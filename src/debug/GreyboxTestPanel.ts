@@ -8,6 +8,7 @@ export class GreyboxTestPanel {
   readonly element: HTMLElement;
 
   private readonly status: HTMLElement;
+  private readonly runtimeStatus: HTMLElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly fallButton: HTMLButtonElement;
 
@@ -32,9 +33,14 @@ export class GreyboxTestPanel {
         <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
         <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
       </div>
+      <p class="eyebrow">Issue #10 runtime diagnostics</p>
+      <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
     `;
 
     const status = this.element.querySelector<HTMLElement>('.probe-status');
+    const runtimeStatus = this.element.querySelector<HTMLElement>(
+      '[data-runtime-status]',
+    );
     const resetButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="reset"]',
     );
@@ -42,41 +48,37 @@ export class GreyboxTestPanel {
       '[data-action="fall"]',
     );
 
-    if (!status || !resetButton || !fallButton) {
+    if (!status || !runtimeStatus || !resetButton || !fallButton) {
       throw new Error('Missing collision test controls.');
     }
 
     this.status = status;
+    this.runtimeStatus = runtimeStatus;
     this.resetButton = resetButton;
     this.fallButton = fallButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
-    window.addEventListener('keydown', this.onKeyDown);
   }
 
   dispose(): void {
     this.resetButton.removeEventListener('click', this.resetProbe);
     this.fallButton.removeEventListener('click', this.testRecovery);
-    window.removeEventListener('keydown', this.onKeyDown);
   }
 
-  private readonly resetProbe = (): void => {
+  readonly resetProbe = (): void => {
     this.options.onReset();
     this.status.textContent = 'Probe reset to the cyan spawn marker.';
   };
 
-  private readonly testRecovery = (): void => {
+  readonly testRecovery = (): void => {
     this.options.onTestRecovery(() => {
       this.status.textContent = 'Recovery volume returned the probe to spawn.';
     });
     this.status.textContent = 'Probe entered the red recovery volume…';
   };
 
-  private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat) return;
-
-    if (event.code === 'KeyR') this.resetProbe();
-    if (event.code === 'KeyF') this.testRecovery();
-  };
+  setRuntimeDiagnostics(text: string): void {
+    this.runtimeStatus.textContent = text;
+  }
 }
