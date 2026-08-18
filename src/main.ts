@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
@@ -7,6 +5,7 @@ import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
 import { CollisionWorld } from './physics/CollisionWorld';
 import { KinematicBody } from './physics/KinematicBody';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
+import { RenderLayer } from './render/RenderLayer';
 import './style.css';
 
 const app = document.querySelector<HTMLElement>('#app');
@@ -15,31 +14,13 @@ if (!app) {
   throw new Error('Missing #app host element.');
 }
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x07110f);
-scene.fog = new THREE.Fog(0x07110f, 20, 38);
-
-const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
-camera.position.set(17, 13, 20);
-camera.lookAt(0, 0.5, 1.5);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.domElement.setAttribute('aria-hidden', 'true');
-
-const ambientLight = new THREE.HemisphereLight(0xc8ffe0, 0x17231f, 2.2);
-scene.add(ambientLight);
-
-const keyLight = new THREE.DirectionalLight(0xffffff, 3.5);
-keyLight.position.set(8, 14, 10);
-scene.add(keyLight);
+const renderLayer = new RenderLayer({ host: app });
 
 const testScene = new GreyboxCollisionScene();
-scene.add(testScene.root);
+renderLayer.scene.add(testScene.root);
 
 const puzzleTestRig = new PuzzleTestRig();
-scene.add(puzzleTestRig.root);
+renderLayer.scene.add(puzzleTestRig.root);
 
 const collisionWorld = new CollisionWorld();
 collisionWorld.registerAll(testScene.collisionMeshes);
@@ -68,12 +49,15 @@ const testPanel = new GreyboxTestPanel({
   },
   onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
   onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
+  onRunResetRegression: () => puzzleTestRig.runResetRegression(),
+  onActivateCheckpoint: () => puzzleTestRig.activateElevatedCheckpoint(),
+  onRecoverCheckpoint: () => puzzleTestRig.recoverTestSlime(),
 });
 
-app.replaceChildren(renderer.domElement, testPanel.element);
+app.replaceChildren(renderLayer.canvas, testPanel.element);
 
 const input = new Input({
-  pointerLockElement: renderer.domElement,
+  pointerLockElement: renderLayer.canvas,
 });
 
 let debugSampleElapsedSeconds = 0;
@@ -96,16 +80,18 @@ const loop = new Loop({
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
-    const previous = body.previousPosition;
-    const current = body.position;
-    renderedProbePosition.set(
-      THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
-    );
-    testScene.setProbePosition(renderedProbePosition);
+  const previous = body.previousPosition;
+  const current = body.position;
 
-    renderer.render(scene, camera);
+  renderedProbePosition.set(
+    THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
+    THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
+    THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
+  );
+
+  testScene.setProbePosition(renderedProbePosition);
+
+  renderLayer.render();
 
     debugSampleElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (debugSampleElapsedSeconds >= 0.25) {
@@ -115,6 +101,7 @@ const loop = new Loop({
       const velocity = body.velocity;
       const groundNormal = body.groundNormal;
 
+      const renderStats = renderLayer.getDiagnostics();
       testPanel.setRuntimeDiagnostics(
         [
           `fixed step: ${(stats.fixedDeltaSeconds * 1000).toFixed(2)} ms`,
@@ -129,39 +116,32 @@ const loop = new Loop({
           `contacts this step: ${body.contactsThisStep}`,
           `last collision: ${body.lastCollisionName}`,
           `registered colliders: ${collisionWorld.colliderCount}`,
+          `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
+          `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
+          `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
+          `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
           `plate / door / platform: ${puzzleTestRig.platePressed ? 'pressed' : 'released'} / ${puzzleTestRig.doorState} / ${puzzleTestRig.platformState}`,
+          `active checkpoint: ${puzzleTestRig.activeCheckpointId}`,
         ].join('\n'),
       );
     }
   },
 });
 
-const resize = (): void => {
-  const width = app.clientWidth;
-  const height = app.clientHeight;
-
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-  renderer.setSize(width, height, false);
-};
-
-renderer.setAnimationLoop((timestampMs) => {
+renderLayer.setAnimationLoop((timestampMs) => {
   loop.tick(timestampMs);
 });
 
-window.addEventListener('resize', resize);
-resize();
+const shutdown = (): void => {
+  loop.dispose();
+  input.dispose();
+  collisionWorld.clear();
+  testPanel.dispose();
+  puzzleTestRig.dispose();
+  testScene.dispose();
+  renderLayer.dispose();
+};
 
 if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    renderer.setAnimationLoop(null);
-    window.removeEventListener('resize', resize);
-    loop.dispose();
-    input.dispose();
-    collisionWorld.clear();
-    testPanel.dispose();
-    puzzleTestRig.dispose();
-    testScene.dispose();
-    renderer.dispose();
-  });
+  import.meta.hot.dispose(shutdown);
 }
