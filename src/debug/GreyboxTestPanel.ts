@@ -33,7 +33,7 @@ export class GreyboxTestPanel {
         <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
         <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
       </div>
-      <p class="eyebrow">Issue #10 runtime diagnostics</p>
+      <p class="eyebrow">Runtime / render diagnostics</p>
       <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
     `;
 
