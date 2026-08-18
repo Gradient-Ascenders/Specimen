@@ -18,11 +18,10 @@ git switch main
 git pull --ff-only
 ```
 
-The repository does not yet define a Node.js version, package manifest, lockfile,
-or production build command. When those files are introduced, use the pinned
-runtime and package manager recorded by the repository. Prefer reproducible
-installs, keep the manifest and lockfile synchronized, and do not replace the
-package manager or lockfile without an approved project decision.
+Use Node.js 24.x and npm 11.x. The repository pins the verified versions in
+`.nvmrc` and the `packageManager` field in `package.json`. Use `npm ci` for
+reproducible installs, keep the manifest and lockfile synchronized, and do not
+replace the package manager or lockfile without an approved project decision.
 
 ## Work from an issue
 
