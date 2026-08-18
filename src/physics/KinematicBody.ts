@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
+import type { EventBus } from '../core/EventBus';
 import { CollisionHit, CollisionWorld } from './CollisionWorld';
+import type { MovementEvents } from './MovementEvents.ts';
 
 const MOVEMENT_EPSILON_SQ = 1e-12;
 const CONTACT_PUSH_METRES = 1e-5;
@@ -10,6 +12,20 @@ export interface ReadonlyVector3State {
   readonly y: number;
   readonly z: number;
 }
+
+export interface JumpInputState {
+  pressed: boolean;
+  held: boolean;
+  released: boolean;
+}
+
+const NO_JUMP_INPUT: Readonly<JumpInputState> = {
+  pressed: false,
+  held: false,
+  released: false,
+};
+
+export type JumpState = 'grounded' | 'coyote' | 'charging' | 'airborne';
 
 export interface KinematicBodyConfig {
   /** Collision sphere radius in metres. */
@@ -34,6 +50,21 @@ export interface KinematicBodyConfig {
   minimumGroundNormalDot: number;
   /** Maximum collision/slide resolutions performed in one fixed update. */
   maxCollisionIterations: number;
+
+  /** Tap-jump launch speed along gameplay-up, in metres per second. */
+  minimumJumpSpeedMetresPerSecond: number;
+  /** Full-charge launch speed along gameplay-up, in metres per second. */
+  maximumJumpSpeedMetresPerSecond: number;
+  /** Time required to reach full jump charge. */
+  maximumJumpChargeSeconds: number;
+  /** Exponent used to shape normalized charge before speed interpolation. */
+  jumpChargeCurveExponent: number;
+  /** Retained jump window after leaving valid ground. */
+  coyoteTimeSeconds: number;
+  /** Brief post-launch interval during which ground probing cannot reattach. */
+  jumpGroundDetachSeconds: number;
+  /** Minimum stable airborne duration required before a landing signal fires. */
+  minimumLandingAirTimeSeconds: number;
 }
 
 export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
@@ -48,26 +79,36 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   groundProbeDistanceMetres: 0.08,
   minimumGroundNormalDot: Math.cos(THREE.MathUtils.degToRad(50)),
   maxCollisionIterations: 3,
+
+  minimumJumpSpeedMetresPerSecond: 4.8,
+  maximumJumpSpeedMetresPerSecond: 8.8,
+  maximumJumpChargeSeconds: 0.7,
+  jumpChargeCurveExponent: 1.35,
+  coyoteTimeSeconds: 0.1,
+  jumpGroundDetachSeconds: 0.05,
+  minimumLandingAirTimeSeconds: 0.04,
 };
 
 export interface KinematicBodyOptions {
   world: CollisionWorld;
   initialPosition: ReadonlyVector3State;
   config?: Partial<KinematicBodyConfig>;
+  events?: EventBus<MovementEvents>;
 }
 
 /**
  * Simple sphere-based kinematic gameplay body.
  *
  * This object owns authoritative movement state. The deformable slime visual
- * and camera may read current/previous position, velocity and gameplay-up, but
- * they do not feed transforms back into the controller.
+ * and camera may read current/previous position, velocity, charge and
+ * gameplay-up, but they do not feed transforms back into the controller.
  */
 export class KinematicBody {
   readonly radiusMetres: number;
 
   private readonly world: CollisionWorld;
   private readonly config: KinematicBodyConfig;
+  private readonly events: EventBus<MovementEvents> | undefined;
 
   private readonly currentPosition = new THREE.Vector3();
   private readonly previousPositionValue = new THREE.Vector3();
@@ -78,6 +119,16 @@ export class KinematicBody {
   private groundedValue = false;
   private attachedValue = false;
 
+  private chargingJumpValue = false;
+  private chargeSecondsValue = 0;
+  private coyoteTimeRemainingSecondsValue = 0;
+  private groundReacquireDelaySeconds = 0;
+  private airborneSeconds = 0;
+  private landedThisStepValue = false;
+  private lastLandingImpactSpeedValue = 0;
+  private lastJumpSpeedValue = 0;
+  private lastJumpChargeFractionValue = 0;
+
   private readonly moveInput = new THREE.Vector3();
   private readonly movementPlaneNormal = new THREE.Vector3();
   private readonly planarVelocity = new THREE.Vector3();
@@ -86,17 +137,17 @@ export class KinematicBody {
   private readonly velocityDelta = new THREE.Vector3();
   private readonly remainingDisplacement = new THREE.Vector3();
   private readonly groundProbeDisplacement = new THREE.Vector3();
+  private readonly gravityStep = new THREE.Vector3();
 
   private readonly movementHit = new CollisionHit();
   private readonly groundHit = new CollisionHit();
-
-  private readonly gravityStep = new THREE.Vector3();
 
   contactsThisStep = 0;
   lastCollisionName = 'none';
 
   constructor(options: KinematicBodyOptions) {
     this.world = options.world;
+    this.events = options.events;
     this.config = {
       ...DEFAULT_KINEMATIC_BODY_CONFIG,
       ...options.config,
@@ -131,19 +182,75 @@ export class KinematicBody {
     return this.groundedValue;
   }
 
-  /** Reserved for the later sticky-surface issue. Always false in #11. */
+  /** Reserved for the later sticky-surface issue. Always false in #12. */
   get attached(): boolean {
     return this.attachedValue;
+  }
+
+  get jumpState(): JumpState {
+    if (this.chargingJumpValue) return 'charging';
+    if (this.groundedValue) return 'grounded';
+    if (this.coyoteTimeRemainingSecondsValue > 0) return 'coyote';
+    return 'airborne';
+  }
+
+  get canJump(): boolean {
+    return !this.chargingJumpValue && this.hasJumpOpportunity();
+  }
+
+  get chargingJump(): boolean {
+    return this.chargingJumpValue;
+  }
+
+  get chargeSeconds(): number {
+    return this.chargeSecondsValue;
+  }
+
+  get chargeFraction(): number {
+    return THREE.MathUtils.clamp(
+      this.chargeSecondsValue / this.config.maximumJumpChargeSeconds,
+      0,
+      1,
+    );
+  }
+
+  get coyoteTimeRemainingSeconds(): number {
+    return this.coyoteTimeRemainingSecondsValue;
+  }
+
+  get landedThisStep(): boolean {
+    return this.landedThisStepValue;
+  }
+
+  get lastLandingImpactSpeedMetresPerSecond(): number {
+    return this.lastLandingImpactSpeedValue;
+  }
+
+  get lastJumpSpeedMetresPerSecond(): number {
+    return this.lastJumpSpeedValue;
+  }
+
+  get lastJumpChargeFraction(): number {
+    return this.lastJumpChargeFractionValue;
+  }
+
+  get maximumJumpChargeSeconds(): number {
+    return this.config.maximumJumpChargeSeconds;
   }
 
   /**
    * Advance one deterministic gameplay step.
    *
-   * `moveX` and `moveZ` are normalized intent axes in [-1, 1]. They currently
-   * use the world X/Z movement basis; the camera can provide a rotated basis in
-   * a later integration without changing the collision solver.
+   * `moveX` and `moveZ` are normalized intent axes in [-1, 1]. `jumpInput`
+   * uses action state captured by Input; a missing value means no jump input,
+   * which keeps development regressions concise.
    */
-  update(deltaSeconds: number, moveX: number, moveZ: number): void {
+  update(
+    deltaSeconds: number,
+    moveX: number,
+    moveZ: number,
+    jumpInput: Readonly<JumpInputState> = NO_JUMP_INPUT,
+  ): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error('KinematicBody deltaSeconds must be positive and finite.');
     }
@@ -151,22 +258,152 @@ export class KinematicBody {
     this.previousPositionValue.copy(this.currentPosition);
     this.contactsThisStep = 0;
     this.lastCollisionName = 'none';
+    this.landedThisStepValue = false;
 
+    const groundedAtStepStart = this.groundedValue;
+
+    if (this.groundReacquireDelaySeconds > 0) {
+      this.groundReacquireDelaySeconds = Math.max(
+        0,
+        this.groundReacquireDelaySeconds - deltaSeconds,
+      );
+    }
+
+    if (groundedAtStepStart) {
+      this.coyoteTimeRemainingSecondsValue = this.config.coyoteTimeSeconds;
+      this.airborneSeconds = 0;
+    } else {
+      this.coyoteTimeRemainingSecondsValue = Math.max(
+        0,
+        this.coyoteTimeRemainingSecondsValue - deltaSeconds,
+      );
+      this.airborneSeconds += deltaSeconds;
+    }
+
+    this.updateJumpState(deltaSeconds, jumpInput);
     this.applyLocomotion(deltaSeconds, moveX, moveZ);
     this.applyGravity(deltaSeconds);
 
+    const downwardSpeedBeforeCollision = Math.max(
+      0,
+      -this.velocityValue.dot(this.gameplayUpValue),
+    );
+
     this.moveAndSlide(deltaSeconds);
     this.refreshGroundState();
+    this.handleLanding(
+      groundedAtStepStart,
+      downwardSpeedBeforeCollision,
+    );
   }
 
   teleport(position: ReadonlyVector3State, preserveVelocity = false): void {
     this.currentPosition.set(position.x, position.y, position.z);
     this.previousPositionValue.copy(this.currentPosition);
+
     if (!preserveVelocity) this.velocityValue.set(0, 0, 0);
+
     this.contactsThisStep = 0;
     this.lastCollisionName = 'none';
     this.attachedValue = false;
+    this.cancelJumpCharge();
+    this.groundReacquireDelaySeconds = 0;
+    this.airborneSeconds = 0;
+    this.landedThisStepValue = false;
+    this.lastLandingImpactSpeedValue = 0;
+    this.lastJumpSpeedValue = 0;
+    this.lastJumpChargeFractionValue = 0;
+
     this.refreshGroundState();
+    this.coyoteTimeRemainingSecondsValue = this.groundedValue
+      ? this.config.coyoteTimeSeconds
+      : 0;
+  }
+
+  private updateJumpState(
+    deltaSeconds: number,
+    jumpInput: Readonly<JumpInputState>,
+  ): void {
+    if (this.chargingJumpValue) {
+      // Focus loss clears Input without synthesizing a release. Treat
+      // "neither held nor released" as cancellation so a stale charge cannot
+      // fire when the browser regains focus.
+      if (!jumpInput.held && !jumpInput.released) {
+        this.cancelJumpCharge();
+        return;
+      }
+
+      if (!this.hasJumpOpportunity()) {
+        this.cancelJumpCharge();
+        return;
+      }
+
+      if (jumpInput.held) {
+        this.chargeSecondsValue = Math.min(
+          this.config.maximumJumpChargeSeconds,
+          this.chargeSecondsValue + deltaSeconds,
+        );
+      }
+
+      if (jumpInput.released) this.launchChargedJump();
+      return;
+    }
+
+    if (!jumpInput.pressed || !this.hasJumpOpportunity()) return;
+
+    this.chargingJumpValue = true;
+    this.chargeSecondsValue = jumpInput.held
+      ? Math.min(deltaSeconds, this.config.maximumJumpChargeSeconds)
+      : 0;
+
+    // A press and release can both occur between two fixed updates. Preserve
+    // that as a valid tap jump instead of dropping the input.
+    if (jumpInput.released) this.launchChargedJump();
+  }
+
+  private launchChargedJump(): void {
+    const normalizedCharge = this.chargeFraction;
+    const curvedCharge = Math.pow(
+      normalizedCharge,
+      this.config.jumpChargeCurveExponent,
+    );
+    const jumpSpeed = THREE.MathUtils.lerp(
+      this.config.minimumJumpSpeedMetresPerSecond,
+      this.config.maximumJumpSpeedMetresPerSecond,
+      curvedCharge,
+    );
+
+    const currentUpSpeed = this.velocityValue.dot(this.gameplayUpValue);
+    if (currentUpSpeed < jumpSpeed) {
+      this.velocityValue.addScaledVector(
+        this.gameplayUpValue,
+        jumpSpeed - currentUpSpeed,
+      );
+    }
+
+    this.lastJumpSpeedValue = jumpSpeed;
+    this.lastJumpChargeFractionValue = normalizedCharge;
+
+    this.chargingJumpValue = false;
+    this.chargeSecondsValue = 0;
+    this.groundedValue = false;
+    this.groundNormalValue.copy(this.gameplayUpValue);
+    this.coyoteTimeRemainingSecondsValue = 0;
+    this.groundReacquireDelaySeconds =
+      this.config.jumpGroundDetachSeconds;
+    this.airborneSeconds = 0;
+  }
+
+  private cancelJumpCharge(): void {
+    this.chargingJumpValue = false;
+    this.chargeSecondsValue = 0;
+  }
+
+  private hasJumpOpportunity(): boolean {
+    return (
+      this.groundedValue ||
+      this.coyoteTimeRemainingSecondsValue > 0
+    );
   }
 
   private applyLocomotion(
@@ -184,9 +421,6 @@ export class KinematicBody {
       this.groundedValue ? this.groundNormalValue : this.gameplayUpValue,
     );
 
-    // Separate movement tangent to the current support plane from velocity
-    // normal to it. On a slope this preserves an uphill/downhill tangent rather
-    // than flattening locomotion back onto world XZ.
     const normalSpeed = this.velocityValue.dot(this.movementPlaneNormal);
     this.normalVelocity
       .copy(this.movementPlaneNormal)
@@ -213,11 +447,13 @@ export class KinematicBody {
           : this.config.airAccelerationMetresPerSecondSquared;
         const maximumVelocityChange = acceleration * deltaSeconds;
         const deltaLength = this.velocityDelta.length();
+
         if (deltaLength > maximumVelocityChange && deltaLength > 0) {
           this.velocityDelta.multiplyScalar(
             maximumVelocityChange / deltaLength,
           );
         }
+
         this.planarVelocity.add(this.velocityDelta);
       }
     } else if (this.groundedValue) {
@@ -236,6 +472,33 @@ export class KinematicBody {
     this.velocityValue
       .copy(this.planarVelocity)
       .add(this.normalVelocity);
+  }
+
+  private applyGravity(deltaSeconds: number): void {
+    this.gravityStep
+      .copy(this.gameplayUpValue)
+      .multiplyScalar(
+        -this.config.gravityMetresPerSecondSquared * deltaSeconds,
+      );
+
+    if (this.groundedValue) {
+      // Walkable ground supports the body against gravity. Retain only the
+      // component into the support normal, preventing passive slope drift.
+      const gravityIntoGround = this.gravityStep.dot(
+        this.groundNormalValue,
+      );
+
+      if (gravityIntoGround < 0) {
+        this.velocityValue.addScaledVector(
+          this.groundNormalValue,
+          gravityIntoGround,
+        );
+      }
+
+      return;
+    }
+
+    this.velocityValue.add(this.gravityStep);
   }
 
   private moveAndSlide(deltaSeconds: number): void {
@@ -274,6 +537,7 @@ export class KinematicBody {
         0,
         1,
       );
+
       if (travelFraction > 0) {
         this.currentPosition.addScaledVector(
           this.remainingDisplacement,
@@ -281,8 +545,6 @@ export class KinematicBody {
         );
       }
 
-      // Tiny outward push avoids numerical re-entry at exact boundaries. The
-      // real gameplay skin is already represented by the enlarged query radius.
       this.currentPosition.addScaledVector(
         this.movementHit.normal,
         CONTACT_PUSH_METRES,
@@ -291,6 +553,7 @@ export class KinematicBody {
       const velocityIntoSurface = this.velocityValue.dot(
         this.movementHit.normal,
       );
+
       if (velocityIntoSurface < 0) {
         this.velocityValue.addScaledVector(
           this.movementHit.normal,
@@ -302,6 +565,7 @@ export class KinematicBody {
       const displacementIntoSurface = this.remainingDisplacement.dot(
         this.movementHit.normal,
       );
+
       if (displacementIntoSurface < 0) {
         this.remainingDisplacement.addScaledVector(
           this.movementHit.normal,
@@ -314,6 +578,8 @@ export class KinematicBody {
   private refreshGroundState(): void {
     this.groundedValue = false;
     this.groundNormalValue.copy(this.gameplayUpValue);
+
+    if (this.groundReacquireDelaySeconds > 0) return;
 
     this.groundProbeDisplacement
       .copy(this.gameplayUpValue)
@@ -334,9 +600,6 @@ export class KinematicBody {
     this.groundedValue = true;
     this.groundNormalValue.copy(this.groundHit.normal);
 
-    // Do not retain velocity that pushes into the support surface. This keeps
-    // the grounded state stable while gravity continues to be applied every
-    // fixed step.
     const velocityIntoGround = this.velocityValue.dot(this.groundNormalValue);
     if (velocityIntoGround < 0) {
       this.velocityValue.addScaledVector(
@@ -346,12 +609,37 @@ export class KinematicBody {
     }
   }
 
+  private handleLanding(
+    groundedAtStepStart: boolean,
+    impactSpeedMetresPerSecond: number,
+  ): void {
+    if (groundedAtStepStart || !this.groundedValue) return;
+
+    const stableLanding =
+      this.airborneSeconds >= this.config.minimumLandingAirTimeSeconds;
+
+    this.airborneSeconds = 0;
+    this.coyoteTimeRemainingSecondsValue = this.config.coyoteTimeSeconds;
+
+    if (!stableLanding) return;
+
+    this.landedThisStepValue = true;
+    this.lastLandingImpactSpeedValue =
+      impactSpeedMetresPerSecond;
+
+    this.events?.emit('landed', {
+      impactSpeedMetresPerSecond,
+    });
+  }
+
   private moveVectorTowardsZero(vector: THREE.Vector3, amount: number): void {
     const length = vector.length();
+
     if (length <= amount || length <= MOVEMENT_EPSILON_SQ) {
       vector.set(0, 0, 0);
       return;
     }
+
     vector.multiplyScalar((length - amount) / length);
   }
 
@@ -374,6 +662,16 @@ export class KinematicBody {
         config.groundBrakingMetresPerSecondSquared,
       ],
       ['groundProbeDistanceMetres', config.groundProbeDistanceMetres],
+      [
+        'minimumJumpSpeedMetresPerSecond',
+        config.minimumJumpSpeedMetresPerSecond,
+      ],
+      [
+        'maximumJumpSpeedMetresPerSecond',
+        config.maximumJumpSpeedMetresPerSecond,
+      ],
+      ['maximumJumpChargeSeconds', config.maximumJumpChargeSeconds],
+      ['jumpChargeCurveExponent', config.jumpChargeCurveExponent],
     ];
 
     for (const [name, value] of positiveFinite) {
@@ -382,9 +680,31 @@ export class KinematicBody {
       }
     }
 
-    if (!Number.isFinite(config.airDragPerSecond) || config.airDragPerSecond < 0) {
-      throw new Error('airDragPerSecond must be a non-negative finite number.');
+    if (
+      config.maximumJumpSpeedMetresPerSecond <
+      config.minimumJumpSpeedMetresPerSecond
+    ) {
+      throw new Error(
+        'maximumJumpSpeedMetresPerSecond must be >= minimumJumpSpeedMetresPerSecond.',
+      );
     }
+
+    const nonNegativeFinite: ReadonlyArray<[string, number]> = [
+      ['airDragPerSecond', config.airDragPerSecond],
+      ['coyoteTimeSeconds', config.coyoteTimeSeconds],
+      ['jumpGroundDetachSeconds', config.jumpGroundDetachSeconds],
+      [
+        'minimumLandingAirTimeSeconds',
+        config.minimumLandingAirTimeSeconds,
+      ],
+    ];
+
+    for (const [name, value] of nonNegativeFinite) {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`${name} must be a non-negative finite number.`);
+      }
+    }
+
     if (
       !Number.isFinite(config.minimumGroundNormalDot) ||
       config.minimumGroundNormalDot < -1 ||
@@ -392,39 +712,12 @@ export class KinematicBody {
     ) {
       throw new Error('minimumGroundNormalDot must be within [-1, 1].');
     }
+
     if (
       !Number.isInteger(config.maxCollisionIterations) ||
       config.maxCollisionIterations <= 0
     ) {
       throw new Error('maxCollisionIterations must be a positive integer.');
     }
-  }
-
-  private applyGravity(deltaSeconds: number): void {
-    this.gravityStep
-      .copy(this.gameplayUpValue)
-      .multiplyScalar(
-        -this.config.gravityMetresPerSecondSquared * deltaSeconds,
-      );
-
-    if (this.groundedValue) {
-      // Walkable ground supports the body against gravity. Keep only the
-      // component pushing into the support surface so gravity cannot introduce
-      // unintended downhill motion after ground braking has run.
-      const gravityIntoGround = this.gravityStep.dot(
-        this.groundNormalValue,
-      );
-
-      if (gravityIntoGround < 0) {
-        this.velocityValue.addScaledVector(
-          this.groundNormalValue,
-          gravityIntoGround,
-        );
-      }
-
-      return;
-    }
-
-    this.velocityValue.add(this.gravityStep);
   }
 }
