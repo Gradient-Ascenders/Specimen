@@ -90,6 +90,8 @@ export class KinematicBody {
   private readonly movementHit = new CollisionHit();
   private readonly groundHit = new CollisionHit();
 
+  private readonly gravityStep = new THREE.Vector3();
+
   contactsThisStep = 0;
   lastCollisionName = 'none';
 
@@ -151,10 +153,7 @@ export class KinematicBody {
     this.lastCollisionName = 'none';
 
     this.applyLocomotion(deltaSeconds, moveX, moveZ);
-    this.velocityValue.addScaledVector(
-      this.gameplayUpValue,
-      -this.config.gravityMetresPerSecondSquared * deltaSeconds,
-    );
+    this.applyGravity(deltaSeconds);
 
     this.moveAndSlide(deltaSeconds);
     this.refreshGroundState();
@@ -399,5 +398,33 @@ export class KinematicBody {
     ) {
       throw new Error('maxCollisionIterations must be a positive integer.');
     }
+  }
+
+  private applyGravity(deltaSeconds: number): void {
+    this.gravityStep
+      .copy(this.gameplayUpValue)
+      .multiplyScalar(
+        -this.config.gravityMetresPerSecondSquared * deltaSeconds,
+      );
+
+    if (this.groundedValue) {
+      // Walkable ground supports the body against gravity. Keep only the
+      // component pushing into the support surface so gravity cannot introduce
+      // unintended downhill motion after ground braking has run.
+      const gravityIntoGround = this.gravityStep.dot(
+        this.groundNormalValue,
+      );
+
+      if (gravityIntoGround < 0) {
+        this.velocityValue.addScaledVector(
+          this.groundNormalValue,
+          gravityIntoGround,
+        );
+      }
+
+      return;
+    }
+
+    this.velocityValue.add(this.gravityStep);
   }
 }

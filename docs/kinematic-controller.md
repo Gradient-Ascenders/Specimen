@@ -46,7 +46,9 @@ Each deterministic gameplay step performs:
 2. Convert named movement actions into a normalized X/Z movement intent.
 3. Accelerate the tangent velocity toward the intended speed, or brake when no ground input is held.
 4. Apply air drag when airborne.
-5. Apply gravity.
+5. Apply full gravity while airborne. While grounded on walkable geometry,
+   retain only gravity's component into the support normal so gravity maintains
+   contact without introducing passive downhill sliding.
 6. Sweep the sphere along `velocity * fixedDelta`.
 7. Move to the earliest contact and remove the component of velocity/displacement pointing into the hit normal.
 8. Repeat collision/slide resolution up to three times for corners and multiple contacts.

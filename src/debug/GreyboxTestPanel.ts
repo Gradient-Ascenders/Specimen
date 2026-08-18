@@ -6,6 +6,7 @@ interface GreyboxTestPanelOptions {
   onRunResetRegression: () => void;
   onActivateCheckpoint: () => void;
   onRecoverCheckpoint: () => void;
+  onRunSlopeIdleRegression: () => string;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -22,6 +23,7 @@ export class GreyboxTestPanel {
   private readonly resetRegressionButton: HTMLButtonElement;
   private readonly checkpointButton: HTMLButtonElement;
   private readonly checkpointRecoveryButton: HTMLButtonElement;
+  private readonly slopeRegressionButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -60,6 +62,7 @@ export class GreyboxTestPanel {
         <div class="controls">
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
+          <button type="button" data-action="slope-regression">Run idle slope check</button>
           <button type="button" data-action="puzzle">Toggle plate test</button>
           <button type="button" data-action="sensor-regression">Run sensor checks</button>
           <button type="button" data-action="reset-regression">Run 10 reset cycles</button>
@@ -71,7 +74,7 @@ export class GreyboxTestPanel {
         <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
       </div>
     `;
-  
+
     const status = this.element.querySelector<HTMLElement>('.probe-status');
     const runtimeStatus = this.element.querySelector<HTMLElement>(
       '[data-runtime-status]',
@@ -97,8 +100,12 @@ export class GreyboxTestPanel {
     const checkpointButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="checkpoint"]',
     );
-    const checkpointRecoveryButton = this.element.querySelector<HTMLButtonElement>(
-      '[data-action="checkpoint-recovery"]',
+    const checkpointRecoveryButton =
+      this.element.querySelector<HTMLButtonElement>(
+        '[data-action="checkpoint-recovery"]',
+      );
+    const slopeRegressionButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="slope-regression"]',
     );
 
     if (
@@ -111,7 +118,8 @@ export class GreyboxTestPanel {
       !collapseButton ||
       !resetRegressionButton ||
       !checkpointButton ||
-      !checkpointRecoveryButton
+      !checkpointRecoveryButton ||
+      !slopeRegressionButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -126,6 +134,7 @@ export class GreyboxTestPanel {
     this.resetRegressionButton = resetRegressionButton;
     this.checkpointButton = checkpointButton;
     this.checkpointRecoveryButton = checkpointRecoveryButton;
+    this.slopeRegressionButton = slopeRegressionButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
@@ -135,10 +144,19 @@ export class GreyboxTestPanel {
       this.runSensorRegression,
     );
     this.collapseButton.addEventListener('click', this.toggleCollapsed);
-    this.sensorRegressionButton.addEventListener('click', this.runSensorRegression);
-    this.resetRegressionButton.addEventListener('click', this.runResetRegression);
+    this.resetRegressionButton.addEventListener(
+      'click',
+      this.runResetRegression,
+    );
     this.checkpointButton.addEventListener('click', this.activateCheckpoint);
-    this.checkpointRecoveryButton.addEventListener('click', this.recoverCheckpoint);
+    this.checkpointRecoveryButton.addEventListener(
+      'click',
+      this.recoverCheckpoint,
+    );
+    this.slopeRegressionButton.addEventListener(
+      'click',
+      this.runSlopeIdleRegression,
+    );
   }
 
   dispose(): void {
@@ -150,11 +168,18 @@ export class GreyboxTestPanel {
       this.runSensorRegression,
     );
     this.collapseButton.removeEventListener('click', this.toggleCollapsed);
-    this.resetRegressionButton.removeEventListener('click', this.runResetRegression);
+    this.resetRegressionButton.removeEventListener(
+      'click',
+      this.runResetRegression,
+    );
     this.checkpointButton.removeEventListener('click', this.activateCheckpoint);
     this.checkpointRecoveryButton.removeEventListener(
       'click',
       this.recoverCheckpoint,
+    );
+    this.slopeRegressionButton.removeEventListener(
+      'click',
+      this.runSlopeIdleRegression,
     );
   }
 
@@ -198,17 +223,24 @@ export class GreyboxTestPanel {
 
   private readonly runResetRegression = (): void => {
     this.options.onRunResetRegression();
-    this.status.textContent = 'Reset checks passed: 10 active/returning puzzle cycles restored the authored state.';
+    this.status.textContent =
+      'Reset checks passed: 10 active/returning puzzle cycles restored the authored state.';
   };
 
   private readonly activateCheckpoint = (): void => {
     this.options.onActivateCheckpoint();
-    this.status.textContent = 'Elevated checkpoint activated. Recovery will use its verified clear spawn.';
+    this.status.textContent =
+      'Elevated checkpoint activated. Recovery will use its verified clear spawn.';
   };
 
   private readonly recoverCheckpoint = (): void => {
     this.options.onRecoverCheckpoint();
     this.status.textContent = 'Test slime recovered at the active checkpoint.';
+  };
+
+  private readonly runSlopeIdleRegression = (): void => {
+    const result = this.options.onRunSlopeIdleRegression();
+    this.status.textContent = `Idle slope regression: ${result}`;
   };
 
   setRuntimeDiagnostics(text: string): void {
