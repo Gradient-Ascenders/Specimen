@@ -27,8 +27,11 @@ renderer and render-layer listeners.
 | Shadows | Disabled | Sprint 0 evaluates direct surface response without the cost or bias settings of a provisional shadow system. Shadow configuration remains deferred to level-lighting work. |
 
 Colour textures added later must declare their intended colour space. Custom
-slime shaders should treat lighting calculations as linear values and allow the
-renderer to perform the tone and sRGB output transforms; they must not bake an
+slime shaders should treat lighting calculations as linear values, assign that
+linear colour to the fragment output, then include
+`#include <tonemapping_fragment>` and `#include <colorspace_fragment>` in that
+order. This makes `ShaderMaterial` shaders participate in the configured
+`NeutralToneMapping` and sRGB output transforms; they must not bake an
 additional display transform into their output.
 
 ## Pixel and resize policy
