@@ -1,6 +1,8 @@
 interface GreyboxTestPanelOptions {
   onReset: () => void;
   onTestRecovery: (onRecovered: () => void) => void;
+  onTogglePuzzleTest: () => boolean;
+  onRunSensorRegression: () => void;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -11,6 +13,8 @@ export class GreyboxTestPanel {
   private readonly runtimeStatus: HTMLElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly fallButton: HTMLButtonElement;
+  private readonly puzzleButton: HTMLButtonElement;
+  private readonly sensorRegressionButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -32,6 +36,8 @@ export class GreyboxTestPanel {
       <div class="controls">
         <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
         <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
+        <button type="button" data-action="puzzle">Toggle plate test</button>
+        <button type="button" data-action="sensor-regression">Run sensor checks</button>
       </div>
       <p class="eyebrow">Runtime / render diagnostics</p>
       <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
@@ -47,8 +53,21 @@ export class GreyboxTestPanel {
     const fallButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="fall"]',
     );
+    const puzzleButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="puzzle"]',
+    );
+    const sensorRegressionButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="sensor-regression"]',
+    );
 
-    if (!status || !runtimeStatus || !resetButton || !fallButton) {
+    if (
+      !status ||
+      !runtimeStatus ||
+      !resetButton ||
+      !fallButton ||
+      !puzzleButton ||
+      !sensorRegressionButton
+    ) {
       throw new Error('Missing collision test controls.');
     }
 
@@ -56,14 +75,23 @@ export class GreyboxTestPanel {
     this.runtimeStatus = runtimeStatus;
     this.resetButton = resetButton;
     this.fallButton = fallButton;
+    this.puzzleButton = puzzleButton;
+    this.sensorRegressionButton = sensorRegressionButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
+    this.puzzleButton.addEventListener('click', this.togglePuzzleTest);
+    this.sensorRegressionButton.addEventListener('click', this.runSensorRegression);
   }
 
   dispose(): void {
     this.resetButton.removeEventListener('click', this.resetProbe);
     this.fallButton.removeEventListener('click', this.testRecovery);
+    this.puzzleButton.removeEventListener('click', this.togglePuzzleTest);
+    this.sensorRegressionButton.removeEventListener(
+      'click',
+      this.runSensorRegression,
+    );
   }
 
   readonly resetProbe = (): void => {
@@ -76,6 +104,18 @@ export class GreyboxTestPanel {
       this.status.textContent = 'Recovery volume returned the probe to spawn.';
     });
     this.status.textContent = 'Probe entered the red recovery volume…';
+  };
+
+  private readonly togglePuzzleTest = (): void => {
+    const occupied = this.options.onTogglePuzzleTest();
+    this.status.textContent = occupied
+      ? 'Test slime is on the pressure plate: door and platform are active.'
+      : 'Test slime left the pressure plate: door and platform are returning.';
+  };
+
+  private readonly runSensorRegression = (): void => {
+    this.options.onRunSensorRegression();
+    this.status.textContent = 'Sensor checks passed: duplicate, multiple, and exit occupancy are stable.';
   };
 
   setRuntimeDiagnostics(text: string): void {

@@ -2,6 +2,7 @@ import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
 import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
+import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { RenderLayer } from './render/RenderLayer';
 import './style.css';
 
@@ -16,9 +17,17 @@ const renderLayer = new RenderLayer({ host: app });
 const testScene = new GreyboxCollisionScene();
 renderLayer.scene.add(testScene.root);
 
+const puzzleTestRig = new PuzzleTestRig();
+renderLayer.scene.add(puzzleTestRig.root);
+
 const testPanel = new GreyboxTestPanel({
-  onReset: () => testScene.resetProbe(),
+  onReset: () => {
+    testScene.resetProbe();
+    puzzleTestRig.reset();
+  },
   onTestRecovery: (onRecovered) => testScene.simulateFall(onRecovered),
+  onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
+  onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
 });
 
 app.replaceChildren(renderLayer.canvas, testPanel.element);
@@ -35,6 +44,7 @@ const loop = new Loop({
     if (input.wasPressed('debugTestRecovery')) testPanel.testRecovery();
 
     testScene.update(deltaSeconds);
+    puzzleTestRig.update(deltaSeconds);
     input.endFixedUpdate();
   },
   render: (_interpolationAlpha, stats) => {
@@ -59,6 +69,7 @@ const loop = new Loop({
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
           `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
+          `plate / door / platform: ${puzzleTestRig.platePressed ? 'pressed' : 'released'} / ${puzzleTestRig.doorState} / ${puzzleTestRig.platformState}`,
         ].join('\n'),
       );
     }
@@ -73,6 +84,7 @@ const shutdown = (): void => {
   loop.dispose();
   input.dispose();
   testPanel.dispose();
+  puzzleTestRig.dispose();
   testScene.dispose();
   renderLayer.dispose();
 };
