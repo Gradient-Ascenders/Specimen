@@ -9,8 +9,9 @@ Moodle takes precedence.
 The brief was supplied for the Issue #6 verification task and reviewed on
 19 August 2026. A copy is not checked into this repository, so a teammate must
 cross-check this interpretation against the shared brief and record that review
-on the pull request. No Moodle screenshot/link or written mentor confirmation
-was available during this audit.
+on the pull request. The project team directly confirmed on 19 August 2026 that
+Beta is due on 1 September 2026. No exact cutoff time, venue, Moodle link, Moodle
+screenshot, or written mentor confirmation is currently provided.
 
 ## Confirmed by the CGV project brief
 
@@ -29,28 +30,29 @@ was available during this audit.
 | What hosting constraints apply? | Confirmed | Deployment must work from a subdirectory; root-absolute asset paths beginning with `/` are unsafe. Linux filenames are case-sensitive. | Supplied CGV project brief; repository `vite.config.ts` uses `base: './'` | Contributors: preserve relative paths and exact filename casing. |
 | How should the team use its mentor? | Confirmed | Approach the assigned mentor during lab sessions with questions and request advice. | Supplied CGV project brief, reviewed 19 August 2026 | Issue #6 owner: take the mentor questions below to a lab session and record written answers/date. |
 
-## Current-year questions still open
+## Current-year information status
 
 Planning dates or workflows in this table are not requirements. Confirm them on
 Moodle; Moodle dates and current-year instructions override this plan.
 
 | Requirement/question | Status | Confirmed answer | Source/evidence | Owner / next action |
 | --- | --- | --- | --- | --- |
-| What is the exact Beta date, time, and venue shown on Moodle? | Needs Moodle confirmation | Unresolved. `~31 August 2026` is a tentative planning assumption only. | Issue #6 mentions the tentative date; no Moodle evidence is recorded. | Issue #6 owner: attach or link the current Moodle notice and record its access date. |
-| What is the exact Moodle submission deadline? | Needs Moodle confirmation | Unresolved. | The general brief delegates year-specific dates to Moodle; no Moodle evidence is recorded. | Issue #6 owner: capture the deadline and timezone from Moodle. |
-| What is the exact Moodle submission link? | Needs Moodle confirmation | Unresolved. | The general brief delegates submission links to Moodle; no Moodle evidence is recorded. | Issue #6 owner: record the current-year Moodle activity/link without copying credentials. |
-| What is the current-year archive naming convention? | Needs Moodle confirmation | Unresolved. `specimen-production.zip` is the repository's local artifact name, not a confirmed submission filename. | Repository archive script; no Moodle naming instruction is recorded. | Issue #6 owner: copy the exact Moodle filename rule into this table. Release owner: rename only when confirmed. |
-| Must an additional hosted URL/link specifically be submitted at Beta? | Needs Moodle confirmation | Unresolved. The brief confirms LAMP deployment for Final, not a Beta hosted-link requirement. | Supplied CGV project brief; no Moodle evidence is recorded. | Issue #6 owner: ask where, if anywhere, a Beta hosted URL must be submitted. |
-| Where exactly is the YouTube trailer link submitted, and are there current-year encode, visibility, or metadata rules? | Needs Moodle confirmation | Unresolved beyond the confirmed YouTube destination and 2-minute maximum. | Supplied CGV project brief; no current-year Moodle evidence is recorded. | Issue #6 owner: capture the complete current-year trailer submission instructions from Moodle. |
-| Is there a prescribed Beta demonstration duration? | Needs Moodle confirmation | Unresolved. | The brief describes the demonstration but gives no duration in the supplied evidence. | Issue #6 owner: check Moodle and record the exact duration or an explicit statement that none is prescribed. |
-| Is there a required demonstration order or content beyond showing the project and answering questions? | Needs Moodle confirmation | Unresolved. | The brief confirms only the general demonstration and questions described above. | Issue #6 owner: check the current-year Moodle demonstration instructions. |
-| Has the team's mentor allocation or any special mentor instruction been confirmed? | Needs mentor confirmation | Unresolved. | The brief delegates mentor allocation to Moodle and only gives the general lab-session advice above. | Issue #6 owner: confirm the assigned mentor on Moodle, ask during a lab, and record the answer and date. |
-| Does the mentor expect additional evidence, screenshots, or video beyond the normal demonstration? | Needs mentor confirmation | Unresolved. | No such requirement appears in the supplied brief or Issue #6. | Issue #6 owner: ask the assigned mentor and record a written answer/date; do not create an evidence requirement by assumption. |
+| What is the Beta due date? | Confirmed | Beta is due on 1 September 2026. | Direct project-team confirmation, recorded 19 August 2026 | Team: plan delivery against 1 September 2026. Replace this evidence note with the Moodle notice if it is later published. |
+| What are the exact Beta cutoff time and venue? | Not currently provided | Cannot be determined from the information currently available. | No current-year Moodle instruction is provided. | Team: follow any later Moodle instruction; until then, do not invent a time or venue. |
+| What is the exact Moodle submission link? | Not currently provided | Cannot be determined from the information currently available. | The general brief delegates submission links to Moodle; no current-year link is provided. | Team: record the Moodle activity/link if it is later published, without copying credentials. |
+| What is the current-year archive naming convention? | Not currently provided | Cannot be determined. `specimen-production.zip` is the repository's local artifact name, not a confirmed submission filename. | Repository archive script; no current-year Moodle naming instruction is provided. | Release owner: retain the local name unless a later Moodle instruction requires another name. |
+| Must an additional hosted URL/link specifically be submitted at Beta? | Not currently provided | Cannot be determined. The brief confirms LAMP deployment for Final, not a Beta hosted-link requirement. | Supplied CGV project brief; no current-year Moodle instruction is provided. | Team: do not treat a Beta hosted URL as required unless later instructions say so. |
+| Where exactly is the YouTube trailer link submitted, and are there current-year encode, visibility, or metadata rules? | Not currently provided | Cannot be determined beyond the confirmed YouTube destination and 2-minute maximum. | Supplied CGV project brief; no current-year Moodle instruction is provided. | Team: follow any later trailer-submission instruction without inventing extra requirements. |
+| Is there a prescribed Beta demonstration duration? | Not currently provided | Cannot be determined from the information currently available. | The brief describes the demonstration but gives no duration in the supplied evidence. | Team: do not claim a prescribed duration unless later instructions provide one. |
+| Is there a required demonstration order or content beyond showing the project and answering questions? | Not currently provided | Cannot be determined from the information currently available. | The brief confirms only the general demonstration and questions described above. | Team: prepare from the confirmed brief and follow any later Moodle instruction. |
+| Has the team's mentor allocation or any special mentor instruction been confirmed? | Not currently provided | Cannot be determined from the information currently available. | The brief delegates mentor allocation to Moodle and only gives the general lab-session advice above. | Team: use the confirmed general mentor guidance and record any later allocation or instruction. |
+| Does the mentor expect additional evidence, screenshots, or video beyond the normal demonstration? | Not currently provided | Cannot be determined from the information currently available. | No such requirement appears in the supplied brief or Issue #6. | Team: do not invent an additional evidence requirement; record it only if later provided. |
 
 ## Source conflicts and downstream use
 
-- Issue #6 asks the team to resolve the tentative 31 August date, but supplies no
-  Moodle evidence. The date therefore remains tentative.
+- Issue #6 records 31 August as tentative planning information. The project
+  team's later direct confirmation sets the Beta due date to 1 September 2026,
+  superseding that assumption.
 - The previous production guide said Issue #6 contained no confirmed publish
   answers. The supplied brief does confirm Final LAMP deployment through a Moodle
   archive upload, while the exact current-year Moodle link, deadline, filename,
@@ -68,20 +70,21 @@ Moodle; Moodle dates and current-year instructions override this plan.
 | Each open brief question has an answer, owner, or escalation path | PASS | Every known confirmed and unresolved item is assigned above. |
 | Conflicts between sources are recorded | PASS | The tentative date, prior deployment-guide wording, and downstream hosted-URL assumption are recorded above. |
 | Release and trailer issues can use confirmed requirements | PASS | Confirmed trailer, build, archive, host, and browser constraints are separated from current-year questions. |
-| Capture links/screenshots or written mentor confirmation | BLOCKED — needs Moodle confirmation / mentor confirmation | No Moodle evidence or mentor response was available. Attach/link it when obtained. |
-| Have another member verify the interpretation | BLOCKED — needs teammate review | A non-author must cross-check the shared brief and review the pull request. |
-| Update the project plan with confirmed dates and deliverables | BLOCKED — needs Moodle confirmation | No project-plan file exists and no exact date is confirmed. This focused requirements record documents the confirmed deliverables and tentative date without inventing a calendar fact. |
+| Capture links/screenshots or written mentor confirmation | NOT CURRENTLY AVAILABLE — accepted for issue closure | No Moodle link/screenshot or mentor response is currently provided. This absence is explicit rather than replaced with an assumption. |
+| Have another member verify the interpretation | Pending pull-request review | PR review remains required before merge, independently of Issue #6 closure. |
+| Update the project plan with confirmed dates and deliverables | PASS | No project-plan file exists, so this focused requirements record now documents the confirmed 1 September 2026 due date and deliverables. |
 | Record remaining ambiguity without silently inventing dates | PASS | The unresolved table states each exact question and next action. |
-| Acceptance criteria are satisfied | BLOCKED — needs Moodle confirmation / mentor confirmation / teammate review | The evidence and independent-review criteria above remain open. |
+| Acceptance criteria are satisfied | ACCEPTED FOR CLOSURE BY TEAM | The due date is confirmed, and every detail that cannot currently be determined is explicitly recorded as unavailable. |
 | Production build succeeds | PASS | `npm run build` passed on 19 August 2026. Vite repeated the existing warning that the JavaScript chunk exceeds 500 kB. |
 | No new unexplained console errors or asset 404s are introduced | PASS — documentation scope | No runtime, asset, or deployment-output file changed. Published-host checks remain part of the later release workflow. |
-| Relevant manual verification is complete | BLOCKED — needs teammate review | A second team member still needs to compare this record with the shared brief. |
+| Relevant manual verification is complete | Pending pull-request review | A second team member still needs to compare this record with the shared brief before merge. |
 | Required screenshots/video/evidence are attached for visual work | PASS — not applicable | This change has no visual or runtime effect. Moodle/mentor evidence remains separately blocked above. |
 | Resource disposal/performance implications have been considered | PASS — documentation scope | No runtime resources or performance paths changed. |
 | Third-party assets/code/resources are recorded in the credits ledger | PASS — not applicable | No third-party asset, code, or resource was introduced. |
-| Another team member reviews the pull request | BLOCKED — needs teammate review | Required after the pull request is opened. |
-| Issue is linked from the pull request | Pending PR | Use `Refs #6` while Moodle, mentor, and teammate verification remain open. |
+| Another team member reviews the pull request | Pending pull-request review | Required before merge. |
+| Issue is linked from the pull request | PASS | PR #61 uses `Refs #6`. |
 | Follow-up defects or deferred scope are recorded | PASS | Remaining requirements work is explicitly listed above rather than added to implementation scope. |
 
-Issue #6 cannot be closed until the blocked evidence and teammate-review items
-are completed and the exact current-year requirements are recorded.
+The project team accepted the explicitly unavailable current-year details and
+authorised Issue #6 for closure on 19 August 2026. Pull-request review remains a
+separate prerequisite for merging this documentation.
