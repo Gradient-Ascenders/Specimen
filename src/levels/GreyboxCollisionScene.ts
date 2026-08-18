@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { SlimeMaterial } from '../render/slime/SlimeMaterial';
+
 type CollisionCase =
   | 'floor'
   | 'wall'
@@ -32,7 +34,7 @@ export class GreyboxCollisionScene {
   readonly root = new THREE.Group();
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
-  private readonly probe: THREE.Mesh;
+  private readonly probe: THREE.Mesh<THREE.SphereGeometry, SlimeMaterial>;
   private recoveryDelay = 0;
   private recoveryCallback: (() => void) | undefined;
 
@@ -138,12 +140,7 @@ export class GreyboxCollisionScene {
     this.addRecoveryMarker();
 
     const probeGeometry = new THREE.SphereGeometry(0.45, 24, 16);
-    const probeMaterial = new THREE.MeshStandardMaterial({
-      color: 0xb9fff4,
-      emissive: 0x187f76,
-      emissiveIntensity: 0.8,
-      roughness: 0.25,
-    });
+    const probeMaterial = new SlimeMaterial();
     this.probe = new THREE.Mesh(probeGeometry, probeMaterial);
     this.probe.name = 'player-collision-probe-radius-0.45m';
     this.probe.userData.radiusMetres = 0.45;
@@ -170,6 +167,7 @@ export class GreyboxCollisionScene {
 
   update(deltaSeconds: number): void {
     this.probe.rotation.y += deltaSeconds * 0.8;
+    this.probe.material.update(deltaSeconds);
 
     if (this.recoveryDelay <= 0) return;
 
