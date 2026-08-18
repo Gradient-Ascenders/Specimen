@@ -14,7 +14,7 @@ metre-based dimensions in `userData.sizeMetres`.
 | Grey | Floor | 8 m × 10 m baseline for ground contact |
 | Blue | Default wall | 3 m high vertical contact that must not permit adhesion |
 | Teal | Sticky wall | 3 m high vertical contact eligible for adhesion |
-| Orange | Ledge | 1 m high step and corner-resolution case |
+| Orange | Ledge | 1 m high step and corner-resolution case; 1 m clear of the slope |
 | Yellow | Slope | 15° incline for grounding and slide tests |
 | Pink | Gap | 2 m separation between two floor sections |
 | Green | Platform | 1.5 m-high isolated platform contact |
