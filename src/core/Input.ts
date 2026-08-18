@@ -108,10 +108,6 @@ export class Input {
     return this.releasedActions.has(action);
   }
 
-  /**
-   * Clear one-shot input after a deterministic gameplay step has consumed it.
-   * Held actions remain active until their matching release or focus loss.
-   */
   endFixedUpdate(): void {
     this.pressedActions.clear();
     this.releasedActions.clear();
@@ -129,7 +125,6 @@ export class Input {
       void Promise.resolve(request).catch(() => undefined);
     } catch {
       // Browsers can reject pointer lock when no valid user activation exists.
-      // The next click on the gameplay canvas will try again.
     }
   }
 
@@ -140,8 +135,7 @@ export class Input {
       const exit = this.hostDocument.exitPointerLock() as void | Promise<void>;
       void Promise.resolve(exit).catch(() => undefined);
     } catch {
-      // Pointer lock may already have been released by the browser (for
-      // example via Escape). Treat that as the desired final state.
+      // Pointer lock may already have been released by the browser.
     }
   }
 
@@ -208,8 +202,10 @@ export class Input {
   private deactivate(actions: readonly InputAction[]): void {
     for (const action of actions) {
       const previousCount = this.holdCounts.get(action) ?? 0;
+
       if (previousCount <= 1) {
         this.holdCounts.delete(action);
+
         if (this.heldActions.delete(action)) {
           this.releasedActions.add(action);
         }
@@ -232,7 +228,14 @@ export class Input {
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const actions = this.keyBindings.get(event.code);
-    if (!actions || this.activeKeys.has(event.code)) return;
+    if (!actions) return;
+
+    // Mapped game controls belong to the game, not browser UI. In particular,
+    // this prevents Space from activating whichever debug button last held
+    // focus while the player is trying to charge a jump.
+    event.preventDefault();
+
+    if (this.activeKeys.has(event.code)) return;
 
     this.activeKeys.add(event.code);
     this.activate(actions);
@@ -240,7 +243,11 @@ export class Input {
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     const actions = this.keyBindings.get(event.code);
-    if (!actions || !this.activeKeys.delete(event.code)) return;
+    if (!actions) return;
+
+    event.preventDefault();
+
+    if (!this.activeKeys.delete(event.code)) return;
 
     this.deactivate(actions);
   };
