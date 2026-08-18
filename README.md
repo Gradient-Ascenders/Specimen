@@ -42,6 +42,18 @@ Vite is configured with a relative base, so the contents of `dist/` can be serve
 from a domain root, a nested route, or an extracted archive directory without
 rewriting asset URLs.
 
+Create and validate the assessment-ready ZIP archive with:
+
+```bash
+npm run archive
+```
+
+The generated `artifacts/specimen-production.zip` contains the contents of
+`dist/` at its root and is intentionally ignored by Git. See
+[`docs/production-deployment.md`](docs/production-deployment.md) for archive
+inspection, external nested-path testing, publication, verification, and retry
+steps.
+
 ## Continuous integration
 
 The `PR validation` workflow checks pull requests targeting `main` before merge,
