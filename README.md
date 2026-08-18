@@ -54,6 +54,13 @@ The generated `artifacts/specimen-production.zip` contains the contents of
 inspection, external nested-path testing, publication, verification, and retry
 steps.
 
+Assessment planning must distinguish the supplied CGV brief from current-year
+Moodle and mentor instructions. See
+[`docs/beta-requirements.md`](docs/beta-requirements.md) for confirmed
+Beta/trailer/deployment requirements, unresolved questions, owners, and the
+Issue #6 acceptance assessment. Moodle dates and current-year instructions take
+precedence over tentative planning information.
+
 ## Continuous integration
 
 The `PR validation` workflow checks pull requests targeting `main` before merge,
