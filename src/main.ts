@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { Input } from './core/Input';
+import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
 import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
 import './style.css';
@@ -40,6 +42,43 @@ const testPanel = new GreyboxTestPanel({
 
 app.replaceChildren(renderer.domElement, testPanel.element);
 
+const input = new Input({
+  pointerLockElement: renderer.domElement,
+});
+
+let debugSampleElapsedSeconds = 0;
+
+const loop = new Loop({
+  fixedUpdate: (deltaSeconds) => {
+    if (input.wasPressed('debugReset')) testPanel.resetProbe();
+    if (input.wasPressed('debugTestRecovery')) testPanel.testRecovery();
+
+    testScene.update(deltaSeconds);
+    input.endFixedUpdate();
+  },
+  render: (_interpolationAlpha, stats) => {
+    renderer.render(scene, camera);
+
+    debugSampleElapsedSeconds += stats.rawFrameDeltaSeconds;
+    if (debugSampleElapsedSeconds >= 0.25) {
+      debugSampleElapsedSeconds = 0;
+      const heldActions = Array.from(input.held).join(', ') || 'none';
+      testPanel.setRuntimeDiagnostics(
+        [
+          `fixed step: ${(stats.fixedDeltaSeconds * 1000).toFixed(2)} ms`,
+          `render FPS: ${stats.renderFps.toFixed(1)}`,
+          `raw delta: ${(stats.rawFrameDeltaSeconds * 1000).toFixed(2)} ms`,
+          `clamped delta: ${(stats.frameDeltaSeconds * 1000).toFixed(2)} ms`,
+          `steps this frame: ${stats.stepsThisFrame}`,
+          `dropped sim time: ${(stats.droppedSimulationTimeSeconds * 1000).toFixed(2)} ms`,
+          `pointer lock: ${input.pointerLocked ? 'locked' : 'unlocked'}`,
+          `held actions: ${heldActions}`,
+        ].join('\n'),
+      );
+    }
+  },
+});
+
 const resize = (): void => {
   const width = app.clientWidth;
   const height = app.clientHeight;
@@ -49,13 +88,8 @@ const resize = (): void => {
   renderer.setSize(width, height, false);
 };
 
-const timer = new THREE.Timer();
-timer.connect(document);
-
-renderer.setAnimationLoop(() => {
-  timer.update();
-  testScene.update(timer.getDelta());
-  renderer.render(scene, camera);
+renderer.setAnimationLoop((timestampMs) => {
+  loop.tick(timestampMs);
 });
 
 window.addEventListener('resize', resize);
@@ -65,7 +99,8 @@ if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     renderer.setAnimationLoop(null);
     window.removeEventListener('resize', resize);
-    timer.dispose();
+    loop.dispose();
+    input.dispose();
     testPanel.dispose();
     testScene.dispose();
     renderer.dispose();
