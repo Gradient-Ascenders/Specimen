@@ -11,8 +11,10 @@ continues to drive the mesh transform through render interpolation.
 advances its time uniform from the existing fixed-step `update(deltaSeconds)`
 call, and disposes it through the scene's established mesh traversal. Uniform
 objects, colours, and vectors are constructed once; the per-step path writes
-only the existing `uTime.value` number. Shader time wraps every 4,096 seconds
-to retain floating-point phase precision during long sessions.
+only the existing `uTime.value` number. Shader time wraps after the common
+phase period (about 292.24 seconds): the primary wave completes 100 cycles
+while the `0.79`-speed wave completes 79. This retains floating-point phase
+precision without discontinuity in deformation or its normal correction.
 
 The current sphere geometry has 24 width and 16 height segments and includes
 smooth vertex normals. The shader assumes the visual mesh uses rigid or uniform

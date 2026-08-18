@@ -12,7 +12,11 @@ export const DEFAULT_SLIME_SHININESS = 72;
 export const DEFAULT_SLIME_RIM_STRENGTH = 0.72;
 export const DEFAULT_SLIME_RIM_POWER = 2.35;
 
-const MAX_SHADER_TIME_SECONDS = 4096;
+// The secondary wave runs at 0.79 = 79/100 of the primary speed. After the
+// primary completes 100 cycles, the secondary has completed exactly 79, so
+// both deformation and its derivative are phase-continuous at this wrap.
+const WOBBLE_COMMON_PERIOD_SECONDS =
+  (Math.PI * 2 * 100) / DEFAULT_SLIME_WOBBLE_SPEED;
 
 const KEY_LIGHT_DIRECTION = new THREE.Vector3(8, 13.5, 8.5).normalize();
 
@@ -95,7 +99,8 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
   /** Advance visual time without allocating or touching gameplay state. */
   update(deltaSeconds: number): void {
     this.elapsedTimeSeconds =
-      (this.elapsedTimeSeconds + deltaSeconds) % MAX_SHADER_TIME_SECONDS;
+      (this.elapsedTimeSeconds + deltaSeconds) %
+      WOBBLE_COMMON_PERIOD_SECONDS;
     this.slimeUniforms.uTime.value = this.elapsedTimeSeconds;
   }
 
