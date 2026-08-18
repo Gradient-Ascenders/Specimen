@@ -4,6 +4,7 @@ import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
 import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
+import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import './style.css';
 
 const app = document.querySelector<HTMLElement>('#app');
@@ -35,9 +36,17 @@ scene.add(keyLight);
 const testScene = new GreyboxCollisionScene();
 scene.add(testScene.root);
 
+const puzzleTestRig = new PuzzleTestRig();
+scene.add(puzzleTestRig.root);
+
 const testPanel = new GreyboxTestPanel({
-  onReset: () => testScene.resetProbe(),
+  onReset: () => {
+    testScene.resetProbe();
+    puzzleTestRig.reset();
+  },
   onTestRecovery: (onRecovered) => testScene.simulateFall(onRecovered),
+  onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
+  onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
 });
 
 app.replaceChildren(renderer.domElement, testPanel.element);
@@ -54,6 +63,7 @@ const loop = new Loop({
     if (input.wasPressed('debugTestRecovery')) testPanel.testRecovery();
 
     testScene.update(deltaSeconds);
+    puzzleTestRig.update(deltaSeconds);
     input.endFixedUpdate();
   },
   render: (_interpolationAlpha, stats) => {
@@ -73,6 +83,7 @@ const loop = new Loop({
           `dropped sim time: ${(stats.droppedSimulationTimeSeconds * 1000).toFixed(2)} ms`,
           `pointer lock: ${input.pointerLocked ? 'locked' : 'unlocked'}`,
           `held actions: ${heldActions}`,
+          `plate / door / platform: ${puzzleTestRig.platePressed ? 'pressed' : 'released'} / ${puzzleTestRig.doorState} / ${puzzleTestRig.platformState}`,
         ].join('\n'),
       );
     }
@@ -102,6 +113,7 @@ if (import.meta.hot) {
     loop.dispose();
     input.dispose();
     testPanel.dispose();
+    puzzleTestRig.dispose();
     testScene.dispose();
     renderer.dispose();
   });
