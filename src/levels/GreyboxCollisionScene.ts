@@ -31,6 +31,7 @@ const RECOVERY_POSITION = new THREE.Vector3(6.5, -2.2, 2);
 export class GreyboxCollisionScene {
   readonly root = new THREE.Group();
 
+  private readonly collisionMeshList: THREE.Mesh[] = [];
   private readonly probe: THREE.Mesh;
   private recoveryDelay = 0;
   private recoveryCallback: (() => void) | undefined;
@@ -150,6 +151,23 @@ export class GreyboxCollisionScene {
     this.resetProbe();
   }
 
+
+  get collisionMeshes(): readonly THREE.Mesh[] {
+    return this.collisionMeshList;
+  }
+
+  copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
+    return target.copy(SPAWN_POSITION);
+  }
+
+  copyRecoveryPosition(target: THREE.Vector3): THREE.Vector3 {
+    return target.copy(RECOVERY_POSITION);
+  }
+
+  setProbePosition(position: { readonly x: number; readonly y: number; readonly z: number }): void {
+    this.probe.position.set(position.x, position.y, position.z);
+  }
+
   update(deltaSeconds: number): void {
     this.probe.rotation.y += deltaSeconds * 0.8;
 
@@ -187,6 +205,7 @@ export class GreyboxCollisionScene {
         : [object.material];
       for (const material of materials) material.dispose();
     });
+    this.collisionMeshList.length = 0;
     this.root.clear();
   }
 
@@ -208,6 +227,7 @@ export class GreyboxCollisionScene {
     mesh.userData.sizeMetres = [...testBox.size];
     mesh.userData.surfaceTag = testBox.surfaceTag;
     this.root.add(mesh);
+    this.collisionMeshList.push(mesh);
 
     const outline = new THREE.LineSegments(
       new THREE.EdgesGeometry(geometry),

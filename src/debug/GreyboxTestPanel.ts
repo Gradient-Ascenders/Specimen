@@ -15,32 +15,44 @@ export class GreyboxTestPanel {
   private readonly fallButton: HTMLButtonElement;
   private readonly puzzleButton: HTMLButtonElement;
   private readonly sensorRegressionButton: HTMLButtonElement;
+  private readonly collapseButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
     this.element.className = 'test-panel';
     this.element.innerHTML = `
-      <p class="eyebrow">Sprint 0 test harness</p>
-      <h1>Collision grey-box</h1>
-      <p class="summary">One grid square equals one metre. Geometry is named and colour-coded for repeatable collision checks.</p>
-      <ul class="case-list" aria-label="Collision test case legend">
-        <li style="--case-colour: #81909b">Floor</li>
-        <li style="--case-colour: #568bd8">Wall</li>
-        <li style="--case-colour: #e3994b">Ledge</li>
-        <li style="--case-colour: #d6c650">Slope</li>
-        <li style="--case-colour: #d95f8d">Gap</li>
-        <li style="--case-colour: #62bf83">Platform</li>
-      </ul>
-      <p class="surface-key"><span class="sticky-key">Sticky wall</span><span class="bouncy-key">Bounce pad</span></p>
-      <p class="probe-status" role="status">Probe is at spawn.</p>
-      <div class="controls">
-        <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
-        <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
-        <button type="button" data-action="puzzle">Toggle plate test</button>
-        <button type="button" data-action="sensor-regression">Run sensor checks</button>
+      <button
+        type="button"
+        class="panel-collapse"
+        data-action="collapse-panel"
+        aria-expanded="true"
+        aria-label="Collapse debug panel"
+        title="Collapse debug panel"
+      >−</button>
+
+      <div class="test-panel-content">
+        <p class="eyebrow">Sprint 0 test harness</p>
+        <h1>Collision grey-box</h1>
+        <p class="summary">One grid square equals one metre. Move the kinematic probe with <kbd>WASD</kbd>; geometry is named and colour-coded for repeatable collision checks.</p>
+        <ul class="case-list" aria-label="Collision test case legend">
+          <li style="--case-colour: #81909b">Floor</li>
+          <li style="--case-colour: #568bd8">Wall</li>
+          <li style="--case-colour: #e3994b">Ledge</li>
+          <li style="--case-colour: #d6c650">Slope</li>
+          <li style="--case-colour: #d95f8d">Gap</li>
+          <li style="--case-colour: #62bf83">Platform</li>
+        </ul>
+        <p class="surface-key"><span class="sticky-key">Sticky wall</span><span class="bouncy-key">Bounce pad</span></p>
+        <p class="probe-status" role="status">Probe is at spawn.</p>
+        <div class="controls">
+          <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
+          <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
+          <button type="button" data-action="puzzle">Toggle plate test</button>
+          <button type="button" data-action="sensor-regression">Run sensor checks</button>
+        </div>
+        <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
+        <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
       </div>
-      <p class="eyebrow">Issue #10 runtime diagnostics</p>
-      <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
     `;
 
     const status = this.element.querySelector<HTMLElement>('.probe-status');
@@ -59,6 +71,9 @@ export class GreyboxTestPanel {
     const sensorRegressionButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="sensor-regression"]',
     );
+    const collapseButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="collapse-panel"]',
+    );
 
     if (
       !status ||
@@ -66,7 +81,8 @@ export class GreyboxTestPanel {
       !resetButton ||
       !fallButton ||
       !puzzleButton ||
-      !sensorRegressionButton
+      !sensorRegressionButton ||
+      !collapseButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -77,11 +93,16 @@ export class GreyboxTestPanel {
     this.fallButton = fallButton;
     this.puzzleButton = puzzleButton;
     this.sensorRegressionButton = sensorRegressionButton;
+    this.collapseButton = collapseButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
     this.puzzleButton.addEventListener('click', this.togglePuzzleTest);
-    this.sensorRegressionButton.addEventListener('click', this.runSensorRegression);
+    this.sensorRegressionButton.addEventListener(
+      'click',
+      this.runSensorRegression,
+    );
+    this.collapseButton.addEventListener('click', this.toggleCollapsed);
   }
 
   dispose(): void {
@@ -92,6 +113,7 @@ export class GreyboxTestPanel {
       'click',
       this.runSensorRegression,
     );
+    this.collapseButton.removeEventListener('click', this.toggleCollapsed);
   }
 
   readonly resetProbe = (): void => {
@@ -115,7 +137,21 @@ export class GreyboxTestPanel {
 
   private readonly runSensorRegression = (): void => {
     this.options.onRunSensorRegression();
-    this.status.textContent = 'Sensor checks passed: duplicate, multiple, and exit occupancy are stable.';
+    this.status.textContent =
+      'Sensor checks passed: duplicate, multiple, and exit occupancy are stable.';
+  };
+
+  private readonly toggleCollapsed = (): void => {
+    const collapsed = this.element.classList.toggle('is-collapsed');
+    this.collapseButton.textContent = collapsed ? '+' : '−';
+    this.collapseButton.setAttribute('aria-expanded', String(!collapsed));
+    this.collapseButton.setAttribute(
+      'aria-label',
+      collapsed ? 'Expand debug panel' : 'Collapse debug panel',
+    );
+    this.collapseButton.title = collapsed
+      ? 'Expand debug panel'
+      : 'Collapse debug panel';
   };
 
   setRuntimeDiagnostics(text: string): void {
