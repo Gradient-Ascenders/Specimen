@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { EventBus } from './core/EventBus';
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
@@ -8,7 +9,9 @@ import { CollisionWorld } from './physics/CollisionWorld';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
   KinematicBody,
+  type JumpInputState,
 } from './physics/KinematicBody';
+import type { MovementEvents } from './physics/MovementEvents.ts';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { RenderLayer } from './render/RenderLayer';
 import './style.css';
@@ -30,6 +33,16 @@ renderLayer.scene.add(puzzleTestRig.root);
 const collisionWorld = new CollisionWorld();
 collisionWorld.registerAll(testScene.collisionMeshes);
 
+const movementEvents = new EventBus<MovementEvents>();
+let landingEventCount = 0;
+let lastLandingImpactSpeedMetresPerSecond = 0;
+
+const unsubscribeLanding = movementEvents.on('landed', (event) => {
+  landingEventCount += 1;
+  lastLandingImpactSpeedMetresPerSecond =
+    event.impactSpeedMetresPerSecond;
+});
+
 const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
 const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
 const renderedProbePosition = new THREE.Vector3();
@@ -37,7 +50,14 @@ const renderedProbePosition = new THREE.Vector3();
 const body = new KinematicBody({
   world: collisionWorld,
   initialPosition: spawnPosition,
+  events: movementEvents,
 });
+
+const jumpInputState: JumpInputState = {
+  pressed: false,
+  held: false,
+  released: false,
+};
 
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
@@ -151,6 +171,8 @@ const testPanel = new GreyboxTestPanel({
     testScene.resetProbe();
     body.teleport(spawnPosition);
     puzzleTestRig.reset();
+    landingEventCount = 0;
+    lastLandingImpactSpeedMetresPerSecond = 0;
   },
   onTestRecovery: (onRecovered) => {
     body.teleport(recoveryPosition);
@@ -187,7 +209,11 @@ const loop = new Loop({
       (input.isDown('moveBackward') ? 1 : 0) -
       (input.isDown('moveForward') ? 1 : 0);
 
-    body.update(deltaSeconds, moveX, moveZ);
+    jumpInputState.pressed = input.wasPressed('jump');
+    jumpInputState.held = input.isDown('jump');
+    jumpInputState.released = input.wasReleased('jump');
+
+    body.update(deltaSeconds, moveX, moveZ, jumpInputState);
     testScene.update(deltaSeconds);
     puzzleTestRig.update(deltaSeconds);
     input.endFixedUpdate();
@@ -206,6 +232,7 @@ const loop = new Loop({
     renderLayer.render();
 
     debugSampleElapsedSeconds += stats.rawFrameDeltaSeconds;
+
     if (debugSampleElapsedSeconds >= 0.25) {
       debugSampleElapsedSeconds = 0;
 
@@ -226,6 +253,12 @@ const loop = new Loop({
           `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
           `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
           `ground normal: ${groundNormal.x.toFixed(2)}, ${groundNormal.y.toFixed(2)}, ${groundNormal.z.toFixed(2)}`,
+          `jump state / can jump: ${body.jumpState} / ${body.canJump ? 'yes' : 'no'}`,
+          `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
+          `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
+          `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
+          `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,
+          `last landing impact / count: ${lastLandingImpactSpeedMetresPerSecond.toFixed(2)} m/s / ${landingEventCount}`,
           `contacts this step: ${body.contactsThisStep}`,
           `last collision: ${body.lastCollisionName}`,
           `registered colliders: ${collisionWorld.colliderCount}`,
@@ -247,6 +280,8 @@ renderLayer.setAnimationLoop((timestampMs) => {
 });
 
 const shutdown = (): void => {
+  unsubscribeLanding();
+  movementEvents.clear();
   loop.dispose();
   input.dispose();
   collisionWorld.clear();
