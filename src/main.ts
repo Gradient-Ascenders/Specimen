@@ -1,7 +1,14 @@
+import * as THREE from 'three';
+
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
 import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
+import { CollisionWorld } from './physics/CollisionWorld';
+import {
+  DEFAULT_KINEMATIC_BODY_CONFIG,
+  KinematicBody,
+} from './physics/KinematicBody';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { RenderLayer } from './render/RenderLayer';
 import './style.css';
@@ -20,17 +27,144 @@ renderLayer.scene.add(testScene.root);
 const puzzleTestRig = new PuzzleTestRig();
 renderLayer.scene.add(puzzleTestRig.root);
 
+const collisionWorld = new CollisionWorld();
+collisionWorld.registerAll(testScene.collisionMeshes);
+
+const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
+const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
+const renderedProbePosition = new THREE.Vector3();
+
+const body = new KinematicBody({
+  world: collisionWorld,
+  initialPosition: spawnPosition,
+});
+
+const SLOPE_REGRESSION_DURATION_SECONDS = 10;
+const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
+const SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES = 0.02;
+
+let slopeRegressionStatus = 'not run';
+
+const runSlopeIdleRegression = (): string => {
+  const slopeMesh = testScene.collisionMeshes.find(
+    (mesh) => mesh.name === 'case-slope-15-degrees',
+  );
+
+  if (!slopeMesh) {
+    slopeRegressionStatus = 'FAIL — authored 15° slope not found';
+    return slopeRegressionStatus;
+  }
+
+  slopeMesh.updateWorldMatrix(true, false);
+  slopeMesh.geometry.computeBoundingBox();
+
+  const bounds = slopeMesh.geometry.boundingBox;
+  if (!bounds) {
+    slopeRegressionStatus = 'FAIL — slope bounds unavailable';
+    return slopeRegressionStatus;
+  }
+
+  const localTopCentre = new THREE.Vector3(
+    (bounds.min.x + bounds.max.x) * 0.5,
+    bounds.max.y,
+    (bounds.min.z + bounds.max.z) * 0.5,
+  );
+
+  const surfacePoint = localTopCentre.applyMatrix4(slopeMesh.matrixWorld);
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(
+    slopeMesh.matrixWorld,
+  );
+  const surfaceNormal = new THREE.Vector3(0, 1, 0)
+    .applyNormalMatrix(normalMatrix)
+    .normalize();
+
+  const regressionStart = surfacePoint
+    .clone()
+    .addScaledVector(
+      surfaceNormal,
+      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres +
+        DEFAULT_KINEMATIC_BODY_CONFIG.skinWidthMetres +
+        0.002,
+    );
+
+  const regressionBody = new KinematicBody({
+    world: collisionWorld,
+    initialPosition: regressionStart,
+  });
+
+  const start = new THREE.Vector3(
+    regressionBody.position.x,
+    regressionBody.position.y,
+    regressionBody.position.z,
+  );
+
+  let ungroundedSteps = 0;
+  const totalSteps = Math.round(
+    SLOPE_REGRESSION_DURATION_SECONDS /
+      SLOPE_REGRESSION_FIXED_DELTA_SECONDS,
+  );
+
+  for (let step = 0; step < totalSteps; step += 1) {
+    regressionBody.update(
+      SLOPE_REGRESSION_FIXED_DELTA_SECONDS,
+      0,
+      0,
+    );
+
+    if (!regressionBody.grounded) ungroundedSteps += 1;
+  }
+
+  const end = new THREE.Vector3(
+    regressionBody.position.x,
+    regressionBody.position.y,
+    regressionBody.position.z,
+  );
+  const tangentDrift = end
+    .sub(start)
+    .projectOnPlane(surfaceNormal)
+    .length();
+
+  const finalVelocity = regressionBody.velocity;
+  const finalSpeed = Math.hypot(
+    finalVelocity.x,
+    finalVelocity.y,
+    finalVelocity.z,
+  );
+
+  const passed =
+    tangentDrift <= SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES &&
+    ungroundedSteps === 0;
+
+  slopeRegressionStatus = [
+    passed ? 'PASS' : 'FAIL',
+    `${SLOPE_REGRESSION_DURATION_SECONDS.toFixed(0)} s`,
+    `drift ${tangentDrift.toFixed(4)} m`,
+    `speed ${finalSpeed.toFixed(4)} m/s`,
+    `ungrounded steps ${ungroundedSteps}`,
+  ].join(' — ');
+
+  return slopeRegressionStatus;
+};
+
 const testPanel = new GreyboxTestPanel({
   onReset: () => {
     testScene.resetProbe();
+    body.teleport(spawnPosition);
     puzzleTestRig.reset();
   },
-  onTestRecovery: (onRecovered) => testScene.simulateFall(onRecovered),
+  onTestRecovery: (onRecovered) => {
+    body.teleport(recoveryPosition);
+    testScene.simulateFall(() => {
+      body.teleport(spawnPosition);
+      onRecovered();
+    });
+  },
   onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
   onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
   onRunResetRegression: () => puzzleTestRig.runResetRegression(),
   onActivateCheckpoint: () => puzzleTestRig.activateElevatedCheckpoint(),
   onRecoverCheckpoint: () => puzzleTestRig.recoverTestSlime(),
+  onRunSlopeIdleRegression: runSlopeIdleRegression,
 });
 
 app.replaceChildren(renderLayer.canvas, testPanel.element);
@@ -46,28 +180,56 @@ const loop = new Loop({
     if (input.wasPressed('debugReset')) testPanel.resetProbe();
     if (input.wasPressed('debugTestRecovery')) testPanel.testRecovery();
 
+    const moveX =
+      (input.isDown('moveRight') ? 1 : 0) -
+      (input.isDown('moveLeft') ? 1 : 0);
+    const moveZ =
+      (input.isDown('moveBackward') ? 1 : 0) -
+      (input.isDown('moveForward') ? 1 : 0);
+
+    body.update(deltaSeconds, moveX, moveZ);
     testScene.update(deltaSeconds);
     puzzleTestRig.update(deltaSeconds);
     input.endFixedUpdate();
   },
-  render: (_interpolationAlpha, stats) => {
+  render: (interpolationAlpha, stats) => {
+    const previous = body.previousPosition;
+    const current = body.position;
+
+    renderedProbePosition.set(
+      THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
+      THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
+      THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
+    );
+
+    testScene.setProbePosition(renderedProbePosition);
     renderLayer.render();
 
     debugSampleElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (debugSampleElapsedSeconds >= 0.25) {
       debugSampleElapsedSeconds = 0;
+
       const heldActions = Array.from(input.held).join(', ') || 'none';
+      const position = body.position;
+      const velocity = body.velocity;
+      const groundNormal = body.groundNormal;
       const renderStats = renderLayer.getDiagnostics();
+
       testPanel.setRuntimeDiagnostics(
         [
           `fixed step: ${(stats.fixedDeltaSeconds * 1000).toFixed(2)} ms`,
           `render FPS: ${stats.renderFps.toFixed(1)}`,
-          `raw delta: ${(stats.rawFrameDeltaSeconds * 1000).toFixed(2)} ms`,
-          `clamped delta: ${(stats.frameDeltaSeconds * 1000).toFixed(2)} ms`,
           `steps this frame: ${stats.stepsThisFrame}`,
-          `dropped sim time: ${(stats.droppedSimulationTimeSeconds * 1000).toFixed(2)} ms`,
           `pointer lock: ${input.pointerLocked ? 'locked' : 'unlocked'}`,
           `held actions: ${heldActions}`,
+          `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
+          `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
+          `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
+          `ground normal: ${groundNormal.x.toFixed(2)}, ${groundNormal.y.toFixed(2)}, ${groundNormal.z.toFixed(2)}`,
+          `contacts this step: ${body.contactsThisStep}`,
+          `last collision: ${body.lastCollisionName}`,
+          `registered colliders: ${collisionWorld.colliderCount}`,
+          `slope idle regression: ${slopeRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
@@ -87,6 +249,7 @@ renderLayer.setAnimationLoop((timestampMs) => {
 const shutdown = (): void => {
   loop.dispose();
   input.dispose();
+  collisionWorld.clear();
   testPanel.dispose();
   puzzleTestRig.dispose();
   testScene.dispose();
