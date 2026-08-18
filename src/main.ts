@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
+import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
 import './style.css';
 
 const app = document.querySelector<HTMLElement>('#app');
@@ -10,44 +12,33 @@ if (!app) {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07110f);
-scene.fog = new THREE.Fog(0x07110f, 5, 11);
+scene.fog = new THREE.Fog(0x07110f, 20, 38);
 
-const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-camera.position.set(0, 0.15, 5);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
+camera.position.set(17, 13, 20);
+camera.lookAt(0, 0.5, 1.5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.domElement.setAttribute('aria-hidden', 'true');
 
-const geometry = new THREE.IcosahedronGeometry(1.15, 4);
-const material = new THREE.MeshStandardMaterial({
-  color: 0x7de2a1,
-  emissive: 0x123d2b,
-  emissiveIntensity: 0.65,
-  metalness: 0.05,
-  roughness: 0.3,
-});
-const specimen = new THREE.Mesh(geometry, material);
-scene.add(specimen);
+const ambientLight = new THREE.HemisphereLight(0xc8ffe0, 0x17231f, 2.2);
+scene.add(ambientLight);
 
-const keyLight = new THREE.DirectionalLight(0xc8ffe0, 4);
-keyLight.position.set(3, 4, 5);
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.5);
+keyLight.position.set(8, 14, 10);
 scene.add(keyLight);
 
-const rimLight = new THREE.PointLight(0x6f8cff, 18, 8);
-rimLight.position.set(-3, -1, 2);
-scene.add(rimLight);
+const testScene = new GreyboxCollisionScene();
+scene.add(testScene.root);
 
-const status = document.createElement('section');
-status.className = 'status';
-status.innerHTML = `
-  <p class="eyebrow">Research subject 03</p>
-  <h1>Specimen</h1>
-  <p>Containment environment online.</p>
-`;
+const testPanel = new GreyboxTestPanel({
+  onReset: () => testScene.resetProbe(),
+  onTestRecovery: (onRecovered) => testScene.simulateFall(onRecovered),
+});
 
-app.replaceChildren(renderer.domElement, status);
+app.replaceChildren(renderer.domElement, testPanel.element);
 
 const resize = (): void => {
   const width = app.clientWidth;
@@ -63,10 +54,7 @@ timer.connect(document);
 
 renderer.setAnimationLoop(() => {
   timer.update();
-  const elapsed = timer.getElapsed();
-  specimen.rotation.x = elapsed * 0.12;
-  specimen.rotation.y = elapsed * 0.2;
-  specimen.position.y = Math.sin(elapsed * 0.8) * 0.08;
+  testScene.update(timer.getDelta());
   renderer.render(scene, camera);
 });
 
@@ -78,8 +66,8 @@ if (import.meta.hot) {
     renderer.setAnimationLoop(null);
     window.removeEventListener('resize', resize);
     timer.dispose();
-    geometry.dispose();
-    material.dispose();
+    testPanel.dispose();
+    testScene.dispose();
     renderer.dispose();
   });
 }
