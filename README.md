@@ -41,3 +41,13 @@ npm run preview
 Vite is configured with a relative base, so the contents of `dist/` can be served
 from a domain root, a nested route, or an extracted archive directory without
 rewriting asset URLs.
+
+## Continuous integration
+
+The `PR validation` workflow checks pull requests targeting `main` before merge,
+and the `CI` workflow checks pushes to `main` after merge. Both select the Node.js
+version from `.nvmrc`, install the locked dependencies with `npm ci`, and run the
+same `npm run build` command used for local delivery.
+
+`PR validation / production-build` is the check intended to be required before
+merging into `main` when repository rules permit it.
