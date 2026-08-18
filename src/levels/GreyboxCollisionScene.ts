@@ -78,7 +78,7 @@ export class GreyboxCollisionScene {
         name: 'case-ledge-1m-high',
         testCase: 'ledge',
         size: [2, 1, 2],
-        position: [-2.2, 0.5, 2.5],
+        position: [-3.8, 0.5, 2.5],
         material: materials.ledge,
         surfaceTag: 'default',
       },
