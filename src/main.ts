@@ -28,6 +28,9 @@ const testPanel = new GreyboxTestPanel({
   onTestRecovery: (onRecovered) => testScene.simulateFall(onRecovered),
   onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
   onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
+  onRunResetRegression: () => puzzleTestRig.runResetRegression(),
+  onActivateCheckpoint: () => puzzleTestRig.activateElevatedCheckpoint(),
+  onRecoverCheckpoint: () => puzzleTestRig.recoverTestSlime(),
 });
 
 app.replaceChildren(renderLayer.canvas, testPanel.element);
@@ -70,6 +73,7 @@ const loop = new Loop({
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
           `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
           `plate / door / platform: ${puzzleTestRig.platePressed ? 'pressed' : 'released'} / ${puzzleTestRig.doorState} / ${puzzleTestRig.platformState}`,
+          `active checkpoint: ${puzzleTestRig.activeCheckpointId}`,
         ].join('\n'),
       );
     }
