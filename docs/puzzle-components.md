@@ -80,7 +80,47 @@ plate.events.on('changed', ({ pressed }) => platform.setActive(pressed));
 - Call `dispose()` when unloading a level. It removes roots, disposes owned GPU
   resources, clears listeners, and leaves no active occupancy behind.
 - Call `reset()` to return a plate, door, or platform to its authored initial
-  state. Issue #19 will register those reset methods by puzzle group.
+  state. Register each mutable component with the level's `PuzzleRegistry` in
+  authored restoration order.
+
+## Resets and checkpoints
+
+Issue #19 adds `PuzzleRegistry` and `CheckpointManager`. A level registers each
+mutable puzzle component once; `PuzzleRegistry.reset()` restores those objects
+in registration order. It deliberately does not own scene construction,
+disposal, or a second whole-game restart path: issue #23's lifecycle will call
+this reset work as part of its authoritative restart operation.
+
+`CheckpointManager` receives an initial checkpoint and a level-specific
+collision clearance check. It validates a spawn when it is registered, when it
+is activated, and immediately before recovery. Unsafe authored spawns throw
+instead of placing the player inside geometry. `reset()` selects the initial
+checkpoint; `recover(target)` asks the player/controller to clear movement
+state and copy the verified checkpoint position.
+
+```ts
+const checkpoints = new CheckpointManager(
+  { id: 'containment-start', spawnPosition: new THREE.Vector3(0, 0.45, 0) },
+  (position, radius) => collisionWorld.isClear(position, radius),
+);
+checkpoints.register({
+  id: 'vent-entrance',
+  spawnPosition: new THREE.Vector3(8, 3.45, 0),
+});
+
+// Fall/out-of-bounds detection calls this; it does not reset puzzle progress.
+checkpoints.recover(playerController);
+```
+
+For an authored level restart, use this restoration order:
+
+1. Reset registered puzzle components in their authored registration order.
+2. Reset checkpoint selection to the initial checkpoint.
+3. Recover the player at that verified initial spawn.
+
+The controller supplied to `recover` owns player-specific transient state such
+as velocity, adhesion, and input buffers. It must copy the supplied position;
+checkpoint data remains immutable authored state.
 
 ## Grey-box rig
 
@@ -93,3 +133,8 @@ claiming player-riding support before issue #11.
 Use **Run sensor checks** to verify that duplicate body IDs count once, multiple
 occupants hold the plate until the final exit, and rapid enter/exit snapshots
 return the plate to its inactive state.
+
+Use **Activate elevated checkpoint** and **Recover at checkpoint** to inspect
+verified checkpoint recovery. **Run 10 reset cycles** exercises active and
+returning plate/door/platform states, checkpoint selection, and player recovery
+without reloading the browser.
