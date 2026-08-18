@@ -48,7 +48,7 @@ export class GreyboxTestPanel {
         <button type="button" data-action="checkpoint">Activate elevated checkpoint</button>
         <button type="button" data-action="checkpoint-recovery">Recover at checkpoint</button>
       </div>
-      <p class="eyebrow">Issue #10 runtime diagnostics</p>
+      <p class="eyebrow">Runtime / render diagnostics</p>
       <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
     `;
 
