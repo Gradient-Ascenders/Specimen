@@ -63,25 +63,26 @@ behaviour and must remain relative.
 
 ## Publish
 
-Issue #6 is the authority for the real assessment publish mechanism,
-destination, group path, administrative owner, and any Moodle or mentor steps.
-As of 19 August 2026, Issue #6 is open and contains no confirmed answers or
-comments, and this repository contains no publish URL or credentials. Do not
-guess a destination or bypass authentication.
+The supplied CGV project brief confirms that Final deployment is to the
+department LAMP server through a Moodle archive upload, not through SSH/SCP.
+Upload the production build, not the source tree. For this Vite project, the ZIP
+must contain the contents of `dist/`, with `index.html` at the archive root and
+no enclosing `dist/` or archive-name directory.
 
-Once Issue #6 records those requirements, the authorised publisher must upload
-`artifacts/specimen-production.zip` through that exact process. Upload the ZIP
-itself only when the confirmed interface accepts an archive; otherwise follow
-the confirmed extraction procedure. In every case, the deployed site must
-retain `index.html` at the group-path root rather than add an extra `dist/` or
-archive-name directory.
+The current-year Moodle activity/link, deadline, archive naming convention,
+group path, administrative owner, and any requirement to submit a hosted URL at
+Beta remain unresolved. Do not guess them, bypass authentication, or treat the
+repository artifact name as a confirmed submission filename. See
+[`beta-requirements.md`](beta-requirements.md) for the authoritative questions,
+owners, and evidence status. Moodle dates and current-year instructions take
+precedence.
 
 ## Verify the published host
 
-After publication, open the exact HTTPS URL from Issue #6 in Chrome and perform
-a fresh check rather than relying on the local result. Record the URL, source
-revision and working-tree state, archive SHA-256, verification time, Chrome
-version, and screenshot in `docs/evidence/`.
+After publication through the confirmed Moodle/LAMP process, open the exact
+published URL in Chrome and perform a fresh check rather than relying on the
+local result. Record the URL, source revision and working-tree state, archive
+SHA-256, verification time, Chrome version, and screenshot in `docs/evidence/`.
 
 In Chrome DevTools, enable Preserve log, reload with the Network panel open,
 and confirm:
