@@ -37,12 +37,48 @@ canvas {
   top: clamp(1rem, 3vw, 2rem);
   left: clamp(1rem, 3vw, 2rem);
   width: min(25rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
   padding: 1.1rem 1.2rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid rgb(155 226 188 / 28%);
   border-radius: 0.75rem;
   background: rgb(7 17 15 / 88%);
   box-shadow: 0 1rem 3rem rgb(0 0 0 / 25%);
   backdrop-filter: blur(0.6rem);
+  scrollbar-width: thin;
+}
+
+.test-panel.is-collapsed {
+  width: auto;
+  max-height: none;
+  padding: 0.45rem;
+  overflow: visible;
+  background: rgb(7 17 15 / 72%);
+}
+
+.test-panel.is-collapsed .test-panel-content {
+  display: none;
+}
+
+.panel-collapse {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  float: right;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.35rem -0.35rem 0.45rem 0.7rem;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.test-panel.is-collapsed .panel-collapse {
+  position: static;
+  float: none;
+  margin: 0;
 }
 
 .test-panel h1 {
@@ -58,6 +94,10 @@ canvas {
   font-weight: 750;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+}
+
+.diagnostics-heading {
+  margin-top: 0.9rem;
 }
 
 .summary,
@@ -149,10 +189,18 @@ kbd {
   font: 0.75rem ui-monospace, monospace;
 }
 
+.runtime-status {
+  margin: 0.65rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 @media (max-width: 600px) {
   .test-panel {
-    top: auto;
-    bottom: 1rem;
+    top: 1rem;
+    bottom: auto;
+    max-height: calc(100vh - 2rem);
   }
 
   .summary {
