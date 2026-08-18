@@ -1,5 +1,7 @@
 import { EventBus } from '../core/EventBus';
 
+const EMPTY_OCCUPANTS: readonly string[] = [];
+
 export interface TriggerOccupancyEvent {
   readonly trigger: Trigger;
   readonly occupantId: string;
@@ -23,6 +25,7 @@ export class Trigger {
   readonly events = new EventBus<TriggerEvents>();
 
   private readonly occupantIds = new Set<string>();
+  private readonly scratchOccupantIds = new Set<string>();
 
   constructor(readonly id: string) {}
 
@@ -39,7 +42,8 @@ export class Trigger {
    * IDs are ignored, so a body can never activate the trigger twice.
    */
   setOccupants(occupantIds: Iterable<string>): void {
-    const nextOccupants = new Set<string>();
+    const nextOccupants = this.scratchOccupantIds;
+    nextOccupants.clear();
     for (const occupantId of occupantIds) {
       if (occupantId) nextOccupants.add(occupantId);
     }
@@ -52,7 +56,7 @@ export class Trigger {
       changed = true;
     }
 
-    for (const occupantId of [...this.occupantIds]) {
+    for (const occupantId of this.occupantIds) {
       if (nextOccupants.has(occupantId)) continue;
       this.occupantIds.delete(occupantId);
       this.events.emit('exited', { trigger: this, occupantId });
@@ -68,7 +72,7 @@ export class Trigger {
   }
 
   clear(): void {
-    this.setOccupants([]);
+    this.setOccupants(EMPTY_OCCUPANTS);
   }
 
   dispose(): void {

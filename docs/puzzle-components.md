@@ -8,8 +8,9 @@ they do not require a specific collision engine or a general-purpose graph.
 
 `Trigger` stores the unique IDs of bodies inside a sensor volume. Physics code
 provides a complete occupancy snapshot with `setOccupants(ids)` each fixed step.
-It emits typed `entered`, `exited`, and `occupancyChanged` events only when the
-set changes; duplicate IDs cannot cause duplicate activation.
+It reuses internal scratch storage, so unchanged snapshots allocate nothing. It
+emits typed `entered`, `exited`, and `occupancyChanged` events only when the set
+changes; duplicate IDs cannot cause duplicate activation.
 
 ```ts
 const trigger = new Trigger('containment-door-sensor');
