@@ -94,6 +94,31 @@ canvas {
   color: #8ce8d6;
 }
 
+.surface-key {
+  display: flex;
+  gap: 0.9rem;
+  margin: 0.8rem 0;
+  color: #d7eee1;
+  font-size: 0.78rem;
+}
+
+.surface-key span::before {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  content: '';
+}
+
+.sticky-key::before {
+  background: #49c9b7;
+}
+
+.bouncy-key::before {
+  background: #b987e8;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;

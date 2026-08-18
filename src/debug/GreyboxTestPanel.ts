@@ -26,6 +26,7 @@ export class GreyboxTestPanel {
         <li style="--case-colour: #d95f8d">Gap</li>
         <li style="--case-colour: #62bf83">Platform</li>
       </ul>
+      <p class="surface-key"><span class="sticky-key">Sticky wall</span><span class="bouncy-key">Bounce pad</span></p>
       <p class="probe-status" role="status">Probe is at spawn.</p>
       <div class="controls">
         <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>

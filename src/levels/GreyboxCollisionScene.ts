@@ -8,12 +8,15 @@ type CollisionCase =
   | 'gap'
   | 'platform';
 
+type SurfaceTag = 'default' | 'sticky' | 'bouncy';
+
 interface TestBox {
   name: string;
   testCase: CollisionCase;
   size: readonly [number, number, number];
   position: readonly [number, number, number];
   material: THREE.Material;
+  surfaceTag: SurfaceTag;
   rotationZ?: number;
 }
 
@@ -42,7 +45,9 @@ export class GreyboxCollisionScene {
       slope: this.createMaterial(0xd6c650),
       gap: this.createMaterial(0xd95f8d),
       platform: this.createMaterial(0x62bf83),
-    } satisfies Record<CollisionCase, THREE.MeshStandardMaterial>;
+      sticky: this.createMaterial(0x49c9b7),
+      bouncy: this.createMaterial(0xb987e8),
+    } satisfies Record<CollisionCase | 'sticky' | 'bouncy', THREE.MeshStandardMaterial>;
 
     const boxes: TestBox[] = [
       {
@@ -51,13 +56,23 @@ export class GreyboxCollisionScene {
         size: [8, 0.4, 10],
         position: [-4, -0.2, 2],
         material: materials.floor,
+        surfaceTag: 'default',
       },
       {
-        name: 'case-wall-3m-high',
+        name: 'case-wall-default-3m-high',
         testCase: 'wall',
         size: [0.4, 3, 4],
         position: [-7.2, 1.5, 0],
         material: materials.wall,
+        surfaceTag: 'default',
+      },
+      {
+        name: 'case-wall-sticky-3m-high',
+        testCase: 'wall',
+        size: [0.4, 3, 3],
+        position: [-4.8, 1.5, -3.2],
+        material: materials.sticky,
+        surfaceTag: 'sticky',
       },
       {
         name: 'case-ledge-1m-high',
@@ -65,6 +80,7 @@ export class GreyboxCollisionScene {
         size: [2, 1, 2],
         position: [-2.2, 0.5, 2.5],
         material: materials.ledge,
+        surfaceTag: 'default',
       },
       {
         name: 'case-slope-15-degrees',
@@ -73,6 +89,7 @@ export class GreyboxCollisionScene {
         position: [0.2, 0.35, 0.5],
         rotationZ: -THREE.MathUtils.degToRad(15),
         material: materials.slope,
+        surfaceTag: 'default',
       },
       {
         name: 'case-gap-near-edge',
@@ -80,6 +97,7 @@ export class GreyboxCollisionScene {
         size: [3, 0.4, 7],
         position: [4, -0.2, 2],
         material: materials.gap,
+        surfaceTag: 'default',
       },
       {
         name: 'case-gap-far-edge',
@@ -87,6 +105,7 @@ export class GreyboxCollisionScene {
         size: [3, 0.4, 7],
         position: [9, -0.2, 2],
         material: materials.gap,
+        surfaceTag: 'default',
       },
       {
         name: 'case-platform-1.5m-high',
@@ -94,6 +113,15 @@ export class GreyboxCollisionScene {
         size: [2.5, 0.35, 2.5],
         position: [9, 1.5, 0],
         material: materials.platform,
+        surfaceTag: 'default',
+      },
+      {
+        name: 'case-bounce-pad-0.2m-high',
+        testCase: 'platform',
+        size: [1.5, 0.2, 1.5],
+        position: [-1.1, 0.1, 5],
+        material: materials.bouncy,
+        surfaceTag: 'bouncy',
       },
     ];
 
@@ -178,6 +206,7 @@ export class GreyboxCollisionScene {
     mesh.rotation.z = testBox.rotationZ ?? 0;
     mesh.userData.collisionCase = testBox.testCase;
     mesh.userData.sizeMetres = [...testBox.size];
+    mesh.userData.surfaceTag = testBox.surfaceTag;
     this.root.add(mesh);
 
     const outline = new THREE.LineSegments(

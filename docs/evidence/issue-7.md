@@ -20,9 +20,9 @@ paths.
 ## Browser checks
 
 Chromium loaded the production build at 1440 × 900. The overview showed the
-floor, wall, ledge, slope, gap, and platform as distinct colour-coded cases,
-alongside the one-metre grid, scale bar, cyan spawn marker, temporary probe, and
-red recovery volume.
+floor, default wall, sticky wall, ledge, slope, gap, platform, and bounce pad as
+distinct colour-coded cases, alongside the one-metre grid, scale bar, cyan spawn
+marker, temporary probe, and red recovery volume.
 
 The recovery control produced the expected sequence:
 

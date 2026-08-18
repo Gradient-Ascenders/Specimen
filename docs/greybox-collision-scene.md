@@ -12,15 +12,33 @@ metre-based dimensions in `userData.sizeMetres`.
 | Colour | Case | Measurement and purpose |
 | --- | --- | --- |
 | Grey | Floor | 8 m × 10 m baseline for ground contact |
-| Blue | Wall | 3 m high vertical contact and adhesion candidate |
+| Blue | Default wall | 3 m high vertical contact that must not permit adhesion |
+| Teal | Sticky wall | 3 m high vertical contact eligible for adhesion |
 | Orange | Ledge | 1 m high step and corner-resolution case |
 | Yellow | Slope | 15° incline for grounding and slide tests |
 | Pink | Gap | 2 m separation between two floor sections |
 | Green | Platform | 1.5 m-high isolated platform contact |
+| Purple | Bounce pad | 0.2 m-high bouncy platform surface |
 
 The ground grid uses one-metre cells. A one-metre white scale bar stands beside
 the cyan spawn marker. The temporary player probe is a sphere with a 0.45 m
 radius, matching the planned simple gameplay collider.
+
+## Surface metadata
+
+Every collision mesh exposes two independent semantic fields:
+
+- `userData.collisionCase` describes the shape's test category, such as `wall`
+  or `platform`.
+- `userData.surfaceTag` describes its gameplay behaviour: `default`, `sticky`,
+  or `bouncy` in this scene.
+
+This allows the normal and sticky walls to remain the same `wall` collision
+case while only the latter is accepted by future adhesion logic. The bounce pad
+remains a `platform` collision case while carrying the `bouncy` tag. Future
+authoring may use the same field for the planned `soluble` and `conductive`
+tags; collision code must use the explicit tag rather than material colour or
+mesh name.
 
 ## Spawn and recovery
 
@@ -39,6 +57,8 @@ after detecting a real fall.
   metre in diameter.
 - Give collision meshes stable, descriptive names and store semantic tags in
   `userData` rather than inferring behaviour from material colour.
+- Keep the collision-case and surface-behaviour tags separate: a wall can be
+  `default` or `sticky`, and a platform can be `default` or `bouncy`.
 - Keep visual outlines separate from collision meshes. Registration code should
   only consume objects carrying `userData.collisionCase`.
 - Mark known-safe spawn positions explicitly and keep recovery volumes below
