@@ -90,6 +90,7 @@ export class GreyboxTestPanel {
     );
     const collapseButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="collapse-panel"]',
+    );
     const resetRegressionButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="reset-regression"]',
     );
@@ -107,7 +108,7 @@ export class GreyboxTestPanel {
       !fallButton ||
       !puzzleButton ||
       !sensorRegressionButton ||
-      !collapseButton
+      !collapseButton ||
       !resetRegressionButton ||
       !checkpointButton ||
       !checkpointRecoveryButton

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
