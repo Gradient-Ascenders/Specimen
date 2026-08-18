@@ -86,8 +86,10 @@ plate.events.on('changed', ({ pressed }) => platform.setActive(pressed));
 ## Resets and checkpoints
 
 Issue #19 adds `PuzzleRegistry` and `CheckpointManager`. A level registers each
-mutable puzzle component once; `PuzzleRegistry.reset()` restores those objects
-in registration order. It deliberately does not own scene construction,
+mutable puzzle component once and assigns it to a puzzle group.
+`PuzzleRegistry.resetGroup(groupId)` restores that group's objects in their
+registration order. `PuzzleRegistry.reset()` restores all groups in level
+registration order. The registry deliberately does not own scene construction,
 disposal, or a second whole-game restart path: issue #23's lifecycle will call
 this reset work as part of its authoritative restart operation.
 
@@ -95,20 +97,30 @@ this reset work as part of its authoritative restart operation.
 collision clearance check. It validates a spawn when it is registered, when it
 is activated, and immediately before recovery. Unsafe authored spawns throw
 instead of placing the player inside geometry. `reset()` selects the initial
-checkpoint; `recover(target)` asks the player/controller to clear movement
-state and copy the verified checkpoint position.
+checkpoint; `recover(target)` restores the active checkpoint's puzzle group in
+authored order, then asks the player/controller to clear movement state and
+copy the verified checkpoint position.
 
 ```ts
+const puzzleRegistry = new PuzzleRegistry();
+puzzleRegistry.register('containment-door', door, 'containment-chamber');
+
 const checkpoints = new CheckpointManager(
-  { id: 'containment-start', spawnPosition: new THREE.Vector3(0, 0.45, 0) },
+  {
+    id: 'containment-start',
+    spawnPosition: new THREE.Vector3(0, 0.45, 0),
+    puzzleGroupId: 'containment-chamber',
+  },
   (position, radius) => collisionWorld.isClear(position, radius),
+  puzzleRegistry,
 );
 checkpoints.register({
   id: 'vent-entrance',
   spawnPosition: new THREE.Vector3(8, 3.45, 0),
+  puzzleGroupId: 'vent-route',
 });
 
-// Fall/out-of-bounds detection calls this; it does not reset puzzle progress.
+// Fall/out-of-bounds detection restores the active route and then respawns.
 checkpoints.recover(playerController);
 ```
 
@@ -120,7 +132,8 @@ For an authored level restart, use this restoration order:
 
 The controller supplied to `recover` owns player-specific transient state such
 as velocity, adhesion, and input buffers. It must copy the supplied position;
-checkpoint data remains immutable authored state.
+checkpoint data remains immutable authored state. Checkpoint recovery always
+performs: validate active spawn → reset active puzzle group → recover player.
 
 ## Grey-box rig
 
@@ -136,5 +149,5 @@ return the plate to its inactive state.
 
 Use **Activate elevated checkpoint** and **Recover at checkpoint** to inspect
 verified checkpoint recovery. **Run 10 reset cycles** exercises active and
-returning plate/door/platform states, checkpoint selection, and player recovery
-without reloading the browser.
+returning plate/door/platform states, ordinary checkpoint recovery, checkpoint
+selection, and player recovery without reloading the browser.

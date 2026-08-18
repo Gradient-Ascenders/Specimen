@@ -10,10 +10,14 @@ and checkpoint recovery.
 - Confirmed every cycle restores the pressure plate to released, the door to
   closed, the platform to its authored start pose, the active checkpoint to the
   initial checkpoint, and the simulated slime to the initial safe spawn.
-- Activated the elevated checkpoint and used **Recover at checkpoint**. The
-  checkpoint manager validates the spawn against the authored clearance callback
-  when registered, activated, and recovered.
+- Activated the elevated checkpoint after changing the pressure plate, door, and
+  platform, then used **Recover at checkpoint**. The active puzzle group returns
+  to authored state before the simulated slime is recovered at the checkpoint.
+  The checkpoint manager validates the spawn against the authored clearance
+  callback when registered, activated, and recovered.
 - Ran `npm run type-check` and `npm run build` successfully.
+- Served the production output with `npm run preview` and confirmed the root
+  document and generated JavaScript bundle return successfully over HTTP.
 
 ## Scope boundary
 

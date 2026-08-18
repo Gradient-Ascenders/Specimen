@@ -47,9 +47,17 @@ export class PuzzleTestRig implements CheckpointRecoveryTarget {
       travelDurationSeconds: 2.2,
     });
     this.root.add(this.pressurePlate.root, this.door.root, this.platform.root);
-    this.puzzleRegistry.register('test-rig-pressure-plate', this.pressurePlate);
-    this.puzzleRegistry.register('test-rig-door', this.door);
-    this.puzzleRegistry.register('test-rig-moving-platform', this.platform);
+    this.puzzleRegistry.register(
+      'test-rig-pressure-plate',
+      this.pressurePlate,
+      'test-rig-main',
+    );
+    this.puzzleRegistry.register('test-rig-door', this.door, 'test-rig-main');
+    this.puzzleRegistry.register(
+      'test-rig-moving-platform',
+      this.platform,
+      'test-rig-main',
+    );
 
     const rigLight = new THREE.PointLight(0xe7fff1, 11, 12);
     rigLight.name = 'test-rig-puzzle-light';
@@ -70,12 +78,18 @@ export class PuzzleTestRig implements CheckpointRecoveryTarget {
     this.root.add(this.testSlime);
 
     this.checkpoints = new CheckpointManager(
-      { id: 'test-rig-initial', spawnPosition: INITIAL_SPAWN },
+      {
+        id: 'test-rig-initial',
+        spawnPosition: INITIAL_SPAWN,
+        puzzleGroupId: 'test-rig-main',
+      },
       this.isSpawnSafe,
+      this.puzzleRegistry,
     );
     this.checkpoints.register({
       id: 'test-rig-elevated',
       spawnPosition: ELEVATED_SPAWN,
+      puzzleGroupId: 'test-rig-main',
     });
 
     this.unsubscribePlate = this.pressurePlate.events.on('changed', ({ pressed }) => {
@@ -145,12 +159,22 @@ export class PuzzleTestRig implements CheckpointRecoveryTarget {
       this.testSlime.position.set(6.5, -2.2, 2);
       this.checkpoints.recover(this);
 
+      if (
+        this.platePressed ||
+        this.doorState !== 'closed' ||
+        this.platformState !== 'atStart' ||
+        this.activeCheckpointId !== 'test-rig-elevated' ||
+        !this.testSlime.position.equals(ELEVATED_SPAWN)
+      ) {
+        throw new Error(`Checkpoint recovery was incomplete on cycle ${cycle + 1}.`);
+      }
+
       this.reset();
       if (
         this.platePressed ||
         this.doorState !== 'closed' ||
         this.platformState !== 'atStart' ||
-        this.activeCheckpointId !== 'test-rig-initial' ||
+        this.checkpoints.activeCheckpointId !== 'test-rig-initial' ||
         !this.testSlime.position.equals(INITIAL_SPAWN)
       ) {
         throw new Error(`Puzzle reset was not deterministic on cycle ${cycle + 1}.`);

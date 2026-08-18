@@ -1,8 +1,14 @@
 import * as THREE from 'three';
 
+export interface PuzzleGroupResetter {
+  hasGroup(groupId: string): boolean;
+  resetGroup(groupId: string): void;
+}
+
 export interface CheckpointDefinition {
   readonly id: string;
   readonly spawnPosition: THREE.Vector3;
+  readonly puzzleGroupId: string;
   readonly clearanceRadius?: number;
 }
 
@@ -32,6 +38,7 @@ export class CheckpointManager {
   constructor(
     initialCheckpoint: CheckpointDefinition,
     private readonly isSpawnSafe: SpawnSafetyCheck,
+    private readonly puzzleGroups: PuzzleGroupResetter,
   ) {
     this.initialCheckpointId = initialCheckpoint.id;
     this.currentCheckpointId = initialCheckpoint.id;
@@ -44,6 +51,9 @@ export class CheckpointManager {
 
   register(definition: CheckpointDefinition): void {
     if (!definition.id) throw new Error('Checkpoint IDs cannot be empty.');
+    if (!definition.puzzleGroupId) {
+      throw new Error('Checkpoints must reference a puzzle group.');
+    }
     if (this.checkpoints.has(definition.id)) {
       throw new Error(`Checkpoint "${definition.id}" is already registered.`);
     }
@@ -56,9 +66,15 @@ export class CheckpointManager {
     const checkpoint: Checkpoint = {
       id: definition.id,
       spawnPosition: definition.spawnPosition.clone(),
+      puzzleGroupId: definition.puzzleGroupId,
       clearanceRadius,
     };
     this.assertSafe(checkpoint);
+    if (!this.puzzleGroups.hasGroup(checkpoint.puzzleGroupId)) {
+      throw new Error(
+        `Checkpoint "${checkpoint.id}" references unknown puzzle group "${checkpoint.puzzleGroupId}".`,
+      );
+    }
     this.checkpoints.set(checkpoint.id, checkpoint);
   }
 
@@ -71,6 +87,7 @@ export class CheckpointManager {
   recover(target: CheckpointRecoveryTarget): void {
     const checkpoint = this.getCheckpoint(this.currentCheckpointId);
     this.assertSafe(checkpoint);
+    this.puzzleGroups.resetGroup(checkpoint.puzzleGroupId);
     target.recoverAt(checkpoint.spawnPosition);
   }
 
