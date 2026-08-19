@@ -1,18 +1,18 @@
 import * as THREE from 'three';
 
-import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody';
-import type { SurfaceTag } from '../physics/SurfaceRegistry';
+import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
+import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 import {
   SlimeVisual,
   type SlimeVisualDiagnostics,
   type SlimeVisualLaunch,
   type SlimeVisualState,
   type Vector3State,
-} from '../render/slime/SlimeVisual';
+} from '../render/slime/SlimeVisual.ts';
 import {
   SlimeBurstPresentation,
   type SlimeBurstDiagnostics,
-} from '../render/slime/SlimeBurstPresentation';
+} from '../render/slime/SlimeBurstPresentation.ts';
 
 interface BoxOptions {
   readonly name: string;

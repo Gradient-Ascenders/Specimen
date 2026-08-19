@@ -230,8 +230,8 @@ export class ElevatorTestRig {
   }
 
   /**
-   * Fixed-step order: body updates first in main.ts, then this moves the
-   * platform and applies its displacement only if the body is still supported.
+   * Fixed-step order: the level runtime updates the body first, then this moves
+   * the platform and applies its displacement only if the body is still supported.
    */
   update(deltaSeconds: number): void {
     this.sequence.update(deltaSeconds, this.player);

@@ -155,6 +155,12 @@ export class Input {
     }
   }
 
+  /** Clear held and transient gameplay input during lifecycle transitions. */
+  resetState(): void {
+    if (this.disposed) return;
+    this.clearState();
+  }
+
   /** Suspend gameplay actions while leaving native focused UI controls usable. */
   setEnabled(enabled: boolean): void {
     if (this.enabledValue === enabled) return;
@@ -260,7 +266,9 @@ export class Input {
     // focus while the player is trying to charge a jump.
     event.preventDefault();
 
-    if (this.activeKeys.has(event.code)) return;
+    // A repeat can arrive after lifecycle/focus cleanup removed the matching
+    // initial keydown. Never let that orphan repeat re-establish held input.
+    if (event.repeat || this.activeKeys.has(event.code)) return;
 
     this.activeKeys.add(event.code);
     this.activate(actions);

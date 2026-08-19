@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { Input } from '../src/core/Input.ts';
+import { Input, type InputAction } from '../src/core/Input.ts';
 
 function createInput(): {
   input: Input;
@@ -25,6 +25,51 @@ function createInput(): {
 
   return { input, hostWindow };
 }
+
+function dispatchKey(
+  target: EventTarget,
+  type: 'keydown' | 'keyup',
+  code: string,
+  repeat = false,
+): void {
+  const event = new Event(type, { cancelable: true });
+  Object.defineProperties(event, {
+    code: { value: code },
+    repeat: { value: repeat },
+  });
+  target.dispatchEvent(event);
+}
+
+function assertOrphanRepeatIsIgnored(
+  code: string,
+  action: InputAction,
+): void {
+  const { input, hostWindow } = createInput();
+
+  dispatchKey(hostWindow, 'keydown', code);
+  assert.equal(input.isDown(action), true);
+  assert.equal(input.wasPressed(action), true);
+
+  input.resetState();
+  dispatchKey(hostWindow, 'keydown', code, true);
+  assert.equal(input.isDown(action), false);
+  assert.equal(input.wasPressed(action), false);
+
+  dispatchKey(hostWindow, 'keyup', code);
+  dispatchKey(hostWindow, 'keydown', code);
+  assert.equal(input.isDown(action), true);
+  assert.equal(input.wasPressed(action), true);
+
+  input.dispose();
+}
+
+test('restart-key orphan repeat cannot retrigger after input reset', () => {
+  assertOrphanRepeatIsIgnored('KeyR', 'debugReset');
+});
+
+test('movement-key orphan repeat cannot reactivate after input reset', () => {
+  assertOrphanRepeatIsIgnored('KeyW', 'moveForward');
+});
 
 test('pointer cleanup does not masquerade as an input-state cancellation', () => {
   const { input } = createInput();
