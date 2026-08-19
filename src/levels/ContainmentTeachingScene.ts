@@ -8,7 +8,6 @@ import {
   type SlimeVisualState,
   type Vector3State,
 } from '../render/slime/SlimeVisual';
-import { VentTraversal } from '../traversal/VentTraversal';
 
 interface BoxOptions {
   readonly name: string;
@@ -17,10 +16,6 @@ interface BoxOptions {
   readonly material: THREE.Material;
   readonly surfaceTag?: SurfaceTag;
   readonly rotationX?: number;
-}
-
-interface ContainmentTeachingSceneOptions {
-  readonly showVentDebug?: boolean;
 }
 
 const ROOM_2_CENTRE_Z = 38;
@@ -33,14 +28,13 @@ const ROOM_2_RECOVERY_POSITION = new THREE.Vector3(-9, 0.5, 31);
  */
 export class ContainmentTeachingScene {
   readonly root = new THREE.Group();
-  readonly ventTraversals: readonly VentTraversal[];
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
   private readonly slimeVisual: SlimeVisual;
   private recoveryDelay = 0;
   private recoveryCallback: (() => void) | undefined;
 
-  constructor(options: ContainmentTeachingSceneOptions = {}) {
+  constructor() {
     this.root.name = 'containment-climb-and-bounce-greybox';
 
     const materials = {
@@ -48,7 +42,6 @@ export class ContainmentTeachingScene {
       wall: this.material(0xdadfe1),
       support: this.material(0x424a50),
       sticky: this.material(0x9fae38, 0x263100),
-      bounce: this.material(0xb987e8, 0x321a4a),
       platform: this.material(0xd6a928, 0x443300),
       locked: this.material(0x8b3030, 0x320505),
       exit: this.material(0x62bf83, 0x0a3018),
@@ -69,26 +62,6 @@ export class ContainmentTeachingScene {
     this.addVentTransition(materials);
     this.addRoomTwo(materials);
     this.addReferenceMarkers(materials.exit);
-    this.ventTraversals = [
-      new VentTraversal({
-        id: 'room-1-containment-to-duct',
-        // The capture volume begins just below the lip, while the player is
-        // still supported by the sticky wall, then aims through the opening.
-        entryCenter: new THREE.Vector3(-4.8, 4.65, 5.35),
-        entryDirection: new THREE.Vector3(0, 0, 1),
-        entryTarget: new THREE.Vector3(-4.8, 5.7, 7.05),
-        clearancePoint: new THREE.Vector3(-4.8, 5.7, 7.15),
-        entryRadiusMetres: 1.25,
-        entrySpeedMetresPerSecond: 2.8,
-        alignmentStrength: 11,
-        steeringFactor: 0.32,
-        emergencyTimeoutSeconds: 0.9,
-        reentryCooldownSeconds: 0.15,
-        requiresStickyAttachment: true,
-        handoffMode: 'free',
-      }),
-    ];
-    if (options.showVentDebug) this.addVentDebug(this.ventTraversals[0]);
 
     this.slimeVisual = new SlimeVisual({ radiusMetres: 0.45 });
     this.root.add(this.slimeVisual.mesh);
@@ -248,27 +221,6 @@ export class ContainmentTeachingScene {
     this.addDuctSide('-final-east', [-7.35, 11.46, 27.1], [0.18, 2.2, 4.2], materials.duct);
   }
 
-  private addVentDebug(vent: VentTraversal): void {
-    const arrow = new THREE.ArrowHelper(
-      vent.entryDirection,
-      vent.entryCenter,
-      1.05,
-      0x54e8e0,
-      0.22,
-      0.12,
-    );
-    arrow.name = `${vent.id}-debug-entry-direction`;
-    this.root.add(arrow);
-
-    const trigger = new THREE.Mesh(
-      new THREE.SphereGeometry(0.78, 16, 10),
-      new THREE.MeshBasicMaterial({ color: 0x54e8e0, transparent: true, opacity: 0.08, wireframe: true }),
-    );
-    trigger.name = `${vent.id}-debug-entry-volume`;
-    trigger.position.copy(vent.entryCenter);
-    this.root.add(trigger);
-  }
-
   private addRoomTwo(materials: Record<string, THREE.Material>): void {
     // 30 × 22 × 18 m calibration chamber. It is intentionally open, safe,
     // and vertical; only the final catch wall is sticky.
@@ -283,16 +235,34 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-rear-wall-below-duct', size: [2.2, 10.2, 0.4], position: [-8.4, 5.1, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-rear-wall-above-duct', size: [2.2, 5.2, 0.4], position: [-8.4, 15.4, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-front-wall', size: [30, 18, 0.4], position: [0, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
-    // Zone 2: modest vertical charged jump, top at ~2.2m.
-    this.addCollider({ name: 'room-2-platform-a-height-lesson', size: [5, 0.5, 4], position: [-4, 1.95, 35], material: materials.platform });
-    // Zone 3: visible, forgiving horizontal gap.
-    this.addCollider({ name: 'room-2-platform-b-gap-lesson', size: [5, 0.5, 5], position: [2, 2.75, 39], material: materials.platform });
-    // Zone 4: elevated sticky catch; normal room walls remain non-sticky.
-    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.4, 6, 5], position: [8, 6, 42.5], material: materials.sticky, surfaceTag: 'sticky' });
-    this.addCollider({ name: 'room-2-top-of-sticky-wall-ledge', size: [2.5, 0.35, 5.5], position: [6.9, 9.1, 42.5], material: materials.support });
-    // Zone 5: one final launch to a clearly marked open exit balcony.
-    this.addCollider({ name: 'room-2-exit-balcony', size: [7, 0.5, 4], position: [3.5, 9.75, 46], material: materials.platform });
-    this.addVisualBox('room-2-open-exit-door', [2.6, 3, 0.2], [3.5, 11.5, 47.9], materials.exit);
+    // Zones 2-3: a forgiving four-jump zig-zag fills the lower chamber and
+    // teaches progressively higher and longer charged jumps. Every miss lands
+    // on the safe room floor, and the generous tops keep this a tutorial.
+    this.addCollider({ name: 'room-2-platform-a-height-lesson', size: [4.5, 0.5, 3.5], position: [-5.5, 1.35, 34], material: materials.platform });
+    this.addCollider({ name: 'room-2-platform-b-gap-lesson', size: [4, 0.5, 3.5], position: [-0.5, 2.55, 37], material: materials.platform });
+    this.addCollider({ name: 'room-2-platform-c-side-jump', size: [3.8, 0.5, 3.5], position: [4.2, 3.85, 34], material: materials.platform });
+    this.addCollider({ name: 'room-2-platform-d-sticky-launch', size: [4, 0.5, 4], position: [8.5, 5.2, 38.5], material: materials.platform });
+
+    // Zone 4: the sticky patch is embedded in the east perimeter wall rather
+    // than presented as a freestanding slab. Platform D leaves a deliberate
+    // four-metre air gap so the player must jump, catch, and climb.
+    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.12, 6, 5], position: [14.73, 6, 42.5], material: materials.sticky, surfaceTag: 'sticky' });
+    this.addCollider({ name: 'room-2-top-of-sticky-wall-ledge', size: [3.1, 0.35, 5.5], position: [13.25, 9.15, 42.5], material: materials.support });
+
+    // Zone 5: three more readable upper-level jumps carry the route back
+    // across the room to the obvious green exit.
+    this.addCollider({ name: 'room-2-upper-step-a', size: [4, 0.4, 3.5], position: [8.8, 9.65, 44], material: materials.platform });
+    this.addCollider({ name: 'room-2-upper-step-b', size: [3.6, 0.4, 3.4], position: [4.2, 10.15, 40.5], material: materials.platform });
+    this.addCollider({ name: 'room-2-exit-balcony', size: [7, 0.5, 4], position: [0, 10.65, 46], material: materials.platform });
+    this.addVisualBox('room-2-open-exit-door', [2.6, 3, 0.2], [0, 12.4, 47.9], materials.exit);
+
+    // A short low route sits beneath the sticky-wall challenge. It both fills
+    // the unused corner and lets a missed wall catch return to Platform D
+    // without replaying the entire lower ascent.
+    this.addCollider({ name: 'room-2-recovery-step-a', size: [3, 0.4, 3], position: [5.5, 0.65, 45.5], material: materials.support });
+    this.addCollider({ name: 'room-2-recovery-step-b', size: [3, 0.4, 3], position: [8.5, 1.55, 45.5], material: materials.support });
+    this.addCollider({ name: 'room-2-recovery-step-c', size: [3, 0.4, 3], position: [10.8, 2.55, 43.5], material: materials.support });
+    this.addCollider({ name: 'room-2-recovery-step-d', size: [3, 0.4, 3], position: [10, 3.65, 40.5], material: materials.support });
 
     this.addCeilingLight('room-2-fluorescent-a', [-8, 16.7, 35]);
     this.addCeilingLight('room-2-fluorescent-b', [0, 16.7, 39]);

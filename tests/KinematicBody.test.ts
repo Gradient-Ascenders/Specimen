@@ -22,7 +22,7 @@ interface AttachedBodyFixture {
   wall: THREE.Mesh;
 }
 
-test('charged jump endpoints produce approximately 50% higher apexes', () => {
+test('charged jump endpoints produce approximately 25% higher apexes', () => {
   const originalMinimumJumpSpeed = 4.8;
   const originalMaximumJumpSpeed = 8.8;
   const minimumHeightRatio =
@@ -32,8 +32,8 @@ test('charged jump endpoints produce approximately 50% higher apexes', () => {
     DEFAULT_KINEMATIC_BODY_CONFIG.maximumJumpSpeedMetresPerSecond ** 2 /
     originalMaximumJumpSpeed ** 2;
 
-  assert.ok(Math.abs(minimumHeightRatio - 1.5) < 0.01);
-  assert.ok(Math.abs(maximumHeightRatio - 1.5) < 0.01);
+  assert.ok(Math.abs(minimumHeightRatio - 1.25) < 0.01);
+  assert.ok(Math.abs(maximumHeightRatio - 1.25) < 0.01);
 });
 
 function createAttachedBody(): AttachedBodyFixture {

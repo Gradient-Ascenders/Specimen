@@ -18,7 +18,7 @@ export const SLIME_VISUAL_TUNING = {
   maximumVisualAccelerationMetresPerSecondSquared: 42,
   slitherBaseAngularSpeedRadiansPerSecond: 4,
   slitherSpeedGainRadiansPerSecond: 5,
-  airborneFullStretchSpeedMetresPerSecond: 10.78,
+  airborneFullStretchSpeedMetresPerSecond: 9.84,
   airborneStretchMaximum: 0.16,
   launchStretchMaximum: 0.20,
   landingVisibleSpeedMetresPerSecond: 1.5,

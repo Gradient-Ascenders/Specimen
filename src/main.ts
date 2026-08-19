@@ -26,9 +26,7 @@ if (!app) {
 
 const renderLayer = new RenderLayer({ host: app });
 
-const testScene = new ContainmentTeachingScene({
-  showVentDebug: import.meta.env.DEV,
-});
+const testScene = new ContainmentTeachingScene();
 renderLayer.scene.add(testScene.root);
 
 const collisionWorld = new CollisionWorld();
@@ -279,9 +277,6 @@ const loop = new Loop({
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
 
-    for (const vent of testScene.ventTraversals) {
-      body.tryBeginVentTraversal(vent, cameraRelativeMovement);
-    }
     body.update(deltaSeconds, cameraRelativeMovement, jumpInputState);
     blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
@@ -346,8 +341,6 @@ const loop = new Loop({
           `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
           `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
           `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
-          `traversal / vent: ${body.traversalState} / ${body.activeVentId}`,
-          `vent inward / alignment: ${body.ventInwardSpeedMetresPerSecond.toFixed(2)} m/s / ${body.ventAlignmentErrorMetres.toFixed(2)} m`,
           `ground normal: ${groundNormal.x.toFixed(2)}, ${groundNormal.y.toFixed(2)}, ${groundNormal.z.toFixed(2)}`,
           `gameplay up: ${body.gameplayUp.x.toFixed(2)}, ${body.gameplayUp.y.toFixed(2)}, ${body.gameplayUp.z.toFixed(2)}`,
           `surface / last contact: ${body.supportSurfaceTag} / ${body.lastContactSurfaceTag}`,
