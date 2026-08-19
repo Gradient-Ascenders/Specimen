@@ -202,18 +202,28 @@ export class ContainmentTeachingScene {
   }
 
   private addVentTransition(materials: Record<string, THREE.Material>): void {
-    // A single, rising duct route creates meaningful separation before the
-    // Room 2 drop without turning the transition into a maze.
+    // A single, fully enclosed rising duct creates meaningful separation before
+    // the Room 2 drop without becoming a maze. Its floor sections overlap so
+    // there is never an invisible gap between the slope and its landing.
     this.addCollider({ name: 'duct-segment-a-floor', size: [2, 0.25, 7], position: [-4.8, 5.1, 9.5], material: materials.duct });
-    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 12], position: [-4.8, 8.5, 18.5], material: materials.duct, rotationX: -THREE.MathUtils.degToRad(34) });
-    this.addCollider({ name: 'duct-segment-c-floor', size: [7.2, 0.25, 2], position: [-5.7, 13.45, 24], material: materials.duct });
-    this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 5], position: [-9, 13.45, 27.5], material: materials.duct });
-
-    this.addDuctSide('-a-west', [-5.85, 6.2, 9.5], [0.18, 2.2, 7], materials.sticky, 'sticky');
+    this.addCollider({ name: 'duct-segment-a-roof', size: [2, 0.18, 7], position: [-4.8, 7.3, 9.5], material: materials.duct });
     this.addDuctSide('-a-east', [-3.75, 6.2, 9.5], [0.18, 2.2, 7], materials.duct);
-    this.addDuctSide('-final-west', [-10.05, 14.45, 27.5], [0.18, 2.2, 5], materials.duct);
-    this.addDuctSide('-final-east', [-7.95, 14.45, 27.5], [0.18, 2.2, 5], materials.duct);
-    this.addVisualBox('duct-drop-frame', [2.2, 0.25, 0.5], [-9, 13.5, 30], materials.duct);
+
+    const rampAngle = -THREE.MathUtils.degToRad(26);
+    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 12], position: [-4.8, 7.85, 18.5], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-roof', size: [2, 0.18, 12], position: [-4.8, 9.83, 17.54], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-west-wall', size: [0.18, 2.2, 12], position: [-5.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-east-wall', size: [0.18, 2.2, 12], position: [-3.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
+
+    // The ramp's high end is 10.49m, exactly level with this short turning
+    // bay. It is intentionally low enough to read as one connected route.
+    this.addCollider({ name: 'duct-segment-c-floor', size: [7.2, 0.25, 2], position: [-5.7, 10.36, 24], material: materials.duct });
+    this.addCollider({ name: 'duct-segment-c-roof', size: [7.2, 0.18, 2], position: [-5.7, 12.56, 24], material: materials.duct });
+    this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 5], position: [-9, 10.36, 27.5], material: materials.duct });
+    this.addCollider({ name: 'duct-final-run-roof', size: [2, 0.18, 5], position: [-9, 12.56, 27.5], material: materials.duct });
+    this.addDuctSide('-final-west', [-10.05, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
+    this.addDuctSide('-final-east', [-7.95, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
+    this.addVisualBox('duct-drop-frame', [2.2, 0.25, 0.5], [-9, 10.42, 30], materials.duct);
   }
 
   private addVentDebug(vent: VentTraversal): void {
