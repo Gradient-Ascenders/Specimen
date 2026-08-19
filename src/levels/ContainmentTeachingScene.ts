@@ -141,10 +141,12 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-1-north-clean-east', size: [5.2, 8, 0.4], position: [4.4, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-above-vent', size: [4.2, 0.7, 0.4], position: [-2.1, 7.65, 6], material: materials.wall });
 
-    this.addCollider({ name: 'room-1-vent-approach-ledge', size: [2.8, 0.3, 2.4], position: [-2.1, 5.95, 4.9], material: materials.support });
+    // A generous shelf prevents the first climb lesson from becoming a narrow
+    // balance test before the player can clearly see the vent route.
+    this.addCollider({ name: 'room-1-vent-approach-ledge', size: [4.2, 0.35, 3.6], position: [-2.1, 5.88, 4.45], material: materials.support });
 
     this.addVisualBox('room-1-locked-door-false-lead', [2.6, 3, 0.18], [4.2, 1.5, 5.76], materials.locked);
-    this.addVisualBox('room-1-vent-open-frame', [2.1, 1.4, 0.15], [-2.1, 6.6, 5.74], materials.duct);
+    this.addOpenVentFrame('room-1-vent-open-frame', [-2.1, 6.6, 5.74], materials.duct);
 
     this.addCollider({ name: 'room-1-containment-pedestal', size: [2.6, 1.1, 2.6], position: [0, 0.55, -0.5], material: materials.support });
     this.addVisualBox('room-1-glass-containment-box', [1.8, 1.9, 1.8], [0, 2.05, -0.5], materials.glass);
@@ -253,6 +255,22 @@ export class ContainmentTeachingScene {
     mesh.name = name;
     mesh.position.set(...position);
     this.root.add(mesh);
+  }
+
+  /** A frame, not a filled panel: the Room 1 vent must read as open. */
+  private addOpenVentFrame(
+    name: string,
+    position: readonly [number, number, number],
+    material: THREE.Material,
+  ): void {
+    const [x, y, z] = position;
+    const width = 2.1;
+    const height = 1.4;
+    const thickness = 0.14;
+    this.addVisualBox(`${name}-top`, [width, thickness, thickness], [x, y + height * 0.5, z], material);
+    this.addVisualBox(`${name}-bottom`, [width, thickness, thickness], [x, y - height * 0.5, z], material);
+    this.addVisualBox(`${name}-left`, [thickness, height, thickness], [x - width * 0.5, y, z], material);
+    this.addVisualBox(`${name}-right`, [thickness, height, thickness], [x + width * 0.5, y, z], material);
   }
 
   private addCeilingLight(name: string, position: readonly [number, number, number]): void {
