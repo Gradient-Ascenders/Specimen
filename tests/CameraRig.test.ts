@@ -71,6 +71,56 @@ test('vertical pointer look follows pitch convention with inversion off and on',
   assert.ok(invertedMouseDown.viewDirectionY > 0);
 });
 
+test('ground movement follows camera yaw while ignoring pitch', () => {
+  const rig = new CameraRig({
+    horizontalSensitivityRadiansPerPixel: 1,
+    verticalSensitivityRadiansPerPixel: 1,
+    minimumPitchRadians: -1,
+    maximumPitchRadians: 1,
+    initialPitchRadians: 0,
+  });
+  const movement = new THREE.Vector3();
+
+  rig.copyGroundMovementDirection(0, -1, movement);
+  assert.ok(movement.distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-10);
+
+  rig.queueLookInput(Math.PI, -10);
+  rig.applyQueuedLookInput();
+  rig.copyGroundMovementDirection(0, -1, movement);
+  assert.ok(movement.distanceTo(new THREE.Vector3(0, 0, 1)) < 1e-10);
+  assert.equal(rig.getDiagnostics().pitchRadians, -1);
+
+  rig.queueLookInput(0, 20);
+  rig.applyQueuedLookInput();
+  rig.copyGroundMovementDirection(0, -1, movement);
+  assert.ok(movement.distanceTo(new THREE.Vector3(0, 0, 1)) < 1e-10);
+  assert.equal(rig.getDiagnostics().pitchRadians, 1);
+});
+
+test('camera-relative cardinal and diagonal movement is normalized', () => {
+  const rig = new CameraRig();
+  const movement = new THREE.Vector3();
+
+  rig.copyGroundMovementDirection(1, 0, movement);
+  assert.deepEqual(movement.toArray(), [1, 0, 0]);
+
+  rig.copyGroundMovementDirection(-1, 0, movement);
+  assert.deepEqual(movement.toArray(), [-1, 0, 0]);
+
+  rig.copyGroundMovementDirection(0, 1, movement);
+  assert.deepEqual(movement.toArray(), [0, 0, 1]);
+
+  for (const [moveX, moveZ] of [
+    [1, -1],
+    [-1, -1],
+    [1, 1],
+    [-1, 1],
+  ] as const) {
+    rig.copyGroundMovementDirection(moveX, moveZ, movement);
+    assert.ok(Math.abs(movement.length() - 1) < 1e-10);
+  }
+});
+
 test('gameplay-up damping is frame-subdivision invariant and never mutates movement state', () => {
   const oneStepTarget = createTarget();
   const splitStepTarget = createTarget();

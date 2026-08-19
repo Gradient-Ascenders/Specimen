@@ -14,6 +14,7 @@ import {
 import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
+import { BlobFacing } from './render/BlobFacing';
 import { RenderLayer } from './render/RenderLayer';
 import './style.css';
 
@@ -50,6 +51,8 @@ const unsubscribeLanding = movementEvents.on('landed', (event) => {
 const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
 const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
 const renderedProbePosition = new THREE.Vector3();
+const cameraRelativeMovement = new THREE.Vector3();
+const blobFacing = new BlobFacing();
 
 const body = new KinematicBody({
   world: collisionWorld,
@@ -216,17 +219,37 @@ const loop = new Loop({
       (input.isDown('moveBackward') ? 1 : 0) -
       (input.isDown('moveForward') ? 1 : 0);
 
-    jumpInputState.pressed = input.wasPressed('jump');
-    jumpInputState.held = input.isDown('jump');
-    jumpInputState.released = input.wasReleased('jump');
-
-    body.update(deltaSeconds, moveX, moveZ, jumpInputState);
-    testScene.update(deltaSeconds);
-    puzzleTestRig.update(deltaSeconds);
     renderLayer.cameraRig.queueLookInput(
       input.pointerDeltaX,
       input.pointerDeltaY,
     );
+    renderLayer.cameraRig.applyQueuedLookInput();
+
+    // Preserve the existing authored-wall input policy. Ordinary ground input
+    // is camera-relative and completely independent of the blob's facing.
+    if (body.attached) {
+      cameraRelativeMovement.set(moveX, 0, moveZ);
+    } else {
+      renderLayer.cameraRig.copyGroundMovementDirection(
+        moveX,
+        moveZ,
+        cameraRelativeMovement,
+      );
+    }
+
+    jumpInputState.pressed = input.wasPressed('jump');
+    jumpInputState.held = input.isDown('jump');
+    jumpInputState.released = input.wasReleased('jump');
+
+    body.update(
+      deltaSeconds,
+      cameraRelativeMovement.x,
+      cameraRelativeMovement.z,
+      jumpInputState,
+    );
+    blobFacing.update(deltaSeconds, body.velocity, !body.attached);
+    testScene.update(deltaSeconds);
+    puzzleTestRig.update(deltaSeconds);
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
@@ -240,6 +263,17 @@ const loop = new Loop({
     );
 
     testScene.setProbePosition(renderedProbePosition);
+    testScene.setProbeYaw(
+      blobFacing.getInterpolatedYaw(interpolationAlpha),
+    );
+    // A high-refresh render can occur without a 60 Hz gameplay step. Consume
+    // any pointer motion from that interval here so camera look remains crisp;
+    // the next fixed step will read the already-updated orbit basis.
+    renderLayer.cameraRig.queueLookInput(
+      input.pointerDeltaX,
+      input.pointerDeltaY,
+    );
+    input.endPointerUpdate();
     renderLayer.cameraRig.update(
       interpolationAlpha,
       stats.frameDeltaSeconds,
@@ -287,6 +321,8 @@ const loop = new Loop({
           `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
           `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
+          `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
+          `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
           `slope idle regression: ${slopeRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,

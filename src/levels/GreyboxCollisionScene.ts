@@ -174,8 +174,11 @@ export class GreyboxCollisionScene {
     this.probe.position.set(position.x, position.y, position.z);
   }
 
+  setProbeYaw(yawRadians: number): void {
+    this.probe.rotation.set(0, yawRadians, 0);
+  }
+
   update(deltaSeconds: number): void {
-    this.probe.rotation.y += deltaSeconds * 0.8;
     this.probe.material.update(deltaSeconds);
 
     if (this.recoveryDelay <= 0) return;

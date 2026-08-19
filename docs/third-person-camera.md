@@ -70,6 +70,31 @@ the orbit-yaw convention independently.
 
 No settings UI is added by Issue #14.
 
+## Normal-ground camera, movement, and facing ownership
+
+The normal gameplay path keeps three orientation decisions separate:
+
+- `CameraRig` owns the accumulated pointer yaw and clamped pitch. It never
+  reads the slime visual's facing.
+- Before each unattached movement step, `main.ts` asks the rig for its
+  horizontal right/back basis and converts normalized WASD input into a world
+  direction. Camera pitch is not part of this basis.
+- `BlobFacing` reads the body's resulting horizontal velocity after the
+  kinematic step. It turns the upright visual toward that direction, or holds
+  the last heading when horizontal speed is negligible.
+
+This makes a stationary mouse orbit camera-only state. Starting movement after
+an orbit uses the new camera direction immediately, while changing movement
+direction never recentres the camera behind the blob. The existing authored
+wall input policy remains isolated and unchanged pending dedicated wall-camera
+comfort work.
+
+Normal-ground facing turns along the shortest yaw arc at `720°/s`, with a
+`0.05 m/s` horizontal speed threshold to suppress near-rest direction noise.
+Both values are named in `src/render/BlobFacing.ts`. Simulation updates the
+facing target at the fixed step and rendering interpolates the previous/current
+yaw along the shortest arc.
+
 ## Collision query layer
 
 `CollisionWorld` uses explicit bit masks:
