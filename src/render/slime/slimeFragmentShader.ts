@@ -11,7 +11,7 @@ uniform float uRimPower;
 
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
-varying float vSurfaceWobble;
+varying float vDeformation;
 
 void main() {
   vec3 normalWorld = normalize(vWorldNormal);
@@ -26,7 +26,7 @@ void main() {
   );
 
   float diffuseFactor = max(dot(normalWorld, lightDirectionWorld), 0.0);
-  vec3 surfaceColour = uBaseColour * (1.0 + vSurfaceWobble * 0.045);
+  vec3 surfaceColour = uBaseColour * (1.0 + vDeformation * 0.055);
   vec3 diffuse = surfaceColour * (
     hemisphereRadiance + uKeyLightRadiance * diffuseFactor
   );

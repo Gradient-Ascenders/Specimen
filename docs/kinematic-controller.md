@@ -16,7 +16,13 @@ Movement state owned by the body:
 - gameplay-up vector
 - attached state (reserved for sticky-surface work; always false in #11)
 
-Camera and visual systems read these values directly. Continuous position/velocity state is not broadcast through the `EventBus`; typed events are reserved for discrete occurrences such as landing or impact when those become useful.
+Camera and visual systems read these values directly. Continuous
+position/velocity state is not broadcast through the `EventBus`; the visual
+system receives typed `jumped` and `landed` events for one-shot deformation.
+The body also exposes the strongest resolved contact normal, inward speed,
+collider name, and surface tag from the current step. These are read-only
+collision facts for effects such as a directional wall splat; they do not
+change collision response.
 
 ## Units and initial tuning
 

@@ -35,11 +35,48 @@ interface SlimeUniforms {
   uShininess: THREE.IUniform<number>;
   uRimStrength: THREE.IUniform<number>;
   uRimPower: THREE.IUniform<number>;
+  uSpeed: THREE.IUniform<number>;
+  uLocomotionPhase: THREE.IUniform<number>;
+  uMoveDirectionLocal: THREE.IUniform<THREE.Vector3>;
+  uSurfaceNormalLocal: THREE.IUniform<THREE.Vector3>;
+  uSurfaceTangentLocal: THREE.IUniform<THREE.Vector3>;
+  uGrounded: THREE.IUniform<number>;
+  uAttached: THREE.IUniform<number>;
+  uJumpCharge: THREE.IUniform<number>;
+  uSquash: THREE.IUniform<number>;
+  uStretch: THREE.IUniform<number>;
+  uStretchDirectionLocal: THREE.IUniform<THREE.Vector3>;
+  uInertiaLocal: THREE.IUniform<THREE.Vector3>;
+  uImpactPointLocal: THREE.IUniform<THREE.Vector3>;
+  uImpactNormalLocal: THREE.IUniform<THREE.Vector3>;
+  uImpactStrength: THREE.IUniform<number>;
+  uImpactAge: THREE.IUniform<number>;
+  uImpactElasticity: THREE.IUniform<number>;
 }
 
 export interface SlimeMaterialOptions {
   baseColour?: THREE.ColorRepresentation;
   wobbleAmplitudeMetres?: number;
+}
+
+export interface SlimeMaterialDeformationState {
+  speed: number;
+  locomotionPhase: number;
+  moveDirectionLocal: THREE.Vector3;
+  surfaceNormalLocal: THREE.Vector3;
+  surfaceTangentLocal: THREE.Vector3;
+  grounded: number;
+  attached: number;
+  jumpCharge: number;
+  squash: number;
+  stretch: number;
+  stretchDirectionLocal: THREE.Vector3;
+  inertiaLocal: THREE.Vector3;
+  impactPointLocal: THREE.Vector3;
+  impactNormalLocal: THREE.Vector3;
+  impactStrength: number;
+  impactAge: number;
+  impactElasticity: number;
 }
 
 /**
@@ -84,6 +121,23 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
       uShininess: { value: DEFAULT_SLIME_SHININESS },
       uRimStrength: { value: DEFAULT_SLIME_RIM_STRENGTH },
       uRimPower: { value: DEFAULT_SLIME_RIM_POWER },
+      uSpeed: { value: 0 },
+      uLocomotionPhase: { value: 0 },
+      uMoveDirectionLocal: { value: new THREE.Vector3(0, 0, -1) },
+      uSurfaceNormalLocal: { value: new THREE.Vector3(0, 1, 0) },
+      uSurfaceTangentLocal: { value: new THREE.Vector3(0, 0, 1) },
+      uGrounded: { value: 1 },
+      uAttached: { value: 0 },
+      uJumpCharge: { value: 0 },
+      uSquash: { value: 0 },
+      uStretch: { value: 0 },
+      uStretchDirectionLocal: { value: new THREE.Vector3(0, 1, 0) },
+      uInertiaLocal: { value: new THREE.Vector3() },
+      uImpactPointLocal: { value: new THREE.Vector3(0, -0.45, 0) },
+      uImpactNormalLocal: { value: new THREE.Vector3(0, 1, 0) },
+      uImpactStrength: { value: 0 },
+      uImpactAge: { value: 10 },
+      uImpactElasticity: { value: 1 },
     };
 
     super({
@@ -102,6 +156,37 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
       (this.elapsedTimeSeconds + deltaSeconds) %
       WOBBLE_COMMON_PERIOD_SECONDS;
     this.slimeUniforms.uTime.value = this.elapsedTimeSeconds;
+  }
+
+  /** Copy bounded visual-controller state into existing uniform values. */
+  setDeformationState(state: SlimeMaterialDeformationState): void {
+    this.slimeUniforms.uSpeed.value = state.speed;
+    this.slimeUniforms.uLocomotionPhase.value = state.locomotionPhase;
+    this.slimeUniforms.uMoveDirectionLocal.value.copy(
+      state.moveDirectionLocal,
+    );
+    this.slimeUniforms.uSurfaceNormalLocal.value.copy(
+      state.surfaceNormalLocal,
+    );
+    this.slimeUniforms.uSurfaceTangentLocal.value.copy(
+      state.surfaceTangentLocal,
+    );
+    this.slimeUniforms.uGrounded.value = state.grounded;
+    this.slimeUniforms.uAttached.value = state.attached;
+    this.slimeUniforms.uJumpCharge.value = state.jumpCharge;
+    this.slimeUniforms.uSquash.value = state.squash;
+    this.slimeUniforms.uStretch.value = state.stretch;
+    this.slimeUniforms.uStretchDirectionLocal.value.copy(
+      state.stretchDirectionLocal,
+    );
+    this.slimeUniforms.uInertiaLocal.value.copy(state.inertiaLocal);
+    this.slimeUniforms.uImpactPointLocal.value.copy(state.impactPointLocal);
+    this.slimeUniforms.uImpactNormalLocal.value.copy(
+      state.impactNormalLocal,
+    );
+    this.slimeUniforms.uImpactStrength.value = state.impactStrength;
+    this.slimeUniforms.uImpactAge.value = state.impactAge;
+    this.slimeUniforms.uImpactElasticity.value = state.impactElasticity;
   }
 
   /** Recolour the same material instance for a future slime identity. */
