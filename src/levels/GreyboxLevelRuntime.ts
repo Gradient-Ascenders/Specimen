@@ -79,6 +79,7 @@ export class GreyboxLevelRuntime {
   private lastLandingImpactSpeedMetresPerSecond = 0;
   private debugSampleElapsedSeconds = 0;
   private debugVisible = false;
+  private debugInteractionEnabled = true;
   private slopeRegressionStatus = 'not run';
   private readonly wallJumpBasisRegressionStatus =
     runWallJumpBasisRegression();
@@ -121,6 +122,13 @@ export class GreyboxLevelRuntime {
   /** The one authoritative player-facing restart operation. */
   restartLevel(): void {
     this.lifecycle.restartLevel();
+  }
+
+  /** Allow the application flow to suppress level-owned diagnostics behind menus. */
+  setDebugInteractionEnabled(enabled: boolean): void {
+    this.debugInteractionEnabled = enabled;
+    const testPanel = this.resources?.testPanel;
+    if (testPanel) this.applyDebugPresentation(testPanel);
   }
 
   unload(): void {
@@ -678,6 +686,7 @@ export class GreyboxLevelRuntime {
 
   private readonly onDebugToggle = (event: KeyboardEvent): void => {
     if (event.code !== DEBUG_TOGGLE_CODE || event.repeat) return;
+    if (!this.debugInteractionEnabled) return;
     event.preventDefault();
     const testPanel = this.resources?.testPanel;
     if (!testPanel) return;
@@ -689,9 +698,14 @@ export class GreyboxLevelRuntime {
     testPanel: GreyboxTestPanel,
   ): void {
     this.debugVisible = visible;
-    testPanel.element.hidden = !visible;
-    testPanel.element.inert = !visible;
-    if (visible) {
+    this.applyDebugPresentation(testPanel);
+  }
+
+  private applyDebugPresentation(testPanel: GreyboxTestPanel): void {
+    const presented = this.debugInteractionEnabled && this.debugVisible;
+    testPanel.element.hidden = !presented;
+    testPanel.element.inert = !presented;
+    if (presented) {
       testPanel.element.removeAttribute('aria-hidden');
     } else {
       testPanel.element.setAttribute('aria-hidden', 'true');

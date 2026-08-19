@@ -318,6 +318,26 @@ test('the rig contracts against a camera-layer wall and fully recovers when it c
   wall.geometry.dispose();
 });
 
+test('follow distance validates and recovers through collision-aware camera logic', () => {
+  const rig = new CameraRig();
+  rig.setFollowTarget(createTarget(), new CollisionWorld());
+  rig.update(1, 0);
+
+  rig.setFollowDistanceMetres(7);
+  for (let step = 0; step < 300; step += 1) rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().desiredDistanceMetres, 7);
+  assert.ok(
+    Math.abs(rig.getDiagnostics().currentDistanceMetres - 7) < 1e-7,
+  );
+
+  rig.setFollowDistanceMetres(3.5);
+  rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().currentDistanceMetres, 3.5);
+  assert.throws(() => rig.setFollowDistanceMetres(3.49));
+  assert.throws(() => rig.setFollowDistanceMetres(7.01));
+  assert.throws(() => rig.setFollowDistanceMetres(Number.NaN));
+});
+
 test('teleport immediately removes stale camera up', () => {
   const target = createTarget();
   const rig = new CameraRig();
