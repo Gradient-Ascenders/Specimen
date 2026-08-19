@@ -18,8 +18,7 @@ interface BoxOptions {
   /** Art-facing identifier; does not affect collision or adhesion behaviour. */
   readonly textureRole?:
     | 'sticky-wall-tile'
-    | 'sticky-vent-tile'
-    | 'sticky-ledge-tile';
+    | 'sticky-vent-tile';
   readonly rotationX?: number;
 }
 
