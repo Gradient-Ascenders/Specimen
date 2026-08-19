@@ -7,6 +7,12 @@ interface GreyboxTestPanelOptions {
   onActivateCheckpoint: () => void;
   onRecoverCheckpoint: () => void;
   onRunSlopeIdleRegression: () => string;
+  onToggleStaticLaser: () => boolean;
+  onResetLaserSequences: () => void;
+  onRunLaserDeterminismRegression: () => string;
+  onEnterElevatorTest: () => void;
+  onRecoverElevatorCheckpoint: () => void;
+  onRunElevatorCarrierRegression: () => string;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -24,6 +30,12 @@ export class GreyboxTestPanel {
   private readonly checkpointButton: HTMLButtonElement;
   private readonly checkpointRecoveryButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
+  private readonly laserToggleButton: HTMLButtonElement;
+  private readonly laserResetButton: HTMLButtonElement;
+  private readonly laserRegressionButton: HTMLButtonElement;
+  private readonly elevatorEnterButton: HTMLButtonElement;
+  private readonly elevatorRecoveryButton: HTMLButtonElement;
+  private readonly elevatorRegressionButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -69,6 +81,12 @@ export class GreyboxTestPanel {
           <button type="button" data-action="reset-regression">Run 10 reset cycles</button>
           <button type="button" data-action="checkpoint">Activate elevated checkpoint</button>
           <button type="button" data-action="checkpoint-recovery">Recover at checkpoint</button>
+          <button type="button" data-action="laser-toggle">Toggle static laser</button>
+          <button type="button" data-action="laser-reset">Reset laser timelines</button>
+          <button type="button" data-action="laser-regression">Run laser determinism checks</button>
+          <button type="button" data-action="elevator-enter">Enter elevator test</button>
+          <button type="button" data-action="elevator-recovery">Recover elevator checkpoint</button>
+          <button type="button" data-action="elevator-regression">Run elevator carrier checks</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -108,6 +126,24 @@ export class GreyboxTestPanel {
     const slopeRegressionButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="slope-regression"]',
     );
+    const laserToggleButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="laser-toggle"]',
+    );
+    const laserResetButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="laser-reset"]',
+    );
+    const laserRegressionButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="laser-regression"]',
+    );
+    const elevatorEnterButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="elevator-enter"]',
+    );
+    const elevatorRecoveryButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="elevator-recovery"]',
+    );
+    const elevatorRegressionButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="elevator-regression"]',
+    );
 
     if (
       !status ||
@@ -120,7 +156,13 @@ export class GreyboxTestPanel {
       !resetRegressionButton ||
       !checkpointButton ||
       !checkpointRecoveryButton ||
-      !slopeRegressionButton
+      !slopeRegressionButton ||
+      !laserToggleButton ||
+      !laserResetButton ||
+      !laserRegressionButton ||
+      !elevatorEnterButton ||
+      !elevatorRecoveryButton ||
+      !elevatorRegressionButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -136,6 +178,12 @@ export class GreyboxTestPanel {
     this.checkpointButton = checkpointButton;
     this.checkpointRecoveryButton = checkpointRecoveryButton;
     this.slopeRegressionButton = slopeRegressionButton;
+    this.laserToggleButton = laserToggleButton;
+    this.laserResetButton = laserResetButton;
+    this.laserRegressionButton = laserRegressionButton;
+    this.elevatorEnterButton = elevatorEnterButton;
+    this.elevatorRecoveryButton = elevatorRecoveryButton;
+    this.elevatorRegressionButton = elevatorRegressionButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
@@ -157,6 +205,30 @@ export class GreyboxTestPanel {
     this.slopeRegressionButton.addEventListener(
       'click',
       this.runSlopeIdleRegression,
+    );
+    this.laserToggleButton.addEventListener(
+      'click',
+      this.toggleStaticLaser,
+    );
+    this.laserResetButton.addEventListener(
+      'click',
+      this.resetLaserSequences,
+    );
+    this.laserRegressionButton.addEventListener(
+      'click',
+      this.runLaserDeterminismRegression,
+    );
+    this.elevatorEnterButton.addEventListener(
+      'click',
+      this.enterElevatorTest,
+    );
+    this.elevatorRecoveryButton.addEventListener(
+      'click',
+      this.recoverElevatorCheckpoint,
+    );
+    this.elevatorRegressionButton.addEventListener(
+      'click',
+      this.runElevatorCarrierRegression,
     );
   }
 
@@ -181,6 +253,30 @@ export class GreyboxTestPanel {
     this.slopeRegressionButton.removeEventListener(
       'click',
       this.runSlopeIdleRegression,
+    );
+    this.laserToggleButton.removeEventListener(
+      'click',
+      this.toggleStaticLaser,
+    );
+    this.laserResetButton.removeEventListener(
+      'click',
+      this.resetLaserSequences,
+    );
+    this.laserRegressionButton.removeEventListener(
+      'click',
+      this.runLaserDeterminismRegression,
+    );
+    this.elevatorEnterButton.removeEventListener(
+      'click',
+      this.enterElevatorTest,
+    );
+    this.elevatorRecoveryButton.removeEventListener(
+      'click',
+      this.recoverElevatorCheckpoint,
+    );
+    this.elevatorRegressionButton.removeEventListener(
+      'click',
+      this.runElevatorCarrierRegression,
     );
   }
 
@@ -242,6 +338,48 @@ export class GreyboxTestPanel {
   private readonly runSlopeIdleRegression = (): void => {
     const result = this.options.onRunSlopeIdleRegression();
     this.status.textContent = `Idle slope regression: ${result}`;
+  };
+
+  private readonly toggleStaticLaser = (): void => {
+    const enabled = this.options.onToggleStaticLaser();
+    this.status.textContent = enabled
+      ? 'Static Room 3 laser enabled.'
+      : 'Static Room 3 laser disabled; emitters remain visible.';
+  };
+
+  private readonly resetLaserSequences = (): void => {
+    this.options.onResetLaserSequences();
+    this.status.textContent =
+      'Laser poses, enabled states, sequence steps, and timers reset.';
+  };
+
+  private readonly runLaserDeterminismRegression = (): void => {
+    const result = this.options.onRunLaserDeterminismRegression();
+    this.status.textContent = `Laser determinism: ${result}`;
+  };
+
+  private readonly enterElevatorTest = (): void => {
+    this.options.onEnterElevatorTest();
+    this.status.textContent =
+      'Player recovered onto the Room 4 elevator roof; warning/ascent starts automatically.';
+  };
+
+  private readonly recoverElevatorCheckpoint = (): void => {
+    this.options.onRecoverElevatorCheckpoint();
+    this.status.textContent =
+      'Room 4 checkpoint group reset elevator, hazards, timers, and player state.';
+  };
+
+  private readonly runElevatorCarrierRegression = (): void => {
+    try {
+      const result = this.options.onRunElevatorCarrierRegression();
+      this.status.textContent = `Elevator carrier: ${result}`;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      this.status.textContent = `Elevator carrier: FAIL — ${message}`;
+      console.error('Elevator carrier regression failed.', error);
+    }
   };
 
   setRuntimeDiagnostics(text: string): void {

@@ -31,11 +31,11 @@ git diff --check    # passed
 Playwright          # 2 production-preview scenarios passed
 ```
 
-The build produced a 627.95 kB minified / 157.00 kB gzip JavaScript chunk and
-retained Vite's known advisory for a chunk over 500 kB. The modest increase from
-the already-pushed camera/controller branch is explained by the targeted wall
-input and edge-transition code; it did not add an asset or loading boundary, so
-code splitting remains outside Issue #15.
+The build produced a 661.24 kB minified / 164.58 kB gzip JavaScript chunk and
+retained Vite's known advisory for a chunk over 500 kB. This total includes the
+laser-hazard and elevator work merged from `main`; the Issue #15 conflict
+resolution added no dependency or asset-loading boundary, so code splitting
+remains outside this focused fix.
 
 ## Selected rule and rationale
 
