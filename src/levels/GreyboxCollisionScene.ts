@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import type { SurfaceTag } from '../physics/SurfaceRegistry';
+
 type CollisionCase =
   | 'floor'
   | 'wall'
@@ -7,8 +9,6 @@ type CollisionCase =
   | 'slope'
   | 'gap'
   | 'platform';
-
-type SurfaceTag = 'default' | 'sticky' | 'bouncy';
 
 interface TestBox {
   name: string;
@@ -23,11 +23,6 @@ interface TestBox {
 const SPAWN_POSITION = new THREE.Vector3(-4, 0.46, 5);
 const RECOVERY_POSITION = new THREE.Vector3(6.5, -2.2, 2);
 
-/**
- * Authored geometry used to develop and inspect collision systems before a
- * production level exists. This class deliberately contains no movement or
- * collision response; later systems can register the named meshes in `root`.
- */
 export class GreyboxCollisionScene {
   readonly root = new THREE.Group();
 
@@ -47,8 +42,12 @@ export class GreyboxCollisionScene {
       gap: this.createMaterial(0xd95f8d),
       platform: this.createMaterial(0x62bf83),
       sticky: this.createMaterial(0x49c9b7),
+      nonStick: this.createMaterial(0xe06f5f),
       bouncy: this.createMaterial(0xb987e8),
-    } satisfies Record<CollisionCase | 'sticky' | 'bouncy', THREE.MeshStandardMaterial>;
+    } satisfies Record<
+      CollisionCase | 'sticky' | 'nonStick' | 'bouncy',
+      THREE.MeshStandardMaterial
+    >;
 
     const boxes: TestBox[] = [
       {
@@ -74,6 +73,14 @@ export class GreyboxCollisionScene {
         position: [-4.8, 1.5, -3.2],
         material: materials.sticky,
         surfaceTag: 'sticky',
+      },
+      {
+        name: 'case-wall-non-stick-3m-high',
+        testCase: 'wall',
+        size: [0.4, 3, 3],
+        position: [-1.5, 1.5, -3.2],
+        material: materials.nonStick,
+        surfaceTag: 'nonStick',
       },
       {
         name: 'case-ledge-1m-high',
@@ -151,7 +158,6 @@ export class GreyboxCollisionScene {
     this.resetProbe();
   }
 
-
   get collisionMeshes(): readonly THREE.Mesh[] {
     return this.collisionMeshList;
   }
@@ -164,7 +170,11 @@ export class GreyboxCollisionScene {
     return target.copy(RECOVERY_POSITION);
   }
 
-  setProbePosition(position: { readonly x: number; readonly y: number; readonly z: number }): void {
+  setProbePosition(position: {
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+  }): void {
     this.probe.position.set(position.x, position.y, position.z);
   }
 
