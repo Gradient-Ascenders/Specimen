@@ -120,6 +120,7 @@ export class KinematicBody {
   private readonly velocityValue = new THREE.Vector3();
   private readonly groundNormalValue = new THREE.Vector3(0, 1, 0);
   private readonly gameplayUpValue = new THREE.Vector3(0, 1, 0);
+  private readonly lastContactNormalValue = new THREE.Vector3(0, 1, 0);
 
   private groundedValue = false;
   private attachedValue = false;
@@ -137,6 +138,8 @@ export class KinematicBody {
   private lastLandingImpactSpeedValue = 0;
   private lastJumpSpeedValue = 0;
   private lastJumpChargeFractionValue = 0;
+  private lastContactImpactSpeedValue = 0;
+  private lastContactNameValue = 'none';
 
   private attachmentCooldownSecondsValue = 0;
   private bounceCooldownSecondsValue = 0;
@@ -282,6 +285,29 @@ export class KinematicBody {
     return this.config.maximumJumpChargeSeconds;
   }
 
+  get maximumLocomotionSpeedMetresPerSecond(): number {
+    return this.config.maxSpeedMetresPerSecond;
+  }
+
+  get lastContactNormal(): ReadonlyVector3State {
+    return this.lastContactNormalValue;
+  }
+
+  get lastContactImpactSpeedMetresPerSecond(): number {
+    return this.lastContactImpactSpeedValue;
+  }
+
+  get lastContactName(): string {
+    return this.lastContactNameValue;
+  }
+
+  /**
+   * Advance one deterministic gameplay step.
+   *
+   * `moveX` and `moveZ` are normalized intent axes in [-1, 1]. `jumpInput`
+   * uses action state captured by Input; a missing value means no jump input,
+   * which keeps development regressions concise.
+   */
   update(
     deltaSeconds: number,
     moveX: number,
@@ -295,6 +321,9 @@ export class KinematicBody {
     this.previousPositionValue.copy(this.currentPosition);
     this.contactsThisStep = 0;
     this.lastCollisionName = 'none';
+    this.lastContactImpactSpeedValue = 0;
+    this.lastContactNameValue = 'none';
+    this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastContactSurfaceTagValue = this.supportSurfaceTagValue;
     this.landedThisStepValue = false;
 
@@ -365,6 +394,9 @@ export class KinematicBody {
     this.lastLandingImpactSpeedValue = 0;
     this.lastJumpSpeedValue = 0;
     this.lastJumpChargeFractionValue = 0;
+    this.lastContactImpactSpeedValue = 0;
+    this.lastContactNameValue = 'none';
+    this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastBounceSpeedValue = 0;
     this.lastBounceSurfaceNameValue = 'none';
 
@@ -448,6 +480,12 @@ export class KinematicBody {
     this.groundReacquireDelaySeconds =
       this.config.jumpGroundDetachSeconds;
     this.airborneSeconds = 0;
+
+    this.events?.emit('jumped', {
+      speedMetresPerSecond: jumpSpeed,
+      chargeFraction: normalizedCharge,
+      directionWorld: this.gameplayUpValue,
+    });
   }
 
   private cancelJumpCharge(): void {
@@ -642,6 +680,15 @@ export class KinematicBody {
       const velocityIntoSurface = this.velocityValue.dot(
         this.movementHit.normal,
       );
+
+      const contactImpactSpeed = Math.max(0, -velocityIntoSurface);
+      if (contactImpactSpeed >= this.lastContactImpactSpeedValue) {
+        this.lastContactImpactSpeedValue = contactImpactSpeed;
+        this.lastContactNormalValue.copy(this.movementHit.normal);
+        this.lastContactNameValue =
+          this.movementHit.object?.name || '<unnamed>';
+        this.lastContactSurfaceTagValue = surface.tag;
+      }
 
       if (
         surface.bounceSpeedMetresPerSecond > 0 &&
