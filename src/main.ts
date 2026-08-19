@@ -15,6 +15,7 @@ import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { RenderLayer } from './render/RenderLayer';
+import type { SlimeVisualState } from './render/slime/SlimeVisual';
 import './style.css';
 
 const app = document.querySelector<HTMLElement>('#app');
@@ -41,12 +42,6 @@ const movementEvents = new EventBus<MovementEvents>();
 let landingEventCount = 0;
 let lastLandingImpactSpeedMetresPerSecond = 0;
 
-const unsubscribeLanding = movementEvents.on('landed', (event) => {
-  landingEventCount += 1;
-  lastLandingImpactSpeedMetresPerSecond =
-    event.impactSpeedMetresPerSecond;
-});
-
 const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
 const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
 const renderedProbePosition = new THREE.Vector3();
@@ -58,6 +53,42 @@ const body = new KinematicBody({
   events: movementEvents,
 });
 renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
+
+const slimeVisualState: SlimeVisualState = {
+  velocityWorld: body.velocity,
+  surfaceNormalWorld: body.groundNormal,
+  gameplayUpWorld: body.gameplayUp,
+  grounded: body.grounded,
+  attached: body.attached,
+  jumpCharge: body.chargeFraction,
+  maximumLocomotionSpeedMetresPerSecond:
+    body.maximumLocomotionSpeedMetresPerSecond,
+  contactCount: body.contactsThisStep,
+  contactNormalWorld: body.lastContactNormal,
+  contactSpeedMetresPerSecond:
+    body.lastContactImpactSpeedMetresPerSecond,
+  contactName: body.lastContactName,
+  contactSurfaceTag: body.lastContactSurfaceTag,
+  landedThisStep: body.landedThisStep,
+};
+
+const unsubscribeLanding = movementEvents.on('landed', (event) => {
+  landingEventCount += 1;
+  lastLandingImpactSpeedMetresPerSecond =
+    event.impactSpeedMetresPerSecond;
+  testScene.onSlimeLanding(
+    body.groundNormal,
+    event.impactSpeedMetresPerSecond,
+  );
+});
+
+const unsubscribeJumped = movementEvents.on('jumped', (event) => {
+  testScene.onSlimeLaunch({
+    directionWorld: event.directionWorld,
+    speedMetresPerSecond: event.speedMetresPerSecond,
+    chargeFraction: event.chargeFraction,
+  });
+});
 
 const jumpInputState: JumpInputState = {
   pressed: false,
@@ -221,7 +252,16 @@ const loop = new Loop({
     jumpInputState.released = input.wasReleased('jump');
 
     body.update(deltaSeconds, moveX, moveZ, jumpInputState);
-    testScene.update(deltaSeconds);
+    slimeVisualState.grounded = body.grounded;
+    slimeVisualState.attached = body.attached;
+    slimeVisualState.jumpCharge = body.chargeFraction;
+    slimeVisualState.contactCount = body.contactsThisStep;
+    slimeVisualState.contactSpeedMetresPerSecond =
+      body.lastContactImpactSpeedMetresPerSecond;
+    slimeVisualState.contactName = body.lastContactName;
+    slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
+    slimeVisualState.landedThisStep = body.landedThisStep;
+    testScene.update(deltaSeconds, slimeVisualState);
     puzzleTestRig.update(deltaSeconds);
     renderLayer.cameraRig.queueLookInput(
       input.pointerDeltaX,
@@ -256,6 +296,7 @@ const loop = new Loop({
       const velocity = body.velocity;
       const groundNormal = body.groundNormal;
       const renderStats = renderLayer.getDiagnostics();
+      const slimeDiagnostics = testScene.slimeDiagnostics;
       const cameraStats = renderLayer.cameraRig.getDiagnostics();
       const cameraPosition = renderLayer.cameraRig.camera.position;
 
@@ -281,6 +322,12 @@ const loop = new Loop({
           `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
           `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,
           `last landing impact / count: ${lastLandingImpactSpeedMetresPerSecond.toFixed(2)} m/s / ${landingEventCount}`,
+          `visual speed / charge: ${slimeDiagnostics.speed.toFixed(2)} / ${slimeDiagnostics.jumpCharge.toFixed(2)}`,
+          `visual squash / stretch: ${slimeDiagnostics.squash.toFixed(2)} / ${slimeDiagnostics.stretch.toFixed(2)}`,
+          `visual impact strength / age: ${slimeDiagnostics.impactStrength.toFixed(2)} / ${slimeDiagnostics.impactAge.toFixed(2)} s`,
+          `visual impact normal: ${slimeDiagnostics.impactNormalLocal.x.toFixed(2)}, ${slimeDiagnostics.impactNormalLocal.y.toFixed(2)}, ${slimeDiagnostics.impactNormalLocal.z.toFixed(2)}`,
+          `visual surface normal: ${slimeDiagnostics.surfaceNormalLocal.x.toFixed(2)}, ${slimeDiagnostics.surfaceNormalLocal.y.toFixed(2)}, ${slimeDiagnostics.surfaceNormalLocal.z.toFixed(2)}`,
+          `visual move direction: ${slimeDiagnostics.moveDirectionLocal.x.toFixed(2)}, ${slimeDiagnostics.moveDirectionLocal.y.toFixed(2)}, ${slimeDiagnostics.moveDirectionLocal.z.toFixed(2)}`,
           `contacts this step: ${body.contactsThisStep}`,
           `last collision: ${body.lastCollisionName}`,
           `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
@@ -306,6 +353,7 @@ renderLayer.setAnimationLoop((timestampMs) => {
 
 const shutdown = (): void => {
   unsubscribeLanding();
+  unsubscribeJumped();
   movementEvents.clear();
   loop.dispose();
   input.dispose();

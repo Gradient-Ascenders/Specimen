@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 
-import { SlimeMaterial } from '../render/slime/SlimeMaterial';
+import {
+  SlimeVisual,
+  type SlimeVisualDiagnostics,
+  type SlimeVisualImpact,
+  type SlimeVisualLaunch,
+  type SlimeVisualState,
+  type Vector3State,
+} from '../render/slime/SlimeVisual';
 import type { SurfaceTag } from '../physics/SurfaceRegistry';
 
 type CollisionCase =
@@ -28,7 +35,7 @@ export class GreyboxCollisionScene {
   readonly root = new THREE.Group();
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
-  private readonly probe: THREE.Mesh<THREE.SphereGeometry, SlimeMaterial>;
+  private readonly slimeVisual: SlimeVisual;
   private recoveryDelay = 0;
   private recoveryCallback: (() => void) | undefined;
 
@@ -145,17 +152,17 @@ export class GreyboxCollisionScene {
     this.addSpawnMarker();
     this.addRecoveryMarker();
 
-    const probeGeometry = new THREE.SphereGeometry(0.45, 24, 16);
-    const probeMaterial = new SlimeMaterial();
-    this.probe = new THREE.Mesh(probeGeometry, probeMaterial);
-    this.probe.name = 'player-collision-probe-radius-0.45m';
-    this.probe.userData.radiusMetres = 0.45;
-    this.root.add(this.probe);
+    this.slimeVisual = new SlimeVisual({ radiusMetres: 0.45 });
+    this.root.add(this.slimeVisual.mesh);
     this.resetProbe();
   }
 
   get collisionMeshes(): readonly THREE.Mesh[] {
     return this.collisionMeshList;
+  }
+
+  get slimeDiagnostics(): SlimeVisualDiagnostics {
+    return this.slimeVisual.diagnostics;
   }
 
   copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
@@ -166,17 +173,12 @@ export class GreyboxCollisionScene {
     return target.copy(RECOVERY_POSITION);
   }
 
-  setProbePosition(position: {
-    readonly x: number;
-    readonly y: number;
-    readonly z: number;
-  }): void {
-    this.probe.position.set(position.x, position.y, position.z);
+  setProbePosition(position: Vector3State): void {
+    this.slimeVisual.setPosition(position);
   }
 
-  update(deltaSeconds: number): void {
-    this.probe.rotation.y += deltaSeconds * 0.8;
-    this.probe.material.update(deltaSeconds);
+  update(deltaSeconds: number, visualState: SlimeVisualState): void {
+    this.slimeVisual.update(deltaSeconds, visualState);
 
     if (this.recoveryDelay <= 0) return;
 
@@ -190,16 +192,36 @@ export class GreyboxCollisionScene {
 
   resetProbe(): void {
     this.recoveryDelay = 0;
-    this.probe.position.copy(SPAWN_POSITION);
+    this.slimeVisual.setPosition(SPAWN_POSITION);
+    this.slimeVisual.reset();
   }
 
   simulateFall(onRecovered: () => void): void {
-    this.probe.position.copy(RECOVERY_POSITION);
+    this.slimeVisual.setPosition(RECOVERY_POSITION);
     this.recoveryCallback = onRecovered;
     this.recoveryDelay = 0.7;
   }
 
+  onSlimeImpact(impact: SlimeVisualImpact): void {
+    this.slimeVisual.onImpact(impact);
+  }
+
+  onSlimeLanding(
+    normalWorld: Vector3State,
+    impactSpeedMetresPerSecond: number,
+  ): void {
+    this.slimeVisual.onLanding(
+      normalWorld,
+      impactSpeedMetresPerSecond,
+    );
+  }
+
+  onSlimeLaunch(launch: SlimeVisualLaunch): void {
+    this.slimeVisual.onLaunch(launch);
+  }
+
   dispose(): void {
+    this.slimeVisual.dispose();
     this.root.removeFromParent();
     this.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh || object instanceof THREE.LineSegments)) {
