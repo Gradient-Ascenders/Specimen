@@ -98,6 +98,7 @@ const jumpInputState: JumpInputState = {
   pressed: false,
   held: false,
   released: false,
+  cancelled: false,
 };
 const wallJumpIntent: WallJumpIntent = {
   lateral: 0,
@@ -293,6 +294,7 @@ const loop = new Loop({
     jumpInputState.pressed = input.wasPressed('jump');
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
+    jumpInputState.cancelled = input.wasClearedSinceFixedUpdate;
 
     wallJumpIntent.lateral = moveX;
     wallJumpIntent.vertical = -moveZ;
@@ -375,6 +377,7 @@ const loop = new Loop({
           `jump state / can jump: ${body.jumpState} / ${body.canJump ? 'yes' : 'no'}`,
           `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
           `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
+          `jump buffer remaining: ${body.jumpInputBufferRemainingSeconds.toFixed(3)} s`,
           `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
           `last jump direction: ${body.lastJumpDirection.x.toFixed(2)}, ${body.lastJumpDirection.y.toFixed(2)}, ${body.lastJumpDirection.z.toFixed(2)}`,
           `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,
