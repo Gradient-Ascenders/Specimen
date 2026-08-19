@@ -42,7 +42,9 @@ let landingEventCount = 0;
 let lastLandingImpactSpeedMetresPerSecond = 0;
 
 const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
-const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
+const outOfBoundsTestPosition = testScene.copyOutOfBoundsTestPosition(
+  new THREE.Vector3(),
+);
 const renderedProbePosition = new THREE.Vector3();
 const cameraRelativeMovement = new THREE.Vector3();
 const noMovement = new THREE.Vector3();
@@ -230,7 +232,7 @@ const testPanel = new GreyboxTestPanel({
     lastLandingImpactSpeedMetresPerSecond = 0;
   },
   onTestRecovery: (onRecovered) => {
-    body.teleport(recoveryPosition);
+    body.teleport(outOfBoundsTestPosition);
     testScene.simulateFall(() => {
       body.teleport(spawnPosition);
       onRecovered();

@@ -44,10 +44,10 @@ the later Room 3/4/5 traversal beats remain outside issue #20.
 
 ## Verification checklist
 
-- Confirm Tack cannot attach to normal Room 1/Room 2 wall meshes.
-- Confirm Tack can attach to the Room 1 contaminated perimeter wall and the
+- Confirm Bob cannot attach to normal Room 1/Room 2 wall meshes.
+- Confirm Bob can attach to the Room 1 contaminated perimeter wall and the
   Room 2 elevated catch wall.
-- Confirm holding movement at the top of Room 1's sticky wall carries Tack
+- Confirm holding movement at the top of Room 1's sticky wall carries Bob
   directly onto the vent floor without a jump or scripted transition.
 - Confirm the Room 2 drop produces an impact-scaled innate rebound.
 - Confirm the charged-jump route reads in order: lower zig-zag, wall catch,
@@ -56,6 +56,8 @@ the later Room 3/4/5 traversal beats remain outside issue #20.
   to move around the high ledge obstruction and reach its top.
 - Confirm a missed wall catch returns to the safe floor and can retry through
   the lower A–D route without resetting the room.
-- Confirm reset returns the player to the Room 1 safe spawn and the existing
-  out-of-bounds recovery path does not require a browser refresh.
-- Run `npm test` and `npm run build` before review.
+- Confirm the `F` recovery test moves Bob below the level before returning him
+  to the Room 1 safe spawn without requiring a browser refresh.
+- Confirm the separate Room 2 safe-landing position clears the chamber floor
+  by Bob's full collision radius and skin width.
+- Run `npm test`, `npm run type-check`, and `npm run build` before review.
