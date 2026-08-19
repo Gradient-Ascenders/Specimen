@@ -29,6 +29,48 @@ function createTarget(): MutableCameraTarget {
   };
 }
 
+function applyVerticalLook(
+  pointerDeltaY: number,
+  invertVertical: boolean,
+): { cameraHeightDelta: number; viewDirectionY: number } {
+  const rig = new CameraRig({
+    initialPitchRadians: 0,
+    minimumPitchRadians: -1,
+    maximumPitchRadians: 1,
+  });
+  rig.setFollowTarget(createTarget(), new CollisionWorld());
+  rig.setLookSettings({ invertVertical });
+  rig.update(1, 0);
+
+  const initialCameraY = rig.camera.position.y;
+  rig.queueLookInput(0, pointerDeltaY);
+  rig.update(1, 0);
+
+  const viewDirection = rig.camera.getWorldDirection(new THREE.Vector3());
+  return {
+    cameraHeightDelta: rig.camera.position.y - initialCameraY,
+    viewDirectionY: viewDirection.y,
+  };
+}
+
+test('vertical pointer look follows pitch convention with inversion off and on', () => {
+  const mouseUp = applyVerticalLook(-100, false);
+  assert.ok(mouseUp.cameraHeightDelta < 0);
+  assert.ok(mouseUp.viewDirectionY > 0);
+
+  const mouseDown = applyVerticalLook(100, false);
+  assert.ok(mouseDown.cameraHeightDelta > 0);
+  assert.ok(mouseDown.viewDirectionY < 0);
+
+  const invertedMouseUp = applyVerticalLook(-100, true);
+  assert.ok(invertedMouseUp.cameraHeightDelta > 0);
+  assert.ok(invertedMouseUp.viewDirectionY < 0);
+
+  const invertedMouseDown = applyVerticalLook(100, true);
+  assert.ok(invertedMouseDown.cameraHeightDelta < 0);
+  assert.ok(invertedMouseDown.viewDirectionY > 0);
+});
+
 test('gameplay-up damping is frame-subdivision invariant and never mutates movement state', () => {
   const oneStepTarget = createTarget();
   const splitStepTarget = createTarget();

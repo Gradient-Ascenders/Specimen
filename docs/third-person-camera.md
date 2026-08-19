@@ -64,6 +64,10 @@ before `Input.endFixedUpdate()` clears it.
 - horizontal inversion (off by default);
 - vertical/Y inversion (off by default).
 
+With vertical inversion off, mouse up looks up and mouse down looks down;
+enabling vertical inversion reverses those directions. Horizontal look retains
+the orbit-yaw convention independently.
+
 No settings UI is added by Issue #14.
 
 ## Collision query layer

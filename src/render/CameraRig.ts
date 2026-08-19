@@ -195,7 +195,10 @@ export class CameraRig {
       this.config.horizontalSensitivityRadiansPerPixel,
       this.config.invertHorizontal,
     );
-    this.queuedPitchRadians += mapPointerAxisToOrbitRadians(
+    // Browser +Y points down, and positive rig pitch raises the camera so its
+    // view points down. The generic mapper follows yaw's opposite sign, so
+    // translate it only at this pitch integration boundary.
+    this.queuedPitchRadians -= mapPointerAxisToOrbitRadians(
       deltaY,
       this.config.verticalSensitivityRadiansPerPixel,
       this.config.invertVertical,

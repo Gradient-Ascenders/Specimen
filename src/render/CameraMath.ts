@@ -10,8 +10,9 @@ export interface CameraLookSettings {
 /**
  * Map one browser pointer-motion axis into an orbit angle.
  *
- * The default sign makes right/down pointer movement turn the view right/down.
- * Keeping this mapping pure makes settings integration testable without a DOM.
+ * The default sign matches the orbit-yaw convention: positive browser pointer
+ * movement produces a negative orbit angle. CameraRig translates that sign at
+ * the pitch boundary because positive rig pitch raises the camera.
  */
 export function mapPointerAxisToOrbitRadians(
   pointerDeltaPixels: number,
