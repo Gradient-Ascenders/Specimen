@@ -61,6 +61,14 @@ export interface KinematicBodyConfig {
   bounceCooldownSeconds: number;
   /** Required approach speed into a bounce surface before it fires. */
   minimumBounceApproachSpeedMetresPerSecond: number;
+
+  /**
+   * Outward separation speed used when an attached jump has directional
+   * surface input. The remaining charged jump speed is spent along the wall.
+   */
+  directionalWallJumpOutwardSpeedMetresPerSecond: number;
+  /** Reattachment cooldown used specifically by directional wall jumps. */
+  directionalWallJumpDetachCooldownSeconds: number;
 }
 
 export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
@@ -90,6 +98,11 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   attachmentDetachCooldownSeconds: 0.12,
   bounceCooldownSeconds: 0.12,
   minimumBounceApproachSpeedMetresPerSecond: 0.12,
+
+  // A directional wall jump spends most of its charged speed along the
+  // authored wall while keeping enough outward motion to clear collision.
+  directionalWallJumpOutwardSpeedMetresPerSecond: 1.2,
+  directionalWallJumpDetachCooldownSeconds: 0.08,
 };
 
 export interface KinematicBodyOptions {
@@ -157,6 +170,7 @@ export class KinematicBody {
   private readonly gravityStep = new THREE.Vector3();
   private readonly movementUpAtStepStart = new THREE.Vector3();
   private readonly launchDirection = new THREE.Vector3();
+  private readonly directionalWallJumpTangent = new THREE.Vector3();
   private readonly edgeOldUp = new THREE.Vector3();
   private readonly edgeTravelDirection = new THREE.Vector3();
   private readonly edgeProbeDisplacement = new THREE.Vector3();
@@ -301,6 +315,10 @@ export class KinematicBody {
     return this.lastJumpChargeFractionValue;
   }
 
+  get lastJumpDirection(): ReadonlyVector3State {
+    return this.launchDirection;
+  }
+
   get maximumJumpChargeSeconds(): number {
     return this.config.maximumJumpChargeSeconds;
   }
@@ -379,7 +397,13 @@ export class KinematicBody {
       this.airborneSeconds += deltaSeconds;
     }
 
-    this.updateJumpState(deltaSeconds, jumpInput);
+    this.updateJumpState(
+      deltaSeconds,
+      jumpInput,
+      movementDirectionWorld,
+      attachedAtStepStart,
+      this.movementUpAtStepStart,
+    );
     this.applyLocomotion(
       deltaSeconds,
       movementDirectionWorld,
@@ -554,6 +578,9 @@ export class KinematicBody {
   private updateJumpState(
     deltaSeconds: number,
     jumpInput: Readonly<JumpInputState>,
+    movementDirectionWorld: ReadonlyVector3State,
+    attachedAtStepStart: boolean,
+    movementUpAtStepStart: THREE.Vector3,
   ): void {
     if (this.chargingJumpValue) {
       if (!jumpInput.held && !jumpInput.released) {
@@ -573,7 +600,13 @@ export class KinematicBody {
         );
       }
 
-      if (jumpInput.released) this.launchChargedJump();
+      if (jumpInput.released) {
+        this.launchChargedJump(
+          movementDirectionWorld,
+          attachedAtStepStart,
+          movementUpAtStepStart,
+        );
+      }
       return;
     }
 
@@ -584,10 +617,20 @@ export class KinematicBody {
       ? Math.min(deltaSeconds, this.config.maximumJumpChargeSeconds)
       : 0;
 
-    if (jumpInput.released) this.launchChargedJump();
+    if (jumpInput.released) {
+      this.launchChargedJump(
+        movementDirectionWorld,
+        attachedAtStepStart,
+        movementUpAtStepStart,
+      );
+    }
   }
 
-  private launchChargedJump(): void {
+  private launchChargedJump(
+    movementDirectionWorld: ReadonlyVector3State,
+    attachedAtStepStart: boolean,
+    movementUpAtStepStart: THREE.Vector3,
+  ): void {
     const normalizedCharge = this.chargeFraction;
     const curvedCharge = Math.pow(
       normalizedCharge,
@@ -599,23 +642,38 @@ export class KinematicBody {
       curvedCharge,
     );
 
-    // Capture the authoritative launch axis before wall detachment restores
-    // gameplayUp to world-up. Physics and presentation must observe the same
-    // direction for this transition.
-    this.launchDirection.copy(this.gameplayUpValue);
-    const currentUpSpeed = this.velocityValue.dot(this.launchDirection);
-    if (currentUpSpeed < jumpSpeed) {
-      this.velocityValue.addScaledVector(
-        this.launchDirection,
-        jumpSpeed - currentUpSpeed,
+    const directionalWallJump =
+      attachedAtStepStart &&
+      this.prepareDirectionalWallJump(
+        movementDirectionWorld,
+        movementUpAtStepStart,
+        jumpSpeed,
       );
+
+    if (!directionalWallJump) {
+      // No wall-direction input keeps the original behaviour: floor jumps use
+      // gameplay-up and attached jumps launch directly away from the wall.
+      this.launchDirection.copy(this.gameplayUpValue);
+      const currentLaunchSpeed =
+        this.velocityValue.dot(this.launchDirection);
+
+      if (currentLaunchSpeed < jumpSpeed) {
+        this.velocityValue.addScaledVector(
+          this.launchDirection,
+          jumpSpeed - currentLaunchSpeed,
+        );
+      }
     }
 
     this.lastJumpSpeedValue = jumpSpeed;
     this.lastJumpChargeFractionValue = normalizedCharge;
 
     if (this.attachedValue) {
-      this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
+      this.detachFromSurface(
+        directionalWallJump
+          ? this.config.directionalWallJumpDetachCooldownSeconds
+          : this.config.attachmentDetachCooldownSeconds,
+      );
     } else {
       this.groundedValue = false;
       this.groundNormalValue.copy(WORLD_UP);
@@ -633,6 +691,59 @@ export class KinematicBody {
       chargeFraction: normalizedCharge,
       directionWorld: this.launchDirection,
     });
+  }
+
+  /**
+   * Resolve camera-relative surface intent into a charged wall-jump direction.
+   *
+   * The desired input is projected onto the wall tangent. Most of the charged
+   * speed is then placed along that tangent, while a small fixed outward speed
+   * clears the current sticky surface. This makes W/S/A/D and diagonals useful
+   * for wall traversal without removing the original no-input "jump away"
+   * behaviour.
+   */
+  private prepareDirectionalWallJump(
+    movementDirectionWorld: ReadonlyVector3State,
+    wallNormal: THREE.Vector3,
+    jumpSpeed: number,
+  ): boolean {
+    this.directionalWallJumpTangent
+      .set(
+        movementDirectionWorld.x,
+        movementDirectionWorld.y,
+        movementDirectionWorld.z,
+      )
+      .projectOnPlane(wallNormal);
+
+    const tangentLengthSq =
+      this.directionalWallJumpTangent.lengthSq();
+    if (tangentLengthSq <= MOVEMENT_EPSILON_SQ) return false;
+
+    this.directionalWallJumpTangent.multiplyScalar(
+      1 / Math.sqrt(tangentLengthSq),
+    );
+
+    // Keep total launch magnitude equal to the charged jump speed. The fixed
+    // outward component is capped defensively so custom low-speed configs still
+    // leave a non-zero directional component.
+    const outwardSpeed = Math.min(
+      this.config.directionalWallJumpOutwardSpeedMetresPerSecond,
+      jumpSpeed * 0.75,
+    );
+    const tangentSpeed = Math.sqrt(
+      Math.max(
+        0,
+        jumpSpeed * jumpSpeed - outwardSpeed * outwardSpeed,
+      ),
+    );
+
+    this.velocityValue
+      .copy(this.directionalWallJumpTangent)
+      .multiplyScalar(tangentSpeed)
+      .addScaledVector(wallNormal, outwardSpeed);
+
+    this.launchDirection.copy(this.velocityValue).normalize();
+    return true;
   }
 
   private cancelJumpCharge(): void {
@@ -1229,6 +1340,10 @@ export class KinematicBody {
         'minimumBounceApproachSpeedMetresPerSecond',
         config.minimumBounceApproachSpeedMetresPerSecond,
       ],
+      [
+        'directionalWallJumpOutwardSpeedMetresPerSecond',
+        config.directionalWallJumpOutwardSpeedMetresPerSecond,
+      ],
     ];
 
     for (const [name, value] of positiveFinite) {
@@ -1251,6 +1366,10 @@ export class KinematicBody {
       ['coyoteTimeSeconds', config.coyoteTimeSeconds],
       ['jumpGroundDetachSeconds', config.jumpGroundDetachSeconds],
       ['minimumLandingAirTimeSeconds', config.minimumLandingAirTimeSeconds],
+      [
+        'directionalWallJumpDetachCooldownSeconds',
+        config.directionalWallJumpDetachCooldownSeconds,
+      ],
     ];
 
     for (const [name, value] of nonNegativeFinite) {
