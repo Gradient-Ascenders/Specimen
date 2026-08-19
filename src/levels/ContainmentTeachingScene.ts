@@ -19,6 +19,10 @@ interface BoxOptions {
   readonly rotationX?: number;
 }
 
+interface ContainmentTeachingSceneOptions {
+  readonly showVentDebug?: boolean;
+}
+
 const ROOM_2_CENTRE_Z = 38;
 const SPAWN_POSITION = new THREE.Vector3(0, 0.5, -1.8);
 const ROOM_2_RECOVERY_POSITION = new THREE.Vector3(-9, 0.5, 31);
@@ -36,7 +40,7 @@ export class ContainmentTeachingScene {
   private recoveryDelay = 0;
   private recoveryCallback: (() => void) | undefined;
 
-  constructor() {
+  constructor(options: ContainmentTeachingSceneOptions = {}) {
     this.root.name = 'containment-climb-and-bounce-greybox';
 
     const materials = {
@@ -84,7 +88,7 @@ export class ContainmentTeachingScene {
         handoffMode: 'free',
       }),
     ];
-    this.addVentDebug(this.ventTraversals[0]);
+    if (options.showVentDebug) this.addVentDebug(this.ventTraversals[0]);
 
     this.slimeVisual = new SlimeVisual({ radiusMetres: 0.45 });
     this.root.add(this.slimeVisual.mesh);

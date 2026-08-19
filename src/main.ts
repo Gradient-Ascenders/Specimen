@@ -25,7 +25,9 @@ if (!app) {
 
 const renderLayer = new RenderLayer({ host: app });
 
-const testScene = new ContainmentTeachingScene();
+const testScene = new ContainmentTeachingScene({
+  showVentDebug: import.meta.env.DEV,
+});
 renderLayer.scene.add(testScene.root);
 
 const collisionWorld = new CollisionWorld();
