@@ -1,6 +1,6 @@
 interface GreyboxTestPanelOptions {
   onReset: () => void;
-  onTestRecovery: (onRecovered: () => void) => void;
+  onTestRecovery: () => void;
   onTogglePuzzleTest: () => boolean;
   onRunSensorRegression: () => void;
   onRunResetRegression: () => void;
@@ -74,7 +74,7 @@ export class GreyboxTestPanel {
 
         <div class="controls">
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
-          <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
+          <button type="button" data-action="fall">Test death <kbd>F</kbd></button>
           <button type="button" data-action="slope-regression">Run idle slope check</button>
           <button type="button" data-action="puzzle">Toggle plate test</button>
           <button type="button" data-action="sensor-regression">Run sensor checks</button>
@@ -286,10 +286,9 @@ export class GreyboxTestPanel {
   };
 
   readonly testRecovery = (): void => {
-    this.options.onTestRecovery(() => {
-      this.status.textContent = 'Recovery volume returned the probe to spawn.';
-    });
-    this.status.textContent = 'Probe entered the red recovery volume…';
+    this.options.onTestRecovery();
+    this.status.textContent =
+      'Probe entered the recovery volume. Retry from the death screen.';
   };
 
   private readonly togglePuzzleTest = (): void => {

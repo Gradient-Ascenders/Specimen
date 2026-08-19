@@ -80,6 +80,7 @@ export class ElevatorTestRig {
     player: KinematicBody,
     collisionWorld: CollisionWorld,
     surfaces: SurfaceRegistry,
+    requestPlayerDeath?: () => void,
   ) {
     this.player = player;
     this.collisionWorld = collisionWorld;
@@ -166,8 +167,12 @@ export class ElevatorTestRig {
       id: 'room4-elevator-connected-hazards',
       hazards: [this.connectedLaser],
       requestRecovery: () => {
-        this.recoveryCountValue += 1;
-        this.checkpoints.recover(this.player);
+        if (requestPlayerDeath) {
+          requestPlayerDeath();
+        } else {
+          this.recoveryCountValue += 1;
+          this.checkpoints.recover(this.player);
+        }
       },
     });
     this.root.add(this.laserSystem.root);

@@ -19,7 +19,13 @@ import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { BlobFacing } from './render/BlobFacing';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
+import { DeathSequence } from './systems/DeathSequence';
+import { DeathScreen } from './ui/DeathScreen';
 import './style.css';
+
+const PLAYER_OUT_OF_BOUNDS_Y_METRES = -4;
+
+type DeathRecoveryOwner = 'laser' | 'elevator';
 
 const app = document.querySelector<HTMLElement>('#app');
 
@@ -27,7 +33,9 @@ if (!app) {
   throw new Error('Missing #app host element.');
 }
 
-const renderLayer = new RenderLayer({ host: app });
+const appHost = app;
+
+const renderLayer = new RenderLayer({ host: appHost });
 
 const testScene = new GreyboxCollisionScene();
 renderLayer.scene.add(testScene.root);
@@ -60,9 +68,14 @@ const body = new KinematicBody({
 });
 renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
 
+const deathSequence = new DeathSequence();
+let currentRecoveryOwner: DeathRecoveryOwner = 'laser';
+let deathRecoveryOwner: DeathRecoveryOwner | null = null;
+
 const laserTestRig = new LaserTestRig({
   player: body,
   checkpointSpawn: spawnPosition,
+  requestPlayerDeath: () => requestPlayerDeath('laser'),
 });
 renderLayer.scene.add(laserTestRig.root);
 
@@ -70,6 +83,7 @@ const elevatorTestRig = new ElevatorTestRig(
   body,
   collisionWorld,
   surfaceRegistry,
+  () => requestPlayerDeath('elevator'),
 );
 renderLayer.scene.add(elevatorTestRig.root);
 
@@ -224,19 +238,22 @@ const runSlopeIdleRegression = (): string => {
 
 const testPanel = new GreyboxTestPanel({
   onReset: () => {
+    deathSequence.reset();
+    currentRecoveryOwner = 'laser';
+    deathRecoveryOwner = null;
+    deathScreen.hide();
+    input.setEnabled(true);
     testScene.resetProbe();
     elevatorTestRig.resetRuntimeOnly();
     laserTestRig.reset();
     puzzleTestRig.reset();
     landingEventCount = 0;
     lastLandingImpactSpeedMetresPerSecond = 0;
+    appHost.dataset.gameState = deathSequence.state;
   },
-  onTestRecovery: (onRecovered) => {
+  onTestRecovery: () => {
     body.teleport(recoveryPosition);
-    testScene.simulateFall(() => {
-      body.teleport(spawnPosition);
-      onRecovered();
-    });
+    requestPlayerDeath(currentRecoveryOwner);
   },
   onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
   onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
@@ -248,24 +265,93 @@ const testPanel = new GreyboxTestPanel({
   onResetLaserSequences: () => laserTestRig.resetSequences(),
   onRunLaserDeterminismRegression: () =>
     laserTestRig.runDeterminismRegression(),
-  onEnterElevatorTest: () => elevatorTestRig.enter(),
-  onRecoverElevatorCheckpoint: () => elevatorTestRig.recover(),
-  onRunElevatorCarrierRegression: () =>
-    elevatorTestRig.runCarrierRegression(),
+  onEnterElevatorTest: () => {
+    currentRecoveryOwner = 'elevator';
+    elevatorTestRig.enter();
+  },
+  onRecoverElevatorCheckpoint: () => {
+    currentRecoveryOwner = 'elevator';
+    elevatorTestRig.recover();
+  },
+  onRunElevatorCarrierRegression: () => {
+    currentRecoveryOwner = 'elevator';
+    return elevatorTestRig.runCarrierRegression();
+  },
 });
-
-app.replaceChildren(renderLayer.canvas, testPanel.element);
 
 const input = new Input({
   pointerLockElement: renderLayer.canvas,
 });
 
+const deathScreen = new DeathScreen({
+  onRetry: retryAfterDeath,
+});
+
+appHost.dataset.gameState = deathSequence.state;
+appHost.replaceChildren(
+  renderLayer.canvas,
+  testPanel.element,
+  deathScreen.element,
+);
+
+function requestPlayerDeath(owner: DeathRecoveryOwner): boolean {
+  if (!deathSequence.requestDeath()) return false;
+  if (!testScene.startDeath(body.position)) {
+    deathSequence.reset();
+    return false;
+  }
+
+  deathRecoveryOwner = owner;
+  input.setEnabled(false);
+  input.releasePointerLock();
+  appHost.dataset.gameState = deathSequence.state;
+  return true;
+}
+
+function retryAfterDeath(): void {
+  if (!deathSequence.canRetry || deathRecoveryOwner === null) return;
+
+  if (deathRecoveryOwner === 'elevator') {
+    elevatorTestRig.recover();
+  } else {
+    laserTestRig.recover();
+  }
+
+  testScene.finishDeath(body.position);
+  deathRecoveryOwner = null;
+  if (!deathSequence.completeRetry()) return;
+
+  deathScreen.hide();
+  input.setEnabled(true);
+  input.requestPointerLock();
+  appHost.dataset.gameState = deathSequence.state;
+}
+
+function updateDeathState(deltaSeconds: number): void {
+  testScene.updateDeath(deltaSeconds);
+  if (deathSequence.update(deltaSeconds)) {
+    deathScreen.show();
+  }
+  appHost.dataset.gameState = deathSequence.state;
+  input.endFixedUpdate();
+}
+
 let debugSampleElapsedSeconds = 0;
 
 const loop = new Loop({
   fixedUpdate: (deltaSeconds) => {
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
+
     if (input.wasPressed('debugReset')) testPanel.resetProbe();
     if (input.wasPressed('debugTestRecovery')) testPanel.testRecovery();
+
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
 
     const moveX =
       (input.isDown('moveRight') ? 1 : 0) -
@@ -307,13 +393,31 @@ const loop = new Loop({
       cameraRelativeMovement,
       jumpInputState,
     );
-    // Lethal hazards query the authoritative post-movement sphere. Recovery
-    // may synchronously reset the active puzzle group and teleport the body.
+
+    if (body.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
+      requestPlayerDeath(currentRecoveryOwner);
+    }
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
+
+    // Lethal hazards query the authoritative post-movement sphere. Their
+    // one-shot callback now enters the death journey before any recovery.
     laserTestRig.update(deltaSeconds);
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
+
     // The body resolves its own locomotion first. The elevator then advances
     // its authored platform pose and applies that fixed-step displacement only
     // if the body remains grounded on the roof.
     elevatorTestRig.update(deltaSeconds);
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
 
     blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
@@ -330,27 +434,29 @@ const loop = new Loop({
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
-    const previous = body.previousPosition;
-    const current = body.position;
+    if (deathSequence.isPlaying) {
+      const previous = body.previousPosition;
+      const current = body.position;
 
-    renderedProbePosition.set(
-      THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
-    );
+      renderedProbePosition.set(
+        THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
+        THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
+        THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
+      );
 
-    testScene.setProbePosition(renderedProbePosition);
-    testScene.setProbeYaw(
-      blobFacing.getInterpolatedYaw(interpolationAlpha),
-    );
-    testScene.presentProbe();
-    // A high-refresh render can occur without a 60 Hz gameplay step. Consume
-    // any pointer motion from that interval here so camera look remains crisp;
-    // the next fixed step will read the already-updated orbit basis.
-    renderLayer.cameraRig.queueLookInput(
-      input.pointerDeltaX,
-      input.pointerDeltaY,
-    );
+      testScene.setProbePosition(renderedProbePosition);
+      testScene.setProbeYaw(
+        blobFacing.getInterpolatedYaw(interpolationAlpha),
+      );
+      testScene.presentProbe();
+      // A high-refresh render can occur without a 60 Hz gameplay step. Consume
+      // any pointer motion from that interval here so camera look remains crisp;
+      // the next fixed step will read the already-updated orbit basis.
+      renderLayer.cameraRig.queueLookInput(
+        input.pointerDeltaX,
+        input.pointerDeltaY,
+      );
+    }
     input.endPointerUpdate();
     renderLayer.cameraRig.update(
       interpolationAlpha,
@@ -373,6 +479,8 @@ const loop = new Loop({
       const cameraPosition = renderLayer.cameraRig.camera.position;
       const laserStats = laserTestRig.getDiagnostics();
       const elevatorStats = elevatorTestRig.getDiagnostics();
+      const deathStats = deathSequence.diagnostics;
+      const burstStats = testScene.deathBurstDiagnostics;
 
       testPanel.setRuntimeDiagnostics(
         [
@@ -381,6 +489,9 @@ const loop = new Loop({
           `steps this frame: ${stats.stepsThisFrame}`,
           `pointer lock: ${input.pointerLocked ? 'locked' : 'unlocked'}`,
           `held actions: ${heldActions}`,
+          `game / death state: ${deathStats.state} (${deathStats.elapsedSeconds.toFixed(2)} s)`,
+          `deaths / retries: ${deathStats.acceptedDeathCount} / ${deathStats.completedRetryCount}`,
+          `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
           `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
           `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
           `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
@@ -450,6 +561,7 @@ const shutdown = (): void => {
   movementEvents.clear();
   loop.dispose();
   input.dispose();
+  deathScreen.dispose();
   collisionWorld.clear();
   surfaceRegistry.clear();
   laserTestRig.dispose();
