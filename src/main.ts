@@ -115,17 +115,12 @@ const runSlopeIdleRegression = (): string => {
   const stickyRoute = testScene.collisionMeshes.find(
     (mesh) => mesh.name === 'room-1-vent-sticky-entry-wall',
   );
-  const bounceLanding = testScene.collisionMeshes.find(
-    (mesh) => mesh.name === 'room-2-bounce-calibration-landing',
-  );
-
-  if (stickyRoute && bounceLanding) {
+  if (stickyRoute) {
     const stickyTag = surfaceRegistry.get(stickyRoute).tag;
-    const bounceTag = surfaceRegistry.get(bounceLanding).tag;
-    const passed = stickyTag === 'sticky' && bounceTag === 'bouncy';
+    const passed = stickyTag === 'sticky';
     slopeRegressionStatus = passed
-      ? 'PASS — Room 1 sticky route and Room 2 bounce landing are authored'
-      : `FAIL — tags are ${stickyTag} / ${bounceTag}`;
+      ? 'PASS — Room 1 sticky route is authored; slime rebound is controller-owned'
+      : `FAIL — sticky route tag is ${stickyTag}`;
     return slopeRegressionStatus;
   }
 
