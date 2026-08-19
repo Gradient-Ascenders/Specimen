@@ -53,6 +53,15 @@ export class ContainmentTeachingScene {
       locked: this.material(0x8b3030, 0x320505),
       exit: this.material(0x62bf83, 0x0a3018),
       duct: this.material(0x444a4d),
+      glass: new THREE.MeshStandardMaterial({
+        color: 0x9ee7e4,
+        emissive: 0x163d42,
+        emissiveIntensity: 0.2,
+        transparent: true,
+        opacity: 0.28,
+        roughness: 0.18,
+        metalness: 0.15,
+      }),
       egg: this.material(0x70c8ff, 0x063b63),
     };
 
@@ -175,12 +184,12 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.2, 0.4], position: [-4.8, 2.6, 6], material: materials.sticky, surfaceTag: 'sticky' });
     this.addCollider({ name: 'room-1-north-clean-centre', size: [4, 6.5, 0.4], position: [-1.8, 3.25, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
-    this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
 
     this.addVisualBox('room-1-locked-door-false-lead', [2.6, 3, 0.18], [4.3, 1.5, 5.76], materials.locked);
     this.addOpenVentFrame('room-1-vent-open-frame', [-4.8, 6, 5.74], materials.duct);
 
     this.addCollider({ name: 'room-1-containment-pedestal', size: [2.6, 1.1, 2.6], position: [0, 0.55, -0.5], material: materials.support });
+    this.addVisualBox('room-1-glass-containment-box', [1.8, 1.9, 1.8], [0, 2.05, -0.5], materials.glass);
     const egg = new THREE.Mesh(new THREE.SphereGeometry(0.48, 20, 14), materials.egg);
     egg.name = 'room-1-specimen-egg';
     egg.scale.set(0.82, 1.18, 0.82);
