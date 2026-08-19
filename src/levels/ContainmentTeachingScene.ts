@@ -339,7 +339,6 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-upper-step-a', size: [4, 0.4, 3.5], position: [8.8, 9.65, 37.65683], material: materials.platform });
     this.addCollider({ name: 'room-2-upper-step-b', size: [3.6, 0.4, 3.4], position: [0.87909, 10.15, 38.41571], material: materials.platform });
     this.addCollider({ name: 'room-2-exit-balcony', size: [7, 0.5, 4], position: [0, 10.65, 46.79795], material: materials.platform });
-    this.addVisualBox('room-2-open-exit-door', [2.6, 3, 0.2], [0, 12.4, 48.6971], materials.exit);
 
     // Blender-authored version: the four low recovery steps were removed.
 
