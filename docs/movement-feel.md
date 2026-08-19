@@ -33,6 +33,7 @@ All movement and jump feel remains in `DEFAULT_KINEMATIC_BODY_CONFIG`.
 | `maximumJumpChargeSeconds` | 0.70 | seconds to full charge |
 | `jumpChargeCurveExponent` | 1.35 | shapes the charge response |
 | `coyoteTimeSeconds` | 0.10 | retained jump window after leaving ground |
+| `jumpInputBufferSeconds` | 0.12 | retained jump press window before gaining support |
 | `jumpGroundDetachSeconds` | 0.05 | prevents immediate ground re-acquisition |
 | `minimumLandingAirTimeSeconds` | 0.04 | filters one-frame contact noise |
 
@@ -52,6 +53,18 @@ without changing their charge timing or response curve.
 A 0.10-second coyote window is retained for baseline playability. It allows a
 jump requested immediately after walking off an edge without making late jumps
 visibly implausible. The value is deliberately small and centrally tunable.
+
+### Pre-landing jump buffer
+
+A jump press made up to 0.12 seconds before landing is retained until the body
+gains valid support. Holding Space through touchdown begins charging normally;
+releasing a buffered press before touchdown launches the minimum jump on
+landing. Focus loss still cancels the intent because input clearing does not
+synthesize a release.
+
+On ordinary floors, a retained jump takes priority over the slime's passive
+impact rebound so deliberate input is not discarded. Authored `bouncy`
+surfaces still apply their explicit bounce behavior first.
 
 ### Post-jump ground detach
 

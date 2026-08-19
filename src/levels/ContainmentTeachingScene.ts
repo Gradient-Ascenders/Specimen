@@ -9,6 +9,10 @@ import {
   type SlimeVisualState,
   type Vector3State,
 } from '../render/slime/SlimeVisual';
+import {
+  SlimeBurstPresentation,
+  type SlimeBurstDiagnostics,
+} from '../render/slime/SlimeBurstPresentation';
 
 interface BoxOptions {
   readonly name: string;
@@ -25,7 +29,9 @@ interface BoxOptions {
 const ROOM_2_CENTRE_Z = 38;
 const SPAWN_POSITION = new THREE.Vector3(-0.20995, 0.52507, -2.60112);
 const OUT_OF_BOUNDS_TEST_POSITION = new THREE.Vector3(0, -5, -1.8);
+const DEATH_RUPTURE_SECONDS = 0.075;
 const ROOM_2_FLOOR_TOP_Y = 0;
+// The 0.45 m player radius and 0.01 m collision skin both need clearance.
 const ROOM_2_SAFE_LANDING_POSITION = new THREE.Vector3(
   -9,
   ROOM_2_FLOOR_TOP_Y +
@@ -43,8 +49,8 @@ export class ContainmentTeachingScene {
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
   private readonly slimeVisual: SlimeVisual;
-  private recoveryDelay = 0;
-  private recoveryCallback: (() => void) | undefined;
+  private readonly slimeBurst = new SlimeBurstPresentation();
+  private deathElapsedSeconds = 0;
 
   constructor() {
     this.root.name = 'containment-climb-and-bounce-greybox';
@@ -79,7 +85,7 @@ export class ContainmentTeachingScene {
     this.slimeVisual = new SlimeVisual({
       radiusMetres: DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
     });
-    this.root.add(this.slimeVisual.mesh);
+    this.root.add(this.slimeVisual.mesh, this.slimeBurst.root);
     this.resetProbe();
   }
 
@@ -89,6 +95,10 @@ export class ContainmentTeachingScene {
 
   get slimeDiagnostics(): SlimeVisualDiagnostics {
     return this.slimeVisual.diagnostics;
+  }
+
+  get deathBurstDiagnostics(): SlimeBurstDiagnostics {
+    return this.slimeBurst.diagnostics;
   }
 
   copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
@@ -117,29 +127,55 @@ export class ContainmentTeachingScene {
 
   update(deltaSeconds: number, visualState?: SlimeVisualState): void {
     if (visualState) this.slimeVisual.update(deltaSeconds, visualState);
-    if (this.recoveryDelay <= 0) return;
-
-    this.recoveryDelay -= deltaSeconds;
-    if (this.recoveryDelay > 0) return;
-
-    this.resetProbe();
-    this.recoveryCallback?.();
-    this.recoveryCallback = undefined;
   }
 
-  resetProbe(): void {
-    this.recoveryDelay = 0;
-    this.slimeVisual.setPosition(SPAWN_POSITION);
+  /** Begin the visual rupture at the authoritative death position. */
+  startDeath(position: Vector3State): boolean {
+    if (!this.slimeBurst.start(position)) return false;
+
+    this.deathElapsedSeconds = 0;
+    this.slimeVisual.setPosition(position);
+    this.slimeVisual.mesh.scale.setScalar(1);
+    this.slimeVisual.mesh.visible = true;
+    return true;
+  }
+
+  /** Continue visual-only death work while gameplay simulation is suspended. */
+  updateDeath(deltaSeconds: number): void {
+    this.deathElapsedSeconds += deltaSeconds;
+    this.slimeBurst.update(deltaSeconds);
+
+    if (this.deathElapsedSeconds < DEATH_RUPTURE_SECONDS) {
+      const anticipation = THREE.MathUtils.smoothstep(
+        this.deathElapsedSeconds,
+        0,
+        DEATH_RUPTURE_SECONDS,
+      );
+      this.slimeVisual.mesh.scale.setScalar(
+        1 + Math.sin(anticipation * Math.PI) * 0.12,
+      );
+      return;
+    }
+
+    this.slimeVisual.mesh.visible = false;
+  }
+
+  /** Restore the live slime after checkpoint recovery succeeds. */
+  finishDeath(position: Vector3State): void {
+    this.deathElapsedSeconds = 0;
+    this.slimeBurst.reset();
+    this.slimeVisual.setPosition(position);
+    this.slimeVisual.mesh.scale.setScalar(1);
+    this.slimeVisual.mesh.visible = true;
     this.slimeVisual.reset();
   }
 
-  simulateFall(onRecovered: () => void): void {
-    this.slimeVisual.setPosition(OUT_OF_BOUNDS_TEST_POSITION);
-    this.recoveryCallback = onRecovered;
-    this.recoveryDelay = 0.7;
+  resetProbe(): void {
+    this.finishDeath(SPAWN_POSITION);
   }
 
   dispose(): void {
+    this.slimeBurst.dispose();
     this.slimeVisual.dispose();
     this.root.removeFromParent();
     this.root.traverse((object) => {

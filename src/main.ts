@@ -18,7 +18,14 @@ import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { BlobFacing } from './render/BlobFacing';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
+import {
+  DeathSequence,
+  type DeathRecoveryAction,
+} from './systems/DeathSequence';
+import { DeathScreen } from './ui/DeathScreen';
 import './style.css';
+
+const PLAYER_OUT_OF_BOUNDS_Y_METRES = -4;
 
 const app = document.querySelector<HTMLElement>('#app');
 
@@ -26,7 +33,9 @@ if (!app) {
   throw new Error('Missing #app host element.');
 }
 
-const renderLayer = new RenderLayer({ host: app });
+const appHost = app;
+
+const renderLayer = new RenderLayer({ host: appHost });
 
 const testScene = new ContainmentTeachingScene();
 renderLayer.scene.add(testScene.root);
@@ -58,6 +67,7 @@ const body = new KinematicBody({
 });
 renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
 
+const deathSequence = new DeathSequence();
 const slimeVisualState: SlimeVisualState = {
   velocityWorld: body.velocity,
   surfaceNormalWorld: body.groundNormal,
@@ -98,6 +108,7 @@ const jumpInputState: JumpInputState = {
   pressed: false,
   held: false,
   released: false,
+  cancelled: false,
 };
 const wallJumpIntent: WallJumpIntent = {
   lateral: 0,
@@ -226,33 +237,92 @@ const runSlopeIdleRegression = (): string => {
 
 const testPanel = new GreyboxTestPanel({
   onReset: () => {
+    deathSequence.reset();
+    deathScreen.hide();
+    input.setEnabled(true);
     testScene.resetProbe();
     body.teleport(spawnPosition);
     landingEventCount = 0;
     lastLandingImpactSpeedMetresPerSecond = 0;
+    appHost.dataset.gameState = deathSequence.state;
   },
-  onTestRecovery: (onRecovered) => {
+  onTestRecovery: () => {
     body.teleport(outOfBoundsTestPosition);
-    testScene.simulateFall(() => {
-      body.teleport(spawnPosition);
-      onRecovered();
-    });
+    requestPlayerDeath(recoverAtSpawn);
   },
   onRunSlopeIdleRegression: runSlopeIdleRegression,
 });
-
-app.replaceChildren(renderLayer.canvas, testPanel.element);
 
 const input = new Input({
   pointerLockElement: renderLayer.canvas,
 });
 
+const deathScreen = new DeathScreen({
+  onRetry: retryAfterDeath,
+  backgroundElements: [renderLayer.canvas, testPanel.element],
+});
+
+appHost.dataset.gameState = deathSequence.state;
+appHost.replaceChildren(
+  renderLayer.canvas,
+  testPanel.element,
+  deathScreen.element,
+);
+
+function recoverAtSpawn(): void {
+  body.teleport(spawnPosition);
+}
+
+function requestPlayerDeath(recovery: DeathRecoveryAction): boolean {
+  if (!deathSequence.requestDeath(recovery)) return false;
+  if (!testScene.startDeath(body.position)) {
+    deathSequence.reset();
+    return false;
+  }
+
+  input.setEnabled(false);
+  input.releasePointerLock();
+  appHost.dataset.gameState = deathSequence.state;
+  return true;
+}
+
+function retryAfterDeath(): void {
+  if (!deathSequence.canRetry) return;
+
+  if (!deathSequence.completeRetry()) return;
+  testScene.finishDeath(body.position);
+
+  deathScreen.hide();
+  input.setEnabled(true);
+  input.requestPointerLock();
+  appHost.dataset.gameState = deathSequence.state;
+}
+
+function updateDeathState(deltaSeconds: number): void {
+  testScene.updateDeath(deltaSeconds);
+  if (deathSequence.update(deltaSeconds)) {
+    deathScreen.show();
+  }
+  appHost.dataset.gameState = deathSequence.state;
+  input.endFixedUpdate();
+}
+
 let debugSampleElapsedSeconds = 0;
 
 const loop = new Loop({
   fixedUpdate: (deltaSeconds) => {
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
+
     if (input.wasPressed('debugReset')) testPanel.resetProbe();
     if (input.wasPressed('debugTestRecovery')) testPanel.testRecovery();
+
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
 
     const moveX =
       (input.isDown('moveRight') ? 1 : 0) -
@@ -288,6 +358,7 @@ const loop = new Loop({
     jumpInputState.pressed = input.wasPressed('jump');
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
+    jumpInputState.cancelled = input.wasClearedSinceFixedUpdate;
 
     wallJumpIntent.lateral = moveX;
     wallJumpIntent.vertical = -moveZ;
@@ -298,6 +369,14 @@ const loop = new Loop({
       jumpInputState,
       wallJumpIntent,
     );
+
+    if (body.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
+      requestPlayerDeath(recoverAtSpawn);
+    }
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
     blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
@@ -312,24 +391,29 @@ const loop = new Loop({
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
-    const previous = body.previousPosition;
-    const current = body.position;
+    if (deathSequence.isPlaying) {
+      const previous = body.previousPosition;
+      const current = body.position;
 
-    renderedProbePosition.set(
-      THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
-    );
+      renderedProbePosition.set(
+        THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
+        THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
+        THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
+      );
 
-    testScene.setProbePosition(renderedProbePosition);
-    testScene.setProbeYaw(
-      blobFacing.getInterpolatedYaw(interpolationAlpha),
-    );
-    testScene.presentProbe();
-    renderLayer.cameraRig.queueLookInput(
-      input.pointerDeltaX,
-      input.pointerDeltaY,
-    );
+      testScene.setProbePosition(renderedProbePosition);
+      testScene.setProbeYaw(
+        blobFacing.getInterpolatedYaw(interpolationAlpha),
+      );
+      testScene.presentProbe();
+      // A high-refresh render can occur without a 60 Hz gameplay step. Consume
+      // any pointer motion from that interval here so camera look remains crisp;
+      // the next fixed step will read the already-updated orbit basis.
+      renderLayer.cameraRig.queueLookInput(
+        input.pointerDeltaX,
+        input.pointerDeltaY,
+      );
+    }
     input.endPointerUpdate();
     renderLayer.cameraRig.update(
       interpolationAlpha,
@@ -350,6 +434,8 @@ const loop = new Loop({
       const slimeDiagnostics = testScene.slimeDiagnostics;
       const cameraStats = renderLayer.cameraRig.getDiagnostics();
       const cameraPosition = renderLayer.cameraRig.camera.position;
+      const deathStats = deathSequence.diagnostics;
+      const burstStats = testScene.deathBurstDiagnostics;
 
       testPanel.setRuntimeDiagnostics(
         [
@@ -358,6 +444,9 @@ const loop = new Loop({
           `steps this frame: ${stats.stepsThisFrame}`,
           `pointer lock: ${input.pointerLocked ? 'locked' : 'unlocked'}`,
           `held actions: ${heldActions}`,
+          `game / death state: ${deathStats.state} (${deathStats.elapsedSeconds.toFixed(2)} s)`,
+          `deaths / retries: ${deathStats.acceptedDeathCount} / ${deathStats.completedRetryCount}`,
+          `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
           `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
           `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
           `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
@@ -370,6 +459,7 @@ const loop = new Loop({
           `jump state / can jump: ${body.jumpState} / ${body.canJump ? 'yes' : 'no'}`,
           `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
           `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
+          `jump buffer remaining: ${body.jumpInputBufferRemainingSeconds.toFixed(3)} s`,
           `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
           `last jump direction: ${body.lastJumpDirection.x.toFixed(2)}, ${body.lastJumpDirection.y.toFixed(2)}, ${body.lastJumpDirection.z.toFixed(2)}`,
           `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,
@@ -410,6 +500,7 @@ const shutdown = (): void => {
   movementEvents.clear();
   loop.dispose();
   input.dispose();
+  deathScreen.dispose();
   collisionWorld.clear();
   surfaceRegistry.clear();
   testPanel.dispose();
