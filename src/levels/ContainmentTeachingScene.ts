@@ -15,6 +15,8 @@ interface BoxOptions {
   readonly position: readonly [number, number, number];
   readonly material: THREE.Material;
   readonly surfaceTag?: SurfaceTag;
+  /** Art-facing identifier; does not affect collision or adhesion behaviour. */
+  readonly textureRole?: 'sticky-wall-tile' | 'sticky-vent-tile';
   readonly rotationX?: number;
 }
 
@@ -42,6 +44,7 @@ export class ContainmentTeachingScene {
       wall: this.material(0xdadfe1),
       support: this.material(0x424a50),
       sticky: this.material(0x9fae38, 0x263100),
+      stickyVent: this.material(0x718c3d, 0x162600),
       platform: this.material(0xd6a928, 0x443300),
       locked: this.material(0x8b3030, 0x320505),
       exit: this.material(0x62bf83, 0x0a3018),
@@ -161,7 +164,7 @@ export class ContainmentTeachingScene {
     // The sticky route is directly below the opening. Its top is exactly level
     // with the duct floor so edge traversal can roll smoothly over the lip.
     this.addCollider({ name: 'room-1-north-clean-west', size: [1.2, 8, 0.4], position: [-6.4, 4, 6], material: materials.wall });
-    this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.225, 0.4], position: [-4.8, 2.6125, 6], material: materials.sticky, surfaceTag: 'sticky' });
+    this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.225, 0.4], position: [-4.8, 2.6125, 6], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
     this.addCollider({ name: 'room-1-north-clean-centre', size: [4, 8, 0.4], position: [-1.8, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
@@ -188,7 +191,7 @@ export class ContainmentTeachingScene {
     // A short sticky floor continuation gives edge traversal an adhesive face
     // to acquire at the vent mouth. The remaining duct immediately returns to
     // ordinary metal once the slime is safely through the opening.
-    this.addCollider({ name: 'duct-segment-a-sticky-entry-floor', size: [2, 0.25, 1.8], position: [-4.8, 5.1, 6.9], material: materials.sticky, surfaceTag: 'sticky' });
+    this.addCollider({ name: 'duct-segment-a-sticky-vent-tile', size: [2, 0.25, 1.8], position: [-4.8, 5.1, 6.9], material: materials.stickyVent, surfaceTag: 'sticky', textureRole: 'sticky-vent-tile' });
     this.addCollider({ name: 'duct-segment-a-floor', size: [2, 0.25, 5.2], position: [-4.8, 5.1, 10.4], material: materials.duct });
     this.addCollider({ name: 'duct-segment-a-roof', size: [2, 0.18, 7], position: [-4.8, 7.3, 9.5], material: materials.duct });
     // This side used to be sticky. It remains a solid duct wall so the route
@@ -249,7 +252,7 @@ export class ContainmentTeachingScene {
     // Zone 4: the sticky patch is embedded in the east perimeter wall rather
     // than presented as a freestanding slab. Platform D leaves a deliberate
     // four-metre air gap so the player must jump, catch, and climb.
-    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.12, 6, 5], position: [14.73, 6, 42.5], material: materials.sticky, surfaceTag: 'sticky' });
+    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.12, 6, 5], position: [14.73, 6, 42.5], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
     this.addCollider({ name: 'room-2-top-of-sticky-wall-ledge', size: [3.1, 0.35, 5.5], position: [13.25, 9.15, 42.5], material: materials.support });
 
     // Zone 5: three more readable upper-level jumps carry the route back
@@ -317,6 +320,7 @@ export class ContainmentTeachingScene {
     mesh.position.set(...options.position);
     mesh.rotation.x = options.rotationX ?? 0;
     mesh.userData.surfaceTag = options.surfaceTag ?? 'default';
+    if (options.textureRole) mesh.userData.textureRole = options.textureRole;
     mesh.userData.sizeMetres = [...options.size];
     this.root.add(mesh);
     this.collisionMeshList.push(mesh);

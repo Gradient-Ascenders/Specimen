@@ -25,6 +25,11 @@ briefs maintained in the shared `Rooms` folder.
 - Only the contaminated Room 1 route and elevated Room 2 catch wall use the
   `sticky` surface tag. Room 1's marking continues a short distance onto the
   duct entrance floor to support a smooth climb-over without jumping.
+- Sticky wall colliders expose `userData.textureRole = 'sticky-wall-tile'`.
+  The short duct entrance instead exposes
+  `userData.textureRole = 'sticky-vent-tile'` and uses the mesh name
+  `duct-segment-a-sticky-vent-tile`, allowing art to texture it separately
+  while both continue to use the same `sticky` gameplay surface tag.
 - The Room 2 floor and platforms remain ordinary surfaces. Innate rebound is
   owned by the slime controller and does not require a `bouncy` surface.
 - White/grey means normal architecture; yellow-green means sticky; gold marks
