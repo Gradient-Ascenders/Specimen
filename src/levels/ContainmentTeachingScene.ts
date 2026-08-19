@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody';
+import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
 import type { SurfaceTag } from '../physics/SurfaceRegistry';
 import {
   SlimeVisual,
@@ -8,11 +8,11 @@ import {
   type SlimeVisualLaunch,
   type SlimeVisualState,
   type Vector3State,
-} from '../render/slime/SlimeVisual';
+} from '../render/slime/SlimeVisual.ts';
 import {
   SlimeBurstPresentation,
   type SlimeBurstDiagnostics,
-} from '../render/slime/SlimeBurstPresentation';
+} from '../render/slime/SlimeBurstPresentation.ts';
 
 interface BoxOptions {
   readonly name: string;
@@ -312,7 +312,13 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-rear-wall-east', size: [22.3, 18, 0.4], position: [3.85, 9, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-rear-wall-below-duct', size: [2.2, 10.2, 0.4], position: [-8.4, 5.1, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-rear-wall-above-duct', size: [2.2, 5.2, 0.4], position: [-8.4, 15.4, ROOM_2_CENTRE_Z - 11], material: materials.wall });
-    this.addCollider({ name: 'room-2-front-wall', size: [30, 18, 0.4], position: [0, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    // Split the front wall around the elevated exit so Room 3 is physically
+    // reachable. The previous green door was only a visual laid over a solid
+    // wall, which was sufficient while issue #20 ended in Room 2.
+    this.addCollider({ name: 'room-2-front-wall-west', size: [13.5, 18, 0.4], position: [-8.25, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-front-wall-east', size: [13.5, 18, 0.4], position: [8.25, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-front-wall-below-exit', size: [3, 10.4, 0.4], position: [0, 5.2, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-front-wall-above-exit', size: [3, 3.9, 0.4], position: [0, 16.05, ROOM_2_CENTRE_Z + 11], material: materials.wall });
     // Zones 2-3: a forgiving four-jump zig-zag fills the lower chamber and
     // teaches progressively higher and longer charged jumps. Every miss lands
     // on the safe room floor, and the generous tops keep this a tutorial.

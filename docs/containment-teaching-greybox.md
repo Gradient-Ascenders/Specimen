@@ -38,9 +38,10 @@ briefs maintained in the shared `Rooms` folder.
 
 ## Scope boundary
 
-This is a primitive-based gameplay grey-box. Opening cutscene sequencing,
-final environment art, visual slime deformation, lasers, moving elevators, and
-the later Room 3/4/5 traversal beats remain outside issue #20.
+This is a primitive-based gameplay grey-box. Opening cutscene sequencing and
+final environment art remain outside issue #20. The later Room 3/4/5 traversal,
+lasers, moving elevator and completion handoff are integrated by issue #21 and
+documented in `docs/containment-level-greybox.md`.
 
 ## Verification checklist
 

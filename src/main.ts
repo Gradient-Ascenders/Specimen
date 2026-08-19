@@ -5,7 +5,11 @@ import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
 import { runWallJumpBasisRegression } from './debug/WallJumpBasisRegression';
-import { ContainmentTeachingScene } from './levels/ContainmentTeachingScene';
+import { ContainmentLevelController } from './levels/ContainmentLevelController';
+import {
+  ContainmentLevelScene,
+  type ContainmentHazardFailure,
+} from './levels/ContainmentLevelScene';
 import { CollisionWorld } from './physics/CollisionWorld';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
@@ -37,7 +41,12 @@ const appHost = app;
 
 const renderLayer = new RenderLayer({ host: appHost });
 
-const testScene = new ContainmentTeachingScene();
+let containmentLevel: ContainmentLevelController;
+const testScene = new ContainmentLevelScene(
+  (failure: ContainmentHazardFailure) => {
+    containmentLevel.requestHazardFailure(failure);
+  },
+);
 renderLayer.scene.add(testScene.root);
 
 const collisionWorld = new CollisionWorld();
@@ -68,6 +77,12 @@ const body = new KinematicBody({
 renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
 
 const deathSequence = new DeathSequence();
+containmentLevel = new ContainmentLevelController({
+  scene: testScene,
+  body,
+  collisionWorld,
+  requestDeath: requestPlayerDeath,
+});
 const slimeVisualState: SlimeVisualState = {
   velocityWorld: body.velocity,
   surfaceNormalWorld: body.groundNormal,
@@ -240,15 +255,15 @@ const testPanel = new GreyboxTestPanel({
     deathSequence.reset();
     deathScreen.hide();
     input.setEnabled(true);
+    containmentLevel.reset();
     testScene.resetProbe();
-    body.teleport(spawnPosition);
     landingEventCount = 0;
     lastLandingImpactSpeedMetresPerSecond = 0;
     appHost.dataset.gameState = deathSequence.state;
   },
   onTestRecovery: () => {
     body.teleport(outOfBoundsTestPosition);
-    requestPlayerDeath(recoverAtSpawn);
+    requestPlayerDeath(() => containmentLevel.recoverActiveCheckpoint());
   },
   onRunSlopeIdleRegression: runSlopeIdleRegression,
 });
@@ -262,16 +277,19 @@ const deathScreen = new DeathScreen({
   backgroundElements: [renderLayer.canvas, testPanel.element],
 });
 
+const unsubscribeLevelCompleted = containmentLevel.events.on(
+  'completed',
+  () => {
+    appHost.dataset.gameState = 'level-complete';
+  },
+);
+
 appHost.dataset.gameState = deathSequence.state;
 appHost.replaceChildren(
   renderLayer.canvas,
   testPanel.element,
   deathScreen.element,
 );
-
-function recoverAtSpawn(): void {
-  body.teleport(spawnPosition);
-}
 
 function requestPlayerDeath(recovery: DeathRecoveryAction): boolean {
   if (!deathSequence.requestDeath(recovery)) return false;
@@ -313,6 +331,19 @@ const loop = new Loop({
   fixedUpdate: (deltaSeconds) => {
     if (!deathSequence.isPlaying) {
       updateDeathState(deltaSeconds);
+      return;
+    }
+
+    if (containmentLevel.state !== 'playing') {
+      containmentLevel.update(deltaSeconds);
+      input.setEnabled(false);
+      input.releasePointerLock();
+      appHost.dataset.gameState =
+        containmentLevel.state === 'complete'
+          ? 'level-complete'
+          : 'level-completing';
+      testScene.update(deltaSeconds, slimeVisualState);
+      input.endFixedUpdate();
       return;
     }
 
@@ -371,11 +402,22 @@ const loop = new Loop({
     );
 
     if (body.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
-      requestPlayerDeath(recoverAtSpawn);
+      containmentLevel.requestOutOfBoundsFailure();
     }
     if (!deathSequence.isPlaying) {
       updateDeathState(deltaSeconds);
       return;
+    }
+
+    containmentLevel.update(deltaSeconds);
+    if (!deathSequence.isPlaying) {
+      updateDeathState(deltaSeconds);
+      return;
+    }
+    if (containmentLevel.state !== 'playing') {
+      input.setEnabled(false);
+      input.releasePointerLock();
+      appHost.dataset.gameState = 'level-completing';
     }
     blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
@@ -446,6 +488,8 @@ const loop = new Loop({
           `held actions: ${heldActions}`,
           `game / death state: ${deathStats.state} (${deathStats.elapsedSeconds.toFixed(2)} s)`,
           `deaths / retries: ${deathStats.acceptedDeathCount} / ${deathStats.completedRetryCount}`,
+          `level / checkpoint: ${containmentLevel.state} / ${containmentLevel.activeCheckpointId}`,
+          `last level failure / completions: ${containmentLevel.lastFailureId} / ${containmentLevel.completionCount}`,
           `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
           `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
           `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
@@ -497,6 +541,7 @@ renderLayer.setAnimationLoop((timestampMs) => {
 const shutdown = (): void => {
   unsubscribeLanding();
   unsubscribeJumped();
+  unsubscribeLevelCompleted();
   movementEvents.clear();
   loop.dispose();
   input.dispose();
@@ -504,6 +549,7 @@ const shutdown = (): void => {
   collisionWorld.clear();
   surfaceRegistry.clear();
   testPanel.dispose();
+  containmentLevel.dispose();
   testScene.dispose();
   renderLayer.dispose();
 };

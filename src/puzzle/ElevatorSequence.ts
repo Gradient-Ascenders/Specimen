@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type {
   ReadonlyVector3State,
 } from '../physics/KinematicBody';
-import { MovingPlatform } from './MovingPlatform';
+import { MovingPlatform } from './MovingPlatform.ts';
 
 const TIME_EPSILON_SECONDS = 1e-9;
 
