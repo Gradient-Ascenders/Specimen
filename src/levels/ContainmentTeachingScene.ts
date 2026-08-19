@@ -158,11 +158,10 @@ export class ContainmentTeachingScene {
 
     // The north perimeter is split so the contaminated wall and open vent are
     // real authored collision surfaces instead of decorative overlays.
-    // The sticky route is directly below the opening and continues into its
-    // left interior wall. This makes the intended climb-to-vent route obvious
-    // without a balancing ledge or a separate lateral transfer.
+    // The sticky route is directly below the opening. Its top is exactly level
+    // with the duct floor so edge traversal can roll smoothly over the lip.
     this.addCollider({ name: 'room-1-north-clean-west', size: [1.2, 8, 0.4], position: [-6.4, 4, 6], material: materials.wall });
-    this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.2, 0.4], position: [-4.8, 2.6, 6], material: materials.sticky, surfaceTag: 'sticky' });
+    this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.225, 0.4], position: [-4.8, 2.6125, 6], material: materials.sticky, surfaceTag: 'sticky' });
     this.addCollider({ name: 'room-1-north-clean-centre', size: [4, 8, 0.4], position: [-1.8, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
@@ -186,7 +185,11 @@ export class ContainmentTeachingScene {
     // A single, fully enclosed rising duct creates meaningful separation before
     // the Room 2 drop without becoming a maze. Its floor sections overlap so
     // there is never an invisible gap between the slope and its landing.
-    this.addCollider({ name: 'duct-segment-a-floor', size: [2, 0.25, 7], position: [-4.8, 5.1, 9.5], material: materials.duct });
+    // A short sticky floor continuation gives edge traversal an adhesive face
+    // to acquire at the vent mouth. The remaining duct immediately returns to
+    // ordinary metal once the slime is safely through the opening.
+    this.addCollider({ name: 'duct-segment-a-sticky-entry-floor', size: [2, 0.25, 1.8], position: [-4.8, 5.1, 6.9], material: materials.sticky, surfaceTag: 'sticky' });
+    this.addCollider({ name: 'duct-segment-a-floor', size: [2, 0.25, 5.2], position: [-4.8, 5.1, 10.4], material: materials.duct });
     this.addCollider({ name: 'duct-segment-a-roof', size: [2, 0.18, 7], position: [-4.8, 7.3, 9.5], material: materials.duct });
     // This side used to be sticky. It remains a solid duct wall so the route
     // is enclosed, but it is now ordinary metal and cannot be climbed.
