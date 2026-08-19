@@ -47,6 +47,7 @@ export class Input {
   private readonly mouseBindings = new Map<number, InputAction[]>();
 
   private readonly activeKeys = new Set<string>();
+  private readonly suppressedKeys = new Set<string>();
   private readonly activeMouseButtons = new Set<number>();
   private readonly holdCounts = new Map<InputAction, number>();
   private readonly heldActions = new Set<InputAction>();
@@ -155,11 +156,20 @@ export class Input {
     }
   }
 
+  /** Clear held and transient gameplay input during lifecycle transitions. */
+  resetState(): void {
+    if (this.disposed) return;
+    this.clearState();
+  }
+
   /** Suspend gameplay actions while leaving native focused UI controls usable. */
   setEnabled(enabled: boolean): void {
-    if (this.enabledValue === enabled) return;
+    if (this.disposed || this.enabledValue === enabled) return;
+    if (!enabled) {
+      for (const code of this.activeKeys) this.suppressedKeys.add(code);
+    }
     this.enabledValue = enabled;
-    this.clearState();
+    this.clearState(true);
   }
 
   dispose(): void {
@@ -238,8 +248,9 @@ export class Input {
     }
   }
 
-  private clearState(): void {
+  private clearState(preserveSuppressedKeys = false): void {
     this.activeKeys.clear();
+    if (!preserveSuppressedKeys) this.suppressedKeys.clear();
     this.activeMouseButtons.clear();
     this.holdCounts.clear();
     this.heldActions.clear();
@@ -251,27 +262,40 @@ export class Input {
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (!this.enabledValue) return;
     const actions = this.keyBindings.get(event.code);
     if (!actions) return;
+
+    if (!this.enabledValue) return;
 
     // Mapped game controls belong to the game, not browser UI. In particular,
     // this prevents Space from activating whichever debug button last held
     // focus while the player is trying to charge a jump.
     event.preventDefault();
 
-    if (this.activeKeys.has(event.code)) return;
+    if (this.suppressedKeys.has(event.code)) return;
+    // A repeat can arrive after lifecycle/focus cleanup removed the matching
+    // initial keydown. Never let that orphan repeat re-establish held input.
+    if (event.repeat || this.activeKeys.has(event.code)) return;
 
     this.activeKeys.add(event.code);
     this.activate(actions);
   };
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
-    if (!this.enabledValue) return;
     const actions = this.keyBindings.get(event.code);
     if (!actions) return;
 
+    if (!this.enabledValue) {
+      // A gameplay key held when a menu opened must not complete a native
+      // button activation after focus moves into that menu. Keys pressed
+      // deliberately while already in the menu remain native UI input.
+      if (this.suppressedKeys.delete(event.code)) event.preventDefault();
+      return;
+    }
+
     event.preventDefault();
+
+    if (this.suppressedKeys.delete(event.code)) return;
 
     if (!this.activeKeys.delete(event.code)) return;
 

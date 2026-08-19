@@ -75,14 +75,35 @@ movement; held actions remain active.
   render-only frame otherwise. This keeps look responsive above 60 Hz without
   scaling mouse sensitivity by either render or simulation delta time.
 - Escape/browser pointer-lock release is observed through
-  `document.pointerLockElement`; no menu behaviour is implemented by this issue.
+  `document.pointerLockElement`. Issue #22's `GameFlowUI` converts a lock loss
+  during active gameplay into the single paused state.
 - Window blur or document visibility loss clears all active/held/transient input
   state. This prevents a key released outside the page from remaining stuck.
 - Focus loss does **not** synthesize release actions, so losing focus cannot
   accidentally trigger release-driven gameplay such as a charged jump.
+- `Input.setEnabled(false)` is the application-menu suspension boundary. It
+  clears held and transient state, ignores mapped activation and pointer motion,
+  and refuses pointer-lock requests until re-enabled. A key held across that
+  boundary cannot reactivate gameplay until key-up followed by a fresh keydown,
+  so Resume cannot replay stale input. The held key's boundary-crossing keyup is
+  also prevented from activating the menu control that received focus during
+  Pause; keys pressed deliberately after the menu opens remain native UI input.
+  Native menu controls remain free to consume Space and other keyboard input.
+- A repeated keydown with no corresponding active initial keydown is ignored.
+  This covers the browser-repeat orphan left when blur or visibility loss clears
+  an active key before the physical key is released. The next fresh non-repeat
+  keydown still activates normally and no release action is synthesized.
 - The boundary reports that action state was cleared until the next fixed
   update, allowing short-lived retained intent such as the landing jump buffer
   to be cancelled explicitly.
+
+Issue #22 coordinates this boundary through the current level lifecycle. The
+runtime is loaded but stopped under Loading and Title. Start/Resume call
+`GreyboxLevelRuntime.start()`; Pause calls `stop()`; player Restart calls the
+single `restartLevel()` operation and then `start()`. Menus may always disable
+input, but only the runtime start hook re-enables it. This distinction preserves
+the death sequence's intentional input suspension and prevents UI state from
+overriding level-owned recovery behavior.
 
 ## Typed event contracts
 

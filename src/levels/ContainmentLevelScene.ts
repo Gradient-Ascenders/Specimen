@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 
-import type { SlimeVisualDiagnostics, SlimeVisualLaunch, SlimeVisualState, Vector3State } from '../render/slime/SlimeVisual';
-import type { SlimeBurstDiagnostics } from '../render/slime/SlimeBurstPresentation';
+import type {
+  SlimeVisualDiagnostics,
+  SlimeVisualLaunch,
+  SlimeVisualState,
+  Vector3State,
+} from '../render/slime/SlimeVisual.ts';
+import type { SlimeBurstDiagnostics } from '../render/slime/SlimeBurstPresentation.ts';
 import { ContainmentTeachingScene } from './ContainmentTeachingScene.ts';
 import { RoomFiveGreybox, type RoomFiveHazardFailure } from './RoomFiveGreybox.ts';
 import { RoomFourGreybox, type RoomFourHazardFailure } from './RoomFourGreybox.ts';

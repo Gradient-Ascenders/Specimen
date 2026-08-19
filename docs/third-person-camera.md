@@ -53,8 +53,8 @@ and collision world; the render update creates no temporary Three.js resources.
 ## Pointer-lock look settings
 
 `Input` remains the only browser-event boundary. While its canvas owns pointer
-lock, `main.ts` passes accumulated relative motion to `CameraRig.queueLookInput`
-before `Input.endFixedUpdate()` clears it.
+lock, `GreyboxLevelRuntime` passes accumulated relative motion to
+`CameraRig.queueLookInput` before `Input.endFixedUpdate()` clears it.
 
 `CameraRig.setLookSettings()` is the settings-system hook for:
 
@@ -62,6 +62,12 @@ before `Input.endFixedUpdate()` clears it.
 - vertical sensitivity (`0.0020` radians per pointer pixel by default);
 - horizontal inversion (off by default);
 - vertical/Y inversion (off by default).
+
+`CameraRig.setFollowDistanceMetres()` is the collision-aware camera-distance
+hook used by Issue #22. It accepts the supported 3.5–7.0 m player range and
+updates the normal open-space target. Moving inward contracts immediately;
+moving outward uses the existing delayed, damped recovery and remains limited
+by camera-obstruction sweeps.
 
 With vertical inversion off, mouse up looks up and mouse down looks down;
 enabling vertical inversion reverses those directions. Horizontal look retains
@@ -75,8 +81,8 @@ The normal gameplay path keeps three orientation decisions separate:
 
 - `CameraRig` owns the accumulated pointer yaw and clamped pitch. It never
   reads the slime visual's facing.
-- Before each movement step, `main.ts` asks the rig to convert normalized WASD
-  input into a world direction. Ground movement uses the world-horizontal
+- Before each movement step, `GreyboxLevelRuntime` asks the rig to convert
+  normalized WASD input into a world direction. Ground movement uses the world-horizontal
   camera right/back basis. Attached movement uses the displayed camera heading
   projected onto the authoritative wall plane. Camera pitch is absent from both
   bases, so it cannot reduce movement speed or invert an axis.

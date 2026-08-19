@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
-import type { SurfaceTag } from '../physics/SurfaceRegistry';
+import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 import {
   SlimeVisual,
   type SlimeVisualDiagnostics,

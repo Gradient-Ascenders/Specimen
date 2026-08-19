@@ -318,6 +318,26 @@ test('the rig contracts against a camera-layer wall and fully recovers when it c
   wall.geometry.dispose();
 });
 
+test('follow distance validates and recovers through collision-aware camera logic', () => {
+  const rig = new CameraRig();
+  rig.setFollowTarget(createTarget(), new CollisionWorld());
+  rig.update(1, 0);
+
+  rig.setFollowDistanceMetres(7);
+  for (let step = 0; step < 300; step += 1) rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().desiredDistanceMetres, 7);
+  assert.ok(
+    Math.abs(rig.getDiagnostics().currentDistanceMetres - 7) < 1e-7,
+  );
+
+  rig.setFollowDistanceMetres(3.5);
+  rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().currentDistanceMetres, 3.5);
+  assert.throws(() => rig.setFollowDistanceMetres(3.49));
+  assert.throws(() => rig.setFollowDistanceMetres(7.01));
+  assert.throws(() => rig.setFollowDistanceMetres(Number.NaN));
+});
+
 test('teleport immediately removes stale camera up', () => {
   const target = createTarget();
   const rig = new CameraRig();
@@ -337,6 +357,33 @@ test('teleport immediately removes stale camera up', () => {
   rig.update(1, 1 / 60);
 
   assert.ok(rig.camera.up.distanceTo(new THREE.Vector3(0, 1, 0)) < 1e-10);
+});
+
+test('camera reset clears transient orbit state without retaining its target', () => {
+  const target = createTarget();
+  const rig = new CameraRig({
+    horizontalSensitivityRadiansPerPixel: 1,
+    verticalSensitivityRadiansPerPixel: 1,
+    initialPitchRadians: 0,
+    minimumPitchRadians: -1,
+    maximumPitchRadians: 1,
+  });
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.update(1, 0);
+  rig.queueLookInput(0.5, 0.25);
+  rig.update(1, 1 / 60);
+  assert.notEqual(rig.getDiagnostics().pitchRadians, 0);
+
+  rig.clearFollowTarget();
+  const reset = rig.getDiagnostics();
+  assert.equal(reset.pitchRadians, 0);
+  assert.equal(reset.obstructed, false);
+  assert.equal(reset.targetGrounded, false);
+  assert.equal(reset.targetAttached, false);
+
+  target.position.set(20, 20, 20);
+  rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().targetGrounded, false);
 });
 
 test('teleport clears stale obstruction distance immediately', () => {

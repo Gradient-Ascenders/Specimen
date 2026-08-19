@@ -15,6 +15,8 @@ import {
 export const CAMERA_VERTICAL_FOV_DEGREES = 48;
 export const CAMERA_NEAR_PLANE_METRES = 0.1;
 export const CAMERA_FAR_PLANE_METRES = 200;
+export const MIN_FOLLOW_DISTANCE_METRES = 3.5;
+export const MAX_FOLLOW_DISTANCE_METRES = 7;
 
 export interface ReadonlyCameraVector3 {
   readonly x: number;
@@ -168,6 +170,26 @@ export class CameraRig {
     this.initialized = false;
   }
 
+  clearFollowTarget(): void {
+    this.followTarget = undefined;
+    this.obstructionWorld = undefined;
+    this.reset();
+  }
+
+  reset(): void {
+    this.pitchRadians = this.config.initialPitchRadians;
+    this.queuedYawRadians = 0;
+    this.queuedPitchRadians = 0;
+    this.planarBack.set(0, 0, 1);
+    this.currentDistanceMetres = this.config.followDistanceMetres;
+    this.clearTimeSeconds = 0;
+    this.initialized = false;
+    this.obstructed = false;
+    this.obstructionName = 'none';
+    this.targetGrounded = false;
+    this.targetAttached = false;
+  }
+
   setLookSettings(settings: Partial<CameraLookSettings>): void {
     if (settings.horizontalSensitivityRadiansPerPixel !== undefined) {
       this.validateSensitivity(
@@ -191,6 +213,20 @@ export class CameraRig {
     if (settings.invertVertical !== undefined) {
       this.config.invertVertical = settings.invertVertical;
     }
+  }
+
+  setFollowDistanceMetres(distanceMetres: number): void {
+    if (
+      !Number.isFinite(distanceMetres) ||
+      distanceMetres < MIN_FOLLOW_DISTANCE_METRES ||
+      distanceMetres > MAX_FOLLOW_DISTANCE_METRES
+    ) {
+      throw new Error(
+        `follow distance must be between ${MIN_FOLLOW_DISTANCE_METRES} and ${MAX_FOLLOW_DISTANCE_METRES} metres.`,
+      );
+    }
+
+    this.config.followDistanceMetres = distanceMetres;
   }
 
   /** Queue centralized pointer-lock input for the next rendered pose. */
