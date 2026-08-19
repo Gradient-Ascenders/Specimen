@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {
   SlimeMaterial,
   type SlimeMaterialDeformationState,
-} from './SlimeMaterial';
+} from './SlimeMaterial.ts';
 
 const VECTOR_EPSILON_SQ = 1e-8;
 const FULL_CYCLE_RADIANS = Math.PI * 2;
@@ -102,12 +102,18 @@ export class SlimeVisual {
   private readonly radiusMetres: number;
   private readonly material: SlimeMaterial;
   private readonly inverseWorldQuaternion = new THREE.Quaternion();
-  private readonly localVelocity = new THREE.Vector3();
-  private readonly previousLocalVelocity = new THREE.Vector3();
+  private readonly worldVelocity = new THREE.Vector3();
+  private readonly previousWorldVelocity = new THREE.Vector3();
   private readonly tangentialVelocity = new THREE.Vector3();
   private readonly targetDirection = new THREE.Vector3(0, 0, -1);
   private readonly targetSurfaceNormal = new THREE.Vector3(0, 1, 0);
   private readonly inertiaTarget = new THREE.Vector3();
+  private readonly moveDirectionWorld = new THREE.Vector3(0, 0, -1);
+  private readonly surfaceNormalWorld = new THREE.Vector3(0, 1, 0);
+  private readonly surfaceTangentWorld = new THREE.Vector3(0, 0, 1);
+  private readonly stretchDirectionWorld = new THREE.Vector3(0, 1, 0);
+  private readonly inertiaWorld = new THREE.Vector3();
+  private readonly impactNormalWorld = new THREE.Vector3(0, 1, 0);
   private readonly directionRotationAxis = new THREE.Vector3();
   private readonly directionReferenceAxis = new THREE.Vector3();
   private readonly directionRotation = new THREE.Quaternion();
@@ -169,25 +175,50 @@ export class SlimeVisual {
 
   update(deltaSeconds: number, state: SlimeVisualState): void {
     this.material.update(deltaSeconds);
-    this.updateLocalBasis(state);
+    this.updateWorldBasis(state);
     this.updateContinuousState(deltaSeconds, state);
     this.updateContactImpact(deltaSeconds, state);
     this.updateSprings(deltaSeconds);
+    this.previousWorldVelocity.copy(this.worldVelocity);
+  }
+
+  /** Convert fixed-step world state through the current rendered orientation. */
+  present(): void {
+    this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
+    this.copyWorldDirectionToLocal(
+      this.moveDirectionWorld,
+      this.deformationState.moveDirectionLocal,
+    );
+    this.copyWorldDirectionToLocal(
+      this.surfaceNormalWorld,
+      this.deformationState.surfaceNormalLocal,
+    );
+    this.copyWorldDirectionToLocal(
+      this.surfaceTangentWorld,
+      this.deformationState.surfaceTangentLocal,
+    );
+    this.copyWorldDirectionToLocal(
+      this.stretchDirectionWorld,
+      this.deformationState.stretchDirectionLocal,
+    );
+    this.deformationState.inertiaLocal
+      .copy(this.inertiaWorld)
+      .applyQuaternion(this.inverseWorldQuaternion);
+    this.copyWorldDirectionToLocal(
+      this.impactNormalWorld,
+      this.deformationState.impactNormalLocal,
+    );
+    this.deformationState.impactPointLocal
+      .copy(this.deformationState.impactNormalLocal)
+      .multiplyScalar(-this.radiusMetres);
     this.material.setDeformationState(this.deformationState);
-    this.previousLocalVelocity.copy(this.localVelocity);
   }
 
   onImpact(impact: SlimeVisualImpact): void {
     const strength = THREE.MathUtils.clamp(impact.strength, 0, 1);
     if (strength <= 0) return;
 
-    this.copyWorldDirectionToLocal(
-      impact.normalWorld,
-      this.deformationState.impactNormalLocal,
-    );
-    this.deformationState.impactPointLocal
-      .copy(this.deformationState.impactNormalLocal)
-      .multiplyScalar(-this.radiusMetres);
+    this.copyDirection(impact.normalWorld, this.impactNormalWorld);
     this.deformationState.impactStrength = strength;
     this.deformationState.impactAge = 0;
     this.deformationState.impactElasticity =
@@ -205,10 +236,7 @@ export class SlimeVisual {
   }
 
   onLaunch(launch: SlimeVisualLaunch): void {
-    this.copyWorldDirectionToLocal(
-      launch.directionWorld,
-      this.deformationState.stretchDirectionLocal,
-    );
+    this.copyDirection(launch.directionWorld, this.stretchDirectionWorld);
     const speedStrength = THREE.MathUtils.clamp(
       launch.speedMetresPerSecond /
         SLIME_VISUAL_TUNING.airborneFullStretchSpeedMetresPerSecond,
@@ -238,9 +266,15 @@ export class SlimeVisual {
   }
 
   reset(): void {
-    this.localVelocity.set(0, 0, 0);
-    this.previousLocalVelocity.set(0, 0, 0);
+    this.worldVelocity.set(0, 0, 0);
+    this.previousWorldVelocity.set(0, 0, 0);
     this.tangentialVelocity.set(0, 0, 0);
+    this.moveDirectionWorld.set(0, 0, -1);
+    this.surfaceNormalWorld.set(0, 1, 0);
+    this.surfaceTangentWorld.set(0, 0, 1);
+    this.stretchDirectionWorld.set(0, 1, 0);
+    this.inertiaWorld.set(0, 0, 0);
+    this.impactNormalWorld.set(0, 1, 0);
     this.deformationState.speed = 0;
     this.deformationState.locomotionPhase = 0;
     this.deformationState.moveDirectionLocal.set(0, 0, -1);
@@ -266,7 +300,7 @@ export class SlimeVisual {
     this.launchSpringVelocity = 0;
     this.contactCooldownSeconds = 0;
     this.previousContactName = 'none';
-    this.material.setDeformationState(this.deformationState);
+    this.present();
   }
 
   dispose(): void {
@@ -275,22 +309,18 @@ export class SlimeVisual {
     this.material.dispose();
   }
 
-  private updateLocalBasis(state: SlimeVisualState): void {
-    this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
-    this.localVelocity
-      .set(
-        state.velocityWorld.x,
-        state.velocityWorld.y,
-        state.velocityWorld.z,
-      )
-      .applyQuaternion(this.inverseWorldQuaternion);
+  private updateWorldBasis(state: SlimeVisualState): void {
+    this.worldVelocity.set(
+      state.velocityWorld.x,
+      state.velocityWorld.y,
+      state.velocityWorld.z,
+    );
 
     const sourceNormal = state.grounded || state.attached
       ? state.surfaceNormalWorld
       : state.gameplayUpWorld;
     this.targetSurfaceNormal
       .set(sourceNormal.x, sourceNormal.y, sourceNormal.z)
-      .applyQuaternion(this.inverseWorldQuaternion)
       .normalize();
   }
 
@@ -303,18 +333,18 @@ export class SlimeVisual {
       deltaSeconds,
     );
     this.smoothUnitDirectionTowards(
-      this.deformationState.surfaceNormalLocal,
+      this.surfaceNormalWorld,
       this.targetSurfaceNormal,
       surfaceBlend,
-      this.deformationState.surfaceTangentLocal,
+      this.surfaceTangentWorld,
     );
-    this.deformationState.surfaceTangentLocal
-      .projectOnPlane(this.deformationState.surfaceNormalLocal)
+    this.surfaceTangentWorld
+      .projectOnPlane(this.surfaceNormalWorld)
       .normalize();
 
     this.tangentialVelocity
-      .copy(this.localVelocity)
-      .projectOnPlane(this.deformationState.surfaceNormalLocal);
+      .copy(this.worldVelocity)
+      .projectOnPlane(this.surfaceNormalWorld);
     const tangentialSpeed = this.tangentialVelocity.length();
     const targetSpeed = THREE.MathUtils.clamp(
       tangentialSpeed / state.maximumLocomotionSpeedMetresPerSecond,
@@ -346,18 +376,18 @@ export class SlimeVisual {
         deltaSeconds,
       );
       this.smoothUnitDirectionTowards(
-        this.deformationState.moveDirectionLocal,
+        this.moveDirectionWorld,
         this.targetDirection,
         directionBlend,
       );
-      this.deformationState.moveDirectionLocal.projectOnPlane(
-        this.deformationState.surfaceNormalLocal,
+      this.moveDirectionWorld.projectOnPlane(
+        this.surfaceNormalWorld,
       );
       if (
-        this.deformationState.moveDirectionLocal.lengthSq() >
+        this.moveDirectionWorld.lengthSq() >
         VECTOR_EPSILON_SQ
       ) {
-        this.deformationState.moveDirectionLocal.normalize();
+        this.moveDirectionWorld.normalize();
       }
     }
 
@@ -384,19 +414,19 @@ export class SlimeVisual {
       ),
     );
 
-    const velocityLength = this.localVelocity.length();
+    const velocityLength = this.worldVelocity.length();
     if (
       !state.grounded &&
       !state.attached &&
       velocityLength > VECTOR_EPSILON_SQ
     ) {
-      this.targetDirection.copy(this.localVelocity).normalize();
-      this.deformationState.stretchDirectionLocal
+      this.targetDirection.copy(this.worldVelocity).normalize();
+      this.stretchDirectionWorld
         .lerp(this.targetDirection, speedBlend)
         .normalize();
     } else if (this.deformationState.speed > 0.01) {
-      this.deformationState.stretchDirectionLocal
-        .lerp(this.deformationState.moveDirectionLocal, speedBlend)
+      this.stretchDirectionWorld
+        .lerp(this.moveDirectionWorld, speedBlend)
         .normalize();
     }
 
@@ -420,14 +450,14 @@ export class SlimeVisual {
     );
 
     this.inertiaTarget
-      .subVectors(this.previousLocalVelocity, this.localVelocity)
+      .subVectors(this.previousWorldVelocity, this.worldVelocity)
       .multiplyScalar(
         1 /
           (deltaSeconds *
             SLIME_VISUAL_TUNING.maximumVisualAccelerationMetresPerSecondSquared),
       );
     if (this.inertiaTarget.lengthSq() > 1) this.inertiaTarget.normalize();
-    this.deformationState.inertiaLocal.lerp(
+    this.inertiaWorld.lerp(
       this.inertiaTarget,
       this.exponentialBlend(
         SLIME_VISUAL_TUNING.inertiaResponsePerSecond,
@@ -512,11 +542,14 @@ export class SlimeVisual {
     directionWorld: Vector3State,
     target: THREE.Vector3,
   ): void {
-    this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
     target
       .set(directionWorld.x, directionWorld.y, directionWorld.z)
       .applyQuaternion(this.inverseWorldQuaternion)
       .normalize();
+  }
+
+  private copyDirection(direction: Vector3State, target: THREE.Vector3): void {
+    target.set(direction.x, direction.y, direction.z).normalize();
   }
 
   private normalizeImpactStrength(

@@ -20,6 +20,7 @@ const ELEVATOR_GROUP_ID = 'room4-elevator-test';
 const ELEVATOR_CHECKPOINT_ID = 'room4-elevator-roof';
 const REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
 const POSITION_TOLERANCE_METRES = 0.006;
+const NO_MOVEMENT = new THREE.Vector3();
 
 const PLATFORM_START = new THREE.Vector3(13, 0.6, -5);
 const PLATFORM_END = new THREE.Vector3(13, 8.6, -5);
@@ -251,8 +252,7 @@ export class ElevatorTestRig {
     ) {
       this.player.update(
         REGRESSION_FIXED_DELTA_SECONDS,
-        0,
-        0,
+        NO_MOVEMENT,
       );
       this.sequence.update(
         REGRESSION_FIXED_DELTA_SECONDS,
@@ -328,8 +328,7 @@ export class ElevatorTestRig {
     for (let step = 0; step < simulatedSteps; step += 1) {
       this.player.update(
         REGRESSION_FIXED_DELTA_SECONDS,
-        0,
-        0,
+        NO_MOVEMENT,
       );
       this.sequence.update(
         REGRESSION_FIXED_DELTA_SECONDS,

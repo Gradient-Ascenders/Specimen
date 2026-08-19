@@ -16,6 +16,7 @@ import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { ElevatorTestRig } from './puzzle/ElevatorTestRig';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
+import { BlobFacing } from './render/BlobFacing';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
 import './style.css';
@@ -47,6 +48,9 @@ let lastLandingImpactSpeedMetresPerSecond = 0;
 const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
 const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
 const renderedProbePosition = new THREE.Vector3();
+const cameraRelativeMovement = new THREE.Vector3();
+const noMovement = new THREE.Vector3();
+const blobFacing = new BlobFacing();
 
 const body = new KinematicBody({
   world: collisionWorld,
@@ -180,8 +184,7 @@ const runSlopeIdleRegression = (): string => {
   for (let step = 0; step < totalSteps; step += 1) {
     regressionBody.update(
       SLOPE_REGRESSION_FIXED_DELTA_SECONDS,
-      0,
-      0,
+      noMovement,
     );
 
     if (!regressionBody.grounded) ungroundedSteps += 1;
@@ -271,11 +274,39 @@ const loop = new Loop({
       (input.isDown('moveBackward') ? 1 : 0) -
       (input.isDown('moveForward') ? 1 : 0);
 
+    renderLayer.cameraRig.queueLookInput(
+      input.pointerDeltaX,
+      input.pointerDeltaY,
+    );
+    renderLayer.cameraRig.applyQueuedLookInput();
+
+    // Resolve both ground and attached movement from the camera before the
+    // body advances. A step that begins attached preserves this support plane
+    // through wall-jump release; ordinary jumps use their new airborne plane.
+    if (body.attached) {
+      renderLayer.cameraRig.copySurfaceMovementDirection(
+        moveX,
+        moveZ,
+        body.gameplayUp,
+        cameraRelativeMovement,
+      );
+    } else {
+      renderLayer.cameraRig.copyGroundMovementDirection(
+        moveX,
+        moveZ,
+        cameraRelativeMovement,
+      );
+    }
+
     jumpInputState.pressed = input.wasPressed('jump');
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
 
-    body.update(deltaSeconds, moveX, moveZ, jumpInputState);
+    body.update(
+      deltaSeconds,
+      cameraRelativeMovement,
+      jumpInputState,
+    );
     // Lethal hazards query the authoritative post-movement sphere. Recovery
     // may synchronously reset the active puzzle group and teleport the body.
     laserTestRig.update(deltaSeconds);
@@ -284,6 +315,7 @@ const loop = new Loop({
     // if the body remains grounded on the roof.
     elevatorTestRig.update(deltaSeconds);
 
+    blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
     slimeVisualState.jumpCharge = body.chargeFraction;
@@ -295,10 +327,6 @@ const loop = new Loop({
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.update(deltaSeconds, slimeVisualState);
     puzzleTestRig.update(deltaSeconds);
-    renderLayer.cameraRig.queueLookInput(
-      input.pointerDeltaX,
-      input.pointerDeltaY,
-    );
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
@@ -312,6 +340,18 @@ const loop = new Loop({
     );
 
     testScene.setProbePosition(renderedProbePosition);
+    testScene.setProbeYaw(
+      blobFacing.getInterpolatedYaw(interpolationAlpha),
+    );
+    testScene.presentProbe();
+    // A high-refresh render can occur without a 60 Hz gameplay step. Consume
+    // any pointer motion from that interval here so camera look remains crisp;
+    // the next fixed step will read the already-updated orbit basis.
+    renderLayer.cameraRig.queueLookInput(
+      input.pointerDeltaX,
+      input.pointerDeltaY,
+    );
+    input.endPointerUpdate();
     renderLayer.cameraRig.update(
       interpolationAlpha,
       stats.frameDeltaSeconds,
@@ -385,6 +425,8 @@ const loop = new Loop({
           `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
           `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
+          `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
+          `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
           `slope idle regression: ${slopeRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
