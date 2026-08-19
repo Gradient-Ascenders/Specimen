@@ -1,61 +1,86 @@
 # Issue #22 verification
 
 Issue #22 adds the DOM/CSS loading, title, gameplay HUD, pause, settings,
-restart-feedback, and credits surfaces around the existing grey-box harness.
+restart, and credits flow around the current lifecycle-owned containment level.
 
-## Automated checks
+## Latest-main integration
 
-- TypeScript type-check passed through the repository's installed TypeScript
-  7.0.2 compiler.
-- The complete Node test suite passed: 42 tests, including flow subscriptions
-  and restart capability, session settings, camera distance, focus-loss
-  repeats, and input suspension.
-- The production Vite build passed and emitted the relative-path `dist/`
-  document, stylesheet, and JavaScript bundle.
-- `git diff --check` passed.
+- Merged `origin/main` at `eac22fd`, which includes the completed Issue #23
+  lifecycle plus current death/retry, deferred recovery, slime burst, movement,
+  jump buffering, sticky-wall, landing rebound, camera, containment, diagnostics,
+  tests, and documentation.
+- Resolved textual conflicts in `src/main.ts`, `src/core/Input.ts`, and
+  `docs/runtime-input.md` semantically. `main.ts` remains a small application
+  bootstrap; current main's `GreyboxLevelRuntime` remains the containment owner;
+  and the input boundary retains both menu suspension and the orphan-repeat /
+  jump-cancellation behavior.
+- The older puzzle/laser/elevator harness was not restored to the active runtime.
 
-The host's global `npm` launcher points to a missing user-level `npm-cli.js`.
-The checks therefore used the Codex bundled Node 24 runtime to invoke the same
-installed TypeScript, Node test runner, and Vite entry points directly. This is
-an environment launcher limitation, not a project dependency or compile error.
+## Lifecycle and restart integration
 
-## Dependency status
+- Loading constructs the runtime but leaves it stopped under Loading and Title.
+- Start and Resume call `GreyboxLevelRuntime.start()`; Pause calls `stop()`.
+- Restart from Pause calls `GreyboxLevelRuntime.restartLevel(): void` exactly
+  once, then calls `start()` and returns directly to gameplay. No subsystem
+  reset sequence exists in the UI or application bootstrap.
+- The current death/retry sequence remains level-owned. Its intentional input
+  suspension and pointer-lock release do not trigger the pause flow, and the UI
+  does not override its input state when resuming after focus loss.
+- `GreyboxLevelRuntime.setDebugInteractionEnabled()` suppresses the level-owned
+  panel behind menus without exposing its DOM to `GameFlowUI`. Hidden tools are
+  `hidden`, `inert`, and `aria-hidden`; production availability remains
+  development-only by default or deliberate through `?debug=1`.
 
-- Issue #19 is closed. Its deterministic puzzle/checkpoint reset work is
-  present on `main`.
-- Issue #23 is open, has no comments, and no matching lifecycle PR or remote
-  branch is available. Restart acceptance is therefore blocked on its one
-  authoritative lifecycle-owned operation.
+## UI and settings
 
-The player Restart button is disabled through `restartAvailable: false` and
-shows neutral build-availability text. It cannot enter the restarting state or
-invoke the injected action until #23 supplies the lifecycle capability. The UI
-still contains no debug-harness subsystem reset sequence.
+- Full-screen loading, title, pause, settings, credits, and restart states are
+  mutually exclusive; the minimal HUD appears only during gameplay.
+- Focus targets use native buttons, ranges, checkbox, headings, labels, and
+  status regions. Escape pauses/resumes or returns from a submenu.
+- `GameSettings` retains sensitivity, vertical inversion, camera distance, and
+  master volume for the application session. Camera settings apply immediately
+  through public `CameraRig` APIs and survive restart. Master volume is stored
+  honestly but no audio system consumes it yet.
+- Credits import canonical `CREDITS.md` and render it through `textContent`.
 
-## Manual and visual verification
+## Automated verification
 
-The production preview was started from the generated build. Automated control
-of the in-app browser was unavailable because the installed Browser plugin
-rejected its own cached service helper as outside its configured trusted path.
-Consequently, no screenshots or claims of completed interactive browser checks
-are recorded in this change.
+- `npm run type-check`: passed.
+- `npm test`: 75 passed, 0 failed. The suite includes current-main death,
+  movement, lifecycle, input, and rendering tests plus Issue #22 flow,
+  subscription, settings, camera-distance, menu-suspension, and lifecycle
+  coordination coverage.
+- `npm run build`: passed with Vite 8.2.1; 34 modules transformed. Output was a
+  668.65 kB JavaScript asset (167.51 kB gzip) and a 9.03 kB stylesheet (3.01 kB
+  gzip). The existing warning for a JavaScript chunk over 500 kB remains.
+- `git diff --check`: passed.
+- Repository-wide conflict-marker search: passed.
 
-The following checks remain for a working browser session and Issue #23
-integration:
+## Production and browser evidence
 
-- Capture Loading, Title, Gameplay HUD, Pause, Settings, and Credits at the
-  representative narrow, square, standard, and wide desktop viewports.
-- Exercise Start, repeated pause/resume, keyboard focus, pointer-lock loss,
-  window blur/return, and every setting through mouse and keyboard.
-- Verify clean production console/network output and nested relative-path
-  deployment.
-- After Issue #23 lands, change player/puzzle/hazard/elevator state and repeat
-  the lifecycle restart at least ten times while monitoring listeners and
-  renderer diagnostics.
+- Served the final `dist/` with Vite preview at `http://127.0.0.1:4174/`.
+- HTTP verification returned 200 for the 846-byte root document, 200 for the
+  generated 668,659-byte JavaScript asset, and 200 for the generated 9,034-byte
+  CSS asset.
+- Normal production diagnostics remain unavailable unless `?debug=1` is
+  supplied by the bootstrap.
+- Interactive browser verification was blocked before navigation because the
+  in-app browser rejected its own `browser-service.mjs` dependency as outside a
+  configured trusted code path. No screenshots or manual interaction claims are
+  made here.
 
-## Resource and credits impact
+## Outstanding manual verification
 
-The UI adds no dependencies, third-party assets, per-frame DOM allocation, or
-Three.js resources. Credits render the canonical root `CREDITS.md` as safe text.
-All UI/global listeners are owned by one abort controller and removed on
-`GameFlowUI.dispose()`.
+Use a working browser session after code review to verify title/start,
+pause/resume, pointer lock and focus loss, settings persistence, full and
+repeated Restart, death/retry coexistence, keyboard navigation, target viewport
+layouts, state screenshots, and console/network output.
+
+## Resource and dependency impact
+
+The UI adds no package dependency, third-party asset, per-frame DOM allocation,
+or Three.js resource. One abort controller owns UI/global listeners and
+`GameFlowUI.dispose()` removes them and its settings subscription. The level
+runtime still owns and disposes the current scene, player, death flow,
+diagnostics, subscriptions, and collision resources; the application owns the
+single renderer, input instance, camera rig, and loop.

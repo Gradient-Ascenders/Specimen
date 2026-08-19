@@ -7,6 +7,10 @@ import {
   type SurfaceRegistry,
   type SurfaceTag,
 } from './SurfaceRegistry.ts';
+import {
+  resolveWallJumpTangent,
+  type WallJumpIntent,
+} from './WallJumpBasis.ts';
 
 const MOVEMENT_EPSILON_SQ = 1e-12;
 const CONTACT_PUSH_METRES = 1e-5;
@@ -22,12 +26,19 @@ export interface JumpInputState {
   pressed: boolean;
   held: boolean;
   released: boolean;
+  /** True when an input-boundary reset must invalidate retained intent. */
+  cancelled?: boolean;
 }
 
 const NO_JUMP_INPUT: Readonly<JumpInputState> = {
   pressed: false,
   held: false,
   released: false,
+};
+
+const NO_WALL_JUMP_INTENT: Readonly<WallJumpIntent> = {
+  lateral: 0,
+  vertical: 0,
 };
 
 export type JumpState = 'grounded' | 'coyote' | 'charging' | 'airborne';
@@ -50,6 +61,7 @@ export interface KinematicBodyConfig {
   maximumJumpChargeSeconds: number;
   jumpChargeCurveExponent: number;
   coyoteTimeSeconds: number;
+  jumpInputBufferSeconds: number;
   jumpGroundDetachSeconds: number;
   minimumLandingAirTimeSeconds: number;
 
@@ -61,6 +73,20 @@ export interface KinematicBodyConfig {
   bounceCooldownSeconds: number;
   /** Required approach speed into a bounce surface before it fires. */
   minimumBounceApproachSpeedMetresPerSecond: number;
+  /** Minimum downward landing speed that triggers the slime's innate rebound. */
+  slimeMinimumBounceImpactSpeedMetresPerSecond: number;
+  /** Fraction of vertical impact speed retained by the slime after landing. */
+  slimeBounceRestitution: number;
+  /** Safety cap for the slime's rebound speed after a very high fall. */
+  slimeMaximumBounceSpeedMetresPerSecond: number;
+
+  /**
+   * Outward separation speed used when an attached jump has directional
+   * surface input. The remaining charged jump speed is spent along the wall.
+   */
+  directionalWallJumpOutwardSpeedMetresPerSecond: number;
+  /** Reattachment cooldown used specifically by directional wall jumps. */
+  directionalWallJumpDetachCooldownSeconds: number;
 }
 
 export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
@@ -76,11 +102,15 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   minimumGroundNormalDot: Math.cos(THREE.MathUtils.degToRad(50)),
   maxCollisionIterations: 3,
 
-  minimumJumpSpeedMetresPerSecond: 4.8,
-  maximumJumpSpeedMetresPerSecond: 8.8,
+  // Jump height scales with launch speed squared. Multiplying the original
+  // 4.8-8.8 m/s charge range by sqrt(1.25) raises every charged jump apex by
+  // approximately 25% while preserving the existing charge response.
+  minimumJumpSpeedMetresPerSecond: 5.37,
+  maximumJumpSpeedMetresPerSecond: 9.84,
   maximumJumpChargeSeconds: 0.7,
   jumpChargeCurveExponent: 1.35,
   coyoteTimeSeconds: 0.1,
+  jumpInputBufferSeconds: 0.12,
   jumpGroundDetachSeconds: 0.05,
   minimumLandingAirTimeSeconds: 0.04,
 
@@ -90,6 +120,14 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   attachmentDetachCooldownSeconds: 0.12,
   bounceCooldownSeconds: 0.12,
   minimumBounceApproachSpeedMetresPerSecond: 0.12,
+  slimeMinimumBounceImpactSpeedMetresPerSecond: 3.1,
+  slimeBounceRestitution: 0.68,
+  slimeMaximumBounceSpeedMetresPerSecond: 11,
+
+  // A directional wall jump spends most of its charged speed along the
+  // authored wall while keeping enough outward motion to clear collision.
+  directionalWallJumpOutwardSpeedMetresPerSecond: 1.2,
+  directionalWallJumpDetachCooldownSeconds: 0.08,
 };
 
 export interface KinematicBodyOptions {
@@ -132,6 +170,8 @@ export class KinematicBody {
   private chargingJumpValue = false;
   private chargeSecondsValue = 0;
   private coyoteTimeRemainingSecondsValue = 0;
+  private jumpInputBufferRemainingSecondsValue = 0;
+  private bufferedJumpReleasedValue = false;
   private groundReacquireDelaySeconds = 0;
   private airborneSeconds = 0;
   private landedThisStepValue = false;
@@ -157,6 +197,9 @@ export class KinematicBody {
   private readonly gravityStep = new THREE.Vector3();
   private readonly movementUpAtStepStart = new THREE.Vector3();
   private readonly launchDirection = new THREE.Vector3();
+  private readonly directionalWallJumpTangent = new THREE.Vector3();
+  private readonly directionalWallJumpUp = new THREE.Vector3();
+  private readonly directionalWallJumpRight = new THREE.Vector3();
   private readonly edgeOldUp = new THREE.Vector3();
   private readonly edgeTravelDirection = new THREE.Vector3();
   private readonly edgeProbeDisplacement = new THREE.Vector3();
@@ -285,6 +328,10 @@ export class KinematicBody {
     return this.coyoteTimeRemainingSecondsValue;
   }
 
+  get jumpInputBufferRemainingSeconds(): number {
+    return this.jumpInputBufferRemainingSecondsValue;
+  }
+
   get landedThisStep(): boolean {
     return this.landedThisStepValue;
   }
@@ -299,6 +346,10 @@ export class KinematicBody {
 
   get lastJumpChargeFraction(): number {
     return this.lastJumpChargeFractionValue;
+  }
+
+  get lastJumpDirection(): ReadonlyVector3State {
+    return this.launchDirection;
   }
 
   get maximumJumpChargeSeconds(): number {
@@ -324,14 +375,16 @@ export class KinematicBody {
   /**
    * Advance one deterministic gameplay step.
    *
-   * `movementDirectionWorld` is the already-resolved camera-relative direction
-   * for this step. `jumpInput` uses action state captured by Input; a missing
-   * value means no jump input, which keeps development regressions concise.
+   * `movementDirectionWorld` is the already-resolved camera-relative locomotion
+   * direction for this step. `wallJumpIntent` is deliberately raw cardinal
+   * input: W/S resolve against wall-up/down and A/D against the wall lateral
+   * basis, independent of camera heading.
    */
   update(
     deltaSeconds: number,
     movementDirectionWorld: ReadonlyVector3State,
     jumpInput: Readonly<JumpInputState> = NO_JUMP_INPUT,
+    wallJumpIntent: Readonly<WallJumpIntent> = NO_WALL_JUMP_INTENT,
   ): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error('KinematicBody deltaSeconds must be positive and finite.');
@@ -360,7 +413,6 @@ export class KinematicBody {
       0,
       this.bounceCooldownSecondsValue - deltaSeconds,
     );
-
     if (this.groundReacquireDelaySeconds > 0) {
       this.groundReacquireDelaySeconds = Math.max(
         0,
@@ -379,7 +431,14 @@ export class KinematicBody {
       this.airborneSeconds += deltaSeconds;
     }
 
-    this.updateJumpState(deltaSeconds, jumpInput);
+    this.updateJumpBuffer(deltaSeconds, jumpInput);
+    this.updateJumpState(
+      deltaSeconds,
+      jumpInput,
+      wallJumpIntent,
+      attachedAtStepStart,
+      this.movementUpAtStepStart,
+    );
     this.applyLocomotion(
       deltaSeconds,
       movementDirectionWorld,
@@ -396,6 +455,7 @@ export class KinematicBody {
     this.moveAndSlide(deltaSeconds);
     this.refreshGroundState(deltaSeconds);
     this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
+    this.consumeBufferedJumpAfterLanding(jumpInput, wallJumpIntent);
   }
 
 
@@ -531,6 +591,7 @@ export class KinematicBody {
     this.supportColliderValue = null;
     this.lastContactSurfaceTagValue = 'default';
     this.cancelJumpCharge();
+    this.clearJumpBuffer();
     this.groundReacquireDelaySeconds = 0;
     this.attachmentCooldownSecondsValue = 0;
     this.bounceCooldownSecondsValue = 0;
@@ -544,7 +605,6 @@ export class KinematicBody {
     this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastBounceSpeedValue = 0;
     this.lastBounceSurfaceNameValue = 'none';
-
     this.refreshGroundState();
     this.coyoteTimeRemainingSecondsValue = this.groundedValue
       ? this.config.coyoteTimeSeconds
@@ -554,6 +614,9 @@ export class KinematicBody {
   private updateJumpState(
     deltaSeconds: number,
     jumpInput: Readonly<JumpInputState>,
+    wallJumpIntent: Readonly<WallJumpIntent>,
+    attachedAtStepStart: boolean,
+    movementUpAtStepStart: THREE.Vector3,
   ): void {
     if (this.chargingJumpValue) {
       if (!jumpInput.held && !jumpInput.released) {
@@ -573,7 +636,13 @@ export class KinematicBody {
         );
       }
 
-      if (jumpInput.released) this.launchChargedJump();
+      if (jumpInput.released) {
+        this.launchChargedJump(
+          wallJumpIntent,
+          attachedAtStepStart,
+          movementUpAtStepStart,
+        );
+      }
       return;
     }
 
@@ -584,10 +653,79 @@ export class KinematicBody {
       ? Math.min(deltaSeconds, this.config.maximumJumpChargeSeconds)
       : 0;
 
-    if (jumpInput.released) this.launchChargedJump();
+    if (jumpInput.released) {
+      this.launchChargedJump(
+        wallJumpIntent,
+        attachedAtStepStart,
+        movementUpAtStepStart,
+      );
+    }
   }
 
-  private launchChargedJump(): void {
+  /** Retain a deliberate airborne press briefly so landing does not eat it. */
+  private updateJumpBuffer(
+    deltaSeconds: number,
+    jumpInput: Readonly<JumpInputState>,
+  ): void {
+    if (jumpInput.cancelled) this.clearJumpBuffer();
+
+    if (this.jumpInputBufferRemainingSecondsValue > 0) {
+      this.jumpInputBufferRemainingSecondsValue = Math.max(
+        0,
+        this.jumpInputBufferRemainingSecondsValue - deltaSeconds,
+      );
+
+      if (this.jumpInputBufferRemainingSecondsValue === 0) {
+        this.bufferedJumpReleasedValue = false;
+      } else if (jumpInput.released) {
+        this.bufferedJumpReleasedValue = true;
+      } else if (!jumpInput.held && !this.bufferedJumpReleasedValue) {
+        // Focus loss clears held input without synthesizing a release. Do not
+        // turn that cleared state into a stale jump after focus returns.
+        this.clearJumpBuffer();
+      }
+    }
+
+    if (jumpInput.pressed && !this.hasJumpOpportunity()) {
+      this.jumpInputBufferRemainingSecondsValue =
+        this.config.jumpInputBufferSeconds;
+      this.bufferedJumpReleasedValue = jumpInput.released;
+    }
+  }
+
+  /** Consume buffered intent after collision has established new support. */
+  private consumeBufferedJumpAfterLanding(
+    jumpInput: Readonly<JumpInputState>,
+    wallJumpIntent: Readonly<WallJumpIntent>,
+  ): void {
+    if (
+      this.jumpInputBufferRemainingSecondsValue <= 0 ||
+      this.chargingJumpValue ||
+      !this.hasJumpOpportunity()
+    ) {
+      return;
+    }
+
+    const launchImmediately =
+      this.bufferedJumpReleasedValue || jumpInput.released;
+    this.clearJumpBuffer();
+    this.chargingJumpValue = true;
+    this.chargeSecondsValue = 0;
+
+    if (launchImmediately) {
+      this.launchChargedJump(
+        wallJumpIntent,
+        this.attachedValue,
+        this.gameplayUpValue,
+      );
+    }
+  }
+
+  private launchChargedJump(
+    wallJumpIntent: Readonly<WallJumpIntent>,
+    attachedAtStepStart: boolean,
+    movementUpAtStepStart: THREE.Vector3,
+  ): void {
     const normalizedCharge = this.chargeFraction;
     const curvedCharge = Math.pow(
       normalizedCharge,
@@ -599,23 +737,38 @@ export class KinematicBody {
       curvedCharge,
     );
 
-    // Capture the authoritative launch axis before wall detachment restores
-    // gameplayUp to world-up. Physics and presentation must observe the same
-    // direction for this transition.
-    this.launchDirection.copy(this.gameplayUpValue);
-    const currentUpSpeed = this.velocityValue.dot(this.launchDirection);
-    if (currentUpSpeed < jumpSpeed) {
-      this.velocityValue.addScaledVector(
-        this.launchDirection,
-        jumpSpeed - currentUpSpeed,
+    const directionalWallJump =
+      attachedAtStepStart &&
+      this.prepareDirectionalWallJump(
+        wallJumpIntent,
+        movementUpAtStepStart,
+        jumpSpeed,
       );
+
+    if (!directionalWallJump) {
+      // No wall-direction input keeps the original behaviour: floor jumps use
+      // gameplay-up and attached jumps launch directly away from the wall.
+      this.launchDirection.copy(this.gameplayUpValue);
+      const currentLaunchSpeed =
+        this.velocityValue.dot(this.launchDirection);
+
+      if (currentLaunchSpeed < jumpSpeed) {
+        this.velocityValue.addScaledVector(
+          this.launchDirection,
+          jumpSpeed - currentLaunchSpeed,
+        );
+      }
     }
 
     this.lastJumpSpeedValue = jumpSpeed;
     this.lastJumpChargeFractionValue = normalizedCharge;
 
     if (this.attachedValue) {
-      this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
+      this.detachFromSurface(
+        directionalWallJump
+          ? this.config.directionalWallJumpDetachCooldownSeconds
+          : this.config.attachmentDetachCooldownSeconds,
+      );
     } else {
       this.groundedValue = false;
       this.groundNormalValue.copy(WORLD_UP);
@@ -623,6 +776,7 @@ export class KinematicBody {
 
     this.chargingJumpValue = false;
     this.chargeSecondsValue = 0;
+    this.clearJumpBuffer();
     this.coyoteTimeRemainingSecondsValue = 0;
     this.groundReacquireDelaySeconds =
       this.config.jumpGroundDetachSeconds;
@@ -635,9 +789,61 @@ export class KinematicBody {
     });
   }
 
+  /**
+   * Resolve raw cardinal input against an authoritative wall-up/lateral basis.
+   *
+   * Locomotion may remain camera-relative while attached, but jump intent does
+   * not inherit CameraRig's heading. W/S always mean wall-up/down; A/D always
+   * mean wall-left/right for the current authored wall normal.
+   */
+  private prepareDirectionalWallJump(
+    wallJumpIntent: Readonly<WallJumpIntent>,
+    wallNormal: THREE.Vector3,
+    jumpSpeed: number,
+  ): boolean {
+    if (
+      !resolveWallJumpTangent(
+        wallNormal,
+        wallJumpIntent,
+        this.directionalWallJumpTangent,
+        this.directionalWallJumpUp,
+        this.directionalWallJumpRight,
+      )
+    ) {
+      return false;
+    }
+
+    // Keep total launch magnitude equal to the charged jump speed. The fixed
+    // outward component is capped defensively so custom low-speed configs still
+    // leave a non-zero directional component.
+    const outwardSpeed = Math.min(
+      this.config.directionalWallJumpOutwardSpeedMetresPerSecond,
+      jumpSpeed * 0.75,
+    );
+    const tangentSpeed = Math.sqrt(
+      Math.max(
+        0,
+        jumpSpeed * jumpSpeed - outwardSpeed * outwardSpeed,
+      ),
+    );
+
+    this.velocityValue
+      .copy(this.directionalWallJumpTangent)
+      .multiplyScalar(tangentSpeed)
+      .addScaledVector(wallNormal, outwardSpeed);
+
+    this.launchDirection.copy(this.velocityValue).normalize();
+    return true;
+  }
+
   private cancelJumpCharge(): void {
     this.chargingJumpValue = false;
     this.chargeSecondsValue = 0;
+  }
+
+  private clearJumpBuffer(): void {
+    this.jumpInputBufferRemainingSecondsValue = 0;
+    this.bufferedJumpReleasedValue = false;
   }
 
   private hasJumpOpportunity(): boolean {
@@ -734,7 +940,7 @@ export class KinematicBody {
 
   private applyGravity(deltaSeconds: number): void {
     this.gravityStep
-      .copy(this.gameplayUpValue)
+      .copy(this.attachedValue ? this.gameplayUpValue : WORLD_UP)
       .multiplyScalar(
         -this.config.gravityMetresPerSecondSquared * deltaSeconds,
       );
@@ -757,7 +963,7 @@ export class KinematicBody {
     this.velocityValue.add(this.gravityStep);
   }
 
-  private moveAndSlide(deltaSeconds: number): void {
+  private moveAndSlide(deltaSeconds: number, allowSurfaceTransitions = true): void {
     this.remainingDisplacement
       .copy(this.velocityValue)
       .multiplyScalar(deltaSeconds);
@@ -823,6 +1029,7 @@ export class KinematicBody {
       }
 
       if (
+        allowSurfaceTransitions &&
         surface.bounceSpeedMetresPerSecond > 0 &&
         this.tryApplyBounce(
           surface.bounceSpeedMetresPerSecond,
@@ -837,7 +1044,21 @@ export class KinematicBody {
         continue;
       }
 
-      if (surface.adhesive) {
+      if (
+        allowSurfaceTransitions &&
+        this.tryApplySlimeLandingBounce(
+          velocityIntoSurface,
+          this.movementHit.normal,
+          this.movementHit.object,
+        )
+      ) {
+        this.remainingDisplacement
+          .copy(this.velocityValue)
+          .multiplyScalar(deltaSeconds * (1 - travelFraction));
+        continue;
+      }
+
+      if (allowSurfaceTransitions && surface.adhesive) {
         this.tryAttach(
           this.movementHit.normal,
           this.movementHit.object,
@@ -885,6 +1106,59 @@ export class KinematicBody {
       return false;
     }
 
+    this.applyBounceImpulse(
+      bounceSpeedMetresPerSecond,
+      velocityIntoSurface,
+      surfaceNormal,
+      surfaceObject,
+    );
+
+    return true;
+  }
+
+  /**
+   * Default slime rebound: only genuine floor/slope landings bounce. Rebound
+   * speed is proportional to the impact, retains less than full energy, and
+   * is capped so a very tall fall remains controllable.
+   */
+  private tryApplySlimeLandingBounce(
+    velocityIntoSurface: number,
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+  ): boolean {
+    if (this.bounceCooldownSecondsValue > 0) return false;
+    // Deliberate buffered input wins over the slime's passive floor rebound.
+    // The collision may then establish support and consume the buffer below;
+    // authored bouncy surfaces have already been handled before this path.
+    if (this.jumpInputBufferRemainingSecondsValue > 0) return false;
+    if (
+      surfaceNormal.dot(WORLD_UP) < this.config.minimumGroundNormalDot ||
+      velocityIntoSurface >=
+        -this.config.slimeMinimumBounceImpactSpeedMetresPerSecond
+    ) {
+      return false;
+    }
+
+    const reboundSpeed = Math.min(
+      this.config.slimeMaximumBounceSpeedMetresPerSecond,
+      -velocityIntoSurface * this.config.slimeBounceRestitution,
+    );
+    this.applyBounceImpulse(
+      reboundSpeed,
+      velocityIntoSurface,
+      surfaceNormal,
+      surfaceObject,
+    );
+
+    return true;
+  }
+
+  private applyBounceImpulse(
+    bounceSpeedMetresPerSecond: number,
+    velocityIntoSurface: number,
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+  ): void {
     if (this.attachedValue) {
       this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
     }
@@ -920,7 +1194,6 @@ export class KinematicBody {
     this.lastBounceSurfaceNameValue =
       surfaceObject?.name || '<unnamed>';
 
-    return true;
   }
 
   private tryAttach(
@@ -970,6 +1243,17 @@ export class KinematicBody {
       this.attachmentCooldownSecondsValue,
       cooldownSeconds,
     );
+  }
+
+  private detachAfterLosingSurfaceSupport(): void {
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.supportColliderValue = null;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(WORLD_UP);
+    this.groundedValue = false;
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
   }
 
   private isAuthoredWallNormal(normal: THREE.Vector3): boolean {
@@ -1024,9 +1308,9 @@ export class KinematicBody {
 
       if (this.tryTransitionAcrossAttachedEdge(deltaSeconds)) return;
 
-      // Sticky geometry ended or the next authored surface explicitly rejects
-      // adhesion. Fall back to world-up and test for ordinary ground below.
-      this.detachFromSurface(0);
+      // CameraRig smooths presentation independently. Authoritative movement,
+      // gravity, and landing calculations return to world-up immediately.
+      this.detachAfterLosingSurfaceSupport();
     }
 
     this.gameplayUpValue.copy(WORLD_UP);
@@ -1229,6 +1513,18 @@ export class KinematicBody {
         'minimumBounceApproachSpeedMetresPerSecond',
         config.minimumBounceApproachSpeedMetresPerSecond,
       ],
+      [
+        'slimeMinimumBounceImpactSpeedMetresPerSecond',
+        config.slimeMinimumBounceImpactSpeedMetresPerSecond,
+      ],
+      [
+        'slimeMaximumBounceSpeedMetresPerSecond',
+        config.slimeMaximumBounceSpeedMetresPerSecond,
+      ],
+      [
+        'directionalWallJumpOutwardSpeedMetresPerSecond',
+        config.directionalWallJumpOutwardSpeedMetresPerSecond,
+      ],
     ];
 
     for (const [name, value] of positiveFinite) {
@@ -1246,11 +1542,26 @@ export class KinematicBody {
       );
     }
 
+    if (
+      !Number.isFinite(config.slimeBounceRestitution) ||
+      config.slimeBounceRestitution <= 0 ||
+      config.slimeBounceRestitution >= 1
+    ) {
+      throw new Error(
+        'slimeBounceRestitution must be finite and within (0, 1).',
+      );
+    }
+
     const nonNegativeFinite: ReadonlyArray<[string, number]> = [
       ['airDragPerSecond', config.airDragPerSecond],
       ['coyoteTimeSeconds', config.coyoteTimeSeconds],
+      ['jumpInputBufferSeconds', config.jumpInputBufferSeconds],
       ['jumpGroundDetachSeconds', config.jumpGroundDetachSeconds],
       ['minimumLandingAirTimeSeconds', config.minimumLandingAirTimeSeconds],
+      [
+        'directionalWallJumpDetachCooldownSeconds',
+        config.directionalWallJumpDetachCooldownSeconds,
+      ],
     ];
 
     for (const [name, value] of nonNegativeFinite) {

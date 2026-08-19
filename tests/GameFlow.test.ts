@@ -27,7 +27,7 @@ test('game flow permits only explicit menu transitions', () => {
   assert.equal(flow.state, 'playing');
 });
 
-test('restart is single-entry and returns to the pause boundary', () => {
+test('restart is single-entry and returns directly to gameplay', () => {
   const flow = new GameFlowStateModel();
   flow.completeBoot();
   flow.start();
@@ -37,17 +37,18 @@ test('restart is single-entry and returns to the pause boundary', () => {
   assert.equal(flow.beginRestart(), false);
   assert.equal(flow.state, 'restarting');
   assert.equal(flow.finishRestart(), true);
-  assert.equal(flow.state, 'paused');
+  assert.equal(flow.state, 'playing');
   assert.equal(flow.finishRestart(), false);
 });
 
-test('restart cannot begin when the lifecycle capability is unavailable', () => {
-  const flow = new GameFlowStateModel(false);
+test('failed restart returns to the paused boundary', () => {
+  const flow = new GameFlowStateModel();
   flow.completeBoot();
   flow.start();
   flow.pause();
 
-  assert.equal(flow.beginRestart(), false);
+  assert.equal(flow.beginRestart(), true);
+  assert.equal(flow.cancelRestart(), true);
   assert.equal(flow.state, 'paused');
 });
 

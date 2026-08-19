@@ -108,4 +108,9 @@ export class BlobFacing {
   get yawRadians(): number {
     return this.currentYawRadians;
   }
+
+  reset(): void {
+    this.currentYawRadians = 0;
+    this.previousYawRadians = 0;
+  }
 }

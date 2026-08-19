@@ -110,6 +110,8 @@ Recovery therefore uses the existing contract:
 ```text
 failure
   ↓
+death flow retains the Room 4 recovery action
+  ↓ Retry
 CheckpointManager.recover(player)
   ↓
 reset active Room 4 puzzle group
@@ -117,6 +119,8 @@ reset active Room 4 puzzle group
   └─ connected laser pose/state/timers
   ↓
 KinematicBody.recoverAt(checkpoint)
+  ↓
+restore live presentation and gameplay input
 ```
 
 There is no second game-wide restart route; #23 remains lifecycle owner.

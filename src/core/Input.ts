@@ -56,7 +56,8 @@ export class Input {
 
   private pointerMovementX = 0;
   private pointerMovementY = 0;
-  private enabled = true;
+  private stateClearedSinceFixedUpdate = false;
+  private enabledValue = true;
   private disposed = false;
 
   constructor(options: InputOptions) {
@@ -86,8 +87,8 @@ export class Input {
     return this.hostDocument.pointerLockElement === this.pointerLockElement;
   }
 
-  get isEnabled(): boolean {
-    return this.enabled;
+  get enabled(): boolean {
+    return this.enabledValue;
   }
 
   get pointerDeltaX(): number {
@@ -100,6 +101,10 @@ export class Input {
 
   get held(): ReadonlySet<InputAction> {
     return this.heldActions;
+  }
+
+  get wasClearedSinceFixedUpdate(): boolean {
+    return this.stateClearedSinceFixedUpdate;
   }
 
   isDown(action: InputAction): boolean {
@@ -117,6 +122,7 @@ export class Input {
   endFixedUpdate(): void {
     this.pressedActions.clear();
     this.releasedActions.clear();
+    this.stateClearedSinceFixedUpdate = false;
     this.endPointerUpdate();
   }
 
@@ -127,7 +133,7 @@ export class Input {
   }
 
   requestPointerLock(): void {
-    if (!this.enabled || this.pointerLocked) return;
+    if (!this.enabledValue || this.pointerLocked) return;
 
     try {
       const request = this.pointerLockElement.requestPointerLock() as
@@ -150,15 +156,19 @@ export class Input {
     }
   }
 
-  /** Suspend gameplay input without removing the browser event boundary. */
-  setEnabled(enabled: boolean): void {
-    if (this.disposed || this.enabled === enabled) return;
+  /** Clear held and transient gameplay input during lifecycle transitions. */
+  resetState(): void {
+    if (this.disposed) return;
+    this.clearState();
+  }
 
+  /** Suspend gameplay actions while leaving native focused UI controls usable. */
+  setEnabled(enabled: boolean): void {
+    if (this.disposed || this.enabledValue === enabled) return;
     if (!enabled) {
       for (const code of this.activeKeys) this.suppressedKeys.add(code);
     }
-
-    this.enabled = enabled;
+    this.enabledValue = enabled;
     this.clearState(true);
   }
 
@@ -248,13 +258,14 @@ export class Input {
     this.releasedActions.clear();
     this.pointerMovementX = 0;
     this.pointerMovementY = 0;
+    this.stateClearedSinceFixedUpdate = true;
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const actions = this.keyBindings.get(event.code);
     if (!actions) return;
 
-    if (!this.enabled) {
+    if (!this.enabledValue) {
       this.suppressedKeys.add(event.code);
       return;
     }
@@ -265,11 +276,9 @@ export class Input {
     event.preventDefault();
 
     if (this.suppressedKeys.has(event.code)) return;
-    // A repeat without an active keydown can arrive after focus/visibility
-    // state was cleared while the physical key remained held. It must not
-    // become a new gameplay activation after Resume.
-    if (event.repeat && !this.activeKeys.has(event.code)) return;
-    if (this.activeKeys.has(event.code)) return;
+    // A repeat can arrive after lifecycle/focus cleanup removed the matching
+    // initial keydown. Never let that orphan repeat re-establish held input.
+    if (event.repeat || this.activeKeys.has(event.code)) return;
 
     this.activeKeys.add(event.code);
     this.activate(actions);
@@ -279,7 +288,7 @@ export class Input {
     const actions = this.keyBindings.get(event.code);
     if (!actions) return;
 
-    if (!this.enabled) {
+    if (!this.enabledValue) {
       this.suppressedKeys.delete(event.code);
       return;
     }
@@ -294,7 +303,7 @@ export class Input {
   };
 
   private readonly onMouseDown = (event: MouseEvent): void => {
-    if (!this.enabled) return;
+    if (!this.enabledValue) return;
     const actions = this.mouseBindings.get(event.button);
     if (!actions || this.activeMouseButtons.has(event.button)) return;
 
@@ -303,7 +312,7 @@ export class Input {
   };
 
   private readonly onMouseUp = (event: MouseEvent): void => {
-    if (!this.enabled) return;
+    if (!this.enabledValue) return;
     const actions = this.mouseBindings.get(event.button);
     if (!actions || !this.activeMouseButtons.delete(event.button)) return;
 
@@ -311,7 +320,7 @@ export class Input {
   };
 
   private readonly onMouseMove = (event: MouseEvent): void => {
-    if (!this.enabled || !this.pointerLocked) return;
+    if (!this.enabledValue || !this.pointerLocked) return;
     this.pointerMovementX += event.movementX;
     this.pointerMovementY += event.movementY;
   };
@@ -325,7 +334,7 @@ export class Input {
   };
 
   private readonly onPointerLockRequest = (): void => {
-    if (!this.enabled) return;
+    if (!this.enabledValue) return;
     this.requestPointerLock();
   };
 }

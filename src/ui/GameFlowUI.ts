@@ -24,11 +24,6 @@ export class GameFlowStateModel {
   private currentState: GameFlowState = 'loading';
   private menuReturnState: MenuReturnState = 'title';
   private readonly stateListeners = new Set<GameFlowStateListener>();
-  private readonly restartAvailable: boolean;
-
-  constructor(restartAvailable = true) {
-    this.restartAvailable = restartAvailable;
-  }
 
   get state(): GameFlowState {
     return this.currentState;
@@ -77,11 +72,14 @@ export class GameFlowStateModel {
   }
 
   beginRestart(): boolean {
-    if (!this.restartAvailable) return false;
     return this.transitionFrom('paused', 'restarting');
   }
 
   finishRestart(): boolean {
+    return this.transitionFrom('restarting', 'playing');
+  }
+
+  cancelRestart(): boolean {
     return this.transitionFrom('restarting', 'paused');
   }
 
@@ -110,12 +108,15 @@ export class GameFlowStateModel {
 }
 
 export interface GameFlowActions {
-  readonly restartAvailable: boolean;
+  startGameplay(): void;
+  stopGameplay(): void;
   setGameplayInputEnabled(enabled: boolean): void;
+  setDebugInteractionEnabled(enabled: boolean): void;
   requestPointerLock(): void;
   releasePointerLock(): void;
   isPointerLocked(): boolean;
-  restartLevel(): void | Promise<void>;
+  isGameplayInputEnabled(): boolean;
+  restartLevel(): void;
   applySettings(settings: Readonly<GameSettingsSnapshot>): void;
 }
 
@@ -161,14 +162,11 @@ export class GameFlowUI {
 
   constructor(options: GameFlowUIOptions) {
     this.actions = options.actions;
-    this.model = new GameFlowStateModel(options.actions.restartAvailable);
+    this.model = new GameFlowStateModel();
     this.settings = options.settings;
     this.hostDocument = options.document ?? document;
     this.hostWindow = options.window ?? window;
-    this.element = this.createElement(
-      options.creditsMarkdown,
-      options.actions.restartAvailable,
-    );
+    this.element = this.createElement(options.creditsMarkdown);
 
     this.restartStatus = this.requireElement('[data-restart-status]');
     this.sensitivityInput = this.requireElement<HTMLInputElement>(
@@ -232,15 +230,14 @@ export class GameFlowUI {
     this.listeners.abort();
     this.unsubscribeSettings();
     this.model.dispose();
+    if (this.gameplayActive) this.actions.stopGameplay();
     this.actions.setGameplayInputEnabled(false);
+    this.actions.setDebugInteractionEnabled(false);
     this.actions.releasePointerLock();
     this.element.remove();
   }
 
-  private createElement(
-    creditsMarkdown: string,
-    restartAvailable: boolean,
-  ): HTMLElement {
+  private createElement(creditsMarkdown: string): HTMLElement {
     const root = this.hostDocument.createElement('div');
     root.className = 'game-flow';
     root.innerHTML = `
@@ -278,11 +275,11 @@ export class GameFlowUI {
           <h1 id="pause-heading">Paused</h1>
           <div class="flow-actions">
             <button class="primary-action" data-action="resume" data-autofocus>Resume</button>
-            <button data-action="restart" ${restartAvailable ? '' : 'disabled'}>Restart trial</button>
+            <button data-action="restart">Restart trial</button>
             <button data-action="settings">Settings</button>
             <button data-action="credits">Credits</button>
           </div>
-          <p class="flow-status" data-restart-status role="status" aria-live="polite">${restartAvailable ? '' : 'Restart is not available in this build yet.'}</p>
+          <p class="flow-status" data-restart-status role="status" aria-live="polite"></p>
         </div>
       </section>
 
@@ -380,44 +377,55 @@ export class GameFlowUI {
     }
 
     const gameplayActive = state === 'playing';
-    this.actions.setGameplayInputEnabled(gameplayActive);
+    // Menus may always suspend input. Re-enabling belongs to runtime.start(),
+    // which can intentionally keep input disabled during the death sequence.
+    if (!gameplayActive) this.actions.setGameplayInputEnabled(false);
+    this.actions.setDebugInteractionEnabled(gameplayActive);
     if (FULL_SCREEN_STATES.has(state)) this.actions.releasePointerLock();
 
     const focusTarget = this.focusTargets.get(state);
-    if (focusTarget) queueMicrotask(() => focusTarget.focus());
+    if (focusTarget) {
+      queueMicrotask(() => {
+        if (!this.disposed && this.model.state === state) focusTarget.focus();
+      });
+    }
   }
 
   private pause(): void {
+    if (this.model.state !== 'playing') return;
+    this.actions.stopGameplay();
     if (!this.model.pause()) return;
     this.syncState();
   }
 
   private resume(): void {
+    if (this.model.state !== 'paused') return;
+    this.actions.startGameplay();
     if (!this.model.resume()) return;
     this.syncState();
     this.actions.requestPointerLock();
   }
 
-  private async restart(): Promise<void> {
+  private restart(): void {
     if (this.restartPending || !this.model.beginRestart()) return;
     this.restartPending = true;
     this.restartStatus.textContent = '';
     this.syncState();
 
-    let statusText: string;
     try {
-      await this.actions.restartLevel();
-      statusText = 'Trial restored. Choose Resume to return to gameplay.';
+      this.actions.restartLevel();
+      this.actions.startGameplay();
+      this.restartStatus.textContent = 'Trial restored.';
+      this.model.finishRestart();
+      this.syncState();
+      this.actions.requestPointerLock();
     } catch {
-      statusText = 'The trial could not be restarted.';
+      this.restartStatus.textContent = 'The trial could not be restarted.';
+      this.model.cancelRestart();
+      this.syncState();
     }
 
     this.restartPending = false;
-    if (this.disposed) return;
-
-    this.restartStatus.textContent = statusText;
-    this.model.finishRestart();
-    this.syncState();
   }
 
   private requireElement<ElementType extends HTMLElement = HTMLElement>(
@@ -436,6 +444,9 @@ export class GameFlowUI {
 
     switch (target.dataset.action) {
       case 'start':
+        if (this.model.state === 'title') {
+          this.actions.startGameplay();
+        }
         if (this.model.start()) {
           this.syncState();
           this.actions.requestPointerLock();
@@ -445,7 +456,7 @@ export class GameFlowUI {
         this.resume();
         break;
       case 'restart':
-        void this.restart();
+        this.restart();
         break;
       case 'settings':
         if (this.model.openSettings()) this.syncState();
@@ -481,7 +492,11 @@ export class GameFlowUI {
   };
 
   private readonly onPointerLockChange = (): void => {
-    if (this.model.state === 'playing' && !this.actions.isPointerLocked()) {
+    if (
+      this.model.state === 'playing' &&
+      this.actions.isGameplayInputEnabled() &&
+      !this.actions.isPointerLocked()
+    ) {
       this.pause();
     }
   };

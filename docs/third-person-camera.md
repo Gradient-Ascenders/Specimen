@@ -53,8 +53,8 @@ and collision world; the render update creates no temporary Three.js resources.
 ## Pointer-lock look settings
 
 `Input` remains the only browser-event boundary. While its canvas owns pointer
-lock, `main.ts` passes accumulated relative motion to `CameraRig.queueLookInput`
-before `Input.endFixedUpdate()` clears it.
+lock, `GreyboxLevelRuntime` passes accumulated relative motion to
+`CameraRig.queueLookInput` before `Input.endFixedUpdate()` clears it.
 
 `CameraRig.setLookSettings()` is the settings-system hook for:
 
@@ -81,8 +81,8 @@ The normal gameplay path keeps three orientation decisions separate:
 
 - `CameraRig` owns the accumulated pointer yaw and clamped pitch. It never
   reads the slime visual's facing.
-- Before each movement step, `main.ts` asks the rig to convert normalized WASD
-  input into a world direction. Ground movement uses the world-horizontal
+- Before each movement step, `GreyboxLevelRuntime` asks the rig to convert
+  normalized WASD input into a world direction. Ground movement uses the world-horizontal
   camera right/back basis. Attached movement uses the displayed camera heading
   projected onto the authoritative wall plane. Camera pitch is absent from both
   bases, so it cannot reduce movement speed or invert an axis.

@@ -1,11 +1,11 @@
 # Game flow UI
 
-Issue #22 wraps the grey-box runtime in one DOM/CSS application flow without
-replacing the existing harness. `GameFlowUI` owns the UI elements, global UI
-listeners, focus changes, state subscriptions, and explicit transitions:
+Issue #22 wraps the lifecycle-owned containment runtime in one DOM/CSS
+application flow. `GameFlowUI` owns UI elements, global UI listeners, focus
+changes, state subscriptions, and explicit presentation transitions:
 
 ```text
-loading -> title -> playing <-> paused -> restarting
+loading -> title -> playing <-> paused -> restarting -> playing
               \       \          \
                +------ settings ---+
                +------ credits -----+
@@ -22,20 +22,25 @@ The HUD is a separate `playing` surface and does not intercept canvas input.
 - The mouse orbits the camera while the canvas owns pointer lock.
 - **Escape** pauses gameplay. Escape from settings or credits returns to the
   parent menu; Escape from pause resumes where browser activation permits.
-- **R** and **F** remain development-harness controls, not player flow actions.
+- **R** and **F** remain development diagnostics, not player menu actions.
 
-Entering any full-screen menu disables `Input`, clears held, pressed, released,
-and pointer-delta state, then releases pointer lock. Resume enables an already
-cleared input boundary before requesting pointer lock from the user action. A
-browser-driven pointer-lock loss while playing also enters pause. Window blur
-clears input and pauses the flow; a later `Loop` focus event may resume frame
-scheduling, but fixed gameplay remains gated unless the flow state is
-`playing`.
+Entering a full-screen menu calls `GreyboxLevelRuntime.stop()`, disables `Input`,
+clears held/pressed/released and pointer-delta state, hides level diagnostics,
+and releases pointer lock. Start and Resume call
+`GreyboxLevelRuntime.start()` before requesting pointer lock from their user
+activation. A browser-driven pointer-lock loss while live gameplay input is
+enabled enters pause; the intentional lock release used by the death sequence
+does not. Window blur also pauses a running trial.
+
+The flow never enables gameplay input directly. Re-enabling belongs to the
+runtime start hook, which can intentionally keep input disabled while the
+current death/retry sequence is active. This keeps the application UI state and
+runtime lifecycle aligned without competing simulation state machines.
 
 ## Session settings
 
 `GameSettings` owns one in-memory model for the application session. It is not
-recreated by menu transitions or a future level restart. Changes apply
+recreated by menu transitions or level restart. Changes apply
 immediately:
 
 - Mouse sensitivity scales both existing `CameraRig` look axes from their
@@ -51,34 +56,38 @@ No unrelated graphics-quality setting is exposed.
 
 ## Restart ownership
 
-`GameFlowUI` knows only the injected `GameFlowActions.restartLevel()` contract.
-It serializes invocation so repeated activation cannot overlap, shows an
-indeterminate restarting surface, and returns to pause for an explicit Resume.
-It does not teleport the player or reset puzzles, hazards, elevators, camera,
-or visuals.
+`GameFlowUI` knows only the injected lifecycle actions. Pause calls `stop()`,
+Start/Resume call `start()`, and Restart calls the authoritative
+`GreyboxLevelRuntime.restartLevel(): void` exactly once before calling `start()`
+to resume the stopped runtime. The UI never teleports the player or resets the
+scene, death state, camera, input, or visuals itself.
 
-Issue #23 remains open with no available lifecycle implementation at the time
-of Issue #22 integration. `main.ts` therefore sets `restartAvailable: false`;
-the player control is disabled with neutral build-availability text and never
-enters `restarting`. When #23 lands, replace the no-op injected action with its
-authoritative lifecycle operation and set that capability to true. The debug
-panel's probe-reset action remains a development harness and is not the player
-Restart implementation.
+Restart is synchronous and single-entry. A successful paused restart returns
+directly to gameplay and requests pointer lock from the Restart button's user
+activation. A failure returns to the paused boundary with status text. The
+existing death/retry sequence remains level-owned and independent: death may
+suspend input and release pointer lock without opening the pause menu, and its
+Retry continues to perform deferred recovery rather than routing through the
+full-level Restart control.
 
-`main.ts` subscribes to flow state solely to coordinate the development panel.
-Outside `playing`, the panel is `hidden`, `inert`, and `aria-hidden`; in
-`playing`, it remains fully usable. Shutdown explicitly unsubscribes before UI
-disposal. If an asynchronous lifecycle restart later settles after disposal,
-the UI skips all post-await status, model, focus, and action updates.
+The debug panel remains owned by `GreyboxLevelRuntime`.
+`setDebugInteractionEnabled(false)` only suppresses its presentation behind
+menus: the panel becomes hidden, inert, and `aria-hidden` while preserving the
+player's F2 visibility preference for gameplay. Normal production builds still
+omit diagnostics; `?debug=1` deliberately makes them available.
 
 ## Loading, credits, and ownership
 
 The loading screen is indeterminate because the runtime has no asset progress
-metric. A two-frame boot handoff guarantees it can paint before title. Credits
+metric. The level is loaded but remains stopped, and a two-frame boot handoff
+guarantees loading can paint before title. Simulation and gameplay input do not
+start until Start. Credits
 are imported from the repository-root `CREDITS.md` with Vite's raw-resource
 support and inserted with `textContent`, so the in-game view cannot drift to a
 manually maintained resource list and does not inject Markdown as HTML.
 
 `GameFlowUI.dispose()` aborts its scoped DOM/global listeners, unsubscribes from
-settings, disables input, releases pointer lock, and removes its root. UI
-transitions allocate no Three.js resources and create no per-frame DOM work.
+settings, stops active gameplay, disables input/debug interaction, releases
+pointer lock, and removes its root. The application then disposes the
+level-owned runtime before the session-owned input and renderer. UI transitions
+allocate no Three.js resources and create no per-frame DOM work.

@@ -84,12 +84,24 @@ movement; held actions remain active.
 - `Input.setEnabled(false)` is the application-menu suspension boundary. It
   clears held and transient state, ignores mapped activation and pointer motion,
   and refuses pointer-lock requests until re-enabled. A key held across that
-  boundary stays suppressed until key-up, so Resume cannot replay stale input.
+  boundary cannot reactivate gameplay until key-up followed by a fresh keydown,
+  so Resume cannot replay stale input.
   Native menu controls remain free to consume Space and other keyboard input.
 - A repeated keydown with no corresponding active initial keydown is ignored.
   This covers the browser-repeat orphan left when blur or visibility loss clears
   an active key before the physical key is released. The next fresh non-repeat
   keydown still activates normally and no release action is synthesized.
+- The boundary reports that action state was cleared until the next fixed
+  update, allowing short-lived retained intent such as the landing jump buffer
+  to be cancelled explicitly.
+
+Issue #22 coordinates this boundary through the current level lifecycle. The
+runtime is loaded but stopped under Loading and Title. Start/Resume call
+`GreyboxLevelRuntime.start()`; Pause calls `stop()`; player Restart calls the
+single `restartLevel()` operation and then `start()`. Menus may always disable
+input, but only the runtime start hook re-enables it. This distinction preserves
+the death sequence's intentional input suspension and prevents UI state from
+overriding level-owned recovery behavior.
 
 ## Typed event contracts
 

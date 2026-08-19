@@ -359,6 +359,33 @@ test('teleport immediately removes stale camera up', () => {
   assert.ok(rig.camera.up.distanceTo(new THREE.Vector3(0, 1, 0)) < 1e-10);
 });
 
+test('camera reset clears transient orbit state without retaining its target', () => {
+  const target = createTarget();
+  const rig = new CameraRig({
+    horizontalSensitivityRadiansPerPixel: 1,
+    verticalSensitivityRadiansPerPixel: 1,
+    initialPitchRadians: 0,
+    minimumPitchRadians: -1,
+    maximumPitchRadians: 1,
+  });
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.update(1, 0);
+  rig.queueLookInput(0.5, 0.25);
+  rig.update(1, 1 / 60);
+  assert.notEqual(rig.getDiagnostics().pitchRadians, 0);
+
+  rig.clearFollowTarget();
+  const reset = rig.getDiagnostics();
+  assert.equal(reset.pitchRadians, 0);
+  assert.equal(reset.obstructed, false);
+  assert.equal(reset.targetGrounded, false);
+  assert.equal(reset.targetAttached, false);
+
+  target.position.set(20, 20, 20);
+  rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().targetGrounded, false);
+});
+
 test('teleport clears stale obstruction distance immediately', () => {
   const target = createTarget();
   const world = new CollisionWorld();

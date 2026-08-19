@@ -10,6 +10,7 @@ import type { KinematicBody } from '../physics/KinematicBody';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry';
 import { ElevatorPresentation } from '../render/elevator/ElevatorPresentation';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation';
+import type { DeathRecoveryAction } from '../systems/DeathSequence';
 import { CheckpointManager } from './Checkpoints';
 import {
   ElevatorSequence,
@@ -80,6 +81,7 @@ export class ElevatorTestRig {
     player: KinematicBody,
     collisionWorld: CollisionWorld,
     surfaces: SurfaceRegistry,
+    requestPlayerDeath?: (recovery: DeathRecoveryAction) => void,
   ) {
     this.player = player;
     this.collisionWorld = collisionWorld;
@@ -166,8 +168,12 @@ export class ElevatorTestRig {
       id: 'room4-elevator-connected-hazards',
       hazards: [this.connectedLaser],
       requestRecovery: () => {
-        this.recoveryCountValue += 1;
-        this.checkpoints.recover(this.player);
+        const recovery = (): void => this.recover();
+        if (requestPlayerDeath) {
+          requestPlayerDeath(recovery);
+        } else {
+          recovery();
+        }
       },
     });
     this.root.add(this.laserSystem.root);
@@ -224,8 +230,8 @@ export class ElevatorTestRig {
   }
 
   /**
-   * Fixed-step order: body updates first in main.ts, then this moves the
-   * platform and applies its displacement only if the body is still supported.
+   * Fixed-step order: the level runtime updates the body first, then this moves
+   * the platform and applies its displacement only if the body is still supported.
    */
   update(deltaSeconds: number): void {
     this.sequence.update(deltaSeconds, this.player);
