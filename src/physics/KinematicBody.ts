@@ -176,7 +176,6 @@ export class KinematicBody {
   private lastContactNameValue = 'none';
 
   private attachmentCooldownSecondsValue = 0;
-  private stickyDetachGraceSecondsValue = 0;
   private bounceCooldownSecondsValue = 0;
   private lastBounceSpeedValue = 0;
   private lastBounceSurfaceNameValue = 'none';
@@ -404,10 +403,6 @@ export class KinematicBody {
       0,
       this.bounceCooldownSecondsValue - deltaSeconds,
     );
-    this.stickyDetachGraceSecondsValue = Math.max(
-      0,
-      this.stickyDetachGraceSecondsValue - deltaSeconds,
-    );
     if (this.groundReacquireDelaySeconds > 0) {
       this.groundReacquireDelaySeconds = Math.max(
         0,
@@ -597,7 +592,6 @@ export class KinematicBody {
     this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastBounceSpeedValue = 0;
     this.lastBounceSurfaceNameValue = 'none';
-    this.stickyDetachGraceSecondsValue = 0;
     this.refreshGroundState();
     this.coyoteTimeRemainingSecondsValue = this.groundedValue
       ? this.config.coyoteTimeSeconds
@@ -1169,16 +1163,15 @@ export class KinematicBody {
     );
   }
 
-  private detachFromSurfaceWithGrace(): void {
+  private detachAfterLosingSurfaceSupport(): void {
     this.attachedValue = false;
     this.attachmentSurface = null;
     this.supportColliderValue = null;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(WORLD_UP);
     this.groundedValue = false;
     this.supportSurfaceTagValue = 'default';
     this.supportTractionMultiplier = 1;
-    // Keep the orientation briefly so camera presentation does not snap at a
-    // sticky seam. Locomotion and gravity already use world-up when detached.
-    this.stickyDetachGraceSecondsValue = 0.12;
   }
 
   private isAuthoredWallNormal(normal: THREE.Vector3): boolean {
@@ -1233,14 +1226,12 @@ export class KinematicBody {
 
       if (this.tryTransitionAcrossAttachedEdge(deltaSeconds)) return;
 
-      // The short presentation grace prevents a harsh camera snap at seams;
-      // gravity and movement nevertheless return to world-up immediately.
-      this.detachFromSurfaceWithGrace();
+      // CameraRig smooths presentation independently. Authoritative movement,
+      // gravity, and landing calculations return to world-up immediately.
+      this.detachAfterLosingSurfaceSupport();
     }
 
-    if (this.stickyDetachGraceSecondsValue <= 0) {
-      this.gameplayUpValue.copy(WORLD_UP);
-    }
+    this.gameplayUpValue.copy(WORLD_UP);
     this.groundNormalValue.copy(WORLD_UP);
     this.groundProbeDisplacement
       .copy(WORLD_UP)

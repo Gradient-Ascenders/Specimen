@@ -19,7 +19,13 @@ const NO_MOVEMENT = new THREE.Vector3();
 interface AttachedBodyFixture {
   body: KinematicBody;
   events: EventBus<MovementEvents>;
+  world: CollisionWorld;
   wall: THREE.Mesh;
+}
+
+interface FallingBodyFixture {
+  body: KinematicBody;
+  floor: THREE.Mesh;
 }
 
 test('charged jump endpoints produce approximately 25% higher apexes', () => {
@@ -55,7 +61,38 @@ function createAttachedBody(): AttachedBodyFixture {
   body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(1, 0, 0));
   assert.equal(body.attached, true);
 
-  return { body, events, wall };
+  return { body, events, world, wall };
+}
+
+function createFallingBody(
+  initialHeightMetres: number,
+  config: ConstructorParameters<typeof KinematicBody>[0]['config'] = {},
+): FallingBodyFixture {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 0.2, 20));
+  floor.name = 'ordinary-test-floor';
+  floor.position.y = -0.1;
+  world.register(floor);
+  surfaces.register(floor);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    config,
+    initialPosition: new THREE.Vector3(0, initialHeightMetres, 0),
+  });
+
+  return { body, floor };
+}
+
+function advanceUntilFloorContact(body: KinematicBody): void {
+  for (let step = 0; step < 300; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+    if (body.lastContactName === 'ordinary-test-floor') return;
+  }
+
+  assert.fail('Body did not contact the ordinary test floor.');
 }
 
 function beginWallJump(body: KinematicBody): void {
@@ -215,6 +252,84 @@ test('slope jump release uses the current airborne movement plane', () => {
 
   idleFixture.slope.geometry.dispose();
   uphillFixture.slope.geometry.dispose();
+});
+
+test('losing sticky support immediately restores authoritative world-up', () => {
+  const { body, world, wall } = createAttachedBody();
+  world.unregister(wall);
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+
+  assert.equal(body.attached, false);
+  assert.ok(Math.abs(body.gameplayUp.x) < EPSILON);
+  assert.ok(Math.abs(body.gameplayUp.y - 1) < EPSILON);
+  assert.ok(Math.abs(body.gameplayUp.z) < EPSILON);
+
+  wall.geometry.dispose();
+});
+
+test('below-threshold ordinary-floor landing does not rebound', () => {
+  const configuredMinimumImpactSpeed = 15;
+  const { body, floor } = createFallingBody(6, {
+    slimeMinimumBounceImpactSpeedMetresPerSecond:
+      configuredMinimumImpactSpeed,
+  });
+
+  advanceUntilFloorContact(body);
+
+  assert.ok(
+    body.lastContactImpactSpeedMetresPerSecond <
+      configuredMinimumImpactSpeed,
+  );
+  assert.ok(
+    body.lastContactImpactSpeedMetresPerSecond >
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeMinimumBounceImpactSpeedMetresPerSecond,
+  );
+  assert.equal(body.lastBounceSpeedMetresPerSecond, 0);
+  assert.equal(body.grounded, true);
+
+  floor.geometry.dispose();
+});
+
+test('ordinary-floor landing rebounds using impact times restitution', () => {
+  const { body, floor } = createFallingBody(6);
+
+  advanceUntilFloorContact(body);
+
+  const expectedReboundSpeed =
+    body.lastContactImpactSpeedMetresPerSecond *
+    DEFAULT_KINEMATIC_BODY_CONFIG.slimeBounceRestitution;
+  assert.ok(
+    expectedReboundSpeed <
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeMaximumBounceSpeedMetresPerSecond,
+  );
+  assert.ok(
+    Math.abs(body.lastBounceSpeedMetresPerSecond - expectedReboundSpeed) <
+      EPSILON,
+    `expected ${expectedReboundSpeed}, received ${body.lastBounceSpeedMetresPerSecond}`,
+  );
+
+  floor.geometry.dispose();
+});
+
+test('very large ordinary-floor impact is capped at maximum rebound speed', () => {
+  const { body, floor } = createFallingBody(12);
+
+  advanceUntilFloorContact(body);
+
+  assert.ok(
+    body.lastContactImpactSpeedMetresPerSecond *
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeBounceRestitution >
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeMaximumBounceSpeedMetresPerSecond,
+  );
+  assert.ok(
+    Math.abs(
+      body.lastBounceSpeedMetresPerSecond -
+        DEFAULT_KINEMATIC_BODY_CONFIG.slimeMaximumBounceSpeedMetresPerSecond,
+    ) < EPSILON,
+  );
+
+  floor.geometry.dispose();
 });
 
 test('authored sticky wall carries movement across its top edge', () => {
