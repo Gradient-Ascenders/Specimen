@@ -9,7 +9,7 @@ briefs maintained in the shared `Rooms` folder.
 | Beat | Space | Player discovery | Grey-box implementation |
 | --- | --- | --- | --- |
 | Orientation | Room 1 | This is a sterile specimen chamber; the normal door is unavailable. | 14 × 12 × 8 m room, central pedestal, glass/egg set piece, red locked door. |
-| Adhesion | Room 1 | Yellow-green contaminated wall tiles are climbable; clean white panels are not. | A 4.2 m wide, 5.8 m high `sticky` perimeter-wall section leads to the vent approach. |
+| Adhesion | Room 1 | Yellow-green contaminated wall tiles are climbable; clean white panels are not. | A 2 m wide `sticky` perimeter-wall entry sits directly beneath the vent and continues onto one interior duct wall. |
 | Transition | Vent duct | The escape route continues through facility ductwork. | A single rising duct route, not a maze, connects toward Room 2's high drop. |
 | Bounce demonstration | Room 2 | A fall onto the calibration landing causes a large rebound. | 7 × 7 m `bouncy` landing surface below the duct drop. |
 | Charged height | Room 2 | Charging a jump reaches a platform that walking cannot. | Platform A: 5 × 4 m, top at approximately 2.2 m. |

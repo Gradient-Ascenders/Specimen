@@ -100,7 +100,7 @@ let slopeRegressionStatus = 'not run';
 
 const runSlopeIdleRegression = (): string => {
   const stickyRoute = testScene.collisionMeshes.find(
-    (mesh) => mesh.name === 'room-1-north-sticky-route',
+    (mesh) => mesh.name === 'room-1-vent-sticky-entry-wall',
   );
   const bounceLanding = testScene.collisionMeshes.find(
     (mesh) => mesh.name === 'room-2-bounce-calibration-landing',
