@@ -16,7 +16,10 @@ interface BoxOptions {
   readonly material: THREE.Material;
   readonly surfaceTag?: SurfaceTag;
   /** Art-facing identifier; does not affect collision or adhesion behaviour. */
-  readonly textureRole?: 'sticky-wall-tile' | 'sticky-vent-tile';
+  readonly textureRole?:
+    | 'sticky-wall-tile'
+    | 'sticky-vent-tile'
+    | 'sticky-ledge-tile';
   readonly rotationX?: number;
 }
 
@@ -252,8 +255,13 @@ export class ContainmentTeachingScene {
     // Zone 4: the sticky patch is embedded in the east perimeter wall rather
     // than presented as a freestanding slab. Platform D leaves a deliberate
     // four-metre air gap so the player must jump, catch, and climb.
-    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.12, 6, 5], position: [14.73, 6, 42.5], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
-    this.addCollider({ name: 'room-2-top-of-sticky-wall-ledge', size: [3.1, 0.35, 5.5], position: [13.25, 9.15, 42.5], material: materials.support });
+    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.12, 6, 6.5], position: [14.73, 6, 40.75], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
+    // The contamination wraps around the ledge's north edge. This avoids the
+    // overhang above the perimeter patch: the player moves around the corner,
+    // climbs the outer fascia, and rolls over its sticky top strip.
+    this.addCollider({ name: 'room-2-sticky-ledge-outer-face', size: [3.1, 6.325, 0.12], position: [13.25, 6.1625, 39.69], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-ledge-tile' });
+    this.addCollider({ name: 'room-2-sticky-ledge-top-strip', size: [3.1, 0.35, 0.8], position: [13.25, 9.15, 40.15], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-ledge-tile' });
+    this.addCollider({ name: 'room-2-top-of-sticky-wall-ledge', size: [3.1, 0.35, 4.7], position: [13.25, 9.15, 42.9], material: materials.support });
 
     // Zone 5: three more readable upper-level jumps carry the route back
     // across the room to the obvious green exit.

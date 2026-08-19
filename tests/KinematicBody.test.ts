@@ -252,3 +252,47 @@ test('authored sticky wall carries movement across its top edge', () => {
 
   wall.geometry.dispose();
 });
+
+test('authored sticky route carries movement around a vertical corner', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const perimeterPatch = new THREE.Mesh(
+    new THREE.BoxGeometry(0.2, 4, 2.4),
+  );
+  perimeterPatch.name = 'sticky-perimeter-patch';
+  perimeterPatch.position.y = 2;
+  perimeterPatch.userData.surfaceTag = 'sticky';
+
+  const ledgeFascia = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 4, 0.2),
+  );
+  ledgeFascia.name = 'sticky-ledge-fascia';
+  ledgeFascia.position.set(-1, 2, 1.1);
+  ledgeFascia.userData.surfaceTag = 'sticky';
+
+  world.registerAll([perimeterPatch, ledgeFascia]);
+  surfaces.registerAll([perimeterPatch, ledgeFascia]);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(-0.56, 1, 0),
+  });
+  body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(1, 0, 0));
+  assert.equal(body.attached, true);
+
+  let crossedCorner = false;
+  for (let step = 0; step < 120; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(0, 0, 1));
+    if (body.attached && body.gameplayUp.z < -0.99) {
+      crossedCorner = true;
+      break;
+    }
+  }
+
+  assert.equal(crossedCorner, true);
+  assert.equal(body.attachmentSurfaceName, 'sticky-ledge-fascia');
+
+  perimeterPatch.geometry.dispose();
+  ledgeFascia.geometry.dispose();
+});
