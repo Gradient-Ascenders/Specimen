@@ -7,6 +7,10 @@ import {
   type SurfaceRegistry,
   type SurfaceTag,
 } from './SurfaceRegistry.ts';
+import {
+  resolveWallJumpTangent,
+  type WallJumpIntent,
+} from './WallJumpBasis.ts';
 
 const MOVEMENT_EPSILON_SQ = 1e-12;
 const CONTACT_PUSH_METRES = 1e-5;
@@ -28,6 +32,11 @@ const NO_JUMP_INPUT: Readonly<JumpInputState> = {
   pressed: false,
   held: false,
   released: false,
+};
+
+const NO_WALL_JUMP_INTENT: Readonly<WallJumpIntent> = {
+  lateral: 0,
+  vertical: 0,
 };
 
 export type JumpState = 'grounded' | 'coyote' | 'charging' | 'airborne';
@@ -171,6 +180,8 @@ export class KinematicBody {
   private readonly movementUpAtStepStart = new THREE.Vector3();
   private readonly launchDirection = new THREE.Vector3();
   private readonly directionalWallJumpTangent = new THREE.Vector3();
+  private readonly directionalWallJumpUp = new THREE.Vector3();
+  private readonly directionalWallJumpRight = new THREE.Vector3();
   private readonly edgeOldUp = new THREE.Vector3();
   private readonly edgeTravelDirection = new THREE.Vector3();
   private readonly edgeProbeDisplacement = new THREE.Vector3();
@@ -342,14 +353,16 @@ export class KinematicBody {
   /**
    * Advance one deterministic gameplay step.
    *
-   * `movementDirectionWorld` is the already-resolved camera-relative direction
-   * for this step. `jumpInput` uses action state captured by Input; a missing
-   * value means no jump input, which keeps development regressions concise.
+   * `movementDirectionWorld` is the already-resolved camera-relative locomotion
+   * direction for this step. `wallJumpIntent` is deliberately raw cardinal
+   * input: W/S resolve against wall-up/down and A/D against the wall lateral
+   * basis, independent of camera heading.
    */
   update(
     deltaSeconds: number,
     movementDirectionWorld: ReadonlyVector3State,
     jumpInput: Readonly<JumpInputState> = NO_JUMP_INPUT,
+    wallJumpIntent: Readonly<WallJumpIntent> = NO_WALL_JUMP_INTENT,
   ): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error('KinematicBody deltaSeconds must be positive and finite.');
@@ -400,7 +413,7 @@ export class KinematicBody {
     this.updateJumpState(
       deltaSeconds,
       jumpInput,
-      movementDirectionWorld,
+      wallJumpIntent,
       attachedAtStepStart,
       this.movementUpAtStepStart,
     );
@@ -578,7 +591,7 @@ export class KinematicBody {
   private updateJumpState(
     deltaSeconds: number,
     jumpInput: Readonly<JumpInputState>,
-    movementDirectionWorld: ReadonlyVector3State,
+    wallJumpIntent: Readonly<WallJumpIntent>,
     attachedAtStepStart: boolean,
     movementUpAtStepStart: THREE.Vector3,
   ): void {
@@ -602,7 +615,7 @@ export class KinematicBody {
 
       if (jumpInput.released) {
         this.launchChargedJump(
-          movementDirectionWorld,
+          wallJumpIntent,
           attachedAtStepStart,
           movementUpAtStepStart,
         );
@@ -619,7 +632,7 @@ export class KinematicBody {
 
     if (jumpInput.released) {
       this.launchChargedJump(
-        movementDirectionWorld,
+        wallJumpIntent,
         attachedAtStepStart,
         movementUpAtStepStart,
       );
@@ -627,7 +640,7 @@ export class KinematicBody {
   }
 
   private launchChargedJump(
-    movementDirectionWorld: ReadonlyVector3State,
+    wallJumpIntent: Readonly<WallJumpIntent>,
     attachedAtStepStart: boolean,
     movementUpAtStepStart: THREE.Vector3,
   ): void {
@@ -645,7 +658,7 @@ export class KinematicBody {
     const directionalWallJump =
       attachedAtStepStart &&
       this.prepareDirectionalWallJump(
-        movementDirectionWorld,
+        wallJumpIntent,
         movementUpAtStepStart,
         jumpSpeed,
       );
@@ -694,34 +707,28 @@ export class KinematicBody {
   }
 
   /**
-   * Resolve camera-relative surface intent into a charged wall-jump direction.
+   * Resolve raw cardinal input against an authoritative wall-up/lateral basis.
    *
-   * The desired input is projected onto the wall tangent. Most of the charged
-   * speed is then placed along that tangent, while a small fixed outward speed
-   * clears the current sticky surface. This makes W/S/A/D and diagonals useful
-   * for wall traversal without removing the original no-input "jump away"
-   * behaviour.
+   * Locomotion may remain camera-relative while attached, but jump intent does
+   * not inherit CameraRig's heading. W/S always mean wall-up/down; A/D always
+   * mean wall-left/right for the current authored wall normal.
    */
   private prepareDirectionalWallJump(
-    movementDirectionWorld: ReadonlyVector3State,
+    wallJumpIntent: Readonly<WallJumpIntent>,
     wallNormal: THREE.Vector3,
     jumpSpeed: number,
   ): boolean {
-    this.directionalWallJumpTangent
-      .set(
-        movementDirectionWorld.x,
-        movementDirectionWorld.y,
-        movementDirectionWorld.z,
+    if (
+      !resolveWallJumpTangent(
+        wallNormal,
+        wallJumpIntent,
+        this.directionalWallJumpTangent,
+        this.directionalWallJumpUp,
+        this.directionalWallJumpRight,
       )
-      .projectOnPlane(wallNormal);
-
-    const tangentLengthSq =
-      this.directionalWallJumpTangent.lengthSq();
-    if (tangentLengthSq <= MOVEMENT_EPSILON_SQ) return false;
-
-    this.directionalWallJumpTangent.multiplyScalar(
-      1 / Math.sqrt(tangentLengthSq),
-    );
+    ) {
+      return false;
+    }
 
     // Keep total launch magnitude equal to the charged jump speed. The fixed
     // outward component is capped defensively so custom low-speed configs still

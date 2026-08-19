@@ -9,13 +9,15 @@ When Tack is attached to a sticky wall:
 
 - Release Space with **no movement input**: preserve the original jump directly
   away from the wall.
-- Hold **W/S/A/D** (or a diagonal) while releasing Space: launch primarily in
-  the camera-relative direction along the wall, with a small outward component
-  to clear the current surface.
+- Hold **W/S/A/D** (or a diagonal) while releasing Space: resolve jump intent
+  from a stable wall-up/lateral basis. W/S always mean up/down the wall and A/D
+  always mean lateral movement, regardless of camera heading.
 
-The movement direction is already resolved by `CameraRig.copySurfaceMovementDirection`
-before `KinematicBody.update()`, so the body does not need to know raw keys or
-camera orientation.
+Attached locomotion still uses `CameraRig.copySurfaceMovementDirection`.
+Directional **jump intent is separate**: `main.ts` passes the raw normalized
+A/D and W/S axes into `KinematicBody`, which resolves them from the current
+authoritative wall normal. The physics body therefore never asks CameraRig for
+wall-jump direction.
 
 Examples:
 
@@ -56,3 +58,42 @@ Check:
 7. Immediate reattachment to the wall being left is still prevented.
 8. Existing adhesion-edge, bounce, elevator, laser, slope, and camera tests
    remain functional.
+
+
+## Stable cardinal basis
+
+For every supported sticky wall normal:
+
+```text
+wallUp    = project(worldUp onto wall plane)
+wallRight = wallUp × wallNormal
+```
+
+Raw jump input then resolves as:
+
+```text
+jump tangent = wallRight × A/D + wallUp × W/S
+```
+
+This keeps the cardinal contract stable while ordinary attached locomotion can
+remain camera-relative for comfort.
+
+## Automated development coverage
+
+`src/debug/WallJumpBasisRegression.ts` runs once in the existing browser
+development harness and reports its result in runtime diagnostics. It does not
+require `node:test` or Node type definitions.
+
+It covers:
+
+- W/S on ±X, ±Z, and representative tilted near-vertical wall normals;
+- A/D as opposite lateral tangents on the same set;
+- the explicit invariant that representative camera headings cannot alter the
+  cardinal wall-jump result because camera heading is not an input to the
+  resolver.
+
+Expected diagnostic:
+
+```text
+wall jump basis regression: PASS — 6 wall normals — 4 camera headings — W/S vertical, A/D lateral
+```

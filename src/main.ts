@@ -4,6 +4,7 @@ import { EventBus } from './core/EventBus';
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
+import { runWallJumpBasisRegression } from './debug/WallJumpBasisRegression';
 import { LaserTestRig } from './hazards/LaserTestRig';
 import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
 import { CollisionWorld } from './physics/CollisionWorld';
@@ -12,6 +13,7 @@ import {
   KinematicBody,
   type JumpInputState,
 } from './physics/KinematicBody';
+import type { WallJumpIntent } from './physics/WallJumpBasis';
 import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { ElevatorTestRig } from './puzzle/ElevatorTestRig';
@@ -114,12 +116,17 @@ const jumpInputState: JumpInputState = {
   held: false,
   released: false,
 };
+const wallJumpIntent: WallJumpIntent = {
+  lateral: 0,
+  vertical: 0,
+};
 
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
 const SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES = 0.02;
 
 let slopeRegressionStatus = 'not run';
+const wallJumpBasisRegressionStatus = runWallJumpBasisRegression();
 
 const runSlopeIdleRegression = (): string => {
   const slopeMesh = testScene.collisionMeshes.find(
@@ -280,9 +287,9 @@ const loop = new Loop({
     );
     renderLayer.cameraRig.applyQueuedLookInput();
 
-    // Resolve both ground and attached movement from the camera before the
-    // body advances. A step that begins attached preserves this support plane
-    // through wall-jump release; ordinary jumps use their new airborne plane.
+    // Locomotion remains camera-relative on both ground and sticky surfaces.
+    // Wall-jump *cardinal intent* is passed separately below so W/S always mean
+    // wall-up/down and A/D remain lateral regardless of camera heading.
     if (body.attached) {
       renderLayer.cameraRig.copySurfaceMovementDirection(
         moveX,
@@ -302,10 +309,14 @@ const loop = new Loop({
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
 
+    wallJumpIntent.lateral = moveX;
+    wallJumpIntent.vertical = -moveZ;
+
     body.update(
       deltaSeconds,
       cameraRelativeMovement,
       jumpInputState,
+      wallJumpIntent,
     );
     // Lethal hazards query the authoritative post-movement sphere. Recovery
     // may synchronously reset the active puzzle group and teleport the body.
@@ -429,6 +440,7 @@ const loop = new Loop({
           `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
           `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
           `slope idle regression: ${slopeRegressionStatus}`,
+          `wall jump basis regression: ${wallJumpBasisRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
