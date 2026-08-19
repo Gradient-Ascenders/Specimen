@@ -18,7 +18,10 @@ import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { BlobFacing } from './render/BlobFacing';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
-import { DeathSequence } from './systems/DeathSequence';
+import {
+  DeathSequence,
+  type DeathRecoveryAction,
+} from './systems/DeathSequence';
 import { DeathScreen } from './ui/DeathScreen';
 import './style.css';
 
@@ -123,17 +126,12 @@ const runSlopeIdleRegression = (): string => {
   const stickyRoute = testScene.collisionMeshes.find(
     (mesh) => mesh.name === 'room-1-vent-sticky-entry-wall',
   );
-  const bounceLanding = testScene.collisionMeshes.find(
-    (mesh) => mesh.name === 'room-2-bounce-calibration-landing',
-  );
-
-  if (stickyRoute && bounceLanding) {
+  if (stickyRoute) {
     const stickyTag = surfaceRegistry.get(stickyRoute).tag;
-    const bounceTag = surfaceRegistry.get(bounceLanding).tag;
-    const passed = stickyTag === 'sticky' && bounceTag === 'bouncy';
+    const passed = stickyTag === 'sticky';
     slopeRegressionStatus = passed
-      ? 'PASS — Room 1 sticky route and Room 2 bounce landing are authored'
-      : `FAIL — tags are ${stickyTag} / ${bounceTag}`;
+      ? 'PASS — Room 1 sticky route is authored; slime rebound is controller-owned'
+      : `FAIL — sticky route tag is ${stickyTag}`;
     return slopeRegressionStatus;
   }
 
@@ -250,7 +248,7 @@ const testPanel = new GreyboxTestPanel({
   },
   onTestRecovery: () => {
     body.teleport(outOfBoundsTestPosition);
-    requestPlayerDeath();
+    requestPlayerDeath(recoverAtSpawn);
   },
   onRunSlopeIdleRegression: runSlopeIdleRegression,
 });
@@ -271,8 +269,12 @@ appHost.replaceChildren(
   deathScreen.element,
 );
 
-function requestPlayerDeath(): boolean {
-  if (!deathSequence.requestDeath()) return false;
+function recoverAtSpawn(): void {
+  body.teleport(spawnPosition);
+}
+
+function requestPlayerDeath(recovery: DeathRecoveryAction): boolean {
+  if (!deathSequence.requestDeath(recovery)) return false;
   if (!testScene.startDeath(body.position)) {
     deathSequence.reset();
     return false;
@@ -287,9 +289,8 @@ function requestPlayerDeath(): boolean {
 function retryAfterDeath(): void {
   if (!deathSequence.canRetry) return;
 
-  body.teleport(spawnPosition);
-  testScene.finishDeath(body.position);
   if (!deathSequence.completeRetry()) return;
+  testScene.finishDeath(body.position);
 
   deathScreen.hide();
   input.setEnabled(true);
@@ -370,7 +371,7 @@ const loop = new Loop({
     );
 
     if (body.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
-      requestPlayerDeath();
+      requestPlayerDeath(recoverAtSpawn);
     }
     if (!deathSequence.isPlaying) {
       updateDeathState(deltaSeconds);

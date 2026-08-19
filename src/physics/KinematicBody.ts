@@ -73,6 +73,12 @@ export interface KinematicBodyConfig {
   bounceCooldownSeconds: number;
   /** Required approach speed into a bounce surface before it fires. */
   minimumBounceApproachSpeedMetresPerSecond: number;
+  /** Minimum downward landing speed that triggers the slime's innate rebound. */
+  slimeMinimumBounceImpactSpeedMetresPerSecond: number;
+  /** Fraction of vertical impact speed retained by the slime after landing. */
+  slimeBounceRestitution: number;
+  /** Safety cap for the slime's rebound speed after a very high fall. */
+  slimeMaximumBounceSpeedMetresPerSecond: number;
 
   /**
    * Outward separation speed used when an attached jump has directional
@@ -96,8 +102,11 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   minimumGroundNormalDot: Math.cos(THREE.MathUtils.degToRad(50)),
   maxCollisionIterations: 3,
 
-  minimumJumpSpeedMetresPerSecond: 4.8,
-  maximumJumpSpeedMetresPerSecond: 8.8,
+  // Jump height scales with launch speed squared. Multiplying the original
+  // 4.8-8.8 m/s charge range by sqrt(1.25) raises every charged jump apex by
+  // approximately 25% while preserving the existing charge response.
+  minimumJumpSpeedMetresPerSecond: 5.37,
+  maximumJumpSpeedMetresPerSecond: 9.84,
   maximumJumpChargeSeconds: 0.7,
   jumpChargeCurveExponent: 1.35,
   coyoteTimeSeconds: 0.1,
@@ -111,6 +120,9 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   attachmentDetachCooldownSeconds: 0.12,
   bounceCooldownSeconds: 0.12,
   minimumBounceApproachSpeedMetresPerSecond: 0.12,
+  slimeMinimumBounceImpactSpeedMetresPerSecond: 3.1,
+  slimeBounceRestitution: 0.68,
+  slimeMaximumBounceSpeedMetresPerSecond: 11,
 
   // A directional wall jump spends most of its charged speed along the
   // authored wall while keeping enough outward motion to clear collision.
@@ -401,7 +413,6 @@ export class KinematicBody {
       0,
       this.bounceCooldownSecondsValue - deltaSeconds,
     );
-
     if (this.groundReacquireDelaySeconds > 0) {
       this.groundReacquireDelaySeconds = Math.max(
         0,
@@ -594,7 +605,6 @@ export class KinematicBody {
     this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastBounceSpeedValue = 0;
     this.lastBounceSurfaceNameValue = 'none';
-
     this.refreshGroundState();
     this.coyoteTimeRemainingSecondsValue = this.groundedValue
       ? this.config.coyoteTimeSeconds
@@ -930,7 +940,7 @@ export class KinematicBody {
 
   private applyGravity(deltaSeconds: number): void {
     this.gravityStep
-      .copy(this.gameplayUpValue)
+      .copy(this.attachedValue ? this.gameplayUpValue : WORLD_UP)
       .multiplyScalar(
         -this.config.gravityMetresPerSecondSquared * deltaSeconds,
       );
@@ -953,7 +963,7 @@ export class KinematicBody {
     this.velocityValue.add(this.gravityStep);
   }
 
-  private moveAndSlide(deltaSeconds: number): void {
+  private moveAndSlide(deltaSeconds: number, allowSurfaceTransitions = true): void {
     this.remainingDisplacement
       .copy(this.velocityValue)
       .multiplyScalar(deltaSeconds);
@@ -1019,6 +1029,7 @@ export class KinematicBody {
       }
 
       if (
+        allowSurfaceTransitions &&
         surface.bounceSpeedMetresPerSecond > 0 &&
         this.tryApplyBounce(
           surface.bounceSpeedMetresPerSecond,
@@ -1033,7 +1044,21 @@ export class KinematicBody {
         continue;
       }
 
-      if (surface.adhesive) {
+      if (
+        allowSurfaceTransitions &&
+        this.tryApplySlimeLandingBounce(
+          velocityIntoSurface,
+          this.movementHit.normal,
+          this.movementHit.object,
+        )
+      ) {
+        this.remainingDisplacement
+          .copy(this.velocityValue)
+          .multiplyScalar(deltaSeconds * (1 - travelFraction));
+        continue;
+      }
+
+      if (allowSurfaceTransitions && surface.adhesive) {
         this.tryAttach(
           this.movementHit.normal,
           this.movementHit.object,
@@ -1081,6 +1106,59 @@ export class KinematicBody {
       return false;
     }
 
+    this.applyBounceImpulse(
+      bounceSpeedMetresPerSecond,
+      velocityIntoSurface,
+      surfaceNormal,
+      surfaceObject,
+    );
+
+    return true;
+  }
+
+  /**
+   * Default slime rebound: only genuine floor/slope landings bounce. Rebound
+   * speed is proportional to the impact, retains less than full energy, and
+   * is capped so a very tall fall remains controllable.
+   */
+  private tryApplySlimeLandingBounce(
+    velocityIntoSurface: number,
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+  ): boolean {
+    if (this.bounceCooldownSecondsValue > 0) return false;
+    // Deliberate buffered input wins over the slime's passive floor rebound.
+    // The collision may then establish support and consume the buffer below;
+    // authored bouncy surfaces have already been handled before this path.
+    if (this.jumpInputBufferRemainingSecondsValue > 0) return false;
+    if (
+      surfaceNormal.dot(WORLD_UP) < this.config.minimumGroundNormalDot ||
+      velocityIntoSurface >=
+        -this.config.slimeMinimumBounceImpactSpeedMetresPerSecond
+    ) {
+      return false;
+    }
+
+    const reboundSpeed = Math.min(
+      this.config.slimeMaximumBounceSpeedMetresPerSecond,
+      -velocityIntoSurface * this.config.slimeBounceRestitution,
+    );
+    this.applyBounceImpulse(
+      reboundSpeed,
+      velocityIntoSurface,
+      surfaceNormal,
+      surfaceObject,
+    );
+
+    return true;
+  }
+
+  private applyBounceImpulse(
+    bounceSpeedMetresPerSecond: number,
+    velocityIntoSurface: number,
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+  ): void {
     if (this.attachedValue) {
       this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
     }
@@ -1116,7 +1194,6 @@ export class KinematicBody {
     this.lastBounceSurfaceNameValue =
       surfaceObject?.name || '<unnamed>';
 
-    return true;
   }
 
   private tryAttach(
@@ -1166,6 +1243,17 @@ export class KinematicBody {
       this.attachmentCooldownSecondsValue,
       cooldownSeconds,
     );
+  }
+
+  private detachAfterLosingSurfaceSupport(): void {
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.supportColliderValue = null;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(WORLD_UP);
+    this.groundedValue = false;
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
   }
 
   private isAuthoredWallNormal(normal: THREE.Vector3): boolean {
@@ -1220,9 +1308,9 @@ export class KinematicBody {
 
       if (this.tryTransitionAcrossAttachedEdge(deltaSeconds)) return;
 
-      // Sticky geometry ended or the next authored surface explicitly rejects
-      // adhesion. Fall back to world-up and test for ordinary ground below.
-      this.detachFromSurface(0);
+      // CameraRig smooths presentation independently. Authoritative movement,
+      // gravity, and landing calculations return to world-up immediately.
+      this.detachAfterLosingSurfaceSupport();
     }
 
     this.gameplayUpValue.copy(WORLD_UP);
@@ -1426,6 +1514,14 @@ export class KinematicBody {
         config.minimumBounceApproachSpeedMetresPerSecond,
       ],
       [
+        'slimeMinimumBounceImpactSpeedMetresPerSecond',
+        config.slimeMinimumBounceImpactSpeedMetresPerSecond,
+      ],
+      [
+        'slimeMaximumBounceSpeedMetresPerSecond',
+        config.slimeMaximumBounceSpeedMetresPerSecond,
+      ],
+      [
         'directionalWallJumpOutwardSpeedMetresPerSecond',
         config.directionalWallJumpOutwardSpeedMetresPerSecond,
       ],
@@ -1443,6 +1539,16 @@ export class KinematicBody {
     ) {
       throw new Error(
         'maximumJumpSpeedMetresPerSecond must be >= minimumJumpSpeedMetresPerSecond.',
+      );
+    }
+
+    if (
+      !Number.isFinite(config.slimeBounceRestitution) ||
+      config.slimeBounceRestitution <= 0 ||
+      config.slimeBounceRestitution >= 1
+    ) {
+      throw new Error(
+        'slimeBounceRestitution must be finite and within (0, 1).',
       );
     }
 

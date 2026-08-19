@@ -2,6 +2,7 @@
 export const DEFAULT_DEATH_BURST_DURATION_SECONDS = 1.15;
 
 export type DeathSequenceState = 'playing' | 'bursting' | 'gameOver';
+export type DeathRecoveryAction = () => void;
 
 export interface DeathSequenceOptions {
   readonly burstDurationSeconds?: number;
@@ -18,7 +19,7 @@ export interface DeathSequenceDiagnostics {
  * Authoritative fixed-step state for the player death journey.
  *
  * Presentation and DOM code mirror this state; neither owns transition timing.
- * A caller supplies the actual checkpoint recovery only after `canRetry` is true.
+ * The accepted death retains its authoritative checkpoint recovery until Retry.
  */
 export class DeathSequence {
   private readonly burstDurationSeconds: number;
@@ -26,6 +27,7 @@ export class DeathSequence {
   private elapsedSecondsValue = 0;
   private acceptedDeathCountValue = 0;
   private completedRetryCountValue = 0;
+  private pendingRecovery: DeathRecoveryAction | null = null;
 
   constructor(options: DeathSequenceOptions = {}) {
     this.burstDurationSeconds =
@@ -60,10 +62,11 @@ export class DeathSequence {
     };
   }
 
-  /** Accept the first fatal request for the current life. */
-  requestDeath(): boolean {
+  /** Accept the first fatal request and retain its authoritative recovery. */
+  requestDeath(recovery: DeathRecoveryAction): boolean {
     if (!this.isPlaying) return false;
 
+    this.pendingRecovery = recovery;
     this.stateValue = 'bursting';
     this.elapsedSecondsValue = 0;
     this.acceptedDeathCountValue += 1;
@@ -87,10 +90,14 @@ export class DeathSequence {
     return true;
   }
 
-  /** Mark a successful externally-owned recovery as complete. */
+  /** Run the retained recovery, then rearm play only after it succeeds. */
   completeRetry(): boolean {
-    if (!this.canRetry) return false;
+    if (!this.canRetry || this.pendingRecovery === null) return false;
 
+    // A thrown recovery leaves game-over state and the action intact so the
+    // visual/UI layer cannot claim success before authoritative reset succeeds.
+    this.pendingRecovery();
+    this.pendingRecovery = null;
     this.stateValue = 'playing';
     this.elapsedSecondsValue = 0;
     this.completedRetryCountValue += 1;
@@ -99,6 +106,7 @@ export class DeathSequence {
 
   /** Clear an in-flight sequence during teardown or an explicit harness reset. */
   reset(): void {
+    this.pendingRecovery = null;
     this.stateValue = 'playing';
     this.elapsedSecondsValue = 0;
   }

@@ -53,7 +53,7 @@ test('game over cannot begin before the shared slime burst phase completes', () 
   const burst = new SlimeBurstPresentation();
   const finalStepSeconds = 1 / 60;
 
-  assert.equal(sequence.requestDeath(), true);
+  assert.equal(sequence.requestDeath(() => undefined), true);
   assert.equal(burst.start(new THREE.Vector3()), true);
 
   const beforeCompletionSeconds =

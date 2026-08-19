@@ -6,6 +6,7 @@ import {
 } from '../puzzle/Checkpoints';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation';
+import type { DeathRecoveryAction } from '../systems/DeathSequence';
 import {
   LaserHazard,
   type LaserContactTarget,
@@ -36,7 +37,7 @@ export interface LaserTestRigOptions {
   readonly player: LaserTestPlayer;
   readonly checkpointSpawn: THREE.Vector3;
   /** Optional game-flow boundary inserted before checkpoint recovery. */
-  readonly requestPlayerDeath?: () => void;
+  readonly requestPlayerDeath?: (recovery: DeathRecoveryAction) => void;
 }
 
 export interface LaserTestRigDiagnostics {
@@ -298,10 +299,11 @@ export class LaserTestRig {
         this.finalBurst,
       ],
       requestRecovery: () => {
+        const recovery = (): void => this.recover();
         if (options.requestPlayerDeath) {
-          options.requestPlayerDeath();
+          options.requestPlayerDeath(recovery);
         } else {
-          this.checkpoints.recover(this.player);
+          recovery();
         }
       },
     });
