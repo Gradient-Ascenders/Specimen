@@ -136,13 +136,17 @@ export class ContainmentTeachingScene {
 
     // The north perimeter is split so the contaminated wall and open vent are
     // real authored collision surfaces instead of decorative overlays.
-    this.addCollider({ name: 'room-1-north-clean-west', size: [2.8, 8, 0.4], position: [-5.6, 4, 6], material: materials.wall });
-    this.addCollider({ name: 'room-1-north-sticky-route', size: [4.2, 5.8, 0.4], position: [-2.1, 2.9, 6], material: materials.sticky, surfaceTag: 'sticky' });
-    this.addCollider({ name: 'room-1-north-clean-east', size: [5.2, 8, 0.4], position: [4.4, 4, 6], material: materials.wall });
-    this.addCollider({ name: 'room-1-north-above-vent', size: [4.2, 0.7, 0.4], position: [-2.1, 7.65, 6], material: materials.wall });
+    // The vent is a real opening beside the sticky path. Tack climbs, moves
+    // sideways off the contaminated wall, and is caught by the duct floor—no
+    // balancing ledge or invisible collider blocks the intended entry.
+    this.addCollider({ name: 'room-1-north-clean-west', size: [1.2, 8, 0.4], position: [-6.4, 4, 6], material: materials.wall });
+    this.addCollider({ name: 'room-1-north-vent-lower-panel', size: [2, 5.2, 0.4], position: [-4.8, 2.6, 6], material: materials.wall });
+    this.addCollider({ name: 'room-1-north-sticky-route', size: [4, 6.5, 0.4], position: [-1.8, 3.25, 6], material: materials.sticky, surfaceTag: 'sticky' });
+    this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
+    this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
 
-    this.addVisualBox('room-1-locked-door-false-lead', [2.6, 3, 0.18], [4.2, 1.5, 5.76], materials.locked);
-    this.addOpenVentFrame('room-1-vent-open-frame', [-2.1, 6.6, 5.74], materials.duct);
+    this.addVisualBox('room-1-locked-door-false-lead', [2.6, 3, 0.18], [4.3, 1.5, 5.76], materials.locked);
+    this.addOpenVentFrame('room-1-vent-open-frame', [-4.8, 6, 5.74], materials.duct);
 
     this.addCollider({ name: 'room-1-containment-pedestal', size: [2.6, 1.1, 2.6], position: [0, 0.55, -0.5], material: materials.support });
     this.addVisualBox('room-1-glass-containment-box', [1.8, 1.9, 1.8], [0, 2.05, -0.5], materials.glass);
@@ -159,13 +163,13 @@ export class ContainmentTeachingScene {
   private addVentTransition(materials: Record<string, THREE.Material>): void {
     // A single, rising duct route creates meaningful separation before the
     // Room 2 drop without turning the transition into a maze.
-    this.addCollider({ name: 'duct-segment-a-floor', size: [2, 0.25, 7], position: [-2.1, 5.85, 9.5], material: materials.duct });
-    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 12], position: [-2.1, 10, 18.5], material: materials.duct, rotationX: -THREE.MathUtils.degToRad(34) });
+    this.addCollider({ name: 'duct-segment-a-floor', size: [2, 0.25, 7], position: [-4.8, 5.1, 9.5], material: materials.duct });
+    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 12], position: [-4.8, 8.5, 18.5], material: materials.duct, rotationX: -THREE.MathUtils.degToRad(34) });
     this.addCollider({ name: 'duct-segment-c-floor', size: [7.2, 0.25, 2], position: [-5.7, 13.45, 24], material: materials.duct });
     this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 5], position: [-9, 13.45, 27.5], material: materials.duct });
 
-    this.addDuctSide('-a-west', [-3.15, 6.85, 9.5], [0.18, 2.2, 7]);
-    this.addDuctSide('-a-east', [-1.05, 6.85, 9.5], [0.18, 2.2, 7]);
+    this.addDuctSide('-a-west', [-5.85, 6.2, 9.5], [0.18, 2.2, 7]);
+    this.addDuctSide('-a-east', [-3.75, 6.2, 9.5], [0.18, 2.2, 7]);
     this.addDuctSide('-final-west', [-10.05, 14.45, 27.5], [0.18, 2.2, 5]);
     this.addDuctSide('-final-east', [-7.95, 14.45, 27.5], [0.18, 2.2, 5]);
     this.addVisualBox('duct-drop-frame', [2.2, 0.25, 0.5], [-9, 13.5, 30], materials.duct);
