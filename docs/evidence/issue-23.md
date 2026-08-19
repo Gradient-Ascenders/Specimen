@@ -26,6 +26,7 @@
 - `src/render/CameraRig.ts`
 - `src/levels/GreyboxCollisionScene.ts`
 - `src/puzzle/ElevatorTestRig.ts`
+- `tests/Input.test.ts`
 - `tests/LevelLifecycle.test.ts`
 - `tests/CameraRig.test.ts`
 - `docs/level-lifecycle.md`
@@ -37,12 +38,15 @@ and the lockfile are unchanged.
 ## Automated verification
 
 - Direct TypeScript check with the bundled Node runtime: passed with no errors.
-- Direct Node test runner: passed all 39 tests, including six lifecycle tests and
-  the new camera-reset coverage.
+- Direct Node test runner: passed all 41 tests, including six lifecycle tests,
+  two input autorepeat regressions, and the camera-reset coverage.
 - The lifecycle tests cover transition order, duplicate load/start protection,
   reentrant restart protection, ten repeated restarts, repeated load/unload
   cleanup, idempotent disposal, rejected post-disposal operations, and restart
   failure state.
+- The input regressions cover restart (`KeyR`) and movement (`KeyW`) keys:
+  lifecycle state clearing cannot allow an orphan repeat to reactivate either
+  action, while keyup followed by a fresh non-repeat keydown still works.
 
 - `npm run type-check`, `npm test`, and `npm run build` could not start because
   the user-level npm launcher points at a missing
@@ -51,7 +55,7 @@ and the lockfile are unchanged.
 - The equivalent repository tools were invoked directly with the bundled Node
   24.19.0 runtime:
   - `node node_modules/typescript/bin/tsc --noEmit`: passed;
-  - `node --test tests/*.test.ts`: 39 passed, 0 failed;
+  - `node --test tests/*.test.ts`: 41 passed, 0 failed;
   - `node node_modules/typescript/bin/tsc`, followed by
     `node node_modules/vite/bin/vite.js build`: passed.
 - Vite 8.2.1 transformed 42 modules and produced `dist/index.html`, CSS, and a
