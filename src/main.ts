@@ -13,7 +13,6 @@ import {
 } from './physics/KinematicBody';
 import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
-import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
 import './style.css';
@@ -28,9 +27,6 @@ const renderLayer = new RenderLayer({ host: app });
 
 const testScene = new ContainmentTeachingScene();
 renderLayer.scene.add(testScene.root);
-
-const puzzleTestRig = new PuzzleTestRig();
-renderLayer.scene.add(puzzleTestRig.root);
 
 const collisionWorld = new CollisionWorld();
 collisionWorld.registerAll(testScene.collisionMeshes);
@@ -225,7 +221,6 @@ const testPanel = new GreyboxTestPanel({
   onReset: () => {
     testScene.resetProbe();
     body.teleport(spawnPosition);
-    puzzleTestRig.reset();
     landingEventCount = 0;
     lastLandingImpactSpeedMetresPerSecond = 0;
   },
@@ -236,11 +231,6 @@ const testPanel = new GreyboxTestPanel({
       onRecovered();
     });
   },
-  onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
-  onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
-  onRunResetRegression: () => puzzleTestRig.runResetRegression(),
-  onActivateCheckpoint: () => puzzleTestRig.activateElevatedCheckpoint(),
-  onRecoverCheckpoint: () => puzzleTestRig.recoverTestSlime(),
   onRunSlopeIdleRegression: runSlopeIdleRegression,
 });
 
@@ -279,7 +269,6 @@ const loop = new Loop({
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.update(deltaSeconds, slimeVisualState);
-    puzzleTestRig.update(deltaSeconds);
     renderLayer.cameraRig.queueLookInput(
       input.pointerDeltaX,
       input.pointerDeltaY,
@@ -356,8 +345,6 @@ const loop = new Loop({
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
           `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
-          `plate / door / platform: ${puzzleTestRig.platePressed ? 'pressed' : 'released'} / ${puzzleTestRig.doorState} / ${puzzleTestRig.platformState}`,
-          `active checkpoint: ${puzzleTestRig.activeCheckpointId}`,
         ].join('\n'),
       );
     }
@@ -377,7 +364,6 @@ const shutdown = (): void => {
   collisionWorld.clear();
   surfaceRegistry.clear();
   testPanel.dispose();
-  puzzleTestRig.dispose();
   testScene.dispose();
   renderLayer.dispose();
 };

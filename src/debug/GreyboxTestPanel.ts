@@ -1,11 +1,6 @@
 interface GreyboxTestPanelOptions {
   onReset: () => void;
   onTestRecovery: (onRecovered: () => void) => void;
-  onTogglePuzzleTest: () => boolean;
-  onRunSensorRegression: () => void;
-  onRunResetRegression: () => void;
-  onActivateCheckpoint: () => void;
-  onRecoverCheckpoint: () => void;
   onRunSlopeIdleRegression: () => string;
 }
 
@@ -17,12 +12,7 @@ export class GreyboxTestPanel {
   private readonly runtimeStatus: HTMLElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly fallButton: HTMLButtonElement;
-  private readonly puzzleButton: HTMLButtonElement;
-  private readonly sensorRegressionButton: HTMLButtonElement;
   private readonly collapseButton: HTMLButtonElement;
-  private readonly resetRegressionButton: HTMLButtonElement;
-  private readonly checkpointButton: HTMLButtonElement;
-  private readonly checkpointRecoveryButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
@@ -64,11 +54,6 @@ export class GreyboxTestPanel {
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
           <button type="button" data-action="slope-regression">Check Room 1/2 surfaces</button>
-          <button type="button" data-action="puzzle">Toggle plate test</button>
-          <button type="button" data-action="sensor-regression">Run sensor checks</button>
-          <button type="button" data-action="reset-regression">Run 10 reset cycles</button>
-          <button type="button" data-action="checkpoint">Activate elevated checkpoint</button>
-          <button type="button" data-action="checkpoint-recovery">Recover at checkpoint</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -86,25 +71,9 @@ export class GreyboxTestPanel {
     const fallButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="fall"]',
     );
-    const puzzleButton = this.element.querySelector<HTMLButtonElement>(
-      '[data-action="puzzle"]',
-    );
-    const sensorRegressionButton = this.element.querySelector<HTMLButtonElement>(
-      '[data-action="sensor-regression"]',
-    );
     const collapseButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="collapse-panel"]',
     );
-    const resetRegressionButton = this.element.querySelector<HTMLButtonElement>(
-      '[data-action="reset-regression"]',
-    );
-    const checkpointButton = this.element.querySelector<HTMLButtonElement>(
-      '[data-action="checkpoint"]',
-    );
-    const checkpointRecoveryButton =
-      this.element.querySelector<HTMLButtonElement>(
-        '[data-action="checkpoint-recovery"]',
-      );
     const slopeRegressionButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="slope-regression"]',
     );
@@ -114,12 +83,7 @@ export class GreyboxTestPanel {
       !runtimeStatus ||
       !resetButton ||
       !fallButton ||
-      !puzzleButton ||
-      !sensorRegressionButton ||
       !collapseButton ||
-      !resetRegressionButton ||
-      !checkpointButton ||
-      !checkpointRecoveryButton ||
       !slopeRegressionButton
     ) {
       throw new Error('Missing collision test controls.');
@@ -129,31 +93,12 @@ export class GreyboxTestPanel {
     this.runtimeStatus = runtimeStatus;
     this.resetButton = resetButton;
     this.fallButton = fallButton;
-    this.puzzleButton = puzzleButton;
-    this.sensorRegressionButton = sensorRegressionButton;
     this.collapseButton = collapseButton;
-    this.resetRegressionButton = resetRegressionButton;
-    this.checkpointButton = checkpointButton;
-    this.checkpointRecoveryButton = checkpointRecoveryButton;
     this.slopeRegressionButton = slopeRegressionButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
-    this.puzzleButton.addEventListener('click', this.togglePuzzleTest);
-    this.sensorRegressionButton.addEventListener(
-      'click',
-      this.runSensorRegression,
-    );
     this.collapseButton.addEventListener('click', this.toggleCollapsed);
-    this.resetRegressionButton.addEventListener(
-      'click',
-      this.runResetRegression,
-    );
-    this.checkpointButton.addEventListener('click', this.activateCheckpoint);
-    this.checkpointRecoveryButton.addEventListener(
-      'click',
-      this.recoverCheckpoint,
-    );
     this.slopeRegressionButton.addEventListener(
       'click',
       this.runSlopeIdleRegression,
@@ -163,21 +108,7 @@ export class GreyboxTestPanel {
   dispose(): void {
     this.resetButton.removeEventListener('click', this.resetProbe);
     this.fallButton.removeEventListener('click', this.testRecovery);
-    this.puzzleButton.removeEventListener('click', this.togglePuzzleTest);
-    this.sensorRegressionButton.removeEventListener(
-      'click',
-      this.runSensorRegression,
-    );
     this.collapseButton.removeEventListener('click', this.toggleCollapsed);
-    this.resetRegressionButton.removeEventListener(
-      'click',
-      this.runResetRegression,
-    );
-    this.checkpointButton.removeEventListener('click', this.activateCheckpoint);
-    this.checkpointRecoveryButton.removeEventListener(
-      'click',
-      this.recoverCheckpoint,
-    );
     this.slopeRegressionButton.removeEventListener(
       'click',
       this.runSlopeIdleRegression,
@@ -196,19 +127,6 @@ export class GreyboxTestPanel {
     this.status.textContent = 'Probe entered the red recovery volume…';
   };
 
-  private readonly togglePuzzleTest = (): void => {
-    const occupied = this.options.onTogglePuzzleTest();
-    this.status.textContent = occupied
-      ? 'Test slime is on the pressure plate: door and platform are active.'
-      : 'Test slime left the pressure plate: door and platform are returning.';
-  };
-
-  private readonly runSensorRegression = (): void => {
-    this.options.onRunSensorRegression();
-    this.status.textContent =
-      'Sensor checks passed: duplicate, multiple, and exit occupancy are stable.';
-  };
-
   private readonly toggleCollapsed = (): void => {
     const collapsed = this.element.classList.toggle('is-collapsed');
     this.collapseButton.textContent = collapsed ? '+' : '−';
@@ -220,23 +138,6 @@ export class GreyboxTestPanel {
     this.collapseButton.title = collapsed
       ? 'Expand debug panel'
       : 'Collapse debug panel';
-  };
-
-  private readonly runResetRegression = (): void => {
-    this.options.onRunResetRegression();
-    this.status.textContent =
-      'Reset checks passed: 10 active/returning puzzle cycles restored the authored state.';
-  };
-
-  private readonly activateCheckpoint = (): void => {
-    this.options.onActivateCheckpoint();
-    this.status.textContent =
-      'Elevated checkpoint activated. Recovery will use its verified clear spawn.';
-  };
-
-  private readonly recoverCheckpoint = (): void => {
-    this.options.onRecoverCheckpoint();
-    this.status.textContent = 'Test slime recovered at the active checkpoint.';
   };
 
   private readonly runSlopeIdleRegression = (): void => {
