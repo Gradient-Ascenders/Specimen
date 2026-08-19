@@ -18,7 +18,9 @@ export interface RoomThreeHazardFailure {
   readonly hazardId: string;
 }
 
-/** Room 3's authored traversal, hazards and transition volumes. */
+/** Room 3's authored traversal, hazards and transition volumes.
+ * Blender transforms last baked from Room3.glb.
+ */
 export class RoomThreeGreybox {
   readonly builder = new GreyboxRoomBuilder('containment-room-3-greybox');
   readonly root = this.builder.root;
@@ -114,8 +116,8 @@ export class RoomThreeGreybox {
     const { platform, sticky, support, exit: exitMaterial } = this.builder.materials;
 
     this.builder.addCollider({ name: 'room-3-entry-platform', size: [8, 0.5, 5], position: [0, 10.15, 51.5], material: platform });
-    this.builder.addCollider({ name: 'room-3-platform-a-bounce', size: [4.5, 0.5, 4], position: [4.2, 11.25, 55], material: platform });
-    this.builder.addCollider({ name: 'room-3-platform-b-gap', size: [4.5, 0.5, 4], position: [11.5, 12.95, 59], material: platform });
+    this.builder.addCollider({ name: 'room-3-platform-a-bounce', size: [4.5, 0.5, 4], position: [2.7885, 10.9032, 57.6261], material: platform });
+    this.builder.addCollider({ name: 'room-3-platform-b-gap', size: [5.13, 0.5, 4], position: [11.2583, 11.4329, 59], material: platform });
 
     this.builder.addCollider({
       name: 'room-3-sticky-wall-main',
@@ -154,13 +156,13 @@ export class RoomThreeGreybox {
     return [
       new LaserHazard({
         id: 'room-3-first-static-laser',
-        start: new THREE.Vector3(-3.8, 11.2, 53.6),
-        end: new THREE.Vector3(3.8, 11.2, 53.6),
+        start: new THREE.Vector3(-2.979, 11.3706, 54.5525),
+        end: new THREE.Vector3(4.621, 11.3706, 54.5525),
       }),
       new LaserHazard({
         id: 'room-3-charged-gap-laser',
-        start: new THREE.Vector3(6.2, 12.35, 57.4),
-        end: new THREE.Vector3(13.8, 12.35, 57.4),
+        start: new THREE.Vector3(6.4542, 11.9598, 61.8538),
+        end: new THREE.Vector3(6.4542, 11.9598, 54.2428),
       }),
       new LaserHazard({
         id: 'room-3-wall-route-laser-low',
@@ -174,8 +176,8 @@ export class RoomThreeGreybox {
       }),
       new LaserHazard({
         id: 'room-3-upper-sweep-laser',
-        start: new THREE.Vector3(2.5, 25.9, 68.2),
-        end: new THREE.Vector3(7.5, 25.9, 68.2),
+        start: new THREE.Vector3(2.9914, 24.7059, 64.8913),
+        end: new THREE.Vector3(7.9914, 24.7059, 64.8913),
         timeline: {
           axisWorld: new THREE.Vector3(0, 1, 0),
           repeat: true,
