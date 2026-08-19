@@ -370,6 +370,17 @@ export class KinematicBody {
     this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
   }
 
+  /**
+   * Checkpoint recovery adapter.
+   *
+   * `teleport` already clears velocity, adhesion, charge, cooldowns and other
+   * player-specific transient state, so CheckpointManager can use the body
+   * directly as its recovery target without another restart path.
+   */
+  recoverAt(position: THREE.Vector3): void {
+    this.teleport(position);
+  }
+
   teleport(position: ReadonlyVector3State, preserveVelocity = false): void {
     this.currentPosition.set(position.x, position.y, position.z);
     this.previousPositionValue.copy(this.currentPosition);
