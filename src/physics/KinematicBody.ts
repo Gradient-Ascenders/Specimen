@@ -7,6 +7,7 @@ import {
   type SurfaceRegistry,
   type SurfaceTag,
 } from './SurfaceRegistry';
+import { VentTraversal } from '../traversal/VentTraversal';
 
 const MOVEMENT_EPSILON_SQ = 1e-12;
 const CONTACT_PUSH_METRES = 1e-5;
@@ -32,6 +33,7 @@ const NO_JUMP_INPUT: Readonly<JumpInputState> = {
 };
 
 export type JumpState = 'grounded' | 'coyote' | 'charging' | 'airborne';
+export type TraversalState = 'normal' | 'ventEntry' | 'ventHandoff';
 
 export interface KinematicBodyConfig {
   radiusMetres: number;
@@ -142,6 +144,7 @@ export class KinematicBody {
   private lastContactNameValue = 'none';
 
   private attachmentCooldownSecondsValue = 0;
+  private stickyDetachGraceSecondsValue = 0;
   private bounceCooldownSecondsValue = 0;
   private lastBounceSpeedValue = 0;
   private lastBounceSurfaceNameValue = 'none';
@@ -157,9 +160,21 @@ export class KinematicBody {
   private readonly gravityStep = new THREE.Vector3();
   private readonly surfaceForward = new THREE.Vector3();
   private readonly surfaceRight = new THREE.Vector3();
+  private readonly ventToTarget = new THREE.Vector3();
+  private readonly ventLateralOffset = new THREE.Vector3();
+  private readonly ventSteeringInput = new THREE.Vector3();
+  private readonly ventHandoffDisplacement = new THREE.Vector3();
 
   private readonly movementHit = new CollisionHit();
   private readonly groundHit = new CollisionHit();
+  private readonly ventHandoffHit = new CollisionHit();
+
+  private traversalStateValue: TraversalState = 'normal';
+  private activeVent: VentTraversal | null = null;
+  private ventElapsedSeconds = 0;
+  private ventInwardSpeedValue = 0;
+  private ventAlignmentErrorValue = 0;
+  private ventReentryCooldownSeconds = 0;
 
   contactsThisStep = 0;
   lastCollisionName = 'none';
@@ -220,6 +235,44 @@ export class KinematicBody {
 
   get attachmentCooldownSeconds(): number {
     return this.attachmentCooldownSecondsValue;
+  }
+
+  get traversalState(): TraversalState {
+    return this.traversalStateValue;
+  }
+
+  get activeVentId(): string {
+    return this.activeVent?.id ?? 'none';
+  }
+
+  get ventInwardSpeedMetresPerSecond(): number {
+    return this.ventInwardSpeedValue;
+  }
+
+  get ventAlignmentErrorMetres(): number {
+    return this.ventAlignmentErrorValue;
+  }
+
+  /** Starts an authored transition only from intentional player movement. */
+  tryBeginVentTraversal(vent: VentTraversal, moveX: number, moveZ: number): boolean {
+    if (this.traversalStateValue !== 'normal') return false;
+    if (this.ventReentryCooldownSeconds > 0) return false;
+    if (this.chargingJumpValue || Math.hypot(moveX, moveZ) < 0.1) return false;
+    if (vent.requiresStickyAttachment && !this.attachedValue) return false;
+    if (!vent.containsEntry(this.currentPosition, this.config.radiusMetres)) return false;
+
+    this.activeVent = vent;
+    this.traversalStateValue = 'ventEntry';
+    this.ventElapsedSeconds = 0;
+    this.ventInwardSpeedValue = Math.max(0, this.velocityValue.dot(vent.entryDirection));
+    this.ventAlignmentErrorValue = 0;
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.groundedValue = false;
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
+    this.cancelJumpCharge();
+    return true;
   }
 
   get bounceCooldownSeconds(): number {
@@ -337,6 +390,19 @@ export class KinematicBody {
       0,
       this.bounceCooldownSecondsValue - deltaSeconds,
     );
+    this.stickyDetachGraceSecondsValue = Math.max(
+      0,
+      this.stickyDetachGraceSecondsValue - deltaSeconds,
+    );
+    this.ventReentryCooldownSeconds = Math.max(
+      0,
+      this.ventReentryCooldownSeconds - deltaSeconds,
+    );
+
+    if (this.traversalStateValue !== 'normal') {
+      this.updateVentTraversal(deltaSeconds, moveX, moveZ);
+      return;
+    }
 
     if (this.groundReacquireDelaySeconds > 0) {
       this.groundReacquireDelaySeconds = Math.max(
@@ -399,6 +465,13 @@ export class KinematicBody {
     this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastBounceSpeedValue = 0;
     this.lastBounceSurfaceNameValue = 'none';
+    this.stickyDetachGraceSecondsValue = 0;
+    this.traversalStateValue = 'normal';
+    this.activeVent = null;
+    this.ventElapsedSeconds = 0;
+    this.ventInwardSpeedValue = 0;
+    this.ventAlignmentErrorValue = 0;
+    this.ventReentryCooldownSeconds = 0;
 
     this.refreshGroundState();
     this.coyoteTimeRemainingSecondsValue = this.groundedValue
@@ -500,6 +573,124 @@ export class KinematicBody {
     );
   }
 
+  private updateVentTraversal(
+    deltaSeconds: number,
+    moveX: number,
+    moveZ: number,
+  ): void {
+    const vent = this.activeVent;
+    if (!vent) {
+      this.traversalStateValue = 'normal';
+      return;
+    }
+
+    this.cancelJumpCharge();
+    this.ventElapsedSeconds += deltaSeconds;
+    if (this.ventElapsedSeconds > vent.emergencyTimeoutSeconds) {
+      // Error recovery deliberately returns to ordinary physics rather than
+      // leaving the player in a permanent scripted state.
+      this.finishVentTraversal(false);
+      return;
+    }
+
+    if (this.traversalStateValue === 'ventEntry') {
+      this.ventToTarget.subVectors(vent.entryTarget, this.currentPosition);
+      const alongDirection = this.ventToTarget.dot(vent.entryDirection);
+      this.ventLateralOffset
+        .copy(this.ventToTarget)
+        .addScaledVector(vent.entryDirection, -alongDirection);
+      this.ventAlignmentErrorValue = this.ventLateralOffset.length();
+      this.velocityValue.addScaledVector(
+        this.ventLateralOffset,
+        vent.alignmentStrength * deltaSeconds,
+      );
+
+      this.ventInwardSpeedValue = this.velocityValue.dot(vent.entryDirection);
+      if (this.ventInwardSpeedValue < vent.entrySpeedMetresPerSecond) {
+        this.velocityValue.addScaledVector(
+          vent.entryDirection,
+          vent.entrySpeedMetresPerSecond - this.ventInwardSpeedValue,
+        );
+      }
+
+      this.applyVentSteering(deltaSeconds, moveX, moveZ, vent);
+      this.moveAndSlide(deltaSeconds, false);
+      if (!vent.hasCleared(this.currentPosition)) return;
+      this.traversalStateValue = 'ventHandoff';
+    }
+
+    if (vent.handoffMode === 'free') {
+      this.finishVentTraversal(true);
+      return;
+    }
+
+    if (!vent.handoffSearchDirection || vent.handoffSearchDistanceMetres <= 0) {
+      this.finishVentTraversal(false);
+      return;
+    }
+
+    this.ventHandoffDisplacement
+      .copy(vent.handoffSearchDirection)
+      .multiplyScalar(vent.handoffSearchDistanceMetres);
+    const hit = this.world.sweepSphere(
+      this.currentPosition,
+      this.ventHandoffDisplacement,
+      this.config.radiusMetres + this.config.skinWidthMetres,
+      this.ventHandoffHit,
+    );
+    const surface = hit ? this.surfaces.get(this.ventHandoffHit.object) : undefined;
+    if (
+      hit && surface?.adhesive &&
+      (!vent.requiredHandoffSurfaceTag || surface.tag === vent.requiredHandoffSurfaceTag) &&
+      this.tryAttach(this.ventHandoffHit.normal, this.ventHandoffHit.object, surface.tag, surface.tractionMultiplier)
+    ) {
+      this.finishVentTraversal(true, true);
+      return;
+    }
+
+    this.moveAndSlide(deltaSeconds, false);
+  }
+
+  private applyVentSteering(
+    deltaSeconds: number,
+    moveX: number,
+    moveZ: number,
+    vent: VentTraversal,
+  ): void {
+    this.ventSteeringInput.set(
+      THREE.MathUtils.clamp(moveX, -1, 1),
+      0,
+      THREE.MathUtils.clamp(moveZ, -1, 1),
+    ).projectOnPlane(vent.entryDirection);
+    if (this.ventSteeringInput.lengthSq() <= MOVEMENT_EPSILON_SQ) return;
+    this.ventSteeringInput.normalize().multiplyScalar(
+      this.config.maxSpeedMetresPerSecond * vent.steeringFactor,
+    );
+    this.velocityDelta.subVectors(this.ventSteeringInput, this.velocityValue)
+      .projectOnPlane(vent.entryDirection);
+    const maximumChange = this.config.airAccelerationMetresPerSecondSquared * vent.steeringFactor * deltaSeconds;
+    if (this.velocityDelta.length() > maximumChange) {
+      this.velocityDelta.setLength(maximumChange);
+    }
+    this.velocityValue.add(this.velocityDelta);
+  }
+
+  private finishVentTraversal(success: boolean, attached = false): void {
+    const vent = this.activeVent;
+    this.traversalStateValue = 'normal';
+    this.activeVent = null;
+    this.ventElapsedSeconds = 0;
+    this.ventReentryCooldownSeconds = vent?.reentryCooldownSeconds ?? 0.15;
+    if (!attached) {
+      this.attachedValue = false;
+      this.attachmentSurface = null;
+      this.groundedValue = false;
+      this.gameplayUpValue.copy(WORLD_UP);
+      this.groundNormalValue.copy(WORLD_UP);
+    }
+    if (!success) this.velocityValue.multiplyScalar(0.5);
+  }
+
   private applyLocomotion(
     deltaSeconds: number,
     moveX: number,
@@ -537,7 +728,9 @@ export class KinematicBody {
     if (this.moveInput.lengthSq() > 1) this.moveInput.normalize();
 
     this.movementPlaneNormal.copy(
-      this.groundedValue ? this.groundNormalValue : this.gameplayUpValue,
+      this.groundedValue
+        ? this.groundNormalValue
+        : this.attachedValue ? this.gameplayUpValue : WORLD_UP,
     );
 
     const normalSpeed = this.velocityValue.dot(this.movementPlaneNormal);
@@ -602,7 +795,7 @@ export class KinematicBody {
 
   private applyGravity(deltaSeconds: number): void {
     this.gravityStep
-      .copy(this.gameplayUpValue)
+      .copy(this.attachedValue ? this.gameplayUpValue : WORLD_UP)
       .multiplyScalar(
         -this.config.gravityMetresPerSecondSquared * deltaSeconds,
       );
@@ -625,7 +818,7 @@ export class KinematicBody {
     this.velocityValue.add(this.gravityStep);
   }
 
-  private moveAndSlide(deltaSeconds: number): void {
+  private moveAndSlide(deltaSeconds: number, allowSurfaceTransitions = true): void {
     this.remainingDisplacement
       .copy(this.velocityValue)
       .multiplyScalar(deltaSeconds);
@@ -691,6 +884,7 @@ export class KinematicBody {
       }
 
       if (
+        allowSurfaceTransitions &&
         surface.bounceSpeedMetresPerSecond > 0 &&
         this.tryApplyBounce(
           surface.bounceSpeedMetresPerSecond,
@@ -705,7 +899,7 @@ export class KinematicBody {
         continue;
       }
 
-      if (surface.adhesive) {
+      if (allowSurfaceTransitions && surface.adhesive) {
         this.tryAttach(
           this.movementHit.normal,
           this.movementHit.object,
@@ -796,7 +990,7 @@ export class KinematicBody {
     surfaceTag: SurfaceTag,
     tractionMultiplier: number,
   ): boolean {
-    if (!surfaceObject) return false;
+    if (!surfaceObject || this.traversalStateValue === 'ventEntry') return false;
     if (!this.isAuthoredWallNormal(surfaceNormal)) return false;
     if (!this.attachedValue && this.attachmentCooldownSecondsValue > 0) {
       return false;
@@ -835,6 +1029,17 @@ export class KinematicBody {
       this.attachmentCooldownSecondsValue,
       cooldownSeconds,
     );
+  }
+
+  private detachFromSurfaceWithGrace(): void {
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.groundedValue = false;
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
+    // Keep the orientation briefly so camera presentation does not snap at a
+    // sticky seam. Locomotion and gravity already use world-up when detached.
+    this.stickyDetachGraceSecondsValue = 0.12;
   }
 
   private isAuthoredWallNormal(normal: THREE.Vector3): boolean {
@@ -886,12 +1091,14 @@ export class KinematicBody {
         }
       }
 
-      // Sticky geometry ended or the next authored surface explicitly rejects
-      // adhesion. Fall back to world-up and test for ordinary ground below.
-      this.detachFromSurface(0);
+      // The short presentation grace prevents a harsh camera snap at seams;
+      // gravity and movement nevertheless return to world-up immediately.
+      this.detachFromSurfaceWithGrace();
     }
 
-    this.gameplayUpValue.copy(WORLD_UP);
+    if (this.stickyDetachGraceSecondsValue <= 0) {
+      this.gameplayUpValue.copy(WORLD_UP);
+    }
     this.groundNormalValue.copy(WORLD_UP);
     this.groundProbeDisplacement
       .copy(WORLD_UP)

@@ -8,6 +8,7 @@ import {
   type SlimeVisualState,
   type Vector3State,
 } from '../render/slime/SlimeVisual';
+import { VentTraversal } from '../traversal/VentTraversal';
 
 interface BoxOptions {
   readonly name: string;
@@ -28,6 +29,7 @@ const ROOM_2_RECOVERY_POSITION = new THREE.Vector3(-9, 0.5, 31);
  */
 export class ContainmentTeachingScene {
   readonly root = new THREE.Group();
+  readonly ventTraversals: readonly VentTraversal[];
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
   private readonly slimeVisual: SlimeVisual;
@@ -63,6 +65,26 @@ export class ContainmentTeachingScene {
     this.addVentTransition(materials);
     this.addRoomTwo(materials);
     this.addReferenceMarkers(materials.exit);
+    this.ventTraversals = [
+      new VentTraversal({
+        id: 'room-1-containment-to-duct',
+        // The capture volume begins just below the lip, while the player is
+        // still supported by the sticky wall, then aims through the opening.
+        entryCenter: new THREE.Vector3(-4.8, 4.65, 5.35),
+        entryDirection: new THREE.Vector3(0, 0, 1),
+        entryTarget: new THREE.Vector3(-4.8, 5.7, 7.05),
+        clearancePoint: new THREE.Vector3(-4.8, 5.7, 7.15),
+        entryRadiusMetres: 1.25,
+        entrySpeedMetresPerSecond: 2.8,
+        alignmentStrength: 11,
+        steeringFactor: 0.32,
+        emergencyTimeoutSeconds: 0.9,
+        reentryCooldownSeconds: 0.15,
+        requiresStickyAttachment: true,
+        handoffMode: 'free',
+      }),
+    ];
+    this.addVentDebug(this.ventTraversals[0]);
 
     this.slimeVisual = new SlimeVisual({ radiusMetres: 0.45 });
     this.root.add(this.slimeVisual.mesh);
@@ -188,6 +210,27 @@ export class ContainmentTeachingScene {
     this.addDuctSide('-final-west', [-10.05, 14.45, 27.5], [0.18, 2.2, 5], materials.duct);
     this.addDuctSide('-final-east', [-7.95, 14.45, 27.5], [0.18, 2.2, 5], materials.duct);
     this.addVisualBox('duct-drop-frame', [2.2, 0.25, 0.5], [-9, 13.5, 30], materials.duct);
+  }
+
+  private addVentDebug(vent: VentTraversal): void {
+    const arrow = new THREE.ArrowHelper(
+      vent.entryDirection,
+      vent.entryCenter,
+      1.5,
+      0x54e8e0,
+      0.22,
+      0.12,
+    );
+    arrow.name = `${vent.id}-debug-entry-direction`;
+    this.root.add(arrow);
+
+    const trigger = new THREE.Mesh(
+      new THREE.SphereGeometry(vent.entryRadiusMetres, 16, 10),
+      new THREE.MeshBasicMaterial({ color: 0x54e8e0, transparent: true, opacity: 0.08, wireframe: true }),
+    );
+    trigger.name = `${vent.id}-debug-entry-volume`;
+    trigger.position.copy(vent.entryCenter);
+    this.root.add(trigger);
   }
 
   private addRoomTwo(materials: Record<string, THREE.Material>): void {
