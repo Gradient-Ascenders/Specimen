@@ -5,7 +5,6 @@ import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import { GreyboxTestPanel } from '../debug/GreyboxTestPanel.ts';
 import { runWallJumpBasisRegression } from '../debug/WallJumpBasisRegression.ts';
-import { LaserTestRig } from '../hazards/LaserTestRig.ts';
 import { CollisionWorld } from '../physics/CollisionWorld.ts';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
@@ -15,18 +14,16 @@ import {
 import type { MovementEvents } from '../physics/MovementEvents.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import type { WallJumpIntent } from '../physics/WallJumpBasis.ts';
-import { ElevatorTestRig } from '../puzzle/ElevatorTestRig.ts';
-import { PuzzleTestRig } from '../puzzle/PuzzleTestRig.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
-import { GreyboxCollisionScene } from './GreyboxCollisionScene.ts';
+import { ContainmentTeachingScene } from './ContainmentTeachingScene.ts';
 import {
   LevelLifecycle,
   type LevelLifecycleState,
 } from './LevelLifecycle.ts';
 
-const LEVEL_ID = 'greybox-level-1';
+const LEVEL_ID = 'containment-teaching-level-1';
 const DEBUG_TOGGLE_CODE = 'F2';
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
@@ -41,20 +38,17 @@ export interface GreyboxLevelRuntimeOptions {
 }
 
 interface GreyboxRuntimeResources {
-  readonly testScene: GreyboxCollisionScene;
-  readonly puzzleTestRig: PuzzleTestRig;
+  readonly testScene: ContainmentTeachingScene;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
   readonly movementEvents: EventBus<MovementEvents>;
   readonly spawnPosition: THREE.Vector3;
-  readonly recoveryPosition: THREE.Vector3;
+  readonly outOfBoundsTestPosition: THREE.Vector3;
   readonly renderedProbePosition: THREE.Vector3;
   readonly cameraRelativeMovement: THREE.Vector3;
   readonly noMovement: THREE.Vector3;
   readonly blobFacing: BlobFacing;
   readonly body: KinematicBody;
-  readonly laserTestRig: LaserTestRig;
-  readonly elevatorTestRig: ElevatorTestRig;
   readonly slimeVisualState: SlimeVisualState;
   readonly jumpInputState: JumpInputState;
   readonly wallJumpIntent: WallJumpIntent;
@@ -63,7 +57,7 @@ interface GreyboxRuntimeResources {
   readonly testPanel: GreyboxTestPanel | undefined;
 }
 
-/** Concrete lifecycle and resource owner for the current Level 1 grey-box. */
+/** Concrete lifecycle and resource owner for the current Level 1 teaching grey-box. */
 export class GreyboxLevelRuntime {
   private readonly host: HTMLElement;
   private readonly input: Input;
@@ -135,10 +129,7 @@ export class GreyboxLevelRuntime {
     const {
       body,
       cameraRelativeMovement,
-      elevatorTestRig,
       jumpInputState,
-      laserTestRig,
-      puzzleTestRig,
       slimeVisualState,
       testPanel,
       testScene,
@@ -197,9 +188,6 @@ export class GreyboxLevelRuntime {
       jumpInputState,
       wallJumpIntent,
     );
-    laserTestRig.update(deltaSeconds);
-    elevatorTestRig.update(deltaSeconds);
-
     resources.blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
@@ -211,7 +199,6 @@ export class GreyboxLevelRuntime {
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.update(deltaSeconds, slimeVisualState);
-    puzzleTestRig.update(deltaSeconds);
     this.input.endFixedUpdate();
   }
 
@@ -257,11 +244,8 @@ export class GreyboxLevelRuntime {
   }
 
   private readonly loadResources = (): void => {
-    const testScene = new GreyboxCollisionScene();
+    const testScene = new ContainmentTeachingScene();
     this.renderLayer.scene.add(testScene.root);
-
-    const puzzleTestRig = new PuzzleTestRig();
-    this.renderLayer.scene.add(puzzleTestRig.root);
 
     const collisionWorld = new CollisionWorld();
     collisionWorld.registerAll(testScene.collisionMeshes);
@@ -269,7 +253,9 @@ export class GreyboxLevelRuntime {
     surfaceRegistry.registerAll(testScene.collisionMeshes);
     const movementEvents = new EventBus<MovementEvents>();
     const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
-    const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
+    const outOfBoundsTestPosition = testScene.copyOutOfBoundsTestPosition(
+      new THREE.Vector3(),
+    );
     const blobFacing = new BlobFacing();
     const body = new KinematicBody({
       world: collisionWorld,
@@ -278,18 +264,6 @@ export class GreyboxLevelRuntime {
       events: movementEvents,
     });
     this.renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
-
-    const laserTestRig = new LaserTestRig({
-      player: body,
-      checkpointSpawn: spawnPosition,
-    });
-    this.renderLayer.scene.add(laserTestRig.root);
-    const elevatorTestRig = new ElevatorTestRig(
-      body,
-      collisionWorld,
-      surfaceRegistry,
-    );
-    this.renderLayer.scene.add(elevatorTestRig.root);
 
     const slimeVisualState: SlimeVisualState = {
       velocityWorld: body.velocity,
@@ -330,26 +304,13 @@ export class GreyboxLevelRuntime {
       ? new GreyboxTestPanel({
           onReset: () => this.restartLevel(),
           onTestRecovery: (onRecovered) => {
-            body.teleport(recoveryPosition);
+            body.teleport(outOfBoundsTestPosition);
             testScene.simulateFall(() => {
               body.teleport(spawnPosition);
               onRecovered();
             });
           },
-          onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
-          onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
-          onRunResetRegression: () => puzzleTestRig.runResetRegression(),
-          onActivateCheckpoint: () => puzzleTestRig.activateElevatedCheckpoint(),
-          onRecoverCheckpoint: () => puzzleTestRig.recoverTestSlime(),
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
-          onToggleStaticLaser: () => laserTestRig.toggleStaticLaser(),
-          onResetLaserSequences: () => laserTestRig.resetSequences(),
-          onRunLaserDeterminismRegression: () =>
-            laserTestRig.runDeterminismRegression(),
-          onEnterElevatorTest: () => elevatorTestRig.enter(),
-          onRecoverElevatorCheckpoint: () => elevatorTestRig.recover(),
-          onRunElevatorCarrierRegression: () =>
-            elevatorTestRig.runCarrierRegression(),
         })
       : undefined;
 
@@ -361,19 +322,16 @@ export class GreyboxLevelRuntime {
 
     this.resources = {
       testScene,
-      puzzleTestRig,
       collisionWorld,
       surfaceRegistry,
       movementEvents,
       spawnPosition,
-      recoveryPosition,
+      outOfBoundsTestPosition,
       renderedProbePosition: new THREE.Vector3(),
       cameraRelativeMovement: new THREE.Vector3(),
       noMovement: new THREE.Vector3(),
       blobFacing,
       body,
-      laserTestRig,
-      elevatorTestRig,
       slimeVisualState,
       jumpInputState: { pressed: false, held: false, released: false },
       wallJumpIntent: { lateral: 0, vertical: 0 },
@@ -394,13 +352,6 @@ export class GreyboxLevelRuntime {
   private readonly restartResources = (): void => {
     const resources = this.requireResources();
     this.input.resetState();
-
-    // Issue #19 registries/checkpoints restore authored puzzle groups first.
-    resources.puzzleTestRig.reset();
-    resources.laserTestRig.reset();
-    resources.elevatorTestRig.resetRuntimeOnly();
-
-    // Player and render-only transients then return to the authored start.
     resources.body.teleport(resources.spawnPosition);
     resources.testScene.resetProbe();
     resources.blobFacing.reset();
@@ -425,9 +376,6 @@ export class GreyboxLevelRuntime {
     resources.unsubscribeLanding();
     resources.unsubscribeJumped();
     resources.movementEvents.clear();
-    resources.laserTestRig.dispose();
-    resources.elevatorTestRig.dispose();
-    resources.puzzleTestRig.dispose();
     resources.testScene.dispose();
     resources.collisionWorld.clear();
     resources.surfaceRegistry.clear();
@@ -443,6 +391,18 @@ export class GreyboxLevelRuntime {
 
   private readonly runSlopeIdleRegression = (): string => {
     const resources = this.requireResources();
+    const stickyRoute = resources.testScene.collisionMeshes.find(
+      (mesh) => mesh.name === 'room-1-vent-sticky-entry-wall',
+    );
+    if (stickyRoute) {
+      const stickyTag = resources.surfaceRegistry.get(stickyRoute).tag;
+      const passed = stickyTag === 'sticky';
+      this.slopeRegressionStatus = passed
+        ? 'PASS — Room 1 sticky route is authored; slime rebound is controller-owned'
+        : `FAIL — sticky route tag is ${stickyTag}`;
+      return this.slopeRegressionStatus;
+    }
+
     const slopeMesh = resources.testScene.collisionMeshes.find(
       (mesh) => mesh.name === 'case-slope-15-degrees',
     );
@@ -537,9 +497,6 @@ export class GreyboxLevelRuntime {
       body,
       blobFacing,
       collisionWorld,
-      elevatorTestRig,
-      laserTestRig,
-      puzzleTestRig,
       surfaceRegistry,
       testScene,
     } = resources;
@@ -551,8 +508,6 @@ export class GreyboxLevelRuntime {
     const slimeDiagnostics = testScene.slimeDiagnostics;
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
     const cameraPosition = this.renderLayer.cameraRig.camera.position;
-    const laserStats = laserTestRig.getDiagnostics();
-    const elevatorStats = elevatorTestRig.getDiagnostics();
 
     testPanel.setRuntimeDiagnostics(
       [
@@ -582,29 +537,24 @@ export class GreyboxLevelRuntime {
         `last landing impact / count: ${this.lastLandingImpactSpeedMetresPerSecond.toFixed(2)} m/s / ${this.landingEventCount}`,
         `visual speed / charge: ${slimeDiagnostics.speed.toFixed(2)} / ${slimeDiagnostics.jumpCharge.toFixed(2)}`,
         `visual squash / stretch: ${slimeDiagnostics.squash.toFixed(2)} / ${slimeDiagnostics.stretch.toFixed(2)}`,
+        `visual impact strength / age: ${slimeDiagnostics.impactStrength.toFixed(2)} / ${slimeDiagnostics.impactAge.toFixed(2)} s`,
+        `visual impact normal: ${slimeDiagnostics.impactNormalLocal.x.toFixed(2)}, ${slimeDiagnostics.impactNormalLocal.y.toFixed(2)}, ${slimeDiagnostics.impactNormalLocal.z.toFixed(2)}`,
+        `visual surface normal: ${slimeDiagnostics.surfaceNormalLocal.x.toFixed(2)}, ${slimeDiagnostics.surfaceNormalLocal.y.toFixed(2)}, ${slimeDiagnostics.surfaceNormalLocal.z.toFixed(2)}`,
+        `visual move direction: ${slimeDiagnostics.moveDirectionLocal.x.toFixed(2)}, ${slimeDiagnostics.moveDirectionLocal.y.toFixed(2)}, ${slimeDiagnostics.moveDirectionLocal.z.toFixed(2)}`,
         `contacts this step: ${body.contactsThisStep}`,
         `last collision: ${body.lastCollisionName}`,
         `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
-        `laser checkpoint: ${laserStats.activeCheckpointId}`,
-        `laser static enabled: ${laserStats.staticEnabled ? 'yes' : 'no'}`,
-        `laser recoveries / last failure: ${laserStats.recoveryRequestCount} / ${laserStats.lastFailureHazardId}`,
-        `laser single sweep: ${laserStats.singleSweepState} @ ${(laserStats.singleSweepPhase * 100).toFixed(0)}%`,
-        `elevator state / progress: ${elevatorStats.state} / ${(elevatorStats.progress * 100).toFixed(0)}%`,
-        `elevator platform Y / delta Y: ${elevatorStats.platformY.toFixed(2)} / ${elevatorStats.displacementY.toFixed(4)} m`,
-        `elevator checkpoint / group: ${elevatorStats.activeCheckpointId} / ${elevatorStats.checkpointGroupId}`,
         `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
         `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
         `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
         `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
         `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
-        `slope idle regression: ${this.slopeRegressionStatus}`,
+        `teaching-surface regression: ${this.slopeRegressionStatus}`,
         `wall jump basis regression: ${this.wallJumpBasisRegressionStatus}`,
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
         `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
         `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
-        `plate / door / platform: ${puzzleTestRig.platePressed ? 'pressed' : 'released'} / ${puzzleTestRig.doorState} / ${puzzleTestRig.platformState}`,
-        `active checkpoint: ${puzzleTestRig.activeCheckpointId}`,
       ].join('\n'),
     );
   }
@@ -633,7 +583,7 @@ export class GreyboxLevelRuntime {
 
   private requireResources(): GreyboxRuntimeResources {
     if (!this.resources) {
-      throw new Error('Grey-box level resources are not loaded.');
+      throw new Error('Teaching level resources are not loaded.');
     }
     return this.resources;
   }

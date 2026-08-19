@@ -3,16 +3,16 @@
 ## Implementation
 
 - Added a guarded lifecycle state machine and a concrete owner for the current
-  Level 1 grey-box runtime.
+  Level 1 containment teaching runtime.
 - Moved level construction, update/render delegation, restart ordering, listener
   ownership, and permanent disposal out of `main.ts`.
 - Added one authoritative `GreyboxLevelRuntime.restartLevel(): void` path. It
-  reuses the existing Issue #19 puzzle/checkpoint reset APIs and restores player,
-  hazard, elevator, camera, visual, and input transients in a deterministic order.
+  restores current player, containment-scene, camera, visual, recovery-callback,
+  and input transients in a deterministic order.
 - Kept the renderer, canvas, input object, and single animation loop
   application-owned. Restart is in-place and does not recreate any of them.
-- Extended the existing grey-box panel with lifecycle, restart, timing, renderer,
-  GPU resource, player, checkpoint, puzzle, laser, elevator, and camera data.
+- Extended the current containment debug panel with lifecycle, restart, timing,
+  renderer, GPU resource, player, movement, teaching-surface, and camera data.
   The panel is hidden by default, toggled with `F2`, absent from production by
   default, and deliberately available for production diagnosis with `?debug=1`.
 
@@ -25,8 +25,10 @@
 - `src/render/BlobFacing.ts`
 - `src/render/CameraRig.ts`
 - `src/levels/GreyboxCollisionScene.ts`
+- `src/levels/ContainmentTeachingScene.ts`
 - `src/puzzle/ElevatorTestRig.ts`
 - `tests/Input.test.ts`
+- `tests/ContainmentTeachingScene.test.ts`
 - `tests/LevelLifecycle.test.ts`
 - `tests/CameraRig.test.ts`
 - `docs/level-lifecycle.md`
@@ -35,11 +37,26 @@
 No dependency or third-party resource was added, so `CREDITS.md`, `package.json`,
 and the lockfile are unchanged.
 
+## Latest-main integration
+
+- Merged `origin/main` at `d2b3f79` into `feat/level-lifecycle` with normal Git
+  merge history.
+- The only textual conflict was `src/main.ts`. It was resolved as the small
+  application bootstrap from Issue #23 while moving main's current
+  `ContainmentTeachingScene` composition, movement flow, and simplified debug
+  controls into the lifecycle-owned runtime.
+- Preserved main's newer charged-jump, sticky-detach, landing-rebound, vent
+  traversal, containment layout, slime visual, debug panel, documentation, and
+  test changes. The older puzzle/laser/elevator harness was not resurrected.
+- Adapted containment recovery so lifecycle reset clears a pending callback and
+  a completed recovery invokes its callback exactly once.
+
 ## Automated verification
 
 - Direct TypeScript check with the bundled Node runtime: passed with no errors.
-- Direct Node test runner: passed all 41 tests, including six lifecycle tests,
-  two input autorepeat regressions, and the camera-reset coverage.
+- Direct Node test runner: passed all 49 tests, including newer main's movement
+  tests, six lifecycle tests, two input autorepeat regressions, two containment
+  recovery tests, and the camera-reset coverage.
 - The lifecycle tests cover transition order, duplicate load/start protection,
   reentrant restart protection, ten repeated restarts, repeated load/unload
   cleanup, idempotent disposal, rejected post-disposal operations, and restart
@@ -55,11 +72,11 @@ and the lockfile are unchanged.
 - The equivalent repository tools were invoked directly with the bundled Node
   24.19.0 runtime:
   - `node node_modules/typescript/bin/tsc --noEmit`: passed;
-  - `node --test tests/*.test.ts`: 41 passed, 0 failed;
+  - `node --test tests/*.test.ts`: 49 passed, 0 failed;
   - `node node_modules/typescript/bin/tsc`, followed by
     `node node_modules/vite/bin/vite.js build`: passed.
-- Vite 8.2.1 transformed 42 modules and produced `dist/index.html`, CSS, and a
-  687.02 kB JavaScript bundle (171.67 kB gzip). Vite retained the repository's
+- Vite 8.2.1 transformed 27 modules and produced `dist/index.html`, CSS, and a
+  631.74 kB JavaScript bundle (158.04 kB gzip). Vite retained the repository's
   existing warning that the JavaScript chunk exceeds 500 kB.
 - `git diff --check`: passed with no whitespace errors.
 
@@ -67,12 +84,12 @@ and the lockfile are unchanged.
 
 - Served the production `dist/` over HTTP with Vite preview at
   `http://127.0.0.1:4173/`.
-- HTTP verification returned 200 for the root document and 200 for the generated
-  687,027-byte JavaScript asset.
-- Interactive browser verification was blocked before navigation because the
-  available in-app browser rejected its own `browser-service.mjs` dependency as
-  outside a configured trusted code path. The implementation therefore has no
-  claimed manual movement/puzzle/elevator interaction, console inspection, or
+- Post-merge HTTP verification returned 200 for the root document and 200 for
+  the generated 631,749-byte JavaScript asset.
+- Interactive browser verification remained blocked before navigation because
+  the available in-app browser rejected its own `browser-service.mjs` dependency
+  as outside a configured trusted code path. The implementation therefore has no
+  claimed manual movement/containment interaction, console inspection, or
   renderer before/after observation from this environment.
 - The automated lifecycle test does execute ten consecutive running restarts and
   proves that they produce exactly ten reset hooks, ten stop hooks, eleven total

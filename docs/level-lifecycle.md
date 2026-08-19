@@ -1,8 +1,8 @@
 # Level lifecycle
 
-`GreyboxLevelRuntime` is the explicit owner of the current Level 1 grey-box.
-It is intentionally concrete: the project does not yet need a factory, registry,
-or transition framework for hypothetical later levels.
+`GreyboxLevelRuntime` is the explicit owner of the current Level 1 containment
+teaching grey-box. It is intentionally concrete: the project does not yet need a
+factory, registry, or transition framework for hypothetical later levels.
 
 ## Ownership and public operations
 
@@ -25,18 +25,17 @@ unloaded runtimes have no level resources to update.
 
 ## Level-owned resources
 
-Loading constructs the current grey-box scene, puzzle rig, collision world,
+Loading constructs the current `ContainmentTeachingScene`, collision world,
 surface registry, movement event bus and subscriptions, kinematic player body,
-laser rig, elevator rig, visual-facing state, and optional debug panel. The
-runtime retains those references as a single resource set.
+visual-facing state, and optional debug panel. The runtime retains those
+references as a single resource set.
 
 Unloading removes the level key listener and debug DOM element, unsubscribes the
 movement callbacks, clears the event bus and collision/surface registries,
-detaches the camera target, and disposes the scene and puzzle/hazard owners.
-Those existing owners remove their scene roots and explicitly dispose the
-geometries and materials they created, including presentation resources. The
-runtime then drops its resource-set reference. It does not dispose the
-application-owned renderer, canvas, input object, loop, or camera rig.
+detaches the camera target, and disposes the containment scene. The scene removes
+its root and explicitly disposes its owned geometries and materials. The runtime
+then drops its resource-set reference. It does not dispose the application-owned
+renderer, canvas, input object, loop, or camera rig.
 
 The application disposes its resources after disposing the level during final
 shutdown. Restarts never construct a renderer, register another application
@@ -53,17 +52,18 @@ static authored geometry and GPU resources during an ordinary restart while the
 lifecycle guard prevents overlapping restart work. In order, the runtime:
 
 1. stops updates and clears held/transient input;
-2. invokes the existing puzzle, laser, and elevator restoration APIs;
-3. teleports the kinematic body to the authored spawn, which clears its movement
+2. teleports the kinematic body to the authored spawn, which clears its movement
    and contact transients;
-4. resets the probe visual, blob facing, camera transients, jump input, and wall
+3. resets the probe visual and any pending recovery callback;
+4. resets blob facing, camera transients, jump input, and wall
    intent;
 5. clears level diagnostic counters and resumes updates if the level was running.
 
-The puzzle, checkpoint, and grouped-runtime restoration implemented for Issue
-#19 is reused through `PuzzleTestRig.reset()`, `LaserTestRig.reset()`, and
-`ElevatorTestRig.resetRuntimeOnly()`. Their internal registries remain the source
-of truth; the lifecycle does not duplicate their reset rules.
+Current `main` deliberately removed the older puzzle, laser, and elevator test
+rigs from the containment teaching scene, so they are not active restart
+participants. If Issue #19 puzzle/checkpoint systems return to the production
+level, their existing reset APIs must be coordinated inside `restartLevel()`;
+external callers must not create another restart path.
 
 Permanent unload is a different operation and performs complete teardown and GPU
 disposal. A later `load()` builds one fresh level resource set and registers one
@@ -78,8 +78,8 @@ reports:
 - fixed-step duration, render frame time/FPS, and steps per frame;
 - renderer draw calls, triangles, GPU geometry count, and GPU texture count;
 - player position, velocity, ground/attachment, surface, jump, and contact state;
-- active puzzle/laser/elevator checkpoints and relevant runtime state;
-- camera, viewport, collision/surface registration, and regression status.
+- camera, viewport, collision/surface registration, teaching-surface status, and
+  wall-jump regression status.
 
 No browser heap value is reported because there is no portable browser API that
 is appropriate for this overlay. The memory indicators are labelled as renderer
@@ -93,7 +93,7 @@ diagnosis and verification.
 
 ## Current limits
 
-This boundary owns only the current Level 1 grey-box. It does not implement
-multi-level loading, asynchronous asset management, pause UI, title screens, or
-transitions. Those features can call the small public lifecycle API without
-learning which current subsystems participate in restart.
+This boundary owns only the current Level 1 containment teaching grey-box. It
+does not implement multi-level loading, asynchronous asset management, pause UI,
+title screens, or transitions. Those features can call the small public
+lifecycle API without learning which current subsystems participate in restart.
