@@ -68,6 +68,12 @@ movement; held actions remain active.
 ### Focus loss and pointer lock
 
 - Clicking the gameplay canvas requests pointer lock.
+- While locked, relative mouse displacement updates camera yaw and pitch; it is
+  not scaled by frame time.
+- On ordinary ground, WASD is resolved from the camera's horizontal basis.
+- Pointer displacement is consumed by the fixed update when one runs, and by a
+  render-only frame otherwise. This keeps look responsive above 60 Hz without
+  scaling mouse sensitivity by either render or simulation delta time.
 - Escape/browser pointer-lock release is observed through
   `document.pointerLockElement`; no menu behaviour is implemented by this issue.
 - Window blur or document visibility loss clears all active/held/transient input
