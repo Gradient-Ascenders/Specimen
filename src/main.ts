@@ -103,6 +103,23 @@ const SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES = 0.02;
 let slopeRegressionStatus = 'not run';
 
 const runSlopeIdleRegression = (): string => {
+  const stickyRoute = testScene.collisionMeshes.find(
+    (mesh) => mesh.name === 'room-1-north-sticky-route',
+  );
+  const bounceLanding = testScene.collisionMeshes.find(
+    (mesh) => mesh.name === 'room-2-bounce-calibration-landing',
+  );
+
+  if (stickyRoute && bounceLanding) {
+    const stickyTag = surfaceRegistry.get(stickyRoute).tag;
+    const bounceTag = surfaceRegistry.get(bounceLanding).tag;
+    const passed = stickyTag === 'sticky' && bounceTag === 'bouncy';
+    slopeRegressionStatus = passed
+      ? 'PASS — Room 1 sticky route and Room 2 bounce landing are authored'
+      : `FAIL — tags are ${stickyTag} / ${bounceTag}`;
+    return slopeRegressionStatus;
+  }
+
   const slopeMesh = testScene.collisionMeshes.find(
     (mesh) => mesh.name === 'case-slope-15-degrees',
   );
@@ -334,7 +351,7 @@ const loop = new Loop({
           `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
           `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
-          `slope idle regression: ${slopeRegressionStatus}`,
+          `teaching-surface check: ${slopeRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,

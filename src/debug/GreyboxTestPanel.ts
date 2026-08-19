@@ -39,9 +39,9 @@ export class GreyboxTestPanel {
       >−</button>
 
       <div class="test-panel-content">
-        <p class="eyebrow">Sprint 0 test harness</p>
-        <h1>Collision grey-box</h1>
-        <p class="summary">One grid square equals one metre. Move with <kbd>WASD</kbd>. Hold <kbd>Space</kbd> to charge and release to jump. On sticky walls, <kbd>W/S</kbd> climb and <kbd>A/D</kbd> move sideways.</p>
+        <p class="eyebrow">Level 1 teaching grey-box</p>
+        <h1>Containment: climb + bounce</h1>
+        <p class="summary">Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump.</p>
 
         <ul class="case-list" aria-label="Collision test case legend">
           <li style="--case-colour: #81909b">Floor</li>
@@ -63,7 +63,7 @@ export class GreyboxTestPanel {
         <div class="controls">
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test recovery <kbd>F</kbd></button>
-          <button type="button" data-action="slope-regression">Run idle slope check</button>
+          <button type="button" data-action="slope-regression">Check Room 1/2 surfaces</button>
           <button type="button" data-action="puzzle">Toggle plate test</button>
           <button type="button" data-action="sensor-regression">Run sensor checks</button>
           <button type="button" data-action="reset-regression">Run 10 reset cycles</button>
@@ -241,7 +241,7 @@ export class GreyboxTestPanel {
 
   private readonly runSlopeIdleRegression = (): void => {
     const result = this.options.onRunSlopeIdleRegression();
-    this.status.textContent = `Idle slope regression: ${result}`;
+    this.status.textContent = `Teaching surface check: ${result}`;
   };
 
   setRuntimeDiagnostics(text: string): void {
