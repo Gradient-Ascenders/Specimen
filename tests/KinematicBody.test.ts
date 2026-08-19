@@ -214,6 +214,58 @@ test('wall jump release keeps the step-start wall movement basis', () => {
   forwardFixture.wall.geometry.dispose();
 });
 
+test('buffered sticky-wall contact keeps directional jump intent', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const events = new EventBus<MovementEvents>();
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 10, 10));
+  wall.name = 'test-buffered-sticky-wall';
+  wall.userData.surfaceTag = 'sticky';
+  world.register(wall);
+  surfaces.register(wall);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    events,
+    initialPosition: new THREE.Vector3(-0.56, 0, 0),
+  });
+  const reportedDirection = new THREE.Vector3();
+  let jumpCount = 0;
+  events.on('jumped', (event) => {
+    jumpCount += 1;
+    reportedDirection.set(
+      event.directionWorld.x,
+      event.directionWorld.y,
+      event.directionWorld.z,
+    );
+  });
+
+  body.update(
+    FIXED_DELTA_SECONDS,
+    new THREE.Vector3(1, 0, 0),
+    {
+      pressed: true,
+      held: false,
+      released: true,
+    },
+    {
+      lateral: 0,
+      vertical: 1,
+    },
+  );
+
+  assert.equal(jumpCount, 1);
+  assert.equal(body.attached, false);
+  assert.equal(body.jumpInputBufferRemainingSeconds, 0);
+  assert.ok(reportedDirection.x < 0);
+  assert.ok(reportedDirection.y > 0);
+  assert.ok(body.velocity.x < 0);
+  assert.ok(body.velocity.y > 0);
+
+  wall.geometry.dispose();
+});
+
 test('slope jump release uses the current airborne movement plane', () => {
   const idleFixture = createSlopeBody();
   const uphillFixture = createSlopeBody();
