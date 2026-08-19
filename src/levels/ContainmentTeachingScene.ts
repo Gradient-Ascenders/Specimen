@@ -228,7 +228,7 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'duct-segment-c-east-wall', size: [0.18, 2.2, 2], position: [-2.15, 11.46, 24], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-south-wall-west', size: [3.35, 2.2, 0.18], position: [-7.58, 11.46, 23.05], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-south-wall-east', size: [1.55, 2.2, 0.18], position: [-2.93, 11.46, 23.05], material: materials.duct });
-    this.addCollider({ name: 'duct-segment-c-north-wall', size: [5.15, 2.2, 0.18], position: [-4.53, 11.46, 24.95], material: materials.duct });
+    this.addCollider({ name: 'duct-segment-c-north-wall', size: [5.65, 2.2, 0.18], position: [-4.53, 11.46, 24.95], material: materials.duct });
     // Close the small outer-side seam between the bay and final duct without
     // placing geometry across the route itself.
     this.addCollider({ name: 'duct-turn-to-final-west-seal', size: [0.3, 2.2, 0.35], position: [-9.4, 11.46, 25], material: materials.duct });
@@ -267,7 +267,13 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-floor', size: [30, 0.4, 22], position: [0, -0.2, ROOM_2_CENTRE_Z], material: materials.floor });
     this.addCollider({ name: 'room-2-west-wall', size: [0.4, 18, 22], position: [-15, 9, ROOM_2_CENTRE_Z], material: materials.wall });
     this.addCollider({ name: 'room-2-east-wall', size: [0.4, 18, 22], position: [15, 9, ROOM_2_CENTRE_Z], material: materials.wall });
-    this.addCollider({ name: 'room-2-rear-wall', size: [30, 18, 0.4], position: [0, 9, ROOM_2_CENTRE_Z - 11], material: materials.wall });
+    // Split the rear wall around the elevated duct outlet. The opening aligns
+    // with the final duct interior and lets the player fall onto Room 2's
+    // bounce landing rather than colliding with an invisible sealed wall.
+    this.addCollider({ name: 'room-2-rear-wall-west', size: [5.5, 18, 0.4], position: [-12.25, 9, ROOM_2_CENTRE_Z - 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-rear-wall-east', size: [22.3, 18, 0.4], position: [3.85, 9, ROOM_2_CENTRE_Z - 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-rear-wall-below-duct', size: [2.2, 10.2, 0.4], position: [-8.4, 5.1, ROOM_2_CENTRE_Z - 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-rear-wall-above-duct', size: [2.2, 5.2, 0.4], position: [-8.4, 15.4, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-front-wall', size: [30, 18, 0.4], position: [0, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
 
     // Zone 1: a 7 × 7 m purple calibration landing under the duct drop.
