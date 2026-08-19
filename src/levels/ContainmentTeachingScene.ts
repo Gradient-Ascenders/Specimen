@@ -220,7 +220,7 @@ export class ContainmentTeachingScene {
     const arrow = new THREE.ArrowHelper(
       vent.entryDirection,
       vent.entryCenter,
-      1.5,
+      1.05,
       0x54e8e0,
       0.22,
       0.12,
@@ -229,7 +229,7 @@ export class ContainmentTeachingScene {
     this.root.add(arrow);
 
     const trigger = new THREE.Mesh(
-      new THREE.SphereGeometry(vent.entryRadiusMetres, 16, 10),
+      new THREE.SphereGeometry(0.78, 16, 10),
       new THREE.MeshBasicMaterial({ color: 0x54e8e0, transparent: true, opacity: 0.08, wireframe: true }),
     );
     trigger.name = `${vent.id}-debug-entry-volume`;
