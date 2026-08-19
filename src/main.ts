@@ -38,6 +38,7 @@ const body = new KinematicBody({
   world: collisionWorld,
   initialPosition: spawnPosition,
 });
+renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
 
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
@@ -190,6 +191,10 @@ const loop = new Loop({
     body.update(deltaSeconds, moveX, moveZ);
     testScene.update(deltaSeconds);
     puzzleTestRig.update(deltaSeconds);
+    renderLayer.cameraRig.queueLookInput(
+      input.pointerDeltaX,
+      input.pointerDeltaY,
+    );
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
@@ -203,6 +208,10 @@ const loop = new Loop({
     );
 
     testScene.setProbePosition(renderedProbePosition);
+    renderLayer.cameraRig.update(
+      interpolationAlpha,
+      stats.frameDeltaSeconds,
+    );
     renderLayer.render();
 
     debugSampleElapsedSeconds += stats.rawFrameDeltaSeconds;
@@ -214,6 +223,8 @@ const loop = new Loop({
       const velocity = body.velocity;
       const groundNormal = body.groundNormal;
       const renderStats = renderLayer.getDiagnostics();
+      const cameraStats = renderLayer.cameraRig.getDiagnostics();
+      const cameraPosition = renderLayer.cameraRig.camera.position;
 
       testPanel.setRuntimeDiagnostics(
         [
@@ -229,6 +240,9 @@ const loop = new Loop({
           `contacts this step: ${body.contactsThisStep}`,
           `last collision: ${body.lastCollisionName}`,
           `registered colliders: ${collisionWorld.colliderCount}`,
+          `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
+          `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
+          `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
           `slope idle regression: ${slopeRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,

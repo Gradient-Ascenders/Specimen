@@ -52,8 +52,9 @@ codes.
 | `debugTestRecovery` | `F` |
 
 The binding system also supports mouse-button bindings. Pointer movement is
-collected separately while the gameplay canvas owns pointer lock so the camera
-rig can consume relative mouse movement later.
+collected separately while the gameplay canvas owns pointer lock. The
+third-person camera consumes the accumulated relative movement before
+`endFixedUpdate()` clears it; browser events remain isolated inside `Input`.
 
 Consumers use:
 

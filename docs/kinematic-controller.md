@@ -18,6 +18,11 @@ Movement state owned by the body:
 
 Camera and visual systems read these values directly. Continuous position/velocity state is not broadcast through the `EventBus`; typed events are reserved for discrete occurrences such as landing or impact when those become useful.
 
+The camera's explicit read-only handoff is documented in
+[Collision-aware third-person camera](third-person-camera.md). Movement remains
+authoritative for `gameplayUp`; camera orientation damping is render-only and
+must never be copied back into this body.
+
 ## Units and initial tuning
 
 The grey-box defines one grid square as one metre. Controller values therefore use SI-style game units:
