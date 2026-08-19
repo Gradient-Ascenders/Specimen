@@ -53,15 +53,6 @@ export class ContainmentTeachingScene {
       locked: this.material(0x8b3030, 0x320505),
       exit: this.material(0x62bf83, 0x0a3018),
       duct: this.material(0x444a4d),
-      glass: new THREE.MeshStandardMaterial({
-        color: 0x9ee7e4,
-        emissive: 0x163d42,
-        emissiveIntensity: 0.2,
-        transparent: true,
-        opacity: 0.28,
-        roughness: 0.18,
-        metalness: 0.15,
-      }),
       egg: this.material(0x70c8ff, 0x063b63),
     };
 
@@ -190,7 +181,6 @@ export class ContainmentTeachingScene {
     this.addOpenVentFrame('room-1-vent-open-frame', [-4.8, 6, 5.74], materials.duct);
 
     this.addCollider({ name: 'room-1-containment-pedestal', size: [2.6, 1.1, 2.6], position: [0, 0.55, -0.5], material: materials.support });
-    this.addVisualBox('room-1-glass-containment-box', [1.8, 1.9, 1.8], [0, 2.05, -0.5], materials.glass);
     const egg = new THREE.Mesh(new THREE.SphereGeometry(0.48, 20, 14), materials.egg);
     egg.name = 'room-1-specimen-egg';
     egg.scale.set(0.82, 1.18, 0.82);
@@ -229,11 +219,15 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'duct-segment-c-south-wall-west', size: [3.35, 2.2, 0.18], position: [-7.58, 11.46, 23.05], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-south-wall-east', size: [1.55, 2.2, 0.18], position: [-2.93, 11.46, 23.05], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-north-wall', size: [5.15, 2.2, 0.18], position: [-4.53, 11.46, 24.95], material: materials.duct });
-    this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 5], position: [-8.4, 10.36, 27.5], material: materials.duct });
-    this.addCollider({ name: 'duct-final-run-roof', size: [2, 0.18, 5], position: [-8.4, 12.56, 27.5], material: materials.duct });
-    this.addDuctSide('-final-west', [-9.45, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
-    this.addDuctSide('-final-east', [-7.35, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
-    this.addVisualBox('duct-drop-frame', [2.2, 0.25, 0.5], [-8.4, 10.42, 30], materials.duct);
+    // Close the small outer-side seam between the bay and final duct without
+    // placing geometry across the route itself.
+    this.addCollider({ name: 'duct-turn-to-final-west-seal', size: [0.3, 2.2, 0.35], position: [-9.4, 11.46, 25], material: materials.duct });
+    // End the floor before Room 2. The uncovered final 0.8 m is the actual
+    // drop opening; it is intentionally not represented by a solid visual box.
+    this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 4.2], position: [-8.4, 10.36, 27.1], material: materials.duct });
+    this.addCollider({ name: 'duct-final-run-roof', size: [2, 0.18, 4.2], position: [-8.4, 12.56, 27.1], material: materials.duct });
+    this.addDuctSide('-final-west', [-9.45, 11.46, 27.1], [0.18, 2.2, 4.2], materials.duct);
+    this.addDuctSide('-final-east', [-7.35, 11.46, 27.1], [0.18, 2.2, 4.2], materials.duct);
   }
 
   private addVentDebug(vent: VentTraversal): void {
@@ -279,7 +273,6 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-exit-balcony', size: [7, 0.5, 4], position: [3.5, 9.75, 46], material: materials.platform });
     this.addVisualBox('room-2-open-exit-door', [2.6, 3, 0.2], [3.5, 11.5, 47.9], materials.exit);
 
-    this.addVisualBox('room-2-vent-drop-frame', [2.1, 1.2, 0.2], [-9, 14, 30.15], materials.duct);
     this.addCeilingLight('room-2-fluorescent-a', [-8, 16.7, 35]);
     this.addCeilingLight('room-2-fluorescent-b', [0, 16.7, 39]);
     this.addCeilingLight('room-2-fluorescent-c', [8, 16.7, 43]);
