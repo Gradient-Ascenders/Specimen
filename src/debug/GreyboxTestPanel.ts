@@ -7,6 +7,9 @@ interface GreyboxTestPanelOptions {
   onActivateCheckpoint: () => void;
   onRecoverCheckpoint: () => void;
   onRunSlopeIdleRegression: () => string;
+  onToggleStaticLaser: () => boolean;
+  onResetLaserSequences: () => void;
+  onRunLaserDeterminismRegression: () => string;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -24,6 +27,9 @@ export class GreyboxTestPanel {
   private readonly checkpointButton: HTMLButtonElement;
   private readonly checkpointRecoveryButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
+  private readonly laserToggleButton: HTMLButtonElement;
+  private readonly laserResetButton: HTMLButtonElement;
+  private readonly laserRegressionButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -69,6 +75,9 @@ export class GreyboxTestPanel {
           <button type="button" data-action="reset-regression">Run 10 reset cycles</button>
           <button type="button" data-action="checkpoint">Activate elevated checkpoint</button>
           <button type="button" data-action="checkpoint-recovery">Recover at checkpoint</button>
+          <button type="button" data-action="laser-toggle">Toggle static laser</button>
+          <button type="button" data-action="laser-reset">Reset laser timelines</button>
+          <button type="button" data-action="laser-regression">Run laser determinism checks</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -108,6 +117,15 @@ export class GreyboxTestPanel {
     const slopeRegressionButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="slope-regression"]',
     );
+    const laserToggleButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="laser-toggle"]',
+    );
+    const laserResetButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="laser-reset"]',
+    );
+    const laserRegressionButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="laser-regression"]',
+    );
 
     if (
       !status ||
@@ -120,7 +138,10 @@ export class GreyboxTestPanel {
       !resetRegressionButton ||
       !checkpointButton ||
       !checkpointRecoveryButton ||
-      !slopeRegressionButton
+      !slopeRegressionButton ||
+      !laserToggleButton ||
+      !laserResetButton ||
+      !laserRegressionButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -136,6 +157,9 @@ export class GreyboxTestPanel {
     this.checkpointButton = checkpointButton;
     this.checkpointRecoveryButton = checkpointRecoveryButton;
     this.slopeRegressionButton = slopeRegressionButton;
+    this.laserToggleButton = laserToggleButton;
+    this.laserResetButton = laserResetButton;
+    this.laserRegressionButton = laserRegressionButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
@@ -157,6 +181,18 @@ export class GreyboxTestPanel {
     this.slopeRegressionButton.addEventListener(
       'click',
       this.runSlopeIdleRegression,
+    );
+    this.laserToggleButton.addEventListener(
+      'click',
+      this.toggleStaticLaser,
+    );
+    this.laserResetButton.addEventListener(
+      'click',
+      this.resetLaserSequences,
+    );
+    this.laserRegressionButton.addEventListener(
+      'click',
+      this.runLaserDeterminismRegression,
     );
   }
 
@@ -181,6 +217,18 @@ export class GreyboxTestPanel {
     this.slopeRegressionButton.removeEventListener(
       'click',
       this.runSlopeIdleRegression,
+    );
+    this.laserToggleButton.removeEventListener(
+      'click',
+      this.toggleStaticLaser,
+    );
+    this.laserResetButton.removeEventListener(
+      'click',
+      this.resetLaserSequences,
+    );
+    this.laserRegressionButton.removeEventListener(
+      'click',
+      this.runLaserDeterminismRegression,
     );
   }
 
@@ -242,6 +290,24 @@ export class GreyboxTestPanel {
   private readonly runSlopeIdleRegression = (): void => {
     const result = this.options.onRunSlopeIdleRegression();
     this.status.textContent = `Idle slope regression: ${result}`;
+  };
+
+  private readonly toggleStaticLaser = (): void => {
+    const enabled = this.options.onToggleStaticLaser();
+    this.status.textContent = enabled
+      ? 'Static Room 3 laser enabled.'
+      : 'Static Room 3 laser disabled; emitters remain visible.';
+  };
+
+  private readonly resetLaserSequences = (): void => {
+    this.options.onResetLaserSequences();
+    this.status.textContent =
+      'Laser poses, enabled states, sequence steps, and timers reset.';
+  };
+
+  private readonly runLaserDeterminismRegression = (): void => {
+    const result = this.options.onRunLaserDeterminismRegression();
+    this.status.textContent = `Laser determinism: ${result}`;
   };
 
   setRuntimeDiagnostics(text: string): void {

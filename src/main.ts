@@ -4,6 +4,7 @@ import { EventBus } from './core/EventBus';
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
+import { LaserTestRig } from './hazards/LaserTestRig';
 import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
 import { CollisionWorld } from './physics/CollisionWorld';
 import {
@@ -53,6 +54,12 @@ const body = new KinematicBody({
   events: movementEvents,
 });
 renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
+
+const laserTestRig = new LaserTestRig({
+  player: body,
+  checkpointSpawn: spawnPosition,
+});
+renderLayer.scene.add(laserTestRig.root);
 
 const slimeVisualState: SlimeVisualState = {
   velocityWorld: body.velocity,
@@ -207,7 +214,7 @@ const runSlopeIdleRegression = (): string => {
 const testPanel = new GreyboxTestPanel({
   onReset: () => {
     testScene.resetProbe();
-    body.teleport(spawnPosition);
+    laserTestRig.reset();
     puzzleTestRig.reset();
     landingEventCount = 0;
     lastLandingImpactSpeedMetresPerSecond = 0;
@@ -225,6 +232,10 @@ const testPanel = new GreyboxTestPanel({
   onActivateCheckpoint: () => puzzleTestRig.activateElevatedCheckpoint(),
   onRecoverCheckpoint: () => puzzleTestRig.recoverTestSlime(),
   onRunSlopeIdleRegression: runSlopeIdleRegression,
+  onToggleStaticLaser: () => laserTestRig.toggleStaticLaser(),
+  onResetLaserSequences: () => laserTestRig.resetSequences(),
+  onRunLaserDeterminismRegression: () =>
+    laserTestRig.runDeterminismRegression(),
 });
 
 app.replaceChildren(renderLayer.canvas, testPanel.element);
@@ -252,6 +263,10 @@ const loop = new Loop({
     jumpInputState.released = input.wasReleased('jump');
 
     body.update(deltaSeconds, moveX, moveZ, jumpInputState);
+    // Lethal hazards query the authoritative post-movement sphere. Recovery
+    // may synchronously reset the active puzzle group and teleport the body.
+    laserTestRig.update(deltaSeconds);
+
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
     slimeVisualState.jumpCharge = body.chargeFraction;
@@ -299,6 +314,7 @@ const loop = new Loop({
       const slimeDiagnostics = testScene.slimeDiagnostics;
       const cameraStats = renderLayer.cameraRig.getDiagnostics();
       const cameraPosition = renderLayer.cameraRig.camera.position;
+      const laserStats = laserTestRig.getDiagnostics();
 
       testPanel.setRuntimeDiagnostics(
         [
@@ -331,6 +347,15 @@ const loop = new Loop({
           `contacts this step: ${body.contactsThisStep}`,
           `last collision: ${body.lastCollisionName}`,
           `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
+          `laser checkpoint: ${laserStats.activeCheckpointId}`,
+          `laser static enabled: ${laserStats.staticEnabled ? 'yes' : 'no'}`,
+          `laser recoveries / last failure: ${laserStats.recoveryRequestCount} / ${laserStats.lastFailureHazardId}`,
+          `laser static start: ${laserStats.staticStart[0].toFixed(2)}, ${laserStats.staticStart[1].toFixed(2)}, ${laserStats.staticStart[2].toFixed(2)} m`,
+          `laser static end: ${laserStats.staticEnd[0].toFixed(2)}, ${laserStats.staticEnd[1].toFixed(2)}, ${laserStats.staticEnd[2].toFixed(2)} m`,
+          `laser single sweep: ${laserStats.singleSweepState} @ ${(laserStats.singleSweepPhase * 100).toFixed(0)}%`,
+          `laser alternating A/B: ${(laserStats.alternatingPhaseA * 100).toFixed(0)}% / ${(laserStats.alternatingPhaseB * 100).toFixed(0)}%`,
+          `laser crossing A/B: ${(laserStats.crossingPhaseA * 100).toFixed(0)}% / ${(laserStats.crossingPhaseB * 100).toFixed(0)}%`,
+          `laser final burst: ${laserStats.finalBurstState} @ ${(laserStats.finalBurstPhase * 100).toFixed(0)}%`,
           `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
           `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
@@ -359,6 +384,7 @@ const shutdown = (): void => {
   input.dispose();
   collisionWorld.clear();
   surfaceRegistry.clear();
+  laserTestRig.dispose();
   testPanel.dispose();
   puzzleTestRig.dispose();
   testScene.dispose();
