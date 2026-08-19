@@ -3,26 +3,19 @@ import test from 'node:test';
 
 import { Input, type InputAction } from '../src/core/Input.ts';
 
-interface InputHarness {
-  readonly input: Input;
-  readonly hostWindow: EventTarget;
-}
-
-function createInputHarness(): InputHarness {
+function createInput(): {
+  input: Input;
+  hostWindow: EventTarget;
+} {
   const hostWindow = new EventTarget();
-  const hostDocument = new EventTarget() as EventTarget & {
-    hidden: boolean;
-    pointerLockElement: Element | null;
-    exitPointerLock(): void;
-  };
-  hostDocument.hidden = false;
-  hostDocument.pointerLockElement = null;
-  hostDocument.exitPointerLock = () => undefined;
-
-  const pointerLockElement = new EventTarget() as EventTarget & {
-    requestPointerLock(): void;
-  };
-  pointerLockElement.requestPointerLock = () => undefined;
+  const hostDocument = Object.assign(new EventTarget(), {
+    hidden: false,
+    pointerLockElement: null,
+    exitPointerLock: () => undefined,
+  });
+  const pointerLockElement = Object.assign(new EventTarget(), {
+    requestPointerLock: () => undefined,
+  });
 
   const input = new Input({
     pointerLockElement: pointerLockElement as unknown as HTMLElement,
@@ -51,7 +44,7 @@ function assertOrphanRepeatIsIgnored(
   code: string,
   action: InputAction,
 ): void {
-  const { input, hostWindow } = createInputHarness();
+  const { input, hostWindow } = createInput();
 
   dispatchKey(hostWindow, 'keydown', code);
   assert.equal(input.isDown(action), true);
@@ -76,4 +69,25 @@ test('restart-key orphan repeat cannot retrigger after input reset', () => {
 
 test('movement-key orphan repeat cannot reactivate after input reset', () => {
   assertOrphanRepeatIsIgnored('KeyW', 'moveForward');
+});
+
+test('pointer cleanup does not masquerade as an input-state cancellation', () => {
+  const { input } = createInput();
+
+  input.endPointerUpdate();
+  assert.equal(input.wasClearedSinceFixedUpdate, false);
+
+  input.dispose();
+});
+
+test('focus clearing remains visible until the next fixed update', () => {
+  const { input, hostWindow } = createInput();
+
+  hostWindow.dispatchEvent(new Event('blur'));
+  assert.equal(input.wasClearedSinceFixedUpdate, true);
+
+  input.endFixedUpdate();
+  assert.equal(input.wasClearedSinceFixedUpdate, false);
+
+  input.dispose();
 });

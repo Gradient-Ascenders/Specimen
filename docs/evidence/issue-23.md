@@ -7,8 +7,8 @@
 - Moved level construction, update/render delegation, restart ordering, listener
   ownership, and permanent disposal out of `main.ts`.
 - Added one authoritative `GreyboxLevelRuntime.restartLevel(): void` path. It
-  restores current player, containment-scene, camera, visual, recovery-callback,
-  and input transients in a deterministic order.
+  restores current player, containment-scene, death/retry, camera, visual, and
+  input transients in a deterministic order.
 - Kept the renderer, canvas, input object, and single animation loop
   application-owned. Restart is in-place and does not recreate any of them.
 - Extended the current containment debug panel with lifecycle, restart, timing,
@@ -28,7 +28,6 @@
 - `src/levels/ContainmentTeachingScene.ts`
 - `src/puzzle/ElevatorTestRig.ts`
 - `tests/Input.test.ts`
-- `tests/ContainmentTeachingScene.test.ts`
 - `tests/LevelLifecycle.test.ts`
 - `tests/CameraRig.test.ts`
 - `docs/level-lifecycle.md`
@@ -39,24 +38,29 @@ and the lockfile are unchanged.
 
 ## Latest-main integration
 
-- Merged `origin/main` at `d2b3f79` into `feat/level-lifecycle` with normal Git
+- Merged `origin/main` at `64d3047` into `feat/level-lifecycle` with normal Git
   merge history.
-- The only textual conflict was `src/main.ts`. It was resolved as the small
-  application bootstrap from Issue #23 while moving main's current
-  `ContainmentTeachingScene` composition, movement flow, and simplified debug
-  controls into the lifecycle-owned runtime.
-- Preserved main's newer charged-jump, sticky-detach, landing-rebound, vent
-  traversal, containment layout, slime visual, debug panel, documentation, and
-  test changes. The older puzzle/laser/elevator harness was not resurrected.
-- Adapted containment recovery so lifecycle reset clears a pending callback and
-  a completed recovery invokes its callback exactly once.
+- Resolved semantic conflicts in `src/core/Input.ts`,
+  `src/levels/ContainmentTeachingScene.ts`,
+  `src/levels/GreyboxCollisionScene.ts`, `src/main.ts`, and
+  `tests/Input.test.ts`. The bootstrap remains small and application-owned while
+  the current level composition stays lifecycle-owned.
+- Preserved main's newer death/retry sequence and screen, slime burst, deferred
+  spawn recovery, jump buffering and cancellation, charged jump, sticky-detach,
+  landing rebound, vent traversal, containment layout, movement tuning, debug
+  panel, documentation, and tests. The older puzzle/laser/elevator harness was
+  not resurrected.
+- Integrated death/retry into the level resource set without adding another
+  full-level restart API: death suspends gameplay, Retry performs the deferred
+  recovery, and panel/debug reset continues to call
+  `GreyboxLevelRuntime.restartLevel()`.
 
 ## Automated verification
 
 - Direct TypeScript check with the bundled Node runtime: passed with no errors.
-- Direct Node test runner: passed all 49 tests, including newer main's movement
-  tests, six lifecycle tests, two input autorepeat regressions, two containment
-  recovery tests, and the camera-reset coverage.
+- Direct Node test runner: passed all 63 tests, including newer main's
+  death/retry, deferred recovery, slime burst, movement, and jump-buffer tests;
+  six lifecycle tests; four input boundary tests; and camera-reset coverage.
 - The lifecycle tests cover transition order, duplicate load/start protection,
   reentrant restart protection, ten repeated restarts, repeated load/unload
   cleanup, idempotent disposal, rejected post-disposal operations, and restart
@@ -65,18 +69,16 @@ and the lockfile are unchanged.
   lifecycle state clearing cannot allow an orphan repeat to reactivate either
   action, while keyup followed by a fresh non-repeat keydown still works.
 
-- `npm run type-check`, `npm test`, and `npm run build` could not start because
-  the user-level npm launcher points at a missing
-  `AppData/Roaming/npm/node_modules/npm/bin/npm-cli.js` (`MODULE_NOT_FOUND`). No
-  npm-script pass is claimed.
-- The equivalent repository tools were invoked directly with the bundled Node
-  24.19.0 runtime:
-  - `node node_modules/typescript/bin/tsc --noEmit`: passed;
-  - `node --test tests/*.test.ts`: 49 passed, 0 failed;
-  - `node node_modules/typescript/bin/tsc`, followed by
-    `node node_modules/vite/bin/vite.js build`: passed.
-- Vite 8.2.1 transformed 27 modules and produced `dist/index.html`, CSS, and a
-  631.74 kB JavaScript bundle (158.04 kB gzip). Vite retained the repository's
+- The repository npm scripts all completed successfully:
+  - `npm run type-check`: passed;
+  - `npm test`: 63 passed, 0 failed;
+  - `npm run build`: passed.
+- The same TypeScript, test, and Vite tools were also invoked directly earlier
+  during conflict resolution and passed. The previously observed user-level npm
+  launcher problem did not reproduce in this final verification.
+- Vite 8.2.1 transformed 30 modules and produced `dist/index.html`, a 5.31 kB
+  CSS asset (2.04 kB gzip), and a 651.99 kB JavaScript bundle (163.30 kB gzip).
+  Vite retained the repository's
   existing warning that the JavaScript chunk exceeds 500 kB.
 - `git diff --check`: passed with no whitespace errors.
 
@@ -84,8 +86,9 @@ and the lockfile are unchanged.
 
 - Served the production `dist/` over HTTP with Vite preview at
   `http://127.0.0.1:4173/`.
-- Post-merge HTTP verification returned 200 for the root document and 200 for
-  the generated 631,749-byte JavaScript asset.
+- Post-merge HTTP verification returned 200 for the root document, 200 for the
+  generated 651,992-byte JavaScript asset, and 200 for the generated 5,313-byte
+  CSS asset.
 - Interactive browser verification remained blocked before navigation because
   the available in-app browser rejected its own `browser-service.mjs` dependency
   as outside a configured trusted code path. The implementation therefore has no

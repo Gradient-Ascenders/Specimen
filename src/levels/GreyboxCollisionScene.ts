@@ -8,6 +8,10 @@ import {
   type SlimeVisualState,
   type Vector3State,
 } from '../render/slime/SlimeVisual';
+import {
+  SlimeBurstPresentation,
+  type SlimeBurstDiagnostics,
+} from '../render/slime/SlimeBurstPresentation';
 import type { SurfaceTag } from '../physics/SurfaceRegistry';
 
 type CollisionCase =
@@ -30,14 +34,15 @@ interface TestBox {
 
 const SPAWN_POSITION = new THREE.Vector3(-4, 0.46, 5);
 const RECOVERY_POSITION = new THREE.Vector3(6.5, -2.2, 2);
+const DEATH_RUPTURE_SECONDS = 0.075;
 
 export class GreyboxCollisionScene {
   readonly root = new THREE.Group();
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
   private readonly slimeVisual: SlimeVisual;
-  private recoveryDelay = 0;
-  private recoveryCallback: (() => void) | undefined;
+  private readonly slimeBurst = new SlimeBurstPresentation();
+  private deathElapsedSeconds = 0;
 
   constructor() {
     this.root.name = 'greybox-collision-test-scene';
@@ -153,7 +158,7 @@ export class GreyboxCollisionScene {
     this.addRecoveryMarker();
 
     this.slimeVisual = new SlimeVisual({ radiusMetres: 0.45 });
-    this.root.add(this.slimeVisual.mesh);
+    this.root.add(this.slimeVisual.mesh, this.slimeBurst.root);
     this.resetProbe();
   }
 
@@ -163,6 +168,10 @@ export class GreyboxCollisionScene {
 
   get slimeDiagnostics(): SlimeVisualDiagnostics {
     return this.slimeVisual.diagnostics;
+  }
+
+  get deathBurstDiagnostics(): SlimeBurstDiagnostics {
+    return this.slimeBurst.diagnostics;
   }
 
   copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
@@ -187,28 +196,51 @@ export class GreyboxCollisionScene {
 
   update(deltaSeconds: number, visualState: SlimeVisualState): void {
     this.slimeVisual.update(deltaSeconds, visualState);
-
-    if (this.recoveryDelay <= 0) return;
-
-    this.recoveryDelay -= deltaSeconds;
-    if (this.recoveryDelay > 0) return;
-
-    const recoveryCallback = this.recoveryCallback;
-    this.resetProbe();
-    recoveryCallback?.();
   }
 
-  resetProbe(): void {
-    this.recoveryDelay = 0;
-    this.recoveryCallback = undefined;
-    this.slimeVisual.setPosition(SPAWN_POSITION);
+  /** Begin the visual rupture at the authoritative death position. */
+  startDeath(position: Vector3State): boolean {
+    if (!this.slimeBurst.start(position)) return false;
+
+    this.deathElapsedSeconds = 0;
+    this.slimeVisual.setPosition(position);
+    this.slimeVisual.mesh.scale.setScalar(1);
+    this.slimeVisual.mesh.visible = true;
+    return true;
+  }
+
+  /** Continue visual-only death work while gameplay simulation is suspended. */
+  updateDeath(deltaSeconds: number): void {
+    this.deathElapsedSeconds += deltaSeconds;
+    this.slimeBurst.update(deltaSeconds);
+
+    if (this.deathElapsedSeconds < DEATH_RUPTURE_SECONDS) {
+      const anticipation = THREE.MathUtils.smoothstep(
+        this.deathElapsedSeconds,
+        0,
+        DEATH_RUPTURE_SECONDS,
+      );
+      this.slimeVisual.mesh.scale.setScalar(
+        1 + Math.sin(anticipation * Math.PI) * 0.12,
+      );
+      return;
+    }
+
+    this.slimeVisual.mesh.visible = false;
+  }
+
+  /** Restore the live slime after the owning checkpoint recovery succeeds. */
+  finishDeath(position: Vector3State): void {
+    this.deathElapsedSeconds = 0;
+    this.slimeBurst.reset();
+    this.slimeVisual.setPosition(position);
+    this.slimeVisual.mesh.scale.setScalar(1);
+    this.slimeVisual.mesh.visible = true;
     this.slimeVisual.reset();
   }
 
-  simulateFall(onRecovered: () => void): void {
-    this.slimeVisual.setPosition(RECOVERY_POSITION);
-    this.recoveryCallback = onRecovered;
-    this.recoveryDelay = 0.7;
+  resetProbe(): void {
+    this.finishDeath(SPAWN_POSITION);
   }
 
   onSlimeImpact(impact: SlimeVisualImpact): void {
@@ -230,6 +262,7 @@ export class GreyboxCollisionScene {
   }
 
   dispose(): void {
+    this.slimeBurst.dispose();
     this.slimeVisual.dispose();
     this.root.removeFromParent();
     this.root.traverse((object) => {

@@ -17,6 +17,11 @@ import type { WallJumpIntent } from '../physics/WallJumpBasis.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
+import {
+  DeathSequence,
+  type DeathRecoveryAction,
+} from '../systems/DeathSequence.ts';
+import { DeathScreen } from '../ui/DeathScreen.ts';
 import { ContainmentTeachingScene } from './ContainmentTeachingScene.ts';
 import {
   LevelLifecycle,
@@ -25,6 +30,7 @@ import {
 
 const LEVEL_ID = 'containment-teaching-level-1';
 const DEBUG_TOGGLE_CODE = 'F2';
+const PLAYER_OUT_OF_BOUNDS_Y_METRES = -4;
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
 const SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES = 0.02;
@@ -49,6 +55,8 @@ interface GreyboxRuntimeResources {
   readonly noMovement: THREE.Vector3;
   readonly blobFacing: BlobFacing;
   readonly body: KinematicBody;
+  readonly deathSequence: DeathSequence;
+  readonly deathScreen: DeathScreen;
   readonly slimeVisualState: SlimeVisualState;
   readonly jumpInputState: JumpInputState;
   readonly wallJumpIntent: WallJumpIntent;
@@ -129,12 +137,18 @@ export class GreyboxLevelRuntime {
     const {
       body,
       cameraRelativeMovement,
+      deathSequence,
       jumpInputState,
       slimeVisualState,
       testPanel,
       testScene,
       wallJumpIntent,
     } = resources;
+
+    if (!deathSequence.isPlaying) {
+      this.updateDeathState(deltaSeconds, resources);
+      return;
+    }
 
     if (this.debugAvailable && this.input.wasPressed('debugReset')) {
       this.restartLevel();
@@ -146,6 +160,10 @@ export class GreyboxLevelRuntime {
       this.input.wasPressed('debugTestRecovery')
     ) {
       testPanel.testRecovery();
+    }
+    if (!deathSequence.isPlaying) {
+      this.updateDeathState(deltaSeconds, resources);
+      return;
     }
 
     const moveX =
@@ -179,6 +197,7 @@ export class GreyboxLevelRuntime {
     jumpInputState.pressed = this.input.wasPressed('jump');
     jumpInputState.held = this.input.isDown('jump');
     jumpInputState.released = this.input.wasReleased('jump');
+    jumpInputState.cancelled = this.input.wasClearedSinceFixedUpdate;
     wallJumpIntent.lateral = moveX;
     wallJumpIntent.vertical = -moveZ;
 
@@ -188,6 +207,17 @@ export class GreyboxLevelRuntime {
       jumpInputState,
       wallJumpIntent,
     );
+
+    if (body.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
+      this.requestPlayerDeath(
+        () => body.teleport(resources.spawnPosition),
+        resources,
+      );
+    }
+    if (!deathSequence.isPlaying) {
+      this.updateDeathState(deltaSeconds, resources);
+      return;
+    }
     resources.blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
@@ -209,22 +239,30 @@ export class GreyboxLevelRuntime {
       return;
     }
 
-    const { body, blobFacing, renderedProbePosition, testScene } = resources;
-    const previous = body.previousPosition;
-    const current = body.position;
-    renderedProbePosition.set(
-      THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
-      THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
-    );
+    const {
+      body,
+      blobFacing,
+      deathSequence,
+      renderedProbePosition,
+      testScene,
+    } = resources;
+    if (deathSequence.isPlaying) {
+      const previous = body.previousPosition;
+      const current = body.position;
+      renderedProbePosition.set(
+        THREE.MathUtils.lerp(previous.x, current.x, interpolationAlpha),
+        THREE.MathUtils.lerp(previous.y, current.y, interpolationAlpha),
+        THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
+      );
 
-    testScene.setProbePosition(renderedProbePosition);
-    testScene.setProbeYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
-    testScene.presentProbe();
-    this.renderLayer.cameraRig.queueLookInput(
-      this.input.pointerDeltaX,
-      this.input.pointerDeltaY,
-    );
+      testScene.setProbePosition(renderedProbePosition);
+      testScene.setProbeYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
+      testScene.presentProbe();
+      this.renderLayer.cameraRig.queueLookInput(
+        this.input.pointerDeltaX,
+        this.input.pointerDeltaY,
+      );
+    }
     this.input.endPointerUpdate();
     this.renderLayer.cameraRig.update(
       interpolationAlpha,
@@ -264,6 +302,7 @@ export class GreyboxLevelRuntime {
       events: movementEvents,
     });
     this.renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
+    const deathSequence = new DeathSequence();
 
     const slimeVisualState: SlimeVisualState = {
       velocityWorld: body.velocity,
@@ -303,22 +342,32 @@ export class GreyboxLevelRuntime {
     const testPanel = this.debugAvailable
       ? new GreyboxTestPanel({
           onReset: () => this.restartLevel(),
-          onTestRecovery: (onRecovered) => {
+          onTestRecovery: () => {
             body.teleport(outOfBoundsTestPosition);
-            testScene.simulateFall(() => {
-              body.teleport(spawnPosition);
-              onRecovered();
-            });
+            this.requestPlayerDeath(
+              () => body.teleport(spawnPosition),
+              this.requireResources(),
+            );
           },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
         })
       : undefined;
+
+    const deathScreen = new DeathScreen({
+      onRetry: this.retryAfterDeath,
+      backgroundElements: [
+        this.renderLayer.canvas,
+        ...(testPanel ? [testPanel.element] : []),
+      ],
+    });
 
     if (testPanel) {
       this.host.append(testPanel.element);
       this.setDebugVisible(false, testPanel);
       this.hostWindow.addEventListener('keydown', this.onDebugToggle);
     }
+    this.host.append(deathScreen.element);
+    this.host.dataset.gameState = deathSequence.state;
 
     this.resources = {
       testScene,
@@ -332,8 +381,15 @@ export class GreyboxLevelRuntime {
       noMovement: new THREE.Vector3(),
       blobFacing,
       body,
+      deathSequence,
+      deathScreen,
       slimeVisualState,
-      jumpInputState: { pressed: false, held: false, released: false },
+      jumpInputState: {
+        pressed: false,
+        held: false,
+        released: false,
+        cancelled: false,
+      },
       wallJumpIntent: { lateral: 0, vertical: 0 },
       unsubscribeLanding,
       unsubscribeJumped,
@@ -342,16 +398,19 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly startResources = (): void => {
+    this.input.setEnabled(this.requireResources().deathSequence.isPlaying);
     this.input.resetState();
   };
 
   private readonly stopResources = (): void => {
-    this.input.resetState();
+    this.input.setEnabled(false);
   };
 
   private readonly restartResources = (): void => {
     const resources = this.requireResources();
     this.input.resetState();
+    resources.deathSequence.reset();
+    resources.deathScreen.hide();
     resources.body.teleport(resources.spawnPosition);
     resources.testScene.resetProbe();
     resources.blobFacing.reset();
@@ -359,6 +418,7 @@ export class GreyboxLevelRuntime {
     resources.jumpInputState.pressed = false;
     resources.jumpInputState.held = false;
     resources.jumpInputState.released = false;
+    resources.jumpInputState.cancelled = false;
     resources.wallJumpIntent.lateral = 0;
     resources.wallJumpIntent.vertical = 0;
 
@@ -366,11 +426,17 @@ export class GreyboxLevelRuntime {
     this.lastLandingImpactSpeedMetresPerSecond = 0;
     this.debugSampleElapsedSeconds = 0;
     this.slopeRegressionStatus = 'not run';
+    this.host.dataset.gameState = resources.deathSequence.state;
+    if (resources.testPanel) {
+      this.setDebugVisible(this.debugVisible, resources.testPanel);
+    }
   };
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
+    resources.deathSequence.reset();
+    resources.deathScreen.dispose();
     resources.testPanel?.dispose();
     resources.testPanel?.element.remove();
     resources.unsubscribeLanding();
@@ -380,14 +446,58 @@ export class GreyboxLevelRuntime {
     resources.collisionWorld.clear();
     resources.surfaceRegistry.clear();
     this.renderLayer.cameraRig.clearFollowTarget();
-    this.input.resetState();
+    this.input.setEnabled(false);
     this.input.releasePointerLock();
+    delete this.host.dataset.gameState;
     this.resources = undefined;
     this.debugVisible = false;
     this.debugSampleElapsedSeconds = 0;
     this.landingEventCount = 0;
     this.lastLandingImpactSpeedMetresPerSecond = 0;
   };
+
+  private requestPlayerDeath(
+    recovery: DeathRecoveryAction,
+    resources: GreyboxRuntimeResources,
+  ): boolean {
+    if (!resources.deathSequence.requestDeath(recovery)) return false;
+    if (!resources.testScene.startDeath(resources.body.position)) {
+      resources.deathSequence.reset();
+      return false;
+    }
+
+    this.input.setEnabled(false);
+    this.input.releasePointerLock();
+    this.host.dataset.gameState = resources.deathSequence.state;
+    return true;
+  }
+
+  private readonly retryAfterDeath = (): void => {
+    const resources = this.requireResources();
+    if (!resources.deathSequence.canRetry) return;
+    if (!resources.deathSequence.completeRetry()) return;
+
+    resources.testScene.finishDeath(resources.body.position);
+    resources.deathScreen.hide();
+    this.input.setEnabled(true);
+    this.input.requestPointerLock();
+    this.host.dataset.gameState = resources.deathSequence.state;
+    if (resources.testPanel) {
+      this.setDebugVisible(this.debugVisible, resources.testPanel);
+    }
+  };
+
+  private updateDeathState(
+    deltaSeconds: number,
+    resources: GreyboxRuntimeResources,
+  ): void {
+    resources.testScene.updateDeath(deltaSeconds);
+    if (resources.deathSequence.update(deltaSeconds)) {
+      resources.deathScreen.show();
+    }
+    this.host.dataset.gameState = resources.deathSequence.state;
+    this.input.endFixedUpdate();
+  }
 
   private readonly runSlopeIdleRegression = (): string => {
     const resources = this.requireResources();
@@ -497,6 +607,7 @@ export class GreyboxLevelRuntime {
       body,
       blobFacing,
       collisionWorld,
+      deathSequence,
       surfaceRegistry,
       testScene,
     } = resources;
@@ -508,6 +619,8 @@ export class GreyboxLevelRuntime {
     const slimeDiagnostics = testScene.slimeDiagnostics;
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
     const cameraPosition = this.renderLayer.cameraRig.camera.position;
+    const deathStats = deathSequence.diagnostics;
+    const burstStats = testScene.deathBurstDiagnostics;
 
     testPanel.setRuntimeDiagnostics(
       [
@@ -519,6 +632,9 @@ export class GreyboxLevelRuntime {
         `steps this frame: ${stats.stepsThisFrame}`,
         `pointer lock: ${this.input.pointerLocked ? 'locked' : 'unlocked'}`,
         `held actions: ${heldActions}`,
+        `game / death state: ${deathStats.state} (${deathStats.elapsedSeconds.toFixed(2)} s)`,
+        `deaths / retries: ${deathStats.acceptedDeathCount} / ${deathStats.completedRetryCount}`,
+        `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
         `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
         `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
         `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
@@ -531,6 +647,7 @@ export class GreyboxLevelRuntime {
         `jump state / can jump: ${body.jumpState} / ${body.canJump ? 'yes' : 'no'}`,
         `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
         `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
+        `jump buffer remaining: ${body.jumpInputBufferRemainingSeconds.toFixed(3)} s`,
         `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
         `last jump direction: ${body.lastJumpDirection.x.toFixed(2)}, ${body.lastJumpDirection.y.toFixed(2)}, ${body.lastJumpDirection.z.toFixed(2)}`,
         `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,

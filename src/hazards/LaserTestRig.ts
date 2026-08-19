@@ -6,6 +6,7 @@ import {
 } from '../puzzle/Checkpoints';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation';
+import type { DeathRecoveryAction } from '../systems/DeathSequence';
 import {
   LaserHazard,
   type LaserContactTarget,
@@ -35,6 +36,8 @@ interface HazardSnapshot {
 export interface LaserTestRigOptions {
   readonly player: LaserTestPlayer;
   readonly checkpointSpawn: THREE.Vector3;
+  /** Optional game-flow boundary inserted before checkpoint recovery. */
+  readonly requestPlayerDeath?: (recovery: DeathRecoveryAction) => void;
 }
 
 export interface LaserTestRigDiagnostics {
@@ -296,7 +299,12 @@ export class LaserTestRig {
         this.finalBurst,
       ],
       requestRecovery: () => {
-        this.checkpoints.recover(this.player);
+        const recovery = (): void => this.recover();
+        if (options.requestPlayerDeath) {
+          options.requestPlayerDeath(recovery);
+        } else {
+          recovery();
+        }
       },
     });
 
@@ -356,14 +364,19 @@ export class LaserTestRig {
     this.presentation.sync();
   }
 
+  /** Recover through the active checkpoint without resetting its selection. */
+  recover(): void {
+    this.checkpoints.recover(this.player);
+    this.presentation.sync();
+  }
+
   /**
    * Full harness reset through the same checkpoint path used after a laser hit.
    * This restores the active puzzle group, then clears/repositions the player.
    */
   reset(): void {
     this.checkpoints.reset();
-    this.checkpoints.recover(this.player);
-    this.presentation.sync();
+    this.recover();
   }
 
   /**

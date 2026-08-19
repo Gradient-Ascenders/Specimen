@@ -62,7 +62,8 @@ const room3Laser = new LaserHazard({
 const room3Lasers = new LaserHazardSystem({
   id: 'room3-lasers',
   hazards: [room3Laser],
-  requestRecovery: () => checkpoints.recover(playerBody),
+  requestRecovery: () =>
+    requestPlayerDeath(() => checkpoints.recover(playerBody)),
 });
 
 puzzleRegistry.register(
@@ -72,14 +73,17 @@ puzzleRegistry.register(
 );
 ```
 
-The resulting failure order is the existing checkpoint contract:
+The resulting failure order preserves the existing checkpoint contract:
 
-1. laser contact requests recovery once;
-2. `CheckpointManager` validates the active spawn;
+1. laser contact starts the death presentation once and retains the active
+   checkpoint recovery action;
+2. Retry invokes `CheckpointManager`, which validates the active spawn;
 3. `PuzzleRegistry.resetGroup(activeGroup)` resets the lasers and connected
    room puzzle state in authored order;
 4. `KinematicBody.recoverAt(...)` clears movement/transient state and copies the
-   verified checkpoint position.
+   verified checkpoint position;
+5. only after recovery succeeds does the death flow restore the live slime,
+   gameplay input, and UI.
 
 Issue #23 remains the owner of whole-level/game restart lifecycle.
 

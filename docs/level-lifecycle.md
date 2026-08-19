@@ -27,15 +27,17 @@ unloaded runtimes have no level resources to update.
 
 Loading constructs the current `ContainmentTeachingScene`, collision world,
 surface registry, movement event bus and subscriptions, kinematic player body,
-visual-facing state, and optional debug panel. The runtime retains those
+visual-facing state, death sequence, death screen, and optional debug panel. The
+containment scene owns its slime-burst presentation. The runtime retains those
 references as a single resource set.
 
-Unloading removes the level key listener and debug DOM element, unsubscribes the
-movement callbacks, clears the event bus and collision/surface registries,
-detaches the camera target, and disposes the containment scene. The scene removes
-its root and explicitly disposes its owned geometries and materials. The runtime
-then drops its resource-set reference. It does not dispose the application-owned
-renderer, canvas, input object, loop, or camera rig.
+Unloading removes the level key listener, death screen, and debug DOM element;
+unsubscribes the movement callbacks; clears the event bus and collision/surface
+registries; detaches the camera target; and disposes the containment scene. The
+scene removes its root and explicitly disposes its owned geometries and
+materials, including the slime burst. The runtime then drops its resource-set
+reference. It does not dispose the application-owned renderer, canvas, input
+object, loop, or camera rig.
 
 The application disposes its resources after disposing the level during final
 shutdown. Restarts never construct a renderer, register another application
@@ -54,10 +56,18 @@ lifecycle guard prevents overlapping restart work. In order, the runtime:
 1. stops updates and clears held/transient input;
 2. teleports the kinematic body to the authored spawn, which clears its movement
    and contact transients;
-3. resets the probe visual and any pending recovery callback;
-4. resets blob facing, camera transients, jump input, and wall
-   intent;
-5. clears level diagnostic counters and resumes updates if the level was running.
+3. resets the probe and slime-burst presentation, death sequence, death screen,
+   and any deferred death recovery;
+4. resets blob facing, camera transients, jump input (including cancellation and
+   buffer state), and wall intent;
+5. clears level diagnostic counters, restores the debug panel's hidden/inert
+   state, and resumes updates and input if the level was running.
+
+Death/retry does not introduce a second restart owner. The `DeathSequence`
+temporarily suspends gameplay input, presents the burst and death screen, and
+defers recovery until Retry. Its recovery callback restores the requested spawn
+through the runtime and rearms the sequence; the debug reset control and all
+other full-level restarts still call `GreyboxLevelRuntime.restartLevel()`.
 
 Current `main` deliberately removed the older puzzle, laser, and elevator test
 rigs from the containment teaching scene, so they are not active restart
@@ -77,7 +87,9 @@ reports:
 - active level, lifecycle state, and completed restart count;
 - fixed-step duration, render frame time/FPS, and steps per frame;
 - renderer draw calls, triangles, GPU geometry count, and GPU texture count;
-- player position, velocity, ground/attachment, surface, jump, and contact state;
+- player position, velocity, ground/attachment, surface, jump buffer, and contact
+  state;
+- death state, accepted death/retry counts, and slime-burst radius;
 - camera, viewport, collision/surface registration, teaching-surface status, and
   wall-jump regression status.
 
