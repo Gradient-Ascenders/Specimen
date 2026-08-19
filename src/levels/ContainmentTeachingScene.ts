@@ -141,10 +141,6 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-1-north-clean-east', size: [5.2, 8, 0.4], position: [4.4, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-above-vent', size: [4.2, 0.7, 0.4], position: [-2.1, 7.65, 6], material: materials.wall });
 
-    // A generous shelf prevents the first climb lesson from becoming a narrow
-    // balance test before the player can clearly see the vent route.
-    this.addCollider({ name: 'room-1-vent-approach-ledge', size: [4.2, 0.35, 3.6], position: [-2.1, 5.88, 4.45], material: materials.support });
-
     this.addVisualBox('room-1-locked-door-false-lead', [2.6, 3, 0.18], [4.2, 1.5, 5.76], materials.locked);
     this.addOpenVentFrame('room-1-vent-open-frame', [-2.1, 6.6, 5.74], materials.duct);
 
