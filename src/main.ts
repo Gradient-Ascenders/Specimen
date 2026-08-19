@@ -4,6 +4,7 @@ import { EventBus } from './core/EventBus';
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
+import { runWallJumpBasisRegression } from './debug/WallJumpBasisRegression';
 import { ContainmentTeachingScene } from './levels/ContainmentTeachingScene';
 import { CollisionWorld } from './physics/CollisionWorld';
 import {
@@ -11,6 +12,7 @@ import {
   KinematicBody,
   type JumpInputState,
 } from './physics/KinematicBody';
+import type { WallJumpIntent } from './physics/WallJumpBasis';
 import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { BlobFacing } from './render/BlobFacing';
@@ -95,12 +97,17 @@ const jumpInputState: JumpInputState = {
   held: false,
   released: false,
 };
+const wallJumpIntent: WallJumpIntent = {
+  lateral: 0,
+  vertical: 0,
+};
 
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
 const SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES = 0.02;
 
 let slopeRegressionStatus = 'not run';
+const wallJumpBasisRegressionStatus = runWallJumpBasisRegression();
 
 const runSlopeIdleRegression = (): string => {
   const stickyRoute = testScene.collisionMeshes.find(
@@ -258,6 +265,9 @@ const loop = new Loop({
     );
     renderLayer.cameraRig.applyQueuedLookInput();
 
+    // Locomotion remains camera-relative on both ground and sticky surfaces.
+    // Wall-jump *cardinal intent* is passed separately below so W/S always mean
+    // wall-up/down and A/D remain lateral regardless of camera heading.
     if (body.attached) {
       renderLayer.cameraRig.copySurfaceMovementDirection(
         moveX,
@@ -277,7 +287,15 @@ const loop = new Loop({
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
 
-    body.update(deltaSeconds, cameraRelativeMovement, jumpInputState);
+    wallJumpIntent.lateral = moveX;
+    wallJumpIntent.vertical = -moveZ;
+
+    body.update(
+      deltaSeconds,
+      cameraRelativeMovement,
+      jumpInputState,
+      wallJumpIntent,
+    );
     blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
@@ -351,6 +369,7 @@ const loop = new Loop({
           `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
           `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
           `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
+          `last jump direction: ${body.lastJumpDirection.x.toFixed(2)}, ${body.lastJumpDirection.y.toFixed(2)}, ${body.lastJumpDirection.z.toFixed(2)}`,
           `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,
           `last landing impact / count: ${lastLandingImpactSpeedMetresPerSecond.toFixed(2)} m/s / ${landingEventCount}`,
           `visual speed / charge: ${slimeDiagnostics.speed.toFixed(2)} / ${slimeDiagnostics.jumpCharge.toFixed(2)}`,
@@ -367,7 +386,8 @@ const loop = new Loop({
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
           `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
           `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
-          `teaching-surface check: ${slopeRegressionStatus}`,
+          `teaching-surface regression: ${slopeRegressionStatus}`,
+          `wall jump basis regression: ${wallJumpBasisRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,

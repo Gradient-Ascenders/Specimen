@@ -5,6 +5,7 @@ import {
   CheckpointManager,
 } from '../puzzle/Checkpoints';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry';
+import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation';
 import {
   LaserHazard,
   type LaserContactTarget,
@@ -73,6 +74,7 @@ export class LaserTestRig {
   private readonly crossingB: LaserHazard;
   private readonly finalBurst: LaserHazard;
   private readonly laserSystem: LaserHazardSystem;
+  private readonly presentation: LaserHazardPresentation;
 
   private readonly regressionPosition = new THREE.Vector3(1000, 1000, 1000);
   private readonly regressionTarget: LaserContactTarget;
@@ -299,6 +301,10 @@ export class LaserTestRig {
     });
 
     this.root.add(this.laserSystem.root);
+    this.presentation = new LaserHazardPresentation(
+      this.laserSystem.hazards,
+    );
+    this.root.add(this.presentation.root);
     this.puzzleRegistry.register(
       'laser-development-runtime',
       this.laserSystem,
@@ -324,6 +330,7 @@ export class LaserTestRig {
 
   update(deltaSeconds: number): void {
     this.laserSystem.update(deltaSeconds, this.player);
+    this.presentation.sync();
   }
 
   get activeCheckpointId(): string {
@@ -340,11 +347,13 @@ export class LaserTestRig {
 
   toggleStaticLaser(): boolean {
     this.staticLaser.setEnabled(!this.staticLaser.enabled);
+    this.presentation.sync();
     return this.staticLaser.enabled;
   }
 
   resetSequences(): void {
     this.puzzleRegistry.resetGroup(LASER_TEST_GROUP_ID);
+    this.presentation.sync();
   }
 
   /**
@@ -354,6 +363,7 @@ export class LaserTestRig {
   reset(): void {
     this.checkpoints.reset();
     this.checkpoints.recover(this.player);
+    this.presentation.sync();
   }
 
   /**
@@ -426,6 +436,7 @@ export class LaserTestRig {
   }
 
   dispose(): void {
+    this.presentation.dispose();
     this.laserSystem.dispose();
     this.puzzleRegistry.clear();
     this.root.removeFromParent();
