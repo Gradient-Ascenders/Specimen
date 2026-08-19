@@ -41,7 +41,7 @@ export class GreyboxTestPanel {
       <div class="test-panel-content">
         <p class="eyebrow">Sprint 0 test harness</p>
         <h1>Collision grey-box</h1>
-        <p class="summary">One grid square equals one metre. Move with <kbd>WASD</kbd>. Hold <kbd>Space</kbd> to charge and release to jump; geometry is named and colour-coded for repeatable collision checks.</p>
+        <p class="summary">One grid square equals one metre. Move with <kbd>WASD</kbd>. Hold <kbd>Space</kbd> to charge and release to jump. On sticky walls, <kbd>W/S</kbd> climb and <kbd>A/D</kbd> move sideways.</p>
 
         <ul class="case-list" aria-label="Collision test case legend">
           <li style="--case-colour: #81909b">Floor</li>
@@ -50,6 +50,7 @@ export class GreyboxTestPanel {
           <li style="--case-colour: #d6c650">Slope</li>
           <li style="--case-colour: #d95f8d">Gap</li>
           <li style="--case-colour: #62bf83">Platform</li>
+          <li style="--case-colour: #e06f5f">Non-stick</li>
         </ul>
 
         <p class="surface-key">

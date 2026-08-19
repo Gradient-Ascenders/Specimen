@@ -12,6 +12,7 @@ import {
   type JumpInputState,
 } from './physics/KinematicBody';
 import type { MovementEvents } from './physics/MovementEvents.ts';
+import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { RenderLayer } from './render/RenderLayer';
 import './style.css';
@@ -33,6 +34,9 @@ renderLayer.scene.add(puzzleTestRig.root);
 const collisionWorld = new CollisionWorld();
 collisionWorld.registerAll(testScene.collisionMeshes);
 
+const surfaceRegistry = new SurfaceRegistry();
+surfaceRegistry.registerAll(testScene.collisionMeshes);
+
 const movementEvents = new EventBus<MovementEvents>();
 let landingEventCount = 0;
 let lastLandingImpactSpeedMetresPerSecond = 0;
@@ -49,6 +53,7 @@ const renderedProbePosition = new THREE.Vector3();
 
 const body = new KinematicBody({
   world: collisionWorld,
+  surfaces: surfaceRegistry,
   initialPosition: spawnPosition,
   events: movementEvents,
 });
@@ -110,6 +115,7 @@ const runSlopeIdleRegression = (): string => {
 
   const regressionBody = new KinematicBody({
     world: collisionWorld,
+    surfaces: surfaceRegistry,
     initialPosition: regressionStart,
   });
 
@@ -264,6 +270,11 @@ const loop = new Loop({
           `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
           `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
           `ground normal: ${groundNormal.x.toFixed(2)}, ${groundNormal.y.toFixed(2)}, ${groundNormal.z.toFixed(2)}`,
+          `gameplay up: ${body.gameplayUp.x.toFixed(2)}, ${body.gameplayUp.y.toFixed(2)}, ${body.gameplayUp.z.toFixed(2)}`,
+          `surface / last contact: ${body.supportSurfaceTag} / ${body.lastContactSurfaceTag}`,
+          `attachment surface: ${body.attachmentSurfaceName}`,
+          `attach / bounce cooldown: ${body.attachmentCooldownSeconds.toFixed(2)} / ${body.bounceCooldownSeconds.toFixed(2)} s`,
+          `last bounce: ${body.lastBounceSpeedMetresPerSecond.toFixed(2)} m/s @ ${body.lastBounceSurfaceName}`,
           `jump state / can jump: ${body.jumpState} / ${body.canJump ? 'yes' : 'no'}`,
           `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
           `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
@@ -272,7 +283,7 @@ const loop = new Loop({
           `last landing impact / count: ${lastLandingImpactSpeedMetresPerSecond.toFixed(2)} m/s / ${landingEventCount}`,
           `contacts this step: ${body.contactsThisStep}`,
           `last collision: ${body.lastCollisionName}`,
-          `registered colliders: ${collisionWorld.colliderCount}`,
+          `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
           `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
           `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
@@ -299,6 +310,7 @@ const shutdown = (): void => {
   loop.dispose();
   input.dispose();
   collisionWorld.clear();
+  surfaceRegistry.clear();
   testPanel.dispose();
   puzzleTestRig.dispose();
   testScene.dispose();
