@@ -5,8 +5,7 @@ import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
 import { runWallJumpBasisRegression } from './debug/WallJumpBasisRegression';
-import { LaserTestRig } from './hazards/LaserTestRig';
-import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
+import { ContainmentTeachingScene } from './levels/ContainmentTeachingScene';
 import { CollisionWorld } from './physics/CollisionWorld';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
@@ -16,8 +15,6 @@ import {
 import type { WallJumpIntent } from './physics/WallJumpBasis';
 import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
-import { ElevatorTestRig } from './puzzle/ElevatorTestRig';
-import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { BlobFacing } from './render/BlobFacing';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
@@ -31,11 +28,8 @@ if (!app) {
 
 const renderLayer = new RenderLayer({ host: app });
 
-const testScene = new GreyboxCollisionScene();
+const testScene = new ContainmentTeachingScene();
 renderLayer.scene.add(testScene.root);
-
-const puzzleTestRig = new PuzzleTestRig();
-renderLayer.scene.add(puzzleTestRig.root);
 
 const collisionWorld = new CollisionWorld();
 collisionWorld.registerAll(testScene.collisionMeshes);
@@ -48,7 +42,9 @@ let landingEventCount = 0;
 let lastLandingImpactSpeedMetresPerSecond = 0;
 
 const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
-const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
+const outOfBoundsTestPosition = testScene.copyOutOfBoundsTestPosition(
+  new THREE.Vector3(),
+);
 const renderedProbePosition = new THREE.Vector3();
 const cameraRelativeMovement = new THREE.Vector3();
 const noMovement = new THREE.Vector3();
@@ -61,19 +57,6 @@ const body = new KinematicBody({
   events: movementEvents,
 });
 renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
-
-const laserTestRig = new LaserTestRig({
-  player: body,
-  checkpointSpawn: spawnPosition,
-});
-renderLayer.scene.add(laserTestRig.root);
-
-const elevatorTestRig = new ElevatorTestRig(
-  body,
-  collisionWorld,
-  surfaceRegistry,
-);
-renderLayer.scene.add(elevatorTestRig.root);
 
 const slimeVisualState: SlimeVisualState = {
   velocityWorld: body.velocity,
@@ -129,6 +112,23 @@ let slopeRegressionStatus = 'not run';
 const wallJumpBasisRegressionStatus = runWallJumpBasisRegression();
 
 const runSlopeIdleRegression = (): string => {
+  const stickyRoute = testScene.collisionMeshes.find(
+    (mesh) => mesh.name === 'room-1-vent-sticky-entry-wall',
+  );
+  const bounceLanding = testScene.collisionMeshes.find(
+    (mesh) => mesh.name === 'room-2-bounce-calibration-landing',
+  );
+
+  if (stickyRoute && bounceLanding) {
+    const stickyTag = surfaceRegistry.get(stickyRoute).tag;
+    const bounceTag = surfaceRegistry.get(bounceLanding).tag;
+    const passed = stickyTag === 'sticky' && bounceTag === 'bouncy';
+    slopeRegressionStatus = passed
+      ? 'PASS — Room 1 sticky route and Room 2 bounce landing are authored'
+      : `FAIL — tags are ${stickyTag} / ${bounceTag}`;
+    return slopeRegressionStatus;
+  }
+
   const slopeMesh = testScene.collisionMeshes.find(
     (mesh) => mesh.name === 'case-slope-15-degrees',
   );
@@ -232,33 +232,18 @@ const runSlopeIdleRegression = (): string => {
 const testPanel = new GreyboxTestPanel({
   onReset: () => {
     testScene.resetProbe();
-    elevatorTestRig.resetRuntimeOnly();
-    laserTestRig.reset();
-    puzzleTestRig.reset();
+    body.teleport(spawnPosition);
     landingEventCount = 0;
     lastLandingImpactSpeedMetresPerSecond = 0;
   },
   onTestRecovery: (onRecovered) => {
-    body.teleport(recoveryPosition);
+    body.teleport(outOfBoundsTestPosition);
     testScene.simulateFall(() => {
       body.teleport(spawnPosition);
       onRecovered();
     });
   },
-  onTogglePuzzleTest: () => puzzleTestRig.toggleTestSlime(),
-  onRunSensorRegression: () => puzzleTestRig.runTriggerRegression(),
-  onRunResetRegression: () => puzzleTestRig.runResetRegression(),
-  onActivateCheckpoint: () => puzzleTestRig.activateElevatedCheckpoint(),
-  onRecoverCheckpoint: () => puzzleTestRig.recoverTestSlime(),
   onRunSlopeIdleRegression: runSlopeIdleRegression,
-  onToggleStaticLaser: () => laserTestRig.toggleStaticLaser(),
-  onResetLaserSequences: () => laserTestRig.resetSequences(),
-  onRunLaserDeterminismRegression: () =>
-    laserTestRig.runDeterminismRegression(),
-  onEnterElevatorTest: () => elevatorTestRig.enter(),
-  onRecoverElevatorCheckpoint: () => elevatorTestRig.recover(),
-  onRunElevatorCarrierRegression: () =>
-    elevatorTestRig.runCarrierRegression(),
 });
 
 app.replaceChildren(renderLayer.canvas, testPanel.element);
@@ -318,14 +303,6 @@ const loop = new Loop({
       jumpInputState,
       wallJumpIntent,
     );
-    // Lethal hazards query the authoritative post-movement sphere. Recovery
-    // may synchronously reset the active puzzle group and teleport the body.
-    laserTestRig.update(deltaSeconds);
-    // The body resolves its own locomotion first. The elevator then advances
-    // its authored platform pose and applies that fixed-step displacement only
-    // if the body remains grounded on the roof.
-    elevatorTestRig.update(deltaSeconds);
-
     blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
@@ -337,7 +314,6 @@ const loop = new Loop({
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.update(deltaSeconds, slimeVisualState);
-    puzzleTestRig.update(deltaSeconds);
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
@@ -355,9 +331,6 @@ const loop = new Loop({
       blobFacing.getInterpolatedYaw(interpolationAlpha),
     );
     testScene.presentProbe();
-    // A high-refresh render can occur without a 60 Hz gameplay step. Consume
-    // any pointer motion from that interval here so camera look remains crisp;
-    // the next fixed step will read the already-updated orbit basis.
     renderLayer.cameraRig.queueLookInput(
       input.pointerDeltaX,
       input.pointerDeltaY,
@@ -382,8 +355,6 @@ const loop = new Loop({
       const slimeDiagnostics = testScene.slimeDiagnostics;
       const cameraStats = renderLayer.cameraRig.getDiagnostics();
       const cameraPosition = renderLayer.cameraRig.camera.position;
-      const laserStats = laserTestRig.getDiagnostics();
-      const elevatorStats = elevatorTestRig.getDiagnostics();
 
       testPanel.setRuntimeDiagnostics(
         [
@@ -417,36 +388,17 @@ const loop = new Loop({
           `contacts this step: ${body.contactsThisStep}`,
           `last collision: ${body.lastCollisionName}`,
           `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
-          `laser checkpoint: ${laserStats.activeCheckpointId}`,
-          `laser static enabled: ${laserStats.staticEnabled ? 'yes' : 'no'}`,
-          `laser recoveries / last failure: ${laserStats.recoveryRequestCount} / ${laserStats.lastFailureHazardId}`,
-          `laser static start: ${laserStats.staticStart[0].toFixed(2)}, ${laserStats.staticStart[1].toFixed(2)}, ${laserStats.staticStart[2].toFixed(2)} m`,
-          `laser static end: ${laserStats.staticEnd[0].toFixed(2)}, ${laserStats.staticEnd[1].toFixed(2)}, ${laserStats.staticEnd[2].toFixed(2)} m`,
-          `laser single sweep: ${laserStats.singleSweepState} @ ${(laserStats.singleSweepPhase * 100).toFixed(0)}%`,
-          `laser alternating A/B: ${(laserStats.alternatingPhaseA * 100).toFixed(0)}% / ${(laserStats.alternatingPhaseB * 100).toFixed(0)}%`,
-          `laser crossing A/B: ${(laserStats.crossingPhaseA * 100).toFixed(0)}% / ${(laserStats.crossingPhaseB * 100).toFixed(0)}%`,
-          `laser final burst: ${laserStats.finalBurstState} @ ${(laserStats.finalBurstPhase * 100).toFixed(0)}%`,
-          `elevator state / progress: ${elevatorStats.state} / ${(elevatorStats.progress * 100).toFixed(0)}%`,
-          `elevator platform Y / delta Y: ${elevatorStats.platformY.toFixed(2)} / ${elevatorStats.displacementY.toFixed(4)} m`,
-          `elevator rider / support: ${elevatorStats.riderSupported ? 'yes' : 'no'} / ${elevatorStats.supportColliderName}`,
-          `elevator timing start / travel / arrival: ${elevatorStats.startDelaySeconds.toFixed(2)} / ${elevatorStats.travelDurationSeconds.toFixed(2)} / ${elevatorStats.arrivalDelaySeconds.toFixed(2)} s`,
-          `elevator sequence elapsed: ${elevatorStats.sequenceElapsedSeconds.toFixed(2)} s`,
-          `elevator checkpoint / group: ${elevatorStats.activeCheckpointId} / ${elevatorStats.checkpointGroupId}`,
-          `elevator connected laser: ${elevatorStats.connectedLaserState} @ ${(elevatorStats.connectedLaserPhase * 100).toFixed(0)}%`,
-          `elevator recoveries: ${elevatorStats.recoveryCount}`,
           `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
           `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
           `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
           `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
-          `slope idle regression: ${slopeRegressionStatus}`,
+          `teaching-surface regression: ${slopeRegressionStatus}`,
           `wall jump basis regression: ${wallJumpBasisRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
           `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
           `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
-          `plate / door / platform: ${puzzleTestRig.platePressed ? 'pressed' : 'released'} / ${puzzleTestRig.doorState} / ${puzzleTestRig.platformState}`,
-          `active checkpoint: ${puzzleTestRig.activeCheckpointId}`,
         ].join('\n'),
       );
     }
@@ -465,10 +417,7 @@ const shutdown = (): void => {
   input.dispose();
   collisionWorld.clear();
   surfaceRegistry.clear();
-  laserTestRig.dispose();
-  elevatorTestRig.dispose();
   testPanel.dispose();
-  puzzleTestRig.dispose();
   testScene.dispose();
   renderLayer.dispose();
 };
