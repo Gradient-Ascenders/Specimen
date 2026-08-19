@@ -64,6 +64,12 @@ export interface KinematicBodyConfig {
   bounceCooldownSeconds: number;
   /** Required approach speed into a bounce surface before it fires. */
   minimumBounceApproachSpeedMetresPerSecond: number;
+  /** Minimum downward landing speed that triggers the slime's innate rebound. */
+  slimeMinimumBounceImpactSpeedMetresPerSecond: number;
+  /** Fraction of vertical impact speed retained by the slime after landing. */
+  slimeBounceRestitution: number;
+  /** Safety cap for the slime's rebound speed after a very high fall. */
+  slimeMaximumBounceSpeedMetresPerSecond: number;
 }
 
 export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
@@ -93,6 +99,9 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   attachmentDetachCooldownSeconds: 0.12,
   bounceCooldownSeconds: 0.12,
   minimumBounceApproachSpeedMetresPerSecond: 0.12,
+  slimeMinimumBounceImpactSpeedMetresPerSecond: 3.1,
+  slimeBounceRestitution: 0.68,
+  slimeMaximumBounceSpeedMetresPerSecond: 11,
 };
 
 export interface KinematicBodyOptions {
@@ -899,6 +908,20 @@ export class KinematicBody {
         continue;
       }
 
+      if (
+        allowSurfaceTransitions &&
+        this.tryApplySlimeLandingBounce(
+          velocityIntoSurface,
+          this.movementHit.normal,
+          this.movementHit.object,
+        )
+      ) {
+        this.remainingDisplacement
+          .copy(this.velocityValue)
+          .multiplyScalar(deltaSeconds * (1 - travelFraction));
+        continue;
+      }
+
       if (allowSurfaceTransitions && surface.adhesive) {
         this.tryAttach(
           this.movementHit.normal,
@@ -947,6 +970,55 @@ export class KinematicBody {
       return false;
     }
 
+    this.applyBounceImpulse(
+      bounceSpeedMetresPerSecond,
+      velocityIntoSurface,
+      surfaceNormal,
+      surfaceObject,
+    );
+
+    return true;
+  }
+
+  /**
+   * Default slime rebound: only genuine floor/slope landings bounce. Rebound
+   * speed is proportional to the impact, retains less than full energy, and
+   * is capped so a very tall fall remains controllable.
+   */
+  private tryApplySlimeLandingBounce(
+    velocityIntoSurface: number,
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+  ): boolean {
+    if (this.bounceCooldownSecondsValue > 0) return false;
+    if (
+      surfaceNormal.dot(WORLD_UP) < this.config.minimumGroundNormalDot ||
+      velocityIntoSurface >=
+        -this.config.slimeMinimumBounceImpactSpeedMetresPerSecond
+    ) {
+      return false;
+    }
+
+    const reboundSpeed = Math.min(
+      this.config.slimeMaximumBounceSpeedMetresPerSecond,
+      -velocityIntoSurface * this.config.slimeBounceRestitution,
+    );
+    this.applyBounceImpulse(
+      reboundSpeed,
+      velocityIntoSurface,
+      surfaceNormal,
+      surfaceObject,
+    );
+
+    return true;
+  }
+
+  private applyBounceImpulse(
+    bounceSpeedMetresPerSecond: number,
+    velocityIntoSurface: number,
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+  ): void {
     if (this.attachedValue) {
       this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
     }
@@ -981,7 +1053,6 @@ export class KinematicBody {
     this.lastBounceSurfaceNameValue =
       surfaceObject?.name || '<unnamed>';
 
-    return true;
   }
 
   private tryAttach(
@@ -1214,6 +1285,14 @@ export class KinematicBody {
         'minimumBounceApproachSpeedMetresPerSecond',
         config.minimumBounceApproachSpeedMetresPerSecond,
       ],
+      [
+        'slimeMinimumBounceImpactSpeedMetresPerSecond',
+        config.slimeMinimumBounceImpactSpeedMetresPerSecond,
+      ],
+      [
+        'slimeMaximumBounceSpeedMetresPerSecond',
+        config.slimeMaximumBounceSpeedMetresPerSecond,
+      ],
     ];
 
     for (const [name, value] of positiveFinite) {
@@ -1228,6 +1307,16 @@ export class KinematicBody {
     ) {
       throw new Error(
         'maximumJumpSpeedMetresPerSecond must be >= minimumJumpSpeedMetresPerSecond.',
+      );
+    }
+
+    if (
+      !Number.isFinite(config.slimeBounceRestitution) ||
+      config.slimeBounceRestitution <= 0 ||
+      config.slimeBounceRestitution >= 1
+    ) {
+      throw new Error(
+        'slimeBounceRestitution must be finite and within (0, 1).',
       );
     }
 

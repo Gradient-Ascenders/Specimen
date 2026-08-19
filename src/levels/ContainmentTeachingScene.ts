@@ -275,9 +275,6 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-rear-wall-below-duct', size: [2.2, 10.2, 0.4], position: [-8.4, 5.1, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-rear-wall-above-duct', size: [2.2, 5.2, 0.4], position: [-8.4, 15.4, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-front-wall', size: [30, 18, 0.4], position: [0, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
-
-    // Zone 1: a 7 × 7 m purple calibration landing under the duct drop.
-    this.addCollider({ name: 'room-2-bounce-calibration-landing', size: [7, 0.22, 7], position: [-9, 0.11, 31], material: materials.bounce, surfaceTag: 'bouncy', });
     // Zone 2: modest vertical charged jump, top at ~2.2m.
     this.addCollider({ name: 'room-2-platform-a-height-lesson', size: [5, 0.5, 4], position: [-4, 1.95, 35], material: materials.platform });
     // Zone 3: visible, forgiving horizontal gap.
