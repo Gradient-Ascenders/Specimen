@@ -86,9 +86,9 @@ The normal gameplay path keeps three orientation decisions separate:
 
 This makes a stationary mouse orbit camera-only state. Starting movement after
 an orbit uses the new camera direction immediately, while changing movement
-direction never recentres the camera behind the blob. The movement body freezes
-the resolved direction and support plane for the full fixed step, including a
-wall-jump release step.
+direction never recentres the camera behind the blob. The movement body retains
+the step-start support plane when a step begins attached, including a wall-jump
+release step. Ordinary slope jumps use the current airborne world-up plane.
 
 Normal-ground facing turns along the shortest yaw arc at `720°/s`, with a
 `0.05 m/s` horizontal speed threshold to suppress near-rest direction noise.

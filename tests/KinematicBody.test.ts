@@ -4,7 +4,10 @@ import test from 'node:test';
 import * as THREE from 'three';
 
 import { EventBus } from '../src/core/EventBus.ts';
-import { KinematicBody } from '../src/physics/KinematicBody.ts';
+import {
+  DEFAULT_KINEMATIC_BODY_CONFIG,
+  KinematicBody,
+} from '../src/physics/KinematicBody.ts';
 import type { MovementEvents } from '../src/physics/MovementEvents.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
@@ -47,6 +50,39 @@ function beginWallJump(body: KinematicBody): void {
     held: true,
     released: false,
   });
+}
+
+function createSlopeBody(): { body: KinematicBody; slope: THREE.Mesh } {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const slope = new THREE.Mesh(new THREE.BoxGeometry(4, 0.35, 4));
+  slope.name = 'test-slope-15-degrees';
+  slope.rotation.z = -THREE.MathUtils.degToRad(15);
+  slope.updateWorldMatrix(true, false);
+  world.register(slope);
+  surfaces.register(slope);
+
+  const surfaceNormal = new THREE.Vector3(0, 1, 0)
+    .applyQuaternion(slope.quaternion)
+    .normalize();
+  const surfacePoint = new THREE.Vector3(0, 0.35 / 2, 0).applyMatrix4(
+    slope.matrixWorld,
+  );
+  const initialPosition = surfacePoint.addScaledVector(
+    surfaceNormal,
+    DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres +
+      DEFAULT_KINEMATIC_BODY_CONFIG.skinWidthMetres +
+      0.002,
+  );
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition,
+  });
+  assert.equal(body.grounded, true);
+  assert.ok(body.groundNormal.y < 1);
+
+  return { body, slope };
 }
 
 test('wall jump event reports the pre-detach launch direction', () => {
@@ -120,6 +156,51 @@ test('wall jump release keeps the step-start wall movement basis', () => {
 
   idleFixture.wall.geometry.dispose();
   forwardFixture.wall.geometry.dispose();
+});
+
+test('slope jump release uses the current airborne movement plane', () => {
+  const idleFixture = createSlopeBody();
+  const uphillFixture = createSlopeBody();
+  const beginCharge = {
+    pressed: true,
+    held: true,
+    released: false,
+  } as const;
+  idleFixture.body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, beginCharge);
+  uphillFixture.body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, beginCharge);
+
+  const release = {
+    pressed: false,
+    held: false,
+    released: true,
+  } as const;
+  idleFixture.body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, release);
+  uphillFixture.body.update(
+    FIXED_DELTA_SECONDS,
+    new THREE.Vector3(1, 0, 0),
+    release,
+  );
+
+  const idleVelocity = new THREE.Vector3(
+    idleFixture.body.velocity.x,
+    idleFixture.body.velocity.y,
+    idleFixture.body.velocity.z,
+  );
+  const uphillVelocity = new THREE.Vector3(
+    uphillFixture.body.velocity.x,
+    uphillFixture.body.velocity.y,
+    uphillFixture.body.velocity.z,
+  );
+  const airControlDelta = uphillVelocity.sub(idleVelocity);
+
+  assert.equal(idleFixture.body.grounded, false);
+  assert.equal(uphillFixture.body.grounded, false);
+  assert.ok(airControlDelta.x > 0);
+  assert.ok(Math.abs(airControlDelta.y) < EPSILON);
+  assert.ok(Math.abs(airControlDelta.z) < EPSILON);
+
+  idleFixture.slope.geometry.dispose();
+  uphillFixture.slope.geometry.dispose();
 });
 
 test('authored sticky wall carries movement across its top edge', () => {

@@ -18,6 +18,9 @@ interface MutableCameraTarget extends CameraFollowTarget {
   attached: boolean;
 }
 
+const EPSILON = 1e-10;
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+
 function createTarget(): MutableCameraTarget {
   return {
     position: new THREE.Vector3(0, 0.46, 0),
@@ -157,6 +160,94 @@ test('attached-surface movement follows displayed camera directions on opposing 
 
     rig.copySurfaceMovementDirection(0, -1, wallUp, movement);
     assert.ok(movement.dot(cameraForward) > 1 - 1e-10);
+  }
+});
+
+test('attached movement follows the displayed camera during partial up damping', () => {
+  const transitionCases = [
+    { wallUp: new THREE.Vector3(1, 0, 0), yawRadians: 0 },
+    {
+      wallUp: new THREE.Vector3(-1, 0, 0),
+      yawRadians: Math.PI / 3,
+    },
+    {
+      wallUp: new THREE.Vector3(0, 0, 1),
+      yawRadians: -Math.PI / 4,
+    },
+  ];
+  const sampleSteps = new Set([1, 4, 10]);
+
+  for (const { wallUp, yawRadians } of transitionCases) {
+    const target = createTarget();
+    const rig = new CameraRig({
+      horizontalSensitivityRadiansPerPixel: 1,
+      initialPitchRadians: 0,
+    });
+    const cameraForward = new THREE.Vector3();
+    const displayedForward = new THREE.Vector3();
+    const displayedRight = new THREE.Vector3();
+    const rightMovement = new THREE.Vector3();
+    const leftMovement = new THREE.Vector3();
+    const forwardMovement = new THREE.Vector3();
+    const backwardMovement = new THREE.Vector3();
+    const previousRight = new THREE.Vector3();
+    const previousForward = new THREE.Vector3();
+    let hasPreviousSample = false;
+
+    rig.setFollowTarget(target, new CollisionWorld());
+    rig.update(1, 0);
+    rig.queueLookInput(yawRadians, 0);
+    rig.update(1, 0);
+
+    target.gameplayUp.copy(wallUp);
+    target.attached = true;
+    for (let step = 1; step <= 10; step += 1) {
+      rig.update(1, 1 / 60);
+      if (!sampleSteps.has(step)) continue;
+
+      // These samples are genuinely transitional: camera-up is neither the
+      // old ground up nor the authoritative wall normal yet.
+      assert.ok(rig.camera.up.dot(WORLD_UP) < 0.999);
+      assert.ok(rig.camera.up.dot(wallUp) < 0.999);
+
+      rig.camera.getWorldDirection(cameraForward);
+      displayedForward
+        .copy(cameraForward)
+        .projectOnPlane(wallUp)
+        .normalize();
+      displayedRight
+        .crossVectors(cameraForward, rig.camera.up)
+        .projectOnPlane(wallUp)
+        .normalize();
+
+      rig.copySurfaceMovementDirection(1, 0, wallUp, rightMovement);
+      rig.copySurfaceMovementDirection(-1, 0, wallUp, leftMovement);
+      rig.copySurfaceMovementDirection(0, -1, wallUp, forwardMovement);
+      rig.copySurfaceMovementDirection(0, 1, wallUp, backwardMovement);
+
+      for (const movement of [
+        rightMovement,
+        leftMovement,
+        forwardMovement,
+        backwardMovement,
+      ]) {
+        assert.ok(Math.abs(movement.dot(wallUp)) < EPSILON);
+      }
+      assert.ok(rightMovement.dot(displayedRight) > 0);
+      assert.ok(leftMovement.dot(displayedRight) < 0);
+      assert.ok(forwardMovement.dot(displayedForward) > 1 - EPSILON);
+      assert.ok(backwardMovement.dot(displayedForward) < -1 + EPSILON);
+      assert.ok(rightMovement.dot(leftMovement) < -1 + EPSILON);
+      assert.ok(forwardMovement.dot(backwardMovement) < -1 + EPSILON);
+
+      if (hasPreviousSample) {
+        assert.ok(previousRight.dot(rightMovement) > 0);
+        assert.ok(previousForward.dot(forwardMovement) > 0);
+      }
+      previousRight.copy(rightMovement);
+      previousForward.copy(forwardMovement);
+      hasPreviousSample = true;
+    }
   }
 });
 

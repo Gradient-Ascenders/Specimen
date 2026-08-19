@@ -24,14 +24,14 @@ feedback described below.
 ## Automated and production checks
 
 ```text
-npm test            # 26 passed, 0 failed
+npm test            # 28 passed, 0 failed
 npm run type-check  # passed
 npm run build       # passed with Vite 8.2.1
 git diff --check    # passed
 Playwright          # 2 production-preview scenarios passed
 ```
 
-The build produced a 627.94 kB minified / 156.99 kB gzip JavaScript chunk and
+The build produced a 627.95 kB minified / 157.00 kB gzip JavaScript chunk and
 retained Vite's known advisory for a chunk over 500 kB. The modest increase from
 the already-pushed camera/controller branch is explained by the targeted wall
 input and edge-transition code; it did not add an asset or loading boundary, so
@@ -47,8 +47,9 @@ code splitting remains outside Issue #15.
 - Attached WASD follows the displayed camera basis projected onto the current
   support plane. Pitch is excluded, so screen-left/right cannot be reversed by
   wall normal or camera pitch.
-- The resolved world-space direction and support plane are fixed for a complete
-  simulation step, including a jump-release step.
+- The resolved world-space direction is fixed for a complete simulation step.
+  A step that begins attached retains its wall plane through jump release;
+  ordinary slope jumps use the current airborne world-up plane.
 - A valid adhesive convex edge rotates tangent velocity into the adjacent
   supported plane. A walkable sticky top returns to grounded world-up movement;
   a missing/non-adhesive/unsupported face detaches.
@@ -62,10 +63,11 @@ camera-relative, and limits camera roll to authored support changes.
 
 The production route was repeated with perpendicular and two diagonal wall
 approaches. The checks covered attachment, camera-relative climb/down,
-left/right traversal, reversal, camera yaw/pitch while attached, movement after
-the camera turn, charged wall jump, detachment, fall/landing, immediate ground
-camera rotation, camera-relative ground movement, and facing alignment with
-actual velocity.
+left/right traversal during partial camera-up damping and after it settled,
+reversal, camera yaw/pitch while attached, charged wall jump, detachment,
+fall/landing, camera return, camera-relative ground movement, and facing
+alignment with actual velocity. Ordinary flat-ground and authored 15-degree
+slope jumps were also repeated in the production preview.
 
 The fallback route separately proved:
 
@@ -76,11 +78,12 @@ The fallback route separately proved:
 - the production page produced no console errors, failed requests, HTTP 4xx/5xx
   responses, or asset 404s.
 
-Focused automated coverage verifies camera-relative attached directions on
-opposing wall normals, wall-jump launch/event direction, release-step movement
-coordinates, sticky wall-to-top continuity, camera teleport presentation
-reset, facing's 0.05 m/s threshold, shortest-angle facing, and render-clock
-independence of directional slime deformation.
+Focused automated coverage verifies partially damped and fully settled camera
+directions on multiple wall normals/yaws, wall-jump launch/event direction,
+release-step wall coordinates, post-release slope-jump air coordinates, sticky
+wall-to-top continuity, camera teleport presentation reset, facing's 0.05 m/s
+threshold, shortest-angle facing, and render-clock independence of directional
+slime deformation.
 
 Headless browser automation establishes state continuity and repeatability; it
 does **not** prove absence of nausea or subjective comfort.

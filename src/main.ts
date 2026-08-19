@@ -257,8 +257,8 @@ const loop = new Loop({
     renderLayer.cameraRig.applyQueuedLookInput();
 
     // Resolve both ground and attached movement from the camera before the
-    // body advances. The body then freezes that world-space direction and its
-    // support plane for the complete fixed step.
+    // body advances. A step that begins attached preserves this support plane
+    // through wall-jump release; ordinary jumps use their new airborne plane.
     if (body.attached) {
       renderLayer.cameraRig.copySurfaceMovementDirection(
         moveX,

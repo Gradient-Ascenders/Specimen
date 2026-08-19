@@ -36,8 +36,10 @@ The movement body and camera deliberately own different orientation state:
   projected onto the authoritative support plane. Pitch is excluded. Therefore
   A/D always follows screen-left/screen-right, while W/S follows screen
   forward/back on the wall; keys are not assigned fixed world-up axes.
-- The resolved world direction and support plane are frozen for each fixed
-  step, so jump detachment cannot reinterpret input halfway through that step.
+- The resolved world direction is fixed for each step. A step that begins
+  attached also retains its original wall plane, so wall-jump detachment cannot
+  reinterpret input halfway through that step. Ordinary slope jumps use the
+  current airborne world-up plane after release.
 - Bob's visual orientation is separate. Ground facing follows actual horizontal
   velocity; attached deformation follows world-space motion/support state and
   is converted with the interpolated presentation orientation at render time.

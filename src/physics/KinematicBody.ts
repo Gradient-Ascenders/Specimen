@@ -331,13 +331,10 @@ export class KinematicBody {
     this.landedThisStepValue = false;
 
     const groundedAtStepStart = this.groundedValue;
-    this.movementUpAtStepStart.copy(
-      this.attachedValue
-        ? this.gameplayUpValue
-        : this.groundedValue
-          ? this.groundNormalValue
-          : this.gameplayUpValue,
-    );
+    const attachedAtStepStart = this.attachedValue;
+    if (attachedAtStepStart) {
+      this.movementUpAtStepStart.copy(this.gameplayUpValue);
+    }
 
     this.attachmentCooldownSecondsValue = Math.max(
       0,
@@ -370,6 +367,7 @@ export class KinematicBody {
     this.applyLocomotion(
       deltaSeconds,
       movementDirectionWorld,
+      attachedAtStepStart,
       this.movementUpAtStepStart,
     );
     this.applyGravity(deltaSeconds);
@@ -519,6 +517,7 @@ export class KinematicBody {
   private applyLocomotion(
     deltaSeconds: number,
     movementDirectionWorld: ReadonlyVector3State,
+    attachedAtStepStart: boolean,
     movementUpAtStepStart: THREE.Vector3,
   ): void {
     this.moveInput.set(
@@ -529,10 +528,16 @@ export class KinematicBody {
 
     if (this.moveInput.lengthSq() > 1) this.moveInput.normalize();
 
-    // Freeze the movement plane selected at the start of the fixed step. A
-    // wall-jump release may detach before locomotion, but it must not reinterpret
-    // the already-resolved wall direction against world-up halfway through.
-    this.movementPlaneNormal.copy(movementUpAtStepStart);
+    // Freeze only an attached support plane selected at the start of the fixed
+    // step. A wall-jump release must retain its already-resolved wall direction,
+    // while an ordinary slope jump must use the current airborne world-up plane.
+    this.movementPlaneNormal.copy(
+      attachedAtStepStart
+        ? movementUpAtStepStart
+        : this.groundedValue
+          ? this.groundNormalValue
+          : this.gameplayUpValue,
+    );
 
     const normalSpeed = this.velocityValue.dot(this.movementPlaneNormal);
     this.normalVelocity
