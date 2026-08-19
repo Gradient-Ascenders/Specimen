@@ -472,9 +472,11 @@ export class SlimeVisual {
     this.onImpact({
       normalWorld: state.contactNormalWorld,
       strength,
-      kind: state.attached && state.contactSurfaceTag === 'sticky'
-        ? 'sticky'
-        : 'wall',
+      kind: state.contactSurfaceTag === 'bouncy'
+        ? 'bounce'
+        : state.attached && state.contactSurfaceTag === 'sticky'
+          ? 'sticky'
+          : 'wall',
     });
   }
 

@@ -84,9 +84,8 @@ visual check, not playable sticky traversal.
 
 Bounce and sticky response values were also exercised through the visual API:
 a bounce impact selected elasticity `1.65`, while a wall impact preserved its
-supplied local normal and strength. These are contract checks, not claims of
-playable bounce/sticky traversal: the current body still treats `bouncy` as
-metadata and reports `attached = false`.
+supplied local normal and strength. These recorded checks predate the later
+authoritative wall-attachment and bounce integration.
 
 ## Frame cost and resources
 
@@ -122,7 +121,7 @@ The movement shader, normal correction, controller and spring equations were
 handwritten for Specimen. No new third-party code, shader technique, asset or
 reference was introduced, so `CREDITS.md` did not require a new entry.
 
-Sticky attachment, wall/ceiling traversal and bounce impulses do not exist in
-the current gameplay controller. Their surface-relative visual contract was
-verified with supplied states, but end-to-end gameplay tests remain deferred
-to the issues that make those mechanics authoritative.
+Authored vertical-wall attachment and bounce impulses are now supplied by the
+gameplay controller. The evidence above remains the Issue #17 supplied-state
+contract check; ceiling traversal is still not implemented and is not claimed
+as an end-to-end gameplay test.

@@ -3,9 +3,15 @@ import * as THREE from 'three';
 import type { EventBus } from '../core/EventBus';
 import { CollisionHit, CollisionWorld } from './CollisionWorld';
 import type { MovementEvents } from './MovementEvents.ts';
+import {
+  type SurfaceRegistry,
+  type SurfaceTag,
+} from './SurfaceRegistry';
 
 const MOVEMENT_EPSILON_SQ = 1e-12;
 const CONTACT_PUSH_METRES = 1e-5;
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const WORLD_FORWARD = new THREE.Vector3(0, 0, -1);
 
 export interface ReadonlyVector3State {
   readonly x: number;
@@ -28,43 +34,34 @@ const NO_JUMP_INPUT: Readonly<JumpInputState> = {
 export type JumpState = 'grounded' | 'coyote' | 'charging' | 'airborne';
 
 export interface KinematicBodyConfig {
-  /** Collision sphere radius in metres. */
   radiusMetres: number;
-  /** Small separation used by queries to keep the body off exact surfaces. */
   skinWidthMetres: number;
-  /** Downward acceleration in metres per second squared. */
   gravityMetresPerSecondSquared: number;
-  /** Maximum intended locomotion speed in metres per second. */
   maxSpeedMetresPerSecond: number;
-  /** Ground acceleration in metres per second squared. */
   groundAccelerationMetresPerSecondSquared: number;
-  /** Air-control acceleration in metres per second squared. */
   airAccelerationMetresPerSecondSquared: number;
-  /** Ground braking when there is no movement input, in m/s^2. */
   groundBrakingMetresPerSecondSquared: number;
-  /** Exponential horizontal air drag coefficient in 1/seconds. */
   airDragPerSecond: number;
-  /** Distance below the body used to maintain a stable grounded state. */
   groundProbeDistanceMetres: number;
-  /** Minimum dot(surfaceNormal, gameplayUp) considered walkable ground. */
   minimumGroundNormalDot: number;
-  /** Maximum collision/slide resolutions performed in one fixed update. */
   maxCollisionIterations: number;
 
-  /** Tap-jump launch speed along gameplay-up, in metres per second. */
   minimumJumpSpeedMetresPerSecond: number;
-  /** Full-charge launch speed along gameplay-up, in metres per second. */
   maximumJumpSpeedMetresPerSecond: number;
-  /** Time required to reach full jump charge. */
   maximumJumpChargeSeconds: number;
-  /** Exponent used to shape normalized charge before speed interpolation. */
   jumpChargeCurveExponent: number;
-  /** Retained jump window after leaving valid ground. */
   coyoteTimeSeconds: number;
-  /** Brief post-launch interval during which ground probing cannot reattach. */
   jumpGroundDetachSeconds: number;
-  /** Minimum stable airborne duration required before a landing signal fires. */
   minimumLandingAirTimeSeconds: number;
+
+  /** Maximum abs(dot(surfaceNormal, worldUp)) that may be used as a wall attachment. */
+  maximumAttachmentWorldUpDot: number;
+  /** Time after an authored detach before the same/new wall may attach again. */
+  attachmentDetachCooldownSeconds: number;
+  /** Minimum time between authored bounce impulses. */
+  bounceCooldownSeconds: number;
+  /** Required approach speed into a bounce surface before it fires. */
+  minimumBounceApproachSpeedMetresPerSecond: number;
 }
 
 export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
@@ -87,26 +84,34 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   coyoteTimeSeconds: 0.1,
   jumpGroundDetachSeconds: 0.05,
   minimumLandingAirTimeSeconds: 0.04,
+
+  // Constrained authored-wall policy: supports near-vertical walls, excludes
+  // floors and ceilings until ceiling traversal is separately validated.
+  maximumAttachmentWorldUpDot: Math.cos(THREE.MathUtils.degToRad(70)),
+  attachmentDetachCooldownSeconds: 0.12,
+  bounceCooldownSeconds: 0.12,
+  minimumBounceApproachSpeedMetresPerSecond: 0.12,
 };
 
 export interface KinematicBodyOptions {
   world: CollisionWorld;
+  surfaces: SurfaceRegistry;
   initialPosition: ReadonlyVector3State;
   config?: Partial<KinematicBodyConfig>;
   events?: EventBus<MovementEvents>;
 }
 
 /**
- * Simple sphere-based kinematic gameplay body.
+ * Sphere-based authoritative gameplay body with authored surface behaviour.
  *
- * This object owns authoritative movement state. The deformable slime visual
- * and camera may read current/previous position, velocity, charge and
- * gameplay-up, but they do not feed transforms back into the controller.
+ * Visual deformation and CameraRig read the state exposed here. The camera
+ * smooths gameplayUp privately; it never writes smoothed orientation back.
  */
 export class KinematicBody {
   readonly radiusMetres: number;
 
   private readonly world: CollisionWorld;
+  private readonly surfaces: SurfaceRegistry;
   private readonly config: KinematicBodyConfig;
   private readonly events: EventBus<MovementEvents> | undefined;
 
@@ -119,6 +124,10 @@ export class KinematicBody {
 
   private groundedValue = false;
   private attachedValue = false;
+  private attachmentSurface: THREE.Mesh | null = null;
+  private supportSurfaceTagValue: SurfaceTag = 'default';
+  private supportTractionMultiplier = 1;
+  private lastContactSurfaceTagValue: SurfaceTag = 'default';
 
   private chargingJumpValue = false;
   private chargeSecondsValue = 0;
@@ -131,7 +140,11 @@ export class KinematicBody {
   private lastJumpChargeFractionValue = 0;
   private lastContactImpactSpeedValue = 0;
   private lastContactNameValue = 'none';
-  private lastContactSurfaceTagValue = 'default';
+
+  private attachmentCooldownSecondsValue = 0;
+  private bounceCooldownSecondsValue = 0;
+  private lastBounceSpeedValue = 0;
+  private lastBounceSurfaceNameValue = 'none';
 
   private readonly moveInput = new THREE.Vector3();
   private readonly movementPlaneNormal = new THREE.Vector3();
@@ -142,6 +155,8 @@ export class KinematicBody {
   private readonly remainingDisplacement = new THREE.Vector3();
   private readonly groundProbeDisplacement = new THREE.Vector3();
   private readonly gravityStep = new THREE.Vector3();
+  private readonly surfaceForward = new THREE.Vector3();
+  private readonly surfaceRight = new THREE.Vector3();
 
   private readonly movementHit = new CollisionHit();
   private readonly groundHit = new CollisionHit();
@@ -151,6 +166,7 @@ export class KinematicBody {
 
   constructor(options: KinematicBodyOptions) {
     this.world = options.world;
+    this.surfaces = options.surfaces;
     this.events = options.events;
     this.config = {
       ...DEFAULT_KINEMATIC_BODY_CONFIG,
@@ -186,9 +202,36 @@ export class KinematicBody {
     return this.groundedValue;
   }
 
-  /** Reserved for the later sticky-surface issue. Always false in #12. */
   get attached(): boolean {
     return this.attachedValue;
+  }
+
+  get attachmentSurfaceName(): string {
+    return this.attachmentSurface?.name || 'none';
+  }
+
+  get supportSurfaceTag(): SurfaceTag {
+    return this.supportSurfaceTagValue;
+  }
+
+  get lastContactSurfaceTag(): SurfaceTag {
+    return this.lastContactSurfaceTagValue;
+  }
+
+  get attachmentCooldownSeconds(): number {
+    return this.attachmentCooldownSecondsValue;
+  }
+
+  get bounceCooldownSeconds(): number {
+    return this.bounceCooldownSecondsValue;
+  }
+
+  get lastBounceSpeedMetresPerSecond(): number {
+    return this.lastBounceSpeedValue;
+  }
+
+  get lastBounceSurfaceName(): string {
+    return this.lastBounceSurfaceNameValue;
   }
 
   get jumpState(): JumpState {
@@ -258,10 +301,6 @@ export class KinematicBody {
     return this.lastContactNameValue;
   }
 
-  get lastContactSurfaceTag(): string {
-    return this.lastContactSurfaceTagValue;
-  }
-
   /**
    * Advance one deterministic gameplay step.
    *
@@ -284,11 +323,20 @@ export class KinematicBody {
     this.lastCollisionName = 'none';
     this.lastContactImpactSpeedValue = 0;
     this.lastContactNameValue = 'none';
-    this.lastContactSurfaceTagValue = 'default';
     this.lastContactNormalValue.copy(this.gameplayUpValue);
+    this.lastContactSurfaceTagValue = this.supportSurfaceTagValue;
     this.landedThisStepValue = false;
 
     const groundedAtStepStart = this.groundedValue;
+
+    this.attachmentCooldownSecondsValue = Math.max(
+      0,
+      this.attachmentCooldownSecondsValue - deltaSeconds,
+    );
+    this.bounceCooldownSecondsValue = Math.max(
+      0,
+      this.bounceCooldownSecondsValue - deltaSeconds,
+    );
 
     if (this.groundReacquireDelaySeconds > 0) {
       this.groundReacquireDelaySeconds = Math.max(
@@ -319,10 +367,7 @@ export class KinematicBody {
 
     this.moveAndSlide(deltaSeconds);
     this.refreshGroundState();
-    this.handleLanding(
-      groundedAtStepStart,
-      downwardSpeedBeforeCollision,
-    );
+    this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
   }
 
   teleport(position: ReadonlyVector3State, preserveVelocity = false): void {
@@ -334,8 +379,16 @@ export class KinematicBody {
     this.contactsThisStep = 0;
     this.lastCollisionName = 'none';
     this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(WORLD_UP);
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
+    this.lastContactSurfaceTagValue = 'default';
     this.cancelJumpCharge();
     this.groundReacquireDelaySeconds = 0;
+    this.attachmentCooldownSecondsValue = 0;
+    this.bounceCooldownSecondsValue = 0;
     this.airborneSeconds = 0;
     this.landedThisStepValue = false;
     this.lastLandingImpactSpeedValue = 0;
@@ -343,8 +396,9 @@ export class KinematicBody {
     this.lastJumpChargeFractionValue = 0;
     this.lastContactImpactSpeedValue = 0;
     this.lastContactNameValue = 'none';
-    this.lastContactSurfaceTagValue = 'default';
     this.lastContactNormalValue.copy(this.gameplayUpValue);
+    this.lastBounceSpeedValue = 0;
+    this.lastBounceSurfaceNameValue = 'none';
 
     this.refreshGroundState();
     this.coyoteTimeRemainingSecondsValue = this.groundedValue
@@ -357,9 +411,6 @@ export class KinematicBody {
     jumpInput: Readonly<JumpInputState>,
   ): void {
     if (this.chargingJumpValue) {
-      // Focus loss clears Input without synthesizing a release. Treat
-      // "neither held nor released" as cancellation so a stale charge cannot
-      // fire when the browser regains focus.
       if (!jumpInput.held && !jumpInput.released) {
         this.cancelJumpCharge();
         return;
@@ -388,8 +439,6 @@ export class KinematicBody {
       ? Math.min(deltaSeconds, this.config.maximumJumpChargeSeconds)
       : 0;
 
-    // A press and release can both occur between two fixed updates. Preserve
-    // that as a valid tap jump instead of dropping the input.
     if (jumpInput.released) this.launchChargedJump();
   }
 
@@ -405,6 +454,8 @@ export class KinematicBody {
       curvedCharge,
     );
 
+    // gameplayUp is still the attachment normal here, so a wall jump launches
+    // away from the authored wall before detaching back to world-up movement.
     const currentUpSpeed = this.velocityValue.dot(this.gameplayUpValue);
     if (currentUpSpeed < jumpSpeed) {
       this.velocityValue.addScaledVector(
@@ -416,10 +467,15 @@ export class KinematicBody {
     this.lastJumpSpeedValue = jumpSpeed;
     this.lastJumpChargeFractionValue = normalizedCharge;
 
+    if (this.attachedValue) {
+      this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
+    } else {
+      this.groundedValue = false;
+      this.groundNormalValue.copy(WORLD_UP);
+    }
+
     this.chargingJumpValue = false;
     this.chargeSecondsValue = 0;
-    this.groundedValue = false;
-    this.groundNormalValue.copy(this.gameplayUpValue);
     this.coyoteTimeRemainingSecondsValue = 0;
     this.groundReacquireDelaySeconds =
       this.config.jumpGroundDetachSeconds;
@@ -452,7 +508,32 @@ export class KinematicBody {
     const clampedX = THREE.MathUtils.clamp(moveX, -1, 1);
     const clampedZ = THREE.MathUtils.clamp(moveZ, -1, 1);
 
-    this.moveInput.set(clampedX, 0, clampedZ);
+    if (this.attachedValue) {
+      // W/S follows projected world-up so "forward" means climb on authored
+      // near-vertical walls. A/D is the tangent lateral axis.
+      this.surfaceForward
+        .copy(WORLD_UP)
+        .projectOnPlane(this.gameplayUpValue);
+
+      if (this.surfaceForward.lengthSq() <= MOVEMENT_EPSILON_SQ) {
+        this.surfaceForward
+          .copy(WORLD_FORWARD)
+          .projectOnPlane(this.gameplayUpValue);
+      }
+
+      this.surfaceForward.normalize();
+      this.surfaceRight
+        .crossVectors(this.gameplayUpValue, this.surfaceForward)
+        .normalize();
+
+      this.moveInput
+        .copy(this.surfaceRight)
+        .multiplyScalar(clampedX)
+        .addScaledVector(this.surfaceForward, -clampedZ);
+    } else {
+      this.moveInput.set(clampedX, 0, clampedZ);
+    }
+
     if (this.moveInput.lengthSq() > 1) this.moveInput.normalize();
 
     this.movementPlaneNormal.copy(
@@ -480,9 +561,14 @@ export class KinematicBody {
         this.velocityDelta
           .subVectors(this.targetVelocity, this.planarVelocity);
 
-        const acceleration = this.groundedValue
-          ? this.config.groundAccelerationMetresPerSecondSquared
-          : this.config.airAccelerationMetresPerSecondSquared;
+        const traction = this.groundedValue
+          ? this.supportTractionMultiplier
+          : 1;
+        const acceleration =
+          (this.groundedValue
+            ? this.config.groundAccelerationMetresPerSecondSquared
+            : this.config.airAccelerationMetresPerSecondSquared) *
+          traction;
         const maximumVelocityChange = acceleration * deltaSeconds;
         const deltaLength = this.velocityDelta.length();
 
@@ -497,7 +583,9 @@ export class KinematicBody {
     } else if (this.groundedValue) {
       this.moveVectorTowardsZero(
         this.planarVelocity,
-        this.config.groundBrakingMetresPerSecondSquared * deltaSeconds,
+        this.config.groundBrakingMetresPerSecondSquared *
+          this.supportTractionMultiplier *
+          deltaSeconds,
       );
     }
 
@@ -520,8 +608,6 @@ export class KinematicBody {
       );
 
     if (this.groundedValue) {
-      // Walkable ground supports the body against gravity. Retain only the
-      // component into the support normal, preventing passive slope drift.
       const gravityIntoGround = this.gravityStep.dot(
         this.groundNormalValue,
       );
@@ -570,6 +656,9 @@ export class KinematicBody {
       this.contactsThisStep += 1;
       this.lastCollisionName = this.movementHit.object?.name || '<unnamed>';
 
+      const surface = this.surfaces.get(this.movementHit.object);
+      this.lastContactSurfaceTagValue = surface.tag;
+
       const travelFraction = THREE.MathUtils.clamp(
         this.movementHit.fraction,
         0,
@@ -598,15 +687,41 @@ export class KinematicBody {
         this.lastContactNormalValue.copy(this.movementHit.normal);
         this.lastContactNameValue =
           this.movementHit.object?.name || '<unnamed>';
-        const surfaceTag = this.movementHit.object?.userData.surfaceTag;
-        this.lastContactSurfaceTagValue =
-          typeof surfaceTag === 'string' ? surfaceTag : 'default';
+        this.lastContactSurfaceTagValue = surface.tag;
       }
 
-      if (velocityIntoSurface < 0) {
+      if (
+        surface.bounceSpeedMetresPerSecond > 0 &&
+        this.tryApplyBounce(
+          surface.bounceSpeedMetresPerSecond,
+          velocityIntoSurface,
+          this.movementHit.normal,
+          this.movementHit.object,
+        )
+      ) {
+        this.remainingDisplacement
+          .copy(this.velocityValue)
+          .multiplyScalar(deltaSeconds * (1 - travelFraction));
+        continue;
+      }
+
+      if (surface.adhesive) {
+        this.tryAttach(
+          this.movementHit.normal,
+          this.movementHit.object,
+          surface.tag,
+          surface.tractionMultiplier,
+        );
+      }
+
+      const updatedVelocityIntoSurface = this.velocityValue.dot(
+        this.movementHit.normal,
+      );
+
+      if (updatedVelocityIntoSurface < 0) {
         this.velocityValue.addScaledVector(
           this.movementHit.normal,
-          -velocityIntoSurface,
+          -updatedVelocityIntoSurface,
         );
       }
 
@@ -624,14 +739,162 @@ export class KinematicBody {
     }
   }
 
+  private tryApplyBounce(
+    bounceSpeedMetresPerSecond: number,
+    velocityIntoSurface: number,
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+  ): boolean {
+    if (this.bounceCooldownSecondsValue > 0) return false;
+    if (
+      velocityIntoSurface >
+      -this.config.minimumBounceApproachSpeedMetresPerSecond
+    ) {
+      return false;
+    }
+
+    if (this.attachedValue) {
+      this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
+    }
+
+    if (velocityIntoSurface < 0) {
+      this.velocityValue.addScaledVector(
+        surfaceNormal,
+        -velocityIntoSurface,
+      );
+    }
+
+    const outgoingNormalSpeed = this.velocityValue.dot(surfaceNormal);
+    if (outgoingNormalSpeed < bounceSpeedMetresPerSecond) {
+      this.velocityValue.addScaledVector(
+        surfaceNormal,
+        bounceSpeedMetresPerSecond - outgoingNormalSpeed,
+      );
+    }
+
+    this.groundedValue = false;
+    this.supportSurfaceTagValue = 'bouncy';
+    this.supportTractionMultiplier = 1;
+    this.cancelJumpCharge();
+    this.coyoteTimeRemainingSecondsValue = 0;
+    this.groundReacquireDelaySeconds = Math.max(
+      this.groundReacquireDelaySeconds,
+      this.config.jumpGroundDetachSeconds,
+    );
+    this.airborneSeconds = 0;
+    this.bounceCooldownSecondsValue = this.config.bounceCooldownSeconds;
+    this.lastBounceSpeedValue = bounceSpeedMetresPerSecond;
+    this.lastBounceSurfaceNameValue =
+      surfaceObject?.name || '<unnamed>';
+
+    return true;
+  }
+
+  private tryAttach(
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+    surfaceTag: SurfaceTag,
+    tractionMultiplier: number,
+  ): boolean {
+    if (!surfaceObject) return false;
+    if (!this.isAuthoredWallNormal(surfaceNormal)) return false;
+    if (!this.attachedValue && this.attachmentCooldownSecondsValue > 0) {
+      return false;
+    }
+
+    this.attachedValue = true;
+    this.attachmentSurface = surfaceObject;
+    this.gameplayUpValue.copy(surfaceNormal).normalize();
+    this.groundNormalValue.copy(this.gameplayUpValue);
+    this.groundedValue = true;
+    this.supportSurfaceTagValue = surfaceTag;
+    this.supportTractionMultiplier = tractionMultiplier;
+    this.coyoteTimeRemainingSecondsValue = this.config.coyoteTimeSeconds;
+    this.groundReacquireDelaySeconds = 0;
+    this.airborneSeconds = 0;
+
+    // Attachment support owns the normal axis; keep only tangent motion.
+    const normalSpeed = this.velocityValue.dot(this.gameplayUpValue);
+    this.velocityValue.addScaledVector(
+      this.gameplayUpValue,
+      -normalSpeed,
+    );
+
+    return true;
+  }
+
+  private detachFromSurface(cooldownSeconds: number): void {
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(WORLD_UP);
+    this.groundedValue = false;
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
+    this.attachmentCooldownSecondsValue = Math.max(
+      this.attachmentCooldownSecondsValue,
+      cooldownSeconds,
+    );
+  }
+
+  private isAuthoredWallNormal(normal: THREE.Vector3): boolean {
+    return (
+      Math.abs(normal.dot(WORLD_UP)) <=
+      this.config.maximumAttachmentWorldUpDot
+    );
+  }
+
   private refreshGroundState(): void {
     this.groundedValue = false;
-    this.groundNormalValue.copy(this.gameplayUpValue);
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
 
     if (this.groundReacquireDelaySeconds > 0) return;
 
+    if (this.attachedValue) {
+      this.groundProbeDisplacement
+        .copy(this.gameplayUpValue)
+        .multiplyScalar(-this.config.groundProbeDistanceMetres);
+
+      const hasAttachmentSupport = this.world.sweepSphere(
+        this.currentPosition,
+        this.groundProbeDisplacement,
+        this.config.radiusMetres + this.config.skinWidthMetres,
+        this.groundHit,
+      );
+
+      if (hasAttachmentSupport) {
+        const surface = this.surfaces.get(this.groundHit.object);
+        const supportDot = this.groundHit.normal.dot(
+          this.gameplayUpValue,
+        );
+
+        if (
+          surface.adhesive &&
+          supportDot >= this.config.minimumGroundNormalDot &&
+          this.isAuthoredWallNormal(this.groundHit.normal)
+        ) {
+          this.attachedValue = true;
+          this.attachmentSurface = this.groundHit.object;
+          this.gameplayUpValue.copy(this.groundHit.normal).normalize();
+          this.groundNormalValue.copy(this.gameplayUpValue);
+          this.groundedValue = true;
+          this.supportSurfaceTagValue = surface.tag;
+          this.supportTractionMultiplier = surface.tractionMultiplier;
+          this.removeVelocityIntoGround();
+          return;
+        }
+      }
+
+      // Sticky geometry ended or the next authored surface explicitly rejects
+      // adhesion. Fall back to world-up and test for ordinary ground below.
+      this.detachFromSurface(0);
+    }
+
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(WORLD_UP);
     this.groundProbeDisplacement
-      .copy(this.gameplayUpValue)
+      .copy(WORLD_UP)
       .multiplyScalar(-this.config.groundProbeDistanceMetres);
 
     const hasGroundHit = this.world.sweepSphere(
@@ -643,13 +906,22 @@ export class KinematicBody {
 
     if (!hasGroundHit) return;
 
-    const groundDot = this.groundHit.normal.dot(this.gameplayUpValue);
+    const groundDot = this.groundHit.normal.dot(WORLD_UP);
     if (groundDot < this.config.minimumGroundNormalDot) return;
 
+    const surface = this.surfaces.get(this.groundHit.object);
     this.groundedValue = true;
     this.groundNormalValue.copy(this.groundHit.normal);
+    this.supportSurfaceTagValue = surface.tag;
+    this.supportTractionMultiplier = surface.tractionMultiplier;
+    this.removeVelocityIntoGround();
+  }
 
-    const velocityIntoGround = this.velocityValue.dot(this.groundNormalValue);
+  private removeVelocityIntoGround(): void {
+    const velocityIntoGround = this.velocityValue.dot(
+      this.groundNormalValue,
+    );
+
     if (velocityIntoGround < 0) {
       this.velocityValue.addScaledVector(
         this.groundNormalValue,
@@ -662,7 +934,16 @@ export class KinematicBody {
     groundedAtStepStart: boolean,
     impactSpeedMetresPerSecond: number,
   ): void {
-    if (groundedAtStepStart || !this.groundedValue) return;
+    // Authored wall attachment is a traversal-state transition, not a
+    // floor landing. Keep the existing landing signal reserved for genuine
+    // airborne -> walkable-ground contacts used by visual impact effects.
+    if (
+      groundedAtStepStart ||
+      !this.groundedValue ||
+      this.attachedValue
+    ) {
+      return;
+    }
 
     const stableLanding =
       this.airborneSeconds >= this.config.minimumLandingAirTimeSeconds;
@@ -673,8 +954,7 @@ export class KinematicBody {
     if (!stableLanding) return;
 
     this.landedThisStepValue = true;
-    this.lastLandingImpactSpeedValue =
-      impactSpeedMetresPerSecond;
+    this.lastLandingImpactSpeedValue = impactSpeedMetresPerSecond;
 
     this.events?.emit('landed', {
       impactSpeedMetresPerSecond,
@@ -721,6 +1001,12 @@ export class KinematicBody {
       ],
       ['maximumJumpChargeSeconds', config.maximumJumpChargeSeconds],
       ['jumpChargeCurveExponent', config.jumpChargeCurveExponent],
+      ['attachmentDetachCooldownSeconds', config.attachmentDetachCooldownSeconds],
+      ['bounceCooldownSeconds', config.bounceCooldownSeconds],
+      [
+        'minimumBounceApproachSpeedMetresPerSecond',
+        config.minimumBounceApproachSpeedMetresPerSecond,
+      ],
     ];
 
     for (const [name, value] of positiveFinite) {
@@ -742,10 +1028,7 @@ export class KinematicBody {
       ['airDragPerSecond', config.airDragPerSecond],
       ['coyoteTimeSeconds', config.coyoteTimeSeconds],
       ['jumpGroundDetachSeconds', config.jumpGroundDetachSeconds],
-      [
-        'minimumLandingAirTimeSeconds',
-        config.minimumLandingAirTimeSeconds,
-      ],
+      ['minimumLandingAirTimeSeconds', config.minimumLandingAirTimeSeconds],
     ];
 
     for (const [name, value] of nonNegativeFinite) {
@@ -760,6 +1043,16 @@ export class KinematicBody {
       config.minimumGroundNormalDot > 1
     ) {
       throw new Error('minimumGroundNormalDot must be within [-1, 1].');
+    }
+
+    if (
+      !Number.isFinite(config.maximumAttachmentWorldUpDot) ||
+      config.maximumAttachmentWorldUpDot < 0 ||
+      config.maximumAttachmentWorldUpDot > 1
+    ) {
+      throw new Error(
+        'maximumAttachmentWorldUpDot must be within [0, 1].',
+      );
     }
 
     if (

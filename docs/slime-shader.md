@@ -95,11 +95,10 @@ limits are grouped as named constants at the top of the vertex shader.
 - **Impact ripple:** distance from `uImpactPointLocal` sets a travelling sine
   phase. Exponential distance and time envelopes localise the response and
   remove it after 1.2 seconds.
-- **Sticky/bounce readiness:** supplied attachment state receives the complete
-  supported slither response plus the extra peel layer. Current gameplay still
-  reports `attached = false` and treats bouncy metadata as ordinary collision,
-  so the authored mechanics must trigger the existing visual API when their
-  gameplay issues implement attachment/bounce impulses.
+- **Sticky/bounce integration:** authored wall attachment receives the complete
+  supported slither response plus the extra peel layer. Bouncy contacts select
+  the stronger visual impact response from the authoritative surface tag and
+  outgoing body velocity. Ceiling traversal is not currently authored.
 
 All layers blend through continuous values. No shader animation state changes
 the mesh transform or gameplay position.

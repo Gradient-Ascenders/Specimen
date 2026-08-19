@@ -5,10 +5,27 @@ const CONTACT_EPSILON = 1e-7;
 
 interface RegisteredCollider {
   readonly mesh: THREE.Mesh;
+  readonly layerMask: number;
   readonly localBounds: THREE.Box3;
   readonly inverseWorld: THREE.Matrix4;
   readonly normalMatrix: THREE.Matrix3;
 }
+
+/**
+ * Query layers for the shared authored-geometry registry.
+ *
+ * Solid level meshes normally belong to both layers. Future triggers or
+ * gameplay-only volumes must opt into their relevant layer rather than
+ * becoming camera obstructions accidentally.
+ */
+export const CollisionLayer = {
+  None: 0,
+  Movement: 1 << 0,
+  CameraObstruction: 1 << 1,
+} as const;
+
+export const DEFAULT_SOLID_COLLISION_LAYERS =
+  CollisionLayer.Movement | CollisionLayer.CameraObstruction;
 
 /**
  * Reusable result container for collision queries.
@@ -60,8 +77,13 @@ export class CollisionWorld {
   private slabUpdatedEnter = false;
   private slabNormalSign = 0;
 
-  register(mesh: THREE.Mesh): void {
+  register(
+    mesh: THREE.Mesh,
+    layerMask = DEFAULT_SOLID_COLLISION_LAYERS,
+  ): void {
     if (this.colliders.some((collider) => collider.mesh === mesh)) return;
+
+    this.validateLayerMask(layerMask);
 
     if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
     const boundingBox = mesh.geometry.boundingBox;
@@ -71,14 +93,18 @@ export class CollisionWorld {
 
     this.colliders.push({
       mesh,
+      layerMask,
       localBounds: boundingBox.clone(),
       inverseWorld: new THREE.Matrix4(),
       normalMatrix: new THREE.Matrix3(),
     });
   }
 
-  registerAll(meshes: readonly THREE.Mesh[]): void {
-    for (const mesh of meshes) this.register(mesh);
+  registerAll(
+    meshes: readonly THREE.Mesh[],
+    layerMask = DEFAULT_SOLID_COLLISION_LAYERS,
+  ): void {
+    for (const mesh of meshes) this.register(mesh, layerMask);
   }
 
   unregister(mesh: THREE.Mesh): void {
@@ -109,12 +135,16 @@ export class CollisionWorld {
     displacement: THREE.Vector3,
     radius: number,
     outHit: CollisionHit,
+    queryMask = CollisionLayer.Movement,
   ): boolean {
     if (!Number.isFinite(radius) || radius <= 0) {
       throw new Error('Sphere sweep radius must be a positive finite number.');
     }
 
+    this.validateLayerMask(queryMask);
     outHit.reset();
+
+    if (queryMask === CollisionLayer.None) return false;
 
     const displacementLength = displacement.length();
     if (displacementLength <= AXIS_EPSILON) return false;
@@ -125,6 +155,8 @@ export class CollisionWorld {
     this.worldEnd.copy(origin).add(displacement);
 
     for (const collider of this.colliders) {
+      if ((collider.layerMask & queryMask) === 0) continue;
+
       const mesh = collider.mesh;
       if (!mesh.visible) continue;
 
@@ -174,6 +206,12 @@ export class CollisionWorld {
     outHit.distance = displacementLength * outHit.fraction;
     outHit.point.copy(origin).addScaledVector(displacement, outHit.fraction);
     return true;
+  }
+
+  private validateLayerMask(layerMask: number): void {
+    if (!Number.isInteger(layerMask) || layerMask < 0) {
+      throw new Error('Collision layer mask must be a non-negative integer.');
+    }
   }
 
   private sweepExpandedLocalBox(

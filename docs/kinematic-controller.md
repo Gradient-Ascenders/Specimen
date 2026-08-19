@@ -24,6 +24,11 @@ collider name, and surface tag from the current step. These are read-only
 collision facts for effects such as a directional wall splat; they do not
 change collision response.
 
+The camera's explicit read-only handoff is documented in
+[Collision-aware third-person camera](third-person-camera.md). Movement remains
+authoritative for `gameplayUp`; camera orientation damping is render-only and
+must never be copied back into this body.
+
 ## Units and initial tuning
 
 The grey-box defines one grid square as one metre. Controller values therefore use SI-style game units:
