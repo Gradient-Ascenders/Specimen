@@ -8,6 +8,8 @@ import { LaserHazardSystem } from '../hazards/LaserHazardSystem';
 import type { CollisionWorld } from '../physics/CollisionWorld';
 import type { KinematicBody } from '../physics/KinematicBody';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry';
+import { ElevatorPresentation } from '../render/elevator/ElevatorPresentation';
+import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation';
 import { CheckpointManager } from './Checkpoints';
 import {
   ElevatorSequence,
@@ -67,6 +69,8 @@ export class ElevatorTestRig {
   private readonly connectedLaser: LaserHazard;
   private readonly laserSystem: LaserHazardSystem;
   private readonly checkpoints: CheckpointManager;
+  private readonly elevatorPresentation: ElevatorPresentation;
+  private readonly laserPresentation: LaserHazardPresentation;
   private readonly checkpointSpawn = new THREE.Vector3();
   private readonly harmlessRegressionTarget: LaserContactTarget;
 
@@ -100,6 +104,8 @@ export class ElevatorTestRig {
     });
 
     this.root.add(this.sequence.root);
+    this.elevatorPresentation = new ElevatorPresentation(this.sequence);
+    this.root.add(this.elevatorPresentation.root);
 
     this.collisionWorld.register(this.platform.collisionMesh);
     this.surfaces.register(this.platform.collisionMesh);
@@ -165,6 +171,10 @@ export class ElevatorTestRig {
       },
     });
     this.root.add(this.laserSystem.root);
+    this.laserPresentation = new LaserHazardPresentation(
+      this.laserSystem.hazards,
+    );
+    this.root.add(this.laserPresentation.root);
 
     // Registration order is authored reset order: elevator pose/sequence,
     // then connected hazards, then CheckpointManager recovers the player.
@@ -201,6 +211,7 @@ export class ElevatorTestRig {
   enter(): void {
     this.checkpoints.reset();
     this.checkpoints.recover(this.player);
+    this.syncPresentation();
   }
 
   /**
@@ -209,6 +220,7 @@ export class ElevatorTestRig {
   recover(): void {
     this.recoveryCountValue += 1;
     this.checkpoints.recover(this.player);
+    this.syncPresentation();
   }
 
   /**
@@ -218,12 +230,14 @@ export class ElevatorTestRig {
   update(deltaSeconds: number): void {
     this.sequence.update(deltaSeconds, this.player);
     this.laserSystem.update(deltaSeconds, this.player);
+    this.syncPresentation();
   }
 
   /** Reset Room 4 mutable state without changing whichever harness owns player. */
   resetRuntimeOnly(): void {
     this.puzzleRegistry.resetGroup(ELEVATOR_GROUP_ID);
     this.checkpoints.reset();
+    this.syncPresentation();
   }
 
   runCarrierRegression(): string {
@@ -340,6 +354,8 @@ export class ElevatorTestRig {
       );
     }
 
+    this.syncPresentation();
+
     if (
       Math.abs(
         this.platform.root.position.y - firstPlatformY,
@@ -389,11 +405,18 @@ export class ElevatorTestRig {
   dispose(): void {
     this.collisionWorld.unregister(this.platform.collisionMesh);
     this.surfaces.unregister(this.platform.collisionMesh);
+    this.laserPresentation.dispose();
+    this.elevatorPresentation.dispose();
     this.laserSystem.dispose();
     this.platform.dispose();
     this.puzzleRegistry.clear();
     this.root.removeFromParent();
     this.root.clear();
+  }
+
+  private syncPresentation(): void {
+    this.elevatorPresentation.sync();
+    this.laserPresentation.sync();
   }
 
   private readonly isSpawnSafe = (
