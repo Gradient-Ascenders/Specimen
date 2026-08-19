@@ -207,6 +207,9 @@ export class ContainmentTeachingScene {
     // there is never an invisible gap between the slope and its landing.
     this.addCollider({ name: 'duct-segment-a-floor', size: [2, 0.25, 7], position: [-4.8, 5.1, 9.5], material: materials.duct });
     this.addCollider({ name: 'duct-segment-a-roof', size: [2, 0.18, 7], position: [-4.8, 7.3, 9.5], material: materials.duct });
+    // This side used to be sticky. It remains a solid duct wall so the route
+    // is enclosed, but it is now ordinary metal and cannot be climbed.
+    this.addDuctSide('-a-west', [-5.85, 6.2, 9.5], [0.18, 2.2, 7], materials.duct);
     this.addDuctSide('-a-east', [-3.75, 6.2, 9.5], [0.18, 2.2, 7], materials.duct);
 
     const rampAngle = -THREE.MathUtils.degToRad(26);
@@ -219,6 +222,12 @@ export class ContainmentTeachingScene {
     // bay. It is intentionally low enough to read as one connected route.
     this.addCollider({ name: 'duct-segment-c-floor', size: [7.2, 0.25, 2], position: [-5.7, 10.36, 24], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-roof', size: [7.2, 0.18, 2], position: [-5.7, 12.56, 24], material: materials.duct });
+    // Enclose the turning bay, leaving only the ramp entry and the final-run
+    // exit open. The short split walls prevent a player falling into the void.
+    this.addCollider({ name: 'duct-segment-c-east-wall', size: [0.18, 2.2, 2], position: [-2.15, 11.46, 24], material: materials.duct });
+    this.addCollider({ name: 'duct-segment-c-south-wall-west', size: [3.35, 2.2, 0.18], position: [-7.58, 11.46, 23.05], material: materials.duct });
+    this.addCollider({ name: 'duct-segment-c-south-wall-east', size: [1.55, 2.2, 0.18], position: [-2.93, 11.46, 23.05], material: materials.duct });
+    this.addCollider({ name: 'duct-segment-c-north-wall', size: [5.15, 2.2, 0.18], position: [-4.53, 11.46, 24.95], material: materials.duct });
     this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 5], position: [-9, 10.36, 27.5], material: materials.duct });
     this.addCollider({ name: 'duct-final-run-roof', size: [2, 0.18, 5], position: [-9, 12.56, 27.5], material: materials.duct });
     this.addDuctSide('-final-west', [-10.05, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
