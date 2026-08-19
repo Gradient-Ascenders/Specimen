@@ -224,15 +224,16 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'duct-segment-c-roof', size: [7.2, 0.18, 2], position: [-5.7, 12.56, 24], material: materials.duct });
     // Enclose the turning bay, leaving only the ramp entry and the final-run
     // exit open. The short split walls prevent a player falling into the void.
+    this.addCollider({ name: 'duct-segment-c-west-wall', size: [0.18, 2.2, 2], position: [-9.25, 11.46, 24], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-east-wall', size: [0.18, 2.2, 2], position: [-2.15, 11.46, 24], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-south-wall-west', size: [3.35, 2.2, 0.18], position: [-7.58, 11.46, 23.05], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-south-wall-east', size: [1.55, 2.2, 0.18], position: [-2.93, 11.46, 23.05], material: materials.duct });
     this.addCollider({ name: 'duct-segment-c-north-wall', size: [5.15, 2.2, 0.18], position: [-4.53, 11.46, 24.95], material: materials.duct });
-    this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 5], position: [-9, 10.36, 27.5], material: materials.duct });
-    this.addCollider({ name: 'duct-final-run-roof', size: [2, 0.18, 5], position: [-9, 12.56, 27.5], material: materials.duct });
-    this.addDuctSide('-final-west', [-10.05, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
-    this.addDuctSide('-final-east', [-7.95, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
-    this.addVisualBox('duct-drop-frame', [2.2, 0.25, 0.5], [-9, 10.42, 30], materials.duct);
+    this.addCollider({ name: 'duct-final-run-floor', size: [2, 0.25, 5], position: [-8.4, 10.36, 27.5], material: materials.duct });
+    this.addCollider({ name: 'duct-final-run-roof', size: [2, 0.18, 5], position: [-8.4, 12.56, 27.5], material: materials.duct });
+    this.addDuctSide('-final-west', [-9.45, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
+    this.addDuctSide('-final-east', [-7.35, 11.46, 27.5], [0.18, 2.2, 5], materials.duct);
+    this.addVisualBox('duct-drop-frame', [2.2, 0.25, 0.5], [-8.4, 10.42, 30], materials.duct);
   }
 
   private addVentDebug(vent: VentTraversal): void {
