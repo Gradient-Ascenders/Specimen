@@ -1,4 +1,5 @@
-export const DEFAULT_DEATH_BURST_DURATION_SECONDS = 0.86;
+/** Shared duration for authoritative death timing and its mirrored burst. */
+export const DEFAULT_DEATH_BURST_DURATION_SECONDS = 1.15;
 
 export type DeathSequenceState = 'playing' | 'bursting' | 'gameOver';
 

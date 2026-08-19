@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
+import { DEFAULT_DEATH_BURST_DURATION_SECONDS } from '../../systems/DeathSequence.ts';
 import { DEFAULT_SLIME_BASE_COLOUR } from './SlimeMaterial.ts';
 import type { Vector3State } from './SlimeVisual.ts';
 
 const FRAGMENT_COUNT = 30;
-const BURST_VISUAL_DURATION_SECONDS = 1.15;
 const BURST_FADE_START_SECONDS = 0.56;
 const GOLDEN_ANGLE_RADIANS = Math.PI * (3 - Math.sqrt(5));
 const LOCAL_UP = new THREE.Vector3(0, 1, 0);
@@ -129,7 +129,7 @@ export class SlimeBurstPresentation {
     }
 
     this.elapsedSeconds = Math.min(
-      BURST_VISUAL_DURATION_SECONDS,
+      DEFAULT_DEATH_BURST_DURATION_SECONDS,
       this.elapsedSeconds + deltaSeconds,
     );
 
@@ -149,11 +149,11 @@ export class SlimeBurstPresentation {
     this.material.opacity = 1 - THREE.MathUtils.smoothstep(
       this.elapsedSeconds,
       BURST_FADE_START_SECONDS,
-      BURST_VISUAL_DURATION_SECONDS,
+      DEFAULT_DEATH_BURST_DURATION_SECONDS,
     );
     this.updateInstances(this.elapsedSeconds);
 
-    if (this.elapsedSeconds >= BURST_VISUAL_DURATION_SECONDS) {
+    if (this.elapsedSeconds >= DEFAULT_DEATH_BURST_DURATION_SECONDS) {
       this.active = false;
       this.root.visible = false;
     }
@@ -227,7 +227,7 @@ export class SlimeBurstPresentation {
       const shrink = 1 - THREE.MathUtils.smoothstep(
         time,
         0.54 + (index % 4) * 0.035,
-        BURST_VISUAL_DURATION_SECONDS,
+        DEFAULT_DEATH_BURST_DURATION_SECONDS,
       );
       const radius = fragment.radiusMetres * grow * shrink;
       this.scale.set(radius, radius * fragment.elongation, radius);

@@ -285,6 +285,7 @@ const input = new Input({
 
 const deathScreen = new DeathScreen({
   onRetry: retryAfterDeath,
+  backgroundElements: [renderLayer.canvas, testPanel.element],
 });
 
 appHost.dataset.gameState = deathSequence.state;
