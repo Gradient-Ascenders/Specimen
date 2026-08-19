@@ -23,8 +23,9 @@ interface BoxOptions {
   readonly rotationX?: number;
 }
 
+
 const ROOM_2_CENTRE_Z = 38;
-const SPAWN_POSITION = new THREE.Vector3(0, 0.5, -1.8);
+const SPAWN_POSITION = new THREE.Vector3(-0.20995, 0.52507, -2.60112);
 const ROOM_2_RECOVERY_POSITION = new THREE.Vector3(-9, 0.5, 31);
 
 /**
@@ -203,14 +204,34 @@ export class ContainmentTeachingScene {
     this.addDuctSide('-a-east', [-3.75, 6.2, 9.5], [0.18, 2.2, 7], materials.duct);
 
     const rampAngle = -THREE.MathUtils.degToRad(26);
-    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 12], position: [-4.8, 7.85, 18.5], material: materials.duct, rotationX: rampAngle });
-    this.addCollider({ name: 'duct-segment-b-roof', size: [2, 0.18, 12], position: [-4.8, 9.83, 17.54], material: materials.duct, rotationX: rampAngle });
-    this.addCollider({ name: 'duct-segment-b-west-wall', size: [0.18, 2.2, 12], position: [-5.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
-    this.addCollider({ name: 'duct-segment-b-east-wall', size: [0.18, 2.2, 12], position: [-3.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 11.88], position: [-4.8, 7.85, 18.5], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-roof', size: [2, 0.18, 11.88], position: [-4.8, 9.83, 17.54], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-west-wall', size: [0.18, 2.2, 11.88], position: [-5.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-east-wall', size: [0.18, 2.2, 11.88], position: [-3.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
 
     // The ramp's high end is 10.49m, exactly level with this short turning
     // bay. It is intentionally low enough to read as one connected route.
-    this.addCollider({ name: 'duct-segment-c-floor', size: [7.2, 0.25, 2], position: [-5.7, 10.36, 24], material: materials.duct });
+    // Blender Boolean notch converted to three ordinary box colliders.
+    // This preserves the rectangular cut-out while remaining compatible with
+    // the game's box-based collision behaviour.
+    this.addCollider({
+      name: 'duct-segment-c-floor-main',
+      size: [7.2, 0.25, 1.37071],
+      position: [-5.7, 10.36, 24.32464],
+      material: materials.duct,
+    });
+    this.addCollider({
+      name: 'duct-segment-c-floor-front-left',
+      size: [3.54316, 0.25, 0.62929],
+      position: [-7.52842, 10.36, 23.32464],
+      material: materials.duct,
+    });
+    this.addCollider({
+      name: 'duct-segment-c-floor-front-right',
+      size: [1.65684, 0.25, 0.62929],
+      position: [-2.92842, 10.36, 23.32464],
+      material: materials.duct,
+    });
     this.addCollider({ name: 'duct-segment-c-roof', size: [7.2, 0.18, 2], position: [-5.7, 12.56, 24], material: materials.duct });
     // Enclose the turning bay, leaving only the ramp entry and the final-run
     // exit open. The short split walls prevent a player falling into the void.
@@ -247,36 +268,26 @@ export class ContainmentTeachingScene {
     // Zones 2-3: a forgiving four-jump zig-zag fills the lower chamber and
     // teaches progressively higher and longer charged jumps. Every miss lands
     // on the safe room floor, and the generous tops keep this a tutorial.
-    this.addCollider({ name: 'room-2-platform-a-height-lesson', size: [4.5, 0.5, 3.5], position: [-5.5, 1.35, 34], material: materials.platform });
-    this.addCollider({ name: 'room-2-platform-b-gap-lesson', size: [4, 0.5, 3.5], position: [-0.5, 2.55, 37], material: materials.platform });
-    this.addCollider({ name: 'room-2-platform-c-side-jump', size: [3.8, 0.5, 3.5], position: [4.2, 3.85, 34], material: materials.platform });
+    this.addCollider({ name: 'room-2-platform-a-height-lesson', size: [3.15, 0.5, 3.15], position: [-6.37855, 1.46779, 37.78357], material: materials.platform });
+    this.addCollider({ name: 'room-2-platform-b-gap-lesson', size: [2.82146, 0.5, 3.5], position: [-0.5, 2.55, 37], material: materials.platform });
+    this.addCollider({ name: 'room-2-platform-c-side-jump', size: [3.8, 0.5, 3.5], position: [4.2, 3.85, 31.0999], material: materials.platform });
     this.addCollider({ name: 'room-2-platform-d-sticky-launch', size: [4, 0.5, 4], position: [8.5, 5.2, 38.5], material: materials.platform });
 
     // Zone 4: the sticky patch is embedded in the east perimeter wall rather
     // than presented as a freestanding slab. Platform D leaves a deliberate
     // four-metre air gap so the player must jump, catch, and climb.
-    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.12, 6, 6.5], position: [14.73, 6, 40.75], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
-    // The contamination wraps around the ledge's north edge. This avoids the
-    // overhang above the perimeter patch: the player moves around the corner,
-    // climbs the outer fascia, and rolls over its sticky top strip.
-    this.addCollider({ name: 'room-2-sticky-ledge-outer-face', size: [3.1, 6.325, 0.12], position: [13.25, 6.1625, 39.69], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-ledge-tile' });
-    this.addCollider({ name: 'room-2-sticky-ledge-top-strip', size: [3.1, 0.35, 0.8], position: [13.25, 9.15, 40.15], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-ledge-tile' });
+    this.addCollider({ name: 'room-2-sticky-catch-wall', size: [0.12, 6.94462, 6.5], position: [14.73472, 7.73804, 43.0006], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
+    // Blender-authored version: the separate sticky ledge fascia/top strip were removed.
     this.addCollider({ name: 'room-2-top-of-sticky-wall-ledge', size: [3.1, 0.35, 4.7], position: [13.25, 9.15, 42.9], material: materials.support });
 
     // Zone 5: three more readable upper-level jumps carry the route back
     // across the room to the obvious green exit.
-    this.addCollider({ name: 'room-2-upper-step-a', size: [4, 0.4, 3.5], position: [8.8, 9.65, 44], material: materials.platform });
-    this.addCollider({ name: 'room-2-upper-step-b', size: [3.6, 0.4, 3.4], position: [4.2, 10.15, 40.5], material: materials.platform });
-    this.addCollider({ name: 'room-2-exit-balcony', size: [7, 0.5, 4], position: [0, 10.65, 46], material: materials.platform });
-    this.addVisualBox('room-2-open-exit-door', [2.6, 3, 0.2], [0, 12.4, 47.9], materials.exit);
+    this.addCollider({ name: 'room-2-upper-step-a', size: [4, 0.4, 3.5], position: [8.8, 9.65, 37.65683], material: materials.platform });
+    this.addCollider({ name: 'room-2-upper-step-b', size: [3.6, 0.4, 3.4], position: [0.87909, 10.15, 38.41571], material: materials.platform });
+    this.addCollider({ name: 'room-2-exit-balcony', size: [7, 0.5, 4], position: [0, 10.65, 46.79795], material: materials.platform });
+    this.addVisualBox('room-2-open-exit-door', [2.6, 3, 0.2], [0, 12.4, 48.6971], materials.exit);
 
-    // A short low route sits beneath the sticky-wall challenge. It both fills
-    // the unused corner and lets a missed wall catch return to Platform D
-    // without replaying the entire lower ascent.
-    this.addCollider({ name: 'room-2-recovery-step-a', size: [3, 0.4, 3], position: [5.5, 0.65, 45.5], material: materials.support });
-    this.addCollider({ name: 'room-2-recovery-step-b', size: [3, 0.4, 3], position: [8.5, 1.55, 45.5], material: materials.support });
-    this.addCollider({ name: 'room-2-recovery-step-c', size: [3, 0.4, 3], position: [10.8, 2.55, 43.5], material: materials.support });
-    this.addCollider({ name: 'room-2-recovery-step-d', size: [3, 0.4, 3], position: [10, 3.65, 40.5], material: materials.support });
+    // Blender-authored version: the four low recovery steps were removed.
 
     this.addCeilingLight('room-2-fluorescent-a', [-8, 16.7, 35]);
     this.addCeilingLight('room-2-fluorescent-b', [0, 16.7, 39]);
@@ -289,7 +300,7 @@ export class ContainmentTeachingScene {
       new THREE.MeshBasicMaterial({ color: 0x54e8e0 }),
     );
     roomOneMarker.name = 'room-1-safe-spawn-marker';
-    roomOneMarker.position.set(SPAWN_POSITION.x, 0.04, SPAWN_POSITION.z);
+    roomOneMarker.position.set(SPAWN_POSITION.x, SPAWN_POSITION.y - 0.46, SPAWN_POSITION.z);
     roomOneMarker.rotation.x = Math.PI / 2;
     this.root.add(roomOneMarker);
 
@@ -318,6 +329,7 @@ export class ContainmentTeachingScene {
       surfaceTag,
     });
   }
+
 
   private addCollider(options: BoxOptions): void {
     const mesh = new THREE.Mesh(
