@@ -103,6 +103,7 @@ production level:
 6. Repeat with a narrow and a wide browser viewport. Vertical framing remains
    stable because resize changes projection aspect only.
 
-Jump impulses and sticky attachment are not implemented by the current movement
-controller. Issue #14 does not add either movement behaviour; those camera paths
-must be rechecked when their owning movement issues land.
+The merged charged-jump controller is consumed through the same read-only
+position and velocity contract; Issue #14 does not change its launch or landing
+behaviour. Sticky attachment is not implemented yet, so that orientation path
+must be rechecked when its owning movement issue lands.

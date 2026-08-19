@@ -2,7 +2,8 @@
 
 Verified on 19 August 2026 with Node.js 24.14.1, npm 11.18.0, and
 HeadlessChrome 152.0.0.0 using ANGLE/SwiftShader WebGL. The tested Issue #14
-worktree is on `feat/third-person-cam`, based on `21c26bf7a1fc`.
+worktree is on `feat/third-person-cam` after integrating `origin/main` through
+`6a185d3`.
 
 ## Automated checks
 
@@ -22,8 +23,9 @@ filtering, read-only movement-state preservation, gameplay-up transition
 invariance, and an integrated wall contraction/recovery path.
 
 The production build retains Vite's existing advisory for the single JavaScript
-chunk over 500 kB (`582.44 kB` minified, `146.82 kB` gzip). No dependency or
-asset was added by Issue #14.
+chunk over 500 kB (`587.63 kB` minified, `147.97 kB` gzip) after integrating
+the charged-jump work from `main`. No dependency or asset was added by Issue
+#14.
 
 ## Production browser checks
 
@@ -55,6 +57,13 @@ geometry from below. While the body was below the floor at
 back to spawn, cleared the obstruction, and recovered to `5.10 m` within the
 captured interval.
 
+After merging the upstream charged-jump controller, a 0.40-second Space hold
+entered the `charging` state and launched at `7.34 m/s` with 71% recorded
+charge. The camera followed the body to `1.54 m` height without changing its
+open-space `5.20 m` boom distance or reporting a false obstruction. The body
+landed at spawn with one `7.06 m/s` landing event and the camera returned to the
+same stable framing.
+
 Live resizing was checked at DPR 1:
 
 | Viewport | Result |
@@ -82,16 +91,13 @@ evidence.
 
 ## Remaining hands-on evidence
 
-The current branch predates the upstream charged-jump merge, so this checkout
-cannot exercise a real jump impulse without importing unrelated movement work.
-Jump/platform camera feel must be rechecked after the issue branch is updated by
-the authorised Git workflow. Sticky attachment/gameplay-up transitions also
-remain unavailable by design.
+Sticky attachment/gameplay-up transitions remain unavailable by design and
+must be rechecked when their owning movement issue lands.
 
 Before the PR is considered fully evidenced, capture representative traversal
 footage in Chrome on Ubuntu/lab-class hardware. The footage should show pointer
 orbit, the wall/ledge passage, inside and outside corners, an overhead
-obstruction, obstruction recovery, rapid direction changes, and charged jumps
-after the upstream movement update is integrated. This hands-on pass should be
-used for final judgement of jitter, lag, sensitivity, and platforming comfort;
-headless SwiftShader timing is not suitable for that judgement.
+obstruction, obstruction recovery, rapid direction changes, and charged jumps.
+This hands-on pass should be used for final judgement of jitter, lag,
+sensitivity, and platforming comfort; headless SwiftShader timing is not
+suitable for that judgement.
