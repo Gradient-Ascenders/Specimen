@@ -193,13 +193,14 @@ export class GreyboxCollisionScene {
     this.recoveryDelay -= deltaSeconds;
     if (this.recoveryDelay > 0) return;
 
+    const recoveryCallback = this.recoveryCallback;
     this.resetProbe();
-    this.recoveryCallback?.();
-    this.recoveryCallback = undefined;
+    recoveryCallback?.();
   }
 
   resetProbe(): void {
     this.recoveryDelay = 0;
+    this.recoveryCallback = undefined;
     this.slimeVisual.setPosition(SPAWN_POSITION);
     this.slimeVisual.reset();
   }

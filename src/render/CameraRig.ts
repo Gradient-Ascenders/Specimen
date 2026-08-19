@@ -168,6 +168,26 @@ export class CameraRig {
     this.initialized = false;
   }
 
+  clearFollowTarget(): void {
+    this.followTarget = undefined;
+    this.obstructionWorld = undefined;
+    this.reset();
+  }
+
+  reset(): void {
+    this.pitchRadians = this.config.initialPitchRadians;
+    this.queuedYawRadians = 0;
+    this.queuedPitchRadians = 0;
+    this.planarBack.set(0, 0, 1);
+    this.currentDistanceMetres = this.config.followDistanceMetres;
+    this.clearTimeSeconds = 0;
+    this.initialized = false;
+    this.obstructed = false;
+    this.obstructionName = 'none';
+    this.targetGrounded = false;
+    this.targetAttached = false;
+  }
+
   setLookSettings(settings: Partial<CameraLookSettings>): void {
     if (settings.horizontalSensitivityRadiansPerPixel !== undefined) {
       this.validateSensitivity(

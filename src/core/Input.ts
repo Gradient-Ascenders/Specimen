@@ -144,6 +144,12 @@ export class Input {
     }
   }
 
+  /** Clear held and transient gameplay input during lifecycle transitions. */
+  resetState(): void {
+    if (this.disposed) return;
+    this.clearState();
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
