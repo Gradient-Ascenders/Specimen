@@ -24,6 +24,16 @@ test('blob facing turns toward actual movement and holds while stationary', () =
   assert.ok(Math.abs(facing.yawRadians + Math.PI / 2) < EPSILON);
 });
 
+test('blob facing holds below its nonzero speed threshold and turns above it', () => {
+  const facing = new BlobFacing();
+
+  facing.update(1 / 60, new THREE.Vector3(0.049, 0, 0));
+  assert.equal(facing.yawRadians, 0);
+
+  facing.update(1 / 60, new THREE.Vector3(0.051, 0, 0));
+  assert.notEqual(facing.yawRadians, 0);
+});
+
 test('blob facing turn rate is invariant to fixed-step subdivision', () => {
   const oneStep = new BlobFacing({ turnSpeedRadiansPerSecond: Math.PI });
   const splitSteps = new BlobFacing({ turnSpeedRadiansPerSecond: Math.PI });

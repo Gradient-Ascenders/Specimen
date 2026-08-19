@@ -279,9 +279,17 @@ export class CameraRig {
 
     if (!this.initialized) this.initializePose();
 
-    this.updateOrientation(safeDeltaSeconds);
+    const presentationDiscontinuity = this.isPresentationDiscontinuity(
+      target.velocity,
+      safeDeltaSeconds,
+    );
+    if (presentationDiscontinuity) {
+      this.resetPresentationForDiscontinuity();
+    } else {
+      this.updateOrientation(safeDeltaSeconds);
+      this.updateFollowPosition(safeDeltaSeconds);
+    }
     this.applyQueuedLookInput();
-    this.updateFollowPosition(target.velocity, safeDeltaSeconds);
     this.updateCameraDistance(safeDeltaSeconds);
     this.writeCameraPose();
   }
@@ -364,10 +372,10 @@ export class CameraRig {
     this.ensurePlanarBack();
   }
 
-  private updateFollowPosition(
+  private isPresentationDiscontinuity(
     velocity: ReadonlyCameraVector3,
     deltaSeconds: number,
-  ): void {
+  ): boolean {
     const targetSpeedMetresPerSecond = Math.hypot(
       velocity.x,
       velocity.y,
@@ -377,11 +385,25 @@ export class CameraRig {
       this.config.teleportSnapDistanceMetres +
       targetSpeedMetresPerSecond * deltaSeconds;
 
-    if (this.smoothedTarget.distanceTo(this.interpolatedTarget) > snapDistance) {
-      this.smoothedTarget.copy(this.interpolatedTarget);
-      return;
-    }
+    return (
+      this.smoothedTarget.distanceTo(this.interpolatedTarget) > snapDistance
+    );
+  }
 
+  private resetPresentationForDiscontinuity(): void {
+    this.smoothedTarget.copy(this.interpolatedTarget);
+    this.smoothedUp.copy(this.targetUp);
+    // Preserve the accumulated orbit heading while rebuilding a valid tangent
+    // against the destination up basis. Pitch is an independent scalar and is
+    // intentionally left untouched.
+    this.ensurePlanarBack();
+    this.currentDistanceMetres = this.config.followDistanceMetres;
+    this.clearTimeSeconds = 0;
+    this.obstructed = false;
+    this.obstructionName = 'none';
+  }
+
+  private updateFollowPosition(deltaSeconds: number): void {
     this.smoothedTarget.lerp(
       this.interpolatedTarget,
       exponentialDampingAlpha(

@@ -306,6 +306,7 @@ const loop = new Loop({
     testScene.setProbeYaw(
       blobFacing.getInterpolatedYaw(interpolationAlpha),
     );
+    testScene.presentProbe();
     // A high-refresh render can occur without a 60 Hz gameplay step. Consume
     // any pointer motion from that interval here so camera look remains crisp;
     // the next fixed step will read the already-updated orbit basis.

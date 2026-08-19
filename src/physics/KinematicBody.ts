@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 
-import type { EventBus } from '../core/EventBus';
-import { CollisionHit, CollisionWorld } from './CollisionWorld';
+import type { EventBus } from '../core/EventBus.ts';
+import { CollisionHit, CollisionWorld } from './CollisionWorld.ts';
 import type { MovementEvents } from './MovementEvents.ts';
 import {
   type SurfaceRegistry,
   type SurfaceTag,
-} from './SurfaceRegistry';
+} from './SurfaceRegistry.ts';
 
 const MOVEMENT_EPSILON_SQ = 1e-12;
 const CONTACT_PUSH_METRES = 1e-5;
@@ -157,6 +157,8 @@ export class KinematicBody {
   private readonly gravityStep = new THREE.Vector3();
   private readonly surfaceForward = new THREE.Vector3();
   private readonly surfaceRight = new THREE.Vector3();
+  private readonly movementUpAtStepStart = new THREE.Vector3();
+  private readonly launchDirection = new THREE.Vector3();
 
   private readonly movementHit = new CollisionHit();
   private readonly groundHit = new CollisionHit();
@@ -328,6 +330,8 @@ export class KinematicBody {
     this.landedThisStepValue = false;
 
     const groundedAtStepStart = this.groundedValue;
+    const wallMovementAtStepStart = this.attachedValue;
+    this.movementUpAtStepStart.copy(this.gameplayUpValue);
 
     this.attachmentCooldownSecondsValue = Math.max(
       0,
@@ -357,7 +361,13 @@ export class KinematicBody {
     }
 
     this.updateJumpState(deltaSeconds, jumpInput);
-    this.applyLocomotion(deltaSeconds, moveX, moveZ);
+    this.applyLocomotion(
+      deltaSeconds,
+      moveX,
+      moveZ,
+      wallMovementAtStepStart,
+      this.movementUpAtStepStart,
+    );
     this.applyGravity(deltaSeconds);
 
     const downwardSpeedBeforeCollision = Math.max(
@@ -454,12 +464,14 @@ export class KinematicBody {
       curvedCharge,
     );
 
-    // gameplayUp is still the attachment normal here, so a wall jump launches
-    // away from the authored wall before detaching back to world-up movement.
-    const currentUpSpeed = this.velocityValue.dot(this.gameplayUpValue);
+    // Capture the authoritative launch axis before wall detachment restores
+    // gameplayUp to world-up. Physics and presentation must observe the same
+    // direction for this transition.
+    this.launchDirection.copy(this.gameplayUpValue);
+    const currentUpSpeed = this.velocityValue.dot(this.launchDirection);
     if (currentUpSpeed < jumpSpeed) {
       this.velocityValue.addScaledVector(
-        this.gameplayUpValue,
+        this.launchDirection,
         jumpSpeed - currentUpSpeed,
       );
     }
@@ -484,7 +496,7 @@ export class KinematicBody {
     this.events?.emit('jumped', {
       speedMetresPerSecond: jumpSpeed,
       chargeFraction: normalizedCharge,
-      directionWorld: this.gameplayUpValue,
+      directionWorld: this.launchDirection,
     });
   }
 
@@ -504,26 +516,30 @@ export class KinematicBody {
     deltaSeconds: number,
     moveX: number,
     moveZ: number,
+    wallMovementAtStepStart: boolean,
+    movementUpAtStepStart: THREE.Vector3,
   ): void {
     const clampedX = THREE.MathUtils.clamp(moveX, -1, 1);
     const clampedZ = THREE.MathUtils.clamp(moveZ, -1, 1);
 
-    if (this.attachedValue) {
+    if (wallMovementAtStepStart) {
       // W/S follows projected world-up so "forward" means climb on authored
-      // near-vertical walls. A/D is the tangent lateral axis.
+      // near-vertical walls. A/D is the tangent lateral axis. Use the basis
+      // selected at the start of this step even if jump handling detached the
+      // body before locomotion was applied.
       this.surfaceForward
         .copy(WORLD_UP)
-        .projectOnPlane(this.gameplayUpValue);
+        .projectOnPlane(movementUpAtStepStart);
 
       if (this.surfaceForward.lengthSq() <= MOVEMENT_EPSILON_SQ) {
         this.surfaceForward
           .copy(WORLD_FORWARD)
-          .projectOnPlane(this.gameplayUpValue);
+          .projectOnPlane(movementUpAtStepStart);
       }
 
       this.surfaceForward.normalize();
       this.surfaceRight
-        .crossVectors(this.gameplayUpValue, this.surfaceForward)
+        .crossVectors(movementUpAtStepStart, this.surfaceForward)
         .normalize();
 
       this.moveInput

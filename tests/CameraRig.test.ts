@@ -29,6 +29,14 @@ function createTarget(): MutableCameraTarget {
   };
 }
 
+function teleportTarget(
+  target: MutableCameraTarget,
+  position: THREE.Vector3,
+): void {
+  target.position.copy(position);
+  target.previousPosition.copy(position);
+}
+
 function applyVerticalLook(
   pointerDeltaY: number,
   invertVertical: boolean,
@@ -186,4 +194,113 @@ test('the rig contracts against a camera-layer wall and fully recovers when it c
   );
 
   wall.geometry.dispose();
+});
+
+test('teleport immediately removes stale camera up', () => {
+  const target = createTarget();
+  const rig = new CameraRig();
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.update(1, 0);
+
+  target.gameplayUp.set(1, 0, 0);
+  target.attached = true;
+  for (let step = 0; step < 120; step += 1) {
+    rig.update(1, 1 / 60);
+  }
+  assert.ok(rig.camera.up.x > 0.999);
+
+  teleportTarget(target, new THREE.Vector3(10, 0.46, 0));
+  target.gameplayUp.set(0, 1, 0);
+  target.attached = false;
+  rig.update(1, 1 / 60);
+
+  assert.ok(rig.camera.up.distanceTo(new THREE.Vector3(0, 1, 0)) < 1e-10);
+});
+
+test('teleport clears stale obstruction distance immediately', () => {
+  const target = createTarget();
+  const world = new CollisionWorld();
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2));
+  wall.position.set(0, 1, 2);
+  world.register(wall);
+  const rig = new CameraRig({ initialPitchRadians: 0 });
+  rig.setFollowTarget(target, world);
+  rig.update(1, 1 / 60);
+  assert.ok(rig.getDiagnostics().currentDistanceMetres < 2);
+
+  teleportTarget(target, new THREE.Vector3(10, 0.46, 0));
+  rig.update(1, 1 / 60);
+
+  const diagnostics = rig.getDiagnostics();
+  assert.equal(diagnostics.obstructed, false);
+  assert.equal(
+    diagnostics.currentDistanceMetres,
+    diagnostics.desiredDistanceMetres,
+  );
+
+  wall.geometry.dispose();
+});
+
+test('teleport preserves accumulated yaw and pitch intent', () => {
+  const target = createTarget();
+  const rig = new CameraRig({
+    horizontalSensitivityRadiansPerPixel: 1,
+    verticalSensitivityRadiansPerPixel: 1,
+    minimumPitchRadians: -1,
+    maximumPitchRadians: 1,
+    initialPitchRadians: 0,
+  });
+  const expectedGroundBack = new THREE.Vector3();
+  const movementAfter = new THREE.Vector3();
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.update(1, 0);
+
+  target.gameplayUp.set(0, 0, 1);
+  target.attached = true;
+  for (let step = 0; step < 120; step += 1) {
+    rig.update(1, 1 / 60);
+  }
+  rig.queueLookInput(Math.PI / 2, -0.4);
+  rig.update(1, 0);
+  const pitchBefore = rig.getDiagnostics().pitchRadians;
+  expectedGroundBack
+    .copy(rig.camera.position)
+    .sub(target.position)
+    .addScaledVector(rig.camera.up, -0.35)
+    .normalize()
+    .addScaledVector(rig.camera.up, -Math.sin(pitchBefore))
+    .multiplyScalar(1 / Math.cos(pitchBefore))
+    .projectOnPlane(new THREE.Vector3(0, 1, 0))
+    .normalize();
+
+  teleportTarget(target, new THREE.Vector3(10, 0.46, 0));
+  target.gameplayUp.set(0, 1, 0);
+  target.attached = false;
+  rig.update(1, 1 / 60);
+  rig.copyGroundMovementDirection(0, 1, movementAfter);
+
+  assert.ok(movementAfter.distanceTo(expectedGroundBack) < 1e-8);
+  assert.equal(rig.getDiagnostics().pitchRadians, pitchBefore);
+});
+
+test('teleport still contracts immediately against destination obstruction', () => {
+  const target = createTarget();
+  const world = new CollisionWorld();
+  const destinationWall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2));
+  destinationWall.name = 'destination-camera-wall';
+  destinationWall.position.set(10, 1, 2);
+  world.register(destinationWall);
+  const rig = new CameraRig({ initialPitchRadians: 0 });
+  rig.setFollowTarget(target, world);
+  rig.update(1, 0);
+
+  teleportTarget(target, new THREE.Vector3(10, 0.46, 0));
+  rig.update(1, 1 / 60);
+
+  const diagnostics = rig.getDiagnostics();
+  assert.equal(diagnostics.obstructed, true);
+  assert.equal(diagnostics.obstructionName, 'destination-camera-wall');
+  assert.ok(diagnostics.currentDistanceMetres < 2);
+
+  destinationWall.geometry.dispose();
 });
