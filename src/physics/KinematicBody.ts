@@ -121,6 +121,7 @@ export class KinematicBody {
   private readonly groundNormalValue = new THREE.Vector3(0, 1, 0);
   private readonly gameplayUpValue = new THREE.Vector3(0, 1, 0);
   private readonly lastContactNormalValue = new THREE.Vector3(0, 1, 0);
+  private supportColliderValue: THREE.Mesh | null = null;
 
   private groundedValue = false;
   private attachedValue = false;
@@ -160,6 +161,8 @@ export class KinematicBody {
 
   private readonly movementHit = new CollisionHit();
   private readonly groundHit = new CollisionHit();
+  private readonly carrierHit = new CollisionHit();
+  private readonly carrierRemainingDisplacement = new THREE.Vector3();
 
   contactsThisStep = 0;
   lastCollisionName = 'none';
@@ -200,6 +203,19 @@ export class KinematicBody {
 
   get grounded(): boolean {
     return this.groundedValue;
+  }
+
+  /** Collider currently providing stable ground/attachment support. */
+  get supportCollider(): THREE.Mesh | null {
+    return this.supportColliderValue;
+  }
+
+  get supportColliderName(): string {
+    return this.supportColliderValue?.name || 'none';
+  }
+
+  isSupportedBy(collider: THREE.Mesh): boolean {
+    return this.groundedValue && this.supportColliderValue === collider;
   }
 
   get attached(): boolean {
@@ -370,6 +386,110 @@ export class KinematicBody {
     this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
   }
 
+
+  /**
+   * Apply an authored moving-platform displacement without changing velocity.
+   *
+   * This method is called after the normal body update for the fixed step.
+   * `previousPosition` is intentionally left untouched so render interpolation
+   * contains both player locomotion and carrier motion. The carrier itself is
+   * ignored during the sweep because its transform has already advanced; all
+   * other movement colliders still block transport.
+   */
+  applyCarrierDisplacement(
+    displacement: ReadonlyVector3State,
+    carrierCollider: THREE.Mesh,
+  ): void {
+    if (
+      !Number.isFinite(displacement.x) ||
+      !Number.isFinite(displacement.y) ||
+      !Number.isFinite(displacement.z)
+    ) {
+      throw new Error(
+        'Carrier displacement components must be finite.',
+      );
+    }
+
+    this.carrierRemainingDisplacement.set(
+      displacement.x,
+      displacement.y,
+      displacement.z,
+    );
+
+    if (
+      this.carrierRemainingDisplacement.lengthSq() <=
+      MOVEMENT_EPSILON_SQ
+    ) {
+      return;
+    }
+
+    const queryRadius =
+      this.config.radiusMetres + this.config.skinWidthMetres;
+
+    for (
+      let iteration = 0;
+      iteration < this.config.maxCollisionIterations;
+      iteration += 1
+    ) {
+      if (
+        this.carrierRemainingDisplacement.lengthSq() <=
+        MOVEMENT_EPSILON_SQ
+      ) {
+        break;
+      }
+
+      const hit = this.world.sweepSphere(
+        this.currentPosition,
+        this.carrierRemainingDisplacement,
+        queryRadius,
+        this.carrierHit,
+        undefined,
+        carrierCollider,
+      );
+
+      if (!hit) {
+        this.currentPosition.add(
+          this.carrierRemainingDisplacement,
+        );
+        this.carrierRemainingDisplacement.set(0, 0, 0);
+        break;
+      }
+
+      const travelFraction = THREE.MathUtils.clamp(
+        this.carrierHit.fraction,
+        0,
+        1,
+      );
+
+      if (travelFraction > 0) {
+        this.currentPosition.addScaledVector(
+          this.carrierRemainingDisplacement,
+          travelFraction,
+        );
+      }
+
+      this.currentPosition.addScaledVector(
+        this.carrierHit.normal,
+        CONTACT_PUSH_METRES,
+      );
+
+      this.carrierRemainingDisplacement.multiplyScalar(
+        1 - travelFraction,
+      );
+      const intoSurface =
+        this.carrierRemainingDisplacement.dot(
+          this.carrierHit.normal,
+        );
+
+      if (intoSurface < 0) {
+        this.carrierRemainingDisplacement.addScaledVector(
+          this.carrierHit.normal,
+          -intoSurface,
+        );
+      }
+    }
+  }
+
   /**
    * Checkpoint recovery adapter.
    *
@@ -391,10 +511,12 @@ export class KinematicBody {
     this.lastCollisionName = 'none';
     this.attachedValue = false;
     this.attachmentSurface = null;
+    this.supportColliderValue = null;
     this.gameplayUpValue.copy(WORLD_UP);
     this.groundNormalValue.copy(WORLD_UP);
     this.supportSurfaceTagValue = 'default';
     this.supportTractionMultiplier = 1;
+    this.supportColliderValue = null;
     this.lastContactSurfaceTagValue = 'default';
     this.cancelJumpCharge();
     this.groundReacquireDelaySeconds = 0;
@@ -786,6 +908,7 @@ export class KinematicBody {
     this.groundedValue = false;
     this.supportSurfaceTagValue = 'bouncy';
     this.supportTractionMultiplier = 1;
+    this.supportColliderValue = null;
     this.cancelJumpCharge();
     this.coyoteTimeRemainingSecondsValue = 0;
     this.groundReacquireDelaySeconds = Math.max(
@@ -815,6 +938,7 @@ export class KinematicBody {
 
     this.attachedValue = true;
     this.attachmentSurface = surfaceObject;
+    this.supportColliderValue = surfaceObject;
     this.gameplayUpValue.copy(surfaceNormal).normalize();
     this.groundNormalValue.copy(this.gameplayUpValue);
     this.groundedValue = true;
@@ -842,6 +966,7 @@ export class KinematicBody {
     this.groundedValue = false;
     this.supportSurfaceTagValue = 'default';
     this.supportTractionMultiplier = 1;
+    this.supportColliderValue = null;
     this.attachmentCooldownSecondsValue = Math.max(
       this.attachmentCooldownSecondsValue,
       cooldownSeconds,
@@ -887,6 +1012,7 @@ export class KinematicBody {
         ) {
           this.attachedValue = true;
           this.attachmentSurface = this.groundHit.object;
+          this.supportColliderValue = this.groundHit.object;
           this.gameplayUpValue.copy(this.groundHit.normal).normalize();
           this.groundNormalValue.copy(this.gameplayUpValue);
           this.groundedValue = true;
@@ -923,6 +1049,7 @@ export class KinematicBody {
     const surface = this.surfaces.get(this.groundHit.object);
     this.groundedValue = true;
     this.groundNormalValue.copy(this.groundHit.normal);
+    this.supportColliderValue = this.groundHit.object;
     this.supportSurfaceTagValue = surface.tag;
     this.supportTractionMultiplier = surface.tractionMultiplier;
     this.removeVelocityIntoGround();
