@@ -184,6 +184,7 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.2, 0.4], position: [-4.8, 2.6, 6], material: materials.sticky, surfaceTag: 'sticky' });
     this.addCollider({ name: 'room-1-north-clean-centre', size: [4, 6.5, 0.4], position: [-1.8, 3.25, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
+    this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
 
     this.addVisualBox('room-1-locked-door-false-lead', [2.6, 3, 0.18], [4.3, 1.5, 5.76], materials.locked);
     this.addOpenVentFrame('room-1-vent-open-frame', [-4.8, 6, 5.74], materials.duct);
