@@ -4,7 +4,7 @@ import { EventBus } from './core/EventBus';
 import { Input } from './core/Input';
 import { Loop } from './core/Loop';
 import { GreyboxTestPanel } from './debug/GreyboxTestPanel';
-import { GreyboxCollisionScene } from './levels/GreyboxCollisionScene';
+import { ContainmentTeachingScene } from './levels/ContainmentTeachingScene';
 import { CollisionWorld } from './physics/CollisionWorld';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
@@ -26,7 +26,7 @@ if (!app) {
 
 const renderLayer = new RenderLayer({ host: app });
 
-const testScene = new GreyboxCollisionScene();
+const testScene = new ContainmentTeachingScene();
 renderLayer.scene.add(testScene.root);
 
 const puzzleTestRig = new PuzzleTestRig();
