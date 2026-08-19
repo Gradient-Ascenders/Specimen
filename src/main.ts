@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import creditsMarkdown from '../CREDITS.md?raw';
 
 import { EventBus } from './core/EventBus';
 import { Input } from './core/Input';
@@ -17,8 +18,11 @@ import { SurfaceRegistry } from './physics/SurfaceRegistry';
 import { ElevatorTestRig } from './puzzle/ElevatorTestRig';
 import { PuzzleTestRig } from './puzzle/PuzzleTestRig';
 import { BlobFacing } from './render/BlobFacing';
+import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
+import { GameFlowUI } from './ui/GameFlowUI';
+import { GameSettings } from './ui/GameSettings';
 import './style.css';
 
 const app = document.querySelector<HTMLElement>('#app');
@@ -28,6 +32,45 @@ if (!app) {
 }
 
 const renderLayer = new RenderLayer({ host: app });
+
+const input = new Input({
+  pointerLockElement: renderLayer.canvas,
+});
+
+const settings = new GameSettings();
+const gameFlow = new GameFlowUI({
+  settings,
+  creditsMarkdown,
+  actions: {
+    restartAvailable: false,
+    setGameplayInputEnabled: (enabled) => input.setEnabled(enabled),
+    requestPointerLock: () => input.requestPointerLock(),
+    releasePointerLock: () => input.releasePointerLock(),
+    isPointerLocked: () => input.pointerLocked,
+    restartLevel: () => undefined,
+    applySettings: (nextSettings) => {
+      renderLayer.cameraRig.setLookSettings({
+        horizontalSensitivityRadiansPerPixel:
+          DEFAULT_CAMERA_RIG_CONFIG.horizontalSensitivityRadiansPerPixel *
+          nextSettings.mouseSensitivity,
+        verticalSensitivityRadiansPerPixel:
+          DEFAULT_CAMERA_RIG_CONFIG.verticalSensitivityRadiansPerPixel *
+          nextSettings.mouseSensitivity,
+        invertVertical: nextSettings.invertVerticalLook,
+      });
+      renderLayer.cameraRig.setFollowDistanceMetres(
+        nextSettings.cameraDistanceMetres,
+      );
+    },
+  },
+});
+
+app.replaceChildren(renderLayer.canvas, gameFlow.element);
+
+let bootFrame = requestAnimationFrame(() => {
+  // A second frame guarantees that the indeterminate loading state paints.
+  bootFrame = requestAnimationFrame(() => gameFlow.completeBoot());
+});
 
 const testScene = new GreyboxCollisionScene();
 renderLayer.scene.add(testScene.root);
@@ -254,16 +297,27 @@ const testPanel = new GreyboxTestPanel({
     elevatorTestRig.runCarrierRegression(),
 });
 
-app.replaceChildren(renderLayer.canvas, testPanel.element);
-
-const input = new Input({
-  pointerLockElement: renderLayer.canvas,
+app.insertBefore(testPanel.element, gameFlow.element);
+const unsubscribeGameFlow = gameFlow.subscribe((state) => {
+  const gameplayActive = state === 'playing';
+  testPanel.element.hidden = !gameplayActive;
+  testPanel.element.inert = !gameplayActive;
+  if (gameplayActive) {
+    testPanel.element.removeAttribute('aria-hidden');
+  } else {
+    testPanel.element.setAttribute('aria-hidden', 'true');
+  }
 });
 
 let debugSampleElapsedSeconds = 0;
 
 const loop = new Loop({
   fixedUpdate: (deltaSeconds) => {
+    if (!gameFlow.gameplayActive) {
+      input.endFixedUpdate();
+      return;
+    }
+
     if (input.wasPressed('debugReset')) testPanel.resetProbe();
     if (input.wasPressed('debugTestRecovery')) testPanel.testRecovery();
 
@@ -445,10 +499,13 @@ renderLayer.setAnimationLoop((timestampMs) => {
 });
 
 const shutdown = (): void => {
+  cancelAnimationFrame(bootFrame);
   unsubscribeLanding();
   unsubscribeJumped();
   movementEvents.clear();
   loop.dispose();
+  unsubscribeGameFlow();
+  gameFlow.dispose();
   input.dispose();
   collisionWorld.clear();
   surfaceRegistry.clear();

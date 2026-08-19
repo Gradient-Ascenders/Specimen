@@ -63,6 +63,12 @@ before `Input.endFixedUpdate()` clears it.
 - horizontal inversion (off by default);
 - vertical/Y inversion (off by default).
 
+`CameraRig.setFollowDistanceMetres()` is the collision-aware camera-distance
+hook used by Issue #22. It accepts the supported 3.5–7.0 m player range and
+updates the normal open-space target. Moving inward contracts immediately;
+moving outward uses the existing delayed, damped recovery and remains limited
+by camera-obstruction sweeps.
+
 With vertical inversion off, mouse up looks up and mouse down looks down;
 enabling vertical inversion reverses those directions. Horizontal look retains
 the orbit-yaw convention independently.

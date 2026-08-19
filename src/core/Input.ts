@@ -47,6 +47,7 @@ export class Input {
   private readonly mouseBindings = new Map<number, InputAction[]>();
 
   private readonly activeKeys = new Set<string>();
+  private readonly suppressedKeys = new Set<string>();
   private readonly activeMouseButtons = new Set<number>();
   private readonly holdCounts = new Map<InputAction, number>();
   private readonly heldActions = new Set<InputAction>();
@@ -55,6 +56,7 @@ export class Input {
 
   private pointerMovementX = 0;
   private pointerMovementY = 0;
+  private enabled = true;
   private disposed = false;
 
   constructor(options: InputOptions) {
@@ -82,6 +84,10 @@ export class Input {
 
   get pointerLocked(): boolean {
     return this.hostDocument.pointerLockElement === this.pointerLockElement;
+  }
+
+  get isEnabled(): boolean {
+    return this.enabled;
   }
 
   get pointerDeltaX(): number {
@@ -121,7 +127,7 @@ export class Input {
   }
 
   requestPointerLock(): void {
-    if (this.pointerLocked) return;
+    if (!this.enabled || this.pointerLocked) return;
 
     try {
       const request = this.pointerLockElement.requestPointerLock() as
@@ -142,6 +148,18 @@ export class Input {
     } catch {
       // Pointer lock may already have been released by the browser.
     }
+  }
+
+  /** Suspend gameplay input without removing the browser event boundary. */
+  setEnabled(enabled: boolean): void {
+    if (this.disposed || this.enabled === enabled) return;
+
+    if (!enabled) {
+      for (const code of this.activeKeys) this.suppressedKeys.add(code);
+    }
+
+    this.enabled = enabled;
+    this.clearState(true);
   }
 
   dispose(): void {
@@ -220,8 +238,9 @@ export class Input {
     }
   }
 
-  private clearState(): void {
+  private clearState(preserveSuppressedKeys = false): void {
     this.activeKeys.clear();
+    if (!preserveSuppressedKeys) this.suppressedKeys.clear();
     this.activeMouseButtons.clear();
     this.holdCounts.clear();
     this.heldActions.clear();
@@ -235,11 +254,21 @@ export class Input {
     const actions = this.keyBindings.get(event.code);
     if (!actions) return;
 
+    if (!this.enabled) {
+      this.suppressedKeys.add(event.code);
+      return;
+    }
+
     // Mapped game controls belong to the game, not browser UI. In particular,
     // this prevents Space from activating whichever debug button last held
     // focus while the player is trying to charge a jump.
     event.preventDefault();
 
+    if (this.suppressedKeys.has(event.code)) return;
+    // A repeat without an active keydown can arrive after focus/visibility
+    // state was cleared while the physical key remained held. It must not
+    // become a new gameplay activation after Resume.
+    if (event.repeat && !this.activeKeys.has(event.code)) return;
     if (this.activeKeys.has(event.code)) return;
 
     this.activeKeys.add(event.code);
@@ -250,7 +279,14 @@ export class Input {
     const actions = this.keyBindings.get(event.code);
     if (!actions) return;
 
+    if (!this.enabled) {
+      this.suppressedKeys.delete(event.code);
+      return;
+    }
+
     event.preventDefault();
+
+    if (this.suppressedKeys.delete(event.code)) return;
 
     if (!this.activeKeys.delete(event.code)) return;
 
@@ -258,6 +294,7 @@ export class Input {
   };
 
   private readonly onMouseDown = (event: MouseEvent): void => {
+    if (!this.enabled) return;
     const actions = this.mouseBindings.get(event.button);
     if (!actions || this.activeMouseButtons.has(event.button)) return;
 
@@ -266,6 +303,7 @@ export class Input {
   };
 
   private readonly onMouseUp = (event: MouseEvent): void => {
+    if (!this.enabled) return;
     const actions = this.mouseBindings.get(event.button);
     if (!actions || !this.activeMouseButtons.delete(event.button)) return;
 
@@ -273,7 +311,7 @@ export class Input {
   };
 
   private readonly onMouseMove = (event: MouseEvent): void => {
-    if (!this.pointerLocked) return;
+    if (!this.enabled || !this.pointerLocked) return;
     this.pointerMovementX += event.movementX;
     this.pointerMovementY += event.movementY;
   };
@@ -287,6 +325,7 @@ export class Input {
   };
 
   private readonly onPointerLockRequest = (): void => {
+    if (!this.enabled) return;
     this.requestPointerLock();
   };
 }
