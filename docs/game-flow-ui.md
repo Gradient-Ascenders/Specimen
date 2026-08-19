@@ -32,6 +32,11 @@ activation. A browser-driven pointer-lock loss while live gameplay input is
 enabled enters pause; the intentional lock release used by the death sequence
 does not. Window blur also pauses a running trial.
 
+If a mapped gameplay key was already held when a menu opened, its matching
+keyup is consumed before the browser can use it to activate the newly focused
+menu button. A fresh Space press made after the menu is open remains ordinary
+native button input.
+
 The flow never enables gameplay input directly. Re-enabling belongs to the
 runtime start hook, which can intentionally keep input disabled while the
 current death/retry sequence is active. This keeps the application UI state and
@@ -66,9 +71,11 @@ Restart is synchronous and single-entry. A successful paused restart returns
 directly to gameplay and requests pointer lock from the Restart button's user
 activation. A failure returns to the paused boundary with status text. The
 existing death/retry sequence remains level-owned and independent: death may
-suspend input and release pointer lock without opening the pause menu, and its
-Retry continues to perform deferred recovery rather than routing through the
-full-level Restart control.
+suspend input and release pointer lock without opening the pause menu. While
+death owns disabled input, Escape, focus loss, and pointer-lock events cannot
+enter Pause. Retry therefore completes deferred recovery into the still-playing
+lifecycle instead of producing a paused UI over a re-enabled runtime. Death
+Retry remains separate from the full-level Restart control.
 
 The debug panel remains owned by `GreyboxLevelRuntime`.
 `setDebugInteractionEnabled(false)` only suppresses its presentation behind

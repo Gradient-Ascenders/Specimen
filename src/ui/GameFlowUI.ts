@@ -19,6 +19,11 @@ export type GameFlowState =
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
 
+export const gameFlowCanPause = (
+  state: GameFlowState,
+  gameplayInputEnabled: boolean,
+): boolean => state === 'playing' && gameplayInputEnabled;
+
 /** Pure transition model: exactly one full-screen surface can own the UI. */
 export class GameFlowStateModel {
   private currentState: GameFlowState = 'loading';
@@ -392,7 +397,14 @@ export class GameFlowUI {
   }
 
   private pause(): void {
-    if (this.model.state !== 'playing') return;
+    if (
+      !gameFlowCanPause(
+        this.model.state,
+        this.actions.isGameplayInputEnabled(),
+      )
+    ) {
+      return;
+    }
     this.actions.stopGameplay();
     if (!this.model.pause()) return;
     this.syncState();
@@ -473,6 +485,7 @@ export class GameFlowUI {
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (event.code !== 'Escape' || event.repeat) return;
     if (this.model.state === 'playing') {
+      if (!this.actions.isGameplayInputEnabled()) return;
       event.preventDefault();
       this.pause();
     } else if (this.model.state === 'paused') {

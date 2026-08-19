@@ -265,10 +265,7 @@ export class Input {
     const actions = this.keyBindings.get(event.code);
     if (!actions) return;
 
-    if (!this.enabledValue) {
-      this.suppressedKeys.add(event.code);
-      return;
-    }
+    if (!this.enabledValue) return;
 
     // Mapped game controls belong to the game, not browser UI. In particular,
     // this prevents Space from activating whichever debug button last held
@@ -289,7 +286,10 @@ export class Input {
     if (!actions) return;
 
     if (!this.enabledValue) {
-      this.suppressedKeys.delete(event.code);
+      // A gameplay key held when a menu opened must not complete a native
+      // button activation after focus moves into that menu. Keys pressed
+      // deliberately while already in the menu remain native UI input.
+      if (this.suppressedKeys.delete(event.code)) event.preventDefault();
       return;
     }
 

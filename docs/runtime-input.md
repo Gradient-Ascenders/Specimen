@@ -85,7 +85,9 @@ movement; held actions remain active.
   clears held and transient state, ignores mapped activation and pointer motion,
   and refuses pointer-lock requests until re-enabled. A key held across that
   boundary cannot reactivate gameplay until key-up followed by a fresh keydown,
-  so Resume cannot replay stale input.
+  so Resume cannot replay stale input. The held key's boundary-crossing keyup is
+  also prevented from activating the menu control that received focus during
+  Pause; keys pressed deliberately after the menu opens remain native UI input.
   Native menu controls remain free to consume Space and other keyboard input.
 - A repeated keydown with no corresponding active initial keydown is ignored.
   This covers the browser-repeat orphan left when blur or visibility loss clears

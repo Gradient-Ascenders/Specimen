@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { Input } from '../src/core/Input.ts';
-import { GameFlowStateModel } from '../src/ui/GameFlowUI.ts';
+import {
+  gameFlowCanPause,
+  GameFlowStateModel,
+} from '../src/ui/GameFlowUI.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 
 test('game flow permits only explicit menu transitions', () => {
@@ -50,6 +53,12 @@ test('failed restart returns to the paused boundary', () => {
   assert.equal(flow.beginRestart(), true);
   assert.equal(flow.cancelRestart(), true);
   assert.equal(flow.state, 'paused');
+});
+
+test('pause ownership defers to a death flow that disabled gameplay input', () => {
+  assert.equal(gameFlowCanPause('playing', true), true);
+  assert.equal(gameFlowCanPause('playing', false), false);
+  assert.equal(gameFlowCanPause('paused', true), false);
 });
 
 test('flow state subscriptions emit immediately and clean up explicitly', () => {
@@ -157,7 +166,7 @@ test('input suspension clears state and ignores gameplay activation', () => {
   assert.equal(pointerElement.requestCount, 0);
 
   input.setEnabled(true);
-  hostWindow.dispatchEvent(keyboardEvent('keydown', 'KeyW'));
+  hostWindow.dispatchEvent(keyboardEvent('keydown', 'KeyW', true));
   assert.equal(input.isDown('moveForward'), false);
   hostWindow.dispatchEvent(keyboardEvent('keyup', 'KeyW'));
   hostWindow.dispatchEvent(keyboardEvent('keydown', 'KeyW'));
@@ -170,6 +179,32 @@ test('input suspension clears state and ignores gameplay activation', () => {
   pointerElement.dispatchEvent(new Event('click'));
   assert.equal(input.isDown('moveForward'), false);
   assert.equal(pointerElement.requestCount, 1);
+});
+
+test('a gameplay Space release cannot activate the focused pause control', () => {
+  const hostWindow = new EventTarget();
+  const input = new Input({
+    window: hostWindow as unknown as Window,
+    document: new FakeDocument() as unknown as Document,
+    pointerLockElement: new FakePointerElement() as unknown as HTMLElement,
+  });
+
+  hostWindow.dispatchEvent(keyboardEvent('keydown', 'Space'));
+  assert.equal(input.isDown('jump'), true);
+  input.setEnabled(false);
+
+  const heldRelease = keyboardEvent('keyup', 'Space');
+  hostWindow.dispatchEvent(heldRelease);
+  assert.equal(heldRelease.defaultPrevented, true);
+
+  const menuPress = keyboardEvent('keydown', 'Space');
+  const menuRelease = keyboardEvent('keyup', 'Space');
+  hostWindow.dispatchEvent(menuPress);
+  hostWindow.dispatchEvent(menuRelease);
+  assert.equal(menuPress.defaultPrevented, false);
+  assert.equal(menuRelease.defaultPrevented, false);
+
+  input.dispose();
 });
 
 test('orphan key repeats after focus loss cannot reactivate movement', () => {

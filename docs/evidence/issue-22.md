@@ -46,35 +46,34 @@ restart, and credits flow around the current lifecycle-owned containment level.
 ## Automated verification
 
 - `npm run type-check`: passed.
-- `npm test`: 75 passed, 0 failed. The suite includes current-main death,
+- `npm test`: 77 passed, 0 failed. The suite includes current-main death,
   movement, lifecycle, input, and rendering tests plus Issue #22 flow,
   subscription, settings, camera-distance, menu-suspension, and lifecycle
   coordination coverage.
 - `npm run build`: passed with Vite 8.2.1; 34 modules transformed. Output was a
-  668.65 kB JavaScript asset (167.51 kB gzip) and a 9.03 kB stylesheet (3.01 kB
+  668.75 kB JavaScript asset (167.55 kB gzip) and a 9.03 kB stylesheet (3.01 kB
   gzip). The existing warning for a JavaScript chunk over 500 kB remains.
 - `git diff --check`: passed.
 - Repository-wide conflict-marker search: passed.
 
 ## Production and browser evidence
 
-- Served the final `dist/` with Vite preview at `http://127.0.0.1:4174/`.
+- Served the final `dist/` with Vite preview at `http://127.0.0.1:4173/`.
 - HTTP verification returned 200 for the 846-byte root document, 200 for the
-  generated 668,659-byte JavaScript asset, and 200 for the generated 9,034-byte
+  generated 668,752-byte JavaScript asset, and 200 for the generated 9,034-byte
   CSS asset.
 - Normal production diagnostics remain unavailable unless `?debug=1` is
   supplied by the bootstrap.
-- Interactive browser verification was blocked before navigation because the
-  in-app browser rejected its own `browser-service.mjs` dependency as outside a
-  configured trusted code path. No screenshots or manual interaction claims are
-  made here.
-
-## Outstanding manual verification
-
-Use a working browser session after code review to verify title/start,
-pause/resume, pointer lock and focus loss, settings persistence, full and
-repeated Restart, death/retry coexistence, keyboard navigation, target viewport
-layouts, state screenshots, and console/network output.
+- Codex's in-app browser remained unavailable because its cached
+  `browser-service.mjs` was rejected by the configured trusted-code path.
+- Reviewer-performed production verification subsequently covered Start,
+  Pause/Resume, repeated Restart, settings persistence, death/retry ordering,
+  keyboard and focus behavior, a 320 × 480 layout, generated asset responses,
+  and console output. The reviewer reported no JavaScript console errors.
+- That review exposed and drove regression coverage for two fixed blockers:
+  releasing a gameplay-held Space key can no longer activate the focused Resume
+  button, and Pause now defers while the death flow owns disabled gameplay input.
+- Formal screenshots were not added to the repository by this change.
 
 ## Resource and dependency impact
 
