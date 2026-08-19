@@ -93,7 +93,11 @@ export interface CameraRigDiagnostics {
   readonly obstructionName: string;
   readonly targetGrounded: boolean;
   readonly targetAttached: boolean;
+  readonly pitchRadians: number;
 }
+
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const CAMERA_BASIS_EPSILON_SQ = 1e-10;
 
 /**
  * Platforming-oriented third-person orbit/follow camera.
@@ -123,6 +127,9 @@ export class CameraRig {
   private readonly planarBack = new THREE.Vector3(0, 0, 1);
   private readonly boomDirection = new THREE.Vector3();
   private readonly boomDisplacement = new THREE.Vector3();
+  private readonly groundBack = new THREE.Vector3(0, 0, 1);
+  private readonly groundRight = new THREE.Vector3(1, 0, 0);
+  private readonly surfaceUp = new THREE.Vector3(0, 1, 0);
   private readonly upRotation = new THREE.Quaternion();
   private readonly partialUpRotation = new THREE.Quaternion();
   private readonly yawRotation = new THREE.Quaternion();
@@ -205,6 +212,101 @@ export class CameraRig {
     );
   }
 
+  /**
+   * Integrate queued pointer motion into the player-owned orbit immediately.
+   *
+   * The fixed update calls this before resolving movement, so a mouse turn and
+   * a movement key observed in the same step use the same camera orientation.
+   * Pointer deltas are already displacement samples and are deliberately not
+   * multiplied by frame time.
+   */
+  applyQueuedLookInput(): void {
+    if (this.queuedYawRadians !== 0) {
+      this.yawRotation.setFromAxisAngle(
+        this.smoothedUp,
+        this.queuedYawRadians,
+      );
+      this.planarBack.applyQuaternion(this.yawRotation).normalize();
+    }
+
+    this.pitchRadians = THREE.MathUtils.clamp(
+      this.pitchRadians + this.queuedPitchRadians,
+      this.config.minimumPitchRadians,
+      this.config.maximumPitchRadians,
+    );
+    this.queuedYawRadians = 0;
+    this.queuedPitchRadians = 0;
+  }
+
+  /**
+   * Convert an input vector into a normalized world-space ground direction.
+   * `moveZ` follows the controller convention: -1 is forward, +1 is backward.
+   * Camera pitch and the blob's facing are intentionally absent from this math.
+   */
+  copyGroundMovementDirection(
+    moveX: number,
+    moveZ: number,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    const clampedX = THREE.MathUtils.clamp(moveX, -1, 1);
+    const clampedZ = THREE.MathUtils.clamp(moveZ, -1, 1);
+
+    this.groundBack.copy(this.planarBack).projectOnPlane(WORLD_UP);
+    if (this.groundBack.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
+      this.groundBack.set(0, 0, 1);
+    } else {
+      this.groundBack.normalize();
+    }
+    this.groundRight.crossVectors(WORLD_UP, this.groundBack).normalize();
+
+    target
+      .copy(this.groundRight)
+      .multiplyScalar(clampedX)
+      .addScaledVector(this.groundBack, clampedZ);
+    if (target.lengthSq() > 1) target.normalize();
+    return target;
+  }
+
+  /**
+   * Convert input into the displayed camera basis on an attached surface.
+   * The authoritative support normal defines the movement plane; camera pitch
+   * remains excluded, so left/right always follows screen-left/screen-right.
+   */
+  copySurfaceMovementDirection(
+    moveX: number,
+    moveZ: number,
+    gameplayUp: ReadonlyCameraVector3,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    const clampedX = THREE.MathUtils.clamp(moveX, -1, 1);
+    const clampedZ = THREE.MathUtils.clamp(moveZ, -1, 1);
+    this.surfaceUp.set(gameplayUp.x, gameplayUp.y, gameplayUp.z);
+    if (this.surfaceUp.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
+      this.surfaceUp.copy(WORLD_UP);
+    } else {
+      this.surfaceUp.normalize();
+    }
+
+    this.groundBack.copy(this.planarBack).projectOnPlane(this.surfaceUp);
+    if (this.groundBack.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
+      this.groundBack.set(0, 0, 1).projectOnPlane(this.surfaceUp);
+      if (this.groundBack.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
+        this.groundBack.set(1, 0, 0).projectOnPlane(this.surfaceUp);
+      }
+    }
+    this.groundBack.normalize();
+    this.groundRight
+      .crossVectors(this.surfaceUp, this.groundBack)
+      .normalize();
+
+    target
+      .copy(this.groundRight)
+      .multiplyScalar(clampedX)
+      .addScaledVector(this.groundBack, clampedZ);
+    if (target.lengthSq() > 1) target.normalize();
+    return target;
+  }
+
   update(interpolationAlpha: number, deltaSeconds: number): void {
     const target = this.followTarget;
     if (!target) return;
@@ -218,9 +320,17 @@ export class CameraRig {
 
     if (!this.initialized) this.initializePose();
 
-    this.updateOrientation(safeDeltaSeconds);
-    this.applyLookInput();
-    this.updateFollowPosition(target.velocity, safeDeltaSeconds);
+    const presentationDiscontinuity = this.isPresentationDiscontinuity(
+      target.velocity,
+      safeDeltaSeconds,
+    );
+    if (presentationDiscontinuity) {
+      this.resetPresentationForDiscontinuity();
+    } else {
+      this.updateOrientation(safeDeltaSeconds);
+      this.updateFollowPosition(safeDeltaSeconds);
+    }
+    this.applyQueuedLookInput();
     this.updateCameraDistance(safeDeltaSeconds);
     this.writeCameraPose();
   }
@@ -240,6 +350,7 @@ export class CameraRig {
       obstructionName: this.obstructionName,
       targetGrounded: this.targetGrounded,
       targetAttached: this.targetAttached,
+      pitchRadians: this.pitchRadians,
     };
   }
 
@@ -302,28 +413,10 @@ export class CameraRig {
     this.ensurePlanarBack();
   }
 
-  private applyLookInput(): void {
-    if (this.queuedYawRadians !== 0) {
-      this.yawRotation.setFromAxisAngle(
-        this.smoothedUp,
-        this.queuedYawRadians,
-      );
-      this.planarBack.applyQuaternion(this.yawRotation).normalize();
-    }
-
-    this.pitchRadians = THREE.MathUtils.clamp(
-      this.pitchRadians + this.queuedPitchRadians,
-      this.config.minimumPitchRadians,
-      this.config.maximumPitchRadians,
-    );
-    this.queuedYawRadians = 0;
-    this.queuedPitchRadians = 0;
-  }
-
-  private updateFollowPosition(
+  private isPresentationDiscontinuity(
     velocity: ReadonlyCameraVector3,
     deltaSeconds: number,
-  ): void {
+  ): boolean {
     const targetSpeedMetresPerSecond = Math.hypot(
       velocity.x,
       velocity.y,
@@ -333,11 +426,25 @@ export class CameraRig {
       this.config.teleportSnapDistanceMetres +
       targetSpeedMetresPerSecond * deltaSeconds;
 
-    if (this.smoothedTarget.distanceTo(this.interpolatedTarget) > snapDistance) {
-      this.smoothedTarget.copy(this.interpolatedTarget);
-      return;
-    }
+    return (
+      this.smoothedTarget.distanceTo(this.interpolatedTarget) > snapDistance
+    );
+  }
 
+  private resetPresentationForDiscontinuity(): void {
+    this.smoothedTarget.copy(this.interpolatedTarget);
+    this.smoothedUp.copy(this.targetUp);
+    // Preserve the accumulated orbit heading while rebuilding a valid tangent
+    // against the destination up basis. Pitch is an independent scalar and is
+    // intentionally left untouched.
+    this.ensurePlanarBack();
+    this.currentDistanceMetres = this.config.followDistanceMetres;
+    this.clearTimeSeconds = 0;
+    this.obstructed = false;
+    this.obstructionName = 'none';
+  }
+
+  private updateFollowPosition(deltaSeconds: number): void {
     this.smoothedTarget.lerp(
       this.interpolatedTarget,
       exponentialDampingAlpha(

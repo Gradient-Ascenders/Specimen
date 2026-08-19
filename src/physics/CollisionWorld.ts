@@ -136,6 +136,7 @@ export class CollisionWorld {
     radius: number,
     outHit: CollisionHit,
     queryMask = CollisionLayer.Movement,
+    ignoredCollider?: THREE.Mesh,
   ): boolean {
     if (!Number.isFinite(radius) || radius <= 0) {
       throw new Error('Sphere sweep radius must be a positive finite number.');
@@ -158,6 +159,7 @@ export class CollisionWorld {
       if ((collider.layerMask & queryMask) === 0) continue;
 
       const mesh = collider.mesh;
+      if (mesh === ignoredCollider) continue;
       if (!mesh.visible) continue;
 
       mesh.updateWorldMatrix(true, false);

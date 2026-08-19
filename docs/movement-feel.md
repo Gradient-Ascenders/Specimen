@@ -28,8 +28,8 @@ All movement and jump feel remains in `DEFAULT_KINEMATIC_BODY_CONFIG`.
 | `airAccelerationMetresPerSecondSquared` | 12 | m/s² |
 | `groundBrakingMetresPerSecondSquared` | 36 | m/s² |
 | `gravityMetresPerSecondSquared` | 18 | m/s² |
-| `minimumJumpSpeedMetresPerSecond` | 4.8 | tap-jump launch speed |
-| `maximumJumpSpeedMetresPerSecond` | 8.8 | full-charge launch speed |
+| `minimumJumpSpeedMetresPerSecond` | 5.88 | tap-jump launch speed (~50% higher apex) |
+| `maximumJumpSpeedMetresPerSecond` | 10.78 | full-charge launch speed (~50% higher apex) |
 | `maximumJumpChargeSeconds` | 0.70 | seconds to full charge |
 | `jumpChargeCurveExponent` | 1.35 | shapes the charge response |
 | `coyoteTimeSeconds` | 0.10 | retained jump window after leaving ground |
@@ -39,6 +39,11 @@ All movement and jump feel remains in `DEFAULT_KINEMATIC_BODY_CONFIG`.
 The charge is clamped to `[0, 1]`. Launch speed interpolates from the minimum
 to maximum jump speed after applying the configured exponent. Holding beyond
 `maximumJumpChargeSeconds` gives no additional power.
+
+Both endpoints are approximately the original launch speeds multiplied by
+`sqrt(1.5)`. Because ballistic height is proportional to launch speed squared,
+this makes tap, partial-charge, and full-charge jumps rise about 50% higher
+without changing their charge timing or response curve.
 
 ## Retained movement aids
 
