@@ -22,6 +22,62 @@ interface AttachedBodyFixture {
   wall: THREE.Mesh;
 }
 
+interface GroundBodyFixture {
+  body: KinematicBody;
+  events: EventBus<MovementEvents>;
+  floor: THREE.Mesh;
+}
+
+function createGroundBody(): GroundBodyFixture {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const events = new EventBus<MovementEvents>();
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 1, 20));
+  floor.name = 'test-jump-buffer-floor';
+  floor.position.y = -0.5;
+  floor.updateWorldMatrix(true, false);
+  world.register(floor);
+  surfaces.register(floor);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    events,
+    initialPosition: new THREE.Vector3(
+      0,
+      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres +
+        DEFAULT_KINEMATIC_BODY_CONFIG.skinWidthMetres,
+      0,
+    ),
+  });
+  assert.equal(body.grounded, true);
+
+  return { body, events, floor };
+}
+
+function launchTapJump(body: KinematicBody): void {
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: true,
+    held: true,
+    released: false,
+  });
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: false,
+    released: true,
+  });
+  assert.equal(body.grounded, false);
+}
+
+function advanceToBufferedLandingApproach(body: KinematicBody): void {
+  for (let step = 0; step < 120; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+    if (body.velocity.y < 0 && body.position.y < 0.85) return;
+  }
+
+  assert.fail('Body did not reach the expected descending landing approach.');
+}
+
 function createAttachedBody(): AttachedBodyFixture {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
@@ -201,6 +257,129 @@ test('slope jump release uses the current airborne movement plane', () => {
 
   idleFixture.slope.geometry.dispose();
   uphillFixture.slope.geometry.dispose();
+});
+
+test('jump pressed shortly before landing begins charging on touchdown', () => {
+  const { body, floor } = createGroundBody();
+  launchTapJump(body);
+  advanceToBufferedLandingApproach(body);
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: true,
+    held: true,
+    released: false,
+  });
+
+  for (let step = 0; step < 8 && !body.chargingJump; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+      pressed: false,
+      held: true,
+      released: false,
+    });
+  }
+
+  assert.equal(body.grounded, true);
+  assert.equal(body.chargingJump, true);
+  assert.equal(body.jumpInputBufferRemainingSeconds, 0);
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: true,
+    released: false,
+  });
+  assert.ok(body.chargeSeconds > 0);
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: false,
+    released: true,
+  });
+  assert.equal(body.grounded, false);
+  assert.ok(body.velocity.y > 0);
+
+  floor.geometry.dispose();
+});
+
+test('jump pressed and released shortly before landing launches on touchdown', () => {
+  const { body, events, floor } = createGroundBody();
+  let jumpCount = 0;
+  events.on('jumped', () => {
+    jumpCount += 1;
+  });
+
+  launchTapJump(body);
+  assert.equal(jumpCount, 1);
+  advanceToBufferedLandingApproach(body);
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: true,
+    held: true,
+    released: false,
+  });
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: false,
+    released: true,
+  });
+
+  for (let step = 0; step < 8 && jumpCount < 2; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  }
+
+  assert.equal(jumpCount, 2);
+  assert.equal(body.grounded, false);
+  assert.ok(body.velocity.y > 0);
+  assert.ok(
+    Math.abs(
+      body.lastJumpSpeedMetresPerSecond -
+        DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond,
+    ) < EPSILON,
+  );
+
+  floor.geometry.dispose();
+});
+
+test('focus-cleared input cancels released buffer without a stale launch', () => {
+  const { body, events, floor } = createGroundBody();
+  let jumpCount = 0;
+  events.on('jumped', () => {
+    jumpCount += 1;
+  });
+
+  launchTapJump(body);
+  advanceToBufferedLandingApproach(body);
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: true,
+    held: true,
+    released: false,
+  });
+  assert.ok(body.jumpInputBufferRemainingSeconds > 0);
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: false,
+    released: true,
+  });
+  assert.ok(body.jumpInputBufferRemainingSeconds > 0);
+
+  // A later focus loss explicitly invalidates even a stored release.
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: false,
+    released: false,
+    cancelled: true,
+  });
+  assert.equal(body.jumpInputBufferRemainingSeconds, 0);
+
+  for (let step = 0; step < 20 && !body.grounded; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  }
+
+  assert.equal(body.grounded, true);
+  assert.equal(body.chargingJump, false);
+  assert.equal(jumpCount, 1);
+
+  floor.geometry.dispose();
 });
 
 test('authored sticky wall carries movement across its top edge', () => {

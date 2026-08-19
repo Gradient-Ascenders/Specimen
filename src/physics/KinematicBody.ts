@@ -22,6 +22,8 @@ export interface JumpInputState {
   pressed: boolean;
   held: boolean;
   released: boolean;
+  /** True when an input-boundary reset must invalidate retained intent. */
+  cancelled?: boolean;
 }
 
 const NO_JUMP_INPUT: Readonly<JumpInputState> = {
@@ -50,6 +52,7 @@ export interface KinematicBodyConfig {
   maximumJumpChargeSeconds: number;
   jumpChargeCurveExponent: number;
   coyoteTimeSeconds: number;
+  jumpInputBufferSeconds: number;
   jumpGroundDetachSeconds: number;
   minimumLandingAirTimeSeconds: number;
 
@@ -81,6 +84,7 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   maximumJumpChargeSeconds: 0.7,
   jumpChargeCurveExponent: 1.35,
   coyoteTimeSeconds: 0.1,
+  jumpInputBufferSeconds: 0.12,
   jumpGroundDetachSeconds: 0.05,
   minimumLandingAirTimeSeconds: 0.04,
 
@@ -132,6 +136,8 @@ export class KinematicBody {
   private chargingJumpValue = false;
   private chargeSecondsValue = 0;
   private coyoteTimeRemainingSecondsValue = 0;
+  private jumpInputBufferRemainingSecondsValue = 0;
+  private bufferedJumpReleasedValue = false;
   private groundReacquireDelaySeconds = 0;
   private airborneSeconds = 0;
   private landedThisStepValue = false;
@@ -285,6 +291,10 @@ export class KinematicBody {
     return this.coyoteTimeRemainingSecondsValue;
   }
 
+  get jumpInputBufferRemainingSeconds(): number {
+    return this.jumpInputBufferRemainingSecondsValue;
+  }
+
   get landedThisStep(): boolean {
     return this.landedThisStepValue;
   }
@@ -379,6 +389,7 @@ export class KinematicBody {
       this.airborneSeconds += deltaSeconds;
     }
 
+    this.updateJumpBuffer(deltaSeconds, jumpInput);
     this.updateJumpState(deltaSeconds, jumpInput);
     this.applyLocomotion(
       deltaSeconds,
@@ -396,6 +407,7 @@ export class KinematicBody {
     this.moveAndSlide(deltaSeconds);
     this.refreshGroundState(deltaSeconds);
     this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
+    this.consumeBufferedJumpAfterLanding(jumpInput);
   }
 
 
@@ -531,6 +543,7 @@ export class KinematicBody {
     this.supportColliderValue = null;
     this.lastContactSurfaceTagValue = 'default';
     this.cancelJumpCharge();
+    this.clearJumpBuffer();
     this.groundReacquireDelaySeconds = 0;
     this.attachmentCooldownSecondsValue = 0;
     this.bounceCooldownSecondsValue = 0;
@@ -587,6 +600,58 @@ export class KinematicBody {
     if (jumpInput.released) this.launchChargedJump();
   }
 
+  /** Retain a deliberate airborne press briefly so landing does not eat it. */
+  private updateJumpBuffer(
+    deltaSeconds: number,
+    jumpInput: Readonly<JumpInputState>,
+  ): void {
+    if (jumpInput.cancelled) this.clearJumpBuffer();
+
+    if (this.jumpInputBufferRemainingSecondsValue > 0) {
+      this.jumpInputBufferRemainingSecondsValue = Math.max(
+        0,
+        this.jumpInputBufferRemainingSecondsValue - deltaSeconds,
+      );
+
+      if (this.jumpInputBufferRemainingSecondsValue === 0) {
+        this.bufferedJumpReleasedValue = false;
+      } else if (jumpInput.released) {
+        this.bufferedJumpReleasedValue = true;
+      } else if (!jumpInput.held && !this.bufferedJumpReleasedValue) {
+        // Focus loss clears held input without synthesizing a release. Do not
+        // turn that cleared state into a stale jump after focus returns.
+        this.clearJumpBuffer();
+      }
+    }
+
+    if (jumpInput.pressed && !this.hasJumpOpportunity()) {
+      this.jumpInputBufferRemainingSecondsValue =
+        this.config.jumpInputBufferSeconds;
+      this.bufferedJumpReleasedValue = jumpInput.released;
+    }
+  }
+
+  /** Consume buffered intent after collision has established new support. */
+  private consumeBufferedJumpAfterLanding(
+    jumpInput: Readonly<JumpInputState>,
+  ): void {
+    if (
+      this.jumpInputBufferRemainingSecondsValue <= 0 ||
+      this.chargingJumpValue ||
+      !this.hasJumpOpportunity()
+    ) {
+      return;
+    }
+
+    const launchImmediately =
+      this.bufferedJumpReleasedValue || jumpInput.released;
+    this.clearJumpBuffer();
+    this.chargingJumpValue = true;
+    this.chargeSecondsValue = 0;
+
+    if (launchImmediately) this.launchChargedJump();
+  }
+
   private launchChargedJump(): void {
     const normalizedCharge = this.chargeFraction;
     const curvedCharge = Math.pow(
@@ -623,6 +688,7 @@ export class KinematicBody {
 
     this.chargingJumpValue = false;
     this.chargeSecondsValue = 0;
+    this.clearJumpBuffer();
     this.coyoteTimeRemainingSecondsValue = 0;
     this.groundReacquireDelaySeconds =
       this.config.jumpGroundDetachSeconds;
@@ -638,6 +704,11 @@ export class KinematicBody {
   private cancelJumpCharge(): void {
     this.chargingJumpValue = false;
     this.chargeSecondsValue = 0;
+  }
+
+  private clearJumpBuffer(): void {
+    this.jumpInputBufferRemainingSecondsValue = 0;
+    this.bufferedJumpReleasedValue = false;
   }
 
   private hasJumpOpportunity(): boolean {
@@ -1249,6 +1320,7 @@ export class KinematicBody {
     const nonNegativeFinite: ReadonlyArray<[string, number]> = [
       ['airDragPerSecond', config.airDragPerSecond],
       ['coyoteTimeSeconds', config.coyoteTimeSeconds],
+      ['jumpInputBufferSeconds', config.jumpInputBufferSeconds],
       ['jumpGroundDetachSeconds', config.jumpGroundDetachSeconds],
       ['minimumLandingAirTimeSeconds', config.minimumLandingAirTimeSeconds],
     ];

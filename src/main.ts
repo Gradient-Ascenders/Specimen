@@ -127,6 +127,7 @@ const jumpInputState: JumpInputState = {
   pressed: false,
   held: false,
   released: false,
+  cancelled: false,
 };
 
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
@@ -388,6 +389,7 @@ const loop = new Loop({
     jumpInputState.pressed = input.wasPressed('jump');
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
+    jumpInputState.cancelled = input.wasClearedSinceFixedUpdate;
 
     body.update(
       deltaSeconds,
@@ -505,6 +507,7 @@ const loop = new Loop({
           `jump state / can jump: ${body.jumpState} / ${body.canJump ? 'yes' : 'no'}`,
           `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
           `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
+          `jump buffer remaining: ${body.jumpInputBufferRemainingSeconds.toFixed(3)} s`,
           `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
           `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,
           `last landing impact / count: ${lastLandingImpactSpeedMetresPerSecond.toFixed(2)} m/s / ${landingEventCount}`,

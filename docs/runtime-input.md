@@ -80,6 +80,9 @@ movement; held actions remain active.
   state. This prevents a key released outside the page from remaining stuck.
 - Focus loss does **not** synthesize release actions, so losing focus cannot
   accidentally trigger release-driven gameplay such as a charged jump.
+- The boundary reports that action state was cleared until the next fixed
+  update, allowing short-lived retained intent such as the landing jump buffer
+  to be cancelled explicitly.
 
 ## Typed event contracts
 

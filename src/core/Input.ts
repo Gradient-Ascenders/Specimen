@@ -55,6 +55,7 @@ export class Input {
 
   private pointerMovementX = 0;
   private pointerMovementY = 0;
+  private stateClearedSinceFixedUpdate = false;
   private enabledValue = true;
   private disposed = false;
 
@@ -101,6 +102,10 @@ export class Input {
     return this.heldActions;
   }
 
+  get wasClearedSinceFixedUpdate(): boolean {
+    return this.stateClearedSinceFixedUpdate;
+  }
+
   isDown(action: InputAction): boolean {
     return this.heldActions.has(action);
   }
@@ -116,6 +121,7 @@ export class Input {
   endFixedUpdate(): void {
     this.pressedActions.clear();
     this.releasedActions.clear();
+    this.stateClearedSinceFixedUpdate = false;
     this.endPointerUpdate();
   }
 
@@ -241,6 +247,7 @@ export class Input {
     this.releasedActions.clear();
     this.pointerMovementX = 0;
     this.pointerMovementY = 0;
+    this.stateClearedSinceFixedUpdate = true;
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
