@@ -1,9 +1,22 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 import type { LaserHazard } from '../../hazards/LaserHazard';
 
 const SEGMENT_EPSILON_SQ = 1e-12;
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
+const COLLAR_QUATERNION = new THREE.Quaternion().setFromAxisAngle(
+  new THREE.Vector3(1, 0, 0),
+  Math.PI / 2,
+);
+const SHUTTER_A_QUATERNION = new THREE.Quaternion().setFromAxisAngle(
+  UP_AXIS,
+  Math.PI / 4,
+);
+const SHUTTER_B_QUATERNION = new THREE.Quaternion().setFromAxisAngle(
+  UP_AXIS,
+  -Math.PI / 4,
+);
 
 interface ProxyVisibility {
   readonly object: THREE.Object3D;
@@ -63,6 +76,14 @@ export class LaserHazardPresentation {
   );
   private readonly collarGeometry = new THREE.TorusGeometry(1, 0.15, 8, 20);
   private readonly shutterGeometry = new THREE.BoxGeometry(1, 1, 1);
+  private readonly emitterBodyGeometries = new Map<
+    number,
+    THREE.BufferGeometry
+  >();
+  private readonly inactiveShutterGeometries = new Map<
+    number,
+    THREE.BufferGeometry
+  >();
 
   private readonly coreMaterial = new THREE.MeshBasicMaterial({
     color: 0xff1838,
@@ -76,15 +97,11 @@ export class LaserHazardPresentation {
     blending: THREE.AdditiveBlending,
     toneMapped: false,
   });
-  private readonly housingMaterial = new THREE.MeshStandardMaterial({
-    color: 0x252a2f,
-    roughness: 0.48,
-    metalness: 0.72,
-  });
-  private readonly collarMaterial = new THREE.MeshStandardMaterial({
-    color: 0x79838b,
-    roughness: 0.42,
-    metalness: 0.78,
+  private readonly emitterBodyMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness: 0.45,
+    metalness: 0.75,
   });
   private readonly activeMaterial = new THREE.MeshStandardMaterial({
     color: 0xff2842,
@@ -130,10 +147,17 @@ export class LaserHazardPresentation {
     this.housingGeometry.dispose();
     this.collarGeometry.dispose();
     this.shutterGeometry.dispose();
+    for (const geometry of this.emitterBodyGeometries.values()) {
+      geometry.dispose();
+    }
+    for (const geometry of this.inactiveShutterGeometries.values()) {
+      geometry.dispose();
+    }
+    this.emitterBodyGeometries.clear();
+    this.inactiveShutterGeometries.clear();
     this.coreMaterial.dispose();
     this.haloMaterial.dispose();
-    this.housingMaterial.dispose();
-    this.collarMaterial.dispose();
+    this.emitterBodyMaterial.dispose();
     this.activeMaterial.dispose();
     this.inactiveMaterial.dispose();
   }
@@ -150,13 +174,16 @@ export class LaserHazardPresentation {
     beamHalo.userData.presentationOnly = true;
     beamHalo.renderOrder = 1;
 
+    const emitterRadius = Math.max(source.beamRadiusMetres * 3.2, 0.18);
     const startEmitter = this.createEmitter(
       `${source.id}-presentation-emitter-start`,
       source.id,
+      emitterRadius,
     );
     const endEmitter = this.createEmitter(
       `${source.id}-presentation-emitter-end`,
       source.id,
+      emitterRadius,
     );
 
     const proxyVisibility: ProxyVisibility[] = [];
@@ -168,12 +195,7 @@ export class LaserHazardPresentation {
       object.visible = false;
     });
 
-    this.root.add(
-      beamHalo,
-      beamCore,
-      startEmitter.root,
-      endEmitter.root,
-    );
+    this.root.add(beamHalo, beamCore, startEmitter.root, endEmitter.root);
 
     return {
       source,
@@ -193,64 +215,55 @@ export class LaserHazardPresentation {
     };
   }
 
-  private createEmitter(name: string, hazardId: string): EmitterVisual {
+  private createEmitter(
+    name: string,
+    hazardId: string,
+    radius: number,
+  ): EmitterVisual {
     const root = new THREE.Group();
     root.name = name;
     root.userData.laserHazardId = hazardId;
     root.userData.presentationOnly = true;
 
-    const housing = new THREE.Mesh(
-      this.housingGeometry,
-      this.housingMaterial,
+    const body = new THREE.Mesh(
+      this.getEmitterBodyGeometry(radius),
+      this.emitterBodyMaterial,
     );
-    housing.name = `${name}-housing`;
-
-    const collar = new THREE.Mesh(
-      this.collarGeometry,
-      this.collarMaterial,
-    );
-    collar.name = `${name}-collar`;
-    collar.rotation.x = Math.PI / 2;
+    body.name = `${name}-housing-collar`;
 
     const activeIndicator = new THREE.Mesh(
       this.housingGeometry,
       this.activeMaterial,
     );
     activeIndicator.name = `${name}-active-aperture`;
+    activeIndicator.scale.set(radius * 0.56, 0.045, radius * 0.56);
+    activeIndicator.position.y = 0.19;
 
     const inactiveAperture = new THREE.Mesh(
       this.housingGeometry,
       this.inactiveMaterial,
     );
     inactiveAperture.name = `${name}-inactive-aperture`;
+    inactiveAperture.scale.copy(activeIndicator.scale);
+    inactiveAperture.position.copy(activeIndicator.position);
 
-    const shutterA = new THREE.Mesh(
-      this.shutterGeometry,
+    const inactiveShutters = new THREE.Mesh(
+      this.getInactiveShutterGeometry(radius),
       this.inactiveMaterial,
     );
-    shutterA.name = `${name}-inactive-shutter-a`;
-    shutterA.rotation.y = Math.PI / 4;
-
-    const shutterB = new THREE.Mesh(
-      this.shutterGeometry,
-      this.inactiveMaterial,
-    );
-    shutterB.name = `${name}-inactive-shutter-b`;
-    shutterB.rotation.y = -Math.PI / 4;
+    inactiveShutters.name = `${name}-inactive-shutters`;
 
     root.add(
-      housing,
-      collar,
+      body,
       activeIndicator,
       inactiveAperture,
-      shutterA,
-      shutterB,
+      inactiveShutters,
     );
 
     return {
       root,
       activeIndicator,
-      inactiveIndicators: [inactiveAperture, shutterA, shutterB],
+      inactiveIndicators: [inactiveAperture, inactiveShutters],
     };
   }
 
@@ -300,12 +313,6 @@ export class LaserHazardPresentation {
     visual.beamHalo.quaternion.copy(this.beamQuaternion);
     visual.beamHalo.scale.set(haloRadius, beamLength, haloRadius);
 
-    const emitterRadius = Math.max(
-      visual.source.beamRadiusMetres * 3.2,
-      0.18,
-    );
-    this.scaleEmitter(visual.startEmitter, emitterRadius);
-    this.scaleEmitter(visual.endEmitter, emitterRadius);
     visual.startEmitter.position.set(
       visual.source.start.x,
       visual.source.start.y,
@@ -320,24 +327,84 @@ export class LaserHazardPresentation {
     visual.endEmitter.quaternion.copy(this.reverseQuaternion);
   }
 
-  private scaleEmitter(emitter: THREE.Group, radius: number): void {
-    const housing = emitter.children[0]!;
-    const collar = emitter.children[1]!;
-    const activeAperture = emitter.children[2]!;
-    const inactiveAperture = emitter.children[3]!;
-    const shutterA = emitter.children[4]!;
-    const shutterB = emitter.children[5]!;
+  private getEmitterBodyGeometry(radius: number): THREE.BufferGeometry {
+    const cached = this.emitterBodyGeometries.get(radius);
+    if (cached) return cached;
 
-    housing.scale.set(radius, 0.34, radius);
-    collar.scale.setScalar(radius * 0.94);
-    collar.position.y = 0.13;
-    activeAperture.scale.set(radius * 0.56, 0.045, radius * 0.56);
-    activeAperture.position.y = 0.19;
-    inactiveAperture.scale.copy(activeAperture.scale);
-    inactiveAperture.position.copy(activeAperture.position);
-    shutterA.scale.set(radius * 1.05, 0.035, radius * 0.13);
-    shutterA.position.y = 0.235;
-    shutterB.scale.copy(shutterA.scale);
-    shutterB.position.copy(shutterA.position);
+    const housing = this.housingGeometry.clone();
+    housing.applyMatrix4(
+      new THREE.Matrix4().makeScale(radius, 0.34, radius),
+    );
+    this.setGeometryColour(housing, 0x252a2f);
+
+    const collar = this.collarGeometry.clone();
+    collar.applyMatrix4(
+      new THREE.Matrix4().compose(
+        new THREE.Vector3(0, 0.13, 0),
+        COLLAR_QUATERNION,
+        new THREE.Vector3().setScalar(radius * 0.94),
+      ),
+    );
+    this.setGeometryColour(collar, 0x79838b);
+
+    const merged = mergeGeometries([housing, collar], false);
+    housing.dispose();
+    collar.dispose();
+    if (!merged) throw new Error('Failed to merge laser emitter body.');
+    merged.computeBoundingSphere();
+    this.emitterBodyGeometries.set(radius, merged);
+    return merged;
+  }
+
+  private getInactiveShutterGeometry(radius: number): THREE.BufferGeometry {
+    const cached = this.inactiveShutterGeometries.get(radius);
+    if (cached) return cached;
+
+    const position = new THREE.Vector3(0, 0.235, 0);
+    const scale = new THREE.Vector3(
+      radius * 1.05,
+      0.035,
+      radius * 0.13,
+    );
+    const shutterA = this.shutterGeometry.clone();
+    shutterA.applyMatrix4(
+      new THREE.Matrix4().compose(
+        position,
+        SHUTTER_A_QUATERNION,
+        scale,
+      ),
+    );
+    const shutterB = this.shutterGeometry.clone();
+    shutterB.applyMatrix4(
+      new THREE.Matrix4().compose(
+        position,
+        SHUTTER_B_QUATERNION,
+        scale,
+      ),
+    );
+
+    const merged = mergeGeometries([shutterA, shutterB], false);
+    shutterA.dispose();
+    shutterB.dispose();
+    if (!merged) throw new Error('Failed to merge inactive laser shutters.');
+    merged.computeBoundingSphere();
+    this.inactiveShutterGeometries.set(radius, merged);
+    return merged;
+  }
+
+  private setGeometryColour(
+    geometry: THREE.BufferGeometry,
+    colourHex: number,
+  ): void {
+    const colour = new THREE.Color(colourHex);
+    const colours = new Float32Array(
+      geometry.getAttribute('position').count * 3,
+    );
+    for (let offset = 0; offset < colours.length; offset += 3) {
+      colours[offset] = colour.r;
+      colours[offset + 1] = colour.g;
+      colours[offset + 2] = colour.b;
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
   }
 }

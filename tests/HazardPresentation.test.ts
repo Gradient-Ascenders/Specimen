@@ -100,6 +100,14 @@ test('scripted laser presentation stays on authoritative moving endpoints', () =
     presentation.root,
     'moving-laser-presentation-beam-core',
   );
+  const startEmitter = requireObject(
+    presentation.root,
+    'moving-laser-presentation-emitter-start',
+  );
+  const endEmitter = requireObject(
+    presentation.root,
+    'moving-laser-presentation-emitter-end',
+  );
   presentation.root.updateMatrixWorld(true);
   assertVectorClose(
     new THREE.Vector3(0, -0.5, 0).applyMatrix4(beam.matrixWorld),
@@ -107,6 +115,14 @@ test('scripted laser presentation stays on authoritative moving endpoints', () =
   );
   assertVectorClose(
     new THREE.Vector3(0, 0.5, 0).applyMatrix4(beam.matrixWorld),
+    new THREE.Vector3(hazard.end.x, hazard.end.y, hazard.end.z),
+  );
+  assertVectorClose(
+    startEmitter.getWorldPosition(new THREE.Vector3()),
+    new THREE.Vector3(hazard.start.x, hazard.start.y, hazard.start.z),
+  );
+  assertVectorClose(
+    endEmitter.getWorldPosition(new THREE.Vector3()),
     new THREE.Vector3(hazard.end.x, hazard.end.y, hazard.end.z),
   );
 
@@ -119,6 +135,14 @@ test('scripted laser presentation stays on authoritative moving endpoints', () =
   );
   assertVectorClose(
     new THREE.Vector3(0, 0.5, 0).applyMatrix4(beam.matrixWorld),
+    new THREE.Vector3(5, 2, 3),
+  );
+  assertVectorClose(
+    startEmitter.getWorldPosition(new THREE.Vector3()),
+    new THREE.Vector3(1, 2, 3),
+  );
+  assertVectorClose(
+    endEmitter.getWorldPosition(new THREE.Vector3()),
     new THREE.Vector3(5, 2, 3),
   );
 
