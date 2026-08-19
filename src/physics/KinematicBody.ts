@@ -11,7 +11,6 @@ import {
 const MOVEMENT_EPSILON_SQ = 1e-12;
 const CONTACT_PUSH_METRES = 1e-5;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
-const WORLD_FORWARD = new THREE.Vector3(0, 0, -1);
 
 export interface ReadonlyVector3State {
   readonly x: number;
@@ -155,13 +154,16 @@ export class KinematicBody {
   private readonly remainingDisplacement = new THREE.Vector3();
   private readonly groundProbeDisplacement = new THREE.Vector3();
   private readonly gravityStep = new THREE.Vector3();
-  private readonly surfaceForward = new THREE.Vector3();
-  private readonly surfaceRight = new THREE.Vector3();
   private readonly movementUpAtStepStart = new THREE.Vector3();
   private readonly launchDirection = new THREE.Vector3();
+  private readonly edgeOldUp = new THREE.Vector3();
+  private readonly edgeTravelDirection = new THREE.Vector3();
+  private readonly edgeProbeDisplacement = new THREE.Vector3();
+  private readonly edgeTransitionRotation = new THREE.Quaternion();
 
   private readonly movementHit = new CollisionHit();
   private readonly groundHit = new CollisionHit();
+  private readonly edgeHit = new CollisionHit();
 
   contactsThisStep = 0;
   lastCollisionName = 'none';
@@ -306,14 +308,13 @@ export class KinematicBody {
   /**
    * Advance one deterministic gameplay step.
    *
-   * `moveX` and `moveZ` are normalized intent axes in [-1, 1]. `jumpInput`
-   * uses action state captured by Input; a missing value means no jump input,
-   * which keeps development regressions concise.
+   * `movementDirectionWorld` is the already-resolved camera-relative direction
+   * for this step. `jumpInput` uses action state captured by Input; a missing
+   * value means no jump input, which keeps development regressions concise.
    */
   update(
     deltaSeconds: number,
-    moveX: number,
-    moveZ: number,
+    movementDirectionWorld: ReadonlyVector3State,
     jumpInput: Readonly<JumpInputState> = NO_JUMP_INPUT,
   ): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
@@ -330,8 +331,13 @@ export class KinematicBody {
     this.landedThisStepValue = false;
 
     const groundedAtStepStart = this.groundedValue;
-    const wallMovementAtStepStart = this.attachedValue;
-    this.movementUpAtStepStart.copy(this.gameplayUpValue);
+    this.movementUpAtStepStart.copy(
+      this.attachedValue
+        ? this.gameplayUpValue
+        : this.groundedValue
+          ? this.groundNormalValue
+          : this.gameplayUpValue,
+    );
 
     this.attachmentCooldownSecondsValue = Math.max(
       0,
@@ -363,9 +369,7 @@ export class KinematicBody {
     this.updateJumpState(deltaSeconds, jumpInput);
     this.applyLocomotion(
       deltaSeconds,
-      moveX,
-      moveZ,
-      wallMovementAtStepStart,
+      movementDirectionWorld,
       this.movementUpAtStepStart,
     );
     this.applyGravity(deltaSeconds);
@@ -376,7 +380,7 @@ export class KinematicBody {
     );
 
     this.moveAndSlide(deltaSeconds);
-    this.refreshGroundState();
+    this.refreshGroundState(deltaSeconds);
     this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
   }
 
@@ -514,47 +518,21 @@ export class KinematicBody {
 
   private applyLocomotion(
     deltaSeconds: number,
-    moveX: number,
-    moveZ: number,
-    wallMovementAtStepStart: boolean,
+    movementDirectionWorld: ReadonlyVector3State,
     movementUpAtStepStart: THREE.Vector3,
   ): void {
-    const clampedX = THREE.MathUtils.clamp(moveX, -1, 1);
-    const clampedZ = THREE.MathUtils.clamp(moveZ, -1, 1);
-
-    if (wallMovementAtStepStart) {
-      // W/S follows projected world-up so "forward" means climb on authored
-      // near-vertical walls. A/D is the tangent lateral axis. Use the basis
-      // selected at the start of this step even if jump handling detached the
-      // body before locomotion was applied.
-      this.surfaceForward
-        .copy(WORLD_UP)
-        .projectOnPlane(movementUpAtStepStart);
-
-      if (this.surfaceForward.lengthSq() <= MOVEMENT_EPSILON_SQ) {
-        this.surfaceForward
-          .copy(WORLD_FORWARD)
-          .projectOnPlane(movementUpAtStepStart);
-      }
-
-      this.surfaceForward.normalize();
-      this.surfaceRight
-        .crossVectors(movementUpAtStepStart, this.surfaceForward)
-        .normalize();
-
-      this.moveInput
-        .copy(this.surfaceRight)
-        .multiplyScalar(clampedX)
-        .addScaledVector(this.surfaceForward, -clampedZ);
-    } else {
-      this.moveInput.set(clampedX, 0, clampedZ);
-    }
+    this.moveInput.set(
+      THREE.MathUtils.clamp(movementDirectionWorld.x, -1, 1),
+      THREE.MathUtils.clamp(movementDirectionWorld.y, -1, 1),
+      THREE.MathUtils.clamp(movementDirectionWorld.z, -1, 1),
+    );
 
     if (this.moveInput.lengthSq() > 1) this.moveInput.normalize();
 
-    this.movementPlaneNormal.copy(
-      this.groundedValue ? this.groundNormalValue : this.gameplayUpValue,
-    );
+    // Freeze the movement plane selected at the start of the fixed step. A
+    // wall-jump release may detach before locomotion, but it must not reinterpret
+    // the already-resolved wall direction against world-up halfway through.
+    this.movementPlaneNormal.copy(movementUpAtStepStart);
 
     const normalSpeed = this.velocityValue.dot(this.movementPlaneNormal);
     this.normalVelocity
@@ -860,7 +838,7 @@ export class KinematicBody {
     );
   }
 
-  private refreshGroundState(): void {
+  private refreshGroundState(deltaSeconds = 0): void {
     this.groundedValue = false;
     this.supportSurfaceTagValue = 'default';
     this.supportTractionMultiplier = 1;
@@ -902,6 +880,8 @@ export class KinematicBody {
         }
       }
 
+      if (this.tryTransitionAcrossAttachedEdge(deltaSeconds)) return;
+
       // Sticky geometry ended or the next authored surface explicitly rejects
       // adhesion. Fall back to world-up and test for ordinary ground below.
       this.detachFromSurface(0);
@@ -931,6 +911,89 @@ export class KinematicBody {
     this.supportSurfaceTagValue = surface.tag;
     this.supportTractionMultiplier = surface.tractionMultiplier;
     this.removeVelocityIntoGround();
+  }
+
+  /**
+   * Continue across a convex edge of authored sticky geometry.
+   *
+   * Once the old support probe passes an edge, sweep a short distance back
+   * along the just-travelled tangent. The adjacent face is the one whose normal
+   * points along that travel direction. Rotating velocity with the support
+   * frame carries motion over the edge instead of dropping or snapping axes.
+   */
+  private tryTransitionAcrossAttachedEdge(deltaSeconds: number): boolean {
+    this.edgeOldUp.copy(this.gameplayUpValue);
+    this.edgeTravelDirection
+      .copy(this.velocityValue)
+      .projectOnPlane(this.edgeOldUp);
+    const tangentialSpeed = this.edgeTravelDirection.length();
+    if (tangentialSpeed * tangentialSpeed <= MOVEMENT_EPSILON_SQ) return false;
+
+    this.edgeTravelDirection.multiplyScalar(1 / tangentialSpeed);
+    this.edgeProbeDisplacement
+      .copy(this.edgeTravelDirection)
+      .multiplyScalar(
+        -(
+          this.config.groundProbeDistanceMetres +
+          tangentialSpeed * Math.max(0, deltaSeconds)
+        ),
+      )
+      .addScaledVector(
+        this.edgeOldUp,
+        -this.config.groundProbeDistanceMetres,
+      );
+
+    if (
+      !this.world.sweepSphere(
+        this.currentPosition,
+        this.edgeProbeDisplacement,
+        this.config.radiusMetres + this.config.skinWidthMetres,
+        this.edgeHit,
+      )
+    ) {
+      return false;
+    }
+
+    const surface = this.surfaces.get(this.edgeHit.object);
+    if (!surface.adhesive) return false;
+
+    const transitionNormal = this.edgeHit.normal;
+    if (
+      transitionNormal.dot(this.edgeTravelDirection) <
+      this.config.minimumGroundNormalDot
+    ) {
+      return false;
+    }
+
+    const walkableGround =
+      transitionNormal.dot(WORLD_UP) >= this.config.minimumGroundNormalDot;
+    const attachableWall = this.isAuthoredWallNormal(transitionNormal);
+    if (!walkableGround && !attachableWall) return false;
+
+    this.edgeTransitionRotation.setFromUnitVectors(
+      this.edgeOldUp,
+      transitionNormal,
+    );
+    this.velocityValue
+      .applyQuaternion(this.edgeTransitionRotation)
+      .projectOnPlane(transitionNormal);
+    this.currentPosition
+      .copy(this.edgeHit.point)
+      .addScaledVector(transitionNormal, CONTACT_PUSH_METRES);
+
+    this.groundedValue = true;
+    this.attachedValue = attachableWall;
+    this.attachmentSurface = attachableWall ? this.edgeHit.object : null;
+    this.gameplayUpValue.copy(
+      attachableWall ? transitionNormal : WORLD_UP,
+    );
+    this.groundNormalValue.copy(transitionNormal);
+    this.supportSurfaceTagValue = surface.tag;
+    this.supportTractionMultiplier = surface.tractionMultiplier;
+    this.coyoteTimeRemainingSecondsValue = this.config.coyoteTimeSeconds;
+    this.groundReacquireDelaySeconds = 0;
+    this.airborneSeconds = 0;
+    return true;
   }
 
   private removeVelocityIntoGround(): void {

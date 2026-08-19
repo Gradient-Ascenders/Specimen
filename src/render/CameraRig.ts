@@ -129,6 +129,7 @@ export class CameraRig {
   private readonly boomDisplacement = new THREE.Vector3();
   private readonly groundBack = new THREE.Vector3(0, 0, 1);
   private readonly groundRight = new THREE.Vector3(1, 0, 0);
+  private readonly surfaceUp = new THREE.Vector3(0, 1, 0);
   private readonly upRotation = new THREE.Quaternion();
   private readonly partialUpRotation = new THREE.Quaternion();
   private readonly yawRotation = new THREE.Quaternion();
@@ -257,6 +258,46 @@ export class CameraRig {
       this.groundBack.normalize();
     }
     this.groundRight.crossVectors(WORLD_UP, this.groundBack).normalize();
+
+    target
+      .copy(this.groundRight)
+      .multiplyScalar(clampedX)
+      .addScaledVector(this.groundBack, clampedZ);
+    if (target.lengthSq() > 1) target.normalize();
+    return target;
+  }
+
+  /**
+   * Convert input into the displayed camera basis on an attached surface.
+   * The authoritative support normal defines the movement plane; camera pitch
+   * remains excluded, so left/right always follows screen-left/screen-right.
+   */
+  copySurfaceMovementDirection(
+    moveX: number,
+    moveZ: number,
+    gameplayUp: ReadonlyCameraVector3,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    const clampedX = THREE.MathUtils.clamp(moveX, -1, 1);
+    const clampedZ = THREE.MathUtils.clamp(moveZ, -1, 1);
+    this.surfaceUp.set(gameplayUp.x, gameplayUp.y, gameplayUp.z);
+    if (this.surfaceUp.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
+      this.surfaceUp.copy(WORLD_UP);
+    } else {
+      this.surfaceUp.normalize();
+    }
+
+    this.groundBack.copy(this.planarBack).projectOnPlane(this.surfaceUp);
+    if (this.groundBack.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
+      this.groundBack.set(0, 0, 1).projectOnPlane(this.surfaceUp);
+      if (this.groundBack.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
+        this.groundBack.set(1, 0, 0).projectOnPlane(this.surfaceUp);
+      }
+    }
+    this.groundBack.normalize();
+    this.groundRight
+      .crossVectors(this.surfaceUp, this.groundBack)
+      .normalize();
 
     target
       .copy(this.groundRight)

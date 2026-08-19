@@ -47,6 +47,7 @@ const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
 const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
 const renderedProbePosition = new THREE.Vector3();
 const cameraRelativeMovement = new THREE.Vector3();
+const noMovement = new THREE.Vector3();
 const blobFacing = new BlobFacing();
 
 const body = new KinematicBody({
@@ -168,8 +169,7 @@ const runSlopeIdleRegression = (): string => {
   for (let step = 0; step < totalSteps; step += 1) {
     regressionBody.update(
       SLOPE_REGRESSION_FIXED_DELTA_SECONDS,
-      0,
-      0,
+      noMovement,
     );
 
     if (!regressionBody.grounded) ungroundedSteps += 1;
@@ -256,10 +256,16 @@ const loop = new Loop({
     );
     renderLayer.cameraRig.applyQueuedLookInput();
 
-    // Preserve the existing authored-wall input policy. Ordinary ground input
-    // is camera-relative and completely independent of the blob's facing.
+    // Resolve both ground and attached movement from the camera before the
+    // body advances. The body then freezes that world-space direction and its
+    // support plane for the complete fixed step.
     if (body.attached) {
-      cameraRelativeMovement.set(moveX, 0, moveZ);
+      renderLayer.cameraRig.copySurfaceMovementDirection(
+        moveX,
+        moveZ,
+        body.gameplayUp,
+        cameraRelativeMovement,
+      );
     } else {
       renderLayer.cameraRig.copyGroundMovementDirection(
         moveX,
@@ -274,8 +280,7 @@ const loop = new Loop({
 
     body.update(
       deltaSeconds,
-      cameraRelativeMovement.x,
-      cameraRelativeMovement.z,
+      cameraRelativeMovement,
       jumpInputState,
     );
     blobFacing.update(deltaSeconds, body.velocity, !body.attached);

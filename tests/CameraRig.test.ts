@@ -129,6 +129,37 @@ test('camera-relative cardinal and diagonal movement is normalized', () => {
   }
 });
 
+test('attached-surface movement follows displayed camera directions on opposing walls', () => {
+  for (const wallUp of [
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(-1, 0, 0),
+  ]) {
+    const target = createTarget();
+    const rig = new CameraRig({ initialPitchRadians: 0 });
+    const movement = new THREE.Vector3();
+    const cameraForward = new THREE.Vector3();
+    const cameraRight = new THREE.Vector3();
+    rig.setFollowTarget(target, new CollisionWorld());
+    rig.update(1, 0);
+
+    target.gameplayUp.copy(wallUp);
+    target.attached = true;
+    for (let step = 0; step < 120; step += 1) {
+      rig.update(1, 1 / 60);
+    }
+
+    rig.camera.getWorldDirection(cameraForward);
+    cameraForward.projectOnPlane(wallUp).normalize();
+    cameraRight.crossVectors(cameraForward, rig.camera.up).normalize();
+
+    rig.copySurfaceMovementDirection(1, 0, wallUp, movement);
+    assert.ok(movement.dot(cameraRight) > 1 - 1e-10);
+
+    rig.copySurfaceMovementDirection(0, -1, wallUp, movement);
+    assert.ok(movement.dot(cameraForward) > 1 - 1e-10);
+  }
+});
+
 test('gameplay-up damping is frame-subdivision invariant and never mutates movement state', () => {
   const oneStepTarget = createTarget();
   const splitStepTarget = createTarget();

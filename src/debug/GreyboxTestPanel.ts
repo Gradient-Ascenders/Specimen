@@ -41,7 +41,7 @@ export class GreyboxTestPanel {
       <div class="test-panel-content">
         <p class="eyebrow">Sprint 0 test harness</p>
         <h1>Collision grey-box</h1>
-        <p class="summary">One grid square equals one metre. Click the game to capture the pointer, look with the mouse, and move relative to the camera with <kbd>WASD</kbd>. Hold <kbd>Space</kbd> to charge and release to jump. On sticky walls, <kbd>W/S</kbd> climb and <kbd>A/D</kbd> move sideways.</p>
+        <p class="summary">One grid square equals one metre. Click the game to capture the pointer, look with the mouse, and move relative to the camera with <kbd>WASD</kbd> on the ground and on sticky walls. Hold <kbd>Space</kbd> to charge and release to jump.</p>
 
         <ul class="case-list" aria-label="Collision test case legend">
           <li style="--case-colour: #81909b">Floor</li>

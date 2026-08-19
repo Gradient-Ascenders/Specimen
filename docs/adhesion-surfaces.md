@@ -1,111 +1,120 @@
-# Authored adhesion surfaces and Tack traversal
+# Authored adhesion surfaces and Bob traversal
 
-Issue #13 keeps traversal authored and inspectable. CollisionWorld remains a
-geometry query service; SurfaceRegistry supplies gameplay meaning for each
-registered mesh.
+Issue #15 retains authored sticky traversal for the supported Sprint 1 route.
+`CollisionWorld` remains a geometry-query service; `SurfaceRegistry` supplies
+the gameplay meaning of every registered collision mesh.
 
 ## Surface metadata
 
-Each authored collision mesh has `mesh.userData.surfaceTag`.
+Set `mesh.userData.surfaceTag` before registering the mesh with both the
+collision world and surface registry.
 
 | Tag | Adhesion | Traction | Bounce |
 | --- | --- | ---: | ---: |
 | `default` | no | 1.00 | none |
-| `sticky` | yes, on validated wall normals | 1.00 | none |
+| `sticky` | yes, on supported faces | 1.00 | none |
 | `nonStick` | explicitly no | 0.22 | none |
 | `bouncy` | no | 1.00 | fixed 8.2 m/s outgoing normal speed |
 
-Optional authoring overrides:
+Optional overrides are `tractionMultiplier` in `[0, 1]` and a non-negative
+`bounceSpeedMetresPerSecond`. Unknown tags and invalid values throw during
+registry setup. Material colour, mesh name, proximity, and ordinary collision
+registration never imply adhesion.
 
-- `mesh.userData.tractionMultiplier`: finite value in `[0, 1]`.
-- `mesh.userData.bounceSpeedMetresPerSecond`: non-negative finite value.
+## Selected wall-camera and input rule
 
-Unknown tags and invalid override values throw during registry setup so
-authoring mistakes fail loudly instead of silently changing traversal.
+The movement body and camera deliberately own different orientation state:
 
-## Attachment policy
+- On attachment, the body immediately sets `gameplayUp` to the outward wall
+  normal. Gravity and the support probe act along its inverse.
+- The camera treats `gameplayUp` as its target up, exponentially damps a private
+  `smoothedUp`, and parallel-transports the existing orbit heading through the
+  change. It does not snap, recenter, or write orientation back to movement.
+- Accumulated mouse yaw and pitch are preserved through attachment, supported
+  edge transitions, detachment, landing, and reset. Mouse look remains direct.
+- While attached, WASD is resolved from the displayed camera heading and
+  projected onto the authoritative support plane. Pitch is excluded. Therefore
+  A/D always follows screen-left/screen-right, while W/S follows screen
+  forward/back on the wall; keys are not assigned fixed world-up axes.
+- The resolved world direction and support plane are frozen for each fixed
+  step, so jump detachment cannot reinterpret input halfway through that step.
+- Bob's visual orientation is separate. Ground facing follows actual horizontal
+  velocity; attached deformation follows world-space motion/support state and
+  is converted with the interpolated presentation orientation at render time.
 
-Attachment is intentionally constrained instead of attempting general
-soft-body or arbitrary contact simulation.
+On detachment the body immediately restores world-up for gameplay, while the
+camera smoothly returns its private up toward world-up without resetting orbit
+intent. Landing does not recenter the camera.
 
-Tack may attach only when:
+## Supported adhesion and edge transitions
 
-1. the contacted mesh is registered as `sticky`;
-2. the authored contact normal is near vertical, based on
-   `maximumAttachmentWorldUpDot`; and
-3. the post-detach cooldown has expired.
+Attachment requires an explicitly registered `sticky` surface and a
+near-vertical contact normal accepted by `maximumAttachmentWorldUpDot`.
+Ordinary floors, ceilings, default walls, and `nonStick` walls cannot attach.
 
-Floors and ceilings are rejected by the wall-normal constraint. Ceiling
-traversal is therefore **not enabled in this issue**.
+When an attached support probe passes a convex edge, the controller performs a
+short, allocation-free edge query. If it finds an adjacent adhesive supported
+face in the direction of travel, it rotates tangent velocity from the old
+support frame into the new one and keeps contact:
 
-When attachment succeeds:
+- a supported near-vertical adjacent face remains attached;
+- a sticky walkable top becomes ordinary grounded movement on that same sticky
+  geometry, with world-up restored;
+- an absent, non-adhesive, ceiling-like, or unsupported adjacent face detaches.
 
-- `attached` becomes true immediately in the movement simulation;
-- `gameplayUp` becomes the wall's outward contact normal;
-- gravity acts along `-gameplayUp`, keeping the body supported;
-- the camera reads the new `gameplayUp` and smooths only its own visual copy;
-- W/S use projected world-up for climb/down movement;
-- A/D use the wall-tangent lateral axis.
+This proves the constrained authored-wall fallback without creating a second
+controller. A designer controls the route simply by tagging only the intended
+collision meshes/faces as sticky and leaving surrounding geometry `default` or
+`nonStick`.
 
-The camera never writes its smoothed orientation back into movement.
+## Level 1 authoring guidance
 
-## Detachment
+For the Sprint 1 Level 1 route:
 
-Tack detaches when:
+- Prefer planar, approximately vertical sticky walls and broad, walkable top
+  ledges. The current grey-box proves a vertical box wall and its 90-degree top
+  transition.
+- Tag every collision mesh that should participate in a continuous adhesive
+  route as `sticky`; explicitly register it with `SurfaceRegistry`. Keep nearby
+  scenery, blockers, and decorative collision `default` or `nonStick`.
+- Give convex wall-to-wall or wall-to-top transitions enough width for the
+  0.45 m body radius and avoid tiny bevels or sliver faces between support
+  surfaces.
+- Use clean shared boundaries or modest convex corners. Test each change of
+  support normal from both travel directions; do not assume arbitrary meshes
+  form a continuous route because they visually touch.
+- Provide visible landing space after deliberate wall jumps and at any authored
+  end of adhesion. Keep required landings away from narrow gaps and unrelated
+  camera obstructions.
+- Avoid ceilings, inverted traversal, curved surfaces, rapidly alternating
+  normals, acute/concave seams, one-sided decorative meshes, and arbitrary
+  scene geometry for the required route. Those geometry classes are not part of
+  the validated Sprint 1 envelope.
+- If later comfort testing rejects a geometry class, remove `sticky` from that
+  class and retain the route on the proven planar authored walls/tops. No code
+  change is required for this fallback.
 
-- a charged jump releases from the wall;
-- the sticky support probe loses valid sticky geometry; or
-- traversal reaches geometry that no longer permits adhesion.
+## Detachment and wall jump
 
-A 0.12-second attachment cooldown prevents an immediate jump-away from
-reattaching to the same wall.
+A charged wall jump captures the current wall normal before detachment and uses
+that one direction for both the physical impulse and visual launch event. The
+existing charge curve and jump strength are unchanged. The 0.12-second
+attachment cooldown prevents immediate reattachment after a deliberate jump.
+Losing authored support without a valid adjacent sticky face returns to
+world-up falling and ordinary ground probing.
 
-A wall jump first applies the existing charged-jump impulse along the current
-wall `gameplayUp`, then restores world-up movement. This means charged jumps
-naturally launch away from the wall without a separate wall-jump formula.
+## Known limitations
 
-## Bounce contract
+- Ceiling adhesion and inverted traversal are intentionally rejected.
+- Curved/free-form surface crawling and arbitrary scene geometry are not
+  supported or claimed.
+- The grey-box proves a convex wall-to-top transition. Adjacent sticky wall
+  normals are accepted by the same edge rule, but a Level 1 wall-to-wall corner
+  still needs route-specific runtime verification. Acute, concave, very small,
+  or rapidly changing faces require separate validation.
+- The camera follows support orientation smoothly, so roll is expected during
+  wall traversal. It is bounded by the authored support normals rather than an
+  unrestricted free-crawl system.
 
-`bouncy` surfaces do not use elastic rigid-body physics. On an approach contact
-of at least 0.12 m/s, the controller sets the outgoing normal component to the
-authored bounce speed while preserving tangent velocity.
-
-The default grey-box pad uses 8.2 m/s. A 0.12-second cooldown prevents repeated
-same-contact impulses while still allowing deterministic re-bounces after the
-body returns to the pad.
-
-## Non-stick / slippery surfaces
-
-`nonStick` is intentionally distinct from `default`: it is an explicit level
-authoring statement that Tack must not adhere. Its reduced traction multiplier
-is also available for authored slippery floor geometry. The grey-box includes a
-red non-stick wall so the rejection path is visible and testable.
-
-## Camera integration and comfort fallback
-
-CameraRig already consumes read-only `gameplayUp` and `attached` state and
-damps its private visual orientation. No camera-side transform is authoritative.
-
-The current fallback is deliberately constrained to authored near-vertical
-walls. Ceiling traversal and arbitrary surface wrapping remain disabled unless
-separate comfort testing validates them.
-
-## Manual verification
-
-1. Run the existing slope regression and confirm it still passes.
-2. Drive into the ordinary blue wall: `attached` must remain false.
-3. Drive into the teal sticky wall: `attached` becomes true and `gameplayUp`
-   changes to the wall normal.
-4. While attached, verify W/S climb/down and A/D move laterally.
-5. Hold/release Space while attached: Tack launches away and detaches.
-6. Re-contact the same wall immediately after jumping: the cooldown prevents
-   instant reattachment.
-7. Drive into the red non-stick wall: it must never attach.
-8. Move repeatedly at sticky-wall edges/corners and confirm attachment does not
-   oscillate or trap the body.
-9. Land on the purple bounce pad several times and confirm the diagnostic
-   reports the same authored bounce speed on each valid contact.
-10. Confirm the body can always leave awkward contacts or use the existing
-    recovery/reset controls.
-11. Record the expanded diagnostics showing `attached`, `gameplay up`, surface
-    tags, attachment target, cooldowns, and bounce values.
+The engineering decision and captured verification are recorded in
+[Issue #15 evidence](evidence/issue-15.md).

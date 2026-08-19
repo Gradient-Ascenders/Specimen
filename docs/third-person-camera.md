@@ -13,16 +13,15 @@ by `KinematicBody`:
 - current and previous position, used for fixed-step render interpolation;
 - velocity, used to distinguish plausible high-speed lag from checkpoint/reset
   teleports;
-- grounded and attached state, exposed in diagnostics and reserved for later
-  comfort tuning;
+- grounded and attached state, used to diagnose supported wall traversal;
 - `gameplayUp`, the movement-owned orientation target.
 
 The camera keeps private smoothed target and up vectors. It never writes a
-position, rotation, up vector, or attachment state back to movement. When a
-future sticky-surface controller changes `gameplayUp`, the rig transports its
-existing orbit around the damped up transition. Deciding whether wall traversal
-should re-centre, preserve world horizon, or use another comfort rule remains
-deliberately deferred.
+position, rotation, up vector, or attachment state back to movement. When
+sticky traversal changes `gameplayUp`, the rig exponentially damps its private
+up and transports the existing orbit heading through that transition. Mouse
+yaw/pitch remain accumulated and direct: attachment, detachment, landing, and
+supported convex edges do not recenter the view.
 
 ## Camera tuning
 
@@ -70,24 +69,26 @@ the orbit-yaw convention independently.
 
 No settings UI is added by Issue #14.
 
-## Normal-ground camera, movement, and facing ownership
+## Camera, movement, and facing ownership
 
 The normal gameplay path keeps three orientation decisions separate:
 
 - `CameraRig` owns the accumulated pointer yaw and clamped pitch. It never
   reads the slime visual's facing.
-- Before each unattached movement step, `main.ts` asks the rig for its
-  horizontal right/back basis and converts normalized WASD input into a world
-  direction. Camera pitch is not part of this basis.
+- Before each movement step, `main.ts` asks the rig to convert normalized WASD
+  input into a world direction. Ground movement uses the world-horizontal
+  camera right/back basis. Attached movement uses the displayed camera heading
+  projected onto the authoritative wall plane. Camera pitch is absent from both
+  bases, so it cannot reduce movement speed or invert an axis.
 - `BlobFacing` reads the body's resulting horizontal velocity after the
   kinematic step. It turns the upright visual toward that direction, or holds
   the last heading when horizontal speed is negligible.
 
 This makes a stationary mouse orbit camera-only state. Starting movement after
 an orbit uses the new camera direction immediately, while changing movement
-direction never recentres the camera behind the blob. The existing authored
-wall input policy remains isolated and unchanged pending dedicated wall-camera
-comfort work.
+direction never recentres the camera behind the blob. The movement body freezes
+the resolved direction and support plane for the full fixed step, including a
+wall-jump release step.
 
 Normal-ground facing turns along the shortest yaw arc at `720°/s`, with a
 `0.05 m/s` horizontal speed threshold to suppress near-rest direction noise.
@@ -132,7 +133,7 @@ production level:
 6. Repeat with a narrow and a wide browser viewport. Vertical framing remains
    stable because resize changes projection aspect only.
 
-The merged charged-jump controller is consumed through the same read-only
-position and velocity contract; Issue #14 does not change its launch or landing
-behaviour. Sticky attachment is not implemented yet, so that orientation path
-must be rechecked when its owning movement issue lands.
+The charged-jump and sticky controllers use the same read-only position,
+velocity, and `gameplayUp` contract. The selected wall-camera rule, authored
+fallback, limits, and Level 1 guidance are documented in
+[Authored adhesion surfaces and Bob traversal](adhesion-surfaces.md).
