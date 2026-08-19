@@ -35,11 +35,13 @@ the later Room 3/4/5 traversal beats remain outside issue #20.
 
 ## Verification checklist
 
-- Confirm Tack cannot attach to normal Room 1/Room 2 wall meshes.
-- Confirm Tack can attach to the Room 1 contaminated perimeter wall and the
+- Confirm Bob cannot attach to normal Room 1/Room 2 wall meshes.
+- Confirm Bob can attach to the Room 1 contaminated perimeter wall and the
   Room 2 elevated catch wall.
 - Confirm the Room 2 landing produces the authored bounce response.
 - Confirm the charged-jump route reads in order: height, gap, then wall catch.
-- Confirm reset returns the player to the Room 1 safe spawn and the existing
-  out-of-bounds recovery path does not require a browser refresh.
+- Confirm the `F` recovery test moves Bob below the level before returning him
+  to the Room 1 safe spawn without requiring a browser refresh.
+- Confirm the separate Room 2 safe-landing position clears the bounce surface
+  by Bob's full collision radius and skin width.
 - Run `npm run type-check` and `npm run build` before review.

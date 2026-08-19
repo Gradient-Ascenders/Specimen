@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody';
 import type { SurfaceTag } from '../physics/SurfaceRegistry';
 import {
   SlimeVisual,
@@ -20,7 +21,16 @@ interface BoxOptions {
 
 const ROOM_2_CENTRE_Z = 38;
 const SPAWN_POSITION = new THREE.Vector3(0, 0.5, -1.8);
-const ROOM_2_RECOVERY_POSITION = new THREE.Vector3(-9, 0.5, 31);
+const OUT_OF_BOUNDS_TEST_POSITION = new THREE.Vector3(0, -5, -1.8);
+const ROOM_2_BOUNCE_LANDING_TOP_Y = 0.22;
+// The 0.45 m player radius and 0.01 m collision skin both need clearance.
+const ROOM_2_SAFE_LANDING_POSITION = new THREE.Vector3(
+  -9,
+  ROOM_2_BOUNCE_LANDING_TOP_Y +
+    DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres +
+    DEFAULT_KINEMATIC_BODY_CONFIG.skinWidthMetres,
+  31,
+);
 
 /**
  * Level 1's first authored grey-box. It follows the Room 1/Room 2 teaching
@@ -64,7 +74,9 @@ export class ContainmentTeachingScene {
     this.addRoomTwo(materials);
     this.addReferenceMarkers(materials.exit);
 
-    this.slimeVisual = new SlimeVisual({ radiusMetres: 0.45 });
+    this.slimeVisual = new SlimeVisual({
+      radiusMetres: DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
+    });
     this.root.add(this.slimeVisual.mesh);
     this.resetProbe();
   }
@@ -81,8 +93,12 @@ export class ContainmentTeachingScene {
     return target.copy(SPAWN_POSITION);
   }
 
-  copyRecoveryPosition(target: THREE.Vector3): THREE.Vector3 {
-    return target.copy(ROOM_2_RECOVERY_POSITION);
+  copyOutOfBoundsTestPosition(target: THREE.Vector3): THREE.Vector3 {
+    return target.copy(OUT_OF_BOUNDS_TEST_POSITION);
+  }
+
+  copyRoomTwoSafeLandingPosition(target: THREE.Vector3): THREE.Vector3 {
+    return target.copy(ROOM_2_SAFE_LANDING_POSITION);
   }
 
   setProbePosition(position: Vector3State): void {
@@ -116,7 +132,7 @@ export class ContainmentTeachingScene {
   }
 
   simulateFall(onRecovered: () => void): void {
-    this.slimeVisual.setPosition(ROOM_2_RECOVERY_POSITION);
+    this.slimeVisual.setPosition(OUT_OF_BOUNDS_TEST_POSITION);
     this.recoveryCallback = onRecovered;
     this.recoveryDelay = 0.7;
   }
@@ -241,7 +257,11 @@ export class ContainmentTeachingScene {
       exitMaterial,
     );
     roomTwoMarker.name = 'room-2-safe-recovery-marker';
-    roomTwoMarker.position.set(ROOM_2_RECOVERY_POSITION.x, 0.04, ROOM_2_RECOVERY_POSITION.z);
+    roomTwoMarker.position.set(
+      ROOM_2_SAFE_LANDING_POSITION.x,
+      ROOM_2_BOUNCE_LANDING_TOP_Y + 0.01,
+      ROOM_2_SAFE_LANDING_POSITION.z,
+    );
     roomTwoMarker.rotation.x = Math.PI / 2;
     this.root.add(roomTwoMarker);
   }
