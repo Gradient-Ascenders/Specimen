@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-import { slimeFragmentShader } from './slimeFragmentShader';
-import { slimeVertexShader } from './slimeVertexShader';
+import { slimeFragmentShader } from './slimeFragmentShader.ts';
+import { slimeVertexShader } from './slimeVertexShader.ts';
 
 export const DEFAULT_SLIME_BASE_COLOUR = 0x72ead0;
 export const DEFAULT_SLIME_WOBBLE_AMPLITUDE_METRES = 0.034;

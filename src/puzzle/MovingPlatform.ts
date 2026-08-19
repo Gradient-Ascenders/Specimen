@@ -2,7 +2,13 @@ import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus';
 
-export type MovingPlatformState = 'atStart' | 'movingToEnd' | 'atEnd' | 'movingToStart';
+const PROGRESS_EPSILON = 1e-10;
+
+export type MovingPlatformState =
+  | 'atStart'
+  | 'movingToEnd'
+  | 'atEnd'
+  | 'movingToStart';
 
 export interface MovingPlatformEvents {
   stateChanged: {
@@ -20,34 +26,64 @@ export interface MovingPlatformOptions {
 }
 
 /**
- * An authored linear platform route. Its pose and displacement are read by the
- * movement system; it does not push or parent a player body itself.
+ * An authored linear platform route.
+ *
+ * The platform owns deterministic fixed-step pose/displacement only. Rider
+ * transport remains a KinematicBody responsibility so the platform never
+ * parents the player or injects launch velocity.
  */
 export class MovingPlatform {
   readonly root = new THREE.Group();
   readonly events = new EventBus<MovingPlatformEvents>();
   readonly displacement = new THREE.Vector3();
+  readonly collisionMesh: THREE.Mesh<
+    THREE.BoxGeometry,
+    THREE.MeshStandardMaterial
+  >;
 
-  private readonly start: THREE.Vector3;
-  private readonly end: THREE.Vector3;
-  private readonly travelDurationSeconds: number;
+  private readonly startValue: THREE.Vector3;
+  private readonly endValue: THREE.Vector3;
+  private readonly sizeValue: THREE.Vector3;
+  private readonly travelDurationSecondsValue: number;
   private readonly previousPosition = new THREE.Vector3();
-  private progress = 0;
+  private progressValue = 0;
   private targetEnd = false;
   private state: MovingPlatformState = 'atStart';
 
   constructor(options: MovingPlatformOptions) {
     this.root.name = `${options.id}-moving-platform`;
-    this.start = options.start.clone();
-    this.end = options.end.clone();
-    this.travelDurationSeconds = options.travelDurationSeconds ?? 2.5;
-    if (!Number.isFinite(this.travelDurationSeconds) || this.travelDurationSeconds <= 0) {
+    this.startValue = options.start.clone();
+    this.endValue = options.end.clone();
+    this.travelDurationSecondsValue =
+      options.travelDurationSeconds ?? 2.5;
+
+    if (
+      !Number.isFinite(this.travelDurationSecondsValue) ||
+      this.travelDurationSecondsValue <= 0
+    ) {
       throw new Error('Platform travel duration must be positive.');
     }
 
-    const size = options.size?.clone() ?? new THREE.Vector3(2.5, 0.3, 2.5);
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(size.x, size.y, size.z),
+    this.sizeValue =
+      options.size?.clone() ?? new THREE.Vector3(2.5, 0.3, 2.5);
+
+    if (
+      !Number.isFinite(this.sizeValue.x) ||
+      !Number.isFinite(this.sizeValue.y) ||
+      !Number.isFinite(this.sizeValue.z) ||
+      this.sizeValue.x <= 0 ||
+      this.sizeValue.y <= 0 ||
+      this.sizeValue.z <= 0
+    ) {
+      throw new Error('Platform size must contain positive finite values.');
+    }
+
+    this.collisionMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        this.sizeValue.x,
+        this.sizeValue.y,
+        this.sizeValue.z,
+      ),
       new THREE.MeshStandardMaterial({
         color: 0x62bf83,
         emissive: 0x0a3018,
@@ -55,9 +91,11 @@ export class MovingPlatform {
         roughness: 0.55,
       }),
     );
-    mesh.name = `${options.id}-moving-platform-surface`;
-    this.root.add(mesh);
-    this.root.position.copy(this.start);
+    this.collisionMesh.name = `${options.id}-moving-platform-surface`;
+    this.collisionMesh.userData.surfaceTag = 'default';
+    this.collisionMesh.userData.movingPlatformId = options.id;
+    this.root.add(this.collisionMesh);
+    this.root.position.copy(this.startValue);
   }
 
   get platformState(): MovingPlatformState {
@@ -65,7 +103,31 @@ export class MovingPlatform {
   }
 
   get isAtEnd(): boolean {
-    return this.progress >= 1;
+    return this.progressValue >= 1 - PROGRESS_EPSILON;
+  }
+
+  get isAtStart(): boolean {
+    return this.progressValue <= PROGRESS_EPSILON;
+  }
+
+  get progress(): number {
+    return this.progressValue;
+  }
+
+  get startPosition(): Readonly<THREE.Vector3> {
+    return this.startValue;
+  }
+
+  get endPosition(): Readonly<THREE.Vector3> {
+    return this.endValue;
+  }
+
+  get size(): Readonly<THREE.Vector3> {
+    return this.sizeValue;
+  }
+
+  get travelDurationSeconds(): number {
+    return this.travelDurationSecondsValue;
   }
 
   setActive(active: boolean): void {
@@ -75,26 +137,48 @@ export class MovingPlatform {
   }
 
   update(deltaSeconds: number): void {
-    this.displacement.set(0, 0, 0);
-    this.previousPosition.copy(this.root.position);
-    const progressStep = deltaSeconds / this.travelDurationSeconds;
-
-    if (this.targetEnd) {
-      this.progress = Math.min(1, this.progress + progressStep);
-      if (this.progress === 1) this.setState('atEnd');
-    } else {
-      this.progress = Math.max(0, this.progress - progressStep);
-      if (this.progress === 0) this.setState('atStart');
+    if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0) {
+      throw new Error(
+        'Platform deltaSeconds must be non-negative and finite.',
+      );
     }
 
-    this.root.position.lerpVectors(this.start, this.end, this.progress);
-    this.displacement.subVectors(this.root.position, this.previousPosition);
+    this.displacement.set(0, 0, 0);
+    this.previousPosition.copy(this.root.position);
+
+    // Normalize tiny floating-point remainders even on the zero-delta
+    // bookkeeping call used by ElevatorSequence. Without this, a route can
+    // visually reach 100% while remaining microscopically below 1 and never
+    // transition from `ascending`.
+    this.snapProgressToBoundary();
+
+    if (deltaSeconds > 0) {
+      const progressStep =
+        deltaSeconds / this.travelDurationSecondsValue;
+
+      this.progressValue = this.targetEnd
+        ? Math.min(1, this.progressValue + progressStep)
+        : Math.max(0, this.progressValue - progressStep);
+
+      this.snapProgressToBoundary();
+    }
+
+    this.root.position.lerpVectors(
+      this.startValue,
+      this.endValue,
+      this.progressValue,
+    );
+    this.displacement.subVectors(
+      this.root.position,
+      this.previousPosition,
+    );
   }
 
   reset(): void {
     this.targetEnd = false;
-    this.progress = 0;
-    this.root.position.copy(this.start);
+    this.progressValue = 0;
+    this.root.position.copy(this.startValue);
+    this.previousPosition.copy(this.startValue);
     this.displacement.set(0, 0, 0);
     this.setState('atStart');
   }
@@ -108,6 +192,19 @@ export class MovingPlatform {
       object.material.dispose();
     });
     this.root.clear();
+  }
+
+  private snapProgressToBoundary(): void {
+    if (this.progressValue >= 1 - PROGRESS_EPSILON) {
+      this.progressValue = 1;
+      if (this.targetEnd) this.setState('atEnd');
+      return;
+    }
+
+    if (this.progressValue <= PROGRESS_EPSILON) {
+      this.progressValue = 0;
+      if (!this.targetEnd) this.setState('atStart');
+    }
   }
 
   private setState(state: MovingPlatformState): void {

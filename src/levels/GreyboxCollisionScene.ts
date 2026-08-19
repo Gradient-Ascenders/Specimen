@@ -177,6 +177,14 @@ export class GreyboxCollisionScene {
     this.slimeVisual.setPosition(position);
   }
 
+  setProbeYaw(yawRadians: number): void {
+    this.slimeVisual.mesh.rotation.set(0, yawRadians, 0);
+  }
+
+  presentProbe(): void {
+    this.slimeVisual.present();
+  }
+
   update(deltaSeconds: number, visualState: SlimeVisualState): void {
     this.slimeVisual.update(deltaSeconds, visualState);
 

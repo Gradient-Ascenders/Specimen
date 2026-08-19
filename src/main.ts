@@ -13,6 +13,7 @@ import {
 } from './physics/KinematicBody';
 import type { MovementEvents } from './physics/MovementEvents.ts';
 import { SurfaceRegistry } from './physics/SurfaceRegistry';
+import { BlobFacing } from './render/BlobFacing';
 import { RenderLayer } from './render/RenderLayer';
 import type { SlimeVisualState } from './render/slime/SlimeVisual';
 import './style.css';
@@ -41,6 +42,9 @@ let lastLandingImpactSpeedMetresPerSecond = 0;
 const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
 const recoveryPosition = testScene.copyRecoveryPosition(new THREE.Vector3());
 const renderedProbePosition = new THREE.Vector3();
+const cameraRelativeMovement = new THREE.Vector3();
+const noMovement = new THREE.Vector3();
+const blobFacing = new BlobFacing();
 
 const body = new KinematicBody({
   world: collisionWorld,
@@ -178,8 +182,7 @@ const runSlopeIdleRegression = (): string => {
   for (let step = 0; step < totalSteps; step += 1) {
     regressionBody.update(
       SLOPE_REGRESSION_FIXED_DELTA_SECONDS,
-      0,
-      0,
+      noMovement,
     );
 
     if (!regressionBody.grounded) ungroundedSteps += 1;
@@ -254,11 +257,33 @@ const loop = new Loop({
       (input.isDown('moveBackward') ? 1 : 0) -
       (input.isDown('moveForward') ? 1 : 0);
 
+    renderLayer.cameraRig.queueLookInput(
+      input.pointerDeltaX,
+      input.pointerDeltaY,
+    );
+    renderLayer.cameraRig.applyQueuedLookInput();
+
+    if (body.attached) {
+      renderLayer.cameraRig.copySurfaceMovementDirection(
+        moveX,
+        moveZ,
+        body.gameplayUp,
+        cameraRelativeMovement,
+      );
+    } else {
+      renderLayer.cameraRig.copyGroundMovementDirection(
+        moveX,
+        moveZ,
+        cameraRelativeMovement,
+      );
+    }
+
     jumpInputState.pressed = input.wasPressed('jump');
     jumpInputState.held = input.isDown('jump');
     jumpInputState.released = input.wasReleased('jump');
 
-    body.update(deltaSeconds, moveX, moveZ, jumpInputState);
+    body.update(deltaSeconds, cameraRelativeMovement, jumpInputState);
+    blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
     slimeVisualState.jumpCharge = body.chargeFraction;
@@ -269,10 +294,6 @@ const loop = new Loop({
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.update(deltaSeconds, slimeVisualState);
-    renderLayer.cameraRig.queueLookInput(
-      input.pointerDeltaX,
-      input.pointerDeltaY,
-    );
     input.endFixedUpdate();
   },
   render: (interpolationAlpha, stats) => {
@@ -286,6 +307,15 @@ const loop = new Loop({
     );
 
     testScene.setProbePosition(renderedProbePosition);
+    testScene.setProbeYaw(
+      blobFacing.getInterpolatedYaw(interpolationAlpha),
+    );
+    testScene.presentProbe();
+    renderLayer.cameraRig.queueLookInput(
+      input.pointerDeltaX,
+      input.pointerDeltaY,
+    );
+    input.endPointerUpdate();
     renderLayer.cameraRig.update(
       interpolationAlpha,
       stats.frameDeltaSeconds,
@@ -340,6 +370,8 @@ const loop = new Loop({
           `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
           `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
           `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
+          `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
+          `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
           `teaching-surface check: ${slopeRegressionStatus}`,
           `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
           `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,

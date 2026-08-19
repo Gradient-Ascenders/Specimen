@@ -111,6 +111,11 @@ export class Input {
   endFixedUpdate(): void {
     this.pressedActions.clear();
     this.releasedActions.clear();
+    this.endPointerUpdate();
+  }
+
+  /** Clear pointer displacement after either simulation or render consumes it. */
+  endPointerUpdate(): void {
     this.pointerMovementX = 0;
     this.pointerMovementY = 0;
   }
