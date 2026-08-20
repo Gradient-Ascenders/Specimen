@@ -233,3 +233,59 @@ The automated regression also includes the retained
 `Bob -> Goop -> restore recovery -> Bob` active-identity path. Camera retargeting
 remains a runtime/presentation integration check and is therefore verified in
 the browser rather than through a Node-only test dependency.
+
+
+## Bob vs Goop jump style
+
+The roster now makes jump style explicit:
+
+```text
+Bob  → charged
+Goop → normal
+Volt → normal placeholder while locked
+```
+
+`KinematicBody` exposes a `chargedJumpEnabled` configuration flag.
+
+For Bob, the existing behaviour is unchanged:
+
+```text
+press Space
+  ↓
+hold to charge
+  ↓
+release
+  ↓
+launch using charge curve
+```
+
+For Goop:
+
+```text
+press Space
+  ↓
+launch immediately at minimum jump speed
+```
+
+Goop never enters the charge state and holding Space does not increase jump
+height. The ordinary jump still uses the existing coyote-time and jump-buffer
+contracts, so removing charge does not remove the controller's responsiveness.
+
+Current normal-jump strength intentionally reuses
+`minimumJumpSpeedMetresPerSecond`; this keeps the change small and leaves one
+existing tuning value as the baseline normal jump strength.
+
+### Manual verification
+
+1. Activate Bob and hold Space: charge must still visibly increase before
+   release.
+2. Activate Goop and press Space: Goop must jump immediately.
+3. Hold Space on Goop: jump height must not increase with hold duration.
+4. F2 should report:
+
+```text
+Bob / Goop jump mode: charged / normal
+```
+
+5. Switching while Space is held must still use the #28 safe input handoff and
+   must not cause Goop to inherit Bob's retained charge.

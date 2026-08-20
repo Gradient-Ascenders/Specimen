@@ -413,6 +413,7 @@ export class GreyboxLevelRuntime {
       config: {
         adhesionEnabled: bobDefinition.abilities.adhesion,
         reboundEnabled: bobDefinition.abilities.rebound,
+        chargedJumpEnabled: bobDefinition.jumpMode === 'charged',
       },
     });
     const goopBody = new KinematicBody({
@@ -422,6 +423,7 @@ export class GreyboxLevelRuntime {
       config: {
         adhesionEnabled: goopDefinition.abilities.adhesion,
         reboundEnabled: goopDefinition.abilities.rebound,
+        chargedJumpEnabled: goopDefinition.jumpMode === 'charged',
       },
     });
     const slimePair = new PersistentSlimePair({
@@ -880,6 +882,7 @@ export class GreyboxLevelRuntime {
         `slime roster: ${slimeRoster.map((entry) => `${entry.displayName}:${entry.betaPlayable ? 'beta' : 'locked'}/${entry.unlocked ? 'unlocked' : 'locked'}/${entry.registered ? 'registered' : 'unregistered'}/${entry.active ? 'active' : 'inactive'}`).join(' | ')}`,
         `slime counts available / unlocked / registered: ${slimeManagerStats.availableCount} / ${slimeManagerStats.unlockedCount} / ${slimeManagerStats.registeredCount}`,
         `Bob abilities adhesion / rebound / dissolve / electrical: ${bobDefinition.abilities.adhesion ? 'yes' : 'no'} / ${bobDefinition.abilities.rebound ? 'yes' : 'no'} / ${bobDefinition.abilities.dissolve ? 'yes' : 'no'} / ${bobDefinition.abilities.electrical ? 'yes' : 'no'}`,
+        `Bob / Goop jump mode: ${bobDefinition.jumpMode} / ${goopDefinition.jumpMode}`,
         `Goop abilities adhesion / rebound / dissolve / electrical: ${goopDefinition.abilities.adhesion ? 'yes' : 'no'} / ${goopDefinition.abilities.rebound ? 'yes' : 'no'} / ${goopDefinition.abilities.dissolve ? 'yes' : 'no'} / ${goopDefinition.abilities.electrical ? 'yes' : 'no'}`,
         `Volt config: ${voltDefinition.betaAvailability} / electrical ${voltDefinition.abilities.electrical ? 'configured' : 'missing'}`,
         `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
