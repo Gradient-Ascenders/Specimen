@@ -5,6 +5,7 @@ import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import { GreyboxTestPanel } from '../debug/GreyboxTestPanel.ts';
 import { runSlimeManagerRegression } from '../debug/SlimeManagerRegression.ts';
+import { runTwoBodySwitchingRegression } from '../debug/TwoBodySwitchingRegression.ts';
 import { runWallJumpBasisRegression } from '../debug/WallJumpBasisRegression.ts';
 import { CollisionWorld } from '../physics/CollisionWorld.ts';
 import {
@@ -14,11 +15,15 @@ import {
 } from '../physics/KinematicBody.ts';
 import type { MovementEvents } from '../physics/MovementEvents.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import { BoxTriggerSensor } from '../puzzle/BoxTriggerSensor.ts';
+import { PressurePlate } from '../puzzle/PressurePlate.ts';
 import type { WallJumpIntent } from '../physics/WallJumpBasis.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
+import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
+import { SlimePairPresentation } from '../slimes/SlimePairPresentation.ts';
 import {
   DeathSequence,
   type DeathRecoveryAction,
@@ -36,6 +41,11 @@ const PLAYER_OUT_OF_BOUNDS_Y_METRES = -4;
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
 const SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES = 0.02;
+const GOOP_SPAWN_OFFSET_X_METRES = 2;
+const TWO_BODY_PLATE_POSITION = new THREE.Vector3(3.1, 0, -2.6);
+const TWO_BODY_PLATE_SIZE = new THREE.Vector3(1.8, 0.18, 1.8);
+const TWO_BODY_SENSOR_CENTRE = new THREE.Vector3(3.1, 0.45, -2.6);
+const TWO_BODY_SENSOR_SIZE = new THREE.Vector3(2, 1, 2);
 
 export interface GreyboxLevelRuntimeOptions {
   host: HTMLElement;
@@ -51,13 +61,24 @@ interface GreyboxRuntimeResources {
   readonly surfaceRegistry: SurfaceRegistry;
   readonly movementEvents: EventBus<MovementEvents>;
   readonly spawnPosition: THREE.Vector3;
+  readonly goopSpawnPosition: THREE.Vector3;
   readonly outOfBoundsTestPosition: THREE.Vector3;
   readonly renderedProbePosition: THREE.Vector3;
+  readonly renderedGoopPosition: THREE.Vector3;
   readonly cameraRelativeMovement: THREE.Vector3;
   readonly noMovement: THREE.Vector3;
   readonly blobFacing: BlobFacing;
   readonly body: KinematicBody;
+  readonly goopBody: KinematicBody;
   readonly slimeManager: SlimeManager<KinematicBody>;
+  readonly slimePair: PersistentSlimePair<KinematicBody>;
+  readonly slimePairPresentation: SlimePairPresentation;
+  readonly pressurePlate: PressurePlate;
+  readonly pressurePlateSensor: BoxTriggerSensor;
+  readonly pressurePlateOccupants: readonly [
+    { readonly id: 'bob'; readonly position: KinematicBody['position']; readonly radiusMetres: number },
+    { readonly id: 'goop'; readonly position: KinematicBody['position']; readonly radiusMetres: number },
+  ];
   readonly deathSequence: DeathSequence;
   readonly deathScreen: DeathScreen;
   readonly slimeVisualState: SlimeVisualState;
@@ -86,6 +107,8 @@ export class GreyboxLevelRuntime {
   private slopeRegressionStatus = 'not run';
   private readonly wallJumpBasisRegressionStatus =
     runWallJumpBasisRegression();
+  private readonly twoBodySwitchingRegressionStatus =
+    runTwoBodySwitchingRegression();
 
   constructor(options: GreyboxLevelRuntimeOptions) {
     this.host = options.host;
@@ -147,6 +170,7 @@ export class GreyboxLevelRuntime {
     const resources = this.requireResources();
     const {
       body,
+      goopBody,
       cameraRelativeMovement,
       deathSequence,
       jumpInputState,
@@ -154,6 +178,7 @@ export class GreyboxLevelRuntime {
       testPanel,
       testScene,
       wallJumpIntent,
+      slimePair,
     } = resources;
 
     if (!deathSequence.isPlaying) {
@@ -177,6 +202,11 @@ export class GreyboxLevelRuntime {
       return;
     }
 
+    let switchedThisStep = false;
+    if (this.input.wasPressed('switchSlime')) {
+      switchedThisStep = this.switchActiveSlime(resources);
+    }
+
     const moveX =
       (this.input.isDown('moveRight') ? 1 : 0) -
       (this.input.isDown('moveLeft') ? 1 : 0);
@@ -184,44 +214,77 @@ export class GreyboxLevelRuntime {
       (this.input.isDown('moveBackward') ? 1 : 0) -
       (this.input.isDown('moveForward') ? 1 : 0);
 
-    this.renderLayer.cameraRig.queueLookInput(
-      this.input.pointerDeltaX,
-      this.input.pointerDeltaY,
-    );
-    this.renderLayer.cameraRig.applyQueuedLookInput();
+    const activeBody = slimePair.activeBody;
 
-    if (body.attached) {
-      this.renderLayer.cameraRig.copySurfaceMovementDirection(
-        moveX,
-        moveZ,
-        body.gameplayUp,
-        cameraRelativeMovement,
+    if (!switchedThisStep) {
+      this.renderLayer.cameraRig.queueLookInput(
+        this.input.pointerDeltaX,
+        this.input.pointerDeltaY,
       );
+      this.renderLayer.cameraRig.applyQueuedLookInput();
+
+      if (activeBody.attached) {
+        this.renderLayer.cameraRig.copySurfaceMovementDirection(
+          moveX,
+          moveZ,
+          activeBody.gameplayUp,
+          cameraRelativeMovement,
+        );
+      } else {
+        this.renderLayer.cameraRig.copyGroundMovementDirection(
+          moveX,
+          moveZ,
+          cameraRelativeMovement,
+        );
+      }
+
+      jumpInputState.pressed = this.input.wasPressed('jump');
+      jumpInputState.held = this.input.isDown('jump');
+      jumpInputState.released = this.input.wasReleased('jump');
+      jumpInputState.cancelled = this.input.wasClearedSinceFixedUpdate;
+      wallJumpIntent.lateral = moveX;
+      wallJumpIntent.vertical = -moveZ;
     } else {
-      this.renderLayer.cameraRig.copyGroundMovementDirection(
-        moveX,
-        moveZ,
-        cameraRelativeMovement,
-      );
+      cameraRelativeMovement.set(0, 0, 0);
+      jumpInputState.pressed = false;
+      jumpInputState.held = false;
+      jumpInputState.released = false;
+      jumpInputState.cancelled = true;
+      wallJumpIntent.lateral = 0;
+      wallJumpIntent.vertical = 0;
     }
 
-    jumpInputState.pressed = this.input.wasPressed('jump');
-    jumpInputState.held = this.input.isDown('jump');
-    jumpInputState.released = this.input.wasReleased('jump');
-    jumpInputState.cancelled = this.input.wasClearedSinceFixedUpdate;
-    wallJumpIntent.lateral = moveX;
-    wallJumpIntent.vertical = -moveZ;
+    // Both bodies simulate every fixed step. Exactly one receives player intent;
+    // the inactive body still falls, collides, lands, and occupies sensors.
+    if (activeBody === body && !switchedThisStep) {
+      body.update(
+        deltaSeconds,
+        cameraRelativeMovement,
+        jumpInputState,
+        wallJumpIntent,
+      );
+      goopBody.update(deltaSeconds, resources.noMovement);
+    } else if (activeBody === goopBody && !switchedThisStep) {
+      body.update(deltaSeconds, resources.noMovement);
+      goopBody.update(
+        deltaSeconds,
+        cameraRelativeMovement,
+        jumpInputState,
+        wallJumpIntent,
+      );
+    } else {
+      body.update(deltaSeconds, resources.noMovement);
+      goopBody.update(deltaSeconds, resources.noMovement);
+    }
 
-    body.update(
-      deltaSeconds,
-      cameraRelativeMovement,
-      jumpInputState,
-      wallJumpIntent,
+    resources.pressurePlateSensor.update(
+      resources.pressurePlate.trigger,
+      resources.pressurePlateOccupants,
     );
 
-    if (body.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
+    if (slimePair.activeBody.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
       this.requestPlayerDeath(
-        () => body.teleport(resources.spawnPosition),
+        () => slimePair.restoreRecoveryState(),
         resources,
       );
     }
@@ -252,9 +315,13 @@ export class GreyboxLevelRuntime {
 
     const {
       body,
+      goopBody,
       blobFacing,
       deathSequence,
       renderedProbePosition,
+      renderedGoopPosition,
+      slimePair,
+      slimePairPresentation,
       testScene,
     } = resources;
     if (deathSequence.isPlaying) {
@@ -266,9 +333,32 @@ export class GreyboxLevelRuntime {
         THREE.MathUtils.lerp(previous.z, current.z, interpolationAlpha),
       );
 
+      renderedGoopPosition.set(
+        THREE.MathUtils.lerp(
+          goopBody.previousPosition.x,
+          goopBody.position.x,
+          interpolationAlpha,
+        ),
+        THREE.MathUtils.lerp(
+          goopBody.previousPosition.y,
+          goopBody.position.y,
+          interpolationAlpha,
+        ),
+        THREE.MathUtils.lerp(
+          goopBody.previousPosition.z,
+          goopBody.position.z,
+          interpolationAlpha,
+        ),
+      );
+
       testScene.setProbePosition(renderedProbePosition);
       testScene.setProbeYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
       testScene.presentProbe();
+      slimePairPresentation.update(
+        renderedProbePosition,
+        renderedGoopPosition,
+        slimePair.activeSlimeId,
+      );
       this.renderLayer.cameraRig.queueLookInput(
         this.input.pointerDeltaX,
         this.input.pointerDeltaY,
@@ -302,20 +392,74 @@ export class GreyboxLevelRuntime {
     surfaceRegistry.registerAll(testScene.collisionMeshes);
     const movementEvents = new EventBus<MovementEvents>();
     const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
+    const goopSpawnPosition = spawnPosition
+      .clone()
+      .add(new THREE.Vector3(GOOP_SPAWN_OFFSET_X_METRES, 0, 0));
     const outOfBoundsTestPosition = testScene.copyOutOfBoundsTestPosition(
       new THREE.Vector3(),
     );
     const blobFacing = new BlobFacing();
+    const slimeManager = new SlimeManager<KinematicBody>();
+    const bobDefinition = slimeManager.getDefinition('bob');
+    const goopDefinition = slimeManager.getDefinition('goop');
+
     const body = new KinematicBody({
       world: collisionWorld,
       surfaces: surfaceRegistry,
       initialPosition: spawnPosition,
       events: movementEvents,
+      config: {
+        adhesionEnabled: bobDefinition.abilities.adhesion,
+        reboundEnabled: bobDefinition.abilities.rebound,
+      },
     });
-    const slimeManager = new SlimeManager<KinematicBody>();
-    slimeManager.registerBody('bob', body);
+    const goopBody = new KinematicBody({
+      world: collisionWorld,
+      surfaces: surfaceRegistry,
+      initialPosition: goopSpawnPosition,
+      config: {
+        adhesionEnabled: goopDefinition.abilities.adhesion,
+        reboundEnabled: goopDefinition.abilities.rebound,
+      },
+    });
+    const slimePair = new PersistentSlimePair({
+      manager: slimeManager,
+      bobBody: body,
+      goopBody,
+      bobSpawnPosition: spawnPosition,
+      goopSpawnPosition,
+    });
 
-    this.renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
+    const slimePairPresentation = new SlimePairPresentation(body.radiusMetres);
+    this.renderLayer.scene.add(slimePairPresentation.root);
+
+    const pressurePlate = new PressurePlate({
+      id: 'two-body-persistence-demo',
+      position: TWO_BODY_PLATE_POSITION,
+      size: TWO_BODY_PLATE_SIZE,
+    });
+    this.renderLayer.scene.add(pressurePlate.root);
+    const pressurePlateSensor = new BoxTriggerSensor(
+      TWO_BODY_SENSOR_CENTRE,
+      TWO_BODY_SENSOR_SIZE,
+    );
+    const pressurePlateOccupants = [
+      {
+        id: 'bob' as const,
+        position: body.position,
+        radiusMetres: body.radiusMetres,
+      },
+      {
+        id: 'goop' as const,
+        position: goopBody.position,
+        radiusMetres: goopBody.radiusMetres,
+      },
+    ] as const;
+
+    this.renderLayer.cameraRig.setFollowTarget(
+      slimePair.activeBody,
+      collisionWorld,
+    );
     const deathSequence = new DeathSequence();
 
     const slimeVisualState: SlimeVisualState = {
@@ -357,14 +501,15 @@ export class GreyboxLevelRuntime {
       ? new GreyboxTestPanel({
           onReset: () => this.restartLevel(),
           onTestRecovery: () => {
-            body.teleport(outOfBoundsTestPosition);
+            slimePair.activeBody.teleport(outOfBoundsTestPosition);
             this.requestPlayerDeath(
-              () => body.teleport(spawnPosition),
+              () => slimePair.restoreRecoveryState(),
               this.requireResources(),
             );
           },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
           onRunSlimeRosterRegression: runSlimeManagerRegression,
+          onRunTwoBodySwitchingRegression: runTwoBodySwitchingRegression,
         })
       : undefined;
 
@@ -390,13 +535,21 @@ export class GreyboxLevelRuntime {
       surfaceRegistry,
       movementEvents,
       spawnPosition,
+      goopSpawnPosition,
       outOfBoundsTestPosition,
       renderedProbePosition: new THREE.Vector3(),
+      renderedGoopPosition: new THREE.Vector3(),
       cameraRelativeMovement: new THREE.Vector3(),
       noMovement: new THREE.Vector3(),
       blobFacing,
       body,
+      goopBody,
       slimeManager,
+      slimePair,
+      slimePairPresentation,
+      pressurePlate,
+      pressurePlateSensor,
+      pressurePlateOccupants,
       deathSequence,
       deathScreen,
       slimeVisualState,
@@ -427,11 +580,15 @@ export class GreyboxLevelRuntime {
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
-    resources.body.teleport(resources.spawnPosition);
-    resources.slimeManager.resetForLevelRestart();
+    resources.slimePair.restoreInitialState();
+    resources.pressurePlate.reset();
     resources.testScene.resetProbe();
     resources.blobFacing.reset();
     this.renderLayer.cameraRig.reset();
+    this.renderLayer.cameraRig.setFollowTarget(
+      resources.slimePair.activeBody,
+      resources.collisionWorld,
+    );
     resources.jumpInputState.pressed = false;
     resources.jumpInputState.held = false;
     resources.jumpInputState.released = false;
@@ -459,6 +616,8 @@ export class GreyboxLevelRuntime {
     resources.unsubscribeLanding();
     resources.unsubscribeJumped();
     resources.movementEvents.clear();
+    resources.pressurePlate.dispose();
+    resources.slimePairPresentation.dispose();
     resources.slimeManager.clearLevelRegistrations();
     resources.slimeManager.dispose();
     resources.testScene.dispose();
@@ -474,6 +633,31 @@ export class GreyboxLevelRuntime {
     this.landingEventCount = 0;
     this.lastLandingImpactSpeedMetresPerSecond = 0;
   };
+
+
+  /**
+   * Safe control transfer boundary. Resetting Input deliberately discards held
+   * movement/jump state so neither the old nor new body inherits stale intent.
+   * CameraRig re-initializes its presentation against the new read-only target.
+   */
+  private switchActiveSlime(resources: GreyboxRuntimeResources): boolean {
+    if (!resources.slimePair.switchActive()) return false;
+
+    this.input.resetState();
+    resources.jumpInputState.pressed = false;
+    resources.jumpInputState.held = false;
+    resources.jumpInputState.released = false;
+    resources.jumpInputState.cancelled = true;
+    resources.wallJumpIntent.lateral = 0;
+    resources.wallJumpIntent.vertical = 0;
+    resources.cameraRelativeMovement.set(0, 0, 0);
+
+    this.renderLayer.cameraRig.setFollowTarget(
+      resources.slimePair.activeBody,
+      resources.collisionWorld,
+    );
+    return true;
+  }
 
   private requestPlayerDeath(
     recovery: DeathRecoveryAction,
@@ -624,17 +808,21 @@ export class GreyboxLevelRuntime {
   ): void {
     const {
       body,
+      goopBody,
       blobFacing,
       collisionWorld,
       deathSequence,
       surfaceRegistry,
       testScene,
       slimeManager,
+      slimePair,
+      pressurePlate,
     } = resources;
     const heldActions = Array.from(this.input.held).join(', ') || 'none';
-    const position = body.position;
-    const velocity = body.velocity;
-    const groundNormal = body.groundNormal;
+    const activeBody = slimePair.activeBody;
+    const position = activeBody.position;
+    const velocity = activeBody.velocity;
+    const groundNormal = activeBody.groundNormal;
     const renderStats = this.renderLayer.getDiagnostics();
     const slimeDiagnostics = testScene.slimeDiagnostics;
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
@@ -661,6 +849,11 @@ export class GreyboxLevelRuntime {
         `deaths / retries: ${deathStats.acceptedDeathCount} / ${deathStats.completedRetryCount}`,
         `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
         `active slime: ${slimeManager.activeDefinition?.displayName ?? 'none'} (${slimeManagerStats.activeSlimeId ?? 'none'})`,
+        `switch action / count: Tab / ${slimePair.switchCount}`,
+        `Bob position: ${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)}, ${body.position.z.toFixed(2)} m`,
+        `Goop position: ${goopBody.position.x.toFixed(2)}, ${goopBody.position.y.toFixed(2)}, ${goopBody.position.z.toFixed(2)} m`,
+        `persistent bodies / active controllers: ${slimeManager.registeredCount} / ${slimeManager.getRosterState().filter((entry) => entry.active).length}`,
+        `two-body plate pressed / occupants: ${pressurePlate.isPressed ? 'yes' : 'no'} / ${Array.from(pressurePlate.trigger.occupants).join(', ') || 'none'}`,
         `slime roster: ${slimeRoster.map((entry) => `${entry.displayName}:${entry.betaPlayable ? 'beta' : 'locked'}/${entry.unlocked ? 'unlocked' : 'locked'}/${entry.registered ? 'registered' : 'unregistered'}/${entry.active ? 'active' : 'inactive'}`).join(' | ')}`,
         `slime counts available / unlocked / registered: ${slimeManagerStats.availableCount} / ${slimeManagerStats.unlockedCount} / ${slimeManagerStats.registeredCount}`,
         `Bob abilities adhesion / rebound / dissolve / electrical: ${bobDefinition.abilities.adhesion ? 'yes' : 'no'} / ${bobDefinition.abilities.rebound ? 'yes' : 'no'} / ${bobDefinition.abilities.dissolve ? 'yes' : 'no'} / ${bobDefinition.abilities.electrical ? 'yes' : 'no'}`,
@@ -668,20 +861,20 @@ export class GreyboxLevelRuntime {
         `Volt config: ${voltDefinition.betaAvailability} / electrical ${voltDefinition.abilities.electrical ? 'configured' : 'missing'}`,
         `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
         `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
-        `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
+        `grounded / attached: ${activeBody.grounded ? 'yes' : 'no'} / ${activeBody.attached ? 'yes' : 'no'}`,
         `ground normal: ${groundNormal.x.toFixed(2)}, ${groundNormal.y.toFixed(2)}, ${groundNormal.z.toFixed(2)}`,
-        `gameplay up: ${body.gameplayUp.x.toFixed(2)}, ${body.gameplayUp.y.toFixed(2)}, ${body.gameplayUp.z.toFixed(2)}`,
-        `surface / last contact: ${body.supportSurfaceTag} / ${body.lastContactSurfaceTag}`,
-        `attachment surface: ${body.attachmentSurfaceName}`,
-        `attach / bounce cooldown: ${body.attachmentCooldownSeconds.toFixed(2)} / ${body.bounceCooldownSeconds.toFixed(2)} s`,
-        `last bounce: ${body.lastBounceSpeedMetresPerSecond.toFixed(2)} m/s @ ${body.lastBounceSurfaceName}`,
-        `jump state / can jump: ${body.jumpState} / ${body.canJump ? 'yes' : 'no'}`,
-        `charge: ${body.chargeSeconds.toFixed(2)} / ${body.maximumJumpChargeSeconds.toFixed(2)} s (${(body.chargeFraction * 100).toFixed(0)}%)`,
-        `coyote remaining: ${body.coyoteTimeRemainingSeconds.toFixed(3)} s`,
-        `jump buffer remaining: ${body.jumpInputBufferRemainingSeconds.toFixed(3)} s`,
-        `last jump: ${body.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(body.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
-        `last jump direction: ${body.lastJumpDirection.x.toFixed(2)}, ${body.lastJumpDirection.y.toFixed(2)}, ${body.lastJumpDirection.z.toFixed(2)}`,
-        `landing this step: ${body.landedThisStep ? 'yes' : 'no'}`,
+        `gameplay up: ${activeBody.gameplayUp.x.toFixed(2)}, ${activeBody.gameplayUp.y.toFixed(2)}, ${activeBody.gameplayUp.z.toFixed(2)}`,
+        `surface / last contact: ${activeBody.supportSurfaceTag} / ${activeBody.lastContactSurfaceTag}`,
+        `attachment surface: ${activeBody.attachmentSurfaceName}`,
+        `attach / bounce cooldown: ${activeBody.attachmentCooldownSeconds.toFixed(2)} / ${activeBody.bounceCooldownSeconds.toFixed(2)} s`,
+        `last bounce: ${activeBody.lastBounceSpeedMetresPerSecond.toFixed(2)} m/s @ ${activeBody.lastBounceSurfaceName}`,
+        `jump state / can jump: ${activeBody.jumpState} / ${activeBody.canJump ? 'yes' : 'no'}`,
+        `charge: ${activeBody.chargeSeconds.toFixed(2)} / ${activeBody.maximumJumpChargeSeconds.toFixed(2)} s (${(activeBody.chargeFraction * 100).toFixed(0)}%)`,
+        `coyote remaining: ${activeBody.coyoteTimeRemainingSeconds.toFixed(3)} s`,
+        `jump buffer remaining: ${activeBody.jumpInputBufferRemainingSeconds.toFixed(3)} s`,
+        `last jump: ${activeBody.lastJumpSpeedMetresPerSecond.toFixed(2)} m/s @ ${(activeBody.lastJumpChargeFraction * 100).toFixed(0)}% charge`,
+        `last jump direction: ${activeBody.lastJumpDirection.x.toFixed(2)}, ${activeBody.lastJumpDirection.y.toFixed(2)}, ${activeBody.lastJumpDirection.z.toFixed(2)}`,
+        `landing this step: ${activeBody.landedThisStep ? 'yes' : 'no'}`,
         `last landing impact / count: ${this.lastLandingImpactSpeedMetresPerSecond.toFixed(2)} m/s / ${this.landingEventCount}`,
         `visual speed / charge: ${slimeDiagnostics.speed.toFixed(2)} / ${slimeDiagnostics.jumpCharge.toFixed(2)}`,
         `visual squash / stretch: ${slimeDiagnostics.squash.toFixed(2)} / ${slimeDiagnostics.stretch.toFixed(2)}`,
@@ -689,8 +882,8 @@ export class GreyboxLevelRuntime {
         `visual impact normal: ${slimeDiagnostics.impactNormalLocal.x.toFixed(2)}, ${slimeDiagnostics.impactNormalLocal.y.toFixed(2)}, ${slimeDiagnostics.impactNormalLocal.z.toFixed(2)}`,
         `visual surface normal: ${slimeDiagnostics.surfaceNormalLocal.x.toFixed(2)}, ${slimeDiagnostics.surfaceNormalLocal.y.toFixed(2)}, ${slimeDiagnostics.surfaceNormalLocal.z.toFixed(2)}`,
         `visual move direction: ${slimeDiagnostics.moveDirectionLocal.x.toFixed(2)}, ${slimeDiagnostics.moveDirectionLocal.y.toFixed(2)}, ${slimeDiagnostics.moveDirectionLocal.z.toFixed(2)}`,
-        `contacts this step: ${body.contactsThisStep}`,
-        `last collision: ${body.lastCollisionName}`,
+        `contacts this step: ${activeBody.contactsThisStep}`,
+        `last collision: ${activeBody.lastCollisionName}`,
         `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
         `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
         `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
@@ -699,6 +892,7 @@ export class GreyboxLevelRuntime {
         `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
         `teaching-surface regression: ${this.slopeRegressionStatus}`,
         `wall jump basis regression: ${this.wallJumpBasisRegressionStatus}`,
+        `two-body switching regression: ${this.twoBodySwitchingRegressionStatus}`,
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
         `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,

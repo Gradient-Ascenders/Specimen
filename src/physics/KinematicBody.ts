@@ -56,6 +56,11 @@ export interface KinematicBodyConfig {
   minimumGroundNormalDot: number;
   maxCollisionIterations: number;
 
+  /** Whether this body may attach to authored sticky surfaces. */
+  adhesionEnabled: boolean;
+  /** Whether this body may use authored/passive rebound behaviour. */
+  reboundEnabled: boolean;
+
   minimumJumpSpeedMetresPerSecond: number;
   maximumJumpSpeedMetresPerSecond: number;
   maximumJumpChargeSeconds: number;
@@ -101,6 +106,8 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   groundProbeDistanceMetres: 0.08,
   minimumGroundNormalDot: Math.cos(THREE.MathUtils.degToRad(50)),
   maxCollisionIterations: 3,
+  adhesionEnabled: true,
+  reboundEnabled: true,
 
   // Jump height scales with launch speed squared. Multiplying the original
   // 4.8-8.8 m/s charge range by sqrt(1.25) raises every charged jump apex by
@@ -1030,6 +1037,7 @@ export class KinematicBody {
 
       if (
         allowSurfaceTransitions &&
+        this.config.reboundEnabled &&
         surface.bounceSpeedMetresPerSecond > 0 &&
         this.tryApplyBounce(
           surface.bounceSpeedMetresPerSecond,
@@ -1058,7 +1066,11 @@ export class KinematicBody {
         continue;
       }
 
-      if (allowSurfaceTransitions && surface.adhesive) {
+      if (
+        allowSurfaceTransitions &&
+        this.config.adhesionEnabled &&
+        surface.adhesive
+      ) {
         this.tryAttach(
           this.movementHit.normal,
           this.movementHit.object,
@@ -1126,6 +1138,7 @@ export class KinematicBody {
     surfaceNormal: THREE.Vector3,
     surfaceObject: THREE.Mesh | null,
   ): boolean {
+    if (!this.config.reboundEnabled) return false;
     if (this.bounceCooldownSecondsValue > 0) return false;
     // Deliberate buffered input wins over the slime's passive floor rebound.
     // The collision may then establish support and consume the buffer below;
@@ -1382,7 +1395,7 @@ export class KinematicBody {
     }
 
     const surface = this.surfaces.get(this.edgeHit.object);
-    if (!surface.adhesive) return false;
+    if (!this.config.adhesionEnabled || !surface.adhesive) return false;
 
     const transitionNormal = this.edgeHit.normal;
     if (
@@ -1479,6 +1492,15 @@ export class KinematicBody {
   }
 
   private validateConfig(config: KinematicBodyConfig): void {
+    if (
+      typeof config.adhesionEnabled !== 'boolean' ||
+      typeof config.reboundEnabled !== 'boolean'
+    ) {
+      throw new Error(
+        'adhesionEnabled and reboundEnabled must be boolean values.',
+      );
+    }
+
     const positiveFinite: ReadonlyArray<[string, number]> = [
       ['radiusMetres', config.radiusMetres],
       ['skinWidthMetres', config.skinWidthMetres],

@@ -4,6 +4,7 @@ export type InputAction =
   | 'moveLeft'
   | 'moveRight'
   | 'jump'
+  | 'switchSlime'
   | 'debugReset'
   | 'debugTestRecovery';
 
@@ -21,6 +22,7 @@ export const DEFAULT_ACTION_BINDINGS = {
   moveLeft: [{ kind: 'key', code: 'KeyA' }],
   moveRight: [{ kind: 'key', code: 'KeyD' }],
   jump: [{ kind: 'key', code: 'Space' }],
+  switchSlime: [{ kind: 'key', code: 'Tab' }],
   debugReset: [{ kind: 'key', code: 'KeyR' }],
   debugTestRecovery: [{ kind: 'key', code: 'KeyF' }],
 } as const satisfies ActionBindings;
