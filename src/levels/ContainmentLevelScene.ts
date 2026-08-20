@@ -75,6 +75,17 @@ export class ContainmentLevelScene {
     this.teaching.setProbeYaw(yawRadians);
   }
 
+  setProbeOpacity(opacity: number): void {
+    this.teaching.setProbeOpacity(opacity);
+  }
+
+  isInsideCameraTightVent(position: Vector3State): boolean {
+    return (
+      this.teaching.isInsideCameraTightVent(position) ||
+      this.roomThree.isInsideCameraTightVent(position)
+    );
+  }
+
   presentProbe(): void {
     this.teaching.presentProbe();
   }

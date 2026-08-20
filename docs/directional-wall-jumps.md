@@ -1,99 +1,61 @@
-# Directional sticky-wall jumping
+# Sticky-wall jumping
 
-This adjustment keeps ordinary floor jumping unchanged and extends the existing
-sticky-wall charged jump.
+Sticky walls use the same charged-jump rules as ordinary floors, rotated into
+the wall's local gravity frame.
 
 ## Behaviour
 
-When Tack is attached to a sticky wall:
+When Bob is attached to a sticky wall:
 
-- Release Space with **no movement input**: preserve the original jump directly
-  away from the wall.
-- Hold **W/S/A/D** (or a diagonal) while releasing Space: resolve jump intent
-  from a stable wall-up/lateral basis. W/S always mean up/down the wall and A/D
-  always mean lateral movement, regardless of camera heading.
+- Charging and releasing Space adds the normal charged-jump impulse directly
+  away from the wall, along the current `gameplayUp` direction.
+- W/S/A/D continue to control ordinary camera-relative surface locomotion.
+- Movement velocity along the wall is preserved through takeoff, just as floor
+  movement carries into a normal jump.
+- Movement input never receives charged-jump speed, so holding a direction does
+  not turn the jump into a dash.
 
-Attached locomotion still uses `CameraRig.copySurfaceMovementDirection`.
-Directional **jump intent is separate**: `main.ts` passes the raw normalized
-A/D and W/S axes into `KinematicBody`, which resolves them from the current
-authoritative wall normal. The physics body therefore never asks CameraRig for
-wall-jump direction.
+This means a wall behaves like rotated ground: jump charge affects local height,
+while movement and air control affect travel along the local ground plane.
 
-Examples:
+## Airborne gravity frame
 
-- W + release: jump upward along the wall.
-- S + release: jump downward along the wall.
-- A/D + release: lateral wall transfer.
-- W+A / W+D: diagonal wall transfer.
-- Space only: existing straight-away wall jump.
+A deliberate jump from a sticky wall retains that wall's local up axis while
+Bob is airborne. Gravity therefore pulls him back toward the wall, the camera
+keeps its wall-relative orientation, and air movement remains aligned with the
+displayed surface frame while crossing a gap between sticky tiles.
 
-This supports wall-to-wall traversal while retaining a predictable fallback.
+The retained frame ends when Bob attaches to another sticky surface, lands on
+ordinary ground, bounces, recovers, or reaches the deterministic 1.35-second
+fallback. Simply walking or falling off a sticky edge does not enable retained
+surface gravity and returns to world-up immediately.
 
 ## Tuning
 
-`DEFAULT_KINEMATIC_BODY_CONFIG` now includes:
+`DEFAULT_KINEMATIC_BODY_CONFIG` includes:
 
-- `directionalWallJumpOutwardSpeedMetresPerSecond = 1.2`
-- `directionalWallJumpDetachCooldownSeconds = 0.08`
+- `stickyJumpGravityDurationSeconds = 1.35`
+- `attachmentDetachCooldownSeconds = 0.12`
 
-For a directional wall jump, the outward component is fixed and the remaining
-charged jump speed is placed along the wall tangent. The vector is constructed
-so the total launch magnitude remains the same tap/charged jump speed used by
-normal jumping.
-
-The shorter directional detach cooldown is intended to keep repeated sticky
-traversal responsive. The existing `attachmentDetachCooldownSeconds` is still
-used by the no-input straight-away wall jump.
+The ordinary minimum and maximum charged-jump speeds apply along local up for
+both floor and sticky-wall jumps. No separate directional wall-jump speed or
+detach cooldown is used.
 
 ## Verification
 
 Check:
 
 1. Ordinary floor tap/full-charge jumps are unchanged.
-2. Space-only wall jump still launches directly away.
-3. W + release launches mostly upward with visible outward separation.
-4. A/D and diagonal launches follow the intended wall direction.
-5. Full charge changes launch magnitude but not the selected direction.
-6. Tack can transfer between suitably placed sticky walls.
-7. Immediate reattachment to the wall being left is still prevented.
-8. Existing adhesion-edge, bounce, elevator, laser, slope, and camera tests
-   remain functional.
+2. A stationary sticky-wall jump launches directly away from the wall.
+3. Holding movement while charging preserves normal locomotion speed without a
+   directional burst on release.
+4. Facing the floor and holding forward keeps Bob travelling toward the floor;
+   it never reverses him, and it never promotes that movement into jump speed.
+5. Gravity, camera orientation, and air control remain wall-relative across a
+   sticky-tile gap.
+6. The gravity frame returns to world-up after the fallback if Bob reaches no
+   surface.
 
-
-## Stable cardinal basis
-
-For every supported sticky wall normal:
-
-```text
-wallUp    = project(worldUp onto wall plane)
-wallRight = wallUp × wallNormal
-```
-
-Raw jump input then resolves as:
-
-```text
-jump tangent = wallRight × A/D + wallUp × W/S
-```
-
-This keeps the cardinal contract stable while ordinary attached locomotion can
-remain camera-relative for comfort.
-
-## Automated development coverage
-
-`src/debug/WallJumpBasisRegression.ts` runs once in the existing browser
-development harness and reports its result in runtime diagnostics. It does not
-require `node:test` or Node type definitions.
-
-It covers:
-
-- W/S on ±X, ±Z, and representative tilted near-vertical wall normals;
-- A/D as opposite lateral tangents on the same set;
-- the explicit invariant that representative camera headings cannot alter the
-  cardinal wall-jump result because camera heading is not an input to the
-  resolver.
-
-Expected diagnostic:
-
-```text
-wall jump basis regression: PASS — 6 wall normals — 4 camera headings — W/S vertical, A/D lateral
-```
+The Node physics suite covers the reported floor-facing case, checks that the
+jump event still reports local up, and verifies that tangential speed stays at
+ordinary locomotion speed rather than becoming a charged dash.

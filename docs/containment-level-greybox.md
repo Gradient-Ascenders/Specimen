@@ -30,12 +30,19 @@ volumes during the fixed update.
 | Room 2 safe floor | `containment-room-2` | Static bounce-room state. |
 | Room 3 entrance | `containment-room-3` | All Room 3 beams, timelines and triggers. |
 | Room 4 elevator roof | `containment-room-4` | Elevator pose/state/timers, exit lock and all ascent lasers. |
-| Room 5 entry, central rest and final ledge | `containment-room-5` | Room 5 lasers, triggers, lever, containment doors and Etch placeholder. |
+| Room 5 entry | `containment-room-5` | Room 5 lasers, triggers, lever, containment doors and Etch placeholder. |
 
 Laser contact and authored fall volumes request the existing death sequence.
 The recovery callback is retained until Retry. Retry first resets the active
 puzzle group and only then calls `KinematicBody.recoverAt(...)`, which clears
 velocity, charge, adhesion and contact transients.
+
+Room 5 keeps the latest Blender transforms as its motion origins. Moving
+platform 1 oscillates symmetrically along runtime X; moving platform 2 travels
+along runtime Z to the Blender Y-axis reference marker. Lasers 1–4 and 8 move
+vertically, lasers 5 and 7 exchange their authored forward/back positions, and
+laser 6 remains static. Room 5 checkpoint reset restores every platform, laser
+phase and ending object to that authored starting state.
 
 The Room 4 fixed-step order remains:
 
@@ -46,6 +53,12 @@ player movement
 → laser contact
 → checkpoint / failure / progression triggers
 ```
+
+Reaching the top of the elevator activates the Room 5 entry checkpoint as soon
+as the platform stops and enters `arrivalPause`. The player therefore recovers
+inside Room 5 if they fall back down the shaft before crossing the exit trigger.
+Walking through the Room 5 entrance activates the same checkpoint idempotently;
+there are no additional checkpoints within Room 5.
 
 ## Elevator sequence
 
@@ -102,6 +115,11 @@ and returns Etch to containment.
   reconciled with current `main`.
 
 ## Manual verification
+
+Development builds expose <kbd>1</kbd> through <kbd>5</kbd> and matching
+debug-panel buttons to recover Bob directly at each room's entry checkpoint.
+Each shortcut resets the selected room's puzzle group and updates the active
+objective; these teleports are never part of the production route.
 
 1. Complete Rooms 1–5 without debug movement or teleporting.
 2. Intentionally hit every laser and enter each fall volume.

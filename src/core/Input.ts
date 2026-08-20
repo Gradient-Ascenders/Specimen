@@ -5,7 +5,12 @@ export type InputAction =
   | 'moveRight'
   | 'jump'
   | 'debugReset'
-  | 'debugTestRecovery';
+  | 'debugTestRecovery'
+  | 'debugTeleportRoomOne'
+  | 'debugTeleportRoomTwo'
+  | 'debugTeleportRoomThree'
+  | 'debugTeleportRoomFour'
+  | 'debugTeleportRoomFive';
 
 export type InputBinding =
   | { readonly kind: 'key'; readonly code: string }
@@ -23,6 +28,11 @@ export const DEFAULT_ACTION_BINDINGS = {
   jump: [{ kind: 'key', code: 'Space' }],
   debugReset: [{ kind: 'key', code: 'KeyR' }],
   debugTestRecovery: [{ kind: 'key', code: 'KeyF' }],
+  debugTeleportRoomOne: [{ kind: 'key', code: 'Digit1' }],
+  debugTeleportRoomTwo: [{ kind: 'key', code: 'Digit2' }],
+  debugTeleportRoomThree: [{ kind: 'key', code: 'Digit3' }],
+  debugTeleportRoomFour: [{ kind: 'key', code: 'Digit4' }],
+  debugTeleportRoomFive: [{ kind: 'key', code: 'Digit5' }],
 } as const satisfies ActionBindings;
 
 export interface InputOptions {

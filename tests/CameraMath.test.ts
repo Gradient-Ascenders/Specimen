@@ -5,6 +5,7 @@ import {
   exponentialDampingAlpha,
   mapPointerAxisToOrbitRadians,
   resolveCameraDistance,
+  resolveCameraTargetOpacity,
 } from '../src/render/CameraMath.ts';
 
 const EPSILON = 1e-10;
@@ -78,4 +79,15 @@ test('exponential recovery is invariant to equivalent frame subdivisions', () =>
     Math.abs(exponentialDampingAlpha(5, 1) - (1 - Math.exp(-5))) <
       EPSILON,
   );
+});
+
+test('follow-target opacity fades smoothly only at close camera distances', () => {
+  assert.equal(resolveCameraTargetOpacity(1.35, 1.35, 0.55, 0.25), 1);
+  assert.equal(resolveCameraTargetOpacity(0.55, 1.35, 0.55, 0.25), 0.25);
+  assert.equal(resolveCameraTargetOpacity(0, 1.35, 0.55, 0.25), 0.25);
+
+  const middle = resolveCameraTargetOpacity(0.95, 1.35, 0.55, 0.25);
+  assert.ok(middle > 0.25);
+  assert.ok(middle < 1);
+  assert.equal(resolveCameraTargetOpacity(2, 1.35, 0.55, 0.25), 1);
 });

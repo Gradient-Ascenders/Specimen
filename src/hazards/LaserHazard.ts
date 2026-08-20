@@ -77,6 +77,7 @@ export class LaserHazard {
   private readonly endValue = new THREE.Vector3();
   private readonly authoredDirection = new THREE.Vector3();
   private readonly sweepAxis = new THREE.Vector3(0, 1, 0);
+  private readonly translationOffset = new THREE.Vector3();
 
   private readonly segment = new THREE.Vector3();
   private readonly toTarget = new THREE.Vector3();
@@ -111,6 +112,7 @@ export class LaserHazard {
   private stepIndexValue = 0;
   private stepElapsedSeconds = 0;
   private sequenceElapsedSecondsValue = 0;
+  private currentAngleRadians = 0;
 
   constructor(options: LaserHazardOptions) {
     if (!options.id) throw new Error('Laser hazard IDs cannot be empty.');
@@ -272,6 +274,24 @@ export class LaserHazard {
     this.updateProxyVisibility();
   }
 
+  /**
+   * Translate the complete authoritative beam from its authored pose.
+   * Room-owned deterministic motion can use this without separating visuals
+   * from lethal collision endpoints.
+   */
+  setTranslationOffset(offset: ReadonlyLaserVector3): void {
+    if (
+      !Number.isFinite(offset.x) ||
+      !Number.isFinite(offset.y) ||
+      !Number.isFinite(offset.z)
+    ) {
+      throw new Error('Laser translation offset must be finite.');
+    }
+
+    this.translationOffset.set(offset.x, offset.y, offset.z);
+    this.applyCurrentPose();
+  }
+
   update(deltaSeconds: number): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error(
@@ -373,8 +393,8 @@ export class LaserHazard {
 
   /** Restore authored pose, enabled state and sequence timer. */
   reset(): void {
-    this.startValue.copy(this.authoredStart);
-    this.endValue.copy(this.authoredEnd);
+    this.translationOffset.set(0, 0, 0);
+    this.currentAngleRadians = 0;
     this.enabledValue = this.initialEnabled;
     this.stepIndexValue = 0;
     this.stepElapsedSeconds = 0;
@@ -385,7 +405,7 @@ export class LaserHazard {
       this.applyTimelineStep(this.timeline.steps[0], 0);
     } else {
       this.sequenceStateValue = 'static';
-      this.updateProxyPose();
+      this.applyCurrentPose();
     }
   }
 
@@ -457,7 +477,7 @@ export class LaserHazard {
     this.enabledValue = step.enabled;
 
     const safeProgress = THREE.MathUtils.clamp(progress, 0, 1);
-    const angleRadians =
+    this.currentAngleRadians =
       step.kind === 'hold'
         ? step.angleRadians
         : THREE.MathUtils.lerp(
@@ -466,10 +486,16 @@ export class LaserHazard {
             safeProgress,
           );
 
-    this.startValue.copy(this.authoredStart);
+    this.applyCurrentPose();
+  }
+
+  private applyCurrentPose(): void {
+    this.startValue
+      .copy(this.authoredStart)
+      .add(this.translationOffset);
     this.beamDirection
       .copy(this.authoredDirection)
-      .applyAxisAngle(this.sweepAxis, angleRadians);
+      .applyAxisAngle(this.sweepAxis, this.currentAngleRadians);
     this.endValue
       .copy(this.startValue)
       .add(this.beamDirection);

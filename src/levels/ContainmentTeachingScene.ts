@@ -31,6 +31,12 @@ const SPAWN_POSITION = new THREE.Vector3(-0.20995, 0.52507, -2.60112);
 const OUT_OF_BOUNDS_TEST_POSITION = new THREE.Vector3(0, -5, -1.8);
 const DEATH_RUPTURE_SECONDS = 0.075;
 const ROOM_2_FLOOR_TOP_Y = 0;
+const TIGHT_CAMERA_VENT_BOUNDS = [
+  { min: [-6.1, 4.5, 5.2], max: [-3.5, 7.8, 13.2] },
+  { min: [-6.1, 4.8, 12.2], max: [-3.5, 11.4, 24.9] },
+  { min: [-9.8, 9.8, 22.8], max: [-1.7, 13, 25.3] },
+  { min: [-9.8, 9.8, 24.7], max: [-7, 13, 29.6] },
+] as const;
 // The 0.45 m player radius and 0.01 m collision skin both need clearance.
 const ROOM_2_SAFE_LANDING_POSITION = new THREE.Vector3(
   -9,
@@ -121,6 +127,21 @@ export class ContainmentTeachingScene {
     this.slimeVisual.mesh.rotation.set(0, yawRadians, 0);
   }
 
+  setProbeOpacity(opacity: number): void {
+    this.slimeVisual.setOpacity(opacity);
+  }
+
+  isInsideCameraTightVent(position: Vector3State): boolean {
+    return TIGHT_CAMERA_VENT_BOUNDS.some(({ min, max }) =>
+      position.x >= min[0] &&
+      position.x <= max[0] &&
+      position.y >= min[1] &&
+      position.y <= max[1] &&
+      position.z >= min[2] &&
+      position.z <= max[2]
+    );
+  }
+
   presentProbe(): void {
     this.slimeVisual.present();
   }
@@ -135,6 +156,7 @@ export class ContainmentTeachingScene {
 
     this.deathElapsedSeconds = 0;
     this.slimeVisual.setPosition(position);
+    this.slimeVisual.setOpacity(1);
     this.slimeVisual.mesh.scale.setScalar(1);
     this.slimeVisual.mesh.visible = true;
     return true;

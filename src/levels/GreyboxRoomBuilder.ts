@@ -8,12 +8,20 @@ export interface GreyboxBoxOptions {
   readonly position: readonly [number, number, number];
   readonly material: THREE.Material;
   readonly surfaceTag?: SurfaceTag;
-  readonly textureRole?: 'sticky-wall-tile' | 'sticky-vent-tile';
+  /** Restrict a thin vertical panel to its two broad climbable/blocking faces. */
+  readonly movementFaceMode?: 'all' | 'vertical-sides';
+  readonly interactionRole?: 'goop-dissolvable';
+  readonly textureRole?:
+    | 'sticky-wall-tile'
+    | 'sticky-vent-tile'
+    | 'acid-floor'
+    | 'wooden-door';
   readonly rotation?: readonly [number, number, number];
 }
 
 export interface ContainmentGreyboxMaterials {
   readonly floor: THREE.MeshStandardMaterial;
+  readonly acid: THREE.MeshStandardMaterial;
   readonly wall: THREE.MeshStandardMaterial;
   readonly support: THREE.MeshStandardMaterial;
   readonly platform: THREE.MeshStandardMaterial;
@@ -23,10 +31,18 @@ export interface ContainmentGreyboxMaterials {
   readonly containment: THREE.MeshStandardMaterial;
   readonly glass: THREE.MeshStandardMaterial;
   readonly etch: THREE.MeshStandardMaterial;
+  readonly wood: THREE.MeshStandardMaterial;
 }
 
 export const createContainmentGreyboxMaterials = (): ContainmentGreyboxMaterials => ({
   floor: material(0xaeb6ba),
+  acid: new THREE.MeshStandardMaterial({
+    color: 0x92bd24,
+    emissive: 0x385600,
+    emissiveIntensity: 0.55,
+    roughness: 0.38,
+    metalness: 0,
+  }),
   wall: material(0xdadfe1),
   support: material(0x424a50),
   platform: material(0xd6a928, 0x443300),
@@ -44,6 +60,7 @@ export const createContainmentGreyboxMaterials = (): ContainmentGreyboxMaterials
     metalness: 0.15,
   }),
   etch: material(0xb4e13e, 0x4b720d),
+  wood: material(0x744522, 0x211006),
 });
 
 /** Shared primitive authoring helper for the later Containment rooms. */
@@ -63,6 +80,10 @@ export class GreyboxRoomBuilder {
   addCollider(options: GreyboxBoxOptions): THREE.Mesh {
     const mesh = this.createBox(options);
     mesh.userData.surfaceTag = options.surfaceTag ?? 'default';
+    mesh.userData.movementFaceMode = options.movementFaceMode ?? 'all';
+    if (options.interactionRole) {
+      mesh.userData.interactionRole = options.interactionRole;
+    }
     if (options.textureRole) mesh.userData.textureRole = options.textureRole;
     mesh.userData.sizeMetres = [...options.size];
     this.collisionMeshes.push(mesh);

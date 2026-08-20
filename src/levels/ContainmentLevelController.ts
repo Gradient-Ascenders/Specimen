@@ -19,12 +19,8 @@ import {
   ROOM_4_PUZZLE_GROUP_ID,
 } from './RoomFourGreybox.ts';
 import {
-  ROOM_5_CENTRAL_CHECKPOINT_ID,
-  ROOM_5_CENTRAL_CHECKPOINT_POSITION,
   ROOM_5_ENTRY_CHECKPOINT_ID,
   ROOM_5_ENTRY_CHECKPOINT_POSITION,
-  ROOM_5_FINAL_CHECKPOINT_ID,
-  ROOM_5_FINAL_CHECKPOINT_POSITION,
   ROOM_5_PUZZLE_GROUP_ID,
 } from './RoomFiveGreybox.ts';
 
@@ -35,8 +31,31 @@ const ROOM_2_CHECKPOINT_ID = 'containment-room-2-safe-floor';
 const LEVER_ADHESION_SECONDS = 0.35;
 
 export type ContainmentLevelState = 'playing' | 'completing' | 'complete';
+export const CONTAINMENT_ROOM_OBJECTIVES = {
+  1: 'Climb through the vent',
+  2: 'Learn how to jump',
+  3: 'Get past the lasers',
+  4: 'Survive the elevator!',
+  5: 'Free Goob!',
+} as const;
+export type ContainmentRoomId = keyof typeof CONTAINMENT_ROOM_OBJECTIVES;
+const DEBUG_ROOM_ENTRY_CHECKPOINT_IDS: Readonly<
+  Record<ContainmentRoomId, string>
+> = {
+  1: INITIAL_CHECKPOINT_ID,
+  2: ROOM_2_CHECKPOINT_ID,
+  3: ROOM_3_CHECKPOINT_ID,
+  4: ROOM_4_CHECKPOINT_ID,
+  5: ROOM_5_ENTRY_CHECKPOINT_ID,
+};
+
+export interface ContainmentObjectiveChangedEvent {
+  readonly roomId: ContainmentRoomId;
+  readonly objective: string;
+}
 
 export interface ContainmentLevelEvents {
+  objectiveChanged: ContainmentObjectiveChangedEvent;
   completed: {
     readonly levelId: 'containment';
     readonly nextLevelId: 'level-2';
@@ -75,6 +94,7 @@ export class ContainmentLevelController {
   private readonly safetyDisplacement = new THREE.Vector3();
   private readonly unsubscribeCallbacks: Array<() => void> = [];
   private stateValue: ContainmentLevelState = 'playing';
+  private activeRoomIdValue: ContainmentRoomId = 1;
   private leverAdhesionSeconds = 0;
   private lastFailureIdValue = 'none';
   private completionCountValue = 0;
@@ -114,6 +134,14 @@ export class ContainmentLevelController {
     return this.checkpoints.activeCheckpointId;
   }
 
+  get activeRoomId(): ContainmentRoomId {
+    return this.activeRoomIdValue;
+  }
+
+  get currentObjective(): string {
+    return CONTAINMENT_ROOM_OBJECTIVES[this.activeRoomIdValue];
+  }
+
   get lastFailureId(): string {
     return this.lastFailureIdValue;
   }
@@ -138,7 +166,15 @@ export class ContainmentLevelController {
 
     this.roomTwoCheckpointTrigger.update(this.body);
     this.scene.roomThree.update(deltaSeconds, this.body);
+    const elevatorProgressBeforeUpdate =
+      this.scene.roomFour.elevator.ascentProgress;
     this.scene.roomFour.update(deltaSeconds, this.body);
+    if (
+      elevatorProgressBeforeUpdate < 1 &&
+      this.scene.roomFour.elevator.ascentProgress >= 1
+    ) {
+      this.activateRoomFiveEntryCheckpoint();
+    }
     this.scene.roomFive.updateTraversal(deltaSeconds, this.body);
 
     if (
@@ -170,12 +206,22 @@ export class ContainmentLevelController {
     this.checkpoints.recover(this.body);
   }
 
+  /** Development-only shortcut that preserves normal checkpoint invariants. */
+  teleportToRoomForDebug(roomId: ContainmentRoomId): void {
+    this.checkpoints.activate(DEBUG_ROOM_ENTRY_CHECKPOINT_IDS[roomId]);
+    this.checkpoints.recover(this.body);
+    this.stateValue = 'playing';
+    this.setActiveRoom(roomId);
+    this.leverAdhesionSeconds = 0;
+  }
+
   reset(): void {
     this.puzzleRegistry.reset();
     this.checkpoints.reset();
     this.body.recoverAt(this.spawnPosition);
     this.roomTwoCheckpointTrigger.reset();
     this.stateValue = 'playing';
+    this.setActiveRoom(1, true);
     this.leverAdhesionSeconds = 0;
     this.lastFailureIdValue = 'none';
     this.completionCountValue = 0;
@@ -210,31 +256,24 @@ export class ContainmentLevelController {
       spawnPosition: ROOM_5_ENTRY_CHECKPOINT_POSITION,
       puzzleGroupId: ROOM_5_PUZZLE_GROUP_ID,
     });
-    this.checkpoints.register({
-      id: ROOM_5_CENTRAL_CHECKPOINT_ID,
-      spawnPosition: ROOM_5_CENTRAL_CHECKPOINT_POSITION,
-      puzzleGroupId: ROOM_5_PUZZLE_GROUP_ID,
-    });
-    this.checkpoints.register({
-      id: ROOM_5_FINAL_CHECKPOINT_ID,
-      spawnPosition: ROOM_5_FINAL_CHECKPOINT_POSITION,
-      puzzleGroupId: ROOM_5_PUZZLE_GROUP_ID,
-    });
   }
 
   private subscribeToTriggers(): void {
-    this.onEntered(this.roomTwoCheckpointTrigger, () =>
-      this.checkpoints.activate(ROOM_2_CHECKPOINT_ID));
-    this.onEntered(this.scene.roomThree.checkpointTrigger, () =>
-      this.checkpoints.activate(ROOM_3_CHECKPOINT_ID));
-    this.onEntered(this.scene.roomFour.checkpointTrigger, () =>
-      this.checkpoints.activate(ROOM_4_CHECKPOINT_ID));
-    this.onEntered(this.scene.roomFive.entryCheckpointTrigger, () =>
-      this.checkpoints.activate(ROOM_5_ENTRY_CHECKPOINT_ID));
-    this.onEntered(this.scene.roomFive.centralCheckpointTrigger, () =>
-      this.checkpoints.activate(ROOM_5_CENTRAL_CHECKPOINT_ID));
-    this.onEntered(this.scene.roomFive.finalCheckpointTrigger, () =>
-      this.checkpoints.activate(ROOM_5_FINAL_CHECKPOINT_ID));
+    this.onEntered(this.roomTwoCheckpointTrigger, () => {
+      this.checkpoints.activate(ROOM_2_CHECKPOINT_ID);
+      this.setActiveRoom(2);
+    });
+    this.onEntered(this.scene.roomThree.checkpointTrigger, () => {
+      this.checkpoints.activate(ROOM_3_CHECKPOINT_ID);
+      this.setActiveRoom(3);
+    });
+    this.onEntered(this.scene.roomFour.checkpointTrigger, () => {
+      this.checkpoints.activate(ROOM_4_CHECKPOINT_ID);
+      this.setActiveRoom(4);
+    });
+    this.onEntered(this.scene.roomFive.entryCheckpointTrigger, () => {
+      this.activateRoomFiveEntryCheckpoint();
+    });
 
     this.onEntered(this.scene.roomThree.failureVolume, () =>
       this.requestFailure('room-3:fall'));
@@ -248,6 +287,20 @@ export class ContainmentLevelController {
     this.unsubscribeCallbacks.push(
       volume.trigger.events.on('entered', callback),
     );
+  }
+
+  private activateRoomFiveEntryCheckpoint(): void {
+    this.checkpoints.activate(ROOM_5_ENTRY_CHECKPOINT_ID);
+    this.setActiveRoom(5);
+  }
+
+  private setActiveRoom(roomId: ContainmentRoomId, force = false): void {
+    if (!force && this.activeRoomIdValue === roomId) return;
+    this.activeRoomIdValue = roomId;
+    this.events.emit('objectiveChanged', {
+      roomId,
+      objective: CONTAINMENT_ROOM_OBJECTIVES[roomId],
+    });
   }
 
   private requestFailure(failureId: string): boolean {

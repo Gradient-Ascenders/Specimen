@@ -69,3 +69,59 @@ test('default authored solids block both movement and camera queries', () => {
 
   solid.geometry.dispose();
 });
+
+test('vertical-side panels block only broad faces without creating movement caps or thin edges', () => {
+  const world = new CollisionWorld();
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.022));
+  wall.name = 'thin-sticky-wall';
+  wall.position.set(0, 2, 0);
+  wall.userData.movementFaceMode = 'vertical-sides';
+  world.register(wall);
+  const hit = new CollisionHit();
+
+  assert.equal(
+    world.sweepSphere(
+      new THREE.Vector3(0, 5, 0),
+      new THREE.Vector3(0, -5, 0),
+      0.45,
+      hit,
+      CollisionLayer.Movement,
+    ),
+    false,
+  );
+  assert.equal(
+    world.sweepSphere(
+      new THREE.Vector3(0, 2, 2),
+      new THREE.Vector3(0, 0, -4),
+      0.45,
+      hit,
+      CollisionLayer.Movement,
+    ),
+    true,
+  );
+  assert.equal(hit.object?.name, 'thin-sticky-wall');
+  assert.equal(
+    world.sweepSphere(
+      new THREE.Vector3(3, 2, 0),
+      new THREE.Vector3(-4, 0, 0),
+      0.45,
+      hit,
+      CollisionLayer.Movement,
+    ),
+    false,
+  );
+
+  // Rendering still treats the complete visible panel as an obstruction.
+  assert.equal(
+    world.sweepSphere(
+      new THREE.Vector3(0, 5, 0),
+      new THREE.Vector3(0, -5, 0),
+      0.22,
+      hit,
+      CollisionLayer.CameraObstruction,
+    ),
+    true,
+  );
+
+  wall.geometry.dispose();
+});

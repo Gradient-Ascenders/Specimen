@@ -196,6 +196,19 @@ export class CollisionWorld {
         .applyMatrix3(collider.normalMatrix)
         .normalize();
 
+      // Thin vertical panels still have mathematical caps and narrow edge
+      // strips. An authored side-only panel must expose only its two broad
+      // faces to movement, otherwise Bob can stand on a cap or attach to one
+      // of the almost invisible edges. Camera obstruction deliberately keeps
+      // the complete visual box.
+      if (
+        (queryMask & CollisionLayer.Movement) !== 0 &&
+        mesh.userData.movementFaceMode === 'vertical-sides' &&
+        !this.isBroadVerticalPanelFace(collider)
+      ) {
+        continue;
+      }
+
       closestFraction = fraction;
       closestCollider = collider;
       outHit.normal.copy(this.candidateNormalWorld);
@@ -208,6 +221,25 @@ export class CollisionWorld {
     outHit.distance = displacementLength * outHit.fraction;
     outHit.point.copy(origin).addScaledVector(displacement, outHit.fraction);
     return true;
+  }
+
+  private isBroadVerticalPanelFace(collider: RegisteredCollider): boolean {
+    if (Math.abs(this.candidateNormalWorld.y) > 0.5) return false;
+
+    const bounds = collider.localBounds;
+    const sizeX = bounds.max.x - bounds.min.x;
+    const sizeY = bounds.max.y - bounds.min.y;
+    const sizeZ = bounds.max.z - bounds.min.z;
+    const thinnestAxis =
+      sizeX <= sizeY && sizeX <= sizeZ
+        ? 'x'
+        : sizeY <= sizeZ
+          ? 'y'
+          : 'z';
+
+    if (thinnestAxis === 'x') return Math.abs(this.candidateNormalLocal.x) > 0.5;
+    if (thinnestAxis === 'y') return Math.abs(this.candidateNormalLocal.y) > 0.5;
+    return Math.abs(this.candidateNormalLocal.z) > 0.5;
   }
 
   private validateLayerMask(layerMask: number): void {

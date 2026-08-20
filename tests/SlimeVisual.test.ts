@@ -29,6 +29,23 @@ function createState(): SlimeVisualState {
   };
 }
 
+test('camera proximity can fade the slime without hiding it abruptly', () => {
+  const visual = new SlimeVisual({ radiusMetres: 0.45 });
+
+  visual.setOpacity(0.4);
+  assert.equal(visual.mesh.material.transparent, true);
+  assert.equal(visual.mesh.material.opacity, 0.4);
+
+  visual.setOpacity(2);
+  assert.equal(visual.mesh.material.opacity, 1);
+  visual.setOpacity(-1);
+  assert.equal(visual.mesh.material.opacity, 0);
+  visual.reset();
+  assert.equal(visual.mesh.material.opacity, 1);
+
+  visual.dispose();
+});
+
 test('directional deformation is independent of render presentations between fixed steps', () => {
   const frequentPresentation = new SlimeVisual({ radiusMetres: 0.45 });
   const sparsePresentation = new SlimeVisual({ radiusMetres: 0.45 });

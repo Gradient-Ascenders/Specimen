@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
-import type { Input } from '../core/Input.ts';
+import type { Input, InputAction } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
-import { GreyboxTestPanel } from '../debug/GreyboxTestPanel.ts';
-import { runWallJumpBasisRegression } from '../debug/WallJumpBasisRegression.ts';
+import {
+  GreyboxTestPanel,
+  type DebugRoomId,
+} from '../debug/GreyboxTestPanel.ts';
 import { CollisionWorld } from '../physics/CollisionWorld.ts';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
@@ -13,8 +15,8 @@ import {
 } from '../physics/KinematicBody.ts';
 import type { MovementEvents } from '../physics/MovementEvents.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
-import type { WallJumpIntent } from '../physics/WallJumpBasis.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
+import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
 import {
@@ -22,7 +24,10 @@ import {
   type DeathRecoveryAction,
 } from '../systems/DeathSequence.ts';
 import { DeathScreen } from '../ui/DeathScreen.ts';
-import { ContainmentLevelController } from './ContainmentLevelController.ts';
+import {
+  ContainmentLevelController,
+  type ContainmentObjectiveChangedEvent,
+} from './ContainmentLevelController.ts';
 import {
   ContainmentLevelScene,
   type ContainmentHazardFailure,
@@ -38,6 +43,20 @@ const PLAYER_OUT_OF_BOUNDS_Y_METRES = -4;
 const SLOPE_REGRESSION_DURATION_SECONDS = 10;
 const SLOPE_REGRESSION_FIXED_DELTA_SECONDS = 1 / 60;
 const SLOPE_REGRESSION_MAX_TANGENT_DRIFT_METRES = 0.02;
+const ROOM_ONE_INITIAL_CAMERA_YAW_RADIANS = Math.PI;
+const VENT_CAMERA_DISTANCE_SCALE = 0.55;
+const CAMERA_FADE_START_DISTANCE_METRES = 1.35;
+const CAMERA_FADE_END_DISTANCE_METRES = 0.55;
+const CAMERA_MINIMUM_TARGET_OPACITY = 0.25;
+const DEBUG_ROOM_TELEPORT_ACTIONS: ReadonlyArray<
+  readonly [InputAction, DebugRoomId]
+> = [
+  ['debugTeleportRoomOne', 1],
+  ['debugTeleportRoomTwo', 2],
+  ['debugTeleportRoomThree', 3],
+  ['debugTeleportRoomFour', 4],
+  ['debugTeleportRoomFive', 5],
+];
 
 export interface GreyboxLevelRuntimeOptions {
   host: HTMLElement;
@@ -45,6 +64,10 @@ export interface GreyboxLevelRuntimeOptions {
   renderLayer: RenderLayer;
   window?: Window;
   debugAvailable?: boolean;
+}
+
+export interface GreyboxLevelRuntimeEvents {
+  objectiveChanged: ContainmentObjectiveChangedEvent;
 }
 
 interface GreyboxRuntimeResources {
@@ -64,15 +87,17 @@ interface GreyboxRuntimeResources {
   readonly deathScreen: DeathScreen;
   readonly slimeVisualState: SlimeVisualState;
   readonly jumpInputState: JumpInputState;
-  readonly wallJumpIntent: WallJumpIntent;
   readonly unsubscribeLanding: () => void;
   readonly unsubscribeJumped: () => void;
+  readonly unsubscribeObjectiveChanged: () => void;
   readonly unsubscribeLevelCompleted: () => void;
   readonly testPanel: GreyboxTestPanel | undefined;
 }
 
 /** Concrete lifecycle and resource owner for the current Level 1 teaching grey-box. */
 export class GreyboxLevelRuntime {
+  readonly events = new EventBus<GreyboxLevelRuntimeEvents>();
+
   private readonly host: HTMLElement;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
@@ -87,8 +112,6 @@ export class GreyboxLevelRuntime {
   private debugVisible = false;
   private debugInteractionEnabled = true;
   private slopeRegressionStatus = 'not run';
-  private readonly wallJumpBasisRegressionStatus =
-    runWallJumpBasisRegression();
 
   constructor(options: GreyboxLevelRuntimeOptions) {
     this.host = options.host;
@@ -143,6 +166,7 @@ export class GreyboxLevelRuntime {
 
   dispose(): void {
     this.lifecycle.dispose();
+    this.events.clear();
   }
 
   fixedUpdate(deltaSeconds: number): void {
@@ -157,7 +181,6 @@ export class GreyboxLevelRuntime {
       slimeVisualState,
       testPanel,
       testScene,
-      wallJumpIntent,
     } = resources;
 
     if (!deathSequence.isPlaying) {
@@ -180,6 +203,16 @@ export class GreyboxLevelRuntime {
 
     if (this.debugAvailable && this.input.wasPressed('debugReset')) {
       this.restartLevel();
+      return;
+    }
+    const requestedDebugRoom =
+      this.debugAvailable && testPanel
+        ? DEBUG_ROOM_TELEPORT_ACTIONS.find(([action]) =>
+            this.input.wasPressed(action))?.[1]
+        : undefined;
+    if (requestedDebugRoom !== undefined && testPanel) {
+      testPanel.teleportRoom(requestedDebugRoom);
+      this.input.endFixedUpdate();
       return;
     }
     if (
@@ -207,7 +240,7 @@ export class GreyboxLevelRuntime {
     );
     this.renderLayer.cameraRig.applyQueuedLookInput();
 
-    if (body.attached) {
+    if (body.usingSurfaceGravity) {
       this.renderLayer.cameraRig.copySurfaceMovementDirection(
         moveX,
         moveZ,
@@ -226,14 +259,10 @@ export class GreyboxLevelRuntime {
     jumpInputState.held = this.input.isDown('jump');
     jumpInputState.released = this.input.wasReleased('jump');
     jumpInputState.cancelled = this.input.wasClearedSinceFixedUpdate;
-    wallJumpIntent.lateral = moveX;
-    wallJumpIntent.vertical = -moveZ;
-
     body.update(
       deltaSeconds,
       cameraRelativeMovement,
       jumpInputState,
-      wallJumpIntent,
     );
 
     if (body.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
@@ -282,6 +311,7 @@ export class GreyboxLevelRuntime {
       renderedProbePosition,
       testScene,
     } = resources;
+    let cameraDistanceScale = 1;
     if (deathSequence.isPlaying) {
       const previous = body.previousPosition;
       const current = body.position;
@@ -294,15 +324,31 @@ export class GreyboxLevelRuntime {
       testScene.setProbePosition(renderedProbePosition);
       testScene.setProbeYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
       testScene.presentProbe();
+      if (testScene.isInsideCameraTightVent(renderedProbePosition)) {
+        cameraDistanceScale = VENT_CAMERA_DISTANCE_SCALE;
+      }
       this.renderLayer.cameraRig.queueLookInput(
         this.input.pointerDeltaX,
         this.input.pointerDeltaY,
       );
     }
     this.input.endPointerUpdate();
+    this.renderLayer.cameraRig.setFollowDistanceScale(cameraDistanceScale);
     this.renderLayer.cameraRig.update(
       interpolationAlpha,
       stats.frameDeltaSeconds,
+    );
+    const cameraDistanceMetres =
+      this.renderLayer.cameraRig.getDiagnostics().currentDistanceMetres;
+    testScene.setProbeOpacity(
+      deathSequence.isPlaying
+        ? resolveCameraTargetOpacity(
+            cameraDistanceMetres,
+            CAMERA_FADE_START_DISTANCE_METRES,
+            CAMERA_FADE_END_DISTANCE_METRES,
+            CAMERA_MINIMUM_TARGET_OPACITY,
+          )
+        : 1,
     );
     this.renderLayer.render();
 
@@ -343,6 +389,9 @@ export class GreyboxLevelRuntime {
       events: movementEvents,
     });
     this.renderLayer.cameraRig.setFollowTarget(body, collisionWorld);
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians(
+      ROOM_ONE_INITIAL_CAMERA_YAW_RADIANS,
+    );
     const deathSequence = new DeathSequence();
     containmentLevel = new ContainmentLevelController({
       scene: testScene,
@@ -397,6 +446,11 @@ export class GreyboxLevelRuntime {
               this.requireResources(),
             );
           },
+          onTeleportRoom: (roomId) => {
+            containmentLevel.teleportToRoomForDebug(roomId);
+            blobFacing.reset();
+            testScene.setProbePosition(body.position);
+          },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
         })
       : undefined;
@@ -413,6 +467,10 @@ export class GreyboxLevelRuntime {
       () => {
         this.host.dataset.gameState = 'level-complete';
       },
+    );
+    const unsubscribeObjectiveChanged = containmentLevel.events.on(
+      'objectiveChanged',
+      (event) => this.events.emit('objectiveChanged', event),
     );
 
     if (testPanel) {
@@ -445,12 +503,16 @@ export class GreyboxLevelRuntime {
         released: false,
         cancelled: false,
       },
-      wallJumpIntent: { lateral: 0, vertical: 0 },
       unsubscribeLanding,
       unsubscribeJumped,
+      unsubscribeObjectiveChanged,
       unsubscribeLevelCompleted,
       testPanel,
     };
+    this.events.emit('objectiveChanged', {
+      roomId: containmentLevel.activeRoomId,
+      objective: containmentLevel.currentObjective,
+    });
   };
 
   private readonly startResources = (): void => {
@@ -475,12 +537,13 @@ export class GreyboxLevelRuntime {
     resources.testScene.resetProbe();
     resources.blobFacing.reset();
     this.renderLayer.cameraRig.reset();
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians(
+      ROOM_ONE_INITIAL_CAMERA_YAW_RADIANS,
+    );
     resources.jumpInputState.pressed = false;
     resources.jumpInputState.held = false;
     resources.jumpInputState.released = false;
     resources.jumpInputState.cancelled = false;
-    resources.wallJumpIntent.lateral = 0;
-    resources.wallJumpIntent.vertical = 0;
 
     this.landingEventCount = 0;
     this.lastLandingImpactSpeedMetresPerSecond = 0;
@@ -501,6 +564,7 @@ export class GreyboxLevelRuntime {
     resources.testPanel?.element.remove();
     resources.unsubscribeLanding();
     resources.unsubscribeJumped();
+    resources.unsubscribeObjectiveChanged();
     resources.unsubscribeLevelCompleted();
     resources.movementEvents.clear();
     resources.containmentLevel.dispose();
@@ -704,6 +768,7 @@ export class GreyboxLevelRuntime {
         `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
         `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
         `grounded / attached: ${body.grounded ? 'yes' : 'no'} / ${body.attached ? 'yes' : 'no'}`,
+        `surface gravity / sticky-jump remaining: ${body.usingSurfaceGravity ? 'yes' : 'no'} / ${body.stickyJumpGravityRemainingSeconds.toFixed(2)} s`,
         `ground normal: ${groundNormal.x.toFixed(2)}, ${groundNormal.y.toFixed(2)}, ${groundNormal.z.toFixed(2)}`,
         `gameplay up: ${body.gameplayUp.x.toFixed(2)}, ${body.gameplayUp.y.toFixed(2)}, ${body.gameplayUp.z.toFixed(2)}`,
         `surface / last contact: ${body.supportSurfaceTag} / ${body.lastContactSurfaceTag}`,
@@ -733,7 +798,6 @@ export class GreyboxLevelRuntime {
         `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
         `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
         `teaching-surface regression: ${this.slopeRegressionStatus}`,
-        `wall jump basis regression: ${this.wallJumpBasisRegressionStatus}`,
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
         `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
