@@ -89,6 +89,22 @@ export function runTwoBodySwitchingRegression(): string {
       'Switching rewrote the inactive airborne Bob position.',
     );
 
+    // Exact review regression: switch away from the initial Bob owner, then
+    // restore the retained initial recovery state. The active identity must
+    // return to Bob; runtime camera handoff is verified manually against this.
+    pair.restoreInitialState();
+    assert(pair.activeSlimeId === 'bob', 'Initial state did not restore Bob.');
+    assert(pair.switchActive(), 'Could not switch to Goop before recovery.');
+    assert(
+      pair.activeSlimeId === 'goop',
+      'Goop was not active before retained recovery.',
+    );
+    pair.restoreRecoveryState();
+    assert(
+      pair.activeSlimeId === 'bob',
+      'Switch -> recovery did not restore Bob as active.',
+    );
+
     // Two-body checkpoint/restoration restores both positions and active owner.
     pair.setRecoveryState({
       bobPosition: new THREE.Vector3(1, 0.45, 2),
@@ -120,6 +136,7 @@ export function runTwoBodySwitchingRegression(): string {
       '1 active controller',
       'inactive plate occupancy retained',
       'airborne state retained',
+      'switch/recovery active owner matched',
       'two-body recovery matched',
     ].join(' — ');
   } catch (error) {

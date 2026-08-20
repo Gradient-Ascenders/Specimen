@@ -105,6 +105,8 @@ export class GreyboxLevelRuntime {
   private debugVisible = false;
   private debugInteractionEnabled = true;
   private slopeRegressionStatus = 'not run';
+  private cameraFollowSlimeId: 'bob' | 'goop' | undefined;
+  private lastDeathSlimeId: 'bob' | 'goop' | undefined;
   private readonly wallJumpBasisRegressionStatus =
     runWallJumpBasisRegression();
   private readonly twoBodySwitchingRegressionStatus =
@@ -460,6 +462,7 @@ export class GreyboxLevelRuntime {
       slimePair.activeBody,
       collisionWorld,
     );
+    this.cameraFollowSlimeId = slimePair.activeSlimeId;
     const deathSequence = new DeathSequence();
 
     const slimeVisualState: SlimeVisualState = {
@@ -585,10 +588,7 @@ export class GreyboxLevelRuntime {
     resources.testScene.resetProbe();
     resources.blobFacing.reset();
     this.renderLayer.cameraRig.reset();
-    this.renderLayer.cameraRig.setFollowTarget(
-      resources.slimePair.activeBody,
-      resources.collisionWorld,
-    );
+    this.retargetCameraToActiveSlime(resources);
     resources.jumpInputState.pressed = false;
     resources.jumpInputState.held = false;
     resources.jumpInputState.released = false;
@@ -632,6 +632,8 @@ export class GreyboxLevelRuntime {
     this.debugSampleElapsedSeconds = 0;
     this.landingEventCount = 0;
     this.lastLandingImpactSpeedMetresPerSecond = 0;
+    this.cameraFollowSlimeId = undefined;
+    this.lastDeathSlimeId = undefined;
   };
 
 
@@ -652,22 +654,34 @@ export class GreyboxLevelRuntime {
     resources.wallJumpIntent.vertical = 0;
     resources.cameraRelativeMovement.set(0, 0, 0);
 
+    this.retargetCameraToActiveSlime(resources);
+    return true;
+  }
+
+  private retargetCameraToActiveSlime(
+    resources: GreyboxRuntimeResources,
+  ): void {
     this.renderLayer.cameraRig.setFollowTarget(
       resources.slimePair.activeBody,
       resources.collisionWorld,
     );
-    return true;
+    this.cameraFollowSlimeId = resources.slimePair.activeSlimeId;
   }
 
   private requestPlayerDeath(
     recovery: DeathRecoveryAction,
     resources: GreyboxRuntimeResources,
   ): boolean {
+    const dyingSlimeId = resources.slimePair.activeSlimeId;
+    const dyingBody = resources.slimePair.activeBody;
+
     if (!resources.deathSequence.requestDeath(recovery)) return false;
-    if (!resources.testScene.startDeath(resources.body.position)) {
+    if (!resources.testScene.startDeath(dyingBody.position)) {
       resources.deathSequence.reset();
       return false;
     }
+
+    this.lastDeathSlimeId = dyingSlimeId;
 
     this.input.setEnabled(false);
     this.input.releasePointerLock();
@@ -680,6 +694,13 @@ export class GreyboxLevelRuntime {
     if (!resources.deathSequence.canRetry) return;
     if (!resources.deathSequence.completeRetry()) return;
 
+    // completeRetry() executes the retained two-body recovery action, which can
+    // restore a different active slime than the one that died. Camera ownership
+    // must follow that restored active identity before gameplay resumes.
+    this.retargetCameraToActiveSlime(resources);
+
+    // The teaching scene owns Bob's legacy visual; the two-body presentation
+    // owns Goop. Restore that scene-owned visual to Bob's authoritative body.
     resources.testScene.finishDeath(resources.body.position);
     resources.deathScreen.hide();
     this.input.setEnabled(true);
@@ -849,6 +870,8 @@ export class GreyboxLevelRuntime {
         `deaths / retries: ${deathStats.acceptedDeathCount} / ${deathStats.completedRetryCount}`,
         `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
         `active slime: ${slimeManager.activeDefinition?.displayName ?? 'none'} (${slimeManagerStats.activeSlimeId ?? 'none'})`,
+        `camera follow slime: ${this.cameraFollowSlimeId ?? 'none'}`,
+        `last death slime: ${this.lastDeathSlimeId ?? 'none'}`,
         `switch action / count: Tab / ${slimePair.switchCount}`,
         `Bob position: ${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)}, ${body.position.z.toFixed(2)} m`,
         `Goop position: ${goopBody.position.x.toFixed(2)}, ${goopBody.position.y.toFixed(2)}, ${goopBody.position.z.toFixed(2)} m`,

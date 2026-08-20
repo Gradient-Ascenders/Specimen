@@ -174,3 +174,62 @@ Not implemented here:
 - networking;
 - split screen;
 - final Cultivation placement/art.
+
+
+## Death/retry active-owner handoff
+
+Death presentation and retry now use the same active-body ownership contract as
+switching.
+
+At failure:
+
+```text
+active slime
+   ↓
+requestPlayerDeath()
+   ↓
+death burst starts at activeBody.position
+```
+
+At Retry:
+
+```text
+DeathSequence.completeRetry()
+   ↓
+retained PersistentSlimePair recovery executes
+   ↓
+active identity may change
+   ↓
+CameraRig retargets to slimePair.activeBody
+   ↓
+gameplay/input resumes
+```
+
+This matters for the exact case where Goop is active at death but the retained
+recovery state restores Bob as the active controller.
+
+F2 diagnostics expose:
+
+```text
+camera follow slime: bob|goop
+last death slime: bob|goop
+```
+
+### Required review evidence
+
+In addition to the automated **Check two-body switching** regression, manually
+capture:
+
+1. switch from Bob to Goop;
+2. separate Goop from Bob so the positions are visually distinct;
+3. trigger death while Goop is active;
+4. verify the burst begins at Goop's position;
+5. press Retry;
+6. verify the retained recovery restores Bob active;
+7. verify `camera follow slime: bob` and the camera is actually framing Bob;
+8. move Bob immediately after Retry to prove input and camera ownership agree.
+
+The automated regression also includes the retained
+`Bob -> Goop -> restore recovery -> Bob` active-identity path. Camera retargeting
+remains a runtime/presentation integration check and is therefore verified in
+the browser rather than through a Node-only test dependency.
