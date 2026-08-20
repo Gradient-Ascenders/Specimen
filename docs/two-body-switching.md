@@ -92,6 +92,35 @@ The current development runtime keeps the existing Bob slime visual and adds:
 Final Cultivation art/UI may replace this presentation without owning switching
 or physics state.
 
+## Roster and readability presentation
+
+Issue #29's gameplay HUD is driven by the level-owned `SlimeManager` snapshot;
+it does not keep a second unlock or active-state list. The current playable HUD
+renders Bob and Goop only. Locked future definitions such as Volt remain data
+and are intentionally omitted until a playable runtime body exists.
+
+Each entry uses text and shape as well as colour:
+
+- `ACTIVE — CONTROLLED` with a solid border and square identity badge means the
+  body receiving input and camera ownership.
+- `INACTIVE — AVAILABLE` with a dashed border and round identity badge means
+  `Tab` can transfer control to that body.
+- `LOCKED — UNAVAILABLE` (or `UNAVAILABLE`) with a dotted border and square
+  outline means the definition cannot currently be selected.
+
+After a successful handoff, a live status message names the new active body and
+the body left inactive. The HUD also reports the current pressure-plate
+occupant. If that occupant is inactive, it explicitly says that switching
+keeps the plate active; the message is derived from the existing trigger state
+and does not reveal other puzzle information.
+
+When an inactive Bob or Goop is occluded, a small world-space marker remains
+visible through authored camera-obstruction geometry. The marker contains the
+body's initial (`B` or `G`) and uses a different outline shape. It is hidden for
+the active body, reduced when the body is already visible, clamped in world size
+and opacity by distance, and disposed with the pair presentation. It is a
+player-body locator only, not an objective marker, minimap, or scene X-ray.
+
 ## Pressure-plate occupancy
 
 `BoxTriggerSensor` adapts persistent sphere bodies to the existing

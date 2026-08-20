@@ -31,6 +31,7 @@ const lifecycleCoordinator = new GameFlowLifecycleCoordinator(levelRuntime);
 const gameFlow = new GameFlowUI({
   settings,
   creditsMarkdown,
+  slimeHUD: levelRuntime,
   actions: {
     startGameplay: () => lifecycleCoordinator.startGameplay(),
     stopGameplay: () => lifecycleCoordinator.stopGameplay(),
