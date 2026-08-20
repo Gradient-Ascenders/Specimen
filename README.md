@@ -2,8 +2,8 @@
 
 **specimen** is a single-player 3D puzzle-platformer set in an abandoned biological research facility. The player positions and switches between three slime bodies whose incompatible abilities must be combined to escape.
 
-- **Tack** sticks, climbs, and performs powerful charged bounces.
-- **Etch** dissolves specifically marked geometry.
+- **Bob** sticks, climbs, and performs powerful charged bounces.
+- **Goop** dissolves specifically marked geometry.
 - **Volt** emits light and powers electrical machinery.
 
 Inactive slimes remain in the level, so they can hold pressure plates, complete circuits, or illuminate spaces while another slime is controlled.
