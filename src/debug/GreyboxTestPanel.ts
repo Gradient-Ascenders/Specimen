@@ -2,6 +2,7 @@ interface GreyboxTestPanelOptions {
   onReset: () => void;
   onTestRecovery: () => void;
   onRunSlopeIdleRegression: () => string;
+  onRunSlimeRosterRegression: () => string;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -14,6 +15,7 @@ export class GreyboxTestPanel {
   private readonly fallButton: HTMLButtonElement;
   private readonly collapseButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
+  private readonly slimeRosterRegressionButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -54,6 +56,7 @@ export class GreyboxTestPanel {
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test death <kbd>F</kbd></button>
           <button type="button" data-action="slope-regression">Check Room 1/2 surfaces</button>
+          <button type="button" data-action="slime-roster-regression">Check slime roster</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -77,6 +80,10 @@ export class GreyboxTestPanel {
     const slopeRegressionButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="slope-regression"]',
     );
+    const slimeRosterRegressionButton =
+      this.element.querySelector<HTMLButtonElement>(
+        '[data-action="slime-roster-regression"]',
+      );
 
     if (
       !status ||
@@ -84,7 +91,8 @@ export class GreyboxTestPanel {
       !resetButton ||
       !fallButton ||
       !collapseButton ||
-      !slopeRegressionButton
+      !slopeRegressionButton ||
+      !slimeRosterRegressionButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -95,6 +103,7 @@ export class GreyboxTestPanel {
     this.fallButton = fallButton;
     this.collapseButton = collapseButton;
     this.slopeRegressionButton = slopeRegressionButton;
+    this.slimeRosterRegressionButton = slimeRosterRegressionButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
@@ -102,6 +111,10 @@ export class GreyboxTestPanel {
     this.slopeRegressionButton.addEventListener(
       'click',
       this.runSlopeIdleRegression,
+    );
+    this.slimeRosterRegressionButton.addEventListener(
+      'click',
+      this.runSlimeRosterRegression,
     );
   }
 
@@ -112,6 +125,10 @@ export class GreyboxTestPanel {
     this.slopeRegressionButton.removeEventListener(
       'click',
       this.runSlopeIdleRegression,
+    );
+    this.slimeRosterRegressionButton.removeEventListener(
+      'click',
+      this.runSlimeRosterRegression,
     );
   }
 
@@ -142,6 +159,11 @@ export class GreyboxTestPanel {
   private readonly runSlopeIdleRegression = (): void => {
     const result = this.options.onRunSlopeIdleRegression();
     this.status.textContent = `Teaching surface check: ${result}`;
+  };
+
+  private readonly runSlimeRosterRegression = (): void => {
+    const result = this.options.onRunSlimeRosterRegression();
+    this.status.textContent = `Slime roster: ${result}`;
   };
 
   setRuntimeDiagnostics(text: string): void {
