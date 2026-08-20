@@ -7,6 +7,7 @@ export type SlimeAbility =
   | 'electrical';
 
 export type SlimeBetaAvailability = 'playable' | 'locked';
+export type SlimeJumpMode = 'charged' | 'normal';
 
 export interface SlimeAbilityConfiguration {
   /** May attach to and traverse authored sticky surfaces. */
@@ -28,6 +29,8 @@ export interface SlimeDefinition {
    * A Beta-playable slime may still begin locked so the level can introduce it.
    */
   readonly initiallyUnlocked: boolean;
+  /** Player-facing jump style for this slime identity. */
+  readonly jumpMode: SlimeJumpMode;
   readonly abilities: SlimeAbilityConfiguration;
 }
 
@@ -43,6 +46,7 @@ export const SLIME_DEFINITIONS: readonly SlimeDefinition[] = [
     displayName: 'Bob',
     betaAvailability: 'playable',
     initiallyUnlocked: true,
+    jumpMode: 'charged',
     abilities: {
       adhesion: true,
       rebound: true,
@@ -55,6 +59,7 @@ export const SLIME_DEFINITIONS: readonly SlimeDefinition[] = [
     displayName: 'Goop',
     betaAvailability: 'playable',
     initiallyUnlocked: false,
+    jumpMode: 'normal',
     abilities: {
       adhesion: false,
       rebound: false,
@@ -67,6 +72,7 @@ export const SLIME_DEFINITIONS: readonly SlimeDefinition[] = [
     displayName: 'Volt',
     betaAvailability: 'locked',
     initiallyUnlocked: false,
+    jumpMode: 'normal',
     abilities: {
       adhesion: false,
       rebound: false,

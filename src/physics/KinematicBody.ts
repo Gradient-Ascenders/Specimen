@@ -56,6 +56,16 @@ export interface KinematicBodyConfig {
   minimumGroundNormalDot: number;
   maxCollisionIterations: number;
 
+  /** Whether this body may attach to authored sticky surfaces. */
+  adhesionEnabled: boolean;
+  /** Whether this body may use authored/passive rebound behaviour. */
+  reboundEnabled: boolean;
+  /**
+   * When false, jump presses launch immediately at the minimum jump speed.
+   * When true, the existing hold/release charged-jump behaviour is used.
+   */
+  chargedJumpEnabled: boolean;
+
   minimumJumpSpeedMetresPerSecond: number;
   maximumJumpSpeedMetresPerSecond: number;
   maximumJumpChargeSeconds: number;
@@ -101,6 +111,9 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   groundProbeDistanceMetres: 0.08,
   minimumGroundNormalDot: Math.cos(THREE.MathUtils.degToRad(50)),
   maxCollisionIterations: 3,
+  adhesionEnabled: true,
+  reboundEnabled: true,
+  chargedJumpEnabled: true,
 
   // Jump height scales with launch speed squared. Multiplying the original
   // 4.8-8.8 m/s charge range by sqrt(1.25) raises every charged jump apex by
@@ -618,6 +631,17 @@ export class KinematicBody {
     attachedAtStepStart: boolean,
     movementUpAtStepStart: THREE.Vector3,
   ): void {
+    if (!this.config.chargedJumpEnabled) {
+      // Normal-jump bodies launch on the press edge instead of entering the
+      // charge/hold/release state. Holding Space cannot repeatedly relaunch
+      // because Input emits `pressed` only once per physical press.
+      if (this.chargingJumpValue) this.cancelJumpCharge();
+      if (jumpInput.pressed && this.hasJumpOpportunity()) {
+        this.launchNormalJump();
+      }
+      return;
+    }
+
     if (this.chargingJumpValue) {
       if (!jumpInput.held && !jumpInput.released) {
         this.cancelJumpCharge();
@@ -706,6 +730,12 @@ export class KinematicBody {
       return;
     }
 
+    if (!this.config.chargedJumpEnabled) {
+      this.clearJumpBuffer();
+      this.launchNormalJump();
+      return;
+    }
+
     const launchImmediately =
       this.bufferedJumpReleasedValue || jumpInput.released;
     this.clearJumpBuffer();
@@ -719,6 +749,49 @@ export class KinematicBody {
         this.gameplayUpValue,
       );
     }
+  }
+
+  /**
+   * Immediate non-charged jump used by identities such as Goop.
+   *
+   * It reuses the minimum jump speed as the authored normal-jump strength,
+   * preserves coyote/buffer behaviour, and never enters the charge state.
+   */
+  private launchNormalJump(): void {
+    const jumpSpeed = this.config.minimumJumpSpeedMetresPerSecond;
+    this.launchDirection.copy(this.gameplayUpValue);
+
+    const currentLaunchSpeed =
+      this.velocityValue.dot(this.launchDirection);
+    if (currentLaunchSpeed < jumpSpeed) {
+      this.velocityValue.addScaledVector(
+        this.launchDirection,
+        jumpSpeed - currentLaunchSpeed,
+      );
+    }
+
+    this.lastJumpSpeedValue = jumpSpeed;
+    this.lastJumpChargeFractionValue = 0;
+
+    if (this.attachedValue) {
+      this.detachFromSurface(this.config.attachmentDetachCooldownSeconds);
+    } else {
+      this.groundedValue = false;
+      this.groundNormalValue.copy(WORLD_UP);
+    }
+
+    this.cancelJumpCharge();
+    this.clearJumpBuffer();
+    this.coyoteTimeRemainingSecondsValue = 0;
+    this.groundReacquireDelaySeconds =
+      this.config.jumpGroundDetachSeconds;
+    this.airborneSeconds = 0;
+
+    this.events?.emit('jumped', {
+      speedMetresPerSecond: jumpSpeed,
+      chargeFraction: 0,
+      directionWorld: this.launchDirection,
+    });
   }
 
   private launchChargedJump(
@@ -1030,6 +1103,7 @@ export class KinematicBody {
 
       if (
         allowSurfaceTransitions &&
+        this.config.reboundEnabled &&
         surface.bounceSpeedMetresPerSecond > 0 &&
         this.tryApplyBounce(
           surface.bounceSpeedMetresPerSecond,
@@ -1058,7 +1132,11 @@ export class KinematicBody {
         continue;
       }
 
-      if (allowSurfaceTransitions && surface.adhesive) {
+      if (
+        allowSurfaceTransitions &&
+        this.config.adhesionEnabled &&
+        surface.adhesive
+      ) {
         this.tryAttach(
           this.movementHit.normal,
           this.movementHit.object,
@@ -1126,6 +1204,7 @@ export class KinematicBody {
     surfaceNormal: THREE.Vector3,
     surfaceObject: THREE.Mesh | null,
   ): boolean {
+    if (!this.config.reboundEnabled) return false;
     if (this.bounceCooldownSecondsValue > 0) return false;
     // Deliberate buffered input wins over the slime's passive floor rebound.
     // The collision may then establish support and consume the buffer below;
@@ -1382,7 +1461,7 @@ export class KinematicBody {
     }
 
     const surface = this.surfaces.get(this.edgeHit.object);
-    if (!surface.adhesive) return false;
+    if (!this.config.adhesionEnabled || !surface.adhesive) return false;
 
     const transitionNormal = this.edgeHit.normal;
     if (
@@ -1479,6 +1558,16 @@ export class KinematicBody {
   }
 
   private validateConfig(config: KinematicBodyConfig): void {
+    if (
+      typeof config.adhesionEnabled !== 'boolean' ||
+      typeof config.reboundEnabled !== 'boolean' ||
+      typeof config.chargedJumpEnabled !== 'boolean'
+    ) {
+      throw new Error(
+        'adhesionEnabled, reboundEnabled, and chargedJumpEnabled must be boolean values.',
+      );
+    }
+
     const positiveFinite: ReadonlyArray<[string, number]> = [
       ['radiusMetres', config.radiusMetres],
       ['skinWidthMetres', config.skinWidthMetres],
