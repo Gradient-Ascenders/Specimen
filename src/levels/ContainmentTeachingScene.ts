@@ -138,14 +138,20 @@ export class ContainmentTeachingScene {
   }
 
   isInsideCameraTightVent(position: Vector3State): boolean {
-    return TIGHT_CAMERA_VENT_BOUNDS.some(({ min, max }) =>
-      position.x >= min[0] &&
-      position.x <= max[0] &&
-      position.y >= min[1] &&
-      position.y <= max[1] &&
-      position.z >= min[2] &&
-      position.z <= max[2]
-    );
+    for (let index = 0; index < TIGHT_CAMERA_VENT_BOUNDS.length; index += 1) {
+      const bounds = TIGHT_CAMERA_VENT_BOUNDS[index];
+      if (
+        position.x >= bounds.min[0] &&
+        position.x <= bounds.max[0] &&
+        position.y >= bounds.min[1] &&
+        position.y <= bounds.max[1] &&
+        position.z >= bounds.min[2] &&
+        position.z <= bounds.max[2]
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   presentProbe(): void {

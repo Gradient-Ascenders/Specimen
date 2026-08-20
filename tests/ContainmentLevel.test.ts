@@ -654,8 +654,17 @@ test('elevator stopping activates the Room 5 entry checkpoint before the player 
   assert.equal(controller.activeCheckpointId, 'containment-room-5-entry');
   assert.equal(controller.activeRoomId, 5);
 
-  // Falling back down the shaft now recovers at Room 5 without resetting the
-  // completed Room 4 elevator to the bottom.
+  // A normal descent first exits and then re-enters the old Room 4 checkpoint
+  // trigger. Forward-only progression must keep Room 5 authoritative.
+  controller.update(0.01);
+  fakeBody.position.copy(scene.roomFour.checkpointTrigger.centre);
+  controller.update(0.01);
+  assert.equal(controller.activeCheckpointId, 'containment-room-5-entry');
+  assert.equal(controller.activeRoomId, 5);
+  assert.equal(death.state, 'playing');
+
+  // Continuing into the shaft failure volume recovers at Room 5 without
+  // resetting the completed Room 4 elevator to the bottom.
   fakeBody.position.set(9, 22, 85.5);
   fakeBody.grounded = false;
   fakeBody.supportCollider = null;

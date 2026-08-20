@@ -19,7 +19,9 @@ The implementation adds automated coverage for:
 - Room 4 death recovery restoring elevator pose, timers and the roof checkpoint;
 - inactive persistent slimes remaining attached to Room 4 and Room 5 carriers;
 - Room 5 retaining its authored starting phase regardless of time spent in
-  earlier rooms.
+  earlier rooms;
+- forward-only checkpoint ownership when falling from Room 5 through the
+  completed elevator shaft.
 
 ## Manual capture required for review
 

@@ -413,6 +413,11 @@ export class CameraRig {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Allocation-free distance read for per-frame presentation decisions. */
+  get currentFollowDistanceMetres(): number {
+    return this.currentDistanceMetres;
+  }
+
   getDiagnostics(): CameraRigDiagnostics {
     return {
       currentDistanceMetres: this.currentDistanceMetres,

@@ -453,7 +453,7 @@ export class GreyboxLevelRuntime {
       stats.frameDeltaSeconds,
     );
     const cameraDistanceMetres =
-      this.renderLayer.cameraRig.getDiagnostics().currentDistanceMetres;
+      this.renderLayer.cameraRig.currentFollowDistanceMetres;
     testScene.setProbeOpacity(
       deathSequence.isPlaying && slimePair.activeSlimeId === 'bob'
         ? resolveCameraTargetOpacity(

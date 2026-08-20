@@ -319,16 +319,13 @@ export class ContainmentLevelController {
 
   private subscribeToTriggers(): void {
     this.onEntered(this.roomTwoCheckpointTrigger, () => {
-      this.checkpoints.activate(ROOM_2_CHECKPOINT_ID);
-      this.setActiveRoom(2);
+      this.activateCheckpointForProgression(2, ROOM_2_CHECKPOINT_ID);
     });
     this.onEntered(this.scene.roomThree.checkpointTrigger, () => {
-      this.checkpoints.activate(ROOM_3_CHECKPOINT_ID);
-      this.setActiveRoom(3);
+      this.activateCheckpointForProgression(3, ROOM_3_CHECKPOINT_ID);
     });
     this.onEntered(this.scene.roomFour.checkpointTrigger, () => {
-      this.checkpoints.activate(ROOM_4_CHECKPOINT_ID);
-      this.setActiveRoom(4);
+      this.activateCheckpointForProgression(4, ROOM_4_CHECKPOINT_ID);
     });
     this.onEntered(this.scene.roomFive.entryCheckpointTrigger, () => {
       this.activateRoomFiveEntryCheckpoint();
@@ -349,8 +346,16 @@ export class ContainmentLevelController {
   }
 
   private activateRoomFiveEntryCheckpoint(): void {
-    this.checkpoints.activate(ROOM_5_ENTRY_CHECKPOINT_ID);
-    this.setActiveRoom(5);
+    this.activateCheckpointForProgression(5, ROOM_5_ENTRY_CHECKPOINT_ID);
+  }
+
+  private activateCheckpointForProgression(
+    roomId: ContainmentRoomId,
+    checkpointId: string,
+  ): void {
+    if (roomId <= this.activeRoomIdValue) return;
+    this.checkpoints.activate(checkpointId);
+    this.setActiveRoom(roomId);
   }
 
   private setActiveRoom(roomId: ContainmentRoomId, force = false): void {

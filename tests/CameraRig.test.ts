@@ -358,6 +358,7 @@ test('tight-space scaling shortens the boom without replacing the player distanc
   rig.update(1, 1 / 60);
   assert.equal(rig.getDiagnostics().desiredDistanceMetres, 3.5);
   assert.equal(rig.getDiagnostics().currentDistanceMetres, 3.5);
+  assert.equal(rig.currentFollowDistanceMetres, 3.5);
 
   rig.setFollowDistanceScale(1);
   for (let step = 0; step < 300; step += 1) rig.update(1, 1 / 60);
