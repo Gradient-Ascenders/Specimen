@@ -173,6 +173,10 @@ export class SlimeVisual {
     this.material.setBaseColour(colour);
   }
 
+  setOpacity(opacity: number): void {
+    this.material.setOpacity(opacity);
+  }
+
   update(deltaSeconds: number, state: SlimeVisualState): void {
     this.material.update(deltaSeconds);
     this.updateWorldBasis(state);
@@ -266,6 +270,7 @@ export class SlimeVisual {
   }
 
   reset(): void {
+    this.material.setOpacity(1);
     this.worldVelocity.set(0, 0, 0);
     this.previousWorldVelocity.set(0, 0, 0);
     this.tangentialVelocity.set(0, 0, 0);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-import type { LaserHazard } from '../../hazards/LaserHazard';
+import type { LaserHazard } from '../../hazards/LaserHazard.ts';
 
 const SEGMENT_EPSILON_SQ = 1e-12;
 const UP_AXIS = new THREE.Vector3(0, 1, 0);

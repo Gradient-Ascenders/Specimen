@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { EventBus } from '../core/EventBus';
+import { EventBus } from '../core/EventBus.ts';
 
 const PROGRESS_EPSILON = 1e-10;
 
@@ -23,6 +23,10 @@ export interface MovingPlatformOptions {
   readonly end: THREE.Vector3;
   readonly size?: THREE.Vector3;
   readonly travelDurationSeconds?: number;
+  /** Authored starting point along the route in [0, 1]. */
+  readonly initialProgress?: number;
+  /** Direction the platform travels after construction and reset. */
+  readonly initialTarget?: 'start' | 'end';
 }
 
 /**
@@ -45,6 +49,8 @@ export class MovingPlatform {
   private readonly endValue: THREE.Vector3;
   private readonly sizeValue: THREE.Vector3;
   private readonly travelDurationSecondsValue: number;
+  private readonly initialProgressValue: number;
+  private readonly initialTargetEnd: boolean;
   private readonly previousPosition = new THREE.Vector3();
   private progressValue = 0;
   private targetEnd = false;
@@ -56,12 +62,21 @@ export class MovingPlatform {
     this.endValue = options.end.clone();
     this.travelDurationSecondsValue =
       options.travelDurationSeconds ?? 2.5;
+    this.initialProgressValue = options.initialProgress ?? 0;
+    this.initialTargetEnd = options.initialTarget === 'end';
 
     if (
       !Number.isFinite(this.travelDurationSecondsValue) ||
       this.travelDurationSecondsValue <= 0
     ) {
       throw new Error('Platform travel duration must be positive.');
+    }
+    if (
+      !Number.isFinite(this.initialProgressValue) ||
+      this.initialProgressValue < 0 ||
+      this.initialProgressValue > 1
+    ) {
+      throw new Error('Platform initial progress must be between 0 and 1.');
     }
 
     this.sizeValue =
@@ -95,7 +110,15 @@ export class MovingPlatform {
     this.collisionMesh.userData.surfaceTag = 'default';
     this.collisionMesh.userData.movingPlatformId = options.id;
     this.root.add(this.collisionMesh);
-    this.root.position.copy(this.startValue);
+    this.progressValue = this.initialProgressValue;
+    this.targetEnd = this.initialTargetEnd;
+    this.root.position.lerpVectors(
+      this.startValue,
+      this.endValue,
+      this.progressValue,
+    );
+    this.previousPosition.copy(this.root.position);
+    this.state = this.resolveState();
   }
 
   get platformState(): MovingPlatformState {
@@ -175,12 +198,16 @@ export class MovingPlatform {
   }
 
   reset(): void {
-    this.targetEnd = false;
-    this.progressValue = 0;
-    this.root.position.copy(this.startValue);
-    this.previousPosition.copy(this.startValue);
+    this.targetEnd = this.initialTargetEnd;
+    this.progressValue = this.initialProgressValue;
+    this.root.position.lerpVectors(
+      this.startValue,
+      this.endValue,
+      this.progressValue,
+    );
+    this.previousPosition.copy(this.root.position);
     this.displacement.set(0, 0, 0);
-    this.setState('atStart');
+    this.setState(this.resolveState());
   }
 
   dispose(): void {
@@ -211,5 +238,15 @@ export class MovingPlatform {
     if (this.state === state) return;
     this.state = state;
     this.events.emit('stateChanged', { platform: this, state });
+  }
+
+  private resolveState(): MovingPlatformState {
+    if (this.progressValue <= PROGRESS_EPSILON && !this.targetEnd) {
+      return 'atStart';
+    }
+    if (this.progressValue >= 1 - PROGRESS_EPSILON && this.targetEnd) {
+      return 'atEnd';
+    }
+    return this.targetEnd ? 'movingToEnd' : 'movingToStart';
   }
 }

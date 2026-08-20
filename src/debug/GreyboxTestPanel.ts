@@ -1,6 +1,9 @@
+export type DebugRoomId = 1 | 2 | 3 | 4 | 5;
+
 interface GreyboxTestPanelOptions {
   onReset: () => void;
   onTestRecovery: () => void;
+  onTeleportRoom: (roomId: DebugRoomId) => void;
   onRunSlopeIdleRegression: () => string;
   onRunSlimeRosterRegression: () => string;
   onRunTwoBodySwitchingRegression: () => string;
@@ -15,6 +18,7 @@ export class GreyboxTestPanel {
   private readonly runtimeStatus: HTMLElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly fallButton: HTMLButtonElement;
+  private readonly roomButtons: readonly HTMLButtonElement[];
   private readonly collapseButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
   private readonly slimeRosterRegressionButton: HTMLButtonElement;
@@ -59,6 +63,11 @@ export class GreyboxTestPanel {
         <div class="controls">
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test death <kbd>F</kbd></button>
+          <button type="button" data-action="room-teleport" data-room-id="1">Room 1 <kbd>1</kbd></button>
+          <button type="button" data-action="room-teleport" data-room-id="2">Room 2 <kbd>2</kbd></button>
+          <button type="button" data-action="room-teleport" data-room-id="3">Room 3 <kbd>3</kbd></button>
+          <button type="button" data-action="room-teleport" data-room-id="4">Room 4 <kbd>4</kbd></button>
+          <button type="button" data-action="room-teleport" data-room-id="5">Room 5 <kbd>5</kbd></button>
           <button type="button" data-action="slope-regression">Check Room 1/2 surfaces</button>
           <button type="button" data-action="slime-roster-regression">Check slime roster</button>
           <button type="button" data-action="two-body-switching-regression">Check two-body switching</button>
@@ -79,6 +88,11 @@ export class GreyboxTestPanel {
     );
     const fallButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="fall"]',
+    );
+    const roomButtons = Array.from(
+      this.element.querySelectorAll<HTMLButtonElement>(
+        '[data-action="room-teleport"]',
+      ),
     );
     const collapseButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="collapse-panel"]',
@@ -104,6 +118,7 @@ export class GreyboxTestPanel {
       !runtimeStatus ||
       !resetButton ||
       !fallButton ||
+      roomButtons.length !== 5 ||
       !collapseButton ||
       !slopeRegressionButton ||
       !slimeRosterRegressionButton ||
@@ -117,6 +132,7 @@ export class GreyboxTestPanel {
     this.runtimeStatus = runtimeStatus;
     this.resetButton = resetButton;
     this.fallButton = fallButton;
+    this.roomButtons = roomButtons;
     this.collapseButton = collapseButton;
     this.slopeRegressionButton = slopeRegressionButton;
     this.slimeRosterRegressionButton = slimeRosterRegressionButton;
@@ -126,6 +142,9 @@ export class GreyboxTestPanel {
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
+    for (const button of this.roomButtons) {
+      button.addEventListener('click', this.teleportRoomFromButton);
+    }
     this.collapseButton.addEventListener('click', this.toggleCollapsed);
     this.slopeRegressionButton.addEventListener(
       'click',
@@ -148,6 +167,9 @@ export class GreyboxTestPanel {
   dispose(): void {
     this.resetButton.removeEventListener('click', this.resetProbe);
     this.fallButton.removeEventListener('click', this.testRecovery);
+    for (const button of this.roomButtons) {
+      button.removeEventListener('click', this.teleportRoomFromButton);
+    }
     this.collapseButton.removeEventListener('click', this.toggleCollapsed);
     this.slopeRegressionButton.removeEventListener(
       'click',
@@ -176,6 +198,20 @@ export class GreyboxTestPanel {
     this.options.onTestRecovery();
     this.status.textContent =
       'Probe entered the recovery volume. Retry from the death screen.';
+  };
+
+  readonly teleportRoom = (roomId: DebugRoomId): void => {
+    this.options.onTeleportRoom(roomId);
+    this.status.textContent =
+      `Probe teleported to the Room ${roomId} entry checkpoint.`;
+  };
+
+  private readonly teleportRoomFromButton = (event: Event): void => {
+    const roomId = Number(
+      (event.currentTarget as HTMLButtonElement).dataset.roomId,
+    );
+    if (!Number.isInteger(roomId) || roomId < 1 || roomId > 5) return;
+    this.teleportRoom(roomId as DebugRoomId);
   };
 
   private readonly toggleCollapsed = (): void => {

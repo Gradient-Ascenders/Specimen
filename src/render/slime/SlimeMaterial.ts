@@ -24,6 +24,7 @@ interface SlimeUniforms {
   [name: string]: THREE.IUniform;
   uTime: THREE.IUniform<number>;
   uBaseColour: THREE.IUniform<THREE.Color>;
+  uOpacity: THREE.IUniform<number>;
   uWobbleAmplitude: THREE.IUniform<number>;
   uWobbleFrequency: THREE.IUniform<number>;
   uWobbleSpeed: THREE.IUniform<number>;
@@ -100,6 +101,7 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
           options.baseColour ?? DEFAULT_SLIME_BASE_COLOUR,
         ),
       },
+      uOpacity: { value: 1 },
       uWobbleAmplitude: {
         value:
           options.wobbleAmplitudeMetres ??
@@ -145,6 +147,7 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
       uniforms: slimeUniforms,
       vertexShader: slimeVertexShader,
       fragmentShader: slimeFragmentShader,
+      transparent: true,
     });
 
     this.slimeUniforms = slimeUniforms;
@@ -192,5 +195,11 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
   /** Recolour the same material instance for a future slime identity. */
   setBaseColour(colour: THREE.ColorRepresentation): void {
     this.slimeUniforms.uBaseColour.value.set(colour);
+  }
+
+  setOpacity(opacity: number): void {
+    const boundedOpacity = THREE.MathUtils.clamp(opacity, 0, 1);
+    this.opacity = boundedOpacity;
+    this.slimeUniforms.uOpacity.value = boundedOpacity;
   }
 }

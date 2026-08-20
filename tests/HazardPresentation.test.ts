@@ -149,3 +149,58 @@ test('scripted laser presentation stays on authoritative moving endpoints', () =
   presentation.dispose();
   hazard.dispose();
 });
+
+test('translated laser endpoints keep collision and presentation synchronized', () => {
+  const hazard = new LaserHazard({
+    id: 'translated-laser',
+    start: new THREE.Vector3(-2, 1, 0),
+    end: new THREE.Vector3(2, 1, 0),
+  });
+  const presentation = new LaserHazardPresentation([hazard]);
+
+  hazard.setTranslationOffset(new THREE.Vector3(0, 3, 2));
+  presentation.sync();
+  assertVectorClose(
+    new THREE.Vector3(hazard.start.x, hazard.start.y, hazard.start.z),
+    new THREE.Vector3(-2, 4, 2),
+  );
+  assertVectorClose(
+    new THREE.Vector3(hazard.end.x, hazard.end.y, hazard.end.z),
+    new THREE.Vector3(2, 4, 2),
+  );
+  assert.equal(
+    hazard.intersects({
+      position: new THREE.Vector3(0, 4, 2),
+      radiusMetres: 0.45,
+    }),
+    true,
+  );
+  assert.equal(
+    hazard.intersects({
+      position: new THREE.Vector3(0, 1, 0),
+      radiusMetres: 0.45,
+    }),
+    false,
+  );
+
+  const beam = requireObject(
+    presentation.root,
+    'translated-laser-presentation-beam-core',
+  );
+  presentation.root.updateMatrixWorld(true);
+  assertVectorClose(
+    new THREE.Vector3(0, -0.5, 0).applyMatrix4(beam.matrixWorld),
+    new THREE.Vector3(-2, 4, 2),
+  );
+
+  assert.throws(() =>
+    hazard.setTranslationOffset({ x: Number.NaN, y: 0, z: 0 }));
+  hazard.reset();
+  assertVectorClose(
+    new THREE.Vector3(hazard.start.x, hazard.start.y, hazard.start.z),
+    new THREE.Vector3(-2, 1, 0),
+  );
+
+  presentation.dispose();
+  hazard.dispose();
+});

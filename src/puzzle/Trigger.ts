@@ -1,4 +1,4 @@
-import { EventBus } from '../core/EventBus';
+import { EventBus } from '../core/EventBus.ts';
 
 const EMPTY_OCCUPANTS: readonly string[] = [];
 
@@ -23,11 +23,14 @@ export interface TriggerEvents {
  */
 export class Trigger {
   readonly events = new EventBus<TriggerEvents>();
+  readonly id: string;
 
   private readonly occupantIds = new Set<string>();
   private readonly scratchOccupantIds = new Set<string>();
 
-  constructor(readonly id: string) {}
+  constructor(id: string) {
+    this.id = id;
+  }
 
   get occupants(): ReadonlySet<string> {
     return this.occupantIds;
