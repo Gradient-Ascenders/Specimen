@@ -4,6 +4,7 @@ interface GreyboxTestPanelOptions {
   onRunSlopeIdleRegression: () => string;
   onRunSlimeRosterRegression: () => string;
   onRunTwoBodySwitchingRegression: () => string;
+  onRunDissolveRegression: () => string;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -18,6 +19,7 @@ export class GreyboxTestPanel {
   private readonly slopeRegressionButton: HTMLButtonElement;
   private readonly slimeRosterRegressionButton: HTMLButtonElement;
   private readonly twoBodySwitchingRegressionButton: HTMLButtonElement;
+  private readonly dissolveRegressionButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -60,6 +62,7 @@ export class GreyboxTestPanel {
           <button type="button" data-action="slope-regression">Check Room 1/2 surfaces</button>
           <button type="button" data-action="slime-roster-regression">Check slime roster</button>
           <button type="button" data-action="two-body-switching-regression">Check two-body switching</button>
+          <button type="button" data-action="dissolve-regression">Check Goop dissolve</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -91,6 +94,10 @@ export class GreyboxTestPanel {
       this.element.querySelector<HTMLButtonElement>(
         '[data-action="two-body-switching-regression"]',
       );
+    const dissolveRegressionButton =
+      this.element.querySelector<HTMLButtonElement>(
+        '[data-action="dissolve-regression"]',
+      );
 
     if (
       !status ||
@@ -100,7 +107,8 @@ export class GreyboxTestPanel {
       !collapseButton ||
       !slopeRegressionButton ||
       !slimeRosterRegressionButton ||
-      !twoBodySwitchingRegressionButton
+      !twoBodySwitchingRegressionButton ||
+      !dissolveRegressionButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -114,6 +122,7 @@ export class GreyboxTestPanel {
     this.slimeRosterRegressionButton = slimeRosterRegressionButton;
     this.twoBodySwitchingRegressionButton =
       twoBodySwitchingRegressionButton;
+    this.dissolveRegressionButton = dissolveRegressionButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
@@ -129,6 +138,10 @@ export class GreyboxTestPanel {
     this.twoBodySwitchingRegressionButton.addEventListener(
       'click',
       this.runTwoBodySwitchingRegression,
+    );
+    this.dissolveRegressionButton.addEventListener(
+      'click',
+      this.runDissolveRegression,
     );
   }
 
@@ -147,6 +160,10 @@ export class GreyboxTestPanel {
     this.twoBodySwitchingRegressionButton.removeEventListener(
       'click',
       this.runTwoBodySwitchingRegression,
+    );
+    this.dissolveRegressionButton.removeEventListener(
+      'click',
+      this.runDissolveRegression,
     );
   }
 
@@ -187,6 +204,11 @@ export class GreyboxTestPanel {
   private readonly runTwoBodySwitchingRegression = (): void => {
     const result = this.options.onRunTwoBodySwitchingRegression();
     this.status.textContent = `Two-body switching: ${result}`;
+  };
+
+  private readonly runDissolveRegression = (): void => {
+    const result = this.options.onRunDissolveRegression();
+    this.status.textContent = `Goop dissolve: ${result}`;
   };
 
   setRuntimeDiagnostics(text: string): void {
