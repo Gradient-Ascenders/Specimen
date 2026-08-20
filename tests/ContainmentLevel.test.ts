@@ -179,7 +179,9 @@ test('Room 5 Blender layout drives deterministic platforms and translated lasers
   const laserOne = room.lasers.hazards[0];
   const laserFive = room.lasers.hazards[4];
   const laserSeven = room.lasers.hazards[6];
-  room.updateTraversal(1.25, fakeBody as unknown as KinematicBody);
+  room.updateTraversal(1.25, fakeBody as unknown as KinematicBody, [
+    fakeBody as unknown as KinematicBody,
+  ]);
   assert.ok(Math.abs(laserOne.start.y - (82.84 + 2.25)) < 1e-10);
   assert.ok(Math.abs(laserFive.start.z - 113.8375) < 1e-10);
   assert.ok(Math.abs(laserSeven.start.z - 113.8375) < 1e-10);
@@ -188,7 +190,9 @@ test('Room 5 Blender layout drives deterministic platforms and translated lasers
   assert.equal(room.movingPlatformTwo.root.position.x, 15.109);
   assert.equal(room.movingPlatformTwo.root.position.y, 82.374);
 
-  room.updateTraversal(1.25, fakeBody as unknown as KinematicBody);
+  room.updateTraversal(1.25, fakeBody as unknown as KinematicBody, [
+    fakeBody as unknown as KinematicBody,
+  ]);
   assert.ok(Math.abs(laserFive.start.z - 116.61) < 1e-10);
   assert.ok(Math.abs(laserSeven.start.z - 111.065) < 1e-10);
 
@@ -211,13 +215,126 @@ test('Room 5 Blender layout drives deterministic platforms and translated lasers
   fakeBody.grounded = true;
   fakeBody.supportCollider = room.movingPlatformOne.collisionMesh;
   const riderStartX = fakeBody.position.x;
-  room.updateTraversal(1 / 60, fakeBody as unknown as KinematicBody);
+  room.updateTraversal(1 / 60, fakeBody as unknown as KinematicBody, [
+    fakeBody as unknown as KinematicBody,
+  ]);
   assert.ok(fakeBody.position.x > riderStartX);
   assert.equal(
     fakeBody.position.x - riderStartX,
     room.movingPlatformOne.displacement.x,
   );
 
+  scene.dispose();
+});
+
+test('Room 5 remains at its authored start until its first active fixed step', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const collisionWorld = new CollisionWorld();
+  collisionWorld.registerAll(scene.collisionMeshes);
+  const fakeBody = createFakeBody();
+  const controller = new ContainmentLevelController({
+    scene,
+    body: fakeBody as unknown as KinematicBody,
+    collisionWorld,
+    requestDeath: () => false,
+  });
+  const initialPlatformPosition =
+    scene.roomFive.movingPlatformOne.root.position.clone();
+  const initialLaserStart = scene.roomFive.lasers.hazards[0].start.clone();
+
+  // Arbitrary time spent in the earlier rooms cannot phase-shift Room 5.
+  controller.update(137.25);
+  assert.ok(
+    scene.roomFive.movingPlatformOne.root.position.equals(
+      initialPlatformPosition,
+    ),
+  );
+  assert.ok(scene.roomFive.lasers.hazards[0].start.equals(initialLaserStart));
+
+  // The entry step establishes room/checkpoint ownership without consuming
+  // any Room 5 simulation time.
+  fakeBody.position.copy(scene.roomFive.entryCheckpointTrigger.centre);
+  controller.update(0.5);
+  assert.equal(controller.activeRoomId, 5);
+  assert.ok(
+    scene.roomFive.movingPlatformOne.root.position.equals(
+      initialPlatformPosition,
+    ),
+  );
+  assert.ok(scene.roomFive.lasers.hazards[0].start.equals(initialLaserStart));
+
+  controller.update(0.5);
+  assert.ok(
+    !scene.roomFive.movingPlatformOne.root.position.equals(
+      initialPlatformPosition,
+    ),
+  );
+  assert.ok(!scene.roomFive.lasers.hazards[0].start.equals(initialLaserStart));
+
+  controller.dispose();
+  collisionWorld.clear();
+  scene.dispose();
+});
+
+test('inactive persistent slimes continue riding Room 4 and Room 5 carriers', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const collisionWorld = new CollisionWorld();
+  collisionWorld.registerAll(scene.collisionMeshes);
+  const bob = createFakeBody();
+  const goop = createFakeBody();
+  const bobBody = bob as unknown as KinematicBody;
+  const goopBody = goop as unknown as KinematicBody;
+  const controller = new ContainmentLevelController({
+    scene,
+    body: bobBody,
+    persistentBodies: [bobBody, goopBody],
+    collisionWorld,
+    requestDeath: () => false,
+  });
+
+  controller.teleportToRoomForDebug(4);
+  bob.grounded = true;
+  bob.supportCollider = scene.roomFour.elevatorPlatform.collisionMesh;
+  goop.position.set(0, 0.46, -2.6);
+
+  // Switching control to Goop leaves Bob persistent on the elevator.
+  controller.setActiveBody(goopBody);
+  const elevatorRiderOffset =
+    bob.position.y - scene.roomFour.elevatorPlatform.root.position.y;
+  const goopBeforeElevator = goop.position.clone();
+  controller.update(3.2);
+
+  assert.equal(scene.roomFour.elevator.state, 'ascending');
+  assert.ok(scene.roomFour.elevator.ascentProgress > 0);
+  assert.ok(
+    Math.abs(
+      bob.position.y -
+        scene.roomFour.elevatorPlatform.root.position.y -
+        elevatorRiderOffset,
+    ) < 1e-10,
+  );
+  assert.ok(goop.position.equals(goopBeforeElevator));
+
+  // The same ownership rule applies to Room 5's looping platforms.
+  controller.setActiveBody(bobBody);
+  controller.teleportToRoomForDebug(5);
+  bob.grounded = false;
+  bob.supportCollider = null;
+  goop.position.copy(scene.roomFive.movingPlatformOne.root.position);
+  goop.grounded = true;
+  goop.supportCollider =
+    scene.roomFive.movingPlatformOne.collisionMesh;
+  const goopBeforePlatform = goop.position.clone();
+  controller.update(1 / 60);
+
+  assert.ok(goop.position.x > goopBeforePlatform.x);
+  assert.equal(
+    goop.position.x - goopBeforePlatform.x,
+    scene.roomFive.movingPlatformOne.displacement.x,
+  );
+
+  controller.dispose();
+  collisionWorld.clear();
   scene.dispose();
 });
 
@@ -420,6 +537,7 @@ test('Containment completion is gated by observation lever adhesion and emits on
     payload = event;
   });
 
+  controller.teleportToRoomForDebug(5);
   fakeBody.position.set(-10, 99.3, 128.8);
   fakeBody.attached = true;
   fakeBody.attachmentSurfaceName = scene.roomFive.leverHandleName;
@@ -477,6 +595,7 @@ test('active checkpoint resets its room state before recovering the player', () 
     controller.activeCheckpointId,
     'containment-room-4-elevator-roof',
   );
+  controller.update(0.01);
   assert.equal(scene.roomFour.elevator.state, 'warning');
 
   controller.update(3.2);
@@ -525,6 +644,7 @@ test('elevator stopping activates the Room 5 entry checkpoint before the player 
   fakeBody.supportCollider = scene.roomFour.elevatorPlatform.collisionMesh;
   controller.update(0.01);
   assert.equal(controller.activeCheckpointId, 'containment-room-4-elevator-roof');
+  controller.update(0.01);
 
   // Consume the warning and complete the ascent, but remain inside the
   // arrival pause rather than walking through the Room 5 entry trigger.

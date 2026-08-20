@@ -85,12 +85,22 @@ export class RoomFourGreybox {
     this.syncPresentation();
   }
 
-  update(deltaSeconds: number, body: KinematicBody): void {
+  updateEntryTrigger(body: KinematicBody): void {
     this.checkpointTrigger.update(body);
-    this.exitTrigger.update(body);
-    this.failureVolume.update(body);
+  }
 
-    this.elevator.update(deltaSeconds, body);
+  updateFailureTrigger(body: KinematicBody): void {
+    this.failureVolume.update(body);
+  }
+
+  updateActive(
+    deltaSeconds: number,
+    body: KinematicBody,
+    persistentBodies: readonly KinematicBody[],
+  ): void {
+    this.exitTrigger.update(body);
+
+    this.elevator.update(deltaSeconds, persistentBodies);
     if (this.elevator.state === 'ascending') {
       this.lasers.update(deltaSeconds, body);
     }

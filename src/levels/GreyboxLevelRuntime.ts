@@ -556,6 +556,7 @@ export class GreyboxLevelRuntime {
       bobSpawnPosition: spawnPosition,
       goopSpawnPosition,
     });
+    const persistentBodies = [body, goopBody] as const;
     const dissolveSystem = new DissolveSystem(
       slimeManager,
       dissolveTargets,
@@ -599,6 +600,7 @@ export class GreyboxLevelRuntime {
     containmentLevel = new ContainmentLevelController({
       scene: testScene,
       body,
+      persistentBodies,
       collisionWorld,
       requestDeath: (recovery) => {
         const resources = this.requireResources();

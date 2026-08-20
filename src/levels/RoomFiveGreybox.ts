@@ -156,14 +156,24 @@ export class RoomFiveGreybox {
     return this.endingStateValue === 'released';
   }
 
-  updateTraversal(deltaSeconds: number, body: KinematicBody): void {
-    this.updateMovingPlatforms(deltaSeconds, body);
+  updateEntryTrigger(body: KinematicBody): void {
+    this.entryCheckpointTrigger.update(body);
+  }
+
+  updateFailureTrigger(body: KinematicBody): void {
+    this.failureVolume.update(body);
+  }
+
+  updateTraversal(
+    deltaSeconds: number,
+    body: KinematicBody,
+    persistentBodies: readonly KinematicBody[],
+  ): void {
+    this.updateMovingPlatforms(deltaSeconds, persistentBodies);
     this.updateLaserMotions(deltaSeconds);
     this.lasers.update(deltaSeconds, body);
     this.laserPresentation.sync();
-    this.entryCheckpointTrigger.update(body);
     this.observationTrigger.update(body);
-    this.failureVolume.update(body);
   }
 
   beginEnding(): boolean {
@@ -233,17 +243,19 @@ export class RoomFiveGreybox {
 
   private updateMovingPlatforms(
     deltaSeconds: number,
-    body: KinematicBody,
+    persistentBodies: readonly KinematicBody[],
   ): void {
     for (const platform of this.movingPlatforms) {
-      const carryingBody = body.isSupportedBy(platform.collisionMesh);
       platform.update(deltaSeconds);
 
-      if (carryingBody && platform.displacement.lengthSq() > 0) {
-        body.applyCarrierDisplacement(
-          platform.displacement,
-          platform.collisionMesh,
-        );
+      if (platform.displacement.lengthSq() > 0) {
+        for (const body of persistentBodies) {
+          if (!body.isSupportedBy(platform.collisionMesh)) continue;
+          body.applyCarrierDisplacement(
+            platform.displacement,
+            platform.collisionMesh,
+          );
+        }
       }
 
       if (platform.isAtEnd) platform.setActive(false);

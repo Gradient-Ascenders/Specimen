@@ -65,6 +65,7 @@ export interface ContainmentLevelEvents {
 export interface ContainmentLevelControllerOptions {
   readonly scene: ContainmentLevelScene;
   readonly body: KinematicBody;
+  readonly persistentBodies?: readonly KinematicBody[];
   readonly collisionWorld: CollisionWorld;
   readonly requestDeath: (recovery: DeathRecoveryAction) => boolean;
 }
@@ -79,6 +80,7 @@ export class ContainmentLevelController {
 
   private readonly scene: ContainmentLevelScene;
   private body: KinematicBody;
+  private readonly persistentBodies: readonly KinematicBody[];
   private readonly collisionWorld: CollisionWorld;
   private readonly requestDeathAction: (recovery: DeathRecoveryAction) => boolean;
   private readonly puzzleRegistry = new PuzzleRegistry();
@@ -102,6 +104,13 @@ export class ContainmentLevelController {
   constructor(options: ContainmentLevelControllerOptions) {
     this.scene = options.scene;
     this.body = options.body;
+    this.persistentBodies = [...(options.persistentBodies ?? [options.body])];
+    if (!this.persistentBodies.includes(this.body)) {
+      throw new Error('The active body must belong to the persistent body set.');
+    }
+    if (new Set(this.persistentBodies).size !== this.persistentBodies.length) {
+      throw new Error('Persistent level bodies must be unique.');
+    }
     this.collisionWorld = options.collisionWorld;
     this.requestDeathAction = options.requestDeath;
     this.scene.copySpawnPosition(this.spawnPosition);
@@ -152,6 +161,9 @@ export class ContainmentLevelController {
 
   /** Follow the currently controlled persistent slime without duplicating level logic. */
   setActiveBody(body: KinematicBody): void {
+    if (!this.persistentBodies.includes(body)) {
+      throw new Error('Cannot activate a body outside the persistent body set.');
+    }
     this.body = body;
   }
 
@@ -169,33 +181,25 @@ export class ContainmentLevelController {
       return;
     }
 
-    this.roomTwoCheckpointTrigger.update(this.body);
-    this.scene.roomThree.update(deltaSeconds, this.body);
-    const elevatorProgressBeforeUpdate =
-      this.scene.roomFour.elevator.ascentProgress;
-    this.scene.roomFour.update(deltaSeconds, this.body);
-    if (
-      elevatorProgressBeforeUpdate < 1 &&
-      this.scene.roomFour.elevator.ascentProgress >= 1
-    ) {
-      this.activateRoomFiveEntryCheckpoint();
-    }
-    this.scene.roomFive.updateTraversal(deltaSeconds, this.body);
+    const roomAtStepStart = this.activeRoomIdValue;
+    this.updateRoomBoundaryTriggers();
 
-    if (
-      this.scene.roomFive.observationTrigger.occupied &&
-      this.body.attached &&
-      this.body.attachmentSurfaceName === this.scene.roomFive.leverHandleName
-    ) {
-      this.leverAdhesionSeconds += deltaSeconds;
-      if (
-        this.leverAdhesionSeconds >= LEVER_ADHESION_SECONDS &&
-        this.scene.roomFive.beginEnding()
-      ) {
-        this.stateValue = 'completing';
-      }
-    } else {
-      this.leverAdhesionSeconds = 0;
+    // Entry activates the room at its authored state. Mutable local simulation
+    // begins on the following fixed step, independent of earlier play time.
+    if (this.activeRoomIdValue !== roomAtStepStart) return;
+
+    if (this.activeRoomIdValue === 3) {
+      this.scene.roomThree.updateActive(deltaSeconds, this.body);
+      return;
+    }
+
+    if (this.activeRoomIdValue === 4) {
+      this.updateRoomFour(deltaSeconds);
+      return;
+    }
+
+    if (this.activeRoomIdValue === 5) {
+      this.updateRoomFive(deltaSeconds);
     }
   }
 
@@ -261,6 +265,56 @@ export class ContainmentLevelController {
       spawnPosition: ROOM_5_ENTRY_CHECKPOINT_POSITION,
       puzzleGroupId: ROOM_5_PUZZLE_GROUP_ID,
     });
+  }
+
+  private updateRoomBoundaryTriggers(): void {
+    this.roomTwoCheckpointTrigger.update(this.body);
+    this.scene.roomThree.updateEntryTrigger(this.body);
+    this.scene.roomFour.updateEntryTrigger(this.body);
+    this.scene.roomFive.updateEntryTrigger(this.body);
+    this.scene.roomThree.updateFailureTrigger(this.body);
+    this.scene.roomFour.updateFailureTrigger(this.body);
+    this.scene.roomFive.updateFailureTrigger(this.body);
+  }
+
+  private updateRoomFour(deltaSeconds: number): void {
+    const elevatorProgressBeforeUpdate =
+      this.scene.roomFour.elevator.ascentProgress;
+    this.scene.roomFour.updateActive(
+      deltaSeconds,
+      this.body,
+      this.persistentBodies,
+    );
+    if (
+      elevatorProgressBeforeUpdate < 1 &&
+      this.scene.roomFour.elevator.ascentProgress >= 1
+    ) {
+      this.activateRoomFiveEntryCheckpoint();
+    }
+  }
+
+  private updateRoomFive(deltaSeconds: number): void {
+    this.scene.roomFive.updateTraversal(
+      deltaSeconds,
+      this.body,
+      this.persistentBodies,
+    );
+
+    if (
+      this.scene.roomFive.observationTrigger.occupied &&
+      this.body.attached &&
+      this.body.attachmentSurfaceName === this.scene.roomFive.leverHandleName
+    ) {
+      this.leverAdhesionSeconds += deltaSeconds;
+      if (
+        this.leverAdhesionSeconds >= LEVER_ADHESION_SECONDS &&
+        this.scene.roomFive.beginEnding()
+      ) {
+        this.stateValue = 'completing';
+      }
+    } else {
+      this.leverAdhesionSeconds = 0;
+    }
   }
 
   private subscribeToTriggers(): void {

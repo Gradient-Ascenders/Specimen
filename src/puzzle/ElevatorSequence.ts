@@ -149,7 +149,7 @@ export class ElevatorSequence {
 
   update(
     deltaSeconds: number,
-    carrier?: ElevatorCarrierTarget,
+    carriers: readonly ElevatorCarrierTarget[],
   ): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error(
@@ -160,10 +160,12 @@ export class ElevatorSequence {
     // Clear the platform displacement every fixed step even while stationary.
     this.platformValue.update(0);
 
-    const riderSupported =
-      carrier?.isSupportedBy(
-        this.platformValue.collisionMesh,
-      ) ?? false;
+    let riderSupported = false;
+    for (const carrier of carriers) {
+      if (!carrier.isSupportedBy(this.platformValue.collisionMesh)) continue;
+      riderSupported = true;
+      break;
+    }
 
     if (
       this.stateValue === 'waitingForRider' &&
@@ -220,13 +222,17 @@ export class ElevatorSequence {
 
           if (
             riderSupported &&
-            carrier &&
             this.platformValue.displacement.lengthSq() > 0
           ) {
-            carrier.applyCarrierDisplacement(
-              this.platformValue.displacement,
-              this.platformValue.collisionMesh,
-            );
+            for (const carrier of carriers) {
+              if (!carrier.isSupportedBy(this.platformValue.collisionMesh)) {
+                continue;
+              }
+              carrier.applyCarrierDisplacement(
+                this.platformValue.displacement,
+                this.platformValue.collisionMesh,
+              );
+            }
           }
         }
 

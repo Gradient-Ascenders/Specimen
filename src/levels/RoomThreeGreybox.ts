@@ -60,12 +60,18 @@ export class RoomThreeGreybox {
     this.root.add(this.lasers.root, this.laserPresentation.root);
   }
 
-  update(deltaSeconds: number, target: TriggerContactTarget): void {
+  updateEntryTrigger(target: TriggerContactTarget): void {
+    this.checkpointTrigger.update(target);
+  }
+
+  updateFailureTrigger(target: TriggerContactTarget): void {
+    this.failureVolume.update(target);
+  }
+
+  updateActive(deltaSeconds: number, target: TriggerContactTarget): void {
     this.lasers.update(deltaSeconds, target);
     this.laserPresentation.sync();
-    this.checkpointTrigger.update(target);
     this.exitTrigger.update(target);
-    this.failureVolume.update(target);
   }
 
   reset(): void {

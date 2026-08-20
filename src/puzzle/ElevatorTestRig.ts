@@ -74,6 +74,7 @@ export class ElevatorTestRig {
   private readonly laserPresentation: LaserHazardPresentation;
   private readonly checkpointSpawn = new THREE.Vector3();
   private readonly harmlessRegressionTarget: LaserContactTarget;
+  private readonly carrierTargets: readonly KinematicBody[];
 
   private recoveryCountValue = 0;
 
@@ -84,6 +85,7 @@ export class ElevatorTestRig {
     requestPlayerDeath?: (recovery: DeathRecoveryAction) => void,
   ) {
     this.player = player;
+    this.carrierTargets = [player];
     this.collisionWorld = collisionWorld;
     this.surfaces = surfaces;
     this.root.name = 'room4-elevator-development-rig';
@@ -234,7 +236,7 @@ export class ElevatorTestRig {
    * the platform and applies its displacement only if the body is still supported.
    */
   update(deltaSeconds: number): void {
-    this.sequence.update(deltaSeconds, this.player);
+    this.sequence.update(deltaSeconds, this.carrierTargets);
     this.laserSystem.update(deltaSeconds, this.player);
     this.syncPresentation();
   }
@@ -276,7 +278,7 @@ export class ElevatorTestRig {
       );
       this.sequence.update(
         REGRESSION_FIXED_DELTA_SECONDS,
-        this.player,
+        this.carrierTargets,
       );
       this.laserSystem.update(
         REGRESSION_FIXED_DELTA_SECONDS,
@@ -352,7 +354,7 @@ export class ElevatorTestRig {
       );
       this.sequence.update(
         REGRESSION_FIXED_DELTA_SECONDS,
-        this.player,
+        this.carrierTargets,
       );
       this.laserSystem.update(
         REGRESSION_FIXED_DELTA_SECONDS,
