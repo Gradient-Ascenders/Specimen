@@ -6,6 +6,12 @@ import {
   MAX_FOLLOW_DISTANCE_METRES,
   MIN_FOLLOW_DISTANCE_METRES,
 } from '../render/CameraRig.ts';
+import type { SlimeHUDSnapshot } from '../slimes/SlimeHUDState.ts';
+import {
+  formatPassiveInteractionStatus,
+  getSlimeRosterEntryView,
+  SlimeSwitchFeedbackModel,
+} from './SlimeRosterView.ts';
 
 export type GameFlowState =
   | 'loading'
@@ -125,10 +131,15 @@ export interface GameFlowActions {
   applySettings(settings: Readonly<GameSettingsSnapshot>): void;
 }
 
+export interface SlimeHUDSource {
+  subscribeSlimeHUD(listener: (snapshot: SlimeHUDSnapshot) => void): () => void;
+}
+
 export interface GameFlowUIOptions {
   actions: GameFlowActions;
   settings: GameSettings;
   creditsMarkdown: string;
+  slimeHUD?: SlimeHUDSource;
   document?: Document;
   window?: Window;
 }
@@ -161,7 +172,12 @@ export class GameFlowUI {
   private readonly volumeOutput: HTMLOutputElement;
   private readonly cameraDistanceInput: HTMLInputElement;
   private readonly cameraDistanceOutput: HTMLOutputElement;
+  private readonly slimeRoster: HTMLElement;
+  private readonly passiveStatus: HTMLElement;
+  private readonly switchFeedback: HTMLElement;
   private readonly unsubscribeSettings: () => void;
+  private readonly unsubscribeSlimeHUD: () => void;
+  private readonly switchFeedbackModel = new SlimeSwitchFeedbackModel();
   private restartPending = false;
   private disposed = false;
 
@@ -195,6 +211,9 @@ export class GameFlowUI {
     this.cameraDistanceOutput = this.requireElement<HTMLOutputElement>(
       '[data-setting-output="camera-distance"]',
     );
+    this.slimeRoster = this.requireElement('[data-slime-roster]');
+    this.passiveStatus = this.requireElement('[data-passive-status]');
+    this.switchFeedback = this.requireElement('[data-switch-feedback]');
 
     for (const panel of this.element.querySelectorAll<HTMLElement>(
       '[data-flow-panel]',
@@ -209,6 +228,8 @@ export class GameFlowUI {
     this.unsubscribeSettings = this.settings.subscribe(
       this.onSettingsChanged,
     );
+    this.unsubscribeSlimeHUD =
+      options.slimeHUD?.subscribeSlimeHUD(this.onSlimeHUDChanged) ?? (() => {});
     this.syncState();
   }
 
@@ -234,6 +255,7 @@ export class GameFlowUI {
     this.disposed = true;
     this.listeners.abort();
     this.unsubscribeSettings();
+    this.unsubscribeSlimeHUD();
     this.model.dispose();
     if (this.gameplayActive) this.actions.stopGameplay();
     this.actions.setGameplayInputEnabled(false);
@@ -271,7 +293,13 @@ export class GameFlowUI {
           <p class="flow-eyebrow">Current objective</p>
           <p class="hud-objective">Reach the elevated containment route.</p>
         </div>
-        <p class="hud-hint"><kbd>WASD</kbd> Move <span>·</span> <kbd>Space</kbd> Charge jump <span>·</span> <kbd>Esc</kbd> Pause</p>
+        <section class="hud-roster" aria-labelledby="hud-roster-heading">
+          <p class="hud-roster-heading" id="hud-roster-heading">Slime roster</p>
+          <ul class="hud-roster-list" data-slime-roster aria-label="Unlocked playable slimes"></ul>
+          <p class="hud-passive-status" data-passive-status role="status" aria-live="polite" hidden></p>
+          <p class="hud-switch-feedback" data-switch-feedback role="status" aria-live="polite"></p>
+        </section>
+        <p class="hud-hint"><kbd>WASD</kbd> Move <span>·</span> <kbd>Space</kbd> Jump <span>·</span> <kbd>Tab</kbd> Switch <span>·</span> <kbd>Esc</kbd> Pause</p>
       </aside>
 
       <section class="flow-screen" data-flow-panel="paused" aria-labelledby="pause-heading" hidden>
@@ -422,10 +450,13 @@ export class GameFlowUI {
     if (this.restartPending || !this.model.beginRestart()) return;
     this.restartPending = true;
     this.restartStatus.textContent = '';
+    this.switchFeedbackModel.clear();
+    this.switchFeedback.textContent = '';
     this.syncState();
 
     try {
       this.actions.restartLevel();
+      this.switchFeedback.textContent = '';
       this.actions.startGameplay();
       this.restartStatus.textContent = 'Trial restored.';
       this.model.finishRestart();
@@ -544,5 +575,44 @@ export class GameFlowUI {
     this.cameraDistanceOutput.value =
       `${settings.cameraDistanceMetres.toFixed(1)} m`;
     this.actions.applySettings(settings);
+  };
+
+  private readonly onSlimeHUDChanged = (snapshot: SlimeHUDSnapshot): void => {
+    this.switchFeedback.textContent = this.switchFeedbackModel.update(snapshot);
+
+    const entries = snapshot.roster.flatMap((entry) => {
+      const view = getSlimeRosterEntryView(entry);
+      if (!view) return [];
+
+      const item = this.hostDocument.createElement('li');
+      item.className = 'hud-slime-entry';
+      item.dataset.slimeId = entry.id;
+      item.dataset.state = view.state;
+      item.setAttribute('aria-label', view.ariaLabel);
+
+      const badge = this.hostDocument.createElement('span');
+      badge.className = 'hud-slime-badge';
+      badge.setAttribute('aria-hidden', 'true');
+      badge.textContent = entry.displayName.slice(0, 1);
+
+      const identity = this.hostDocument.createElement('span');
+      identity.className = 'hud-slime-identity';
+      identity.textContent = entry.displayName;
+
+      const state = this.hostDocument.createElement('span');
+      state.className = 'hud-slime-state';
+      state.textContent = view.stateLabel;
+
+      const control = this.hostDocument.createElement('span');
+      control.className = 'hud-slime-control';
+      control.textContent = view.controlLabel;
+
+      item.append(badge, identity, state, control);
+      return [item];
+    });
+    this.slimeRoster.replaceChildren(...entries);
+    const passiveStatus = formatPassiveInteractionStatus(snapshot);
+    this.passiveStatus.textContent = passiveStatus ?? '';
+    this.passiveStatus.hidden = passiveStatus === undefined;
   };
 }

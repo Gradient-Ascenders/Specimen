@@ -48,6 +48,7 @@ codes.
 | `moveLeft` | `A` |
 | `moveRight` | `D` |
 | `jump` | `Space` |
+| `switchSlime` | `Tab` |
 | `debugReset` | `R` |
 | `debugTestRecovery` | `F` |
 

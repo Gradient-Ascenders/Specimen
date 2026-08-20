@@ -25,6 +25,13 @@ import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
 import { SlimePairPresentation } from '../slimes/SlimePairPresentation.ts';
 import {
+  EMPTY_SLIME_HUD_SNAPSHOT,
+  type SlimeHUDListener,
+  type SlimeHUDSnapshot,
+  type SlimePassiveInteraction,
+  type SlimePlayerSwitchFeedback,
+} from '../slimes/SlimeHUDState.ts';
+import {
   DeathSequence,
   type DeathRecoveryAction,
 } from '../systems/DeathSequence.ts';
@@ -86,6 +93,8 @@ interface GreyboxRuntimeResources {
   readonly wallJumpIntent: WallJumpIntent;
   readonly unsubscribeLanding: () => void;
   readonly unsubscribeJumped: () => void;
+  unsubscribePressureOccupancy: () => void;
+  unsubscribeSlimeRoster: readonly (() => void)[];
   readonly testPanel: GreyboxTestPanel | undefined;
 }
 
@@ -107,6 +116,8 @@ export class GreyboxLevelRuntime {
   private slopeRegressionStatus = 'not run';
   private cameraFollowSlimeId: 'bob' | 'goop' | undefined;
   private lastDeathSlimeId: 'bob' | 'goop' | undefined;
+  private playerSwitchFeedbackSequence = 0;
+  private readonly slimeHUDListeners = new Set<SlimeHUDListener>();
   private readonly wallJumpBasisRegressionStatus =
     runWallJumpBasisRegression();
   private readonly twoBodySwitchingRegressionStatus =
@@ -133,6 +144,41 @@ export class GreyboxLevelRuntime {
 
   get restartCount(): number {
     return this.lifecycle.restartCount;
+  }
+
+  subscribeSlimeHUD(listener: SlimeHUDListener): () => void {
+    this.slimeHUDListeners.add(listener);
+    listener(this.getSlimeHUDSnapshot());
+    return () => this.slimeHUDListeners.delete(listener);
+  }
+
+  getSlimeHUDSnapshot(): SlimeHUDSnapshot {
+    return this.createSlimeHUDSnapshot();
+  }
+
+  private createSlimeHUDSnapshot(
+    playerSwitchFeedback?: SlimePlayerSwitchFeedback,
+    resetSwitchFeedback = false,
+  ): SlimeHUDSnapshot {
+    const resources = this.resources;
+    if (!resources) return EMPTY_SLIME_HUD_SNAPSHOT;
+
+    const passiveInteractions: SlimePassiveInteraction[] = [];
+    for (const occupantId of resources.pressurePlate.trigger.occupants) {
+      if (occupantId !== 'bob' && occupantId !== 'goop') continue;
+      passiveInteractions.push({
+        slimeId: occupantId,
+        label: 'pressure plate',
+      });
+    }
+
+    return {
+      roster: resources.slimeManager.getRosterState(),
+      activeSlimeId: resources.slimeManager.activeSlimeId,
+      passiveInteractions,
+      playerSwitchFeedback,
+      resetSwitchFeedback,
+    };
   }
 
   load(): void {
@@ -165,6 +211,7 @@ export class GreyboxLevelRuntime {
 
   dispose(): void {
     this.lifecycle.dispose();
+    this.slimeHUDListeners.clear();
   }
 
   fixedUpdate(deltaSeconds: number): void {
@@ -356,11 +403,6 @@ export class GreyboxLevelRuntime {
       testScene.setProbePosition(renderedProbePosition);
       testScene.setProbeYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
       testScene.presentProbe();
-      slimePairPresentation.update(
-        renderedProbePosition,
-        renderedGoopPosition,
-        slimePair.activeSlimeId,
-      );
       this.renderLayer.cameraRig.queueLookInput(
         this.input.pointerDeltaX,
         this.input.pointerDeltaY,
@@ -371,6 +413,15 @@ export class GreyboxLevelRuntime {
       interpolationAlpha,
       stats.frameDeltaSeconds,
     );
+    if (deathSequence.isPlaying) {
+      slimePairPresentation.update(
+        renderedProbePosition,
+        renderedGoopPosition,
+        slimePair.activeSlimeId,
+        this.renderLayer.cameraRig.camera,
+        resources.collisionWorld,
+      );
+    }
     this.renderLayer.render();
 
     this.debugSampleElapsedSeconds += stats.rawFrameDeltaSeconds;
@@ -567,8 +618,23 @@ export class GreyboxLevelRuntime {
       wallJumpIntent: { lateral: 0, vertical: 0 },
       unsubscribeLanding,
       unsubscribeJumped,
+      unsubscribePressureOccupancy: () => {},
+      unsubscribeSlimeRoster: [],
       testPanel,
     };
+
+    const resources = this.resources;
+    resources.unsubscribeSlimeRoster = [
+      slimeManager.events.on('unlocked', this.onSlimeRosterChanged),
+      slimeManager.events.on('registered', this.onSlimeRosterChanged),
+      slimeManager.events.on('unregistered', this.onSlimeRosterChanged),
+      slimeManager.events.on('activeChanged', this.onSlimeRosterChanged),
+    ];
+    resources.unsubscribePressureOccupancy = pressurePlate.trigger.events.on(
+      'occupancyChanged',
+      this.onSlimeRosterChanged,
+    );
+    this.notifySlimeHUD();
   };
 
   private readonly startResources = (): void => {
@@ -606,6 +672,7 @@ export class GreyboxLevelRuntime {
     if (resources.testPanel) {
       this.setDebugVisible(this.debugVisible, resources.testPanel);
     }
+    this.notifySlimeHUD(undefined, true);
   };
 
   private readonly unloadResources = (): void => {
@@ -617,6 +684,8 @@ export class GreyboxLevelRuntime {
     resources.testPanel?.element.remove();
     resources.unsubscribeLanding();
     resources.unsubscribeJumped();
+    resources.unsubscribePressureOccupancy();
+    for (const unsubscribe of resources.unsubscribeSlimeRoster) unsubscribe();
     resources.movementEvents.clear();
     resources.pressurePlate.dispose();
     resources.slimePairPresentation.dispose();
@@ -636,6 +705,7 @@ export class GreyboxLevelRuntime {
     this.lastLandingImpactSpeedMetresPerSecond = 0;
     this.cameraFollowSlimeId = undefined;
     this.lastDeathSlimeId = undefined;
+    this.notifySlimeHUD();
   };
 
 
@@ -645,6 +715,7 @@ export class GreyboxLevelRuntime {
    * CameraRig re-initializes its presentation against the new read-only target.
    */
   private switchActiveSlime(resources: GreyboxRuntimeResources): boolean {
+    const previousSlimeId = resources.slimePair.activeSlimeId;
     if (!resources.slimePair.switchActive()) return false;
 
     this.input.resetState();
@@ -657,7 +728,28 @@ export class GreyboxLevelRuntime {
     resources.cameraRelativeMovement.set(0, 0, 0);
 
     this.retargetCameraToActiveSlime(resources);
+    this.playerSwitchFeedbackSequence += 1;
+    this.notifySlimeHUD({
+      sequence: this.playerSwitchFeedbackSequence,
+      previousSlimeId,
+      activeSlimeId: resources.slimePair.activeSlimeId,
+    });
     return true;
+  }
+
+  private readonly onSlimeRosterChanged = (): void => {
+    this.notifySlimeHUD();
+  };
+
+  private notifySlimeHUD(
+    playerSwitchFeedback?: SlimePlayerSwitchFeedback,
+    resetSwitchFeedback = false,
+  ): void {
+    const snapshot = this.createSlimeHUDSnapshot(
+      playerSwitchFeedback,
+      resetSwitchFeedback,
+    );
+    for (const listener of this.slimeHUDListeners) listener(snapshot);
   }
 
   private retargetCameraToActiveSlime(
@@ -700,6 +792,7 @@ export class GreyboxLevelRuntime {
     // restore a different active slime than the one that died. Camera ownership
     // must follow that restored active identity before gameplay resumes.
     this.retargetCameraToActiveSlime(resources);
+    this.notifySlimeHUD(undefined, true);
 
     // The teaching scene owns Bob's legacy visual; the two-body presentation
     // owns Goop. Restore that scene-owned visual to Bob's authoritative body.
