@@ -31,6 +31,12 @@ const SPAWN_POSITION = new THREE.Vector3(-0.20995, 0.52507, -2.60112);
 const OUT_OF_BOUNDS_TEST_POSITION = new THREE.Vector3(0, -5, -1.8);
 const DEATH_RUPTURE_SECONDS = 0.075;
 const ROOM_2_FLOOR_TOP_Y = 0;
+const TIGHT_CAMERA_VENT_BOUNDS = [
+  { min: [-6.1, 4.5, 5.2], max: [-3.5, 7.8, 13.2] },
+  { min: [-6.1, 4.8, 12.2], max: [-3.5, 11.4, 24.9] },
+  { min: [-9.8, 9.8, 22.8], max: [-1.7, 13, 25.3] },
+  { min: [-9.8, 9.8, 24.7], max: [-7, 13, 29.6] },
+] as const;
 // The 0.45 m player radius and 0.01 m collision skin both need clearance.
 const ROOM_2_SAFE_LANDING_POSITION = new THREE.Vector3(
   -9,
@@ -127,6 +133,27 @@ export class ContainmentTeachingScene {
     this.slimeVisual.mesh.rotation.set(0, yawRadians, 0);
   }
 
+  setProbeOpacity(opacity: number): void {
+    this.slimeVisual.setOpacity(opacity);
+  }
+
+  isInsideCameraTightVent(position: Vector3State): boolean {
+    for (let index = 0; index < TIGHT_CAMERA_VENT_BOUNDS.length; index += 1) {
+      const bounds = TIGHT_CAMERA_VENT_BOUNDS[index];
+      if (
+        position.x >= bounds.min[0] &&
+        position.x <= bounds.max[0] &&
+        position.y >= bounds.min[1] &&
+        position.y <= bounds.max[1] &&
+        position.z >= bounds.min[2] &&
+        position.z <= bounds.max[2]
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   presentProbe(): void {
     this.slimeVisual.present();
   }
@@ -141,6 +168,7 @@ export class ContainmentTeachingScene {
 
     this.deathElapsedSeconds = 0;
     this.slimeVisual.setPosition(position);
+    this.slimeVisual.setOpacity(1);
     this.slimeVisual.mesh.scale.setScalar(1);
     this.slimeVisual.mesh.visible = true;
     return true;
@@ -330,7 +358,13 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-rear-wall-east', size: [22.3, 18, 0.4], position: [3.85, 9, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-rear-wall-below-duct', size: [2.2, 10.2, 0.4], position: [-8.4, 5.1, ROOM_2_CENTRE_Z - 11], material: materials.wall });
     this.addCollider({ name: 'room-2-rear-wall-above-duct', size: [2.2, 5.2, 0.4], position: [-8.4, 15.4, ROOM_2_CENTRE_Z - 11], material: materials.wall });
-    this.addCollider({ name: 'room-2-front-wall', size: [30, 18, 0.4], position: [0, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    // Split the front wall around the elevated exit so Room 3 is physically
+    // reachable. The previous green door was only a visual laid over a solid
+    // wall, which was sufficient while issue #20 ended in Room 2.
+    this.addCollider({ name: 'room-2-front-wall-west', size: [13.5, 18, 0.4], position: [-8.25, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-front-wall-east', size: [13.5, 18, 0.4], position: [8.25, 9, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-front-wall-below-exit', size: [3, 10.4, 0.4], position: [0, 5.2, ROOM_2_CENTRE_Z + 11], material: materials.wall });
+    this.addCollider({ name: 'room-2-front-wall-above-exit', size: [3, 3.9, 0.4], position: [0, 16.05, ROOM_2_CENTRE_Z + 11], material: materials.wall });
     // Zones 2-3: a forgiving four-jump zig-zag fills the lower chamber and
     // teaches progressively higher and longer charged jumps. Every miss lands
     // on the safe room floor, and the generous tops keep this a tutorial.
@@ -351,7 +385,6 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-upper-step-a', size: [4, 0.4, 3.5], position: [8.8, 9.65, 37.65683], material: materials.platform });
     this.addCollider({ name: 'room-2-upper-step-b', size: [3.6, 0.4, 3.4], position: [0.87909, 10.15, 38.41571], material: materials.platform });
     this.addCollider({ name: 'room-2-exit-balcony', size: [7, 0.5, 4], position: [0, 10.65, 46.79795], material: materials.platform });
-    this.addVisualBox('room-2-open-exit-door', [2.6, 3, 0.2], [0, 12.4, 48.6971], materials.exit);
 
     // Blender-authored version: the four low recovery steps were removed.
 

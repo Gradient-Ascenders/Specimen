@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {
   LaserHazard,
   type LaserContactTarget,
-} from './LaserHazard';
+} from './LaserHazard.ts';
 
 export interface LaserHazardSystemOptions {
   readonly id: string;

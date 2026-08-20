@@ -59,6 +59,10 @@ const gameFlow = new GameFlowUI({
     },
   },
 });
+const unsubscribeObjectiveChanged = levelRuntime.events.on(
+  'objectiveChanged',
+  ({ objective }) => gameFlow.setObjective(objective),
+);
 
 app.replaceChildren(renderLayer.canvas, gameFlow.element);
 levelRuntime.load();
@@ -79,6 +83,7 @@ renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
 const shutdown = (): void => {
   cancelAnimationFrame(bootFrame);
   loop.dispose();
+  unsubscribeObjectiveChanged();
   gameFlow.dispose();
   levelRuntime.dispose();
   input.dispose();

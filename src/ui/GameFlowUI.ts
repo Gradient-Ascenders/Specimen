@@ -165,6 +165,7 @@ export class GameFlowUI {
   private readonly panels = new Map<GameFlowState, HTMLElement>();
   private readonly focusTargets = new Map<GameFlowState, HTMLElement>();
   private readonly restartStatus: HTMLElement;
+  private readonly objective: HTMLElement;
   private readonly sensitivityInput: HTMLInputElement;
   private readonly sensitivityOutput: HTMLOutputElement;
   private readonly invertVerticalInput: HTMLInputElement;
@@ -190,6 +191,7 @@ export class GameFlowUI {
     this.element = this.createElement(options.creditsMarkdown);
 
     this.restartStatus = this.requireElement('[data-restart-status]');
+    this.objective = this.requireElement('[data-current-objective]');
     this.sensitivityInput = this.requireElement<HTMLInputElement>(
       '[data-setting="sensitivity"]',
     );
@@ -250,6 +252,12 @@ export class GameFlowUI {
     return this.model.subscribe(listener);
   }
 
+  setObjective(objective: string): void {
+    const nextObjective = objective.trim();
+    if (!nextObjective) throw new Error('Gameplay objectives cannot be empty.');
+    this.objective.textContent = nextObjective;
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -291,7 +299,7 @@ export class GameFlowUI {
       <aside class="game-hud" data-flow-panel="playing" aria-label="Gameplay guidance" hidden>
         <div>
           <p class="flow-eyebrow">Current objective</p>
-          <p class="hud-objective">Reach the elevated containment route.</p>
+          <p class="hud-objective" data-current-objective role="status" aria-live="polite">Climb through the vent</p>
         </div>
         <section class="hud-roster" aria-labelledby="hud-roster-heading">
           <p class="hud-roster-heading" id="hud-roster-heading">Slime roster</p>

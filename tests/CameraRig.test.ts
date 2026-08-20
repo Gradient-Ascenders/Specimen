@@ -108,6 +108,16 @@ test('ground movement follows camera yaw while ignoring pitch', () => {
   assert.equal(rig.getDiagnostics().pitchRadians, 1);
 });
 
+test('an authored ground heading orients both framing and movement predictably', () => {
+  const rig = new CameraRig();
+  const movement = new THREE.Vector3();
+
+  rig.setGroundOrbitYawRadians(Math.PI);
+  rig.copyGroundMovementDirection(0, -1, movement);
+  assert.ok(movement.distanceTo(new THREE.Vector3(0, 0, 1)) < EPSILON);
+  assert.throws(() => rig.setGroundOrbitYawRadians(Number.NaN));
+});
+
 test('camera-relative cardinal and diagonal movement is normalized', () => {
   const rig = new CameraRig();
   const movement = new THREE.Vector3();
@@ -336,6 +346,28 @@ test('follow distance validates and recovers through collision-aware camera logi
   assert.throws(() => rig.setFollowDistanceMetres(3.49));
   assert.throws(() => rig.setFollowDistanceMetres(7.01));
   assert.throws(() => rig.setFollowDistanceMetres(Number.NaN));
+});
+
+test('tight-space scaling shortens the boom without replacing the player distance', () => {
+  const rig = new CameraRig();
+  rig.setFollowTarget(createTarget(), new CollisionWorld());
+  rig.setFollowDistanceMetres(7);
+  rig.update(1, 0);
+
+  rig.setFollowDistanceScale(0.5);
+  rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().desiredDistanceMetres, 3.5);
+  assert.equal(rig.getDiagnostics().currentDistanceMetres, 3.5);
+  assert.equal(rig.currentFollowDistanceMetres, 3.5);
+
+  rig.setFollowDistanceScale(1);
+  for (let step = 0; step < 300; step += 1) rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().desiredDistanceMetres, 7);
+  assert.ok(Math.abs(rig.getDiagnostics().currentDistanceMetres - 7) < 1e-7);
+
+  assert.throws(() => rig.setFollowDistanceScale(0.24));
+  assert.throws(() => rig.setFollowDistanceScale(1.01));
+  assert.throws(() => rig.setFollowDistanceScale(Number.NaN));
 });
 
 test('teleport immediately removes stale camera up', () => {

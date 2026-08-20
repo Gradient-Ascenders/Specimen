@@ -33,13 +33,17 @@ interface Checkpoint extends CheckpointDefinition {
 export class CheckpointManager {
   private readonly checkpoints = new Map<string, Checkpoint>();
   private readonly initialCheckpointId: string;
+  private readonly isSpawnSafe: SpawnSafetyCheck;
+  private readonly puzzleGroups: PuzzleGroupResetter;
   private currentCheckpointId: string;
 
   constructor(
     initialCheckpoint: CheckpointDefinition,
-    private readonly isSpawnSafe: SpawnSafetyCheck,
-    private readonly puzzleGroups: PuzzleGroupResetter,
+    isSpawnSafe: SpawnSafetyCheck,
+    puzzleGroups: PuzzleGroupResetter,
   ) {
+    this.isSpawnSafe = isSpawnSafe;
+    this.puzzleGroups = puzzleGroups;
     this.initialCheckpointId = initialCheckpoint.id;
     this.currentCheckpointId = initialCheckpoint.id;
     this.register(initialCheckpoint);

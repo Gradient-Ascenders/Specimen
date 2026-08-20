@@ -217,6 +217,14 @@ test('wall jump event reports the pre-detach launch direction', () => {
   });
 
   assert.equal(body.attached, false);
+  assert.equal(body.usingSurfaceGravity, true);
+  assert.ok(
+    new THREE.Vector3(
+      body.gameplayUp.x,
+      body.gameplayUp.y,
+      body.gameplayUp.z,
+    ).distanceTo(attachedUp) < EPSILON,
+  );
   assert.ok(reportedDirection.distanceTo(attachedUp) < EPSILON);
   assert.ok(
     body.velocity.x * attachedUp.x +
@@ -227,7 +235,117 @@ test('wall jump event reports the pre-detach launch direction', () => {
   wall.geometry.dispose();
 });
 
-test('wall jump release keeps the step-start wall movement basis', () => {
+test('sticky jump retains local gravity through a gap then falls back to world gravity', () => {
+  const { body, world, wall } = createAttachedBody();
+  const stickyUp = new THREE.Vector3(
+    body.gameplayUp.x,
+    body.gameplayUp.y,
+    body.gameplayUp.z,
+  );
+
+  beginWallJump(body);
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: false,
+    released: true,
+  });
+  world.unregister(wall);
+
+  const launchSpeedAlongStickyUp = new THREE.Vector3(
+    body.velocity.x,
+    body.velocity.y,
+    body.velocity.z,
+  ).dot(stickyUp);
+  for (let step = 0; step < 30; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  }
+
+  assert.equal(body.attached, false);
+  assert.equal(body.usingSurfaceGravity, true);
+  assert.ok(
+    new THREE.Vector3(
+      body.gameplayUp.x,
+      body.gameplayUp.y,
+      body.gameplayUp.z,
+    ).distanceTo(stickyUp) < EPSILON,
+  );
+  assert.ok(
+    new THREE.Vector3(
+      body.velocity.x,
+      body.velocity.y,
+      body.velocity.z,
+    ).dot(stickyUp) < launchSpeedAlongStickyUp,
+  );
+  assert.ok(Math.abs(body.velocity.y) < EPSILON);
+
+  for (let step = 0; step < 120 && body.usingSurfaceGravity; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  }
+
+  assert.equal(body.usingSurfaceGravity, false);
+  assert.equal(body.stickyJumpGravityRemainingSeconds, 0);
+  assert.ok(Math.abs(body.gameplayUp.x) < EPSILON);
+  assert.ok(Math.abs(body.gameplayUp.y - 1) < EPSILON);
+  assert.ok(Math.abs(body.gameplayUp.z) < EPSILON);
+  assert.ok(body.velocity.y < 0);
+
+  wall.geometry.dispose();
+});
+
+test('sticky jump crosses a gap and adopts the destination tile', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const firstTile = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2, 4));
+  firstTile.name = 'sticky-transfer-start';
+  firstTile.userData.surfaceTag = 'sticky';
+  const destinationTile = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2, 4));
+  destinationTile.name = 'sticky-transfer-destination';
+  destinationTile.position.y = 4.5;
+  destinationTile.userData.surfaceTag = 'sticky';
+  world.registerAll([firstTile, destinationTile]);
+  surfaces.registerAll([firstTile, destinationTile]);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(-0.56, 0.5, 0),
+  });
+  body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(1, 0, 0));
+  assert.equal(body.attachmentSurfaceName, firstTile.name);
+
+  for (let step = 0; step < 42; step += 1) {
+    body.update(
+      FIXED_DELTA_SECONDS,
+      NO_MOVEMENT,
+      {
+        pressed: step === 0,
+        held: true,
+        released: false,
+      },
+    );
+  }
+  body.update(
+    FIXED_DELTA_SECONDS,
+    new THREE.Vector3(0, 1, 0),
+    { pressed: false, held: false, released: true },
+  );
+  assert.equal(body.usingSurfaceGravity, true);
+  world.unregister(firstTile);
+
+  for (let step = 0; step < 120 && !body.attached; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(0, 1, 0));
+  }
+
+  assert.equal(body.attached, true);
+  assert.equal(body.attachmentSurfaceName, destinationTile.name);
+  assert.equal(body.stickyJumpGravityRemainingSeconds, 0);
+  assert.ok(body.gameplayUp.x < -0.99);
+
+  firstTile.geometry.dispose();
+  destinationTile.geometry.dispose();
+});
+
+test('wall jump release preserves ordinary surface locomotion', () => {
   const idleFixture = createAttachedBody();
   const forwardFixture = createAttachedBody();
   beginWallJump(idleFixture.body);
@@ -239,9 +357,6 @@ test('wall jump release keeps the step-start wall movement basis', () => {
     released: true,
   } as const;
   idleFixture.body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, release);
-  // The camera has already resolved this as a world-space tangent direction.
-  // Jump detachment must keep using the step-start wall plane rather than
-  // projecting it away against world-up midway through the fixed step.
   forwardFixture.body.update(
     FIXED_DELTA_SECONDS,
     new THREE.Vector3(0, 1, 0),
@@ -259,13 +374,49 @@ test('wall jump release keeps the step-start wall movement basis', () => {
     forwardFixture.body.velocity.z,
   );
   assert.ok(forwardVelocity.y > idleVelocity.y);
+  assert.ok(Math.abs(forwardVelocity.x - idleVelocity.x) < EPSILON);
   assert.ok(Math.abs(forwardVelocity.z - idleVelocity.z) < EPSILON);
 
   idleFixture.wall.geometry.dispose();
   forwardFixture.wall.geometry.dispose();
 });
 
-test('buffered sticky-wall contact keeps directional jump intent', () => {
+test('floor-facing sticky jump keeps locomotion without a directional dash', () => {
+  const { body, wall } = createAttachedBody();
+  const towardFloor = new THREE.Vector3(0, -1, 0);
+
+  for (let step = 0; step < 20; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, towardFloor, {
+      pressed: step === 0,
+      held: true,
+      released: false,
+    });
+  }
+  const tangentSpeedBeforeRelease = Math.abs(body.velocity.y);
+
+  body.update(FIXED_DELTA_SECONDS, towardFloor, {
+    pressed: false,
+    held: false,
+    released: true,
+  });
+
+  assert.equal(body.attached, false);
+  assert.ok(body.velocity.x < 0);
+  assert.ok(body.velocity.y < 0);
+  assert.ok(Math.abs(body.lastJumpDirection.x + 1) < EPSILON);
+  assert.ok(Math.abs(body.lastJumpDirection.y) < EPSILON);
+  assert.ok(
+    Math.abs(body.velocity.y) <=
+      body.maximumLocomotionSpeedMetresPerSecond + EPSILON,
+  );
+  assert.ok(
+    Math.abs(Math.abs(body.velocity.y) - tangentSpeedBeforeRelease) < 0.1,
+  );
+
+  wall.geometry.dispose();
+});
+
+test('buffered sticky-wall contact uses a normal local-up jump', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   const events = new EventBus<MovementEvents>();
@@ -294,15 +445,11 @@ test('buffered sticky-wall contact keeps directional jump intent', () => {
 
   body.update(
     FIXED_DELTA_SECONDS,
-    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(1, 1, 0),
     {
       pressed: true,
       held: false,
       released: true,
-    },
-    {
-      lateral: 0,
-      vertical: 1,
     },
   );
 
@@ -310,9 +457,12 @@ test('buffered sticky-wall contact keeps directional jump intent', () => {
   assert.equal(body.attached, false);
   assert.equal(body.jumpInputBufferRemainingSeconds, 0);
   assert.ok(reportedDirection.x < 0);
-  assert.ok(reportedDirection.y > 0);
+  assert.ok(Math.abs(reportedDirection.y) < EPSILON);
   assert.ok(body.velocity.x < 0);
-  assert.ok(body.velocity.y > 0);
+  assert.ok(
+    Math.abs(body.velocity.y) <=
+      body.maximumLocomotionSpeedMetresPerSecond + EPSILON,
+  );
 
   wall.geometry.dispose();
 });

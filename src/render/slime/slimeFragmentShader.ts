@@ -1,5 +1,6 @@
 export const slimeFragmentShader = /* glsl */ `
 uniform vec3 uBaseColour;
+uniform float uOpacity;
 uniform vec3 uKeyLightDirection;
 uniform vec3 uKeyLightRadiance;
 uniform vec3 uHemisphereSkyRadiance;
@@ -56,7 +57,7 @@ void main() {
   vec3 rim = rimColour * fresnel * uRimStrength *
     (0.35 + hemisphereRadiance * 0.65);
 
-  gl_FragColor = vec4(diffuse + wetSpecular + rim, 1.0);
+  gl_FragColor = vec4(diffuse + wetSpecular + rim, uOpacity);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

@@ -69,3 +69,34 @@ export function resolveCameraDistance(
     (targetDistance - currentDistanceMetres) * alpha
   );
 }
+
+/**
+ * Fade a followed character only when obstruction forces the boom very close.
+ * The smoothstep avoids a visible pop as the camera enters or leaves a vent.
+ */
+export function resolveCameraTargetOpacity(
+  cameraDistanceMetres: number,
+  fadeStartDistanceMetres: number,
+  fadeEndDistanceMetres: number,
+  minimumOpacity: number,
+): number {
+  const safeDistance = Number.isFinite(cameraDistanceMetres)
+    ? cameraDistanceMetres
+    : fadeStartDistanceMetres;
+  const range = fadeStartDistanceMetres - fadeEndDistanceMetres;
+  if (
+    !Number.isFinite(range) ||
+    range <= 0 ||
+    !Number.isFinite(minimumOpacity)
+  ) {
+    return 1;
+  }
+
+  const clampedMinimumOpacity = Math.min(1, Math.max(0, minimumOpacity));
+  const linear = Math.min(
+    1,
+    Math.max(0, (safeDistance - fadeEndDistanceMetres) / range),
+  );
+  const smooth = linear * linear * (3 - 2 * linear);
+  return clampedMinimumOpacity + (1 - clampedMinimumOpacity) * smooth;
+}

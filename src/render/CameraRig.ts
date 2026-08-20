@@ -17,6 +17,8 @@ export const CAMERA_NEAR_PLANE_METRES = 0.1;
 export const CAMERA_FAR_PLANE_METRES = 200;
 export const MIN_FOLLOW_DISTANCE_METRES = 3.5;
 export const MAX_FOLLOW_DISTANCE_METRES = 7;
+const MIN_FOLLOW_DISTANCE_SCALE = 0.25;
+const MAX_FOLLOW_DISTANCE_SCALE = 1;
 
 export interface ReadonlyCameraVector3 {
   readonly x: number;
@@ -141,6 +143,7 @@ export class CameraRig {
   private queuedYawRadians = 0;
   private queuedPitchRadians = 0;
   private currentDistanceMetres: number;
+  private followDistanceScale = 1;
   private clearTimeSeconds = 0;
   private initialized = false;
   private obstructed = false;
@@ -181,6 +184,7 @@ export class CameraRig {
     this.queuedYawRadians = 0;
     this.queuedPitchRadians = 0;
     this.planarBack.set(0, 0, 1);
+    this.followDistanceScale = 1;
     this.currentDistanceMetres = this.config.followDistanceMetres;
     this.clearTimeSeconds = 0;
     this.initialized = false;
@@ -227,6 +231,37 @@ export class CameraRig {
     }
 
     this.config.followDistanceMetres = distanceMetres;
+  }
+
+  /**
+   * Set an authored starting heading without manufacturing pointer input.
+   * Zero retains the rig's default heading; positive angles rotate around
+   * world-up using the same convention as the ground movement basis.
+   */
+  setGroundOrbitYawRadians(yawRadians: number): void {
+    if (!Number.isFinite(yawRadians)) {
+      throw new Error('ground orbit yaw must be a finite number.');
+    }
+
+    this.planarBack
+      .set(Math.sin(yawRadians), 0, Math.cos(yawRadians))
+      .normalize();
+    this.queuedYawRadians = 0;
+  }
+
+  /** Temporarily shorten the boom for an authored tight-space camera zone. */
+  setFollowDistanceScale(scale: number): void {
+    if (
+      !Number.isFinite(scale) ||
+      scale < MIN_FOLLOW_DISTANCE_SCALE ||
+      scale > MAX_FOLLOW_DISTANCE_SCALE
+    ) {
+      throw new Error(
+        `follow distance scale must be between ${MIN_FOLLOW_DISTANCE_SCALE} and ${MAX_FOLLOW_DISTANCE_SCALE}.`,
+      );
+    }
+
+    this.followDistanceScale = scale;
   }
 
   /** Queue centralized pointer-lock input for the next rendered pose. */
@@ -378,10 +413,15 @@ export class CameraRig {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Allocation-free distance read for per-frame presentation decisions. */
+  get currentFollowDistanceMetres(): number {
+    return this.currentDistanceMetres;
+  }
+
   getDiagnostics(): CameraRigDiagnostics {
     return {
       currentDistanceMetres: this.currentDistanceMetres,
-      desiredDistanceMetres: this.config.followDistanceMetres,
+      desiredDistanceMetres: this.getDesiredDistanceMetres(),
       obstructed: this.obstructed,
       obstructionName: this.obstructionName,
       targetGrounded: this.targetGrounded,
@@ -394,7 +434,7 @@ export class CameraRig {
     this.smoothedTarget.copy(this.interpolatedTarget);
     this.smoothedUp.copy(this.targetUp);
     this.ensurePlanarBack();
-    this.currentDistanceMetres = this.config.followDistanceMetres;
+    this.currentDistanceMetres = this.getDesiredDistanceMetres();
     this.clearTimeSeconds = 0;
     this.initialized = true;
   }
@@ -474,7 +514,7 @@ export class CameraRig {
     // against the destination up basis. Pitch is an independent scalar and is
     // intentionally left untouched.
     this.ensurePlanarBack();
-    this.currentDistanceMetres = this.config.followDistanceMetres;
+    this.currentDistanceMetres = this.getDesiredDistanceMetres();
     this.clearTimeSeconds = 0;
     this.obstructed = false;
     this.obstructionName = 'none';
@@ -507,6 +547,7 @@ export class CameraRig {
   }
 
   private updateCameraDistance(deltaSeconds: number): void {
+    const desiredDistanceMetres = this.getDesiredDistanceMetres();
     this.framingPivot
       .copy(this.smoothedTarget)
       .addScaledVector(this.smoothedUp, this.config.targetHeightMetres);
@@ -519,7 +560,7 @@ export class CameraRig {
       .normalize();
     this.boomDisplacement
       .copy(this.boomDirection)
-      .multiplyScalar(this.config.followDistanceMetres);
+      .multiplyScalar(desiredDistanceMetres);
 
     const hasObstruction =
       this.obstructionWorld?.sweepSphere(
@@ -553,12 +594,16 @@ export class CameraRig {
 
     this.currentDistanceMetres = resolveCameraDistance(
       this.currentDistanceMetres,
-      this.config.followDistanceMetres,
+      desiredDistanceMetres,
       obstructionLimitMetres,
       this.config.minimumDistanceMetres,
       this.config.recoveryDampingPerSecond,
       recoveryDeltaSeconds,
     );
+  }
+
+  private getDesiredDistanceMetres(): number {
+    return this.config.followDistanceMetres * this.followDistanceScale;
   }
 
   private writeCameraPose(): void {
