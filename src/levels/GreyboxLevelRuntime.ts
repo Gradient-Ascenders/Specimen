@@ -1,9 +1,15 @@
 import * as THREE from 'three';
 
+import {
+  createAuthoredDissolveTarget,
+  type DissolveTarget,
+} from '../abilities/DissolveTarget.ts';
+import { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import { GreyboxTestPanel } from '../debug/GreyboxTestPanel.ts';
+import { runDissolveRegression } from '../debug/DissolveRegression.ts';
 import { runSlimeManagerRegression } from '../debug/SlimeManagerRegression.ts';
 import { runTwoBodySwitchingRegression } from '../debug/TwoBodySwitchingRegression.ts';
 import { runWallJumpBasisRegression } from '../debug/WallJumpBasisRegression.ts';
@@ -17,6 +23,7 @@ import type { MovementEvents } from '../physics/MovementEvents.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { BoxTriggerSensor } from '../puzzle/BoxTriggerSensor.ts';
 import { PressurePlate } from '../puzzle/PressurePlate.ts';
+import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import type { WallJumpIntent } from '../physics/WallJumpBasis.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
@@ -53,6 +60,7 @@ const TWO_BODY_PLATE_POSITION = new THREE.Vector3(3.1, 0, -2.6);
 const TWO_BODY_PLATE_SIZE = new THREE.Vector3(1.8, 0.18, 1.8);
 const TWO_BODY_SENSOR_CENTRE = new THREE.Vector3(3.1, 0.45, -2.6);
 const TWO_BODY_SENSOR_SIZE = new THREE.Vector3(2, 1, 2);
+const DISSOLVE_PUZZLE_GROUP_ID = 'containment-goop-dissolve-demo';
 
 export interface GreyboxLevelRuntimeOptions {
   host: HTMLElement;
@@ -82,6 +90,9 @@ interface GreyboxRuntimeResources {
   readonly slimePairPresentation: SlimePairPresentation;
   readonly pressurePlate: PressurePlate;
   readonly pressurePlateSensor: BoxTriggerSensor;
+  readonly puzzleRegistry: PuzzleRegistry;
+  readonly dissolveTargets: readonly DissolveTarget[];
+  readonly dissolveSystem: DissolveSystem<KinematicBody>;
   readonly pressurePlateOccupants: readonly [
     { readonly id: 'bob'; readonly position: KinematicBody['position']; readonly radiusMetres: number },
     { readonly id: 'goop'; readonly position: KinematicBody['position']; readonly radiusMetres: number },
@@ -331,9 +342,14 @@ export class GreyboxLevelRuntime {
       resources.pressurePlateOccupants,
     );
 
+    resources.dissolveSystem.update(
+      deltaSeconds,
+      this.input.isDown('useAbility'),
+    );
+
     if (slimePair.activeBody.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
       this.requestPlayerDeath(
-        () => slimePair.restoreRecoveryState(),
+        () => this.restoreCheckpointState(resources),
         resources,
       );
     }
@@ -444,6 +460,31 @@ export class GreyboxLevelRuntime {
     const surfaceRegistry = new SurfaceRegistry();
     surfaceRegistry.registerAll(testScene.collisionMeshes);
     const movementEvents = new EventBus<MovementEvents>();
+    const puzzleRegistry = new PuzzleRegistry();
+    const dissolveTargets = testScene.solubleTargetMeshes
+      .map((mesh) =>
+        createAuthoredDissolveTarget(
+          mesh,
+          collisionWorld,
+          surfaceRegistry,
+        ),
+      )
+      .filter((target): target is DissolveTarget => target !== undefined);
+
+    if (dissolveTargets.length === 0) {
+      throw new Error(
+        'Issue #30 development scene has no authored soluble target.',
+      );
+    }
+
+    for (const target of dissolveTargets) {
+      puzzleRegistry.register(
+        `dissolve-${target.id}`,
+        target,
+        DISSOLVE_PUZZLE_GROUP_ID,
+      );
+    }
+
     const spawnPosition = testScene.copySpawnPosition(new THREE.Vector3());
     const goopSpawnPosition = spawnPosition
       .clone()
@@ -484,6 +525,10 @@ export class GreyboxLevelRuntime {
       bobSpawnPosition: spawnPosition,
       goopSpawnPosition,
     });
+    const dissolveSystem = new DissolveSystem(
+      slimeManager,
+      dissolveTargets,
+    );
 
     const slimePairPresentation = new SlimePairPresentation(body.radiusMetres);
     this.renderLayer.scene.add(slimePairPresentation.root);
@@ -559,13 +604,17 @@ export class GreyboxLevelRuntime {
           onTestRecovery: () => {
             slimePair.activeBody.teleport(outOfBoundsTestPosition);
             this.requestPlayerDeath(
-              () => slimePair.restoreRecoveryState(),
+              () =>
+                this.restoreCheckpointState(
+                  this.requireResources(),
+                ),
               this.requireResources(),
             );
           },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
           onRunSlimeRosterRegression: runSlimeManagerRegression,
           onRunTwoBodySwitchingRegression: runTwoBodySwitchingRegression,
+          onRunDissolveRegression: runDissolveRegression,
         })
       : undefined;
 
@@ -605,6 +654,9 @@ export class GreyboxLevelRuntime {
       slimePairPresentation,
       pressurePlate,
       pressurePlateSensor,
+      puzzleRegistry,
+      dissolveTargets,
+      dissolveSystem,
       pressurePlateOccupants,
       deathSequence,
       deathScreen,
@@ -651,6 +703,7 @@ export class GreyboxLevelRuntime {
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
+    resources.puzzleRegistry.reset();
     resources.slimePair.restoreInitialState();
     resources.pressurePlate.reset();
     resources.testScene.resetProbe();
@@ -688,6 +741,9 @@ export class GreyboxLevelRuntime {
     for (const unsubscribe of resources.unsubscribeSlimeRoster) unsubscribe();
     resources.movementEvents.clear();
     resources.pressurePlate.dispose();
+    resources.dissolveSystem.dispose();
+    for (const target of resources.dissolveTargets) target.dispose();
+    resources.puzzleRegistry.clear();
     resources.slimePairPresentation.dispose();
     resources.slimeManager.clearLevelRegistrations();
     resources.slimeManager.dispose();
@@ -707,6 +763,23 @@ export class GreyboxLevelRuntime {
     this.lastDeathSlimeId = undefined;
     this.notifySlimeHUD();
   };
+
+
+  /**
+   * Current two-body checkpoint recovery seam.
+   *
+   * Puzzle components restore first, matching CheckpointManager's existing
+   * group-reset-before-player-recovery contract. The persistent slime pair then
+   * restores both bodies and active ownership.
+   */
+  private restoreCheckpointState(
+    resources: GreyboxRuntimeResources,
+  ): void {
+    resources.puzzleRegistry.resetGroup(
+      DISSOLVE_PUZZLE_GROUP_ID,
+    );
+    resources.slimePair.restoreRecoveryState();
+  }
 
 
   /**
@@ -933,6 +1006,8 @@ export class GreyboxLevelRuntime {
       slimeManager,
       slimePair,
       pressurePlate,
+      dissolveSystem,
+      dissolveTargets,
     } = resources;
     const heldActions = Array.from(this.input.held).join(', ') || 'none';
     const activeBody = slimePair.activeBody;
@@ -950,6 +1025,8 @@ export class GreyboxLevelRuntime {
     const bobDefinition = slimeManager.getDefinition('bob');
     const goopDefinition = slimeManager.getDefinition('goop');
     const voltDefinition = slimeManager.getDefinition('volt');
+    const dissolveStats = dissolveSystem.getDiagnostics();
+    const primaryDissolveTarget = dissolveTargets[0];
 
     testPanel.setRuntimeDiagnostics(
       [
@@ -977,6 +1054,12 @@ export class GreyboxLevelRuntime {
         `Bob abilities adhesion / rebound / dissolve / electrical: ${bobDefinition.abilities.adhesion ? 'yes' : 'no'} / ${bobDefinition.abilities.rebound ? 'yes' : 'no'} / ${bobDefinition.abilities.dissolve ? 'yes' : 'no'} / ${bobDefinition.abilities.electrical ? 'yes' : 'no'}`,
         `Bob / Goop jump mode: ${bobDefinition.jumpMode} / ${goopDefinition.jumpMode}`,
         `Goop abilities adhesion / rebound / dissolve / electrical: ${goopDefinition.abilities.adhesion ? 'yes' : 'no'} / ${goopDefinition.abilities.rebound ? 'yes' : 'no'} / ${goopDefinition.abilities.dissolve ? 'yes' : 'no'} / ${goopDefinition.abilities.electrical ? 'yes' : 'no'}`,
+        `dissolve action / permitted: E / ${dissolveStats.permitted ? 'yes' : 'no'}`,
+        `dissolve contact / active: ${dissolveStats.contactTargetId} / ${dissolveStats.activeTargetId}`,
+        `dissolve progress: ${(primaryDissolveTarget.progress * 100).toFixed(0)}%`,
+        `dissolve collision / completed: ${primaryDissolveTarget.collisionEnabled ? 'yes' : 'no'} / ${primaryDissolveTarget.completed ? 'yes' : 'no'}`,
+        `dissolve threshold / duration: ${(primaryDissolveTarget.collisionDisableProgress * 100).toFixed(0)}% / ${primaryDissolveTarget.dissolveDurationSeconds.toFixed(2)} s`,
+        `dissolve completions: ${primaryDissolveTarget.completionCount}`,
         `Volt config: ${voltDefinition.betaAvailability} / electrical ${voltDefinition.abilities.electrical ? 'configured' : 'missing'}`,
         `body position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)} m`,
         `body velocity: ${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)}, ${velocity.z.toFixed(2)} m/s`,
