@@ -79,6 +79,8 @@ test('complete Containment scene exposes unique, consistently tagged colliders',
   assert.equal(goopDoor.userData.surfaceTag, 'default');
   assert.equal(goopDoor.userData.interactionRole, 'goop-dissolvable');
   assert.equal(goopDoor.userData.textureRole, 'wooden-door');
+  assert.equal(goopDoor.userData.soluble, true);
+  assert.ok(scene.solubleTargetMeshes.includes(goopDoor));
   assert.deepEqual(goopDoor.userData.sizeMetres, [3, 4.5, 0.3]);
   assert.ok(goopDoor.position.equals(new THREE.Vector3(0, 77, 125.25)));
   assert.ok(goopDoor.material instanceof THREE.MeshStandardMaterial);

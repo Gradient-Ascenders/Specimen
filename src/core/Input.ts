@@ -4,6 +4,8 @@ export type InputAction =
   | 'moveLeft'
   | 'moveRight'
   | 'jump'
+  | 'switchSlime'
+  | 'useAbility'
   | 'debugReset'
   | 'debugTestRecovery'
   | 'debugTeleportRoomOne'
@@ -26,6 +28,8 @@ export const DEFAULT_ACTION_BINDINGS = {
   moveLeft: [{ kind: 'key', code: 'KeyA' }],
   moveRight: [{ kind: 'key', code: 'KeyD' }],
   jump: [{ kind: 'key', code: 'Space' }],
+  switchSlime: [{ kind: 'key', code: 'Tab' }],
+  useAbility: [{ kind: 'key', code: 'KeyE' }],
   debugReset: [{ kind: 'key', code: 'KeyR' }],
   debugTestRecovery: [{ kind: 'key', code: 'KeyF' }],
   debugTeleportRoomOne: [{ kind: 'key', code: 'Digit1' }],

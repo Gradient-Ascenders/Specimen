@@ -78,7 +78,7 @@ export class ContainmentLevelController {
   readonly events = new EventBus<ContainmentLevelEvents>();
 
   private readonly scene: ContainmentLevelScene;
-  private readonly body: KinematicBody;
+  private body: KinematicBody;
   private readonly collisionWorld: CollisionWorld;
   private readonly requestDeathAction: (recovery: DeathRecoveryAction) => boolean;
   private readonly puzzleRegistry = new PuzzleRegistry();
@@ -148,6 +148,11 @@ export class ContainmentLevelController {
 
   get completionCount(): number {
     return this.completionCountValue;
+  }
+
+  /** Follow the currently controlled persistent slime without duplicating level logic. */
+  setActiveBody(body: KinematicBody): void {
+    this.body = body;
   }
 
   update(deltaSeconds: number): void {

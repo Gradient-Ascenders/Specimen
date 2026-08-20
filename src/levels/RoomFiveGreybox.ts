@@ -306,6 +306,11 @@ export class RoomFiveGreybox {
       interactionRole: 'goop-dissolvable',
       textureRole: 'wooden-door',
     });
+    goopWoodenDoor.userData.soluble = true;
+    goopWoodenDoor.userData.solubleId = goopWoodenDoor.name;
+    goopWoodenDoor.userData.dissolveDurationSeconds = 1.8;
+    goopWoodenDoor.userData.dissolveCollisionDisableProgress = 0.72;
+    goopWoodenDoor.userData.dissolveActivationRangeMetres = 0.12;
 
     this.builder.addLight('room-5-entry-light', [9, 96, 96]);
     this.builder.addLight('room-5-containment-light', [0, 94, 110], 0xcfff70, 15, 22);

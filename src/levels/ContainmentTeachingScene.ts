@@ -54,6 +54,7 @@ export class ContainmentTeachingScene {
   readonly root = new THREE.Group();
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
+  private readonly solubleTargetMeshList: THREE.Mesh[] = [];
   private readonly slimeVisual: SlimeVisual;
   private readonly slimeBurst = new SlimeBurstPresentation();
   private deathElapsedSeconds = 0;
@@ -97,6 +98,11 @@ export class ContainmentTeachingScene {
 
   get collisionMeshes(): readonly THREE.Mesh[] {
     return this.collisionMeshList;
+  }
+
+  /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
+  get solubleTargetMeshes(): readonly THREE.Mesh[] {
+    return this.solubleTargetMeshList;
   }
 
   get slimeDiagnostics(): SlimeVisualDiagnostics {
@@ -211,6 +217,7 @@ export class ContainmentTeachingScene {
       for (const material of materials) material.dispose();
     });
     this.collisionMeshList.length = 0;
+    this.solubleTargetMeshList.length = 0;
     this.root.clear();
   }
 
@@ -247,6 +254,17 @@ export class ContainmentTeachingScene {
     this.addOpenVentFrame('room-1-vent-open-frame', [-4.8, 6, 5.74], materials.duct);
 
     this.addCollider({ name: 'room-1-containment-pedestal', size: [2.6, 1.1, 2.6], position: [0, 0.55, -0.5], material: materials.support });
+
+    // Development proof for #30. Only this explicitly-marked barrier is
+    // soluble; ordinary floor/wall/sticky/non-stick geometry remains untouched.
+    this.addSolubleCollider({
+      name: 'room-1-goop-soluble-test-barrier',
+      size: [2.2, 2.4, 0.35],
+      position: [4.8, 1.2, -2.6],
+      dissolveDurationSeconds: 1.8,
+      collisionDisableProgress: 0.72,
+    });
+
     this.addVisualBox('room-1-glass-containment-box', [1.8, 1.9, 1.8], [0, 2.05, -0.5], materials.glass);
     const egg = new THREE.Mesh(new THREE.SphereGeometry(0.48, 20, 14), materials.egg);
     egg.name = 'room-1-specimen-egg';
@@ -407,6 +425,39 @@ export class ContainmentTeachingScene {
       material,
       surfaceTag,
     });
+  }
+
+
+  private addSolubleCollider(options: {
+    readonly name: string;
+    readonly size: readonly [number, number, number];
+    readonly position: readonly [number, number, number];
+    readonly dissolveDurationSeconds: number;
+    readonly collisionDisableProgress: number;
+  }): void {
+    const material = this.material(0xb66a36, 0x4f1a06);
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(...options.size),
+      material,
+    );
+    mesh.name = options.name;
+    mesh.position.set(...options.position);
+    mesh.userData.surfaceTag = 'default';
+    mesh.userData.sizeMetres = [...options.size];
+
+    // Explicit authoring metadata. DissolveTarget ignores every mesh that does
+    // not opt in with soluble === true.
+    mesh.userData.soluble = true;
+    mesh.userData.solubleId = options.name;
+    mesh.userData.dissolveDurationSeconds =
+      options.dissolveDurationSeconds;
+    mesh.userData.dissolveCollisionDisableProgress =
+      options.collisionDisableProgress;
+    mesh.userData.dissolveActivationRangeMetres = 0.12;
+
+    this.root.add(mesh);
+    this.collisionMeshList.push(mesh);
+    this.solubleTargetMeshList.push(mesh);
   }
 
 
