@@ -35,6 +35,12 @@ const forbiddenFiles = new Set([
   'tsconfig.json',
   'vite.config.ts',
 ]);
+const requiredRootFiles = [
+  'README.md',
+  'index.html',
+  'start-server.ps1',
+  'start-server.sh',
+];
 
 const toArchivePath = (path) => path.split(sep).join('/');
 
@@ -73,8 +79,10 @@ const run = (command, args, options = {}) => {
 };
 
 const validateBuild = async (files) => {
-  if (!files.includes('index.html')) {
-    throw new Error('dist/index.html is required at the build root.');
+  for (const requiredFile of requiredRootFiles) {
+    if (!files.includes(requiredFile)) {
+      throw new Error(`dist/${requiredFile} is required at the build root.`);
+    }
   }
 
   for (const file of files) {

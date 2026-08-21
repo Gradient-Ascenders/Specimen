@@ -29,10 +29,13 @@ unzip -Z1 artifacts/specimen-production.zip
 unzip -t artifacts/specimen-production.zip
 ```
 
-`index.html` must be at the archive root. Hashed JavaScript and CSS files must
-be beneath `assets/`. The listing must not contain an enclosing `dist/`
-directory, `src/`, `node_modules/`, or development configuration. Generated
-archives are ignored and must not be committed.
+`index.html`, `README.md`, `start-server.sh`, and `start-server.ps1` must
+be at the archive root. The README and launchers let a recipient serve the
+extracted build locally; the static LAMP host merely serves them as ordinary
+files. Hashed JavaScript and CSS files must be beneath `assets/`. The listing
+must not contain an enclosing `dist/` directory, `src/`, `node_modules/`,
+or development configuration. Generated archives are ignored and must not be
+committed.
 
 When downloading the `specimen-production` artifact from GitHub Actions,
 extract the Actions artifact wrapper and submit its inner
