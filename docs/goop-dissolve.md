@@ -139,7 +139,7 @@ three-layer value noise → mask in [0, 1]
         ↓
 discard when mask <= uDissolveAmount
         ↓
-kept fragments within uEdgeWidth of the threshold receive emissive edge colour
+kept fragments within uDissolveEdgeWidth of the threshold receive emissive edge colour
 ```
 
 A strict zero-progress guard prevents even a rare zero-valued mask sample from
@@ -156,8 +156,8 @@ surface's real scene-light response.
 | `uDissolveAmount` | `DissolveTarget.progress`, `[0, 1]` | Sole threshold authority; zero is intact and one is complete. |
 | `uNoiseScale` | material constant, target-local inverse metres | Sets corrosion feature size without a texture. |
 | `uNoiseOffset` | deterministic hash of target ID | Gives targets stable, distinct masks without random runtime state. |
-| `uEdgeWidth` | material constant in mask units | Width of the visible band immediately above the discard threshold. |
-| `uEdgeColour` | material constant | High-contrast corrosion boundary. |
+| `uDissolveEdgeWidth` | material constant in mask units | Width of the visible band immediately above the discard threshold. |
+| `uDissolveEdgeColour` | material constant | High-contrast corrosion boundary. |
 
 The current integration supports explicitly authored static `Mesh` geometry
 whose slots use `MeshStandardMaterial`. Each private dissolve material copies
