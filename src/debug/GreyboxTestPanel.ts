@@ -206,6 +206,10 @@ export class GreyboxTestPanel {
       `Probe teleported to the Room ${roomId} entry checkpoint.`;
   };
 
+  markProbeAtSpawn(): void {
+    this.status.textContent = 'Probe is at spawn.';
+  }
+
   private readonly teleportRoomFromButton = (event: Event): void => {
     const roomId = Number(
       (event.currentTarget as HTMLButtonElement).dataset.roomId,

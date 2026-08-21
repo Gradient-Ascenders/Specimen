@@ -434,7 +434,7 @@ test('Containment objectives follow room entry and reset to Room 1', () => {
     'Learn how to jump',
     'Get past the lasers',
     'Survive the elevator!',
-    'Free Goob!',
+    'Free Goop!',
     'Climb through the vent',
   ]);
 

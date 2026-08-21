@@ -851,6 +851,7 @@ export class GreyboxLevelRuntime {
     this.slopeRegressionStatus = 'not run';
     this.host.dataset.gameState = resources.deathSequence.state;
     if (resources.testPanel) {
+      resources.testPanel.markProbeAtSpawn();
       this.setDebugVisible(this.debugVisible, resources.testPanel);
     }
     this.notifySlimeHUD(undefined, true);
@@ -1231,7 +1232,9 @@ export class GreyboxLevelRuntime {
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
         `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
+        `scene objects: ${renderStats.sceneObjects}`,
         `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
+        `shader programs: ${renderStats.programs}`,
       ].join('\n'),
     );
   }

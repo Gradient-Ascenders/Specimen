@@ -15,8 +15,10 @@ export interface RenderDiagnostics {
   readonly pixelRatio: number;
   readonly drawCalls: number;
   readonly triangles: number;
+  readonly sceneObjects: number;
   readonly geometries: number;
   readonly textures: number;
+  readonly programs: number;
 }
 
 export interface RenderLayerOptions {
@@ -91,6 +93,10 @@ export class RenderLayer {
 
   getDiagnostics(): RenderDiagnostics {
     this.renderer.getDrawingBufferSize(this.drawingBufferSize);
+    let sceneObjects = 0;
+    this.scene.traverse(() => {
+      sceneObjects += 1;
+    });
 
     return {
       viewportWidth: this.viewportWidth,
@@ -100,8 +106,10 @@ export class RenderLayer {
       pixelRatio: this.renderer.getPixelRatio(),
       drawCalls: this.renderer.info.render.calls,
       triangles: this.renderer.info.render.triangles,
+      sceneObjects,
       geometries: this.renderer.info.memory.geometries,
       textures: this.renderer.info.memory.textures,
+      programs: this.renderer.info.programs?.length ?? 0,
     };
   }
 

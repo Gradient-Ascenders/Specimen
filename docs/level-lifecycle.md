@@ -86,7 +86,8 @@ reports:
 
 - active level, lifecycle state, and completed restart count;
 - fixed-step duration, render frame time/FPS, and steps per frame;
-- renderer draw calls, triangles, GPU geometry count, and GPU texture count;
+- renderer draw calls, triangles, scene-object count, GPU geometry/texture
+  counts, and compiled shader-program count;
 - player position, velocity, ground/attachment, surface, jump buffer, and contact
   state;
 - death state, accepted death/retry counts, and slime-burst radius;
