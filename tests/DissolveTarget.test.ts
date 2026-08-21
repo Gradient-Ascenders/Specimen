@@ -37,6 +37,8 @@ function createTargetFixture(
         color: index === 0 ? 0xb66a36 : 0x70864b,
         emissive: 0x241006,
         emissiveIntensity: 0.25,
+        roughness: 0.63,
+        metalness: 0.27,
       }),
   );
   const mesh = new THREE.Mesh(
@@ -82,29 +84,76 @@ function compileShadowHook(material: THREE.Material): {
   return shader;
 }
 
+function compileSurfaceHook(material: THREE.Material): {
+  readonly uniforms: Record<string, THREE.IUniform>;
+  readonly vertexShader: string;
+  readonly fragmentShader: string;
+} {
+  const shader = {
+    uniforms: {} as Record<string, THREE.IUniform>,
+    vertexShader: '#include <common>\n#include <project_vertex>',
+    fragmentShader: `#include <common>
+void main() {
+  #include <clipping_planes_fragment>
+  vec3 totalEmissiveRadiance = emissive;
+  #include <emissivemap_fragment>
+}`,
+  };
+  material.onBeforeCompile(shader, null as never);
+  return shader;
+}
+
 test('gameplay progress drives visible, depth, and distance dissolve passes', () => {
   const fixture = createTargetFixture('render-sync');
   const { target, mesh } = fixture;
 
   try {
     assert.ok(mesh.material instanceof DissolveMaterial);
+    assert.ok(mesh.material instanceof THREE.MeshStandardMaterial);
     assert.equal(mesh.material.transparent, false);
     assert.equal(mesh.material.depthWrite, true);
+    assert.equal(mesh.material.roughness, 0.63);
+    assert.equal(mesh.material.metalness, 0.27);
+    assert.ok(mesh.material.color.equals(fixture.sourceMaterials[0]!.color));
+    assert.ok(
+      mesh.material.emissive.equals(fixture.sourceMaterials[0]!.emissive),
+    );
+    assert.equal(
+      mesh.material.emissiveIntensity,
+      fixture.sourceMaterials[0]!.emissiveIntensity,
+    );
     assert.ok(mesh.customDepthMaterial instanceof THREE.MeshDepthMaterial);
     assert.ok(
       mesh.customDistanceMaterial instanceof THREE.MeshDistanceMaterial,
     );
 
+    const surfaceShader = compileSurfaceHook(mesh.material);
     const depthShader = compileShadowHook(mesh.customDepthMaterial);
     const distanceShader = compileShadowHook(mesh.customDistanceMaterial);
-    assert.match(depthShader.fragmentShader, /dissolveShadowMask/);
+    assert.match(surfaceShader.fragmentShader, /dissolveSurfaceMask/);
+    assert.match(surfaceShader.fragmentShader, /discard/);
+    assert.match(
+      surfaceShader.fragmentShader,
+      /uniform float uDissolveEdgeWidth;/,
+    );
+    assert.match(
+      surfaceShader.fragmentShader,
+      /uniform vec3 uDissolveEdgeColour;/,
+    );
+    assert.match(surfaceShader.fragmentShader, /totalEmissiveRadiance \+=/);
+    assert.doesNotMatch(surfaceShader.fragmentShader, /uKeyLightDirection/);
+    assert.match(depthShader.fragmentShader, /dissolveSurfaceMask/);
     assert.match(depthShader.fragmentShader, /discard/);
-    assert.match(distanceShader.fragmentShader, /dissolveShadowMask/);
+    assert.match(distanceShader.fragmentShader, /dissolveSurfaceMask/);
     assert.match(distanceShader.fragmentShader, /discard/);
 
     target.advance(0.4);
     assert.ok(Math.abs(target.progress - 0.2) < EPSILON);
     assert.equal(target.renderDiagnostics.dissolveAmount, target.progress);
+    assert.equal(
+      surfaceShader.uniforms.uDissolveAmount?.value,
+      target.progress,
+    );
     assert.equal(
       depthShader.uniforms.uDissolveAmount?.value,
       target.progress,
@@ -194,8 +243,8 @@ test('multiple targets retain independent material state and deterministic seeds
     const firstMaterials = first.mesh.material as DissolveMaterial[];
     assert.equal(firstMaterials.length, 2);
     assert.equal(
-      firstMaterials[0]?.uniforms.uDissolveAmount,
-      firstMaterials[1]?.uniforms.uDissolveAmount,
+      firstMaterials[0]?.dissolveAmountUniform,
+      firstMaterials[1]?.dissolveAmountUniform,
     );
 
     first.target.reset();

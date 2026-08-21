@@ -1,13 +1,12 @@
-export const dissolveVertexShader = /* glsl */ `
-varying vec3 vLocalPosition;
-varying vec3 vWorldNormal;
+/** Declarations injected into Three.js's standard and shadow vertex shaders. */
+export const dissolveVertexPars = /* glsl */ `
+varying vec3 vDissolveLocalPosition;
+`;
 
-void main() {
-  vLocalPosition = position;
-
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
+/**
+ * Capture Three.js's fully transformed local position. This is deliberately
+ * inserted after morphing, skinning, and displacement but before projection.
+ */
+export const dissolveVertexPosition = /* glsl */ `
+vDissolveLocalPosition = transformed;
 `;

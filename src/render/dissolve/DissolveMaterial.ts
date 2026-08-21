@@ -1,15 +1,22 @@
 import * as THREE from 'three';
 
-import { dissolveFragmentShader } from './dissolveFragmentShader.ts';
-import { dissolveNoiseGlsl } from './dissolveNoise.ts';
-import { dissolveVertexShader } from './dissolveVertexShader.ts';
+import {
+  dissolveFragmentDiscard,
+  dissolveFragmentEdge,
+  dissolveFragmentEdgePars,
+  dissolveFragmentPars,
+} from './dissolveFragmentShader.ts';
+import {
+  dissolveVertexPars,
+  dissolveVertexPosition,
+} from './dissolveVertexShader.ts';
 
 export const DEFAULT_DISSOLVE_NOISE_SCALE = 1.75;
 export const DEFAULT_DISSOLVE_EDGE_WIDTH = 0.075;
 export const DEFAULT_DISSOLVE_EDGE_COLOUR = 0xb7ff57;
 
-const KEY_LIGHT_DIRECTION = new THREE.Vector3(8, 13.5, 8.5).normalize();
-const SHADOW_PROGRAM_CACHE_KEY = 'specimen-dissolve-shadow-mask-v1';
+const SURFACE_PROGRAM_CACHE_KEY = 'specimen-dissolve-standard-surface-v2';
+const SHADOW_PROGRAM_CACHE_KEY = 'specimen-dissolve-shadow-mask-v2';
 
 interface DissolveMaskUniforms {
   [name: string]: THREE.IUniform;
@@ -18,26 +25,8 @@ interface DissolveMaskUniforms {
   uNoiseOffset: THREE.IUniform<THREE.Vector3>;
 }
 
-interface DissolveSurfaceUniforms extends DissolveMaskUniforms {
-  uEdgeWidth: THREE.IUniform<number>;
-  uBaseColour: THREE.IUniform<THREE.Color>;
-  uEmissiveColour: THREE.IUniform<THREE.Color>;
-  uEdgeColour: THREE.IUniform<THREE.Color>;
-  uKeyLightDirection: THREE.IUniform<THREE.Vector3>;
-  uKeyLightRadiance: THREE.IUniform<THREE.Color>;
-  uHemisphereSkyRadiance: THREE.IUniform<THREE.Color>;
-  uHemisphereGroundRadiance: THREE.IUniform<THREE.Color>;
-  uOpacity: THREE.IUniform<number>;
-}
-
-interface ColourMaterial extends THREE.Material {
-  readonly color?: THREE.Color;
-  readonly emissive?: THREE.Color;
-  readonly emissiveIntensity?: number;
-}
-
 export interface DissolveMaterialOptions {
-  readonly sourceMaterial: THREE.Material;
+  readonly sourceMaterial: THREE.MeshStandardMaterial;
   readonly maskUniforms: DissolveMaskUniforms;
   readonly edgeColour?: THREE.ColorRepresentation;
   readonly edgeWidth?: number;
@@ -52,56 +41,51 @@ export interface DissolveMaterialBundleDiagnostics {
 }
 
 /**
- * Visible, texture-free material for one authored soluble material slot.
- *
- * All slots on one target share the same mask uniforms, so grouped geometry
- * cannot split into contradictory dissolve states.
+ * A private copy of one authored MeshStandardMaterial with two small shader
+ * insertions: the gameplay threshold discard and an emissive corrosion edge.
+ * Three.js still owns all scene-light, shadow, fog, map, and PBR evaluation.
  */
-export class DissolveMaterial extends THREE.ShaderMaterial {
-  constructor(options: DissolveMaterialOptions) {
-    const source = options.sourceMaterial as ColourMaterial;
-    const baseColour = source.color?.clone() ?? new THREE.Color(0x9a6640);
-    const emissiveColour = source.emissive?.clone() ?? new THREE.Color(0);
-    emissiveColour.multiplyScalar(source.emissiveIntensity ?? 1);
+export class DissolveMaterial extends THREE.MeshStandardMaterial {
+  readonly dissolveAmountUniform: THREE.IUniform<number>;
 
-    const uniforms: DissolveSurfaceUniforms = {
-      ...options.maskUniforms,
-      uEdgeWidth: {
-        value: options.edgeWidth ?? DEFAULT_DISSOLVE_EDGE_WIDTH,
-      },
-      uBaseColour: { value: baseColour },
-      uEmissiveColour: { value: emissiveColour },
-      uEdgeColour: {
-        value: new THREE.Color(
-          options.edgeColour ?? DEFAULT_DISSOLVE_EDGE_COLOUR,
-        ),
-      },
-      uKeyLightDirection: { value: KEY_LIGHT_DIRECTION.clone() },
-      uKeyLightRadiance: {
-        value: new THREE.Color(0xffffff).multiplyScalar(1.15),
-      },
-      uHemisphereSkyRadiance: {
-        value: new THREE.Color(0xddeeff).multiplyScalar(0.48),
-      },
-      uHemisphereGroundRadiance: {
-        value: new THREE.Color(0x25332e).multiplyScalar(0.32),
-      },
-      uOpacity: { value: source.opacity },
+  constructor(options: DissolveMaterialOptions) {
+    super();
+    this.copy(options.sourceMaterial);
+    this.name = `dissolve-${options.sourceMaterial.name || 'authored'}-material`;
+    this.dissolveAmountUniform = options.maskUniforms.uDissolveAmount;
+
+    const edgeWidthUniform: THREE.IUniform<number> = {
+      value: options.edgeWidth ?? DEFAULT_DISSOLVE_EDGE_WIDTH,
+    };
+    const edgeColourUniform: THREE.IUniform<THREE.Color> = {
+      value: new THREE.Color(
+        options.edgeColour ?? DEFAULT_DISSOLVE_EDGE_COLOUR,
+      ),
     };
 
-    super({
-      name: `dissolve-${source.name || 'authored'}-material`,
-      uniforms,
-      vertexShader: dissolveVertexShader,
-      fragmentShader: dissolveFragmentShader,
-      side: source.side,
-      transparent: source.transparent || source.opacity < 1,
-      depthTest: source.depthTest,
-      depthWrite: source.depthWrite,
-      toneMapped: true,
-    });
+    this.onBeforeCompile = (shader) => {
+      shader.uniforms.uDissolveAmount = options.maskUniforms.uDissolveAmount;
+      shader.uniforms.uNoiseScale = options.maskUniforms.uNoiseScale;
+      shader.uniforms.uNoiseOffset = options.maskUniforms.uNoiseOffset;
+      shader.uniforms.uDissolveEdgeWidth = edgeWidthUniform;
+      shader.uniforms.uDissolveEdgeColour = edgeColourUniform;
 
-    this.shadowSide = source.shadowSide;
+      shader.vertexShader = injectDissolveVertexShader(shader.vertexShader);
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>\n${dissolveFragmentPars}\n${dissolveFragmentEdgePars}`,
+        )
+        .replace(
+          '#include <clipping_planes_fragment>',
+          `#include <clipping_planes_fragment>\n${dissolveFragmentDiscard}`,
+        )
+        .replace(
+          '#include <emissivemap_fragment>',
+          `#include <emissivemap_fragment>\n${dissolveFragmentEdge}`,
+        );
+    };
+    this.customProgramCacheKey = () => SURFACE_PROGRAM_CACHE_KEY;
   }
 }
 
@@ -114,28 +98,43 @@ export class DissolveMaterialBundle {
   private readonly maskUniforms: DissolveMaskUniforms;
   private disposed = false;
 
-  constructor(
-    sourceMaterials: readonly THREE.Material[],
-    targetId: string,
-  ) {
+  constructor(sourceMaterials: readonly THREE.Material[], targetId: string) {
     if (sourceMaterials.length === 0) {
       throw new Error('Dissolve targets require at least one material.');
     }
+
+    const standardMaterials = sourceMaterials.map((sourceMaterial) => {
+      if (
+        !(sourceMaterial instanceof THREE.MeshStandardMaterial) ||
+        sourceMaterial.type !== 'MeshStandardMaterial'
+      ) {
+        throw new Error(
+          `Dissolve target "${targetId}" requires explicitly authored MeshStandardMaterial surfaces.`,
+        );
+      }
+      return sourceMaterial as THREE.MeshStandardMaterial;
+    });
 
     this.maskUniforms = {
       uDissolveAmount: { value: 0 },
       uNoiseScale: { value: DEFAULT_DISSOLVE_NOISE_SCALE },
       uNoiseOffset: { value: createDeterministicNoiseOffset(targetId) },
     };
-    this.surfaceMaterials = sourceMaterials.map(
+    this.surfaceMaterials = standardMaterials.map(
       (sourceMaterial) =>
         new DissolveMaterial({
           sourceMaterial,
           maskUniforms: this.maskUniforms,
         }),
     );
-    this.depthMaterial = createDepthMaterial(this.maskUniforms);
-    this.distanceMaterial = createDistanceMaterial(this.maskUniforms);
+    this.depthMaterial = createDepthMaterial(
+      this.maskUniforms,
+      standardMaterials[0],
+    );
+    this.distanceMaterial = createDistanceMaterial(
+      this.maskUniforms,
+      standardMaterials[0],
+    );
   }
 
   get dissolveAmount(): number {
@@ -187,8 +186,10 @@ function createDeterministicNoiseOffset(id: string): THREE.Vector3 {
 
 function createDepthMaterial(
   uniforms: DissolveMaskUniforms,
+  source: THREE.MeshStandardMaterial,
 ): THREE.MeshDepthMaterial {
   const material = new THREE.MeshDepthMaterial();
+  copyShadowSurfaceProperties(material, source);
   material.name = 'dissolve-directional-depth-material';
   configureShadowShader(material, uniforms);
   return material;
@@ -196,11 +197,44 @@ function createDepthMaterial(
 
 function createDistanceMaterial(
   uniforms: DissolveMaskUniforms,
+  source: THREE.MeshStandardMaterial,
 ): THREE.MeshDistanceMaterial {
   const material = new THREE.MeshDistanceMaterial();
+  copyShadowSurfaceProperties(material, source);
   material.name = 'dissolve-point-distance-material';
   configureShadowShader(material, uniforms);
   return material;
+}
+
+function copyShadowSurfaceProperties(
+  material: THREE.MeshDepthMaterial | THREE.MeshDistanceMaterial,
+  source: THREE.MeshStandardMaterial,
+): void {
+  material.side = source.side;
+  material.shadowSide = source.shadowSide;
+  material.depthTest = source.depthTest;
+  material.depthWrite = source.depthWrite;
+  material.alphaTest = source.alphaTest;
+  material.map = source.map;
+  material.alphaMap = source.alphaMap;
+  material.displacementMap = source.displacementMap;
+  material.displacementScale = source.displacementScale;
+  material.displacementBias = source.displacementBias;
+  material.clipShadows = source.clipShadows;
+  material.clippingPlanes = source.clippingPlanes;
+  material.clipIntersection = source.clipIntersection;
+}
+
+function injectDissolveVertexShader(vertexShader: string): string {
+  return vertexShader
+    .replace(
+      '#include <common>',
+      `#include <common>\n${dissolveVertexPars}`,
+    )
+    .replace(
+      '#include <project_vertex>',
+      `${dissolveVertexPosition}\n#include <project_vertex>`,
+    );
 }
 
 function configureShadowShader(
@@ -212,33 +246,15 @@ function configureShadowShader(
     shader.uniforms.uNoiseScale = uniforms.uNoiseScale;
     shader.uniforms.uNoiseOffset = uniforms.uNoiseOffset;
 
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nvarying vec3 vDissolveLocalPosition;',
-      )
-      .replace(
-        '#include <project_vertex>',
-        'vDissolveLocalPosition = transformed;\n#include <project_vertex>',
-      );
-
+    shader.vertexShader = injectDissolveVertexShader(shader.vertexShader);
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>
-uniform float uDissolveAmount;
-uniform float uNoiseScale;
-uniform vec3 uNoiseOffset;
-varying vec3 vDissolveLocalPosition;
-${dissolveNoiseGlsl}`,
+        `#include <common>\n${dissolveFragmentPars}`,
       )
       .replace(
         '#include <clipping_planes_fragment>',
-        `#include <clipping_planes_fragment>
-float dissolveShadowMask = dissolveMask(vDissolveLocalPosition);
-if (uDissolveAmount > 0.0 && dissolveShadowMask <= uDissolveAmount) {
-  discard;
-}`,
+        `#include <clipping_planes_fragment>\n${dissolveFragmentDiscard}`,
       );
   };
   material.customProgramCacheKey = () => SHADOW_PROGRAM_CACHE_KEY;

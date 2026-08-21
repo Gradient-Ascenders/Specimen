@@ -6,6 +6,8 @@
  * gameplay is interrupted and after any repeated progress/reset cycle.
  */
 export const dissolveNoiseGlsl = /* glsl */ `
+// David Hoskins, "Hash without Sine" hash13 (MIT), adapted only in naming.
+// https://www.shadertoy.com/view/4djSRW
 float dissolveHash(vec3 point) {
   point = fract(point * 0.1031);
   point += dot(point, point.yzx + 33.33);

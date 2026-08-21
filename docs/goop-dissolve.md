@@ -25,6 +25,11 @@ Unmarked geometry is never inserted into the dissolve runtime. Ordinary
 `default`, `sticky`, `nonStick`, and `bouncy` surfaces therefore remain
 unaffected.
 
+The current authored targets are the Room 1 orange development barrier and the
+Room 5 Goop wooden door. Room 5 includes three authored point lights; because
+the dissolve surface retains `MeshStandardMaterial`, that door responds to
+those lights instead of switching to an inspection-rig approximation.
+
 ## Control and ability gate
 
 The named gameplay action is:
@@ -107,12 +112,18 @@ No vertex data, imported asset geometry, or destructive mesh data is changed.
 
 ## Dissolve shader
 
-`DissolveMaterial` is a handwritten, texture-free `ShaderMaterial`. The vertex
-stage passes the undeformed target-local position and world normal to the
-fragment stage. Target-local position keeps the corrosion fixed to the authored
-object when the object or camera moves; current soluble meshes must use geometry
-dimensions or uniform mesh scale because the lightweight world-normal transform
-assumes rigid/uniform scale.
+`DissolveMaterial` extends Three.js's `MeshStandardMaterial` shader through
+`onBeforeCompile`. It first copies the explicitly authored standard material,
+then inserts only the dissolve coordinates, threshold, and edge. Three.js keeps
+evaluating the room's actual directional, hemisphere, point, and spot lights as
+well as the authored roughness, metalness, maps, fog, and tone mapping. At
+`uDissolveAmount = 0`, the edge is inactive and the discard guard is inactive,
+so the retained surface has the source material's standard-lighting response.
+
+The vertex insertion passes Three.js's transformed target-local position to the
+fragment stage after morph, skin, and displacement chunks and before projection.
+Target-local position keeps corrosion fixed to the authored object when the
+object or camera moves, without requiring a world-normal approximation.
 
 The fragment stage evaluates stable three-dimensional value noise. A small
 hash creates values at lattice corners, cubic interpolation joins each cell,
@@ -133,11 +144,10 @@ kept fragments within uEdgeWidth of the threshold receive emissive edge colour
 
 A strict zero-progress guard prevents even a rare zero-valued mask sample from
 being discarded after reset. At completion the existing gameplay code clamps
-progress to `1` and hides the mesh. The bright green-white edge is emissive, so
-it remains legible under dim or occluded Cultivation-style lighting. The base
-surface uses an explicit hemisphere plus directional diffuse approximation of
-the current `RenderLayer` inspection lighting and carries the authored base and
-emissive colours forward.
+progress to `1` and hides the mesh. The bright green-white band is added to
+Three.js's `totalEmissiveRadiance` after the source emissive map is evaluated,
+so it remains legible in dim Cultivation conditions without replacing the
+surface's real scene-light response.
 
 ### Uniform contract
 
@@ -147,17 +157,14 @@ emissive colours forward.
 | `uNoiseScale` | material constant, target-local inverse metres | Sets corrosion feature size without a texture. |
 | `uNoiseOffset` | deterministic hash of target ID | Gives targets stable, distinct masks without random runtime state. |
 | `uEdgeWidth` | material constant in mask units | Width of the visible band immediately above the discard threshold. |
-| `uBaseColour` | authored material colour | Lit colour of retained structure. |
-| `uEmissiveColour` | authored emissive colour × intensity | Preserves the authored low-light cue. |
 | `uEdgeColour` | material constant | High-contrast corrosion boundary. |
-| lighting uniforms | fixed inspection-light approximation | Keeps retained structure readable without consuming arbitrary scene lights. |
-| `uOpacity` | authored material opacity | Preserves the supported source opacity contract. |
 
 The current integration supports explicitly authored static `Mesh` geometry
-and preserves each source material slot's colour, emissive contribution,
-opacity, side, depth-test, and depth-write settings. It does not implicitly
-convert arbitrary meshes, skinned/displaced geometry, or source texture/PBR
-map stacks; those require deliberate authoring rather than a silent fallback.
+whose slots use `MeshStandardMaterial`. Each private dissolve material copies
+the complete source standard-material contract, including colour, opacity,
+roughness, metalness, emissive response, supported texture maps, side, depth,
+fog, and clipping properties. Other material families are rejected with an
+authoring error instead of silently changing their lighting model.
 
 ## Depth and shadows
 
@@ -167,9 +174,11 @@ Each target nevertheless installs both a `MeshDepthMaterial` and a
 `MeshDistanceMaterial` through Three.js's `customDepthMaterial` and
 `customDistanceMaterial` hooks. Their compiled fragment shaders use the same
 noise function, offset, scale, and `uDissolveAmount` object as the visible
-material, then discard the same fragments. This covers directional/spot shadow
-maps and point-light distance maps if a later authored target enables shadows;
-it cannot cast an obviously intact shadow after its visible surface has holes.
+material, then discard the same fragments. They also borrow relevant authored
+alpha/displacement maps and clipping settings. This covers directional/spot
+shadow maps and point-light distance maps if a later authored target enables
+shadows; it cannot cast an obviously intact shadow after its visible surface
+has holes.
 
 The visible material stays opaque with depth writes enabled for the current
 opaque barrier. Fragment discard therefore produces correct holes in the main
@@ -276,6 +285,11 @@ mesh. It owns one `DissolveMaterial` per authored material slot plus one depth
 and one distance material. The original surface and any pre-existing custom
 depth/distance materials remain borrowed and are restored by `dispose()`.
 
+Copied surface materials and shadow materials borrow source textures; they do
+not clone or own those textures. Bundle disposal therefore releases only its
+owned material/program resources, while the level remains responsible for the
+source material, geometry, and textures.
+
 Fixed-step updates mutate one scalar uniform; they do not set `needsUpdate` or
 allocate render resources. Reset reuses the same bundle. Disposal releases all
 bundle-owned materials once. Geometry and source-material disposal remain with
@@ -301,8 +315,8 @@ This issue does not implement:
 - Bob dissolve access;
 - Goop adhesion/rebound;
 - dissolve audio;
-- final Cultivation room placement.
+- unrelated Cultivation puzzle authoring.
 
-Final Cultivation authors can reuse the material contract without moving
+Future soluble-target authors can reuse the material contract without moving
 collision, ability gating, timing, completion, or reset authority into
 rendering.
