@@ -34,6 +34,11 @@ be beneath `assets/`. The listing must not contain an enclosing `dist/`
 directory, `src/`, `node_modules/`, or development configuration. Generated
 archives are ignored and must not be committed.
 
+When downloading the `specimen-production` artifact from GitHub Actions,
+extract the Actions artifact wrapper and submit its inner
+`specimen-production.zip`; do not upload the outer workflow-artifact ZIP to
+Moodle because `index.html` is not at that wrapper's root.
+
 ## Pre-publish archive test
 
 Extract the artifact outside the repository, place it beneath a representative
