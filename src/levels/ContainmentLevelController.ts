@@ -36,7 +36,7 @@ export const CONTAINMENT_ROOM_OBJECTIVES = {
   2: 'Learn how to jump',
   3: 'Get past the lasers',
   4: 'Survive the elevator!',
-  5: 'Free Goob!',
+  5: 'Free Goop!',
 } as const;
 export type ContainmentRoomId = keyof typeof CONTAINMENT_ROOM_OBJECTIVES;
 const DEBUG_ROOM_ENTRY_CHECKPOINT_IDS: Readonly<

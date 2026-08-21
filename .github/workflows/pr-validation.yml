@@ -25,5 +25,16 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Type-check
+        run: npm run type-check
+
       - name: Build and validate production archive
         run: npm run archive
+
+      - name: Upload Moodle-ready production archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: specimen-production
+          path: artifacts/specimen-production.zip
+          if-no-files-found: error
+          retention-days: 14

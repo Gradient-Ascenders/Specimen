@@ -12,6 +12,7 @@ import {
   utimes,
 } from 'node:fs/promises';
 import { constants } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,10 +23,17 @@ const artifactDirectory = join(projectRoot, 'artifacts');
 const archivePath = join(artifactDirectory, 'specimen-production.zip');
 const archiveTimestamp = new Date('1980-01-01T00:00:00.000Z');
 const forbiddenRoots = new Set([
+  '.git',
   'dist',
   'node_modules',
   'scripts',
   'src',
+]);
+const forbiddenFiles = new Set([
+  'package.json',
+  'package-lock.json',
+  'tsconfig.json',
+  'vite.config.ts',
 ]);
 
 const toArchivePath = (path) => path.split(sep).join('/');
@@ -71,16 +79,26 @@ const validateBuild = async (files) => {
 
   for (const file of files) {
     const [root] = file.split('/');
-    if (forbiddenRoots.has(root)) {
+    if (forbiddenRoots.has(root) || forbiddenFiles.has(file)) {
       throw new Error(`Development-only path found in production build: ${file}`);
     }
   }
 
   const indexHtml = await readFile(join(buildDirectory, 'index.html'), 'utf8');
-  const localReferences = Array.from(
-    indexHtml.matchAll(/(?:src|href)=["']\.\/([^"']+)["']/g),
+  const references = Array.from(
+    indexHtml.matchAll(/(?:src|href)=["']([^"']+)["']/g),
     (match) => match[1],
   );
+  const rootRelativeReference = references.find((path) => path.startsWith('/'));
+  if (rootRelativeReference) {
+    throw new Error(
+      `Built index.html contains a root-relative reference: ${rootRelativeReference}`,
+    );
+  }
+
+  const localReferences = references
+    .filter((path) => path.startsWith('./'))
+    .map((path) => path.slice(2).split(/[?#]/, 1)[0]);
 
   if (!localReferences.some((path) => path.endsWith('.js'))) {
     throw new Error('Built index.html does not reference a production JavaScript file.');
@@ -144,7 +162,11 @@ const main = async () => {
     await rename(destinationTemporaryArchive, archivePath);
 
     const archiveSize = (await stat(archivePath)).size;
+    const archiveSha256 = createHash('sha256')
+      .update(await readFile(archivePath))
+      .digest('hex');
     console.log(`Created ${relative(projectRoot, archivePath)} (${archiveSize} bytes)`);
+    console.log(`SHA-256: ${archiveSha256}`);
     console.log('Validated archive root:');
     for (const file of archivedFiles) console.log(`  ${file}`);
   } finally {
