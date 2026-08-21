@@ -33,6 +33,11 @@ installed and system fallback fonts only.
 
 No third-party tutorials, references, or adapted code have been introduced yet.
 
+The soluble-geometry dissolve hash, value-noise interpolation, threshold,
+corrosion edge, and matching shadow-pass GLSL were handwritten for Specimen.
+They do not copy or adapt an external shader, tutorial, noise texture, or other
+resource, so issue #31 adds no third-party credit entry.
+
 ## Maintaining this ledger
 
 When a pull request introduces third-party code, assets, textures, models,
