@@ -29,13 +29,11 @@ unzip -Z1 artifacts/specimen-production.zip
 unzip -t artifacts/specimen-production.zip
 ```
 
-`index.html`, `README.md`, `start-server.sh`, and `start-server.ps1` must
-be at the archive root. The README and launchers let a recipient serve the
-extracted build locally; the static LAMP host merely serves them as ordinary
-files. Hashed JavaScript and CSS files must be beneath `assets/`. The listing
-must not contain an enclosing `dist/` directory, `src/`, `node_modules/`,
-or development configuration. Generated archives are ignored and must not be
-committed.
+`index.html` must be at the archive root. Hashed JavaScript and CSS files must
+be beneath `assets/`. The listing must not contain an enclosing `dist/`
+directory, `src/`, `node_modules/`, repository documentation, local launcher
+scripts, or development configuration. Generated archives are ignored and must
+not be committed.
 
 When downloading the `specimen-production` artifact from GitHub Actions,
 extract the Actions artifact wrapper and submit its inner
@@ -44,8 +42,25 @@ Moodle because `index.html` is not at that wrapper's root.
 
 ## Pre-publish archive test
 
-Extract the artifact outside the repository, place it beneath a representative
-group subdirectory, and serve the parent over HTTP:
+The repository launchers extract the production archive into a temporary
+`site/group-folder/`, serve its parent over HTTP, and remove the temporary files
+when stopped:
+
+```bash
+bash scripts/start-production-server.sh
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-production-server.ps1
+```
+
+Both open `http://127.0.0.1:4173/group-folder/` by default. They require an
+existing `artifacts/specimen-production.zip`, so run `npm run archive` first.
+Pass another port as the Bash script's first argument or as PowerShell's
+`-Port` argument. Set `SPECIMEN_NO_BROWSER=1` to suppress automatic browser
+opening.
+
+To perform the same extraction and serving process manually:
 
 ```bash
 smoke_root="$(mktemp -d)"

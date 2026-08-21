@@ -9,7 +9,7 @@ source for this issue.
 
 ### Environment and artifact
 
-- Verification date: 21 August 2026, ending at approximately 13:52 SAST.
+- Verification date: 21 August 2026, ending at approximately 14:02 SAST.
 - Source: `chore/containment-sprint1-gate`, working tree based on
   `16615ac7cfb3c2bcb82e4af5819714260c82b5fe` with the review corrections in
   this change.
@@ -20,9 +20,9 @@ source for this issue.
   engine.
 - Browser: Playwright MCP with Chrome for Testing `152.0.7977.8`, Linux
   x86_64, 1280 × 720 viewport.
-- Final archive: `artifacts/specimen-production.zip`, 201,593 bytes.
+- Final archive: `artifacts/specimen-production.zip`, 199,603 bytes.
 - SHA-256:
-  `b4223c25e29a809dd36d618e6368f7ffd6d2e0ab170e63ed2448142e27701d0d`.
+  `22a4d516a21906d44a1cf575894372f7cb10c183ca950540d505d7665c75f4d4`.
 
 ### Build and archive
 
@@ -33,24 +33,21 @@ The following commands passed against the corrected working tree:
 3. `npm run type-check` — passed.
 4. `npm run build` — passed with Vite 8.2.1.
 5. `npm run archive` — rebuilt and validated the production ZIP.
-6. `unzip -Z1` and `unzip -t` — six entries, all integrity checks passed.
+6. `unzip -Z1` and `unzip -t` — three entries, all integrity checks passed.
 7. `diff -qr dist <extracted-group-folder>` — no differences.
 
 The final archive contains exactly:
 
 ```text
-README.md
 assets/index-C4EX9ji3.css
 assets/index-D4UfvHSV.js
 index.html
-start-server.ps1
-start-server.sh
 ```
 
-`index.html` and the three local-play helpers are at the archive root. There is
-no enclosing `dist/` directory, source tree, `node_modules/`, package manifest,
-TypeScript/Vite configuration, or project development script. Archive
-generation now requires the helpers, rejects root-relative HTML references and
+`index.html` is at the archive root. There is no enclosing `dist/` directory,
+source tree, `node_modules/`, package manifest, repository README, local
+launcher, TypeScript/Vite configuration, or development script. Archive
+generation rejects those non-runtime files, root-relative HTML references, and
 common source/configuration leakage, and prints the archive SHA-256.
 
 The build retains the required Vite `base: './'`. Vite emitted its existing
@@ -59,16 +56,14 @@ non-blocking chunk-size warning: the minified JavaScript chunk is about
 
 ### Exact archive over nested-path HTTP
 
-The final ZIP was extracted outside the repository beneath
-`site/group-folder/`. Its parent was served with
-`python3 -m http.server 4188 --bind 127.0.0.1`; neither Vite's development
-server nor preview server was used.
+The repository Bash launcher extracted the final ZIP outside the repository
+beneath a temporary `site/group-folder/`. It served the parent with Python's
+plain static HTTP server; neither Vite's development server nor preview server
+was used. The temporary extraction was removed when the launcher stopped.
 
-The helper-inclusive final archive was loaded both through its packaged Bash
-launcher and from the representative nested path:
+Playwright loaded the representative nested path:
 
-- `http://127.0.0.1:4187/`;
-- `http://127.0.0.1:4188/group-folder/?build=b4223c25`.
+- `http://127.0.0.1:4189/group-folder/?build=22a4d516`.
 
 The only network requests were the nested-path document, hashed JavaScript,
 and hashed CSS, all returning HTTP 200. No request used the server root,
@@ -82,19 +77,22 @@ Normal production omitted the debug panel and entered gameplay with one
 canvas, one game-flow root, one death screen, pointer lock on the canvas, and
 only the gameplay panel visible.
 
-### Packaged local launchers
+### Repository local launchers
 
-`bash -n` passed for `start-server.sh`. The executable bit survived the Vite
-copy, archive, and extraction. Running the extracted script with
-`SPECIMEN_NO_BROWSER=1 bash ./start-server.sh 4187` started Python's static
-server; HTTP requests for `/`, `/README.md`, and `/start-server.ps1` returned
-200, and Playwright entered gameplay at the served root.
+`bash -n` passed for `scripts/start-production-server.sh`. Running it with
+`SPECIMEN_NO_BROWSER=1 bash scripts/start-production-server.sh 4189` extracted
+the exact archive beneath `/group-folder/`, started Python's static server, and
+let Playwright enter gameplay. The document and its two hashed assets returned
+200 from the nested path. The launcher also rejected an invalid port and a
+missing archive with actionable errors.
 
 PowerShell is not installed in this verification environment, so
-`start-server.ps1` was inspected but not executed. A Windows PowerShell smoke
-test remains outstanding. Both launchers bind only to `127.0.0.1`, accept an
-optional port, serve the directory containing `index.html`, and attempt to open
-the default browser unless `SPECIMEN_NO_BROWSER=1` is set.
+`scripts/start-production-server.ps1` was inspected but not executed. A Windows
+PowerShell smoke test remains outstanding. Both repository launchers bind only
+to `127.0.0.1`, extract the production ZIP beneath a representative
+`/group-folder/`, and attempt to open the default browser unless
+`SPECIMEN_NO_BROWSER=1` is set. Neither launcher nor repository documentation
+is copied into `dist/` or the deployment archive.
 
 ### UI, input, restart, and recovery
 
@@ -158,7 +156,7 @@ route. The following checks were not claimed:
 - full level-complete/disposal transition;
 - sustained performance on Chrome/Ubuntu lab hardware;
 - manual observation for duplicate animation speed or input response;
-- Windows execution of the packaged PowerShell launcher;
+- Windows execution of the repository PowerShell launcher;
 - playthrough duration, screenshot, or video evidence.
 
 A team member must run both full playthroughs from the extracted archive over
