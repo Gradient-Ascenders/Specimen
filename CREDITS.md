@@ -31,7 +31,13 @@ installed and system fallback fonts only.
 
 ## Tutorials / references / adapted code
 
-No third-party tutorials, references, or adapted code have been introduced yet.
+| Resource | Author / creator | Source | Licence | Use in Specimen |
+| --- | --- | --- | --- | --- |
+| Hash without Sine (`hash13`) | David Hoskins | [Original Shadertoy](https://www.shadertoy.com/view/4djSRW) | MIT, copyright © 2014 David Hoskins | Adapted with renamed variables as the lattice hash in the soluble-geometry value-noise mask. |
+
+The dissolve value-noise interpolation, octave composition, gameplay
+threshold, corrosion edge, standard-material integration, and matching shadow
+passes were written for Specimen. No external texture or shader asset is used.
 
 ## Maintaining this ledger
 

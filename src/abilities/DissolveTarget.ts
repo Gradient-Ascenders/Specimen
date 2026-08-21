@@ -3,6 +3,10 @@ import * as THREE from 'three';
 import { EventBus } from '../core/EventBus.ts';
 import type { CollisionWorld } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import {
+  DissolveMaterialBundle,
+  type DissolveMaterialBundleDiagnostics,
+} from '../render/dissolve/DissolveMaterial.ts';
 
 const SCALE_EPSILON = 1e-9;
 
@@ -26,13 +30,6 @@ export interface DissolveTargetOptions {
   readonly activationRangeMetres?: number;
 }
 
-interface MaterialState {
-  readonly material: THREE.Material;
-  readonly opacity: number;
-  readonly transparent: boolean;
-  readonly depthWrite: boolean;
-}
-
 /**
  * One explicitly-authored soluble geometry target.
  *
@@ -51,7 +48,9 @@ export class DissolveTarget {
   private readonly activationRangeMetresValue: number;
   private readonly authoredVisible: boolean;
   private readonly originalMaterial: THREE.Material | THREE.Material[];
-  private readonly materialStates: MaterialState[];
+  private readonly originalDepthMaterial: THREE.Material | undefined;
+  private readonly originalDistanceMaterial: THREE.Material | undefined;
+  private readonly dissolveMaterials: DissolveMaterialBundle;
 
   private readonly localBounds: THREE.Box3;
   private readonly inverseWorld = new THREE.Matrix4();
@@ -112,23 +111,23 @@ export class DissolveTarget {
     this.authoredVisible = this.mesh.visible;
     this.localBounds = bounds.clone();
 
-    // Soluble presentation gets private material instances so fade state never
-    // mutates a material shared by unrelated authored geometry.
+    // Soluble presentation gets private shader/depth/distance materials so its
+    // progress never mutates a material shared by unrelated authored geometry.
     this.originalMaterial = this.mesh.material;
-    const clonedMaterial = Array.isArray(this.mesh.material)
-      ? this.mesh.material.map((material) => material.clone())
-      : this.mesh.material.clone();
-    this.mesh.material = clonedMaterial;
-
-    const materials = Array.isArray(clonedMaterial)
-      ? clonedMaterial
-      : [clonedMaterial];
-    this.materialStates = materials.map((material) => ({
-      material,
-      opacity: material.opacity,
-      transparent: material.transparent,
-      depthWrite: material.depthWrite,
-    }));
+    this.originalDepthMaterial = this.mesh.customDepthMaterial;
+    this.originalDistanceMaterial = this.mesh.customDistanceMaterial;
+    const sourceMaterials = Array.isArray(this.originalMaterial)
+      ? this.originalMaterial
+      : [this.originalMaterial];
+    this.dissolveMaterials = new DissolveMaterialBundle(
+      sourceMaterials,
+      this.id,
+    );
+    this.mesh.material = Array.isArray(this.originalMaterial)
+      ? [...this.dissolveMaterials.surfaceMaterials]
+      : this.dissolveMaterials.surfaceMaterials[0];
+    this.mesh.customDepthMaterial = this.dissolveMaterials.depthMaterial;
+    this.mesh.customDistanceMaterial = this.dissolveMaterials.distanceMaterial;
 
     this.ensureCollisionEnabled(true);
     this.applyPresentation();
@@ -161,6 +160,11 @@ export class DissolveTarget {
   /** Debug/evidence counter intentionally survives reset cycles. */
   get completionCount(): number {
     return this.completionCountValue;
+  }
+
+  /** Read-only renderer diagnostics used by deterministic tests/debug evidence. */
+  get renderDiagnostics(): DissolveMaterialBundleDiagnostics {
+    return this.dissolveMaterials.diagnostics;
   }
 
   /**
@@ -269,10 +273,10 @@ export class DissolveTarget {
     this.surfaceRegistry.unregister(this.mesh);
     this.events.clear();
 
-    for (const state of this.materialStates) {
-      state.material.dispose();
-    }
+    this.dissolveMaterials.dispose();
     this.mesh.material = this.originalMaterial;
+    this.mesh.customDepthMaterial = this.originalDepthMaterial;
+    this.mesh.customDistanceMaterial = this.originalDistanceMaterial;
   }
 
   private ensureCollisionEnabled(enabled: boolean): void {
@@ -293,18 +297,8 @@ export class DissolveTarget {
   }
 
   private applyPresentation(): void {
-    const fade = 1 - this.progressValue * 0.9;
     this.mesh.visible = this.authoredVisible && !this.completedValue;
-
-    for (const state of this.materialStates) {
-      const material = state.material;
-      material.opacity = state.opacity * fade;
-      material.transparent =
-        this.progressValue > 0 ? true : state.transparent;
-      material.depthWrite =
-        this.progressValue > 0 ? false : state.depthWrite;
-      material.needsUpdate = true;
-    }
+    this.dissolveMaterials.setDissolveAmount(this.progressValue);
   }
 }
 
