@@ -16,6 +16,9 @@ export interface RenderDiagnostics {
   readonly drawCalls: number;
   readonly triangles: number;
   readonly sceneObjects: number;
+  readonly sceneLights: number;
+  readonly uniqueMaterials: number;
+  readonly instancedMeshes: number;
   readonly geometries: number;
   readonly textures: number;
   readonly programs: number;
@@ -94,8 +97,19 @@ export class RenderLayer {
   getDiagnostics(): RenderDiagnostics {
     this.renderer.getDrawingBufferSize(this.drawingBufferSize);
     let sceneObjects = 0;
-    this.scene.traverse(() => {
+    let sceneLights = 0;
+    let instancedMeshes = 0;
+    const uniqueMaterials = new Set<THREE.Material>();
+    this.scene.traverse((object) => {
       sceneObjects += 1;
+      if (object instanceof THREE.Light) sceneLights += 1;
+      if (object instanceof THREE.InstancedMesh) instancedMeshes += 1;
+      if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
+        const materials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+        for (const material of materials) uniqueMaterials.add(material);
+      }
     });
 
     return {
@@ -107,6 +121,9 @@ export class RenderLayer {
       drawCalls: this.renderer.info.render.calls,
       triangles: this.renderer.info.render.triangles,
       sceneObjects,
+      sceneLights,
+      uniqueMaterials: uniqueMaterials.size,
+      instancedMeshes,
       geometries: this.renderer.info.memory.geometries,
       textures: this.renderer.info.memory.textures,
       programs: this.renderer.info.programs?.length ?? 0,

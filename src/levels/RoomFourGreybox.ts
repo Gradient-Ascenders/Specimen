@@ -58,12 +58,10 @@ export class RoomFourGreybox {
   private readonly laserPresentation: LaserHazardPresentation;
   private readonly elevatorPresentation: ElevatorPresentation;
   private readonly exitLock: THREE.Mesh;
-  private readonly exitLockOutline: THREE.Object3D | undefined;
 
   constructor(requestFailure: (failure: RoomFourHazardFailure) => void) {
     this.buildShell();
     this.exitLock = this.buildExit();
-    this.exitLockOutline = this.root.getObjectByName(`${this.exitLock.name}-outline`);
 
     this.root.add(this.elevator.root);
     this.collisionMeshes.push(this.elevatorPlatform.collisionMesh);
@@ -165,7 +163,6 @@ export class RoomFourGreybox {
   private syncPresentation(): void {
     const locked = !this.elevator.exitReady;
     this.exitLock.visible = locked;
-    if (this.exitLockOutline) this.exitLockOutline.visible = locked;
     this.laserPresentation.sync();
     this.elevatorPresentation.sync();
   }

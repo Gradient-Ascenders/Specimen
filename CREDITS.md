@@ -20,6 +20,12 @@ No third-party models or meshes have been introduced yet.
 
 No third-party textures or materials have been introduced yet.
 
+Containment issue #32 Phase 1/1.5 uses only project-authored deterministic
+procedural texture data and vector-stroke signage generated at runtime. Its
+Room 1 geometry is built from project-authored Three.js primitives and the
+Three.js `RoundedBoxGeometry` add-on already covered by the framework licence.
+It does not use a downloaded texture pack or other third-party art asset.
+
 ## Audio / music
 
 No third-party audio or music has been introduced yet.
