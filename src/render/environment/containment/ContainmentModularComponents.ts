@@ -209,7 +209,11 @@ export function createSignagePanel(
     uv.setXY(
       index,
       THREE.MathUtils.lerp(region.uMin, region.uMax, uv.getX(index)),
-      THREE.MathUtils.lerp(region.vMin, region.vMax, uv.getY(index)),
+      // The deterministic atlas is authored top-to-bottom in its typed pixel
+      // buffer. DataTexture addresses that first row at the bottom, so reverse
+      // V within the selected row to keep the project-authored lettering
+      // upright without changing which atlas label the plane selects.
+      THREE.MathUtils.lerp(region.vMax, region.vMin, uv.getY(index)),
     );
   }
   uv.needsUpdate = true;

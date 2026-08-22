@@ -5,6 +5,7 @@ import {
   createBorrowedBox,
   createBorrowedCylinder,
   createChamferedBox,
+  createInstancedBoxes,
   createInstancedChamferedBoxes,
   createSignagePanel,
   markVisualOnly,
@@ -235,13 +236,17 @@ export class RoomOneArt {
         position: [0.28, 0.58, -1.354],
         material: gasket,
       }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-pedestal-top-gasket',
-        size: [2.42, 0.12, 2.42],
-        radius: 0.045,
-        position: [0, 1.04, 0],
-        material: gasket,
-      }),
+      createInstancedBoxes(
+        this.resources,
+        'room-1-pedestal-upper-gasket-frame',
+        gasket,
+        [
+          { position: [-1.28, 1.15, 0], size: [0.06, 0.06, 2.32] },
+          { position: [1.28, 1.15, 0], size: [0.06, 0.06, 2.32] },
+          { position: [0, 1.15, -1.19], size: [2.5, 0.06, 0.06] },
+          { position: [0, 1.15, 1.19], size: [2.5, 0.06, 0.06] },
+        ],
+      ),
       createBorrowedCylinder(this.resources, {
         name: 'room-1-pedestal-cyan-instrument',
         size: [0.035, 0.018, 0.035],
@@ -272,9 +277,12 @@ export class RoomOneArt {
     this.containmentBoxRoot.add(
       createChamferedBox(this.resources, {
         name: 'room-1-containment-lower-instrumentation-base',
-        size: [2.46, 0.58, 2.26],
+        size: [2.46, 0.39, 2.26],
         radius: 0.075,
-        position: [0, 0.13, 0],
+        // Seat on, rather than occupy, the pedestal gasket volume. The former
+        // overlap put near-identical black and white side faces into depth
+        // competition at shallow gameplay-camera angles.
+        position: [0, 0.215, 0],
         material: mainCeramic,
       }),
       createChamferedBox(this.resources, {
@@ -302,20 +310,20 @@ export class RoomOneArt {
         name: 'room-1-containment-asymmetric-control-block',
         size: [0.48, 0.82, 1.2],
         radius: 0.055,
-        position: [1.26, 0.23, 0.22],
+        position: [1.43, 0.23, 0.22],
         material: serviceMetal,
       }),
       createChamferedBox(this.resources, {
         name: 'room-1-containment-control-face',
         size: [0.31, 0.44, 0.055],
         radius: 0.022,
-        position: [1.26, 0.26, -0.405],
+        position: [1.43, 0.26, -0.405],
         material: graphite,
       }),
       createBorrowedCylinder(this.resources, {
         name: 'room-1-containment-pressure-gauge',
         size: [0.1, 0.035, 0.1],
-        position: [1.26, 0.32, -0.455],
+        position: [1.43, 0.32, -0.455],
         rotation: [Math.PI / 2, 0, 0],
         material: warningStatus,
       }),
@@ -595,7 +603,7 @@ export class RoomOneArt {
   }
 
   private buildStickyRoute(): void {
-    const { mechanicalBacking, graphite, serviceMetal, stickyMembrane, stickyDetail } =
+    const { mechanicalBacking, graphite, serviceMetal, stickyMembrane } =
       this.resources.materials;
     this.root.add(
       createChamferedBox(this.resources, {
@@ -623,34 +631,6 @@ export class RoomOneArt {
     markVisualOnly(membrane);
     this.root.add(membrane);
 
-    const bulges = new THREE.InstancedMesh(
-      this.resources.geometries.unitSphere,
-      stickyMembrane,
-      7,
-    );
-    bulges.name = 'room-1-sticky-wall-organic-relief';
-    const bulgeMatrix = new THREE.Matrix4();
-    const bulgePosition = new THREE.Vector3();
-    const bulgeScale = new THREE.Vector3();
-    const bulgeRotation = new THREE.Quaternion();
-    const relief = [
-      [-5.24, 1.15, 0.52, 0.72], [-4.54, 1.72, 0.38, 0.55],
-      [-5.12, 2.45, 0.45, 0.8], [-4.42, 2.94, 0.5, 0.62],
-      [-5.27, 3.62, 0.36, 0.58], [-4.72, 4.15, 0.48, 0.7],
-      [-4.36, 4.72, 0.3, 0.42],
-    ];
-    relief.forEach(([x, y, width, height], index) => {
-      bulgePosition.set(x, y, 5.43);
-      bulgeScale.set(width, height, 0.09 + (index % 2) * 0.018);
-      bulgeMatrix.compose(bulgePosition, bulgeRotation, bulgeScale);
-      bulges.setMatrixAt(index, bulgeMatrix);
-    });
-    bulges.instanceMatrix.needsUpdate = true;
-    bulges.computeBoundingBox();
-    bulges.computeBoundingSphere();
-    markVisualOnly(bulges);
-    this.root.add(bulges);
-
     this.root.add(
       createInstancedChamferedBoxes(this.resources, {
         name: 'room-1-sticky-wall-mechanical-clamps',
@@ -663,25 +643,10 @@ export class RoomOneArt {
         ].map((position) => ({ position: position as [number, number, number] })),
       }),
     );
-
-    const tendrils = [
-      [new THREE.Vector3(-5.28, 0.75, 5.4), new THREE.Vector3(-5.02, 1.62, 5.38), new THREE.Vector3(-5.22, 2.7, 5.4)],
-      [new THREE.Vector3(-4.55, 1.2, 5.39), new THREE.Vector3(-4.32, 2.32, 5.37), new THREE.Vector3(-4.58, 3.55, 5.39)],
-      [new THREE.Vector3(-5.1, 3.25, 5.39), new THREE.Vector3(-4.78, 4.0, 5.37), new THREE.Vector3(-4.35, 4.75, 5.4)],
-    ];
-    tendrils.forEach((points, index) => {
-      const geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 18, 0.034, 6, false);
-      geometry.name = `room-1-sticky-organic-ridge-${index + 1}-geometry`;
-      this.uniqueGeometries.add(geometry);
-      const ridge = new THREE.Mesh(geometry, stickyDetail);
-      ridge.name = `room-1-sticky-organic-ridge-${index + 1}`;
-      markVisualOnly(ridge);
-      this.root.add(ridge);
-    });
   }
 
   private buildVentTransition(): void {
-    const { mechanicalBacking, graphite, serviceMetal, stickyVentMembrane } = this.resources.materials;
+    const { mechanicalBacking, graphite, serviceMetal } = this.resources.materials;
     this.addChamferedFrame(
       this.root,
       'room-1-vent-deep-graphite-collar',
@@ -721,14 +686,6 @@ export class RoomOneArt {
         ],
       }),
     );
-
-    const membraneGeometry = this.createOrganicMembraneGeometry(1.72, 1.55, 0.035, 29);
-    const membrane = new THREE.Mesh(membraneGeometry, stickyVentMembrane);
-    membrane.name = 'duct-segment-a-sticky-vent-inset-organic-membrane';
-    membrane.rotation.x = -Math.PI / 2;
-    membrane.position.set(-4.8, 5.205, 6.85);
-    markVisualOnly(membrane);
-    this.root.add(membrane);
   }
 
   private buildSignage(): void {

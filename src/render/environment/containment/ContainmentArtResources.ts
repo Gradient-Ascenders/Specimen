@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
+import { DEFAULT_SLIME_BASE_COLOUR } from '../../slime/SlimeMaterial.ts';
 import {
   createContainmentProceduralTextures,
   type ContainmentProceduralTextures,
@@ -187,14 +188,14 @@ export class ContainmentArtResources {
       }),
       stickyMembrane: new THREE.MeshStandardMaterial({
         name: 'containment-sticky-membrane',
-        color: 0x708b2f,
-        emissive: 0x090d00,
-        emissiveIntensity: 0.08,
+        color: DEFAULT_SLIME_BASE_COLOUR,
+        emissive: 0x061714,
+        emissiveIntensity: 0.05,
         roughness: 0.24,
         metalness: 0,
         normalMap: stickyNormal,
         roughnessMap: stickyRoughness,
-        normalScale: new THREE.Vector2(0.28, 0.28),
+        normalScale: new THREE.Vector2(0.17, 0.17),
       }),
       stickyVentMembrane: new THREE.MeshStandardMaterial({
         name: 'containment-sticky-vent-membrane',

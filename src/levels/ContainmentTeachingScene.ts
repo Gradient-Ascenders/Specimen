@@ -79,8 +79,16 @@ export class ContainmentTeachingScene {
       wall: artResources.materials.mechanicalBacking,
       ceiling: artResources.materials.mainCeramic,
       support: artResources.materials.mainCeramic,
-      sticky: artResources.materials.stickyMembrane,
-      stickyVent: artResources.materials.stickyVentMembrane,
+      // Gameplay metadata owns adhesion. This collider-only material emits no
+      // render fragments; RoomOneArt supplies the explicit green membrane and
+      // dark backing without exposing the collider's coplanar top face.
+      sticky: this.collisionOnlyMaterial(
+        'containment-room-1-sticky-wall-collision-only',
+      ),
+      // This short floor remains sticky only to smooth the wall-to-duct
+      // transition. Its appearance stays ordinary service metal so it reads as
+      // part of the vent rather than a second biological membrane.
+      stickyVent: artResources.materials.serviceMetal,
       platform: artResources.materials.secondaryCeramic,
       locked: artResources.materials.lockedStatus,
       exit: artResources.materials.staticCyanEmissive,
@@ -277,7 +285,14 @@ export class ContainmentTeachingScene {
     // The sticky route is directly below the opening. Its top is exactly level
     // with the duct floor so edge traversal can roll smoothly over the lip.
     this.addCollider({ name: 'room-1-north-clean-west', size: [1.2, 8, 0.4], position: [-6.4, 4, 6], material: materials.wall });
-    this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.225, 0.4], position: [-4.8, 2.6125, 6], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
+    this.addCollider({
+      name: 'room-1-vent-sticky-entry-wall',
+      size: [2, 5.225, 0.4],
+      position: [-4.8, 2.6125, 6],
+      material: materials.sticky,
+      surfaceTag: 'sticky',
+      textureRole: 'sticky-wall-tile',
+    });
     this.addCollider({ name: 'room-1-north-clean-centre', size: [4, 8, 0.4], position: [-1.8, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
@@ -522,6 +537,14 @@ export class ContainmentTeachingScene {
       roughness: 0.7,
       metalness: 0.05,
     });
+    this.ownedMaterials.add(material);
+    return material;
+  }
+
+  private collisionOnlyMaterial(name: string): THREE.MeshBasicMaterial {
+    const material = new THREE.MeshBasicMaterial();
+    material.name = name;
+    material.visible = false;
     this.ownedMaterials.add(material);
     return material;
   }
