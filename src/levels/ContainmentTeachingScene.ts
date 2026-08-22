@@ -15,6 +15,7 @@ import {
 } from '../render/slime/SlimeBurstPresentation.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomOneArt } from '../render/environment/containment/RoomOneArt.ts';
+import { RoomTwoArt } from '../render/environment/containment/RoomTwoArt.ts';
 
 interface BoxOptions {
   readonly name: string;
@@ -55,6 +56,7 @@ const ROOM_2_SAFE_LANDING_POSITION = new THREE.Vector3(
 export class ContainmentTeachingScene {
   readonly root = new THREE.Group();
   readonly roomOneArt: RoomOneArt;
+  readonly roomTwoArt: RoomTwoArt;
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
   private readonly solubleTargetMeshList: THREE.Mesh[] = [];
@@ -96,18 +98,21 @@ export class ContainmentTeachingScene {
       glass: artResources.materials.containmentGlass,
       egg: artResources.materials.specimenShell,
     };
+    const roomTwoCollisionMaterial = this.collisionOnlyMaterial(
+      'containment-room-2-production-collision-only',
+    );
     const roomTwoMaterials = {
-      floor: this.material(0xaeb6ba),
-      wall: this.material(0xdadfe1),
-      support: this.material(0x424a50),
-      sticky: this.material(0x9fae38, 0x263100),
-      stickyVent: this.material(0x718c3d, 0x162600),
-      platform: this.material(0xd6a928, 0x443300),
-      locked: this.material(0x8b3030, 0x320505),
-      exit: this.material(0x62bf83, 0x0a3018),
-      duct: this.material(0x444a4d),
-      glass: this.material(0x9ee7e4, 0x163d42),
-      egg: this.material(0x70c8ff, 0x063b63),
+      floor: roomTwoCollisionMaterial,
+      wall: roomTwoCollisionMaterial,
+      support: roomTwoCollisionMaterial,
+      sticky: roomTwoCollisionMaterial,
+      stickyVent: roomTwoCollisionMaterial,
+      platform: roomTwoCollisionMaterial,
+      locked: roomTwoCollisionMaterial,
+      exit: roomTwoCollisionMaterial,
+      duct: roomTwoCollisionMaterial,
+      glass: roomTwoCollisionMaterial,
+      egg: roomTwoCollisionMaterial,
     };
 
     this.addRoomOne(
@@ -117,10 +122,11 @@ export class ContainmentTeachingScene {
     this.addVentTransition(roomOneMaterials);
     this.addRoomTwo(roomTwoMaterials);
     if (options.includeDevelopmentHelpers === true) {
-      this.addReferenceMarkers(roomTwoMaterials.exit);
+      this.addReferenceMarkers(artResources.materials.staticCyanEmissive);
     }
     this.roomOneArt = new RoomOneArt(artResources);
-    this.root.add(this.roomOneArt.root);
+    this.roomTwoArt = new RoomTwoArt(artResources);
+    this.root.add(this.roomOneArt.root, this.roomTwoArt.root);
 
     this.slimeVisual = new SlimeVisual({
       radiusMetres: DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
@@ -248,6 +254,7 @@ export class ContainmentTeachingScene {
     this.slimeBurst.dispose();
     this.slimeVisual.dispose();
     this.roomOneArt.dispose();
+    this.roomTwoArt.dispose();
     this.root.removeFromParent();
     for (const geometry of this.ownedGeometries) geometry.dispose();
     for (const material of this.ownedMaterials) material.dispose();
@@ -527,18 +534,6 @@ export class ContainmentTeachingScene {
     light.name = name;
     light.position.set(...position);
     this.root.add(light);
-  }
-
-  private material(colour: number, emissive = 0x000000): THREE.MeshStandardMaterial {
-    const material = new THREE.MeshStandardMaterial({
-      color: colour,
-      emissive,
-      emissiveIntensity: emissive === 0 ? 0 : 0.28,
-      roughness: 0.7,
-      metalness: 0.05,
-    });
-    this.ownedMaterials.add(material);
-    return material;
   }
 
   private collisionOnlyMaterial(name: string): THREE.MeshBasicMaterial {

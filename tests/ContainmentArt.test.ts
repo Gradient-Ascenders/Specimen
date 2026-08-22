@@ -16,12 +16,12 @@ test('Containment procedural textures are compact, deterministic and correctly c
   const secondTextures = textureList(second);
 
   assert.equal(firstTextures.length, 9);
-  assert.equal(first.diagnostics.estimatedTextureBytes, 655_360);
+  assert.equal(first.diagnostics.estimatedTextureBytes, 917_504);
   firstTextures.forEach((texture, index) => {
     const counterpart = secondTextures[index];
     assert.deepEqual(
       [texture.image.width, texture.image.height],
-      index === firstTextures.length - 1 ? [512, 256] : [64, 64],
+      index === firstTextures.length - 1 ? [512, 384] : [64, 64],
     );
     assert.equal(
       Buffer.from(texture.image.data.buffer).equals(
@@ -130,6 +130,54 @@ test('Room 1 sticky wall uses Bob-related restrained membrane art', () => {
   scene.dispose();
 });
 
+test('Room 2 art is visual-only and preserves authored gameplay semantics', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const art = scene.teaching.roomTwoArt.root;
+  const colliderSet = new Set(scene.collisionMeshes);
+  const roomTwoColliders = scene.collisionMeshes.filter((mesh) =>
+    mesh.name.startsWith('room-2-'),
+  );
+
+  assert.equal(art.name, 'room-2-production-art');
+  assert.equal(roomTwoColliders.length, 20);
+  for (const collider of roomTwoColliders) {
+    assert.equal(collider.material.visible, false, collider.name);
+    assert.equal(
+      collider.material.name,
+      'containment-room-2-production-collision-only',
+      collider.name,
+    );
+  }
+  assert.equal(
+    roomTwoColliders.find((mesh) => mesh.name === 'room-2-sticky-catch-wall')
+      ?.userData.surfaceTag,
+    'sticky',
+  );
+  for (const collider of roomTwoColliders.filter((mesh) =>
+    mesh.name.includes('platform') || mesh.name.includes('step'),
+  )) {
+    assert.equal(collider.userData.surfaceTag, 'default', collider.name);
+  }
+
+  const membrane = art.getObjectByName(
+    'room-2-sticky-catch-wall-inset-organic-membrane',
+  );
+  assert.ok(membrane instanceof THREE.Mesh);
+  assert.equal(membrane.material, scene.artResources.materials.stickyMembrane);
+  assert.ok(art.getObjectByName('room-2-observation-reinforced-glass'));
+  assert.ok(art.getObjectByName('room-2-upper-structural-cross-members'));
+  assert.ok(art.getObjectByName('room-2-platform-a-height-lesson-durable-composite-tread'));
+  assert.equal(art.getObjectByName('room-2-platform-a-bouncy-membrane'), undefined);
+
+  art.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
+      assert.equal(object.userData.visualOnly, true, object.name);
+      assert.equal(colliderSet.has(object), false, object.name);
+    }
+  });
+  scene.dispose();
+});
+
 test('Room 1 hero states are deterministic and independent from gameplay collision', () => {
   const scene = new ContainmentLevelScene(() => {});
   const art = scene.teaching.roomOneArt;
@@ -177,7 +225,14 @@ test('Room 1 hero states are deterministic and independent from gameplay collisi
 test('Room 1 signs are upright and specimen controls do not intersect stacked housings', () => {
   const scene = new ContainmentLevelScene(() => {});
   const resources = scene.artResources;
-  for (const label of ['bay', 'specimen', 'locked', 'vent'] as const) {
+  for (const label of [
+    'bay',
+    'specimen',
+    'locked',
+    'vent',
+    'chamber',
+    'ascent',
+  ] as const) {
     const sign = createSignagePanel(resources, {
       name: `sign-orientation-probe-${label}`,
       label,
@@ -188,9 +243,11 @@ test('Room 1 signs are upright and specimen controls do not intersect stacked ho
     const uvs = sign.geometry.getAttribute('uv');
     const region = resources.textures.signRegions[label];
     for (let index = 0; index < positions.count; index += 1) {
-      assert.equal(
-        uvs.getY(index),
-        positions.getY(index) > 0 ? region.vMin : region.vMax,
+      assert.ok(
+        Math.abs(
+          uvs.getY(index) -
+            (positions.getY(index) > 0 ? region.vMin : region.vMax),
+        ) < 1e-7,
         `${label} atlas row must be upright`,
       );
     }
@@ -277,18 +334,18 @@ test('Containment art ownership disposes once and recreates without count growth
   recreated.dispose();
 });
 
-test('Containment scene resets and recreates without duplicating Room 1 art resources', () => {
+test('Containment scene resets and recreates without duplicating Room 1 or Room 2 art resources', () => {
   const first = new ContainmentLevelScene(() => {});
   const initialDiagnostics = first.artResources.diagnostics;
   let initialObjects = 0;
-  first.teaching.roomOneArt.root.traverse(() => {
+  first.teaching.root.traverse(() => {
     initialObjects += 1;
   });
 
   first.resetProbe();
   first.resetProbe();
   let objectsAfterResets = 0;
-  first.teaching.roomOneArt.root.traverse(() => {
+  first.teaching.root.traverse(() => {
     objectsAfterResets += 1;
   });
   assert.equal(objectsAfterResets, initialObjects);
@@ -297,7 +354,7 @@ test('Containment scene resets and recreates without duplicating Room 1 art reso
 
   const second = new ContainmentLevelScene(() => {});
   let recreatedObjects = 0;
-  second.teaching.roomOneArt.root.traverse(() => {
+  second.teaching.root.traverse(() => {
     recreatedObjects += 1;
   });
   assert.equal(recreatedObjects, initialObjects);
