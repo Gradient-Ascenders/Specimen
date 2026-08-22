@@ -35,7 +35,7 @@ export class ContainmentLevelScene {
     // collision parent path; production art is layered beneath it.
     this.root.name = 'containment-level-greybox';
     this.teaching = new ContainmentTeachingScene(this.artResources, options);
-    this.roomThree = new RoomThreeGreybox(requestHazardFailure);
+    this.roomThree = new RoomThreeGreybox(requestHazardFailure, this.artResources);
     this.roomFour = new RoomFourGreybox(requestHazardFailure);
     this.roomFive = new RoomFiveGreybox(requestHazardFailure);
     this.root.add(

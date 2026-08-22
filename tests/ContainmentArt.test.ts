@@ -15,13 +15,13 @@ test('Containment procedural textures are compact, deterministic and correctly c
   const firstTextures = textureList(first);
   const secondTextures = textureList(second);
 
-  assert.equal(firstTextures.length, 9);
-  assert.equal(first.diagnostics.estimatedTextureBytes, 917_504);
+  assert.equal(firstTextures.length, 10);
+  assert.equal(first.diagnostics.estimatedTextureBytes, 1_458_176);
   firstTextures.forEach((texture, index) => {
     const counterpart = secondTextures[index];
     assert.deepEqual(
       [texture.image.width, texture.image.height],
-      index === firstTextures.length - 1 ? [512, 384] : [64, 64],
+      texture === first.textures.signageAtlas ? [512, 640] : [64, 64],
     );
     assert.equal(
       Buffer.from(texture.image.data.buffer).equals(
@@ -34,13 +34,14 @@ test('Containment procedural textures are compact, deterministic and correctly c
     assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter);
     assert.equal(
       texture.colorSpace,
-      index === firstTextures.length - 1
+      texture === first.textures.signageAtlas ||
+        texture === first.textures.acidFoundationAlbedo
         ? THREE.SRGBColorSpace
         : THREE.NoColorSpace,
     );
     assert.equal(
       texture.wrapS,
-      index === firstTextures.length - 1
+      texture === first.textures.signageAtlas
         ? THREE.ClampToEdgeWrapping
         : THREE.RepeatWrapping,
     );
@@ -178,6 +179,96 @@ test('Room 2 art is visual-only and preserves authored gameplay semantics', () =
   scene.dispose();
 });
 
+test('Room 3 art contains the acid and instruments the frozen route without owning gameplay', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const art = scene.roomThree.art;
+  const colliderSet = new Set(scene.collisionMeshes);
+  const roomThreeColliders = scene.collisionMeshes.filter((mesh) =>
+    mesh.name.startsWith('room-3-'),
+  );
+  const laserState = scene.roomThree.lasers.hazards.map((hazard) => ({
+    id: hazard.id,
+    start: [hazard.start.x, hazard.start.y, hazard.start.z],
+    end: [hazard.end.x, hazard.end.y, hazard.end.z],
+    enabled: hazard.enabled,
+    sequenceState: hazard.sequenceState,
+  }));
+
+  assert.equal(art.root.name, 'room-3-production-art');
+  assert.equal(roomThreeColliders.length, 26);
+  for (const collider of roomThreeColliders) {
+    assert.equal(collider.material.visible, false, collider.name);
+  }
+  assert.equal(
+    art.acidSurface.userData.authoritativeCollider,
+    'room-3-acid-floor',
+  );
+  assert.equal(art.acidSurface.userData.materialRole, 'replaceable-acid-surface');
+  assert.equal(art.acidSurface.material, art.acidSurfaceMaterial);
+  assert.ok(art.root.getObjectByName('room-3-basin-substantial-perimeter-curbs'));
+  assert.ok(art.root.getObjectByName('room-3-entry-platform-actuator-column'));
+  assert.ok(art.root.getObjectByName('room-3-first-static-laser-start-instrument-housing'));
+  assert.equal(art.root.getObjectByName('room-3-upper-sweep-gantry-rail'), undefined);
+  assert.equal(art.root.getObjectByName('room-3-platform-c-overhead-hanger-1'), undefined);
+  assert.equal(art.root.getObjectByName('room-3-first-static-laser-instrument-pedestal-1'), undefined);
+  assert.ok(art.root.getObjectByName('room-3-platform-c-underside-actuator-socket'));
+  const roomThreeSign = art.root.getObjectByName('room-3-entry-sector-sign');
+  assert.ok(roomThreeSign instanceof THREE.Mesh);
+  assert.equal(roomThreeSign.position.z, 49.24);
+  const entryPanel = art.root.getObjectByName('room-3-entry-panel-east');
+  assert.ok(entryPanel instanceof THREE.Mesh);
+  assert.ok(
+    roomThreeSign.position.z > entryPanel.position.z + 0.06,
+    'C-03 signage must remain physically separated from the entry panel face',
+  );
+  const mainMembrane = art.root.getObjectByName(
+    'room-3-main-adhesion-replaceable-membrane',
+  );
+  assert.ok(mainMembrane instanceof THREE.Mesh);
+  assert.equal(mainMembrane.material, scene.artResources.materials.stickyMembrane);
+
+  scene.root.updateMatrixWorld(true);
+  for (const [artName, colliderName] of [
+    ['room-3-panel-west-south-lower', 'room-3-west-wall'],
+    ['room-3-panel-east-entry-quiet', 'room-3-east-wall'],
+    ['room-3-entry-panel-east', 'room-3-entry-wall-east'],
+    ['room-3-main-adhesion-replaceable-membrane', 'room-3-sticky-wall-main'],
+    ['room-3-final-adhesion-replaceable-membrane', 'room-3-final-sticky-strip'],
+    ['room-3-entry-graphite-jambs', 'room-3-entry-wall-east'],
+    ['room-3-ceiling-major-service-trusses', 'room-3-ceiling'],
+    ['room-3-exit-duct-graphite-collar-left', 'room-3-rear-wall-west'],
+  ] as const) {
+    const artObject = art.root.getObjectByName(artName);
+    const collider = roomThreeColliders.find((mesh) => mesh.name === colliderName);
+    assert.ok(artObject, artName);
+    assert.ok(collider, colliderName);
+    assert.ok(
+      new THREE.Box3().setFromObject(artObject).intersectsBox(
+        new THREE.Box3().setFromObject(collider),
+      ),
+      `${artName} must occupy its authoritative ${colliderName} volume`,
+    );
+  }
+
+  art.root.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
+      assert.equal(object.userData.visualOnly, true, object.name);
+      assert.equal(colliderSet.has(object), false, object.name);
+    }
+  });
+  assert.deepEqual(
+    scene.roomThree.lasers.hazards.map((hazard) => ({
+      id: hazard.id,
+      start: [hazard.start.x, hazard.start.y, hazard.start.z],
+      end: [hazard.end.x, hazard.end.y, hazard.end.z],
+      enabled: hazard.enabled,
+      sequenceState: hazard.sequenceState,
+    })),
+    laserState,
+  );
+  scene.dispose();
+});
+
 test('Room 1 hero states are deterministic and independent from gameplay collision', () => {
   const scene = new ContainmentLevelScene(() => {});
   const art = scene.teaching.roomOneArt;
@@ -232,6 +323,10 @@ test('Room 1 signs are upright and specimen controls do not intersect stacked ho
     'vent',
     'chamber',
     'ascent',
+    'roomThree',
+    'chemical',
+    'laserArray',
+    'adhesionTest',
   ] as const) {
     const sign = createSignagePanel(resources, {
       name: `sign-orientation-probe-${label}`,
@@ -382,6 +477,7 @@ function textureList(resources: ContainmentArtResources): readonly THREE.DataTex
     resources.textures.stickyRoughness,
     resources.textures.stickyVentNormal,
     resources.textures.stickyVentRoughness,
+    resources.textures.acidFoundationAlbedo,
     resources.textures.signageAtlas,
   ];
 }

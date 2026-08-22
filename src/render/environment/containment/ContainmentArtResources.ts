@@ -65,6 +65,7 @@ export class ContainmentArtResources {
       stickyRoughness,
       stickyVentNormal,
       stickyVentRoughness,
+      acidFoundationAlbedo,
       signageAtlas,
     } = this.textures;
 
@@ -80,6 +81,7 @@ export class ContainmentArtResources {
     stickyRoughness.repeat.set(1, 1);
     stickyVentNormal.repeat.set(1, 1);
     stickyVentRoughness.repeat.set(1, 1);
+    acidFoundationAlbedo.repeat.set(4, 3);
 
     this.materials = {
       mainCeramic: new THREE.MeshStandardMaterial({
@@ -323,6 +325,7 @@ export class ContainmentArtResources {
       this.textures.stickyRoughness,
       this.textures.stickyVentNormal,
       this.textures.stickyVentRoughness,
+      this.textures.acidFoundationAlbedo,
       this.textures.signageAtlas,
     ];
   }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 const TEXTURE_SIZE = 64;
 const SIGN_ATLAS_WIDTH = 512;
-const SIGN_ATLAS_HEIGHT = 384;
+const SIGN_ATLAS_HEIGHT = 640;
 
 export type ContainmentSignLabel =
   | 'bay'
@@ -10,7 +10,11 @@ export type ContainmentSignLabel =
   | 'locked'
   | 'vent'
   | 'chamber'
-  | 'ascent';
+  | 'ascent'
+  | 'roomThree'
+  | 'chemical'
+  | 'laserArray'
+  | 'adhesionTest';
 
 export interface ContainmentSignRegion {
   readonly uMin: number;
@@ -28,6 +32,7 @@ export interface ContainmentProceduralTextures {
   readonly stickyRoughness: THREE.DataTexture;
   readonly stickyVentNormal: THREE.DataTexture;
   readonly stickyVentRoughness: THREE.DataTexture;
+  readonly acidFoundationAlbedo: THREE.DataTexture;
   readonly signageAtlas: THREE.DataTexture;
   readonly signRegions: Readonly<Record<ContainmentSignLabel, ContainmentSignRegion>>;
 }
@@ -74,6 +79,7 @@ export function createContainmentProceduralTextures(): ContainmentProceduralText
     'containment-sticky-vent-roughness',
     (x, y) => 66 + Math.round(hashNoise(x, y, 151) * 24),
   );
+  const acidFoundationAlbedo = createAcidFoundationAlbedo();
   const { texture: signageAtlas, regions: signRegions } = createSignageAtlas();
 
   return {
@@ -85,9 +91,40 @@ export function createContainmentProceduralTextures(): ContainmentProceduralText
     stickyRoughness,
     stickyVentNormal,
     stickyVentRoughness,
+    acidFoundationAlbedo,
     signageAtlas,
     signRegions,
   };
+}
+
+function createAcidFoundationAlbedo(): THREE.DataTexture {
+  const pixels = new Uint8Array(TEXTURE_SIZE * TEXTURE_SIZE * 4);
+  for (let y = 0; y < TEXTURE_SIZE; y += 1) {
+    for (let x = 0; x < TEXTURE_SIZE; x += 1) {
+      const broad =
+        Math.sin(x * 0.23 + Math.sin(y * 0.16) * 1.8) * 0.5 +
+        Math.sin(y * 0.19 - x * 0.08) * 0.28;
+      const fine = (hashNoise(x, y, 211) - 0.5) * 0.14;
+      const foamBand = Math.max(
+        0,
+        1 - Math.abs(Math.sin(x * 0.14 + y * 0.09 + Math.sin(y * 0.2))) * 12,
+      );
+      const value = THREE.MathUtils.clamp(0.72 + broad * 0.12 + fine + foamBand * 0.13, 0.5, 1);
+      const offset = (y * TEXTURE_SIZE + x) * 4;
+      pixels[offset] = Math.round(178 * value);
+      pixels[offset + 1] = Math.round(216 * value);
+      pixels[offset + 2] = Math.round(118 * value);
+      pixels[offset + 3] = 255;
+    }
+  }
+  return dataTexture(
+    'containment-acid-static-foundation-albedo',
+    pixels,
+    TEXTURE_SIZE,
+    TEXTURE_SIZE,
+    true,
+    THREE.SRGBColorSpace,
+  );
 }
 
 function organicCellHeight(
@@ -205,6 +242,7 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   '0': [[0.2, 0.08, 0.8, 0.08], [0.8, 0.08, 0.92, 0.2], [0.92, 0.2, 0.92, 0.8], [0.92, 0.8, 0.8, 0.92], [0.8, 0.92, 0.2, 0.92], [0.2, 0.92, 0.08, 0.8], [0.08, 0.8, 0.08, 0.2], [0.08, 0.2, 0.2, 0.08], [0.2, 0.82, 0.8, 0.18]],
   '1': [[0.28, 0.24, 0.5, 0.08], [0.5, 0.08, 0.5, 0.92], [0.25, 0.92, 0.78, 0.92]],
   '2': [[0.12, 0.25, 0.28, 0.08], [0.28, 0.08, 0.72, 0.08], [0.72, 0.08, 0.9, 0.25], [0.9, 0.25, 0.12, 0.92], [0.12, 0.92, 0.9, 0.92]],
+  '3': [[0.12, 0.2, 0.28, 0.08], [0.28, 0.08, 0.72, 0.08], [0.72, 0.08, 0.9, 0.24], [0.9, 0.24, 0.72, 0.5], [0.72, 0.5, 0.9, 0.7], [0.9, 0.7, 0.72, 0.92], [0.72, 0.92, 0.24, 0.92], [0.24, 0.92, 0.1, 0.8], [0.32, 0.5, 0.72, 0.5]],
   '9': [[0.88, 0.76, 0.72, 0.92], [0.72, 0.92, 0.28, 0.92], [0.28, 0.92, 0.1, 0.75], [0.1, 0.75, 0.1, 0.55], [0.1, 0.55, 0.28, 0.4], [0.28, 0.4, 0.8, 0.4], [0.8, 0.4, 0.9, 0.25], [0.9, 0.25, 0.72, 0.08], [0.72, 0.08, 0.28, 0.08]],
   A: [[0.08, 0.92, 0.5, 0.08], [0.5, 0.08, 0.92, 0.92], [0.25, 0.6, 0.75, 0.6]],
   B: [[0.1, 0.08, 0.1, 0.92], [0.1, 0.08, 0.7, 0.08], [0.7, 0.08, 0.88, 0.24], [0.88, 0.24, 0.7, 0.5], [0.7, 0.5, 0.1, 0.5], [0.7, 0.5, 0.9, 0.68], [0.9, 0.68, 0.72, 0.92], [0.72, 0.92, 0.1, 0.92]],
@@ -240,6 +278,10 @@ function createSignageAtlas(): {
     ['vent', 'VENT ACCESS', 'SERVICE ROUTE', [117, 139, 60, 255]],
     ['chamber', 'C-02', 'TRAVERSAL TEST CHAMBER', [83, 137, 135, 255]],
     ['ascent', 'ASCENT 09 M', 'CALIBRATION ROUTE', [180, 141, 48, 255]],
+    ['roomThree', 'C-03', 'BIOLOGICAL MATERIAL TESTING', [83, 137, 135, 255]],
+    ['chemical', 'CHEMICAL CONTAINMENT', 'AUTHORIZED TEST AREA', [180, 141, 48, 255]],
+    ['laserArray', 'LASER ARRAY L-03', 'ALIGNMENT CONTROL', [168, 54, 61, 255]],
+    ['adhesionTest', 'ADHESION TEST A03', 'REPLACEABLE MEMBRANE', [83, 137, 135, 255]],
   ];
   const rowHeight = SIGN_ATLAS_HEIGHT / signs.length;
   const background: Rgba = [25, 30, 31, 255];
