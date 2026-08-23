@@ -42,7 +42,7 @@ All defaults live in `DEFAULT_CAMERA_RIG_CONFIG` in
 | Camera query radius | 0.22 m | Swept sphere clearance around the camera |
 | Contact buffer | 0.03 m | Additional inward separation from a query contact |
 | Teleport snap threshold | 3 m | Checkpoint/reset discontinuities do not leave long follow lag |
-| Pitch range / initial pitch | -25° to 65° / 18° | Avoids orbit poles and keeps traversal visible |
+| Pitch range / initial pitch | -65° to 65° / 18° | Provides equal upward/downward reach while avoiding orbit poles |
 
 Obstruction contraction is immediate, so damping cannot carry the camera
 through a wall. Once the path grows or clears, distance returns with exponential
@@ -74,6 +74,49 @@ enabling vertical inversion reverses those directions. Horizontal look retains
 the orbit-yaw convention independently.
 
 No settings UI is added by Issue #14.
+
+## Contextual camera profiles
+
+`ContextualCameraProfile` is a small authored override for bounded gameplay
+sections. It changes distance, target height, visual pitch, transition time and
+screen-plane framing dead zone without replacing the normal camera or its
+collision sweep. `CameraProfileZone` combines one of these profiles with an
+existing trigger volume and a read-only fixed-step anchor. The level runtime
+resolves the active zone and passes only that generic context to `CameraRig`;
+the rig contains no room or elevator conditions.
+
+The Level 1 Room 4 lift uses the first contextual profile because a close
+player-follow camera makes a vertically moving platform and its upcoming
+hazards difficult to read. Its current tuning is centralized in
+`ROOM_4_LIFT_CAMERA_PROFILE`:
+
+| Value | Lift profile |
+| --- | ---: |
+| Distance | 10.5 m |
+| Anchor-relative target height | 1.1 m |
+| Downward pitch | 65° |
+| Transition | 0.65 s |
+| Dead-zone half-width / half-height | 1.5 m / 1.25 m |
+| Framing damping | 7 s⁻¹ |
+
+The lift platform supplies interpolated large-scale motion. The active slime
+supplies framing intent only after it crosses the screen-oriented dead zone, so
+small steps and jumps do not drag the camera while the elevator rises. Entering
+the authored shaft zone blends into the profile; leaving into Room 5 blends
+back to the normal player follow.
+
+The profile never changes accumulated yaw. Mouse yaw remains available and the
+same `planarBack` continues to define both displayed horizontal orientation and
+camera-relative WASD, so profile entry cannot rotate movement underneath the
+player. Visual pitch is authored while the profile is active. Mouse pitch is
+ignored during that interval and the previous manual pitch is preserved for
+the transition back to ordinary gameplay.
+
+Room checkpoint recovery resets the zone and elevator together, then resolves
+the recovered active slime against the zone immediately. A recovery onto the
+lift therefore restores the high-angle view; a full level restart, an outside
+checkpoint, slime switching outside the shaft, and level unload all resolve or
+clear the profile through existing camera lifecycle seams.
 
 ## Camera, movement, and facing ownership
 

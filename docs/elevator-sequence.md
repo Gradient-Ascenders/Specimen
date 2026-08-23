@@ -127,12 +127,34 @@ There is no second game-wide restart route; #23 remains lifecycle owner.
 
 ## Camera contract
 
-No elevator-specific camera authority is introduced.
+The Level 1 lift uses a high-angle contextual camera because the normal close
+third-person follow camera makes a vertically moving platform difficult to
+read. The contextual view follows the lift's large-scale movement while
+allowing the player to move within the frame, improving visibility and reducing
+unnecessary camera motion.
 
-`CameraRig` continues to read interpolated authoritative player state. Because
-carrier motion updates body position without fake launch velocity and preserves
-previous/current interpolation, the existing bounded follow lag remains stable
-during ascent. The camera never reads or writes elevator sequence timers.
+Room 4 owns a trigger-backed `CameraProfileZone` covering the playable shaft.
+While the active slime occupies it, `CameraRig` blends over 0.65 seconds toward
+a 10.5 m boom at 65° downward pitch. The camera remains perspective rather than
+top-down. Leaving through the Room 5 opening resolves no profile and blends
+back to normal follow using the same transition.
+
+The moving platform exposes its current and fixed-step previous route poses as
+a read-only camera anchor. That anchor drives the camera's large-scale vertical
+progression. The active slime drives only loose framing: movement within a
+1.5 m horizontal and 1.25 m vertical screen-plane dead zone does not move the
+framing pivot, while larger displacement is damped at 7 s⁻¹.
+
+The profile authors pitch but does not author yaw. Existing mouse yaw and the
+`planarBack` movement basis remain shared, so WASD stays aligned with the view.
+Manual pitch input is held while the profile is active and the prior pitch is
+restored on exit. The normal swept-sphere camera-obstruction query remains in
+use for the high-angle boom.
+
+Checkpoint recovery resets Room 4's elevator and camera zone before restoring
+the player. The recovered position is resolved immediately: a Room 4 recovery
+reactivates the lift profile, while Room 5 recovery, level restart, unload, or a
+switch to a slime outside the shaft cannot retain it.
 
 Kevin's #67 renderer may read:
 
