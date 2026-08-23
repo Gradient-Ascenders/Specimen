@@ -257,6 +257,7 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   '3': [[0.12, 0.2, 0.28, 0.08], [0.28, 0.08, 0.72, 0.08], [0.72, 0.08, 0.9, 0.24], [0.9, 0.24, 0.72, 0.5], [0.72, 0.5, 0.9, 0.7], [0.9, 0.7, 0.72, 0.92], [0.72, 0.92, 0.24, 0.92], [0.24, 0.92, 0.1, 0.8], [0.32, 0.5, 0.72, 0.5]],
   '4': [[0.72, 0.92, 0.72, 0.08], [0.72, 0.08, 0.08, 0.68], [0.08, 0.68, 0.92, 0.68]],
   '5': [[0.88, 0.08, 0.14, 0.08], [0.14, 0.08, 0.14, 0.48], [0.14, 0.48, 0.72, 0.48], [0.72, 0.48, 0.9, 0.66], [0.9, 0.66, 0.72, 0.92], [0.72, 0.92, 0.18, 0.92], [0.18, 0.92, 0.08, 0.82]],
+  '8': [[0.24, 0.08, 0.76, 0.08], [0.76, 0.08, 0.9, 0.22], [0.9, 0.22, 0.76, 0.5], [0.76, 0.5, 0.24, 0.5], [0.24, 0.5, 0.1, 0.22], [0.1, 0.22, 0.24, 0.08], [0.24, 0.5, 0.08, 0.72], [0.08, 0.72, 0.24, 0.92], [0.24, 0.92, 0.76, 0.92], [0.76, 0.92, 0.92, 0.72], [0.92, 0.72, 0.76, 0.5]],
   '9': [[0.88, 0.76, 0.72, 0.92], [0.72, 0.92, 0.28, 0.92], [0.28, 0.92, 0.1, 0.75], [0.1, 0.75, 0.1, 0.55], [0.1, 0.55, 0.28, 0.4], [0.28, 0.4, 0.8, 0.4], [0.8, 0.4, 0.9, 0.25], [0.9, 0.25, 0.72, 0.08], [0.72, 0.08, 0.28, 0.08]],
   A: [[0.08, 0.92, 0.5, 0.08], [0.5, 0.08, 0.92, 0.92], [0.25, 0.6, 0.75, 0.6]],
   B: [[0.1, 0.08, 0.1, 0.92], [0.1, 0.08, 0.7, 0.08], [0.7, 0.08, 0.88, 0.24], [0.88, 0.24, 0.7, 0.5], [0.7, 0.5, 0.1, 0.5], [0.7, 0.5, 0.9, 0.68], [0.9, 0.68, 0.72, 0.92], [0.72, 0.92, 0.1, 0.92]],
@@ -279,41 +280,70 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   U: [[0.08, 0.08, 0.08, 0.74], [0.08, 0.74, 0.26, 0.92], [0.26, 0.92, 0.74, 0.92], [0.74, 0.92, 0.92, 0.74], [0.92, 0.74, 0.92, 0.08]],
   V: [[0.08, 0.08, 0.5, 0.92], [0.5, 0.92, 0.92, 0.08]],
   Y: [[0.08, 0.08, 0.5, 0.5], [0.92, 0.08, 0.5, 0.5], [0.5, 0.5, 0.5, 0.92]],
+  Z: [[0.08, 0.08, 0.92, 0.08], [0.92, 0.08, 0.08, 0.92], [0.08, 0.92, 0.92, 0.92]],
 };
+
+const CONTAINMENT_SIGNS: readonly [
+  ContainmentSignLabel,
+  string,
+  string,
+  Rgba,
+][] = [
+  ['bay', 'C-01', 'BIOLOGICAL CONTAINMENT', [180, 141, 48, 255]],
+  ['specimen', 'SP-01', 'SPECIMEN TEST BAY', [83, 137, 135, 255]],
+  ['locked', 'LOCKED', 'DOOR C-01', [168, 54, 61, 255]],
+  ['vent', 'VENT ACCESS', 'SERVICE ROUTE', [117, 139, 60, 255]],
+  ['chamber', 'C-02', 'TRAVERSAL TEST CHAMBER', [83, 137, 135, 255]],
+  ['ascent', 'ASCENT 09 M', 'CALIBRATION ROUTE', [180, 141, 48, 255]],
+  ['roomThree', 'C-03', 'BIOLOGICAL MATERIAL TESTING', [83, 137, 135, 255]],
+  ['chemical', 'CHEMICAL CONTAINMENT', 'AUTHORIZED TEST AREA', [180, 141, 48, 255]],
+  ['laserArray', 'LASER ARRAY L-03', 'ALIGNMENT CONTROL', [168, 54, 61, 255]],
+  ['adhesionTest', 'ADHESION TEST A03', 'REPLACEABLE MEMBRANE', [83, 137, 135, 255]],
+  ['roomFour', 'C-04', 'VERTICAL TRANSFER CORE', [180, 141, 48, 255]],
+  ['serviceOne', 'S01  08 M', 'SERVICE LEVEL', [151, 159, 157, 255]],
+  ['transferTwo', 'S02  24 M', 'TRANSFER ARRAY', [180, 141, 48, 255]],
+  ['laserCore', 'L-04', 'ACTIVE ALIGNMENT ZONE', [168, 54, 61, 255]],
+  ['roomFiveExit', 'C-05', 'RESEARCH LAB ACCESS', [83, 137, 135, 255]],
+  ['roomFive', 'C-05', 'PRIMARY CONTAINMENT LAB', [180, 141, 48, 255]],
+  ['primaryContainment', 'PC-05', 'BIOLOGICAL PROCESS CHAMBER', [117, 139, 60, 255]],
+  ['pressureArray', 'PRESSURE ARRAY', 'MANIFOLD 05', [180, 141, 48, 255]],
+  ['observationControl', 'OBSERVATION CONTROL', 'SPECIMEN MONITORING', [83, 137, 135, 255]],
+  ['compositeAccess', 'COMPOSITE ACCESS', 'CORROSIVE CLEARANCE', [180, 141, 48, 255]],
+];
+
+/** Return authored, non-space sign characters that have no visible strokes. */
+export function getUnsupportedContainmentSignCharacters(): readonly string[] {
+  const unsupported = new Set<string>();
+  for (const [, title, subtitle] of CONTAINMENT_SIGNS) {
+    for (const character of `${title}${subtitle}`) {
+      if (
+        character !== ' ' &&
+        (VECTOR_GLYPHS[character]?.length ?? 0) === 0
+      ) {
+        unsupported.add(character);
+      }
+    }
+  }
+  return [...unsupported].sort();
+}
 
 function createSignageAtlas(): {
   readonly texture: THREE.DataTexture;
   readonly regions: Readonly<Record<ContainmentSignLabel, ContainmentSignRegion>>;
 } {
   const pixels = new Uint8Array(SIGN_ATLAS_WIDTH * SIGN_ATLAS_HEIGHT * 4);
-  const signs: readonly [ContainmentSignLabel, string, string, Rgba][] = [
-    ['bay', 'C-01', 'BIOLOGICAL CONTAINMENT', [180, 141, 48, 255]],
-    ['specimen', 'SP-01', 'SPECIMEN TEST BAY', [83, 137, 135, 255]],
-    ['locked', 'LOCKED', 'DOOR C-01', [168, 54, 61, 255]],
-    ['vent', 'VENT ACCESS', 'SERVICE ROUTE', [117, 139, 60, 255]],
-    ['chamber', 'C-02', 'TRAVERSAL TEST CHAMBER', [83, 137, 135, 255]],
-    ['ascent', 'ASCENT 09 M', 'CALIBRATION ROUTE', [180, 141, 48, 255]],
-    ['roomThree', 'C-03', 'BIOLOGICAL MATERIAL TESTING', [83, 137, 135, 255]],
-    ['chemical', 'CHEMICAL CONTAINMENT', 'AUTHORIZED TEST AREA', [180, 141, 48, 255]],
-    ['laserArray', 'LASER ARRAY L-03', 'ALIGNMENT CONTROL', [168, 54, 61, 255]],
-    ['adhesionTest', 'ADHESION TEST A03', 'REPLACEABLE MEMBRANE', [83, 137, 135, 255]],
-    ['roomFour', 'C-04', 'VERTICAL TRANSFER CORE', [180, 141, 48, 255]],
-    ['serviceOne', 'S01  08 M', 'SERVICE LEVEL', [151, 159, 157, 255]],
-    ['transferTwo', 'S02  24 M', 'TRANSFER ARRAY', [180, 141, 48, 255]],
-    ['laserCore', 'L-04', 'ACTIVE ALIGNMENT ZONE', [168, 54, 61, 255]],
-    ['roomFiveExit', 'C-05', 'RESEARCH LAB ACCESS', [83, 137, 135, 255]],
-    ['roomFive', 'C-05', 'PRIMARY CONTAINMENT LAB', [180, 141, 48, 255]],
-    ['primaryContainment', 'PC-05', 'BIOLOGICAL PROCESS CHAMBER', [117, 139, 60, 255]],
-    ['pressureArray', 'PRESSURE ARRAY', 'MANIFOLD 05', [180, 141, 48, 255]],
-    ['observationControl', 'OBSERVATION CONTROL', 'SPECIMEN MONITORING', [83, 137, 135, 255]],
-    ['compositeAccess', 'COMPOSITE ACCESS', 'CORROSIVE CLEARANCE', [180, 141, 48, 255]],
-  ];
-  const rowHeight = SIGN_ATLAS_HEIGHT / signs.length;
+  const unsupportedCharacters = getUnsupportedContainmentSignCharacters();
+  if (unsupportedCharacters.length > 0) {
+    throw new Error(
+      `Containment signage has unsupported vector glyphs: ${unsupportedCharacters.join(', ')}`,
+    );
+  }
+  const rowHeight = SIGN_ATLAS_HEIGHT / CONTAINMENT_SIGNS.length;
   const background: Rgba = [25, 30, 31, 255];
   const primary: Rgba = [232, 232, 224, 255];
   const secondary: Rgba = [151, 159, 157, 255];
 
-  signs.forEach(([, title, subtitle, accent], row) => {
+  CONTAINMENT_SIGNS.forEach(([, title, subtitle, accent], row) => {
     const y = row * rowHeight;
     fillRect(pixels, 0, y, SIGN_ATLAS_WIDTH, rowHeight, background);
     fillRect(pixels, 0, y, 7, rowHeight, accent);
@@ -331,9 +361,14 @@ function createSignageAtlas(): {
     THREE.SRGBColorSpace,
   );
   const regions = Object.fromEntries(
-    signs.map(([key], row) => [
+    CONTAINMENT_SIGNS.map(([key], row) => [
       key,
-      { uMin: 0, uMax: 1, vMin: row / signs.length, vMax: (row + 1) / signs.length },
+      {
+        uMin: 0,
+        uMax: 1,
+        vMin: row / CONTAINMENT_SIGNS.length,
+        vMax: (row + 1) / CONTAINMENT_SIGNS.length,
+      },
     ]),
   ) as Record<ContainmentSignLabel, ContainmentSignRegion>;
   return { texture, regions };

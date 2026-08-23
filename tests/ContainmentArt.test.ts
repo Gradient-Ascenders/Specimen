@@ -7,7 +7,12 @@ import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
 import { captureContainmentCollisionFingerprint } from '../src/levels/ContainmentCollisionFingerprint.ts';
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import { createSignagePanel } from '../src/render/environment/containment/ContainmentModularComponents.ts';
+import { getUnsupportedContainmentSignCharacters } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
 import { DEFAULT_SLIME_BASE_COLOUR } from '../src/render/slime/SlimeMaterial.ts';
+
+test('every authored Containment sign character has a visible vector glyph', () => {
+  assert.deepEqual(getUnsupportedContainmentSignCharacters(), []);
+});
 
 test('Containment procedural textures are compact, deterministic and correctly configured', () => {
   const first = new ContainmentArtResources();
@@ -15,7 +20,9 @@ test('Containment procedural textures are compact, deterministic and correctly c
   const firstTextures = textureList(first);
   const secondTextures = textureList(second);
 
-  assert.equal(firstTextures.length, 10);
+  assert.equal(firstTextures.length, first.diagnostics.textureCount);
+  assert.equal(first.diagnostics.textureCount, 10);
+  assert.equal(first.diagnostics.materialCount, 22);
   assert.equal(first.diagnostics.estimatedTextureBytes, 2_768_896);
   firstTextures.forEach((texture, index) => {
     const counterpart = secondTextures[index];

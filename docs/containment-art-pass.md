@@ -1,10 +1,10 @@
 # Containment art pass
 
-Issue #32 gives Containment a bright clinical biological-testing-facility
-language without making presentation authoritative for gameplay. Phase 1.5
-establishes the corrected **Clean Biotech Stylized Realism** language in Room 1
-only. Rooms 2–5 retain their existing presentation until the Room 1 quality
-gate is approved.
+Issue #32 gives all five Containment rooms a bright clinical
+biological-testing-facility language without making presentation authoritative
+for gameplay. The approved pass carries the corrected **Clean Biotech Stylized
+Realism** language from the Room 1 specimen introduction through Room 5 while
+preserving each room's gameplay hierarchy and identity.
 
 ## Architectural language
 
@@ -21,10 +21,11 @@ unchanged authoritative gameplay collider
 ```
 
 Large, asymmetrically composed modules create quiet fields. Smaller modules
-and exposed backing cluster only around the specimen machine, locked door,
-sticky test surface, vent, and one controlled maintenance reveal. The panels
-are shallow visual shells; their centimetre-scale chamfers catch the existing
-light without suggesting a different traversal surface.
+and exposed backing cluster around functional focal points: the specimen
+machine, traversal and adhesion tests, chemical basin infrastructure, lift
+guides and laser mounts, and the final research/observation equipment. The
+panels are shallow visual shells; their centimetre-scale chamfers catch the
+existing light without suggesting a different traversal surface.
 
 `ContainmentArtResources.borrowChamferedBoxGeometry()` caches physically sized
 `RoundedBoxGeometry` instances by dimensions and bevel radius. Repeated modules
@@ -37,21 +38,23 @@ general-purpose modelling framework.
 
 | Role | Base colour | PBR treatment |
 | --- | --- | --- |
-| Main ceramic | `#e9e7e1` | Warm, clean, non-metallic; 0.62 roughness and an almost imperceptible micro-normal. |
-| Secondary ceramic | `#d2d6d4` | Cool pale-grey recesses and equipment faces; 0.66 roughness. |
-| Clinical floor | `#bdc4c2` | Slightly darker and broader-highlighted than the panels. |
-| Mechanical backing | `#232a2c` | Matte charcoal cavities and substrate; deliberately lighter than crushed black. |
-| Graphite structure | `#242b2d` | Manufactured frames, clamps, tracks, and undersides. |
-| Service metal | `#718087` | Restrained galvanized duct and service hardware. |
-| Gasket | `#111718` | Rubber seals and glass seating, used only at construction joints. |
-| Containment glass | `#a6c8ca` | Pale aqua, 0.16 opacity, no emissive contribution, always seated in a gasket/frame. |
-| Neutral fixture | warm white | Existing ceiling fixtures read as clinical white rather than turquoise strips. |
-| Biological sticky | olive/lime | Wet organic membrane; gameplay accent and not general decoration. |
+| Main ceramic | `#e9e7e1` | Warm, clean, non-metallic; 0.58 roughness and an almost imperceptible micro-normal. |
+| Secondary ceramic | `#d2d6d4` | Cool pale-grey recesses and equipment faces; 0.61 roughness. |
+| Clinical floor | `#c2c8c6` | Slightly darker than the panels; 0.66 roughness. |
+| Mechanical backing | `#232a2c` | Matte charcoal cavities; 0.64 roughness and 0.34 metalness. |
+| Graphite frame | `#23292b` | Manufactured clamps, tracks, and undersides; 0.50 roughness and 0.58 metalness. |
+| Service metal | `#626c70` | Restrained galvanized hardware; 0.50 roughness and 0.62 metalness. |
+| Structural steel | `#465156` | Lift frames and major supports; 0.46 roughness and 0.72 metalness. |
+| Elevator tread | `#929a9b` | Durable composite deck; 0.62 roughness and 0.42 metalness. |
+| Gasket | `#101516` | Rubber seals and glass seating; 0.82 roughness and 0.04 metalness. |
+| Containment glass | `#a6c8ca` | Pale aqua, 0.16 opacity, 0.20 roughness, no emissive contribution, always seated in a gasket/frame. |
+| Neutral fixture | `#f3f2e9` | Warm-white diffuser with restrained 0.24 emissive intensity. |
+| Biological sticky | `#72ead0` / `#5f742d` | Bob-related wet membrane and the darker recessed vent variant; gameplay accents, not general decoration. |
 | Status accents | muted aqua, amber, red | Sparse equipment state and wayfinding only. |
 
 The ceramic, graphite, and service-metal normal responses are deliberately
 subordinate to form. The room must retain its hierarchy if every micro-normal
-map is disabled. Phase 1.5 adds no lights, shadows, reflection probes,
+map is disabled. The pass adds no new lights, shadows, reflection probes,
 post-processing, particles, or animated failure effects.
 
 ## Gameplay and presentation separation
@@ -91,44 +94,49 @@ The overlay is visual-only and is disposed before its scene.
 
 ```text
 ContainmentArtResources
-├── 9 deterministic DataTextures
-├── 20 shared materials
+├── 10 deterministic DataTextures
+├── 22 shared materials
 ├── shared primitive geometries
 ├── a physically sized chamfer-geometry cache
 └── idempotent dispose()
 ```
 
-Room art borrows these resources and never disposes them. Room 1 owns only its
-unique organic membrane, egg-state, crack, shard, and sign-plane geometry. The
-level disposes consumers before the shared library. Repeated disposal is safe,
-and create/dispose/recreate tests assert stable counts and references. Static
-art creates no per-frame resources. Room 3's later acid presentation is the
-only animated environment-material exception; its level-update-driven clock,
-ownership and fixed procedural cost are documented in
+Room art borrows these shared resources and never disposes them. Individual
+room groups own and dispose only their unique sign planes, curved/hero
+geometry, and other room-specific resources. Room 3 additionally owns its one
+acid surface material. The level disposes consumers before the shared library.
+Repeated disposal is safe, and create/dispose/recreate tests assert stable
+counts and references. Static art creates no per-frame resources. The Room 3
+acid presentation is the only animated environment-material exception; its
+level-update-driven clock, ownership and fixed procedural cost are documented in
 [`acid-surface-shader.md`](acid-surface-shader.md).
 
 ## Procedural textures and graphics
 
-All Phase 1/1.5 texture and graphic data is project-authored and generated once
-in memory without DOM canvas APIs or downloaded assets:
+All texture and graphic data for the five-room pass is project-authored and
+generated once in memory without DOM canvas APIs or downloaded assets:
 
 - 64 × 64 restrained ceramic normal and roughness;
 - 64 × 64 graphite/service-metal normal and roughness;
 - 64 × 64 organic sticky membrane normal and wet roughness;
 - 64 × 64 related sticky-vent normal and wet roughness;
-- 512 × 256 antialiased vector-stroke signage atlas.
+- 64 × 64 acid foundation albedo;
+- 512 × 1280 antialiased vector-stroke signage atlas with twenty 64-pixel rows.
 
-The atlas contains the concise identifiers `C-01 / BIOLOGICAL CONTAINMENT`,
-`SP-01 / SPECIMEN TEST BAY`, `LOCKED / DOOR C-01`, and
-`VENT ACCESS / SERVICE ROUTE`. A project-authored stroke alphabet avoids a
-font/runtime dependency and the old 5 × 7 pixel aesthetic. Warm white type,
-muted subtitles, generous negative space, and a single semantic accent bar form
-the provisional Specimen facility identity.
+The atlas carries identifiers and wayfinding for Rooms 1–5, from
+`C-01 / BIOLOGICAL CONTAINMENT` through `C-05 / PRIMARY CONTAINMENT LAB`, plus
+service, chemical, laser, pressure and observation labels. A project-authored
+stroke alphabet avoids a font/runtime dependency and the old 5 × 7 pixel
+aesthetic. Atlas creation validates that every authored non-space character
+has visible vector strokes, so unsupported copy fails explicitly instead of
+rendering incomplete signage. Warm white type, muted subtitles, generous
+negative space, and a single semantic accent bar form the Specimen facility
+identity.
 
 Generation is deterministic. Non-colour maps use `NoColorSpace`, repeat
-wrapping, and mipmapped linear filtering. The signage atlas uses sRGB and clamp
-wrapping. The nine uncompressed RGBA source buffers total 655,360 bytes before
-GPU mipmaps.
+wrapping, and mipmapped linear filtering. The acid albedo and signage atlas use
+sRGB; the atlas uses clamp wrapping while the remaining textures repeat. The
+ten uncompressed RGBA source buffers total 2,768,896 bytes before GPU mipmaps.
 
 ## Sticky language
 
@@ -143,7 +151,7 @@ The vent variant is smaller scale and recessed inside a deep galvanized duct
 collar with purposeful ribs. Its geometry stays shallow in the tight camera
 volume. Ordinary ceramic never uses either membrane map or relief language.
 
-Containment currently has no `nonStick` or `bouncy` collider tags. Phase 1.5
+Containment currently has no `nonStick` or `bouncy` collider tags. The art pass
 therefore authors neither presentation. Ordinary platforms remain ordinary;
 Bob's existing innate rebound is unchanged.
 
@@ -188,6 +196,19 @@ The room is approximately 90% pristine and 10% strained: one service reveal,
 organic membrane pressure at its frame, and restrained warning status imply a
 problem without a grime or abandoned-facility pass.
 
+## Five-room progression
+
+- Room 1 establishes the clinical specimen machine, false lead door, adhesion
+  membrane and vent escape.
+- Room 2 extends the language across the traversal teaching chamber while
+  keeping platforms and route silhouettes dominant.
+- Room 3 frames the approved acid basin as active chemical-processing
+  infrastructure; the animated liquid is documented separately.
+- Room 4 becomes a vertical transfer core with structural ribs, guide rails,
+  service trunks and laser instrumentation around the frozen elevator route.
+- Room 5 resolves into the primary research and observation chamber, with
+  pressure equipment and the exit path retaining the final visual hierarchy.
+
 ## Issue #33 boundary
 
 Issue #32 owns the static environment-art foundation and cutscene-ready static
@@ -195,6 +216,6 @@ states. Issue #33 still owns lighting redesign, shadow tuning, animated alarms,
 flicker, sparks, smoke, particles, release VFX and animation, bloom,
 post-processing, and other dynamic containment-failure presentation.
 
-Room 1 remains the approval gate. Do not propagate this language into Rooms
-2–5 until its shape design, hierarchy, route readability, and cost have been
-reviewed.
+The static Rooms 1–5 art foundation and Room 3 acid surface are complete for
+Issue #32. Later whole-level dynamic polish remains inside the Issue #33
+boundary above.

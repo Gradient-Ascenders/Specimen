@@ -22,10 +22,13 @@ ceramic micro-normal map, so the effect adds no texture residency.
 The static maps also leave a conservative standard-material foundation if the
 custom insertions are disabled during development.
 
-Checkpoint reset does not recreate or rewind the environmental material. A
-full level restart disposes and recreates Room 3, so the new material begins at
-`uTime = 0`. Repeated create/dispose/recreate therefore produces one fresh
-material and uniform set per level instance.
+Checkpoint recovery and the player-facing full-level restart both reset the
+existing Containment scene in place. They do not recreate or rewind the
+environmental material, so the same uniform object and accumulated `uTime`
+continue when play resumes. Only unloading/disposing the level and constructing
+a new `ContainmentLevelScene` creates a fresh material beginning at `uTime = 0`.
+Repeated dispose/recreate cycles therefore still produce exactly one material
+and uniform set per scene instance without leaks.
 
 ## Coordinate and update model
 
