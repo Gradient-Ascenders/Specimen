@@ -105,13 +105,19 @@ All temporary positions and IDs live in `CultivationFoundationManifest`:
 - trigger roles, centres, and sizes;
 - radioactive volume IDs, centres, and sizes;
 - the out-of-bounds plane;
-- structural assembly IDs reserved for separately-owned assembly components.
+- six structural assembly definitions, including support IDs/roles, puzzle
+  groups, authored transforms, timings, collider sizes, and final surface tags.
 
-Final Room 1–3 work should replace manifest values and register real resettable
-room components without changing runtime or checkpoint interfaces. Rooms 4–5
-add checkpoint definitions, trigger authoring, room objectives, and puzzle
-groups through the same contracts. Structural assemblies remain empty in the
-foundation manifest until their owning design supplies stable IDs.
+The runtime now creates three Room 1 drop-to-acid platforms and three Room 2
+retained-rope catch blocks from those definitions. Each soluble support target
+and its assembly are registered as real resettable room components in
+target-before-assembly order. See `docs/cultivation-structural-assemblies.md`
+for their metadata, state machines, collision order, reset contract, and tuning.
+
+Final Room 1–3 work may refine the remaining harness values and presentation
+without changing runtime or checkpoint interfaces. Rooms 4–5 add checkpoint
+definitions, trigger authoring, room objectives, and puzzle groups through the
+same contracts.
 
 ## Manual verification
 

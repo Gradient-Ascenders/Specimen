@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import type { RadioactiveHazardDefinition } from '../hazards/RadioactiveHazardSystem.ts';
+import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 import type { CultivationCheckpointDefinition } from './CultivationCheckpointManager.ts';
 
 export const CULTIVATION_ROOM_ONE_GROUP_ID = 'cultivation-room-1';
@@ -18,12 +19,29 @@ export interface CultivationTriggerAuthoring {
   readonly size: THREE.Vector3;
 }
 
+export interface CultivationStructuralAssemblyAuthoring {
+  readonly id: string;
+  readonly mode: 'drop-to-acid' | 'rope-catch';
+  readonly puzzleGroupId: string;
+  readonly supportTargetId: string;
+  readonly supportRole: 'soluble-rope' | 'soluble-brace';
+  readonly supportPosition: THREE.Vector3;
+  readonly supportSize: THREE.Vector3;
+  readonly initialPosition: THREE.Vector3;
+  readonly finalPosition: THREE.Vector3;
+  readonly movingSize: THREE.Vector3;
+  readonly releaseDelaySeconds: number;
+  readonly travelDurationSeconds: number;
+  readonly settlingDurationSeconds?: number;
+  readonly settlingSwingRadians?: number;
+  readonly finalSurfaceTag: SurfaceTag;
+}
+
 export interface CultivationFoundationManifest {
   readonly checkpoints: readonly CultivationCheckpointDefinition[];
   readonly triggers: readonly CultivationTriggerAuthoring[];
   readonly radioactiveHazards: readonly RadioactiveHazardDefinition[];
-  /** Reserved stable IDs for separately-owned structural assembly components. */
-  readonly structuralAssemblyIds: readonly string[];
+  readonly structuralAssemblies: readonly CultivationStructuralAssemblyAuthoring[];
   readonly outOfBoundsYMetres: number;
 }
 
@@ -97,6 +115,103 @@ export const CULTIVATION_FOUNDATION_MANIFEST: CultivationFoundationManifest = {
       size: new THREE.Vector3(5, 1.1, 4),
     },
   ],
-  structuralAssemblyIds: [],
+  structuralAssemblies: [
+    {
+      id: 'cultivation-room-1-drop-platform-1',
+      mode: 'drop-to-acid',
+      puzzleGroupId: CULTIVATION_ROOM_ONE_GROUP_ID,
+      supportTargetId: 'cultivation-room-1-soluble-rope-1',
+      supportRole: 'soluble-rope',
+      supportPosition: new THREE.Vector3(-3.4, 8.75, 5),
+      supportSize: new THREE.Vector3(0.7, 3.5, 0.7),
+      initialPosition: new THREE.Vector3(-3.4, 7, 5),
+      finalPosition: new THREE.Vector3(-3.4, 0.35, 5),
+      movingSize: new THREE.Vector3(2.6, 0.5, 2.6),
+      releaseDelaySeconds: 0.08,
+      travelDurationSeconds: 0.72,
+      finalSurfaceTag: 'default',
+    },
+    {
+      id: 'cultivation-room-1-drop-platform-2',
+      mode: 'drop-to-acid',
+      puzzleGroupId: CULTIVATION_ROOM_ONE_GROUP_ID,
+      supportTargetId: 'cultivation-room-1-soluble-rope-2',
+      supportRole: 'soluble-rope',
+      supportPosition: new THREE.Vector3(0, 9, 7.4),
+      supportSize: new THREE.Vector3(0.7, 4, 0.7),
+      initialPosition: new THREE.Vector3(0, 7, 7.4),
+      finalPosition: new THREE.Vector3(0, 0.42, 7.4),
+      movingSize: new THREE.Vector3(2.6, 0.5, 2.6),
+      releaseDelaySeconds: 0.1,
+      travelDurationSeconds: 0.78,
+      finalSurfaceTag: 'default',
+    },
+    {
+      id: 'cultivation-room-1-drop-platform-3',
+      mode: 'drop-to-acid',
+      puzzleGroupId: CULTIVATION_ROOM_ONE_GROUP_ID,
+      supportTargetId: 'cultivation-room-1-soluble-rope-3',
+      supportRole: 'soluble-rope',
+      supportPosition: new THREE.Vector3(3.4, 9.25, 9.7),
+      supportSize: new THREE.Vector3(0.7, 4.5, 0.7),
+      initialPosition: new THREE.Vector3(3.4, 7, 9.7),
+      finalPosition: new THREE.Vector3(3.4, 0.5, 9.7),
+      movingSize: new THREE.Vector3(2.6, 0.5, 2.6),
+      releaseDelaySeconds: 0.12,
+      travelDurationSeconds: 0.84,
+      finalSurfaceTag: 'default',
+    },
+    {
+      id: 'cultivation-room-2-rope-catch-block-1',
+      mode: 'rope-catch',
+      puzzleGroupId: CULTIVATION_ROOM_TWO_GROUP_ID,
+      supportTargetId: 'cultivation-room-2-soluble-brace-1',
+      supportRole: 'soluble-brace',
+      supportPosition: new THREE.Vector3(-5, 10.5, 20),
+      supportSize: new THREE.Vector3(2, 0.65, 0.8),
+      initialPosition: new THREE.Vector3(-5, 9, 20),
+      finalPosition: new THREE.Vector3(-5.5, 5, 23.5),
+      movingSize: new THREE.Vector3(2.8, 0.5, 2.8),
+      releaseDelaySeconds: 0.08,
+      travelDurationSeconds: 0.68,
+      settlingDurationSeconds: 0.48,
+      settlingSwingRadians: 0.065,
+      finalSurfaceTag: 'default',
+    },
+    {
+      id: 'cultivation-room-2-rope-catch-block-2',
+      mode: 'rope-catch',
+      puzzleGroupId: CULTIVATION_ROOM_TWO_GROUP_ID,
+      supportTargetId: 'cultivation-room-2-soluble-brace-2',
+      supportRole: 'soluble-brace',
+      supportPosition: new THREE.Vector3(0, 10.5, 23.5),
+      supportSize: new THREE.Vector3(2, 0.65, 0.8),
+      initialPosition: new THREE.Vector3(0, 9, 23.5),
+      finalPosition: new THREE.Vector3(-0.5, 6, 25.5),
+      movingSize: new THREE.Vector3(2.8, 0.5, 2.8),
+      releaseDelaySeconds: 0.1,
+      travelDurationSeconds: 0.72,
+      settlingDurationSeconds: 0.5,
+      settlingSwingRadians: 0.06,
+      finalSurfaceTag: 'default',
+    },
+    {
+      id: 'cultivation-room-2-rope-catch-block-3',
+      mode: 'rope-catch',
+      puzzleGroupId: CULTIVATION_ROOM_TWO_GROUP_ID,
+      supportTargetId: 'cultivation-room-2-soluble-brace-3',
+      supportRole: 'soluble-brace',
+      supportPosition: new THREE.Vector3(5, 10.5, 26),
+      supportSize: new THREE.Vector3(2, 0.65, 0.8),
+      initialPosition: new THREE.Vector3(5, 9, 26),
+      finalPosition: new THREE.Vector3(4.5, 7.25, 27.5),
+      movingSize: new THREE.Vector3(2.8, 0.5, 2.8),
+      releaseDelaySeconds: 0.12,
+      travelDurationSeconds: 0.76,
+      settlingDurationSeconds: 0.52,
+      settlingSwingRadians: 0.055,
+      finalSurfaceTag: 'default',
+    },
+  ],
   outOfBoundsYMetres: -5,
 };

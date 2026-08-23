@@ -228,3 +228,44 @@ test('inactive out-of-bounds bodies request one pair recovery for their own iden
   assert.ok(fixture.goop.position.y > 0);
   fixture.controller.dispose();
 });
+
+test('external room components reset in target-before-assembly order', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const manager = new SlimeManager<KinematicBody>();
+  const start = CULTIVATION_FOUNDATION_MANIFEST.checkpoints[0];
+  const bob = new KinematicBody({ world, surfaces, initialPosition: start.bobSpawnPosition });
+  const goop = new KinematicBody({ world, surfaces, initialPosition: start.goopSpawnPosition });
+  const pair = new PersistentSlimePair({
+    manager,
+    bobBody: bob,
+    goopBody: goop,
+    bobSpawnPosition: start.bobSpawnPosition,
+    goopSpawnPosition: start.goopSpawnPosition,
+  });
+  const order: string[] = [];
+  const controller = new CultivationLevelController({
+    pair,
+    collisionWorld: world,
+    initialActiveSlimeId: 'bob',
+    requestDeath: () => false,
+    cancelTransients: () => order.push('transients'),
+    puzzleComponents: [
+      {
+        id: 'test-support-target',
+        groupId: 'cultivation-room-1',
+        component: { reset: () => order.push('target') },
+      },
+      {
+        id: 'test-assembly',
+        groupId: 'cultivation-room-1',
+        component: { reset: () => order.push('assembly') },
+      },
+    ],
+  });
+
+  controller.reset('bob');
+  assert.deepEqual(order, ['transients', 'target', 'assembly']);
+  controller.dispose();
+  manager.dispose();
+});
