@@ -71,7 +71,8 @@ selection never determine entry.
 - Bob and Goop have separate Room 3 entry volumes and may occupy them in either
   order.
 - Partial occupancy keeps Room 2 and its puzzle group authoritative. Leaving an
-  exit clears that slime's entry flag until it returns.
+  exit clears that slime's entry flag until it returns. Both sensors reconcile
+  before the fixed update evaluates the combined occupancy snapshot.
 - If either slime fails before both exits are occupied, Retry restores both
   Room 2 spawns and clears both partial flags.
 - Once both occupy their authored exits together, Room 3 becomes authoritative.

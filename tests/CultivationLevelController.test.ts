@@ -122,6 +122,31 @@ test('Room 3 requires both slimes to occupy their own exits at the same time', (
   fixture.controller.dispose();
 });
 
+test('Room 3 reconciles both exits before evaluating a same-step occupancy handoff', () => {
+  const fixture = createController();
+  const [roomTwo, bobExit, goopExit] = CULTIVATION_FOUNDATION_MANIFEST.triggers;
+  fixture.bob.teleport(roomTwo.centre);
+  fixture.controller.update();
+
+  fixture.goop.teleport(goopExit.centre);
+  fixture.controller.update();
+  assert.equal(fixture.controller.readModel.goopEnteredRoomThree, true);
+
+  fixture.bob.teleport(bobExit.centre);
+  fixture.goop.teleport(roomTwo.centre);
+  fixture.controller.update();
+
+  assert.equal(fixture.controller.readModel.bobEnteredRoomThree, true);
+  assert.equal(fixture.controller.readModel.goopEnteredRoomThree, false);
+  assert.equal(fixture.controller.readModel.roomId, 'cultivation-room-2');
+  assert.equal(fixture.controller.readModel.checkpointId, 'cultivation-room-2-entry');
+
+  fixture.goop.teleport(goopExit.centre);
+  fixture.controller.update();
+  assert.equal(fixture.controller.readModel.roomId, 'cultivation-room-3');
+  fixture.controller.dispose();
+});
+
 test('Room 3 exits count only their authored slime identity', () => {
   const fixture = createController();
   const [roomTwo, bobExit, goopExit] = CULTIVATION_FOUNDATION_MANIFEST.triggers;

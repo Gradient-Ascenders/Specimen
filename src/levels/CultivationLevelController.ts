@@ -101,7 +101,6 @@ export class CultivationLevelController {
   private goopEnteredRoomTwoEarly = false;
   private failureLatched = false;
   private lastFailureValue = 'none';
-  private triggerEventsSuppressed = false;
 
   constructor(options: CultivationLevelControllerOptions) {
     this.pair = options.pair;
@@ -158,6 +157,7 @@ export class CultivationLevelController {
     for (const runtime of this.triggerRuntimes) {
       runtime.sensor.update(runtime.trigger, this.occupants);
     }
+    this.syncRoomThreeOccupancy();
     for (const occupant of this.occupants) {
       if (occupant.position.y < this.manifest.outOfBoundsYMetres) {
         this.requestFailure(`cultivation:out-of-bounds:${occupant.id}`, occupant.id);
@@ -226,19 +226,12 @@ export class CultivationLevelController {
 
   private subscribeToTriggers(): void {
     for (const runtime of this.triggerRuntimes) {
-      if (runtime.authoring.role === 'room-2-entry') {
-        this.unsubscribeCallbacks.push(
-          runtime.trigger.events.on('entered', ({ occupantId }) => {
-            this.handleRoomTwoEntry(occupantId);
-          }),
-        );
-      } else {
-        this.unsubscribeCallbacks.push(
-          runtime.trigger.events.on('occupancyChanged', () => {
-            this.syncRoomThreeOccupancy();
-          }),
-        );
-      }
+      if (runtime.authoring.role !== 'room-2-entry') continue;
+      this.unsubscribeCallbacks.push(
+        runtime.trigger.events.on('entered', ({ occupantId }) => {
+          this.handleRoomTwoEntry(occupantId);
+        }),
+      );
     }
   }
 
@@ -258,7 +251,6 @@ export class CultivationLevelController {
 
   private syncRoomThreeOccupancy(): void {
     if (
-      this.triggerEventsSuppressed ||
       this.stateValue !== 'playing' ||
       this.progression.roomId !== 'cultivation-room-2'
     ) return;
@@ -295,12 +287,7 @@ export class CultivationLevelController {
   }
 
   private clearTriggerOccupants(): void {
-    this.triggerEventsSuppressed = true;
-    try {
-      for (const runtime of this.triggerRuntimes) runtime.trigger.clear();
-    } finally {
-      this.triggerEventsSuppressed = false;
-    }
+    for (const runtime of this.triggerRuntimes) runtime.trigger.clear();
   }
 
   private emitProgress(objectiveMayHaveChanged = false): void {
