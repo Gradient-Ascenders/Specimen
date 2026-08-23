@@ -233,6 +233,52 @@ test('Room 5 Blender layout drives deterministic platforms and translated lasers
   scene.dispose();
 });
 
+test('Room 5 moving-platform handoff remains phase locked across loops and reset', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const room = scene.roomFive;
+  const fakeBody = createFakeBody() as unknown as KinematicBody;
+  const persistentBodies = [fakeBody];
+  const fixedDeltaSeconds = 1 / 60;
+  const firstHandoffStepCount = 96;
+  const fullLoopStepCount = 384;
+
+  assert.equal(
+    room.movingPlatformOne.travelDurationSeconds,
+    room.movingPlatformTwo.travelDurationSeconds,
+  );
+
+  const advanceSteps = (stepCount: number): void => {
+    for (let step = 0; step < stepCount; step += 1) {
+      room.updateTraversal(fixedDeltaSeconds, fakeBody, persistentBodies);
+    }
+  };
+
+  // Platform 1 begins halfway through its X route. Each time it reaches the
+  // Room 5 handoff end, platform 2 must be at the same midpoint of its Z route
+  // instead of drifting toward an easier or harder jump on later loops.
+  advanceSteps(firstHandoffStepCount);
+  assert.equal(room.movingPlatformOne.progress, 1);
+  assert.ok(Math.abs(room.movingPlatformTwo.progress - 0.5) < 1e-10);
+
+  for (let loop = 0; loop < 8; loop += 1) {
+    advanceSteps(fullLoopStepCount);
+    assert.equal(room.movingPlatformOne.progress, 1);
+    assert.ok(
+      Math.abs(room.movingPlatformTwo.progress - 0.5) < 1e-10,
+      `Room 5 moving-platform phase drifted after loop ${loop + 1}`,
+    );
+  }
+
+  room.reset();
+  assert.equal(room.movingPlatformOne.progress, 0.5);
+  assert.equal(room.movingPlatformTwo.progress, 0);
+  advanceSteps(firstHandoffStepCount);
+  assert.equal(room.movingPlatformOne.progress, 1);
+  assert.ok(Math.abs(room.movingPlatformTwo.progress - 0.5) < 1e-10);
+
+  scene.dispose();
+});
+
 test('Room 5 remains at its authored start until its first active fixed step', () => {
   const scene = new ContainmentLevelScene(() => {});
   const collisionWorld = new CollisionWorld();
