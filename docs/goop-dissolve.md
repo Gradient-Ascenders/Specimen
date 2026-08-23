@@ -86,9 +86,12 @@ The initial playtest defaults are held in
 | Fire cooldown | `0.45 s` |
 | Launch clearance | `0.02 m` |
 | Maximum live projectiles | `8` |
-| Maximum visible target IDs | `16` |
+| Maximum visible target IDs / occlusion probes per step | `16` |
 
 These values are data, not assumptions embedded in targeting or presentation.
+The visibility limit caps expensive occlusion probes independently from the
+number of successful results, so a run of hidden targets cannot produce an
+unbounded set of fixed-step collision sweeps.
 
 ## Projectile collision
 

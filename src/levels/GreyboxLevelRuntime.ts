@@ -1219,7 +1219,7 @@ export class GreyboxLevelRuntime {
         `Bob abilities adhesion / rebound / dissolve / electrical: ${bobDefinition.abilities.adhesion ? 'yes' : 'no'} / ${bobDefinition.abilities.rebound ? 'yes' : 'no'} / ${bobDefinition.abilities.dissolve ? 'yes' : 'no'} / ${bobDefinition.abilities.electrical ? 'yes' : 'no'}`,
         `Bob / Goop jump mode: ${bobDefinition.jumpMode} / ${goopDefinition.jumpMode}`,
         `Goop abilities adhesion / rebound / dissolve / electrical: ${goopDefinition.abilities.adhesion ? 'yes' : 'no'} / ${goopDefinition.abilities.rebound ? 'yes' : 'no'} / ${goopDefinition.abilities.dissolve ? 'yes' : 'no'} / ${goopDefinition.abilities.electrical ? 'yes' : 'no'}`,
-        `acid aim / target / candidates: ${acidStats.aimActive ? 'active' : 'inactive'} / ${acidStats.targetedSolubleId} / ${acidStats.visibleTargetCount}`,
+        `acid aim / target / candidates / probes: ${acidStats.aimActive ? 'active' : 'inactive'} / ${acidStats.targetedSolubleId} / ${acidStats.visibleTargetCount} / ${acidStats.visibilityProbeCount}`,
         `acid projectiles live / fired: ${acidStats.liveProjectileCount} / ${acidStats.firedCount}`,
         `acid impacts soluble / world: ${acidStats.solubleImpactCount} / ${acidStats.worldImpactCount}`,
         `acid cooldown remaining: ${acidStats.cooldownRemainingSeconds.toFixed(2)} s`,

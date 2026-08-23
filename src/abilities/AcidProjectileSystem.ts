@@ -163,6 +163,7 @@ export interface AcidProjectileDiagnostics {
   readonly aimActive: boolean;
   readonly targetedSolubleId: string;
   readonly visibleTargetCount: number;
+  readonly visibilityProbeCount: number;
   readonly liveProjectileCount: number;
   readonly activeBurnCount: number;
   readonly cooldownRemainingSeconds: number;
@@ -212,6 +213,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   private firedCount = 0;
   private solubleImpactCount = 0;
   private worldImpactCount = 0;
+  private visibilityProbeCountValue = 0;
   private disposed = false;
 
   constructor(options: AcidProjectileSystemOptions<Body>) {
@@ -326,6 +328,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       targetedSolubleId:
         this.aimReadModelValue.targetedSolubleId ?? 'none',
       visibleTargetCount: this.aimReadModelValue.visibleSolubleIds.length,
+      visibilityProbeCount: this.visibilityProbeCountValue,
       liveProjectileCount: this.projectiles.filter(
         (projectile) => projectile.state.active,
       ).length,
@@ -392,6 +395,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   private updateVisibleTargets(): void {
     const visibleIds = this.aimReadModelValue.visibleSolubleIds;
     visibleIds.length = 0;
+    this.visibilityProbeCountValue = 0;
     const activeBody = this.slimeManager.activeBody;
     if (!activeBody) return;
 
@@ -419,6 +423,16 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
         continue;
       }
 
+      // Bound expensive occlusion sweeps independently from successful
+      // results. Otherwise a long run of occluded candidates could probe every
+      // registered target even though visibleIds itself is capped.
+      if (
+        this.visibilityProbeCountValue >=
+        this.config.maximumVisibleTargets
+      ) {
+        break;
+      }
+      this.visibilityProbeCountValue += 1;
       const hasHit = this.collisionWorld.sweepSphere(
         this.aimOrigin,
         this.candidateDisplacement,
@@ -612,6 +626,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   private clearAimTargetingState(): void {
     this.aimReadModelValue.targetedSolubleId = undefined;
     this.aimReadModelValue.visibleSolubleIds.length = 0;
+    this.visibilityProbeCountValue = 0;
     this.aimReadModelValue.canFire = false;
     this.updateCooldownReadModel();
   }

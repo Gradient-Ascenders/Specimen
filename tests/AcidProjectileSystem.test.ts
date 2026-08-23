@@ -68,30 +68,40 @@ interface Fixture {
   dispose(): void;
 }
 
-function createFixture(targetPosition = new THREE.Vector3(0, 0, -3)): Fixture {
+function createFixture(
+  targetPosition = new THREE.Vector3(0, 0, -3),
+  additionalTargetPositions: readonly THREE.Vector3[] = [],
+): Fixture {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   const manager = new TestSlimeManager();
 
-  const targetMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 0.02),
-    new THREE.MeshStandardMaterial(),
-  );
-  targetMesh.name = 'soluble-target';
-  targetMesh.position.copy(targetPosition);
-  targetMesh.userData.surfaceTag = 'default';
-  world.register(targetMesh);
-  surfaces.register(targetMesh);
-  const target = new DissolveTarget({
-    id: 'soluble-target',
-    mesh: targetMesh,
-    collisionWorld: world,
-    surfaceRegistry: surfaces,
-    dissolveDurationSeconds: 2,
-    collisionDisableProgress: 0.75,
+  const targetPositions = [targetPosition, ...additionalTargetPositions];
+  const ownedMeshes: THREE.Mesh[] = [];
+  const targets = targetPositions.map((position, index) => {
+    const id = index === 0 ? 'soluble-target' : `soluble-target-${index + 1}`;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 0.02),
+      new THREE.MeshStandardMaterial(),
+    );
+    mesh.name = id;
+    mesh.position.copy(position);
+    mesh.userData.surfaceTag = 'default';
+    world.register(mesh);
+    surfaces.register(mesh);
+    ownedMeshes.push(mesh);
+    return new DissolveTarget({
+      id,
+      mesh,
+      collisionWorld: world,
+      surfaceRegistry: surfaces,
+      dissolveDurationSeconds: 2,
+      collisionDisableProgress: 0.75,
+    });
   });
-  const dissolve = new DissolveSystem([target]);
-  const ownedMeshes = [targetMesh];
+  const target = targets[0];
+  const targetMesh = target.mesh;
+  const dissolve = new DissolveSystem(targets);
 
   return {
     world,
@@ -103,7 +113,7 @@ function createFixture(targetPosition = new THREE.Vector3(0, 0, -3)): Fixture {
     ownedMeshes,
     dispose: () => {
       dissolve.dispose();
-      target.dispose();
+      for (const dissolveTarget of targets) dissolveTarget.dispose();
       for (const mesh of ownedMeshes) {
         mesh.geometry.dispose();
         const materials = Array.isArray(mesh.material)
@@ -274,6 +284,43 @@ test('cooldown and projectile-pool limits bound deterministic shot count', () =>
   system.reset();
   assert.equal(system.getDiagnostics().liveProjectileCount, 0);
   assert.equal(system.aimReadModel.cooldownProgress, 1);
+
+  system.dispose();
+  fixture.dispose();
+});
+
+test('occluded candidates cannot exceed the fixed-step visibility probe cap', () => {
+  const fixture = createFixture(
+    new THREE.Vector3(-3, 0, -5),
+    [
+      new THREE.Vector3(-1, 0, -5),
+      new THREE.Vector3(1, 0, -5),
+      new THREE.Vector3(3, 0, -5),
+    ],
+  );
+  addWorldBox(
+    fixture,
+    'occluding-wall',
+    new THREE.Vector3(10, 4, 0.2),
+    new THREE.Vector3(0, 0, -2),
+  );
+  const system = new AcidProjectileSystem({
+    slimeManager: fixture.manager,
+    collisionWorld: fixture.world,
+    dissolveSystem: fixture.dissolve,
+    aimRayProvider: new TestAimRay(
+      new THREE.Vector3(),
+      new THREE.Vector3(0, 0, -1),
+    ),
+    config: {
+      maximumVisibleTargets: 2,
+    },
+  });
+
+  system.update(1 / 60, AIM_ONLY);
+
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, []);
+  assert.equal(system.getDiagnostics().visibilityProbeCount, 2);
 
   system.dispose();
   fixture.dispose();
