@@ -5,8 +5,8 @@ collision scene and by later camera, shader, and Level 1 lighting work.
 
 ## Ownership and frame flow
 
-`RenderLayer` owns the one shared `WebGLRenderer`, the game `CameraRig`, the
-persistent test lighting, and viewport sizing. The runtime only supplies the
+`RenderLayer` owns the one shared `WebGLRenderer`, the game `CameraRig`, and
+viewport sizing. The runtime only supplies the
 animation timestamp to `Loop` and asks the render layer to draw after fixed
 updates; it does not create or dispose render-owned objects.
 
@@ -60,18 +60,12 @@ viewports retain the base framing and reveal more horizontal space. This is a
 static inspection view, not final follow-camera behaviour; later camera work
 should retain ownership in `CameraRig` and replace only the test-framing policy.
 
-## Clinical inspection lighting
+## Level-owned lighting
 
-The persistent baseline uses two non-shadowing lights:
-
-- a cool-white hemisphere fill at intensity `1.35`, with a dark neutral-green
-  ground colour, so upward and downward orientation remain distinguishable;
-- a white directional key at intensity `2.4`, positioned at `(8, 14, 10)` and
-  aimed at `(0, 0.5, 1.5)`, so top and side faces receive visibly different
-  illumination and curved normals remain legible.
-
-This pair is intentionally diagnostic rather than cinematic. Future shaders
-should be evaluated under it before adding level-specific mood lighting.
+Issue #33 removed the persistent clinical inspection pair. RenderLayer no
+longer contributes unexplained scene lighting; each level owns lighting and
+cleanup below its own root. Level 1's room rigs, fixture sources, state mapping
+and performance bounds are documented in `docs/containment-lighting.md`.
 
 ## Render diagnostics
 
