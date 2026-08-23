@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import * as THREE from 'three';
+
 import { EventBus } from '../src/core/EventBus.ts';
+import { CULTIVATION_FOUNDATION_MANIFEST } from '../src/levels/CultivationFoundationManifest.ts';
+import { CultivationLevelScene } from '../src/levels/CultivationLevelScene.ts';
 import { GameSessionCoordinator } from '../src/levels/GameSessionCoordinator.ts';
 import type { GameLevelRuntime, GameLevelRuntimeEvents } from '../src/levels/GameLevelRuntime.ts';
 import type { LevelLifecycleState } from '../src/levels/LevelLifecycle.ts';
@@ -77,6 +81,55 @@ test('Level 1 completion replaces it with exactly one Level 2 runtime', () => {
   session.start();
   assert.equal(session.state, 'running');
   session.dispose();
+});
+
+test('Level 2 retains effective level-owned lighting after the Level 1 handoff', () => {
+  const renderedScene = new THREE.Scene();
+  const levelOneRoot = new THREE.Group();
+  levelOneRoot.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1));
+  renderedScene.add(levelOneRoot);
+  const levelOne = new MockRuntime('level-1', progression);
+  const levelOneUnload = levelOne.unload.bind(levelOne);
+  levelOne.unload = () => {
+    levelOneUnload();
+    levelOneRoot.removeFromParent();
+  };
+  let levelTwoScene: CultivationLevelScene | undefined;
+
+  const session = new GameSessionCoordinator({
+    initialRuntime: levelOne,
+    createLevelTwo: (snapshot) => {
+      levelTwoScene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
+      const levelTwo = new MockRuntime('level-2', snapshot);
+      const levelTwoLoad = levelTwo.load.bind(levelTwo);
+      levelTwo.load = () => {
+        levelTwoLoad();
+        renderedScene.add(levelTwoScene!.root);
+      };
+      const levelTwoDispose = levelTwo.dispose.bind(levelTwo);
+      levelTwo.dispose = () => {
+        levelTwoDispose();
+        levelTwoScene?.dispose();
+      };
+      return levelTwo;
+    },
+    scheduleTransition: (transition) => transition(),
+  });
+  session.load();
+  session.start();
+  levelOne.events.emit('completed', { levelId: 'containment', nextLevelId: 'level-2' });
+
+  const effectiveLights: THREE.Light[] = [];
+  renderedScene.traverseVisible((object) => {
+    if (object instanceof THREE.Light && object.intensity > 0) effectiveLights.push(object);
+  });
+  assert.equal(levelOneRoot.parent, null);
+  assert.ok(levelTwoScene);
+  assert.ok(effectiveLights.some((light) => light instanceof THREE.HemisphereLight));
+  assert.ok(effectiveLights.some((light) => light instanceof THREE.DirectionalLight));
+
+  session.dispose();
+  assert.equal(renderedScene.children.length, 0);
 });
 
 test('a Level 2 load failure leaves a diagnosable non-running session', () => {

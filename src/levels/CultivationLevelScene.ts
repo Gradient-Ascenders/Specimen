@@ -20,6 +20,7 @@ export class CultivationLevelScene {
 
   constructor(manifest: CultivationFoundationManifest) {
     this.root.name = 'cultivation-level-2-foundation';
+    this.addFoundationLighting();
     const collisionMeshes: THREE.Mesh[] = [];
     const solubleSupportMeshes: THREE.Mesh[] = [];
     const boxes: readonly BoxAuthoring[] = [
@@ -118,6 +119,26 @@ export class CultivationLevelScene {
     mesh.userData.sizeMetres = [...box.size];
     this.root.add(mesh);
     return mesh;
+  }
+
+  private addFoundationLighting(): void {
+    const lighting = new THREE.Group();
+    lighting.name = 'cultivation-foundation-lighting';
+
+    const ambientFill = new THREE.HemisphereLight(0xbdd8c8, 0x18221d, 0.9);
+    ambientFill.name = 'cultivation-foundation-ambient-fill';
+
+    const key = new THREE.DirectionalLight(0xe4f2df, 1.35);
+    key.name = 'cultivation-foundation-key';
+    key.position.set(-7, 12, -8);
+    key.castShadow = false;
+    const keyTarget = new THREE.Object3D();
+    keyTarget.name = 'cultivation-foundation-key-target';
+    keyTarget.position.set(0, 1.5, 18);
+    key.target = keyTarget;
+
+    lighting.add(ambientFill, key, keyTarget);
+    this.root.add(lighting);
   }
 }
 

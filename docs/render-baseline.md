@@ -66,6 +66,10 @@ Issue #33 removed the persistent clinical inspection pair. RenderLayer no
 longer contributes unexplained scene lighting; each level owns lighting and
 cleanup below its own root. Level 1's room rigs, fixture sources, state mapping
 and performance bounds are documented in `docs/containment-lighting.md`.
+Cultivation currently owns a minimal hemisphere fill and directional key below
+`cultivation-foundation-lighting`; neither casts shadows. This keeps its
+foundation materials readable after the Level 1 handoff without pre-empting a
+future authored Level 2 lighting pass.
 
 ## Render diagnostics
 
