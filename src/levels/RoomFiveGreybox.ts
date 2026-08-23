@@ -29,6 +29,7 @@ const LEVER_PULL_SECONDS = 1;
 const CONTAINMENT_FAILURE_SECONDS = 1.5;
 const STICKY_WALL_THICKNESS_METRES = 0.022;
 const MODERATE_LASER_PERIOD_SECONDS = 5;
+const MOVING_PLATFORM_TRAVEL_DURATION_SECONDS = 3.2;
 const LASER_FIVE_TO_SEVEN_DISTANCE_METRES = 5.545;
 const MOTION_OFFSET_EPSILON_METRES = 1e-12;
 
@@ -80,7 +81,7 @@ export class RoomFiveGreybox {
     start: new THREE.Vector3(2.136, 82.374, 100.384),
     end: new THREE.Vector3(10.082, 82.374, 100.384),
     size: new THREE.Vector3(1.849, 0.523, 2.091),
-    travelDurationSeconds: 3.2,
+    travelDurationSeconds: MOVING_PLATFORM_TRAVEL_DURATION_SECONDS,
     initialProgress: 0.5,
     initialTarget: 'end',
   });
@@ -89,7 +90,7 @@ export class RoomFiveGreybox {
     start: new THREE.Vector3(15.109, 82.374, 100.384),
     end: new THREE.Vector3(15.109, 82.374, 107.234),
     size: new THREE.Vector3(1.849, 0.523, 2.091),
-    travelDurationSeconds: 3,
+    travelDurationSeconds: MOVING_PLATFORM_TRAVEL_DURATION_SECONDS,
     initialTarget: 'end',
   });
   readonly goopWoodenDoor: THREE.Mesh;
