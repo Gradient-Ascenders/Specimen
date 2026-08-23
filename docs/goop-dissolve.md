@@ -91,7 +91,9 @@ The initial playtest defaults are held in
 These values are data, not assumptions embedded in targeting or presentation.
 The visibility limit caps expensive occlusion probes independently from the
 number of successful results, so a run of hidden targets cannot produce an
-unbounded set of fixed-step collision sweeps.
+unbounded set of fixed-step collision sweeps. An eligible target hit by the
+main camera ray is inserted first using that existing sweep, ensuring the
+crosshair target cannot be displaced by earlier occluded registration entries.
 
 ## Projectile collision
 

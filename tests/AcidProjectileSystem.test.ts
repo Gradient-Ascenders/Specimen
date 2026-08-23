@@ -326,6 +326,54 @@ test('occluded candidates cannot exceed the fixed-step visibility probe cap', ()
   fixture.dispose();
 });
 
+test('the camera-ray target is retained after earlier candidates exhaust the probe cap', () => {
+  const fixture = createFixture(
+    new THREE.Vector3(-3, 0, -5),
+    [
+      new THREE.Vector3(3, 0, -5),
+      new THREE.Vector3(0, 0, -5),
+    ],
+  );
+  addWorldBox(
+    fixture,
+    'left-occluder',
+    new THREE.Vector3(1, 4, 0.2),
+    new THREE.Vector3(-1.2, 0, -2),
+  );
+  addWorldBox(
+    fixture,
+    'right-occluder',
+    new THREE.Vector3(1, 4, 0.2),
+    new THREE.Vector3(1.2, 0, -2),
+  );
+  const system = new AcidProjectileSystem({
+    slimeManager: fixture.manager,
+    collisionWorld: fixture.world,
+    dissolveSystem: fixture.dissolve,
+    aimRayProvider: new TestAimRay(
+      new THREE.Vector3(),
+      new THREE.Vector3(0, 0, -1),
+    ),
+    config: {
+      maximumVisibleTargets: 2,
+    },
+  });
+
+  system.update(1 / 60, AIM_ONLY);
+
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, [
+    'soluble-target-3',
+  ]);
+  assert.equal(
+    system.aimReadModel.targetedSolubleId,
+    'soluble-target-3',
+  );
+  assert.equal(system.getDiagnostics().visibilityProbeCount, 2);
+
+  system.dispose();
+  fixture.dispose();
+});
+
 test('cooldown accepts the next shot exactly at the configured boundary', () => {
   const fixture = createFixture(new THREE.Vector3(0, 0, -20));
   const system = new AcidProjectileSystem({

@@ -7,6 +7,7 @@ import {
   type CollisionWorld,
 } from '../physics/CollisionWorld.ts';
 import { DissolveSystem } from './DissolveSystem.ts';
+import type { DissolveTarget } from './DissolveTarget.ts';
 
 const DISTANCE_EPSILON = 1e-8;
 const COOLDOWN_EPSILON_SECONDS = 1e-9;
@@ -379,11 +380,10 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
     writeVectorState(this.aimReadModelValue.aimOrigin, this.aimOrigin);
     writeVectorState(this.aimReadModelValue.aimDirection, this.aimDirection);
     writeVectorState(this.aimReadModelValue.aimPoint, this.aimPoint);
-    this.updateVisibleTargets();
-
     const aimedTarget = this.aimHit.object
       ? this.dissolveSystem.getTargetForMesh(this.aimHit.object)
       : undefined;
+    this.updateVisibleTargets(aimedTarget);
     this.aimReadModelValue.targetedSolubleId =
       aimedTarget &&
       this.aimReadModelValue.visibleSolubleIds.includes(aimedTarget.id)
@@ -392,26 +392,27 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
     this.updateCooldownReadModel();
   }
 
-  private updateVisibleTargets(): void {
+  private updateVisibleTargets(aimedTarget: DissolveTarget | undefined): void {
     const visibleIds = this.aimReadModelValue.visibleSolubleIds;
     visibleIds.length = 0;
     this.visibilityProbeCountValue = 0;
     const activeBody = this.slimeManager.activeBody;
     if (!activeBody) return;
 
+    // The main camera-ray sweep already proved this target is unobstructed.
+    // Seed it before bounded secondary probes so registration order can never
+    // suppress the target directly under the crosshair.
+    if (
+      aimedTarget &&
+      this.isAvailableTargetInRange(aimedTarget, activeBody)
+    ) {
+      visibleIds.push(aimedTarget.id);
+    }
+
     for (const target of this.dissolveSystem.registeredTargets) {
       if (visibleIds.length >= this.config.maximumVisibleTargets) break;
-      if (target.completed || !target.collisionEnabled || !target.mesh.visible) {
-        continue;
-      }
-
-      target.copyClosestWorldPoint(activeBody.position, this.rangePoint);
-      if (
-        this.rangePoint.distanceToSquared(activeBody.position) >
-        this.config.maximumRangeMetres * this.config.maximumRangeMetres
-      ) {
-        continue;
-      }
+      if (target === aimedTarget) continue;
+      if (!this.isAvailableTargetInRange(target, activeBody)) continue;
 
       target.copyClosestWorldPoint(this.aimOrigin, this.targetPoint);
       this.candidateDisplacement.subVectors(
@@ -444,6 +445,21 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
         visibleIds.push(target.id);
       }
     }
+  }
+
+  private isAvailableTargetInRange(
+    target: DissolveTarget,
+    activeBody: Body,
+  ): boolean {
+    if (target.completed || !target.collisionEnabled || !target.mesh.visible) {
+      return false;
+    }
+
+    target.copyClosestWorldPoint(activeBody.position, this.rangePoint);
+    return (
+      this.rangePoint.distanceToSquared(activeBody.position) <=
+      this.config.maximumRangeMetres * this.config.maximumRangeMetres
+    );
   }
 
   private fireProjectile(): void {
