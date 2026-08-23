@@ -430,6 +430,16 @@ export class CameraRig {
     return target;
   }
 
+  /**
+   * Copy the live centre-crosshair ray without exposing camera mutation.
+   * Callers own both vectors and may reuse them across fixed updates.
+   */
+  copyAimRay(origin: THREE.Vector3, direction: THREE.Vector3): void {
+    this.camera.updateWorldMatrix(true, false);
+    origin.copy(this.camera.position);
+    this.camera.getWorldDirection(direction).normalize();
+  }
+
   update(interpolationAlpha: number, deltaSeconds: number): void {
     const target = this.followTarget;
     if (!target) return;

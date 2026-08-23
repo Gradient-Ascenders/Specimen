@@ -41,7 +41,7 @@ export class GreyboxTestPanel {
       <div class="test-panel-content">
         <p class="eyebrow">Level 1 teaching grey-box</p>
         <h1>Containment: climb + bounce</h1>
-        <p class="summary">Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump.</p>
+        <p class="summary">Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump. As Goop, hold right mouse to aim and press left mouse to fire acid.</p>
 
         <ul class="case-list" aria-label="Collision test case legend">
           <li style="--case-colour: #81909b">Floor</li>

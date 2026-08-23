@@ -167,6 +167,36 @@ export class DissolveTarget {
     return this.dissolveMaterials.diagnostics;
   }
 
+  /** Copy the nearest point on the authored bounds to a caller-owned vector. */
+  copyClosestWorldPoint(
+    point: { readonly x: number; readonly y: number; readonly z: number },
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    this.mesh.updateWorldMatrix(true, false);
+    this.inverseWorld.copy(this.mesh.matrixWorld).invert();
+    this.localPoint
+      .set(point.x, point.y, point.z)
+      .applyMatrix4(this.inverseWorld);
+    target.set(
+      THREE.MathUtils.clamp(
+        this.localPoint.x,
+        this.localBounds.min.x,
+        this.localBounds.max.x,
+      ),
+      THREE.MathUtils.clamp(
+        this.localPoint.y,
+        this.localBounds.min.y,
+        this.localBounds.max.y,
+      ),
+      THREE.MathUtils.clamp(
+        this.localPoint.z,
+        this.localBounds.min.z,
+        this.localBounds.max.z,
+      ),
+    );
+    return target.applyMatrix4(this.mesh.matrixWorld);
+  }
+
   /**
    * Contact/activation test against the authored mesh bounds.
    *
@@ -221,7 +251,7 @@ export class DissolveTarget {
     );
   }
 
-  /** Advance bounded progress while Goop is deliberately activating the target. */
+  /** Advance bounded progress for one accepted fixed-step acid burn. */
   advance(deltaSeconds: number): void {
     if (this.disposed || this.completedValue) return;
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {

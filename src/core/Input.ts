@@ -5,7 +5,8 @@ export type InputAction =
   | 'moveRight'
   | 'jump'
   | 'switchSlime'
-  | 'useAbility'
+  | 'aimAbility'
+  | 'fireAbility'
   | 'debugReset'
   | 'debugTestRecovery'
   | 'debugTeleportRoomOne'
@@ -29,7 +30,8 @@ export const DEFAULT_ACTION_BINDINGS = {
   moveRight: [{ kind: 'key', code: 'KeyD' }],
   jump: [{ kind: 'key', code: 'Space' }],
   switchSlime: [{ kind: 'key', code: 'Tab' }],
-  useAbility: [{ kind: 'key', code: 'KeyE' }],
+  aimAbility: [{ kind: 'mouseButton', button: 2 }],
+  fireAbility: [{ kind: 'mouseButton', button: 0 }],
   debugReset: [{ kind: 'key', code: 'KeyR' }],
   debugTestRecovery: [{ kind: 'key', code: 'KeyF' }],
   debugTeleportRoomOne: [{ kind: 'key', code: 'Digit1' }],
@@ -94,6 +96,10 @@ export class Input {
     this.pointerLockElement.addEventListener(
       'click',
       this.onPointerLockRequest,
+    );
+    this.pointerLockElement.addEventListener(
+      'contextmenu',
+      this.onContextMenu,
     );
   }
 
@@ -203,6 +209,10 @@ export class Input {
     this.pointerLockElement.removeEventListener(
       'click',
       this.onPointerLockRequest,
+    );
+    this.pointerLockElement.removeEventListener(
+      'contextmenu',
+      this.onContextMenu,
     );
 
     this.clearState();
@@ -317,7 +327,7 @@ export class Input {
   };
 
   private readonly onMouseDown = (event: MouseEvent): void => {
-    if (!this.enabledValue) return;
+    if (!this.enabledValue || !this.pointerLocked) return;
     const actions = this.mouseBindings.get(event.button);
     if (!actions || this.activeMouseButtons.has(event.button)) return;
 
@@ -350,5 +360,9 @@ export class Input {
   private readonly onPointerLockRequest = (): void => {
     if (!this.enabledValue) return;
     this.requestPointerLock();
+  };
+
+  private readonly onContextMenu = (event: Event): void => {
+    event.preventDefault();
   };
 }

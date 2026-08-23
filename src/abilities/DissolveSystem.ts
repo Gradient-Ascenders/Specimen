@@ -1,114 +1,139 @@
-import type { SlimeManager } from '../slimes/SlimeManager.ts';
+import * as THREE from 'three';
+
+import { EventBus } from '../core/EventBus.ts';
 import { DissolveTarget } from './DissolveTarget.ts';
 
-export interface DissolveBody {
-  readonly position: {
-    readonly x: number;
-    readonly y: number;
-    readonly z: number;
-  };
-  readonly radiusMetres: number;
+export type BurnStartResult = 'started' | 'already-burning' | 'rejected';
+
+export interface DissolveSystemEvents {
+  burnStarted: { readonly target: DissolveTarget };
+  burnCompleted: { readonly target: DissolveTarget };
+  burnReset: { readonly target: DissolveTarget };
 }
 
 export interface DissolveSystemDiagnostics {
-  readonly permitted: boolean;
-  readonly contactTargetId: string;
-  readonly activeTargetId: string;
-  readonly progress: number;
-  readonly collisionEnabled: boolean;
-  readonly completed: boolean;
-  readonly completionCount: number;
+  readonly activeBurnCount: number;
+  readonly activeBurnTargetIds: readonly string[];
+  readonly completedBurnCount: number;
+  readonly resetBurnCount: number;
 }
 
 /**
- * Ability coordinator for authored soluble geometry.
+ * Fixed-step coordinator for accepted acid burns.
  *
- * SlimeManager remains authoritative for who may invoke dissolve. A target must
- * be contacted to begin an activation. Once an activation has begun, holding
- * the action may carry it through the collision-disable threshold even though
- * the collider itself has disappeared.
+ * Projectile collision decides whether a burn may begin. Once accepted, this
+ * coordinator advances the existing DissolveTarget progress independently of
+ * aiming, active-slime ownership, or later projectile hits. A target can have
+ * at most one active burn, so repeated impacts never multiply its dissolve
+ * rate.
  */
-export class DissolveSystem<Body extends DissolveBody> {
-  private activeTarget: DissolveTarget | undefined;
-  private contactTarget: DissolveTarget | undefined;
+export class DissolveSystem {
+  readonly events = new EventBus<DissolveSystemEvents>();
 
-  constructor(
-    private readonly slimeManager: SlimeManager<Body>,
-    private readonly targets: readonly DissolveTarget[],
-  ) {}
+  private readonly targets: readonly DissolveTarget[];
+  private readonly targetByMesh = new Map<THREE.Mesh, DissolveTarget>();
+  private readonly burningTargets = new Set<DissolveTarget>();
+  private completedBurnCountValue = 0;
+  private resetBurnCountValue = 0;
+  private disposed = false;
 
-  update(deltaSeconds: number, activationHeld: boolean): void {
+  constructor(targets: readonly DissolveTarget[]) {
+    this.targets = [...targets];
+
+    const targetIds = new Set<string>();
+    for (const target of this.targets) {
+      if (targetIds.has(target.id)) {
+        throw new Error(`Duplicate dissolve target ID "${target.id}".`);
+      }
+      if (this.targetByMesh.has(target.mesh)) {
+        throw new Error(
+          `Dissolve mesh "${target.mesh.name || '<unnamed>'}" was registered twice.`,
+        );
+      }
+      targetIds.add(target.id);
+      this.targetByMesh.set(target.mesh, target);
+    }
+  }
+
+  get registeredTargets(): readonly DissolveTarget[] {
+    this.assertNotDisposed('read registered targets');
+    return this.targets;
+  }
+
+  get activeBurnCount(): number {
+    return this.burningTargets.size;
+  }
+
+  getTargetForMesh(mesh: THREE.Mesh): DissolveTarget | undefined {
+    this.assertNotDisposed('resolve a dissolve target');
+    return this.targetByMesh.get(mesh);
+  }
+
+  startBurn(target: DissolveTarget): BurnStartResult {
+    this.assertNotDisposed('start a burn');
+    if (!this.targetByMesh.has(target.mesh) || target.completed) {
+      return 'rejected';
+    }
+    if (this.burningTargets.has(target)) return 'already-burning';
+
+    this.burningTargets.add(target);
+    this.events.emit('burnStarted', { target });
+    return 'started';
+  }
+
+  update(deltaSeconds: number): void {
+    this.assertNotDisposed('update burns');
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error(
         'DissolveSystem deltaSeconds must be positive and finite.',
       );
     }
 
-    this.contactTarget = undefined;
-
-    const canDissolve =
-      this.slimeManager.canActiveUseAbility('dissolve');
-    const activeBody = this.slimeManager.activeBody;
-
-    if (!canDissolve || !activeBody) {
-      this.activeTarget = undefined;
-      return;
-    }
-
     for (const target of this.targets) {
-      if (
-        !target.completed &&
-        target.isWithinActivationRange(
-          activeBody.position,
-          activeBody.radiusMetres,
-        )
-      ) {
-        this.contactTarget = target;
-        break;
-      }
+      if (!this.burningTargets.has(target)) continue;
+
+      target.advance(deltaSeconds);
+      if (!target.completed) continue;
+
+      this.burningTargets.delete(target);
+      this.completedBurnCountValue += 1;
+      this.events.emit('burnCompleted', { target });
     }
+  }
 
-    if (!activationHeld) {
-      this.activeTarget = undefined;
-      return;
-    }
-
-    if (!this.activeTarget || this.activeTarget.completed) {
-      this.activeTarget = this.contactTarget;
-    }
-
-    if (!this.activeTarget) return;
-
-    // Use the manager's invocation gate rather than bypassing configuration.
-    // If active ownership/capability changes, the callback cannot execute.
-    const invoked = this.slimeManager.invokeActiveAbility(
-      'dissolve',
-      () => {
-        this.activeTarget?.advance(deltaSeconds);
-      },
-    );
-
-    if (!invoked || this.activeTarget.completed) {
-      this.activeTarget = undefined;
+  /** Cancel active reactions before PuzzleRegistry restores target progress. */
+  reset(): void {
+    this.assertNotDisposed('reset burns');
+    for (const target of this.targets) {
+      if (!this.burningTargets.delete(target)) continue;
+      this.resetBurnCountValue += 1;
+      this.events.emit('burnReset', { target });
     }
   }
 
   getDiagnostics(): DissolveSystemDiagnostics {
-    const target = this.activeTarget ?? this.contactTarget ?? this.targets[0];
-
+    this.assertNotDisposed('read diagnostics');
     return {
-      permitted: this.slimeManager.canActiveUseAbility('dissolve'),
-      contactTargetId: this.contactTarget?.id ?? 'none',
-      activeTargetId: this.activeTarget?.id ?? 'none',
-      progress: target?.progress ?? 0,
-      collisionEnabled: target?.collisionEnabled ?? false,
-      completed: target?.completed ?? false,
-      completionCount: target?.completionCount ?? 0,
+      activeBurnCount: this.burningTargets.size,
+      activeBurnTargetIds: this.targets
+        .filter((target) => this.burningTargets.has(target))
+        .map((target) => target.id),
+      completedBurnCount: this.completedBurnCountValue,
+      resetBurnCount: this.resetBurnCountValue,
     };
   }
 
   dispose(): void {
-    this.activeTarget = undefined;
-    this.contactTarget = undefined;
+    if (this.disposed) return;
+    this.burningTargets.clear();
+    this.targetByMesh.clear();
+    this.events.clear();
+    this.disposed = true;
+  }
+
+  private assertNotDisposed(operation: string): void {
+    if (this.disposed) {
+      throw new Error(`Cannot ${operation} after DissolveSystem disposal.`);
+    }
   }
 }
