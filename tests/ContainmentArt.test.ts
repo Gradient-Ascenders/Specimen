@@ -177,6 +177,30 @@ test('Room 2 art is visual-only and preserves authored gameplay semantics', () =
   assert.ok(art.getObjectByName('room-2-platform-a-height-lesson-durable-composite-tread'));
   assert.equal(art.getObjectByName('room-2-platform-a-bouncy-membrane'), undefined);
 
+  scene.root.updateMatrixWorld(true);
+  for (const opening of [
+    {
+      name: 'rear vent exit',
+      origin: new THREE.Vector3(-8.4, 11.5, 26.8),
+    },
+    {
+      name: 'front room exit',
+      origin: new THREE.Vector3(0, 12.25, 48.4),
+    },
+  ]) {
+    const raycaster = new THREE.Raycaster(
+      opening.origin,
+      new THREE.Vector3(0, 0, 1),
+      0,
+      0.8,
+    );
+    assert.deepEqual(
+      raycaster.intersectObject(art, true),
+      [],
+      `${opening.name} must remain visually open through the Room 2 end wall`,
+    );
+  }
+
   art.traverse((object) => {
     if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
       assert.equal(object.userData.visualOnly, true, object.name);
@@ -466,6 +490,36 @@ test('Room 5 art builds a reset-safe hero chamber around frozen gameplay', () =>
   assert.ok(art.root.getObjectByName('room-5-observation-angled-control-console'));
   assert.ok(art.root.getObjectByName('room-5-observation-connection'));
   assert.ok(art.root.getObjectByName('room-5-soluble-composite-door-structural-frame'));
+
+  scene.root.updateMatrixWorld(true);
+  const ascentMembrane = art.root.getObjectByName(
+    'room-5-east-ascent-adhesion-membrane',
+  );
+  const extensionMembrane = art.root.getObjectByName(
+    'room-5-east-ascent-extension-adhesion-membrane',
+  );
+  const eastFrontWall = art.root.getObjectByName(
+    'room-5-east-front-clinical-wall-zone',
+  );
+  const eastUpperRearWall = art.root.getObjectByName(
+    'room-5-east-upper-rear-clinical-wall-zone',
+  );
+  assert.ok(ascentMembrane);
+  assert.ok(extensionMembrane);
+  assert.ok(eastFrontWall);
+  assert.ok(eastUpperRearWall);
+  const ascentBounds = new THREE.Box3().setFromObject(ascentMembrane);
+  const extensionBounds = new THREE.Box3().setFromObject(extensionMembrane);
+  const eastFrontBounds = new THREE.Box3().setFromObject(eastFrontWall);
+  const eastUpperRearBounds = new THREE.Box3().setFromObject(eastUpperRearWall);
+  assert.ok(
+    ascentBounds.min.x < eastFrontBounds.min.x,
+    'the lower east sticky wall must remain in front of the clinical wall skin',
+  );
+  assert.ok(
+    extensionBounds.min.x < eastUpperRearBounds.min.x,
+    'the upper east sticky wall must remain in front of the clinical wall skin',
+  );
 
   const specimenSign = art.root.getObjectByName(
     'room-5-contained-specimen-identification',

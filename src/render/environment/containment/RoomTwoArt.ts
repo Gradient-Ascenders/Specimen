@@ -227,20 +227,43 @@ export class RoomTwoArt {
     const openingWidth = front ? 3 : 2.2;
     const openingBottom = front ? 10.4 : 10.2;
     const openingTop = front ? 14.1 : 12.8;
-
-    this.root.add(
-      createBorrowedBox(this.resources, {
-        name: `room-2-${prefix}-wall-mechanical-substrate`,
-        size: [29.7, 17.7, 0.08],
-        position: [0, 9, z + (front ? 0.045 : -0.045)],
-        material: mechanicalBacking,
-      }),
-    );
-
     const leftEdge = -14.8;
     const rightEdge = 14.8;
     const openingLeft = openingX - openingWidth * 0.5;
     const openingRight = openingX + openingWidth * 0.5;
+    const substrateBottom = 0.15;
+    const substrateTop = 17.85;
+    const substrateZ = z + (front ? 0.045 : -0.045);
+
+    // Keep the dark backing behind the wall skins without sealing the real
+    // inter-room route. Four instances retain one draw call and leave the
+    // authored opening completely empty.
+    this.root.add(
+      createInstancedBoxes(
+        this.resources,
+        `room-2-${prefix}-wall-mechanical-substrate-segments`,
+        mechanicalBacking,
+        [
+          {
+            position: [(leftEdge + openingLeft) * 0.5, 9, substrateZ],
+            size: [openingLeft - leftEdge, 17.7, 0.08],
+          },
+          {
+            position: [(openingRight + rightEdge) * 0.5, 9, substrateZ],
+            size: [rightEdge - openingRight, 17.7, 0.08],
+          },
+          {
+            position: [openingX, (substrateBottom + openingBottom) * 0.5, substrateZ],
+            size: [openingWidth, openingBottom - substrateBottom, 0.08],
+          },
+          {
+            position: [openingX, (openingTop + substrateTop) * 0.5, substrateZ],
+            size: [openingWidth, substrateTop - openingTop, 0.08],
+          },
+        ],
+      ),
+    );
+
     const panels = [
       {
         name: 'lower-left',

@@ -167,10 +167,12 @@ export class RoomFiveArt {
       { name: 'west-front', size: [13.0, 10.0, 0.12] as const, position: [-19.7, 81.0, 99.0] as const, rotation: [0, Math.PI / 2, 0] as const, material: mainCeramic },
       { name: 'west-rear', size: [14.7, 10.0, 0.12] as const, position: [-19.7, 81.0, 117.2] as const, rotation: [0, Math.PI / 2, 0] as const, material: secondaryCeramic },
       { name: 'west-upper', size: [25.8, 10.7, 0.12] as const, position: [-19.7, 94.6, 108.5] as const, rotation: [0, Math.PI / 2, 0] as const, material: mainCeramic },
-      { name: 'east-front', size: [12.5, 8.5, 0.12] as const, position: [19.7, 80.2, 98.5] as const, rotation: [0, -Math.PI / 2, 0] as const, material: secondaryCeramic },
-      { name: 'east-rear-lower', size: [10.1, 8.5, 0.12] as const, position: [19.7, 80.2, 120.0] as const, rotation: [0, -Math.PI / 2, 0] as const, material: mainCeramic },
-      { name: 'east-upper-front', size: [9.4, 5.4, 0.12] as const, position: [19.7, 97.3, 98.6] as const, rotation: [0, -Math.PI / 2, 0] as const, material: mainCeramic },
-      { name: 'east-upper-rear', size: [8.2, 5.4, 0.12] as const, position: [19.7, 97.3, 121.2] as const, rotation: [0, -Math.PI / 2, 0] as const, material: secondaryCeramic },
+      // East-wall skins sit behind the sticky cartridge at x=19.69. Their
+      // previous x=19.70 depth put the chamfered front faces over the membrane.
+      { name: 'east-front', size: [12.5, 8.5, 0.12] as const, position: [19.77, 80.2, 98.5] as const, rotation: [0, -Math.PI / 2, 0] as const, material: secondaryCeramic },
+      { name: 'east-rear-lower', size: [10.1, 8.5, 0.12] as const, position: [19.77, 80.2, 120.0] as const, rotation: [0, -Math.PI / 2, 0] as const, material: mainCeramic },
+      { name: 'east-upper-front', size: [9.4, 5.4, 0.12] as const, position: [19.77, 97.3, 98.6] as const, rotation: [0, -Math.PI / 2, 0] as const, material: mainCeramic },
+      { name: 'east-upper-rear', size: [8.2, 5.4, 0.12] as const, position: [19.77, 97.3, 121.2] as const, rotation: [0, -Math.PI / 2, 0] as const, material: secondaryCeramic },
     ];
     for (const panel of wallPanels) {
       this.root.add(createChamferedBox(this.resources, {
@@ -905,7 +907,7 @@ export class RoomFiveArt {
         radius: 0.045,
         material: structuralSteel,
         transforms: eastWallHazards.map((hazard) => ({
-          position: [19.74, hazard.start.y, hazard.start.z],
+          position: [19.765, hazard.start.y, hazard.start.z],
         })),
       }),
       createInstancedBoxes(
@@ -913,7 +915,7 @@ export class RoomFiveArt {
         'room-5-east-wall-laser-track-running-faces',
         serviceMetal,
         eastWallHazards.map((hazard) => ({
-          position: [19.675, hazard.start.y, hazard.start.z] as const,
+          position: [19.705, hazard.start.y, hazard.start.z] as const,
           size: [0.03, 5.4, 0.16] as const,
         })),
       ),
@@ -922,7 +924,7 @@ export class RoomFiveArt {
         'room-5-east-wall-laser-warning-registers',
         lockedStatus,
         eastWallHazards.map((hazard) => ({
-          position: [19.65, hazard.start.y + 2.65, hazard.start.z] as const,
+          position: [19.69, hazard.start.y + 2.65, hazard.start.z] as const,
           size: [0.025, 0.14, 0.42] as const,
         })),
       ),
