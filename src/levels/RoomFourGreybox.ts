@@ -7,14 +7,22 @@ import { ElevatorSequence } from '../puzzle/ElevatorSequence.ts';
 import { MovingPlatform } from '../puzzle/MovingPlatform.ts';
 import { ElevatorPresentation } from '../render/elevator/ElevatorPresentation.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
-import type { ContextualCameraProfile } from '../render/CameraProfile.ts';
+import type {
+  ContextualCameraContext,
+  ContextualCameraProfile,
+} from '../render/CameraProfile.ts';
 import { CameraProfileZone } from './CameraProfileZone.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
-import { LevelTriggerVolume } from './LevelTriggerVolume.ts';
+import {
+  LevelTriggerVolume,
+  type TriggerContactTarget,
+} from './LevelTriggerVolume.ts';
 
 export const ROOM_4_CHECKPOINT_POSITION = new THREE.Vector3(9, 30.21, 85.5);
 export const ROOM_4_CHECKPOINT_ID = 'containment-room-4-elevator-roof';
 export const ROOM_4_PUZZLE_GROUP_ID = 'containment-room-4';
+export const ROOM_4_LIFT_ARRIVAL_BLEND_START_PROGRESS = 0.78;
+export const ROOM_4_LIFT_CAMERA_EXIT_RELEASE_Z = 86.5;
 export const ROOM_4_LIFT_CAMERA_PROFILE: Readonly<ContextualCameraProfile> = {
   id: 'containment-room-4-lift-high-angle',
   distanceMetres: 10.5,
@@ -25,6 +33,19 @@ export const ROOM_4_LIFT_CAMERA_PROFILE: Readonly<ContextualCameraProfile> = {
   framingDeadZoneHalfHeightMetres: 1.25,
   framingDampingPerSecond: 7,
 };
+export const ROOM_4_LIFT_ARRIVAL_CAMERA_PROFILE: Readonly<ContextualCameraProfile> = {
+  id: 'containment-room-4-lift-arrival',
+  distanceMetres: 5,
+  targetHeightMetres: 0.55,
+  pitchRadians: THREE.MathUtils.degToRad(15),
+  transitionDurationSeconds: 0.65,
+  framingDeadZoneHalfWidthMetres: 0.75,
+  framingDeadZoneHalfHeightMetres: 0.6,
+  framingDampingPerSecond: 8,
+};
+
+const ACTIVE_LIFT_CAMERA_PROFILE_ID =
+  'containment-room-4-lift-progressive';
 
 export interface RoomFourHazardFailure {
   readonly roomId: 'room-4';
@@ -50,11 +71,15 @@ export class RoomFourGreybox {
     startDelaySeconds: 3,
     arrivalDelaySeconds: 2,
   });
+  private readonly activeLiftCameraProfile = {
+    ...ROOM_4_LIFT_CAMERA_PROFILE,
+    id: ACTIVE_LIFT_CAMERA_PROFILE_ID,
+  };
   readonly liftCameraZone = new CameraProfileZone({
     id: 'room-4-lift-camera-zone',
     centre: new THREE.Vector3(9, 51, 85.5),
     size: new THREE.Vector3(12.4, 52, 11.4),
-    profile: ROOM_4_LIFT_CAMERA_PROFILE,
+    profile: this.activeLiftCameraProfile,
     anchor: this.elevatorPlatform,
   });
   readonly checkpointTrigger = new LevelTriggerVolume({
@@ -78,6 +103,8 @@ export class RoomFourGreybox {
   private readonly elevatorPresentation: ElevatorPresentation;
   private readonly exitLock: THREE.Mesh;
   private readonly exitLockOutline: THREE.Object3D | undefined;
+  private liftCameraArrivalBlendValue = 0;
+  private liftCameraExitReleased = false;
 
   constructor(requestFailure: (failure: RoomFourHazardFailure) => void) {
     this.buildShell();
@@ -112,6 +139,40 @@ export class RoomFourGreybox {
     this.failureVolume.update(body);
   }
 
+  get liftCameraArrivalBlend(): number {
+    return this.liftCameraArrivalBlendValue;
+  }
+
+  get cameraObstructionMeshes(): readonly THREE.Mesh[] {
+    return [
+      ...this.builder.cameraObstructionMeshes,
+      ...this.elevatorPresentation.cameraObstructionMeshes,
+    ];
+  }
+
+  /**
+   * Progressively compact the authored view near the upper stop. The stable
+   * zone context lets CameraRig retain its generic profile lifecycle while the
+   * level owns the elevator-specific progression signal.
+   */
+  resolveLiftCamera(
+    target: TriggerContactTarget,
+  ): ContextualCameraContext | undefined {
+    const context = this.liftCameraZone.resolve(target);
+    if (
+      !this.liftCameraExitReleased &&
+      this.elevator.exitReady &&
+      target.position.z >= ROOM_4_LIFT_CAMERA_EXIT_RELEASE_Z
+    ) {
+      this.liftCameraExitReleased = true;
+    }
+
+    if (this.liftCameraExitReleased || !context) return undefined;
+
+    this.syncLiftCameraProfile();
+    return context;
+  }
+
   updateActive(
     deltaSeconds: number,
     body: KinematicBody,
@@ -120,6 +181,7 @@ export class RoomFourGreybox {
     this.exitTrigger.update(body);
 
     this.elevator.update(deltaSeconds, persistentBodies);
+    this.syncLiftCameraProfile();
     if (this.elevator.state === 'ascending') {
       this.lasers.update(deltaSeconds, body);
     }
@@ -133,6 +195,8 @@ export class RoomFourGreybox {
     this.exitTrigger.reset();
     this.failureVolume.reset();
     this.liftCameraZone.reset();
+    this.liftCameraExitReleased = false;
+    this.setLiftCameraArrivalBlend(0);
     this.syncPresentation();
   }
 
@@ -152,18 +216,29 @@ export class RoomFourGreybox {
     const { floor, wall, duct } = this.builder.materials;
 
     this.builder.addCollider({ name: 'room-4-shaft-floor', size: [13, 0.4, 13], position: [9, 25.8, 85.5], material: floor });
-    this.builder.addCollider({ name: 'room-4-shaft-west-wall', size: [0.4, 51, 12], position: [2.5, 51, 85.5], material: wall });
-    this.builder.addCollider({ name: 'room-4-shaft-east-wall', size: [0.4, 51, 12], position: [15.5, 51, 85.5], material: wall });
+    // The upper shell meets Room 5's 78.75 m doorway clearance. Without this
+    // cap the high-angle boom has no authored geometry to keep it in-world.
+    this.builder.addCollider({ name: 'room-4-shaft-west-wall', size: [0.4, 53.25, 12], position: [2.5, 52.125, 85.5], material: wall });
+    this.builder.addCollider({ name: 'room-4-shaft-east-wall', size: [0.4, 53.25, 12], position: [15.5, 52.125, 85.5], material: wall });
+    this.builder.addCollider({ name: 'room-4-shaft-ceiling', size: [13, 0.4, 12], position: [9, 78.95, 85.5], material: wall });
+    // The visible ceiling remains the honest gameplay collider. This wider
+    // invisible cap only prevents a diagonal camera boom escaping around its
+    // short authored footprint; movement queries never register this volume.
+    this.builder.addCameraObstruction({
+      name: 'room-4-upper-camera-cap',
+      size: [21, 0.4, 20],
+      position: [9, 78.95, 85.5],
+    });
 
     // South wall leaves a low opening for the Room 3 duct drop.
-    this.builder.addCollider({ name: 'room-4-south-wall-west', size: [5.2, 51, 0.4], position: [5.1, 51, 79.5], material: wall });
-    this.builder.addCollider({ name: 'room-4-south-wall-east', size: [5.2, 51, 0.4], position: [12.9, 51, 79.5], material: wall });
-    this.builder.addCollider({ name: 'room-4-south-wall-above-entry', size: [2.6, 44, 0.4], position: [9, 55, 79.5], material: wall });
+    this.builder.addCollider({ name: 'room-4-south-wall-west', size: [5.2, 53.25, 0.4], position: [5.1, 52.125, 79.5], material: wall });
+    this.builder.addCollider({ name: 'room-4-south-wall-east', size: [5.2, 53.25, 0.4], position: [12.9, 52.125, 79.5], material: wall });
+    this.builder.addCollider({ name: 'room-4-south-wall-above-entry', size: [2.6, 45.75, 0.4], position: [9, 55.875, 79.5], material: wall });
     this.builder.addCollider({ name: 'room-4-south-wall-below-entry', size: [2.6, 3, 0.4], position: [9, 27.5, 79.5], material: wall });
 
     // North wall leaves only the top Room 5 doorway open.
-    this.builder.addCollider({ name: 'room-4-north-wall-west', size: [5.2, 51, 0.4], position: [5.1, 51, 91.5], material: wall });
-    this.builder.addCollider({ name: 'room-4-north-wall-east', size: [5.2, 51, 0.4], position: [12.9, 51, 91.5], material: wall });
+    this.builder.addCollider({ name: 'room-4-north-wall-west', size: [5.2, 53.25, 0.4], position: [5.1, 52.125, 91.5], material: wall });
+    this.builder.addCollider({ name: 'room-4-north-wall-east', size: [5.2, 53.25, 0.4], position: [12.9, 52.125, 91.5], material: wall });
     this.builder.addCollider({ name: 'room-4-north-wall-below-exit', size: [2.6, 47, 0.4], position: [9, 49, 91.5], material: wall });
 
     this.builder.addCollider({ name: 'room-4-entry-duct-floor', size: [2.4, 0.25, 1.2], position: [9, 31.05, 80.1], material: duct });
@@ -189,6 +264,61 @@ export class RoomFourGreybox {
     if (this.exitLockOutline) this.exitLockOutline.visible = locked;
     this.laserPresentation.sync();
     this.elevatorPresentation.sync();
+  }
+
+  private syncLiftCameraProfile(): void {
+    const progress = this.elevator.ascentProgress;
+    const linearBlend = THREE.MathUtils.clamp(
+      (progress - ROOM_4_LIFT_ARRIVAL_BLEND_START_PROGRESS) /
+        (1 - ROOM_4_LIFT_ARRIVAL_BLEND_START_PROGRESS),
+      0,
+      1,
+    );
+    this.setLiftCameraArrivalBlend(
+      THREE.MathUtils.smoothstep(linearBlend, 0, 1),
+    );
+  }
+
+  private setLiftCameraArrivalBlend(blend: number): void {
+    this.liftCameraArrivalBlendValue = blend;
+    const ascent = ROOM_4_LIFT_CAMERA_PROFILE;
+    const arrival = ROOM_4_LIFT_ARRIVAL_CAMERA_PROFILE;
+    const profile = this.activeLiftCameraProfile;
+    profile.distanceMetres = THREE.MathUtils.lerp(
+      ascent.distanceMetres,
+      arrival.distanceMetres,
+      blend,
+    );
+    profile.targetHeightMetres = THREE.MathUtils.lerp(
+      ascent.targetHeightMetres,
+      arrival.targetHeightMetres,
+      blend,
+    );
+    profile.pitchRadians = THREE.MathUtils.lerp(
+      ascent.pitchRadians,
+      arrival.pitchRadians,
+      blend,
+    );
+    profile.transitionDurationSeconds = THREE.MathUtils.lerp(
+      ascent.transitionDurationSeconds,
+      arrival.transitionDurationSeconds,
+      blend,
+    );
+    profile.framingDeadZoneHalfWidthMetres = THREE.MathUtils.lerp(
+      ascent.framingDeadZoneHalfWidthMetres,
+      arrival.framingDeadZoneHalfWidthMetres,
+      blend,
+    );
+    profile.framingDeadZoneHalfHeightMetres = THREE.MathUtils.lerp(
+      ascent.framingDeadZoneHalfHeightMetres,
+      arrival.framingDeadZoneHalfHeightMetres,
+      blend,
+    );
+    profile.framingDampingPerSecond = THREE.MathUtils.lerp(
+      ascent.framingDampingPerSecond,
+      arrival.framingDampingPerSecond,
+      blend,
+    );
   }
 
   private createHazards(): readonly LaserHazard[] {

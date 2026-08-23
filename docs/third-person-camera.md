@@ -85,25 +85,30 @@ existing trigger volume and a read-only fixed-step anchor. The level runtime
 resolves the active zone and passes only that generic context to `CameraRig`;
 the rig contains no room or elevator conditions.
 
-The Level 1 Room 4 lift uses the first contextual profile because a close
-player-follow camera makes a vertically moving platform and its upcoming
-hazards difficult to read. Its current tuning is centralized in
-`ROOM_4_LIFT_CAMERA_PROFILE`:
+The Level 1 Room 4 lift uses a progression-shaped contextual profile because a
+close player-follow camera makes a vertically moving platform and its upcoming
+hazards difficult to read. The ascent and arrival endpoints are centralized in
+`ROOM_4_LIFT_CAMERA_PROFILE` and `ROOM_4_LIFT_ARRIVAL_CAMERA_PROFILE`:
 
-| Value | Lift profile |
-| --- | ---: |
-| Distance | 10.5 m |
-| Anchor-relative target height | 1.1 m |
-| Downward pitch | 65° |
-| Transition | 0.65 s |
-| Dead-zone half-width / half-height | 1.5 m / 1.25 m |
-| Framing damping | 7 s⁻¹ |
+| Value | Main ascent | Arrival |
+| --- | ---: | ---: |
+| Distance | 10.5 m | 5.0 m |
+| Anchor-relative target height | 1.1 m | 0.55 m |
+| Downward pitch | 65° | 15° |
+| Transition | 0.65 s | 0.65 s |
+| Dead-zone half-width / half-height | 1.5 m / 1.25 m | 0.75 m / 0.6 m |
+| Framing damping | 7 s⁻¹ | 8 s⁻¹ |
 
 The lift platform supplies interpolated large-scale motion. The active slime
 supplies framing intent only after it crosses the screen-oriented dead zone, so
 small steps and jumps do not drag the camera while the elevator rises. Entering
-the authored shaft zone blends into the profile; leaving into Room 5 blends
-back to the normal player follow.
+the authored shaft zone blends into the profile. Over roughly the final 22% of
+authoritative platform travel, Room 4 smoothsteps its stable profile from the
+high-angle values to the compact arrival values. Arrival framing remains active
+through `arrivalPause`. Once `exitReady` is authoritative and the player walks
+forward across the upper platform, Room 4 releases the context before the
+doorway; the rig then uses its normal blend-out toward Room 5. This is driven by
+elevator state and authored position rather than a timer in camera code.
 
 The profile never changes accumulated yaw. Mouse yaw remains available and the
 same `planarBack` continues to define both displayed horizontal orientation and
@@ -156,14 +161,27 @@ yaw along the shortest arc.
 
 The default solid registration mask is `0b11`, so the current grey-box floor,
 walls, ledges, slope, and platforms block both movement and the camera. Camera
-queries explicitly request only `CameraObstruction`. The slime visual, grid,
-outlines, markers, recovery volume, puzzle triggers, and test sensors are not
-registered in this collision world and therefore cannot shorten the camera.
-Future trigger-only or transient volumes must opt into a non-camera layer.
+queries explicitly request only `CameraObstruction`. `GreyboxRoomBuilder` may
+also author invisible camera-obstruction boxes. The runtime registers those
+meshes with `0b10` only, so the same camera sweep sees them while player and
+checkpoint-safety movement queries ignore them. Their mesh remains active in
+the scene graph for CPU queries while an invisible material suppresses renderer
+submission. The slime visual, grid, outlines, markers, recovery volume, puzzle
+triggers, and test sensors are not registered and cannot shorten the camera.
 
-The rig sphere-sweeps from its target pivot toward the desired pose every
+The rig sphere-sweeps from its target pivot toward the full desired pose every
 rendered frame. This handles walls, corners, and overhead geometry continuously
 instead of detecting an overlap after the camera has already crossed a surface.
+Contextual profiles only change the preferred focus, pitch and distance; they
+use the same query and cannot force their preferred pose through geometry.
+
+Room shells must still author intentional obstruction coverage. Room 2 has a
+normal solid ceiling. Room 4 keeps its short visible solid ceiling, while one
+wider invisible camera-only cap covers diagonal boom requests around that
+ceiling's footprint. Its presentation-only upper elevator frame is also
+registered on the camera layer because it is visible and opaque but must not
+block Bob. The compact arrival request stays beneath that lower frame; both
+query volumes remain environmental safety boundaries.
 
 ## Grey-box verification route
 

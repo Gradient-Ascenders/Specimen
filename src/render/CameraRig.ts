@@ -96,6 +96,11 @@ export interface CameraRigDiagnostics {
   readonly desiredDistanceMetres: number;
   readonly obstructed: boolean;
   readonly obstructionName: string;
+  readonly obstructionDistanceMetres: number | null;
+  readonly obstructionRadiusMetres: number;
+  readonly focusPosition: ReadonlyCameraVector3;
+  readonly preferredCameraPosition: ReadonlyCameraVector3;
+  readonly resolvedCameraPosition: ReadonlyCameraVector3;
   readonly targetGrounded: boolean;
   readonly targetAttached: boolean;
   readonly profileId: string;
@@ -144,6 +149,7 @@ export class CameraRig {
   private readonly planarBack = new THREE.Vector3(0, 0, 1);
   private readonly boomDirection = new THREE.Vector3();
   private readonly boomDisplacement = new THREE.Vector3();
+  private readonly preferredCameraPosition = new THREE.Vector3();
   private readonly groundBack = new THREE.Vector3(0, 0, 1);
   private readonly groundRight = new THREE.Vector3(1, 0, 0);
   private readonly surfaceUp = new THREE.Vector3(0, 1, 0);
@@ -210,6 +216,7 @@ export class CameraRig {
     this.contextualProfileBlendTarget = 0;
     this.contextualFramingOffset.set(0, 0, 0);
     this.desiredContextualFramingOffset.set(0, 0, 0);
+    this.preferredCameraPosition.set(0, 0, 0);
     this.clearTimeSeconds = 0;
     this.initialized = false;
     this.obstructed = false;
@@ -487,6 +494,15 @@ export class CameraRig {
       desiredDistanceMetres: this.getDesiredDistanceMetres(),
       obstructed: this.obstructed,
       obstructionName: this.obstructionName,
+      obstructionDistanceMetres: this.obstructed
+        ? this.obstructionHit.distance
+        : null,
+      obstructionRadiusMetres: this.config.obstructionRadiusMetres,
+      focusPosition: this.snapshotVector(this.framingPivot),
+      preferredCameraPosition: this.snapshotVector(
+        this.preferredCameraPosition,
+      ),
+      resolvedCameraPosition: this.snapshotVector(this.camera.position),
       targetGrounded: this.targetGrounded,
       targetAttached: this.targetAttached,
       profileId: this.contextualCamera?.profile.id ?? 'default',
@@ -807,6 +823,9 @@ export class CameraRig {
     this.boomDisplacement
       .copy(this.boomDirection)
       .multiplyScalar(desiredDistanceMetres);
+    this.preferredCameraPosition
+      .copy(this.framingPivot)
+      .add(this.boomDisplacement);
 
     const hasObstruction =
       this.obstructionWorld?.sweepSphere(
@@ -993,5 +1012,9 @@ export class CameraRig {
     if (!Number.isFinite(value) || value < 0) {
       throw new Error(`${name} must be a non-negative finite number.`);
     }
+  }
+
+  private snapshotVector(vector: THREE.Vector3): ReadonlyCameraVector3 {
+    return { x: vector.x, y: vector.y, z: vector.z };
   }
 }

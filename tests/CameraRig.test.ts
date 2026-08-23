@@ -3,7 +3,11 @@ import test from 'node:test';
 
 import * as THREE from 'three';
 
-import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
+import {
+  CollisionHit,
+  CollisionLayer,
+  CollisionWorld,
+} from '../src/physics/CollisionWorld.ts';
 import {
   CameraRig,
   type CameraFollowTarget,
@@ -522,6 +526,69 @@ test('the rig contracts against a camera-layer wall and fully recovers when it c
   );
 
   wall.geometry.dispose();
+});
+
+test('a contextual high-angle profile stays beneath a blocking ceiling', () => {
+  const target = createTarget();
+  const world = new CollisionWorld();
+  const material = new THREE.MeshBasicMaterial({ visible: false });
+  const ceiling = new THREE.Mesh(
+    new THREE.BoxGeometry(20, 0.2, 20),
+    material,
+  );
+  ceiling.name = 'camera-test-ceiling';
+  ceiling.position.set(0, 3, 0);
+  world.register(ceiling, CollisionLayer.CameraObstruction);
+  const rig = new CameraRig();
+  rig.setFollowTarget(target, world);
+  rig.setContextualCamera({
+    profile: TEST_CONTEXTUAL_PROFILE,
+    anchor: {
+      position: new THREE.Vector3(),
+      previousPosition: new THREE.Vector3(),
+    },
+  });
+  advanceRig(rig, 1);
+
+  let diagnostics = rig.getDiagnostics();
+  assert.equal(diagnostics.obstructionName, 'camera-test-ceiling');
+  assert.ok(diagnostics.preferredCameraPosition.y > 3);
+  assert.ok(diagnostics.resolvedCameraPosition.y < 3);
+  assert.equal(diagnostics.obstructionRadiusMetres, 0.22);
+  assert.ok((diagnostics.obstructionDistanceMetres ?? 0) > 0);
+  assert.deepEqual(diagnostics.focusPosition, {
+    x: 0,
+    y: TEST_CONTEXTUAL_PROFILE.targetHeightMetres,
+    z: 0,
+  });
+  assert.equal(
+    world.sweepSphere(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 5, 0),
+      0.45,
+      new CollisionHit(),
+      CollisionLayer.Movement,
+    ),
+    false,
+  );
+
+  const movement = new THREE.Vector3();
+  rig.copyGroundMovementDirection(0, -1, movement);
+  assert.ok(movement.distanceTo(new THREE.Vector3(0, 0, -1)) < EPSILON);
+
+  ceiling.visible = false;
+  advanceRig(rig, 4);
+  diagnostics = rig.getDiagnostics();
+  assert.equal(diagnostics.obstructed, false);
+  assert.ok(
+    Math.abs(
+      diagnostics.currentDistanceMetres - diagnostics.desiredDistanceMetres,
+    ) < 1e-7,
+  );
+  assert.ok(rig.camera.position.toArray().every(Number.isFinite));
+
+  ceiling.geometry.dispose();
+  material.dispose();
 });
 
 test('follow distance validates and recovers through collision-aware camera logic', () => {
