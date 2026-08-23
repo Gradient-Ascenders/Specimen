@@ -2,6 +2,8 @@ import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
 import { Loop } from './core/Loop.ts';
+import { CultivationLevelRuntime } from './levels/CultivationLevelRuntime.ts';
+import { GameSessionCoordinator } from './levels/GameSessionCoordinator.ts';
 import { GreyboxLevelRuntime } from './levels/GreyboxLevelRuntime.ts';
 import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
 import { RenderLayer } from './render/RenderLayer.ts';
@@ -18,7 +20,7 @@ if (!app) {
 
 const renderLayer = new RenderLayer({ host: app });
 const input = new Input({ pointerLockElement: renderLayer.canvas });
-const levelRuntime = new GreyboxLevelRuntime({
+const levelOneRuntime = new GreyboxLevelRuntime({
   host: app,
   input,
   renderLayer,
@@ -26,18 +28,34 @@ const levelRuntime = new GreyboxLevelRuntime({
     import.meta.env.DEV ||
     new URLSearchParams(window.location.search).get('debug') === '1',
 });
+const gameSession = new GameSessionCoordinator({
+  initialRuntime: levelOneRuntime,
+  createLevelTwo: (progression) =>
+    new CultivationLevelRuntime({
+      host: app,
+      input,
+      renderLayer,
+      progression,
+      debugAvailable:
+        import.meta.env.DEV ||
+        new URLSearchParams(window.location.search).get('debug') === '1',
+    }),
+  scheduleTransition: (transition) => {
+    requestAnimationFrame(() => transition());
+  },
+});
 const settings = new GameSettings();
-const lifecycleCoordinator = new GameFlowLifecycleCoordinator(levelRuntime);
+const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
 const gameFlow = new GameFlowUI({
   settings,
   creditsMarkdown,
-  slimeHUD: levelRuntime,
+  slimeHUD: gameSession,
   actions: {
     startGameplay: () => lifecycleCoordinator.startGameplay(),
     stopGameplay: () => lifecycleCoordinator.stopGameplay(),
     setGameplayInputEnabled: (enabled) => input.setEnabled(enabled),
     setDebugInteractionEnabled: (enabled) =>
-      levelRuntime.setDebugInteractionEnabled(enabled),
+      gameSession.setDebugInteractionEnabled(enabled),
     requestPointerLock: () => input.requestPointerLock(),
     releasePointerLock: () => input.releasePointerLock(),
     isPointerLocked: () => input.pointerLocked,
@@ -59,18 +77,30 @@ const gameFlow = new GameFlowUI({
     },
   },
 });
-const unsubscribeObjectiveChanged = levelRuntime.events.on(
+const unsubscribeObjectiveChanged = gameSession.events.on(
   'objectiveChanged',
   ({ objective }) => gameFlow.setObjective(objective),
 );
+const unsubscribeTransitionStarted = gameSession.events.on(
+  'transitionStarted',
+  ({ message }) => gameFlow.beginLevelTransition(message),
+);
+const unsubscribeTransitionCompleted = gameSession.events.on(
+  'transitionCompleted',
+  () => gameFlow.finishLevelTransition(),
+);
+const unsubscribeTransitionFailed = gameSession.events.on(
+  'transitionFailed',
+  ({ message }) => gameFlow.failLevelTransition(message),
+);
 
 app.replaceChildren(renderLayer.canvas, gameFlow.element);
-levelRuntime.load();
+gameSession.load();
 
 const loop = new Loop({
-  fixedUpdate: (deltaSeconds) => levelRuntime.fixedUpdate(deltaSeconds),
+  fixedUpdate: (deltaSeconds) => gameSession.fixedUpdate(deltaSeconds),
   render: (interpolationAlpha, stats) =>
-    levelRuntime.render(interpolationAlpha, stats),
+    gameSession.render(interpolationAlpha, stats),
 });
 
 let bootFrame = 0;
@@ -87,7 +117,7 @@ const startRenderLoop = (): void => {
 // Let the loading state paint once, then compile every Level 1 light signature
 // before normal rendering or gameplay can begin.
 bootFrame = requestAnimationFrame(() => {
-  void levelRuntime.prepareLightingPrograms().then(startRenderLoop, (error) => {
+  void levelOneRuntime.prepareLightingPrograms().then(startRenderLoop, (error) => {
     if (shuttingDown) return;
     console.error('Containment lighting prewarm failed.', error);
     startRenderLoop();
@@ -99,8 +129,11 @@ const shutdown = (): void => {
   cancelAnimationFrame(bootFrame);
   loop.dispose();
   unsubscribeObjectiveChanged();
+  unsubscribeTransitionStarted();
+  unsubscribeTransitionCompleted();
+  unsubscribeTransitionFailed();
   gameFlow.dispose();
-  levelRuntime.dispose();
+  gameSession.dispose();
   input.dispose();
   renderLayer.dispose();
 };

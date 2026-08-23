@@ -3,6 +3,7 @@ export type DebugRoomId = 1 | 2 | 3 | 4 | 5;
 interface GreyboxTestPanelOptions {
   onReset: () => void;
   onTestRecovery: () => void;
+  onCompleteLevel: () => boolean;
   onTeleportRoom: (roomId: DebugRoomId) => void;
   onRunSlopeIdleRegression: () => string;
   onRunSlimeRosterRegression: () => string;
@@ -23,6 +24,7 @@ export class GreyboxTestPanel {
   private readonly runtimeStatus: HTMLElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly fallButton: HTMLButtonElement;
+  private readonly completeLevelButton: HTMLButtonElement;
   private readonly roomButtons: readonly HTMLButtonElement[];
   private readonly collapseButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
@@ -73,6 +75,7 @@ export class GreyboxTestPanel {
         <div class="controls">
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test death <kbd>F</kbd></button>
+          <button type="button" data-action="complete-level">Enter Level 2 <kbd>0</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="1">Room 1 <kbd>1</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="2">Room 2 <kbd>2</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="3">Room 3 <kbd>3</kbd></button>
@@ -103,6 +106,9 @@ export class GreyboxTestPanel {
     );
     const fallButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="fall"]',
+    );
+    const completeLevelButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="complete-level"]',
     );
     const roomButtons = Array.from(
       this.element.querySelectorAll<HTMLButtonElement>(
@@ -149,6 +155,7 @@ export class GreyboxTestPanel {
       !runtimeStatus ||
       !resetButton ||
       !fallButton ||
+      !completeLevelButton ||
       roomButtons.length !== 5 ||
       !collapseButton ||
       !slopeRegressionButton ||
@@ -168,6 +175,7 @@ export class GreyboxTestPanel {
     this.runtimeStatus = runtimeStatus;
     this.resetButton = resetButton;
     this.fallButton = fallButton;
+    this.completeLevelButton = completeLevelButton;
     this.roomButtons = roomButtons;
     this.collapseButton = collapseButton;
     this.slopeRegressionButton = slopeRegressionButton;
@@ -183,6 +191,7 @@ export class GreyboxTestPanel {
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
+    this.completeLevelButton.addEventListener('click', this.completeLevel);
     for (const button of this.roomButtons) {
       button.addEventListener('click', this.teleportRoomFromButton);
     }
@@ -219,6 +228,7 @@ export class GreyboxTestPanel {
   dispose(): void {
     this.resetButton.removeEventListener('click', this.resetProbe);
     this.fallButton.removeEventListener('click', this.testRecovery);
+    this.completeLevelButton.removeEventListener('click', this.completeLevel);
     for (const button of this.roomButtons) {
       button.removeEventListener('click', this.teleportRoomFromButton);
     }
@@ -261,6 +271,13 @@ export class GreyboxTestPanel {
     this.options.onTestRecovery();
     this.status.textContent =
       'Probe entered the recovery volume. Retry from the death screen.';
+  };
+
+  readonly completeLevel = (): void => {
+    const accepted = this.options.onCompleteLevel();
+    this.status.textContent = accepted
+      ? 'Level 1 completion triggered. Entering Level 2…'
+      : 'Level 1 completion is already in progress.';
   };
 
   readonly teleportRoom = (roomId: DebugRoomId): void => {
