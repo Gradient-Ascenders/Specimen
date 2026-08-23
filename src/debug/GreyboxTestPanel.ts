@@ -10,6 +10,10 @@ interface GreyboxTestPanelOptions {
   onRunTwoBodySwitchingRegression: () => string;
   onRunDissolveRegression: () => string;
   onToggleCollisionOverlay: () => boolean;
+  onCycleBobLighting: () => string;
+  onCycleGoopLighting: () => string;
+  onFinalizeLightingSkip: () => void;
+  onResetLightingPreview: () => void;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -28,6 +32,10 @@ export class GreyboxTestPanel {
   private readonly twoBodySwitchingRegressionButton: HTMLButtonElement;
   private readonly dissolveRegressionButton: HTMLButtonElement;
   private readonly collisionOverlayButton: HTMLButtonElement;
+  private readonly bobLightingButton: HTMLButtonElement;
+  private readonly goopLightingButton: HTMLButtonElement;
+  private readonly finalizeLightingButton: HTMLButtonElement;
+  private readonly resetLightingButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -78,6 +86,10 @@ export class GreyboxTestPanel {
           <button type="button" data-action="two-body-switching-regression">Check two-body switching</button>
           <button type="button" data-action="dissolve-regression">Check Goop dissolve</button>
           <button type="button" data-action="collision-overlay" aria-pressed="false">Show collision overlay</button>
+          <button type="button" data-action="bob-lighting">Cycle Bob hatch lighting</button>
+          <button type="button" data-action="goop-lighting">Cycle Goop release lighting</button>
+          <button type="button" data-action="finalize-lighting">Preview cutscene skip final state</button>
+          <button type="button" data-action="reset-lighting">Reset lighting preview</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -125,6 +137,18 @@ export class GreyboxTestPanel {
       this.element.querySelector<HTMLButtonElement>(
         '[data-action="collision-overlay"]',
       );
+    const bobLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="bob-lighting"]',
+    );
+    const goopLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="goop-lighting"]',
+    );
+    const finalizeLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="finalize-lighting"]',
+    );
+    const resetLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="reset-lighting"]',
+    );
 
     if (
       !status ||
@@ -138,7 +162,11 @@ export class GreyboxTestPanel {
       !slimeRosterRegressionButton ||
       !twoBodySwitchingRegressionButton ||
       !dissolveRegressionButton ||
-      !collisionOverlayButton
+      !collisionOverlayButton ||
+      !bobLightingButton ||
+      !goopLightingButton ||
+      !finalizeLightingButton ||
+      !resetLightingButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -156,6 +184,10 @@ export class GreyboxTestPanel {
       twoBodySwitchingRegressionButton;
     this.dissolveRegressionButton = dissolveRegressionButton;
     this.collisionOverlayButton = collisionOverlayButton;
+    this.bobLightingButton = bobLightingButton;
+    this.goopLightingButton = goopLightingButton;
+    this.finalizeLightingButton = finalizeLightingButton;
+    this.resetLightingButton = resetLightingButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
@@ -184,6 +216,13 @@ export class GreyboxTestPanel {
       'click',
       this.toggleCollisionOverlay,
     );
+    this.bobLightingButton.addEventListener('click', this.cycleBobLighting);
+    this.goopLightingButton.addEventListener('click', this.cycleGoopLighting);
+    this.finalizeLightingButton.addEventListener(
+      'click',
+      this.finalizeLightingSkip,
+    );
+    this.resetLightingButton.addEventListener('click', this.resetLightingPreview);
   }
 
   dispose(): void {
@@ -214,6 +253,13 @@ export class GreyboxTestPanel {
       'click',
       this.toggleCollisionOverlay,
     );
+    this.bobLightingButton.removeEventListener('click', this.cycleBobLighting);
+    this.goopLightingButton.removeEventListener('click', this.cycleGoopLighting);
+    this.finalizeLightingButton.removeEventListener(
+      'click',
+      this.finalizeLightingSkip,
+    );
+    this.resetLightingButton.removeEventListener('click', this.resetLightingPreview);
   }
 
   readonly resetProbe = (): void => {
@@ -294,6 +340,27 @@ export class GreyboxTestPanel {
     this.status.textContent = visible
       ? 'Collision overlay enabled: cyan default, magenta sticky, amber soluble.'
       : 'Collision overlay hidden.';
+  };
+
+  private readonly cycleBobLighting = (): void => {
+    const state = this.options.onCycleBobLighting();
+    this.status.textContent = `Bob hatch lighting preview: ${state}.`;
+  };
+
+  private readonly cycleGoopLighting = (): void => {
+    const state = this.options.onCycleGoopLighting();
+    this.status.textContent = `Goop release lighting preview: ${state}.`;
+  };
+
+  private readonly finalizeLightingSkip = (): void => {
+    this.options.onFinalizeLightingSkip();
+    this.status.textContent =
+      'Cutscene lighting preview finalised through the skip contract.';
+  };
+
+  private readonly resetLightingPreview = (): void => {
+    this.options.onResetLightingPreview();
+    this.status.textContent = 'Lighting preview restored from gameplay state.';
   };
 
   setRuntimeDiagnostics(text: string): void {

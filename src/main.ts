@@ -97,20 +97,35 @@ const unsubscribeTransitionFailed = gameSession.events.on(
 app.replaceChildren(renderLayer.canvas, gameFlow.element);
 gameSession.load();
 
-let bootFrame = requestAnimationFrame(() => {
-  // A second frame guarantees that the indeterminate loading state paints.
-  bootFrame = requestAnimationFrame(() => gameFlow.completeBoot());
-});
-
 const loop = new Loop({
   fixedUpdate: (deltaSeconds) => gameSession.fixedUpdate(deltaSeconds),
   render: (interpolationAlpha, stats) =>
     gameSession.render(interpolationAlpha, stats),
 });
 
-renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
+let bootFrame = 0;
+let shuttingDown = false;
+const startRenderLoop = (): void => {
+  if (shuttingDown) return;
+  renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
+  // Present authoritative Room 1 frames before the loading UI yields control.
+  bootFrame = requestAnimationFrame(() => {
+    bootFrame = requestAnimationFrame(() => gameFlow.completeBoot());
+  });
+};
+
+// Let the loading state paint once, then compile every Level 1 light signature
+// before normal rendering or gameplay can begin.
+bootFrame = requestAnimationFrame(() => {
+  void levelOneRuntime.prepareLightingPrograms().then(startRenderLoop, (error) => {
+    if (shuttingDown) return;
+    console.error('Containment lighting prewarm failed.', error);
+    startRenderLoop();
+  });
+});
 
 const shutdown = (): void => {
+  shuttingDown = true;
   cancelAnimationFrame(bootFrame);
   loop.dispose();
   unsubscribeObjectiveChanged();

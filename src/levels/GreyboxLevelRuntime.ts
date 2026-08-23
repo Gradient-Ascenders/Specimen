@@ -34,6 +34,10 @@ import { BlobFacing } from '../render/BlobFacing.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
+import type {
+  BobHatchLightingState,
+  GoopReleaseLightingState,
+} from '../render/environment/containment/ContainmentLightingRig.ts';
 import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
@@ -93,6 +97,30 @@ const TWO_BODY_PLATE_SIZE = new THREE.Vector3(1.8, 0.18, 1.8);
 const TWO_BODY_SENSOR_CENTRE = new THREE.Vector3(3.1, 0.45, -2.6);
 const TWO_BODY_SENSOR_SIZE = new THREE.Vector3(2, 1, 2);
 const DISSOLVE_PUZZLE_GROUP_ID = 'containment-goop-dissolve-demo';
+const BOB_HATCH_LIGHTING_PREVIEW_STATES: readonly BobHatchLightingState[] = [
+  'gameplay',
+  'establishing',
+  'emergence',
+  'impact',
+  'complete',
+];
+const GOOP_RELEASE_LIGHTING_PREVIEW_STATES: readonly GoopReleaseLightingState[] = [
+  'normal',
+  'warning',
+  'locks-disengaging',
+  'opening',
+  'reveal',
+  'released',
+];
+const LIGHTING_PREWARM_CAMERA_TARGETS: Readonly<
+  Record<DebugRoomId, readonly [number, number, number]>
+> = {
+  1: [-0.21, 0.8, -2.6],
+  2: [-9, 1.2, 31],
+  3: [0, 10.86, 51.4],
+  4: [9, 30.21, 85.5],
+  5: [9, 75.21, 94],
+};
 
 export interface GreyboxLevelRuntimeOptions {
   host: HTMLElement;
@@ -153,6 +181,43 @@ interface GreyboxRuntimeResources {
   readonly testPanel: GreyboxTestPanel | undefined;
 }
 
+interface LightingTransitionProfile {
+  readonly roomId: DebugRoomId;
+  readonly visit: number;
+  readonly firstVisit: boolean;
+  readonly frameIntervalBeforeMs: number;
+  nextFrameIntervalMs?: number;
+  readonly renderDurationMs: number;
+  readonly programsBefore: number;
+  readonly programsAfter: number;
+  readonly pointLights: number;
+  readonly spotLights: number;
+  readonly directionalLights: number;
+  readonly hemisphereLights: number;
+}
+
+interface LightingPrewarmStepProfile {
+  readonly roomId: DebugRoomId;
+  readonly compiledObjects: number;
+  readonly durationMs: number;
+  readonly compileDurationMs: number;
+  readonly primeDurationMs: number;
+  readonly programsBefore: number;
+  readonly programsAfterCompile: number;
+  readonly programsAfter: number;
+  readonly pointLights: number;
+  readonly spotLights: number;
+  readonly directionalLights: number;
+  readonly hemisphereLights: number;
+}
+
+interface LightingPrewarmProfile {
+  readonly durationMs: number;
+  readonly programsBefore: number;
+  readonly programsAfter: number;
+  readonly steps: readonly LightingPrewarmStepProfile[];
+}
+
 /** Concrete lifecycle and resource owner for the current Level 1 teaching grey-box. */
 export class GreyboxLevelRuntime {
   readonly events = new EventBus<GameLevelRuntimeEvents>();
@@ -175,6 +240,14 @@ export class GreyboxLevelRuntime {
   private lastDeathSlimeId: 'bob' | 'goop' | undefined;
   private playerSwitchFeedbackSequence = 0;
   private readonly slimeHUDListeners = new Set<SlimeHUDListener>();
+  private readonly lightingRoomVisits = new Map<DebugRoomId, number>();
+  private readonly lightingTransitionProfiles: LightingTransitionProfile[] = [];
+  private lastRenderedLightingRoomId: DebugRoomId | undefined;
+  private pendingLightingTransitionProfile: LightingTransitionProfile | undefined;
+  private lightingPrewarmPromise: Promise<void> | undefined;
+  private lightingPrewarmProfile: LightingPrewarmProfile | undefined;
+  private lightingPrewarmGeneration = 0;
+  private cancelLightingPrewarm: (() => void) | undefined;
   private readonly twoBodySwitchingRegressionStatus =
     runTwoBodySwitchingRegression();
 
@@ -253,6 +326,16 @@ export class GreyboxLevelRuntime {
 
   start(): void {
     this.lifecycle.start();
+  }
+
+  /** Precompile the four distinct Containment lighting signatures while loading. */
+  prepareLightingPrograms(): Promise<void> {
+    if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
+    const resources = this.requireResources();
+    const generation = ++this.lightingPrewarmGeneration;
+    const promise = this.runLightingPrewarm(resources, generation);
+    this.lightingPrewarmPromise = promise;
+    return promise;
   }
 
   stop(): void {
@@ -465,6 +548,12 @@ export class GreyboxLevelRuntime {
       return;
     }
 
+    if (this.pendingLightingTransitionProfile) {
+      this.pendingLightingTransitionProfile.nextFrameIntervalMs =
+        stats.rawFrameDeltaSeconds * 1000;
+      this.pendingLightingTransitionProfile = undefined;
+    }
+
     const {
       body,
       goopBody,
@@ -546,7 +635,45 @@ export class GreyboxLevelRuntime {
           )
         : 1,
     );
+    const lightingRoomId = testScene.lightingDiagnostics.activeRoomId;
+    const profileLightingTransition =
+      this.debugAvailable &&
+      lightingRoomId !== this.lastRenderedLightingRoomId;
+    let transitionProgramsBefore = 0;
+    let transitionRenderStarted = 0;
+    if (profileLightingTransition) {
+      transitionProgramsBefore =
+        this.renderLayer.renderer.info.programs?.length ?? 0;
+      transitionRenderStarted = this.hostWindow.performance.now();
+    }
+
     this.renderLayer.render();
+
+    if (profileLightingTransition) {
+      const visit = (this.lightingRoomVisits.get(lightingRoomId) ?? 0) + 1;
+      this.lightingRoomVisits.set(lightingRoomId, visit);
+      const signature = countVisibleLights(
+        this.renderLayer.scene,
+        this.renderLayer.cameraRig.camera,
+      );
+      const profile: LightingTransitionProfile = {
+        roomId: lightingRoomId,
+        visit,
+        firstVisit: visit === 1,
+        frameIntervalBeforeMs: stats.rawFrameDeltaSeconds * 1000,
+        renderDurationMs:
+          this.hostWindow.performance.now() - transitionRenderStarted,
+        programsBefore: transitionProgramsBefore,
+        programsAfter: this.renderLayer.renderer.info.programs?.length ?? 0,
+        ...signature,
+      };
+      this.lightingTransitionProfiles.push(profile);
+      if (this.lightingTransitionProfiles.length > 32) {
+        this.lightingTransitionProfiles.shift();
+      }
+      this.pendingLightingTransitionProfile = profile;
+      this.lastRenderedLightingRoomId = lightingRoomId;
+    }
 
     this.debugSampleElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (
@@ -769,6 +896,33 @@ export class GreyboxLevelRuntime {
             collisionOverlay.setVisible(!collisionOverlay.isVisible);
             return collisionOverlay.isVisible;
           },
+          onCycleBobLighting: () => {
+            const current = testScene.lightingDiagnostics.bobHatchState;
+            const next = nextPreviewState(
+              BOB_HATCH_LIGHTING_PREVIEW_STATES,
+              current,
+            );
+            testScene.cutsceneLighting.setBobHatchLightingState(next);
+            return next;
+          },
+          onCycleGoopLighting: () => {
+            const current = testScene.lightingDiagnostics.goopReleaseState;
+            const next = nextPreviewState(
+              GOOP_RELEASE_LIGHTING_PREVIEW_STATES,
+              current,
+            );
+            testScene.cutsceneLighting.setGoopReleaseLightingState(next);
+            return next;
+          },
+          onFinalizeLightingSkip: () => {
+            testScene.cutsceneLighting.finalizeBobHatch('skipped');
+            testScene.cutsceneLighting.finalizeGoopRelease('skipped');
+          },
+          onResetLightingPreview: () => {
+            testScene.lighting.reset();
+            testScene.lighting.setActiveRoom(containmentLevel.activeRoomId);
+            testScene.lighting.reconcileAuthoritativeState(true);
+          },
         })
       : undefined;
 
@@ -915,6 +1069,11 @@ export class GreyboxLevelRuntime {
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
+    this.lightingPrewarmGeneration += 1;
+    this.cancelLightingPrewarm?.();
+    this.cancelLightingPrewarm = undefined;
+    this.lightingPrewarmPromise = undefined;
+    this.lightingPrewarmProfile = undefined;
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
     resources.deathSequence.reset();
     resources.deathScreen.dispose();
@@ -951,6 +1110,10 @@ export class GreyboxLevelRuntime {
     this.lastLandingImpactSpeedMetresPerSecond = 0;
     this.cameraFollowSlimeId = undefined;
     this.lastDeathSlimeId = undefined;
+    this.lightingRoomVisits.clear();
+    this.lightingTransitionProfiles.length = 0;
+    this.lastRenderedLightingRoomId = undefined;
+    this.pendingLightingTransitionProfile = undefined;
     this.notifySlimeHUD();
   };
 
@@ -1316,6 +1479,11 @@ export class GreyboxLevelRuntime {
         `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
         `scene objects / lights: ${renderStats.sceneObjects} / ${renderStats.sceneLights}`,
+        `authored lights active / total / shadow: ${testScene.lightingDiagnostics.visibleAuthoredLightCount} / ${testScene.lightingDiagnostics.authoredLightCount} / ${testScene.lightingDiagnostics.shadowCastingLightCount}`,
+        `lighting room / Bob hatch / Goop release: ${testScene.lightingDiagnostics.activeRoomId} / ${testScene.lightingDiagnostics.bobHatchState} / ${testScene.lightingDiagnostics.goopReleaseState}`,
+        `lighting particles / manual release drive: ${testScene.lightingDiagnostics.activeParticleCount} / ${testScene.lightingDiagnostics.goopReleaseManuallyDriven ? 'yes' : 'no'}`,
+        `lighting transition profiles: ${JSON.stringify(this.lightingTransitionProfiles)}`,
+        `lighting prewarm profile: ${JSON.stringify(this.lightingPrewarmProfile ?? null)}`,
         `unique materials / instanced meshes: ${renderStats.uniqueMaterials} / ${renderStats.instancedMeshes}`,
         `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
         `shader programs: ${renderStats.programs}`,
@@ -1333,6 +1501,114 @@ export class GreyboxLevelRuntime {
     if (!testPanel) return;
     this.setDebugVisible(!this.debugVisible, testPanel);
   };
+
+  private async runLightingPrewarm(
+    resources: GreyboxRuntimeResources,
+    generation: number,
+  ): Promise<void> {
+    const renderer = this.renderLayer.renderer;
+    const camera = this.renderLayer.cameraRig.camera;
+    const prewarmCamera = camera.clone();
+    const previousViewport = renderer.getViewport(new THREE.Vector4());
+    const previousScissor = renderer.getScissor(new THREE.Vector4());
+    const previousScissorTest = renderer.getScissorTest();
+    const programsBefore = renderer.info.programs?.length ?? 0;
+    const started = this.hostWindow.performance.now();
+    const steps: LightingPrewarmStepProfile[] = [];
+    let rendererStateRestored = false;
+    const restoreRendererState = (): void => {
+      if (rendererStateRestored) return;
+      rendererStateRestored = true;
+      renderer.setViewport(previousViewport);
+      renderer.setScissor(previousScissor);
+      renderer.setScissorTest(previousScissorTest);
+    };
+    const isCurrent = (): boolean =>
+      this.resources === resources &&
+      this.lightingPrewarmGeneration === generation;
+    this.cancelLightingPrewarm = restoreRendererState;
+
+    try {
+      // This draw remains behind the loading screen. The one-pixel
+      // viewport initializes first-use fixture buffers without flashing a room.
+      renderer.setViewport(0, 0, 1, 1);
+      renderer.setScissor(0, 0, 1, 1);
+      renderer.setScissorTest(true);
+      await resources.testScene.lighting.prewarmShaderConfigurations(
+        async (roomId) => {
+          if (!isCurrent()) return;
+          const stepProgramsBefore = renderer.info.programs?.length ?? 0;
+          const stepStarted = this.hostWindow.performance.now();
+          const signature = countVisibleLights(
+            this.renderLayer.scene,
+            prewarmCamera,
+          );
+          const compileSubset = createRoomCompileSubset(resources, roomId);
+          const compileStarted = this.hostWindow.performance.now();
+          try {
+            if (renderer.extensions.has('KHR_parallel_shader_compile')) {
+              await renderer.compileAsync(
+                compileSubset,
+                prewarmCamera,
+                this.renderLayer.scene,
+              );
+            } else {
+              renderer.compile(
+                compileSubset,
+                prewarmCamera,
+                this.renderLayer.scene,
+              );
+            }
+          } finally {
+            compileSubset.clear();
+          }
+          const compileDurationMs =
+            this.hostWindow.performance.now() - compileStarted;
+          const programsAfterCompile = renderer.info.programs?.length ?? 0;
+          if (!isCurrent()) return;
+          const target = LIGHTING_PREWARM_CAMERA_TARGETS[roomId];
+          prewarmCamera.position.set(target[0], target[1] + 1.2, target[2] - 5);
+          prewarmCamera.lookAt(target[0], target[1] + 0.5, target[2] + 2);
+          prewarmCamera.updateMatrixWorld();
+          const primeStarted = this.hostWindow.performance.now();
+          // Boot already draws Room 1 twice behind the loading screen. Only
+          // future rooms need an additional hidden first-use geometry draw.
+          if (roomId !== 1) {
+            renderer.render(this.renderLayer.scene, prewarmCamera);
+          }
+          const primeDurationMs =
+            this.hostWindow.performance.now() - primeStarted;
+          renderer.setViewport(0, 0, 1, 1);
+          renderer.setScissor(0, 0, 1, 1);
+          renderer.setScissorTest(true);
+          steps.push({
+            roomId,
+            compiledObjects: compileSubset.userData.compiledObjects as number,
+            durationMs: this.hostWindow.performance.now() - stepStarted,
+            compileDurationMs,
+            primeDurationMs,
+            programsBefore: stepProgramsBefore,
+            programsAfterCompile,
+            programsAfter: renderer.info.programs?.length ?? 0,
+            ...signature,
+          });
+        },
+      );
+
+      if (!isCurrent()) return;
+      this.lightingPrewarmProfile = {
+        durationMs: this.hostWindow.performance.now() - started,
+        programsBefore,
+        programsAfter: renderer.info.programs?.length ?? 0,
+        steps,
+      };
+    } finally {
+      restoreRendererState();
+      if (this.cancelLightingPrewarm === restoreRendererState) {
+        this.cancelLightingPrewarm = undefined;
+      }
+    }
+  }
 
   private setDebugVisible(
     visible: boolean,
@@ -1359,4 +1635,175 @@ export class GreyboxLevelRuntime {
     }
     return this.resources;
   }
+}
+
+function countVisibleLights(
+  root: THREE.Object3D,
+  camera: THREE.Camera,
+): Pick<
+  LightingTransitionProfile,
+  | 'pointLights'
+  | 'spotLights'
+  | 'directionalLights'
+  | 'hemisphereLights'
+> {
+  let pointLights = 0;
+  let spotLights = 0;
+  let directionalLights = 0;
+  let hemisphereLights = 0;
+  root.traverseVisible((object) => {
+    if (!object.layers.test(camera.layers)) return;
+    if (object instanceof THREE.PointLight) pointLights += 1;
+    else if (object instanceof THREE.SpotLight) spotLights += 1;
+    else if (object instanceof THREE.DirectionalLight) directionalLights += 1;
+    else if (object instanceof THREE.HemisphereLight) hemisphereLights += 1;
+  });
+  return {
+    pointLights,
+    spotLights,
+    directionalLights,
+    hemisphereLights,
+  };
+}
+
+function createRoomCompileSubset(
+  resources: GreyboxRuntimeResources,
+  roomId: DebugRoomId,
+): THREE.Group {
+  const levelRoot = resources.testScene.root;
+  const teachingRoot = requiredNamedObject(
+    levelRoot,
+    'containment-climb-and-bounce-greybox',
+  );
+  const lightingRoot = requiredNamedObject(
+    levelRoot,
+    `containment-room-${roomId}-lighting-rig`,
+  );
+  const sources: THREE.Object3D[] = [
+    lightingRoot,
+    resources.slimePairPresentation.root,
+  ];
+
+  if (roomId <= 2) {
+    const prefix = `room-${roomId}-`;
+    for (const child of teachingRoot.children) {
+      if (
+        child.name.startsWith(prefix) ||
+        (roomId === 1 && child.name.startsWith('duct-')) ||
+        child.name.startsWith('player-slime-')
+      ) {
+        sources.push(child);
+      }
+    }
+  } else {
+    sources.push(
+      requiredNamedObject(levelRoot, `containment-room-${roomId}-greybox`),
+    );
+    for (const child of teachingRoot.children) {
+      if (child.name.startsWith('player-slime-')) sources.push(child);
+    }
+  }
+
+  if (roomId === 1) sources.push(resources.pressurePlate.root);
+
+  const subset = new THREE.Group();
+  subset.name = `containment-room-${roomId}-shader-prewarm-subset`;
+  const compiledSignatures = new Set<string>();
+  let compiledObjects = 0;
+  for (const source of sources) {
+    source.traverse((object) => {
+      if (!isRenderableObject(object)) return;
+      const compileSignature = compileObjectSignature(object);
+      if (compiledSignatures.has(compileSignature)) return;
+      compiledSignatures.add(compileSignature);
+      const clone = cloneCompileObject(object);
+      clone.visible = true;
+      subset.add(clone);
+      compiledObjects += 1;
+    });
+  }
+  subset.userData.compiledObjects = compiledObjects;
+  return subset;
+}
+
+function requiredNamedObject(
+  root: THREE.Object3D,
+  name: string,
+): THREE.Object3D {
+  const object = root.getObjectByName(name);
+  if (!object) throw new Error(`Missing prewarm source ${name}.`);
+  return object;
+}
+
+function isRenderableObject(
+  object: THREE.Object3D,
+): object is THREE.Mesh | THREE.Line | THREE.Points | THREE.Sprite {
+  return (
+    object instanceof THREE.Mesh ||
+    object instanceof THREE.Line ||
+    object instanceof THREE.Points ||
+    object instanceof THREE.Sprite
+  );
+}
+
+function compileObjectSignature(
+  object: THREE.Mesh | THREE.Line | THREE.Points | THREE.Sprite,
+): string {
+  const materials = Array.isArray(object.material)
+    ? object.material
+    : [object.material];
+  const geometry = 'geometry' in object ? object.geometry : undefined;
+  const attributes = geometry
+    ? Object.entries(geometry.attributes)
+        .map(
+          ([name, attribute]) =>
+            `${name}:${attribute.itemSize}:${attribute.normalized ? 1 : 0}`,
+        )
+        .sort()
+        .join(',')
+    : '';
+  const morphAttributes = geometry
+    ? Object.entries(geometry.morphAttributes)
+        .map(([name, entries]) => `${name}:${entries.length}`)
+        .sort()
+        .join(',')
+    : '';
+  return [
+    object.type,
+    object instanceof THREE.InstancedMesh ? 'instanced' : 'single',
+    object instanceof THREE.InstancedMesh && object.instanceColor
+      ? 'instance-colour'
+      : 'no-instance-colour',
+    materials.map((material) => material.uuid).join(','),
+    attributes,
+    morphAttributes,
+  ].join('|');
+}
+
+function cloneCompileObject(
+  object: THREE.Mesh | THREE.Line | THREE.Points | THREE.Sprite,
+): THREE.Object3D {
+  if (object instanceof THREE.InstancedMesh) {
+    const clone = new THREE.InstancedMesh(
+      object.geometry,
+      object.material,
+      1,
+    );
+    if (object.instanceColor) {
+      clone.instanceColor = new THREE.InstancedBufferAttribute(
+        new Float32Array([1, 1, 1]),
+        3,
+      );
+    }
+    clone.castShadow = object.castShadow;
+    clone.receiveShadow = object.receiveShadow;
+    clone.layers.mask = object.layers.mask;
+    return clone;
+  }
+  return object.clone(false);
+}
+
+function nextPreviewState<T>(states: readonly T[], current: T): T {
+  const currentIndex = states.indexOf(current);
+  return states[(currentIndex + 1) % states.length]!;
 }
