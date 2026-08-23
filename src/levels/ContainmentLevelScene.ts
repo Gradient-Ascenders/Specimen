@@ -108,6 +108,7 @@ export class ContainmentLevelScene {
 
   update(deltaSeconds: number, visualState?: SlimeVisualState): void {
     this.teaching.update(deltaSeconds, visualState);
+    this.roomThree.updatePresentation(deltaSeconds);
   }
 
   startDeath(position: Vector3State): boolean {

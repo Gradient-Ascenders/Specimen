@@ -102,7 +102,10 @@ Room art borrows these resources and never disposes them. Room 1 owns only its
 unique organic membrane, egg-state, crack, shard, and sign-plane geometry. The
 level disposes consumers before the shared library. Repeated disposal is safe,
 and create/dispose/recreate tests assert stable counts and references. Static
-art has no update hook and creates no per-frame resources.
+art creates no per-frame resources. Room 3's later acid presentation is the
+only animated environment-material exception; its level-update-driven clock,
+ownership and fixed procedural cost are documented in
+[`acid-surface-shader.md`](acid-surface-shader.md).
 
 ## Procedural textures and graphics
 

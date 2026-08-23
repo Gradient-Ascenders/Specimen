@@ -82,6 +82,10 @@ export class RoomThreeGreybox {
     this.exitTrigger.update(target);
   }
 
+  updatePresentation(deltaSeconds: number): void {
+    this.art.update(deltaSeconds);
+  }
+
   reset(): void {
     this.lasers.reset();
     this.checkpointTrigger.reset();

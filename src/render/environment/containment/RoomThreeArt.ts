@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import type { LaserHazard } from '../../../hazards/LaserHazard.ts';
+import { AcidSurfaceMaterial } from './AcidSurfaceMaterial.ts';
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
 import {
   createBorrowedBox,
@@ -37,7 +38,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 /** Room 3-only visual layer around the frozen acid, laser and traversal route. */
 export class RoomThreeArt {
   readonly root = new THREE.Group();
-  readonly acidSurfaceMaterial: THREE.MeshStandardMaterial;
+  readonly acidSurfaceMaterial: AcidSurfaceMaterial;
   readonly acidSurface: THREE.Mesh;
 
   private readonly resources: ContainmentArtResources;
@@ -52,19 +53,9 @@ export class RoomThreeArt {
     this.root.name = 'room-3-production-art';
     markVisualOnly(this.root);
 
-    // Static foundation only. A later graphics pass may replace this material
-    // through acidSurface without changing the authoritative acid collider.
-    this.acidSurfaceMaterial = new THREE.MeshStandardMaterial({
-      name: 'room-3-acid-static-foundation',
-      color: 0x557c24,
-      emissive: 0x142704,
-      emissiveIntensity: 0.12,
-      roughness: 0.31,
-      metalness: 0,
-      map: resources.textures.acidFoundationAlbedo,
-      normalMap: resources.textures.ceramicNormal,
-      roughnessMap: resources.textures.ceramicRoughness,
-      normalScale: new THREE.Vector2(0.025, 0.025),
+    this.acidSurfaceMaterial = new AcidSurfaceMaterial({
+      foundationMap: resources.textures.acidFoundationAlbedo,
+      microNormalMap: resources.textures.ceramicNormal,
     });
     this.acidSurface = createBorrowedBox(resources, {
       name: 'room-3-acid-surface-material-integration-point',
@@ -84,6 +75,10 @@ export class RoomThreeArt {
     this.buildChemicalServiceRuns();
     this.buildTransferDuct();
     this.buildTransitionsAndSignage();
+  }
+
+  update(deltaSeconds: number): void {
+    this.acidSurfaceMaterial.update(deltaSeconds);
   }
 
   dispose(): void {
