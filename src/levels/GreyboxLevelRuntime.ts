@@ -16,7 +16,10 @@ import {
 import { runDissolveRegression } from '../debug/DissolveRegression.ts';
 import { runSlimeManagerRegression } from '../debug/SlimeManagerRegression.ts';
 import { runTwoBodySwitchingRegression } from '../debug/TwoBodySwitchingRegression.ts';
-import { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  CollisionLayer,
+  CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
   KinematicBody,
@@ -545,6 +548,10 @@ export class GreyboxLevelRuntime {
 
     const collisionWorld = new CollisionWorld();
     collisionWorld.registerAll(testScene.collisionMeshes);
+    collisionWorld.registerAll(
+      testScene.cameraObstructionMeshes,
+      CollisionLayer.CameraObstruction,
+    );
     const surfaceRegistry = new SurfaceRegistry();
     surfaceRegistry.registerAll(testScene.collisionMeshes);
     const movementEvents = new EventBus<MovementEvents>();
@@ -986,7 +993,7 @@ export class GreyboxLevelRuntime {
 
   private syncContextualCamera(resources: GreyboxRuntimeResources): void {
     this.renderLayer.cameraRig.setContextualCamera(
-      resources.testScene.roomFour.liftCameraZone.resolve(
+      resources.testScene.roomFour.resolveLiftCamera(
         resources.slimePair.activeBody,
       ),
     );
@@ -1179,7 +1186,6 @@ export class GreyboxLevelRuntime {
     const renderStats = this.renderLayer.getDiagnostics();
     const slimeDiagnostics = testScene.slimeDiagnostics;
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
-    const cameraPosition = this.renderLayer.cameraRig.camera.position;
     const deathStats = deathSequence.diagnostics;
     const burstStats = testScene.deathBurstDiagnostics;
     const slimeManagerStats = slimeManager.getDiagnostics();
@@ -1259,8 +1265,12 @@ export class GreyboxLevelRuntime {
         `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
         `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
         `camera profile / blend: ${cameraStats.profileId} / ${(cameraStats.profileBlend * 100).toFixed(0)}%`,
-        `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
-        `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
+        `lift state / progress / arrival camera: ${testScene.roomFour.elevator.state} / ${(testScene.roomFour.elevator.ascentProgress * 100).toFixed(1)}% / ${(testScene.roomFour.liftCameraArrivalBlend * 100).toFixed(1)}%`,
+        `camera obstruction: ${cameraStats.obstructed ? `${cameraStats.obstructionName} @ ${cameraStats.obstructionDistanceMetres?.toFixed(2)} m` : 'none'}`,
+        `camera collision radius: ${cameraStats.obstructionRadiusMetres.toFixed(2)} m`,
+        `camera focus: ${cameraStats.focusPosition.x.toFixed(2)}, ${cameraStats.focusPosition.y.toFixed(2)}, ${cameraStats.focusPosition.z.toFixed(2)} m`,
+        `camera preferred: ${cameraStats.preferredCameraPosition.x.toFixed(2)}, ${cameraStats.preferredCameraPosition.y.toFixed(2)}, ${cameraStats.preferredCameraPosition.z.toFixed(2)} m`,
+        `camera resolved: ${cameraStats.resolvedCameraPosition.x.toFixed(2)}, ${cameraStats.resolvedCameraPosition.y.toFixed(2)}, ${cameraStats.resolvedCameraPosition.z.toFixed(2)} m`,
         `camera pitch manual / effective: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}° / ${THREE.MathUtils.radToDeg(cameraStats.effectivePitchRadians).toFixed(1)}°`,
         `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
         `teaching-surface regression: ${this.slopeRegressionStatus}`,

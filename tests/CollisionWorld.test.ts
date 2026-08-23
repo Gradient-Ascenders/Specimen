@@ -43,6 +43,49 @@ test('camera obstruction queries ignore movement-only colliders', () => {
   movementOnly.geometry.dispose();
 });
 
+test('camera-only blockers obstruct camera sweeps but remain absent from movement', () => {
+  const world = new CollisionWorld();
+  const hiddenMaterial = new THREE.MeshBasicMaterial({ visible: false });
+  const cameraOnly = new THREE.Mesh(
+    new THREE.BoxGeometry(4, 0.4, 4),
+    hiddenMaterial,
+  );
+  cameraOnly.name = 'test-camera-only-cap';
+  cameraOnly.position.set(0, 3, 0);
+  world.register(cameraOnly, CollisionLayer.CameraObstruction);
+
+  const origin = new THREE.Vector3(0, 0, 0);
+  const displacement = new THREE.Vector3(0, 5, 0);
+  const hit = new CollisionHit();
+
+  assert.equal(cameraOnly.visible, true);
+  assert.equal(hiddenMaterial.visible, false);
+  assert.equal(
+    world.sweepSphere(
+      origin,
+      displacement,
+      0.22,
+      hit,
+      CollisionLayer.CameraObstruction,
+    ),
+    true,
+  );
+  assert.equal(hit.object?.name, 'test-camera-only-cap');
+  assert.equal(
+    world.sweepSphere(
+      origin,
+      displacement,
+      0.45,
+      hit,
+      CollisionLayer.Movement,
+    ),
+    false,
+  );
+
+  cameraOnly.geometry.dispose();
+  hiddenMaterial.dispose();
+});
+
 test('default authored solids block both movement and camera queries', () => {
   const world = new CollisionWorld();
   const solid = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));

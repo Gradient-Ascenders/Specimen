@@ -19,6 +19,13 @@ export interface GreyboxBoxOptions {
   readonly rotation?: readonly [number, number, number];
 }
 
+export interface CameraObstructionBoxOptions {
+  readonly name: string;
+  readonly size: readonly [number, number, number];
+  readonly position: readonly [number, number, number];
+  readonly rotation?: readonly [number, number, number];
+}
+
 export interface ContainmentGreyboxMaterials {
   readonly floor: THREE.MeshStandardMaterial;
   readonly acid: THREE.MeshStandardMaterial;
@@ -67,7 +74,12 @@ export const createContainmentGreyboxMaterials = (): ContainmentGreyboxMaterials
 export class GreyboxRoomBuilder {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
+  readonly cameraObstructionMeshes: THREE.Mesh[] = [];
   readonly materials: ContainmentGreyboxMaterials;
+
+  private readonly cameraObstructionMaterial = new THREE.MeshBasicMaterial({
+    visible: false,
+  });
 
   constructor(
     name: string,
@@ -95,6 +107,26 @@ export class GreyboxRoomBuilder {
     return this.createBox(options);
   }
 
+  /**
+   * Author an invisible volume used only by camera-obstruction queries.
+   *
+   * The mesh itself stays visible to the scene graph and custom collision
+   * world; Material.visible suppresses renderer submission without making the
+   * query volume disappear from CollisionWorld.
+   */
+  addCameraObstruction(
+    options: CameraObstructionBoxOptions,
+  ): THREE.Mesh {
+    const mesh = this.createBox({
+      ...options,
+      material: this.cameraObstructionMaterial,
+    });
+    mesh.userData.queryRole = 'camera-obstruction';
+    mesh.userData.sizeMetres = [...options.size];
+    this.cameraObstructionMeshes.push(mesh);
+    return mesh;
+  }
+
   addLight(
     name: string,
     position: readonly [number, number, number],
@@ -114,6 +146,7 @@ export class GreyboxRoomBuilder {
     for (const material of Object.values(this.materials)) {
       ownedMaterials.add(material);
     }
+    ownedMaterials.add(this.cameraObstructionMaterial);
     this.root.removeFromParent();
     this.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh || object instanceof THREE.LineSegments)) {
@@ -127,6 +160,7 @@ export class GreyboxRoomBuilder {
     });
     for (const ownedMaterial of ownedMaterials) ownedMaterial.dispose();
     this.collisionMeshes.length = 0;
+    this.cameraObstructionMeshes.length = 0;
     this.root.clear();
   }
 

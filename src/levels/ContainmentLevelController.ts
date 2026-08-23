@@ -280,6 +280,7 @@ export class ContainmentLevelController {
   private updateRoomFour(deltaSeconds: number): void {
     const elevatorProgressBeforeUpdate =
       this.scene.roomFour.elevator.ascentProgress;
+    const exitWasReady = this.scene.roomFour.elevator.exitReady;
     this.scene.roomFour.updateActive(
       deltaSeconds,
       this.body,
@@ -289,6 +290,12 @@ export class ContainmentLevelController {
       elevatorProgressBeforeUpdate < 1 &&
       this.scene.roomFour.elevator.ascentProgress >= 1
     ) {
+      // Secure the upper recovery point as soon as the lift stops, but keep
+      // Room 4 authoritative until its arrival pause has actually opened the
+      // exit. Otherwise switching active rooms strands the sequence forever.
+      this.checkpoints.activate(ROOM_5_ENTRY_CHECKPOINT_ID);
+    }
+    if (!exitWasReady && this.scene.roomFour.elevator.exitReady) {
       this.activateRoomFiveEntryCheckpoint();
     }
   }
@@ -346,7 +353,16 @@ export class ContainmentLevelController {
   }
 
   private activateRoomFiveEntryCheckpoint(): void {
-    this.activateCheckpointForProgression(5, ROOM_5_ENTRY_CHECKPOINT_ID);
+    if (this.activeRoomIdValue >= 5) return;
+
+    // Reaching the upper stop makes recovery safe before the shutter opens,
+    // but it does not transfer simulation ownership. A recovery spawn lies in
+    // Room 5's entry trigger, so that trigger must not strand Room 4's
+    // arrivalPause by advancing ownership prematurely.
+    this.checkpoints.activate(ROOM_5_ENTRY_CHECKPOINT_ID);
+    if (!this.scene.roomFour.elevator.exitReady) return;
+
+    this.setActiveRoom(5);
   }
 
   private activateCheckpointForProgression(
