@@ -49,11 +49,15 @@ codes.
 | `moveRight` | `D` |
 | `jump` | `Space` |
 | `switchSlime` | `Tab` |
+| `aimAbility` | Right Mouse Button |
+| `fireAbility` | Left Mouse Button while aiming |
 | `debugReset` | `R` |
 | `debugTestRecovery` | `F` |
 
-The binding system also supports mouse-button bindings. Pointer movement is
-collected separately while the gameplay canvas owns pointer lock. The
+Mouse ability actions are accepted only while the gameplay canvas owns pointer
+lock. Right-click context-menu suppression is attached only to that canvas and
+is removed when `Input` is disposed. Pointer movement is collected separately
+while the gameplay canvas owns pointer lock. The
 third-person camera consumes the accumulated relative movement before
 `endFixedUpdate()` clears it; browser events remain isolated inside `Input`.
 

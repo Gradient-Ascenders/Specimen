@@ -55,6 +55,15 @@ export class ContainmentLevelScene {
     ];
   }
 
+  /** Authored camera boundaries and opaque camera-only presentation meshes. */
+  get cameraObstructionMeshes(): readonly THREE.Mesh[] {
+    return [
+      ...this.roomThree.builder.cameraObstructionMeshes,
+      ...this.roomFour.cameraObstructionMeshes,
+      ...this.roomFive.builder.cameraObstructionMeshes,
+    ];
+  }
+
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
   get solubleTargetMeshes(): readonly THREE.Mesh[] {
     return [

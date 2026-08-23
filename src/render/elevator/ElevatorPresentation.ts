@@ -23,6 +23,7 @@ export interface ElevatorPresentationDiagnostics {
  */
 export class ElevatorPresentation {
   readonly root = new THREE.Group();
+  readonly cameraObstructionMeshes: THREE.Mesh[] = [];
 
   private readonly sequence: ElevatorSequence;
   private readonly platformDecoration = new THREE.Group();
@@ -142,6 +143,7 @@ export class ElevatorPresentation {
     for (const material of this.materials) material.dispose();
     this.geometries.clear();
     this.materials.clear();
+    this.cameraObstructionMeshes.length = 0;
   }
 
   private buildPlatformRoof(): readonly THREE.PointLight[] {

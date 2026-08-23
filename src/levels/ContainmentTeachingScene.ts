@@ -391,6 +391,7 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-2-floor', size: [30, 0.4, 22], position: [0, -0.2, ROOM_2_CENTRE_Z], material: materials.floor });
     this.addCollider({ name: 'room-2-west-wall', size: [0.4, 18, 22], position: [-15, 9, ROOM_2_CENTRE_Z], material: materials.wall });
     this.addCollider({ name: 'room-2-east-wall', size: [0.4, 18, 22], position: [15, 9, ROOM_2_CENTRE_Z], material: materials.wall });
+    this.addCollider({ name: 'room-2-ceiling', size: [30, 0.4, 22], position: [0, 18.2, ROOM_2_CENTRE_Z], material: materials.wall });
     // Split the rear wall around the elevated duct outlet. The opening aligns
     // with the final duct interior and lets the player fall onto Room 2's
     // bounce landing rather than colliding with an invisible sealed wall.

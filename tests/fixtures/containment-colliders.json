@@ -1178,6 +1178,37 @@
     "developmentOnly": false
   },
   {
+    "name": "room-2-ceiling",
+    "worldPosition": [
+      0,
+      18.2,
+      38
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      30,
+      0.4,
+      22
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
     "name": "room-2-rear-wall-west",
     "worldPosition": [
       -12.25,
@@ -2545,7 +2576,7 @@
     "name": "room-4-shaft-west-wall",
     "worldPosition": [
       2.5,
-      51,
+      52.125,
       85.5
     ],
     "worldQuaternion": [
@@ -2561,7 +2592,7 @@
     ],
     "localDimensions": [
       0.4,
-      51,
+      53.25,
       12
     ],
     "surfaceTag": "default",
@@ -2576,7 +2607,7 @@
     "name": "room-4-shaft-east-wall",
     "worldPosition": [
       15.5,
-      51,
+      52.125,
       85.5
     ],
     "worldQuaternion": [
@@ -2592,7 +2623,38 @@
     ],
     "localDimensions": [
       0.4,
-      51,
+      53.25,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-shaft-ceiling",
+    "worldPosition": [
+      9,
+      78.95,
+      85.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      13,
+      0.4,
       12
     ],
     "surfaceTag": "default",
@@ -2607,7 +2669,7 @@
     "name": "room-4-south-wall-west",
     "worldPosition": [
       5.1,
-      51,
+      52.125,
       79.5
     ],
     "worldQuaternion": [
@@ -2623,7 +2685,7 @@
     ],
     "localDimensions": [
       5.2,
-      51,
+      53.25,
       0.4
     ],
     "surfaceTag": "default",
@@ -2638,7 +2700,7 @@
     "name": "room-4-south-wall-east",
     "worldPosition": [
       12.9,
-      51,
+      52.125,
       79.5
     ],
     "worldQuaternion": [
@@ -2654,7 +2716,7 @@
     ],
     "localDimensions": [
       5.2,
-      51,
+      53.25,
       0.4
     ],
     "surfaceTag": "default",
@@ -2669,7 +2731,7 @@
     "name": "room-4-south-wall-above-entry",
     "worldPosition": [
       9,
-      55,
+      55.875,
       79.5
     ],
     "worldQuaternion": [
@@ -2685,7 +2747,7 @@
     ],
     "localDimensions": [
       2.6,
-      44,
+      45.75,
       0.4
     ],
     "surfaceTag": "default",
@@ -2731,7 +2793,7 @@
     "name": "room-4-north-wall-west",
     "worldPosition": [
       5.1,
-      51,
+      52.125,
       91.5
     ],
     "worldQuaternion": [
@@ -2747,7 +2809,7 @@
     ],
     "localDimensions": [
       5.2,
-      51,
+      53.25,
       0.4
     ],
     "surfaceTag": "default",
@@ -2762,7 +2824,7 @@
     "name": "room-4-north-wall-east",
     "worldPosition": [
       12.9,
-      51,
+      52.125,
       91.5
     ],
     "worldQuaternion": [
@@ -2778,7 +2840,7 @@
     ],
     "localDimensions": [
       5.2,
-      51,
+      53.25,
       0.4
     ],
     "surfaceTag": "default",

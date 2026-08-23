@@ -19,6 +19,9 @@ The HUD is a separate `playing` surface and does not intercept canvas input.
 
 - **WASD** moves relative to the camera.
 - **Space** charges and releases a jump.
+- **Tab** switches between Bob and Goop.
+- As Goop, hold **Right Mouse Button** to aim and press **Left Mouse Button**
+  to fire an acid projectile.
 - The mouse orbits the camera while the canvas owns pointer lock.
 - **Escape** pauses gameplay. Escape from settings or credits returns to the
   parent menu; Escape from pause resumes where browser activation permits.

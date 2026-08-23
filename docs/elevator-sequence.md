@@ -127,12 +127,48 @@ There is no second game-wide restart route; #23 remains lifecycle owner.
 
 ## Camera contract
 
-No elevator-specific camera authority is introduced.
+The Level 1 lift uses a high-angle contextual camera because the normal close
+third-person follow camera makes a vertically moving platform difficult to
+read. The contextual view follows the lift's large-scale movement while
+allowing the player to move within the frame, improving visibility and reducing
+unnecessary camera motion.
 
-`CameraRig` continues to read interpolated authoritative player state. Because
-carrier motion updates body position without fake launch velocity and preserves
-previous/current interpolation, the existing bounded follow lag remains stable
-during ascent. The camera never reads or writes elevator sequence timers.
+Room 4 owns a trigger-backed `CameraProfileZone` covering the playable shaft.
+While the active slime occupies it during the useful ascent, `CameraRig` blends
+over 0.65 seconds toward a 10.5 m boom at 65° downward pitch. Over roughly the
+final 22% of actual elevator travel, Room 4 smoothsteps that stable context
+toward a compact 5.0 m, 15° arrival profile with a lower anchor offset and
+tighter dead zone. It holds the arrival profile at the upper stop, then
+releases it after `exitReady` when the active slime advances across the upper
+platform toward the doorway. The camera begins its normal Room 5 blend before
+the player crosses the room boundary and remains perspective rather than
+top-down.
+
+The moving platform exposes its current and fixed-step previous route poses as
+a read-only camera anchor. That anchor drives the camera's large-scale vertical
+progression. The active slime drives only loose framing: movement within a
+1.5 m horizontal and 1.25 m vertical screen-plane dead zone does not move the
+framing pivot, while larger displacement is damped at 7 s⁻¹.
+
+The profile authors pitch but does not author yaw. Existing mouse yaw and the
+`planarBack` movement basis remain shared, so WASD stays aligned with the view.
+Manual pitch input is held while the profile is active and the prior pitch is
+restored on exit. The normal swept-sphere camera-obstruction query remains in
+use throughout. Normal shaft solids, the visible presentation-only upper frame,
+and a wider invisible upper camera cap are all visible to that query; only
+normal solids are visible to movement queries.
+
+Reaching the upper stop activates the Room 5 entry checkpoint immediately but
+does not transfer active-room simulation ownership. Recovery at that checkpoint
+spawns inside Room 5's entry trigger, but the trigger now also respects the
+`exitReady` ownership gate. Room 4 continues updating through the authored
+arrival pause; only `exitReady` transfers ownership to Room 5. This keeps
+upper-stop recovery safe without freezing the exit lock in its closed state.
+
+Checkpoint recovery resets Room 4's elevator and camera zone before restoring
+the player. The recovered position is resolved immediately: a Room 4 recovery
+reactivates the lift profile, while Room 5 recovery, level restart, unload, or a
+switch to a slime outside the shaft cannot retain it.
 
 Kevin's #67 renderer may read:
 

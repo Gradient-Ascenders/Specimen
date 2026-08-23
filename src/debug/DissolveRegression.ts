@@ -6,33 +6,15 @@ import {
 import { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { CollisionWorld } from '../physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
-import { SlimeManager } from '../slimes/SlimeManager.ts';
-
-class FakeDissolveBody {
-  readonly radiusMetres = 0.45;
-  readonly position = new THREE.Vector3();
-
-  constructor(position: THREE.Vector3) {
-    this.position.copy(position);
-  }
-}
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
 }
 
-/** Dependency-free #30 regression that never mutates the live scene target. */
+/** Dependency-free burn/reset regression that never mutates the live target. */
 export function runDissolveRegression(): string {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
-  const manager = new SlimeManager<FakeDissolveBody>();
-
-  const bob = new FakeDissolveBody(new THREE.Vector3(0, 0, 0.66));
-  const goop = new FakeDissolveBody(new THREE.Vector3(0, 0, 0.66));
-  manager.registerBody('bob', bob);
-  manager.unlock('goop');
-  manager.registerBody('goop', goop);
-
   const geometry = new THREE.BoxGeometry(2, 2, 0.4);
   const material = new THREE.MeshStandardMaterial();
   const solubleMesh = new THREE.Mesh(geometry, material);
@@ -54,16 +36,14 @@ export function runDissolveRegression(): string {
     throw new Error('Marked soluble regression target was rejected.');
   }
 
-  const system = new DissolveSystem(manager, [target]);
+  const system = new DissolveSystem([target]);
   let completedEvents = 0;
   const unsubscribeCompleted = target.events.on('completed', () => {
     completedEvents += 1;
   });
-
   const nonSolubleMeshes: THREE.Mesh[] = [];
 
   try {
-    // Every existing non-soluble surface class must remain ineligible.
     for (const surfaceTag of [
       'default',
       'sticky',
@@ -84,40 +64,25 @@ export function runDissolveRegression(): string {
       );
     }
 
-    // Bob can stand in the same contact range and hold E, but the #27 ability
-    // gate must prevent any progress.
-    manager.activate('bob');
-    system.update(0.5, true);
-    assert(target.progress === 0, 'Bob advanced dissolve progress.');
-
-    // Goop may partially dissolve the marked target.
-    manager.activate('goop');
-    system.update(0.4, true);
+    assert(system.startBurn(target) === 'started', 'Burn was not accepted.');
+    system.update(0.4);
     assert(
       Math.abs(target.progress - 0.2) < 1e-9,
       'Partial dissolve progress was not deterministic.',
     );
     assert(target.collisionEnabled, 'Collision disabled before threshold.');
 
-    // Interrupted activation preserves partial progress without rebuilding.
-    const interruptedProgress = target.progress;
-    system.update(0.75, false);
     assert(
-      target.progress === interruptedProgress,
-      'Interrupted dissolve unexpectedly changed progress.',
+      system.startBurn(target) === 'already-burning',
+      'Repeated hit created another burn.',
+    );
+    system.update(0.4);
+    assert(
+      Math.abs(target.progress - 0.4) < 1e-9,
+      'Repeated hit accelerated dissolve progress.',
     );
 
-    // Continue below threshold.
-    system.update(0.9, true);
-    assert(
-      target.progress < target.collisionDisableProgress,
-      'Regression unexpectedly crossed threshold too early.',
-    );
-    assert(target.collisionEnabled, 'Collision desynchronised below threshold.');
-
-    // Cross the authored threshold: collision must disappear on the same
-    // authoritative progress transition.
-    system.update(0.2, true);
+    system.update(0.6);
     assert(
       target.progress >= target.collisionDisableProgress,
       'Threshold was not crossed.',
@@ -127,17 +92,14 @@ export function runDissolveRegression(): string {
       'Collision remained registered after threshold.',
     );
 
-    // Because activation was already established, the hold can continue to
-    // completion even though the collider is now gone.
-    system.update(1, true);
+    system.update(0.6);
     assert(target.completed, 'Dissolve did not reach completed state.');
     assert(target.progress === 1, 'Completed dissolve was not clamped to 1.');
     assert(!target.mesh.visible, 'Completed target remained visible.');
     assert(completedEvents === 1, 'Completion event did not fire exactly once.');
 
     const originalMesh = target.mesh;
-
-    // Reset restores the exact same mesh and collider without reloading.
+    system.reset();
     target.reset();
     assert(target.mesh === originalMesh, 'Reset replaced the authored mesh.');
     assert(target.progress === 0, 'Reset did not clear dissolve progress.');
@@ -146,13 +108,17 @@ export function runDissolveRegression(): string {
     assert(target.collisionEnabled, 'Reset did not restore collision.');
     assert(world.colliderCount === 1, 'Reset did not re-register collision.');
 
-    // Repeated complete/reset cycles remain reversible.
     for (let cycle = 0; cycle < 5; cycle += 1) {
-      system.update(2, true);
+      assert(
+        system.startBurn(target) === 'started',
+        `Repeated burn failed to start on cycle ${cycle + 1}.`,
+      );
+      system.update(2);
       assert(
         target.completed && !target.collisionEnabled,
         `Repeated dissolve failed on cycle ${cycle + 1}.`,
       );
+      system.reset();
       target.reset();
       assert(
         target.progress === 0 &&
@@ -164,21 +130,18 @@ export function runDissolveRegression(): string {
 
     return [
       'PASS',
-      'Bob rejected',
-      'Goop partial/interrupted/complete',
+      'partial/non-stacking/complete burn',
       '4 non-soluble surface classes rejected',
       'collision threshold synchronized',
       '5 repeated reset cycles',
     ].join(' — ');
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     return `FAIL — ${message}`;
   } finally {
     unsubscribeCompleted();
     system.dispose();
     target.dispose();
-    manager.dispose();
 
     geometry.dispose();
     material.dispose();

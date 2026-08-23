@@ -140,7 +140,7 @@ test('Room 2 art is visual-only and preserves authored gameplay semantics', () =
   );
 
   assert.equal(art.name, 'room-2-production-art');
-  assert.equal(roomTwoColliders.length, 20);
+  assert.equal(roomTwoColliders.length, 21);
   for (const collider of roomTwoColliders) {
     assert.equal(collider.material.visible, false, collider.name);
     assert.equal(
@@ -319,7 +319,7 @@ test('Room 4 art houses the frozen elevator and laser sequence without owning ga
   }));
 
   assert.equal(art.name, 'room-4-production-art');
-  assert.equal(roomFourColliders.length, 14);
+  assert.equal(roomFourColliders.length, 15);
   for (const collider of roomFourColliders) {
     assert.equal(collider.material.visible, false, collider.name);
   }

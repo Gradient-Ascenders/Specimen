@@ -4,6 +4,7 @@ import {
   createAuthoredDissolveTarget,
   type DissolveTarget,
 } from '../abilities/DissolveTarget.ts';
+import { AcidProjectileSystem } from '../abilities/AcidProjectileSystem.ts';
 import { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
 import type { Input, InputAction } from '../core/Input.ts';
@@ -15,7 +16,10 @@ import {
 import { runDissolveRegression } from '../debug/DissolveRegression.ts';
 import { runSlimeManagerRegression } from '../debug/SlimeManagerRegression.ts';
 import { runTwoBodySwitchingRegression } from '../debug/TwoBodySwitchingRegression.ts';
-import { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  CollisionLayer,
+  CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import {
   DEFAULT_KINEMATIC_BODY_CONFIG,
   KinematicBody,
@@ -121,7 +125,8 @@ interface GreyboxRuntimeResources {
   readonly pressurePlateSensor: BoxTriggerSensor;
   readonly puzzleRegistry: PuzzleRegistry;
   readonly dissolveTargets: readonly DissolveTarget[];
-  readonly dissolveSystem: DissolveSystem<KinematicBody>;
+  readonly dissolveSystem: DissolveSystem;
+  readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly collisionOverlay: ContainmentCollisionOverlay | undefined;
   readonly pressurePlateOccupants: readonly [
     {
@@ -391,11 +396,6 @@ export class GreyboxLevelRuntime {
       resources.pressurePlateOccupants,
     );
 
-    resources.dissolveSystem.update(
-      deltaSeconds,
-      this.input.isDown('useAbility'),
-    );
-
     if (slimePair.activeBody.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
       containmentLevel.requestOutOfBoundsFailure();
     }
@@ -406,6 +406,7 @@ export class GreyboxLevelRuntime {
 
     containmentLevel.setActiveBody(activeBody);
     containmentLevel.update(deltaSeconds);
+    this.syncContextualCamera(resources);
     if (!deathSequence.isPlaying) {
       this.updateDeathState(deltaSeconds, resources);
       return;
@@ -415,6 +416,14 @@ export class GreyboxLevelRuntime {
       this.input.releasePointerLock();
       this.host.dataset.gameState = 'level-completing';
     }
+
+    resources.acidProjectileSystem.update(deltaSeconds, {
+      aimHeld: this.input.isDown('aimAbility'),
+      firePressed: this.input.wasPressed('fireAbility'),
+      gameplayInputEnabled: this.input.enabled,
+      pointerLocked: this.input.pointerLocked,
+    });
+    resources.dissolveSystem.update(deltaSeconds);
     resources.blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
@@ -542,6 +551,10 @@ export class GreyboxLevelRuntime {
 
     const collisionWorld = new CollisionWorld();
     collisionWorld.registerAll(testScene.collisionMeshes);
+    collisionWorld.registerAll(
+      testScene.cameraObstructionMeshes,
+      CollisionLayer.CameraObstruction,
+    );
     const surfaceRegistry = new SurfaceRegistry();
     surfaceRegistry.registerAll(testScene.collisionMeshes);
     const collisionOverlay = this.debugAvailable
@@ -614,10 +627,13 @@ export class GreyboxLevelRuntime {
       goopSpawnPosition,
     });
     const persistentBodies = [body, goopBody] as const;
-    const dissolveSystem = new DissolveSystem(
+    const dissolveSystem = new DissolveSystem(dissolveTargets);
+    const acidProjectileSystem = new AcidProjectileSystem({
       slimeManager,
-      dissolveTargets,
-    );
+      collisionWorld,
+      dissolveSystem,
+      aimRayProvider: this.renderLayer.cameraRig,
+    });
 
     const slimePairPresentation = new SlimePairPresentation(body.radiusMetres);
     this.renderLayer.scene.add(slimePairPresentation.root);
@@ -721,6 +737,7 @@ export class GreyboxLevelRuntime {
             containmentLevel.teleportToRoomForDebug(roomId);
             blobFacing.reset();
             testScene.setProbePosition(body.position);
+            this.syncContextualCamera(this.requireResources());
           },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
           onRunSlimeRosterRegression: runSlimeManagerRegression,
@@ -785,6 +802,7 @@ export class GreyboxLevelRuntime {
       dissolveTargets,
       dissolveSystem,
       collisionOverlay,
+      acidProjectileSystem,
       pressurePlateOccupants,
       deathSequence,
       deathScreen,
@@ -832,6 +850,7 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    this.requireResources().acidProjectileSystem.cancelAim();
     this.input.setEnabled(false);
   };
 
@@ -840,6 +859,8 @@ export class GreyboxLevelRuntime {
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
     resources.containmentLevel.reset();
     resources.puzzleRegistry.reset();
     resources.slimePair.restoreInitialState();
@@ -849,6 +870,7 @@ export class GreyboxLevelRuntime {
     resources.blobFacing.reset();
     this.renderLayer.cameraRig.reset();
     this.retargetCameraToActiveSlime(resources);
+    this.syncContextualCamera(resources);
     this.renderLayer.cameraRig.setGroundOrbitYawRadians(
       ROOM_ONE_INITIAL_CAMERA_YAW_RADIANS,
     );
@@ -885,6 +907,7 @@ export class GreyboxLevelRuntime {
     resources.movementEvents.clear();
     resources.containmentLevel.dispose();
     resources.pressurePlate.dispose();
+    resources.acidProjectileSystem.dispose();
     resources.dissolveSystem.dispose();
     for (const target of resources.dissolveTargets) target.dispose();
     resources.collisionOverlay?.dispose();
@@ -920,6 +943,8 @@ export class GreyboxLevelRuntime {
     resources: GreyboxRuntimeResources,
     recoverLevelCheckpoint: DeathRecoveryAction,
   ): void {
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
     resources.puzzleRegistry.resetGroup(DISSOLVE_PUZZLE_GROUP_ID);
     recoverLevelCheckpoint();
     resources.slimePair.captureCurrentRecoveryState();
@@ -935,6 +960,7 @@ export class GreyboxLevelRuntime {
     const previousSlimeId = resources.slimePair.activeSlimeId;
     if (!resources.slimePair.switchActive()) return false;
 
+    resources.acidProjectileSystem.cancelAim();
     this.input.resetState();
     resources.jumpInputState.pressed = false;
     resources.jumpInputState.held = false;
@@ -978,6 +1004,14 @@ export class GreyboxLevelRuntime {
     this.cameraFollowSlimeId = resources.slimePair.activeSlimeId;
   }
 
+  private syncContextualCamera(resources: GreyboxRuntimeResources): void {
+    this.renderLayer.cameraRig.setContextualCamera(
+      resources.testScene.roomFour.resolveLiftCamera(
+        resources.slimePair.activeBody,
+      ),
+    );
+  }
+
   private requestPlayerDeath(
     recovery: DeathRecoveryAction,
     resources: GreyboxRuntimeResources,
@@ -993,6 +1027,7 @@ export class GreyboxLevelRuntime {
 
     this.lastDeathSlimeId = dyingSlimeId;
 
+    resources.acidProjectileSystem.cancelAim();
     this.input.setEnabled(false);
     this.input.releasePointerLock();
     this.host.dataset.gameState = resources.deathSequence.state;
@@ -1008,6 +1043,7 @@ export class GreyboxLevelRuntime {
     // restore a different active slime than the one that died. Camera ownership
     // must follow that restored active identity before gameplay resumes.
     this.retargetCameraToActiveSlime(resources);
+    this.syncContextualCamera(resources);
     this.notifySlimeHUD(undefined, true);
 
     // The teaching scene owns Bob's legacy visual; the two-body presentation
@@ -1152,6 +1188,7 @@ export class GreyboxLevelRuntime {
       slimePair,
       pressurePlate,
       dissolveSystem,
+      acidProjectileSystem,
       dissolveTargets,
       collisionOverlay,
     } = resources;
@@ -1163,7 +1200,6 @@ export class GreyboxLevelRuntime {
     const renderStats = this.renderLayer.getDiagnostics();
     const slimeDiagnostics = testScene.slimeDiagnostics;
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
-    const cameraPosition = this.renderLayer.cameraRig.camera.position;
     const deathStats = deathSequence.diagnostics;
     const burstStats = testScene.deathBurstDiagnostics;
     const slimeManagerStats = slimeManager.getDiagnostics();
@@ -1172,6 +1208,7 @@ export class GreyboxLevelRuntime {
     const goopDefinition = slimeManager.getDefinition('goop');
     const voltDefinition = slimeManager.getDefinition('volt');
     const dissolveStats = dissolveSystem.getDiagnostics();
+    const acidStats = acidProjectileSystem.getDiagnostics();
     const primaryDissolveTarget = dissolveTargets[0];
 
     testPanel.setRuntimeDiagnostics(
@@ -1203,8 +1240,12 @@ export class GreyboxLevelRuntime {
         `Bob abilities adhesion / rebound / dissolve / electrical: ${bobDefinition.abilities.adhesion ? 'yes' : 'no'} / ${bobDefinition.abilities.rebound ? 'yes' : 'no'} / ${bobDefinition.abilities.dissolve ? 'yes' : 'no'} / ${bobDefinition.abilities.electrical ? 'yes' : 'no'}`,
         `Bob / Goop jump mode: ${bobDefinition.jumpMode} / ${goopDefinition.jumpMode}`,
         `Goop abilities adhesion / rebound / dissolve / electrical: ${goopDefinition.abilities.adhesion ? 'yes' : 'no'} / ${goopDefinition.abilities.rebound ? 'yes' : 'no'} / ${goopDefinition.abilities.dissolve ? 'yes' : 'no'} / ${goopDefinition.abilities.electrical ? 'yes' : 'no'}`,
-        `dissolve action / permitted: E / ${dissolveStats.permitted ? 'yes' : 'no'}`,
-        `dissolve contact / active: ${dissolveStats.contactTargetId} / ${dissolveStats.activeTargetId}`,
+        `acid aim / target / candidates / probes: ${acidStats.aimActive ? 'active' : 'inactive'} / ${acidStats.targetedSolubleId} / ${acidStats.visibleTargetCount} / ${acidStats.visibilityProbeCount}`,
+        `acid projectiles live / fired: ${acidStats.liveProjectileCount} / ${acidStats.firedCount}`,
+        `acid impacts soluble / world: ${acidStats.solubleImpactCount} / ${acidStats.worldImpactCount}`,
+        `acid cooldown remaining: ${acidStats.cooldownRemainingSeconds.toFixed(2)} s`,
+        `dissolve burns active / completed / reset: ${dissolveStats.activeBurnCount} / ${dissolveStats.completedBurnCount} / ${dissolveStats.resetBurnCount}`,
+        `dissolve burn targets: ${dissolveStats.activeBurnTargetIds.join(', ') || 'none'}`,
         `dissolve progress: ${(primaryDissolveTarget.progress * 100).toFixed(0)}%`,
         `dissolve collision / completed: ${primaryDissolveTarget.collisionEnabled ? 'yes' : 'no'} / ${primaryDissolveTarget.completed ? 'yes' : 'no'}`,
         `dissolve threshold / duration: ${(primaryDissolveTarget.collisionDisableProgress * 100).toFixed(0)}% / ${primaryDissolveTarget.dissolveDurationSeconds.toFixed(2)} s`,
@@ -1238,9 +1279,14 @@ export class GreyboxLevelRuntime {
         `last collision: ${activeBody.lastCollisionName}`,
         `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
         `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
-        `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
-        `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
-        `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
+        `camera profile / blend: ${cameraStats.profileId} / ${(cameraStats.profileBlend * 100).toFixed(0)}%`,
+        `lift state / progress / arrival camera: ${testScene.roomFour.elevator.state} / ${(testScene.roomFour.elevator.ascentProgress * 100).toFixed(1)}% / ${(testScene.roomFour.liftCameraArrivalBlend * 100).toFixed(1)}%`,
+        `camera obstruction: ${cameraStats.obstructed ? `${cameraStats.obstructionName} @ ${cameraStats.obstructionDistanceMetres?.toFixed(2)} m` : 'none'}`,
+        `camera collision radius: ${cameraStats.obstructionRadiusMetres.toFixed(2)} m`,
+        `camera focus: ${cameraStats.focusPosition.x.toFixed(2)}, ${cameraStats.focusPosition.y.toFixed(2)}, ${cameraStats.focusPosition.z.toFixed(2)} m`,
+        `camera preferred: ${cameraStats.preferredCameraPosition.x.toFixed(2)}, ${cameraStats.preferredCameraPosition.y.toFixed(2)}, ${cameraStats.preferredCameraPosition.z.toFixed(2)} m`,
+        `camera resolved: ${cameraStats.resolvedCameraPosition.x.toFixed(2)}, ${cameraStats.resolvedCameraPosition.y.toFixed(2)}, ${cameraStats.resolvedCameraPosition.z.toFixed(2)} m`,
+        `camera pitch manual / effective: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}° / ${THREE.MathUtils.radToDeg(cameraStats.effectivePitchRadians).toFixed(1)}°`,
         `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
         `teaching-surface regression: ${this.slopeRegressionStatus}`,
         `two-body switching regression: ${this.twoBodySwitchingRegressionStatus}`,

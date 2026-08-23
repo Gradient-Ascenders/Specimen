@@ -17,6 +17,12 @@ export interface MovingPlatformEvents {
   };
 }
 
+export interface ReadonlyMovingPlatformVector3 {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
 export interface MovingPlatformOptions {
   readonly id: string;
   readonly start: THREE.Vector3;
@@ -51,7 +57,7 @@ export class MovingPlatform {
   private readonly travelDurationSecondsValue: number;
   private readonly initialProgressValue: number;
   private readonly initialTargetEnd: boolean;
-  private readonly previousPosition = new THREE.Vector3();
+  private readonly previousPositionValue = new THREE.Vector3();
   private progressValue = 0;
   private targetEnd = false;
   private state: MovingPlatformState = 'atStart';
@@ -117,12 +123,22 @@ export class MovingPlatform {
       this.endValue,
       this.progressValue,
     );
-    this.previousPosition.copy(this.root.position);
+    this.previousPositionValue.copy(this.root.position);
     this.state = this.resolveState();
   }
 
   get platformState(): MovingPlatformState {
     return this.state;
+  }
+
+  /** Current route pose for read-only render interpolation consumers. */
+  get position(): ReadonlyMovingPlatformVector3 {
+    return this.root.position;
+  }
+
+  /** Fixed-step start pose paired with `position`. */
+  get previousPosition(): ReadonlyMovingPlatformVector3 {
+    return this.previousPositionValue;
   }
 
   get isAtEnd(): boolean {
@@ -167,7 +183,7 @@ export class MovingPlatform {
     }
 
     this.displacement.set(0, 0, 0);
-    this.previousPosition.copy(this.root.position);
+    this.previousPositionValue.copy(this.root.position);
 
     // Normalize tiny floating-point remainders even on the zero-delta
     // bookkeeping call used by ElevatorSequence. Without this, a route can
@@ -193,7 +209,7 @@ export class MovingPlatform {
     );
     this.displacement.subVectors(
       this.root.position,
-      this.previousPosition,
+      this.previousPositionValue,
     );
   }
 
@@ -205,7 +221,7 @@ export class MovingPlatform {
       this.endValue,
       this.progressValue,
     );
-    this.previousPosition.copy(this.root.position);
+    this.previousPositionValue.copy(this.root.position);
     this.displacement.set(0, 0, 0);
     this.setState(this.resolveState());
   }

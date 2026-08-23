@@ -6,11 +6,13 @@ import { Input, type InputAction } from '../src/core/Input.ts';
 function createInput(): {
   input: Input;
   hostWindow: EventTarget;
+  hostDocument: EventTarget & { pointerLockElement: EventTarget | null };
+  pointerLockElement: EventTarget;
 } {
   const hostWindow = new EventTarget();
   const hostDocument = Object.assign(new EventTarget(), {
     hidden: false,
-    pointerLockElement: null,
+    pointerLockElement: null as EventTarget | null,
     exitPointerLock: () => undefined,
   });
   const pointerLockElement = Object.assign(new EventTarget(), {
@@ -23,7 +25,7 @@ function createInput(): {
     window: hostWindow as unknown as Window,
   });
 
-  return { input, hostWindow };
+  return { input, hostWindow, hostDocument, pointerLockElement };
 }
 
 function dispatchKey(
@@ -102,4 +104,55 @@ test('focus clearing remains visible until the next fixed update', () => {
   assert.equal(input.wasClearedSinceFixedUpdate, false);
 
   input.dispose();
+});
+
+test('mouse ability actions require pointer lock and preserve press/hold state', () => {
+  const { input, hostWindow, hostDocument, pointerLockElement } = createInput();
+
+  const unlockedAim = new Event('mousedown');
+  Object.defineProperty(unlockedAim, 'button', { value: 2 });
+  hostWindow.dispatchEvent(unlockedAim);
+  assert.equal(input.isDown('aimAbility'), false);
+
+  hostDocument.pointerLockElement = pointerLockElement;
+  const aimDown = new Event('mousedown');
+  Object.defineProperty(aimDown, 'button', { value: 2 });
+  hostWindow.dispatchEvent(aimDown);
+  assert.equal(input.isDown('aimAbility'), true);
+  assert.equal(input.wasPressed('aimAbility'), true);
+
+  const fireDown = new Event('mousedown');
+  Object.defineProperty(fireDown, 'button', { value: 0 });
+  hostWindow.dispatchEvent(fireDown);
+  assert.equal(input.wasPressed('fireAbility'), true);
+
+  input.endFixedUpdate();
+  assert.equal(input.isDown('aimAbility'), true);
+  assert.equal(input.wasPressed('aimAbility'), false);
+  assert.equal(input.wasPressed('fireAbility'), false);
+
+  const aimUp = new Event('mouseup');
+  Object.defineProperty(aimUp, 'button', { value: 2 });
+  hostWindow.dispatchEvent(aimUp);
+  assert.equal(input.isDown('aimAbility'), false);
+  assert.equal(input.wasReleased('aimAbility'), true);
+
+  input.dispose();
+});
+
+test('context menu prevention is scoped to the game canvas boundary', () => {
+  const { input, hostWindow, pointerLockElement } = createInput();
+  const canvasContextMenu = new Event('contextmenu', { cancelable: true });
+  const windowContextMenu = new Event('contextmenu', { cancelable: true });
+
+  pointerLockElement.dispatchEvent(canvasContextMenu);
+  hostWindow.dispatchEvent(windowContextMenu);
+
+  assert.equal(canvasContextMenu.defaultPrevented, true);
+  assert.equal(windowContextMenu.defaultPrevented, false);
+
+  input.dispose();
+  const afterDispose = new Event('contextmenu', { cancelable: true });
+  pointerLockElement.dispatchEvent(afterDispose);
+  assert.equal(afterDispose.defaultPrevented, false);
 });

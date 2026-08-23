@@ -12,7 +12,11 @@ import {
   ContainmentLevelScene,
   type ContainmentHazardFailure,
 } from '../src/levels/ContainmentLevelScene.ts';
-import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
+import {
+  CollisionHit,
+  CollisionLayer,
+  CollisionWorld,
+} from '../src/physics/CollisionWorld.ts';
 import type { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { CameraRig } from '../src/render/CameraRig.ts';
 import { DeathSequence } from '../src/systems/DeathSequence.ts';
@@ -61,6 +65,8 @@ test('complete Containment scene exposes unique, consistently tagged colliders',
   assert.ok(names.includes('room-3-first-static-laser-beam-proxy') === false);
   assert.ok(names.includes('room-3-acid-floor'));
   assert.ok(names.includes('room-4-cargo-elevator-moving-platform-surface'));
+  assert.ok(names.includes('room-2-ceiling'));
+  assert.ok(names.includes('room-4-shaft-ceiling'));
   assert.ok(names.includes('room-5-containment-glass'));
   assert.ok(names.includes('room-5-goop-wooden-door'));
   assert.ok(names.includes('room-5-observation-sticky-lever-handle'));
@@ -253,6 +259,13 @@ test('Room 5 remains at its authored start until its first active fixed step', (
 
   // The entry step establishes room/checkpoint ownership without consuming
   // any Room 5 simulation time.
+  scene.roomFour.elevator.begin();
+  scene.roomFour.elevator.update(
+    scene.roomFour.elevator.startDelaySeconds +
+      scene.roomFour.elevator.travelDurationSeconds +
+      scene.roomFour.elevator.arrivalDelaySeconds,
+    [],
+  );
   fakeBody.position.copy(scene.roomFive.entryCheckpointTrigger.centre);
   controller.update(0.5);
   assert.equal(controller.activeRoomId, 5);
@@ -384,6 +397,136 @@ test('authored vent zones use tight framing and Room 1 opens toward the route', 
   scene.dispose();
 });
 
+test('Room 2 ceiling contains a maximum-distance high-pitch camera', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const world = new CollisionWorld();
+  world.registerAll(scene.collisionMeshes);
+  const position = new THREE.Vector3(0, 11.36, 40);
+  const rig = new CameraRig({
+    initialPitchRadians: THREE.MathUtils.degToRad(65),
+  });
+  rig.setFollowTarget(
+    {
+      position,
+      previousPosition: position,
+      velocity: new THREE.Vector3(),
+      gameplayUp: new THREE.Vector3(0, 1, 0),
+      grounded: true,
+      attached: false,
+    },
+    world,
+  );
+  rig.setFollowDistanceMetres(7);
+  rig.setGroundOrbitYawRadians(Math.PI * 0.5);
+  rig.update(1, 1 / 60);
+
+  const diagnostics = rig.getDiagnostics();
+  assert.equal(diagnostics.obstructionName, 'room-2-ceiling');
+  assert.ok(diagnostics.preferredCameraPosition.y > 18);
+  assert.ok(diagnostics.resolvedCameraPosition.y < 18);
+
+  world.clear();
+  scene.dispose();
+});
+
+test('Room 4 camera cap is camera-only and compact arrival framing stays inside the shaft', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const cap = scene.cameraObstructionMeshes.find(
+    (mesh) => mesh.name === 'room-4-upper-camera-cap',
+  );
+  assert.ok(cap);
+  assert.equal(scene.collisionMeshes.includes(cap), false);
+  assert.equal(cap.visible, true);
+  assert.equal((cap.material as THREE.Material).visible, false);
+  // The production Room 4 art replaces the greybox elevator top frame. The
+  // dedicated invisible cap remains the authoritative camera-only blocker.
+  assert.equal(
+    scene.cameraObstructionMeshes.some(
+      (mesh) => mesh.name === 'room-4-cargo-elevator-shaft-top-frame',
+    ),
+    false,
+  );
+
+  const cameraOnlyWorld = new CollisionWorld();
+  cameraOnlyWorld.register(cap, CollisionLayer.CameraObstruction);
+  const hit = new CollisionHit();
+  const origin = new THREE.Vector3(9, 75, 85.5);
+  const upward = new THREE.Vector3(0, 6, 0);
+  assert.equal(
+    cameraOnlyWorld.sweepSphere(
+      origin,
+      upward,
+      0.22,
+      hit,
+      CollisionLayer.CameraObstruction,
+    ),
+    true,
+  );
+  assert.equal(hit.object, cap);
+  assert.equal(
+    cameraOnlyWorld.sweepSphere(
+      origin,
+      upward,
+      0.45,
+      hit,
+      CollisionLayer.Movement,
+    ),
+    false,
+  );
+
+  const world = new CollisionWorld();
+  world.registerAll(scene.collisionMeshes);
+  world.registerAll(
+    scene.cameraObstructionMeshes,
+    CollisionLayer.CameraObstruction,
+  );
+  scene.roomFour.elevator.begin();
+  scene.roomFour.elevator.update(
+    scene.roomFour.elevator.startDelaySeconds +
+      scene.roomFour.elevator.travelDurationSeconds,
+    [],
+  );
+  assert.equal(scene.roomFour.elevator.state, 'arrivalPause');
+
+  const position = new THREE.Vector3(9, 75.21, 85.5);
+  const rig = new CameraRig();
+  rig.setFollowTarget(
+    {
+      position,
+      previousPosition: position,
+      velocity: new THREE.Vector3(),
+      gameplayUp: new THREE.Vector3(0, 1, 0),
+      grounded: true,
+      attached: false,
+    },
+    world,
+  );
+  const context = scene.roomFour.resolveLiftCamera({
+    position,
+    radiusMetres: 0.45,
+  });
+  assert.ok(context);
+  rig.setContextualCamera(context);
+
+  for (const yaw of [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5]) {
+    rig.setGroundOrbitYawRadians(yaw);
+    for (let step = 0; step < 90; step += 1) rig.update(1, 1 / 60);
+    const diagnostics = rig.getDiagnostics();
+    assert.equal(diagnostics.obstructed, false);
+    assert.ok(diagnostics.preferredCameraPosition.y < 78.1);
+    assert.ok(diagnostics.resolvedCameraPosition.y < 78.1);
+    assert.ok(diagnostics.resolvedCameraPosition.x > 2.7);
+    assert.ok(diagnostics.resolvedCameraPosition.x < 15.3);
+    assert.ok(diagnostics.resolvedCameraPosition.z > 79.7);
+    assert.ok(diagnostics.resolvedCameraPosition.z < 91.3);
+    assert.ok(rig.camera.position.toArray().every(Number.isFinite));
+  }
+
+  cameraOnlyWorld.clear();
+  world.clear();
+  scene.dispose();
+});
+
 test('Containment objectives follow room entry and reset to Room 1', () => {
   let controller: ContainmentLevelController;
   const scene = new ContainmentLevelScene(
@@ -418,6 +561,15 @@ test('Containment objectives follow room entry and reset to Room 1', () => {
     [5, scene.roomFive.entryCheckpointTrigger.centre],
   ];
   for (const [roomId, position] of roomEntries) {
+    if (roomId === 5) {
+      scene.roomFour.elevator.begin();
+      scene.roomFour.elevator.update(
+        scene.roomFour.elevator.startDelaySeconds +
+          scene.roomFour.elevator.travelDurationSeconds +
+          scene.roomFour.elevator.arrivalDelaySeconds,
+        [],
+      );
+    }
     fakeBody.position.copy(position);
     controller.update(0.01);
     assert.equal(controller.activeRoomId, roomId);
@@ -652,7 +804,50 @@ test('elevator stopping activates the Room 5 entry checkpoint before the player 
   assert.equal(scene.roomFour.elevator.state, 'arrivalPause');
   assert.equal(scene.roomFour.elevator.ascentProgress, 1);
   assert.equal(controller.activeCheckpointId, 'containment-room-5-entry');
+  assert.equal(controller.activeRoomId, 4);
+
+  const exitLock = scene.roomFour.collisionMeshes.find(
+    (mesh) => mesh.name === 'room-4-exit-lock',
+  );
+  assert.ok(exitLock);
+  assert.equal(exitLock.visible, true);
+  const exitSweep = new CollisionHit();
+  assert.equal(
+    collisionWorld.sweepSphere(
+      fakeBody.position,
+      new THREE.Vector3(0, 0, 8),
+      fakeBody.radiusMetres,
+      exitSweep,
+      CollisionLayer.Movement,
+    ),
+    true,
+  );
+  assert.equal(exitSweep.object?.name, 'room-4-exit-lock');
+
+  // Recovering at the upper checkpoint lands inside Room 5's entry trigger.
+  // That trigger must not steal simulation ownership while Room 4 still owns
+  // the arrival pause and closed shutter.
+  controller.recoverActiveCheckpoint();
+  assert.ok(fakeBody.position.equals(new THREE.Vector3(9, 75.21, 94)));
+  controller.update(0.01);
+  assert.equal(controller.activeRoomId, 4);
+  assert.equal(scene.roomFour.elevator.state, 'arrivalPause');
+  assert.equal(exitLock.visible, true);
+
+  controller.update(2);
+  assert.equal(scene.roomFour.elevator.state, 'exitReady');
+  assert.equal(exitLock.visible, false);
   assert.equal(controller.activeRoomId, 5);
+  assert.equal(
+    collisionWorld.sweepSphere(
+      new THREE.Vector3(9, 75.21, 85.5),
+      new THREE.Vector3(0, 0, 8),
+      fakeBody.radiusMetres,
+      exitSweep,
+      CollisionLayer.Movement,
+    ),
+    false,
+  );
 
   // A normal descent first exits and then re-enters the old Room 4 checkpoint
   // trigger. Forward-only progression must keep Room 5 authoritative.
