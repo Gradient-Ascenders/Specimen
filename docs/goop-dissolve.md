@@ -1,322 +1,246 @@
-# Goop reversible dissolve mechanic and rendering
+# Goop acid aim, projectiles, reversible burns, and rendering
 
-Issue #30 implements the corrosive ability using the current official slime
-names: **Goop** replaces the older issue wording "Etch", and **Bob** replaces
-"Tack". Issue #31 adds the gameplay-driven rendering described below without
-changing issue #30's ability, timing, collision, completion, or reset rules.
+Issues #30, #31, and #91 share one dissolve authority. Issue #30 introduced
+authored, reset-safe `DissolveTarget` progress, Issue #31 made that progress
+drive the dissolve shader, and Issue #91 replaces the development-only
+contact/hold activation with Goop's ranged acid interaction.
 
-## Authoring contract
+## Controls and ability gate
 
-Geometry is soluble only when explicitly marked:
+The named gameplay actions are:
 
 ```text
-mesh.userData.soluble = true
+aimAbility  -> hold Right Mouse Button
+fireAbility -> press Left Mouse Button while aiming
 ```
 
-The current development barrier additionally authors:
+Mouse actions are accepted only while the game canvas owns pointer lock. The
+canvas alone suppresses the browser context menu. `Input` remains the sole
+browser-event owner; gameplay code never reads raw mouse events.
+
+Aim mode requires all of the following:
 
 ```text
-dissolveDurationSeconds = 1.8
-dissolveCollisionDisableProgress = 0.72
-dissolveActivationRangeMetres = 0.12
-```
-
-Unmarked geometry is never inserted into the dissolve runtime. Ordinary
-`default`, `sticky`, `nonStick`, and `bouncy` surfaces therefore remain
-unaffected.
-
-The current authored targets are the Room 1 orange development barrier and the
-Room 5 Goop wooden door. Room 5 includes three authored point lights; because
-the dissolve surface retains `MeshStandardMaterial`, that door responds to
-those lights instead of switching to an inspection-rig approximation.
-
-## Control and ability gate
-
-The named gameplay action is:
-
-```text
-useAbility → E
-```
-
-Dissolve requires all of the following:
-
-```text
-active slime is available
+normal gameplay accepts input
+        +
+the canvas owns pointer lock
+        +
+Goop is active, unlocked, and registered
         +
 SlimeManager permits `dissolve`
         +
-active body is in range of an authored soluble target
-        +
-E is held
+Right Mouse Button is held
 ```
 
-Bob's roster configuration has `dissolve = false`, so the manager blocks the
-ability callback even when Bob is physically touching the same target.
+Bob's roster configuration has `dissolve = false`, so Bob cannot enter aim mode
+or fire acid. Movement and normal jumping remain available while Goop aims.
 
-Goop keeps the movement limitations established previously:
+## Soluble authoring
+
+Only explicit gameplay metadata creates a target:
 
 ```text
-adhesion = false
-rebound = false
-jump mode = normal
-dissolve = true
+mesh.userData.soluble = true
+mesh.userData.solubleId = "stable-authored-id"
+mesh.userData.dissolveDurationSeconds = 1.8
+mesh.userData.dissolveCollisionDisableProgress = 0.72
 ```
 
-## Progress and interruption
+Names, colours, textures, and materials do not grant eligibility. Unmarked
+`default`, `sticky`, `nonStick`, and `bouncy` geometry remains immune. The old
+`dissolveActivationRangeMetres` metadata is retained for compatibility with the
+original target contract but no longer starts production corrosion.
 
-Progress is deterministic fixed-step state:
+The current authored targets are the Room 1 orange development barrier and the
+Room 5 Goop wooden door. Room 5 includes authored point lights, and the target's
+derived `MeshStandardMaterial` continues to respond to the real scene lighting.
+
+## Camera targeting and launch safety
+
+The active `CameraRig` copies its live centre-crosshair ray into caller-owned
+vectors. `AcidProjectileSystem` sweeps a very small probe along that ray and
+clamps the aim point to the nearest camera-obstruction collider or the maximum
+range.
+
+This camera query is targeting data, not impact authority. Firing calculates a
+new direction from Goop's authoritative body position toward the clamped aim
+point. Before a projectile becomes live, the system sweeps from Goop's centre
+to a launch point outside the body radius. An obstruction in that short launch
+segment wins immediately, so an offset camera cannot shoot through a wall near
+Goop.
+
+Firing into empty space is valid. The projectile expires at its range or
+lifetime limit.
+
+## Central tuning
+
+The initial playtest defaults are held in
+`DEFAULT_ACID_PROJECTILE_CONFIG`:
+
+| Setting | Default |
+| --- | ---: |
+| Maximum range | `16 m` |
+| Projectile speed | `18 m/s` |
+| Collision radius | `0.10 m` |
+| Lifetime | `1.10 s` |
+| Fire cooldown | `0.45 s` |
+| Launch clearance | `0.02 m` |
+| Maximum live projectiles | `8` |
+| Maximum visible target IDs | `16` |
+
+These values are data, not assumptions embedded in targeting or presentation.
+
+## Projectile collision
+
+Projectiles run on the existing `1 / 60 s` fixed step. Each movement segment is
+a `CollisionWorld.sweepSphere` query against the movement collision layer. The
+nearest registered box collider therefore wins even when the projectile would
+cross a thin target in one update.
+
+- Registered walls, floors, platforms, glass, and other ordinary objects stop
+  the projectile harmlessly.
+- A hit starts a burn only when its exact mesh maps to a registered
+  `DissolveTarget`.
+- Slime bodies are not part of the authored world-collider registry, so acid
+  does not interact with Bob or Goop.
+- Lasers do not participate in projectile collision.
+- There is no ricochet, penetration, homing, ammo, reload, or damage.
+- A fixed pool caps live projectile state. No geometry or material is allocated
+  by gameplay firing.
+
+## Burn coordination
+
+`DissolveSystem` is the non-stacking fixed-step burn coordinator. A valid
+projectile hit calls `startBurn(target)` once. Accepted targets continue burning
+after aim release or slime switching:
 
 ```text
 progress += fixedDelta / dissolveDuration
 ```
 
-It is clamped to `[0, 1]`.
+A second hit returns `already-burning` and may produce a secondary presentation
+impact, but it never adds another progress update. A target with partial
+authoritative progress continues from that progress. Completed targets reject
+new burn work.
 
-If E is released or Goop switches away before completion, progress pauses at
-its current value. It does not automatically rebuild during ordinary gameplay.
-
-When E is held continuously, an activation that already started may continue
-through the collision-disable threshold even though the collider itself is no
-longer present.
-
-## Gameplay/render boundary
-
-`DissolveTarget.progress` is the single source of truth.
+`DissolveTarget.progress` remains the only threshold authority:
 
 ```text
-0% ------------------ 72% ------------------ 100%
-intact shader mask      collision off          completed
-collision on                                   invisible
+0% ------------------ authored threshold ------------------ 100%
+intact shader mask       collision off                        completed, hidden
+collision on
 ```
 
-Every fixed-step gameplay change calls the target's existing presentation
-boundary. That boundary copies the already-bounded progress into one shared
-`uDissolveAmount` uniform object used by the target's visible, depth, and point
+At the threshold the target unregisters from both `CollisionWorld` and
+`SurfaceRegistry`. Projectile code never edits material, visibility, shader
+state, or collision registration directly.
+
+## Dissolve rendering
+
+Every accepted fixed-step progress change copies the bounded value into the
+shared `uDissolveAmount` uniform used by the target's visible, depth, and point
 light distance materials. Rendering never advances, eases, or reconstructs
-progress. When input is interrupted, gameplay stops calling `advance()`, so the
-uniform and procedural cutout remain at exactly the same partial state.
-
-At the authored threshold the target is unregistered from both
-`CollisionWorld` and `SurfaceRegistry`.
-
-At completion:
-
-```text
-progress = 1
-collision = disabled
-visible = false
-completed = true
-```
-
-No vertex data, imported asset geometry, or destructive mesh data is changed.
-
-## Dissolve shader
+gameplay progress.
 
 `DissolveMaterial` extends Three.js's `MeshStandardMaterial` shader through
-`onBeforeCompile`. It first copies the explicitly authored standard material,
-then inserts only the dissolve coordinates, threshold, and edge. Three.js keeps
-evaluating the room's actual directional, hemisphere, point, and spot lights as
-well as the authored roughness, metalness, maps, fog, and tone mapping. At
-`uDissolveAmount = 0`, the edge is inactive and the discard guard is inactive,
-so the retained surface has the source material's standard-lighting response.
-
-The vertex insertion passes Three.js's transformed target-local position to the
-fragment stage after morph, skin, and displacement chunks and before projection.
-Target-local position keeps corrosion fixed to the authored object when the
-object or camera moves, without requiring a world-normal approximation.
-
-The fragment stage evaluates stable three-dimensional value noise. A small
-hash creates values at lattice corners, cubic interpolation joins each cell,
-and three fixed-frequency layers provide broad holes plus finer corrosion. A
-deterministic offset derived from the target ID varies the pattern between
-targets. There is no time input in the threshold path.
+`onBeforeCompile`. It preserves the authored material's lighting, roughness,
+metalness, maps, fog, and tone mapping, while adding only the target-local
+dissolve coordinates, threshold, and emissive edge. Stable three-dimensional
+value noise creates the cutout; a deterministic target-ID offset gives separate
+targets distinct patterns without runtime randomness or a time input.
 
 ```text
-target-local position
-        + deterministic target offset
-        ↓
-three-layer value noise → mask in [0, 1]
-        ↓
-discard when mask <= uDissolveAmount
-        ↓
-kept fragments within uDissolveEdgeWidth of the threshold receive emissive edge colour
+target-local position + deterministic target offset
+        -> three-layer value noise
+        -> discard when mask <= uDissolveAmount
+        -> emissive edge immediately above the threshold
 ```
 
-A strict zero-progress guard prevents even a rare zero-valued mask sample from
-being discarded after reset. At completion the existing gameplay code clamps
-progress to `1` and hides the mesh. The bright green-white band is added to
-Three.js's `totalEmissiveRadiance` after the source emissive map is evaluated,
-so it remains legible in dim Cultivation conditions without replacing the
-surface's real scene-light response.
+A strict zero-progress guard leaves the source surface intact after reset. The
+surface remains opaque with depth writes enabled, so discarded fragments create
+real depth holes without transparent sorting artefacts. Matching
+`MeshDepthMaterial` and `MeshDistanceMaterial` shaders use the same mask and
+uniform object, preventing an intact shadow after the visible surface has
+dissolved.
 
-### Uniform contract
+The integration supports explicitly-authored static `Mesh` geometry using
+`MeshStandardMaterial`. Unsupported material families fail authoring instead of
+silently changing their lighting model. Each target owns its derived surface,
+depth, and distance materials, borrows source textures, and restores the
+original material hooks on disposal.
 
-| Uniform | Source | Purpose |
-| --- | --- | --- |
-| `uDissolveAmount` | `DissolveTarget.progress`, `[0, 1]` | Sole threshold authority; zero is intact and one is complete. |
-| `uNoiseScale` | material constant, target-local inverse metres | Sets corrosion feature size without a texture. |
-| `uNoiseOffset` | deterministic hash of target ID | Gives targets stable, distinct masks without random runtime state. |
-| `uDissolveEdgeWidth` | material constant in mask units | Width of the visible band immediately above the discard threshold. |
-| `uDissolveEdgeColour` | material constant | High-contrast corrosion boundary. |
+## Presentation contracts
 
-The current integration supports explicitly authored static `Mesh` geometry
-whose slots use `MeshStandardMaterial`. Each private dissolve material copies
-the complete source standard-material contract, including colour, opacity,
-roughness, metalness, emissive response, supported texture maps, side, depth,
-fog, and clipping properties. Other material families are rejected with an
-authoring error instead of silently changing their lighting model.
+Continuous state is read directly from stable, bounded projections:
 
-## Depth and shadows
+- `aimReadModel`: active state, camera origin/direction, clamped point, maximum
+  range, selected soluble ID, visible/in-range soluble IDs, firing readiness,
+  and cooldown state;
+- `projectileStates`: a fixed pool containing active flag, current/previous
+  position, and direction for interpolation;
+- `DissolveTarget.progress` and render diagnostics: the authoritative burn and
+  synchronized shader state.
 
-The current renderer has shadow maps disabled and the Room 1 proof target does
-not set `castShadow`, so it does not presently participate in a shadow pass.
-Each target nevertheless installs both a `MeshDepthMaterial` and a
-`MeshDistanceMaterial` through Three.js's `customDepthMaterial` and
-`customDistanceMaterial` hooks. Their compiled fragment shaders use the same
-noise function, offset, scale, and `uDissolveAmount` object as the visible
-material, then discard the same fragments. They also borrow relevant authored
-alpha/displacement maps and clipping settings. This covers directional/spot
-shadow maps and point-light distance maps if a later authored target enables
-shadows; it cannot cast an obviously intact shadow after its visible surface
-has holes.
+Discrete typed events cover:
 
-The visible material stays opaque with depth writes enabled for the current
-opaque barrier. Fragment discard therefore produces correct holes in the main
-depth buffer without the sorting and depth artefacts of the previous fade.
+- aim entered/exited;
+- projectile fired;
+- soluble or world impact;
+- burn started, completed, or reset;
+- target collision changes and completion.
 
-## Completion events
+These are presentation/audio inputs for #92 and #37. They cannot change target
+eligibility, collision results, or dissolve progress.
 
-Each target exposes typed discrete events:
+## Reset and lifecycle
+
+- Switching away from Goop cancels aim immediately; fired projectiles and burns
+  continue.
+- Pause and pointer-lock loss cancel aim. A stopped level freezes fixed-step
+  projectiles and burns until gameplay resumes.
+- Death cancels aim and disables input. Retry clears projectiles and active
+  burns before the puzzle group restores its targets and then recovers both
+  slime bodies.
+- Whole-level restart clears aim, projectiles, cooldown, and burns before
+  `PuzzleRegistry` restores every target.
+- Unload disposes projectile/burn events and references before targets and world
+  collision are disposed.
+
+The reset order is intentionally:
 
 ```text
-collisionChanged
-completed
+clear aim and live projectiles
+        -> cancel active burns
+        -> reset DissolveTarget puzzle state
+        -> recover Bob and Goop
 ```
 
-`completed` fires once when a cycle reaches 100%. Reset re-arms the target for
-a later completion cycle.
+Reset restores the same authored mesh with zero progress, collision enabled,
+authored visibility, and `uDissolveAmount = 0`. It does not recreate geometry,
+materials, or textures. Repeated lifecycle cycles retain no listeners,
+projectile systems, burns, or target registrations from an old level instance.
 
-## Reset/checkpoint contract
+## Verification diagnostics
 
-`DissolveTarget` implements the existing puzzle `reset()` contract and is
-registered in `PuzzleRegistry`.
+The F2 panel reports aim state, targeted/candidate IDs, live/fired projectiles,
+impact counts, cooldown, active burn IDs, progress, collision, completion, and
+reset counts. The **Check Goop dissolve** regression verifies non-stacking burn
+progress, authored eligibility, collision synchronisation, and repeated reset.
 
-Reset restores the same authored mesh:
+Automated target tests additionally cover visible/depth/distance progress
+synchronisation, partial-state hold, completion, repeated resets, independent
+multi-target uniforms and seeds, shadow-discard injection, and idempotent
+disposal.
 
-```text
-progress = 0
-completed = false
-visible = true
-collision = registered
-uDissolveAmount = 0
-```
+Historical Issue #31 visual evidence remains in `docs/evidence/`:
 
-The zero uniform restores the intact pattern immediately. No material,
-geometry, texture, or mesh is recreated during reset, and no stale partial
-threshold can survive into the next cycle.
-
-The current two-body recovery helper performs:
-
-```text
-reset active dissolve puzzle group
-        ↓
-restore Bob + Goop recovery state
-```
-
-This follows the existing checkpoint ordering where puzzle-group reset occurs
-before recovery-target placement. No browser reload or second game-wide restart
-path is introduced.
-
-## Development proof
-
-Room 1 contains one orange/brown explicitly-soluble barrier near the two-body
-development area.
-
-To inspect:
-
-1. Switch to **Bob** and walk into the marked barrier.
-2. Hold **E**. Progress must remain `0%`.
-3. Switch to **Goop**.
-4. Touch the barrier and hold **E**.
-5. Release E partway through; progress must remain at the partial value.
-6. Hold E again.
-7. At `72%`, diagnostics must report collision disabled.
-8. Continue holding to `100%`; the barrier must become invisible/completed.
-9. Restart or trigger recovery; the same barrier must immediately return with
-   progress `0%` and collision enabled.
-
-F2 diagnostics expose:
-
-```text
-dissolve action / permitted
-dissolve contact / active target
-dissolve progress
-dissolve collision / completed
-dissolve threshold / duration
-dissolve completions
-```
-
-The **Check Goop dissolve** regression verifies:
-
-- Bob cannot progress the target;
-- Goop can partially dissolve;
-- interrupted progress is retained;
-- all four existing non-soluble surface classes remain rejected;
-- collision flips on the authored progress threshold;
-- completion hides the target and emits once;
-- reset restores the same mesh without reload;
-- five repeated complete/reset cycles remain deterministic.
-
-Expected result:
-
-```text
-Goop dissolve: PASS — Bob rejected — Goop partial/interrupted/complete — 4 non-soluble surface classes rejected — collision threshold synchronized — 5 repeated reset cycles
-```
-
-`tests/DissolveTarget.test.ts` additionally verifies the deterministic render
-contract: visible/depth/distance progress synchronisation, partial-state hold,
-resume, completion, five repeated resets, independent multi-target uniforms
-and seeds, compatible shadow-discard injection, and idempotent disposal.
-
-## Ownership and lifecycle
-
-One `DissolveMaterialBundle` is created when `DissolveTarget` wraps an authored
-mesh. It owns one `DissolveMaterial` per authored material slot plus one depth
-and one distance material. The original surface and any pre-existing custom
-depth/distance materials remain borrowed and are restored by `dispose()`.
-
-Copied surface materials and shadow materials borrow source textures; they do
-not clone or own those textures. Bundle disposal therefore releases only its
-owned material/program resources, while the level remains responsible for the
-source material, geometry, and textures.
-
-Fixed-step updates mutate one scalar uniform; they do not set `needsUpdate` or
-allocate render resources. Reset reuses the same bundle. Disposal releases all
-bundle-owned materials once. Geometry and source-material disposal remain with
-the level scene that originally authored them.
-
-## Visual evidence
-
-- [`issue-31-partial.png`](evidence/issue-31-partial.png) shows a stable partial
-  cutout with the emissive corrosion band.
-- [`issue-31-complete.png`](evidence/issue-31-complete.png) shows the same route
-  after gameplay reaches completion.
-- [`issue-31-reset-restored.png`](evidence/issue-31-reset-restored.png) shows the
-  intact target after recovery reset.
-- [`issue-31-dissolve-reset.webm`](evidence/issue-31-dissolve-reset.webm)
-  records intact → partial → complete → reset in the live canvas.
+- `issue-31-partial.png` shows a stable partial cutout and corrosion band;
+- `issue-31-complete.png` shows the route after gameplay completion;
+- `issue-31-reset-restored.png` shows the intact target after reset;
+- `issue-31-dissolve-reset.webm` records intact, partial, complete, and reset.
 
 ## Deferred scope
 
-This issue does not implement:
-
-- dissolving arbitrary meshes;
-- destructive geometry mutation;
-- Bob dissolve access;
-- Goop adhesion/rebound;
-- dissolve audio;
-- unrelated Cultivation puzzle authoring.
-
-Future soluble-target authors can reuse the material contract without moving
-collision, ability gating, timing, completion, or reset authority into
-rendering.
+This feature does not implement arbitrary-mesh dissolution, destructive
+geometry mutation, Bob dissolve access, Goop adhesion/rebound, acid damage,
+ricochet, penetration, homing, ammo/reload, projectile presentation, or audio.
