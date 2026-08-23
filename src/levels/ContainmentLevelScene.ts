@@ -36,7 +36,7 @@ export class ContainmentLevelScene {
     this.root.name = 'containment-level-greybox';
     this.teaching = new ContainmentTeachingScene(this.artResources, options);
     this.roomThree = new RoomThreeGreybox(requestHazardFailure, this.artResources);
-    this.roomFour = new RoomFourGreybox(requestHazardFailure);
+    this.roomFour = new RoomFourGreybox(requestHazardFailure, this.artResources);
     this.roomFive = new RoomFiveGreybox(requestHazardFailure);
     this.root.add(
       this.teaching.root,

@@ -40,6 +40,11 @@ interface EmitterVisual {
   readonly inactiveIndicators: readonly THREE.Mesh[];
 }
 
+export interface LaserHazardPresentationOptions {
+  /** Scanner beams may terminate in open space without a second emitter. */
+  readonly showEndEmitters?: boolean;
+}
+
 /**
  * Presentation-only adapter for the deterministic laser runtime.
  *
@@ -51,6 +56,7 @@ export class LaserHazardPresentation {
   readonly root = new THREE.Group();
 
   private readonly visuals: readonly LaserVisual[];
+  private readonly showEndEmitters: boolean;
   private readonly segment = new THREE.Vector3();
   private readonly midpoint = new THREE.Vector3();
   private readonly direction = new THREE.Vector3();
@@ -119,9 +125,13 @@ export class LaserHazardPresentation {
     metalness: 0.28,
   });
 
-  constructor(hazards: readonly LaserHazard[]) {
+  constructor(
+    hazards: readonly LaserHazard[],
+    options: LaserHazardPresentationOptions = {},
+  ) {
     this.root.name = 'laser-hazard-presentation';
     this.root.userData.presentationOnly = true;
+    this.showEndEmitters = options.showEndEmitters ?? true;
     this.visuals = hazards.map((hazard) => this.createVisual(hazard));
     this.sync();
   }
@@ -289,7 +299,7 @@ export class LaserHazardPresentation {
     }
 
     visual.startEmitter.visible = hasLength;
-    visual.endEmitter.visible = hasLength;
+    visual.endEmitter.visible = hasLength && this.showEndEmitters;
     if (!hasLength) return;
 
     const beamLength = Math.sqrt(lengthSquared);

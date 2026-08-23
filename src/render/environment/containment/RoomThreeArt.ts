@@ -82,6 +82,7 @@ export class RoomThreeArt {
     this.buildLaserInfrastructure(hazards);
     this.buildCeilingInfrastructure();
     this.buildChemicalServiceRuns();
+    this.buildTransferDuct();
     this.buildTransitionsAndSignage();
   }
 
@@ -359,6 +360,99 @@ export class RoomThreeArt {
       graphite,
       [10, 15, 20, 25].flatMap((y) => runs.map((run) => ({ position: [-16.42, y, run.z], size: [0.5, 0.12, 0.5] }))),
     ));
+  }
+
+  /**
+   * Presentation skin for the authoritative Room 3-to-4 duct colliders.
+   *
+   * The greybox owns a complete floor, roof and two side walls from z=77 to
+   * z=80.8. Those meshes are collision-only in the art build, so this layer
+   * follows their inner faces and hands the clean Room 3 shell over to Room
+   * 4's darker service threshold without changing the playable opening.
+   */
+  private buildTransferDuct(): void {
+    const {
+      secondaryCeramic,
+      serviceMetal,
+      structuralSteel,
+      mechanicalBacking,
+      neutralFixture,
+    } = this.resources.materials;
+
+    this.root.add(
+      createChamferedBox(this.resources, {
+        name: 'room-3-to-4-duct-floor-clean-liner',
+        size: [2.32, 0.1, 1.25],
+        radius: 0.035,
+        position: [9, 31.185, 77.675],
+        material: secondaryCeramic,
+      }),
+      createChamferedBox(this.resources, {
+        name: 'room-3-to-4-duct-floor-service-liner',
+        size: [2.32, 0.1, 1.17],
+        radius: 0.035,
+        position: [9, 31.185, 78.895],
+        material: serviceMetal,
+      }),
+      createChamferedBox(this.resources, {
+        name: 'room-3-to-4-duct-ceiling-backing',
+        size: [2.31, 0.08, 3.7],
+        radius: 0.025,
+        position: [8.951, 33.405, 78.9],
+        material: mechanicalBacking,
+      }),
+      createInstancedChamferedBoxes(this.resources, {
+        name: 'room-3-to-4-duct-clean-side-liners',
+        size: [0.06, 2.12, 1.24],
+        radius: 0.025,
+        material: secondaryCeramic,
+        transforms: [7.95, 10.05].map((x) => ({
+          position: [x, 32.25, 77.67],
+        })),
+      }),
+      createInstancedChamferedBoxes(this.resources, {
+        name: 'room-3-to-4-duct-service-side-liners',
+        size: [0.06, 2.12, 2.24],
+        radius: 0.025,
+        material: serviceMetal,
+        transforms: [7.95, 10.05].map((x) => ({
+          position: [x, 32.25, 79.49],
+        })),
+      }),
+      createInstancedBoxes(
+        this.resources,
+        'room-3-to-4-duct-side-transition-seams',
+        structuralSteel,
+        [
+          { position: [7.995, 32.25, 78.33], size: [0.07, 2.12, 0.12] },
+          { position: [10.005, 32.25, 78.33], size: [0.07, 2.12, 0.12] },
+        ],
+      ),
+      createInstancedBoxes(
+        this.resources,
+        'room-3-to-4-duct-ceiling-service-ribs',
+        structuralSteel,
+        [77.45, 78.65, 79.85].map((z) => ({
+          position: [8.951, 33.34, z],
+          size: [2.28, 0.08, 0.14],
+        })),
+      ),
+      createRectangularFrame(this.resources, {
+        name: 'room-3-to-4-shaft-end-service-portal',
+        width: 2.64,
+        height: 2.58,
+        barWidth: 0.18,
+        depth: 0.16,
+        position: [9, 32.25, 79.56],
+        material: structuralSteel,
+      }),
+      createBorrowedBox(this.resources, {
+        name: 'room-3-to-4-duct-neutral-ceiling-diffuser',
+        size: [1.45, 0.035, 0.34],
+        position: [8.951, 33.35, 78.7],
+        material: neutralFixture,
+      }),
+    );
   }
 
   private buildTransitionsAndSignage(): void {

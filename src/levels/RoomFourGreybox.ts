@@ -6,6 +6,8 @@ import type { KinematicBody } from '../physics/KinematicBody.ts';
 import { ElevatorSequence } from '../puzzle/ElevatorSequence.ts';
 import { MovingPlatform } from '../puzzle/MovingPlatform.ts';
 import { ElevatorPresentation } from '../render/elevator/ElevatorPresentation.ts';
+import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import { RoomFourArt } from '../render/environment/containment/RoomFourArt.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import { LevelTriggerVolume } from './LevelTriggerVolume.ts';
@@ -54,14 +56,19 @@ export class RoomFourGreybox {
     size: new THREE.Vector3(15, 11, 15),
   });
   readonly lasers: LaserHazardSystem;
+  readonly art: RoomFourArt;
 
   private readonly laserPresentation: LaserHazardPresentation;
   private readonly elevatorPresentation: ElevatorPresentation;
   private readonly exitLock: THREE.Mesh;
 
-  constructor(requestFailure: (failure: RoomFourHazardFailure) => void) {
+  constructor(
+    requestFailure: (failure: RoomFourHazardFailure) => void,
+    artResources: ContainmentArtResources,
+  ) {
     this.buildShell();
     this.exitLock = this.buildExit();
+    this.hideGameplayColliders();
 
     this.root.add(this.elevator.root);
     this.collisionMeshes.push(this.elevatorPlatform.collisionMesh);
@@ -73,12 +80,16 @@ export class RoomFourGreybox {
       requestRecovery: (hazard) =>
         requestFailure({ roomId: 'room-4', hazardId: hazard.id }),
     });
-    this.laserPresentation = new LaserHazardPresentation(hazards);
+    this.laserPresentation = new LaserHazardPresentation(hazards, {
+      showEndEmitters: false,
+    });
     this.elevatorPresentation = new ElevatorPresentation(this.elevator);
+    this.art = new RoomFourArt(artResources, hazards);
     this.root.add(
       this.lasers.root,
       this.laserPresentation.root,
       this.elevatorPresentation.root,
+      this.art.root,
     );
     this.syncPresentation();
   }
@@ -118,6 +129,7 @@ export class RoomFourGreybox {
     this.checkpointTrigger.dispose();
     this.exitTrigger.dispose();
     this.failureVolume.dispose();
+    this.art.dispose();
     this.laserPresentation.dispose();
     this.elevatorPresentation.dispose();
     this.lasers.dispose();
@@ -149,6 +161,16 @@ export class RoomFourGreybox {
     this.builder.addLight('room-4-bottom-light', [9, 32, 85.5], 0xffb13b, 13, 18);
     this.builder.addLight('room-4-mid-light', [9, 52, 85.5], 0xff6b32, 12, 20);
     this.builder.addLight('room-4-top-light', [9, 74, 88], 0x8dffb8, 14, 20);
+  }
+
+  private hideGameplayColliders(): void {
+    for (const [role, material] of Object.entries(this.builder.materials)) {
+      material.name = `containment-room-4-${role}-collision-only`;
+      material.visible = false;
+    }
+    this.elevatorPlatform.collisionMesh.material.name =
+      'containment-room-4-elevator-roof-collision-only';
+    this.elevatorPlatform.collisionMesh.material.visible = false;
   }
 
   private buildExit(): THREE.Mesh {

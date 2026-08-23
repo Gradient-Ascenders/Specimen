@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 import type {
   ElevatorSequence,
@@ -147,9 +148,9 @@ export class ElevatorPresentation {
     const size = this.sequence.platform.size;
     const deckMaterial = this.material(
       new THREE.MeshStandardMaterial({
-        color: 0x343c42,
-        roughness: 0.58,
-        metalness: 0.68,
+        color: 0x929a9b,
+        roughness: 0.62,
+        metalness: 0.42,
       }),
     );
     const trimMaterial = this.material(
@@ -166,38 +167,145 @@ export class ElevatorPresentation {
         metalness: 0.62,
       }),
     );
+    const seamMaterial = this.material(
+      new THREE.MeshStandardMaterial({
+        color: 0x525a5c,
+        roughness: 0.68,
+        metalness: 0.38,
+      }),
+    );
 
-    const deck = this.box(
-      `${this.sequence.id}-industrial-roof`,
-      size.x + 0.08,
-      size.y + 0.04,
-      size.z + 0.08,
+    const deck = new THREE.Mesh(
+      this.geometry(
+        new RoundedBoxGeometry(
+          size.x + 0.08,
+          size.y + 0.04,
+          size.z + 0.08,
+          2,
+          0.08,
+        ),
+      ),
       deckMaterial,
     );
+    deck.name = `${this.sequence.id}-industrial-roof`;
+    deck.userData.presentationOnly = true;
     this.platformDecoration.add(deck);
 
     const roofY = size.y * 0.5 + 0.055;
-    for (const z of [-size.z * 0.5 + 0.1, size.z * 0.5 - 0.1]) {
+    for (const [index, [x, z, width, depth]] of [
+      [0, -size.z * 0.26, size.x * 0.72, 0.035],
+      [0, size.z * 0.26, size.x * 0.72, 0.035],
+      [-size.x * 0.26, 0, 0.035, size.z * 0.72],
+      [size.x * 0.26, 0, 0.035, size.z * 0.72],
+    ].entries()) {
+      const seam = this.box(
+        `${this.sequence.id}-deck-plate-seam-${index + 1}`,
+        width,
+        0.018,
+        depth,
+        seamMaterial,
+      );
+      seam.position.set(x, roofY + 0.01, z);
+      this.platformDecoration.add(seam);
+    }
+    for (const [index, [x, z, width, depth]] of [
+      [-size.x * 0.27, -size.z * 0.5 + 0.1, 1.05, 0.12],
+      [size.x * 0.27, size.z * 0.5 - 0.1, 1.05, 0.12],
+      [-size.x * 0.5 + 0.1, size.z * 0.27, 0.12, 1.05],
+      [size.x * 0.5 - 0.1, -size.z * 0.27, 0.12, 1.05],
+    ].entries()) {
       const trim = this.box(
-        `${this.sequence.id}-roof-warning-trim-x`,
-        size.x - 0.18,
-        0.07,
-        0.14,
+        `${this.sequence.id}-roof-sparse-warning-index-${index + 1}`,
+        width,
+        0.065,
+        depth,
         trimMaterial,
       );
-      trim.position.set(0, roofY, z);
+      trim.position.set(x, roofY, z);
       this.platformDecoration.add(trim);
     }
-    for (const x of [-size.x * 0.5 + 0.1, size.x * 0.5 - 0.1]) {
-      const trim = this.box(
-        `${this.sequence.id}-roof-warning-trim-z`,
-        0.14,
-        0.07,
-        size.z - 0.18,
+
+    const deckSeat = this.box(
+      `${this.sequence.id}-graphite-perimeter-seat`,
+      size.x + 0.18,
+      0.22,
+      size.z + 0.18,
+      darkMaterial,
+    );
+    deckSeat.position.y = -size.y * 0.5 - 0.08;
+    this.platformDecoration.add(deckSeat);
+
+    for (const z of [-size.z * 0.29, size.z * 0.29]) {
+      const beam = this.box(
+        `${this.sequence.id}-underside-longitudinal-load-frame`,
+        size.x * 0.82,
+        0.28,
+        0.28,
+        darkMaterial,
+      );
+      beam.position.set(0, -size.y * 0.5 - 0.34, z);
+      this.platformDecoration.add(beam);
+    }
+    for (const x of [-size.x * 0.29, size.x * 0.29]) {
+      const beam = this.box(
+        `${this.sequence.id}-underside-cross-member`,
+        0.28,
+        0.28,
+        size.z * 0.82,
+        darkMaterial,
+      );
+      beam.position.set(x, -size.y * 0.5 - 0.34, 0);
+      this.platformDecoration.add(beam);
+    }
+    const motorHousing = this.box(
+      `${this.sequence.id}-underside-actuator-motor-housing`,
+      size.x * 0.42,
+      0.72,
+      size.z * 0.34,
+      darkMaterial,
+    );
+    motorHousing.position.y = -size.y * 0.5 - 0.68;
+    this.platformDecoration.add(motorHousing);
+
+    const rollerGeometry = this.geometry(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.16, 16),
+    );
+    for (const z of [-size.z * 0.28, size.z * 0.28]) {
+      const underdeckBracket = this.box(
+        `${this.sequence.id}-west-guide-underdeck-bracket`,
+        1.0,
+        0.18,
+        0.32,
+        darkMaterial,
+      );
+      underdeckBracket.position.set(-size.x * 0.5 + 0.55, -0.58, z);
+      const couplingRod = this.box(
+        `${this.sequence.id}-west-guide-coupling-rod`,
+        2.5,
+        0.08,
+        0.08,
         trimMaterial,
       );
-      trim.position.set(x, roofY, 0);
-      this.platformDecoration.add(trim);
+      couplingRod.position.set(-size.x * 0.5 - 0.72, -0.78, z);
+      const housing = this.box(
+        `${this.sequence.id}-guide-roller-housing`,
+        0.3,
+        0.46,
+        0.5,
+        darkMaterial,
+      );
+      housing.position.set(-size.x * 0.5 - 1.95, -0.78, z);
+      const roller = new THREE.Mesh(rollerGeometry, trimMaterial);
+      roller.name = `${this.sequence.id}-guide-roller`;
+      roller.userData.presentationOnly = true;
+      roller.rotation.x = Math.PI / 2;
+      roller.position.set(-size.x * 0.5 - 2.18, -0.78, z);
+      this.platformDecoration.add(
+        underdeckBracket,
+        couplingRod,
+        housing,
+        roller,
+      );
     }
 
     const lightGeometry = this.geometry(
@@ -247,30 +355,8 @@ export class ElevatorPresentation {
     readonly shutter: THREE.Mesh;
     readonly beacon: THREE.Mesh;
   } {
-    const start = this.sequence.routeStart;
     const end = this.sequence.routeEnd;
     const size = this.sequence.platform.size;
-    const minimumY = Math.min(start.y, end.y) - 0.5;
-    const maximumY = Math.max(start.y, end.y) + 2.3;
-    const shaftHeight = maximumY - minimumY;
-    const centreY = (minimumY + maximumY) * 0.5;
-
-    const steelMaterial = this.material(
-      new THREE.MeshStandardMaterial({
-        color: 0x263139,
-        roughness: 0.58,
-        metalness: 0.78,
-      }),
-    );
-    const markingMaterial = this.material(
-      new THREE.MeshStandardMaterial({
-        color: 0xe5b642,
-        emissive: 0x3a2404,
-        emissiveIntensity: 0.42,
-        roughness: 0.62,
-        metalness: 0.25,
-      }),
-    );
     const shutterMaterial = this.material(
       new THREE.MeshStandardMaterial({
         color: 0x4b555b,
@@ -278,49 +364,6 @@ export class ElevatorPresentation {
         metalness: 0.72,
       }),
     );
-
-    const columnOffsetX = size.x * 0.5 + 0.58;
-    const columnOffsetZ = size.z * 0.5 + 0.58;
-    for (const xSign of [-1, 1]) {
-      for (const zSign of [-1, 1]) {
-        const column = this.box(
-          `${this.sequence.id}-shaft-support`,
-          0.2,
-          shaftHeight,
-          0.2,
-          steelMaterial,
-        );
-        column.position.set(
-          start.x + xSign * columnOffsetX,
-          centreY,
-          start.z + zSign * columnOffsetZ,
-        );
-        this.root.add(column);
-      }
-    }
-
-    const backZ = start.z - columnOffsetZ;
-    for (let y = minimumY + 0.65; y < maximumY - 0.5; y += 0.9) {
-      const marker = this.box(
-        `${this.sequence.id}-shaft-height-marker`,
-        size.x + 1.15,
-        0.09,
-        0.12,
-        markingMaterial,
-      );
-      marker.position.set(start.x, y, backZ);
-      this.root.add(marker);
-    }
-
-    const topFrame = this.box(
-      `${this.sequence.id}-shaft-top-frame`,
-      size.x + 1.4,
-      0.28,
-      size.z + 1.4,
-      steelMaterial,
-    );
-    topFrame.position.set(start.x, maximumY, start.z);
-    this.root.add(topFrame);
 
     const roofY = end.y + size.y * 0.5;
     const shutter = this.box(
@@ -333,99 +376,25 @@ export class ElevatorPresentation {
     shutter.position.set(
       end.x,
       roofY + 1.35,
-      end.z - (size.z * 0.5 + 0.32),
+      end.z + (size.z * 0.5 + 1.72),
     );
     this.root.add(shutter);
 
     this.exitRoute.name = `${this.sequence.id}-room5-exit-route`;
     this.exitRoute.userData.presentationOnly = true;
     const walkway = this.box(
-      `${this.sequence.id}-room5-exit-walkway`,
-      2.35,
-      0.18,
-      4.2,
-      steelMaterial,
+      `${this.sequence.id}-room5-exit-centre-status-guide`,
+      0.32,
+      0.045,
+      2.5,
+      this.arrivalMaterial,
     );
     walkway.position.set(
       end.x,
-      roofY - 0.09,
-      end.z - (size.z * 0.5 + 2.1),
+      roofY + 0.095,
+      end.z + (size.z * 0.5 + 2.7),
     );
     this.exitRoute.add(walkway);
-
-    const routeGuide = this.box(
-      `${this.sequence.id}-room5-exit-guide`,
-      0.32,
-      0.05,
-      4.0,
-      this.arrivalMaterial,
-    );
-    routeGuide.position.set(end.x, roofY + 0.025, walkway.position.z);
-    this.exitRoute.add(routeGuide);
-
-    for (const zSign of [-1, 1]) {
-      const routeTrim = this.box(
-        `${this.sequence.id}-room5-exit-trim`,
-        0.12,
-        0.08,
-        4.2,
-        markingMaterial,
-      );
-      routeTrim.position.set(
-        end.x + zSign * 1.08,
-        roofY + 0.04,
-        walkway.position.z,
-      );
-      this.exitRoute.add(routeTrim);
-    }
-
-    const portalZ = end.z - (size.z * 0.5 + 4.2);
-    for (const xSign of [-1, 1]) {
-      const portalSide = this.box(
-        `${this.sequence.id}-room5-exit-portal-side`,
-        0.22,
-        3.0,
-        0.22,
-        steelMaterial,
-      );
-      portalSide.position.set(end.x + xSign * 1.25, roofY + 1.5, portalZ);
-      this.exitRoute.add(portalSide);
-    }
-    const portalTop = this.box(
-      `${this.sequence.id}-room5-exit-portal-top`,
-      2.72,
-      0.22,
-      0.22,
-      steelMaterial,
-    );
-    portalTop.position.set(end.x, roofY + 3.0, portalZ);
-    this.exitRoute.add(portalTop);
-
-    const arrowStem = this.box(
-      `${this.sequence.id}-room5-exit-arrow-stem`,
-      0.18,
-      0.7,
-      0.08,
-      this.arrivalMaterial,
-    );
-    arrowStem.position.set(end.x, roofY + 2.28, portalZ + 0.14);
-    this.exitRoute.add(arrowStem);
-    for (const rotationZ of [-Math.PI / 4, Math.PI / 4]) {
-      const arrowHead = this.box(
-        `${this.sequence.id}-room5-exit-arrow-head`,
-        0.48,
-        0.16,
-        0.08,
-        this.arrivalMaterial,
-      );
-      arrowHead.position.set(
-        end.x + Math.sign(rotationZ) * 0.17,
-        roofY + 2.58,
-        portalZ + 0.14,
-      );
-      arrowHead.rotation.z = rotationZ;
-      this.exitRoute.add(arrowHead);
-    }
     this.root.add(this.exitRoute);
 
     const beaconGeometry = this.geometry(new THREE.BoxGeometry(1.8, 0.18, 0.12));
@@ -434,7 +403,7 @@ export class ElevatorPresentation {
     beacon.position.set(
       end.x,
       roofY + 2.42,
-      end.z - size.z * 0.5 - 0.22,
+      end.z + size.z * 0.5 + 1.45,
     );
     this.root.add(beacon);
 

@@ -13,6 +13,8 @@ export interface ContainmentArtMaterials {
   readonly clinicalFloor: THREE.MeshStandardMaterial;
   readonly graphite: THREE.MeshStandardMaterial;
   readonly serviceMetal: THREE.MeshStandardMaterial;
+  readonly structuralSteel: THREE.MeshStandardMaterial;
+  readonly elevatorTread: THREE.MeshStandardMaterial;
   readonly mechanicalBacking: THREE.MeshStandardMaterial;
   readonly gasket: THREE.MeshStandardMaterial;
   readonly neutralFixture: THREE.MeshStandardMaterial;
@@ -128,6 +130,24 @@ export class ContainmentArtResources {
         normalMap: graphiteNormal,
         roughnessMap: graphiteRoughness,
         normalScale: new THREE.Vector2(0.05, 0.05),
+      }),
+      structuralSteel: new THREE.MeshStandardMaterial({
+        name: 'containment-dark-structural-steel',
+        color: 0x465156,
+        roughness: 0.46,
+        metalness: 0.72,
+        normalMap: graphiteNormal,
+        roughnessMap: graphiteRoughness,
+        normalScale: new THREE.Vector2(0.065, 0.065),
+      }),
+      elevatorTread: new THREE.MeshStandardMaterial({
+        name: 'containment-elevator-composite-tread',
+        color: 0x929a9b,
+        roughness: 0.62,
+        metalness: 0.42,
+        normalMap: graphiteNormal,
+        roughnessMap: graphiteRoughness,
+        normalScale: new THREE.Vector2(0.085, 0.085),
       }),
       mechanicalBacking: new THREE.MeshStandardMaterial({
         name: 'containment-mechanical-backing',

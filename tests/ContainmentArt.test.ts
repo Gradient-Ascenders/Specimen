@@ -16,12 +16,12 @@ test('Containment procedural textures are compact, deterministic and correctly c
   const secondTextures = textureList(second);
 
   assert.equal(firstTextures.length, 10);
-  assert.equal(first.diagnostics.estimatedTextureBytes, 1_458_176);
+  assert.equal(first.diagnostics.estimatedTextureBytes, 2_113_536);
   firstTextures.forEach((texture, index) => {
     const counterpart = secondTextures[index];
     assert.deepEqual(
       [texture.image.width, texture.image.height],
-      texture === first.textures.signageAtlas ? [512, 640] : [64, 64],
+      texture === first.textures.signageAtlas ? [512, 960] : [64, 64],
     );
     assert.equal(
       Buffer.from(texture.image.data.buffer).equals(
@@ -212,6 +212,24 @@ test('Room 3 art contains the acid and instruments the frozen route without owni
   assert.equal(art.root.getObjectByName('room-3-platform-c-overhead-hanger-1'), undefined);
   assert.equal(art.root.getObjectByName('room-3-first-static-laser-instrument-pedestal-1'), undefined);
   assert.ok(art.root.getObjectByName('room-3-platform-c-underside-actuator-socket'));
+  assert.ok(art.root.getObjectByName('room-3-to-4-duct-floor-clean-liner'));
+  assert.ok(art.root.getObjectByName('room-3-to-4-duct-service-side-liners'));
+  assert.ok(art.root.getObjectByName('room-3-to-4-duct-side-transition-seams'));
+  assert.ok(art.root.getObjectByName('room-3-to-4-shaft-end-service-portal'));
+  const cleanDuctSides = art.root.getObjectByName(
+    'room-3-to-4-duct-clean-side-liners',
+  );
+  const serviceDuctSides = art.root.getObjectByName(
+    'room-3-to-4-duct-service-side-liners',
+  );
+  assert.ok(cleanDuctSides instanceof THREE.InstancedMesh);
+  assert.ok(serviceDuctSides instanceof THREE.InstancedMesh);
+  const cleanDuctSideBounds = new THREE.Box3().setFromObject(cleanDuctSides);
+  const serviceDuctSideBounds = new THREE.Box3().setFromObject(serviceDuctSides);
+  assert.ok(
+    cleanDuctSideBounds.max.z < serviceDuctSideBounds.min.z,
+    'clean and service duct skins must not have coplanar overlap',
+  );
   const roomThreeSign = art.root.getObjectByName('room-3-entry-sector-sign');
   assert.ok(roomThreeSign instanceof THREE.Mesh);
   assert.equal(roomThreeSign.position.z, 49.24);
@@ -237,6 +255,10 @@ test('Room 3 art contains the acid and instruments the frozen route without owni
     ['room-3-entry-graphite-jambs', 'room-3-entry-wall-east'],
     ['room-3-ceiling-major-service-trusses', 'room-3-ceiling'],
     ['room-3-exit-duct-graphite-collar-left', 'room-3-rear-wall-west'],
+    ['room-3-to-4-duct-floor-clean-liner', 'room-3-to-4-duct-floor'],
+    ['room-3-to-4-duct-clean-side-liners', 'room-3-to-4-duct-west-wall'],
+    ['room-3-to-4-duct-ceiling-backing', 'room-3-to-4-duct-roof'],
+    ['room-3-to-4-shaft-end-service-portal-left', 'room-3-to-4-duct-west-wall'],
   ] as const) {
     const artObject = art.root.getObjectByName(artName);
     const collider = roomThreeColliders.find((mesh) => mesh.name === colliderName);
@@ -265,6 +287,145 @@ test('Room 3 art contains the acid and instruments the frozen route without owni
       sequenceState: hazard.sequenceState,
     })),
     laserState,
+  );
+  scene.dispose();
+});
+
+test('Room 4 art houses the frozen elevator and laser sequence without owning gameplay', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const room = scene.roomFour;
+  const art = room.art.root;
+  const colliderSet = new Set(scene.collisionMeshes);
+  const roomFourColliders = scene.collisionMeshes.filter((mesh) =>
+    mesh.name.startsWith('room-4-'),
+  );
+  const collisionBefore = captureContainmentCollisionFingerprint(
+    scene.collisionMeshes,
+  );
+  const elevatorBefore = {
+    start: room.elevator.routeStart.toArray(),
+    end: room.elevator.routeEnd.toArray(),
+    duration: room.elevator.travelDurationSeconds,
+    startDelay: room.elevator.startDelaySeconds,
+    arrivalDelay: room.elevator.arrivalDelaySeconds,
+    checkpointGroup: room.elevator.checkpointGroupId,
+  };
+  const lasersBefore = room.lasers.hazards.map((hazard) => ({
+    id: hazard.id,
+    start: hazard.start.toArray(),
+    end: hazard.end.toArray(),
+    enabled: hazard.enabled,
+    sequenceState: hazard.sequenceState,
+  }));
+
+  assert.equal(art.name, 'room-4-production-art');
+  assert.equal(roomFourColliders.length, 14);
+  for (const collider of roomFourColliders) {
+    assert.equal(collider.material.visible, false, collider.name);
+  }
+  assert.ok(art.getObjectByName('room-4-major-north-south-structural-ribs'));
+  assert.ok(art.getObjectByName('room-4-elevator-continuous-guide-rails'));
+  assert.ok(art.getObjectByName('room-4-main-vertical-power-trunk'));
+  assert.ok(art.getObjectByName('room-4-south-recessed-maintenance-bay'));
+  assert.ok(art.getObjectByName('room-4-laser-origin-precision-instrument-housings'));
+  assert.ok(art.getObjectByName('room-4-lower-elevator-machinery-base'));
+  assert.ok(art.getObjectByName('room-4-upper-receiving-portal-structural-frame'));
+  assert.ok(art.getObjectByName('room-4-entry-core-sign'));
+  assert.ok(
+    art.getObjectByName('room-4-entry-core-sign-recessed-backing'),
+  );
+  assert.ok(
+    art.getObjectByName('room-4-transfer-array-s02-sign-service-frame'),
+  );
+  for (const [name, position, rotationY] of [
+    ['room-4-entry-core-sign', [9, 34.65, 79.965], 0],
+    ['room-4-service-level-s01-sign', [5.15, 42.25, 91.075], Math.PI],
+    ['room-4-transfer-array-s02-sign', [12.85, 58.65, 91.075], Math.PI],
+    ['room-4-laser-core-sign', [5.15, 65, 79.965], 0],
+    ['room-4-room-five-destination-sign', [9, 78.05, 90.945], Math.PI],
+  ] as const) {
+    const sign = art.getObjectByName(name);
+    assert.ok(sign instanceof THREE.Mesh, name);
+    assert.deepEqual(sign.position.toArray(), position, name);
+    assert.equal(sign.rotation.y, rotationY, name);
+    const backing = art.getObjectByName(`${name}-recessed-backing`);
+    const frame = art.getObjectByName(`${name}-service-frame`);
+    assert.ok(backing instanceof THREE.Mesh, `${name} backing`);
+    assert.ok(frame instanceof THREE.Group, `${name} frame`);
+    assert.ok(
+      Math.abs(sign.position.z - backing.position.z) >= 0.08,
+      `${name} must remain separated from its backing to avoid z-fighting`,
+    );
+  }
+  const guideBracket = room.root.getObjectByName(
+    'room-4-cargo-elevator-west-guide-underdeck-bracket',
+  );
+  const guideCoupling = room.root.getObjectByName(
+    'room-4-cargo-elevator-west-guide-coupling-rod',
+  );
+  const guideHousing = room.root.getObjectByName(
+    'room-4-cargo-elevator-guide-roller-housing',
+  );
+  assert.ok(guideBracket instanceof THREE.Mesh);
+  assert.ok(guideCoupling instanceof THREE.Mesh);
+  assert.ok(guideHousing instanceof THREE.Mesh);
+  room.root.updateMatrixWorld(true);
+  const platformBounds = new THREE.Box3().setFromObject(
+    room.elevator.platform.collisionMesh,
+  );
+  const guideBracketBounds = new THREE.Box3().setFromObject(guideBracket);
+  const guideCouplingBounds = new THREE.Box3().setFromObject(guideCoupling);
+  const guideHousingBounds = new THREE.Box3().setFromObject(guideHousing);
+  assert.ok(
+    guideBracketBounds.min.x >= platformBounds.min.x &&
+      guideBracketBounds.max.x <= platformBounds.max.x,
+    `substantial guide bracket ${guideBracketBounds.min.x.toFixed(3)}..${guideBracketBounds.max.x.toFixed(3)} must stay inside moving collider ${platformBounds.min.x.toFixed(3)}..${platformBounds.max.x.toFixed(3)}`,
+  );
+  assert.ok(
+    guideCouplingBounds.max.y <= platformBounds.min.y - 0.45,
+    'non-colliding guide coupling must read as recessed underside machinery',
+  );
+  assert.ok(
+    guideHousingBounds.max.y <= platformBounds.min.y - 0.25,
+    'guide roller housing must remain below the reachable deck silhouette',
+  );
+  assert.equal(
+    room.root.getObjectByName(
+      'room-4-single-sweep-presentation-emitter-end',
+    )?.visible,
+    false,
+  );
+
+  art.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
+      assert.equal(object.userData.visualOnly, true, object.name);
+      assert.equal(colliderSet.has(object), false, object.name);
+    }
+  });
+  assert.deepEqual(
+    captureContainmentCollisionFingerprint(scene.collisionMeshes),
+    collisionBefore,
+  );
+  assert.deepEqual(
+    {
+      start: room.elevator.routeStart.toArray(),
+      end: room.elevator.routeEnd.toArray(),
+      duration: room.elevator.travelDurationSeconds,
+      startDelay: room.elevator.startDelaySeconds,
+      arrivalDelay: room.elevator.arrivalDelaySeconds,
+      checkpointGroup: room.elevator.checkpointGroupId,
+    },
+    elevatorBefore,
+  );
+  assert.deepEqual(
+    room.lasers.hazards.map((hazard) => ({
+      id: hazard.id,
+      start: hazard.start.toArray(),
+      end: hazard.end.toArray(),
+      enabled: hazard.enabled,
+      sequenceState: hazard.sequenceState,
+    })),
+    lasersBefore,
   );
   scene.dispose();
 });
@@ -327,6 +488,11 @@ test('Room 1 signs are upright and specimen controls do not intersect stacked ho
     'chemical',
     'laserArray',
     'adhesionTest',
+    'roomFour',
+    'serviceOne',
+    'transferTwo',
+    'laserCore',
+    'roomFiveExit',
   ] as const) {
     const sign = createSignagePanel(resources, {
       name: `sign-orientation-probe-${label}`,
