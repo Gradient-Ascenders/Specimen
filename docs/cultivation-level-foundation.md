@@ -68,13 +68,15 @@ selection never determine entry.
   Room 1 remains authoritative.
 - Bob crossing that boundary completes Room 1 and activates the Room 2 pair
   checkpoint.
-- Bob and Goop have separate Room 3 entry volumes and may cross in either order.
-- Partial entry keeps Room 2 and its puzzle group authoritative.
-- If either slime fails before both entry flags are true, Retry restores both
+- Bob and Goop have separate Room 3 entry volumes and may occupy them in either
+  order.
+- Partial occupancy keeps Room 2 and its puzzle group authoritative. Leaving an
+  exit clears that slime's entry flag until it returns.
+- If either slime fails before both exits are occupied, Retry restores both
   Room 2 spawns and clears both partial flags.
-- Once both have entered, Room 3 becomes authoritative. Its temporary harness
-  checkpoint deliberately restores Bob to an upper platform and Goop to a
-  separate lower spawn.
+- Once both occupy their authored exits together, Room 3 becomes authoritative.
+  Its temporary harness checkpoint deliberately restores Bob to an upper
+  platform and Goop to a separate lower spawn.
 
 ## Radiation policy
 
@@ -125,7 +127,9 @@ progression snapshot.
    and while airborne.
 3. Send Goop through the Room 2 trigger before Bob and inspect F2: the early flag
    changes while Room 1 remains authoritative.
-4. Cross Bob's and Goop's Room 3 exits in both orders. Before the second entry,
+4. Occupy Bob's and Goop's Room 3 exits in both orders. Move the first slime out
+   before the second arrives and confirm Room 2 remains authoritative; return it
+   to its exit and confirm Room 3 activates. Before simultaneous occupancy,
    trigger death and confirm both return to Room 2 with partial flags cleared.
 5. Move Goop through the green radiation volume safely. Leave inactive Bob in
    it, switch to Goop, and confirm one pair death/recovery request.

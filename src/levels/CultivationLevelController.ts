@@ -101,6 +101,7 @@ export class CultivationLevelController {
   private goopEnteredRoomTwoEarly = false;
   private failureLatched = false;
   private lastFailureValue = 'none';
+  private triggerEventsSuppressed = false;
 
   constructor(options: CultivationLevelControllerOptions) {
     this.pair = options.pair;
@@ -225,17 +226,19 @@ export class CultivationLevelController {
 
   private subscribeToTriggers(): void {
     for (const runtime of this.triggerRuntimes) {
-      this.unsubscribeCallbacks.push(
-        runtime.trigger.events.on('entered', ({ occupantId }) => {
-          if (runtime.authoring.role === 'room-2-entry') {
+      if (runtime.authoring.role === 'room-2-entry') {
+        this.unsubscribeCallbacks.push(
+          runtime.trigger.events.on('entered', ({ occupantId }) => {
             this.handleRoomTwoEntry(occupantId);
-          } else if (runtime.authoring.role === 'bob-room-3-entry' && occupantId === 'bob') {
-            this.setRoomThreeEntry('bob');
-          } else if (runtime.authoring.role === 'goop-room-3-entry' && occupantId === 'goop') {
-            this.setRoomThreeEntry('goop');
-          }
-        }),
-      );
+          }),
+        );
+      } else {
+        this.unsubscribeCallbacks.push(
+          runtime.trigger.events.on('occupancyChanged', () => {
+            this.syncRoomThreeOccupancy();
+          }),
+        );
+      }
     }
   }
 
@@ -253,12 +256,32 @@ export class CultivationLevelController {
     this.emitProgress(true);
   }
 
-  private setRoomThreeEntry(slimeId: PlayableSlimeId): void {
-    if (this.progression.roomId !== 'cultivation-room-2') return;
+  private syncRoomThreeOccupancy(): void {
+    if (
+      this.triggerEventsSuppressed ||
+      this.stateValue !== 'playing' ||
+      this.progression.roomId !== 'cultivation-room-2'
+    ) return;
+
+    let bobEnteredRoomThree = false;
+    let goopEnteredRoomThree = false;
+    for (const runtime of this.triggerRuntimes) {
+      if (runtime.authoring.role === 'bob-room-3-entry') {
+        bobEnteredRoomThree = runtime.trigger.occupants.has('bob');
+      } else if (runtime.authoring.role === 'goop-room-3-entry') {
+        goopEnteredRoomThree = runtime.trigger.occupants.has('goop');
+      }
+    }
+
+    if (
+      this.progression.bobEnteredRoomThree === bobEnteredRoomThree &&
+      this.progression.goopEnteredRoomThree === goopEnteredRoomThree
+    ) return;
+
     const next = {
       ...this.progression,
-      bobEnteredRoomThree: this.progression.bobEnteredRoomThree || slimeId === 'bob',
-      goopEnteredRoomThree: this.progression.goopEnteredRoomThree || slimeId === 'goop',
+      bobEnteredRoomThree,
+      goopEnteredRoomThree,
     };
     this.progression = next;
     if (next.bobEnteredRoomThree && next.goopEnteredRoomThree) {
@@ -272,7 +295,12 @@ export class CultivationLevelController {
   }
 
   private clearTriggerOccupants(): void {
-    for (const runtime of this.triggerRuntimes) runtime.trigger.clear();
+    this.triggerEventsSuppressed = true;
+    try {
+      for (const runtime of this.triggerRuntimes) runtime.trigger.clear();
+    } finally {
+      this.triggerEventsSuppressed = false;
+    }
   }
 
   private emitProgress(objectiveMayHaveChanged = false): void {

@@ -95,6 +95,50 @@ test('Room 2 remains authoritative until both slimes reach their separate Room 3
   fixture.controller.dispose();
 });
 
+test('Room 3 requires both slimes to occupy their own exits at the same time', () => {
+  const fixture = createController();
+  const [roomTwo, bobExit, goopExit] = CULTIVATION_FOUNDATION_MANIFEST.triggers;
+  fixture.bob.teleport(roomTwo.centre);
+  fixture.controller.update();
+
+  fixture.bob.teleport(bobExit.centre);
+  fixture.controller.update();
+  assert.equal(fixture.controller.readModel.bobEnteredRoomThree, true);
+
+  fixture.bob.teleport(roomTwo.centre);
+  fixture.controller.update();
+  assert.equal(fixture.controller.readModel.bobEnteredRoomThree, false);
+
+  fixture.goop.teleport(goopExit.centre);
+  fixture.controller.update();
+  assert.equal(fixture.controller.readModel.goopEnteredRoomThree, true);
+  assert.equal(fixture.controller.readModel.roomId, 'cultivation-room-2');
+  assert.equal(fixture.controller.readModel.checkpointId, 'cultivation-room-2-entry');
+
+  fixture.bob.teleport(bobExit.centre);
+  fixture.controller.update();
+  assert.equal(fixture.controller.readModel.roomId, 'cultivation-room-3');
+  assert.equal(fixture.controller.readModel.checkpointId, 'cultivation-room-3-entry');
+  fixture.controller.dispose();
+});
+
+test('Room 3 exits count only their authored slime identity', () => {
+  const fixture = createController();
+  const [roomTwo, bobExit, goopExit] = CULTIVATION_FOUNDATION_MANIFEST.triggers;
+  fixture.bob.teleport(roomTwo.centre);
+  fixture.controller.update();
+
+  fixture.bob.teleport(goopExit.centre);
+  fixture.goop.teleport(bobExit.centre);
+  fixture.controller.update();
+
+  assert.equal(fixture.controller.readModel.bobEnteredRoomThree, false);
+  assert.equal(fixture.controller.readModel.goopEnteredRoomThree, false);
+  assert.equal(fixture.controller.readModel.roomId, 'cultivation-room-2');
+  assert.equal(fixture.controller.readModel.checkpointId, 'cultivation-room-2-entry');
+  fixture.controller.dispose();
+});
+
 test('switching during split entry preserves occupancy and checkpoint identity', () => {
   const fixture = createController();
   const [roomTwo, bobExit, goopExit] = CULTIVATION_FOUNDATION_MANIFEST.triggers;
