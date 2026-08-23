@@ -1,0 +1,4094 @@
+[
+  {
+    "name": "room-1-floor",
+    "worldPosition": [
+      0,
+      -0.2,
+      0
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      14,
+      0.4,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-rear-wall",
+    "worldPosition": [
+      0,
+      4,
+      -6
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      14,
+      8,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-west-wall",
+    "worldPosition": [
+      -7,
+      4,
+      0
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      8,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-east-wall",
+    "worldPosition": [
+      7,
+      4,
+      0
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      8,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-ceiling",
+    "worldPosition": [
+      0,
+      8,
+      0
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      14,
+      0.3,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-north-clean-west",
+    "worldPosition": [
+      -6.4,
+      4,
+      6
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.2,
+      8,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-vent-sticky-entry-wall",
+    "worldPosition": [
+      -4.8,
+      2.6125,
+      6
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      5.225,
+      0.4
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-north-clean-centre",
+    "worldPosition": [
+      -1.8,
+      4,
+      6
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4,
+      8,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-north-clean-east",
+    "worldPosition": [
+      3.6,
+      4,
+      6
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      6.8,
+      8,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-north-above-vent",
+    "worldPosition": [
+      -4.8,
+      7.4,
+      6
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      1.2,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-containment-pedestal",
+    "worldPosition": [
+      0,
+      0.55,
+      -0.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.6,
+      1.1,
+      2.6
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-1-goop-soluble-test-barrier",
+    "worldPosition": [
+      4.8,
+      1.2,
+      -2.6
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.2,
+      2.4,
+      0.35
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": true,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": true
+  },
+  {
+    "name": "duct-segment-a-sticky-vent-tile",
+    "worldPosition": [
+      -4.8,
+      5.1,
+      6.9
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      0.25,
+      1.8
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": "sticky-vent-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-a-floor",
+    "worldPosition": [
+      -4.8,
+      5.1,
+      10.4
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      0.25,
+      5.2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-a-roof",
+    "worldPosition": [
+      -4.8,
+      7.3,
+      9.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      0.18,
+      7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-side-a-west",
+    "worldPosition": [
+      -5.85,
+      6.2,
+      9.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-side-a-east",
+    "worldPosition": [
+      -3.75,
+      6.2,
+      9.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-b-ramp",
+    "worldPosition": [
+      -4.8,
+      7.85,
+      18.5
+    ],
+    "worldQuaternion": [
+      -0.224951,
+      0,
+      0,
+      0.97437
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      0.25,
+      11.88
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-b-roof",
+    "worldPosition": [
+      -4.8,
+      9.83,
+      17.54
+    ],
+    "worldQuaternion": [
+      -0.224951,
+      0,
+      0,
+      0.97437
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      0.18,
+      11.88
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-b-west-wall",
+    "worldPosition": [
+      -5.8,
+      8.84,
+      18.02
+    ],
+    "worldQuaternion": [
+      -0.224951,
+      0,
+      0,
+      0.97437
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      11.88
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-b-east-wall",
+    "worldPosition": [
+      -3.8,
+      8.84,
+      18.02
+    ],
+    "worldQuaternion": [
+      -0.224951,
+      0,
+      0,
+      0.97437
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      11.88
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-floor-main",
+    "worldPosition": [
+      -5.7,
+      10.36,
+      24.32464
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      7.2,
+      0.25,
+      1.37071
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-floor-front-left",
+    "worldPosition": [
+      -7.52842,
+      10.36,
+      23.32464
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3.54316,
+      0.25,
+      0.62929
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-floor-front-right",
+    "worldPosition": [
+      -2.92842,
+      10.36,
+      23.32464
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.65684,
+      0.25,
+      0.62929
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-roof",
+    "worldPosition": [
+      -5.7,
+      12.56,
+      24
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      7.2,
+      0.18,
+      2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-west-wall",
+    "worldPosition": [
+      -9.25,
+      11.46,
+      24
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-east-wall",
+    "worldPosition": [
+      -2.15,
+      11.46,
+      24
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-south-wall-west",
+    "worldPosition": [
+      -7.58,
+      11.46,
+      23.05
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3.35,
+      2.2,
+      0.18
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-south-wall-east",
+    "worldPosition": [
+      -2.93,
+      11.46,
+      23.05
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.55,
+      2.2,
+      0.18
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-segment-c-north-wall",
+    "worldPosition": [
+      -4.53,
+      11.46,
+      24.95
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.65,
+      2.2,
+      0.18
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-turn-to-final-west-seal",
+    "worldPosition": [
+      -9.4,
+      11.46,
+      25
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.3,
+      2.2,
+      0.35
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-final-run-floor",
+    "worldPosition": [
+      -8.4,
+      10.36,
+      27.1
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      0.25,
+      4.2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-final-run-roof",
+    "worldPosition": [
+      -8.4,
+      12.56,
+      27.1
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2,
+      0.18,
+      4.2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-side-final-west",
+    "worldPosition": [
+      -9.45,
+      11.46,
+      27.1
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      4.2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "duct-side-final-east",
+    "worldPosition": [
+      -7.35,
+      11.46,
+      27.1
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2,
+      4.2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-floor",
+    "worldPosition": [
+      0,
+      -0.2,
+      38
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      30,
+      0.4,
+      22
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-west-wall",
+    "worldPosition": [
+      -15,
+      9,
+      38
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      18,
+      22
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-east-wall",
+    "worldPosition": [
+      15,
+      9,
+      38
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      18,
+      22
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-ceiling",
+    "worldPosition": [
+      0,
+      18.2,
+      38
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      30,
+      0.4,
+      22
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-rear-wall-west",
+    "worldPosition": [
+      -12.25,
+      9,
+      27
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.5,
+      18,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-rear-wall-east",
+    "worldPosition": [
+      3.85,
+      9,
+      27
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      22.299999,
+      18,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-rear-wall-below-duct",
+    "worldPosition": [
+      -8.4,
+      5.1,
+      27
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.2,
+      10.2,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-rear-wall-above-duct",
+    "worldPosition": [
+      -8.4,
+      15.4,
+      27
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.2,
+      5.2,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-front-wall-west",
+    "worldPosition": [
+      -8.25,
+      9,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      13.5,
+      18,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-front-wall-east",
+    "worldPosition": [
+      8.25,
+      9,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      13.5,
+      18,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-front-wall-below-exit",
+    "worldPosition": [
+      0,
+      5.2,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      10.4,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-front-wall-above-exit",
+    "worldPosition": [
+      0,
+      16.05,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      3.9,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-platform-a-height-lesson",
+    "worldPosition": [
+      -6.37855,
+      1.46779,
+      37.78357
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3.15,
+      0.5,
+      3.15
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-platform-b-gap-lesson",
+    "worldPosition": [
+      -0.5,
+      2.55,
+      37
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.82146,
+      0.5,
+      3.5
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-platform-c-side-jump",
+    "worldPosition": [
+      4.2,
+      3.85,
+      31.0999
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3.8,
+      0.5,
+      3.5
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-platform-d-sticky-launch",
+    "worldPosition": [
+      8.5,
+      5.2,
+      38.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-sticky-catch-wall",
+    "worldPosition": [
+      14.73472,
+      7.73804,
+      43.0006
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.12,
+      6.94462,
+      6.5
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-top-of-sticky-wall-ledge",
+    "worldPosition": [
+      13.25,
+      9.15,
+      42.9
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3.1,
+      0.35,
+      4.7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-upper-step-a",
+    "worldPosition": [
+      8.8,
+      9.65,
+      37.65683
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4,
+      0.4,
+      3.5
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-upper-step-b",
+    "worldPosition": [
+      0.87909,
+      10.15,
+      38.41571
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3.6,
+      0.4,
+      3.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-2-exit-balcony",
+    "worldPosition": [
+      0,
+      10.65,
+      46.79795
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      7,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-acid-floor",
+    "worldPosition": [
+      0,
+      4.8,
+      63
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      34,
+      0.4,
+      28
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": "acid-floor",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-west-wall",
+    "worldPosition": [
+      -17,
+      19.6,
+      63
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      29.6,
+      28
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-east-wall",
+    "worldPosition": [
+      17,
+      19.6,
+      63
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      29.6,
+      28
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-ceiling",
+    "worldPosition": [
+      0,
+      34.4,
+      63
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      34,
+      0.4,
+      28
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-entry-wall-west",
+    "worldPosition": [
+      -9.25,
+      19.6,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      15.5,
+      29.6,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-entry-wall-east",
+    "worldPosition": [
+      9.25,
+      19.6,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      15.5,
+      29.6,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-entry-wall-above",
+    "worldPosition": [
+      0,
+      24.2,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      20.4,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-entry-wall-below",
+    "worldPosition": [
+      0,
+      7.5,
+      49
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      5.4,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-rear-wall-west",
+    "worldPosition": [
+      -4.6,
+      19.6,
+      77
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      24.799999,
+      29.6,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-rear-wall-east",
+    "worldPosition": [
+      13.5,
+      19.6,
+      77
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      7,
+      29.6,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-rear-wall-above-vent",
+    "worldPosition": [
+      8.8982,
+      33.9189,
+      76.8938
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.1836,
+      1.1112,
+      0.1978
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-rear-wall-below-vent",
+    "worldPosition": [
+      9,
+      17.4,
+      77
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.2,
+      24.799999,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-entry-platform",
+    "worldPosition": [
+      0,
+      10.15,
+      51.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      8,
+      0.5,
+      5
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-platform-a-bounce",
+    "worldPosition": [
+      2.7885,
+      10.9032,
+      57.6261
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4.5,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-platform-b-gap",
+    "worldPosition": [
+      11.2583,
+      11.4329,
+      59
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.13,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-sticky-wall-main",
+    "worldPosition": [
+      16.72,
+      17.25,
+      63
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      9.5,
+      8
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-wall-exit-ledge",
+    "worldPosition": [
+      14.7,
+      21.1,
+      66
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4.6,
+      0.5,
+      4.8
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-platform-c",
+    "worldPosition": [
+      10,
+      22.1,
+      60.5406
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4.2,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-platform-d",
+    "worldPosition": [
+      5,
+      23.7,
+      62.839
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-platform-e",
+    "worldPosition": [
+      -0.4591,
+      24.1676,
+      68.5505
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-platform-f",
+    "worldPosition": [
+      5.7,
+      25.0753,
+      73.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4.2,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-final-sticky-strip",
+    "worldPosition": [
+      9,
+      27.6771,
+      76.72
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4,
+      7.3609,
+      0.18
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-to-4-duct-floor",
+    "worldPosition": [
+      9,
+      31.05,
+      78.9
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.4,
+      0.25,
+      3.8
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-to-4-duct-roof",
+    "worldPosition": [
+      8.951,
+      33.45,
+      78.9
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.3869,
+      0.18,
+      3.8
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-to-4-duct-west-wall",
+    "worldPosition": [
+      7.85,
+      32.25,
+      78.9
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.2237,
+      3.8
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-3-to-4-duct-east-wall",
+    "worldPosition": [
+      10.15,
+      32.25,
+      78.9
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.18,
+      2.4,
+      3.8
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-3-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-shaft-floor",
+    "worldPosition": [
+      9,
+      25.8,
+      85.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      13,
+      0.4,
+      13
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-shaft-west-wall",
+    "worldPosition": [
+      2.5,
+      52.125,
+      85.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      53.25,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-shaft-east-wall",
+    "worldPosition": [
+      15.5,
+      52.125,
+      85.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      53.25,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-shaft-ceiling",
+    "worldPosition": [
+      9,
+      78.95,
+      85.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      13,
+      0.4,
+      12
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-south-wall-west",
+    "worldPosition": [
+      5.1,
+      52.125,
+      79.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.2,
+      53.25,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-south-wall-east",
+    "worldPosition": [
+      12.9,
+      52.125,
+      79.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.2,
+      53.25,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-south-wall-above-entry",
+    "worldPosition": [
+      9,
+      55.875,
+      79.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.6,
+      45.75,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-south-wall-below-entry",
+    "worldPosition": [
+      9,
+      27.5,
+      79.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.6,
+      3,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-north-wall-west",
+    "worldPosition": [
+      5.1,
+      52.125,
+      91.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.2,
+      53.25,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-north-wall-east",
+    "worldPosition": [
+      12.9,
+      52.125,
+      91.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.2,
+      53.25,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-north-wall-below-exit",
+    "worldPosition": [
+      9,
+      49,
+      91.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.6,
+      47,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-entry-duct-floor",
+    "worldPosition": [
+      9,
+      31.05,
+      80.1
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.4,
+      0.25,
+      1.2
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-exit-platform",
+    "worldPosition": [
+      9,
+      74.5,
+      90.2
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4.5,
+      0.5,
+      3
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-exit-lock",
+    "worldPosition": [
+      9,
+      76.3,
+      91.3
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      2.6,
+      3.6,
+      0.35
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-4-cargo-elevator-moving-platform-surface",
+    "worldPosition": [
+      9,
+      29.5,
+      85.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      8,
+      0.5,
+      8
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-4-greybox/room-4-cargo-elevator-moving-platform",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-floor",
+    "worldPosition": [
+      0,
+      74.55,
+      108.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      40,
+      0.4,
+      34
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-west-wall",
+    "worldPosition": [
+      -20,
+      87.75,
+      108.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      26,
+      34
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-east-wall",
+    "worldPosition": [
+      20,
+      87.75,
+      108.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.4,
+      26,
+      34
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-ceiling",
+    "worldPosition": [
+      0,
+      100.75,
+      108.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      40,
+      0.4,
+      34
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-front-wall-west",
+    "worldPosition": [
+      -6.25,
+      87.75,
+      91.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      27.5,
+      26,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-front-wall-east",
+    "worldPosition": [
+      15.25,
+      87.75,
+      91.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      9.5,
+      26,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-front-wall-above-entry",
+    "worldPosition": [
+      9,
+      89.75,
+      91.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      22,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-rear-wall-west",
+    "worldPosition": [
+      -16,
+      87.75,
+      125.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      8,
+      26,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-rear-wall-east-left-of-goop-door",
+    "worldPosition": [
+      -4.75,
+      87.75,
+      125.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      6.5,
+      26,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-rear-wall-east-right-of-goop-door",
+    "worldPosition": [
+      10.75,
+      87.75,
+      125.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      18.5,
+      26,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-rear-wall-above-goop-door",
+    "worldPosition": [
+      0,
+      90,
+      125.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      21.5,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-rear-wall-below-observation",
+    "worldPosition": [
+      -10,
+      85.85,
+      125.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4,
+      22.200001,
+      0.4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-goop-wooden-door",
+    "worldPosition": [
+      0,
+      77,
+      125.25
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      4.5,
+      0.3
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": "goop-dissolvable",
+    "textureRole": "wooden-door",
+    "soluble": true,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-lower-platform-c",
+    "worldPosition": [
+      0.084,
+      76.687,
+      102.793
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4.5,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-central-rest-platform",
+    "worldPosition": [
+      -0.68,
+      80.832,
+      115.652
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5,
+      0.5,
+      4.5
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-containment-route-top",
+    "worldPosition": [
+      0,
+      75.325,
+      110
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      6,
+      0.5,
+      6
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-upper-platform-a",
+    "worldPosition": [
+      6.109,
+      82.374,
+      110.287
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.849,
+      0.523,
+      2.091
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-upper-platform-a.001",
+    "worldPosition": [
+      6.109,
+      82.374,
+      115.657
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.849,
+      0.523,
+      1.921
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-upper-platform-a.003",
+    "worldPosition": [
+      6.109,
+      82.374,
+      105.453
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.849,
+      0.523,
+      2.091
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-moving-platform-1-moving-platform-surface",
+    "worldPosition": [
+      6.109,
+      82.374,
+      100.384
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.849,
+      0.523,
+      2.091
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox/room-5-moving-platform-1-moving-platform",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-moving-platform-2-moving-platform-surface",
+    "worldPosition": [
+      15.109,
+      82.374,
+      100.384
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      1.849,
+      0.523,
+      2.091
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox/room-5-moving-platform-2-moving-platform",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-east-sticky-ascent",
+    "worldPosition": [
+      19.72,
+      89.5,
+      107.247
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.022,
+      18.351999,
+      5.46
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "vertical-sides",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-east-sticky-ascent-extension",
+    "worldPosition": [
+      19.72,
+      97.068,
+      115.636
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.022,
+      3.192,
+      11.328
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "vertical-sides",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-final-approach-platform",
+    "worldPosition": [
+      15.436,
+      93.2,
+      120
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      4.5,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-final-sticky-transfer-1",
+    "worldPosition": [
+      10,
+      95.2,
+      125.18
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      6.5,
+      0.022
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "vertical-sides",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-final-sticky-transfer-3",
+    "worldPosition": [
+      2,
+      95.2,
+      125.18
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      6.5,
+      0.022
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "vertical-sides",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-final-sticky-transfer-5",
+    "worldPosition": [
+      -6,
+      95.2,
+      125.18
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      3,
+      6.5,
+      0.022
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "vertical-sides",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-final-bounce-platform",
+    "worldPosition": [
+      -9.5,
+      95.5,
+      121.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5,
+      0.5,
+      4
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-containment-glass",
+    "worldPosition": [
+      0,
+      77.075,
+      110
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      5.1,
+      3.2,
+      4.5
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-observation-floor",
+    "worldPosition": [
+      -10,
+      97.3,
+      129
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      8,
+      0.4,
+      7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-observation-roof",
+    "worldPosition": [
+      -10,
+      104.2,
+      129
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      8,
+      0.3,
+      7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-observation-west-wall",
+    "worldPosition": [
+      -14,
+      100.75,
+      129
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.3,
+      7,
+      7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-observation-east-wall",
+    "worldPosition": [
+      -6,
+      100.75,
+      129
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.3,
+      7,
+      7
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-observation-back-wall",
+    "worldPosition": [
+      -10,
+      100.75,
+      132.5
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      8,
+      7,
+      0.3
+    ],
+    "surfaceTag": "default",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": null,
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  },
+  {
+    "name": "room-5-observation-sticky-lever-handle",
+    "worldPosition": [
+      -10,
+      100.2,
+      131.75
+    ],
+    "worldQuaternion": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "worldScale": [
+      1,
+      1,
+      1
+    ],
+    "localDimensions": [
+      0.42,
+      2.6,
+      0.42
+    ],
+    "surfaceTag": "sticky",
+    "movementFaceMode": "all",
+    "interactionRole": null,
+    "textureRole": "sticky-wall-tile",
+    "soluble": false,
+    "parentPath": "containment-level-greybox/containment-room-5-greybox",
+    "developmentOnly": false
+  }
+]

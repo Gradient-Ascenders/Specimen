@@ -8,6 +8,7 @@ interface GreyboxTestPanelOptions {
   onRunSlimeRosterRegression: () => string;
   onRunTwoBodySwitchingRegression: () => string;
   onRunDissolveRegression: () => string;
+  onToggleCollisionOverlay: () => boolean;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -24,6 +25,7 @@ export class GreyboxTestPanel {
   private readonly slimeRosterRegressionButton: HTMLButtonElement;
   private readonly twoBodySwitchingRegressionButton: HTMLButtonElement;
   private readonly dissolveRegressionButton: HTMLButtonElement;
+  private readonly collisionOverlayButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -39,7 +41,7 @@ export class GreyboxTestPanel {
       >−</button>
 
       <div class="test-panel-content">
-        <p class="eyebrow">Level 1 teaching grey-box</p>
+        <p class="eyebrow">Level 1 containment diagnostics</p>
         <h1>Containment: climb + bounce</h1>
         <p class="summary">Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump. As Goop, hold right mouse to aim and press left mouse to fire acid.</p>
 
@@ -72,6 +74,7 @@ export class GreyboxTestPanel {
           <button type="button" data-action="slime-roster-regression">Check slime roster</button>
           <button type="button" data-action="two-body-switching-regression">Check two-body switching</button>
           <button type="button" data-action="dissolve-regression">Check Goop dissolve</button>
+          <button type="button" data-action="collision-overlay" aria-pressed="false">Show collision overlay</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -112,6 +115,10 @@ export class GreyboxTestPanel {
       this.element.querySelector<HTMLButtonElement>(
         '[data-action="dissolve-regression"]',
       );
+    const collisionOverlayButton =
+      this.element.querySelector<HTMLButtonElement>(
+        '[data-action="collision-overlay"]',
+      );
 
     if (
       !status ||
@@ -123,7 +130,8 @@ export class GreyboxTestPanel {
       !slopeRegressionButton ||
       !slimeRosterRegressionButton ||
       !twoBodySwitchingRegressionButton ||
-      !dissolveRegressionButton
+      !dissolveRegressionButton ||
+      !collisionOverlayButton
     ) {
       throw new Error('Missing collision test controls.');
     }
@@ -139,6 +147,7 @@ export class GreyboxTestPanel {
     this.twoBodySwitchingRegressionButton =
       twoBodySwitchingRegressionButton;
     this.dissolveRegressionButton = dissolveRegressionButton;
+    this.collisionOverlayButton = collisionOverlayButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
@@ -161,6 +170,10 @@ export class GreyboxTestPanel {
     this.dissolveRegressionButton.addEventListener(
       'click',
       this.runDissolveRegression,
+    );
+    this.collisionOverlayButton.addEventListener(
+      'click',
+      this.toggleCollisionOverlay,
     );
   }
 
@@ -186,6 +199,10 @@ export class GreyboxTestPanel {
     this.dissolveRegressionButton.removeEventListener(
       'click',
       this.runDissolveRegression,
+    );
+    this.collisionOverlayButton.removeEventListener(
+      'click',
+      this.toggleCollisionOverlay,
     );
   }
 
@@ -249,6 +266,17 @@ export class GreyboxTestPanel {
   private readonly runDissolveRegression = (): void => {
     const result = this.options.onRunDissolveRegression();
     this.status.textContent = `Goop dissolve: ${result}`;
+  };
+
+  private readonly toggleCollisionOverlay = (): void => {
+    const visible = this.options.onToggleCollisionOverlay();
+    this.collisionOverlayButton.textContent = visible
+      ? 'Hide collision overlay'
+      : 'Show collision overlay';
+    this.collisionOverlayButton.setAttribute('aria-pressed', String(visible));
+    this.status.textContent = visible
+      ? 'Collision overlay enabled: cyan default, magenta sticky, amber soluble.'
+      : 'Collision overlay hidden.';
   };
 
   setRuntimeDiagnostics(text: string): void {

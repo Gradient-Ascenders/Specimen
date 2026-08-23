@@ -99,7 +99,6 @@ export class GreyboxRoomBuilder {
     if (options.textureRole) mesh.userData.textureRole = options.textureRole;
     mesh.userData.sizeMetres = [...options.size];
     this.collisionMeshes.push(mesh);
-    this.addOutline(mesh);
     return mesh;
   }
 
@@ -174,17 +173,6 @@ export class GreyboxRoomBuilder {
     if (options.rotation) mesh.rotation.set(...options.rotation);
     this.root.add(mesh);
     return mesh;
-  }
-
-  private addOutline(mesh: THREE.Mesh): void {
-    const outline = new THREE.LineSegments(
-      new THREE.EdgesGeometry(mesh.geometry),
-      new THREE.LineBasicMaterial({ color: 0x24302f }),
-    );
-    outline.name = `${mesh.name}-outline`;
-    outline.position.copy(mesh.position);
-    outline.rotation.copy(mesh.rotation);
-    this.root.add(outline);
   }
 }
 

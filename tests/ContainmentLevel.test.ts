@@ -90,7 +90,7 @@ test('complete Containment scene exposes unique, consistently tagged colliders',
   assert.deepEqual(goopDoor.userData.sizeMetres, [3, 4.5, 0.3]);
   assert.ok(goopDoor.position.equals(new THREE.Vector3(0, 77, 125.25)));
   assert.ok(goopDoor.material instanceof THREE.MeshStandardMaterial);
-  assert.equal(goopDoor.material.color.getHex(), 0x744522);
+  assert.equal(goopDoor.material.color.getHex(), 0x686047);
 
   const stickyMeshes = scene.collisionMeshes.filter(
     (mesh) => mesh.userData.surfaceTag === 'sticky',
@@ -438,13 +438,14 @@ test('Room 4 camera cap is camera-only and compact arrival framing stays inside 
   assert.equal(scene.collisionMeshes.includes(cap), false);
   assert.equal(cap.visible, true);
   assert.equal((cap.material as THREE.Material).visible, false);
-  const topFrame = scene.cameraObstructionMeshes.find(
-    (mesh) =>
-      mesh.name === 'room-4-cargo-elevator-shaft-top-frame',
+  // The production Room 4 art replaces the greybox elevator top frame. The
+  // dedicated invisible cap remains the authoritative camera-only blocker.
+  assert.equal(
+    scene.cameraObstructionMeshes.some(
+      (mesh) => mesh.name === 'room-4-cargo-elevator-shaft-top-frame',
+    ),
+    false,
   );
-  assert.ok(topFrame);
-  assert.equal(scene.collisionMeshes.includes(topFrame), false);
-  assert.equal((topFrame.material as THREE.Material).visible, true);
 
   const cameraOnlyWorld = new CollisionWorld();
   cameraOnlyWorld.register(cap, CollisionLayer.CameraObstruction);

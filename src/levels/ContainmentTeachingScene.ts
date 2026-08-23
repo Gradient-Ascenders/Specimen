@@ -13,6 +13,9 @@ import {
   SlimeBurstPresentation,
   type SlimeBurstDiagnostics,
 } from '../render/slime/SlimeBurstPresentation.ts';
+import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import { RoomOneArt } from '../render/environment/containment/RoomOneArt.ts';
+import { RoomTwoArt } from '../render/environment/containment/RoomTwoArt.ts';
 
 interface BoxOptions {
   readonly name: string;
@@ -52,42 +55,78 @@ const ROOM_2_SAFE_LANDING_POSITION = new THREE.Vector3(
  */
 export class ContainmentTeachingScene {
   readonly root = new THREE.Group();
+  readonly roomOneArt: RoomOneArt;
+  readonly roomTwoArt: RoomTwoArt;
 
   private readonly collisionMeshList: THREE.Mesh[] = [];
   private readonly solubleTargetMeshList: THREE.Mesh[] = [];
+  private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
+  private readonly ownedMaterials = new Set<THREE.Material>();
+  private readonly artResources: ContainmentArtResources;
   private readonly slimeVisual: SlimeVisual;
   private readonly slimeBurst = new SlimeBurstPresentation();
   private deathElapsedSeconds = 0;
+  private disposed = false;
 
-  constructor() {
+  constructor(
+    artResources: ContainmentArtResources,
+    options: { readonly includeDevelopmentHelpers?: boolean } = {},
+  ) {
+    this.artResources = artResources;
+    // Retain the validated hierarchy name for collision fingerprint stability.
     this.root.name = 'containment-climb-and-bounce-greybox';
 
-    const materials = {
-      floor: this.material(0xaeb6ba),
-      wall: this.material(0xdadfe1),
-      support: this.material(0x424a50),
-      sticky: this.material(0x9fae38, 0x263100),
-      stickyVent: this.material(0x718c3d, 0x162600),
-      platform: this.material(0xd6a928, 0x443300),
-      locked: this.material(0x8b3030, 0x320505),
-      exit: this.material(0x62bf83, 0x0a3018),
-      duct: this.material(0x444a4d),
-      glass: new THREE.MeshStandardMaterial({
-        color: 0x9ee7e4,
-        emissive: 0x163d42,
-        emissiveIntensity: 0.2,
-        transparent: true,
-        opacity: 0.28,
-        roughness: 0.18,
-        metalness: 0.15,
-      }),
-      egg: this.material(0x70c8ff, 0x063b63),
+    const roomOneMaterials = {
+      floor: artResources.materials.clinicalFloor,
+      wall: artResources.materials.mechanicalBacking,
+      ceiling: artResources.materials.mainCeramic,
+      support: artResources.materials.mainCeramic,
+      // Gameplay metadata owns adhesion. This collider-only material emits no
+      // render fragments; RoomOneArt supplies the explicit green membrane and
+      // dark backing without exposing the collider's coplanar top face.
+      sticky: this.collisionOnlyMaterial(
+        'containment-room-1-sticky-wall-collision-only',
+      ),
+      // This short floor remains sticky only to smooth the wall-to-duct
+      // transition. Its appearance stays ordinary service metal so it reads as
+      // part of the vent rather than a second biological membrane.
+      stickyVent: artResources.materials.serviceMetal,
+      platform: artResources.materials.secondaryCeramic,
+      locked: artResources.materials.lockedStatus,
+      exit: artResources.materials.staticCyanEmissive,
+      duct: artResources.materials.serviceMetal,
+      glass: artResources.materials.containmentGlass,
+      egg: artResources.materials.specimenShell,
+    };
+    const roomTwoCollisionMaterial = this.collisionOnlyMaterial(
+      'containment-room-2-production-collision-only',
+    );
+    const roomTwoMaterials = {
+      floor: roomTwoCollisionMaterial,
+      wall: roomTwoCollisionMaterial,
+      support: roomTwoCollisionMaterial,
+      sticky: roomTwoCollisionMaterial,
+      stickyVent: roomTwoCollisionMaterial,
+      platform: roomTwoCollisionMaterial,
+      locked: roomTwoCollisionMaterial,
+      exit: roomTwoCollisionMaterial,
+      duct: roomTwoCollisionMaterial,
+      glass: roomTwoCollisionMaterial,
+      egg: roomTwoCollisionMaterial,
     };
 
-    this.addRoomOne(materials);
-    this.addVentTransition(materials);
-    this.addRoomTwo(materials);
-    this.addReferenceMarkers(materials.exit);
+    this.addRoomOne(
+      roomOneMaterials,
+      options.includeDevelopmentHelpers === true,
+    );
+    this.addVentTransition(roomOneMaterials);
+    this.addRoomTwo(roomTwoMaterials);
+    if (options.includeDevelopmentHelpers === true) {
+      this.addReferenceMarkers(artResources.materials.staticCyanEmissive);
+    }
+    this.roomOneArt = new RoomOneArt(artResources);
+    this.roomTwoArt = new RoomTwoArt(artResources);
+    this.root.add(this.roomOneArt.root, this.roomTwoArt.root);
 
     this.slimeVisual = new SlimeVisual({
       radiusMetres: DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
@@ -205,23 +244,22 @@ export class ContainmentTeachingScene {
   }
 
   resetProbe(): void {
+    this.roomOneArt.reset();
     this.finishDeath(SPAWN_POSITION);
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.slimeBurst.dispose();
     this.slimeVisual.dispose();
+    this.roomOneArt.dispose();
+    this.roomTwoArt.dispose();
     this.root.removeFromParent();
-    this.root.traverse((object) => {
-      if (!(object instanceof THREE.Mesh || object instanceof THREE.LineSegments)) {
-        return;
-      }
-      object.geometry.dispose();
-      const materials = Array.isArray(object.material)
-        ? object.material
-        : [object.material];
-      for (const material of materials) material.dispose();
-    });
+    for (const geometry of this.ownedGeometries) geometry.dispose();
+    for (const material of this.ownedMaterials) material.dispose();
+    this.ownedGeometries.clear();
+    this.ownedMaterials.clear();
     this.collisionMeshList.length = 0;
     this.solubleTargetMeshList.length = 0;
     this.root.clear();
@@ -238,45 +276,47 @@ export class ContainmentTeachingScene {
     this.slimeVisual.onLaunch(launch);
   }
 
-  private addRoomOne(materials: Record<string, THREE.Material>): void {
+  private addRoomOne(
+    materials: Record<string, THREE.Material>,
+    includeDevelopmentHelpers: boolean,
+  ): void {
     // 14 × 12 × 8 m sterile containment chamber.
     this.addCollider({ name: 'room-1-floor', size: [14, 0.4, 12], position: [0, -0.2, 0], material: materials.floor });
     this.addCollider({ name: 'room-1-rear-wall', size: [14, 8, 0.4], position: [0, 4, -6], material: materials.wall });
     this.addCollider({ name: 'room-1-west-wall', size: [0.4, 8, 12], position: [-7, 4, 0], material: materials.wall });
     this.addCollider({ name: 'room-1-east-wall', size: [0.4, 8, 12], position: [7, 4, 0], material: materials.wall });
-    this.addCollider({ name: 'room-1-ceiling', size: [14, 0.3, 12], position: [0, 8, 0], material: materials.wall });
+    this.addCollider({ name: 'room-1-ceiling', size: [14, 0.3, 12], position: [0, 8, 0], material: materials.ceiling });
 
     // The north perimeter is split so the contaminated wall and open vent are
     // real authored collision surfaces instead of decorative overlays.
     // The sticky route is directly below the opening. Its top is exactly level
     // with the duct floor so edge traversal can roll smoothly over the lip.
     this.addCollider({ name: 'room-1-north-clean-west', size: [1.2, 8, 0.4], position: [-6.4, 4, 6], material: materials.wall });
-    this.addCollider({ name: 'room-1-vent-sticky-entry-wall', size: [2, 5.225, 0.4], position: [-4.8, 2.6125, 6], material: materials.sticky, surfaceTag: 'sticky', textureRole: 'sticky-wall-tile' });
+    this.addCollider({
+      name: 'room-1-vent-sticky-entry-wall',
+      size: [2, 5.225, 0.4],
+      position: [-4.8, 2.6125, 6],
+      material: materials.sticky,
+      surfaceTag: 'sticky',
+      textureRole: 'sticky-wall-tile',
+    });
     this.addCollider({ name: 'room-1-north-clean-centre', size: [4, 8, 0.4], position: [-1.8, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
-
-    this.addVisualBox('room-1-locked-door-false-lead', [2.6, 3, 0.18], [4.3, 1.5, 5.76], materials.locked);
-    this.addOpenVentFrame('room-1-vent-open-frame', [-4.8, 6, 5.74], materials.duct);
 
     this.addCollider({ name: 'room-1-containment-pedestal', size: [2.6, 1.1, 2.6], position: [0, 0.55, -0.5], material: materials.support });
 
     // Development proof for #30. Only this explicitly-marked barrier is
     // soluble; ordinary floor/wall/sticky/non-stick geometry remains untouched.
-    this.addSolubleCollider({
-      name: 'room-1-goop-soluble-test-barrier',
-      size: [2.2, 2.4, 0.35],
-      position: [4.8, 1.2, -2.6],
-      dissolveDurationSeconds: 1.8,
-      collisionDisableProgress: 0.72,
-    });
-
-    this.addVisualBox('room-1-glass-containment-box', [1.8, 1.9, 1.8], [0, 2.05, -0.5], materials.glass);
-    const egg = new THREE.Mesh(new THREE.SphereGeometry(0.48, 20, 14), materials.egg);
-    egg.name = 'room-1-specimen-egg';
-    egg.scale.set(0.82, 1.18, 0.82);
-    egg.position.set(0, 1.85, -0.5);
-    this.root.add(egg);
+    if (includeDevelopmentHelpers) {
+      this.addSolubleCollider({
+        name: 'room-1-goop-soluble-test-barrier',
+        size: [2.2, 2.4, 0.35],
+        position: [4.8, 1.2, -2.6],
+        dissolveDurationSeconds: 1.8,
+        collisionDisableProgress: 0.72,
+      });
+    }
 
     this.addCeilingLight('room-1-fluorescent-a', [-3.8, 7.7, -1.5]);
     this.addCeilingLight('room-1-fluorescent-b', [3.8, 7.7, -1.5]);
@@ -395,19 +435,22 @@ export class ContainmentTeachingScene {
   }
 
   private addReferenceMarkers(exitMaterial: THREE.Material): void {
+    const roomOneMarkerGeometry = new THREE.TorusGeometry(0.72, 0.055, 10, 40);
+    const roomOneMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0x54e8e0 });
+    this.ownedGeometries.add(roomOneMarkerGeometry);
+    this.ownedMaterials.add(roomOneMarkerMaterial);
     const roomOneMarker = new THREE.Mesh(
-      new THREE.TorusGeometry(0.72, 0.055, 10, 40),
-      new THREE.MeshBasicMaterial({ color: 0x54e8e0 }),
+      roomOneMarkerGeometry,
+      roomOneMarkerMaterial,
     );
     roomOneMarker.name = 'room-1-safe-spawn-marker';
     roomOneMarker.position.set(SPAWN_POSITION.x, SPAWN_POSITION.y - 0.46, SPAWN_POSITION.z);
     roomOneMarker.rotation.x = Math.PI / 2;
     this.root.add(roomOneMarker);
 
-    const roomTwoMarker = new THREE.Mesh(
-      new THREE.TorusGeometry(0.72, 0.055, 10, 40),
-      exitMaterial,
-    );
+    const roomTwoMarkerGeometry = new THREE.TorusGeometry(0.72, 0.055, 10, 40);
+    this.ownedGeometries.add(roomTwoMarkerGeometry);
+    const roomTwoMarker = new THREE.Mesh(roomTwoMarkerGeometry, exitMaterial);
     roomTwoMarker.name = 'room-2-safe-recovery-marker';
     roomTwoMarker.position.set(
       ROOM_2_SAFE_LANDING_POSITION.x,
@@ -442,9 +485,11 @@ export class ContainmentTeachingScene {
     readonly dissolveDurationSeconds: number;
     readonly collisionDisableProgress: number;
   }): void {
-    const material = this.material(0xb66a36, 0x4f1a06);
+    const material = this.artResources.materials.solubleComposite;
+    const geometry = new THREE.BoxGeometry(...options.size);
+    this.ownedGeometries.add(geometry);
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(...options.size),
+      geometry,
       material,
     );
     mesh.name = options.name;
@@ -469,8 +514,10 @@ export class ContainmentTeachingScene {
 
 
   private addCollider(options: BoxOptions): void {
+    const geometry = new THREE.BoxGeometry(...options.size);
+    this.ownedGeometries.add(geometry);
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(...options.size),
+      geometry,
       options.material,
     );
     mesh.name = options.name;
@@ -481,38 +528,6 @@ export class ContainmentTeachingScene {
     mesh.userData.sizeMetres = [...options.size];
     this.root.add(mesh);
     this.collisionMeshList.push(mesh);
-
-    const outline = new THREE.LineSegments(
-      new THREE.EdgesGeometry(mesh.geometry),
-      new THREE.LineBasicMaterial({ color: 0x24302f }),
-    );
-    outline.name = `${options.name}-outline`;
-    outline.position.copy(mesh.position);
-    outline.rotation.copy(mesh.rotation);
-    this.root.add(outline);
-  }
-
-  private addVisualBox(name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material): void {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-    mesh.name = name;
-    mesh.position.set(...position);
-    this.root.add(mesh);
-  }
-
-  /** A frame, not a filled panel: the Room 1 vent must read as open. */
-  private addOpenVentFrame(
-    name: string,
-    position: readonly [number, number, number],
-    material: THREE.Material,
-  ): void {
-    const [x, y, z] = position;
-    const width = 2.1;
-    const height = 1.4;
-    const thickness = 0.14;
-    this.addVisualBox(`${name}-top`, [width, thickness, thickness], [x, y + height * 0.5, z], material);
-    this.addVisualBox(`${name}-bottom`, [width, thickness, thickness], [x, y - height * 0.5, z], material);
-    this.addVisualBox(`${name}-left`, [thickness, height, thickness], [x - width * 0.5, y, z], material);
-    this.addVisualBox(`${name}-right`, [thickness, height, thickness], [x + width * 0.5, y, z], material);
   }
 
   private addCeilingLight(name: string, position: readonly [number, number, number]): void {
@@ -522,13 +537,11 @@ export class ContainmentTeachingScene {
     this.root.add(light);
   }
 
-  private material(colour: number, emissive = 0x000000): THREE.MeshStandardMaterial {
-    return new THREE.MeshStandardMaterial({
-      color: colour,
-      emissive,
-      emissiveIntensity: emissive === 0 ? 0 : 0.28,
-      roughness: 0.7,
-      metalness: 0.05,
-    });
+  private collisionOnlyMaterial(name: string): THREE.MeshBasicMaterial {
+    const material = new THREE.MeshBasicMaterial();
+    material.name = name;
+    material.visible = false;
+    this.ownedMaterials.add(material);
+    return material;
   }
 }

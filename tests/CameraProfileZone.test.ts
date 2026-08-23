@@ -15,11 +15,13 @@ import {
   CollisionWorld,
 } from '../src/physics/CollisionWorld.ts';
 import { CameraRig } from '../src/render/CameraRig.ts';
+import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 
 const STEP_SECONDS = 1 / 60;
 
 test('Room 4 lift zone activates, restores, and resolves correctly after reset', () => {
-  const room = new RoomFourGreybox(() => {});
+  const artResources = new ContainmentArtResources();
+  const room = new RoomFourGreybox(() => {}, artResources);
   const world = new CollisionWorld();
   world.registerAll(room.collisionMeshes);
   world.registerAll(
@@ -204,4 +206,5 @@ test('Room 4 lift zone activates, restores, and resolves correctly after reset',
 
   world.clear();
   room.dispose();
+  artResources.dispose();
 });

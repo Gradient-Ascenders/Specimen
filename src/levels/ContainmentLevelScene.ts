@@ -7,6 +7,7 @@ import type {
   Vector3State,
 } from '../render/slime/SlimeVisual.ts';
 import type { SlimeBurstDiagnostics } from '../render/slime/SlimeBurstPresentation.ts';
+import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { ContainmentTeachingScene } from './ContainmentTeachingScene.ts';
 import { RoomFiveGreybox, type RoomFiveHazardFailure } from './RoomFiveGreybox.ts';
 import { RoomFourGreybox, type RoomFourHazardFailure } from './RoomFourGreybox.ts';
@@ -20,16 +21,23 @@ export type ContainmentHazardFailure =
 /** Complete Level 1 scene composition while preserving the teaching-scene API. */
 export class ContainmentLevelScene {
   readonly root = new THREE.Group();
-  readonly teaching = new ContainmentTeachingScene();
+  readonly artResources = new ContainmentArtResources();
+  readonly teaching: ContainmentTeachingScene;
   readonly roomThree: RoomThreeGreybox;
   readonly roomFour: RoomFourGreybox;
   readonly roomFive: RoomFiveGreybox;
 
-  constructor(requestHazardFailure: (failure: ContainmentHazardFailure) => void) {
+  constructor(
+    requestHazardFailure: (failure: ContainmentHazardFailure) => void,
+    options: { readonly includeDevelopmentHelpers?: boolean } = {},
+  ) {
+    // Retain the validated hierarchy name because it is part of the frozen
+    // collision parent path; production art is layered beneath it.
     this.root.name = 'containment-level-greybox';
-    this.roomThree = new RoomThreeGreybox(requestHazardFailure);
-    this.roomFour = new RoomFourGreybox(requestHazardFailure);
-    this.roomFive = new RoomFiveGreybox(requestHazardFailure);
+    this.teaching = new ContainmentTeachingScene(this.artResources, options);
+    this.roomThree = new RoomThreeGreybox(requestHazardFailure, this.artResources);
+    this.roomFour = new RoomFourGreybox(requestHazardFailure, this.artResources);
+    this.roomFive = new RoomFiveGreybox(requestHazardFailure, this.artResources);
     this.root.add(
       this.teaching.root,
       this.roomThree.root,
@@ -109,6 +117,7 @@ export class ContainmentLevelScene {
 
   update(deltaSeconds: number, visualState?: SlimeVisualState): void {
     this.teaching.update(deltaSeconds, visualState);
+    this.roomThree.updatePresentation(deltaSeconds);
   }
 
   startDeath(position: Vector3State): boolean {
@@ -143,6 +152,7 @@ export class ContainmentLevelScene {
     this.roomFour.dispose();
     this.roomThree.dispose();
     this.teaching.dispose();
+    this.artResources.dispose();
     this.root.removeFromParent();
     this.root.clear();
   }

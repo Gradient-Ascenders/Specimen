@@ -33,6 +33,7 @@ import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
+import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
 import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
@@ -126,6 +127,7 @@ interface GreyboxRuntimeResources {
   readonly dissolveTargets: readonly DissolveTarget[];
   readonly dissolveSystem: DissolveSystem;
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
+  readonly collisionOverlay: ContainmentCollisionOverlay | undefined;
   readonly pressurePlateOccupants: readonly [
     {
       readonly id: 'bob';
@@ -543,6 +545,7 @@ export class GreyboxLevelRuntime {
       (failure: ContainmentHazardFailure) => {
         containmentLevel.requestHazardFailure(failure);
       },
+      { includeDevelopmentHelpers: this.debugAvailable },
     );
     this.renderLayer.scene.add(testScene.root);
 
@@ -554,6 +557,9 @@ export class GreyboxLevelRuntime {
     );
     const surfaceRegistry = new SurfaceRegistry();
     surfaceRegistry.registerAll(testScene.collisionMeshes);
+    const collisionOverlay = this.debugAvailable
+      ? new ContainmentCollisionOverlay(testScene.collisionMeshes)
+      : undefined;
     const movementEvents = new EventBus<MovementEvents>();
     const puzzleRegistry = new PuzzleRegistry();
     const dissolveTargets = testScene.solubleTargetMeshes
@@ -737,6 +743,11 @@ export class GreyboxLevelRuntime {
           onRunSlimeRosterRegression: runSlimeManagerRegression,
           onRunTwoBodySwitchingRegression: runTwoBodySwitchingRegression,
           onRunDissolveRegression: runDissolveRegression,
+          onToggleCollisionOverlay: () => {
+            if (!collisionOverlay) return false;
+            collisionOverlay.setVisible(!collisionOverlay.isVisible);
+            return collisionOverlay.isVisible;
+          },
         })
       : undefined;
 
@@ -790,6 +801,7 @@ export class GreyboxLevelRuntime {
       puzzleRegistry,
       dissolveTargets,
       dissolveSystem,
+      collisionOverlay,
       acidProjectileSystem,
       pressurePlateOccupants,
       deathSequence,
@@ -898,6 +910,7 @@ export class GreyboxLevelRuntime {
     resources.acidProjectileSystem.dispose();
     resources.dissolveSystem.dispose();
     for (const target of resources.dissolveTargets) target.dispose();
+    resources.collisionOverlay?.dispose();
     resources.puzzleRegistry.clear();
     resources.slimePairPresentation.dispose();
     resources.slimeManager.clearLevelRegistrations();
@@ -1177,6 +1190,7 @@ export class GreyboxLevelRuntime {
       dissolveSystem,
       acidProjectileSystem,
       dissolveTargets,
+      collisionOverlay,
     } = resources;
     const heldActions = Array.from(this.input.held).join(', ') || 'none';
     const activeBody = slimePair.activeBody;
@@ -1201,7 +1215,8 @@ export class GreyboxLevelRuntime {
       [
         `active level: ${LEVEL_ID}`,
         `lifecycle state / restarts: ${this.lifecycle.state} / ${this.lifecycle.restartCount}`,
-        `debug overlay: visible (${DEBUG_TOGGLE_CODE} toggles)`,
+        `debug panel: visible (${DEBUG_TOGGLE_CODE} toggles)`,
+        `collision overlay: ${collisionOverlay ? (collisionOverlay.isVisible ? 'visible' : 'hidden') : 'unavailable'}`,
         `fixed step: ${(stats.fixedDeltaSeconds * 1000).toFixed(2)} ms`,
         `render frame / FPS: ${(stats.rawFrameDeltaSeconds * 1000).toFixed(2)} ms / ${stats.renderFps.toFixed(1)}`,
         `steps this frame: ${stats.stepsThisFrame}`,
@@ -1278,9 +1293,12 @@ export class GreyboxLevelRuntime {
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
         `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
-        `scene objects: ${renderStats.sceneObjects}`,
+        `scene objects / lights: ${renderStats.sceneObjects} / ${renderStats.sceneLights}`,
+        `unique materials / instanced meshes: ${renderStats.uniqueMaterials} / ${renderStats.instancedMeshes}`,
         `GPU geometries / textures: ${renderStats.geometries} / ${renderStats.textures}`,
         `shader programs: ${renderStats.programs}`,
+        `Containment art materials / textures / geometries: ${testScene.artResources.diagnostics.materialCount} / ${testScene.artResources.diagnostics.textureCount} / ${testScene.artResources.diagnostics.geometryCount}`,
+        `Containment art texture bytes: ${testScene.artResources.diagnostics.estimatedTextureBytes}`,
       ].join('\n'),
     );
   }

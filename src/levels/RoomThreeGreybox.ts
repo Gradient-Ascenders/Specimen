@@ -2,6 +2,8 @@ import * as THREE from 'three';
 
 import { LaserHazard } from '../hazards/LaserHazard.ts';
 import { LaserHazardSystem } from '../hazards/LaserHazardSystem.ts';
+import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import { RoomThreeArt } from '../render/environment/containment/RoomThreeArt.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import {
@@ -41,13 +43,18 @@ export class RoomThreeGreybox {
     size: new THREE.Vector3(38, 10, 32),
   });
   readonly lasers: LaserHazardSystem;
+  readonly art: RoomThreeArt;
 
   private readonly laserPresentation: LaserHazardPresentation;
 
-  constructor(requestFailure: (failure: RoomThreeHazardFailure) => void) {
+  constructor(
+    requestFailure: (failure: RoomThreeHazardFailure) => void,
+    artResources: ContainmentArtResources,
+  ) {
     this.buildShell();
     this.buildTraversal();
     this.buildVentTransition();
+    this.hideGameplayColliders();
 
     const hazards = this.createHazards();
     this.lasers = new LaserHazardSystem({
@@ -57,7 +64,8 @@ export class RoomThreeGreybox {
         requestFailure({ roomId: 'room-3', hazardId: hazard.id }),
     });
     this.laserPresentation = new LaserHazardPresentation(hazards);
-    this.root.add(this.lasers.root, this.laserPresentation.root);
+    this.art = new RoomThreeArt(artResources, hazards);
+    this.root.add(this.lasers.root, this.laserPresentation.root, this.art.root);
   }
 
   updateEntryTrigger(target: TriggerContactTarget): void {
@@ -72,6 +80,10 @@ export class RoomThreeGreybox {
     this.lasers.update(deltaSeconds, target);
     this.laserPresentation.sync();
     this.exitTrigger.update(target);
+  }
+
+  updatePresentation(deltaSeconds: number): void {
+    this.art.update(deltaSeconds);
   }
 
   reset(): void {
@@ -97,9 +109,17 @@ export class RoomThreeGreybox {
     this.checkpointTrigger.dispose();
     this.exitTrigger.dispose();
     this.failureVolume.dispose();
+    this.art.dispose();
     this.laserPresentation.dispose();
     this.lasers.dispose();
     this.builder.dispose();
+  }
+
+  private hideGameplayColliders(): void {
+    for (const [role, material] of Object.entries(this.builder.materials)) {
+      material.name = `containment-room-3-${role}-collision-only`;
+      material.visible = false;
+    }
   }
 
   private buildShell(): void {
