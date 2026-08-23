@@ -263,128 +263,173 @@ export class CultivationLevelRuntime {
   }
 
   private readonly loadResources = (): void => {
-    const scene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
-    this.renderLayer.scene.add(scene.root);
-    const collisionWorld = new CollisionWorld();
-    collisionWorld.registerAll(scene.collisionMeshes);
-    const surfaceRegistry = new SurfaceRegistry();
-    surfaceRegistry.registerAll(scene.collisionMeshes);
-    const manager = new SlimeManager<KinematicBody>();
-    if (!manager.isUnlocked('goop')) manager.unlock('goop');
-    const entrance = CULTIVATION_FOUNDATION_MANIFEST.checkpoints[0];
-    const bobDefinition = manager.getDefinition('bob');
-    const goopDefinition = manager.getDefinition('goop');
-    const bobBody = new KinematicBody({
-      world: collisionWorld,
-      surfaces: surfaceRegistry,
-      initialPosition: entrance.bobSpawnPosition,
-      config: {
-        adhesionEnabled: bobDefinition.abilities.adhesion,
-        reboundEnabled: bobDefinition.abilities.rebound,
-        chargedJumpEnabled: bobDefinition.jumpMode === 'charged',
-      },
-    });
-    const goopBody = new KinematicBody({
-      world: collisionWorld,
-      surfaces: surfaceRegistry,
-      initialPosition: entrance.goopSpawnPosition,
-      config: {
-        adhesionEnabled: goopDefinition.abilities.adhesion,
-        reboundEnabled: goopDefinition.abilities.rebound,
-        chargedJumpEnabled: goopDefinition.jumpMode === 'charged',
-      },
-    });
-    const pair = new PersistentSlimePair({
-      manager,
-      bobBody,
-      goopBody,
-      bobSpawnPosition: entrance.bobSpawnPosition,
-      goopSpawnPosition: entrance.goopSpawnPosition,
-      initialActiveSlimeId: this.initialProgression.activeSlimeId,
-    });
-
-    const deathSequence = new DeathSequence();
-    let radiation: RadioactiveHazardSystem;
-    const controller = new CultivationLevelController({
-      pair,
-      collisionWorld,
-      initialActiveSlimeId: this.initialProgression.activeSlimeId,
-      requestDeath: (recovery, dyingSlimeId) =>
-        this.requestPlayerDeath(recovery, dyingSlimeId),
-      cancelTransients: () => radiation?.reset(),
-    });
-    radiation = new RadioactiveHazardSystem(
-      CULTIVATION_FOUNDATION_MANIFEST.radioactiveHazards,
-      (failure) => controller.requestRadiationFailure(failure),
-    );
-    const radiationTargets: readonly RadiationContactTarget[] = [
-      {
-        id: 'bob', kind: 'slime', position: bobBody.position,
-        radiusMetres: bobBody.radiusMetres,
-        response: bobDefinition.hazardResponses.radiation,
-      },
-      {
-        id: 'goop', kind: 'slime', position: goopBody.position,
-        radiusMetres: goopBody.radiusMetres,
-        response: goopDefinition.hazardResponses.radiation,
-      },
-    ];
-
-    const bobVisual = new SlimeVisual({ radiusMetres: bobBody.radiusMetres });
-    this.renderLayer.scene.add(bobVisual.mesh);
-    const pairPresentation = new SlimePairPresentation(bobBody.radiusMetres);
-    this.renderLayer.scene.add(pairPresentation.root);
-    const burst = new SlimeBurstPresentation();
-    this.renderLayer.scene.add(burst.root);
-    const debugPanel = this.debugAvailable
-      ? new CultivationTestPanel(() => this.restartLevel())
-      : undefined;
-    if (debugPanel) {
-      this.host.append(debugPanel.element);
-      this.hostWindow.addEventListener('keydown', this.onDebugToggle);
-    }
-    const deathScreen = new DeathScreen({
-      onRetry: this.retryAfterDeath,
-      backgroundElements: [this.renderLayer.canvas, ...(debugPanel ? [debugPanel.element] : [])],
-    });
-    this.host.append(deathScreen.element);
-
-    const bobVisualState = this.createBobVisualState(bobBody);
-    const unsubscribeControllerObjective = controller.events.on(
-      'objectiveChanged',
-      (event) => this.events.emit('objectiveChanged', event),
-    );
-    const unsubscribeControllerProgress = controller.events.on(
-      'progressChanged',
-      () => this.host.dataset.gameState = controller.readModel.state,
-    );
-    const notifyManager = () => this.notifyHUD();
-    const unsubscribeManager = [
-      manager.events.on('activeChanged', notifyManager),
-      manager.events.on('registered', notifyManager),
-      manager.events.on('unregistered', notifyManager),
-      manager.events.on('unlocked', notifyManager),
-    ];
-
-    this.resources = {
-      scene, collisionWorld, surfaceRegistry, manager, pair, controller, radiation,
-      radiationTargets, bobVisual, pairPresentation, burst, deathSequence,
-      deathScreen, bobFacing: new BlobFacing(), bobVisualState,
-      jumpInputState: { pressed: false, held: false, released: false, cancelled: false },
-      movement: new THREE.Vector3(), noMovement: new THREE.Vector3(),
-      renderedBobPosition: new THREE.Vector3(), renderedGoopPosition: new THREE.Vector3(),
-      debugPanel, unsubscribeControllerObjective, unsubscribeControllerProgress,
-      unsubscribeManager,
+    const rollbackActions: Array<() => void> = [];
+    const rollback = (action: () => void): void => {
+      rollbackActions.push(action);
     };
-    this.renderLayer.cameraRig.reset();
-    this.retargetCamera(this.resources);
-    this.host.dataset.gameState = controller.readModel.state;
-    this.applyDebugPresentation();
-    this.notifyHUD();
-    this.events.emit('objectiveChanged', {
-      roomId: controller.readModel.roomId,
-      objective: controller.readModel.objective,
-    });
+
+    try {
+      const scene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
+      rollback(() => scene.dispose());
+      this.renderLayer.scene.add(scene.root);
+
+      const collisionWorld = new CollisionWorld();
+      rollback(() => collisionWorld.clear());
+      collisionWorld.registerAll(scene.collisionMeshes);
+
+      const surfaceRegistry = new SurfaceRegistry();
+      rollback(() => surfaceRegistry.clear());
+      surfaceRegistry.registerAll(scene.collisionMeshes);
+
+      const manager = new SlimeManager<KinematicBody>();
+      rollback(() => manager.dispose());
+      if (!manager.isUnlocked('goop')) manager.unlock('goop');
+      const entrance = CULTIVATION_FOUNDATION_MANIFEST.checkpoints[0];
+      const bobDefinition = manager.getDefinition('bob');
+      const goopDefinition = manager.getDefinition('goop');
+      const bobBody = new KinematicBody({
+        world: collisionWorld,
+        surfaces: surfaceRegistry,
+        initialPosition: entrance.bobSpawnPosition,
+        config: {
+          adhesionEnabled: bobDefinition.abilities.adhesion,
+          reboundEnabled: bobDefinition.abilities.rebound,
+          chargedJumpEnabled: bobDefinition.jumpMode === 'charged',
+        },
+      });
+      const goopBody = new KinematicBody({
+        world: collisionWorld,
+        surfaces: surfaceRegistry,
+        initialPosition: entrance.goopSpawnPosition,
+        config: {
+          adhesionEnabled: goopDefinition.abilities.adhesion,
+          reboundEnabled: goopDefinition.abilities.rebound,
+          chargedJumpEnabled: goopDefinition.jumpMode === 'charged',
+        },
+      });
+      const pair = new PersistentSlimePair({
+        manager,
+        bobBody,
+        goopBody,
+        bobSpawnPosition: entrance.bobSpawnPosition,
+        goopSpawnPosition: entrance.goopSpawnPosition,
+        initialActiveSlimeId: this.initialProgression.activeSlimeId,
+      });
+
+      const deathSequence = new DeathSequence();
+      let radiation: RadioactiveHazardSystem;
+      const controller = new CultivationLevelController({
+        pair,
+        collisionWorld,
+        initialActiveSlimeId: this.initialProgression.activeSlimeId,
+        requestDeath: (recovery, dyingSlimeId) =>
+          this.requestPlayerDeath(recovery, dyingSlimeId),
+        cancelTransients: () => radiation?.reset(),
+      });
+      rollback(() => controller.dispose());
+      radiation = new RadioactiveHazardSystem(
+        CULTIVATION_FOUNDATION_MANIFEST.radioactiveHazards,
+        (failure) => controller.requestRadiationFailure(failure),
+      );
+      rollback(() => radiation.dispose());
+      const radiationTargets: readonly RadiationContactTarget[] = [
+        {
+          id: 'bob', kind: 'slime', position: bobBody.position,
+          radiusMetres: bobBody.radiusMetres,
+          response: bobDefinition.hazardResponses.radiation,
+        },
+        {
+          id: 'goop', kind: 'slime', position: goopBody.position,
+          radiusMetres: goopBody.radiusMetres,
+          response: goopDefinition.hazardResponses.radiation,
+        },
+      ];
+
+      const bobVisual = new SlimeVisual({ radiusMetres: bobBody.radiusMetres });
+      rollback(() => bobVisual.dispose());
+      this.renderLayer.scene.add(bobVisual.mesh);
+      const pairPresentation = new SlimePairPresentation(bobBody.radiusMetres);
+      rollback(() => pairPresentation.dispose());
+      this.renderLayer.scene.add(pairPresentation.root);
+      const burst = new SlimeBurstPresentation();
+      rollback(() => burst.dispose());
+      this.renderLayer.scene.add(burst.root);
+      const debugPanel = this.debugAvailable
+        ? new CultivationTestPanel(() => this.restartLevel())
+        : undefined;
+      if (debugPanel) {
+        rollback(() => debugPanel.dispose());
+        this.host.append(debugPanel.element);
+        this.hostWindow.addEventListener('keydown', this.onDebugToggle);
+        rollback(() =>
+          this.hostWindow.removeEventListener('keydown', this.onDebugToggle));
+      }
+      const deathScreen = new DeathScreen({
+        onRetry: this.retryAfterDeath,
+        backgroundElements: [
+          this.renderLayer.canvas,
+          ...(debugPanel ? [debugPanel.element] : []),
+        ],
+      });
+      rollback(() => deathScreen.dispose());
+      this.host.append(deathScreen.element);
+
+      const bobVisualState = this.createBobVisualState(bobBody);
+      const unsubscribeControllerObjective = controller.events.on(
+        'objectiveChanged',
+        (event) => this.events.emit('objectiveChanged', event),
+      );
+      rollback(unsubscribeControllerObjective);
+      const unsubscribeControllerProgress = controller.events.on(
+        'progressChanged',
+        () => this.host.dataset.gameState = controller.readModel.state,
+      );
+      rollback(unsubscribeControllerProgress);
+      const notifyManager = () => this.notifyHUD();
+      const unsubscribeManager = [
+        manager.events.on('activeChanged', notifyManager),
+        manager.events.on('registered', notifyManager),
+        manager.events.on('unregistered', notifyManager),
+        manager.events.on('unlocked', notifyManager),
+      ];
+      rollback(() => {
+        for (const unsubscribe of unsubscribeManager) unsubscribe();
+      });
+
+      this.resources = {
+        scene, collisionWorld, surfaceRegistry, manager, pair, controller,
+        radiation, radiationTargets, bobVisual, pairPresentation, burst,
+        deathSequence, deathScreen, bobFacing: new BlobFacing(), bobVisualState,
+        jumpInputState: {
+          pressed: false,
+          held: false,
+          released: false,
+          cancelled: false,
+        },
+        movement: new THREE.Vector3(),
+        noMovement: new THREE.Vector3(),
+        renderedBobPosition: new THREE.Vector3(),
+        renderedGoopPosition: new THREE.Vector3(),
+        debugPanel,
+        unsubscribeControllerObjective,
+        unsubscribeControllerProgress,
+        unsubscribeManager,
+      };
+      this.renderLayer.cameraRig.reset();
+      this.retargetCamera(this.resources);
+      this.host.dataset.gameState = controller.readModel.state;
+      this.applyDebugPresentation();
+      this.notifyHUD();
+      this.events.emit('objectiveChanged', {
+        roomId: controller.readModel.roomId,
+        objective: controller.readModel.objective,
+      });
+      rollbackActions.length = 0;
+    } catch (error) {
+      this.resources = undefined;
+      this.rollbackFailedLoad(rollbackActions);
+      throw error;
+    }
   };
 
   private readonly startResources = (): void => {
@@ -441,6 +486,37 @@ export class CultivationLevelRuntime {
     this.debugVisible = false;
     this.notifyHUD();
   };
+
+  private rollbackFailedLoad(rollbackActions: Array<() => void>): void {
+    for (let index = rollbackActions.length - 1; index >= 0; index -= 1) {
+      try {
+        rollbackActions[index]();
+      } catch {
+        // Preserve the original construction failure while completing as much
+        // rollback as possible.
+      }
+    }
+    rollbackActions.length = 0;
+
+    try {
+      this.renderLayer.cameraRig.clearFollowTarget();
+    } catch {
+      // The camera may not have reached its initialization step.
+    }
+    try {
+      this.input.setEnabled(false);
+      this.input.releasePointerLock();
+    } catch {
+      // Input cleanup is best effort while preserving the load error.
+    }
+    delete this.host.dataset.gameState;
+    this.debugVisible = false;
+    try {
+      this.notifyHUD();
+    } catch {
+      // A HUD subscriber must not replace the original load error.
+    }
+  }
 
   private switchActive(resources: CultivationRuntimeResources): boolean {
     const previousSlimeId = resources.pair.activeSlimeId;

@@ -33,7 +33,9 @@ export class GameSessionCoordinator {
   private unsubscribeRuntimeEvents: readonly (() => void)[] = [];
   private unsubscribeRuntimeHUD: () => void = () => {};
   private transitionPending = false;
+  private transitionGeneration = 0;
   private transitionFailed = false;
+  private debugInteractionEnabled = true;
   private disposed = false;
 
   constructor(options: GameSessionCoordinatorOptions) {
@@ -54,8 +56,12 @@ export class GameSessionCoordinator {
     if (this.transitionFailed) throw new Error('Cannot restart after a failed level transition.');
     this.runtime.restartLevel();
   }
-  unload(): void { this.runtime.unload(); }
+  unload(): void {
+    this.cancelPendingTransition();
+    this.runtime.unload();
+  }
   setDebugInteractionEnabled(enabled: boolean): void {
+    this.debugInteractionEnabled = enabled;
     this.runtime.setDebugInteractionEnabled(enabled && !this.transitionPending);
   }
 
@@ -80,6 +86,7 @@ export class GameSessionCoordinator {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.cancelPendingTransition();
     this.unbindRuntime();
     this.runtime.dispose();
     this.hudListeners.clear();
@@ -112,12 +119,21 @@ export class GameSessionCoordinator {
     const progression = this.runtime.captureProgressionSnapshot();
     if (this.runtime.state === 'running') this.runtime.stop();
     this.transitionPending = true;
+    const transitionGeneration = ++this.transitionGeneration;
+    this.runtime.setDebugInteractionEnabled(false);
     this.events.emit('transitionStarted', { message: 'Entering Level 2…' });
-    this.scheduleTransition(() => this.performLevelTwoTransition(progression));
+    this.scheduleTransition(() =>
+      this.performLevelTwoTransition(progression, transitionGeneration));
   }
 
-  private performLevelTwoTransition(progression: LevelProgressionSnapshot): void {
-    if (this.disposed || !this.transitionPending) return;
+  private performLevelTwoTransition(
+    progression: LevelProgressionSnapshot,
+    transitionGeneration: number,
+  ): void {
+    if (
+      this.disposed || !this.transitionPending ||
+      transitionGeneration !== this.transitionGeneration
+    ) return;
     const previousRuntime = this.runtime;
     let nextRuntime: GameLevelRuntime | undefined;
 
@@ -128,6 +144,9 @@ export class GameSessionCoordinator {
 
       nextRuntime = this.createLevelTwo(progression);
       this.runtime = nextRuntime;
+      nextRuntime.setDebugInteractionEnabled(
+        this.debugInteractionEnabled && !this.transitionPending,
+      );
       this.bindRuntime(nextRuntime);
       nextRuntime.load();
       this.transitionPending = false;
@@ -144,5 +163,11 @@ export class GameSessionCoordinator {
       });
       for (const listener of this.hudListeners) listener(EMPTY_SLIME_HUD_SNAPSHOT);
     }
+  }
+
+  private cancelPendingTransition(): void {
+    if (!this.transitionPending) return;
+    this.transitionPending = false;
+    this.transitionGeneration += 1;
   }
 }

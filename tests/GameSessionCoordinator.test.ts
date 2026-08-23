@@ -12,6 +12,7 @@ class MockRuntime implements GameLevelRuntime {
   readonly events = new EventBus<GameLevelRuntimeEvents>();
   state: LevelLifecycleState = 'unloaded';
   readonly calls: string[] = [];
+  readonly debugInteractionCalls: boolean[] = [];
   readonly id: string;
   private readonly progression: LevelProgressionSnapshot;
   private readonly failLoad: boolean;
@@ -34,7 +35,9 @@ class MockRuntime implements GameLevelRuntime {
   dispose(): void { this.calls.push('dispose'); this.state = 'disposed'; }
   fixedUpdate(): void {}
   render(): void {}
-  setDebugInteractionEnabled(): void {}
+  setDebugInteractionEnabled(enabled: boolean): void {
+    this.debugInteractionCalls.push(enabled);
+  }
   subscribeSlimeHUD(listener: (snapshot: typeof EMPTY_SLIME_HUD_SNAPSHOT) => void): () => void {
     listener(EMPTY_SLIME_HUD_SNAPSHOT);
     return () => {};
@@ -92,5 +95,61 @@ test('a Level 2 load failure leaves a diagnosable non-running session', () => {
   assert.equal(session.state, 'stopped');
   assert.match(failures[0], /load failed/);
   assert.throws(() => session.restartLevel(), /failed level transition/);
+  session.dispose();
+});
+
+test('unload invalidates a pending handoff even if another transition starts', () => {
+  const levelOne = new MockRuntime('level-1', progression);
+  const scheduled: Array<() => void> = [];
+  let created = 0;
+  const session = new GameSessionCoordinator({
+    initialRuntime: levelOne,
+    createLevelTwo: (snapshot) => {
+      created += 1;
+      return new MockRuntime('level-2', snapshot);
+    },
+    scheduleTransition: (transition) => scheduled.push(transition),
+  });
+  session.load();
+  session.start();
+
+  levelOne.events.emit('completed', { levelId: 'containment', nextLevelId: 'level-2' });
+  session.unload();
+  assert.equal(session.state, 'unloaded');
+
+  session.load();
+  session.start();
+  levelOne.events.emit('completed', { levelId: 'containment', nextLevelId: 'level-2' });
+  assert.equal(scheduled.length, 2);
+  scheduled[0]();
+  assert.equal(created, 0);
+  scheduled[1]();
+  assert.equal(created, 1);
+  session.dispose();
+});
+
+test('replacement runtime inherits disabled debug interaction during transition', () => {
+  const levelOne = new MockRuntime('level-1', progression);
+  let levelTwo: MockRuntime | undefined;
+  const session = new GameSessionCoordinator({
+    initialRuntime: levelOne,
+    createLevelTwo: (snapshot) => {
+      levelTwo = new MockRuntime('level-2', snapshot);
+      return levelTwo;
+    },
+    scheduleTransition: (transition) => transition(),
+  });
+  session.load();
+  session.start();
+  session.events.on('transitionStarted', () =>
+    session.setDebugInteractionEnabled(false));
+
+  levelOne.events.emit('completed', { levelId: 'containment', nextLevelId: 'level-2' });
+  assert.ok(levelTwo);
+  assert.deepEqual(levelTwo.debugInteractionCalls, [false]);
+
+  session.start();
+  session.setDebugInteractionEnabled(true);
+  assert.deepEqual(levelTwo.debugInteractionCalls, [false, true]);
   session.dispose();
 });
