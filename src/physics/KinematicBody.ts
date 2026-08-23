@@ -49,7 +49,7 @@ export interface KinematicBodyConfig {
 
   /** Whether this body may attach to authored sticky surfaces. */
   adhesionEnabled: boolean;
-  /** Whether this body may use authored/passive rebound behaviour. */
+  /** Whether this body may use authored bounce and hard-landing reactions. */
   reboundEnabled: boolean;
   /**
    * When false, jump presses launch immediately at the minimum jump speed.
@@ -76,12 +76,10 @@ export interface KinematicBodyConfig {
   bounceCooldownSeconds: number;
   /** Required approach speed into a bounce surface before it fires. */
   minimumBounceApproachSpeedMetresPerSecond: number;
-  /** Minimum downward landing speed that triggers the slime's innate rebound. */
-  slimeMinimumBounceImpactSpeedMetresPerSecond: number;
-  /** Fraction of vertical impact speed retained by the slime after landing. */
-  slimeBounceRestitution: number;
-  /** Safety cap for the slime's rebound speed after a very high fall. */
-  slimeMaximumBounceSpeedMetresPerSecond: number;
+  /** Minimum downward impact speed that triggers a hard-landing reaction hop. */
+  slimeHardLandingImpactSpeedMetresPerSecond: number;
+  /** Fixed launch speed for the slime's visible hard-landing reaction hop. */
+  slimeLandingReactionHopSpeedMetresPerSecond: number;
 }
 
 export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
@@ -119,9 +117,12 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   stickyJumpGravityDurationSeconds: 1.35,
   bounceCooldownSeconds: 0.12,
   minimumBounceApproachSpeedMetresPerSecond: 0.12,
-  slimeMinimumBounceImpactSpeedMetresPerSecond: 3.1,
-  slimeBounceRestitution: 0.68,
-  slimeMaximumBounceSpeedMetresPerSecond: 11,
+  // A same-height full-charge jump lands at about 9.66 m/s. Requiring 10 m/s
+  // reserves the reaction for falls of roughly 2.8 metres or more, while the
+  // fixed 5 m/s response rises about 0.69 m under the default gravity and
+  // remains below the 5.37 m/s normal gameplay jump.
+  slimeHardLandingImpactSpeedMetresPerSecond: 10,
+  slimeLandingReactionHopSpeedMetresPerSecond: 5,
 };
 
 export interface KinematicBodyOptions {
@@ -1032,20 +1033,6 @@ export class KinematicBody {
 
       if (
         allowSurfaceTransitions &&
-        this.tryApplySlimeLandingBounce(
-          velocityIntoSurface,
-          this.movementHit.normal,
-          this.movementHit.object,
-        )
-      ) {
-        this.remainingDisplacement
-          .copy(this.velocityValue)
-          .multiplyScalar(deltaSeconds * (1 - travelFraction));
-        continue;
-      }
-
-      if (
-        allowSurfaceTransitions &&
         this.config.adhesionEnabled &&
         surface.adhesive
       ) {
@@ -1106,39 +1093,26 @@ export class KinematicBody {
     return true;
   }
 
-  /**
-   * Default slime rebound: only genuine floor/slope landings bounce. Rebound
-   * speed is proportional to the impact, retains less than full energy, and
-   * is capped so a very tall fall remains controllable.
-   */
-  private tryApplySlimeLandingBounce(
-    velocityIntoSurface: number,
-    surfaceNormal: THREE.Vector3,
-    surfaceObject: THREE.Mesh | null,
+  /** Apply a fixed, visible hop after a genuinely hard floor landing. */
+  private tryApplySlimeLandingReactionHop(
+    impactSpeedMetresPerSecond: number,
   ): boolean {
     if (!this.config.reboundEnabled) return false;
     if (this.bounceCooldownSecondsValue > 0) return false;
-    // Deliberate buffered input wins over the slime's passive floor rebound.
-    // The collision may then establish support and consume the buffer below;
-    // authored bouncy surfaces have already been handled before this path.
+    // Deliberate buffered input wins over the passive landing reaction.
     if (this.jumpInputBufferRemainingSecondsValue > 0) return false;
     if (
-      surfaceNormal.dot(WORLD_UP) < this.config.minimumGroundNormalDot ||
-      velocityIntoSurface >=
-        -this.config.slimeMinimumBounceImpactSpeedMetresPerSecond
+      impactSpeedMetresPerSecond <
+      this.config.slimeHardLandingImpactSpeedMetresPerSecond
     ) {
       return false;
     }
 
-    const reboundSpeed = Math.min(
-      this.config.slimeMaximumBounceSpeedMetresPerSecond,
-      -velocityIntoSurface * this.config.slimeBounceRestitution,
-    );
     this.applyBounceImpulse(
-      reboundSpeed,
-      velocityIntoSurface,
-      surfaceNormal,
-      surfaceObject,
+      this.config.slimeLandingReactionHopSpeedMetresPerSecond,
+      0,
+      this.groundNormalValue,
+      this.supportColliderValue,
     );
 
     return true;
@@ -1498,6 +1472,8 @@ export class KinematicBody {
     this.events?.emit('landed', {
       impactSpeedMetresPerSecond,
     });
+
+    this.tryApplySlimeLandingReactionHop(impactSpeedMetresPerSecond);
   }
 
   private moveVectorTowardsZero(vector: THREE.Vector3, amount: number): void {
@@ -1561,12 +1537,12 @@ export class KinematicBody {
         config.minimumBounceApproachSpeedMetresPerSecond,
       ],
       [
-        'slimeMinimumBounceImpactSpeedMetresPerSecond',
-        config.slimeMinimumBounceImpactSpeedMetresPerSecond,
+        'slimeHardLandingImpactSpeedMetresPerSecond',
+        config.slimeHardLandingImpactSpeedMetresPerSecond,
       ],
       [
-        'slimeMaximumBounceSpeedMetresPerSecond',
-        config.slimeMaximumBounceSpeedMetresPerSecond,
+        'slimeLandingReactionHopSpeedMetresPerSecond',
+        config.slimeLandingReactionHopSpeedMetresPerSecond,
       ],
     ];
 
@@ -1586,12 +1562,20 @@ export class KinematicBody {
     }
 
     if (
-      !Number.isFinite(config.slimeBounceRestitution) ||
-      config.slimeBounceRestitution <= 0 ||
-      config.slimeBounceRestitution >= 1
+      config.slimeLandingReactionHopSpeedMetresPerSecond >=
+      config.slimeHardLandingImpactSpeedMetresPerSecond
     ) {
       throw new Error(
-        'slimeBounceRestitution must be finite and within (0, 1).',
+        'slimeLandingReactionHopSpeedMetresPerSecond must be less than slimeHardLandingImpactSpeedMetresPerSecond.',
+      );
+    }
+
+    if (
+      config.slimeLandingReactionHopSpeedMetresPerSecond >=
+      config.minimumJumpSpeedMetresPerSecond
+    ) {
+      throw new Error(
+        'slimeLandingReactionHopSpeedMetresPerSecond must be less than minimumJumpSpeedMetresPerSecond.',
       );
     }
 
