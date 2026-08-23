@@ -20,7 +20,9 @@ export type GameFlowState =
   | 'paused'
   | 'settings'
   | 'credits'
-  | 'restarting';
+  | 'restarting'
+  | 'transitioning'
+  | 'transitionFailed';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -90,6 +92,18 @@ export class GameFlowStateModel {
     return this.transitionFrom('restarting', 'playing');
   }
 
+  beginLevelTransition(): boolean {
+    return this.transitionFrom('playing', 'transitioning');
+  }
+
+  finishLevelTransition(): boolean {
+    return this.transitionFrom('transitioning', 'playing');
+  }
+
+  failLevelTransition(): boolean {
+    return this.transitionFrom('transitioning', 'transitionFailed');
+  }
+
   cancelRestart(): boolean {
     return this.transitionFrom('restarting', 'paused');
   }
@@ -151,6 +165,8 @@ const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'settings',
   'credits',
   'restarting',
+  'transitioning',
+  'transitionFailed',
 ]);
 
 export class GameFlowUI {
@@ -176,6 +192,9 @@ export class GameFlowUI {
   private readonly slimeRoster: HTMLElement;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
+  private readonly transitionMessage: HTMLElement;
+  private readonly transitionFailureMessage: HTMLElement;
+  private readonly transitionContinueButton: HTMLButtonElement;
   private readonly unsubscribeSettings: () => void;
   private readonly unsubscribeSlimeHUD: () => void;
   private readonly switchFeedbackModel = new SlimeSwitchFeedbackModel();
@@ -216,6 +235,13 @@ export class GameFlowUI {
     this.slimeRoster = this.requireElement('[data-slime-roster]');
     this.passiveStatus = this.requireElement('[data-passive-status]');
     this.switchFeedback = this.requireElement('[data-switch-feedback]');
+    this.transitionMessage = this.requireElement('[data-transition-message]');
+    this.transitionFailureMessage = this.requireElement(
+      '[data-transition-failure-message]',
+    );
+    this.transitionContinueButton = this.requireElement<HTMLButtonElement>(
+      '[data-action="enter-level-two"]',
+    );
 
     for (const panel of this.element.querySelectorAll<HTMLElement>(
       '[data-flow-panel]',
@@ -256,6 +282,28 @@ export class GameFlowUI {
     const nextObjective = objective.trim();
     if (!nextObjective) throw new Error('Gameplay objectives cannot be empty.');
     this.objective.textContent = nextObjective;
+  }
+
+  beginLevelTransition(message: string): void {
+    if (!this.model.beginLevelTransition()) return;
+    this.transitionMessage.textContent = message;
+    this.transitionContinueButton.hidden = true;
+    this.switchFeedbackModel.clear();
+    this.switchFeedback.textContent = '';
+    this.syncState();
+  }
+
+  finishLevelTransition(): void {
+    if (this.model.state !== 'transitioning') return;
+    this.transitionMessage.textContent = 'Level 2 ready';
+    this.transitionContinueButton.hidden = false;
+    this.transitionContinueButton.focus();
+  }
+
+  failLevelTransition(message: string): void {
+    if (!this.model.failLevelTransition()) return;
+    this.transitionFailureMessage.textContent = message;
+    this.syncState();
   }
 
   dispose(): void {
@@ -374,6 +422,25 @@ export class GameFlowUI {
           <p class="flow-eyebrow">Containment runtime</p>
           <h1 id="restarting-heading">Restarting trial…</h1>
           <p role="status" aria-live="polite">Restoring the authored level state.</p>
+        </div>
+      </section>
+
+      <section class="flow-screen" data-flow-panel="transitioning" aria-labelledby="transition-heading" hidden>
+        <div class="flow-card restart-card">
+          <div class="loading-mark" aria-hidden="true"></div>
+          <p class="flow-eyebrow">Cultivation runtime</p>
+          <h1 id="transition-heading" data-transition-message>Entering Level 2…</h1>
+          <p role="status" aria-live="polite">Transferring the specimen pair.</p>
+          <button class="primary-action" type="button" data-action="enter-level-two" hidden>Enter Level 2</button>
+        </div>
+      </section>
+
+      <section class="flow-screen" data-flow-panel="transitionFailed" aria-labelledby="transition-failed-heading" hidden>
+        <div class="flow-card">
+          <p class="flow-eyebrow">Runtime stopped</p>
+          <h1 id="transition-failed-heading">Level transition failed</h1>
+          <p class="flow-status" data-transition-failure-message role="alert">Level 2 could not be started.</p>
+          <p class="setting-note">Reload after inspecting the console and F2 diagnostics.</p>
         </div>
       </section>
     `;
@@ -508,6 +575,14 @@ export class GameFlowUI {
         break;
       case 'restart':
         this.restart();
+        break;
+      case 'enter-level-two':
+        if (this.model.state !== 'transitioning' || target.hidden) break;
+        this.actions.startGameplay();
+        if (this.model.finishLevelTransition()) {
+          this.syncState();
+          this.actions.requestPointerLock();
+        }
         break;
       case 'settings':
         if (this.model.openSettings()) this.syncState();

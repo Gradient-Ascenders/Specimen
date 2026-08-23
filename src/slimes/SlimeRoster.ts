@@ -8,6 +8,7 @@ export type SlimeAbility =
 
 export type SlimeBetaAvailability = 'playable' | 'locked';
 export type SlimeJumpMode = 'charged' | 'normal';
+export type RadiationResponse = 'lethal' | 'immune';
 
 export interface SlimeAbilityConfiguration {
   /** May attach to and traverse authored sticky surfaces. */
@@ -31,6 +32,10 @@ export interface SlimeDefinition {
   readonly initiallyUnlocked: boolean;
   /** Player-facing jump style for this slime identity. */
   readonly jumpMode: SlimeJumpMode;
+  readonly hazardResponses: {
+    /** Explicit identity policy for authored radioactive hazards. */
+    readonly radiation: RadiationResponse;
+  };
   readonly abilities: SlimeAbilityConfiguration;
 }
 
@@ -47,6 +52,7 @@ export const SLIME_DEFINITIONS: readonly SlimeDefinition[] = [
     betaAvailability: 'playable',
     initiallyUnlocked: true,
     jumpMode: 'charged',
+    hazardResponses: { radiation: 'lethal' },
     abilities: {
       adhesion: true,
       rebound: true,
@@ -60,6 +66,7 @@ export const SLIME_DEFINITIONS: readonly SlimeDefinition[] = [
     betaAvailability: 'playable',
     initiallyUnlocked: false,
     jumpMode: 'normal',
+    hazardResponses: { radiation: 'immune' },
     abilities: {
       adhesion: false,
       rebound: false,
@@ -73,6 +80,7 @@ export const SLIME_DEFINITIONS: readonly SlimeDefinition[] = [
     betaAvailability: 'locked',
     initiallyUnlocked: false,
     jumpMode: 'normal',
+    hazardResponses: { radiation: 'lethal' },
     abilities: {
       adhesion: false,
       rebound: false,

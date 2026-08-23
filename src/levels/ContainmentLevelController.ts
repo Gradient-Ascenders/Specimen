@@ -171,12 +171,7 @@ export class ContainmentLevelController {
     if (this.stateValue === 'complete') return;
     if (this.stateValue === 'completing') {
       if (this.scene.roomFive.updateEnding(deltaSeconds)) {
-        this.stateValue = 'complete';
-        this.completionCountValue += 1;
-        this.events.emit('completed', {
-          levelId: 'containment',
-          nextLevelId: 'level-2',
-        });
+        this.completeLevel();
       }
       return;
     }
@@ -222,6 +217,13 @@ export class ContainmentLevelController {
     this.stateValue = 'playing';
     this.setActiveRoom(roomId);
     this.leverAdhesionSeconds = 0;
+  }
+
+  /** Development-only shortcut that exercises the normal level handoff event. */
+  completeForDebug(): boolean {
+    if (this.stateValue !== 'playing') return false;
+    this.completeLevel();
+    return true;
   }
 
   reset(): void {
@@ -389,6 +391,15 @@ export class ContainmentLevelController {
       this.checkpoints.recover(this.body));
     if (accepted) this.lastFailureIdValue = failureId;
     return accepted;
+  }
+
+  private completeLevel(): void {
+    this.stateValue = 'complete';
+    this.completionCountValue += 1;
+    this.events.emit('completed', {
+      levelId: 'containment',
+      nextLevelId: 'level-2',
+    });
   }
 
   private readonly isSpawnSafe = (

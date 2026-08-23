@@ -52,7 +52,6 @@ import {
 import { DeathScreen } from '../ui/DeathScreen.ts';
 import {
   ContainmentLevelController,
-  type ContainmentObjectiveChangedEvent,
 } from './ContainmentLevelController.ts';
 import {
   ContainmentLevelScene,
@@ -62,6 +61,11 @@ import {
   LevelLifecycle,
   type LevelLifecycleState,
 } from './LevelLifecycle.ts';
+import type { GameLevelRuntimeEvents } from './GameLevelRuntime.ts';
+import type {
+  LevelProgressionSnapshot,
+  PlayableSlimeId,
+} from './LevelProgression.ts';
 
 const LEVEL_ID = 'containment-teaching-level-1';
 const DEBUG_TOGGLE_CODE = 'F2';
@@ -96,10 +100,6 @@ export interface GreyboxLevelRuntimeOptions {
   renderLayer: RenderLayer;
   window?: Window;
   debugAvailable?: boolean;
-}
-
-export interface GreyboxLevelRuntimeEvents {
-  objectiveChanged: ContainmentObjectiveChangedEvent;
 }
 
 interface GreyboxRuntimeResources {
@@ -155,7 +155,7 @@ interface GreyboxRuntimeResources {
 
 /** Concrete lifecycle and resource owner for the current Level 1 teaching grey-box. */
 export class GreyboxLevelRuntime {
-  readonly events = new EventBus<GreyboxLevelRuntimeEvents>();
+  readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
   private readonly input: Input;
@@ -209,6 +209,17 @@ export class GreyboxLevelRuntime {
 
   getSlimeHUDSnapshot(): SlimeHUDSnapshot {
     return this.createSlimeHUDSnapshot();
+  }
+
+  captureProgressionSnapshot(): LevelProgressionSnapshot {
+    const resources = this.requireResources();
+    return {
+      unlockedSlimeIds: resources.slimeManager.getRosterState()
+        .filter((entry) =>
+          entry.unlocked && (entry.id === 'bob' || entry.id === 'goop'))
+        .map((entry) => entry.id as PlayableSlimeId),
+      activeSlimeId: resources.slimePair.activeSlimeId,
+    };
   }
 
   private createSlimeHUDSnapshot(
@@ -306,6 +317,15 @@ export class GreyboxLevelRuntime {
 
     if (this.debugAvailable && this.input.wasPressed('debugReset')) {
       this.restartLevel();
+      return;
+    }
+    if (
+      this.debugAvailable &&
+      testPanel &&
+      this.input.wasPressed('debugCompleteLevel')
+    ) {
+      testPanel.completeLevel();
+      this.input.endFixedUpdate();
       return;
     }
     const requestedDebugRoom =
@@ -732,6 +752,7 @@ export class GreyboxLevelRuntime {
               resources,
             );
           },
+          onCompleteLevel: () => containmentLevel.completeForDebug(),
           onTeleportRoom: (roomId) => {
             containmentLevel.setActiveBody(slimePair.activeBody);
             containmentLevel.teleportToRoomForDebug(roomId);
@@ -760,8 +781,9 @@ export class GreyboxLevelRuntime {
     });
     const unsubscribeLevelCompleted = containmentLevel.events.on(
       'completed',
-      () => {
+      (event) => {
         this.host.dataset.gameState = 'level-complete';
+        this.events.emit('completed', event);
       },
     );
     const unsubscribeObjectiveChanged = containmentLevel.events.on(
