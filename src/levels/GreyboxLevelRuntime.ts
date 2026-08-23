@@ -404,6 +404,7 @@ export class GreyboxLevelRuntime {
 
     containmentLevel.setActiveBody(activeBody);
     containmentLevel.update(deltaSeconds);
+    this.syncContextualCamera(resources);
     if (!deathSequence.isPlaying) {
       this.updateDeathState(deltaSeconds, resources);
       return;
@@ -715,6 +716,7 @@ export class GreyboxLevelRuntime {
             containmentLevel.teleportToRoomForDebug(roomId);
             blobFacing.reset();
             testScene.setProbePosition(body.position);
+            this.syncContextualCamera(this.requireResources());
           },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
           onRunSlimeRosterRegression: runSlimeManagerRegression,
@@ -837,6 +839,7 @@ export class GreyboxLevelRuntime {
     resources.blobFacing.reset();
     this.renderLayer.cameraRig.reset();
     this.retargetCameraToActiveSlime(resources);
+    this.syncContextualCamera(resources);
     this.renderLayer.cameraRig.setGroundOrbitYawRadians(
       ROOM_ONE_INITIAL_CAMERA_YAW_RADIANS,
     );
@@ -965,6 +968,14 @@ export class GreyboxLevelRuntime {
     this.cameraFollowSlimeId = resources.slimePair.activeSlimeId;
   }
 
+  private syncContextualCamera(resources: GreyboxRuntimeResources): void {
+    this.renderLayer.cameraRig.setContextualCamera(
+      resources.testScene.roomFour.liftCameraZone.resolve(
+        resources.slimePair.activeBody,
+      ),
+    );
+  }
+
   private requestPlayerDeath(
     recovery: DeathRecoveryAction,
     resources: GreyboxRuntimeResources,
@@ -995,6 +1006,7 @@ export class GreyboxLevelRuntime {
     // restore a different active slime than the one that died. Camera ownership
     // must follow that restored active identity before gameplay resumes.
     this.retargetCameraToActiveSlime(resources);
+    this.syncContextualCamera(resources);
     this.notifySlimeHUD(undefined, true);
 
     // The teaching scene owns Bob's legacy visual; the two-body presentation
@@ -1223,9 +1235,10 @@ export class GreyboxLevelRuntime {
         `last collision: ${activeBody.lastCollisionName}`,
         `registered colliders / surfaces: ${collisionWorld.colliderCount} / ${surfaceRegistry.registeredCount}`,
         `camera distance: ${cameraStats.currentDistanceMetres.toFixed(2)} / ${cameraStats.desiredDistanceMetres.toFixed(2)} m`,
+        `camera profile / blend: ${cameraStats.profileId} / ${(cameraStats.profileBlend * 100).toFixed(0)}%`,
         `camera obstruction: ${cameraStats.obstructed ? cameraStats.obstructionName : 'none'}`,
         `camera position: ${cameraPosition.x.toFixed(2)}, ${cameraPosition.y.toFixed(2)}, ${cameraPosition.z.toFixed(2)} m`,
-        `camera pitch: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}°`,
+        `camera pitch manual / effective: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}° / ${THREE.MathUtils.radToDeg(cameraStats.effectivePitchRadians).toFixed(1)}°`,
         `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
         `teaching-surface regression: ${this.slopeRegressionStatus}`,
         `two-body switching regression: ${this.twoBodySwitchingRegressionStatus}`,

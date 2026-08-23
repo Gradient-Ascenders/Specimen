@@ -7,12 +7,24 @@ import { ElevatorSequence } from '../puzzle/ElevatorSequence.ts';
 import { MovingPlatform } from '../puzzle/MovingPlatform.ts';
 import { ElevatorPresentation } from '../render/elevator/ElevatorPresentation.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
+import type { ContextualCameraProfile } from '../render/CameraProfile.ts';
+import { CameraProfileZone } from './CameraProfileZone.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import { LevelTriggerVolume } from './LevelTriggerVolume.ts';
 
 export const ROOM_4_CHECKPOINT_POSITION = new THREE.Vector3(9, 30.21, 85.5);
 export const ROOM_4_CHECKPOINT_ID = 'containment-room-4-elevator-roof';
 export const ROOM_4_PUZZLE_GROUP_ID = 'containment-room-4';
+export const ROOM_4_LIFT_CAMERA_PROFILE: Readonly<ContextualCameraProfile> = {
+  id: 'containment-room-4-lift-high-angle',
+  distanceMetres: 10.5,
+  targetHeightMetres: 1.1,
+  pitchRadians: THREE.MathUtils.degToRad(65),
+  transitionDurationSeconds: 0.65,
+  framingDeadZoneHalfWidthMetres: 1.5,
+  framingDeadZoneHalfHeightMetres: 1.25,
+  framingDampingPerSecond: 7,
+};
 
 export interface RoomFourHazardFailure {
   readonly roomId: 'room-4';
@@ -37,6 +49,13 @@ export class RoomFourGreybox {
     checkpointGroupId: ROOM_4_PUZZLE_GROUP_ID,
     startDelaySeconds: 3,
     arrivalDelaySeconds: 2,
+  });
+  readonly liftCameraZone = new CameraProfileZone({
+    id: 'room-4-lift-camera-zone',
+    centre: new THREE.Vector3(9, 51, 85.5),
+    size: new THREE.Vector3(12.4, 52, 11.4),
+    profile: ROOM_4_LIFT_CAMERA_PROFILE,
+    anchor: this.elevatorPlatform,
   });
   readonly checkpointTrigger = new LevelTriggerVolume({
     id: 'room-4-roof-checkpoint-trigger',
@@ -113,6 +132,7 @@ export class RoomFourGreybox {
     this.checkpointTrigger.reset();
     this.exitTrigger.reset();
     this.failureVolume.reset();
+    this.liftCameraZone.reset();
     this.syncPresentation();
   }
 
@@ -120,6 +140,7 @@ export class RoomFourGreybox {
     this.checkpointTrigger.dispose();
     this.exitTrigger.dispose();
     this.failureVolume.dispose();
+    this.liftCameraZone.dispose();
     this.laserPresentation.dispose();
     this.elevatorPresentation.dispose();
     this.lasers.dispose();

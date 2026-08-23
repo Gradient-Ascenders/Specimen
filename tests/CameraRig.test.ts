@@ -8,6 +8,10 @@ import {
   CameraRig,
   type CameraFollowTarget,
 } from '../src/render/CameraRig.ts';
+import type {
+  ContextualCameraAnchor,
+  ContextualCameraProfile,
+} from '../src/render/CameraProfile.ts';
 
 interface MutableCameraTarget extends CameraFollowTarget {
   position: THREE.Vector3;
@@ -20,6 +24,16 @@ interface MutableCameraTarget extends CameraFollowTarget {
 
 const EPSILON = 1e-10;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const TEST_CONTEXTUAL_PROFILE: ContextualCameraProfile = {
+  id: 'test-high-angle-profile',
+  distanceMetres: 10,
+  targetHeightMetres: 0.35,
+  pitchRadians: THREE.MathUtils.degToRad(60),
+  transitionDurationSeconds: 0.6,
+  framingDeadZoneHalfWidthMetres: 1,
+  framingDeadZoneHalfHeightMetres: 1,
+  framingDampingPerSecond: 8,
+};
 
 function createTarget(): MutableCameraTarget {
   return {
@@ -38,6 +52,17 @@ function teleportTarget(
 ): void {
   target.position.copy(position);
   target.previousPosition.copy(position);
+}
+
+function advanceRig(
+  rig: CameraRig,
+  seconds: number,
+  interpolationAlpha = 1,
+): void {
+  const stepCount = Math.ceil(seconds * 60);
+  for (let step = 0; step < stepCount; step += 1) {
+    rig.update(interpolationAlpha, 1 / 60);
+  }
 }
 
 function applyVerticalLook(
@@ -80,6 +105,177 @@ test('vertical pointer look follows pitch convention with inversion off and on',
   const invertedMouseDown = applyVerticalLook(100, true);
   assert.ok(invertedMouseDown.cameraHeightDelta < 0);
   assert.ok(invertedMouseDown.viewDirectionY > 0);
+});
+
+test('default pitch limits provide an equally usable upward and downward view', () => {
+  const rig = new CameraRig();
+  rig.setFollowTarget(createTarget(), new CollisionWorld());
+  rig.update(1, 0);
+
+  rig.queueLookInput(0, -10_000);
+  rig.update(1, 0);
+  assert.ok(
+    Math.abs(
+      rig.getDiagnostics().pitchRadians - THREE.MathUtils.degToRad(-65),
+    ) < EPSILON,
+  );
+  assert.ok(
+    rig.camera.getWorldDirection(new THREE.Vector3()).y >
+      Math.sin(THREE.MathUtils.degToRad(64)),
+  );
+
+  rig.queueLookInput(0, 10_000);
+  rig.update(1, 0);
+  assert.ok(
+    Math.abs(
+      rig.getDiagnostics().pitchRadians - THREE.MathUtils.degToRad(65),
+    ) < EPSILON,
+  );
+  assert.ok(
+    rig.camera.getWorldDirection(new THREE.Vector3()).y <
+      -Math.sin(THREE.MathUtils.degToRad(64)),
+  );
+});
+
+test('contextual profile ignores vertical look through blend-out and restores manual pitch', () => {
+  const target = createTarget();
+  const anchor: ContextualCameraAnchor = {
+    position: new THREE.Vector3(),
+    previousPosition: new THREE.Vector3(),
+  };
+  const rig = new CameraRig({
+    initialPitchRadians: 0,
+    verticalSensitivityRadiansPerPixel: 1,
+  });
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.update(1, 0);
+  rig.queueLookInput(0, -0.4);
+  rig.update(1, 0);
+  const manualPitchBefore = rig.getDiagnostics().pitchRadians;
+
+  rig.setContextualCamera({ profile: TEST_CONTEXTUAL_PROFILE, anchor });
+  advanceRig(rig, TEST_CONTEXTUAL_PROFILE.transitionDurationSeconds);
+
+  let diagnostics = rig.getDiagnostics();
+  assert.equal(diagnostics.profileId, TEST_CONTEXTUAL_PROFILE.id);
+  assert.ok(Math.abs(diagnostics.profileBlend - 1) < EPSILON);
+  assert.ok(
+    Math.abs(
+      diagnostics.desiredDistanceMetres -
+        TEST_CONTEXTUAL_PROFILE.distanceMetres,
+    ) < EPSILON,
+  );
+  assert.ok(
+    Math.abs(
+      diagnostics.effectivePitchRadians -
+        TEST_CONTEXTUAL_PROFILE.pitchRadians,
+    ) < EPSILON,
+  );
+
+  rig.queueLookInput(0, 1);
+  rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().pitchRadians, manualPitchBefore);
+
+  rig.setContextualCamera(undefined);
+  advanceRig(rig, TEST_CONTEXTUAL_PROFILE.transitionDurationSeconds * 0.5);
+  rig.queueLookInput(0, 1);
+  rig.update(1, 1 / 60);
+  assert.equal(rig.getDiagnostics().pitchRadians, manualPitchBefore);
+
+  advanceRig(rig, TEST_CONTEXTUAL_PROFILE.transitionDurationSeconds);
+  diagnostics = rig.getDiagnostics();
+  assert.equal(diagnostics.profileId, 'default');
+  assert.ok(diagnostics.profileBlend < EPSILON);
+  assert.ok(
+    Math.abs(diagnostics.effectivePitchRadians - manualPitchBefore) < EPSILON,
+  );
+  assert.ok(rig.camera.position.toArray().every(Number.isFinite));
+});
+
+test('contextual framing follows its anchor while ignoring movement inside the dead zone', () => {
+  const target = createTarget();
+  const anchorPosition = new THREE.Vector3();
+  const anchorPreviousPosition = new THREE.Vector3();
+  const rig = new CameraRig();
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.setContextualCamera({
+    profile: TEST_CONTEXTUAL_PROFILE,
+    anchor: {
+      position: anchorPosition,
+      previousPosition: anchorPreviousPosition,
+    },
+  });
+  rig.update(1, 0);
+  advanceRig(rig, 6);
+  const settledPosition = rig.camera.position.clone();
+
+  target.position.x = 0.5;
+  target.previousPosition.x = 0.5;
+  advanceRig(rig, 1);
+  assert.ok(rig.camera.position.distanceTo(settledPosition) < 1e-8);
+
+  anchorPosition.y = 2;
+  anchorPreviousPosition.y = 2;
+  target.position.y += 2;
+  target.previousPosition.y += 2;
+  rig.update(1, 1 / 60);
+  assert.ok(
+    Math.abs(rig.camera.position.y - settledPosition.y - 2) < 1e-8,
+  );
+});
+
+test('contextual visual framing preserves camera-relative forward movement', () => {
+  const target = createTarget();
+  const anchor = {
+    position: new THREE.Vector3(),
+    previousPosition: new THREE.Vector3(),
+  };
+  const rig = new CameraRig({
+    horizontalSensitivityRadiansPerPixel: 1,
+  });
+  const movement = new THREE.Vector3();
+  const displayedForward = new THREE.Vector3();
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.setContextualCamera({ profile: TEST_CONTEXTUAL_PROFILE, anchor });
+  advanceRig(rig, 1);
+
+  rig.queueLookInput(-Math.PI / 3, 100);
+  rig.update(1, 1 / 60);
+  rig.copyGroundMovementDirection(0, -1, movement);
+  rig.camera
+    .getWorldDirection(displayedForward)
+    .projectOnPlane(WORLD_UP)
+    .normalize();
+
+  assert.ok(movement.dot(displayedForward) > 1 - EPSILON);
+  assert.ok(
+    Math.abs(
+      rig.getDiagnostics().effectivePitchRadians -
+        TEST_CONTEXTUAL_PROFILE.pitchRadians,
+    ) < EPSILON,
+  );
+});
+
+test('contextual framing remains finite if an authored anchor becomes invalid', () => {
+  const target = createTarget();
+  const anchorPosition = new THREE.Vector3();
+  const rig = new CameraRig();
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.setContextualCamera({
+    profile: TEST_CONTEXTUAL_PROFILE,
+    anchor: {
+      position: anchorPosition,
+      previousPosition: new THREE.Vector3(),
+    },
+  });
+  advanceRig(rig, 1);
+
+  anchorPosition.y = Number.NaN;
+  rig.update(1, 1 / 60);
+
+  assert.ok(rig.camera.position.toArray().every(Number.isFinite));
+  assert.ok(Number.isFinite(rig.getDiagnostics().effectivePitchRadians));
+  assert.ok(Number.isFinite(rig.getDiagnostics().desiredDistanceMetres));
 });
 
 test('ground movement follows camera yaw while ignoring pitch', () => {
