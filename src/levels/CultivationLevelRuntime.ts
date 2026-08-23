@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 
+import {
+  createAuthoredDissolveTarget,
+  type DissolveTarget,
+} from '../abilities/DissolveTarget.ts';
 import { EventBus } from '../core/EventBus.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
@@ -14,6 +18,11 @@ import {
   type JumpInputState,
 } from '../physics/KinematicBody.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import {
+  DropToAcidAssembly,
+  RopeCatchAssembly,
+  type SuspendedStructureAssembly,
+} from '../puzzle/SuspendedStructureAssembly.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
@@ -55,6 +64,8 @@ interface CultivationRuntimeResources {
   readonly scene: CultivationLevelScene;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
+  readonly dissolveTargets: readonly DissolveTarget[];
+  readonly structuralAssemblies: readonly SuspendedStructureAssembly[];
   readonly manager: SlimeManager<KinematicBody>;
   readonly pair: PersistentSlimePair<KinematicBody>;
   readonly controller: CultivationLevelController;
@@ -203,6 +214,7 @@ export class CultivationLevelRuntime {
     }
 
     const activeBody = resources.pair.activeBody;
+    this.updateStructuralAssemblies(deltaSeconds, resources);
     if (!switched && activeBody === resources.pair.bobBody) {
       resources.pair.bobBody.update(deltaSeconds, resources.movement, resources.jumpInputState);
       resources.pair.goopBody.update(deltaSeconds, resources.noMovement);
@@ -246,6 +258,10 @@ export class CultivationLevelRuntime {
     if (this.debugVisible && resources.debugPanel && this.debugElapsedSeconds >= 0.25) {
       this.debugElapsedSeconds = 0;
       const readModel = resources.controller.readModel;
+      const assemblyDiagnostics = resources.structuralAssemblies.map((assembly) => {
+        const diagnostics = assembly.getDiagnostics();
+        return `${diagnostics.id} / ${diagnostics.supportTargetId}: ${diagnostics.state} p=${diagnostics.supportProgress.toFixed(2)}/${diagnostics.travelProgress.toFixed(2)} pos=${diagnostics.position.map((value) => value.toFixed(2)).join(',')} collision=${diagnostics.collisionEnabled ? 'on' : 'off'} transitions=${diagnostics.transitionCount}`;
+      });
       resources.debugPanel.setRuntimeDiagnostics([
         `active level: cultivation-level-2`,
         `lifecycle / gameplay: ${this.state} / ${readModel.state}`,
@@ -258,6 +274,7 @@ export class CultivationLevelRuntime {
         `last failure / death slime: ${readModel.lastFailure} / ${this.lastDeathSlimeId ?? 'none'}`,
         `radiation requests: ${resources.radiation.failureRequestCount}`,
         `bodies / colliders / scene objects: ${resources.manager.registeredCount} / ${resources.collisionWorld.colliderCount} / ${this.renderLayer.getDiagnostics().sceneObjects}`,
+        ...assemblyDiagnostics,
       ].join('\n'));
     }
   }
@@ -280,6 +297,57 @@ export class CultivationLevelRuntime {
       const surfaceRegistry = new SurfaceRegistry();
       rollback(() => surfaceRegistry.clear());
       surfaceRegistry.registerAll(scene.collisionMeshes);
+
+      const dissolveTargets = scene.solubleSupportMeshes.map((mesh) => {
+        const target = createAuthoredDissolveTarget(
+          mesh,
+          collisionWorld,
+          surfaceRegistry,
+        );
+        if (!target) {
+          throw new Error(`Cultivation support "${mesh.name}" is not authored as soluble.`);
+        }
+        rollback(() => target.dispose());
+        return target;
+      });
+      const targetById = new Map(dissolveTargets.map((target) => [target.id, target]));
+      const structuralAssemblies = CULTIVATION_FOUNDATION_MANIFEST.structuralAssemblies.map(
+        (authoring): SuspendedStructureAssembly => {
+          const supportTarget = targetById.get(authoring.supportTargetId);
+          if (!supportTarget) {
+            throw new Error(
+              `Assembly "${authoring.id}" references missing support "${authoring.supportTargetId}".`,
+            );
+          }
+          const commonOptions = {
+            id: authoring.id,
+            supportTargetId: authoring.supportTargetId,
+            supportRole: authoring.supportRole,
+            supportTarget,
+            collisionWorld,
+            surfaceRegistry,
+            initialPosition: authoring.initialPosition,
+            finalPosition: authoring.finalPosition,
+            size: authoring.movingSize,
+            releaseDelaySeconds: authoring.releaseDelaySeconds,
+            travelDurationSeconds: authoring.travelDurationSeconds,
+            collisionWhileSuspended: true,
+            collisionDuringTravel: true,
+            collisionAtRest: true,
+            finalSurfaceTag: authoring.finalSurfaceTag,
+          };
+          const assembly = authoring.mode === 'drop-to-acid'
+            ? new DropToAcidAssembly(commonOptions)
+            : new RopeCatchAssembly({
+                ...commonOptions,
+                settlingDurationSeconds: authoring.settlingDurationSeconds,
+                settlingSwingRadians: authoring.settlingSwingRadians,
+              });
+          rollback(() => assembly.dispose());
+          scene.root.add(assembly.root);
+          return assembly;
+        },
+      );
 
       const manager = new SlimeManager<KinematicBody>();
       rollback(() => manager.dispose());
@@ -325,6 +393,20 @@ export class CultivationLevelRuntime {
         requestDeath: (recovery, dyingSlimeId) =>
           this.requestPlayerDeath(recovery, dyingSlimeId),
         cancelTransients: () => radiation?.reset(),
+        puzzleComponents: CULTIVATION_FOUNDATION_MANIFEST.structuralAssemblies.flatMap(
+          (authoring, index) => [
+            {
+              id: `${authoring.id}-support-target`,
+              groupId: authoring.puzzleGroupId,
+              component: dissolveTargets[index]!,
+            },
+            {
+              id: authoring.id,
+              groupId: authoring.puzzleGroupId,
+              component: structuralAssemblies[index]!,
+            },
+          ],
+        ),
       });
       rollback(() => controller.dispose());
       radiation = new RadioactiveHazardSystem(
@@ -355,7 +437,10 @@ export class CultivationLevelRuntime {
       rollback(() => burst.dispose());
       this.renderLayer.scene.add(burst.root);
       const debugPanel = this.debugAvailable
-        ? new CultivationTestPanel(() => this.restartLevel())
+        ? new CultivationTestPanel(
+            () => this.restartLevel(),
+            (complete) => this.advanceNextStructuralSupport(complete),
+          )
         : undefined;
       if (debugPanel) {
         rollback(() => debugPanel.dispose());
@@ -397,7 +482,8 @@ export class CultivationLevelRuntime {
       });
 
       this.resources = {
-        scene, collisionWorld, surfaceRegistry, manager, pair, controller,
+        scene, collisionWorld, surfaceRegistry, dissolveTargets,
+        structuralAssemblies, manager, pair, controller,
         radiation, radiationTargets, bobVisual, pairPresentation, burst,
         deathSequence, deathScreen, bobFacing: new BlobFacing(), bobVisualState,
         jumpInputState: {
@@ -470,6 +556,8 @@ export class CultivationLevelRuntime {
     resources.debugPanel?.dispose();
     resources.controller.dispose();
     resources.radiation.dispose();
+    for (const assembly of resources.structuralAssemblies) assembly.dispose();
+    for (const target of resources.dissolveTargets) target.dispose();
     resources.burst.dispose();
     resources.bobVisual.dispose();
     resources.pairPresentation.dispose();
@@ -516,6 +604,26 @@ export class CultivationLevelRuntime {
     } catch {
       // A HUD subscriber must not replace the original load error.
     }
+  }
+
+  private updateStructuralAssemblies(
+    deltaSeconds: number,
+    resources: CultivationRuntimeResources,
+  ): void {
+    for (const assembly of resources.structuralAssemblies) {
+      assembly.update(deltaSeconds);
+    }
+  }
+
+  private advanceNextStructuralSupport(complete: boolean): void {
+    const target = this.requireResources().dissolveTargets.find(
+      (candidate) => !candidate.completed,
+    );
+    if (!target) return;
+    const desiredProgress = complete ? 1 : Math.max(target.progress, 0.5);
+    const progressDelta = desiredProgress - target.progress;
+    if (progressDelta <= 0) return;
+    target.advance(progressDelta * target.dissolveDurationSeconds);
   }
 
   private switchActive(resources: CultivationRuntimeResources): boolean {

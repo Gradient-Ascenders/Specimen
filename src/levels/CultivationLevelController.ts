@@ -62,7 +62,14 @@ export interface CultivationLevelControllerOptions {
     dyingSlimeId: PlayableSlimeId,
   ) => boolean;
   readonly cancelTransients: () => void;
+  readonly puzzleComponents?: readonly CultivationPuzzleComponentRegistration[];
   readonly manifest?: CultivationFoundationManifest;
+}
+
+export interface CultivationPuzzleComponentRegistration {
+  readonly id: string;
+  readonly groupId: string;
+  readonly component: ResettablePuzzleComponent;
 }
 
 class EmptyRoomReset implements ResettablePuzzleComponent {
@@ -116,6 +123,13 @@ export class CultivationLevelController {
     this.puzzleRegistry.register('cultivation-room-1-state', new EmptyRoomReset(), CULTIVATION_ROOM_ONE_GROUP_ID);
     this.puzzleRegistry.register('cultivation-room-2-state', new EmptyRoomReset(), CULTIVATION_ROOM_TWO_GROUP_ID);
     this.puzzleRegistry.register('cultivation-room-3-state', new EmptyRoomReset(), CULTIVATION_ROOM_THREE_GROUP_ID);
+    for (const registration of options.puzzleComponents ?? []) {
+      this.puzzleRegistry.register(
+        registration.id,
+        registration.component,
+        registration.groupId,
+      );
+    }
 
     const initial = this.requireCheckpoint(CULTIVATION_ENTRANCE_CHECKPOINT_ID);
     this.progression = { ...initial.progression };
