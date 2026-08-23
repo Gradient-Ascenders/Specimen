@@ -13,7 +13,7 @@ export type RadiationResponse = 'lethal' | 'immune';
 export interface SlimeAbilityConfiguration {
   /** May attach to and traverse authored sticky surfaces. */
   readonly adhesion: boolean;
-  /** Owns the slime's passive/default rebound behaviour. */
+  /** Owns authored bounce and passive hard-landing reaction behaviour. */
   readonly rebound: boolean;
   /** May invoke corrosive interactions against authored soluble geometry. */
   readonly dissolve: boolean;

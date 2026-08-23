@@ -9,7 +9,7 @@ fixed-step movement, laser, elevator, checkpoint and death systems.
 | Room | Main beat | Completion condition |
 | --- | --- | --- |
 | 1 | Discover the contaminated sticky wall and enter the duct. | Reach the Room 2 drop. |
-| 2 | Learn impact rebound, charged height and a sticky wall catch. | Cross the formerly decorative upper doorway. |
+| 2 | Learn the hard-landing reaction, charged height and a sticky wall catch. | Cross the formerly decorative upper doorway. |
 | 3 | Combine bounce, adhesion and readable lethal lasers in a vertical route. | Enter the high rear ventilation duct. |
 | 4 | Land on the elevator, survive its deterministic ascent and wait for the exit lock. | Cross the top doorway after `exitReady`. |
 | 5 | Traverse lower machinery, the containment pedestal, upper platforms and final sticky transfers. | Adhere to the observation-room lever until containment fails. |
