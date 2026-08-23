@@ -4,7 +4,7 @@ const TEXTURE_SIZE = 64;
 const SIGN_ATLAS_WIDTH = 512;
 // Keep every vector sign on the approved 64 px row while extending the shared
 // atlas for Room 4. Earlier-room signage therefore retains its exact density.
-const SIGN_ATLAS_HEIGHT = 960;
+const SIGN_ATLAS_HEIGHT = 1280;
 
 export type ContainmentSignLabel =
   | 'bay'
@@ -21,7 +21,12 @@ export type ContainmentSignLabel =
   | 'serviceOne'
   | 'transferTwo'
   | 'laserCore'
-  | 'roomFiveExit';
+  | 'roomFiveExit'
+  | 'roomFive'
+  | 'primaryContainment'
+  | 'pressureArray'
+  | 'observationControl'
+  | 'compositeAccess';
 
 export interface ContainmentSignRegion {
   readonly uMin: number;
@@ -297,6 +302,11 @@ function createSignageAtlas(): {
     ['transferTwo', 'S02  24 M', 'TRANSFER ARRAY', [180, 141, 48, 255]],
     ['laserCore', 'L-04', 'ACTIVE ALIGNMENT ZONE', [168, 54, 61, 255]],
     ['roomFiveExit', 'C-05', 'RESEARCH LAB ACCESS', [83, 137, 135, 255]],
+    ['roomFive', 'C-05', 'PRIMARY CONTAINMENT LAB', [180, 141, 48, 255]],
+    ['primaryContainment', 'PC-05', 'BIOLOGICAL PROCESS CHAMBER', [117, 139, 60, 255]],
+    ['pressureArray', 'PRESSURE ARRAY', 'MANIFOLD 05', [180, 141, 48, 255]],
+    ['observationControl', 'OBSERVATION CONTROL', 'SPECIMEN MONITORING', [83, 137, 135, 255]],
+    ['compositeAccess', 'COMPOSITE ACCESS', 'CORROSIVE CLEARANCE', [180, 141, 48, 255]],
   ];
   const rowHeight = SIGN_ATLAS_HEIGHT / signs.length;
   const background: Rgba = [25, 30, 31, 255];

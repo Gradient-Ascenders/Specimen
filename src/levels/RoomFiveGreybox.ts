@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { LaserHazard } from '../hazards/LaserHazard.ts';
 import { LaserHazardSystem } from '../hazards/LaserHazardSystem.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
+import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import { RoomFiveArt } from '../render/environment/containment/RoomFiveArt.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { MovingPlatform } from '../puzzle/MovingPlatform.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
@@ -108,6 +110,7 @@ export class RoomFiveGreybox {
     size: new THREE.Vector3(44, 12, 39),
   });
   readonly lasers: LaserHazardSystem;
+  readonly art: RoomFiveArt;
 
   private readonly laserPresentation: LaserHazardPresentation;
   private readonly movingPlatforms = [
@@ -122,12 +125,34 @@ export class RoomFiveGreybox {
   private endingElapsedSeconds = 0;
   private traversalElapsedSeconds = 0;
 
-  constructor(requestFailure: (failure: RoomFiveHazardFailure) => void) {
+  constructor(
+    requestFailure: (failure: RoomFiveHazardFailure) => void,
+    artResources: ContainmentArtResources,
+  ) {
     this.goopWoodenDoor = this.buildShell();
+    const solubleDoorMaterial = artResources.materials.solubleComposite.clone();
+    solubleDoorMaterial.name = 'room-5-soluble-biological-composite-source';
+    solubleDoorMaterial.color.setHex(0x686047);
+    solubleDoorMaterial.emissive.setHex(0x121408);
+    solubleDoorMaterial.emissiveIntensity = 0.1;
+    solubleDoorMaterial.roughness = 0.82;
+    solubleDoorMaterial.normalScale.set(0.25, 0.25);
+    this.goopWoodenDoor.material = solubleDoorMaterial;
     this.buildTraversal();
     const endingObjects = this.buildContainmentAndObservationRoom();
     this.leverHandle = endingObjects.leverHandle;
     this.etchPlaceholder = endingObjects.etch;
+    const leverMaterial = artResources.materials.stickyMembrane.clone();
+    leverMaterial.name = 'room-5-authoritative-sticky-lever-handle';
+    this.leverHandle.material = leverMaterial;
+    const containedGoopMaterial = this.etchPlaceholder
+      .material as THREE.MeshStandardMaterial;
+    containedGoopMaterial.name = 'room-5-contained-goop-biological-material';
+    containedGoopMaterial.color.setHex(0x7cae2d);
+    containedGoopMaterial.emissive.setHex(0x213b08);
+    containedGoopMaterial.emissiveIntensity = 0.22;
+    containedGoopMaterial.roughness = 0.2;
+    containedGoopMaterial.metalness = 0;
 
     const hazards = this.createHazards();
     this.laserMotions = ROOM_FIVE_LASER_MOTIONS.map((definition) => {
@@ -144,7 +169,13 @@ export class RoomFiveGreybox {
         requestFailure({ roomId: 'room-5', hazardId: hazard.id }),
     });
     this.laserPresentation = new LaserHazardPresentation(hazards);
-    this.root.add(this.lasers.root, this.laserPresentation.root);
+    this.art = new RoomFiveArt(
+      artResources,
+      hazards,
+      [this.movingPlatformOne, this.movingPlatformTwo],
+    );
+    this.hideGameplayColliders();
+    this.root.add(this.lasers.root, this.laserPresentation.root, this.art.root);
     this.resetEndingPresentation();
   }
 
@@ -228,6 +259,7 @@ export class RoomFiveGreybox {
     this.observationTrigger.reset();
     this.failureVolume.reset();
     this.laserPresentation.sync();
+    this.art.reset();
     this.resetEndingPresentation();
   }
 
@@ -235,6 +267,7 @@ export class RoomFiveGreybox {
     this.entryCheckpointTrigger.dispose();
     this.observationTrigger.dispose();
     this.failureVolume.dispose();
+    this.art.dispose();
     this.laserPresentation.dispose();
     this.lasers.dispose();
     for (const platform of this.movingPlatforms) platform.dispose();
@@ -435,6 +468,20 @@ export class RoomFiveGreybox {
     });
 
     return { leverHandle, etch };
+  }
+
+  private hideGameplayColliders(): void {
+    for (const [role, material] of Object.entries(this.builder.materials)) {
+      material.name = `containment-room-5-${role}-collision-only`;
+      material.visible = role === 'etch';
+    }
+    (this.goopWoodenDoor.material as THREE.Material).visible = true;
+    (this.leverHandle.material as THREE.Material).visible = true;
+    for (const platform of this.movingPlatforms) {
+      platform.collisionMesh.material.name =
+        `${platform.collisionMesh.name}-collision-only`;
+      platform.collisionMesh.material.visible = false;
+    }
   }
 
 

@@ -16,12 +16,12 @@ test('Containment procedural textures are compact, deterministic and correctly c
   const secondTextures = textureList(second);
 
   assert.equal(firstTextures.length, 10);
-  assert.equal(first.diagnostics.estimatedTextureBytes, 2_113_536);
+  assert.equal(first.diagnostics.estimatedTextureBytes, 2_768_896);
   firstTextures.forEach((texture, index) => {
     const counterpart = secondTextures[index];
     assert.deepEqual(
       [texture.image.width, texture.image.height],
-      texture === first.textures.signageAtlas ? [512, 960] : [64, 64],
+      texture === first.textures.signageAtlas ? [512, 1280] : [64, 64],
     );
     assert.equal(
       Buffer.from(texture.image.data.buffer).equals(
@@ -430,6 +430,171 @@ test('Room 4 art houses the frozen elevator and laser sequence without owning ga
   scene.dispose();
 });
 
+test('Room 5 art builds a reset-safe hero chamber around frozen gameplay', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const room = scene.roomFive;
+  const art = room.art;
+  const collisionBefore = captureContainmentCollisionFingerprint(
+    scene.collisionMeshes,
+  );
+  const colliderSet = new Set(scene.collisionMeshes);
+  const roomFiveColliders = scene.collisionMeshes.filter((mesh) =>
+    mesh.name.startsWith('room-5-'),
+  );
+
+  assert.equal(roomFiveColliders.length, 35);
+  assert.equal(art.root.name, 'room-5-production-art');
+  assert.equal(art.containmentAssembly.name, 'room-5-containment-assembly');
+  assert.equal(
+    art.containmentPanelRoot.name,
+    'room-5-containment-panel-root',
+  );
+  assert.ok(art.root.getObjectByName('room-5-containment-base'));
+  assert.ok(art.root.getObjectByName('room-5-lower-containment-ring'));
+  assert.ok(art.root.getObjectByName('room-5-upper-containment-ring'));
+  assert.ok(art.root.getObjectByName('room-5-structural-clamps'));
+  assert.ok(art.root.getObjectByName('room-5-upper-service-manifold'));
+  assert.ok(art.root.getObjectByName('room-5-major-overhead-compound-feed'));
+  assert.ok(art.root.getObjectByName('room-5-observation-control-room'));
+  assert.ok(art.root.getObjectByName('room-5-observation-angled-control-console'));
+  assert.ok(art.root.getObjectByName('room-5-observation-connection'));
+  assert.ok(art.root.getObjectByName('room-5-soluble-composite-door-structural-frame'));
+
+  const specimenSign = art.root.getObjectByName(
+    'room-5-contained-specimen-identification',
+  );
+  const specimenSignBacking = art.root.getObjectByName(
+    'room-5-contained-specimen-identification-recessed-backing',
+  );
+  const specimenSignAssembly = art.root.getObjectByName(
+    'room-5-contained-specimen-identification-mounted-assembly',
+  );
+  const frontClamp = art.root.getObjectByName(
+    'room-5-containment-front-restraint-clamp',
+  );
+  assert.ok(specimenSign);
+  assert.ok(specimenSignBacking);
+  assert.ok(specimenSignAssembly);
+  assert.ok(frontClamp);
+  assert.ok(Math.abs(specimenSign.rotation.y - Math.PI) < 1e-8);
+  scene.root.updateMatrixWorld(true);
+  const specimenSignBounds = new THREE.Box3().setFromObject(specimenSign);
+  const specimenSignBackingBounds = new THREE.Box3().setFromObject(
+    specimenSignBacking,
+  );
+  const specimenSignAssemblyBounds = new THREE.Box3().setFromObject(
+    specimenSignAssembly,
+  );
+  const frontClampBounds = new THREE.Box3().setFromObject(frontClamp);
+  assert.ok(
+    specimenSignBounds.max.z < specimenSignBackingBounds.min.z - 0.15,
+    'the front-facing specimen sign must sit clearly ahead of its opaque backing',
+  );
+  assert.ok(
+    specimenSignAssemblyBounds.max.x < frontClampBounds.min.x - 0.04,
+    'the specimen sign assembly must remain clear of the front restraint clamp',
+  );
+
+  assert.deepEqual(
+    Object.values(art.panelPivots).map((pivot) => pivot.name),
+    [
+      'room-5-containment-panel-front-pivot',
+      'room-5-containment-panel-rear-pivot',
+      'room-5-containment-panel-left-pivot',
+      'room-5-containment-panel-right-pivot',
+    ],
+  );
+  for (const [panel, pivot] of Object.entries(art.panelPivots)) {
+    assert.equal(pivot.userData.panel, panel);
+    assert.equal(pivot.userData.initialState, 'closed');
+    assert.equal(pivot.userData.cutsceneReady, true);
+    assert.ok(pivot.rotation.equals(new THREE.Euler(0, 0, 0)));
+    assert.ok(
+      pivot.getObjectByName(`room-5-containment-panel-${panel}-reinforced-pane`),
+    );
+  }
+
+  art.setPanelPreview('front', 0.5);
+  art.setPanelPreview('left', -0.35);
+  assert.equal(art.panelPivots.front.rotation.y, 0.5);
+  assert.equal(art.panelPivots.left.rotation.y, -0.35);
+  assert.equal(art.panelPivots.rear.rotation.y, 0);
+  assert.equal(art.panelPivots.right.rotation.y, 0);
+  assert.deepEqual(
+    captureContainmentCollisionFingerprint(scene.collisionMeshes),
+    collisionBefore,
+  );
+  room.reset();
+  for (const pivot of Object.values(art.panelPivots)) {
+    assert.ok(pivot.rotation.equals(new THREE.Euler(0, 0, 0)));
+  }
+
+  const glassCollider = roomFiveColliders.find(
+    (mesh) => mesh.name === 'room-5-containment-glass',
+  );
+  const roofPane = art.root.getObjectByName(
+    'room-5-containment-traversable-roof-pane',
+  );
+  assert.ok(glassCollider);
+  assert.ok(roofPane);
+  scene.root.updateMatrixWorld(true);
+  const glassBounds = new THREE.Box3().setFromObject(glassCollider);
+  const roofBounds = new THREE.Box3().setFromObject(roofPane);
+  assert.ok(Math.abs(roofBounds.max.y - glassBounds.max.y) < 0.01);
+  assert.ok(roofBounds.min.x >= glassBounds.min.x);
+  assert.ok(roofBounds.max.x <= glassBounds.max.x);
+  assert.ok(roofBounds.min.z >= glassBounds.min.z);
+  assert.ok(roofBounds.max.z <= glassBounds.max.z);
+
+  for (const platform of [room.movingPlatformOne, room.movingPlatformTwo]) {
+    assert.equal(platform.collisionMesh.material.visible, false);
+    const dressing = platform.root.children.find((child) =>
+      child.name.endsWith('-production-dressing'),
+    );
+    assert.ok(dressing);
+    const colliderBounds = new THREE.Box3().setFromObject(
+      platform.collisionMesh,
+    );
+    const tread = dressing.getObjectByName(
+      `${dressing.name}-durable-clean-tread`,
+    );
+    assert.ok(tread);
+    const treadBounds = new THREE.Box3().setFromObject(tread);
+    assert.ok(Math.abs(treadBounds.max.y - colliderBounds.max.y) < 0.01);
+    dressing.traverse((object) => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
+        assert.equal(object.userData.visualOnly, true, object.name);
+        assert.equal(colliderSet.has(object), false, object.name);
+      }
+    });
+  }
+
+  assert.equal(glassCollider.material.visible, false);
+  assert.equal(room.goopWoodenDoor.material.visible, true);
+  assert.notEqual(
+    room.goopWoodenDoor.material,
+    scene.artResources.materials.solubleComposite,
+  );
+  assert.equal(
+    (room.goopWoodenDoor.material as THREE.MeshStandardMaterial).normalMap,
+    scene.artResources.materials.solubleComposite.normalMap,
+  );
+  assert.equal(room.goopWoodenDoor.userData.soluble, true);
+  assert.equal(room.goopWoodenDoor.userData.textureRole, 'wooden-door');
+
+  art.root.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.InstancedMesh) {
+      assert.equal(object.userData.visualOnly, true, object.name);
+      assert.equal(colliderSet.has(object), false, object.name);
+    }
+  });
+  assert.deepEqual(
+    captureContainmentCollisionFingerprint(scene.collisionMeshes),
+    collisionBefore,
+  );
+  scene.dispose();
+});
+
 test('Room 1 hero states are deterministic and independent from gameplay collision', () => {
   const scene = new ContainmentLevelScene(() => {});
   const art = scene.teaching.roomOneArt;
@@ -493,6 +658,11 @@ test('Room 1 signs are upright and specimen controls do not intersect stacked ho
     'transferTwo',
     'laserCore',
     'roomFiveExit',
+    'roomFive',
+    'primaryContainment',
+    'pressureArray',
+    'observationControl',
+    'compositeAccess',
   ] as const) {
     const sign = createSignagePanel(resources, {
       name: `sign-orientation-probe-${label}`,
