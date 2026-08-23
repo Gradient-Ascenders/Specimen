@@ -767,6 +767,39 @@ test('Containment completion is gated by observation lever adhesion and emits on
   scene.dispose();
 });
 
+test('development completion shortcut emits the normal handoff once', () => {
+  let controller: ContainmentLevelController;
+  const scene = new ContainmentLevelScene(
+    (failure: ContainmentHazardFailure) => {
+      controller.requestHazardFailure(failure);
+    },
+  );
+  const collisionWorld = new CollisionWorld();
+  collisionWorld.registerAll(scene.collisionMeshes);
+  const fakeBody = createFakeBody();
+  controller = new ContainmentLevelController({
+    scene,
+    body: fakeBody as unknown as KinematicBody,
+    collisionWorld,
+    requestDeath: () => false,
+  });
+
+  const completions: Array<{ levelId: string; nextLevelId: string }> = [];
+  controller.events.on('completed', (event) => completions.push(event));
+
+  assert.equal(controller.completeForDebug(), true);
+  assert.equal(controller.completeForDebug(), false);
+  assert.equal(controller.state, 'complete');
+  assert.equal(controller.completionCount, 1);
+  assert.deepEqual(completions, [
+    { levelId: 'containment', nextLevelId: 'level-2' },
+  ]);
+
+  controller.dispose();
+  collisionWorld.clear();
+  scene.dispose();
+});
+
 test('active checkpoint resets its room state before recovering the player', () => {
   let controller: ContainmentLevelController;
   const scene = new ContainmentLevelScene(
