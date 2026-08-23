@@ -173,6 +173,95 @@ input:focus-visible {
   filter: drop-shadow(0 0.2rem 0.5rem rgb(0 0 0 / 80%));
 }
 
+.goop-aim-crosshair {
+  --crosshair-colour: #edf5e8;
+  --crosshair-size: clamp(2.35rem, 5vmin, 3.15rem);
+  position: absolute;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  width: var(--crosshair-size);
+  height: var(--crosshair-size);
+  border: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter:
+    drop-shadow(0 0 1px #000)
+    drop-shadow(0 0 0.28rem rgb(0 0 0 / 92%));
+}
+
+.goop-aim-crosshair::before,
+.goop-aim-crosshair::after {
+  position: absolute;
+  content: '';
+}
+
+.goop-aim-crosshair::before {
+  inset: 12%;
+  border: 0.14rem dashed var(--crosshair-colour);
+  border-radius: 50%;
+  opacity: 0.8;
+}
+
+.goop-aim-crosshair::after {
+  top: 50%;
+  left: 50%;
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 0.13rem solid var(--crosshair-colour);
+  background: rgb(0 0 0 / 42%);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.goop-aim-crosshair[data-state='ready'] {
+  --crosshair-colour: #d8ff65;
+}
+
+.goop-aim-crosshair[data-state='ready']::before {
+  inset: 4%;
+  border-style: solid;
+  border-radius: 28%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 78%);
+  transform: rotate(45deg);
+}
+
+.goop-aim-crosshair[data-state='ready']::after {
+  background: var(--crosshair-colour);
+}
+
+.goop-aim-crosshair[data-state='cooldown'] {
+  --crosshair-colour: #ffd86a;
+}
+
+.goop-aim-crosshair[data-state='cooldown']::before {
+  inset: 5%;
+  border-width: 0.16rem;
+  border-style: dashed;
+  border-radius: 32%;
+  transform: rotate(45deg);
+}
+
+.goop-aim-crosshair[data-state='cooldown']::after {
+  width: 0.54rem;
+  height: 0.18rem;
+  border: 0.08rem solid #111;
+  background: var(--crosshair-colour);
+  transform: translate(-50%, -50%);
+}
+
+.goop-aim-crosshair.is-firing {
+  animation: goop-crosshair-fire 110ms ease-out;
+}
+
+@keyframes goop-crosshair-fire {
+  50% {
+    transform: translate(-50%, -50%) scale(0.78);
+    filter:
+      drop-shadow(0 0 1px #000)
+      drop-shadow(0 0 0.7rem #caff54);
+  }
+}
+
 .hud-objective {
   margin: 0.25rem 0 0;
   font-size: clamp(0.95rem, 2vw, 1.15rem);

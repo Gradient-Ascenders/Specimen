@@ -31,6 +31,7 @@ import { BoxTriggerSensor } from '../puzzle/BoxTriggerSensor.ts';
 import { PressurePlate } from '../puzzle/PressurePlate.ts';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
+import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
@@ -156,6 +157,7 @@ interface GreyboxRuntimeResources {
   readonly dissolveSystem: DissolveSystem;
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly collisionOverlay: ContainmentCollisionOverlay | undefined;
+  readonly goopAcidPresentation: GoopAcidPresentation;
   readonly pressurePlateOccupants: readonly [
     {
       readonly id: 'bob';
@@ -563,6 +565,7 @@ export class GreyboxLevelRuntime {
       renderedGoopPosition,
       slimePair,
       slimePairPresentation,
+      goopAcidPresentation,
       testScene,
     } = resources;
     let cameraDistanceScale = 1;
@@ -609,6 +612,17 @@ export class GreyboxLevelRuntime {
       );
     }
     this.input.endPointerUpdate();
+    const aimPresentationAllowed =
+      this.lifecycle.state === 'running' &&
+      deathSequence.isPlaying &&
+      resources.containmentLevel.state === 'playing' &&
+      this.input.enabled;
+    goopAcidPresentation.update(
+      interpolationAlpha,
+      stats.frameDeltaSeconds,
+      aimPresentationAllowed,
+      this.lifecycle.state === 'running' && deathSequence.isPlaying,
+    );
     this.renderLayer.cameraRig.setFollowDistanceScale(cameraDistanceScale);
     this.renderLayer.cameraRig.update(
       interpolationAlpha,
@@ -780,6 +794,13 @@ export class GreyboxLevelRuntime {
       collisionWorld,
       dissolveSystem,
       aimRayProvider: this.renderLayer.cameraRig,
+    });
+    const goopAcidPresentation = new GoopAcidPresentation({
+      host: this.host,
+      scene: this.renderLayer.scene,
+      cameraRig: this.renderLayer.cameraRig,
+      source: acidProjectileSystem,
+      targets: dissolveTargets,
     });
 
     const slimePairPresentation = new SlimePairPresentation(body.radiusMetres);
@@ -979,6 +1000,7 @@ export class GreyboxLevelRuntime {
       dissolveSystem,
       collisionOverlay,
       acidProjectileSystem,
+      goopAcidPresentation,
       pressurePlateOccupants,
       deathSequence,
       deathScreen,
@@ -1018,6 +1040,7 @@ export class GreyboxLevelRuntime {
 
   private readonly startResources = (): void => {
     const resources = this.requireResources();
+    resources.goopAcidPresentation.resume();
     this.input.setEnabled(
       resources.deathSequence.isPlaying &&
         resources.containmentLevel.state === 'playing',
@@ -1026,7 +1049,9 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
-    this.requireResources().acidProjectileSystem.cancelAim();
+    const resources = this.requireResources();
+    resources.acidProjectileSystem.cancelAim();
+    resources.goopAcidPresentation.suspend();
     this.input.setEnabled(false);
   };
 
@@ -1037,6 +1062,7 @@ export class GreyboxLevelRuntime {
     resources.deathScreen.hide();
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
+    resources.goopAcidPresentation.reset();
     resources.containmentLevel.reset();
     resources.puzzleRegistry.reset();
     resources.slimePair.restoreInitialState();
@@ -1088,6 +1114,7 @@ export class GreyboxLevelRuntime {
     resources.movementEvents.clear();
     resources.containmentLevel.dispose();
     resources.pressurePlate.dispose();
+    resources.goopAcidPresentation.dispose();
     resources.acidProjectileSystem.dispose();
     resources.dissolveSystem.dispose();
     for (const target of resources.dissolveTargets) target.dispose();
@@ -1130,6 +1157,7 @@ export class GreyboxLevelRuntime {
   ): void {
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
+    resources.goopAcidPresentation.reset();
     resources.puzzleRegistry.resetGroup(DISSOLVE_PUZZLE_GROUP_ID);
     recoverLevelCheckpoint();
     resources.slimePair.captureCurrentRecoveryState();
@@ -1213,6 +1241,7 @@ export class GreyboxLevelRuntime {
     this.lastDeathSlimeId = dyingSlimeId;
 
     resources.acidProjectileSystem.cancelAim();
+    resources.goopAcidPresentation.suspend();
     this.input.setEnabled(false);
     this.input.releasePointerLock();
     this.host.dataset.gameState = resources.deathSequence.state;
@@ -1229,6 +1258,7 @@ export class GreyboxLevelRuntime {
     // must follow that restored active identity before gameplay resumes.
     this.retargetCameraToActiveSlime(resources);
     this.syncContextualCamera(resources);
+    resources.goopAcidPresentation.resume();
     this.notifySlimeHUD(undefined, true);
 
     // The teaching scene owns Bob's legacy visual; the two-body presentation
@@ -1374,6 +1404,7 @@ export class GreyboxLevelRuntime {
       pressurePlate,
       dissolveSystem,
       acidProjectileSystem,
+      goopAcidPresentation,
       dissolveTargets,
       collisionOverlay,
     } = resources;
@@ -1394,6 +1425,7 @@ export class GreyboxLevelRuntime {
     const voltDefinition = slimeManager.getDefinition('volt');
     const dissolveStats = dissolveSystem.getDiagnostics();
     const acidStats = acidProjectileSystem.getDiagnostics();
+    const acidPresentationStats = goopAcidPresentation.getDiagnostics();
     const primaryDissolveTarget = dissolveTargets[0];
 
     testPanel.setRuntimeDiagnostics(
@@ -1429,6 +1461,9 @@ export class GreyboxLevelRuntime {
         `acid projectiles live / fired: ${acidStats.liveProjectileCount} / ${acidStats.firedCount}`,
         `acid impacts soluble / world: ${acidStats.solubleImpactCount} / ${acidStats.worldImpactCount}`,
         `acid cooldown remaining: ${acidStats.cooldownRemainingSeconds.toFixed(2)} s`,
+        `acid presentation crosshair / highlights / selected: ${acidPresentationStats.crosshairState} / ${acidPresentationStats.highlightedTargetCount} / ${acidPresentationStats.selectedTargetCount}`,
+        `acid presentation projectile / trails / droplets / flashes: ${acidPresentationStats.activeProjectileCount} / ${acidPresentationStats.activeTrailCount} / ${acidPresentationStats.activeDropletCount} / ${acidPresentationStats.activeFlashCount}`,
+        `acid presentation pools projectiles / droplets / flashes / DOM: ${acidPresentationStats.projectileSlotCount} / ${acidPresentationStats.dropletCapacity} / ${acidPresentationStats.flashCapacity} / ${acidPresentationStats.crosshairElementCount}`,
         `dissolve burns active / completed / reset: ${dissolveStats.activeBurnCount} / ${dissolveStats.completedBurnCount} / ${dissolveStats.resetBurnCount}`,
         `dissolve burn targets: ${dissolveStats.activeBurnTargetIds.join(', ') || 'none'}`,
         `dissolve progress: ${(primaryDissolveTarget.progress * 100).toFixed(0)}%`,
@@ -1682,6 +1717,7 @@ function createRoomCompileSubset(
   const sources: THREE.Object3D[] = [
     lightingRoot,
     resources.slimePairPresentation.root,
+    resources.goopAcidPresentation.root,
   ];
 
   if (roomId <= 2) {

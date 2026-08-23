@@ -65,6 +65,12 @@ export interface CameraRigConfig extends CameraLookSettings {
   obstructionBufferMetres: number;
   /** Follow errors beyond this are treated as teleports/checkpoint resets. */
   teleportSnapDistanceMetres: number;
+  /** Multiplicative boom distance used by Goop's presentation-only aim pose. */
+  aimDistanceScale: number;
+  /** Sideways framing offset that keeps Goop clear of the centre aim ray. */
+  aimShoulderOffsetMetres: number;
+  /** Symmetric entry/exit duration for the presentation-only aim pose. */
+  aimTransitionDurationSeconds: number;
   minimumPitchRadians: number;
   maximumPitchRadians: number;
   initialPitchRadians: number;
@@ -82,6 +88,9 @@ export const DEFAULT_CAMERA_RIG_CONFIG: Readonly<CameraRigConfig> = {
   obstructionRadiusMetres: 0.22,
   obstructionBufferMetres: 0.03,
   teleportSnapDistanceMetres: 3,
+  aimDistanceScale: 0.84,
+  aimShoulderOffsetMetres: 0.82,
+  aimTransitionDurationSeconds: 0.2,
   horizontalSensitivityRadiansPerPixel: 0.0022,
   verticalSensitivityRadiansPerPixel: 0.002,
   invertHorizontal: false,
@@ -107,6 +116,8 @@ export interface CameraRigDiagnostics {
   readonly profileBlend: number;
   readonly pitchRadians: number;
   readonly effectivePitchRadians: number;
+  readonly aimPresentationBlend: number;
+  readonly aimShoulderOffsetMetres: number;
 }
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -135,6 +146,7 @@ export class CameraRig {
   private readonly smoothedTarget = new THREE.Vector3();
   private readonly followError = new THREE.Vector3();
   private readonly framingPivot = new THREE.Vector3();
+  private readonly cameraLookPivot = new THREE.Vector3();
   private readonly normalFramingPivot = new THREE.Vector3();
   private readonly contextualAnchorPosition = new THREE.Vector3();
   private readonly contextualFramingPivot = new THREE.Vector3();
@@ -149,6 +161,8 @@ export class CameraRig {
   private readonly planarBack = new THREE.Vector3(0, 0, 1);
   private readonly boomDirection = new THREE.Vector3();
   private readonly boomDisplacement = new THREE.Vector3();
+  private readonly aimShoulderDirection = new THREE.Vector3();
+  private readonly aimShoulderDisplacement = new THREE.Vector3();
   private readonly preferredCameraPosition = new THREE.Vector3();
   private readonly groundBack = new THREE.Vector3(0, 0, 1);
   private readonly groundRight = new THREE.Vector3(1, 0, 0);
@@ -173,6 +187,8 @@ export class CameraRig {
   private contextualCamera: ContextualCameraContext | undefined;
   private contextualProfileBlend = 0;
   private contextualProfileBlendTarget = 0;
+  private aimPresentationBlend = 0;
+  private aimPresentationBlendTarget = 0;
 
   constructor(config: Partial<CameraRigConfig> = {}) {
     this.config = {
@@ -216,6 +232,9 @@ export class CameraRig {
     this.contextualProfileBlendTarget = 0;
     this.contextualFramingOffset.set(0, 0, 0);
     this.desiredContextualFramingOffset.set(0, 0, 0);
+    this.aimPresentationBlend = 0;
+    this.aimPresentationBlendTarget = 0;
+    this.aimShoulderDisplacement.set(0, 0, 0);
     this.preferredCameraPosition.set(0, 0, 0);
     this.clearTimeSeconds = 0;
     this.initialized = false;
@@ -316,6 +335,17 @@ export class CameraRig {
     }
 
     this.followDistanceScale = scale;
+  }
+
+  /**
+   * Blend the existing collision-aware boom into Goop's modest aim pose.
+   * This never changes the camera ray, FOV, orbit, or target authority.
+   */
+  setAimPresentationActive(active: boolean, immediate = false): void {
+    this.aimPresentationBlendTarget = active ? 1 : 0;
+    if (immediate) {
+      this.aimPresentationBlend = this.aimPresentationBlendTarget;
+    }
   }
 
   /** Queue centralized pointer-lock input for the next rendered pose. */
@@ -471,6 +501,7 @@ export class CameraRig {
       this.updateFollowPosition(safeDeltaSeconds);
     }
     this.updateContextualTransition(safeDeltaSeconds);
+    this.updateAimPresentationTransition(safeDeltaSeconds);
     this.applyQueuedLookInput();
     this.updateCameraDistance(safeAlpha, safeDeltaSeconds);
     this.writeCameraPose();
@@ -498,7 +529,7 @@ export class CameraRig {
         ? this.obstructionHit.distance
         : null,
       obstructionRadiusMetres: this.config.obstructionRadiusMetres,
-      focusPosition: this.snapshotVector(this.framingPivot),
+      focusPosition: this.snapshotVector(this.cameraLookPivot),
       preferredCameraPosition: this.snapshotVector(
         this.preferredCameraPosition,
       ),
@@ -509,6 +540,8 @@ export class CameraRig {
       profileBlend: this.getContextualProfileWeight(),
       pitchRadians: this.pitchRadians,
       effectivePitchRadians: this.effectivePitchRadians,
+      aimPresentationBlend: this.getAimPresentationWeight(),
+      aimShoulderOffsetMetres: this.aimShoulderDisplacement.length(),
     };
   }
 
@@ -656,6 +689,28 @@ export class CameraRig {
       this.contextualFramingOffset.set(0, 0, 0);
       this.desiredContextualFramingOffset.set(0, 0, 0);
     }
+  }
+
+  private updateAimPresentationTransition(deltaSeconds: number): void {
+    if (deltaSeconds <= 0) return;
+    const step = deltaSeconds / this.config.aimTransitionDurationSeconds;
+    if (this.aimPresentationBlendTarget > this.aimPresentationBlend) {
+      this.aimPresentationBlend = Math.min(
+        this.aimPresentationBlendTarget,
+        this.aimPresentationBlend + step,
+      );
+    } else if (
+      this.aimPresentationBlendTarget < this.aimPresentationBlend
+    ) {
+      this.aimPresentationBlend = Math.max(
+        this.aimPresentationBlendTarget,
+        this.aimPresentationBlend - step,
+      );
+    }
+  }
+
+  private getAimPresentationWeight(): number {
+    return THREE.MathUtils.smoothstep(this.aimPresentationBlend, 0, 1);
   }
 
   private getContextualProfileWeight(): number {
@@ -810,6 +865,7 @@ export class CameraRig {
     } else {
       this.framingPivot.copy(this.normalFramingPivot);
     }
+    this.applyAimShoulderOffset();
 
     const cosPitch = Math.cos(this.effectivePitchRadians);
     this.boomDirection
@@ -871,13 +927,34 @@ export class CameraRig {
     const normalDistanceMetres =
       this.config.followDistanceMetres * this.followDistanceScale;
     const profile = this.contextualCamera?.profile;
-    return profile
+    const authoredDistanceMetres = profile
       ? THREE.MathUtils.lerp(
           normalDistanceMetres,
           profile.distanceMetres,
           this.getContextualProfileWeight(),
         )
       : normalDistanceMetres;
+    return THREE.MathUtils.lerp(
+      authoredDistanceMetres,
+      authoredDistanceMetres * this.config.aimDistanceScale,
+      this.getAimPresentationWeight(),
+    );
+  }
+
+  private applyAimShoulderOffset(): void {
+    const requestedOffsetMetres =
+      this.config.aimShoulderOffsetMetres * this.getAimPresentationWeight();
+    this.aimShoulderDisplacement.set(0, 0, 0);
+    this.cameraLookPivot.copy(this.framingPivot);
+    if (requestedOffsetMetres <= CAMERA_BASIS_EPSILON_SQ) return;
+
+    this.aimShoulderDirection
+      .crossVectors(this.smoothedUp, this.planarBack)
+      .normalize();
+    this.aimShoulderDisplacement
+      .copy(this.aimShoulderDirection)
+      .multiplyScalar(requestedOffsetMetres);
+    this.cameraLookPivot.add(this.aimShoulderDisplacement);
   }
 
   private writeCameraPose(): void {
@@ -885,7 +962,7 @@ export class CameraRig {
       .copy(this.framingPivot)
       .addScaledVector(this.boomDirection, this.currentDistanceMetres);
     this.camera.up.copy(this.smoothedUp);
-    this.camera.lookAt(this.framingPivot);
+    this.camera.lookAt(this.cameraLookPivot);
     this.camera.updateMatrixWorld();
   }
 
@@ -967,11 +1044,27 @@ export class CameraRig {
       ['recoveryDampingPerSecond', config.recoveryDampingPerSecond],
       ['obstructionRadiusMetres', config.obstructionRadiusMetres],
       ['teleportSnapDistanceMetres', config.teleportSnapDistanceMetres],
+      ['aimTransitionDurationSeconds', config.aimTransitionDurationSeconds],
     ];
     for (const [name, value] of positiveValues) {
       if (!Number.isFinite(value) || value <= 0) {
         throw new Error(`${name} must be a positive finite number.`);
       }
+    }
+
+    if (
+      !Number.isFinite(config.aimShoulderOffsetMetres) ||
+      config.aimShoulderOffsetMetres < 0
+    ) {
+      throw new Error('aimShoulderOffsetMetres must be non-negative and finite.');
+    }
+
+    if (
+      !Number.isFinite(config.aimDistanceScale) ||
+      config.aimDistanceScale <= 0 ||
+      config.aimDistanceScale > 1
+    ) {
+      throw new Error('aimDistanceScale must be within (0, 1].');
     }
 
     const nonNegativeValues: ReadonlyArray<[string, number]> = [

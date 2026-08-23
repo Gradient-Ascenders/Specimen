@@ -141,6 +141,69 @@ test('default pitch limits provide an equally usable upward and downward view', 
   );
 });
 
+test('Goop aim smoothly adopts a collision-aware shoulder pose and exposes its live centre ray', () => {
+  const rig = new CameraRig({
+    initialPitchRadians: 0,
+    aimTransitionDurationSeconds: 0.2,
+    aimDistanceScale: 0.84,
+    aimShoulderOffsetMetres: 0.82,
+  });
+  const world = new CollisionWorld();
+  rig.setFollowTarget(createTarget(), world);
+  rig.update(1, 0);
+  const normalDistance = rig.getDiagnostics().desiredDistanceMetres;
+  const initialFov = rig.camera.fov;
+  const initialFocus = new THREE.Vector3().copy(
+    rig.getDiagnostics().focusPosition,
+  );
+
+  rig.setAimPresentationActive(true);
+  rig.update(1, 0.1);
+  const entering = rig.getDiagnostics();
+  assert.ok(entering.aimPresentationBlend > 0);
+  assert.ok(entering.aimPresentationBlend < 1);
+  assert.ok(entering.desiredDistanceMetres < normalDistance);
+  assert.ok(entering.desiredDistanceMetres > normalDistance * 0.84);
+
+  rig.update(1, 0.1);
+  const aimed = rig.getDiagnostics();
+  assert.ok(Math.abs(aimed.aimPresentationBlend - 1) < EPSILON);
+  assert.ok(
+    Math.abs(aimed.desiredDistanceMetres - normalDistance * 0.84) < EPSILON,
+  );
+  assert.equal(rig.camera.fov, initialFov);
+  assert.ok(Math.abs(aimed.aimShoulderOffsetMetres - 0.82) < EPSILON);
+  assert.ok(
+    new THREE.Vector3()
+      .copy(aimed.focusPosition)
+      .distanceTo(initialFocus) > 0.8,
+  );
+
+  const aimOrigin = new THREE.Vector3();
+  const aimDirection = new THREE.Vector3();
+  rig.copyAimRay(aimOrigin, aimDirection);
+  assert.ok(aimOrigin.distanceTo(rig.camera.position) < EPSILON);
+  assert.ok(
+    aimDirection.distanceTo(
+      rig.camera.getWorldDirection(new THREE.Vector3()),
+    ) < EPSILON,
+  );
+
+  rig.setAimPresentationActive(false);
+  advanceRig(rig, 1);
+  assert.ok(rig.getDiagnostics().aimPresentationBlend < EPSILON);
+  assert.ok(rig.getDiagnostics().aimShoulderOffsetMetres < EPSILON);
+  assert.ok(
+    new THREE.Vector3()
+      .copy(rig.getDiagnostics().focusPosition)
+      .distanceTo(initialFocus) < EPSILON,
+  );
+  assert.ok(
+    Math.abs(rig.getDiagnostics().desiredDistanceMetres - normalDistance) <
+      EPSILON,
+  );
+});
+
 test('contextual profile ignores vertical look through blend-out and restores manual pitch', () => {
   const target = createTarget();
   const anchor: ContextualCameraAnchor = {
