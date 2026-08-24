@@ -5,6 +5,10 @@ import * as THREE from 'three';
 
 import { CULTIVATION_FOUNDATION_MANIFEST } from '../src/levels/CultivationFoundationManifest.ts';
 import { CultivationLevelScene } from '../src/levels/CultivationLevelScene.ts';
+import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
+import { KinematicBody } from '../src/physics/KinematicBody.ts';
+import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
+import { WallButton } from '../src/puzzle/WallButton.ts';
 
 test('Cultivation harness exposes explicitly tagged collision and hazard authoring', () => {
   const scene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
@@ -61,6 +65,50 @@ test('Cultivation harness exposes explicitly tagged collision and hazard authori
   assert.ok(roomThree.bobSpawnPosition.y > roomThree.goopSpawnPosition.y);
   scene.dispose();
   assert.equal(scene.root.children.length, 0);
+});
+
+test('Cultivation button pad is the sole attachment support across its usable area', () => {
+  const collisionWorld = new CollisionWorld();
+  const surfaceRegistry = new SurfaceRegistry();
+  const scene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
+  collisionWorld.registerAll(scene.collisionMeshes);
+  surfaceRegistry.registerAll(scene.collisionMeshes);
+
+  const authoring = CULTIVATION_FOUNDATION_MANIFEST.wallButtonDoor.button;
+  const bob = new KinematicBody({
+    world: collisionWorld,
+    surfaces: surfaceRegistry,
+    initialPosition: authoring.position.clone().add(new THREE.Vector3(0.55, 0, 0)),
+    config: { reboundEnabled: false },
+  });
+  const button = new WallButton({
+    id: authoring.id,
+    collisionWorld,
+    surfaceRegistry,
+    position: authoring.position,
+    surfaceSize: authoring.surfaceSize,
+    contactCentre: authoring.contactCentre,
+    contactSize: authoring.contactSize,
+    requiredOccupant: { id: authoring.requiredOccupantId, body: bob },
+  });
+  scene.root.add(button.root);
+
+  try {
+    bob.update(1 / 60, new THREE.Vector3(-1, 0, 0));
+
+    assert.equal(bob.attached, true);
+    assert.equal(bob.supportCollider, button.surfaceMesh);
+
+    button.setEnabled(true);
+    button.update([{ id: authoring.requiredOccupantId, body: bob }]);
+    assert.equal(button.isPressed, true);
+    assert.equal(button.occupantId, authoring.requiredOccupantId);
+  } finally {
+    button.dispose();
+    collisionWorld.clear();
+    surfaceRegistry.clear();
+    scene.dispose();
+  }
 });
 
 test('Cultivation structural authoring rejects role mismatches and obstructed poses', () => {

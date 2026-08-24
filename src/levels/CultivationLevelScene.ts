@@ -44,7 +44,7 @@ export class CultivationLevelScene {
       { id: 'cultivation-room-2-sticky-panel-b', size: [0.18, 2.4, 2.4], position: [-7.55, 3.3, 17.8], colour: 0xb4a15a },
       { id: 'cultivation-room-2-sticky-panel-c', size: [0.18, 2.4, 2.4], position: [-7.55, 4.55, 19.9], colour: 0xb4a15a },
       { id: 'cultivation-room-2-sticky-panel-d', size: [0.18, 2.3, 2.4], position: [-7.55, 5.55, 21.9], colour: 0xb4a15a },
-      { id: 'cultivation-room-2-sticky-panel-e', size: [0.18, 1.8, 2.2], position: [-7.55, 6.15, 23.25], colour: 0xb4a15a },
+      { id: 'cultivation-room-2-sticky-panel-e', size: [0.18, 1.8, 2.2], position: [-7.55, 4.5, 23.8], colour: 0xb4a15a },
       { id: 'cultivation-room-2-vent-sticky-panel', size: [2.2, 2.8, 0.18], position: [6.7, 7.15, 30.55], colour: 0xb4a15a },
     ];
     for (const panel of stickyPanels) {
