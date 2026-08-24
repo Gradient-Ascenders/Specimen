@@ -642,7 +642,7 @@ export class CultivationLevelRuntime {
       rollback(() => burst.dispose());
       this.renderLayer.scene.add(burst.root);
       const debugPanel = this.debugAvailable
-          ? new CultivationTestPanel(
+        ? new CultivationTestPanel(
             () => this.restartLevel(),
             (complete) => this.advanceNextStructuralSupport(complete),
             (roomId) => this.teleportToAuthoredPreviewRoom(roomId),
@@ -966,7 +966,11 @@ export class CultivationLevelRuntime {
   }
 
   private advanceNextStructuralSupport(complete: boolean): void {
-    const target = this.requireResources().dissolveTargets.find(
+    const resources = this.requireResources();
+    const candidates = this.authoredPreviewRoomId === undefined
+      ? resources.dissolveTargets
+      : resources.previewDissolveTargets;
+    const target = candidates.find(
       (candidate) => !candidate.completed,
     );
     if (!target) return;
