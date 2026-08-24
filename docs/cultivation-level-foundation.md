@@ -1,10 +1,9 @@
 # Cultivation Level 2 foundation
 
 Issue #93 introduces the application transition from Containment to a dedicated
-Cultivation runtime. The final Room 1–3 design documents are unavailable, so the
-current scene is an authored-neutral playable harness. Its purpose is to prove
-runtime ownership, dual-body recovery, split progression, and radioactive
-hazards without inventing final puzzles.
+Cultivation runtime. The foundation owns runtime lifecycle, dual-body recovery,
+split progression, and radioactive hazards. Room-specific mechanics are added
+from their supplied source designs without changing those contracts.
 
 ## Transition ownership
 
@@ -107,12 +106,16 @@ All temporary positions and IDs live in `CultivationFoundationManifest`:
 - the out-of-bounds plane;
 - six structural assembly definitions, including support IDs/roles, puzzle
   groups, authored transforms, timings, collider sizes, and final surface tags.
+- Room 2's Bob-only sticky wall button, Goop-route vertical blast door,
+  obstruction volume, asymmetric timings, and puzzle-group ownership.
 
 The runtime now creates three Room 1 drop-to-acid platforms and three Room 2
 retained-rope catch blocks from those definitions. Each soluble support target
 and its assembly are registered as real resettable room components in
 target-before-assembly order. See `docs/cultivation-structural-assemblies.md`
 for their metadata, state machines, collision order, reset contract, and tuning.
+Room 2's cooperative gate is documented in
+`docs/cultivation-room-2-button-door.md`.
 
 Final Room 1–3 work may refine the remaining harness values and presentation
 without changing runtime or checkpoint interfaces. Rooms 4–5 add checkpoint
@@ -145,3 +148,10 @@ progression snapshot.
    spawn while preserving the checkpoint's active identity.
 8. Restart and repeat unload/load cycles while comparing F2 body, collider, and
    scene-object counts. Check the console for stale callbacks and asset 404s.
+9. In Room 2, attach Bob to the left-wall button and switch to Goop. Confirm Bob
+   keeps the button held while inactive and the centre blast door opens. Detach
+   Bob and confirm the door closes.
+10. While the blast door closes, place Bob and then Goop in its opening. Confirm
+    either body blocks and reopens it; after clearing the opening, confirm it
+    closes fully. Trigger Retry during opening, open, closing, blocked, and
+    reopening states and confirm the panel returns to its exact closed pose.
