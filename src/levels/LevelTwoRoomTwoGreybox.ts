@@ -44,6 +44,13 @@ const BLOCK_ASSEMBLIES: readonly BlockAssemblyDefinition[] = [
   },
 ];
 
+const WALL_BUTTON_PRESS_DURATION_SECONDS = 0.6;
+const WALL_BUTTON_PRESS_TRAVEL_METRES = 0.14;
+const WALL_BUTTON_READY_COLOUR = new THREE.Color(0xe53945);
+const WALL_BUTTON_READY_EMISSIVE = new THREE.Color(0x5a0008);
+const WALL_BUTTON_PRESSED_COLOUR = new THREE.Color(0x62ff91);
+const WALL_BUTTON_PRESSED_EMISSIVE = new THREE.Color(0x0d8a35);
+
 export interface LevelTwoRoomTwoHazardFailure {
   readonly roomId: 2;
   readonly hazardId: string;
@@ -61,6 +68,13 @@ interface LocalLaserContactTarget extends LaserContactTarget {
   radiusMetres: number;
 }
 
+interface WallButtonPresentation {
+  readonly surface: THREE.Mesh;
+  readonly pad: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
+  readonly statusLight: THREE.PointLight;
+  readonly padRestX: number;
+}
+
 /** Large Room 2 split-route puzzle with measured wall lasers and block jumps. */
 export class LevelTwoRoomTwoGreybox {
   readonly builder = new GreyboxRoomBuilder('cultivation-room-2-greybox');
@@ -73,6 +87,7 @@ export class LevelTwoRoomTwoGreybox {
   readonly wallButton: THREE.Mesh;
 
   private readonly goopExitDoor: ProximityShutterDoor;
+  private readonly wallButtonPresentation: WallButtonPresentation;
   private readonly laserPresentation: LaserHazardPresentation;
   private readonly localLaserTargetById: Readonly<
     Record<RadioactiveFloorSlimeId, LocalLaserContactTarget>
@@ -81,6 +96,8 @@ export class LevelTwoRoomTwoGreybox {
     goop: { id: 'goop', position: new THREE.Vector3(), radiusMetres: 0.45 },
   };
   private readonly localLaserTargets: LocalLaserContactTarget[] = [];
+  private wallButtonPresentationPressed: boolean | undefined;
+  private wallButtonPressProgress = 0;
 
   constructor(
     requestFailure: (failure: LevelTwoRoomTwoHazardFailure) => void,
@@ -101,7 +118,9 @@ export class LevelTwoRoomTwoGreybox {
         }),
     });
     this.goopExitDoor = goopExitDoor;
-    this.wallButton = this.buildStickyButtonRoute();
+    this.wallButtonPresentation = this.buildStickyButtonRoute();
+    this.wallButton = this.wallButtonPresentation.surface;
+    this.setWallButtonPresentationPressed(false, true);
     this.buildBlastDoor();
     this.buildSuspendedBlocks();
     this.buildBobExitVent();
@@ -149,7 +168,8 @@ export class LevelTwoRoomTwoGreybox {
       localTarget.radiusMetres = occupant.radiusMetres;
       this.localLaserTargets.push(localTarget);
     }
-    this.wallButton.userData.pressed = bobHoldingButton;
+    this.setWallButtonPresentationPressed(bobHoldingButton);
+    this.updateWallButtonPressAnimation(deltaSeconds);
     this.goopExitDoor.setLocked(!bobHoldingButton);
 
     for (const drop of this.blockDrops) drop.update(deltaSeconds);
@@ -166,7 +186,7 @@ export class LevelTwoRoomTwoGreybox {
   reset(): void {
     for (const drop of this.blockDrops) drop.reset();
     this.radiationHazard.reset();
-    this.wallButton.userData.pressed = false;
+    this.setWallButtonPresentationPressed(false, true);
     this.goopExitDoor.setLocked(true);
     this.lasers.reset();
     this.laserPresentation.sync();
@@ -193,8 +213,8 @@ export class LevelTwoRoomTwoGreybox {
     });
     const radiation = this.builder.addCollider({
       name: 'cultivation-room-2-radioactive-floor',
-      size: [37.6, 0.3, 30],
-      position: [0, -0.15, 23],
+      size: [37.6, 0.3, 37],
+      position: [0, -0.15, 26.5],
       material: acid,
       textureRole: 'acid-floor',
     });
@@ -202,16 +222,6 @@ export class LevelTwoRoomTwoGreybox {
     radiation.userData.roomId = 2;
     radiation.userData.hazardRole = 'radioactive';
     radiation.userData.hazardPolicy = 'bob-lethal-goop-immune';
-    const doorSideTiles = this.builder.addCollider({
-      name: 'cultivation-room-2-door-side-safe-tiles',
-      size: [37.6, 0.4, 7],
-      position: [0, 0, 41.5],
-      material: floor,
-    });
-    doorSideTiles.userData.levelId = 'cultivation';
-    doorSideTiles.userData.roomId = 2;
-    doorSideTiles.userData.safeZoneRole = 'far-door-landing';
-
     this.builder.addCollider({
       name: 'cultivation-room-2-west-wall',
       size: [0.4, 24, 45],
@@ -274,7 +284,7 @@ export class LevelTwoRoomTwoGreybox {
     return radiation;
   }
 
-  private buildStickyButtonRoute(): THREE.Mesh {
+  private buildStickyButtonRoute(): WallButtonPresentation {
     const { sticky, support } = this.builder.materials;
     const panels: ReadonlyArray<{
       readonly id: string;
@@ -303,11 +313,14 @@ export class LevelTwoRoomTwoGreybox {
       collider.userData.routeOrder = panels.indexOf(panel) + 1;
     }
 
+    const buttonCollisionMaterial = new THREE.MeshBasicMaterial({
+      visible: false,
+    });
     const button = this.builder.addCollider({
       name: 'cultivation-room-2-wall-button',
-      size: [0.22, 2.4, 2.4],
-      position: [-18.45, 14.2, 28.5],
-      material: support,
+      size: [0.28, 1.5, 1.5],
+      position: [-18.5, 14.2, 28.5],
+      material: buttonCollisionMaterial,
       surfaceTag: 'sticky',
       movementFaceMode: 'vertical-sides',
     });
@@ -315,6 +328,36 @@ export class LevelTwoRoomTwoGreybox {
     button.userData.roomId = 2;
     button.userData.interactionRole = 'bob-adhesion-hold-button';
     button.userData.controlsId = 'cultivation-room-2-blast-door';
+    button.userData.textureRole = 'sticky-button-face';
+
+    const padMaterial = new THREE.MeshStandardMaterial({
+      color: WALL_BUTTON_READY_COLOUR,
+      emissive: WALL_BUTTON_READY_EMISSIVE,
+      emissiveIntensity: 0.3,
+      roughness: 0.38,
+      metalness: 0.18,
+    });
+    const padRestX = -18.49;
+    const pad = new THREE.Mesh(
+      new THREE.BoxGeometry(0.26, 1.4, 1.4),
+      padMaterial,
+    );
+    pad.name = 'cultivation-room-2-wall-button-pad';
+    pad.position.set(padRestX, 14.2, 28.5);
+    pad.userData.presentationOnly = true;
+    pad.userData.visualRole = 'wall-button-square-pad';
+    pad.userData.textureRole = 'sticky-button-face';
+    this.root.add(pad);
+
+    const statusLight = this.builder.addLight(
+      'cultivation-room-2-wall-button-status-light',
+      [-17.9, 14.2, 28.5],
+      0xe53945,
+      1,
+      5,
+    );
+    statusLight.userData.presentationOnly = true;
+    statusLight.userData.visualRole = 'wall-button-status';
 
     this.builder.addCollider({
       name: 'cultivation-room-2-button-rest-ledge',
@@ -322,7 +365,12 @@ export class LevelTwoRoomTwoGreybox {
       position: [-17.35, 11.6, 29],
       material: support,
     });
-    return button;
+    return {
+      surface: button,
+      pad,
+      statusLight,
+      padRestX,
+    };
   }
 
   private buildBlastDoor(): void {
@@ -575,20 +623,63 @@ export class LevelTwoRoomTwoGreybox {
           ],
         },
       }),
-      new LaserHazard({
-        id: 'cultivation-room-2-laser-3-panel-e-pulse',
-        start: new THREE.Vector3(-18.38, 13.5, 25),
-        end: new THREE.Vector3(-18.38, 13.5, 30.8),
-        timeline: {
-          axisWorld: new THREE.Vector3(1, 0, 0),
-          repeat: true,
-          steps: [
-            { kind: 'hold', durationSeconds: 1.2, enabled: true, angleRadians: 0 },
-            { kind: 'hold', durationSeconds: 1.05, enabled: false, angleRadians: 0 },
-          ],
-        },
-      }),
     ];
+  }
+
+  private setWallButtonPresentationPressed(
+    pressed: boolean,
+    immediate = false,
+  ): void {
+    if (this.wallButtonPresentationPressed === pressed && !immediate) return;
+    this.wallButtonPresentationPressed = pressed;
+    const { surface } = this.wallButtonPresentation;
+    surface.userData.pressed = pressed;
+    surface.userData.presentationState = pressed ? 'pressed-green' : 'ready-red';
+    if (immediate) {
+      this.wallButtonPressProgress = pressed ? 1 : 0;
+      this.writeWallButtonPressPose();
+    }
+  }
+
+  private updateWallButtonPressAnimation(deltaSeconds: number): void {
+    const target = this.wallButtonPresentationPressed ? 1 : 0;
+    const maximumStep =
+      Math.max(0, deltaSeconds) / WALL_BUTTON_PRESS_DURATION_SECONDS;
+    this.wallButtonPressProgress += THREE.MathUtils.clamp(
+      target - this.wallButtonPressProgress,
+      -maximumStep,
+      maximumStep,
+    );
+    this.writeWallButtonPressPose();
+  }
+
+  private writeWallButtonPressPose(): void {
+    const { surface, pad, statusLight, padRestX } =
+      this.wallButtonPresentation;
+    const progress = this.wallButtonPressProgress;
+    pad.position.x =
+      padRestX - WALL_BUTTON_PRESS_TRAVEL_METRES * progress;
+    pad.material.color.lerpColors(
+      WALL_BUTTON_READY_COLOUR,
+      WALL_BUTTON_PRESSED_COLOUR,
+      progress,
+    );
+    pad.material.emissive.lerpColors(
+      WALL_BUTTON_READY_EMISSIVE,
+      WALL_BUTTON_PRESSED_EMISSIVE,
+      progress,
+    );
+    pad.material.emissiveIntensity = THREE.MathUtils.lerp(0.3, 1.5, progress);
+    pad.userData.presentationState = surface.userData.presentationState;
+    pad.userData.pressProgress = progress;
+    pad.userData.pressDurationSeconds = WALL_BUTTON_PRESS_DURATION_SECONDS;
+    statusLight.color.lerpColors(
+      WALL_BUTTON_READY_COLOUR,
+      WALL_BUTTON_PRESSED_COLOUR,
+      progress,
+    );
+    statusLight.intensity = THREE.MathUtils.lerp(1, 8, progress);
+    statusLight.userData.presentationState = surface.userData.presentationState;
   }
 }
 

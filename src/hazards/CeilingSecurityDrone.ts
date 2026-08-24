@@ -13,6 +13,7 @@ import {
 import type { DroneProjectileSystem } from './DroneProjectileSystem.ts';
 
 const EPSILON = 1e-9;
+const CABLE_LOCAL_AXIS = new THREE.Vector3(0, 1, 0);
 
 export type CeilingSecurityDroneState =
   | 'active'
@@ -41,6 +42,7 @@ export interface CeilingSecurityDroneReadModel {
   readonly state: CeilingSecurityDroneState;
   readonly stateElapsedSeconds: number;
   readonly replacementCableVisible: boolean;
+  readonly replacementCableDeploymentProgress: number;
   readonly hatchOpen: boolean;
   readonly drone: SecurityDroneReadModel;
 }
@@ -51,6 +53,7 @@ interface MutableCeilingReadModel {
   state: CeilingSecurityDroneState;
   stateElapsedSeconds: number;
   replacementCableVisible: boolean;
+  replacementCableDeploymentProgress: number;
   hatchOpen: boolean;
   readonly drone: SecurityDroneReadModel;
 }
@@ -96,13 +99,17 @@ export class CeilingSecurityDrone {
   private readonly initialQuaternion = new THREE.Quaternion();
   private readonly impactQuaternion = new THREE.Quaternion();
   private readonly radiationPosition = new THREE.Vector3();
+  private readonly cableAttachmentOffset = new THREE.Vector3();
+  private readonly cableAttachment = new THREE.Vector3();
+  private readonly deployedCableEnd = new THREE.Vector3();
+  private readonly cableDirection = new THREE.Vector3();
   private readonly model: MutableCeilingReadModel;
   private readonly unsubscribeSupport: () => void;
   private state: CeilingSecurityDroneState = 'active';
   private stateElapsed = 0;
   private radiationContactPending = false;
-  private replacementInstalled = false;
   private cableCollisionEnabled = false;
+  private cableDeploymentProgress = 0;
   private disposed = false;
 
   constructor(
@@ -121,6 +128,7 @@ export class CeilingSecurityDrone {
     this.impactPosition = config.radioactiveImpactPosition.clone();
     this.initialQuaternion.setFromEuler(config.drone.initialRotation ?? new THREE.Euler());
     this.impactQuaternion.setFromEuler(config.radioactiveImpactRotation);
+    this.cableAttachmentOffset.set(0, config.drone.colliderSize.y * 0.5, 0);
 
     this.root.name = `${config.drone.id}-ceiling-lifecycle`;
     this.drone = new SecurityDrone(config.drone, world, surfaces, projectiles);
@@ -135,11 +143,13 @@ export class CeilingSecurityDrone {
     );
     this.cable = createProxy(
       `${config.drone.id}-replacement-cable`,
-      new THREE.Vector3(0.12, 1, 0.12),
+      new THREE.Vector3(0.22, 1, 0.22),
       config.hatchPosition,
       0x7f8b91,
-      'non-soluble-replacement-cable',
+      'drone-replacement-deployment-cable',
     );
+    this.cable.material.roughness = 0.38;
+    this.cable.material.metalness = 0.78;
     this.cable.visible = false;
     this.root.add(this.mount, this.cable);
     world.register(this.mount);
@@ -158,6 +168,7 @@ export class CeilingSecurityDrone {
       state: 'active',
       stateElapsedSeconds: 0,
       replacementCableVisible: false,
+      replacementCableDeploymentProgress: 0,
       hatchOpen: false,
       drone: this.drone.readModel,
     };
@@ -174,7 +185,6 @@ export class CeilingSecurityDrone {
 
     if (
       this.state === 'active' &&
-      !this.replacementInstalled &&
       this.support.progress > 0
     ) {
       this.transition('supportDissolving');
@@ -198,21 +208,32 @@ export class CeilingSecurityDrone {
         if (this.stateElapsed + EPSILON >= warningStart) {
           this.transition('replacementWarning');
           this.setHatchOpen(true);
+          this.cableDeploymentProgress = 0;
           this.setCableVisible(true);
           this.events.emit('replacementWarning', { droneId: this.drone.id });
         }
       } else if (this.state === 'replacementWarning') {
+        this.cableDeploymentProgress = THREE.MathUtils.smoothstep(
+          this.stateElapsed,
+          0,
+          this.config.replacementWarningSeconds,
+        );
         if (this.stateElapsed + EPSILON >= this.config.replacementWarningSeconds) {
           this.transition('reinstalling');
         }
       } else if (this.state === 'reinstalling') {
+        this.cableDeploymentProgress = 1;
         const t = Math.min(1, this.stateElapsed / this.config.reinstallDurationSeconds);
         this.drone.root.position.lerpVectors(this.impactPosition, this.initialPosition, t);
         this.drone.root.quaternion.slerpQuaternions(this.impactQuaternion, this.initialQuaternion, t);
         if (t >= 1 - EPSILON) {
+          // The animated carrier cable is temporary. Swap it back to the
+          // original dissolve target so every completed reinstall produces a
+          // visible, collidable, acid-soluble cable for the next cycle.
+          this.setCableVisible(false);
+          this.support.reset();
           this.transition('active');
           this.setHatchOpen(false);
-          this.replacementInstalled = true;
           this.drone.setEnabled(true);
           this.events.emit('installed', { droneId: this.drone.id });
           this.events.emit('poweredOn', { droneId: this.drone.id });
@@ -243,7 +264,7 @@ export class CeilingSecurityDrone {
     this.state = 'active';
     this.stateElapsed = 0;
     this.radiationContactPending = false;
-    this.replacementInstalled = false;
+    this.cableDeploymentProgress = 0;
     this.drone.reset();
     this.setCableVisible(false);
     this.setHatchOpen(false);
@@ -310,9 +331,26 @@ export class CeilingSecurityDrone {
 
   private syncCable(): void {
     const hatch = this.config.hatchPosition;
-    const drone = this.drone.root.position;
-    const length = Math.max(0.01, hatch.distanceTo(drone));
-    this.cable.position.lerpVectors(hatch, drone, 0.5);
+    this.cableAttachment
+      .copy(this.cableAttachmentOffset)
+      .applyQuaternion(this.drone.root.quaternion)
+      .add(this.drone.root.position);
+    this.deployedCableEnd.lerpVectors(
+      hatch,
+      this.cableAttachment,
+      this.cableDeploymentProgress,
+    );
+    this.cableDirection.subVectors(this.deployedCableEnd, hatch);
+    const length = Math.max(0.01, this.cableDirection.length());
+    this.cable.position.lerpVectors(hatch, this.deployedCableEnd, 0.5);
+    if (this.cableDirection.lengthSq() > EPSILON) {
+      this.cable.quaternion.setFromUnitVectors(
+        CABLE_LOCAL_AXIS,
+        this.cableDirection.normalize(),
+      );
+    } else {
+      this.cable.quaternion.identity();
+    }
     this.cable.scale.set(1, length, 1);
   }
 
@@ -320,6 +358,8 @@ export class CeilingSecurityDrone {
     this.model.state = this.state;
     this.model.stateElapsedSeconds = this.stateElapsed;
     this.model.replacementCableVisible = this.cable.visible;
+    this.model.replacementCableDeploymentProgress =
+      this.cableDeploymentProgress;
   }
 
   private setCableVisible(visible: boolean): void {

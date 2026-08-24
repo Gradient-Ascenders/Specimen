@@ -36,16 +36,16 @@ function droneConfig(id: string, type: 'ceiling' | 'ground'): SecurityDroneConfi
   };
 }
 
-test('one completed rope independently drops, disables, warns, and reinstalls its ceiling drone', () => {
+test('a deployment cable descends, reconnects, and restores a soluble cable', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   const supportMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2, 0.2), new THREE.MeshStandardMaterial());
-  supportMesh.name = 'test-rope';
+  supportMesh.name = 'test-cable';
   supportMesh.position.y = 7;
   world.register(supportMesh);
   surfaces.register(supportMesh);
   const support = new DissolveTarget({
-    id: 'test-rope',
+    id: 'test-cable',
     mesh: supportMesh,
     collisionWorld: world,
     surfaceRegistry: surfaces,
@@ -66,7 +66,16 @@ test('one completed rope independently drops, disables, warns, and reinstalls it
     reinstallDurationSeconds: 1.75,
   };
   const lifecycle = new CeilingSecurityDrone(config, support, world, surfaces, projectiles);
+  const deploymentCable = lifecycle.root.getObjectByName(
+    'ceiling-replacement-cable',
+  ) as THREE.Mesh;
+  assert.ok(deploymentCable);
+  assert.equal(deploymentCable.userData.soluble, false);
   const activeColliderCount = world.colliderCount;
+  let releaseCount = 0;
+  let installedCount = 0;
+  lifecycle.events.on('released', () => releaseCount += 1);
+  lifecycle.events.on('installed', () => installedCount += 1);
 
   support.advance(1);
   const releasedColliderCount = world.colliderCount;
@@ -79,17 +88,55 @@ test('one completed rope independently drops, disables, warns, and reinstalls it
   lifecycle.update(8, []);
   assert.equal(lifecycle.readModel.state, 'replacementWarning');
   assert.equal(lifecycle.readModel.hatchOpen, true);
+  assert.equal(lifecycle.readModel.replacementCableDeploymentProgress, 0);
+  assert.ok(deploymentCable.scale.y <= 0.011);
   assert.equal(world.colliderCount, releasedColliderCount + 1);
-  lifecycle.update(2, []);
+  lifecycle.update(1, []);
+  assert.equal(lifecycle.readModel.state, 'replacementWarning');
+  assert.equal(lifecycle.readModel.replacementCableDeploymentProgress, 0.5);
+  const halfDeployedLength = deploymentCable.scale.y;
+  assert.ok(halfDeployedLength > 1);
+  lifecycle.update(1, []);
   assert.equal(lifecycle.readModel.state, 'reinstalling');
-  lifecycle.update(1.75, []);
+  assert.equal(lifecycle.readModel.replacementCableDeploymentProgress, 1);
+  const connectedLength = deploymentCable.scale.y;
+  assert.ok(connectedLength > halfDeployedLength);
+  lifecycle.update(0.875, []);
+  assert.equal(lifecycle.readModel.state, 'reinstalling');
+  assert.ok(deploymentCable.scale.y < connectedLength);
+  lifecycle.update(0.875, []);
   assert.equal(lifecycle.readModel.state, 'active');
   assert.equal(lifecycle.drone.readModel.enabled, true);
-  assert.equal(lifecycle.readModel.replacementCableVisible, true);
+  assert.equal(lifecycle.readModel.replacementCableVisible, false);
+  assert.equal(support.completed, false);
+  assert.equal(support.progress, 0);
+  assert.equal(support.collisionEnabled, true);
+  assert.equal(supportMesh.visible, true);
+  assert.equal(world.colliderCount, activeColliderCount);
   lifecycle.update(0.1, []);
   assert.equal(lifecycle.readModel.state, 'active');
+  assert.equal(releaseCount, 1);
+  assert.equal(installedCount, 1);
 
-  support.reset();
+  support.advance(1);
+  assert.equal(lifecycle.readModel.state, 'released');
+  assert.equal(support.completionCount, 2);
+  lifecycle.update(0.01, []);
+  lifecycle.update(0.65, []);
+  lifecycle.signalRadiationContact();
+  lifecycle.update(8, []);
+  lifecycle.update(2, []);
+  lifecycle.update(1.75, []);
+  assert.equal(lifecycle.readModel.state, 'active');
+  assert.equal(lifecycle.readModel.replacementCableVisible, false);
+  assert.equal(support.completed, false);
+  assert.equal(support.progress, 0);
+  assert.equal(support.collisionEnabled, true);
+  assert.equal(supportMesh.visible, true);
+  assert.equal(releaseCount, 2);
+  assert.equal(installedCount, 2);
+  assert.equal(world.colliderCount, activeColliderCount);
+
   lifecycle.reset();
   assert.equal(lifecycle.readModel.state, 'active');
   assert.equal(lifecycle.readModel.replacementCableVisible, false);

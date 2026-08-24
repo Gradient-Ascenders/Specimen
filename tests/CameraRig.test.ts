@@ -141,7 +141,7 @@ test('default pitch limits provide extended upward and usable downward views', (
   );
 });
 
-test('floor obstruction cannot flatten the centre ray during steep upward aim', () => {
+test('first-person aim preserves the full upward centre ray near a floor', () => {
   const target = createTarget();
   const world = new CollisionWorld();
   const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 0.2, 20));
@@ -158,7 +158,7 @@ test('floor obstruction cannot flatten the centre ray during steep upward aim', 
 
   const diagnostics = rig.getDiagnostics();
   const aimDirection = rig.camera.getWorldDirection(new THREE.Vector3());
-  assert.equal(diagnostics.obstructionName, floor.name);
+  assert.equal(diagnostics.obstructionName, 'none');
   assert.ok(diagnostics.currentDistanceMetres < 1);
   assert.ok(
     Math.abs(
@@ -174,12 +174,12 @@ test('floor obstruction cannot flatten the centre ray during steep upward aim', 
   floor.geometry.dispose();
 });
 
-test('Goop aim smoothly adopts a collision-aware shoulder pose and exposes its live centre ray', () => {
+test('Goop aim smoothly adopts a centred first-person pose and exposes its live centre ray', () => {
   const rig = new CameraRig({
     initialPitchRadians: 0,
     aimTransitionDurationSeconds: 0.2,
-    aimDistanceScale: 0.84,
-    aimShoulderOffsetMetres: 0.82,
+    aimFirstPersonDistanceMetres: 0.08,
+    aimShoulderOffsetMetres: 0,
   });
   const world = new CollisionWorld();
   rig.setFollowTarget(createTarget(), world);
@@ -196,20 +196,21 @@ test('Goop aim smoothly adopts a collision-aware shoulder pose and exposes its l
   assert.ok(entering.aimPresentationBlend > 0);
   assert.ok(entering.aimPresentationBlend < 1);
   assert.ok(entering.desiredDistanceMetres < normalDistance);
-  assert.ok(entering.desiredDistanceMetres > normalDistance * 0.84);
+  assert.ok(entering.desiredDistanceMetres > 0.08);
 
   rig.update(1, 0.1);
   const aimed = rig.getDiagnostics();
   assert.ok(Math.abs(aimed.aimPresentationBlend - 1) < EPSILON);
   assert.ok(
-    Math.abs(aimed.desiredDistanceMetres - normalDistance * 0.84) < EPSILON,
+    Math.abs(aimed.desiredDistanceMetres - 0.08) < EPSILON,
   );
+  assert.ok(Math.abs(aimed.currentDistanceMetres - 0.08) < EPSILON);
   assert.equal(rig.camera.fov, initialFov);
-  assert.ok(Math.abs(aimed.aimShoulderOffsetMetres - 0.82) < EPSILON);
+  assert.ok(aimed.aimShoulderOffsetMetres < EPSILON);
   assert.ok(
     new THREE.Vector3()
       .copy(aimed.focusPosition)
-      .distanceTo(initialFocus) > 0.8,
+      .distanceTo(initialFocus) < EPSILON,
   );
 
   const aimOrigin = new THREE.Vector3();

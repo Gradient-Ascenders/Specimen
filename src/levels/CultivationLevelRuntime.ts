@@ -49,6 +49,7 @@ import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
 import { SlimePairPresentation } from '../slimes/SlimePairPresentation.ts';
 import { DeathSequence, type DeathRecoveryAction } from '../systems/DeathSequence.ts';
 import { DeathScreen } from '../ui/DeathScreen.ts';
+import { SlimeDamageVignette } from '../ui/SlimeDamageVignette.ts';
 import { CultivationLevelController } from './CultivationLevelController.ts';
 import { CULTIVATION_FOUNDATION_MANIFEST } from './CultivationFoundationManifest.ts';
 import { CultivationLevelScene } from './CultivationLevelScene.ts';
@@ -97,6 +98,7 @@ interface CultivationRuntimeResources {
   readonly roomThreeEncounter: RoomThreeDroneEncounter | undefined;
   readonly roomThreeController: CultivationRoomThreeController | undefined;
   readonly droneProjectilePresentation: DroneProjectilePresentation | undefined;
+  readonly damageVignette: SlimeDamageVignette | undefined;
   readonly structuralAssemblies: readonly SuspendedStructureAssembly[];
   readonly wallButton: WallButton<KinematicBody>;
   readonly blastDoor: VerticalBlastDoor;
@@ -357,6 +359,7 @@ export class CultivationLevelRuntime {
         deltaSeconds,
         authoredProgression.roomId,
         resources.previewOccupants,
+        resources.pair.goopBody,
       );
       if (resources.deathSequence.isPlaying) {
         for (const occupant of resources.previewOccupants) {
@@ -411,7 +414,34 @@ export class CultivationLevelRuntime {
     resources.bobVisual.setPosition(resources.renderedBobPosition);
     resources.bobVisual.mesh.rotation.set(0, resources.bobFacing.getInterpolatedYaw(interpolationAlpha), 0);
     resources.bobVisual.present();
+    // A render frame can occur without a fixed update. Preserve the same
+    // pointer-sampling behaviour as Level 1 so those frames apply mouse input
+    // instead of discarding it and making Level 2 sensitivity frame-rate
+    // dependent. Fixed updates clear consumed deltas, so this cannot double
+    // apply input on frames where simulation already handled it.
+    if (
+      this.lifecycle.state === 'running' &&
+      resources.deathSequence.isPlaying &&
+      resources.controller.readModel.state === 'playing' &&
+      this.input.enabled
+    ) {
+      this.renderLayer.cameraRig.queueLookInput(
+        this.input.pointerDeltaX,
+        this.input.pointerDeltaY,
+      );
+    }
     this.input.endPointerUpdate();
+    const aimPresentationAllowed =
+      this.lifecycle.state === 'running' &&
+      resources.deathSequence.isPlaying &&
+      resources.controller.readModel.state === 'playing' &&
+      this.input.enabled;
+    resources.goopAcidPresentation.update(
+      interpolationAlpha,
+      stats.frameDeltaSeconds,
+      aimPresentationAllowed,
+      this.lifecycle.state === 'running' && resources.deathSequence.isPlaying,
+    );
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     resources.pairPresentation.update(
       resources.renderedBobPosition,
@@ -419,17 +449,18 @@ export class CultivationLevelRuntime {
       resources.pair.activeSlimeId,
       this.renderLayer.cameraRig.camera,
       resources.collisionWorld,
-    );
-    resources.goopAcidPresentation.update(
-      interpolationAlpha,
-      stats.frameDeltaSeconds,
-      this.lifecycle.state === 'running' &&
-        resources.deathSequence.isPlaying &&
-        resources.controller.readModel.state === 'playing' &&
-        this.input.enabled,
-      this.lifecycle.state === 'running' && resources.deathSequence.isPlaying,
+      this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
+      resources.pair.bobBody.gameplayUp,
+      resources.pair.goopBody.gameplayUp,
     );
     resources.droneProjectilePresentation?.update(interpolationAlpha);
+    resources.damageVignette?.update(
+      stats.frameDeltaSeconds,
+      resources.pair.activeSlimeId,
+      this.lifecycle.state === 'running' &&
+        resources.deathSequence.isPlaying &&
+        this.roomThreeSlimeEligibility[resources.pair.activeSlimeId],
+    );
     this.renderLayer.render();
 
     this.debugElapsedSeconds += stats.rawFrameDeltaSeconds;
@@ -786,6 +817,13 @@ export class CultivationLevelRuntime {
         rollback(() => droneProjectilePresentation.dispose());
         this.renderLayer.scene.add(droneProjectilePresentation.mesh);
       }
+      const damageVignette = roomThreeEncounter
+        ? new SlimeDamageVignette({ damage: roomThreeEncounter.damage })
+        : undefined;
+      if (damageVignette) {
+        rollback(() => damageVignette.dispose());
+        this.host.append(damageVignette.element);
+      }
       const pairPresentation = new SlimePairPresentation(bobBody.radiusMetres);
       rollback(() => pairPresentation.dispose());
       this.renderLayer.scene.add(pairPresentation.root);
@@ -853,6 +891,7 @@ export class CultivationLevelRuntime {
         dissolveTargets, previewDissolveTargets,
         dissolveSystem, acidProjectileSystem, goopAcidPresentation,
         roomThreeEncounter, roomThreeController, droneProjectilePresentation,
+        damageVignette,
         structuralAssemblies, wallButton, blastDoor, buttonDoorCoordinator,
         manager, pair, controller,
         radiation, radiationTargets, previewOccupants,
@@ -873,15 +912,25 @@ export class CultivationLevelRuntime {
         unsubscribeControllerProgress,
         unsubscribeManager,
       };
-      this.renderLayer.cameraRig.reset();
-      this.retargetCamera(this.resources);
-      this.host.dataset.gameState = controller.readModel.state;
+      if (authoredPreview) {
+        // Level 1's Digit0 shortcut now enters the authored three-room route
+        // immediately. The separate backend-foundation composition remains a
+        // reusable implementation harness, but is no longer a competing
+        // player destination in development builds.
+        if (!this.teleportToAuthoredPreviewRoom(1)) {
+          throw new Error('Could not enter authored Cultivation Room 1.');
+        }
+      } else {
+        this.renderLayer.cameraRig.reset();
+        this.retargetCamera(this.resources);
+        this.host.dataset.gameState = controller.readModel.state;
+        this.notifyHUD();
+        this.events.emit('objectiveChanged', {
+          roomId: controller.readModel.roomId,
+          objective: controller.readModel.objective,
+        });
+      }
       this.applyDebugPresentation();
-      this.notifyHUD();
-      this.events.emit('objectiveChanged', {
-        roomId: controller.readModel.roomId,
-        objective: controller.readModel.objective,
-      });
       rollbackActions.length = 0;
     } catch (error) {
       this.resources = undefined;
@@ -919,6 +968,7 @@ export class CultivationLevelRuntime {
     resources.roomThreeEncounter?.reset();
     resources.roomThreeController?.reset();
     resources.droneProjectilePresentation?.reset();
+    resources.damageVignette?.reset();
     resources.controller.reset(this.initialProgression.activeSlimeId);
     if (this.authoredPreviewRoomId !== undefined) {
       this.captureAuthoredPreviewCheckpoint(resources, false);
@@ -946,6 +996,7 @@ export class CultivationLevelRuntime {
     resources.controller.dispose();
     resources.radiation.dispose();
     resources.roomThreeController?.dispose();
+    resources.damageVignette?.dispose();
     resources.droneProjectilePresentation?.dispose();
     resources.roomThreeEncounter?.dispose();
     resources.buttonDoorCoordinator.dispose();
@@ -1038,6 +1089,7 @@ export class CultivationLevelRuntime {
     resources.roomThreeEncounter?.reset();
     resources.roomThreeController?.reset();
     resources.droneProjectilePresentation?.reset();
+    resources.damageVignette?.reset();
     resources.buttonDoorCoordinator.setEnabled(false);
     resources.burst.reset();
     resources.deathSequence.reset();
@@ -1092,6 +1144,7 @@ export class CultivationLevelRuntime {
     resources.roomThreeEncounter?.reset();
     resources.roomThreeController?.reset();
     resources.droneProjectilePresentation?.reset();
+    resources.damageVignette?.reset();
     this.recoverAuthoredPreviewRoom(resources);
   }
 

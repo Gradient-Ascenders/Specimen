@@ -17,10 +17,12 @@ export interface DroneProjectileConfig {
 }
 
 export const DEFAULT_DRONE_PROJECTILE_CONFIG: Readonly<DroneProjectileConfig> = {
-  speedMetresPerSecond: 14,
-  radiusMetres: 0.1,
-  maximumRangeMetres: 20,
-  lifetimeSeconds: 1.5,
+  // Close shots arrive before a normal reaction, while a shot crossing most
+  // of Room 3 remains visible long enough for a deliberate lateral dodge.
+  speedMetresPerSecond: 150,
+  radiusMetres: 0.16,
+  maximumRangeMetres: 100,
+  lifetimeSeconds: 0.75,
   damage: 20,
   poolCapacity: 48,
 };

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
+import type { KinematicBody } from '../physics/KinematicBody.ts';
 import {
   LEVEL_TWO_BOB_AIR_DUCT_LAYOUT,
   LevelTwoAirDuctGreybox,
@@ -202,12 +203,13 @@ export class LevelTwoPreviewScene {
     deltaSeconds: number,
     roomId: LevelTwoAuthoredRoomId,
     occupants: readonly LevelTwoRoomTwoOccupant[],
+    goopBody?: KinematicBody,
   ): void {
     this.roomOne.updateRadiation(occupants);
     this.roomTwo.updateRadiation(occupants);
     this.roomThree.updateRadiation(occupants);
 
-    this.roomOne.update(deltaSeconds);
+    this.roomOne.update(deltaSeconds, goopBody);
     let roomTwoOccupied = roomId === 2;
     let roomThreeOccupied = roomId === 3;
     for (const occupant of occupants) {

@@ -11,6 +11,10 @@ import type { DissolveTarget } from './DissolveTarget.ts';
 
 const DISTANCE_EPSILON = 1e-8;
 const COOLDOWN_EPSILON_SECONDS = 1e-9;
+const DEFAULT_VISIBILITY_Y_SAMPLES = [0.5] as const;
+const SUPPORT_CABLE_VISIBILITY_Y_SAMPLES = [0.5, 0.78, 0.22] as const;
+const SUPPORT_CABLE_AUTHORING_ROLE =
+  'ceiling-drone-soluble-support-cable';
 
 export interface AcidProjectileConfig {
   readonly maximumRangeMetres: number;
@@ -420,16 +424,6 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       if (target === aimedTarget) continue;
       if (!this.isAvailableTargetInRange(target, activeBody)) continue;
 
-      target.copyClosestWorldPoint(this.aimOrigin, this.targetPoint);
-      this.candidateDisplacement.subVectors(
-        this.targetPoint,
-        this.aimOrigin,
-      );
-      if (this.candidateDisplacement.lengthSq() <= DISTANCE_EPSILON) {
-        visibleIds.push(target.id);
-        continue;
-      }
-
       // Bound expensive occlusion sweeps independently from successful
       // results. Otherwise a long run of occluded candidates could probe every
       // registered target even though visibleIds itself is capped.
@@ -439,6 +433,38 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       ) {
         break;
       }
+      if (this.isTargetVisibleFromAimOrigin(target)) {
+        visibleIds.push(target.id);
+      }
+    }
+  }
+
+  private isTargetVisibleFromAimOrigin(target: DissolveTarget): boolean {
+    // A suspended platform may cross the centre of its thin support cable even
+    // though the cable remains plainly visible above and below it. Sample a
+    // small fixed set along that authored cable; ordinary targets retain their
+    // single centre probe and the shared per-step probe cap still applies.
+    const ySamples =
+      target.mesh.userData.authoringRole === SUPPORT_CABLE_AUTHORING_ROLE
+        ? SUPPORT_CABLE_VISIBILITY_Y_SAMPLES
+        : DEFAULT_VISIBILITY_Y_SAMPLES;
+
+    for (const yFraction of ySamples) {
+      target.copyWorldBoundsPoint(0.5, yFraction, 0.5, this.targetPoint);
+      this.candidateDisplacement.subVectors(
+        this.targetPoint,
+        this.aimOrigin,
+      );
+      if (this.candidateDisplacement.lengthSq() <= DISTANCE_EPSILON) {
+        return true;
+      }
+      if (
+        this.visibilityProbeCountValue >=
+        this.config.maximumVisibleTargets
+      ) {
+        return false;
+      }
+
       this.visibilityProbeCountValue += 1;
       const hasHit = this.collisionWorld.sweepSphere(
         this.aimOrigin,
@@ -447,10 +473,9 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
         this.candidateHit,
         CollisionLayer.CameraObstruction,
       );
-      if (hasHit && this.candidateHit.object === target.mesh) {
-        visibleIds.push(target.id);
-      }
+      if (hasHit && this.candidateHit.object === target.mesh) return true;
     }
+    return false;
   }
 
   private isAvailableTargetInRange(

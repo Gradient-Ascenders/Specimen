@@ -26,7 +26,6 @@ export const MIN_FOLLOW_DISTANCE_METRES = 3.5;
 export const MAX_FOLLOW_DISTANCE_METRES = 7;
 const MIN_FOLLOW_DISTANCE_SCALE = 0.25;
 const MAX_FOLLOW_DISTANCE_SCALE = 1;
-const MAX_AIM_SHOULDER_TO_PLANAR_BOOM_RATIO = 0.5;
 
 /**
  * Read-only handoff from authoritative movement to render-side camera logic.
@@ -66,9 +65,9 @@ export interface CameraRigConfig extends CameraLookSettings {
   obstructionBufferMetres: number;
   /** Follow errors beyond this are treated as teleports/checkpoint resets. */
   teleportSnapDistanceMetres: number;
-  /** Multiplicative boom distance used by Goop's presentation-only aim pose. */
-  aimDistanceScale: number;
-  /** Sideways framing offset that keeps Goop clear of the centre aim ray. */
+  /** Fixed near-pivot distance used by Goop's first-person aim pose. */
+  aimFirstPersonDistanceMetres: number;
+  /** Optional sideways framing offset retained for authored aim variants. */
   aimShoulderOffsetMetres: number;
   /** Symmetric entry/exit duration for the presentation-only aim pose. */
   aimTransitionDurationSeconds: number;
@@ -89,8 +88,8 @@ export const DEFAULT_CAMERA_RIG_CONFIG: Readonly<CameraRigConfig> = {
   obstructionRadiusMetres: 0.22,
   obstructionBufferMetres: 0.03,
   teleportSnapDistanceMetres: 3,
-  aimDistanceScale: 0.84,
-  aimShoulderOffsetMetres: 0.82,
+  aimFirstPersonDistanceMetres: 0.08,
+  aimShoulderOffsetMetres: 0,
   aimTransitionDurationSeconds: 0.2,
   horizontalSensitivityRadiansPerPixel: 0.0022,
   verticalSensitivityRadiansPerPixel: 0.002,
@@ -339,7 +338,7 @@ export class CameraRig {
   }
 
   /**
-   * Blend the existing collision-aware boom into Goop's modest aim pose.
+   * Blend the existing collision-aware boom into Goop's first-person aim pose.
    * This never changes the camera ray, FOV, orbit, or target authority.
    */
   setAimPresentationActive(active: boolean, immediate = false): void {
@@ -518,6 +517,11 @@ export class CameraRig {
   /** Allocation-free distance read for per-frame presentation decisions. */
   get currentFollowDistanceMetres(): number {
     return this.currentDistanceMetres;
+  }
+
+  /** Allocation-free render blend used to suppress the body during transitions. */
+  get aimPresentationWeight(): number {
+    return this.getAimPresentationWeight();
   }
 
   getDiagnostics(): CameraRigDiagnostics {
@@ -912,11 +916,19 @@ export class CameraRig {
         ? deltaSeconds
         : 0;
 
+    const minimumDistanceMetres = THREE.MathUtils.lerp(
+      this.config.minimumDistanceMetres,
+      Math.min(
+        this.config.minimumDistanceMetres,
+        this.config.aimFirstPersonDistanceMetres,
+      ),
+      this.getAimPresentationWeight(),
+    );
     this.currentDistanceMetres = resolveCameraDistance(
       this.currentDistanceMetres,
       desiredDistanceMetres,
       obstructionLimitMetres,
-      this.config.minimumDistanceMetres,
+      minimumDistanceMetres,
       this.config.recoveryDampingPerSecond,
       recoveryDeltaSeconds,
     );
@@ -936,7 +948,7 @@ export class CameraRig {
       : normalDistanceMetres;
     return THREE.MathUtils.lerp(
       authoredDistanceMetres,
-      authoredDistanceMetres * this.config.aimDistanceScale,
+      this.config.aimFirstPersonDistanceMetres,
       this.getAimPresentationWeight(),
     );
   }
@@ -951,20 +963,9 @@ export class CameraRig {
     this.aimShoulderDirection
       .crossVectors(this.smoothedUp, this.planarBack)
       .normalize();
-    // A fixed lateral look offset can dominate the centre ray when a steep
-    // upward view drives the boom into the floor and collision shortens it.
-    // Bound the offset against the resolved boom's planar reach so the
-    // crosshair continues to follow the player's authored pitch.
-    const planarBoomDistanceMetres =
-      Math.abs(Math.cos(this.effectivePitchRadians)) *
-      this.currentDistanceMetres;
-    const resolvedOffsetMetres = Math.min(
-      requestedOffsetMetres,
-      planarBoomDistanceMetres * MAX_AIM_SHOULDER_TO_PLANAR_BOOM_RATIO,
-    );
     this.aimShoulderDisplacement
       .copy(this.aimShoulderDirection)
-      .multiplyScalar(resolvedOffsetMetres);
+      .multiplyScalar(requestedOffsetMetres);
     this.cameraLookPivot.add(this.aimShoulderDisplacement);
   }
 
@@ -1055,6 +1056,7 @@ export class CameraRig {
       ['recoveryDampingPerSecond', config.recoveryDampingPerSecond],
       ['obstructionRadiusMetres', config.obstructionRadiusMetres],
       ['teleportSnapDistanceMetres', config.teleportSnapDistanceMetres],
+      ['aimFirstPersonDistanceMetres', config.aimFirstPersonDistanceMetres],
       ['aimTransitionDurationSeconds', config.aimTransitionDurationSeconds],
     ];
     for (const [name, value] of positiveValues) {
@@ -1068,14 +1070,6 @@ export class CameraRig {
       config.aimShoulderOffsetMetres < 0
     ) {
       throw new Error('aimShoulderOffsetMetres must be non-negative and finite.');
-    }
-
-    if (
-      !Number.isFinite(config.aimDistanceScale) ||
-      config.aimDistanceScale <= 0 ||
-      config.aimDistanceScale > 1
-    ) {
-      throw new Error('aimDistanceScale must be within (0, 1].');
     }
 
     const nonNegativeValues: ReadonlyArray<[string, number]> = [

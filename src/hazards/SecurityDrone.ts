@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { EventBus } from '../core/EventBus.ts';
 import { CollisionHit, CollisionLayer, type CollisionWorld } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import { SecurityDronePresentation } from '../render/hazards/SecurityDronePresentation.ts';
 import type { DroneProjectileSystem } from './DroneProjectileSystem.ts';
 
 const EPSILON = 1e-9;
@@ -92,6 +93,7 @@ export class SecurityDrone {
   readonly events = new EventBus<SecurityDroneEvents>();
   readonly collider: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
   readonly frontIndicator: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+  readonly presentation: SecurityDronePresentation;
   readonly readModel: SecurityDroneReadModel;
   readonly id: string;
 
@@ -154,20 +156,10 @@ export class SecurityDrone {
     this.collider.userData.droneId = config.id;
     this.collider.userData.soluble = false;
     this.collider.userData.surfaceTag = 'default';
-    this.frontIndicator = new THREE.Mesh(
-      new THREE.SphereGeometry(0.18, 8, 6),
-      new THREE.MeshBasicMaterial({ color: 0xff3048, toneMapped: false }),
-    );
-    this.frontIndicator.name = `${config.id}-front-indicator`;
-    const indicatorDistance =
-      Math.abs(this.baseForward.x) * config.colliderSize.x * 0.5 +
-      Math.abs(this.baseForward.y) * config.colliderSize.y * 0.5 +
-      Math.abs(this.baseForward.z) * config.colliderSize.z * 0.5 +
-      0.08;
-    this.frontIndicator.position.copy(this.baseForward).multiplyScalar(indicatorDistance);
-    this.frontIndicator.userData.presentationOnly = true;
-    this.frontIndicator.userData.droneId = config.id;
-    this.root.add(this.collider, this.frontIndicator);
+    this.collider.material.visible = false;
+    this.presentation = new SecurityDronePresentation(config);
+    this.frontIndicator = this.presentation.eye;
+    this.root.add(this.collider, this.presentation.root);
     this.world.register(this.collider);
     this.surfaces.register(this.collider);
 
@@ -281,8 +273,7 @@ export class SecurityDrone {
     this.root.clear();
     this.collider.geometry.dispose();
     this.collider.material.dispose();
-    this.frontIndicator.geometry.dispose();
-    this.frontIndicator.material.dispose();
+    this.presentation.dispose();
     this.target = undefined;
     this.disposed = true;
   }
@@ -440,6 +431,8 @@ export class SecurityDrone {
     this.root.getWorldPosition(this.worldPosition);
     write(this.model.position, this.worldPosition);
     write(this.model.scanDirection, this.scanDirection);
+    this.presentation.setAimDirection(this.scanDirection);
+    this.presentation.setState(this.state, this.enabled);
   }
 
   private assertActive(operation: string): void {

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import * as THREE from 'three';
+
+import { DEFAULT_DRONE_PROJECTILE_CONFIG } from '../src/hazards/DroneProjectileSystem.ts';
 import { DroneProjectilePresentation } from '../src/render/hazards/DroneProjectilePresentation.ts';
 
 test('drone projectile proxies interpolate bounded live read states and reset cleanly', () => {
@@ -23,6 +26,10 @@ test('drone projectile proxies interpolate bounded live read states and reset cl
     },
   ] as const;
   const presentation = new DroneProjectilePresentation(states);
+  assert.equal(
+    (presentation.mesh.geometry as THREE.SphereGeometry).parameters.radius,
+    DEFAULT_DRONE_PROJECTILE_CONFIG.radiusMetres,
+  );
 
   presentation.update(0.5);
   assert.equal(presentation.mesh.count, 1);
