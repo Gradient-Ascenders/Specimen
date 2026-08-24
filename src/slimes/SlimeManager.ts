@@ -46,13 +46,15 @@ export class SlimeManager<Body extends object> {
   private readonly definitions = new Map<SlimeId, SlimeDefinition>();
   private readonly unlockedIds = new Set<SlimeId>();
   private readonly bodies = new Map<SlimeId, Body>();
+  private readonly preferredDefaultSlimeId: SlimeId;
   private activeSlimeIdValue: SlimeId | undefined;
   private disposed = false;
 
   constructor(
     definitions: readonly SlimeDefinition[] = SLIME_DEFINITIONS,
-    private readonly preferredDefaultSlimeId: SlimeId = 'bob',
+    preferredDefaultSlimeId: SlimeId = 'bob',
   ) {
+    this.preferredDefaultSlimeId = preferredDefaultSlimeId;
     if (definitions.length === 0) {
       throw new Error('SlimeManager requires at least one slime definition.');
     }

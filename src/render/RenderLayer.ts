@@ -32,9 +32,8 @@ export interface RenderLayerOptions {
 /**
  * Shared rendering boundary for the application.
  *
- * It owns the WebGL renderer, the game camera, the persistent inspection
- * lights, and viewport sizing. Levels remain responsible for every resource
- * below their own scene root.
+ * It owns the WebGL renderer, the game camera, and viewport sizing. Levels own
+ * their authored lighting below their own scene roots.
  */
 export class RenderLayer {
   readonly scene = new THREE.Scene();
@@ -43,7 +42,6 @@ export class RenderLayer {
 
   private readonly host: HTMLElement;
   private readonly hostWindow: Window;
-  private readonly lighting = new THREE.Group();
   private readonly drawingBufferSize = new THREE.Vector2();
   private readonly resizeObserver: ResizeObserver | undefined;
 
@@ -69,8 +67,6 @@ export class RenderLayer {
     this.renderer.shadowMap.enabled = false;
     this.renderer.setClearColor(BACKGROUND_COLOUR, 1);
     this.renderer.domElement.setAttribute('aria-hidden', 'true');
-
-    this.addInspectionLighting();
 
     this.hostWindow.addEventListener('resize', this.resize);
     if (typeof ResizeObserver !== 'undefined') {
@@ -137,26 +133,7 @@ export class RenderLayer {
     this.renderer.setAnimationLoop(null);
     this.hostWindow.removeEventListener('resize', this.resize);
     this.resizeObserver?.disconnect();
-    this.lighting.removeFromParent();
-    this.lighting.clear();
     this.renderer.dispose();
-  }
-
-  private addInspectionLighting(): void {
-    this.lighting.name = 'clinical-inspection-lighting';
-
-    const ambientLight = new THREE.HemisphereLight(0xddeeff, 0x25332e, 1.35);
-    ambientLight.name = 'clinical-ambient-fill';
-    this.lighting.add(ambientLight);
-
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
-    keyLight.name = 'clinical-directional-key';
-    keyLight.position.set(8, 14, 10);
-    keyLight.target.position.set(0, 0.5, 1.5);
-    keyLight.target.name = 'clinical-directional-key-target';
-    this.lighting.add(keyLight, keyLight.target);
-
-    this.scene.add(this.lighting);
   }
 
   private readonly resize = (): void => {
