@@ -39,7 +39,7 @@ function ceiling(
       targetPolicy: 'bob-only',
       initialScanPhase: phase,
     },
-    supportTargetId: `${id}-soluble-support-rope`,
+    supportTargetId: `${id}-acid-soluble-support-cable`,
     radioactiveImpactPosition: new THREE.Vector3(position.x, 0.62, position.z),
     radioactiveImpactRotation: new THREE.Euler(Math.PI * 0.48, 0.12, -0.18),
     hatchPosition: new THREE.Vector3(position.x, 29.55, position.z),

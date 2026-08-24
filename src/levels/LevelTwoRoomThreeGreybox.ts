@@ -42,7 +42,7 @@ interface LocalLaserContactTarget extends LaserContactTarget {
  * Large Room 3 cooperation chamber.
  *
  * Drone bodies are supplied by the Issue #96 encounter owner. This scene owns
- * the shared ropes, radiation floor, cover, lasers, and checkpoint geometry.
+ * their soluble cables, radiation floor, cover, lasers, and checkpoint geometry.
  */
 export class LevelTwoRoomThreeGreybox {
   readonly builder = new GreyboxRoomBuilder('cultivation-room-3-greybox');
@@ -420,26 +420,26 @@ export class LevelTwoRoomThreeGreybox {
   }
 
   private buildRoofDronePlaceholders(): void {
-    const { wood } = this.builder.materials;
+    const { cable: cableMaterial } = this.builder.materials;
 
     for (const definition of CULTIVATION_ROOM_THREE_DRONE_AUTHORING.ceilingDrones) {
-      const { id, initialPosition } = definition.drone;
+      const { id, initialPosition, colliderSize } = definition.drone;
       const { x, y, z } = initialPosition;
-      const ropeBottom = y + 0.68;
-      const ropeTop = 29.25;
-      const ropeLength = ropeTop - ropeBottom;
-      const rope = this.builder.addCollider({
+      const cableBottom = y + colliderSize.y * 0.5;
+      const cableTop = definition.hatchPosition.y;
+      const cableLength = cableTop - cableBottom;
+      const cable = this.builder.addCollider({
         name: definition.supportTargetId,
-        size: [0.45, ropeLength, 0.45],
-        position: [x, ropeBottom + ropeLength * 0.5, z],
-        material: wood,
+        size: [0.22, cableLength, 0.22],
+        position: [x, cableBottom + cableLength * 0.5, z],
+        material: cableMaterial,
         interactionRole: 'goop-dissolvable',
       });
-      Object.assign(rope.userData, {
+      Object.assign(cable.userData, {
         soluble: true,
-        solubleId: rope.name,
-        authoringRole: 'ceiling-drone-soluble-support',
-        textureRole: 'soluble-rope',
+        solubleId: cable.name,
+        authoringRole: 'ceiling-drone-soluble-support-cable',
+        textureRole: 'soluble-cable',
         levelId: 'cultivation',
         roomId: 3,
         droneId: id,
@@ -449,17 +449,17 @@ export class LevelTwoRoomThreeGreybox {
         dissolveCollisionDisableProgress: 0.72,
         dissolveActivationRangeMetres: 0.18,
       });
-      this.solubleTargetMeshes.push(rope);
+      this.solubleTargetMeshes.push(cable);
 
       const marker = this.builder.addVisualBox({
         name: `${id}-soluble-marker-band`,
-        size: [0.64, 0.4, 0.64],
-        position: [x, rope.position.y, z],
+        size: [0.48, 0.32, 0.48],
+        position: [x, cable.position.y, z],
         material: this.builder.materials.etch,
       });
       marker.userData.presentationOnly = true;
-      marker.userData.targetId = rope.name;
-      rope.add(marker);
+      marker.userData.targetId = cable.name;
+      cable.add(marker);
       marker.position.set(0, 0, 0);
     }
   }

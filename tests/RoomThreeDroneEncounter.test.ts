@@ -11,7 +11,7 @@ import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 
-test('Room 3 constructs exactly seven authored drones and resets one-to-one rope release', () => {
+test('Room 3 constructs seven drones and resets one-to-one cable release', () => {
   const scene = new LevelTwoPreviewScene(() => {});
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
@@ -22,6 +22,17 @@ test('Room 3 constructs exactly seven authored drones and resets one-to-one rope
     assert.ok(target);
     return target;
   });
+  const roomThreeCables = targets.filter(
+    (target) => target.mesh.userData.roomId === 3,
+  );
+  assert.equal(roomThreeCables.length, 3);
+  assert.ok(roomThreeCables.every(
+    (target) =>
+      target.id.endsWith('-acid-soluble-support-cable') &&
+      target.mesh.userData.textureRole === 'soluble-cable' &&
+      target.mesh.userData.authoringRole ===
+        'ceiling-drone-soluble-support-cable',
+  ));
   const supportsById = new Map(targets.map((target) => [target.id, target]));
   const bobSpawn = scene.copyRoomSpawnPosition(3, 'bob', new THREE.Vector3());
   const goopSpawn = scene.copyRoomSpawnPosition(3, 'goop', new THREE.Vector3());

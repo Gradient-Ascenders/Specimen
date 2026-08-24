@@ -36,16 +36,16 @@ function droneConfig(id: string, type: 'ceiling' | 'ground'): SecurityDroneConfi
   };
 }
 
-test('a reinstalled ceiling drone restores a soluble rope for repeated drop cycles', () => {
+test('a deployment cable descends, reconnects, and restores a soluble cable', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   const supportMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2, 0.2), new THREE.MeshStandardMaterial());
-  supportMesh.name = 'test-rope';
+  supportMesh.name = 'test-cable';
   supportMesh.position.y = 7;
   world.register(supportMesh);
   surfaces.register(supportMesh);
   const support = new DissolveTarget({
-    id: 'test-rope',
+    id: 'test-cable',
     mesh: supportMesh,
     collisionWorld: world,
     surfaceRegistry: surfaces,
@@ -66,6 +66,11 @@ test('a reinstalled ceiling drone restores a soluble rope for repeated drop cycl
     reinstallDurationSeconds: 1.75,
   };
   const lifecycle = new CeilingSecurityDrone(config, support, world, surfaces, projectiles);
+  const deploymentCable = lifecycle.root.getObjectByName(
+    'ceiling-replacement-cable',
+  ) as THREE.Mesh;
+  assert.ok(deploymentCable);
+  assert.equal(deploymentCable.userData.soluble, false);
   const activeColliderCount = world.colliderCount;
   let releaseCount = 0;
   let installedCount = 0;
@@ -83,10 +88,23 @@ test('a reinstalled ceiling drone restores a soluble rope for repeated drop cycl
   lifecycle.update(8, []);
   assert.equal(lifecycle.readModel.state, 'replacementWarning');
   assert.equal(lifecycle.readModel.hatchOpen, true);
+  assert.equal(lifecycle.readModel.replacementCableDeploymentProgress, 0);
+  assert.ok(deploymentCable.scale.y <= 0.011);
   assert.equal(world.colliderCount, releasedColliderCount + 1);
-  lifecycle.update(2, []);
+  lifecycle.update(1, []);
+  assert.equal(lifecycle.readModel.state, 'replacementWarning');
+  assert.equal(lifecycle.readModel.replacementCableDeploymentProgress, 0.5);
+  const halfDeployedLength = deploymentCable.scale.y;
+  assert.ok(halfDeployedLength > 1);
+  lifecycle.update(1, []);
   assert.equal(lifecycle.readModel.state, 'reinstalling');
-  lifecycle.update(1.75, []);
+  assert.equal(lifecycle.readModel.replacementCableDeploymentProgress, 1);
+  const connectedLength = deploymentCable.scale.y;
+  assert.ok(connectedLength > halfDeployedLength);
+  lifecycle.update(0.875, []);
+  assert.equal(lifecycle.readModel.state, 'reinstalling');
+  assert.ok(deploymentCable.scale.y < connectedLength);
+  lifecycle.update(0.875, []);
   assert.equal(lifecycle.readModel.state, 'active');
   assert.equal(lifecycle.drone.readModel.enabled, true);
   assert.equal(lifecycle.readModel.replacementCableVisible, false);

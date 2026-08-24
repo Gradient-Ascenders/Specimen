@@ -1,7 +1,7 @@
 # Cultivation Room 3 security drones
 
 Issue #96 is implemented against the authored Level 2 Room 3 greybox. Static
-cover, radiation, lasers, soluble ropes, and exit geometry remain owned by
+cover, radiation, lasers, soluble cables, and exit geometry remain owned by
 `LevelTwoRoomThreeGreybox`; deterministic drone gameplay is composed by
 `CultivationLevelRuntime` when the authored preview is available.
 
@@ -73,15 +73,20 @@ ACTIVE -> SUPPORT_DISSOLVING -> RELEASED -> FALLING -> DISABLED
        -> REPLACEMENT_WARNING -> REINSTALLING -> ACTIVE
 ```
 
-Only the explicitly associated soluble rope releases a ceiling drone. Fall is
+Only the explicitly associated acid-soluble metal cable releases a ceiling
+drone. The former wooden support proxy is no longer authored in Room 3. Fall is
 an authored 0.65 s transform. The existing Room 3 radiation floor supplies the
-contact query; it never mutates drone state. Disabled duration is 10 s,
-including a 2 s warning, followed by a 1.75 s installation. Replacement cables
-are explicit non-soluble carrier colliders only during the replacement motion.
-At installation completion the temporary cable is removed and the original
-soluble rope target is restored at zero dissolve progress. The same drone can
-therefore be shot down repeatedly without creating another target, collider,
-or event subscription.
+contact query; it never mutates drone state. Disabled duration is 10 s. During
+its final 2 s, the hatch opens and a matching temporary cable visibly extends
+from the hatch down to the fallen drone. Once connected, that cable remains
+taut while the 1.75 s reinstallation lifts the drone.
+
+The moving deployment segment is a non-targetable carrier only during the
+replacement motion, preventing a half-deployed dissolve from leaving a drone
+floating in an invalid state. At installation completion it is seamlessly
+swapped for the identically sized acid-soluble support cable at zero dissolve
+progress. The installed cable highlights in Goop aim mode and can be shot down
+again without creating another target, collider, or event subscription.
 
 Ground lifecycle:
 
@@ -99,7 +104,7 @@ permanently disables that drone until recovery or restart.
 ## Authoring and completion
 
 `CultivationRoomThreeAuthoring.ts` centralises Room 3-local drone IDs, poses,
-forward vectors, scan phases, target policies, muzzle/detection anchors, rope
+forward vectors, scan phases, target policies, muzzle/detection anchors, cable
 associations, radiation impact poses, hatch/cable anchors, rear regions, and
 fall poses. The encounter root is parented to the translated Room 3 root, while
 all projectile, target, and radiation queries use world-space authoritative
@@ -134,6 +139,6 @@ dying slime. The Room 1–3 debug controls use the normal authored preview reset
 and recovery path.
 
 Node coverage includes cone/range/LOS behavior, continuous collision and pool
-bounds, damage/regeneration, inactive targeting, rope association, replacement,
+bounds, damage/regeneration, inactive targeting, cable association/deployment,
 rear-push validation, exact seven-drone construction, completion gating,
 resource cleanup, acid-resistant impacts, and existing Level 2 regressions.
