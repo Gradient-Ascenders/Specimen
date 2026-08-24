@@ -1,3 +1,5 @@
+import { createBrandMarkMarkup } from './Branding.ts';
+
 export interface DeathScreenOptions {
   readonly onRetry: () => void;
   readonly backgroundElements: readonly HTMLElement[];
@@ -30,16 +32,19 @@ export class DeathScreen {
     this.element.innerHTML = `
       <div class="death-screen-vignette" aria-hidden="true"></div>
       <div class="death-card">
-        <div class="death-mark" aria-hidden="true">
-          <span></span><span></span><span></span>
+        <div class="death-signal" aria-hidden="true">
+          ${createBrandMarkMarkup('simple', 'death-mark')}
+          <span class="death-signal-line death-signal-line--one"></span>
+          <span class="death-signal-line death-signal-line--two"></span>
         </div>
-        <p class="death-eyebrow">Specimen signal lost</p>
-        <h1 id="death-screen-title">You died</h1>
+        <p class="system-label death-eyebrow">Specimen signal lost</p>
+        <h1 id="death-screen-title">Signal terminated</h1>
+        <div class="signal-rule signal-rule--warning" aria-hidden="true"><span></span></div>
         <p class="death-message">
           Reconstitute the specimen at the last stable checkpoint.
         </p>
-        <button class="death-retry" type="button">
-          Retry <span aria-hidden="true">↻</span>
+        <button class="system-action primary-action death-retry" type="button">
+          <span>Retry</span><span aria-hidden="true">↻</span>
         </button>
       </div>
     `;
