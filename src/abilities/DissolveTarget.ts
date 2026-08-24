@@ -220,11 +220,37 @@ export class DissolveTarget {
 
   /** Copy the authored bounds centre to a caller-owned world-space vector. */
   copyWorldBoundsCenter(target: THREE.Vector3): THREE.Vector3 {
+    return this.copyWorldBoundsPoint(0.5, 0.5, 0.5, target);
+  }
+
+  /**
+   * Copy a normalized point within the authored bounds to caller-owned space.
+   * Fractions are clamped so visibility systems can sample long targets without
+   * allocating temporary boxes or exposing the target's mutable bounds.
+   */
+  copyWorldBoundsPoint(
+    xFraction: number,
+    yFraction: number,
+    zFraction: number,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
     this.mesh.updateWorldMatrix(true, false);
     target.set(
-      (this.localBounds.min.x + this.localBounds.max.x) * 0.5,
-      (this.localBounds.min.y + this.localBounds.max.y) * 0.5,
-      (this.localBounds.min.z + this.localBounds.max.z) * 0.5,
+      THREE.MathUtils.lerp(
+        this.localBounds.min.x,
+        this.localBounds.max.x,
+        THREE.MathUtils.clamp(xFraction, 0, 1),
+      ),
+      THREE.MathUtils.lerp(
+        this.localBounds.min.y,
+        this.localBounds.max.y,
+        THREE.MathUtils.clamp(yFraction, 0, 1),
+      ),
+      THREE.MathUtils.lerp(
+        this.localBounds.min.z,
+        this.localBounds.max.z,
+        THREE.MathUtils.clamp(zFraction, 0, 1),
+      ),
     );
     return target.applyMatrix4(this.mesh.matrixWorld);
   }
