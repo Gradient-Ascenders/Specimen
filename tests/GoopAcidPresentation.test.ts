@@ -321,6 +321,53 @@ test('authoritative projectiles, impacts, burns, and resets reconcile pooled vis
   }
 });
 
+test('suspension hides live projectile and burn visuals until presentation resumes', () => {
+  const fixture = createFixture();
+  try {
+    fixture.projectile.id = 7;
+    fixture.projectile.active = true;
+    fixture.events.emit('burnStarted', { targetId: fixture.target.id });
+    fixture.presentation.update(0.5, 0.1, true);
+
+    let diagnostics = fixture.presentation.getDiagnostics();
+    assert.equal(diagnostics.activeProjectileCount, 1);
+    assert.equal(diagnostics.activeTrailCount, 1);
+    assert.equal(diagnostics.burningTargetCount, 1);
+    assert.ok(fixture.target.renderDiagnostics.burnHighlightStrength > 0);
+
+    fixture.presentation.suspend();
+    diagnostics = fixture.presentation.getDiagnostics();
+    assert.equal(diagnostics.activeProjectileCount, 0);
+    assert.equal(diagnostics.activeTrailCount, 0);
+    assert.equal(diagnostics.burningTargetCount, 1, 'live burn state is preserved');
+    assert.equal(fixture.target.renderDiagnostics.aimHighlightStrength, 0);
+    assert.equal(fixture.target.renderDiagnostics.aimSelectedStrength, 0);
+    assert.equal(fixture.target.renderDiagnostics.burnHighlightStrength, 0);
+
+    fixture.presentation.update(0.75, 0.25, true);
+    diagnostics = fixture.presentation.getDiagnostics();
+    assert.equal(diagnostics.activeProjectileCount, 0);
+    assert.equal(diagnostics.activeTrailCount, 0);
+    assert.equal(fixture.target.renderDiagnostics.burnHighlightStrength, 0);
+
+    fixture.presentation.resume();
+    fixture.presentation.update(0.75, 0.25, false);
+    diagnostics = fixture.presentation.getDiagnostics();
+    assert.equal(diagnostics.activeProjectileCount, 0);
+    assert.equal(diagnostics.activeTrailCount, 0);
+    assert.equal(fixture.target.renderDiagnostics.burnHighlightStrength, 0);
+
+    fixture.presentation.update(0.75, 0, true, false);
+    diagnostics = fixture.presentation.getDiagnostics();
+    assert.equal(diagnostics.activeProjectileCount, 1);
+    assert.equal(diagnostics.activeTrailCount, 1);
+    assert.equal(diagnostics.burningTargetCount, 1);
+    assert.ok(fixture.target.renderDiagnostics.burnHighlightStrength > 0);
+  } finally {
+    disposeFixture(fixture);
+  }
+});
+
 test('disposal is idempotent and removes the one owned DOM element', () => {
   const fixture = createFixture();
   fixture.presentation.dispose();

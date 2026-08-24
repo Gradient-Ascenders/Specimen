@@ -266,7 +266,9 @@ completion and reset remove the sizzle immediately.
 - Switching away from Goop cancels aim immediately; fired projectiles and burns
   continue.
 - Pause and pointer-lock loss cancel aim. A stopped level freezes fixed-step
-  projectiles and burns until gameplay resumes.
+  projectiles and burns, hides their transient projectile/trail/burn rendering,
+  and reconciles that presentation from the unchanged live state when gameplay
+  resumes.
 - Death cancels aim and disables input. Retry clears projectiles and active
   burns before the puzzle group restores its targets and then recovers both
   slime bodies.
@@ -291,12 +293,15 @@ projectile systems, burns, or target registrations from an old level instance.
 
 The #92 adapter follows the same seams. Aim cancellation fades/clears the
 crosshair, target presentation, and camera request. Slime switching does not
-destroy accepted projectiles or burns while #91 still reports them. Pause and
-death suspend transient presentation; retry, checkpoint recovery, and restart
-clear pooled trails, impacts, flashes, and burn accents immediately. Level
-unload removes its single DOM node, unsubscribes typed-event listeners, detaches
-the presentation root, and disposes only resources it owns. Shared source
-textures on soluble authored materials remain borrowed and are not disposed.
+destroy accepted projectiles or burns while #91 still reports them. Pause,
+death, cutscene ownership, and other lifecycle-disallowed states hide pooled
+projectiles, trails, impacts, flashes, and all target highlight/burn strengths
+without mutating #91 state. A permitted resume reconciles from the live read
+models. Retry, checkpoint recovery, and restart clear those transient states
+immediately. Level unload removes its single DOM node, unsubscribes typed-event
+listeners, detaches the presentation root, and disposes only resources it owns.
+Shared source textures on soluble authored materials remain borrowed and are
+not disposed.
 
 ## Verification diagnostics
 

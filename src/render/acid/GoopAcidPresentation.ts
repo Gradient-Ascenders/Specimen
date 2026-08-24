@@ -170,6 +170,7 @@ export class GoopAcidPresentation {
   private nextDropletIndex = 0;
   private nextFlashIndex = 0;
   private suspended = false;
+  private transientPresentationSuppressed = true;
   private disposed = false;
 
   constructor(options: GoopAcidPresentationOptions) {
@@ -283,21 +284,25 @@ export class GoopAcidPresentation {
 
     this.cameraRig.setAimPresentationActive(aimActive, !allowed);
     this.syncCrosshair(resolveGoopCrosshairState(this.source.aimReadModel, allowed));
-    if (!allowed) this.clearTargetHighlights();
+    if (!allowed) {
+      this.suppressTransientPresentation();
+      return;
+    }
+
+    this.transientPresentationSuppressed = false;
     if (advanceEffects) this.presentationTimeSeconds += safeDeltaSeconds;
     this.updateTargetPresentation(aimActive, safeDeltaSeconds, advanceEffects);
     this.updateProjectiles(safeAlpha);
     this.updateImpactEffects(safeDeltaSeconds, advanceEffects);
   }
 
-  /** Clear aim-only and short-lived effects while preserving #91 live states. */
+  /** Hide transient visuals while preserving #91 live states for reconciliation. */
   suspend(): void {
     if (this.disposed) return;
     this.suspended = true;
     this.cameraRig.setAimPresentationActive(false, true);
     this.syncCrosshair('hidden');
-    this.clearTargetHighlights();
-    this.clearImpactEffects();
+    this.suppressTransientPresentation();
   }
 
   resume(): void {
@@ -323,6 +328,7 @@ export class GoopAcidPresentation {
     }
     for (const slot of this.projectileSlots) this.hideProjectileSlot(slot);
     this.clearImpactEffects();
+    this.transientPresentationSuppressed = true;
   }
 
   getDiagnostics(): GoopAcidPresentationDiagnostics {
@@ -553,6 +559,7 @@ export class GoopAcidPresentation {
     target?: DissolveTarget,
   ): void {
     if (this.disposed || this.suspended) return;
+    this.transientPresentationSuppressed = false;
     const dropletCount = kind === 'valid' ? 9 : kind === 'repeat' ? 5 : 4;
     const speed = kind === 'valid' ? 1.7 : kind === 'repeat' ? 1.2 : 0.85;
     const lifetime = kind === 'valid' ? 0.42 : kind === 'repeat' ? 0.3 : 0.26;
@@ -692,17 +699,23 @@ export class GoopAcidPresentation {
     slot.trail.visible = false;
   }
 
-  private clearTargetHighlights(): void {
+  private suppressTransientPresentation(): void {
+    if (this.transientPresentationSuppressed) return;
+    this.transientPresentationSuppressed = true;
+
     for (const state of this.targets) {
       state.aimStrength = 0;
       state.selectedStrength = 0;
+      state.burnStrength = 0;
       state.target.setCorrosionPresentation(
         0,
         0,
-        state.burnStrength,
+        0,
         this.presentationTimeSeconds,
       );
     }
+    for (const slot of this.projectileSlots) this.hideProjectileSlot(slot);
+    this.clearImpactEffects();
   }
 
   private clearImpactEffects(): void {
