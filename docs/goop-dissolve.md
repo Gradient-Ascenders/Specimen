@@ -60,10 +60,10 @@ derived `MeshStandardMaterial` continues to respond to the real scene lighting.
 The active `CameraRig` copies its live centre-crosshair ray into caller-owned
 vectors. `AcidProjectileSystem` sweeps a very small probe along that ray and
 clamps the aim point to the nearest camera-obstruction collider or the maximum
-range. Goop can pitch this ray up to 80° above the movement plane. If floor
-collision shortens the camera boom during a steep upward view, the shoulder
-offset contracts with the remaining planar boom distance instead of pulling the
-crosshair back toward the horizon.
+range. Goop can pitch this ray up to 80° above the movement plane. Aim mode
+smoothly moves the existing rig to a centred first-person pose and suppresses
+Goop's body for the full camera blend, preventing the slime from obscuring this
+ray at steep or close angles.
 
 This camera query is targeting data, not impact authority. Firing calculates a
 new direction from Goop's authoritative body position toward the clamped aim

@@ -11,6 +11,10 @@ import type { DissolveTarget } from './DissolveTarget.ts';
 
 const DISTANCE_EPSILON = 1e-8;
 const COOLDOWN_EPSILON_SECONDS = 1e-9;
+const DEFAULT_VISIBILITY_Y_SAMPLES = [0.5] as const;
+const SUPPORT_CABLE_VISIBILITY_Y_SAMPLES = [0.5, 0.78, 0.22] as const;
+const SUPPORT_CABLE_AUTHORING_ROLE =
+  'ceiling-drone-soluble-support-cable';
 
 export interface AcidProjectileConfig {
   readonly maximumRangeMetres: number;
@@ -147,6 +151,7 @@ export interface AcidProjectileEvents {
   worldImpact: {
     readonly projectileId: number;
     readonly objectName: string;
+    readonly authoringRole?: string;
     readonly point: PointEventPayload;
   };
   burnStarted: { readonly targetId: string };
@@ -160,6 +165,7 @@ export interface AcidProjectileSystemOptions<Body extends AcidProjectileBody> {
   readonly dissolveSystem: DissolveSystem;
   readonly aimRayProvider: AimRayProvider;
   readonly config?: Partial<AcidProjectileConfig>;
+  readonly isTargetEnabled?: (target: DissolveTarget) => boolean;
 }
 
 export interface AcidProjectileDiagnostics {
@@ -190,6 +196,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   private readonly dissolveSystem: DissolveSystem;
   private readonly aimRayProvider: AimRayProvider;
   private readonly config: AcidProjectileConfig;
+  private readonly isTargetEnabled: (target: DissolveTarget) => boolean;
   private readonly projectiles: AcidProjectileSlot[];
   private readonly projectileReadStates: readonly AcidProjectileReadState[];
   private readonly unsubscribeBurnEvents: readonly (() => void)[];
@@ -224,6 +231,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
     this.collisionWorld = options.collisionWorld;
     this.dissolveSystem = options.dissolveSystem;
     this.aimRayProvider = options.aimRayProvider;
+    this.isTargetEnabled = options.isTargetEnabled ?? (() => true);
     this.config = {
       ...DEFAULT_ACID_PROJECTILE_CONFIG,
       ...options.config,
@@ -416,16 +424,6 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       if (target === aimedTarget) continue;
       if (!this.isAvailableTargetInRange(target, activeBody)) continue;
 
-      target.copyClosestWorldPoint(this.aimOrigin, this.targetPoint);
-      this.candidateDisplacement.subVectors(
-        this.targetPoint,
-        this.aimOrigin,
-      );
-      if (this.candidateDisplacement.lengthSq() <= DISTANCE_EPSILON) {
-        visibleIds.push(target.id);
-        continue;
-      }
-
       // Bound expensive occlusion sweeps independently from successful
       // results. Otherwise a long run of occluded candidates could probe every
       // registered target even though visibleIds itself is capped.
@@ -435,6 +433,38 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       ) {
         break;
       }
+      if (this.isTargetVisibleFromAimOrigin(target)) {
+        visibleIds.push(target.id);
+      }
+    }
+  }
+
+  private isTargetVisibleFromAimOrigin(target: DissolveTarget): boolean {
+    // A suspended platform may cross the centre of its thin support cable even
+    // though the cable remains plainly visible above and below it. Sample a
+    // small fixed set along that authored cable; ordinary targets retain their
+    // single centre probe and the shared per-step probe cap still applies.
+    const ySamples =
+      target.mesh.userData.authoringRole === SUPPORT_CABLE_AUTHORING_ROLE
+        ? SUPPORT_CABLE_VISIBILITY_Y_SAMPLES
+        : DEFAULT_VISIBILITY_Y_SAMPLES;
+
+    for (const yFraction of ySamples) {
+      target.copyWorldBoundsPoint(0.5, yFraction, 0.5, this.targetPoint);
+      this.candidateDisplacement.subVectors(
+        this.targetPoint,
+        this.aimOrigin,
+      );
+      if (this.candidateDisplacement.lengthSq() <= DISTANCE_EPSILON) {
+        return true;
+      }
+      if (
+        this.visibilityProbeCountValue >=
+        this.config.maximumVisibleTargets
+      ) {
+        return false;
+      }
+
       this.visibilityProbeCountValue += 1;
       const hasHit = this.collisionWorld.sweepSphere(
         this.aimOrigin,
@@ -443,17 +473,21 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
         this.candidateHit,
         CollisionLayer.CameraObstruction,
       );
-      if (hasHit && this.candidateHit.object === target.mesh) {
-        visibleIds.push(target.id);
-      }
+      if (hasHit && this.candidateHit.object === target.mesh) return true;
     }
+    return false;
   }
 
   private isAvailableTargetInRange(
     target: DissolveTarget,
     activeBody: Body,
   ): boolean {
-    if (target.completed || !target.collisionEnabled || !target.mesh.visible) {
+    if (
+      !this.isTargetEnabled(target) ||
+      target.completed ||
+      !target.collisionEnabled ||
+      !target.mesh.visible
+    ) {
       return false;
     }
 
@@ -489,7 +523,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       this.launchDisplacement,
       this.config.projectileRadiusMetres,
       this.launchHit,
-      CollisionLayer.Movement,
+      CollisionLayer.Projectile,
     );
     if (launchBlocked) {
       this.launchPosition.copy(this.launchHit.point);
@@ -550,7 +584,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
           this.projectileDisplacement,
           this.config.projectileRadiusMetres,
           this.projectileHit,
-          CollisionLayer.Movement,
+          CollisionLayer.Projectile,
         )
       ) {
         projectile.position.copy(this.projectileHit.point);
@@ -584,7 +618,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
     const target = hit.object
       ? this.dissolveSystem.getTargetForMesh(hit.object)
       : undefined;
-    if (target) {
+    if (target && this.isTargetEnabled(target)) {
       const result = this.dissolveSystem.startBurn(target);
       this.solubleImpactCount += 1;
       this.events.emit('solubleImpact', {
@@ -598,6 +632,9 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       this.events.emit('worldImpact', {
         projectileId: projectile.state.id,
         objectName: hit.object?.name || 'unnamed-world-collider',
+        authoringRole: typeof hit.object?.userData.authoringRole === 'string'
+          ? hit.object.userData.authoringRole
+          : undefined,
         point: pointPayload(hit.point),
       });
     }

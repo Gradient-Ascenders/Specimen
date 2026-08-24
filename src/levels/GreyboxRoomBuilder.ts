@@ -15,6 +15,7 @@ export interface GreyboxBoxOptions {
     | 'sticky-wall-tile'
     | 'sticky-vent-tile'
     | 'acid-floor'
+    | 'soluble-cable'
     | 'wooden-door';
   readonly rotation?: readonly [number, number, number];
 }
@@ -39,6 +40,7 @@ export interface ContainmentGreyboxMaterials {
   readonly glass: THREE.MeshStandardMaterial;
   readonly etch: THREE.MeshStandardMaterial;
   readonly wood: THREE.MeshStandardMaterial;
+  readonly cable: THREE.MeshStandardMaterial;
 }
 
 export const createContainmentGreyboxMaterials = (): ContainmentGreyboxMaterials => ({
@@ -68,6 +70,11 @@ export const createContainmentGreyboxMaterials = (): ContainmentGreyboxMaterials
   }),
   etch: material(0xb4e13e, 0x4b720d),
   wood: material(0x744522, 0x211006),
+  cable: new THREE.MeshStandardMaterial({
+    color: 0x7f8b91,
+    roughness: 0.38,
+    metalness: 0.78,
+  }),
 });
 
 /** Shared primitive authoring helper for the later Containment rooms. */
@@ -124,6 +131,21 @@ export class GreyboxRoomBuilder {
     mesh.userData.sizeMetres = [...options.size];
     this.cameraObstructionMeshes.push(mesh);
     return mesh;
+  }
+
+  /** Add a simple authoring light for grey-box rooms without a lighting rig. */
+  addLight(
+    name: string,
+    position: readonly [number, number, number],
+    colour = 0xe7fff1,
+    intensity = 10,
+    distance = 18,
+  ): THREE.PointLight {
+    const light = new THREE.PointLight(colour, intensity, distance);
+    light.name = name;
+    light.position.set(...position);
+    this.root.add(light);
+    return light;
   }
 
   dispose(): void {

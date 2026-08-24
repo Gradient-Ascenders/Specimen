@@ -110,6 +110,33 @@ test('default authored solids block both movement and camera queries', () => {
   assert.equal(hit.object?.name, 'test-authored-solid');
   assert.ok(hit.distance > 1 && hit.distance < 2);
 
+  assert.equal(
+    world.sweepSphere(
+      origin,
+      displacement,
+      0.2,
+      hit,
+      CollisionLayer.Projectile,
+    ),
+    true,
+  );
+  assert.equal(
+    world.sweepSphere(
+      origin,
+      displacement,
+      0.001,
+      hit,
+      CollisionLayer.LineOfSight,
+    ),
+    true,
+  );
+
+  world.setLayerMask(solid, CollisionLayer.Movement);
+  assert.equal(
+    world.sweepSphere(origin, displacement, 0.2, hit, CollisionLayer.Projectile),
+    false,
+  );
+
   solid.geometry.dispose();
 });
 

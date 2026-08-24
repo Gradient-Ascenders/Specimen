@@ -12,6 +12,8 @@ export interface ReadonlyLaserVector3 {
 }
 
 export interface LaserContactTarget {
+  /** Optional stable identity propagated when a group reports lethal contact. */
+  readonly id?: string;
   readonly position: ReadonlyLaserVector3;
   readonly radiusMetres: number;
 }

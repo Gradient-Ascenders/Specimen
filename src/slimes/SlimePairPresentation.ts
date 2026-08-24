@@ -33,6 +33,8 @@ const LOCATOR_COLLISION_RADIUS_METRES = 0.04;
 const LOCATOR_MIN_SIZE_METRES = 0.45;
 const LOCATOR_MAX_SIZE_METRES = 1.2;
 const LOCATOR_HEIGHT_MULTIPLIER = 1.7;
+const RING_LOCAL_NORMAL = new THREE.Vector3(0, 0, 1);
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
 /** Development-readable Goop proxy and active-control indication for #28. */
 export class SlimePairPresentation {
@@ -51,6 +53,7 @@ export class SlimePairPresentation {
   private readonly locatorHit = new CollisionHit();
   private readonly locatorDisplacement = new THREE.Vector3();
   private readonly locatorTarget = new THREE.Vector3();
+  private readonly activeGameplayUp = new THREE.Vector3();
   private readonly locatorDiagnosticsValue: MutableSlimeLocatorDiagnostics = {
     bobVisible: false,
     goopVisible: false,
@@ -83,7 +86,6 @@ export class SlimePairPresentation {
       }),
     );
     this.activeRing.name = 'active-slime-control-indicator';
-    this.activeRing.rotation.x = Math.PI / 2;
     this.root.add(this.activeRing);
 
     this.bobLocator = this.createLocator('bob', 'B', 'diamond', 0x9be7ff);
@@ -100,6 +102,9 @@ export class SlimePairPresentation {
     activeSlimeId: SlimeId,
     camera: THREE.Camera,
     collisionWorld: CollisionWorld,
+    firstPersonAimActive = false,
+    bobGameplayUp: SlimePairPresentationPosition = WORLD_UP,
+    goopGameplayUp: SlimePairPresentationPosition = WORLD_UP,
   ): void {
     this.goopMesh.position.set(
       goopPosition.x,
@@ -109,11 +114,24 @@ export class SlimePairPresentation {
 
     const activePosition =
       activeSlimeId === 'goop' ? goopPosition : bobPosition;
-    this.activeRing.position.set(
-      activePosition.x,
-      activePosition.y - 0.43,
-      activePosition.z,
+    const activeUp = activeSlimeId === 'goop' ? goopGameplayUp : bobGameplayUp;
+    this.activeGameplayUp.set(activeUp.x, activeUp.y, activeUp.z);
+    if (this.activeGameplayUp.lengthSq() <= 1e-10) {
+      this.activeGameplayUp.copy(WORLD_UP);
+    } else {
+      this.activeGameplayUp.normalize();
+    }
+    this.activeRing.position
+      .set(activePosition.x, activePosition.y, activePosition.z)
+      .addScaledVector(this.activeGameplayUp, -0.43);
+    this.activeRing.quaternion.setFromUnitVectors(
+      RING_LOCAL_NORMAL,
+      this.activeGameplayUp,
     );
+    this.goopMesh.visible = !(
+      firstPersonAimActive && activeSlimeId === 'goop'
+    );
+    this.activeRing.visible = !firstPersonAimActive;
 
     this.updateLocator(
       this.bobLocator,

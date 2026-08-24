@@ -4,14 +4,20 @@ import {
   createAuthoredDissolveTarget,
   type DissolveTarget,
 } from '../abilities/DissolveTarget.ts';
+import { AcidProjectileSystem } from '../abilities/AcidProjectileSystem.ts';
+import { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
-import { CultivationTestPanel } from '../debug/CultivationTestPanel.ts';
+import {
+  CultivationTestPanel,
+  type CultivationDebugRoomId,
+} from '../debug/CultivationTestPanel.ts';
 import {
   RadioactiveHazardSystem,
   type RadiationContactTarget,
 } from '../hazards/RadioactiveHazardSystem.ts';
+import { RoomThreeDroneEncounter } from '../hazards/RoomThreeDroneEncounter.ts';
 import { CollisionWorld } from '../physics/CollisionWorld.ts';
 import {
   KinematicBody,
@@ -27,6 +33,8 @@ import { VerticalBlastDoor } from '../puzzle/VerticalBlastDoor.ts';
 import { WallButton } from '../puzzle/WallButton.ts';
 import { WallButtonDoorCoordinator } from '../puzzle/WallButtonDoorCoordinator.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
+import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
+import { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
 import { SlimeVisual, type SlimeVisualState } from '../render/slime/SlimeVisual.ts';
@@ -41,11 +49,25 @@ import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
 import { SlimePairPresentation } from '../slimes/SlimePairPresentation.ts';
 import { DeathSequence, type DeathRecoveryAction } from '../systems/DeathSequence.ts';
 import { DeathScreen } from '../ui/DeathScreen.ts';
+import { SlimeDamageVignette } from '../ui/SlimeDamageVignette.ts';
 import { CultivationLevelController } from './CultivationLevelController.ts';
 import { CULTIVATION_FOUNDATION_MANIFEST } from './CultivationFoundationManifest.ts';
 import { CultivationLevelScene } from './CultivationLevelScene.ts';
+import { CultivationRoomThreeController } from './CultivationRoomThreeController.ts';
+import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from './CultivationRoomThreeAuthoring.ts';
 import type { GameLevelRuntimeEvents } from './GameLevelRuntime.ts';
 import { LevelLifecycle, type LevelLifecycleState } from './LevelLifecycle.ts';
+import {
+  CULTIVATION_ROOM_OBJECTIVES,
+  LevelTwoPreviewScene,
+  type LevelTwoAuthoredRoomId,
+  type LevelTwoPreviewHazardFailure,
+} from './LevelTwoPreviewScene.ts';
+import {
+  advanceLevelTwoPreviewProgression,
+  createLevelTwoPreviewProgression,
+  type LevelTwoPreviewProgressionSnapshot,
+} from './LevelTwoPreviewProgression.ts';
 import {
   type LevelProgressionSnapshot,
   type PlayableSlimeId,
@@ -65,9 +87,18 @@ export interface CultivationLevelRuntimeOptions {
 
 interface CultivationRuntimeResources {
   readonly scene: CultivationLevelScene;
+  readonly authoredPreview: LevelTwoPreviewScene | undefined;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
   readonly dissolveTargets: readonly DissolveTarget[];
+  readonly previewDissolveTargets: readonly DissolveTarget[];
+  readonly dissolveSystem: DissolveSystem;
+  readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
+  readonly goopAcidPresentation: GoopAcidPresentation;
+  readonly roomThreeEncounter: RoomThreeDroneEncounter | undefined;
+  readonly roomThreeController: CultivationRoomThreeController | undefined;
+  readonly droneProjectilePresentation: DroneProjectilePresentation | undefined;
+  readonly damageVignette: SlimeDamageVignette | undefined;
   readonly structuralAssemblies: readonly SuspendedStructureAssembly[];
   readonly wallButton: WallButton<KinematicBody>;
   readonly blastDoor: VerticalBlastDoor;
@@ -77,6 +108,22 @@ interface CultivationRuntimeResources {
   readonly controller: CultivationLevelController;
   readonly radiation: RadioactiveHazardSystem;
   readonly radiationTargets: readonly RadiationContactTarget[];
+  readonly previewOccupants: readonly [
+    {
+      readonly id: 'bob';
+      readonly position: KinematicBody['position'];
+      readonly radiusMetres: number;
+      readonly attached: boolean;
+      readonly supportCollider: THREE.Mesh | null;
+    },
+    {
+      readonly id: 'goop';
+      readonly position: KinematicBody['position'];
+      readonly radiusMetres: number;
+      readonly attached: boolean;
+      readonly supportCollider: THREE.Mesh | null;
+    },
+  ];
   readonly bobVisual: SlimeVisual;
   readonly pairPresentation: SlimePairPresentation;
   readonly burst: SlimeBurstPresentation;
@@ -112,6 +159,15 @@ export class CultivationLevelRuntime {
   private debugElapsedSeconds = 0;
   private switchFeedbackSequence = 0;
   private lastDeathSlimeId: PlayableSlimeId | undefined;
+  private authoredPreviewProgression:
+    | LevelTwoPreviewProgressionSnapshot
+    | undefined;
+  private authoredPreviewRecoveryActiveSlimeId: PlayableSlimeId | undefined;
+  private readonly authoredPreviewResolvedRooms = {
+    bob: 1 as LevelTwoAuthoredRoomId,
+    goop: 1 as LevelTwoAuthoredRoomId,
+  };
+  private readonly roomThreeSlimeEligibility = { bob: false, goop: false };
 
   constructor(options: CultivationLevelRuntimeOptions) {
     validateLevelProgressionSnapshot(options.progression);
@@ -135,6 +191,10 @@ export class CultivationLevelRuntime {
 
   get state(): LevelLifecycleState {
     return this.lifecycle.state;
+  }
+
+  private get authoredPreviewRoomId(): LevelTwoAuthoredRoomId | undefined {
+    return this.authoredPreviewProgression?.roomId;
   }
 
   load(): void { this.lifecycle.load(); }
@@ -191,7 +251,10 @@ export class CultivationLevelRuntime {
       this.input.endFixedUpdate();
       return;
     }
-    if (resources.controller.readModel.state === 'complete') {
+    if (
+      resources.controller.readModel.state === 'complete' ||
+      resources.roomThreeController?.readModel.complete
+    ) {
       this.input.setEnabled(false);
       this.input.releasePointerLock();
       this.input.endFixedUpdate();
@@ -199,6 +262,12 @@ export class CultivationLevelRuntime {
     }
     if (this.debugAvailable && this.input.wasPressed('debugReset')) {
       this.restartLevel();
+      return;
+    }
+    const debugRoomId = this.consumeAuthoredPreviewTeleport();
+    if (debugRoomId !== undefined) {
+      this.teleportToAuthoredPreviewRoom(debugRoomId);
+      this.input.endFixedUpdate();
       return;
     }
 
@@ -234,7 +303,9 @@ export class CultivationLevelRuntime {
     }
 
     const activeBody = resources.pair.activeBody;
-    this.updateStructuralAssemblies(deltaSeconds, resources);
+    if (this.authoredPreviewRoomId === undefined) {
+      this.updateStructuralAssemblies(deltaSeconds, resources);
+    }
     if (!switched && activeBody === resources.pair.bobBody) {
       resources.pair.bobBody.update(deltaSeconds, resources.movement, resources.jumpInputState);
       resources.pair.goopBody.update(deltaSeconds, resources.noMovement);
@@ -246,9 +317,88 @@ export class CultivationLevelRuntime {
       resources.pair.goopBody.update(deltaSeconds, resources.noMovement);
     }
 
-    resources.radiation.update(resources.radiationTargets);
-    if (resources.deathSequence.isPlaying) resources.controller.update();
-    resources.buttonDoorCoordinator.update(deltaSeconds);
+    const authoredPreview = resources.authoredPreview;
+    const authoredProgression = this.authoredPreviewProgression;
+    if (authoredPreview && authoredProgression) {
+      const resolvedRooms = this.authoredPreviewResolvedRooms;
+      resolvedRooms.bob = authoredPreview.resolveRoomId(
+        resources.pair.bobBody.position,
+      );
+      resolvedRooms.goop = authoredPreview.resolveRoomId(
+        resources.pair.goopBody.position,
+      );
+      const roomThreeEligibility = this.roomThreeSlimeEligibility;
+      roomThreeEligibility.bob = resolvedRooms.bob === 3;
+      roomThreeEligibility.goop = resolvedRooms.goop === 3;
+      if (
+        (roomThreeEligibility.bob || roomThreeEligibility.goop) &&
+        resources.roomThreeEncounter &&
+        resources.roomThreeController
+      ) {
+        resources.roomThreeEncounter.update(
+          deltaSeconds,
+          resources.pair.activeSlimeId,
+          !switched && activeBody === resources.pair.bobBody
+            ? resources.movement
+            : resources.noMovement,
+          roomThreeEligibility,
+        );
+        resources.roomThreeController.update(
+          resources.previewOccupants[0],
+          resources.previewOccupants[1],
+        );
+        if (resources.roomThreeController.readModel.complete) {
+          this.host.dataset.gameState = 'level-complete';
+          this.input.setEnabled(false);
+          this.input.releasePointerLock();
+          this.input.endFixedUpdate();
+          return;
+        }
+      }
+      authoredPreview.update(
+        deltaSeconds,
+        authoredProgression.roomId,
+        resources.previewOccupants,
+        resources.pair.goopBody,
+      );
+      if (resources.deathSequence.isPlaying) {
+        for (const occupant of resources.previewOccupants) {
+          if (occupant.position.y >= CULTIVATION_FOUNDATION_MANIFEST.outOfBoundsYMetres) {
+            continue;
+          }
+          this.requestPlayerDeath(
+            () => this.resetAndRecoverAuthoredPreviewRoom(resources),
+            occupant.id,
+          );
+          break;
+        }
+      }
+      // A fatal frame must not also promote the checkpoint that Retry restores.
+      if (resources.deathSequence.isPlaying) {
+        const nextProgression = advanceLevelTwoPreviewProgression(
+          authoredProgression,
+          resolvedRooms,
+        );
+        if (nextProgression !== authoredProgression) {
+          this.authoredPreviewProgression = nextProgression;
+          this.captureAuthoredPreviewCheckpoint(resources);
+          if (nextProgression.roomId !== authoredProgression.roomId) {
+            this.emitAuthoredPreviewObjective();
+          }
+        }
+      }
+    } else {
+      resources.radiation.update(resources.radiationTargets);
+      if (resources.deathSequence.isPlaying) resources.controller.update();
+      resources.buttonDoorCoordinator.update(deltaSeconds);
+    }
+    resources.acidProjectileSystem.update(deltaSeconds, {
+      aimHeld: this.input.isDown('aimAbility'),
+      firePressed: this.input.wasPressed('fireAbility'),
+      gameplayInputEnabled: this.input.enabled,
+      pointerLocked: this.input.pointerLocked,
+    });
+    resources.dissolveSystem.update(deltaSeconds);
     if (resources.deathSequence.isPlaying) this.updateBobVisual(deltaSeconds, resources);
     this.input.endFixedUpdate();
   }
@@ -264,7 +414,34 @@ export class CultivationLevelRuntime {
     resources.bobVisual.setPosition(resources.renderedBobPosition);
     resources.bobVisual.mesh.rotation.set(0, resources.bobFacing.getInterpolatedYaw(interpolationAlpha), 0);
     resources.bobVisual.present();
+    // A render frame can occur without a fixed update. Preserve the same
+    // pointer-sampling behaviour as Level 1 so those frames apply mouse input
+    // instead of discarding it and making Level 2 sensitivity frame-rate
+    // dependent. Fixed updates clear consumed deltas, so this cannot double
+    // apply input on frames where simulation already handled it.
+    if (
+      this.lifecycle.state === 'running' &&
+      resources.deathSequence.isPlaying &&
+      resources.controller.readModel.state === 'playing' &&
+      this.input.enabled
+    ) {
+      this.renderLayer.cameraRig.queueLookInput(
+        this.input.pointerDeltaX,
+        this.input.pointerDeltaY,
+      );
+    }
     this.input.endPointerUpdate();
+    const aimPresentationAllowed =
+      this.lifecycle.state === 'running' &&
+      resources.deathSequence.isPlaying &&
+      resources.controller.readModel.state === 'playing' &&
+      this.input.enabled;
+    resources.goopAcidPresentation.update(
+      interpolationAlpha,
+      stats.frameDeltaSeconds,
+      aimPresentationAllowed,
+      this.lifecycle.state === 'running' && resources.deathSequence.isPlaying,
+    );
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     resources.pairPresentation.update(
       resources.renderedBobPosition,
@@ -272,6 +449,17 @@ export class CultivationLevelRuntime {
       resources.pair.activeSlimeId,
       this.renderLayer.cameraRig.camera,
       resources.collisionWorld,
+      this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
+      resources.pair.bobBody.gameplayUp,
+      resources.pair.goopBody.gameplayUp,
+    );
+    resources.droneProjectilePresentation?.update(interpolationAlpha);
+    resources.damageVignette?.update(
+      stats.frameDeltaSeconds,
+      resources.pair.activeSlimeId,
+      this.lifecycle.state === 'running' &&
+        resources.deathSequence.isPlaying &&
+        this.roomThreeSlimeEligibility[resources.pair.activeSlimeId],
     );
     this.renderLayer.render();
 
@@ -286,6 +474,8 @@ export class CultivationLevelRuntime {
       const doorObstructions = [...resources.blastDoor.obstructionIds];
       resources.debugPanel.setRuntimeDiagnostics([
         `active level: cultivation-level-2`,
+        `geometry mode: ${this.authoredPreviewRoomId === undefined ? 'backend foundation' : `authored Room ${this.authoredPreviewRoomId}`}`,
+        `authored recovery B/G: ${this.authoredPreviewProgression?.recoveryRoomIds.bob ?? '-'} / ${this.authoredPreviewProgression?.recoveryRoomIds.goop ?? '-'}`,
         `lifecycle / gameplay: ${this.state} / ${readModel.state}`,
         `active slime: ${resources.pair.activeSlimeId}`,
         `Bob: ${this.formatPosition(resources.pair.bobBody.position)} m`,
@@ -295,6 +485,7 @@ export class CultivationLevelRuntime {
         `early Goop Room 2: ${readModel.goopEnteredRoomTwoEarly ? 'yes' : 'no'}`,
         `last failure / death slime: ${readModel.lastFailure} / ${this.lastDeathSlimeId ?? 'none'}`,
         `radiation requests: ${resources.radiation.failureRequestCount}`,
+        ...this.formatRoomThreeDiagnostics(resources),
         `bodies / colliders / scene objects: ${resources.manager.registeredCount} / ${resources.collisionWorld.colliderCount} / ${this.renderLayer.getDiagnostics().sceneObjects}`,
         `wall button: ${resources.wallButton.isPressed ? 'pressed' : 'released'} occupant=${resources.wallButton.occupantId ?? 'none'} enabled=${resources.wallButton.enabled ? 'yes' : 'no'}`,
         `blast door: ${resources.blastDoor.state} p=${resources.blastDoor.progress.toFixed(3)} target=${resources.blastDoor.desiredOpen ? 'open' : 'closed'} collision=${resources.blastDoor.collisionEnabled ? 'on' : 'off'} obstruction=${doorObstructions.join(',') || 'none'} transitions=${resources.blastDoor.transitionCount}`,
@@ -304,6 +495,8 @@ export class CultivationLevelRuntime {
   }
 
   private readonly loadResources = (): void => {
+    this.authoredPreviewProgression = undefined;
+    this.authoredPreviewRecoveryActiveSlimeId = undefined;
     const rollbackActions: Array<() => void> = [];
     const rollback = (action: () => void): void => {
       rollbackActions.push(action);
@@ -313,16 +506,37 @@ export class CultivationLevelRuntime {
       const scene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
       rollback(() => scene.dispose());
       this.renderLayer.scene.add(scene.root);
+      const authoredPreview = this.debugAvailable
+        ? new LevelTwoPreviewScene((failure) =>
+            this.handleAuthoredPreviewFailure(failure),
+          )
+        : undefined;
+      if (authoredPreview) {
+        rollback(() => authoredPreview.dispose());
+        this.renderLayer.scene.add(authoredPreview.root);
+      }
 
       const collisionWorld = new CollisionWorld();
       rollback(() => collisionWorld.clear());
       collisionWorld.registerAll(scene.collisionMeshes);
+      if (authoredPreview) {
+        collisionWorld.registerAll(authoredPreview.collisionMeshes);
+      }
 
       const surfaceRegistry = new SurfaceRegistry();
       rollback(() => surfaceRegistry.clear());
       surfaceRegistry.registerAll(scene.collisionMeshes);
+      if (authoredPreview) {
+        surfaceRegistry.registerAll(authoredPreview.collisionMeshes);
+      }
 
-      const dissolveTargets = scene.solubleSupportMeshes.map((mesh) => {
+      const solubleMeshes = authoredPreview
+        ? [
+            ...scene.solubleSupportMeshes,
+            ...authoredPreview.solubleTargetMeshes,
+          ]
+        : scene.solubleSupportMeshes;
+      const dissolveTargets = solubleMeshes.map((mesh) => {
         const target = createAuthoredDissolveTarget(
           mesh,
           collisionWorld,
@@ -334,6 +548,10 @@ export class CultivationLevelRuntime {
         rollback(() => target.dispose());
         return target;
       });
+      const previewDissolveTargets = dissolveTargets.slice(
+        scene.solubleSupportMeshes.length,
+      );
+      authoredPreview?.bindDissolveTargets(previewDissolveTargets);
       const targetById = new Map(dissolveTargets.map((target) => [target.id, target]));
       const structuralAssemblies = CULTIVATION_FOUNDATION_MANIFEST.structuralAssemblies.map(
         (authoring): SuspendedStructureAssembly => {
@@ -407,6 +625,41 @@ export class CultivationLevelRuntime {
         goopSpawnPosition: entrance.goopSpawnPosition,
         initialActiveSlimeId: this.initialProgression.activeSlimeId,
       });
+      const previewOccupants = [
+        {
+          id: 'bob' as const,
+          position: bobBody.position,
+          radiusMetres: bobBody.radiusMetres,
+          get attached() {
+            return bobBody.attached;
+          },
+          get supportCollider() {
+            return bobBody.supportCollider;
+          },
+        },
+        {
+          id: 'goop' as const,
+          position: goopBody.position,
+          radiusMetres: goopBody.radiusMetres,
+          get attached() {
+            return goopBody.attached;
+          },
+          get supportCollider() {
+            return goopBody.supportCollider;
+          },
+        },
+      ] as const;
+      const dissolveSystem = new DissolveSystem(dissolveTargets);
+      rollback(() => dissolveSystem.dispose());
+      let controller: CultivationLevelController;
+      const acidProjectileSystem = new AcidProjectileSystem({
+        slimeManager: manager,
+        collisionWorld,
+        dissolveSystem,
+        aimRayProvider: this.renderLayer.cameraRig,
+        isTargetEnabled: (target) => this.isDissolveTargetEnabled(target),
+      });
+      rollback(() => acidProjectileSystem.dispose());
 
       const buttonDoorAuthoring = CULTIVATION_FOUNDATION_MANIFEST.wallButtonDoor;
       const wallButtonOccupants = [
@@ -458,14 +711,43 @@ export class CultivationLevelRuntime {
       rollback(() => buttonDoorCoordinator.dispose());
 
       const deathSequence = new DeathSequence();
-      let radiation: RadioactiveHazardSystem;
-      const controller = new CultivationLevelController({
+      let radiation: RadioactiveHazardSystem | undefined;
+      const roomThreeEncounter = authoredPreview
+        ? new RoomThreeDroneEncounter({
+            config: CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
+            supportsById: targetById,
+            collisionWorld,
+            surfaceRegistry,
+            bobBody,
+            goopBody,
+            radiationSurface: authoredPreview.roomThree.radiationHazard,
+            requestDeath: (slimeId) => this.requestRoomThreeDroneDeath(slimeId),
+          })
+        : undefined;
+      if (roomThreeEncounter && authoredPreview) {
+        rollback(() => roomThreeEncounter.dispose());
+        authoredPreview.roomThree.root.add(roomThreeEncounter.root);
+      }
+      const roomThreeController = roomThreeEncounter && authoredPreview
+        ? new CultivationRoomThreeController(
+            authoredPreview.roomThree.root,
+            () => roomThreeEncounter.readModel.groundDisabledCount,
+          )
+        : undefined;
+      if (roomThreeController) rollback(() => roomThreeController.dispose());
+
+      controller = new CultivationLevelController({
         pair,
         collisionWorld,
         initialActiveSlimeId: this.initialProgression.activeSlimeId,
         requestDeath: (recovery, dyingSlimeId) =>
           this.requestPlayerDeath(recovery, dyingSlimeId),
-        cancelTransients: () => radiation?.reset(),
+        cancelTransients: () => {
+          radiation?.reset();
+          acidProjectileSystem.reset();
+          dissolveSystem.reset();
+          roomThreeEncounter?.cancelTransientState();
+        },
         puzzleComponents: [
           {
             id: `${buttonDoorAuthoring.id}-coordinator`,
@@ -487,7 +769,7 @@ export class CultivationLevelRuntime {
               {
                 id: `${authoring.id}-support-target`,
                 groupId: authoring.puzzleGroupId,
-                component: dissolveTargets[index]!,
+                component: targetById.get(authoring.supportTargetId)!,
               },
               {
                 id: authoring.id,
@@ -520,6 +802,28 @@ export class CultivationLevelRuntime {
       const bobVisual = new SlimeVisual({ radiusMetres: bobBody.radiusMetres });
       rollback(() => bobVisual.dispose());
       this.renderLayer.scene.add(bobVisual.mesh);
+      const goopAcidPresentation = new GoopAcidPresentation({
+        host: this.host,
+        scene: this.renderLayer.scene,
+        cameraRig: this.renderLayer.cameraRig,
+        source: acidProjectileSystem,
+        targets: dissolveTargets,
+      });
+      rollback(() => goopAcidPresentation.dispose());
+      const droneProjectilePresentation = roomThreeEncounter
+        ? new DroneProjectilePresentation(roomThreeEncounter.projectiles.states)
+        : undefined;
+      if (droneProjectilePresentation) {
+        rollback(() => droneProjectilePresentation.dispose());
+        this.renderLayer.scene.add(droneProjectilePresentation.mesh);
+      }
+      const damageVignette = roomThreeEncounter
+        ? new SlimeDamageVignette({ damage: roomThreeEncounter.damage })
+        : undefined;
+      if (damageVignette) {
+        rollback(() => damageVignette.dispose());
+        this.host.append(damageVignette.element);
+      }
       const pairPresentation = new SlimePairPresentation(bobBody.radiusMetres);
       rollback(() => pairPresentation.dispose());
       this.renderLayer.scene.add(pairPresentation.root);
@@ -530,6 +834,7 @@ export class CultivationLevelRuntime {
         ? new CultivationTestPanel(
             () => this.restartLevel(),
             (complete) => this.advanceNextStructuralSupport(complete),
+            (roomId) => this.teleportToAuthoredPreviewRoom(roomId),
           )
         : undefined;
       if (debugPanel) {
@@ -582,10 +887,15 @@ export class CultivationLevelRuntime {
       });
 
       this.resources = {
-        scene, collisionWorld, surfaceRegistry, dissolveTargets,
+        scene, authoredPreview, collisionWorld, surfaceRegistry,
+        dissolveTargets, previewDissolveTargets,
+        dissolveSystem, acidProjectileSystem, goopAcidPresentation,
+        roomThreeEncounter, roomThreeController, droneProjectilePresentation,
+        damageVignette,
         structuralAssemblies, wallButton, blastDoor, buttonDoorCoordinator,
         manager, pair, controller,
-        radiation, radiationTargets, bobVisual, pairPresentation, burst,
+        radiation, radiationTargets, previewOccupants,
+        bobVisual, pairPresentation, burst,
         deathSequence, deathScreen, bobFacing: new BlobFacing(), bobVisualState,
         jumpInputState: {
           pressed: false,
@@ -602,15 +912,25 @@ export class CultivationLevelRuntime {
         unsubscribeControllerProgress,
         unsubscribeManager,
       };
-      this.renderLayer.cameraRig.reset();
-      this.retargetCamera(this.resources);
-      this.host.dataset.gameState = controller.readModel.state;
+      if (authoredPreview) {
+        // Level 1's Digit0 shortcut now enters the authored three-room route
+        // immediately. The separate backend-foundation composition remains a
+        // reusable implementation harness, but is no longer a competing
+        // player destination in development builds.
+        if (!this.teleportToAuthoredPreviewRoom(1)) {
+          throw new Error('Could not enter authored Cultivation Room 1.');
+        }
+      } else {
+        this.renderLayer.cameraRig.reset();
+        this.retargetCamera(this.resources);
+        this.host.dataset.gameState = controller.readModel.state;
+        this.notifyHUD();
+        this.events.emit('objectiveChanged', {
+          roomId: controller.readModel.roomId,
+          objective: controller.readModel.objective,
+        });
+      }
       this.applyDebugPresentation();
-      this.notifyHUD();
-      this.events.emit('objectiveChanged', {
-        roomId: controller.readModel.roomId,
-        objective: controller.readModel.objective,
-      });
       rollbackActions.length = 0;
     } catch (error) {
       this.resources = undefined;
@@ -621,6 +941,7 @@ export class CultivationLevelRuntime {
 
   private readonly startResources = (): void => {
     const resources = this.requireResources();
+    resources.goopAcidPresentation.resume();
     this.input.resetState();
     this.input.setEnabled(
       resources.deathSequence.isPlaying && resources.controller.readModel.state === 'playing',
@@ -628,6 +949,9 @@ export class CultivationLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    const resources = this.requireResources();
+    resources.acidProjectileSystem.cancelAim();
+    resources.goopAcidPresentation.suspend();
     this.input.setEnabled(false);
   };
 
@@ -637,7 +961,21 @@ export class CultivationLevelRuntime {
     resources.deathSequence.reset();
     resources.deathScreen.hide();
     resources.burst.reset();
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
+    resources.authoredPreview?.reset();
+    for (const target of resources.previewDissolveTargets) target.reset();
+    resources.roomThreeEncounter?.reset();
+    resources.roomThreeController?.reset();
+    resources.droneProjectilePresentation?.reset();
+    resources.damageVignette?.reset();
     resources.controller.reset(this.initialProgression.activeSlimeId);
+    if (this.authoredPreviewRoomId !== undefined) {
+      this.captureAuthoredPreviewCheckpoint(resources, false);
+      this.recoverAuthoredPreviewRoom(resources);
+      this.emitAuthoredPreviewObjective();
+    }
+    resources.goopAcidPresentation.reset();
     resources.bobVisual.reset();
     resources.bobFacing.reset();
     this.clearJumpInput(resources.jumpInputState, false);
@@ -657,16 +995,24 @@ export class CultivationLevelRuntime {
     resources.debugPanel?.dispose();
     resources.controller.dispose();
     resources.radiation.dispose();
+    resources.roomThreeController?.dispose();
+    resources.damageVignette?.dispose();
+    resources.droneProjectilePresentation?.dispose();
+    resources.roomThreeEncounter?.dispose();
     resources.buttonDoorCoordinator.dispose();
     resources.blastDoor.dispose();
     resources.wallButton.dispose();
     for (const assembly of resources.structuralAssemblies) assembly.dispose();
+    resources.goopAcidPresentation.dispose();
+    resources.acidProjectileSystem.dispose();
+    resources.dissolveSystem.dispose();
     for (const target of resources.dissolveTargets) target.dispose();
     resources.burst.dispose();
     resources.bobVisual.dispose();
     resources.pairPresentation.dispose();
     resources.manager.clearLevelRegistrations();
     resources.manager.dispose();
+    resources.authoredPreview?.dispose();
     resources.scene.dispose();
     resources.collisionWorld.clear();
     resources.surfaceRegistry.clear();
@@ -676,6 +1022,8 @@ export class CultivationLevelRuntime {
     delete this.host.dataset.gameState;
     this.resources = undefined;
     this.debugVisible = false;
+    this.authoredPreviewProgression = undefined;
+    this.authoredPreviewRecoveryActiveSlimeId = undefined;
     this.notifyHUD();
   };
 
@@ -703,11 +1051,144 @@ export class CultivationLevelRuntime {
     }
     delete this.host.dataset.gameState;
     this.debugVisible = false;
+    this.authoredPreviewProgression = undefined;
+    this.authoredPreviewRecoveryActiveSlimeId = undefined;
     try {
       this.notifyHUD();
     } catch {
       // A HUD subscriber must not replace the original load error.
     }
+  }
+
+  private consumeAuthoredPreviewTeleport():
+    | CultivationDebugRoomId
+    | undefined {
+    if (!this.debugAvailable || !this.resources?.authoredPreview) {
+      return undefined;
+    }
+    if (this.input.wasPressed('debugTeleportRoomOne')) return 1;
+    if (this.input.wasPressed('debugTeleportRoomTwo')) return 2;
+    if (this.input.wasPressed('debugTeleportRoomThree')) return 3;
+    return undefined;
+  }
+
+  private teleportToAuthoredPreviewRoom(
+    roomId: CultivationDebugRoomId,
+  ): boolean {
+    const resources = this.resources;
+    if (!resources?.authoredPreview) return false;
+
+    this.authoredPreviewProgression =
+      createLevelTwoPreviewProgression(roomId);
+    this.authoredPreviewRecoveryActiveSlimeId =
+      resources.pair.activeSlimeId;
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
+    resources.authoredPreview.reset();
+    for (const target of resources.previewDissolveTargets) target.reset();
+    resources.roomThreeEncounter?.reset();
+    resources.roomThreeController?.reset();
+    resources.droneProjectilePresentation?.reset();
+    resources.damageVignette?.reset();
+    resources.buttonDoorCoordinator.setEnabled(false);
+    resources.burst.reset();
+    resources.deathSequence.reset();
+    resources.deathScreen.hide();
+    this.captureAuthoredPreviewCheckpoint(resources, false);
+    this.recoverAuthoredPreviewRoom(resources);
+    resources.bobFacing.reset();
+    resources.movement.set(0, 0, 0);
+    this.clearJumpInput(resources.jumpInputState, true);
+    this.input.resetState();
+    this.renderLayer.cameraRig.reset();
+    this.retargetCamera(resources);
+    this.host.dataset.gameState = 'playing';
+    this.lastDeathSlimeId = undefined;
+    this.emitAuthoredPreviewObjective();
+    this.notifyHUD(undefined, true);
+    return true;
+  }
+
+  private handleAuthoredPreviewFailure(
+    failure: LevelTwoPreviewHazardFailure,
+  ): void {
+    const resources = this.resources;
+    const preview = resources?.authoredPreview;
+    const dyingSlimeId =
+      failure.slimeId ?? resources?.pair.activeSlimeId;
+    if (
+      !resources ||
+      !preview ||
+      !dyingSlimeId ||
+      !resources.deathSequence.isPlaying
+    ) {
+      return;
+    }
+    const dyingBody = dyingSlimeId === 'bob'
+      ? resources.pair.bobBody
+      : resources.pair.goopBody;
+    if (preview.resolveRoomId(dyingBody.position) !== failure.roomId) return;
+    this.requestPlayerDeath(
+      () => this.resetAndRecoverAuthoredPreviewRoom(resources),
+      dyingSlimeId,
+    );
+  }
+
+  private resetAndRecoverAuthoredPreviewRoom(
+    resources: CultivationRuntimeResources,
+  ): void {
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
+    resources.authoredPreview?.reset();
+    for (const target of resources.previewDissolveTargets) target.reset();
+    resources.roomThreeEncounter?.reset();
+    resources.roomThreeController?.reset();
+    resources.droneProjectilePresentation?.reset();
+    resources.damageVignette?.reset();
+    this.recoverAuthoredPreviewRoom(resources);
+  }
+
+  private recoverAuthoredPreviewRoom(
+    resources: CultivationRuntimeResources,
+  ): void {
+    resources.pair.restoreRecoveryState();
+  }
+
+  private captureAuthoredPreviewCheckpoint(
+    resources: CultivationRuntimeResources,
+    captureActiveSlime = true,
+  ): void {
+    const preview = resources.authoredPreview;
+    const progression = this.authoredPreviewProgression;
+    if (!preview || !progression) return;
+    if (captureActiveSlime) {
+      this.authoredPreviewRecoveryActiveSlimeId =
+        resources.pair.activeSlimeId;
+    }
+    const activeSlimeId = this.authoredPreviewRecoveryActiveSlimeId;
+    if (!activeSlimeId) return;
+    resources.pair.setRecoveryState({
+      bobPosition: preview.copyRoomSpawnPosition(
+        progression.recoveryRoomIds.bob,
+        'bob',
+        new THREE.Vector3(),
+      ),
+      goopPosition: preview.copyRoomSpawnPosition(
+        progression.recoveryRoomIds.goop,
+        'goop',
+        new THREE.Vector3(),
+      ),
+      activeSlimeId,
+    });
+  }
+
+  private emitAuthoredPreviewObjective(): void {
+    const roomId = this.authoredPreviewRoomId;
+    if (roomId === undefined) return;
+    this.events.emit('objectiveChanged', {
+      roomId,
+      objective: CULTIVATION_ROOM_OBJECTIVES[roomId],
+    });
   }
 
   private updateStructuralAssemblies(
@@ -720,7 +1201,14 @@ export class CultivationLevelRuntime {
   }
 
   private advanceNextStructuralSupport(complete: boolean): void {
-    const target = this.requireResources().dissolveTargets.find(
+    const resources = this.requireResources();
+    const roomId = this.authoredPreviewRoomId;
+    const candidates = roomId === undefined
+      ? resources.dissolveTargets
+      : resources.previewDissolveTargets.filter(
+          (candidate) => candidate.mesh.userData.roomId === roomId,
+        );
+    const target = candidates.find(
       (candidate) => !candidate.completed,
     );
     if (!target) return;
@@ -746,6 +1234,50 @@ export class CultivationLevelRuntime {
     return true;
   }
 
+  private requestRoomThreeDroneDeath(slimeId: PlayableSlimeId): boolean {
+    const resources = this.resources;
+    const preview = resources?.authoredPreview;
+    if (
+      !resources ||
+      !preview ||
+      !resources.deathSequence.isPlaying
+    ) return false;
+    const struckBody = slimeId === 'bob'
+      ? resources.pair.bobBody
+      : resources.pair.goopBody;
+    if (preview.resolveRoomId(struckBody.position) !== 3) return false;
+    return this.requestPlayerDeath(
+      () => this.resetAndRecoverAuthoredPreviewRoom(resources),
+      slimeId,
+    );
+  }
+
+  private isDissolveTargetEnabled(target: DissolveTarget): boolean {
+    const roomId = this.authoredPreviewRoomId;
+    const targetRoomId = target.mesh.userData.roomId;
+    if (roomId === undefined) return targetRoomId === undefined;
+    const resources = this.resources;
+    const preview = resources?.authoredPreview;
+    if (!resources || !preview) return false;
+    const goopRoomId = preview.resolveRoomId(resources.pair.goopBody.position);
+    return targetRoomId === goopRoomId;
+  }
+
+  private formatRoomThreeDiagnostics(
+    resources: CultivationRuntimeResources,
+  ): readonly string[] {
+    const encounter = resources.roomThreeEncounter;
+    const completion = resources.roomThreeController?.readModel;
+    if (!encounter) return ['Room 3 drones: unavailable outside the authored preview'];
+    return [
+      `Room 3 ground drones: ${encounter.readModel.groundDisabledCount}/4 disabled; projectiles=${encounter.projectiles.liveCount}`,
+      `Room 3 exits B/G/complete: ${completion?.bobAtExit ? 'yes' : 'no'}/${completion?.goopAtExit ? 'yes' : 'no'}/${completion?.complete ? 'yes' : 'no'}`,
+      `health Bob/Goop: ${encounter.damage.health.map((state) => `${state.slimeId}=${state.health.toFixed(0)}${state.regenerating ? 'R' : ''}`).join(' ')}`,
+      ...encounter.readModel.ceilingDrones.map((drone) => `${drone.id}: ${drone.state} / combat=${drone.drone.state} target=${drone.drone.targetSlimeId ?? 'none'} t=${drone.stateElapsedSeconds.toFixed(2)}`),
+      ...encounter.readModel.groundDrones.map((drone) => `${drone.id}: ${drone.state} push=${drone.pushProgress.toFixed(2)} / combat=${drone.drone.state} target=${drone.drone.targetSlimeId ?? 'none'}`),
+    ];
+  }
+
   private requestPlayerDeath(
     recovery: DeathRecoveryAction,
     dyingSlimeId: PlayableSlimeId,
@@ -767,6 +1299,7 @@ export class CultivationLevelRuntime {
     const resources = this.requireResources();
     if (!resources.deathSequence.completeRetry()) return;
     resources.burst.reset();
+    resources.goopAcidPresentation.reset();
     resources.deathScreen.hide();
     this.input.resetState();
     this.renderLayer.cameraRig.reset();

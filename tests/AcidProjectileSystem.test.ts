@@ -293,6 +293,37 @@ test('projectile collision near Goop overrides an unobstructed offset camera', (
   fixture.dispose();
 });
 
+test('acid treats explicitly non-soluble drone bodies as ordinary world impacts', () => {
+  const fixture = createFixture(new THREE.Vector3(0, 0, -4));
+  const drone = addWorldBox(
+    fixture,
+    'test-drone-body',
+    new THREE.Vector3(1, 1, 0.6),
+    new THREE.Vector3(0, 0, -2),
+  );
+  drone.userData.soluble = false;
+  drone.userData.authoringRole = 'acid-resistant-drone';
+  const system = new AcidProjectileSystem({
+    slimeManager: fixture.manager,
+    collisionWorld: fixture.world,
+    dissolveSystem: fixture.dissolve,
+    aimRayProvider: new TestAimRay(new THREE.Vector3(), new THREE.Vector3(0, 0, -1)),
+    config: { projectileSpeedMetresPerSecond: 120 },
+  });
+  let impactRole: string | undefined;
+  system.events.on('worldImpact', ({ authoringRole }) => {
+    impactRole = authoringRole;
+  });
+
+  system.update(1 / 30, { ...AIM_ONLY, firePressed: true });
+  assert.equal(impactRole, 'acid-resistant-drone');
+  assert.equal(fixture.dissolve.activeBurnCount, 0);
+  assert.equal(fixture.target.progress, 0);
+
+  system.dispose();
+  fixture.dispose();
+});
+
 test('cooldown and projectile-pool limits bound deterministic shot count', () => {
   const fixture = createFixture(new THREE.Vector3(0, 0, -80));
   const system = new AcidProjectileSystem({
@@ -410,6 +441,119 @@ test('the camera-ray target is retained after earlier candidates exhaust the pro
   fixture.dispose();
 });
 
+test('aim mode highlights a hanging rope when its lower tip is occluded', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const manager = new TestSlimeManager();
+  const rope = new THREE.Mesh(
+    new THREE.BoxGeometry(0.48, 6, 0.48),
+    new THREE.MeshStandardMaterial(),
+  );
+  rope.name = 'hanging-rope';
+  rope.position.set(0, 4, -6);
+  rope.userData.surfaceTag = 'default';
+  world.register(rope);
+  surfaces.register(rope);
+  const target = new DissolveTarget({
+    id: rope.name,
+    mesh: rope,
+    collisionWorld: world,
+    surfaceRegistry: surfaces,
+    dissolveDurationSeconds: 2,
+    collisionDisableProgress: 0.75,
+  });
+  const platform = new THREE.Mesh(
+    new THREE.BoxGeometry(5, 1, 5),
+    new THREE.MeshStandardMaterial(),
+  );
+  platform.name = 'suspended-platform';
+  platform.position.set(0, 0.5, -6);
+  world.register(platform);
+  const dissolve = new DissolveSystem([target]);
+  const system = new AcidProjectileSystem({
+    slimeManager: manager,
+    collisionWorld: world,
+    dissolveSystem: dissolve,
+    aimRayProvider: new TestAimRay(
+      new THREE.Vector3(),
+      new THREE.Vector3(1, 0, -1),
+    ),
+  });
+
+  system.update(1 / 60, AIM_ONLY);
+
+  assert.equal(system.aimReadModel.targetedSolubleId, undefined);
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, ['hanging-rope']);
+  assert.equal(system.getDiagnostics().visibilityProbeCount, 1);
+
+  system.dispose();
+  dissolve.dispose();
+  target.dispose();
+  world.clear();
+  surfaces.clear();
+  rope.geometry.dispose();
+  rope.material.dispose();
+  platform.geometry.dispose();
+  platform.material.dispose();
+});
+
+test('aim mode highlights a thin support cable when its centre is occluded', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const manager = new TestSlimeManager();
+  const cable = new THREE.Mesh(
+    new THREE.BoxGeometry(0.22, 10, 0.22),
+    new THREE.MeshStandardMaterial(),
+  );
+  cable.name = 'thin-support-cable';
+  cable.position.set(0, 7, -10);
+  cable.userData.surfaceTag = 'default';
+  cable.userData.authoringRole = 'ceiling-drone-soluble-support-cable';
+  world.register(cable);
+  surfaces.register(cable);
+  const target = new DissolveTarget({
+    id: cable.name,
+    mesh: cable,
+    collisionWorld: world,
+    surfaceRegistry: surfaces,
+    dissolveDurationSeconds: 2,
+    collisionDisableProgress: 0.75,
+  });
+  const centreOccluder = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 2, 0.4),
+    new THREE.MeshStandardMaterial(),
+  );
+  centreOccluder.name = 'platform-crossing-cable-centre';
+  centreOccluder.position.set(0, 4, -5);
+  world.register(centreOccluder);
+  const dissolve = new DissolveSystem([target]);
+  const system = new AcidProjectileSystem({
+    slimeManager: manager,
+    collisionWorld: world,
+    dissolveSystem: dissolve,
+    aimRayProvider: new TestAimRay(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(1, 0, 0),
+    ),
+  });
+
+  system.update(1 / 60, AIM_ONLY);
+
+  assert.equal(system.aimReadModel.targetedSolubleId, undefined);
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, [cable.name]);
+  assert.equal(system.getDiagnostics().visibilityProbeCount, 2);
+
+  system.dispose();
+  dissolve.dispose();
+  target.dispose();
+  world.clear();
+  surfaces.clear();
+  cable.geometry.dispose();
+  cable.material.dispose();
+  centreOccluder.geometry.dispose();
+  centreOccluder.material.dispose();
+});
+
 test('cooldown accepts the next shot exactly at the configured boundary', () => {
   const fixture = createFixture(new THREE.Vector3(0, 0, -20));
   const system = new AcidProjectileSystem({
@@ -431,6 +575,35 @@ test('cooldown accepts the next shot exactly at the configured boundary', () => 
   assert.equal(system.getDiagnostics().firedCount, 1);
   system.update(0.01, { ...AIM_ONLY, firePressed: true });
   assert.equal(system.getDiagnostics().firedCount, 2);
+
+  system.dispose();
+  fixture.dispose();
+});
+
+test('room-scoped aim eligibility follows Goop physical entry before shared progression', () => {
+  const fixture = createFixture(new THREE.Vector3(0, 0, -5));
+  fixture.target.mesh.userData.roomId = 3;
+  let goopPhysicalRoomId = 2;
+  const system = new AcidProjectileSystem({
+    slimeManager: fixture.manager,
+    collisionWorld: fixture.world,
+    dissolveSystem: fixture.dissolve,
+    aimRayProvider: new TestAimRay(
+      new THREE.Vector3(),
+      new THREE.Vector3(0, 0, -1),
+    ),
+    isTargetEnabled: (target) =>
+      target.mesh.userData.roomId === goopPhysicalRoomId,
+  });
+
+  system.update(1 / 60, AIM_ONLY);
+  assert.equal(system.aimReadModel.targetedSolubleId, undefined);
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, []);
+
+  goopPhysicalRoomId = 3;
+  system.update(1 / 60, AIM_ONLY);
+  assert.equal(system.aimReadModel.targetedSolubleId, fixture.target.id);
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, [fixture.target.id]);
 
   system.dispose();
   fixture.dispose();
