@@ -126,6 +126,21 @@ export class GreyboxRoomBuilder {
     return mesh;
   }
 
+  /** Add a simple authoring light for grey-box rooms without a lighting rig. */
+  addLight(
+    name: string,
+    position: readonly [number, number, number],
+    colour = 0xe7fff1,
+    intensity = 10,
+    distance = 18,
+  ): THREE.PointLight {
+    const light = new THREE.PointLight(colour, intensity, distance);
+    light.name = name;
+    light.position.set(...position);
+    this.root.add(light);
+    return light;
+  }
+
   dispose(): void {
     const ownedMaterials = new Set<THREE.Material>();
     for (const material of Object.values(this.materials)) {
