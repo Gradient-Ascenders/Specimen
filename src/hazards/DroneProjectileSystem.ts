@@ -60,6 +60,8 @@ export interface DroneProjectileTarget {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly previousPosition: { readonly x: number; readonly y: number; readonly z: number };
   readonly radiusMetres: number;
+  /** False while the persistent body is outside this encounter's room. */
+  readonly eligible?: boolean;
 }
 
 export interface DroneProjectileEvents {
@@ -184,6 +186,7 @@ export class DroneProjectileSystem {
       let targetFraction = Number.POSITIVE_INFINITY;
       let targetHit: DroneProjectileTarget | undefined;
       for (const target of targets) {
+        if (target.eligible === false) continue;
         this.targetDisplacement.set(
           target.position.x - target.previousPosition.x,
           target.position.y - target.previousPosition.y,

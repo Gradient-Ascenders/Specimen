@@ -15,9 +15,14 @@ cover, radiation, lasers, soluble ropes, and exit geometry remain owned by
 - `CultivationRoomThreeController` alone decides encounter completion.
 - Three.js meshes and read models expose state but never advance gameplay time.
 
-Both persistent bodies participate in detection and projectile collision every
-fixed step. Active-slime selection is used only to validate deliberate Bob rear
-pushes, so switching never hides or protects the inactive body.
+Encounter activation follows physical occupancy rather than the shared
+objective room. During split progression, Room 3 starts simulating as soon as
+either persistent body enters while Room 2 keeps simulating for the body left
+behind. Only bodies physically resolved to Room 3 participate in drone
+detection and projectile collision. Goop's physical room likewise scopes acid
+targets, and drone death requests are accepted only for struck bodies still in
+Room 3. Active-slime selection is used only to validate deliberate Bob rear
+pushes, so switching never hides or protects an eligible inactive body.
 
 ## State machines and tuning
 

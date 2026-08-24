@@ -83,6 +83,37 @@ test('typed target policy keeps inactive eligible bodies targetable', () => {
   damage.dispose();
 });
 
+test('physical-room eligibility prevents acquisition and invalidates a tracked target', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const damage = new SlimeDamageSystem();
+  const projectiles = new DroneProjectileSystem(world, damage);
+  const drone = new SecurityDrone(config(), world, surfaces, projectiles);
+  const target = {
+    slimeId: 'bob' as const,
+    position: new THREE.Vector3(0, 0, 5),
+    eligible: false,
+  };
+
+  drone.update(0.1, [target]);
+  assert.equal(drone.readModel.state, 'scanning');
+  assert.equal(drone.readModel.targetSlimeId, undefined);
+
+  target.eligible = true;
+  drone.update(0.1, [target]);
+  assert.equal(drone.readModel.state, 'warning');
+  assert.equal(drone.readModel.targetSlimeId, 'bob');
+
+  target.eligible = false;
+  drone.update(0.3, [target]);
+  assert.equal(drone.readModel.state, 'targetLost');
+  assert.equal(drone.readModel.targetSlimeId, undefined);
+
+  drone.dispose();
+  projectiles.dispose();
+  damage.dispose();
+});
+
 test('range and cone boundaries are inclusive without admitting outside targets', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();

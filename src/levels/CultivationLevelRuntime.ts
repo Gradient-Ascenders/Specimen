@@ -161,6 +161,11 @@ export class CultivationLevelRuntime {
     | LevelTwoPreviewProgressionSnapshot
     | undefined;
   private authoredPreviewRecoveryActiveSlimeId: PlayableSlimeId | undefined;
+  private readonly authoredPreviewResolvedRooms = {
+    bob: 1 as LevelTwoAuthoredRoomId,
+    goop: 1 as LevelTwoAuthoredRoomId,
+  };
+  private readonly roomThreeSlimeEligibility = { bob: false, goop: false };
 
   constructor(options: CultivationLevelRuntimeOptions) {
     validateLevelProgressionSnapshot(options.progression);
@@ -313,8 +318,18 @@ export class CultivationLevelRuntime {
     const authoredPreview = resources.authoredPreview;
     const authoredProgression = this.authoredPreviewProgression;
     if (authoredPreview && authoredProgression) {
+      const resolvedRooms = this.authoredPreviewResolvedRooms;
+      resolvedRooms.bob = authoredPreview.resolveRoomId(
+        resources.pair.bobBody.position,
+      );
+      resolvedRooms.goop = authoredPreview.resolveRoomId(
+        resources.pair.goopBody.position,
+      );
+      const roomThreeEligibility = this.roomThreeSlimeEligibility;
+      roomThreeEligibility.bob = resolvedRooms.bob === 3;
+      roomThreeEligibility.goop = resolvedRooms.goop === 3;
       if (
-        authoredProgression.roomId === 3 &&
+        (roomThreeEligibility.bob || roomThreeEligibility.goop) &&
         resources.roomThreeEncounter &&
         resources.roomThreeController
       ) {
@@ -324,6 +339,7 @@ export class CultivationLevelRuntime {
           !switched && activeBody === resources.pair.bobBody
             ? resources.movement
             : resources.noMovement,
+          roomThreeEligibility,
         );
         resources.roomThreeController.update(
           resources.previewOccupants[0],
@@ -358,10 +374,7 @@ export class CultivationLevelRuntime {
       if (resources.deathSequence.isPlaying) {
         const nextProgression = advanceLevelTwoPreviewProgression(
           authoredProgression,
-          {
-            bob: authoredPreview.resolveRoomId(resources.pair.bobBody.position),
-            goop: authoredPreview.resolveRoomId(resources.pair.goopBody.position),
-          },
+          resolvedRooms,
         );
         if (nextProgression !== authoredProgression) {
           this.authoredPreviewProgression = nextProgression;
@@ -1170,11 +1183,16 @@ export class CultivationLevelRuntime {
 
   private requestRoomThreeDroneDeath(slimeId: PlayableSlimeId): boolean {
     const resources = this.resources;
+    const preview = resources?.authoredPreview;
     if (
-      !resources?.authoredPreview ||
-      this.authoredPreviewRoomId !== 3 ||
+      !resources ||
+      !preview ||
       !resources.deathSequence.isPlaying
     ) return false;
+    const struckBody = slimeId === 'bob'
+      ? resources.pair.bobBody
+      : resources.pair.goopBody;
+    if (preview.resolveRoomId(struckBody.position) !== 3) return false;
     return this.requestPlayerDeath(
       () => this.resetAndRecoverAuthoredPreviewRoom(resources),
       slimeId,
@@ -1184,9 +1202,12 @@ export class CultivationLevelRuntime {
   private isDissolveTargetEnabled(target: DissolveTarget): boolean {
     const roomId = this.authoredPreviewRoomId;
     const targetRoomId = target.mesh.userData.roomId;
-    return roomId === undefined
-      ? targetRoomId === undefined
-      : targetRoomId === roomId;
+    if (roomId === undefined) return targetRoomId === undefined;
+    const resources = this.resources;
+    const preview = resources?.authoredPreview;
+    if (!resources || !preview) return false;
+    const goopRoomId = preview.resolveRoomId(resources.pair.goopBody.position);
+    return targetRoomId === goopRoomId;
   }
 
   private formatRoomThreeDiagnostics(

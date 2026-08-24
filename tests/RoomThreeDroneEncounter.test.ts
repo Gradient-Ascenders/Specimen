@@ -71,3 +71,81 @@ test('Room 3 constructs exactly seven authored drones and resets one-to-one rope
   world.clear();
   surfaces.clear();
 });
+
+test('split-room eligibility keeps Room 3 live without targeting the body left in Room 2', () => {
+  const scene = new LevelTwoPreviewScene(() => {});
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  world.registerAll(scene.collisionMeshes);
+  surfaces.registerAll(scene.collisionMeshes);
+  const targets = scene.solubleTargetMeshes.map((mesh) => {
+    const target = createAuthoredDissolveTarget(mesh, world, surfaces);
+    assert.ok(target);
+    return target;
+  });
+  const supportsById = new Map(targets.map((target) => [target.id, target]));
+  const bob = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: scene.copyRoomSpawnPosition(2, 'bob', new THREE.Vector3()),
+  });
+  const goop = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: scene.copyRoomSpawnPosition(3, 'goop', new THREE.Vector3()),
+  });
+  const config = {
+    ...CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
+    groundDrones: CULTIVATION_ROOM_THREE_DRONE_AUTHORING.groundDrones.map(
+      (entry, index) => index === 0
+        ? { ...entry, drone: { ...entry.drone, targetPolicy: 'both' as const } }
+        : entry,
+    ),
+  };
+  const encounter = new RoomThreeDroneEncounter({
+    config,
+    supportsById,
+    collisionWorld: world,
+    surfaceRegistry: surfaces,
+    bobBody: bob,
+    goopBody: goop,
+    requestDeath: () => true,
+  });
+  scene.roomThree.root.add(encounter.root);
+  const testedDrone = encounter.groundDrones[0].drone;
+
+  encounter.update(0.001, 'goop', new THREE.Vector3(), {
+    bob: false,
+    goop: false,
+  });
+  const origin = testedDrone.root.localToWorld(
+    config.groundDrones[0].drone.detectionAnchor!.clone(),
+  );
+  const direction = new THREE.Vector3(
+    testedDrone.readModel.scanDirection.x,
+    testedDrone.readModel.scanDirection.y,
+    testedDrone.readModel.scanDirection.z,
+  );
+  bob.teleport(origin.clone().addScaledVector(direction, 2));
+  goop.teleport(origin.clone().addScaledVector(direction, 4));
+
+  encounter.update(0.1, 'goop', new THREE.Vector3(), {
+    bob: false,
+    goop: true,
+  });
+  assert.equal(testedDrone.readModel.targetSlimeId, 'goop');
+  assert.equal(testedDrone.readModel.state, 'warning');
+
+  encounter.update(0.3, 'bob', new THREE.Vector3(), {
+    bob: true,
+    goop: false,
+  });
+  assert.equal(testedDrone.readModel.state, 'targetLost');
+  assert.equal(testedDrone.readModel.targetSlimeId, undefined);
+
+  encounter.dispose();
+  for (const target of targets) target.dispose();
+  scene.dispose();
+  world.clear();
+  surfaces.clear();
+});

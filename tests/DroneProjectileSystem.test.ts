@@ -95,3 +95,29 @@ test('swept projectile collision catches a moving slime and damages only once', 
   damage.dispose();
   owner.geometry.dispose();
 });
+
+test('projectiles ignore persistent bodies that have left the encounter room', () => {
+  const world = new CollisionWorld();
+  const damage = new SlimeDamageSystem();
+  const system = new DroneProjectileSystem(world, damage, {
+    speedMetresPerSecond: 100,
+  });
+  const owner = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  const outsideRoom = {
+    ...target(8),
+    eligible: false,
+  };
+  let impacts = 0;
+  system.events.on('slimeImpact', () => impacts += 1);
+
+  system.spawn('drone', owner, new THREE.Vector3(), new THREE.Vector3(0, 0, 1));
+  system.update(0.1, [outsideRoom]);
+
+  assert.equal(damage.health[0].health, 100);
+  assert.equal(impacts, 0);
+  assert.equal(system.liveCount, 1);
+
+  system.dispose();
+  damage.dispose();
+  owner.geometry.dispose();
+});

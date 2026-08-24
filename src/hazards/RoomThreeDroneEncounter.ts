@@ -15,6 +15,7 @@ import {
 import {
   DroneProjectileSystem,
   type DroneProjectileReadState,
+  type DroneProjectileTarget,
 } from './DroneProjectileSystem.ts';
 import {
   GroundSecurityDrone,
@@ -69,6 +70,16 @@ export interface RoomThreeDroneEncounterEvents {
   reset: Record<string, never>;
 }
 
+export interface RoomThreeSlimeEligibility {
+  readonly bob: boolean;
+  readonly goop: boolean;
+}
+
+const ALL_SLIMES_ELIGIBLE: RoomThreeSlimeEligibility = {
+  bob: true,
+  goop: true,
+};
+
 /** Owns the bounded shared combat services and all seven Room 3 drone instances. */
 export class RoomThreeDroneEncounter {
   readonly root = new THREE.Group();
@@ -82,20 +93,11 @@ export class RoomThreeDroneEncounter {
 
   private readonly bobBody: KinematicBody;
   private readonly radiationSurface: RoomThreeDroneEncounterOptions['radiationSurface'];
+  private readonly slimeEligibility = { bob: true, goop: true };
   private readonly targets: readonly SecurityDroneTarget[];
   private readonly projectileTargets: readonly [
-    {
-      readonly slimeId: 'bob';
-      readonly position: KinematicBody['position'];
-      readonly previousPosition: KinematicBody['previousPosition'];
-      readonly radiusMetres: number;
-    },
-    {
-      readonly slimeId: 'goop';
-      readonly position: KinematicBody['position'];
-      readonly previousPosition: KinematicBody['previousPosition'];
-      readonly radiusMetres: number;
-    },
+    DroneProjectileTarget,
+    DroneProjectileTarget,
   ];
   private readonly model: MutableEncounterReadModel;
   private readonly droneById = new Map<string, CeilingSecurityDrone | GroundSecurityDrone>();
@@ -130,9 +132,22 @@ export class RoomThreeDroneEncounter {
     this.radiationSurface = options.radiationSurface;
     this.damage = new SlimeDamageSystem();
     this.projectiles = new DroneProjectileSystem(options.collisionWorld, this.damage);
+    const slimeEligibility = this.slimeEligibility;
     this.targets = [
-      { slimeId: 'bob', position: options.bobBody.position },
-      { slimeId: 'goop', position: options.goopBody.position },
+      {
+        slimeId: 'bob',
+        position: options.bobBody.position,
+        get eligible() {
+          return slimeEligibility.bob;
+        },
+      },
+      {
+        slimeId: 'goop',
+        position: options.goopBody.position,
+        get eligible() {
+          return slimeEligibility.goop;
+        },
+      },
     ];
     this.projectileTargets = [
       {
@@ -140,12 +155,18 @@ export class RoomThreeDroneEncounter {
         position: options.bobBody.position,
         previousPosition: options.bobBody.previousPosition,
         radiusMetres: options.bobBody.radiusMetres,
+        get eligible() {
+          return slimeEligibility.bob;
+        },
       },
       {
         slimeId: 'goop',
         position: options.goopBody.position,
         previousPosition: options.goopBody.previousPosition,
         radiusMetres: options.goopBody.radiusMetres,
+        get eligible() {
+          return slimeEligibility.goop;
+        },
       },
     ];
 
@@ -195,8 +216,11 @@ export class RoomThreeDroneEncounter {
     deltaSeconds: number,
     activeSlimeId: 'bob' | 'goop',
     bobMovementIntent: { readonly x: number; readonly y: number; readonly z: number },
+    slimeEligibility: RoomThreeSlimeEligibility = ALL_SLIMES_ELIGIBLE,
   ): void {
     this.assertActive();
+    this.slimeEligibility.bob = slimeEligibility.bob;
+    this.slimeEligibility.goop = slimeEligibility.goop;
     this.damage.update(deltaSeconds);
     for (const drone of this.ceilingDrones) {
       drone.update(deltaSeconds, this.targets);

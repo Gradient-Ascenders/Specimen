@@ -19,6 +19,8 @@ export type SecurityDroneState =
 export interface SecurityDroneTarget {
   readonly slimeId: 'bob' | 'goop';
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  /** False while the persistent body is outside this encounter's room. */
+  readonly eligible?: boolean;
 }
 
 export interface SecurityDroneConfig {
@@ -345,6 +347,7 @@ export class SecurityDrone {
   }
 
   private canSee(target: SecurityDroneTarget): boolean {
+    if (target.eligible === false) return false;
     this.copyAnchor(this.config.detectionAnchor, this.detectionOrigin);
     this.displacement.set(
       target.position.x - this.detectionOrigin.x,

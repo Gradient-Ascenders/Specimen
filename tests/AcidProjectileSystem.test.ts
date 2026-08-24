@@ -466,3 +466,32 @@ test('cooldown accepts the next shot exactly at the configured boundary', () => 
   system.dispose();
   fixture.dispose();
 });
+
+test('room-scoped aim eligibility follows Goop physical entry before shared progression', () => {
+  const fixture = createFixture(new THREE.Vector3(0, 0, -5));
+  fixture.target.mesh.userData.roomId = 3;
+  let goopPhysicalRoomId = 2;
+  const system = new AcidProjectileSystem({
+    slimeManager: fixture.manager,
+    collisionWorld: fixture.world,
+    dissolveSystem: fixture.dissolve,
+    aimRayProvider: new TestAimRay(
+      new THREE.Vector3(),
+      new THREE.Vector3(0, 0, -1),
+    ),
+    isTargetEnabled: (target) =>
+      target.mesh.userData.roomId === goopPhysicalRoomId,
+  });
+
+  system.update(1 / 60, AIM_ONLY);
+  assert.equal(system.aimReadModel.targetedSolubleId, undefined);
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, []);
+
+  goopPhysicalRoomId = 3;
+  system.update(1 / 60, AIM_ONLY);
+  assert.equal(system.aimReadModel.targetedSolubleId, fixture.target.id);
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, [fixture.target.id]);
+
+  system.dispose();
+  fixture.dispose();
+});

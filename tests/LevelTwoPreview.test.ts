@@ -629,6 +629,36 @@ test('Room 2 and Room 3 lasers report the struck persistent slime', () => {
   scene.dispose();
 });
 
+test('split occupants keep Room 2 and Room 3 simulation active together', () => {
+  const scene = new LevelTwoPreviewScene(() => {});
+  const roomTwoLaser = scene.roomTwo.lasers.hazards[0];
+  const roomThreeLaser = scene.roomThree.lasers.hazards[0];
+  const bobRoomTwo = new THREE.Vector3(
+    roomTwoLaser.start.x,
+    roomTwoLaser.start.y,
+    roomTwoLaser.start.z,
+  );
+  const goopRoomThree = new THREE.Vector3(
+    roomThreeLaser.start.x,
+    roomThreeLaser.start.y,
+    roomThreeLaser.start.z,
+  );
+  scene.roomTwo.root.localToWorld(bobRoomTwo);
+  scene.roomThree.root.localToWorld(goopRoomThree);
+
+  scene.update(1 / 60, 2, [
+    { id: 'bob', position: bobRoomTwo, radiusMetres: 0.45 },
+    { id: 'goop', position: goopRoomThree, radiusMetres: 0.45 },
+  ]);
+
+  assert.equal(scene.resolveRoomId(bobRoomTwo), 2);
+  assert.equal(scene.resolveRoomId(goopRoomThree), 3);
+  assert.equal(scene.roomTwo.lasers.lastFailureTargetId, 'bob');
+  assert.equal(scene.roomThree.lasers.lastFailureTargetId, 'goop');
+
+  scene.dispose();
+});
+
 test('radioactive floors kill Bob, latch contact, and leave Goop immune', () => {
   const failures: Array<{
     readonly roomId: 1 | 2 | 3;
