@@ -44,6 +44,29 @@ test('restart is single-entry and returns directly to gameplay', () => {
   assert.equal(flow.finishRestart(), false);
 });
 
+test('level transition owns a visible non-interactive state and resumes gameplay', () => {
+  const model = new GameFlowStateModel();
+  model.completeBoot();
+  model.start();
+
+  assert.equal(model.beginLevelTransition(), true);
+  assert.equal(model.state, 'transitioning');
+  assert.equal(model.pause(), false);
+  assert.equal(model.finishLevelTransition(), true);
+  assert.equal(model.state, 'playing');
+});
+
+test('failed level transition remains stopped instead of returning to gameplay', () => {
+  const model = new GameFlowStateModel();
+  model.completeBoot();
+  model.start();
+  model.beginLevelTransition();
+
+  assert.equal(model.failLevelTransition(), true);
+  assert.equal(model.state, 'transitionFailed');
+  assert.equal(model.start(), false);
+});
+
 test('failed restart returns to the paused boundary', () => {
   const flow = new GameFlowStateModel();
   flow.completeBoot();

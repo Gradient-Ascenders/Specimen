@@ -318,8 +318,6 @@ export class ContainmentTeachingScene {
       });
     }
 
-    this.addCeilingLight('room-1-fluorescent-a', [-3.8, 7.7, -1.5]);
-    this.addCeilingLight('room-1-fluorescent-b', [3.8, 7.7, -1.5]);
   }
 
   private addVentTransition(materials: Record<string, THREE.Material>): void {
@@ -429,9 +427,6 @@ export class ContainmentTeachingScene {
 
     // Blender-authored version: the four low recovery steps were removed.
 
-    this.addCeilingLight('room-2-fluorescent-a', [-8, 16.7, 35]);
-    this.addCeilingLight('room-2-fluorescent-b', [0, 16.7, 39]);
-    this.addCeilingLight('room-2-fluorescent-c', [8, 16.7, 43]);
   }
 
   private addReferenceMarkers(exitMaterial: THREE.Material): void {
@@ -528,13 +523,6 @@ export class ContainmentTeachingScene {
     mesh.userData.sizeMetres = [...options.size];
     this.root.add(mesh);
     this.collisionMeshList.push(mesh);
-  }
-
-  private addCeilingLight(name: string, position: readonly [number, number, number]): void {
-    const light = new THREE.PointLight(0xe7fff1, 10, 12);
-    light.name = name;
-    light.position.set(...position);
-    this.root.add(light);
   }
 
   private collisionOnlyMaterial(name: string): THREE.MeshBasicMaterial {

@@ -150,9 +150,6 @@ export class RoomThreeGreybox {
     this.builder.addCollider({ name: 'room-3-rear-wall-above-vent', size: [2.1836, 1.1112, 0.1978], position: [8.8982, 33.9189, 76.8938], material: wall });
     this.builder.addCollider({ name: 'room-3-rear-wall-below-vent', size: [2.2, 24.8, 0.4], position: [9, 17.4, 77], material: wall });
 
-    this.builder.addLight('room-3-light-entry', [-8, 30, 54]);
-    this.builder.addLight('room-3-light-centre', [8, 30, 64]);
-    this.builder.addLight('room-3-light-exit', [9, 33, 74], 0x9dffc0, 12, 16);
   }
 
   private buildTraversal(): void {

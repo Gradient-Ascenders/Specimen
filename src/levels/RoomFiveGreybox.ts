@@ -188,6 +188,25 @@ export class RoomFiveGreybox {
     return this.endingStateValue === 'released';
   }
 
+  /** Normalized progress inside the current authoritative ending phase. */
+  get endingProgress(): number {
+    if (this.endingStateValue === 'leverPull') {
+      return THREE.MathUtils.clamp(
+        this.endingElapsedSeconds / LEVER_PULL_SECONDS,
+        0,
+        1,
+      );
+    }
+    if (this.endingStateValue === 'containmentFailure') {
+      return THREE.MathUtils.clamp(
+        this.endingElapsedSeconds / CONTAINMENT_FAILURE_SECONDS,
+        0,
+        1,
+      );
+    }
+    return this.endingStateValue === 'released' ? 1 : 0;
+  }
+
   updateEntryTrigger(body: KinematicBody): void {
     this.entryCheckpointTrigger.update(body);
   }
@@ -358,9 +377,6 @@ export class RoomFiveGreybox {
     goopWoodenDoor.userData.dissolveCollisionDisableProgress = 0.72;
     goopWoodenDoor.userData.dissolveActivationRangeMetres = 0.12;
 
-    this.builder.addLight('room-5-entry-light', [9, 96, 96]);
-    this.builder.addLight('room-5-containment-light', [0, 94, 110], 0xcfff70, 15, 22);
-    this.builder.addLight('room-5-observation-light', [-10, 103, 129], 0x9dffc0, 13, 14);
     return goopWoodenDoor;
   }
 

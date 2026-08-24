@@ -36,6 +36,8 @@ All movement and jump feel remains in `DEFAULT_KINEMATIC_BODY_CONFIG`.
 | `jumpInputBufferSeconds` | 0.12 | retained jump press window before gaining support |
 | `jumpGroundDetachSeconds` | 0.05 | prevents immediate ground re-acquisition |
 | `minimumLandingAirTimeSeconds` | 0.04 | filters one-frame contact noise |
+| `slimeHardLandingImpactSpeedMetresPerSecond` | 10 | m/s downward speed required for a landing reaction |
+| `slimeLandingReactionHopSpeedMetresPerSecond` | 5 | m/s fixed hard-landing reaction impulse |
 
 The charge is clamped to `[0, 1]`. Launch speed interpolates from the minimum
 to maximum jump speed after applying the configured exponent. Holding beyond
@@ -63,7 +65,7 @@ landing. Focus loss still cancels the intent because input clearing does not
 synthesize a release.
 
 On ordinary floors, a retained jump takes priority over the slime's passive
-impact rebound so deliberate input is not discarded. Authored `bouncy`
+hard-landing reaction so deliberate input is not discarded. Authored `bouncy`
 surfaces still apply their explicit bounce behavior first.
 
 ### Post-jump ground detach

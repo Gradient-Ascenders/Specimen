@@ -10,7 +10,10 @@ import {
 } from '../src/physics/KinematicBody.ts';
 import type { MovementEvents } from '../src/physics/MovementEvents.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
-import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
+import {
+  DEFAULT_SURFACE_DEFINITIONS,
+  SurfaceRegistry,
+} from '../src/physics/SurfaceRegistry.ts';
 
 const FIXED_DELTA_SECONDS = 1 / 60;
 const EPSILON = 1e-10;
@@ -29,7 +32,9 @@ interface GroundBodyFixture {
   floor: THREE.Mesh;
 }
 
-function createGroundBody(): GroundBodyFixture {
+function createGroundBody(
+  config: ConstructorParameters<typeof KinematicBody>[0]['config'] = {},
+): GroundBodyFixture {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   const events = new EventBus<MovementEvents>();
@@ -44,6 +49,7 @@ function createGroundBody(): GroundBodyFixture {
     world,
     surfaces,
     events,
+    config,
     initialPosition: new THREE.Vector3(
       0,
       DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres +
@@ -81,6 +87,7 @@ function advanceToBufferedLandingApproach(body: KinematicBody): void {
 
 interface FallingBodyFixture {
   body: KinematicBody;
+  events: EventBus<MovementEvents>;
   floor: THREE.Mesh;
 }
 
@@ -96,6 +103,24 @@ test('charged jump endpoints produce approximately 25% higher apexes', () => {
 
   assert.ok(Math.abs(minimumHeightRatio - 1.25) < 0.01);
   assert.ok(Math.abs(maximumHeightRatio - 1.25) < 0.01);
+});
+
+test('landing-reaction tuning cannot equal or exceed the normal jump impulse', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+
+  assert.throws(
+    () => new KinematicBody({
+      world,
+      surfaces,
+      initialPosition: new THREE.Vector3(),
+      config: {
+        slimeLandingReactionHopSpeedMetresPerSecond:
+          DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond,
+      },
+    }),
+    /must be less than minimumJumpSpeedMetresPerSecond/,
+  );
 });
 
 function createAttachedBody(): AttachedBodyFixture {
@@ -126,6 +151,7 @@ function createFallingBody(
 ): FallingBodyFixture {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
+  const events = new EventBus<MovementEvents>();
   const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 0.2, 20));
   floor.name = 'ordinary-test-floor';
   floor.position.y = -0.1;
@@ -135,20 +161,49 @@ function createFallingBody(
   const body = new KinematicBody({
     world,
     surfaces,
+    events,
     config,
     initialPosition: new THREE.Vector3(0, initialHeightMetres, 0),
   });
 
-  return { body, floor };
+  return { body, events, floor };
 }
 
-function advanceUntilFloorContact(body: KinematicBody): void {
+function advanceUntilLanding(body: KinematicBody): void {
   for (let step = 0; step < 300; step += 1) {
     body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
-    if (body.lastContactName === 'ordinary-test-floor') return;
+    if (body.landedThisStep) return;
   }
 
-  assert.fail('Body did not contact the ordinary test floor.');
+  assert.fail('Body did not reach a stable landing transition.');
+}
+
+function advanceUntilGrounded(body: KinematicBody): void {
+  for (let step = 0; step < 600; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+    if (body.grounded) return;
+  }
+
+  assert.fail('Body did not reach a stable grounded state.');
+}
+
+function launchFullyChargedJump(body: KinematicBody): void {
+  const chargeSteps = Math.ceil(
+    body.maximumJumpChargeSeconds / FIXED_DELTA_SECONDS,
+  );
+  for (let step = 0; step < chargeSteps; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+      pressed: step === 0,
+      held: true,
+      released: false,
+    });
+  }
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: false,
+    held: false,
+    released: true,
+  });
+  assert.equal(body.grounded, false);
 }
 
 function beginWallJump(body: KinematicBody): void {
@@ -567,27 +622,121 @@ test('losing sticky support immediately restores authoritative world-up', () => 
   wall.geometry.dispose();
 });
 
-test('below-threshold ordinary-floor landing does not rebound', () => {
-  const configuredMinimumImpactSpeed = 15;
-  const { body, floor } = createFallingBody(6, {
-    slimeMinimumBounceImpactSpeedMetresPerSecond:
-      configuredMinimumImpactSpeed,
-  });
+test('a small ledge fall lands without an automatic hop', () => {
+  const { body, floor } = createFallingBody(1.2);
 
-  advanceUntilFloorContact(body);
+  advanceUntilLanding(body);
 
   assert.ok(
-    body.lastContactImpactSpeedMetresPerSecond <
-      configuredMinimumImpactSpeed,
-  );
-  assert.ok(
-    body.lastContactImpactSpeedMetresPerSecond >
-      DEFAULT_KINEMATIC_BODY_CONFIG.slimeMinimumBounceImpactSpeedMetresPerSecond,
+    body.lastLandingImpactSpeedMetresPerSecond <
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeHardLandingImpactSpeedMetresPerSecond,
   );
   assert.equal(body.lastBounceSpeedMetresPerSecond, 0);
   assert.equal(body.grounded, true);
 
   floor.geometry.dispose();
+});
+
+test('a normal jump lands without an automatic hop', () => {
+  const { body, floor } = createGroundBody({ chargedJumpEnabled: false });
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT, {
+    pressed: true,
+    held: true,
+    released: false,
+  });
+  assert.equal(body.grounded, false);
+  advanceUntilGrounded(body);
+
+  assert.equal(body.lastBounceSpeedMetresPerSecond, 0);
+  assert.equal(body.grounded, true);
+
+  floor.geometry.dispose();
+});
+
+test('a minimally charged jump lands without an automatic hop', () => {
+  const { body, floor } = createGroundBody();
+
+  launchTapJump(body);
+  advanceUntilGrounded(body);
+
+  assert.equal(body.lastBounceSpeedMetresPerSecond, 0);
+  assert.equal(body.grounded, true);
+
+  floor.geometry.dispose();
+});
+
+test('a fully charged jump lands without an automatic hop', () => {
+  const { body, floor } = createGroundBody();
+
+  launchFullyChargedJump(body);
+  assert.equal(body.lastJumpChargeFraction, 1);
+  advanceUntilGrounded(body);
+
+  assert.ok(
+    body.lastLandingImpactSpeedMetresPerSecond <
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeHardLandingImpactSpeedMetresPerSecond,
+  );
+  assert.equal(body.lastBounceSpeedMetresPerSecond, 0);
+  assert.equal(body.grounded, true);
+
+  floor.geometry.dispose();
+});
+
+test('a fully charged jump from the Room 2 exit height hops on the Room 3 entry platform', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const events = new EventBus<MovementEvents>();
+  const lowerFloor = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 5));
+  lowerFloor.name = 'room-3-entry-platform';
+  lowerFloor.position.y = 10.15;
+  const launchPlatform = new THREE.Mesh(new THREE.BoxGeometry(7, 0.5, 4));
+  launchPlatform.name = 'room-2-exit-balcony';
+  launchPlatform.position.y = 10.65;
+  lowerFloor.updateWorldMatrix(true, false);
+  launchPlatform.updateWorldMatrix(true, false);
+  world.registerAll([lowerFloor, launchPlatform]);
+  surfaces.registerAll([lowerFloor, launchPlatform]);
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    events,
+    initialPosition: new THREE.Vector3(
+      0,
+      10.9 +
+        DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres +
+        DEFAULT_KINEMATIC_BODY_CONFIG.skinWidthMetres,
+      0,
+    ),
+  });
+  const landingSpeeds: number[] = [];
+  events.on('landed', (event) => {
+    landingSpeeds.push(event.impactSpeedMetresPerSecond);
+  });
+
+  assert.equal(body.grounded, true);
+  launchFullyChargedJump(body);
+  world.unregister(launchPlatform);
+  surfaces.unregister(launchPlatform);
+  advanceUntilLanding(body);
+
+  assert.ok(
+    body.lastLandingImpactSpeedMetresPerSecond >=
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeHardLandingImpactSpeedMetresPerSecond,
+  );
+  assert.equal(
+    body.lastBounceSpeedMetresPerSecond,
+    DEFAULT_KINEMATIC_BODY_CONFIG.slimeLandingReactionHopSpeedMetresPerSecond,
+  );
+  assert.ok(body.velocity.y > 0);
+
+  advanceUntilGrounded(body);
+
+  assert.equal(landingSpeeds.length, 2);
+  assert.equal(body.grounded, true);
+
+  lowerFloor.geometry.dispose();
+  launchPlatform.geometry.dispose();
 });
 
 test('jump pressed and released shortly before landing launches on touchdown', () => {
@@ -629,45 +778,103 @@ test('jump pressed and released shortly before landing launches on touchdown', (
   floor.geometry.dispose();
 });
 
-test('ordinary-floor landing rebounds using impact times restitution', () => {
-  const { body, floor } = createFallingBody(6);
+test('a large fall produces one visible landing-reaction hop', () => {
+  const { body, events, floor } = createFallingBody(3.5);
+  const landingSpeeds: number[] = [];
+  events.on('landed', (event) => {
+    landingSpeeds.push(event.impactSpeedMetresPerSecond);
+  });
 
-  advanceUntilFloorContact(body);
+  advanceUntilLanding(body);
 
-  const expectedReboundSpeed =
-    body.lastContactImpactSpeedMetresPerSecond *
-    DEFAULT_KINEMATIC_BODY_CONFIG.slimeBounceRestitution;
+  assert.equal(body.landedThisStep, true);
   assert.ok(
-    expectedReboundSpeed <
-      DEFAULT_KINEMATIC_BODY_CONFIG.slimeMaximumBounceSpeedMetresPerSecond,
+    body.lastLandingImpactSpeedMetresPerSecond >=
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeHardLandingImpactSpeedMetresPerSecond,
   );
   assert.ok(
-    Math.abs(body.lastBounceSpeedMetresPerSecond - expectedReboundSpeed) <
-      EPSILON,
-    `expected ${expectedReboundSpeed}, received ${body.lastBounceSpeedMetresPerSecond}`,
+    Math.abs(
+      body.velocity.y -
+        DEFAULT_KINEMATIC_BODY_CONFIG.slimeLandingReactionHopSpeedMetresPerSecond,
+    ) < EPSILON,
   );
+  assert.ok(
+    body.lastBounceSpeedMetresPerSecond <
+      DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond,
+  );
+  assert.equal(body.grounded, false);
+
+  advanceUntilGrounded(body);
+
+  assert.equal(landingSpeeds.length, 2);
+  assert.ok(
+    landingSpeeds[1] <
+      DEFAULT_KINEMATIC_BODY_CONFIG.slimeHardLandingImpactSpeedMetresPerSecond,
+  );
+  assert.equal(body.grounded, true);
 
   floor.geometry.dispose();
 });
 
-test('very large ordinary-floor impact is capped at maximum rebound speed', () => {
-  const { body, floor } = createFallingBody(12);
+test('repeated large falls produce exactly one reaction hop each', () => {
+  const qualifyingFallHeightMetres = 3.5;
+  const { body, floor } = createFallingBody(qualifyingFallHeightMetres);
 
-  advanceUntilFloorContact(body);
+  for (let fall = 0; fall < 2; fall += 1) {
+    let reactionHopDepartures = 0;
 
-  assert.ok(
-    body.lastContactImpactSpeedMetresPerSecond *
-      DEFAULT_KINEMATIC_BODY_CONFIG.slimeBounceRestitution >
-      DEFAULT_KINEMATIC_BODY_CONFIG.slimeMaximumBounceSpeedMetresPerSecond,
-  );
+    for (let step = 0; step < 600; step += 1) {
+      body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+      if (body.landedThisStep && body.velocity.y > 0) {
+        reactionHopDepartures += 1;
+      }
+      if (reactionHopDepartures > 0 && body.grounded) break;
+    }
+
+    assert.equal(reactionHopDepartures, 1);
+    assert.equal(body.grounded, true);
+
+    if (fall === 0) {
+      body.teleport(new THREE.Vector3(0, qualifyingFallHeightMetres, 0));
+    }
+  }
+
+  floor.geometry.dispose();
+});
+
+test('an authored bouncy surface keeps its configured gameplay bounce', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const bouncePad = new THREE.Mesh(new THREE.BoxGeometry(20, 0.2, 20));
+  bouncePad.name = 'authored-test-bounce-pad';
+  bouncePad.position.y = -0.1;
+  bouncePad.userData.surfaceTag = 'bouncy';
+  world.register(bouncePad);
+  surfaces.register(bouncePad);
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(0, 1.2, 0),
+  });
+
+  for (
+    let step = 0;
+    step < 300 && body.lastBounceSurfaceName !== bouncePad.name;
+    step += 1
+  ) {
+    body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  }
+
+  assert.equal(body.lastBounceSurfaceName, bouncePad.name);
   assert.ok(
     Math.abs(
       body.lastBounceSpeedMetresPerSecond -
-        DEFAULT_KINEMATIC_BODY_CONFIG.slimeMaximumBounceSpeedMetresPerSecond,
+        DEFAULT_SURFACE_DEFINITIONS.bouncy.bounceSpeedMetresPerSecond,
     ) < EPSILON,
   );
+  assert.ok(body.velocity.y > 0);
 
-  floor.geometry.dispose();
+  bouncePad.geometry.dispose();
 });
 
 test('focus-cleared input cancels released buffer without a stale launch', () => {
@@ -709,7 +916,7 @@ test('focus-cleared input cancels released buffer without a stale launch', () =>
   assert.equal(body.grounded, true);
   assert.equal(body.chargingJump, false);
   assert.equal(jumpCount, 1);
-  assert.ok(body.lastBounceSpeedMetresPerSecond > 0);
+  assert.equal(body.lastBounceSpeedMetresPerSecond, 0);
 
   floor.geometry.dispose();
 });
