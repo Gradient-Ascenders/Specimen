@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { EventBus } from '../core/EventBus';
+import { EventBus } from '../core/EventBus.ts';
 
 export type DoorState = 'closed' | 'opening' | 'open' | 'closing';
 
