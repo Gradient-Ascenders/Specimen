@@ -134,6 +134,26 @@ export class RadioactiveFloorHazard {
     this.trigger.setOccupants(this.touchingIds);
   }
 
+  /** Read-only contact query used by non-slime systems sharing this floor. */
+  intersectsWorldSphere(
+    position: { readonly x: number; readonly y: number; readonly z: number },
+    radiusMetres: number,
+  ): boolean {
+    if (!Number.isFinite(radiusMetres) || radiusMetres <= 0) return false;
+    this.mesh.updateWorldMatrix(true, false);
+    this.inverseWorld.copy(this.mesh.matrixWorld).invert();
+    const elements = this.mesh.matrixWorld.elements;
+    const minimumScale = Math.min(
+      Math.hypot(elements[0], elements[1], elements[2]),
+      Math.hypot(elements[4], elements[5], elements[6]),
+      Math.hypot(elements[8], elements[9], elements[10]),
+    );
+    return minimumScale > SCALE_EPSILON && this.intersects(
+      { position, radiusMetres },
+      minimumScale,
+    );
+  }
+
   reset(): void {
     this.trigger.clear();
   }
@@ -145,7 +165,7 @@ export class RadioactiveFloorHazard {
   }
 
   private intersects(
-    occupant: RadioactiveFloorOccupant,
+    occupant: Pick<RadioactiveFloorOccupant, 'position' | 'radiusMetres'>,
     minimumScale: number,
   ): boolean {
     this.localPosition

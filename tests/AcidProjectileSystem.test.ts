@@ -293,6 +293,37 @@ test('projectile collision near Goop overrides an unobstructed offset camera', (
   fixture.dispose();
 });
 
+test('acid treats explicitly non-soluble drone bodies as ordinary world impacts', () => {
+  const fixture = createFixture(new THREE.Vector3(0, 0, -4));
+  const drone = addWorldBox(
+    fixture,
+    'test-drone-body',
+    new THREE.Vector3(1, 1, 0.6),
+    new THREE.Vector3(0, 0, -2),
+  );
+  drone.userData.soluble = false;
+  drone.userData.authoringRole = 'acid-resistant-drone';
+  const system = new AcidProjectileSystem({
+    slimeManager: fixture.manager,
+    collisionWorld: fixture.world,
+    dissolveSystem: fixture.dissolve,
+    aimRayProvider: new TestAimRay(new THREE.Vector3(), new THREE.Vector3(0, 0, -1)),
+    config: { projectileSpeedMetresPerSecond: 120 },
+  });
+  let impactRole: string | undefined;
+  system.events.on('worldImpact', ({ authoringRole }) => {
+    impactRole = authoringRole;
+  });
+
+  system.update(1 / 30, { ...AIM_ONLY, firePressed: true });
+  assert.equal(impactRole, 'acid-resistant-drone');
+  assert.equal(fixture.dissolve.activeBurnCount, 0);
+  assert.equal(fixture.target.progress, 0);
+
+  system.dispose();
+  fixture.dispose();
+});
+
 test('cooldown and projectile-pool limits bound deterministic shot count', () => {
   const fixture = createFixture(new THREE.Vector3(0, 0, -80));
   const system = new AcidProjectileSystem({

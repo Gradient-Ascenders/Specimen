@@ -51,7 +51,7 @@ export const CULTIVATION_ROOM_OBJECTIVES: Readonly<
 > = {
   1: 'Help Bob reach Room 2',
   2: 'Get Bob and Goop into Room 3',
-  3: 'Get both slimes past the security room',
+  3: 'Disable four drones and bring both slimes to their exits',
 };
 
 const ROOM_OFFSETS: Readonly<Record<LevelTwoAuthoredRoomId, THREE.Vector3>> = {

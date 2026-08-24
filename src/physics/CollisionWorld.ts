@@ -5,7 +5,7 @@ const CONTACT_EPSILON = 1e-7;
 
 interface RegisteredCollider {
   readonly mesh: THREE.Mesh;
-  readonly layerMask: number;
+  layerMask: number;
   readonly localBounds: THREE.Box3;
   readonly inverseWorld: THREE.Matrix4;
   readonly normalMatrix: THREE.Matrix3;
@@ -14,7 +14,7 @@ interface RegisteredCollider {
 /**
  * Query layers for the shared authored-geometry registry.
  *
- * Solid level meshes normally belong to both layers. Future triggers or
+ * Solid level meshes normally belong to every blocking layer. Future triggers or
  * gameplay-only volumes must opt into their relevant layer rather than
  * becoming camera obstructions accidentally.
  */
@@ -22,10 +22,15 @@ export const CollisionLayer = {
   None: 0,
   Movement: 1 << 0,
   CameraObstruction: 1 << 1,
+  Projectile: 1 << 2,
+  LineOfSight: 1 << 3,
 } as const;
 
 export const DEFAULT_SOLID_COLLISION_LAYERS =
-  CollisionLayer.Movement | CollisionLayer.CameraObstruction;
+  CollisionLayer.Movement |
+  CollisionLayer.CameraObstruction |
+  CollisionLayer.Projectile |
+  CollisionLayer.LineOfSight;
 
 /**
  * Reusable result container for collision queries.
@@ -110,6 +115,15 @@ export class CollisionWorld {
   unregister(mesh: THREE.Mesh): void {
     const index = this.colliders.findIndex((collider) => collider.mesh === mesh);
     if (index >= 0) this.colliders.splice(index, 1);
+  }
+
+  setLayerMask(mesh: THREE.Mesh, layerMask: number): void {
+    this.validateLayerMask(layerMask);
+    const collider = this.colliders.find((candidate) => candidate.mesh === mesh);
+    if (!collider) {
+      throw new Error(`Collider ${mesh.name || '<unnamed>'} is not registered.`);
+    }
+    collider.layerMask = layerMask;
   }
 
   clear(): void {

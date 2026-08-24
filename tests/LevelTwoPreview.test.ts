@@ -552,15 +552,11 @@ test('Room 2 and Room 3 lasers are authored directly against their sticky panels
   const groundDrones = scene.collisionMeshes.filter(
     (mesh) => mesh.userData.droneType === 'ground-security',
   );
-  assert.equal(groundDrones.length, 4);
-  for (const drone of groundDrones) {
-    assert.equal(drone.userData.interactionRole, 'bob-rear-push');
-    assert.equal(drone.userData.nonSoluble, true);
-  }
+  assert.equal(groundDrones.length, 0, 'Issue #96 runtime replaces all ground placeholders');
   assert.deepEqual(CULTIVATION_ROOM_OBJECTIVES, {
     1: 'Help Bob reach Room 2',
     2: 'Get Bob and Goop into Room 3',
-    3: 'Get both slimes past the security room',
+    3: 'Disable four drones and bring both slimes to their exits',
   });
 
   scene.dispose();

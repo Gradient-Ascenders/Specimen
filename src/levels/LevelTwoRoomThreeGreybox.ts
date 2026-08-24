@@ -12,6 +12,7 @@ import {
 } from '../hazards/RadioactiveFloorHazard.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { LEVEL_TWO_BOB_AIR_DUCT_LAYOUT } from './LevelTwoAirDuctGreybox.ts';
+import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from './CultivationRoomThreeAuthoring.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 
 export const LEVEL_TWO_ROOM_THREE_BOB_SPAWN = new THREE.Vector3(
@@ -24,17 +25,6 @@ export const LEVEL_TWO_ROOM_THREE_GOOP_SPAWN = new THREE.Vector3(
   0.46,
   2.8,
 );
-
-interface RoofDroneDefinition {
-  readonly id: string;
-  readonly position: readonly [number, number, number];
-}
-
-const ROOF_DRONES: readonly RoofDroneDefinition[] = [
-  { id: 'cultivation-room-3-roof-drone-1', position: [13, 19.5, 18.5] },
-  { id: 'cultivation-room-3-roof-drone-2', position: [-1, 18, 36] },
-  { id: 'cultivation-room-3-roof-drone-3', position: [-12, 19, 55.5] },
-];
 
 export interface LevelTwoRoomThreeHazardFailure {
   readonly roomId: 3;
@@ -51,10 +41,8 @@ interface LocalLaserContactTarget extends LaserContactTarget {
 /**
  * Large Room 3 cooperation chamber.
  *
- * Drone bodies remain readable placeholders until Issue #96, while their
- * soluble support ropes already participate in Goop's dissolve system. The
- * three laser tests are live and are authored directly against Bob's sticky
- * surfaces rather than floating near unrelated geometry.
+ * Drone bodies are supplied by the Issue #96 encounter owner. This scene owns
+ * the shared ropes, radiation floor, cover, lasers, and checkpoint geometry.
  */
 export class LevelTwoRoomThreeGreybox {
   readonly builder = new GreyboxRoomBuilder('cultivation-room-3-greybox');
@@ -72,14 +60,6 @@ export class LevelTwoRoomThreeGreybox {
     goop: { id: 'goop', position: new THREE.Vector3(), radiusMetres: 0.45 },
   };
   private readonly localLaserTargets: LocalLaserContactTarget[] = [];
-  private readonly droneLensMaterial = new THREE.MeshStandardMaterial({
-    color: 0x9d162b,
-    emissive: 0xff1838,
-    emissiveIntensity: 1.5,
-    roughness: 0.35,
-    metalness: 0.1,
-  });
-
   constructor(
     requestFailure: (failure: LevelTwoRoomThreeHazardFailure) => void,
   ) {
@@ -427,43 +407,16 @@ export class LevelTwoRoomThreeGreybox {
   }
 
   private buildRoofDronePlaceholders(): void {
-    const { support, wood } = this.builder.materials;
+    const { wood } = this.builder.materials;
 
-    for (const definition of ROOF_DRONES) {
-      const [x, y, z] = definition.position;
-      const drone = this.builder.addVisualBox({
-        name: `${definition.id}-body-placeholder`,
-        size: [2.2, 1.35, 2.2],
-        position: definition.position,
-        material: support,
-      });
-      Object.assign(drone.userData, {
-        levelId: 'cultivation',
-        roomId: 3,
-        droneId: definition.id,
-        droneType: 'hanging-roof',
-        nonSoluble: true,
-        placeholder: true,
-      });
-
-      this.builder.addVisualBox({
-        name: `${definition.id}-scan-lens-placeholder`,
-        size: [0.9, 0.28, 0.9],
-        position: [x, y - 0.82, z],
-        material: this.droneLensMaterial,
-      });
-      this.builder.addVisualBox({
-        name: `${definition.id}-ceiling-mount`,
-        size: [1.8, 0.45, 1.8],
-        position: [x, 29.55, z],
-        material: support,
-      });
-
+    for (const definition of CULTIVATION_ROOM_THREE_DRONE_AUTHORING.ceilingDrones) {
+      const { id, initialPosition } = definition.drone;
+      const { x, y, z } = initialPosition;
       const ropeBottom = y + 0.68;
       const ropeTop = 29.25;
       const ropeLength = ropeTop - ropeBottom;
       const rope = this.builder.addCollider({
-        name: `${definition.id}-soluble-support-rope`,
+        name: definition.supportTargetId,
         size: [0.45, ropeLength, 0.45],
         position: [x, ropeBottom + ropeLength * 0.5, z],
         material: wood,
@@ -472,17 +425,21 @@ export class LevelTwoRoomThreeGreybox {
       Object.assign(rope.userData, {
         soluble: true,
         solubleId: rope.name,
+        authoringRole: 'ceiling-drone-soluble-support',
         textureRole: 'soluble-rope',
         levelId: 'cultivation',
         roomId: 3,
-        droneId: definition.id,
+        droneId: id,
         releaseMode: 'temporary-roof-drone-disable',
         replacementDelaySeconds: 10,
+        dissolveDurationSeconds: 0.8,
+        dissolveCollisionDisableProgress: 0.72,
+        dissolveActivationRangeMetres: 0.18,
       });
       this.solubleTargetMeshes.push(rope);
 
       const marker = this.builder.addVisualBox({
-        name: `${definition.id}-soluble-marker-band`,
+        name: `${id}-soluble-marker-band`,
         size: [0.64, 0.4, 0.64],
         position: [x, rope.position.y, z],
         material: this.builder.materials.etch,
@@ -495,7 +452,7 @@ export class LevelTwoRoomThreeGreybox {
   }
 
   private buildFinalSecurityArea(): void {
-    const { duct, exit, support, wall } = this.builder.materials;
+    const { duct, exit, wall } = this.builder.materials;
 
     this.builder.addCollider({ name: 'cultivation-room-3-exit-wall-west', size: [21, 30, 0.4], position: [-13.5, 15, 72], material: wall });
     this.builder.addCollider({ name: 'cultivation-room-3-exit-wall-east', size: [21, 30, 0.4], position: [13.5, 15, 72], material: wall });
@@ -503,48 +460,18 @@ export class LevelTwoRoomThreeGreybox {
     this.builder.addCollider({ name: 'cultivation-room-3-exit-connector-floor', size: [6, 0.4, 4], position: [0, 0, 74], material: duct });
     this.builder.addVisualBox({ name: 'cultivation-room-3-exit-status-header', size: [6.4, 0.45, 0.5], position: [0, 6.3, 71.7], material: exit });
 
-    const groundDronePositions: ReadonlyArray<readonly [number, number, number]> = [
-      [-6, 1.1, 68],
-      [-2, 1.1, 68.7],
-      [2, 1.1, 68.7],
-      [6, 1.1, 68],
-    ];
-    groundDronePositions.forEach((position, index) => {
-      const drone = this.builder.addCollider({
-        name: `cultivation-room-3-ground-drone-${index + 1}-placeholder`,
-        size: [1.7, 1.5, 1.7],
-        position,
-        material: support,
-      });
-      Object.assign(drone.userData, {
-        levelId: 'cultivation',
-        roomId: 3,
-        droneId: `cultivation-room-3-ground-drone-${index + 1}`,
-        droneType: 'ground-security',
-        forward: [0, 0, -1],
-        rearPushDirection: [0, 0, -1],
-        interactionRole: 'bob-rear-push',
-        nonSoluble: true,
-        placeholder: true,
-      });
-
-      const lens = this.builder.addVisualBox({
-        name: `cultivation-room-3-ground-drone-${index + 1}-front-lens`,
-        size: [0.75, 0.48, 0.18],
-        position: [position[0], position[1], position[2] - 0.92],
-        material: this.droneLensMaterial,
-      });
-      lens.userData.presentationOnly = true;
-      lens.userData.droneId = drone.userData.droneId;
-    });
   }
 
   private addCheckpointAnchors(): void {
     this.addAnchor('cultivation-room-3-bob-checkpoint-anchor', LEVEL_TWO_ROOM_THREE_BOB_SPAWN, { checkpointRole: 'bob-upper' });
     this.addAnchor('cultivation-room-3-goop-checkpoint-anchor', LEVEL_TWO_ROOM_THREE_GOOP_SPAWN, { checkpointRole: 'goop-lower' });
-    this.addAnchor('cultivation-room-3-both-slimes-exit-trigger-anchor', new THREE.Vector3(0, 3, 73.5), {
-      triggerRole: 'both-slimes-room-completion',
-      sizeMetres: [6, 6, 3],
+    this.addAnchor('cultivation-room-3-bob-exit-trigger-anchor', new THREE.Vector3(-1.5, 3, 73.5), {
+      triggerRole: 'bob-room-completion',
+      sizeMetres: [3, 6, 3],
+    });
+    this.addAnchor('cultivation-room-3-goop-exit-trigger-anchor', new THREE.Vector3(1.5, 3, 73.5), {
+      triggerRole: 'goop-room-completion',
+      sizeMetres: [3, 6, 3],
     });
   }
 
