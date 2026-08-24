@@ -1,6 +1,12 @@
-# specimen
+<h1 align="center">
+  <img
+    src="public/brand/specimen-lockup-full.png"
+    alt="Specimen — Explore, Adapt, Transcend"
+    width="420"
+  />
+</h1>
 
-**specimen** is a single-player 3D puzzle-platformer set in an abandoned biological research facility. The player positions and switches between three slime bodies whose incompatible abilities must be combined to escape.
+**Specimen** is a single-player 3D puzzle-platformer set in an abandoned biological research facility. The player positions and switches between three slime bodies whose incompatible abilities must be combined to escape.
 
 - **Bob** sticks, climbs, and performs powerful charged bounces.
 - **Goop** dissolves specifically marked geometry.

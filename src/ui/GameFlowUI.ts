@@ -12,6 +12,10 @@ import {
   getSlimeRosterEntryView,
   SlimeSwitchFeedbackModel,
 } from './SlimeRosterView.ts';
+import {
+  createBrandMarkMarkup,
+  createBrandedLoaderMarkup,
+} from './Branding.ts';
 
 export type GameFlowState =
   | 'loading'
@@ -277,7 +281,7 @@ export class GameFlowUI {
     root.className = 'game-flow';
     root.innerHTML = `
       <section class="flow-screen loading-screen" data-flow-panel="loading" aria-labelledby="loading-title">
-        <div class="loading-mark" aria-hidden="true"></div>
+        ${createBrandedLoaderMarkup()}
         <p class="flow-eyebrow">Containment runtime</p>
         <h1 id="loading-title">Preparing containment…</h1>
         <p role="status" aria-live="polite">Calibrating the specimen environment.</p>
@@ -285,6 +289,7 @@ export class GameFlowUI {
 
       <section class="flow-screen" data-flow-panel="title" aria-labelledby="title-heading" hidden>
         <div class="flow-card title-card">
+          ${createBrandMarkMarkup('detailed', 'title-brand')}
           <p class="flow-eyebrow">Containment trial 01</p>
           <h1 id="title-heading">Specimen</h1>
           <p class="flow-lede">Adapt. Traverse. Escape the grey-box containment route.</p>
@@ -310,10 +315,15 @@ export class GameFlowUI {
         <p class="hud-hint"><kbd>WASD</kbd> Move <span>·</span> <kbd>Space</kbd> Jump <span>·</span> <kbd>Tab</kbd> Switch <span>·</span> <kbd>Esc</kbd> Pause</p>
       </aside>
 
-      <section class="flow-screen" data-flow-panel="paused" aria-labelledby="pause-heading" hidden>
-        <div class="flow-card">
-          <p class="flow-eyebrow">Trial suspended</p>
-          <h1 id="pause-heading">Paused</h1>
+      <section class="flow-screen pause-screen" data-flow-panel="paused" aria-labelledby="pause-heading" hidden>
+        <div class="flow-card pause-card">
+          <div class="flow-heading flow-heading--pause">
+            ${createBrandMarkMarkup('simple', 'pause-brand')}
+            <div>
+              <p class="flow-eyebrow">Trial suspended</p>
+              <h1 id="pause-heading">Paused</h1>
+            </div>
+          </div>
           <div class="flow-actions">
             <button class="primary-action" data-action="resume" data-autofocus>Resume</button>
             <button data-action="restart">Restart trial</button>
@@ -326,8 +336,13 @@ export class GameFlowUI {
 
       <section class="flow-screen" data-flow-panel="settings" aria-labelledby="settings-heading" hidden>
         <div class="flow-card settings-card">
-          <p class="flow-eyebrow">Session configuration</p>
-          <h1 id="settings-heading">Settings</h1>
+          <div class="flow-heading flow-heading--settings">
+            ${createBrandMarkMarkup('simple', 'settings-brand')}
+            <div>
+              <p class="flow-eyebrow">Session configuration</p>
+              <h1 id="settings-heading">Settings</h1>
+            </div>
+          </div>
           <div class="setting-row">
             <label for="mouse-sensitivity">Mouse sensitivity</label>
             <div class="range-control">
@@ -360,8 +375,13 @@ export class GameFlowUI {
 
       <section class="flow-screen" data-flow-panel="credits" aria-labelledby="credits-heading" hidden>
         <div class="flow-card credits-card">
-          <p class="flow-eyebrow">Canonical project ledger</p>
-          <h1 id="credits-heading">Credits</h1>
+          <div class="flow-heading flow-heading--credits">
+            ${createBrandMarkMarkup('detailed', 'credits-brand')}
+            <div>
+              <p class="flow-eyebrow">Canonical project ledger</p>
+              <h1 id="credits-heading">Credits</h1>
+            </div>
+          </div>
           <p class="flow-lede">This view is sourced directly from <code>CREDITS.md</code> at build time.</p>
           <pre class="credits-ledger"></pre>
           <button data-action="back" data-autofocus>Back</button>
@@ -370,7 +390,7 @@ export class GameFlowUI {
 
       <section class="flow-screen" data-flow-panel="restarting" aria-labelledby="restarting-heading" hidden>
         <div class="flow-card restart-card">
-          <div class="loading-mark" aria-hidden="true"></div>
+          ${createBrandedLoaderMarkup()}
           <p class="flow-eyebrow">Containment runtime</p>
           <h1 id="restarting-heading">Restarting trial…</h1>
           <p role="status" aria-live="polite">Restoring the authored level state.</p>
