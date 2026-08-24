@@ -10,7 +10,10 @@ import { RenderLayer } from './render/RenderLayer.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
+import '@fontsource/michroma/400.css';
+import '@fontsource-variable/space-grotesk';
 import './style.css';
+import './ui/ui-theme.css';
 
 const app = document.querySelector<HTMLElement>('#app');
 

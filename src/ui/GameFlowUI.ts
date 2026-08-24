@@ -14,7 +14,7 @@ import {
 } from './SlimeRosterView.ts';
 import {
   createBrandMarkMarkup,
-  createBrandedLoaderMarkup,
+  createBrandedScannerMarkup,
 } from './Branding.ts';
 
 export type GameFlowState =
@@ -36,6 +36,163 @@ export const gameFlowCanPause = (
   gameplayInputEnabled: boolean,
 ): boolean => state === 'playing' && gameplayInputEnabled;
 
+export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
+
+export const getGameFlowKeyboardAction = (
+  code: string,
+  state: GameFlowState,
+): GameFlowKeyboardAction | null => {
+  if (code === 'KeyP' && state === 'playing') return 'pause';
+  if (code === 'KeyP' && state === 'paused') return 'resume';
+  if (code === 'Escape' && (state === 'settings' || state === 'credits')) {
+    return 'back';
+  }
+  return null;
+};
+
+export interface CreditsInlinePart {
+  readonly text: string;
+  readonly href?: string;
+}
+
+const safeCreditsUrl = (value: string): string | undefined => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:'
+      ? url.href
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const parseCreditsInlineParts = (value: string): CreditsInlinePart[] => {
+  const source = value.trim();
+  const parts: CreditsInlinePart[] = [];
+  const markdownToken = /\[([^\]]+)]\(([^)]+)\)|`([^`]+)`/g;
+  let cursor = 0;
+
+  for (const match of source.matchAll(markdownToken)) {
+    const matchIndex = match.index;
+    if (matchIndex > cursor) {
+      parts.push({ text: source.slice(cursor, matchIndex) });
+    }
+
+    const linkLabel = match[1];
+    const linkDestination = match[2]?.trim();
+    if (linkLabel !== undefined && linkDestination !== undefined) {
+      const href = safeCreditsUrl(linkDestination);
+      parts.push(
+        href
+          ? { text: linkLabel, href }
+          : { text: `${linkLabel} (${linkDestination})` },
+      );
+    } else {
+      parts.push({ text: match[3] ?? '' });
+    }
+    cursor = matchIndex + match[0].length;
+  }
+
+  if (cursor < source.length) parts.push({ text: source.slice(cursor) });
+  return parts;
+};
+
+const appendCreditsInlineContent = (
+  element: HTMLElement,
+  value: string,
+): void => {
+  for (const part of parseCreditsInlineParts(value)) {
+    if (!part.href) {
+      element.append(element.ownerDocument.createTextNode(part.text));
+      continue;
+    }
+
+    const link = element.ownerDocument.createElement('a');
+    link.textContent = part.text;
+    link.href = part.href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    element.append(link);
+  }
+};
+
+const appendCreditsLedger = (
+  ledger: HTMLElement,
+  creditsMarkdown: string,
+): void => {
+  const lines = creditsMarkdown.trim().split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]?.trim() ?? '';
+    if (!line || line === '# Credits') continue;
+
+    if (line.startsWith('## ')) {
+      const heading = ledger.ownerDocument.createElement('h2');
+      heading.textContent = line.slice(3);
+      ledger.append(heading);
+      continue;
+    }
+
+    if (
+      line.startsWith('|') &&
+      /^\|(?:\s*:?-+:?\s*\|)+$/.test(lines[index + 1]?.trim() ?? '')
+    ) {
+      const headers = line
+        .slice(1, -1)
+        .split('|')
+        .map((cell) => cell.trim());
+      index += 2;
+
+      const entries = ledger.ownerDocument.createElement('div');
+      entries.className = 'credits-entries';
+      while (index < lines.length && lines[index]?.trim().startsWith('|')) {
+        const values = (lines[index] ?? '')
+          .trim()
+          .slice(1, -1)
+          .split('|')
+          .map((cell) => cell.trim());
+        const entry = ledger.ownerDocument.createElement('article');
+        entry.className = 'credits-entry';
+
+        const title = ledger.ownerDocument.createElement('h3');
+        appendCreditsInlineContent(title, values[0] ?? '');
+        entry.append(title);
+
+        const details = ledger.ownerDocument.createElement('dl');
+        for (let cellIndex = 1; cellIndex < headers.length; cellIndex += 1) {
+          const detail = ledger.ownerDocument.createElement('div');
+          const term = ledger.ownerDocument.createElement('dt');
+          const description = ledger.ownerDocument.createElement('dd');
+          term.textContent = headers[cellIndex] ?? '';
+          appendCreditsInlineContent(description, values[cellIndex] ?? '');
+          detail.append(term, description);
+          details.append(detail);
+        }
+        entry.append(details);
+        entries.append(entry);
+        index += 1;
+      }
+      ledger.append(entries);
+      index -= 1;
+      continue;
+    }
+
+    const paragraphLines = [line];
+    while (
+      index + 1 < lines.length &&
+      lines[index + 1]?.trim() &&
+      !lines[index + 1]?.trim().startsWith('#') &&
+      !lines[index + 1]?.trim().startsWith('|')
+    ) {
+      index += 1;
+      paragraphLines.push(lines[index]?.trim() ?? '');
+    }
+    const paragraph = ledger.ownerDocument.createElement('p');
+    appendCreditsInlineContent(paragraph, paragraphLines.join(' '));
+    ledger.append(paragraph);
+  }
+};
+
 /** Pure transition model: exactly one full-screen surface can own the UI. */
 export class GameFlowStateModel {
   private currentState: GameFlowState = 'loading';
@@ -44,6 +201,10 @@ export class GameFlowStateModel {
 
   get state(): GameFlowState {
     return this.currentState;
+  }
+
+  get menuOrigin(): MenuReturnState {
+    return this.menuReturnState;
   }
 
   subscribe(listener: GameFlowStateListener): () => void {
@@ -189,6 +350,7 @@ export class GameFlowUI {
   private readonly sensitivityInput: HTMLInputElement;
   private readonly sensitivityOutput: HTMLOutputElement;
   private readonly invertVerticalInput: HTMLInputElement;
+  private readonly invertVerticalOutput: HTMLOutputElement;
   private readonly volumeInput: HTMLInputElement;
   private readonly volumeOutput: HTMLOutputElement;
   private readonly cameraDistanceInput: HTMLInputElement;
@@ -223,6 +385,9 @@ export class GameFlowUI {
     );
     this.invertVerticalInput = this.requireElement<HTMLInputElement>(
       '[data-setting="invert-vertical"]',
+    );
+    this.invertVerticalOutput = this.requireElement<HTMLOutputElement>(
+      '[data-setting-output="invert-vertical"]',
     );
     this.volumeInput = this.requireElement<HTMLInputElement>(
       '[data-setting="volume"]',
@@ -329,145 +494,204 @@ export class GameFlowUI {
     root.className = 'game-flow';
     root.innerHTML = `
       <section class="flow-screen loading-screen" data-flow-panel="loading" aria-labelledby="loading-title">
-        ${createBrandedLoaderMarkup()}
-        <p class="flow-eyebrow">Containment runtime</p>
-        <h1 id="loading-title">Preparing containment…</h1>
-        <p role="status" aria-live="polite">Calibrating the specimen environment.</p>
+        <div class="system-state">
+          ${createBrandedScannerMarkup()}
+          <p class="system-label">Containment runtime · 01</p>
+          <h1 id="loading-title">Calibrating specimen</h1>
+          <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <p class="system-copy" role="status" aria-live="polite">Preparing the containment environment.</p>
+        </div>
       </section>
 
-      <section class="flow-screen" data-flow-panel="title" aria-labelledby="title-heading" hidden>
-        <div class="flow-card title-card">
-          ${createBrandMarkMarkup('detailed', 'title-brand')}
-          <p class="flow-eyebrow">Containment trial 01</p>
-          <h1 id="title-heading">Specimen</h1>
-          <p class="flow-lede">Adapt. Traverse. Escape the grey-box containment route.</p>
-          <div class="flow-actions">
-            <button class="primary-action" data-action="start" data-autofocus>Start trial</button>
-            <button data-action="settings">Settings</button>
-            <button data-action="credits">Credits</button>
+      <section class="flow-screen title-screen" data-flow-panel="title" aria-labelledby="title-heading" hidden>
+        <div class="title-composition">
+          <header class="title-branding">
+            ${createBrandMarkMarkup('detailed', 'title-brand-mark')}
+            <div>
+              <p class="flow-eyebrow">Containment · Trial 01</p>
+              <h1 id="title-heading">Specimen</h1>
+            </div>
+          </header>
+          <p class="title-tagline">Explore <span>·</span> Adapt <span>·</span> Transcend</p>
+          <div class="flow-actions game-menu title-actions">
+            <button class="primary-action menu-action" data-action="start" data-autofocus>
+              <span class="menu-index" aria-hidden="true">01</span>
+              <span>Start trial</span>
+              <span class="menu-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="menu-action" data-action="settings">
+              <span class="menu-index" aria-hidden="true">02</span>
+              <span>Settings</span>
+              <span class="menu-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="menu-action" data-action="credits">
+              <span class="menu-index" aria-hidden="true">03</span>
+              <span>Credits</span>
+              <span class="menu-arrow" aria-hidden="true">→</span>
+            </button>
           </div>
+          <div class="signal-rule title-signal" aria-hidden="true"><span></span></div>
         </div>
       </section>
 
       <aside class="game-hud" data-flow-panel="playing" aria-label="Gameplay guidance" hidden>
-        <div>
-          <p class="flow-eyebrow">Current objective</p>
-          <p class="hud-objective" data-current-objective role="status" aria-live="polite">Climb through the vent</p>
-        </div>
-        <section class="hud-roster" aria-labelledby="hud-roster-heading">
-          <p class="hud-roster-heading" id="hud-roster-heading">Slime roster</p>
-          <ul class="hud-roster-list" data-slime-roster aria-label="Unlocked playable slimes"></ul>
-          <p class="hud-passive-status" data-passive-status role="status" aria-live="polite" hidden></p>
-          <p class="hud-switch-feedback" data-switch-feedback role="status" aria-live="polite"></p>
+        <section class="hud-objective-module" aria-labelledby="hud-objective-heading">
+          <p class="system-label" id="hud-objective-heading">Current objective</p>
+          <div class="hud-objective-line">
+            <span aria-hidden="true">01</span>
+            <p class="hud-objective" data-current-objective role="status" aria-live="polite">Climb through the vent</p>
+          </div>
+          <div class="signal-rule" aria-hidden="true"><span></span></div>
         </section>
-        <p class="hud-hint"><kbd>WASD</kbd> Move <span>·</span> <kbd>Space</kbd> Jump <span>·</span> <kbd>Tab</kbd> Switch <span>·</span> <kbd>Esc</kbd> Pause</p>
+        <section class="hud-roster" aria-labelledby="hud-roster-heading">
+          <header class="hud-roster-header">
+            <p class="system-label" id="hud-roster-heading">Specimen array</p>
+            <span aria-hidden="true">LINK / STABLE</span>
+          </header>
+          <ul class="hud-roster-list" data-slime-roster aria-label="Unlocked playable slimes"></ul>
+          <p class="system-status hud-passive-status" data-passive-status role="status" aria-live="polite" hidden></p>
+          <p class="system-status hud-switch-feedback" data-switch-feedback role="status" aria-live="polite"></p>
+        </section>
+        <p class="hud-hint"><span><kbd>WASD</kbd> Move</span><span><kbd>Space</kbd> Jump</span><span><kbd>Tab</kbd> Switch</span><span><kbd>P</kbd> Pause</span></p>
       </aside>
 
       <section class="flow-screen pause-screen" data-flow-panel="paused" aria-labelledby="pause-heading" hidden>
-        <div class="flow-card pause-card">
-          <div class="flow-heading flow-heading--pause">
-            ${createBrandMarkMarkup('simple', 'pause-brand')}
+        <div class="pause-rail">
+          <header class="pause-heading">
+            ${createBrandMarkMarkup('simple', 'pause-brand-mark')}
             <div>
               <p class="flow-eyebrow">Trial suspended</p>
               <h1 id="pause-heading">Paused</h1>
             </div>
+          </header>
+          <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <div class="flow-actions game-menu pause-actions">
+            <button class="primary-action menu-action" data-action="resume" data-autofocus>
+              <span>Resume</span>
+              <span class="menu-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="menu-action pause-restart" data-action="restart">
+              <span>Restart trial</span>
+              <span class="menu-arrow" aria-hidden="true">↻</span>
+            </button>
+            <button class="menu-action" data-action="settings">
+              <span>Settings</span>
+              <span class="menu-arrow" aria-hidden="true">→</span>
+            </button>
+            <button class="menu-action" data-action="credits">
+              <span>Credits</span>
+              <span class="menu-arrow" aria-hidden="true">→</span>
+            </button>
           </div>
-          <div class="flow-actions">
-            <button class="primary-action" data-action="resume" data-autofocus>Resume</button>
-            <button data-action="restart">Restart trial</button>
-            <button data-action="settings">Settings</button>
-            <button data-action="credits">Credits</button>
-          </div>
-          <p class="flow-status" data-restart-status role="status" aria-live="polite"></p>
+          <p class="system-status" data-restart-status role="status" aria-live="polite"></p>
+          <p class="pause-hint" aria-hidden="true"><kbd>P</kbd> Resume</p>
         </div>
       </section>
 
-      <section class="flow-screen" data-flow-panel="settings" aria-labelledby="settings-heading" hidden>
-        <div class="flow-card settings-card">
-          <div class="flow-heading flow-heading--settings">
-            ${createBrandMarkMarkup('simple', 'settings-brand')}
+      <section class="flow-screen submenu-screen settings-screen" data-flow-panel="settings" aria-labelledby="settings-heading" hidden>
+        <div class="system-panel settings-panel">
+          <header class="system-panel-header">
+            <span class="signal-bar" aria-hidden="true"></span>
             <div>
-              <p class="flow-eyebrow">Session configuration</p>
+              <p class="system-label">Session configuration</p>
               <h1 id="settings-heading">Settings</h1>
             </div>
-          </div>
+          </header>
+          <div class="signal-rule" aria-hidden="true"><span></span></div>
           <div class="setting-row">
-            <label for="mouse-sensitivity">Mouse sensitivity</label>
-            <div class="range-control">
-              <input id="mouse-sensitivity" data-setting="sensitivity" type="range" min="0.5" max="2" step="0.1">
+            <div class="setting-heading">
+              <label for="mouse-sensitivity">Mouse sensitivity</label>
               <output for="mouse-sensitivity" data-setting-output="sensitivity"></output>
             </div>
+            <input id="mouse-sensitivity" data-setting="sensitivity" type="range" min="0.5" max="2" step="0.1">
           </div>
-          <label class="setting-row checkbox-row" for="invert-vertical">
-            <span>Invert vertical look</span>
+          <label class="setting-row setting-toggle-row" for="invert-vertical">
+            <span class="setting-heading">
+              <span>Invert vertical look</span>
+              <output data-setting-output="invert-vertical"></output>
+            </span>
             <input id="invert-vertical" data-setting="invert-vertical" type="checkbox">
           </label>
           <div class="setting-row">
-            <label for="camera-distance">Camera distance</label>
-            <div class="range-control">
-              <input id="camera-distance" data-setting="camera-distance" type="range" min="${MIN_FOLLOW_DISTANCE_METRES}" max="${MAX_FOLLOW_DISTANCE_METRES}" step="0.1">
+            <div class="setting-heading">
+              <label for="camera-distance">Camera distance</label>
               <output for="camera-distance" data-setting-output="camera-distance"></output>
             </div>
+            <input id="camera-distance" data-setting="camera-distance" type="range" min="${MIN_FOLLOW_DISTANCE_METRES}" max="${MAX_FOLLOW_DISTANCE_METRES}" step="0.1">
           </div>
           <div class="setting-row">
-            <label for="master-volume">Master volume</label>
-            <div class="range-control">
-              <input id="master-volume" data-setting="volume" type="range" min="0" max="100" step="5">
+            <div class="setting-heading">
+              <label for="master-volume">Master volume</label>
               <output for="master-volume" data-setting-output="volume"></output>
             </div>
-            <p class="setting-note">Stored for this session. Audio playback is not yet connected.</p>
+            <input id="master-volume" data-setting="volume" type="range" min="0" max="100" step="5">
+            <p class="setting-note">Stored for this session. Audio output is not yet connected.</p>
           </div>
-          <button data-action="back" data-autofocus>Back</button>
+          <button class="system-action system-back" data-action="back" data-autofocus>
+            <span aria-hidden="true">←</span><span>Back</span>
+          </button>
         </div>
       </section>
 
-      <section class="flow-screen" data-flow-panel="credits" aria-labelledby="credits-heading" hidden>
-        <div class="flow-card credits-card">
-          <div class="flow-heading flow-heading--credits">
-            ${createBrandMarkMarkup('detailed', 'credits-brand')}
+      <section class="flow-screen submenu-screen credits-screen" data-flow-panel="credits" aria-labelledby="credits-heading" hidden>
+        <div class="system-panel credits-panel">
+          <header class="system-panel-header credits-header">
+            ${createBrandMarkMarkup('detailed', 'credits-brand-mark')}
             <div>
-              <p class="flow-eyebrow">Canonical project ledger</p>
+              <p class="system-label">Project ledger</p>
               <h1 id="credits-heading">Credits</h1>
+              <p class="system-copy">Specimen / Development record</p>
             </div>
-          </div>
-          <p class="flow-lede">This view is sourced directly from <code>CREDITS.md</code> at build time.</p>
-          <pre class="credits-ledger"></pre>
-          <button data-action="back" data-autofocus>Back</button>
+          </header>
+          <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <div class="credits-ledger" aria-label="Credits ledger"></div>
+          <button class="system-action system-back" data-action="back" data-autofocus>
+            <span aria-hidden="true">←</span><span>Back</span>
+          </button>
         </div>
       </section>
 
       <section class="flow-screen" data-flow-panel="restarting" aria-labelledby="restarting-heading" hidden>
-        <div class="flow-card restart-card">
-          ${createBrandedLoaderMarkup()}
-          <p class="flow-eyebrow">Containment runtime</p>
-          <h1 id="restarting-heading">Restarting trial…</h1>
-          <p role="status" aria-live="polite">Restoring the authored level state.</p>
+        <div class="system-state">
+          ${createBrandedScannerMarkup()}
+          <p class="system-label">Containment runtime · 01</p>
+          <h1 id="restarting-heading">Reconstituting specimen</h1>
+          <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <p class="system-copy" role="status" aria-live="polite">Restoring the trial state.</p>
         </div>
       </section>
 
       <section class="flow-screen" data-flow-panel="transitioning" aria-labelledby="transition-heading" hidden>
-        <div class="flow-card restart-card">
-          ${createBrandedLoaderMarkup()}
-          <p class="flow-eyebrow">Cultivation runtime</p>
+        <div class="system-state">
+          ${createBrandedScannerMarkup()}
+          <p class="system-label">Cultivation runtime · 02</p>
           <h1 id="transition-heading" data-transition-message>Entering Level 2…</h1>
-          <p role="status" aria-live="polite">Transferring the specimen pair.</p>
-          <button class="primary-action" type="button" data-action="enter-level-two" hidden>Enter Level 2</button>
+          <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <p class="system-copy" role="status" aria-live="polite">Transferring the specimen pair.</p>
+          <button class="system-action primary-action transition-action" type="button" data-action="enter-level-two" hidden>
+            <span>Enter Level 2</span><span aria-hidden="true">→</span>
+          </button>
         </div>
       </section>
 
-      <section class="flow-screen" data-flow-panel="transitionFailed" aria-labelledby="transition-failed-heading" hidden>
-        <div class="flow-card">
-          <p class="flow-eyebrow">Runtime stopped</p>
-          <h1 id="transition-failed-heading">Level transition failed</h1>
-          <p class="flow-status" data-transition-failure-message role="alert">Level 2 could not be started.</p>
-          <p class="setting-note">Reload after inspecting the console and F2 diagnostics.</p>
+      <section class="flow-screen transition-failed-screen" data-flow-panel="transitionFailed" aria-labelledby="transition-failed-heading" hidden>
+        <div class="system-state system-state--failure">
+          ${createBrandMarkMarkup('simple', 'failure-brand-mark')}
+          <p class="system-label">Runtime signal interrupted</p>
+          <h1 id="transition-failed-heading">Transition failed</h1>
+          <div class="signal-rule signal-rule--warning" aria-hidden="true"><span></span></div>
+          <p class="system-status" data-transition-failure-message role="alert">The next containment sector could not be initialized.</p>
+          <p class="system-copy">Reload to retry the transfer.</p>
         </div>
       </section>
     `;
 
     const ledger = root.querySelector<HTMLElement>('.credits-ledger');
     if (!ledger) throw new Error('Missing credits ledger element.');
-    ledger.textContent = creditsMarkdown.trim();
+    // Parse only the ledger's deliberately small Markdown subset. Text is
+    // assigned through DOM text nodes and links are restricted to HTTP(S), so
+    // no source text is interpreted as arbitrary HTML.
+    appendCreditsLedger(ledger, creditsMarkdown);
     return root;
   }
 
@@ -500,6 +724,7 @@ export class GameFlowUI {
   private syncState(): void {
     const state = this.model.state;
     this.element.dataset.state = state;
+    this.element.dataset.menuOrigin = this.model.menuOrigin;
     for (const [panelState, panel] of this.panels) {
       panel.hidden = panelState !== state;
     }
@@ -617,18 +842,26 @@ export class GameFlowUI {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.code !== 'Escape' || event.repeat) return;
-    if (this.model.state === 'playing') {
+    if (event.repeat) return;
+    const action = getGameFlowKeyboardAction(event.code, this.model.state);
+
+    if (action === 'pause') {
       if (!this.actions.isGameplayInputEnabled()) return;
       event.preventDefault();
       this.pause();
-    } else if (this.model.state === 'paused') {
+      return;
+    }
+
+    if (action === 'resume') {
       event.preventDefault();
       this.resume();
-    } else if (
-      this.model.state === 'settings' ||
-      this.model.state === 'credits'
-    ) {
+      return;
+    }
+
+    // Escape is reserved for backing out of nested UI. During gameplay the
+    // browser owns Escape's pointer-lock release, which is already observed by
+    // onPointerLockChange and resolves to the same authoritative pause state.
+    if (action === 'back') {
       event.preventDefault();
       if (this.model.back()) this.syncState();
     }
@@ -670,11 +903,28 @@ export class GameFlowUI {
     settings: Readonly<GameSettingsSnapshot>,
   ): void => {
     this.sensitivityInput.value = settings.mouseSensitivity.toFixed(1);
+    this.sensitivityInput.style.setProperty(
+      '--range-progress',
+      `${((settings.mouseSensitivity - 0.5) / 1.5) * 100}%`,
+    );
     this.sensitivityOutput.value = `${settings.mouseSensitivity.toFixed(1)}×`;
     this.invertVerticalInput.checked = settings.invertVerticalLook;
+    this.invertVerticalOutput.value = settings.invertVerticalLook ? 'On' : 'Off';
     this.volumeInput.value = String(Math.round(settings.masterVolume * 100));
+    this.volumeInput.style.setProperty(
+      '--range-progress',
+      `${settings.masterVolume * 100}%`,
+    );
     this.volumeOutput.value = `${Math.round(settings.masterVolume * 100)}%`;
     this.cameraDistanceInput.value = settings.cameraDistanceMetres.toFixed(1);
+    this.cameraDistanceInput.style.setProperty(
+      '--range-progress',
+      `${
+        ((settings.cameraDistanceMetres - MIN_FOLLOW_DISTANCE_METRES) /
+          (MAX_FOLLOW_DISTANCE_METRES - MIN_FOLLOW_DISTANCE_METRES)) *
+        100
+      }%`,
+    );
     this.cameraDistanceOutput.value =
       `${settings.cameraDistanceMetres.toFixed(1)} m`;
     this.actions.applySettings(settings);
@@ -683,9 +933,11 @@ export class GameFlowUI {
   private readonly onSlimeHUDChanged = (snapshot: SlimeHUDSnapshot): void => {
     this.switchFeedback.textContent = this.switchFeedbackModel.update(snapshot);
 
+    let visibleIndex = 0;
     const entries = snapshot.roster.flatMap((entry) => {
       const view = getSlimeRosterEntryView(entry);
       if (!view) return [];
+      visibleIndex += 1;
 
       const item = this.hostDocument.createElement('li');
       item.className = 'hud-slime-entry';
@@ -696,7 +948,11 @@ export class GameFlowUI {
       const badge = this.hostDocument.createElement('span');
       badge.className = 'hud-slime-badge';
       badge.setAttribute('aria-hidden', 'true');
-      badge.textContent = entry.displayName.slice(0, 1);
+      const badgeGlyph = this.hostDocument.createElement('span');
+      badgeGlyph.textContent = entry.displayName.slice(0, 1);
+      const badgeIndex = this.hostDocument.createElement('small');
+      badgeIndex.textContent = String(visibleIndex).padStart(2, '0');
+      badge.append(badgeGlyph, badgeIndex);
 
       const identity = this.hostDocument.createElement('span');
       identity.className = 'hud-slime-identity';
