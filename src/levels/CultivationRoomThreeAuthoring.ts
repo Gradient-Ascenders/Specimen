@@ -11,7 +11,9 @@ const commonDrone = {
   scanHalfAngleRadians: 35 * DEG,
   scanSpeedRadiansPerSecond: 30 * DEG,
   detectionHalfAngleRadians: 15 * DEG,
-  detectionRangeMetres: 18,
+  // One unobstructed sentry can pressure almost the full 72 m chamber. Cover,
+  // rather than outranging or sidestepping a slow shot, is the intended answer.
+  detectionRangeMetres: 90,
   warningSeconds: 0.4,
   fireIntervalSeconds: 0.3,
   targetLossGraceSeconds: 0.3,

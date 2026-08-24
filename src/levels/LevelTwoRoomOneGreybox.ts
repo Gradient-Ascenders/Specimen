@@ -8,6 +8,7 @@ import {
 } from '../hazards/RadioactiveFloorHazard.ts';
 import { GreyboxDropPreview } from './GreyboxDropPreview.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
+import type { KinematicBody } from '../physics/KinematicBody.ts';
 
 export const LEVEL_TWO_ROOM_ONE_BOB_SPAWN = new THREE.Vector3(-11, 0.66, 5.5);
 export const LEVEL_TWO_ROOM_ONE_GOOP_SPAWN = new THREE.Vector3(-9, 0.66, 5.5);
@@ -22,23 +23,27 @@ interface PlatformAssemblyDefinition {
 const PLATFORM_ASSEMBLIES: readonly PlatformAssemblyDefinition[] = [
   {
     id: 'cultivation-room-1-platform-1',
-    landingPosition: [-3, 0.55, 15.5],
+    landingPosition: [-3, 0.3, 15.5],
     suspendedPosition: [-3, 13, 15.5],
     size: [5, 0.6, 5],
   },
   {
     id: 'cultivation-room-1-platform-2',
-    landingPosition: [2, 1.15, 25],
+    landingPosition: [2, 0.3, 25],
     suspendedPosition: [2, 15, 25],
     size: [5, 0.6, 5],
   },
   {
     id: 'cultivation-room-1-platform-3',
-    landingPosition: [-1, 1.75, 35],
+    landingPosition: [-1, 0.3, 35],
     suspendedPosition: [-1, 12.5, 35],
     size: [5, 0.6, 5],
   },
 ];
+
+const GOOP_PLATFORM_EJECTION_HORIZONTAL_SPEED = 24;
+const GOOP_PLATFORM_EJECTION_UPWARD_SPEED = 12;
+const GOOP_PLATFORM_EJECTION_CLEARANCE_METRES = 0.18;
 
 export interface LevelTwoRoomOneHazardFailure {
   readonly roomId: 1;
@@ -54,6 +59,12 @@ export class LevelTwoRoomOneGreybox {
   readonly solubleTargetMeshes: THREE.Mesh[] = [];
   readonly platformDrops: GreyboxDropPreview[] = [];
   readonly radiationHazard: RadioactiveFloorHazard;
+  private readonly ejectedPlatformIds = new Set<string>();
+  private readonly previousDropWorldPosition = new THREE.Vector3();
+  private readonly currentDropWorldPosition = new THREE.Vector3();
+  private readonly goopEjectionDirection = new THREE.Vector3();
+  private readonly goopEjectionPosition = new THREE.Vector3();
+  private readonly goopKnockback = new THREE.Vector3();
 
   constructor(
     requestFailure: (failure: LevelTwoRoomOneHazardFailure) => void,
@@ -82,8 +93,20 @@ export class LevelTwoRoomOneGreybox {
     for (const drop of this.platformDrops) drop.bind(targets);
   }
 
-  update(deltaSeconds: number): void {
-    for (const drop of this.platformDrops) drop.update(deltaSeconds);
+  get platformEjectionCount(): number {
+    return this.ejectedPlatformIds.size;
+  }
+
+  update(deltaSeconds: number, goopBody?: KinematicBody): void {
+    for (const drop of this.platformDrops) {
+      const wasFalling = drop.state === 'falling';
+      drop.mesh.getWorldPosition(this.previousDropWorldPosition);
+      drop.update(deltaSeconds);
+      drop.mesh.getWorldPosition(this.currentDropWorldPosition);
+      if (wasFalling && goopBody) {
+        this.ejectGoopFromFallingPlatform(drop, goopBody);
+      }
+    }
   }
 
   updateRadiation(
@@ -94,6 +117,7 @@ export class LevelTwoRoomOneGreybox {
 
   reset(): void {
     for (const drop of this.platformDrops) drop.reset();
+    this.ejectedPlatformIds.clear();
     this.radiationHazard.reset();
   }
 
@@ -368,5 +392,74 @@ export class LevelTwoRoomOneGreybox {
     mesh.userData.roomId = 1;
     mesh.userData.hazardRole = 'radioactive';
     mesh.userData.hazardPolicy = 'bob-lethal-goop-immune';
+  }
+
+  private ejectGoopFromFallingPlatform(
+    drop: GreyboxDropPreview,
+    goopBody: KinematicBody,
+  ): void {
+    if (
+      this.ejectedPlatformIds.has(drop.id) ||
+      this.currentDropWorldPosition.y >= this.previousDropWorldPosition.y
+    ) {
+      return;
+    }
+
+    const size = drop.mesh.userData.sizeMetres as
+      | readonly [number, number, number]
+      | undefined;
+    if (!size) return;
+
+    const halfWidth = size[0] * 0.5;
+    const halfHeight = size[1] * 0.5;
+    const halfDepth = size[2] * 0.5;
+    const radius = goopBody.radiusMetres;
+    const relativeX = goopBody.position.x - this.currentDropWorldPosition.x;
+    const relativeZ = goopBody.position.z - this.currentDropWorldPosition.z;
+    if (
+      Math.abs(relativeX) > halfWidth + radius ||
+      Math.abs(relativeZ) > halfDepth + radius
+    ) {
+      return;
+    }
+
+    const previousBottom = this.previousDropWorldPosition.y - halfHeight;
+    const currentBottom = this.currentDropWorldPosition.y - halfHeight;
+    const goopBottom = goopBody.position.y - radius;
+    const goopTop = goopBody.position.y + radius;
+    if (currentBottom > goopTop || previousBottom < goopBottom) return;
+
+    this.goopEjectionDirection.set(relativeX, 0, relativeZ);
+    if (this.goopEjectionDirection.lengthSq() <= 1e-8) {
+      this.goopEjectionDirection.set(1, 0, 0);
+    } else {
+      this.goopEjectionDirection.normalize();
+    }
+
+    const expandedHalfWidth =
+      halfWidth + radius + GOOP_PLATFORM_EJECTION_CLEARANCE_METRES;
+    const expandedHalfDepth =
+      halfDepth + radius + GOOP_PLATFORM_EJECTION_CLEARANCE_METRES;
+    const distanceToXEdge =
+      Math.abs(this.goopEjectionDirection.x) > 1e-8
+        ? expandedHalfWidth / Math.abs(this.goopEjectionDirection.x)
+        : Number.POSITIVE_INFINITY;
+    const distanceToZEdge =
+      Math.abs(this.goopEjectionDirection.z) > 1e-8
+        ? expandedHalfDepth / Math.abs(this.goopEjectionDirection.z)
+        : Number.POSITIVE_INFINITY;
+    const ejectionDistance = Math.min(distanceToXEdge, distanceToZEdge);
+
+    this.goopEjectionPosition
+      .copy(this.currentDropWorldPosition)
+      .addScaledVector(this.goopEjectionDirection, ejectionDistance);
+    this.goopEjectionPosition.y = goopBody.position.y;
+    goopBody.teleport(this.goopEjectionPosition);
+    this.goopKnockback
+      .copy(this.goopEjectionDirection)
+      .multiplyScalar(GOOP_PLATFORM_EJECTION_HORIZONTAL_SPEED);
+    this.goopKnockback.y = GOOP_PLATFORM_EJECTION_UPWARD_SPEED;
+    goopBody.applyKnockback(this.goopKnockback);
+    this.ejectedPlatformIds.add(drop.id);
   }
 }

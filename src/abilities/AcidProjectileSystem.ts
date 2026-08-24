@@ -420,7 +420,11 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
       if (target === aimedTarget) continue;
       if (!this.isAvailableTargetInRange(target, activeBody)) continue;
 
-      target.copyClosestWorldPoint(this.aimOrigin, this.targetPoint);
+      // Probe the representative centre instead of the point nearest the
+      // camera. On a hanging rope, the nearest point is its lower tip, which
+      // can be hidden by the suspended platform even while most of the rope is
+      // plainly visible and shootable.
+      target.copyWorldBoundsCenter(this.targetPoint);
       this.candidateDisplacement.subVectors(
         this.targetPoint,
         this.aimOrigin,

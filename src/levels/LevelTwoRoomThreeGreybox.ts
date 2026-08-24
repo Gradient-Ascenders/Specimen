@@ -374,6 +374,19 @@ export class LevelTwoRoomThreeGreybox {
 
   private buildGoopCoverRoute(): void {
     const { containment, support } = this.builder.materials;
+    const checkpointShield = this.builder.addCollider({
+      name: 'cultivation-room-3-goop-checkpoint-shield',
+      size: [8, 4.5, 1],
+      position: [0, 2.25, 7],
+      material: containment,
+    });
+    Object.assign(checkpointShield.userData, {
+      levelId: 'cultivation',
+      roomId: 3,
+      routeOwner: 'goop',
+      coverRole: 'checkpoint-spawn-shield',
+    });
+
     const covers: ReadonlyArray<{
       readonly position: readonly [number, number, number];
       readonly size: readonly [number, number, number];

@@ -32,21 +32,39 @@ Base drone:
 SCANNING -> WARNING -> FIRING -> TARGET_LOST -> COOLDOWN -> SCANNING
 ```
 
-Initial tuning uses a 35-degree scan half-angle at 30 degrees/second, a
-15-degree detection half-angle, 18 m range, 0.4 s warning, 0.3 s firing
+Current tuning uses a 35-degree scan half-angle at 30 degrees/second, a
+15-degree detection half-angle, 90 m range, 0.4 s warning, 0.3 s firing
 interval, 0.3 s loss grace, and 2.2 s cooldown. LOS is a bounded
 `CollisionWorld` query against the explicit `LineOfSight` layer. Authored Room
-3 cover and other solids block LOS and projectiles.
+3 cover and other solids block LOS and projectiles. The extended range lets an
+unobstructed sentry acquire across nearly the full 72 m chamber; the warning
+window is therefore the player's cue to get behind cover rather than trying to
+outrange it.
 
-Shots travel at 14 m/s with a 0.1 m radius, 20 m range, 1.5 s lifetime,
+Shots travel at 150 m/s with a 0.16 m radius, 100 m range, 0.75 s lifetime,
 20 damage, and a 48-slot cap. World collision wins equal-distance ties. Each
-shot produces at most one impact and returns to the pool. A minimal pooled red
-sphere proxy makes travel readable; final tracers, flashes, impacts, and audio
-remain presentation work outside this issue.
+shot produces at most one impact and returns to the pool. Continuous swept
+collision preserves reliable impacts at that speed. A close shot arrives too
+quickly for an ordinary reaction and its wider profile punishes last-second
+movement; a shot crossing most of the chamber remains visible long enough for
+a deliberate lateral dodge. Physical cover remains the safest answer. A
+dedicated 8 m-wide shield just beyond Goop's Room 3 checkpoint blocks the
+distant ground sentries' spawn line while leaving both sides open for a
+deliberate first move.
 
 Bob and Goop each have 100 health. A standard 20-damage hit kills on the fifth
 hit. Regeneration begins 2.75 s after the latest hit at 20 health/second. Death
 is latched by health state and routed into the existing pair death/retry flow.
+The active slime's missing-health read model drives a soft screen-edge fog in
+Bob teal or Goop green. A hit adds a short pulse, deeper damage increases the
+opacity, regeneration fades it back out, and reset/retry removes it.
+
+The old visible collision boxes have been replaced by an original laboratory
+sentry presentation: a pale armoured shell, dark mechanism, twin side barrels,
+central warning eye, and either a ground tripod or ceiling clamp. The gameplay
+box remains registered but invisible. An articulated head follows the same
+scan/target direction used by the firing authority, and the eye changes state
+for warning, firing, cooldown, and disablement.
 
 Ceiling lifecycle:
 

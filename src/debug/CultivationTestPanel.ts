@@ -14,9 +14,9 @@ export class CultivationTestPanel {
     this.element.className = 'test-panel cultivation-test-panel';
     this.element.innerHTML = `
       <div class="test-panel-content">
-        <p class="eyebrow">Level 2 foundation harness</p>
+        <p class="eyebrow">Level 2 grey-box harness</p>
         <h1>Cultivation runtime</h1>
-        <p class="summary">Validate the Level 2 backend foundation or jump directly into the authored Rooms 1–3 grey-box.</p>
+        <p class="summary">Playtest the authored Rooms 1–3 grey-box and its shared gameplay systems.</p>
         <div class="controls">
           <button type="button" data-action="reset">Reset Level 2 <kbd>R</kbd></button>
           <button type="button" data-action="partial-support">Partially dissolve next support</button>

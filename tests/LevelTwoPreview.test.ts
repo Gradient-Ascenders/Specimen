@@ -19,7 +19,12 @@ import {
   advanceLevelTwoPreviewProgression,
   createLevelTwoPreviewProgression,
 } from '../src/levels/LevelTwoPreviewProgression.ts';
-import { CollisionHit, CollisionWorld } from '../src/physics/CollisionWorld.ts';
+import {
+  CollisionHit,
+  CollisionLayer,
+  CollisionWorld,
+} from '../src/physics/CollisionWorld.ts';
+import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 
 const createScene = (): LevelTwoPreviewScene =>
@@ -117,6 +122,45 @@ test('Level 2 preview composes three large connected rooms with unique colliders
   scene.dispose();
 });
 
+test('Room 3 checkpoint shield blocks distant ground-drone sightlines to Goop spawn', () => {
+  const scene = createScene();
+  const world = new CollisionWorld();
+  world.registerAll(scene.collisionMeshes);
+  scene.root.updateWorldMatrix(true, true);
+  const shield = findCollider(
+    scene,
+    'cultivation-room-3-goop-checkpoint-shield',
+  );
+  assert.deepEqual(shield.userData.sizeMetres, [8, 4.5, 1]);
+  assert.equal(shield.userData.coverRole, 'checkpoint-spawn-shield');
+
+  const goopSpawn = scene.copyRoomSpawnPosition(3, 'goop', new THREE.Vector3());
+  for (const localDroneX of [-6, -2, 2, 6]) {
+    const sightOrigin = scene.roomThree.root.localToWorld(
+      new THREE.Vector3(localDroneX, 1, 68),
+    );
+    const hit = new CollisionHit();
+    assert.equal(
+      world.sweepSphere(
+        sightOrigin,
+        goopSpawn.clone().sub(sightOrigin),
+        0.001,
+        hit,
+        CollisionLayer.LineOfSight,
+      ),
+      true,
+    );
+    assert.ok(
+      hit.object?.userData.coverRole === 'checkpoint-spawn-shield' ||
+        hit.object?.userData.coverRole === 'drone-line-of-sight-blocker',
+    );
+    if (localDroneX < 0) assert.equal(hit.object?.name, shield.name);
+  }
+
+  world.clear();
+  scene.dispose();
+});
+
 test('Room 1 and Room 2 traversal platforms begin suspended, not pre-solved', () => {
   const scene = createScene();
 
@@ -193,6 +237,74 @@ test('dissolving supports deterministically lands traversal platforms and reset 
   scene.dispose();
 });
 
+test('Room 1 dropped platforms rest directly on the radioactive floor', () => {
+  const scene = createScene();
+  const radiation = findCollider(scene, 'cultivation-room-1-radioactive-floor');
+  const radiationSize = radiation.userData.sizeMetres as readonly number[];
+  const radiationTop = radiation.position.y + radiationSize[1]! * 0.5;
+
+  for (const drop of scene.roomOne.platformDrops) {
+    const platformSize = drop.mesh.userData.sizeMetres as readonly number[];
+    const landingPosition = drop.mesh.userData.landingPosition as readonly number[];
+    const platformBottom = landingPosition[1]! - platformSize[1]! * 0.5;
+    assert.ok(Math.abs(platformBottom - radiationTop) < 1e-10);
+  }
+
+  scene.dispose();
+});
+
+test('a falling Room 1 platform ejects Goop fully clear with exaggerated knockback', () => {
+  const scene = createScene();
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  world.registerAll(scene.collisionMeshes);
+  surfaces.registerAll(scene.collisionMeshes);
+  const targets = scene.solubleTargetMeshes.map((mesh) => {
+    const target = createAuthoredDissolveTarget(mesh, world, surfaces);
+    assert.ok(target);
+    return target;
+  });
+  scene.bindDissolveTargets(targets);
+
+  const drop = scene.roomOne.platformDrops[0];
+  const dropWorldPosition = drop.mesh.getWorldPosition(new THREE.Vector3());
+  const goop = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(
+      dropWorldPosition.x,
+      0.45,
+      dropWorldPosition.z,
+    ),
+  });
+  const target = targets.find(
+    (candidate) => candidate.id === drop.solubleTargetId,
+  );
+  assert.ok(target);
+  target.advance(target.dissolveDurationSeconds);
+
+  scene.update(1, 1, [], goop);
+
+  const landedWorldPosition = drop.mesh.getWorldPosition(new THREE.Vector3());
+  const platformSize = drop.mesh.userData.sizeMetres as readonly number[];
+  assert.equal(drop.state, 'landed');
+  assert.equal(scene.roomOne.platformEjectionCount, 1);
+  assert.ok(
+    Math.abs(goop.position.x - landedWorldPosition.x) >
+      platformSize[0]! * 0.5 + goop.radiusMetres,
+  );
+  assert.ok(Math.hypot(goop.velocity.x, goop.velocity.z) >= 24 - 1e-10);
+  assert.ok(goop.velocity.y >= 12 - 1e-10);
+
+  scene.update(1, 1, [], goop);
+  assert.equal(scene.roomOne.platformEjectionCount, 1);
+  scene.reset();
+  assert.equal(scene.roomOne.platformEjectionCount, 0);
+
+  for (const dissolveTarget of targets) dissolveTarget.dispose();
+  scene.dispose();
+});
+
 test('Level 2 preview exposes explicit radiation and soluble-support metadata', () => {
   const scene = createScene();
   const radiation = scene.collisionMeshes.filter(
@@ -230,17 +342,19 @@ test('Level 2 preview exposes explicit radiation and soluble-support metadata', 
   scene.dispose();
 });
 
-test('Room 2 has a visible safe tiled landing between the acid and far exits', () => {
+test('Room 2 acid reaches the far exits so Bob cannot use a floor shortcut', () => {
   const scene = createScene();
   const radiation = findCollider(scene, 'cultivation-room-2-radioactive-floor');
-  const safeTiles = findCollider(scene, 'cultivation-room-2-door-side-safe-tiles');
 
-  assert.deepEqual(radiation.userData.sizeMetres, [37.6, 0.3, 30]);
-  assert.deepEqual(safeTiles.userData.sizeMetres, [37.6, 0.4, 7]);
-  assert.equal(safeTiles.userData.safeZoneRole, 'far-door-landing');
-  assert.equal(radiation.position.z + 15, 38);
-  assert.equal(safeTiles.position.z - 3.5, 38);
-  assert.equal(safeTiles.position.z + 3.5, 45);
+  assert.deepEqual(radiation.userData.sizeMetres, [37.6, 0.3, 37]);
+  assert.equal(radiation.position.z - 18.5, 8);
+  assert.equal(radiation.position.z + 18.5, 45);
+  assert.equal(
+    scene.collisionMeshes.some(
+      (mesh) => mesh.name === 'cultivation-room-2-door-side-safe-tiles',
+    ),
+    false,
+  );
 
   scene.dispose();
 });
@@ -442,6 +556,44 @@ test('unlocked passage shutters raise near either slime and lower once clear', (
 test('Room 2 button unlocks Goop shutter only while Bob remains attached', () => {
   const scene = createScene();
   const door = scene.roomTwoToThreeGoopPassage.entryDoor;
+  const buttonPad = scene.root.getObjectByName(
+    'cultivation-room-2-wall-button-pad',
+  ) as THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
+  const buttonStatusLight = scene.root.getObjectByName(
+    'cultivation-room-2-wall-button-status-light',
+  ) as THREE.PointLight;
+  assert.ok(buttonPad);
+  assert.ok(buttonStatusLight);
+  assert.equal(buttonPad.userData.visualRole, 'wall-button-square-pad');
+  assert.equal(buttonPad.userData.textureRole, 'sticky-button-face');
+  assert.equal(
+    scene.root.getObjectByName('cultivation-room-2-wall-button-sloped-housing'),
+    undefined,
+  );
+  assert.equal(
+    scene.root.getObjectByName('cultivation-room-2-wall-button-status-ring'),
+    undefined,
+  );
+  assert.equal(
+    scene.roomTwo.collisionMeshes.some(
+      (mesh) => mesh.name.includes('wall-button-') && mesh.name.endsWith('-slope'),
+    ),
+    false,
+  );
+  assert.equal(scene.roomTwo.wallButton.userData.surfaceTag, 'sticky');
+  assert.deepEqual(scene.roomTwo.wallButton.userData.sizeMetres, [0.28, 1.5, 1.5]);
+  assert.equal(scene.roomTwo.wallButton.userData.presentationState, 'ready-red');
+  assert.equal(buttonPad.material.color.getHex(), 0xe53945);
+  const padRestX = buttonPad.position.x;
+  const buttonSize = scene.roomTwo.wallButton.userData.sizeMetres as readonly number[];
+  const collisionFaceX =
+    scene.roomTwo.wallButton.position.x + buttonSize[0]! * 0.5;
+  const padFaceX =
+    buttonPad.position.x + buttonPad.geometry.parameters.width * 0.5;
+  assert.ok(
+    collisionFaceX >= padFaceX,
+    'button collision must stop Bob before his body clips into the visible pad',
+  );
   const goopPosition = new THREE.Vector3(0, 0.66, -1);
   door.root.localToWorld(goopPosition);
   const goop = {
@@ -465,19 +617,42 @@ test('Room 2 button unlocks Goop shutter only while Bob remains attached', () =>
     attached: true,
     supportCollider: scene.roomTwo.wallButton,
   };
-  scene.update(1, 2, [bob, goop]);
+  scene.update(0.1, 2, [bob, goop]);
   assert.equal(scene.roomTwo.wallButton.userData.pressed, true);
+  assert.equal(scene.roomTwo.wallButton.userData.presentationState, 'pressed-green');
+  assert.ok(buttonPad.position.x < padRestX);
+  assert.ok(buttonPad.position.x > padRestX - 0.14);
+  assert.ok(buttonPad.userData.pressProgress > 0);
+  assert.ok(buttonPad.userData.pressProgress < 1);
+  assert.equal(buttonPad.userData.pressDurationSeconds, 0.6);
   assert.equal(door.locked, false);
+
+  scene.update(1, 2, [bob, goop]);
+  assert.equal(buttonPad.userData.pressProgress, 1);
+  assert.equal(buttonPad.material.color.getHex(), 0x62ff91);
+  assert.equal(buttonPad.material.emissiveIntensity, 1.5);
+  assert.equal(buttonStatusLight.color.getHex(), 0x62ff91);
+  assert.equal(buttonStatusLight.intensity, 8);
   assert.equal(door.state, 'open');
   assert.equal(door.statusLight.userData.lockState, 'unlocked-green');
 
   scene.update(1, 2, [goop]);
   assert.equal(scene.roomTwo.wallButton.userData.pressed, false);
+  assert.equal(scene.roomTwo.wallButton.userData.presentationState, 'ready-red');
+  assert.equal(buttonPad.position.x, padRestX);
+  assert.equal(buttonPad.material.color.getHex(), 0xe53945);
+  assert.equal(buttonStatusLight.color.getHex(), 0xe53945);
   assert.equal(door.locked, true);
   assert.equal(door.state, 'closed');
   assert.equal(door.statusLight.userData.lockState, 'locked-red');
 
+  scene.update(1, 2, [bob, goop]);
+  assert.equal(scene.roomTwo.wallButton.userData.pressed, true);
+  assert.equal(door.locked, false);
+
   scene.reset();
+  assert.equal(buttonPad.userData.pressProgress, 0);
+  assert.equal(buttonPad.position.x, padRestX);
   assert.equal(door.locked, true);
   assert.equal(door.state, 'closed');
   assert.equal(door.openProgress, 0);
@@ -541,13 +716,19 @@ test('Room 2 and Room 3 lasers are authored directly against their sticky panels
   const pairs: ReadonlyArray<readonly [LaserHazard, THREE.Mesh]> = [
     [scene.roomTwo.lasers.hazards[0], findCollider(scene, 'cultivation-room-2-sticky-route-b')],
     [scene.roomTwo.lasers.hazards[1], findCollider(scene, 'cultivation-room-2-sticky-route-c')],
-    [scene.roomTwo.lasers.hazards[2], findCollider(scene, 'cultivation-room-2-sticky-route-e')],
     [scene.roomThree.lasers.hazards[0], findCollider(scene, 'cultivation-room-3-entry-sticky-transfer')],
     [scene.roomThree.lasers.hazards[1], findCollider(scene, 'cultivation-room-3-central-sticky-transfer')],
     [scene.roomThree.lasers.hazards[2], findCollider(scene, 'cultivation-room-3-high-sticky-transfer')],
   ];
 
   for (const [laser, panel] of pairs) assertLaserAgainstPanel(laser, panel);
+  assert.deepEqual(
+    scene.roomTwo.lasers.hazards.map((hazard) => hazard.id),
+    [
+      'cultivation-room-2-laser-1-panel-b-crossbar',
+      'cultivation-room-2-laser-2-panel-c-vertical',
+    ],
+  );
 
   const groundDrones = scene.collisionMeshes.filter(
     (mesh) => mesh.userData.droneType === 'ground-security',

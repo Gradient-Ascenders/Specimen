@@ -43,6 +43,10 @@ test('Room 3 constructs exactly seven authored drones and resets one-to-one rope
 
   assert.equal(encounter.ceilingDrones.length, 3);
   assert.equal(encounter.groundDrones.length, 4);
+  assert.ok([
+    ...CULTIVATION_ROOM_THREE_DRONE_AUTHORING.ceilingDrones,
+    ...CULTIVATION_ROOM_THREE_DRONE_AUTHORING.groundDrones,
+  ].every((entry) => entry.drone.detectionRangeMetres >= 90));
   assert.equal(world.colliderCount, baselineColliders + 10);
   assert.equal(surfaces.registeredCount, baselineSurfaces + 10);
   for (const lifecycle of [...encounter.ceilingDrones, ...encounter.groundDrones]) {

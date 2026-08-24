@@ -218,6 +218,17 @@ export class DissolveTarget {
     return target.applyMatrix4(this.mesh.matrixWorld);
   }
 
+  /** Copy the authored bounds centre to a caller-owned world-space vector. */
+  copyWorldBoundsCenter(target: THREE.Vector3): THREE.Vector3 {
+    this.mesh.updateWorldMatrix(true, false);
+    target.set(
+      (this.localBounds.min.x + this.localBounds.max.x) * 0.5,
+      (this.localBounds.min.y + this.localBounds.max.y) * 0.5,
+      (this.localBounds.min.z + this.localBounds.max.z) * 0.5,
+    );
+    return target.applyMatrix4(this.mesh.matrixWorld);
+  }
+
   /**
    * Contact/activation test against the authored mesh bounds.
    *

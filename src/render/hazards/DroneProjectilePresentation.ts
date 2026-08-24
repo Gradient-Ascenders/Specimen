@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 
-import type { DroneProjectileReadState } from '../../hazards/DroneProjectileSystem.ts';
+import {
+  DEFAULT_DRONE_PROJECTILE_CONFIG,
+  type DroneProjectileReadState,
+} from '../../hazards/DroneProjectileSystem.ts';
 
 /** Minimal pooled travel proxy; final tracer/impact art remains deferred. */
 export class DroneProjectilePresentation {
@@ -11,7 +14,10 @@ export class DroneProjectilePresentation {
   private readonly position = new THREE.Vector3();
   private disposed = false;
 
-  constructor(states: readonly DroneProjectileReadState[], radiusMetres = 0.1) {
+  constructor(
+    states: readonly DroneProjectileReadState[],
+    radiusMetres = DEFAULT_DRONE_PROJECTILE_CONFIG.radiusMetres,
+  ) {
     if (!Number.isFinite(radiusMetres) || radiusMetres <= 0) {
       throw new Error('Drone projectile presentation radius must be positive and finite.');
     }

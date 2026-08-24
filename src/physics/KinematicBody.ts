@@ -619,6 +619,43 @@ export class KinematicBody {
       : 0;
   }
 
+  /**
+   * Add an authored world-space knockback impulse to the body.
+   *
+   * This is intentionally separate from locomotion and jumping so hazards and
+   * scripted physical reactions cannot masquerade as player input.
+   */
+  applyKnockback(velocityChange: ReadonlyVector3State): void {
+    if (
+      !Number.isFinite(velocityChange.x) ||
+      !Number.isFinite(velocityChange.y) ||
+      !Number.isFinite(velocityChange.z)
+    ) {
+      throw new Error('Knockback velocity components must be finite.');
+    }
+
+    this.velocityValue.add(
+      this.velocityDelta.set(
+        velocityChange.x,
+        velocityChange.y,
+        velocityChange.z,
+      ),
+    );
+    this.groundedValue = false;
+    this.supportColliderValue = null;
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.stickyJumpGravityActiveValue = false;
+    this.stickyJumpGravityRemainingSecondsValue = 0;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.cancelJumpCharge();
+    this.clearJumpBuffer();
+    this.groundReacquireDelaySeconds = Math.max(
+      this.groundReacquireDelaySeconds,
+      this.config.jumpGroundDetachSeconds,
+    );
+  }
+
   private updateJumpState(
     deltaSeconds: number,
     jumpInput: Readonly<JumpInputState>,

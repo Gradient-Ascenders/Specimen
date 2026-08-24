@@ -3,7 +3,10 @@ import test from 'node:test';
 
 import * as THREE from 'three';
 
-import { DroneProjectileSystem } from '../src/hazards/DroneProjectileSystem.ts';
+import {
+  DEFAULT_DRONE_PROJECTILE_CONFIG,
+  DroneProjectileSystem,
+} from '../src/hazards/DroneProjectileSystem.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SlimeDamageSystem } from '../src/systems/SlimeDamageSystem.ts';
 
@@ -117,6 +120,28 @@ test('projectiles ignore persistent bodies that have left the encounter room', (
   assert.equal(impacts, 0);
   assert.equal(system.liveCount, 1);
 
+  system.dispose();
+  damage.dispose();
+  owner.geometry.dispose();
+});
+
+test('default projectile resolves close shots quickly but leaves far-range travel time', () => {
+  const world = new CollisionWorld();
+  const damage = new SlimeDamageSystem();
+  const system = new DroneProjectileSystem(world, damage);
+  const owner = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+
+  assert.equal(DEFAULT_DRONE_PROJECTILE_CONFIG.speedMetresPerSecond, 150);
+  assert.equal(DEFAULT_DRONE_PROJECTILE_CONFIG.radiusMetres, 0.16);
+  assert.ok(DEFAULT_DRONE_PROJECTILE_CONFIG.maximumRangeMetres >= 90);
+  system.spawn('far-drone', owner, new THREE.Vector3(), new THREE.Vector3(0, 0, 1));
+  system.update(0.1, [target(75)]);
+  assert.equal(damage.health[0].health, 100);
+  assert.equal(system.liveCount, 1);
+  system.update(0.4, [target(75)]);
+
+  assert.equal(damage.health[0].health, 80);
+  assert.equal(system.liveCount, 0);
   system.dispose();
   damage.dispose();
   owner.geometry.dispose();
