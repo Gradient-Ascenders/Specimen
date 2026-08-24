@@ -107,8 +107,11 @@ export class CultivationCheckpointManager<Body extends PersistentSlimeBody> {
     resetPuzzleGroup = true,
   ): CultivationCheckpointSnapshot {
     const checkpoint = this.getCheckpoint(this.activeSnapshot.id);
-    this.assertSafe(checkpoint);
     if (resetPuzzleGroup) this.puzzleGroups.resetGroup(checkpoint.puzzleGroupId);
+    // Dynamic room collision (notably the vertical blast door) must first
+    // return to its authored reset pose. Validate that exact restored geometry
+    // before either persistent body is recovered into the room.
+    this.assertSafe(checkpoint);
     pair.setRecoveryState({
       bobPosition: this.activeSnapshot.bobSpawnPosition,
       goopPosition: this.activeSnapshot.goopSpawnPosition,

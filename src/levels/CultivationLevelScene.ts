@@ -28,10 +28,32 @@ export class CultivationLevelScene {
       { id: 'cultivation-foundation-left-wall', size: [0.4, 5, 42], position: [-8, 2.5, 19], colour: 0x43514c },
       { id: 'cultivation-foundation-right-wall', size: [0.4, 5, 42], position: [8, 2.5, 19], colour: 0x43514c },
       { id: 'cultivation-foundation-entry-wall', size: [16, 5, 0.4], position: [0, 2.5, -2], colour: 0x43514c },
+      { id: 'cultivation-room-2-far-wall-left', size: [6.1, 12, 0.4], position: [-4.95, 6, 30.8], colour: 0x43514c },
+      { id: 'cultivation-room-2-far-wall-centre-right', size: [4.2, 12, 0.4], position: [4, 6, 30.8], colour: 0x43514c },
+      { id: 'cultivation-room-2-far-wall-above-door', size: [3.8, 7.4, 0.4], position: [0, 8.3, 30.8], colour: 0x43514c },
+      { id: 'cultivation-room-2-far-wall-below-vent', size: [1.8, 7.4, 0.4], position: [7, 3.7, 30.8], colour: 0x43514c },
+      { id: 'cultivation-room-2-far-wall-above-vent', size: [1.8, 2.2, 0.4], position: [7, 10.9, 30.8], colour: 0x43514c },
       { id: 'cultivation-room-3-upper-bob-platform', size: [5, 0.4, 5], position: [-2.5, 4, 34], colour: 0xd3b94f },
     ];
+    validateWallButtonDoorAuthoring(manifest, boxes);
     validateStructuralAssemblyAuthoring(manifest.structuralAssemblies, boxes);
     for (const box of boxes) collisionMeshes.push(this.addCollisionBox(box));
+
+    const stickyPanels: readonly BoxAuthoring[] = [
+      { id: 'cultivation-room-2-sticky-panel-a', size: [0.18, 3.1, 2.8], position: [-7.55, 1.7, 15.2], colour: 0xb4a15a },
+      { id: 'cultivation-room-2-sticky-panel-b', size: [0.18, 2.4, 2.4], position: [-7.55, 3.3, 17.8], colour: 0xb4a15a },
+      { id: 'cultivation-room-2-sticky-panel-c', size: [0.18, 2.4, 2.4], position: [-7.55, 4.55, 19.9], colour: 0xb4a15a },
+      { id: 'cultivation-room-2-sticky-panel-d', size: [0.18, 2.3, 2.4], position: [-7.55, 5.55, 21.9], colour: 0xb4a15a },
+      { id: 'cultivation-room-2-sticky-panel-e', size: [0.18, 1.8, 2.2], position: [-7.55, 6.15, 23.25], colour: 0xb4a15a },
+      { id: 'cultivation-room-2-vent-sticky-panel', size: [2.2, 2.8, 0.18], position: [6.7, 7.15, 30.55], colour: 0xb4a15a },
+    ];
+    for (const panel of stickyPanels) {
+      const mesh = this.addCollisionBox(panel);
+      mesh.userData.surfaceTag = 'sticky';
+      mesh.userData.authoringRole = 'cultivation-sticky-route';
+      mesh.userData.movementFaceMode = 'vertical-sides';
+      collisionMeshes.push(mesh);
+    }
 
     for (const assembly of manifest.structuralAssemblies) {
       const support = new THREE.Mesh(
@@ -222,6 +244,41 @@ function validateStructuralAssemblyAuthoring(
 
     assemblyIds.add(assembly.id);
     supportTargetIds.add(assembly.supportTargetId);
+  }
+}
+
+function validateWallButtonDoorAuthoring(
+  manifest: CultivationFoundationManifest,
+  staticBoxes: readonly BoxAuthoring[],
+): void {
+  const authoring = manifest.wallButtonDoor;
+  if (!authoring.id || !authoring.button.id || !authoring.door.id) {
+    throw new Error('Cultivation wall-button and blast-door IDs must be non-empty.');
+  }
+  if (authoring.puzzleGroupId !== 'cultivation-room-2') {
+    throw new Error('Cultivation wall-button door must belong to the Room 2 puzzle group.');
+  }
+  validateFiniteVector(authoring.id, 'button position', authoring.button.position);
+  validatePositiveVector(authoring.id, 'button surface size', authoring.button.surfaceSize);
+  validateFiniteVector(authoring.id, 'button contact centre', authoring.button.contactCentre);
+  validatePositiveVector(authoring.id, 'button contact size', authoring.button.contactSize);
+  validateFiniteVector(authoring.id, 'door closed position', authoring.door.closedPosition);
+  validatePositiveVector(authoring.id, 'door panel size', authoring.door.panelSize);
+  validateFiniteVector(authoring.id, 'door travel axis', authoring.door.travelAxis);
+  validateFiniteVector(authoring.id, 'door obstruction centre', authoring.door.obstructionCentre);
+  validatePositiveVector(authoring.id, 'door obstruction size', authoring.door.obstructionSize);
+  validatePositiveFinite(authoring.id, 'door travel distance', authoring.door.travelDistance);
+  validatePositiveFinite(authoring.id, 'door opening duration', authoring.door.openingDurationSeconds);
+  validatePositiveFinite(authoring.id, 'door closing duration', authoring.door.closingDurationSeconds);
+  if (authoring.door.travelAxis.lengthSq() <= 1e-10) {
+    throw new Error('Cultivation blast-door travel axis must be non-zero.');
+  }
+
+  const opening = staticBoxes.find((box) => box.id === 'cultivation-room-2-far-wall-above-door');
+  if (!opening) throw new Error('Cultivation blast door requires an authored far-wall opening.');
+  const closedCentre = authoring.door.closedPosition;
+  if (Math.abs(closedCentre.z - opening.position[2]) > 1e-8) {
+    throw new Error('Cultivation blast door must share the far-wall plane.');
   }
 }
 

@@ -23,6 +23,9 @@ import {
   RopeCatchAssembly,
   type SuspendedStructureAssembly,
 } from '../puzzle/SuspendedStructureAssembly.ts';
+import { VerticalBlastDoor } from '../puzzle/VerticalBlastDoor.ts';
+import { WallButton } from '../puzzle/WallButton.ts';
+import { WallButtonDoorCoordinator } from '../puzzle/WallButtonDoorCoordinator.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
@@ -66,6 +69,9 @@ interface CultivationRuntimeResources {
   readonly surfaceRegistry: SurfaceRegistry;
   readonly dissolveTargets: readonly DissolveTarget[];
   readonly structuralAssemblies: readonly SuspendedStructureAssembly[];
+  readonly wallButton: WallButton<KinematicBody>;
+  readonly blastDoor: VerticalBlastDoor;
+  readonly buttonDoorCoordinator: WallButtonDoorCoordinator<KinematicBody>;
   readonly manager: SlimeManager<KinematicBody>;
   readonly pair: PersistentSlimePair<KinematicBody>;
   readonly controller: CultivationLevelController;
@@ -203,7 +209,21 @@ export class CultivationLevelRuntime {
     if (!switched) {
       this.renderLayer.cameraRig.queueLookInput(this.input.pointerDeltaX, this.input.pointerDeltaY);
       this.renderLayer.cameraRig.applyQueuedLookInput();
-      this.renderLayer.cameraRig.copyGroundMovementDirection(moveX, moveZ, resources.movement);
+      const activeBody = resources.pair.activeBody;
+      if (activeBody.usingSurfaceGravity) {
+        this.renderLayer.cameraRig.copySurfaceMovementDirection(
+          moveX,
+          moveZ,
+          activeBody.gameplayUp,
+          resources.movement,
+        );
+      } else {
+        this.renderLayer.cameraRig.copyGroundMovementDirection(
+          moveX,
+          moveZ,
+          resources.movement,
+        );
+      }
       resources.jumpInputState.pressed = this.input.wasPressed('jump');
       resources.jumpInputState.held = this.input.isDown('jump');
       resources.jumpInputState.released = this.input.wasReleased('jump');
@@ -228,6 +248,7 @@ export class CultivationLevelRuntime {
 
     resources.radiation.update(resources.radiationTargets);
     if (resources.deathSequence.isPlaying) resources.controller.update();
+    resources.buttonDoorCoordinator.update(deltaSeconds);
     if (resources.deathSequence.isPlaying) this.updateBobVisual(deltaSeconds, resources);
     this.input.endFixedUpdate();
   }
@@ -262,6 +283,7 @@ export class CultivationLevelRuntime {
         const diagnostics = assembly.getDiagnostics();
         return `${diagnostics.id} / ${diagnostics.supportTargetId}: ${diagnostics.state} p=${diagnostics.supportProgress.toFixed(2)}/${diagnostics.travelProgress.toFixed(2)} pos=${diagnostics.position.map((value) => value.toFixed(2)).join(',')} collision=${diagnostics.collisionEnabled ? 'on' : 'off'} transitions=${diagnostics.transitionCount}`;
       });
+      const doorObstructions = [...resources.blastDoor.obstructionIds];
       resources.debugPanel.setRuntimeDiagnostics([
         `active level: cultivation-level-2`,
         `lifecycle / gameplay: ${this.state} / ${readModel.state}`,
@@ -274,6 +296,8 @@ export class CultivationLevelRuntime {
         `last failure / death slime: ${readModel.lastFailure} / ${this.lastDeathSlimeId ?? 'none'}`,
         `radiation requests: ${resources.radiation.failureRequestCount}`,
         `bodies / colliders / scene objects: ${resources.manager.registeredCount} / ${resources.collisionWorld.colliderCount} / ${this.renderLayer.getDiagnostics().sceneObjects}`,
+        `wall button: ${resources.wallButton.isPressed ? 'pressed' : 'released'} occupant=${resources.wallButton.occupantId ?? 'none'} enabled=${resources.wallButton.enabled ? 'yes' : 'no'}`,
+        `blast door: ${resources.blastDoor.state} p=${resources.blastDoor.progress.toFixed(3)} target=${resources.blastDoor.desiredOpen ? 'open' : 'closed'} collision=${resources.blastDoor.collisionEnabled ? 'on' : 'off'} obstruction=${doorObstructions.join(',') || 'none'} transitions=${resources.blastDoor.transitionCount}`,
         ...assemblyDiagnostics,
       ].join('\n'));
     }
@@ -384,6 +408,55 @@ export class CultivationLevelRuntime {
         initialActiveSlimeId: this.initialProgression.activeSlimeId,
       });
 
+      const buttonDoorAuthoring = CULTIVATION_FOUNDATION_MANIFEST.wallButtonDoor;
+      const wallButtonOccupants = [
+        { id: 'bob', body: pair.bobBody },
+        { id: 'goop', body: pair.goopBody },
+      ] as const;
+      const requiredWallButtonOccupant = wallButtonOccupants.find(
+        ({ id }) => id === buttonDoorAuthoring.button.requiredOccupantId,
+      );
+      if (!requiredWallButtonOccupant) {
+        throw new Error(
+          `Unknown wall-button occupant: ${buttonDoorAuthoring.button.requiredOccupantId}`,
+        );
+      }
+      const wallButton = new WallButton({
+        id: buttonDoorAuthoring.button.id,
+        collisionWorld,
+        surfaceRegistry,
+        position: buttonDoorAuthoring.button.position,
+        surfaceSize: buttonDoorAuthoring.button.surfaceSize,
+        contactCentre: buttonDoorAuthoring.button.contactCentre,
+        contactSize: buttonDoorAuthoring.button.contactSize,
+        requiredOccupant: requiredWallButtonOccupant,
+      });
+      rollback(() => wallButton.dispose());
+      scene.root.add(wallButton.root);
+
+      const blastDoor = new VerticalBlastDoor({
+        id: buttonDoorAuthoring.door.id,
+        collisionWorld,
+        surfaceRegistry,
+        closedPosition: buttonDoorAuthoring.door.closedPosition,
+        panelSize: buttonDoorAuthoring.door.panelSize,
+        travelAxis: buttonDoorAuthoring.door.travelAxis,
+        travelDistance: buttonDoorAuthoring.door.travelDistance,
+        openingDurationSeconds: buttonDoorAuthoring.door.openingDurationSeconds,
+        closingDurationSeconds: buttonDoorAuthoring.door.closingDurationSeconds,
+        obstructionCentre: buttonDoorAuthoring.door.obstructionCentre,
+        obstructionSize: buttonDoorAuthoring.door.obstructionSize,
+      });
+      rollback(() => blastDoor.dispose());
+      scene.root.add(blastDoor.root);
+
+      const buttonDoorCoordinator = new WallButtonDoorCoordinator(
+        wallButton,
+        blastDoor,
+        wallButtonOccupants,
+      );
+      rollback(() => buttonDoorCoordinator.dispose());
+
       const deathSequence = new DeathSequence();
       let radiation: RadioactiveHazardSystem;
       const controller = new CultivationLevelController({
@@ -393,20 +466,37 @@ export class CultivationLevelRuntime {
         requestDeath: (recovery, dyingSlimeId) =>
           this.requestPlayerDeath(recovery, dyingSlimeId),
         cancelTransients: () => radiation?.reset(),
-        puzzleComponents: CULTIVATION_FOUNDATION_MANIFEST.structuralAssemblies.flatMap(
-          (authoring, index) => [
-            {
-              id: `${authoring.id}-support-target`,
-              groupId: authoring.puzzleGroupId,
-              component: dissolveTargets[index]!,
-            },
-            {
-              id: authoring.id,
-              groupId: authoring.puzzleGroupId,
-              component: structuralAssemblies[index]!,
-            },
-          ],
-        ),
+        puzzleComponents: [
+          {
+            id: `${buttonDoorAuthoring.id}-coordinator`,
+            groupId: buttonDoorAuthoring.puzzleGroupId,
+            component: buttonDoorCoordinator,
+          },
+          {
+            id: buttonDoorAuthoring.button.id,
+            groupId: buttonDoorAuthoring.puzzleGroupId,
+            component: wallButton,
+          },
+          {
+            id: buttonDoorAuthoring.door.id,
+            groupId: buttonDoorAuthoring.puzzleGroupId,
+            component: blastDoor,
+          },
+          ...CULTIVATION_FOUNDATION_MANIFEST.structuralAssemblies.flatMap(
+            (authoring, index) => [
+              {
+                id: `${authoring.id}-support-target`,
+                groupId: authoring.puzzleGroupId,
+                component: dissolveTargets[index]!,
+              },
+              {
+                id: authoring.id,
+                groupId: authoring.puzzleGroupId,
+                component: structuralAssemblies[index]!,
+              },
+            ],
+          ),
+        ],
       });
       rollback(() => controller.dispose());
       radiation = new RadioactiveHazardSystem(
@@ -467,9 +557,19 @@ export class CultivationLevelRuntime {
       rollback(unsubscribeControllerObjective);
       const unsubscribeControllerProgress = controller.events.on(
         'progressChanged',
-        () => this.host.dataset.gameState = controller.readModel.state,
+        () => {
+          this.host.dataset.gameState = controller.readModel.state;
+          buttonDoorCoordinator.setEnabled(
+            controller.readModel.state === 'playing' &&
+            controller.readModel.roomId === 'cultivation-room-2',
+          );
+        },
       );
       rollback(unsubscribeControllerProgress);
+      buttonDoorCoordinator.setEnabled(
+        controller.readModel.state === 'playing' &&
+        controller.readModel.roomId === 'cultivation-room-2',
+      );
       const notifyManager = () => this.notifyHUD();
       const unsubscribeManager = [
         manager.events.on('activeChanged', notifyManager),
@@ -483,7 +583,8 @@ export class CultivationLevelRuntime {
 
       this.resources = {
         scene, collisionWorld, surfaceRegistry, dissolveTargets,
-        structuralAssemblies, manager, pair, controller,
+        structuralAssemblies, wallButton, blastDoor, buttonDoorCoordinator,
+        manager, pair, controller,
         radiation, radiationTargets, bobVisual, pairPresentation, burst,
         deathSequence, deathScreen, bobFacing: new BlobFacing(), bobVisualState,
         jumpInputState: {
@@ -556,6 +657,9 @@ export class CultivationLevelRuntime {
     resources.debugPanel?.dispose();
     resources.controller.dispose();
     resources.radiation.dispose();
+    resources.buttonDoorCoordinator.dispose();
+    resources.blastDoor.dispose();
+    resources.wallButton.dispose();
     for (const assembly of resources.structuralAssemblies) assembly.dispose();
     for (const target of resources.dissolveTargets) target.dispose();
     resources.burst.dispose();
