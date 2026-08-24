@@ -39,6 +39,24 @@ test('shared brand markup stays decorative and loaders reuse the simple mark', (
   assert.doesNotMatch(loader, new RegExp(BRAND_ASSETS.detailedMark));
 });
 
+test('every live game-flow loader uses the shared branded markup', async () => {
+  const gameFlowUi = await readFile(
+    new URL('src/ui/GameFlowUI.ts', repositoryRoot),
+    'utf8',
+  );
+
+  assert.doesNotMatch(gameFlowUi, /class="[^"]*\bloading-mark\b[^"]*"/);
+
+  for (const panel of ['loading', 'restarting', 'transitioning']) {
+    assert.match(
+      gameFlowUi,
+      new RegExp(
+        `data-flow-panel="${panel}"[\\s\\S]*?\\$\\{createBrandedLoaderMarkup\\(\\)\\}`,
+      ),
+    );
+  }
+});
+
 test('document metadata and README use deployment-safe brand paths', async () => {
   const [indexHtml, readme, favicon] = await Promise.all([
     readFile(new URL('index.html', repositoryRoot), 'utf8'),

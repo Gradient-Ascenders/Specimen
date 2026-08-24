@@ -447,7 +447,7 @@ export class GameFlowUI {
 
       <section class="flow-screen" data-flow-panel="transitioning" aria-labelledby="transition-heading" hidden>
         <div class="flow-card restart-card">
-          <div class="loading-mark" aria-hidden="true"></div>
+          ${createBrandedLoaderMarkup()}
           <p class="flow-eyebrow">Cultivation runtime</p>
           <h1 id="transition-heading" data-transition-message>Entering Level 2…</h1>
           <p role="status" aria-live="polite">Transferring the specimen pair.</p>
