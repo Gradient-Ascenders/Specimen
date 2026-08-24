@@ -171,12 +171,7 @@ export class ContainmentLevelController {
     if (this.stateValue === 'complete') return;
     if (this.stateValue === 'completing') {
       if (this.scene.roomFive.updateEnding(deltaSeconds)) {
-        this.stateValue = 'complete';
-        this.completionCountValue += 1;
-        this.events.emit('completed', {
-          levelId: 'containment',
-          nextLevelId: 'level-2',
-        });
+        this.completeLevel();
       }
       return;
     }
@@ -213,15 +208,24 @@ export class ContainmentLevelController {
 
   recoverActiveCheckpoint(): void {
     this.checkpoints.recover(this.body);
+    this.scene.reconcilePresentationAfterRecovery();
   }
 
   /** Development-only shortcut that preserves normal checkpoint invariants. */
   teleportToRoomForDebug(roomId: ContainmentRoomId): void {
     this.checkpoints.activate(DEBUG_ROOM_ENTRY_CHECKPOINT_IDS[roomId]);
     this.checkpoints.recover(this.body);
+    this.scene.reconcilePresentationAfterRecovery();
     this.stateValue = 'playing';
     this.setActiveRoom(roomId);
     this.leverAdhesionSeconds = 0;
+  }
+
+  /** Development-only shortcut that exercises the normal level handoff event. */
+  completeForDebug(): boolean {
+    if (this.stateValue !== 'playing') return false;
+    this.completeLevel();
+    return true;
   }
 
   reset(): void {
@@ -234,6 +238,7 @@ export class ContainmentLevelController {
     this.leverAdhesionSeconds = 0;
     this.lastFailureIdValue = 'none';
     this.completionCountValue = 0;
+    this.scene.resetPresentation();
   }
 
   dispose(): void {
@@ -377,6 +382,7 @@ export class ContainmentLevelController {
   private setActiveRoom(roomId: ContainmentRoomId, force = false): void {
     if (!force && this.activeRoomIdValue === roomId) return;
     this.activeRoomIdValue = roomId;
+    this.scene.lighting.setActiveRoom(roomId);
     this.events.emit('objectiveChanged', {
       roomId,
       objective: CONTAINMENT_ROOM_OBJECTIVES[roomId],
@@ -385,10 +391,21 @@ export class ContainmentLevelController {
 
   private requestFailure(failureId: string): boolean {
     if (this.stateValue !== 'playing') return false;
-    const accepted = this.requestDeathAction(() =>
-      this.checkpoints.recover(this.body));
+    const accepted = this.requestDeathAction(() => {
+      this.checkpoints.recover(this.body);
+      this.scene.reconcilePresentationAfterRecovery();
+    });
     if (accepted) this.lastFailureIdValue = failureId;
     return accepted;
+  }
+
+  private completeLevel(): void {
+    this.stateValue = 'complete';
+    this.completionCountValue += 1;
+    this.events.emit('completed', {
+      levelId: 'containment',
+      nextLevelId: 'level-2',
+    });
   }
 
   private readonly isSpawnSafe = (

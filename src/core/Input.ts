@@ -9,7 +9,7 @@ export type InputAction =
   | 'fireAbility'
   | 'debugReset'
   | 'debugTestRecovery'
-  | 'debugToggleLevel'
+  | 'debugCompleteLevel'
   | 'debugTeleportRoomOne'
   | 'debugTeleportRoomTwo'
   | 'debugTeleportRoomThree'
@@ -35,7 +35,7 @@ export const DEFAULT_ACTION_BINDINGS = {
   fireAbility: [{ kind: 'mouseButton', button: 0 }],
   debugReset: [{ kind: 'key', code: 'KeyR' }],
   debugTestRecovery: [{ kind: 'key', code: 'KeyF' }],
-  debugToggleLevel: [{ kind: 'key', code: 'Digit0' }],
+  debugCompleteLevel: [{ kind: 'key', code: 'Digit0' }],
   debugTeleportRoomOne: [{ kind: 'key', code: 'Digit1' }],
   debugTeleportRoomTwo: [{ kind: 'key', code: 'Digit2' }],
   debugTeleportRoomThree: [{ kind: 'key', code: 'Digit3' }],

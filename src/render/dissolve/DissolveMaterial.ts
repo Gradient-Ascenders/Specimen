@@ -14,8 +14,10 @@ import {
 export const DEFAULT_DISSOLVE_NOISE_SCALE = 1.75;
 export const DEFAULT_DISSOLVE_EDGE_WIDTH = 0.075;
 export const DEFAULT_DISSOLVE_EDGE_COLOUR = 0xb7ff57;
+export const DEFAULT_AIM_HIGHLIGHT_COLOUR = 0xd7ff65;
+export const DEFAULT_BURN_HIGHLIGHT_COLOUR = 0xb4ff45;
 
-const SURFACE_PROGRAM_CACHE_KEY = 'specimen-dissolve-standard-surface-v2';
+const SURFACE_PROGRAM_CACHE_KEY = 'specimen-dissolve-standard-surface-v4';
 const SHADOW_PROGRAM_CACHE_KEY = 'specimen-dissolve-shadow-mask-v2';
 
 interface DissolveMaskUniforms {
@@ -25,15 +27,29 @@ interface DissolveMaskUniforms {
   uNoiseOffset: THREE.IUniform<THREE.Vector3>;
 }
 
+interface CorrosionPresentationUniforms {
+  [name: string]: THREE.IUniform;
+  uAimHighlightStrength: THREE.IUniform<number>;
+  uAimSelectedStrength: THREE.IUniform<number>;
+  uAimHighlightColour: THREE.IUniform<THREE.Color>;
+  uBurnHighlightStrength: THREE.IUniform<number>;
+  uBurnHighlightColour: THREE.IUniform<THREE.Color>;
+  uCorrosionPresentationTime: THREE.IUniform<number>;
+}
+
 export interface DissolveMaterialOptions {
   readonly sourceMaterial: THREE.MeshStandardMaterial;
   readonly maskUniforms: DissolveMaskUniforms;
+  readonly presentationUniforms: CorrosionPresentationUniforms;
   readonly edgeColour?: THREE.ColorRepresentation;
   readonly edgeWidth?: number;
 }
 
 export interface DissolveMaterialBundleDiagnostics {
   readonly dissolveAmount: number;
+  readonly aimHighlightStrength: number;
+  readonly aimSelectedStrength: number;
+  readonly burnHighlightStrength: number;
   readonly materialCount: number;
   readonly hasDepthMaterial: boolean;
   readonly hasDistanceMaterial: boolean;
@@ -69,6 +85,18 @@ export class DissolveMaterial extends THREE.MeshStandardMaterial {
       shader.uniforms.uNoiseOffset = options.maskUniforms.uNoiseOffset;
       shader.uniforms.uDissolveEdgeWidth = edgeWidthUniform;
       shader.uniforms.uDissolveEdgeColour = edgeColourUniform;
+      shader.uniforms.uAimHighlightStrength =
+        options.presentationUniforms.uAimHighlightStrength;
+      shader.uniforms.uAimSelectedStrength =
+        options.presentationUniforms.uAimSelectedStrength;
+      shader.uniforms.uAimHighlightColour =
+        options.presentationUniforms.uAimHighlightColour;
+      shader.uniforms.uBurnHighlightStrength =
+        options.presentationUniforms.uBurnHighlightStrength;
+      shader.uniforms.uBurnHighlightColour =
+        options.presentationUniforms.uBurnHighlightColour;
+      shader.uniforms.uCorrosionPresentationTime =
+        options.presentationUniforms.uCorrosionPresentationTime;
 
       shader.vertexShader = injectDissolveVertexShader(shader.vertexShader);
       shader.fragmentShader = shader.fragmentShader
@@ -96,6 +124,7 @@ export class DissolveMaterialBundle {
   readonly distanceMaterial: THREE.MeshDistanceMaterial;
 
   private readonly maskUniforms: DissolveMaskUniforms;
+  private readonly presentationUniforms: CorrosionPresentationUniforms;
   private disposed = false;
 
   constructor(sourceMaterials: readonly THREE.Material[], targetId: string) {
@@ -120,11 +149,24 @@ export class DissolveMaterialBundle {
       uNoiseScale: { value: DEFAULT_DISSOLVE_NOISE_SCALE },
       uNoiseOffset: { value: createDeterministicNoiseOffset(targetId) },
     };
+    this.presentationUniforms = {
+      uAimHighlightStrength: { value: 0 },
+      uAimSelectedStrength: { value: 0 },
+      uAimHighlightColour: {
+        value: new THREE.Color(DEFAULT_AIM_HIGHLIGHT_COLOUR),
+      },
+      uBurnHighlightStrength: { value: 0 },
+      uBurnHighlightColour: {
+        value: new THREE.Color(DEFAULT_BURN_HIGHLIGHT_COLOUR),
+      },
+      uCorrosionPresentationTime: { value: 0 },
+    };
     this.surfaceMaterials = standardMaterials.map(
       (sourceMaterial) =>
         new DissolveMaterial({
           sourceMaterial,
           maskUniforms: this.maskUniforms,
+          presentationUniforms: this.presentationUniforms,
         }),
     );
     this.depthMaterial = createDepthMaterial(
@@ -145,11 +187,47 @@ export class DissolveMaterialBundle {
     const offset = this.maskUniforms.uNoiseOffset.value;
     return {
       dissolveAmount: this.dissolveAmount,
+      aimHighlightStrength:
+        this.presentationUniforms.uAimHighlightStrength.value,
+      aimSelectedStrength:
+        this.presentationUniforms.uAimSelectedStrength.value,
+      burnHighlightStrength:
+        this.presentationUniforms.uBurnHighlightStrength.value,
       materialCount: this.surfaceMaterials.length,
       hasDepthMaterial: true,
       hasDistanceMaterial: true,
       noiseOffset: [offset.x, offset.y, offset.z],
     };
+  }
+
+  setCorrosionPresentation(
+    aimStrength: number,
+    selectedStrength: number,
+    burnStrength: number,
+    timeSeconds: number,
+  ): void {
+    for (const [name, value] of [
+      ['aim strength', aimStrength],
+      ['selected strength', selectedStrength],
+      ['burn strength', burnStrength],
+      ['presentation time', timeSeconds],
+    ] as const) {
+      if (!Number.isFinite(value)) {
+        throw new Error(`Dissolve ${name} must be finite.`);
+      }
+    }
+    this.presentationUniforms.uAimHighlightStrength.value =
+      THREE.MathUtils.clamp(aimStrength, 0, 1);
+    this.presentationUniforms.uAimSelectedStrength.value =
+      THREE.MathUtils.clamp(selectedStrength, 0, 1);
+    this.presentationUniforms.uBurnHighlightStrength.value =
+      THREE.MathUtils.clamp(burnStrength, 0, 1);
+    this.presentationUniforms.uCorrosionPresentationTime.value =
+      Math.max(0, timeSeconds);
+  }
+
+  clearCorrosionPresentation(): void {
+    this.setCorrosionPresentation(0, 0, 0, 0);
   }
 
   setDissolveAmount(amount: number): void {

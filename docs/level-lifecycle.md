@@ -104,9 +104,17 @@ capture player input. Production builds omit it by default; a deliberate
 `?debug=1` query enables the same hidden-by-default tools for production-build
 diagnosis and verification.
 
+## Multi-level application ownership
+
+Issue #93 adds `GameSessionCoordinator` above the concrete level runtimes. The
+coordinator owns the current runtime, forwards lifecycle/render/HUD operations,
+and performs the Containment-to-Cultivation replacement from an explicit
+progression snapshot. Concrete level resources remain level-owned; see
+`docs/cultivation-level-foundation.md` for transition and recovery details.
+
 ## Current limits
 
-This boundary owns only the current Level 1 containment teaching grey-box. It
-does not implement multi-level loading, asynchronous asset management, pause UI,
-title screens, or transitions. Those features can call the small public
-lifecycle API without learning which current subsystems participate in restart.
+Each concrete runtime still owns only its own level. The application coordinator
+currently supports the single authored Containment-to-Cultivation handoff; it is
+not a general route graph or asynchronous asset manager. Cultivation Rooms 4–5
+remain unplanned, and there is no transition beyond the Level 2 foundation.

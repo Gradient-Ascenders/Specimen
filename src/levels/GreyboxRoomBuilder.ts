@@ -126,6 +126,7 @@ export class GreyboxRoomBuilder {
     return mesh;
   }
 
+  /** Add a simple authoring light for grey-box rooms without a lighting rig. */
   addLight(
     name: string,
     position: readonly [number, number, number],

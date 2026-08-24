@@ -81,8 +81,8 @@ test('room debug teleports use top-row number keys without repeat retriggers', (
   }
 });
 
-test('level debug toggle uses zero without repeat retriggers', () => {
-  assertOrphanRepeatIsIgnored('Digit0', 'debugToggleLevel');
+test('level completion debug shortcut uses zero without repeat retriggers', () => {
+  assertOrphanRepeatIsIgnored('Digit0', 'debugCompleteLevel');
 });
 
 test('movement-key orphan repeat cannot reactivate after input reset', () => {

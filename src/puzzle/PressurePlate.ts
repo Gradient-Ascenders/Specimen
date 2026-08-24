@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-import { EventBus } from '../core/EventBus';
-import { Trigger } from './Trigger';
+import { EventBus } from '../core/EventBus.ts';
+import { Trigger } from './Trigger.ts';
 
 export interface PressurePlateEvents {
   changed: {

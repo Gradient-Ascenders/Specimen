@@ -254,9 +254,6 @@ export class RoomFourGreybox {
     this.builder.addCollider({ name: 'room-4-entry-duct-floor', size: [2.4, 0.25, 1.2], position: [9, 31.05, 80.1], material: duct });
     this.builder.addCollider({ name: 'room-4-exit-platform', size: [4.5, 0.5, 3], position: [9, 74.5, 90.2], material: floor });
 
-    this.builder.addLight('room-4-bottom-light', [9, 32, 85.5], 0xffb13b, 13, 18);
-    this.builder.addLight('room-4-mid-light', [9, 52, 85.5], 0xff6b32, 12, 20);
-    this.builder.addLight('room-4-top-light', [9, 74, 88], 0x8dffb8, 14, 20);
   }
 
   private hideGameplayColliders(): void {

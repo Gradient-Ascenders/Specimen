@@ -3,13 +3,17 @@ export type DebugRoomId = 1 | 2 | 3 | 4 | 5;
 interface GreyboxTestPanelOptions {
   onReset: () => void;
   onTestRecovery: () => void;
-  onToggleLevel: () => 1 | 2;
-  onTeleportRoom: (roomId: DebugRoomId) => boolean;
+  onCompleteLevel: () => boolean;
+  onTeleportRoom: (roomId: DebugRoomId) => void;
   onRunSlopeIdleRegression: () => string;
   onRunSlimeRosterRegression: () => string;
   onRunTwoBodySwitchingRegression: () => string;
   onRunDissolveRegression: () => string;
   onToggleCollisionOverlay: () => boolean;
+  onCycleBobLighting: () => string;
+  onCycleGoopLighting: () => string;
+  onFinalizeLightingSkip: () => void;
+  onResetLightingPreview: () => void;
 }
 
 /** DOM controls and legend used only by the grey-box development harness. */
@@ -18,12 +22,9 @@ export class GreyboxTestPanel {
 
   private readonly status: HTMLElement;
   private readonly runtimeStatus: HTMLElement;
-  private readonly levelLabel: HTMLElement;
-  private readonly title: HTMLElement;
-  private readonly summary: HTMLElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly fallButton: HTMLButtonElement;
-  private readonly levelButton: HTMLButtonElement;
+  private readonly completeLevelButton: HTMLButtonElement;
   private readonly roomButtons: readonly HTMLButtonElement[];
   private readonly collapseButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
@@ -31,6 +32,10 @@ export class GreyboxTestPanel {
   private readonly twoBodySwitchingRegressionButton: HTMLButtonElement;
   private readonly dissolveRegressionButton: HTMLButtonElement;
   private readonly collisionOverlayButton: HTMLButtonElement;
+  private readonly bobLightingButton: HTMLButtonElement;
+  private readonly goopLightingButton: HTMLButtonElement;
+  private readonly finalizeLightingButton: HTMLButtonElement;
+  private readonly resetLightingButton: HTMLButtonElement;
 
   constructor(private readonly options: GreyboxTestPanelOptions) {
     this.element = document.createElement('section');
@@ -46,9 +51,9 @@ export class GreyboxTestPanel {
       >−</button>
 
       <div class="test-panel-content">
-        <p class="eyebrow" data-level-label>Level 1 containment diagnostics</p>
-        <h1 data-level-title>Containment: climb + bounce</h1>
-        <p class="summary" data-level-summary>Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump. As Goop, hold right mouse to aim and press left mouse to fire acid.</p>
+        <p class="eyebrow">Level 1 containment diagnostics</p>
+        <h1>Containment: climb + bounce</h1>
+        <p class="summary">Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump. As Goop, hold right mouse to aim and press left mouse to fire acid.</p>
 
         <ul class="case-list" aria-label="Collision test case legend">
           <li style="--case-colour: #81909b">Floor</li>
@@ -70,7 +75,7 @@ export class GreyboxTestPanel {
         <div class="controls">
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test death <kbd>F</kbd></button>
-          <button type="button" data-action="toggle-level">Switch to Level 2 <kbd>0</kbd></button>
+          <button type="button" data-action="complete-level">Enter Level 2 <kbd>0</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="1">Room 1 <kbd>1</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="2">Room 2 <kbd>2</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="3">Room 3 <kbd>3</kbd></button>
@@ -81,6 +86,10 @@ export class GreyboxTestPanel {
           <button type="button" data-action="two-body-switching-regression">Check two-body switching</button>
           <button type="button" data-action="dissolve-regression">Check Goop dissolve</button>
           <button type="button" data-action="collision-overlay" aria-pressed="false">Show collision overlay</button>
+          <button type="button" data-action="bob-lighting">Cycle Bob hatch lighting</button>
+          <button type="button" data-action="goop-lighting">Cycle Goop release lighting</button>
+          <button type="button" data-action="finalize-lighting">Preview cutscene skip final state</button>
+          <button type="button" data-action="reset-lighting">Reset lighting preview</button>
         </div>
 
         <p class="eyebrow diagnostics-heading">Runtime / movement diagnostics</p>
@@ -92,21 +101,14 @@ export class GreyboxTestPanel {
     const runtimeStatus = this.element.querySelector<HTMLElement>(
       '[data-runtime-status]',
     );
-    const levelLabel = this.element.querySelector<HTMLElement>(
-      '[data-level-label]',
-    );
-    const title = this.element.querySelector<HTMLElement>('[data-level-title]');
-    const summary = this.element.querySelector<HTMLElement>(
-      '[data-level-summary]',
-    );
     const resetButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="reset"]',
     );
     const fallButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="fall"]',
     );
-    const levelButton = this.element.querySelector<HTMLButtonElement>(
-      '[data-action="toggle-level"]',
+    const completeLevelButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="complete-level"]',
     );
     const roomButtons = Array.from(
       this.element.querySelectorAll<HTMLButtonElement>(
@@ -135,35 +137,45 @@ export class GreyboxTestPanel {
       this.element.querySelector<HTMLButtonElement>(
         '[data-action="collision-overlay"]',
       );
+    const bobLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="bob-lighting"]',
+    );
+    const goopLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="goop-lighting"]',
+    );
+    const finalizeLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="finalize-lighting"]',
+    );
+    const resetLightingButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="reset-lighting"]',
+    );
 
     if (
       !status ||
       !runtimeStatus ||
-      !levelLabel ||
-      !title ||
-      !summary ||
       !resetButton ||
       !fallButton ||
-      !levelButton ||
+      !completeLevelButton ||
       roomButtons.length !== 5 ||
       !collapseButton ||
       !slopeRegressionButton ||
       !slimeRosterRegressionButton ||
       !twoBodySwitchingRegressionButton ||
       !dissolveRegressionButton ||
-      !collisionOverlayButton
+      !collisionOverlayButton ||
+      !bobLightingButton ||
+      !goopLightingButton ||
+      !finalizeLightingButton ||
+      !resetLightingButton
     ) {
       throw new Error('Missing collision test controls.');
     }
 
     this.status = status;
     this.runtimeStatus = runtimeStatus;
-    this.levelLabel = levelLabel;
-    this.title = title;
-    this.summary = summary;
     this.resetButton = resetButton;
     this.fallButton = fallButton;
-    this.levelButton = levelButton;
+    this.completeLevelButton = completeLevelButton;
     this.roomButtons = roomButtons;
     this.collapseButton = collapseButton;
     this.slopeRegressionButton = slopeRegressionButton;
@@ -172,10 +184,14 @@ export class GreyboxTestPanel {
       twoBodySwitchingRegressionButton;
     this.dissolveRegressionButton = dissolveRegressionButton;
     this.collisionOverlayButton = collisionOverlayButton;
+    this.bobLightingButton = bobLightingButton;
+    this.goopLightingButton = goopLightingButton;
+    this.finalizeLightingButton = finalizeLightingButton;
+    this.resetLightingButton = resetLightingButton;
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
-    this.levelButton.addEventListener('click', this.toggleLevel);
+    this.completeLevelButton.addEventListener('click', this.completeLevel);
     for (const button of this.roomButtons) {
       button.addEventListener('click', this.teleportRoomFromButton);
     }
@@ -200,12 +216,19 @@ export class GreyboxTestPanel {
       'click',
       this.toggleCollisionOverlay,
     );
+    this.bobLightingButton.addEventListener('click', this.cycleBobLighting);
+    this.goopLightingButton.addEventListener('click', this.cycleGoopLighting);
+    this.finalizeLightingButton.addEventListener(
+      'click',
+      this.finalizeLightingSkip,
+    );
+    this.resetLightingButton.addEventListener('click', this.resetLightingPreview);
   }
 
   dispose(): void {
     this.resetButton.removeEventListener('click', this.resetProbe);
     this.fallButton.removeEventListener('click', this.testRecovery);
-    this.levelButton.removeEventListener('click', this.toggleLevel);
+    this.completeLevelButton.removeEventListener('click', this.completeLevel);
     for (const button of this.roomButtons) {
       button.removeEventListener('click', this.teleportRoomFromButton);
     }
@@ -230,6 +253,13 @@ export class GreyboxTestPanel {
       'click',
       this.toggleCollisionOverlay,
     );
+    this.bobLightingButton.removeEventListener('click', this.cycleBobLighting);
+    this.goopLightingButton.removeEventListener('click', this.cycleGoopLighting);
+    this.finalizeLightingButton.removeEventListener(
+      'click',
+      this.finalizeLightingSkip,
+    );
+    this.resetLightingButton.removeEventListener('click', this.resetLightingPreview);
   }
 
   readonly resetProbe = (): void => {
@@ -243,41 +273,18 @@ export class GreyboxTestPanel {
       'Probe entered the recovery volume. Retry from the death screen.';
   };
 
+  readonly completeLevel = (): void => {
+    const accepted = this.options.onCompleteLevel();
+    this.status.textContent = accepted
+      ? 'Level 1 completion triggered. Entering Level 2…'
+      : 'Level 1 completion is already in progress.';
+  };
+
   readonly teleportRoom = (roomId: DebugRoomId): void => {
-    const teleported = this.options.onTeleportRoom(roomId);
-    this.status.textContent = teleported
-      ? `Both slimes teleported to the current level's Room ${roomId} entry.`
-      : `Room ${roomId} is not authored for the current level yet.`;
+    this.options.onTeleportRoom(roomId);
+    this.status.textContent =
+      `Probe teleported to the Room ${roomId} entry checkpoint.`;
   };
-
-  readonly toggleLevel = (): void => {
-    const levelId = this.options.onToggleLevel();
-    this.setActiveLevel(levelId);
-    this.status.textContent = `Development preview switched to Level ${levelId}, Room 1.`;
-  };
-
-  setActiveLevel(levelId: 1 | 2): void {
-    const isLevelTwo = levelId === 2;
-    this.levelLabel.textContent = isLevelTwo
-      ? 'Level 2 cultivation authoring preview'
-      : 'Level 1 containment diagnostics';
-    this.title.textContent = isLevelTwo
-      ? 'Cultivation: two-slime cooperation'
-      : 'Containment: climb + bounce';
-    this.summary.innerHTML = isLevelTwo
-      ? 'Rooms 1–3 preview Goop-created routes, split exits, and the upper/lower security-room flow. Press <kbd>0</kbd> to return to Level 1; <kbd>1</kbd>–<kbd>3</kbd> select authored rooms. Rooms 4–5 are not authored yet.'
-      : 'Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Press <kbd>0</kbd> for the Level 2 preview. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump.';
-    this.levelButton.innerHTML = isLevelTwo
-      ? 'Switch to Level 1 <kbd>0</kbd>'
-      : 'Switch to Level 2 <kbd>0</kbd>';
-    this.roomButtons.forEach((button, index) => {
-      const unavailable = isLevelTwo && index >= 3;
-      button.disabled = unavailable;
-      button.title = unavailable
-        ? `Level 2 Room ${index + 1} is not authored yet`
-        : '';
-    });
-  }
 
   markProbeAtSpawn(): void {
     this.status.textContent = 'Probe is at spawn.';
@@ -333,6 +340,27 @@ export class GreyboxTestPanel {
     this.status.textContent = visible
       ? 'Collision overlay enabled: cyan default, magenta sticky, amber soluble.'
       : 'Collision overlay hidden.';
+  };
+
+  private readonly cycleBobLighting = (): void => {
+    const state = this.options.onCycleBobLighting();
+    this.status.textContent = `Bob hatch lighting preview: ${state}.`;
+  };
+
+  private readonly cycleGoopLighting = (): void => {
+    const state = this.options.onCycleGoopLighting();
+    this.status.textContent = `Goop release lighting preview: ${state}.`;
+  };
+
+  private readonly finalizeLightingSkip = (): void => {
+    this.options.onFinalizeLightingSkip();
+    this.status.textContent =
+      'Cutscene lighting preview finalised through the skip contract.';
+  };
+
+  private readonly resetLightingPreview = (): void => {
+    this.options.onResetLightingPreview();
+    this.status.textContent = 'Lighting preview restored from gameplay state.';
   };
 
   setRuntimeDiagnostics(text: string): void {

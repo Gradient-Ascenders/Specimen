@@ -8,6 +8,11 @@ import type {
 } from '../render/slime/SlimeVisual.ts';
 import type { SlimeBurstDiagnostics } from '../render/slime/SlimeBurstPresentation.ts';
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import {
+  ContainmentLightingRig,
+  type ContainmentCutsceneLighting,
+  type ContainmentLightingDiagnostics,
+} from '../render/environment/containment/ContainmentLightingRig.ts';
 import { ContainmentTeachingScene } from './ContainmentTeachingScene.ts';
 import { RoomFiveGreybox, type RoomFiveHazardFailure } from './RoomFiveGreybox.ts';
 import { RoomFourGreybox, type RoomFourHazardFailure } from './RoomFourGreybox.ts';
@@ -26,6 +31,7 @@ export class ContainmentLevelScene {
   readonly roomThree: RoomThreeGreybox;
   readonly roomFour: RoomFourGreybox;
   readonly roomFive: RoomFiveGreybox;
+  readonly lighting: ContainmentLightingRig;
 
   constructor(
     requestHazardFailure: (failure: ContainmentHazardFailure) => void,
@@ -44,6 +50,22 @@ export class ContainmentLevelScene {
       this.roomFour.root,
       this.roomFive.root,
     );
+    this.lighting = new ContainmentLightingRig({
+      levelRoot: this.root,
+      roomOneArt: this.teaching.roomOneArt,
+      roomFour: this.roomFour,
+      roomFive: this.roomFive,
+    });
+    this.root.add(this.lighting.root);
+  }
+
+  /** Small #38-facing API; callers never need individual fixture objects. */
+  get cutsceneLighting(): ContainmentCutsceneLighting {
+    return this.lighting.cutsceneLighting;
+  }
+
+  get lightingDiagnostics(): ContainmentLightingDiagnostics {
+    return this.lighting.diagnostics;
   }
 
   get collisionMeshes(): readonly THREE.Mesh[] {
@@ -118,6 +140,15 @@ export class ContainmentLevelScene {
   update(deltaSeconds: number, visualState?: SlimeVisualState): void {
     this.teaching.update(deltaSeconds, visualState);
     this.roomThree.updatePresentation(deltaSeconds);
+    this.lighting.update(deltaSeconds);
+  }
+
+  resetPresentation(): void {
+    this.lighting.reset();
+  }
+
+  reconcilePresentationAfterRecovery(): void {
+    this.lighting.reconcileAuthoritativeState(true);
   }
 
   startDeath(position: Vector3State): boolean {
@@ -148,6 +179,7 @@ export class ContainmentLevelScene {
   }
 
   dispose(): void {
+    this.lighting.dispose();
     this.roomFive.dispose();
     this.roomFour.dispose();
     this.roomThree.dispose();
