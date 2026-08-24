@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
-import type { LaserContactTarget } from '../hazards/LaserHazard.ts';
 import {
   LEVEL_TWO_BOB_AIR_DUCT_LAYOUT,
   LevelTwoAirDuctGreybox,
@@ -202,19 +201,25 @@ export class LevelTwoPreviewScene {
   update(
     deltaSeconds: number,
     roomId: LevelTwoAuthoredRoomId,
-    target: LaserContactTarget,
-    occupants: Iterable<LevelTwoRoomTwoOccupant>,
+    occupants: readonly LevelTwoRoomTwoOccupant[],
   ): void {
     this.roomOne.updateRadiation(occupants);
     this.roomTwo.updateRadiation(occupants);
     this.roomThree.updateRadiation(occupants);
 
-    if (roomId === 1) {
-      this.roomOne.update(deltaSeconds);
-    } else if (roomId === 2) {
-      this.roomTwo.update(deltaSeconds, target, occupants);
-    } else {
-      this.roomThree.update(deltaSeconds, target);
+    this.roomOne.update(deltaSeconds);
+    let roomTwoOccupied = roomId === 2;
+    let roomThreeOccupied = roomId === 3;
+    for (const occupant of occupants) {
+      const occupiedRoomId = this.resolveRoomId(occupant.position);
+      roomTwoOccupied ||= occupiedRoomId === 2;
+      roomThreeOccupied ||= occupiedRoomId === 3;
+    }
+    if (roomTwoOccupied) {
+      this.roomTwo.update(deltaSeconds, occupants);
+    }
+    if (roomThreeOccupied) {
+      this.roomThree.update(deltaSeconds, occupants);
     }
 
     this.roomOneToTwoPassage.update(deltaSeconds, occupants);

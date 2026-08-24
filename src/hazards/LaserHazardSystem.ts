@@ -14,7 +14,10 @@ export interface LaserHazardSystemOptions {
    * Level integration should route this to:
    * `checkpointManager.recover(playerController)`.
    */
-  readonly requestRecovery: (hazard: LaserHazard) => void;
+  readonly requestRecovery: (
+    hazard: LaserHazard,
+    target: LaserContactTarget,
+  ) => void;
 }
 
 /**
@@ -28,11 +31,15 @@ export class LaserHazardSystem {
   readonly id: string;
 
   private readonly hazardsValue: readonly LaserHazard[];
-  private readonly requestRecovery: (hazard: LaserHazard) => void;
+  private readonly requestRecovery: (
+    hazard: LaserHazard,
+    target: LaserContactTarget,
+  ) => void;
 
   private contactLatched = false;
   private recoveryRequestCountValue = 0;
   private lastFailureHazardIdValue = 'none';
+  private lastFailureTargetIdValue = 'none';
 
   constructor(options: LaserHazardSystemOptions) {
     if (!options.id) {
@@ -76,6 +83,10 @@ export class LaserHazardSystem {
     return this.lastFailureHazardIdValue;
   }
 
+  get lastFailureTargetId(): string {
+    return this.lastFailureTargetIdValue;
+  }
+
   /**
    * Advance every authored beam, then perform one group-level lethal-contact
    * check. The first contact wins; crossing beams cannot request duplicate
@@ -85,9 +96,7 @@ export class LaserHazardSystem {
     deltaSeconds: number,
     target: LaserContactTarget,
   ): void {
-    for (const hazard of this.hazardsValue) {
-      hazard.update(deltaSeconds);
-    }
+    this.advanceHazards(deltaSeconds);
 
     let touchingHazard: LaserHazard | undefined;
     for (const hazard of this.hazardsValue) {
@@ -95,8 +104,45 @@ export class LaserHazardSystem {
       touchingHazard = hazard;
       break;
     }
+    this.resolveContact(touchingHazard, target);
+  }
 
-    if (!touchingHazard) {
+  /**
+   * Advance each beam once, then evaluate every persistent target against the
+   * resulting authoritative pose. Hazard order and target order are stable;
+   * the first contact owns the single recovery request for this fixed step.
+   */
+  updateTargets(
+    deltaSeconds: number,
+    targets: readonly LaserContactTarget[],
+  ): void {
+    this.advanceHazards(deltaSeconds);
+
+    let touchingHazard: LaserHazard | undefined;
+    let touchingTarget: LaserContactTarget | undefined;
+    for (const hazard of this.hazardsValue) {
+      for (const target of targets) {
+        if (!hazard.intersects(target)) continue;
+        touchingHazard = hazard;
+        touchingTarget = target;
+        break;
+      }
+      if (touchingHazard) break;
+    }
+    this.resolveContact(touchingHazard, touchingTarget);
+  }
+
+  private advanceHazards(deltaSeconds: number): void {
+    for (const hazard of this.hazardsValue) {
+      hazard.update(deltaSeconds);
+    }
+  }
+
+  private resolveContact(
+    touchingHazard: LaserHazard | undefined,
+    touchingTarget: LaserContactTarget | undefined,
+  ): void {
+    if (!touchingHazard || !touchingTarget) {
       this.contactLatched = false;
       return;
     }
@@ -106,11 +152,12 @@ export class LaserHazardSystem {
     this.contactLatched = true;
     this.recoveryRequestCountValue += 1;
     this.lastFailureHazardIdValue = touchingHazard.id;
+    this.lastFailureTargetIdValue = touchingTarget.id ?? 'anonymous';
 
     // Checkpoint recovery may synchronously reset this system through its
     // PuzzleRegistry group before recovering the player. Do no further work
     // after the callback in this fixed step.
-    this.requestRecovery(touchingHazard);
+    this.requestRecovery(touchingHazard, touchingTarget);
   }
 
   /** Restore authored beam state and re-arm lethal contact detection. */

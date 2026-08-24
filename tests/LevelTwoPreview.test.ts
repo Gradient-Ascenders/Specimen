@@ -15,6 +15,10 @@ import {
   LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z,
   LevelTwoPreviewScene,
 } from '../src/levels/LevelTwoPreviewScene.ts';
+import {
+  advanceLevelTwoPreviewProgression,
+  createLevelTwoPreviewProgression,
+} from '../src/levels/LevelTwoPreviewProgression.ts';
 import { CollisionHit, CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 
@@ -29,6 +33,58 @@ const findCollider = (
   assert.ok(mesh, `Missing collider ${name}`);
   return mesh;
 };
+
+test('Goop reaching Room 2 early does not advance Bob or the shared objective', () => {
+  const initial = createLevelTwoPreviewProgression(1);
+  const goopEnteredEarly = advanceLevelTwoPreviewProgression(initial, {
+    bob: 1,
+    goop: 2,
+  });
+
+  assert.equal(goopEnteredEarly.roomId, 1);
+  assert.deepEqual(goopEnteredEarly.recoveryRoomIds, {
+    bob: 1,
+    goop: 2,
+  });
+
+  const bobCompletedRoomOne = advanceLevelTwoPreviewProgression(
+    goopEnteredEarly,
+    { bob: 2, goop: 2 },
+  );
+  assert.equal(bobCompletedRoomOne.roomId, 2);
+  assert.deepEqual(bobCompletedRoomOne.recoveryRoomIds, {
+    bob: 2,
+    goop: 2,
+  });
+});
+
+test('Room 3 remains split until Bob and Goop reach their own entrances', () => {
+  const roomTwo = createLevelTwoPreviewProgression(2);
+  const bobEnteredFirst = advanceLevelTwoPreviewProgression(roomTwo, {
+    bob: 3,
+    goop: 2,
+  });
+
+  assert.equal(bobEnteredFirst.roomId, 2);
+  assert.equal(bobEnteredFirst.bobEnteredRoomThree, true);
+  assert.equal(bobEnteredFirst.goopEnteredRoomThree, false);
+  assert.deepEqual(bobEnteredFirst.recoveryRoomIds, {
+    bob: 3,
+    goop: 2,
+  });
+
+  const bothEntered = advanceLevelTwoPreviewProgression(bobEnteredFirst, {
+    bob: 3,
+    goop: 3,
+  });
+  assert.equal(bothEntered.roomId, 3);
+  assert.equal(bothEntered.bobEnteredRoomThree, true);
+  assert.equal(bothEntered.goopEnteredRoomThree, true);
+  assert.deepEqual(bothEntered.recoveryRoomIds, {
+    bob: 3,
+    goop: 3,
+  });
+});
 
 test('Level 2 preview composes three large connected rooms with unique colliders', () => {
   const scene = createScene();
@@ -107,7 +163,6 @@ test('dissolving supports deterministically lands traversal platforms and reset 
   scene.update(
     1,
     1,
-    { position: { x: 0, y: 1000, z: 0 }, radiusMetres: 0.45 },
     [],
   );
   assert.equal(roomOneDrop.state, 'landed');
@@ -122,7 +177,6 @@ test('dissolving supports deterministically lands traversal platforms and reset 
   scene.update(
     1,
     2,
-    { position: { x: 0, y: 1000, z: 0 }, radiusMetres: 0.45 },
     [],
   );
   assert.equal(roomTwoDrop.state, 'landed');
@@ -364,19 +418,18 @@ test('unlocked passage shutters raise near either slime and lower once clear', (
     radiusMetres: 0.45,
   };
 
-  scene.update(1, 1, bob, [bob, goop]);
+  scene.update(1, 1, [bob, goop]);
   assert.equal(door.state, 'open');
   assert.equal(door.openProgress, 1);
   assert.ok(door.collisionMesh.position.y > closedY + 4);
 
-  scene.update(1, 1, goop, [goop]);
+  scene.update(1, 1, [goop]);
   assert.equal(door.state, 'open');
   assert.equal(door.openProgress, 1);
 
   scene.update(
     1,
     1,
-    { position: { x: 0, y: 1000, z: 0 }, radiusMetres: 0.45 },
     [],
   );
   assert.equal(door.state, 'closed');
@@ -397,7 +450,7 @@ test('Room 2 button unlocks Goop shutter only while Bob remains attached', () =>
     radiusMetres: 0.45,
   };
 
-  scene.update(1, 2, goop, [goop]);
+  scene.update(1, 2, [goop]);
   assert.equal(door.locked, true);
   assert.equal(door.state, 'closed');
   assert.equal(door.statusLight.userData.lockState, 'locked-red');
@@ -412,13 +465,13 @@ test('Room 2 button unlocks Goop shutter only while Bob remains attached', () =>
     attached: true,
     supportCollider: scene.roomTwo.wallButton,
   };
-  scene.update(1, 2, goop, [bob, goop]);
+  scene.update(1, 2, [bob, goop]);
   assert.equal(scene.roomTwo.wallButton.userData.pressed, true);
   assert.equal(door.locked, false);
   assert.equal(door.state, 'open');
   assert.equal(door.statusLight.userData.lockState, 'unlocked-green');
 
-  scene.update(1, 2, goop, [goop]);
+  scene.update(1, 2, [goop]);
   assert.equal(scene.roomTwo.wallButton.userData.pressed, false);
   assert.equal(door.locked, true);
   assert.equal(door.state, 'closed');
@@ -513,7 +566,7 @@ test('Room 2 and Room 3 lasers are authored directly against their sticky panels
   scene.dispose();
 });
 
-test('Room 2 and Room 3 aligned lasers request recovery through the preview seam', () => {
+test('Room 2 and Room 3 lasers report the struck persistent slime', () => {
   const failures: Array<{
     readonly roomId: 1 | 2 | 3;
     readonly hazardId: string;
@@ -528,14 +581,28 @@ test('Room 2 and Room 3 aligned lasers request recovery through the preview seam
     roomTwoLaser.start.z,
   );
   scene.roomTwo.root.localToWorld(roomTwoContact);
+  const inactiveBob = {
+    id: 'bob' as const,
+    position: roomTwoContact,
+    radiusMetres: 0.45,
+  };
+  const activeGoop = {
+    id: 'goop' as const,
+    position: scene.copyRoomSpawnPosition(2, 'goop', new THREE.Vector3()),
+    radiusMetres: 0.45,
+  };
   scene.update(
     1 / 60,
     2,
-    { position: roomTwoContact, radiusMetres: 0.45 },
-    [],
+    [activeGoop, inactiveBob],
   );
+  assert.equal(scene.roomTwo.lasers.lastFailureTargetId, 'bob');
   assert.deepEqual(failures, [
-    { roomId: 2, hazardId: 'cultivation-room-2-laser-1-panel-b-crossbar' },
+    {
+      roomId: 2,
+      hazardId: 'cultivation-room-2-laser-1-panel-b-crossbar',
+      slimeId: 'bob',
+    },
   ]);
 
   scene.reset();
@@ -546,15 +613,21 @@ test('Room 2 and Room 3 aligned lasers request recovery through the preview seam
     roomThreeLaser.start.z,
   );
   scene.roomThree.root.localToWorld(roomThreeContact);
+  const bob = {
+    id: 'bob' as const,
+    position: roomThreeContact,
+    radiusMetres: 0.45,
+  };
   scene.update(
     1 / 60,
     3,
-    { position: roomThreeContact, radiusMetres: 0.45 },
-    [],
+    [bob],
   );
+  assert.equal(scene.roomThree.lasers.lastFailureTargetId, 'bob');
   assert.deepEqual(failures[1], {
     roomId: 3,
     hazardId: 'cultivation-room-3-entry-sticky-laser',
+    slimeId: 'bob',
   });
 
   scene.dispose();
@@ -573,10 +646,8 @@ test('radioactive floors kill Bob, latch contact, and leave Goop immune', () => 
   const bob = { id: 'bob' as const, position: acidContact, radiusMetres: 0.45 };
   const goop = { id: 'goop' as const, position: acidContact, radiusMetres: 0.45 };
 
-  // Goop is the active laser target here, proving inactive Bob is still
-  // evaluated independently by the radioactive-floor system.
-  scene.update(1 / 60, 1, goop, [bob, goop]);
-  scene.update(1 / 60, 1, goop, [bob, goop]);
+  scene.update(1 / 60, 1, [bob, goop]);
+  scene.update(1 / 60, 1, [bob, goop]);
   assert.deepEqual(failures, [
     {
       roomId: 1,
@@ -586,7 +657,7 @@ test('radioactive floors kill Bob, latch contact, and leave Goop immune', () => 
   ]);
 
   scene.reset();
-  scene.update(1 / 60, 1, goop, [goop]);
+  scene.update(1 / 60, 1, [goop]);
   assert.equal(failures.length, 1);
 
   scene.dispose();

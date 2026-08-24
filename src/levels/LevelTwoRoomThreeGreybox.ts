@@ -42,6 +42,12 @@ export interface LevelTwoRoomThreeHazardFailure {
   readonly slimeId?: RadioactiveFloorSlimeId;
 }
 
+interface LocalLaserContactTarget extends LaserContactTarget {
+  readonly id: RadioactiveFloorSlimeId;
+  readonly position: THREE.Vector3;
+  radiusMetres: number;
+}
+
 /**
  * Large Room 3 cooperation chamber.
  *
@@ -59,10 +65,13 @@ export class LevelTwoRoomThreeGreybox {
   readonly radiationHazard: RadioactiveFloorHazard;
 
   private readonly laserPresentation: LaserHazardPresentation;
-  private readonly localLaserTarget = {
-    position: new THREE.Vector3(),
-    radiusMetres: 0.45,
+  private readonly localLaserTargetById: Readonly<
+    Record<RadioactiveFloorSlimeId, LocalLaserContactTarget>
+  > = {
+    bob: { id: 'bob', position: new THREE.Vector3(), radiusMetres: 0.45 },
+    goop: { id: 'goop', position: new THREE.Vector3(), radiusMetres: 0.45 },
   };
+  private readonly localLaserTargets: LocalLaserContactTarget[] = [];
   private readonly droneLensMaterial = new THREE.MeshStandardMaterial({
     color: 0x9d162b,
     emissive: 0xff1838,
@@ -98,8 +107,12 @@ export class LevelTwoRoomThreeGreybox {
     this.lasers = new LaserHazardSystem({
       id: 'cultivation-room-3-upper-route-lasers',
       hazards,
-      requestRecovery: (hazard) =>
-        requestFailure({ roomId: 3, hazardId: hazard.id }),
+      requestRecovery: (hazard, target) =>
+        requestFailure({
+          roomId: 3,
+          hazardId: hazard.id,
+          slimeId: asSlimeId(target.id),
+        }),
     });
     this.laserPresentation = new LaserHazardPresentation(hazards);
     this.root.add(this.lasers.root, this.laserPresentation.root);
@@ -107,17 +120,22 @@ export class LevelTwoRoomThreeGreybox {
 
   update(
     deltaSeconds: number,
-    target: LaserContactTarget,
+    occupants: readonly RadioactiveFloorOccupant[],
   ): void {
     this.root.updateWorldMatrix(true, false);
-    this.localLaserTarget.position.set(
-      target.position.x,
-      target.position.y,
-      target.position.z,
-    );
-    this.root.worldToLocal(this.localLaserTarget.position);
-    this.localLaserTarget.radiusMetres = target.radiusMetres;
-    this.lasers.update(deltaSeconds, this.localLaserTarget);
+    this.localLaserTargets.length = 0;
+    for (const occupant of occupants) {
+      const localTarget = this.localLaserTargetById[occupant.id];
+      localTarget.position.set(
+        occupant.position.x,
+        occupant.position.y,
+        occupant.position.z,
+      );
+      this.root.worldToLocal(localTarget.position);
+      localTarget.radiusMetres = occupant.radiusMetres;
+      this.localLaserTargets.push(localTarget);
+    }
+    this.lasers.updateTargets(deltaSeconds, this.localLaserTargets);
     this.laserPresentation.sync();
   }
 
@@ -591,3 +609,8 @@ export class LevelTwoRoomThreeGreybox {
     ];
   }
 }
+
+const asSlimeId = (
+  id: string | undefined,
+): RadioactiveFloorSlimeId | undefined =>
+  id === 'bob' || id === 'goop' ? id : undefined;

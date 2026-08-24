@@ -55,6 +55,12 @@ export interface LevelTwoRoomTwoOccupant extends RadioactiveFloorOccupant {
   readonly supportCollider?: THREE.Mesh | null;
 }
 
+interface LocalLaserContactTarget extends LaserContactTarget {
+  readonly id: RadioactiveFloorSlimeId;
+  readonly position: THREE.Vector3;
+  radiusMetres: number;
+}
+
 /** Large Room 2 split-route puzzle with measured wall lasers and block jumps. */
 export class LevelTwoRoomTwoGreybox {
   readonly builder = new GreyboxRoomBuilder('cultivation-room-2-greybox');
@@ -68,10 +74,13 @@ export class LevelTwoRoomTwoGreybox {
 
   private readonly goopExitDoor: ProximityShutterDoor;
   private readonly laserPresentation: LaserHazardPresentation;
-  private readonly localLaserTarget = {
-    position: new THREE.Vector3(),
-    radiusMetres: 0.45,
+  private readonly localLaserTargetById: Readonly<
+    Record<RadioactiveFloorSlimeId, LocalLaserContactTarget>
+  > = {
+    bob: { id: 'bob', position: new THREE.Vector3(), radiusMetres: 0.45 },
+    goop: { id: 'goop', position: new THREE.Vector3(), radiusMetres: 0.45 },
   };
+  private readonly localLaserTargets: LocalLaserContactTarget[] = [];
 
   constructor(
     requestFailure: (failure: LevelTwoRoomTwoHazardFailure) => void,
@@ -102,8 +111,12 @@ export class LevelTwoRoomTwoGreybox {
     this.lasers = new LaserHazardSystem({
       id: 'cultivation-room-2-wall-route-lasers',
       hazards,
-      requestRecovery: (hazard) =>
-        requestFailure({ roomId: 2, hazardId: hazard.id }),
+      requestRecovery: (hazard, target) =>
+        requestFailure({
+          roomId: 2,
+          hazardId: hazard.id,
+          slimeId: asSlimeId(target.id),
+        }),
     });
     this.laserPresentation = new LaserHazardPresentation(hazards);
     this.root.add(this.lasers.root, this.laserPresentation.root);
@@ -115,27 +128,32 @@ export class LevelTwoRoomTwoGreybox {
 
   update(
     deltaSeconds: number,
-    target: LaserContactTarget,
-    occupants: Iterable<LevelTwoRoomTwoOccupant>,
+    occupants: readonly LevelTwoRoomTwoOccupant[],
   ): void {
     let bobHoldingButton = false;
+    this.root.updateWorldMatrix(true, false);
+    this.localLaserTargets.length = 0;
     for (const occupant of occupants) {
-      if (occupant.id !== 'bob') continue;
-      bobHoldingButton =
-        occupant.attached === true &&
-        occupant.supportCollider === this.wallButton;
-      break;
+      if (occupant.id === 'bob') {
+        bobHoldingButton =
+          occupant.attached === true &&
+          occupant.supportCollider === this.wallButton;
+      }
+      const localTarget = this.localLaserTargetById[occupant.id];
+      localTarget.position.set(
+        occupant.position.x,
+        occupant.position.y,
+        occupant.position.z,
+      );
+      this.root.worldToLocal(localTarget.position);
+      localTarget.radiusMetres = occupant.radiusMetres;
+      this.localLaserTargets.push(localTarget);
     }
     this.wallButton.userData.pressed = bobHoldingButton;
     this.goopExitDoor.setLocked(!bobHoldingButton);
 
     for (const drop of this.blockDrops) drop.update(deltaSeconds);
-    this.root.updateWorldMatrix(true, false);
-    this.localLaserTarget.position
-      .set(target.position.x, target.position.y, target.position.z);
-    this.root.worldToLocal(this.localLaserTarget.position);
-    this.localLaserTarget.radiusMetres = target.radiusMetres;
-    this.lasers.update(deltaSeconds, this.localLaserTarget);
+    this.lasers.updateTargets(deltaSeconds, this.localLaserTargets);
     this.laserPresentation.sync();
   }
 
@@ -573,3 +591,8 @@ export class LevelTwoRoomTwoGreybox {
     ];
   }
 }
+
+const asSlimeId = (
+  id: string | undefined,
+): RadioactiveFloorSlimeId | undefined =>
+  id === 'bob' || id === 'goop' ? id : undefined;
