@@ -42,7 +42,7 @@ All defaults live in `DEFAULT_CAMERA_RIG_CONFIG` in
 | Camera query radius | 0.22 m | Swept sphere clearance around the camera |
 | Contact buffer | 0.03 m | Additional inward separation from a query contact |
 | Teleport snap threshold | 3 m | Checkpoint/reset discontinuities do not leave long follow lag |
-| Pitch range / initial pitch | -65° to 65° / 18° | Provides equal upward/downward reach while avoiding orbit poles |
+| Pitch range / initial pitch | -80° to 65° / 18° | Gives elevated aim targets substantially more upward reach while avoiding orbit poles |
 
 Obstruction contraction is immediate, so damping cannot carry the camera
 through a wall. Once the path grows or clears, distance returns with exponential
@@ -174,6 +174,26 @@ rendered frame. This handles walls, corners, and overhead geometry continuously
 instead of detecting an overlap after the camera has already crossed a surface.
 Contextual profiles only change the preferred focus, pitch and distance; they
 use the same query and cannot force their preferred pose through geometry.
+
+## Goop aim presentation
+
+Goop aim is a modifier on this existing rig, not a second camera or targeting
+calculation. While #91 reports valid Goop aim, the preferred boom distance
+smoothly blends over 0.2 seconds to 84% of the current contextual distance and
+the look pivot shifts up to 0.82 m toward screen-right. This modest shoulder
+framing keeps Goop clear of the crosshair without laterally moving the camera.
+When steep pitch or an obstruction leaves little planar boom distance, the
+shoulder shift contracts with it so it cannot flatten the real aiming ray. Yaw,
+pitch, FOV, and follow-target ownership do not change; the camera's resulting
+live centre ray remains the exact ray #91 consumes.
+
+The camera position remains on the existing shortened boom, which passes
+through the normal sphere sweep and distance damping. The look offset therefore
+cannot move the camera through wall/corner obstruction, and movement keeps the
+same camera-relative basis while aiming. Release, slime
+switch, pause, death, retry, restart, cutscene input lock, and unload clear the
+aim request through existing runtime lifecycle seams. The normal distance is
+restored smoothly; there is no FOV snap or aggressive zoom.
 
 Room shells must still author intentional obstruction coverage. Room 2 has a
 normal solid ceiling. Room 4 keeps its short visible solid ceiling, while one

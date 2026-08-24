@@ -96,3 +96,33 @@ test('both spawn anchors are safety-checked at registration and recovery', () =>
   safe = false;
   assert.throws(() => checkpoints.recover(pair), /unsafe Bob spawn/);
 });
+
+test('recovery validates the restored puzzle state before moving either body', () => {
+  const order: string[] = [];
+  const manager = new SlimeManager<TestBody>();
+  const pair = new PersistentSlimePair({
+    manager,
+    bobBody: new TestBody('bob', order),
+    goopBody: new TestBody('goop', order),
+    bobSpawnPosition: new THREE.Vector3(-1, 0.45, 0),
+    goopSpawnPosition: new THREE.Vector3(1, 0.45, 0),
+  });
+  let puzzleStateIsSafe = true;
+  const checkpoints = new CultivationCheckpointManager(
+    checkpoint('start', 'room-1', 0),
+    'bob',
+    () => puzzleStateIsSafe,
+    {
+      hasGroup: () => true,
+      resetGroup: (id) => {
+        order.push(`reset:${id}`);
+        puzzleStateIsSafe = true;
+      },
+    },
+  );
+
+  puzzleStateIsSafe = false;
+  checkpoints.recover(pair);
+
+  assert.deepEqual(order, ['reset:room-1', 'recover:bob', 'recover:goop']);
+});

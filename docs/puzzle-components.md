@@ -50,6 +50,40 @@ const door = new Door({
 });
 ```
 
+## Wall hold button
+
+`WallButton` is a physical, sticky wall control. Unlike a general trigger, it
+accepts only the configured occupant ID **and body instance**, and only while
+that body is attached to the button's exact registered `surfaceMesh` and its
+sphere overlaps the authored local contact box. Proximity, active-player
+selection, attachment to a neighbouring collider, and a matching spoofed ID do
+not press it.
+
+The button starts disabled. A room owner enables it with `setEnabled(true)` and
+supplies the complete occupant collection to `update()` each fixed step. This
+means an inactive persistent body can continue holding the button. The
+`changed`, `pressed`, and `released` events are stable transitions rather than
+per-frame notifications.
+
+## Vertical blast door
+
+`VerticalBlastDoor` is separate from the existing hinged `Door`. It owns one
+authoritative box collider and translates it along an authored local axis using
+fixed-step progress. Opening and closing durations may differ; partial motion
+reverses from its current progress and clamps to exact open/closed endpoints.
+
+Closing checks both an authored obstruction volume and the panel's swept box
+against all supplied body spheres. A detected body produces `blocked`, then
+`reopening`; the door does not resume closing until the volume is clear. The
+collider remains registered throughout motion, and `reset()` restores the exact
+closed transform from every transition state.
+
+`WallButtonDoorCoordinator` is the reusable wiring for these two components. It
+updates the button before the door, supplies every persistent body as a door
+obstacle, and gates the pair by room progression. Register the coordinator,
+button, and door in that order so recovery first disables the relationship,
+then clears button occupancy, then restores the closed collider.
+
 ## Moving platform
 
 `MovingPlatform` travels deterministically along one authored linear route. It
@@ -74,12 +108,12 @@ plate.events.on('changed', ({ pressed }) => platform.setActive(pressed));
 - Use a component's root for scene placement; do not alter child transforms that
   define its local visual mechanism.
 - Call component updates only from the fixed-step loop.
-- Subscribe to plate/door/platform state transitions for discrete puzzle logic.
+- Subscribe to button/plate/door/platform state transitions for discrete puzzle logic.
   Read platform pose and displacement directly every fixed step for carrier
   movement.
 - Call `dispose()` when unloading a level. It removes roots, disposes owned GPU
   resources, clears listeners, and leaves no active occupancy behind.
-- Call `reset()` to return a plate, door, or platform to its authored initial
+- Call `reset()` to return a button, plate, door, or platform to its authored initial
   state. Register each mutable component with the level's `PuzzleRegistry` in
   authored restoration order.
 
@@ -133,7 +167,9 @@ For an authored level restart, use this restoration order:
 The controller supplied to `recover` owns player-specific transient state such
 as velocity, adhesion, and input buffers. It must copy the supplied position;
 checkpoint data remains immutable authored state. Checkpoint recovery always
-performs: validate active spawn → reset active puzzle group → recover player.
+performs: reset the active puzzle group → validate the restored active spawn →
+recover the player. Checkpoint registration and activation still validate
+authored anchors immediately.
 
 ## Grey-box rig
 

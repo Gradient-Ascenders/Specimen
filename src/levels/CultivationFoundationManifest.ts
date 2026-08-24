@@ -37,11 +37,36 @@ export interface CultivationStructuralAssemblyAuthoring {
   readonly finalSurfaceTag: SurfaceTag;
 }
 
+export interface CultivationWallButtonDoorAuthoring {
+  readonly id: string;
+  readonly puzzleGroupId: string;
+  readonly button: {
+    readonly id: string;
+    readonly position: THREE.Vector3;
+    readonly surfaceSize: THREE.Vector3;
+    readonly contactCentre: THREE.Vector3;
+    readonly contactSize: THREE.Vector3;
+    readonly requiredOccupantId: 'bob';
+  };
+  readonly door: {
+    readonly id: string;
+    readonly closedPosition: THREE.Vector3;
+    readonly panelSize: THREE.Vector3;
+    readonly travelAxis: THREE.Vector3;
+    readonly travelDistance: number;
+    readonly openingDurationSeconds: number;
+    readonly closingDurationSeconds: number;
+    readonly obstructionCentre: THREE.Vector3;
+    readonly obstructionSize: THREE.Vector3;
+  };
+}
+
 export interface CultivationFoundationManifest {
   readonly checkpoints: readonly CultivationCheckpointDefinition[];
   readonly triggers: readonly CultivationTriggerAuthoring[];
   readonly radioactiveHazards: readonly RadioactiveHazardDefinition[];
   readonly structuralAssemblies: readonly CultivationStructuralAssemblyAuthoring[];
+  readonly wallButtonDoor: CultivationWallButtonDoorAuthoring;
   readonly outOfBoundsYMetres: number;
 }
 
@@ -98,14 +123,14 @@ export const CULTIVATION_FOUNDATION_MANIFEST: CultivationFoundationManifest = {
     {
       id: 'cultivation-bob-room-3-entry-trigger',
       role: 'bob-room-3-entry',
-      centre: new THREE.Vector3(-3.5, 1, 29),
-      size: new THREE.Vector3(6, 3, 3),
+      centre: new THREE.Vector3(7, 8.6, 32.5),
+      size: new THREE.Vector3(2.4, 2.4, 2),
     },
     {
       id: 'cultivation-goop-room-3-entry-trigger',
       role: 'goop-room-3-entry',
-      centre: new THREE.Vector3(3.5, 1, 29),
-      size: new THREE.Vector3(6, 3, 3),
+      centre: new THREE.Vector3(0, 1.5, 32.5),
+      size: new THREE.Vector3(3.6, 3, 2),
     },
   ],
   radioactiveHazards: [
@@ -213,5 +238,28 @@ export const CULTIVATION_FOUNDATION_MANIFEST: CultivationFoundationManifest = {
       finalSurfaceTag: 'default',
     },
   ],
+  wallButtonDoor: {
+    id: 'cultivation-room-2-button-door',
+    puzzleGroupId: CULTIVATION_ROOM_TWO_GROUP_ID,
+    button: {
+      id: 'cultivation-room-2-wall-button',
+      position: new THREE.Vector3(-7.55, 6.25, 24),
+      surfaceSize: new THREE.Vector3(0.18, 1.5, 1.8),
+      contactCentre: new THREE.Vector3(0.58, 0, 0),
+      contactSize: new THREE.Vector3(1.5, 2.1, 2.4),
+      requiredOccupantId: 'bob',
+    },
+    door: {
+      id: 'cultivation-room-2-goop-blast-door',
+      closedPosition: new THREE.Vector3(0, 2.3, 30.8),
+      panelSize: new THREE.Vector3(3.8, 4.6, 0.35),
+      travelAxis: new THREE.Vector3(0, 1, 0),
+      travelDistance: 4.9,
+      openingDurationSeconds: 1,
+      closingDurationSeconds: 0.8,
+      obstructionCentre: new THREE.Vector3(0, 0, 0),
+      obstructionSize: new THREE.Vector3(4.6, 5.2, 2.4),
+    },
+  },
   outOfBoundsYMetres: -5,
 };

@@ -141,6 +141,15 @@ test('gameplay progress drives visible, depth, and distance dissolve passes', ()
       /uniform vec3 uDissolveEdgeColour;/,
     );
     assert.match(surfaceShader.fragmentShader, /totalEmissiveRadiance \+=/);
+    assert.match(
+      surfaceShader.fragmentShader,
+      /uniform float uAimHighlightStrength;/,
+    );
+    assert.doesNotMatch(surfaceShader.fragmentShader, /aimContour/);
+    assert.match(surfaceShader.fragmentShader, /aimBaseGlow/);
+    assert.match(surfaceShader.fragmentShader, /aimSelectionLines/);
+    assert.match(surfaceShader.fragmentShader, /aimHatch/);
+    assert.match(surfaceShader.fragmentShader, /burnSpeckle/);
     assert.doesNotMatch(surfaceShader.fragmentShader, /uKeyLightDirection/);
     assert.match(depthShader.fragmentShader, /dissolveSurfaceMask/);
     assert.match(depthShader.fragmentShader, /discard/);
@@ -164,6 +173,15 @@ test('gameplay progress drives visible, depth, and distance dissolve passes', ()
     );
     assert.equal(mesh.visible, true);
     assert.equal(target.collisionEnabled, true);
+
+    target.setCorrosionPresentation(0.34, 0.75, 0.5, 2.25);
+    assert.equal(target.renderDiagnostics.aimHighlightStrength, 0.34);
+    assert.equal(target.renderDiagnostics.aimSelectedStrength, 0.75);
+    assert.equal(target.renderDiagnostics.burnHighlightStrength, 0.5);
+    assert.equal(surfaceShader.uniforms.uAimHighlightStrength?.value, 0.34);
+    assert.equal(surfaceShader.uniforms.uAimSelectedStrength?.value, 0.75);
+    assert.equal(surfaceShader.uniforms.uBurnHighlightStrength?.value, 0.5);
+    assert.equal(target.progress, 0.2);
 
     target.advance(0.98);
     assert.ok(Math.abs(target.progress - 0.69) < EPSILON);
@@ -205,6 +223,9 @@ test('interruption, resume, completion, and repeated reset clear render state', 
       fixture.target.reset();
       assert.equal(fixture.target.progress, 0);
       assert.equal(fixture.target.renderDiagnostics.dissolveAmount, 0);
+      assert.equal(fixture.target.renderDiagnostics.aimHighlightStrength, 0);
+      assert.equal(fixture.target.renderDiagnostics.aimSelectedStrength, 0);
+      assert.equal(fixture.target.renderDiagnostics.burnHighlightStrength, 0);
       assert.equal(fixture.mesh.visible, true);
       assert.equal(fixture.target.collisionEnabled, true);
       assert.equal(fixture.world.colliderCount, 1);

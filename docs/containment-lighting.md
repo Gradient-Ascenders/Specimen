@@ -164,10 +164,13 @@ behind the loading screen. Each call to `WebGLRenderer.compileAsync()` receives
 a room-owned renderable subset and the authoritative full scene as Three.js's
 `targetScene`, so the subset compiles against the correct active lights and
 environment without multiplying every Level 1 material across every signature.
-The subsets include the room, shared slime presentation and the corresponding
-Bob/Goop transient material. Exact shared material/object-feature signatures
-use one lightweight representative, avoiding repeated `InstancedMesh` buffer
-clones while retaining every distinct shader variant.
+The subsets include the room, shared slime presentation, the corresponding
+Bob/Goop transient material, and #92's bounded acid presentation root. The acid
+root contributes representatives for its core, halo, trail, droplets, and
+impact flash while all live slots remain hidden and gameplay state remains
+untouched. Exact shared material/object-feature signatures use one lightweight
+representative, avoiding repeated `InstancedMesh` buffer clones while retaining
+every distinct shader variant.
 
 A one-pixel scissored draw from each future room entry then performs bounded
 first-use geometry/material uploads without displaying another room. Room 1
