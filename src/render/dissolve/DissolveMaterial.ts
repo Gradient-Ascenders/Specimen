@@ -17,7 +17,7 @@ export const DEFAULT_DISSOLVE_EDGE_COLOUR = 0xb7ff57;
 export const DEFAULT_AIM_HIGHLIGHT_COLOUR = 0xd7ff65;
 export const DEFAULT_BURN_HIGHLIGHT_COLOUR = 0xb4ff45;
 
-const SURFACE_PROGRAM_CACHE_KEY = 'specimen-dissolve-standard-surface-v3';
+const SURFACE_PROGRAM_CACHE_KEY = 'specimen-dissolve-standard-surface-v4';
 const SHADOW_PROGRAM_CACHE_KEY = 'specimen-dissolve-shadow-mask-v2';
 
 interface DissolveMaskUniforms {

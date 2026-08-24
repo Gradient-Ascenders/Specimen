@@ -60,7 +60,10 @@ derived `MeshStandardMaterial` continues to respond to the real scene lighting.
 The active `CameraRig` copies its live centre-crosshair ray into caller-owned
 vectors. `AcidProjectileSystem` sweeps a very small probe along that ray and
 clamps the aim point to the nearest camera-obstruction collider or the maximum
-range.
+range. Goop can pitch this ray up to 80° above the movement plane. If floor
+collision shortens the camera boom during a steep upward view, the shoulder
+offset contracts with the remaining planar boom distance instead of pulling the
+crosshair back toward the horizon.
 
 This camera query is targeting data, not impact authority. Firing calculates a
 new direction from Goop's authoritative body position toward the clamped aim
@@ -79,16 +82,18 @@ The initial playtest defaults are held in
 
 | Setting | Default |
 | --- | ---: |
-| Maximum range | `16 m` |
+| Maximum range | `75 m` |
 | Projectile speed | `18 m/s` |
 | Collision radius | `0.10 m` |
-| Lifetime | `1.10 s` |
+| Lifetime | `4.20 s` |
 | Fire cooldown | `0.45 s` |
 | Launch clearance | `0.02 m` |
-| Maximum live projectiles | `8` |
+| Maximum live projectiles | `10` |
 | Maximum visible target IDs / occlusion probes per step | `16` |
 
 These values are data, not assumptions embedded in targeting or presentation.
+The lifetime covers a full-range shot at the default speed, and the ten-slot
+pool preserves cooldown-paced firing while those longer shots remain active.
 The visibility limit caps expensive occlusion probes independently from the
 number of successful results, so a run of hidden targets cannot produce an
 unbounded set of fixed-step collision sweeps. An eligible target hit by the
@@ -205,7 +210,7 @@ projectile integration, hit detection, or burn timing. The mapping is:
 
 | Authoritative state from #91 / #31 | Presentation only |
 | --- | --- |
-| `aimReadModel.active` and candidate IDs | One crosshair and restrained target contour pattern |
+| `aimReadModel.active` and candidate IDs | One crosshair and a clean, steady target glow |
 | `selectedTargetId` | Stronger hatch/pulse and ready/cooldown confirmation |
 | `projectileStates` current/previous transforms | Pooled acid core, halo, and short line trail |
 | world/soluble impact event | Bounded weak/strong procedural splash |
@@ -227,12 +232,13 @@ replaces a material during aiming and never writes `uDissolveAmount`.
 | `uCorrosionPresentationTime` | #92 presentation pattern motion |
 
 At zero highlight and burn strengths the injected shader contribution is
-exactly zero, leaving the authored lit surface unchanged. Highlighting adds
-edge/pattern emission after the normal material lighting, so the authored
-material identity and partial dissolve remain visible. Candidate and selected
-strengths approach their targets over 0.2 seconds. Selection adds a geometric
-hatch as well as colour, and the crosshair uses shape, line style, and colour
-for neutral, ready, and cooldown states.
+exactly zero, leaving the authored lit surface unchanged. Candidate highlighting
+adds steady emission after the normal material lighting, so the authored
+material identity and partial dissolve remain visible without a noise-contour
+overlay. Candidate and selected strengths approach their targets over 0.2
+seconds. Selection adds a geometric hatch and pulse as well as colour, and the
+crosshair uses shape, line style, and colour for neutral, ready, and cooldown
+states.
 
 The projectile slots are allocated once to match #91's fixed authoritative
 pool. Core geometry, halo texture/material, and trail materials are shared.

@@ -42,7 +42,7 @@ All defaults live in `DEFAULT_CAMERA_RIG_CONFIG` in
 | Camera query radius | 0.22 m | Swept sphere clearance around the camera |
 | Contact buffer | 0.03 m | Additional inward separation from a query contact |
 | Teleport snap threshold | 3 m | Checkpoint/reset discontinuities do not leave long follow lag |
-| Pitch range / initial pitch | -65° to 65° / 18° | Provides equal upward/downward reach while avoiding orbit poles |
+| Pitch range / initial pitch | -80° to 65° / 18° | Gives elevated aim targets substantially more upward reach while avoiding orbit poles |
 
 Obstruction contraction is immediate, so damping cannot carry the camera
 through a wall. Once the path grows or clears, distance returns with exponential
@@ -180,8 +180,10 @@ use the same query and cannot force their preferred pose through geometry.
 Goop aim is a modifier on this existing rig, not a second camera or targeting
 calculation. While #91 reports valid Goop aim, the preferred boom distance
 smoothly blends over 0.2 seconds to 84% of the current contextual distance and
-the look pivot shifts 0.82 m toward screen-right. This modest shoulder framing
-keeps Goop clear of the crosshair without laterally moving the camera. Yaw,
+the look pivot shifts up to 0.82 m toward screen-right. This modest shoulder
+framing keeps Goop clear of the crosshair without laterally moving the camera.
+When steep pitch or an obstruction leaves little planar boom distance, the
+shoulder shift contracts with it so it cannot flatten the real aiming ray. Yaw,
 pitch, FOV, and follow-target ownership do not change; the camera's resulting
 live centre ray remains the exact ray #91 consumes.
 

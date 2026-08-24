@@ -26,6 +26,7 @@ export const MIN_FOLLOW_DISTANCE_METRES = 3.5;
 export const MAX_FOLLOW_DISTANCE_METRES = 7;
 const MIN_FOLLOW_DISTANCE_SCALE = 0.25;
 const MAX_FOLLOW_DISTANCE_SCALE = 1;
+const MAX_AIM_SHOULDER_TO_PLANAR_BOOM_RATIO = 0.5;
 
 /**
  * Read-only handoff from authoritative movement to render-side camera logic.
@@ -95,7 +96,7 @@ export const DEFAULT_CAMERA_RIG_CONFIG: Readonly<CameraRigConfig> = {
   verticalSensitivityRadiansPerPixel: 0.002,
   invertHorizontal: false,
   invertVertical: false,
-  minimumPitchRadians: THREE.MathUtils.degToRad(-65),
+  minimumPitchRadians: THREE.MathUtils.degToRad(-80),
   maximumPitchRadians: THREE.MathUtils.degToRad(65),
   initialPitchRadians: THREE.MathUtils.degToRad(18),
 };
@@ -865,8 +866,6 @@ export class CameraRig {
     } else {
       this.framingPivot.copy(this.normalFramingPivot);
     }
-    this.applyAimShoulderOffset();
-
     const cosPitch = Math.cos(this.effectivePitchRadians);
     this.boomDirection
       .copy(this.planarBack)
@@ -921,6 +920,7 @@ export class CameraRig {
       this.config.recoveryDampingPerSecond,
       recoveryDeltaSeconds,
     );
+    this.applyAimShoulderOffset();
   }
 
   private getDesiredDistanceMetres(): number {
@@ -951,9 +951,20 @@ export class CameraRig {
     this.aimShoulderDirection
       .crossVectors(this.smoothedUp, this.planarBack)
       .normalize();
+    // A fixed lateral look offset can dominate the centre ray when a steep
+    // upward view drives the boom into the floor and collision shortens it.
+    // Bound the offset against the resolved boom's planar reach so the
+    // crosshair continues to follow the player's authored pitch.
+    const planarBoomDistanceMetres =
+      Math.abs(Math.cos(this.effectivePitchRadians)) *
+      this.currentDistanceMetres;
+    const resolvedOffsetMetres = Math.min(
+      requestedOffsetMetres,
+      planarBoomDistanceMetres * MAX_AIM_SHOULDER_TO_PLANAR_BOOM_RATIO,
+    );
     this.aimShoulderDisplacement
       .copy(this.aimShoulderDirection)
-      .multiplyScalar(requestedOffsetMetres);
+      .multiplyScalar(resolvedOffsetMetres);
     this.cameraLookPivot.add(this.aimShoulderDisplacement);
   }
 

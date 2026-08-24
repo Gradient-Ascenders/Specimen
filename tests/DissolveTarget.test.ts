@@ -145,6 +145,9 @@ test('gameplay progress drives visible, depth, and distance dissolve passes', ()
       surfaceShader.fragmentShader,
       /uniform float uAimHighlightStrength;/,
     );
+    assert.doesNotMatch(surfaceShader.fragmentShader, /aimContour/);
+    assert.match(surfaceShader.fragmentShader, /aimBaseGlow/);
+    assert.match(surfaceShader.fragmentShader, /aimSelectionLines/);
     assert.match(surfaceShader.fragmentShader, /aimHatch/);
     assert.match(surfaceShader.fragmentShader, /burnSpeckle/);
     assert.doesNotMatch(surfaceShader.fragmentShader, /uKeyLightDirection/);

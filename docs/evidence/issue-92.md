@@ -15,7 +15,8 @@
 - The existing collision-aware camera rig receives a smooth shoulder/distance
   modifier. Its resulting live centre ray remains authoritative; only the look
   pivot shifts laterally, while the camera position remains on the normal
-  obstruction-swept boom.
+  obstruction-swept boom. The shift contracts against the resolved planar boom
+  during steep or obstructed views so it cannot flatten upward aiming.
 
 All effects are procedural Three.js geometry/shader/CSS work. No external
 textures, code, or third-party visual assets were introduced, so `CREDITS.md`
@@ -40,8 +41,10 @@ fast-forwarding to `origin/main` at `5c86af2`, which includes #33's merged
 authored Containment lighting and environmental effects:
 
 - `issue-92-bob-idle.png` — Bob active with no crosshair or target treatment;
-- `issue-92-goop-aim-selected.png` — the shoulder aim pose, selected procedural
-  hatch/contour, and ready crosshair in the white Room 1 laboratory;
+- `issue-92-goop-aim-selected.png` — a historical pre-feedback capture of the
+  shoulder aim pose and ready crosshair. The current candidate treatment uses a
+  clean glow instead of the pictured noise contour while retaining the selected
+  diagonal hatch;
 - `issue-92-acid-projectile.png` — live shot/valid-hit frame with the compact
   yellow-green projectile/flash language;
 - `issue-92-valid-hit-burn.png` — stronger target-local valid-hit flash;
@@ -62,9 +65,11 @@ partial dissolve, completion, pause/resume, death/retry, slime switching,
 reset/restart, Room 1 white/glass
 surfaces, current Room 5 containment geometry/lighting, and the narrow viewport.
 The authoritative diagnostics recorded one world impact separately from valid
-hits. The pre-art lifecycle stress pass kept the presentation fixed at 8
-projectile slots, 48 droplets, 8 flashes, and one DOM node through eleven
-restarts. After the #33 branch update, all 202 tests pass, including the final
+hits. The pre-range-adjustment lifecycle stress pass kept the presentation fixed
+at 8 projectile slots, 48 droplets, 8 flashes, and one DOM node through eleven
+restarts. The current 75 m tuning allocates 10 projectile slots so cooldown-paced
+shots remain available across the longer flight window. After the #33 branch
+update, all 202 tests pass, including the final
 lighting rig's disposal/recreation invariants. The production prewarm compiled
 the acid representatives in all five room subsets (`50 / 38 / 62 / 75 / 83`
 representatives total per room), and the first valid shot left the shader cache

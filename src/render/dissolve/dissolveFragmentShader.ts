@@ -42,19 +42,18 @@ float dissolveIsActive = step(0.0001, uDissolveAmount) *
 totalEmissiveRadiance += uDissolveEdgeColour *
   dissolveEdgeBand * dissolveIsActive * 1.65;
 
-// Aim presentation reuses the target-local dissolve field without changing its
-// threshold. Candidates receive sparse corrosion contours; selection adds a
-// clearly different diagonal hatch and pulse so the state is not colour-only.
-float aimContourPhase = abs(fract(dissolveSurfaceMask * 5.0) - 0.5);
-float aimContour = 1.0 - smoothstep(0.012, 0.035, aimContourPhase);
+// Candidates receive a clean, steady glow. Selection adds diagonal lines and
+// a pulse so hovering remains visibly distinct without covering every valid
+// target in the dissolve field's camouflage-like contour pattern.
 float aimHatchPhase = abs(
   fract((vDissolveLocalPosition.x + vDissolveLocalPosition.y * 0.72 +
     vDissolveLocalPosition.z * 0.43) * 5.2) - 0.5
 );
 float aimHatch = 1.0 - smoothstep(0.018, 0.055, aimHatchPhase);
 float aimPulse = 0.82 + 0.18 * sin(uCorrosionPresentationTime * 7.0);
-float aimPattern = mix(aimContour * 0.38, max(aimContour, aimHatch * 0.72),
-  uAimSelectedStrength);
+float aimBaseGlow = 0.45;
+float aimSelectionLines = aimHatch * 0.72 * uAimSelectedStrength;
+float aimPattern = aimBaseGlow + aimSelectionLines;
 totalEmissiveRadiance += uAimHighlightColour * aimPattern *
   uAimHighlightStrength * mix(1.0, aimPulse * 1.25, uAimSelectedStrength);
 

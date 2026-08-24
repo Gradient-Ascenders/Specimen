@@ -125,7 +125,7 @@ function createFixture(): Fixture {
     aimOrigin: { x: 0, y: 0, z: 0 },
     aimDirection: { x: 0, y: 0, z: -1 },
     aimPoint: { x: 0, y: 0, z: -10 },
-    maximumRangeMetres: 16,
+    maximumRangeMetres: 75,
     targetedSolubleId: undefined,
     visibleSolubleIds: [],
     canFire: false,
