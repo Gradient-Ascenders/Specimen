@@ -6,6 +6,7 @@ import {
   gameFlowCanPause,
   GameFlowStateModel,
   getGameFlowKeyboardAction,
+  parseCreditsInlineParts,
 } from '../src/ui/GameFlowUI.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 
@@ -105,6 +106,31 @@ test('flow state subscriptions emit immediately and clean up explicitly', () => 
   flow.pause();
 
   assert.deepEqual(states, ['loading', 'title', 'playing']);
+});
+
+test('credits preserve validated source links and inline code labels', () => {
+  assert.deepEqual(
+    parseCreditsInlineParts(
+      'Use [npm package](https://www.npmjs.com/package/three/v/0.185.1) with `Three.js`.',
+    ),
+    [
+      { text: 'Use ' },
+      {
+        text: 'npm package',
+        href: 'https://www.npmjs.com/package/three/v/0.185.1',
+      },
+      { text: ' with ' },
+      { text: 'Three.js' },
+      { text: '.' },
+    ],
+  );
+});
+
+test('credits never activate unsafe link destinations', () => {
+  assert.deepEqual(
+    parseCreditsInlineParts('[source](javascript:alert)'),
+    [{ text: 'source (javascript:alert)' }],
+  );
 });
 
 test('settings retain session values across flow transitions', () => {

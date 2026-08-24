@@ -50,11 +50,71 @@ export const getGameFlowKeyboardAction = (
   return null;
 };
 
-const creditsInlineText = (value: string): string =>
-  value
-    .replace(/\[([^\]]+)]\([^)]+\)/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .trim();
+export interface CreditsInlinePart {
+  readonly text: string;
+  readonly href?: string;
+}
+
+const safeCreditsUrl = (value: string): string | undefined => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:'
+      ? url.href
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const parseCreditsInlineParts = (value: string): CreditsInlinePart[] => {
+  const source = value.trim();
+  const parts: CreditsInlinePart[] = [];
+  const markdownToken = /\[([^\]]+)]\(([^)]+)\)|`([^`]+)`/g;
+  let cursor = 0;
+
+  for (const match of source.matchAll(markdownToken)) {
+    const matchIndex = match.index;
+    if (matchIndex > cursor) {
+      parts.push({ text: source.slice(cursor, matchIndex) });
+    }
+
+    const linkLabel = match[1];
+    const linkDestination = match[2]?.trim();
+    if (linkLabel !== undefined && linkDestination !== undefined) {
+      const href = safeCreditsUrl(linkDestination);
+      parts.push(
+        href
+          ? { text: linkLabel, href }
+          : { text: `${linkLabel} (${linkDestination})` },
+      );
+    } else {
+      parts.push({ text: match[3] ?? '' });
+    }
+    cursor = matchIndex + match[0].length;
+  }
+
+  if (cursor < source.length) parts.push({ text: source.slice(cursor) });
+  return parts;
+};
+
+const appendCreditsInlineContent = (
+  element: HTMLElement,
+  value: string,
+): void => {
+  for (const part of parseCreditsInlineParts(value)) {
+    if (!part.href) {
+      element.append(element.ownerDocument.createTextNode(part.text));
+      continue;
+    }
+
+    const link = element.ownerDocument.createElement('a');
+    link.textContent = part.text;
+    link.href = part.href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    element.append(link);
+  }
+};
 
 const appendCreditsLedger = (
   ledger: HTMLElement,
@@ -90,12 +150,12 @@ const appendCreditsLedger = (
           .trim()
           .slice(1, -1)
           .split('|')
-          .map(creditsInlineText);
+          .map((cell) => cell.trim());
         const entry = ledger.ownerDocument.createElement('article');
         entry.className = 'credits-entry';
 
         const title = ledger.ownerDocument.createElement('h3');
-        title.textContent = values[0] ?? '';
+        appendCreditsInlineContent(title, values[0] ?? '');
         entry.append(title);
 
         const details = ledger.ownerDocument.createElement('dl');
@@ -104,7 +164,7 @@ const appendCreditsLedger = (
           const term = ledger.ownerDocument.createElement('dt');
           const description = ledger.ownerDocument.createElement('dd');
           term.textContent = headers[cellIndex] ?? '';
-          description.textContent = values[cellIndex] ?? '';
+          appendCreditsInlineContent(description, values[cellIndex] ?? '');
           detail.append(term, description);
           details.append(detail);
         }
@@ -128,7 +188,7 @@ const appendCreditsLedger = (
       paragraphLines.push(lines[index]?.trim() ?? '');
     }
     const paragraph = ledger.ownerDocument.createElement('p');
-    paragraph.textContent = creditsInlineText(paragraphLines.join(' '));
+    appendCreditsInlineContent(paragraph, paragraphLines.join(' '));
     ledger.append(paragraph);
   }
 };
@@ -628,8 +688,8 @@ export class GameFlowUI {
 
     const ledger = root.querySelector<HTMLElement>('.credits-ledger');
     if (!ledger) throw new Error('Missing credits ledger element.');
-    // Parse only the ledger's deliberately small Markdown subset and assign all
-    // player-facing values through textContent. CREDITS.md remains canonical;
+    // Parse only the ledger's deliberately small Markdown subset. Text is
+    // assigned through DOM text nodes and links are restricted to HTTP(S), so
     // no source text is interpreted as arbitrary HTML.
     appendCreditsLedger(ledger, creditsMarkdown);
     return root;
