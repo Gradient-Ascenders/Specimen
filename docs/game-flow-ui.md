@@ -91,7 +91,10 @@ omit diagnostics; `?debug=1` deliberately makes them available.
 The loading screen is indeterminate because the runtime has no asset progress
 metric. The level is loaded but remains stopped, and a two-frame boot handoff
 guarantees loading can paint before title. Simulation and gameplay input do not
-start until Start. Credits
+start until Start. Initial boot and full-level restart share the same decorative
+simple-mark containment scanner; its rings are CSS-only and stop moving when
+reduced motion is requested. The title uses the detailed mark, while pause and
+settings keep the simple mark subordinate to their functional headings. Credits
 are imported from the repository-root `CREDITS.md` with Vite's raw-resource
 support and inserted with `textContent`, so the in-game view cannot drift to a
 manually maintained resource list and does not inject Markdown as HTML.

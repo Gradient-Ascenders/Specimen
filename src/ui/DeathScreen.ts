@@ -1,3 +1,5 @@
+import { createBrandMarkMarkup } from './Branding.ts';
+
 export interface DeathScreenOptions {
   readonly onRetry: () => void;
   readonly backgroundElements: readonly HTMLElement[];
@@ -30,9 +32,7 @@ export class DeathScreen {
     this.element.innerHTML = `
       <div class="death-screen-vignette" aria-hidden="true"></div>
       <div class="death-card">
-        <div class="death-mark" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </div>
+        ${createBrandMarkMarkup('simple', 'death-mark')}
         <p class="death-eyebrow">Specimen signal lost</p>
         <h1 id="death-screen-title">You died</h1>
         <p class="death-message">

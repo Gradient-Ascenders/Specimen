@@ -102,6 +102,9 @@ test('death screen disables background interaction and restores it on hide', () 
       ],
     });
 
+    assert.match(dialog.innerHTML, /brand\/specimen-mark-simple\.svg/);
+    assert.match(dialog.innerHTML, /alt=""/);
+
     screen.show();
     assert.equal(dialog.hidden, false);
     assert.equal(dialog.getAttribute('aria-hidden'), 'false');
