@@ -163,6 +163,7 @@ test('only active Goop can aim and fire', () => {
 
   system.update(1 / 60, AIM_ONLY);
   assert.equal(system.aimReadModel.active, true);
+  assert.equal(system.aimReadModel.maximumRangeMetres, 75);
   assert.equal(system.aimReadModel.targetedSolubleId, 'soluble-target');
   assert.deepEqual(system.aimReadModel.visibleSolubleIds, ['soluble-target']);
 
@@ -181,6 +182,41 @@ test('only active Goop can aim and fire', () => {
   });
   assert.equal(system.aimReadModel.active, false);
   assert.equal(system.getDiagnostics().firedCount, 0);
+
+  system.dispose();
+  fixture.dispose();
+});
+
+test('the default 75 metre range keeps distant highlighted targets reachable', () => {
+  const fixture = createFixture(new THREE.Vector3(0, 0, -70));
+  const system = new AcidProjectileSystem({
+    slimeManager: fixture.manager,
+    collisionWorld: fixture.world,
+    dissolveSystem: fixture.dissolve,
+    aimRayProvider: new TestAimRay(
+      new THREE.Vector3(),
+      new THREE.Vector3(0, 0, -1),
+    ),
+  });
+
+  system.update(1 / 60, AIM_ONLY);
+  assert.deepEqual(system.aimReadModel.visibleSolubleIds, ['soluble-target']);
+  assert.equal(system.aimReadModel.targetedSolubleId, 'soluble-target');
+
+  system.update(1 / 60, {
+    ...AIM_ONLY,
+    firePressed: true,
+  });
+  for (
+    let step = 0;
+    step < 300 && system.getDiagnostics().solubleImpactCount === 0;
+    step += 1
+  ) {
+    system.update(1 / 60, AIM_ONLY);
+  }
+
+  assert.equal(system.getDiagnostics().solubleImpactCount, 1);
+  assert.equal(fixture.dissolve.activeBurnCount, 1);
 
   system.dispose();
   fixture.dispose();
@@ -258,7 +294,7 @@ test('projectile collision near Goop overrides an unobstructed offset camera', (
 });
 
 test('cooldown and projectile-pool limits bound deterministic shot count', () => {
-  const fixture = createFixture(new THREE.Vector3(0, 0, -20));
+  const fixture = createFixture(new THREE.Vector3(0, 0, -80));
   const system = new AcidProjectileSystem({
     slimeManager: fixture.manager,
     collisionWorld: fixture.world,

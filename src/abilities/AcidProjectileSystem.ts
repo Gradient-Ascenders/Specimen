@@ -25,14 +25,16 @@ export interface AcidProjectileConfig {
 }
 
 export const DEFAULT_ACID_PROJECTILE_CONFIG: Readonly<AcidProjectileConfig> = {
-  maximumRangeMetres: 16,
+  maximumRangeMetres: 75,
   projectileSpeedMetresPerSecond: 18,
   projectileRadiusMetres: 0.1,
-  projectileLifetimeSeconds: 1.1,
+  // A default shot needs just over 4.1 seconds to cover the full 75 m range.
+  projectileLifetimeSeconds: 4.2,
   fireCooldownSeconds: 0.45,
   launchClearanceMetres: 0.02,
   aimProbeRadiusMetres: 0.001,
-  maximumLiveProjectiles: 8,
+  // Ten slots preserve cooldown-paced firing throughout that longer flight.
+  maximumLiveProjectiles: 10,
   maximumVisibleTargets: 16,
 };
 
