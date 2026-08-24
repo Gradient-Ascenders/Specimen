@@ -77,8 +77,11 @@ Only the explicitly associated soluble rope releases a ceiling drone. Fall is
 an authored 0.65 s transform. The existing Room 3 radiation floor supplies the
 contact query; it never mutates drone state. Disabled duration is 10 s,
 including a 2 s warning, followed by a 1.75 s installation. Replacement cables
-are explicit non-soluble colliders only while present and remain as the new
-support after installation.
+are explicit non-soluble carrier colliders only during the replacement motion.
+At installation completion the temporary cable is removed and the original
+soluble rope target is restored at zero dissolve progress. The same drone can
+therefore be shot down repeatedly without creating another target, collider,
+or event subscription.
 
 Ground lifecycle:
 

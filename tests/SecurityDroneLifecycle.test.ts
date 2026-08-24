@@ -36,7 +36,7 @@ function droneConfig(id: string, type: 'ceiling' | 'ground'): SecurityDroneConfi
   };
 }
 
-test('one completed rope independently drops, disables, warns, and reinstalls its ceiling drone', () => {
+test('a reinstalled ceiling drone restores a soluble rope for repeated drop cycles', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   const supportMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2, 0.2), new THREE.MeshStandardMaterial());
@@ -67,6 +67,10 @@ test('one completed rope independently drops, disables, warns, and reinstalls it
   };
   const lifecycle = new CeilingSecurityDrone(config, support, world, surfaces, projectiles);
   const activeColliderCount = world.colliderCount;
+  let releaseCount = 0;
+  let installedCount = 0;
+  lifecycle.events.on('released', () => releaseCount += 1);
+  lifecycle.events.on('installed', () => installedCount += 1);
 
   support.advance(1);
   const releasedColliderCount = world.colliderCount;
@@ -85,11 +89,36 @@ test('one completed rope independently drops, disables, warns, and reinstalls it
   lifecycle.update(1.75, []);
   assert.equal(lifecycle.readModel.state, 'active');
   assert.equal(lifecycle.drone.readModel.enabled, true);
-  assert.equal(lifecycle.readModel.replacementCableVisible, true);
+  assert.equal(lifecycle.readModel.replacementCableVisible, false);
+  assert.equal(support.completed, false);
+  assert.equal(support.progress, 0);
+  assert.equal(support.collisionEnabled, true);
+  assert.equal(supportMesh.visible, true);
+  assert.equal(world.colliderCount, activeColliderCount);
   lifecycle.update(0.1, []);
   assert.equal(lifecycle.readModel.state, 'active');
+  assert.equal(releaseCount, 1);
+  assert.equal(installedCount, 1);
 
-  support.reset();
+  support.advance(1);
+  assert.equal(lifecycle.readModel.state, 'released');
+  assert.equal(support.completionCount, 2);
+  lifecycle.update(0.01, []);
+  lifecycle.update(0.65, []);
+  lifecycle.signalRadiationContact();
+  lifecycle.update(8, []);
+  lifecycle.update(2, []);
+  lifecycle.update(1.75, []);
+  assert.equal(lifecycle.readModel.state, 'active');
+  assert.equal(lifecycle.readModel.replacementCableVisible, false);
+  assert.equal(support.completed, false);
+  assert.equal(support.progress, 0);
+  assert.equal(support.collisionEnabled, true);
+  assert.equal(supportMesh.visible, true);
+  assert.equal(releaseCount, 2);
+  assert.equal(installedCount, 2);
+  assert.equal(world.colliderCount, activeColliderCount);
+
   lifecycle.reset();
   assert.equal(lifecycle.readModel.state, 'active');
   assert.equal(lifecycle.readModel.replacementCableVisible, false);

@@ -101,7 +101,6 @@ export class CeilingSecurityDrone {
   private state: CeilingSecurityDroneState = 'active';
   private stateElapsed = 0;
   private radiationContactPending = false;
-  private replacementInstalled = false;
   private cableCollisionEnabled = false;
   private disposed = false;
 
@@ -174,7 +173,6 @@ export class CeilingSecurityDrone {
 
     if (
       this.state === 'active' &&
-      !this.replacementInstalled &&
       this.support.progress > 0
     ) {
       this.transition('supportDissolving');
@@ -210,9 +208,13 @@ export class CeilingSecurityDrone {
         this.drone.root.position.lerpVectors(this.impactPosition, this.initialPosition, t);
         this.drone.root.quaternion.slerpQuaternions(this.impactQuaternion, this.initialQuaternion, t);
         if (t >= 1 - EPSILON) {
+          // The animated carrier cable is temporary. Swap it back to the
+          // original dissolve target so every completed reinstall produces a
+          // visible, collidable, acid-soluble rope for the next cycle.
+          this.setCableVisible(false);
+          this.support.reset();
           this.transition('active');
           this.setHatchOpen(false);
-          this.replacementInstalled = true;
           this.drone.setEnabled(true);
           this.events.emit('installed', { droneId: this.drone.id });
           this.events.emit('poweredOn', { droneId: this.drone.id });
@@ -243,7 +245,6 @@ export class CeilingSecurityDrone {
     this.state = 'active';
     this.stateElapsed = 0;
     this.radiationContactPending = false;
-    this.replacementInstalled = false;
     this.drone.reset();
     this.setCableVisible(false);
     this.setHatchOpen(false);
