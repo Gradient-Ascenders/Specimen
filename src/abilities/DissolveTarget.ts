@@ -167,6 +167,27 @@ export class DissolveTarget {
     return this.dissolveMaterials.diagnostics;
   }
 
+  /** Presentation-only input; cannot mutate gameplay progress or collision. */
+  setCorrosionPresentation(
+    aimStrength: number,
+    selectedStrength: number,
+    burnStrength: number,
+    timeSeconds: number,
+  ): void {
+    if (this.disposed) return;
+    this.dissolveMaterials.setCorrosionPresentation(
+      aimStrength,
+      selectedStrength,
+      burnStrength,
+      timeSeconds,
+    );
+  }
+
+  clearCorrosionPresentation(): void {
+    if (this.disposed) return;
+    this.dissolveMaterials.clearCorrosionPresentation();
+  }
+
   /** Copy the nearest point on the authored bounds to a caller-owned vector. */
   copyClosestWorldPoint(
     point: { readonly x: number; readonly y: number; readonly z: number },
@@ -291,6 +312,7 @@ export class DissolveTarget {
 
     this.progressValue = 0;
     this.completedValue = false;
+    this.clearCorrosionPresentation();
     this.ensureCollisionEnabled(true);
     this.applyPresentation();
   }

@@ -111,7 +111,7 @@ test('vertical pointer look follows pitch convention with inversion off and on',
   assert.ok(invertedMouseDown.viewDirectionY > 0);
 });
 
-test('default pitch limits provide an equally usable upward and downward view', () => {
+test('default pitch limits provide extended upward and usable downward views', () => {
   const rig = new CameraRig();
   rig.setFollowTarget(createTarget(), new CollisionWorld());
   rig.update(1, 0);
@@ -120,12 +120,12 @@ test('default pitch limits provide an equally usable upward and downward view', 
   rig.update(1, 0);
   assert.ok(
     Math.abs(
-      rig.getDiagnostics().pitchRadians - THREE.MathUtils.degToRad(-65),
+      rig.getDiagnostics().pitchRadians - THREE.MathUtils.degToRad(-80),
     ) < EPSILON,
   );
   assert.ok(
     rig.camera.getWorldDirection(new THREE.Vector3()).y >
-      Math.sin(THREE.MathUtils.degToRad(64)),
+      Math.sin(THREE.MathUtils.degToRad(79)),
   );
 
   rig.queueLookInput(0, 10_000);
@@ -138,6 +138,102 @@ test('default pitch limits provide an equally usable upward and downward view', 
   assert.ok(
     rig.camera.getWorldDirection(new THREE.Vector3()).y <
       -Math.sin(THREE.MathUtils.degToRad(64)),
+  );
+});
+
+test('floor obstruction cannot flatten the centre ray during steep upward aim', () => {
+  const target = createTarget();
+  const world = new CollisionWorld();
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(20, 0.2, 20));
+  floor.name = 'upward-aim-test-floor';
+  floor.position.y = -0.1;
+  world.register(floor);
+  const rig = new CameraRig();
+  rig.setFollowTarget(target, world);
+  rig.update(1, 0);
+
+  rig.setAimPresentationActive(true, true);
+  rig.queueLookInput(0, -10_000);
+  rig.update(1, 1 / 60);
+
+  const diagnostics = rig.getDiagnostics();
+  const aimDirection = rig.camera.getWorldDirection(new THREE.Vector3());
+  assert.equal(diagnostics.obstructionName, floor.name);
+  assert.ok(diagnostics.currentDistanceMetres < 1);
+  assert.ok(
+    Math.abs(
+      diagnostics.pitchRadians - THREE.MathUtils.degToRad(-80),
+    ) < EPSILON,
+  );
+  assert.ok(
+    THREE.MathUtils.radToDeg(Math.asin(aimDirection.y)) > 75,
+    `expected a steep upward aim ray, received ${THREE.MathUtils.radToDeg(Math.asin(aimDirection.y)).toFixed(2)} degrees`,
+  );
+  assert.ok(diagnostics.aimShoulderOffsetMetres < 0.1);
+
+  floor.geometry.dispose();
+});
+
+test('Goop aim smoothly adopts a collision-aware shoulder pose and exposes its live centre ray', () => {
+  const rig = new CameraRig({
+    initialPitchRadians: 0,
+    aimTransitionDurationSeconds: 0.2,
+    aimDistanceScale: 0.84,
+    aimShoulderOffsetMetres: 0.82,
+  });
+  const world = new CollisionWorld();
+  rig.setFollowTarget(createTarget(), world);
+  rig.update(1, 0);
+  const normalDistance = rig.getDiagnostics().desiredDistanceMetres;
+  const initialFov = rig.camera.fov;
+  const initialFocus = new THREE.Vector3().copy(
+    rig.getDiagnostics().focusPosition,
+  );
+
+  rig.setAimPresentationActive(true);
+  rig.update(1, 0.1);
+  const entering = rig.getDiagnostics();
+  assert.ok(entering.aimPresentationBlend > 0);
+  assert.ok(entering.aimPresentationBlend < 1);
+  assert.ok(entering.desiredDistanceMetres < normalDistance);
+  assert.ok(entering.desiredDistanceMetres > normalDistance * 0.84);
+
+  rig.update(1, 0.1);
+  const aimed = rig.getDiagnostics();
+  assert.ok(Math.abs(aimed.aimPresentationBlend - 1) < EPSILON);
+  assert.ok(
+    Math.abs(aimed.desiredDistanceMetres - normalDistance * 0.84) < EPSILON,
+  );
+  assert.equal(rig.camera.fov, initialFov);
+  assert.ok(Math.abs(aimed.aimShoulderOffsetMetres - 0.82) < EPSILON);
+  assert.ok(
+    new THREE.Vector3()
+      .copy(aimed.focusPosition)
+      .distanceTo(initialFocus) > 0.8,
+  );
+
+  const aimOrigin = new THREE.Vector3();
+  const aimDirection = new THREE.Vector3();
+  rig.copyAimRay(aimOrigin, aimDirection);
+  assert.ok(aimOrigin.distanceTo(rig.camera.position) < EPSILON);
+  assert.ok(
+    aimDirection.distanceTo(
+      rig.camera.getWorldDirection(new THREE.Vector3()),
+    ) < EPSILON,
+  );
+
+  rig.setAimPresentationActive(false);
+  advanceRig(rig, 1);
+  assert.ok(rig.getDiagnostics().aimPresentationBlend < EPSILON);
+  assert.ok(rig.getDiagnostics().aimShoulderOffsetMetres < EPSILON);
+  assert.ok(
+    new THREE.Vector3()
+      .copy(rig.getDiagnostics().focusPosition)
+      .distanceTo(initialFocus) < EPSILON,
+  );
+  assert.ok(
+    Math.abs(rig.getDiagnostics().desiredDistanceMetres - normalDistance) <
+      EPSILON,
   );
 });
 
