@@ -153,6 +153,7 @@ export class KinematicBody {
   private readonly groundNormalValue = new THREE.Vector3(0, 1, 0);
   private readonly gameplayUpValue = new THREE.Vector3(0, 1, 0);
   private readonly lastContactNormalValue = new THREE.Vector3(0, 1, 0);
+  private lastContactColliderValue: THREE.Mesh | null = null;
   private supportColliderValue: THREE.Mesh | null = null;
 
   private groundedValue = false;
@@ -375,6 +376,10 @@ export class KinematicBody {
     return this.lastContactNameValue;
   }
 
+  get lastContactCollider(): THREE.Mesh | null {
+    return this.lastContactColliderValue;
+  }
+
   /**
    * Advance one deterministic gameplay step.
    *
@@ -396,6 +401,7 @@ export class KinematicBody {
     this.lastCollisionName = 'none';
     this.lastContactImpactSpeedValue = 0;
     this.lastContactNameValue = 'none';
+    this.lastContactColliderValue = null;
     this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastContactSurfaceTagValue = this.supportSurfaceTagValue;
     this.landedThisStepValue = false;
@@ -603,6 +609,7 @@ export class KinematicBody {
     this.lastJumpChargeFractionValue = 0;
     this.lastContactImpactSpeedValue = 0;
     this.lastContactNameValue = 'none';
+    this.lastContactColliderValue = null;
     this.lastContactNormalValue.copy(this.gameplayUpValue);
     this.lastBounceSpeedValue = 0;
     this.lastBounceSurfaceNameValue = 'none';
@@ -1011,6 +1018,7 @@ export class KinematicBody {
         this.lastContactNormalValue.copy(this.movementHit.normal);
         this.lastContactNameValue =
           this.movementHit.object?.name || '<unnamed>';
+        this.lastContactColliderValue = this.movementHit.object;
         this.lastContactSurfaceTagValue = surface.tag;
       }
 

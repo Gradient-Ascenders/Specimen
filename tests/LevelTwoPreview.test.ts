@@ -552,15 +552,11 @@ test('Room 2 and Room 3 lasers are authored directly against their sticky panels
   const groundDrones = scene.collisionMeshes.filter(
     (mesh) => mesh.userData.droneType === 'ground-security',
   );
-  assert.equal(groundDrones.length, 4);
-  for (const drone of groundDrones) {
-    assert.equal(drone.userData.interactionRole, 'bob-rear-push');
-    assert.equal(drone.userData.nonSoluble, true);
-  }
+  assert.equal(groundDrones.length, 0, 'Issue #96 runtime replaces all ground placeholders');
   assert.deepEqual(CULTIVATION_ROOM_OBJECTIVES, {
     1: 'Help Bob reach Room 2',
     2: 'Get Bob and Goop into Room 3',
-    3: 'Get both slimes past the security room',
+    3: 'Disable four drones and bring both slimes to their exits',
   });
 
   scene.dispose();
@@ -629,6 +625,36 @@ test('Room 2 and Room 3 lasers report the struck persistent slime', () => {
     hazardId: 'cultivation-room-3-entry-sticky-laser',
     slimeId: 'bob',
   });
+
+  scene.dispose();
+});
+
+test('split occupants keep Room 2 and Room 3 simulation active together', () => {
+  const scene = new LevelTwoPreviewScene(() => {});
+  const roomTwoLaser = scene.roomTwo.lasers.hazards[0];
+  const roomThreeLaser = scene.roomThree.lasers.hazards[0];
+  const bobRoomTwo = new THREE.Vector3(
+    roomTwoLaser.start.x,
+    roomTwoLaser.start.y,
+    roomTwoLaser.start.z,
+  );
+  const goopRoomThree = new THREE.Vector3(
+    roomThreeLaser.start.x,
+    roomThreeLaser.start.y,
+    roomThreeLaser.start.z,
+  );
+  scene.roomTwo.root.localToWorld(bobRoomTwo);
+  scene.roomThree.root.localToWorld(goopRoomThree);
+
+  scene.update(1 / 60, 2, [
+    { id: 'bob', position: bobRoomTwo, radiusMetres: 0.45 },
+    { id: 'goop', position: goopRoomThree, radiusMetres: 0.45 },
+  ]);
+
+  assert.equal(scene.resolveRoomId(bobRoomTwo), 2);
+  assert.equal(scene.resolveRoomId(goopRoomThree), 3);
+  assert.equal(scene.roomTwo.lasers.lastFailureTargetId, 'bob');
+  assert.equal(scene.roomThree.lasers.lastFailureTargetId, 'goop');
 
   scene.dispose();
 });
