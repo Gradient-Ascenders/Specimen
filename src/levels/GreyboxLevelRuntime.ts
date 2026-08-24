@@ -62,6 +62,11 @@ import {
   LevelLifecycle,
   type LevelLifecycleState,
 } from './LevelLifecycle.ts';
+import {
+  CULTIVATION_ROOM_OBJECTIVES,
+  LevelTwoPreviewScene,
+  type LevelTwoAuthoredRoomId,
+} from './LevelTwoPreviewScene.ts';
 
 const LEVEL_ID = 'containment-teaching-level-1';
 const DEBUG_TOGGLE_CODE = 'F2';
@@ -90,6 +95,11 @@ const TWO_BODY_SENSOR_CENTRE = new THREE.Vector3(3.1, 0.45, -2.6);
 const TWO_BODY_SENSOR_SIZE = new THREE.Vector3(2, 1, 2);
 const DISSOLVE_PUZZLE_GROUP_ID = 'containment-goop-dissolve-demo';
 
+const isLevelTwoAuthoredRoomId = (
+  roomId: DebugRoomId,
+): roomId is LevelTwoAuthoredRoomId =>
+  roomId === 1 || roomId === 2 || roomId === 3;
+
 export interface GreyboxLevelRuntimeOptions {
   host: HTMLElement;
   input: Input;
@@ -104,6 +114,7 @@ export interface GreyboxLevelRuntimeEvents {
 
 interface GreyboxRuntimeResources {
   readonly testScene: ContainmentLevelScene;
+  readonly levelTwoPreview: LevelTwoPreviewScene | undefined;
   readonly containmentLevel: ContainmentLevelController;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
@@ -133,11 +144,15 @@ interface GreyboxRuntimeResources {
       readonly id: 'bob';
       readonly position: KinematicBody['position'];
       readonly radiusMetres: number;
+      readonly attached: boolean;
+      readonly supportCollider: THREE.Mesh | null;
     },
     {
       readonly id: 'goop';
       readonly position: KinematicBody['position'];
       readonly radiusMetres: number;
+      readonly attached: boolean;
+      readonly supportCollider: THREE.Mesh | null;
     },
   ];
   readonly deathSequence: DeathSequence;
@@ -174,6 +189,8 @@ export class GreyboxLevelRuntime {
   private cameraFollowSlimeId: 'bob' | 'goop' | undefined;
   private lastDeathSlimeId: 'bob' | 'goop' | undefined;
   private playerSwitchFeedbackSequence = 0;
+  private currentPreviewLevelIdValue: 1 | 2 = 1;
+  private levelTwoRoomIdValue: LevelTwoAuthoredRoomId = 1;
   private readonly slimeHUDListeners = new Set<SlimeHUDListener>();
   private readonly twoBodySwitchingRegressionStatus =
     runTwoBodySwitchingRegression();
@@ -291,7 +308,21 @@ export class GreyboxLevelRuntime {
       return;
     }
 
-    if (containmentLevel.state !== 'playing') {
+    if (
+      this.debugAvailable &&
+      testPanel &&
+      resources.levelTwoPreview &&
+      this.input.wasPressed('debugToggleLevel')
+    ) {
+      testPanel.toggleLevel();
+      this.input.endFixedUpdate();
+      return;
+    }
+
+    if (
+      this.currentPreviewLevelIdValue === 1 &&
+      containmentLevel.state !== 'playing'
+    ) {
       containmentLevel.update(deltaSeconds);
       this.input.setEnabled(false);
       this.input.releasePointerLock();
@@ -391,27 +422,56 @@ export class GreyboxLevelRuntime {
       goopBody.update(deltaSeconds, resources.noMovement);
     }
 
+    if (this.currentPreviewLevelIdValue === 2 && resources.levelTwoPreview) {
+      const resolvedRoomId = resources.levelTwoPreview.resolveRoomId(
+        activeBody.position,
+      );
+      if (resolvedRoomId > this.levelTwoRoomIdValue) {
+        this.levelTwoRoomIdValue = resolvedRoomId;
+        this.emitLevelTwoObjective();
+      }
+    }
+
     resources.pressurePlateSensor.update(
       resources.pressurePlate.trigger,
       resources.pressurePlateOccupants,
     );
 
     if (slimePair.activeBody.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
-      containmentLevel.requestOutOfBoundsFailure();
+      if (this.currentPreviewLevelIdValue === 2 && resources.levelTwoPreview) {
+        this.requestPlayerDeath(
+          () => this.resetAndRecoverLevelTwoPreviewRoom(resources),
+          resources,
+        );
+      } else {
+        containmentLevel.requestOutOfBoundsFailure();
+      }
     }
     if (!deathSequence.isPlaying) {
       this.updateDeathState(deltaSeconds, resources);
       return;
     }
 
-    containmentLevel.setActiveBody(activeBody);
-    containmentLevel.update(deltaSeconds);
+    if (this.currentPreviewLevelIdValue === 1) {
+      containmentLevel.setActiveBody(activeBody);
+      containmentLevel.update(deltaSeconds);
+    } else {
+      resources.levelTwoPreview?.update(
+        deltaSeconds,
+        this.levelTwoRoomIdValue,
+        activeBody,
+        resources.pressurePlateOccupants,
+      );
+    }
     this.syncContextualCamera(resources);
     if (!deathSequence.isPlaying) {
       this.updateDeathState(deltaSeconds, resources);
       return;
     }
-    if (containmentLevel.state !== 'playing') {
+    if (
+      this.currentPreviewLevelIdValue === 1 &&
+      containmentLevel.state !== 'playing'
+    ) {
       this.input.setEnabled(false);
       this.input.releasePointerLock();
       this.host.dataset.gameState = 'level-completing';
@@ -540,6 +600,8 @@ export class GreyboxLevelRuntime {
   }
 
   private readonly loadResources = (): void => {
+    this.currentPreviewLevelIdValue = 1;
+    this.levelTwoRoomIdValue = 1;
     let containmentLevel: ContainmentLevelController;
     const testScene = new ContainmentLevelScene(
       (failure: ContainmentHazardFailure) => {
@@ -548,21 +610,51 @@ export class GreyboxLevelRuntime {
       { includeDevelopmentHelpers: this.debugAvailable },
     );
     this.renderLayer.scene.add(testScene.root);
+    const levelTwoPreview = this.debugAvailable
+      ? new LevelTwoPreviewScene((failure) => {
+          const resources = this.resources;
+          if (
+            !resources ||
+            this.currentPreviewLevelIdValue !== 2 ||
+            !resources.deathSequence.isPlaying
+          ) {
+            return;
+          }
+          this.requestPlayerDeath(
+            () => this.resetAndRecoverLevelTwoPreviewRoom(resources),
+            resources,
+            failure.slimeId,
+          );
+        })
+      : undefined;
+    if (levelTwoPreview) this.renderLayer.scene.add(levelTwoPreview.root);
 
     const collisionWorld = new CollisionWorld();
     collisionWorld.registerAll(testScene.collisionMeshes);
+    if (levelTwoPreview) {
+      collisionWorld.registerAll(levelTwoPreview.collisionMeshes);
+    }
     collisionWorld.registerAll(
       testScene.cameraObstructionMeshes,
       CollisionLayer.CameraObstruction,
     );
     const surfaceRegistry = new SurfaceRegistry();
     surfaceRegistry.registerAll(testScene.collisionMeshes);
+    if (levelTwoPreview) {
+      surfaceRegistry.registerAll(levelTwoPreview.collisionMeshes);
+    }
+    const allDevelopmentColliders = levelTwoPreview
+      ? [...testScene.collisionMeshes, ...levelTwoPreview.collisionMeshes]
+      : testScene.collisionMeshes;
     const collisionOverlay = this.debugAvailable
-      ? new ContainmentCollisionOverlay(testScene.collisionMeshes)
+      ? new ContainmentCollisionOverlay(allDevelopmentColliders)
       : undefined;
     const movementEvents = new EventBus<MovementEvents>();
     const puzzleRegistry = new PuzzleRegistry();
-    const dissolveTargets = testScene.solubleTargetMeshes
+    const solubleTargetMeshes = levelTwoPreview
+      ? [...testScene.solubleTargetMeshes, ...levelTwoPreview.solubleTargetMeshes]
+      : testScene.solubleTargetMeshes;
+    const dissolveTargets = solubleTargetMeshes
       .map((mesh) =>
         createAuthoredDissolveTarget(
           mesh,
@@ -571,6 +663,8 @@ export class GreyboxLevelRuntime {
         ),
       )
       .filter((target): target is DissolveTarget => target !== undefined);
+
+    levelTwoPreview?.bindDissolveTargets(dissolveTargets);
 
     if (dissolveTargets.length === 0) {
       throw new Error(
@@ -653,11 +747,23 @@ export class GreyboxLevelRuntime {
         id: 'bob' as const,
         position: body.position,
         radiusMetres: body.radiusMetres,
+        get attached() {
+          return body.attached;
+        },
+        get supportCollider() {
+          return body.supportCollider;
+        },
       },
       {
         id: 'goop' as const,
         position: goopBody.position,
         radiusMetres: goopBody.radiusMetres,
+        get attached() {
+          return goopBody.attached;
+        },
+        get supportCollider() {
+          return goopBody.supportCollider;
+        },
       },
     ] as const;
 
@@ -726,19 +832,19 @@ export class GreyboxLevelRuntime {
             slimePair.activeBody.teleport(outOfBoundsTestPosition);
             const resources = this.requireResources();
             this.requestPlayerDeath(
-              () =>
+              () => {
+                if (this.currentPreviewLevelIdValue === 2) {
+                  this.resetAndRecoverLevelTwoPreviewRoom(resources);
+                  return;
+                }
                 this.restoreCheckpointState(resources, () =>
-                  containmentLevel.recoverActiveCheckpoint()),
+                  containmentLevel.recoverActiveCheckpoint());
+              },
               resources,
             );
           },
-          onTeleportRoom: (roomId) => {
-            containmentLevel.setActiveBody(slimePair.activeBody);
-            containmentLevel.teleportToRoomForDebug(roomId);
-            blobFacing.reset();
-            testScene.setProbePosition(body.position);
-            this.syncContextualCamera(this.requireResources());
-          },
+          onToggleLevel: () => this.togglePreviewLevel(),
+          onTeleportRoom: (roomId) => this.teleportToDebugRoom(roomId),
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
           onRunSlimeRosterRegression: runSlimeManagerRegression,
           onRunTwoBodySwitchingRegression: runTwoBodySwitchingRegression,
@@ -771,6 +877,7 @@ export class GreyboxLevelRuntime {
 
     if (testPanel) {
       this.host.append(testPanel.element);
+      testPanel.setActiveLevel(1);
       this.setDebugVisible(false, testPanel);
       this.hostWindow.addEventListener('keydown', this.onDebugToggle);
     }
@@ -779,6 +886,7 @@ export class GreyboxLevelRuntime {
 
     this.resources = {
       testScene,
+      levelTwoPreview,
       containmentLevel,
       collisionWorld,
       surfaceRegistry,
@@ -862,8 +970,12 @@ export class GreyboxLevelRuntime {
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
     resources.containmentLevel.reset();
+    resources.levelTwoPreview?.reset();
     resources.puzzleRegistry.reset();
     resources.slimePair.restoreInitialState();
+    if (this.currentPreviewLevelIdValue === 2 && resources.levelTwoPreview) {
+      this.recoverLevelTwoPreviewRoom(resources);
+    }
     resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
     resources.pressurePlate.reset();
     resources.testScene.resetProbe();
@@ -885,8 +997,14 @@ export class GreyboxLevelRuntime {
     this.slopeRegressionStatus = 'not run';
     this.host.dataset.gameState = resources.deathSequence.state;
     if (resources.testPanel) {
-      resources.testPanel.markProbeAtSpawn();
+      resources.testPanel.setActiveLevel(this.currentPreviewLevelIdValue);
+      if (this.currentPreviewLevelIdValue === 1) {
+        resources.testPanel.markProbeAtSpawn();
+      }
       this.setDebugVisible(this.debugVisible, resources.testPanel);
+    }
+    if (this.currentPreviewLevelIdValue === 2) {
+      this.emitLevelTwoObjective();
     }
     this.notifySlimeHUD(undefined, true);
   };
@@ -915,6 +1033,7 @@ export class GreyboxLevelRuntime {
     resources.slimePairPresentation.dispose();
     resources.slimeManager.clearLevelRegistrations();
     resources.slimeManager.dispose();
+    resources.levelTwoPreview?.dispose();
     resources.testScene.dispose();
     resources.collisionWorld.clear();
     resources.surfaceRegistry.clear();
@@ -929,6 +1048,8 @@ export class GreyboxLevelRuntime {
     this.lastLandingImpactSpeedMetresPerSecond = 0;
     this.cameraFollowSlimeId = undefined;
     this.lastDeathSlimeId = undefined;
+    this.currentPreviewLevelIdValue = 1;
+    this.levelTwoRoomIdValue = 1;
     this.notifySlimeHUD();
   };
 
@@ -949,6 +1070,112 @@ export class GreyboxLevelRuntime {
     recoverLevelCheckpoint();
     resources.slimePair.captureCurrentRecoveryState();
     resources.slimePair.restoreRecoveryState();
+  }
+
+  private togglePreviewLevel(): 1 | 2 {
+    const resources = this.requireResources();
+    if (!resources.levelTwoPreview) return 1;
+
+    resources.levelTwoPreview.reset();
+    this.currentPreviewLevelIdValue =
+      this.currentPreviewLevelIdValue === 1 ? 2 : 1;
+    this.levelTwoRoomIdValue = 1;
+    this.teleportToDebugRoom(1);
+    return this.currentPreviewLevelIdValue;
+  }
+
+  private teleportToDebugRoom(roomId: DebugRoomId): boolean {
+    const resources = this.requireResources();
+    if (
+      this.currentPreviewLevelIdValue === 2 &&
+      !isLevelTwoAuthoredRoomId(roomId)
+    ) {
+      return false;
+    }
+    const {
+      acidProjectileSystem,
+      blobFacing,
+      body,
+      containmentLevel,
+      dissolveSystem,
+      levelTwoPreview,
+      slimePair,
+      testScene,
+    } = resources;
+
+    acidProjectileSystem.reset();
+    dissolveSystem.reset();
+    blobFacing.reset();
+
+    if (this.currentPreviewLevelIdValue === 1) {
+      containmentLevel.setActiveBody(slimePair.activeBody);
+      containmentLevel.teleportToRoomForDebug(roomId);
+      const inactivePosition = new THREE.Vector3(
+        slimePair.activeBody.position.x + 1.5,
+        slimePair.activeBody.position.y,
+        slimePair.activeBody.position.z,
+      );
+      slimePair.inactiveBody.recoverAt(inactivePosition);
+      this.events.emit('objectiveChanged', {
+        roomId: containmentLevel.activeRoomId,
+        objective: containmentLevel.currentObjective,
+      });
+    } else {
+      if (!levelTwoPreview || !isLevelTwoAuthoredRoomId(roomId)) return false;
+      this.levelTwoRoomIdValue = roomId;
+      levelTwoPreview.reset();
+      this.recoverLevelTwoPreviewRoom(resources);
+      this.emitLevelTwoObjective();
+    }
+
+    this.renderLayer.cameraRig.reset();
+    this.retargetCameraToActiveSlime(resources);
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians(
+      ROOM_ONE_INITIAL_CAMERA_YAW_RADIANS,
+    );
+    testScene.setProbePosition(body.position);
+    this.syncContextualCamera(resources);
+    this.host.dataset.gameState = 'playing';
+    return true;
+  }
+
+  private recoverLevelTwoPreviewRoom(resources: GreyboxRuntimeResources): void {
+    const levelTwoPreview = resources.levelTwoPreview;
+    if (!levelTwoPreview) return;
+
+    const bobPosition = levelTwoPreview.copyRoomSpawnPosition(
+      this.levelTwoRoomIdValue,
+      'bob',
+      new THREE.Vector3(),
+    );
+    const goopPosition = levelTwoPreview.copyRoomSpawnPosition(
+      this.levelTwoRoomIdValue,
+      'goop',
+      new THREE.Vector3(),
+    );
+    resources.body.recoverAt(bobPosition);
+    resources.goopBody.recoverAt(goopPosition);
+    resources.slimePair.setRecoveryState({
+      bobPosition,
+      goopPosition,
+      activeSlimeId: resources.slimePair.activeSlimeId,
+    });
+  }
+
+  private resetAndRecoverLevelTwoPreviewRoom(
+    resources: GreyboxRuntimeResources,
+  ): void {
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
+    resources.levelTwoPreview?.reset();
+    this.recoverLevelTwoPreviewRoom(resources);
+  }
+
+  private emitLevelTwoObjective(): void {
+    this.events.emit('objectiveChanged', {
+      roomId: this.levelTwoRoomIdValue,
+      objective: CULTIVATION_ROOM_OBJECTIVES[this.levelTwoRoomIdValue],
+    });
   }
 
   /**
@@ -1006,18 +1233,21 @@ export class GreyboxLevelRuntime {
 
   private syncContextualCamera(resources: GreyboxRuntimeResources): void {
     this.renderLayer.cameraRig.setContextualCamera(
-      resources.testScene.roomFour.resolveLiftCamera(
-        resources.slimePair.activeBody,
-      ),
+      this.currentPreviewLevelIdValue === 1
+        ? resources.testScene.roomFour.resolveLiftCamera(
+            resources.slimePair.activeBody,
+          )
+        : undefined,
     );
   }
 
   private requestPlayerDeath(
     recovery: DeathRecoveryAction,
     resources: GreyboxRuntimeResources,
+    dyingSlimeId: 'bob' | 'goop' = resources.slimePair.activeSlimeId,
   ): boolean {
-    const dyingSlimeId = resources.slimePair.activeSlimeId;
-    const dyingBody = resources.slimePair.activeBody;
+    const dyingBody =
+      dyingSlimeId === 'bob' ? resources.body : resources.goopBody;
 
     if (!resources.deathSequence.requestDeath(recovery)) return false;
     if (!resources.testScene.startDeath(dyingBody.position)) {
@@ -1213,7 +1443,8 @@ export class GreyboxLevelRuntime {
 
     testPanel.setRuntimeDiagnostics(
       [
-        `active level: ${LEVEL_ID}`,
+        `active level: ${this.currentPreviewLevelIdValue === 1 ? LEVEL_ID : 'cultivation-level-2-authoring-preview'}`,
+        `active room: ${this.currentPreviewLevelIdValue === 1 ? containmentLevel.activeRoomId : this.levelTwoRoomIdValue}`,
         `lifecycle state / restarts: ${this.lifecycle.state} / ${this.lifecycle.restartCount}`,
         `debug panel: visible (${DEBUG_TOGGLE_CODE} toggles)`,
         `collision overlay: ${collisionOverlay ? (collisionOverlay.isVisible ? 'visible' : 'hidden') : 'unavailable'}`,

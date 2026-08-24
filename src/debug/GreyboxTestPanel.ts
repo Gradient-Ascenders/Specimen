@@ -3,7 +3,8 @@ export type DebugRoomId = 1 | 2 | 3 | 4 | 5;
 interface GreyboxTestPanelOptions {
   onReset: () => void;
   onTestRecovery: () => void;
-  onTeleportRoom: (roomId: DebugRoomId) => void;
+  onToggleLevel: () => 1 | 2;
+  onTeleportRoom: (roomId: DebugRoomId) => boolean;
   onRunSlopeIdleRegression: () => string;
   onRunSlimeRosterRegression: () => string;
   onRunTwoBodySwitchingRegression: () => string;
@@ -17,8 +18,12 @@ export class GreyboxTestPanel {
 
   private readonly status: HTMLElement;
   private readonly runtimeStatus: HTMLElement;
+  private readonly levelLabel: HTMLElement;
+  private readonly title: HTMLElement;
+  private readonly summary: HTMLElement;
   private readonly resetButton: HTMLButtonElement;
   private readonly fallButton: HTMLButtonElement;
+  private readonly levelButton: HTMLButtonElement;
   private readonly roomButtons: readonly HTMLButtonElement[];
   private readonly collapseButton: HTMLButtonElement;
   private readonly slopeRegressionButton: HTMLButtonElement;
@@ -41,9 +46,9 @@ export class GreyboxTestPanel {
       >−</button>
 
       <div class="test-panel-content">
-        <p class="eyebrow">Level 1 containment diagnostics</p>
-        <h1>Containment: climb + bounce</h1>
-        <p class="summary">Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump. As Goop, hold right mouse to aim and press left mouse to fire acid.</p>
+        <p class="eyebrow" data-level-label>Level 1 containment diagnostics</p>
+        <h1 data-level-title>Containment: climb + bounce</h1>
+        <p class="summary" data-level-summary>Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump. As Goop, hold right mouse to aim and press left mouse to fire acid.</p>
 
         <ul class="case-list" aria-label="Collision test case legend">
           <li style="--case-colour: #81909b">Floor</li>
@@ -65,6 +70,7 @@ export class GreyboxTestPanel {
         <div class="controls">
           <button type="button" data-action="reset">Reset probe <kbd>R</kbd></button>
           <button type="button" data-action="fall">Test death <kbd>F</kbd></button>
+          <button type="button" data-action="toggle-level">Switch to Level 2 <kbd>0</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="1">Room 1 <kbd>1</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="2">Room 2 <kbd>2</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="3">Room 3 <kbd>3</kbd></button>
@@ -86,11 +92,21 @@ export class GreyboxTestPanel {
     const runtimeStatus = this.element.querySelector<HTMLElement>(
       '[data-runtime-status]',
     );
+    const levelLabel = this.element.querySelector<HTMLElement>(
+      '[data-level-label]',
+    );
+    const title = this.element.querySelector<HTMLElement>('[data-level-title]');
+    const summary = this.element.querySelector<HTMLElement>(
+      '[data-level-summary]',
+    );
     const resetButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="reset"]',
     );
     const fallButton = this.element.querySelector<HTMLButtonElement>(
       '[data-action="fall"]',
+    );
+    const levelButton = this.element.querySelector<HTMLButtonElement>(
+      '[data-action="toggle-level"]',
     );
     const roomButtons = Array.from(
       this.element.querySelectorAll<HTMLButtonElement>(
@@ -123,8 +139,12 @@ export class GreyboxTestPanel {
     if (
       !status ||
       !runtimeStatus ||
+      !levelLabel ||
+      !title ||
+      !summary ||
       !resetButton ||
       !fallButton ||
+      !levelButton ||
       roomButtons.length !== 5 ||
       !collapseButton ||
       !slopeRegressionButton ||
@@ -138,8 +158,12 @@ export class GreyboxTestPanel {
 
     this.status = status;
     this.runtimeStatus = runtimeStatus;
+    this.levelLabel = levelLabel;
+    this.title = title;
+    this.summary = summary;
     this.resetButton = resetButton;
     this.fallButton = fallButton;
+    this.levelButton = levelButton;
     this.roomButtons = roomButtons;
     this.collapseButton = collapseButton;
     this.slopeRegressionButton = slopeRegressionButton;
@@ -151,6 +175,7 @@ export class GreyboxTestPanel {
 
     this.resetButton.addEventListener('click', this.resetProbe);
     this.fallButton.addEventListener('click', this.testRecovery);
+    this.levelButton.addEventListener('click', this.toggleLevel);
     for (const button of this.roomButtons) {
       button.addEventListener('click', this.teleportRoomFromButton);
     }
@@ -180,6 +205,7 @@ export class GreyboxTestPanel {
   dispose(): void {
     this.resetButton.removeEventListener('click', this.resetProbe);
     this.fallButton.removeEventListener('click', this.testRecovery);
+    this.levelButton.removeEventListener('click', this.toggleLevel);
     for (const button of this.roomButtons) {
       button.removeEventListener('click', this.teleportRoomFromButton);
     }
@@ -218,10 +244,40 @@ export class GreyboxTestPanel {
   };
 
   readonly teleportRoom = (roomId: DebugRoomId): void => {
-    this.options.onTeleportRoom(roomId);
-    this.status.textContent =
-      `Probe teleported to the Room ${roomId} entry checkpoint.`;
+    const teleported = this.options.onTeleportRoom(roomId);
+    this.status.textContent = teleported
+      ? `Both slimes teleported to the current level's Room ${roomId} entry.`
+      : `Room ${roomId} is not authored for the current level yet.`;
   };
+
+  readonly toggleLevel = (): void => {
+    const levelId = this.options.onToggleLevel();
+    this.setActiveLevel(levelId);
+    this.status.textContent = `Development preview switched to Level ${levelId}, Room 1.`;
+  };
+
+  setActiveLevel(levelId: 1 | 2): void {
+    const isLevelTwo = levelId === 2;
+    this.levelLabel.textContent = isLevelTwo
+      ? 'Level 2 cultivation authoring preview'
+      : 'Level 1 containment diagnostics';
+    this.title.textContent = isLevelTwo
+      ? 'Cultivation: two-slime cooperation'
+      : 'Containment: climb + bounce';
+    this.summary.innerHTML = isLevelTwo
+      ? 'Rooms 1–3 preview Goop-created routes, split exits, and the upper/lower security-room flow. Press <kbd>0</kbd> to return to Level 1; <kbd>1</kbd>–<kbd>3</kbd> select authored rooms. Rooms 4–5 are not authored yet.'
+      : 'Room 1 teaches yellow-green wall adhesion; Room 2 teaches bounce height, gap distance, and bounce-to-wall catches. Press <kbd>0</kbd> for the Level 2 preview. Move with <kbd>WASD</kbd>; hold then release <kbd>Space</kbd> to charge a jump.';
+    this.levelButton.innerHTML = isLevelTwo
+      ? 'Switch to Level 1 <kbd>0</kbd>'
+      : 'Switch to Level 2 <kbd>0</kbd>';
+    this.roomButtons.forEach((button, index) => {
+      const unavailable = isLevelTwo && index >= 3;
+      button.disabled = unavailable;
+      button.title = unavailable
+        ? `Level 2 Room ${index + 1} is not authored yet`
+        : '';
+    });
+  }
 
   markProbeAtSpawn(): void {
     this.status.textContent = 'Probe is at spawn.';
