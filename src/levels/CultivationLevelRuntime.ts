@@ -9,15 +9,16 @@ import { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
-import {
+import type {
   CultivationTestPanel,
-  type CultivationDebugRoomId,
+  CultivationDebugRoomId,
 } from '../debug/CultivationTestPanel.ts';
+import type { CultivationLevelDebugSupport } from '../debug/CultivationLevelDebug.ts';
 import {
   RadioactiveHazardSystem,
   type RadiationContactTarget,
 } from '../hazards/RadioactiveHazardSystem.ts';
-import { RoomThreeDroneEncounter } from '../hazards/RoomThreeDroneEncounter.ts';
+import type { RoomThreeDroneEncounter } from '../hazards/RoomThreeDroneEncounter.ts';
 import {
   ColliderTransformMode,
   CollisionWorld,
@@ -37,7 +38,7 @@ import { WallButton } from '../puzzle/WallButton.ts';
 import { WallButtonDoorCoordinator } from '../puzzle/WallButtonDoorCoordinator.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
-import { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
+import type { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
 import { SlimeVisual, type SlimeVisualState } from '../render/slime/SlimeVisual.ts';
@@ -52,24 +53,20 @@ import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
 import { SlimePairPresentation } from '../slimes/SlimePairPresentation.ts';
 import { DeathSequence, type DeathRecoveryAction } from '../systems/DeathSequence.ts';
 import { DeathScreen } from '../ui/DeathScreen.ts';
-import { SlimeDamageVignette } from '../ui/SlimeDamageVignette.ts';
+import type { SlimeDamageVignette } from '../ui/SlimeDamageVignette.ts';
 import { CultivationLevelController } from './CultivationLevelController.ts';
 import { CULTIVATION_FOUNDATION_MANIFEST } from './CultivationFoundationManifest.ts';
 import { CultivationLevelScene } from './CultivationLevelScene.ts';
-import { CultivationRoomThreeController } from './CultivationRoomThreeController.ts';
-import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from './CultivationRoomThreeAuthoring.ts';
+import type { CultivationRoomThreeController } from './CultivationRoomThreeController.ts';
 import type { GameLevelRuntimeEvents } from './GameLevelRuntime.ts';
 import { LevelLifecycle, type LevelLifecycleState } from './LevelLifecycle.ts';
-import {
-  CULTIVATION_ROOM_OBJECTIVES,
+import type {
   LevelTwoPreviewScene,
-  type LevelTwoAuthoredRoomId,
-  type LevelTwoPreviewHazardFailure,
+  LevelTwoAuthoredRoomId,
+  LevelTwoPreviewHazardFailure,
 } from './LevelTwoPreviewScene.ts';
-import {
-  advanceLevelTwoPreviewProgression,
-  createLevelTwoPreviewProgression,
-  type LevelTwoPreviewProgressionSnapshot,
+import type {
+  LevelTwoPreviewProgressionSnapshot,
 } from './LevelTwoPreviewProgression.ts';
 import {
   type LevelProgressionSnapshot,
@@ -86,6 +83,7 @@ export interface CultivationLevelRuntimeOptions {
   readonly progression: LevelProgressionSnapshot;
   readonly window?: Window;
   readonly debugAvailable?: boolean;
+  readonly debugSupport?: CultivationLevelDebugSupport;
 }
 
 interface CultivationRuntimeResources {
@@ -153,6 +151,7 @@ export class CultivationLevelRuntime {
   private readonly renderLayer: RenderLayer;
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
+  private readonly debugSupport: CultivationLevelDebugSupport | undefined;
   private readonly initialProgression: LevelProgressionSnapshot;
   private readonly lifecycle: LevelLifecycle;
   private readonly hudListeners = new Set<SlimeHUDListener>();
@@ -179,6 +178,10 @@ export class CultivationLevelRuntime {
     this.renderLayer = options.renderLayer;
     this.hostWindow = options.window ?? window;
     this.debugAvailable = options.debugAvailable ?? import.meta.env.DEV;
+    this.debugSupport = options.debugSupport;
+    if (this.debugAvailable && !this.debugSupport) {
+      throw new Error('Cultivation debug support must be loaded when debugging is enabled.');
+    }
     this.initialProgression = {
       unlockedSlimeIds: [...options.progression.unlockedSlimeIds],
       activeSlimeId: options.progression.activeSlimeId,
@@ -378,7 +381,7 @@ export class CultivationLevelRuntime {
       }
       // A fatal frame must not also promote the checkpoint that Retry restores.
       if (resources.deathSequence.isPlaying) {
-        const nextProgression = advanceLevelTwoPreviewProgression(
+        const nextProgression = this.debugSupport!.advancePreviewProgression(
           authoredProgression,
           resolvedRooms,
         );
@@ -512,7 +515,7 @@ export class CultivationLevelRuntime {
       rollback(() => scene.dispose());
       this.renderLayer.scene.add(scene.root);
       const authoredPreview = this.debugAvailable
-        ? new LevelTwoPreviewScene((failure) =>
+        ? new this.debugSupport!.PreviewScene((failure) =>
             this.handleAuthoredPreviewFailure(failure),
           )
         : undefined;
@@ -729,8 +732,7 @@ export class CultivationLevelRuntime {
       const deathSequence = new DeathSequence();
       let radiation: RadioactiveHazardSystem | undefined;
       const roomThreeEncounter = authoredPreview
-        ? new RoomThreeDroneEncounter({
-            config: CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
+        ? this.debugSupport!.createRoomThreeEncounter({
             supportsById: targetById,
             collisionWorld,
             surfaceRegistry,
@@ -745,7 +747,7 @@ export class CultivationLevelRuntime {
         authoredPreview.roomThree.root.add(roomThreeEncounter.root);
       }
       const roomThreeController = roomThreeEncounter && authoredPreview
-        ? new CultivationRoomThreeController(
+        ? new this.debugSupport!.RoomThreeController(
             authoredPreview.roomThree.root,
             () => roomThreeEncounter.readModel.groundDisabledCount,
           )
@@ -827,14 +829,18 @@ export class CultivationLevelRuntime {
       });
       rollback(() => goopAcidPresentation.dispose());
       const droneProjectilePresentation = roomThreeEncounter
-        ? new DroneProjectilePresentation(roomThreeEncounter.projectiles.states)
+        ? new this.debugSupport!.DroneProjectilePresentation(
+            roomThreeEncounter.projectiles.states,
+          )
         : undefined;
       if (droneProjectilePresentation) {
         rollback(() => droneProjectilePresentation.dispose());
         this.renderLayer.scene.add(droneProjectilePresentation.mesh);
       }
       const damageVignette = roomThreeEncounter
-        ? new SlimeDamageVignette({ damage: roomThreeEncounter.damage })
+        ? new this.debugSupport!.DamageVignette({
+            damage: roomThreeEncounter.damage,
+          })
         : undefined;
       if (damageVignette) {
         rollback(() => damageVignette.dispose());
@@ -847,7 +853,7 @@ export class CultivationLevelRuntime {
       rollback(() => burst.dispose());
       this.renderLayer.scene.add(burst.root);
       const debugPanel = this.debugAvailable
-        ? new CultivationTestPanel(
+        ? new this.debugSupport!.TestPanel(
             () => this.restartLevel(),
             (complete) => this.advanceNextStructuralSupport(complete),
             (roomId) => this.teleportToAuthoredPreviewRoom(roomId),
@@ -1095,7 +1101,7 @@ export class CultivationLevelRuntime {
     if (!resources?.authoredPreview) return false;
 
     this.authoredPreviewProgression =
-      createLevelTwoPreviewProgression(roomId);
+      this.debugSupport!.createPreviewProgression(roomId);
     this.authoredPreviewRecoveryActiveSlimeId =
       resources.pair.activeSlimeId;
     resources.acidProjectileSystem.reset();
@@ -1203,7 +1209,7 @@ export class CultivationLevelRuntime {
     if (roomId === undefined) return;
     this.events.emit('objectiveChanged', {
       roomId,
-      objective: CULTIVATION_ROOM_OBJECTIVES[roomId],
+      objective: this.debugSupport!.roomObjectives[roomId],
     });
   }
 

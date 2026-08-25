@@ -2,7 +2,6 @@ import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
 import { Loop } from './core/Loop.ts';
-import { CultivationLevelRuntime } from './levels/CultivationLevelRuntime.ts';
 import { GameSessionCoordinator } from './levels/GameSessionCoordinator.ts';
 import { GreyboxLevelRuntime } from './levels/GreyboxLevelRuntime.ts';
 import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
@@ -27,26 +26,33 @@ const renderLayer = new RenderLayer({
   pixelRatioCap: settings.value.renderPixelRatioCap,
 });
 const input = new Input({ pointerLockElement: renderLayer.canvas });
+const debugAvailable =
+  import.meta.env.DEV ||
+  new URLSearchParams(window.location.search).get('debug') === '1';
 const levelOneRuntime = new GreyboxLevelRuntime({
   host: app,
   input,
   renderLayer,
-  debugAvailable:
-    import.meta.env.DEV ||
-    new URLSearchParams(window.location.search).get('debug') === '1',
+  debugAvailable,
 });
 const gameSession = new GameSessionCoordinator({
   initialRuntime: levelOneRuntime,
-  createLevelTwo: (progression) =>
-    new CultivationLevelRuntime({
+  createLevelTwo: async (progression) => {
+    const [runtimeModule, debugModule] = await Promise.all([
+      import('./levels/CultivationLevelRuntime.ts'),
+      debugAvailable
+        ? import('./debug/CultivationLevelDebug.ts')
+        : Promise.resolve(undefined),
+    ]);
+    return new runtimeModule.CultivationLevelRuntime({
       host: app,
       input,
       renderLayer,
       progression,
-      debugAvailable:
-        import.meta.env.DEV ||
-        new URLSearchParams(window.location.search).get('debug') === '1',
-    }),
+      debugAvailable,
+      debugSupport: debugModule?.CULTIVATION_LEVEL_DEBUG_SUPPORT,
+    });
+  },
   scheduleTransition: (transition) => {
     requestAnimationFrame(() => transition());
   },
