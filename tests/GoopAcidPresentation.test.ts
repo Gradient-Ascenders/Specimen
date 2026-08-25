@@ -245,11 +245,113 @@ test('candidate and selected highlights transition without changing dissolve pro
   }
 });
 
+test('idle presentation skips inactive pool work and droplet uploads', () => {
+  const fixture = createFixture();
+  try {
+    const droplets = fixture.presentation.root.getObjectByName(
+      'goop-acid-impact-droplets',
+    );
+    assert.ok(droplets instanceof THREE.InstancedMesh);
+    const initialMatrixVersion = droplets.instanceMatrix.version;
+    const initial = fixture.presentation.getDiagnostics();
+
+    for (let frame = 0; frame < 600; frame += 1) {
+      fixture.presentation.update(1, 1 / 60, true);
+    }
+
+    const idle = fixture.presentation.getDiagnostics();
+    assert.equal(
+      idle.corrosionUniformUpdateCount,
+      initial.corrosionUniformUpdateCount,
+    );
+    assert.equal(
+      idle.projectileSlotUpdateCount,
+      initial.projectileSlotUpdateCount,
+    );
+    assert.equal(
+      idle.dropletMatrixUploadCount,
+      initial.dropletMatrixUploadCount,
+    );
+    assert.equal(droplets.instanceMatrix.version, initialMatrixVersion);
+    assert.equal(droplets.count, 0);
+  } finally {
+    disposeFixture(fixture);
+  }
+});
+
+test('the first impact keeps every inactive droplet instance collapsed', () => {
+  const fixture = createFixture();
+  try {
+    const droplets = fixture.presentation.root.getObjectByName(
+      'goop-acid-impact-droplets',
+    );
+    assert.ok(droplets instanceof THREE.InstancedMesh);
+    const matrix = new THREE.Matrix4();
+    const instanceScaleSquared = (index: number): number => {
+      droplets.getMatrixAt(index, matrix);
+      const elements = matrix.elements;
+      return (
+        elements[0] ** 2 +
+        elements[1] ** 2 +
+        elements[2] ** 2 +
+        elements[4] ** 2 +
+        elements[5] ** 2 +
+        elements[6] ** 2 +
+        elements[8] ** 2 +
+        elements[9] ** 2 +
+        elements[10] ** 2
+      );
+    };
+
+    for (let index = 0; index < 48; index += 1) {
+      assert.equal(instanceScaleSquared(index), 0);
+    }
+
+    fixture.events.emit('worldImpact', {
+      projectileId: 1,
+      objectName: 'ordinary-wall',
+      point: { x: 1, y: 2, z: 3 },
+    });
+    fixture.presentation.update(1, 0, true);
+
+    assert.equal(fixture.presentation.getDiagnostics().activeDropletCount, 4);
+    for (let index = 0; index < 4; index += 1) {
+      assert.ok(instanceScaleSquared(index) > 0);
+    }
+    for (let index = 4; index < 48; index += 1) {
+      assert.equal(instanceScaleSquared(index), 0);
+    }
+  } finally {
+    disposeFixture(fixture);
+  }
+});
+
+test('burn reset reconciles an already-visible burn highlight', () => {
+  const fixture = createFixture();
+  try {
+    fixture.events.emit('burnStarted', { targetId: fixture.target.id });
+    fixture.presentation.update(1, 0.1, true);
+    assert.ok(fixture.target.renderDiagnostics.burnHighlightStrength > 0);
+
+    fixture.events.emit('burnReset', { targetId: fixture.target.id });
+    fixture.presentation.update(1, 1 / 60, true);
+
+    assert.equal(fixture.target.renderDiagnostics.burnHighlightStrength, 0);
+  } finally {
+    disposeFixture(fixture);
+  }
+});
+
 test('authoritative projectiles, impacts, burns, and resets reconcile pooled visuals', () => {
   const fixture = createFixture();
   try {
     fixture.projectile.id = 4;
     fixture.projectile.active = true;
+    fixture.events.emit('projectileFired', {
+      projectileId: 4,
+      position: fixture.projectile.position,
+      direction: fixture.projectile.direction,
+    });
     fixture.presentation.update(0.5, 1 / 60, true);
     let diagnostics = fixture.presentation.getDiagnostics();
     assert.equal(diagnostics.activeProjectileCount, 1);
@@ -302,6 +404,11 @@ test('authoritative projectiles, impacts, burns, and resets reconcile pooled vis
 
     // Switching/idle aim does not remove an authoritative in-flight shot.
     fixture.projectile.active = true;
+    fixture.events.emit('projectileFired', {
+      projectileId: fixture.projectile.id,
+      position: fixture.projectile.position,
+      direction: fixture.projectile.direction,
+    });
     fixture.aim.active = false;
     fixture.presentation.update(0.5, 1 / 60, true);
     assert.equal(fixture.presentation.getDiagnostics().activeProjectileCount, 1);
@@ -326,6 +433,11 @@ test('suspension hides live projectile and burn visuals until presentation resum
   try {
     fixture.projectile.id = 7;
     fixture.projectile.active = true;
+    fixture.events.emit('projectileFired', {
+      projectileId: 7,
+      position: fixture.projectile.position,
+      direction: fixture.projectile.direction,
+    });
     fixture.events.emit('burnStarted', { targetId: fixture.target.id });
     fixture.presentation.update(0.5, 0.1, true);
 

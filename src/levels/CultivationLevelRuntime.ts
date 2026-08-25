@@ -467,6 +467,7 @@ export class CultivationLevelRuntime {
     if (this.debugVisible && resources.debugPanel && this.debugElapsedSeconds >= 0.25) {
       this.debugElapsedSeconds = 0;
       const readModel = resources.controller.readModel;
+      const acidPresentation = resources.goopAcidPresentation.getDiagnostics();
       const assemblyDiagnostics = resources.structuralAssemblies.map((assembly) => {
         const diagnostics = assembly.getDiagnostics();
         return `${diagnostics.id} / ${diagnostics.supportTargetId}: ${diagnostics.state} p=${diagnostics.supportProgress.toFixed(2)}/${diagnostics.travelProgress.toFixed(2)} pos=${diagnostics.position.map((value) => value.toFixed(2)).join(',')} collision=${diagnostics.collisionEnabled ? 'on' : 'off'} transitions=${diagnostics.transitionCount}`;
@@ -485,6 +486,7 @@ export class CultivationLevelRuntime {
         `early Goop Room 2: ${readModel.goopEnteredRoomTwoEarly ? 'yes' : 'no'}`,
         `last failure / death slime: ${readModel.lastFailure} / ${this.lastDeathSlimeId ?? 'none'}`,
         `radiation requests: ${resources.radiation.failureRequestCount}`,
+        `acid presentation work uniforms / projectile slots / droplet uploads: ${acidPresentation.corrosionUniformUpdateCount} / ${acidPresentation.projectileSlotUpdateCount} / ${acidPresentation.dropletMatrixUploadCount}`,
         ...this.formatRoomThreeDiagnostics(resources),
         `bodies / colliders / scene objects: ${resources.manager.registeredCount} / ${resources.collisionWorld.colliderCount} / ${this.renderLayer.getDiagnostics().sceneObjects}`,
         `wall button: ${resources.wallButton.isPressed ? 'pressed' : 'released'} occupant=${resources.wallButton.occupantId ?? 'none'} enabled=${resources.wallButton.enabled ? 'yes' : 'no'}`,

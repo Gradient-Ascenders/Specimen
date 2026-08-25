@@ -94,6 +94,41 @@ test('inactive-body locators identify the correct body and survive occlusion', (
   wall.geometry.dispose();
 });
 
+test('inactive-body locator responds immediately when occluding geometry moves', () => {
+  const presentation = new SlimePairPresentation(0.45);
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1, 5);
+  const collisionWorld = new CountingCollisionWorld();
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2));
+  wall.position.set(0, 1, 2.5);
+  collisionWorld.register(wall);
+  const bobPosition = { x: 2, y: 0.45, z: 0 };
+  const goopPosition = { x: 0, y: 0.45, z: 0 };
+
+  presentation.update(
+    bobPosition,
+    goopPosition,
+    'bob',
+    camera,
+    collisionWorld,
+  );
+  assert.equal(presentation.locatorDiagnostics.goopOccluded, true);
+
+  wall.position.x = 10;
+  presentation.update(
+    bobPosition,
+    goopPosition,
+    'bob',
+    camera,
+    collisionWorld,
+  );
+  assert.equal(presentation.locatorDiagnostics.goopOccluded, false);
+  assert.equal(collisionWorld.queryCount, 2);
+
+  presentation.dispose();
+  wall.geometry.dispose();
+});
+
 test('first-person Goop aim hides the active body and control ring until aim ends', () => {
   const presentation = new SlimePairPresentation(0.45);
   const camera = new THREE.PerspectiveCamera();

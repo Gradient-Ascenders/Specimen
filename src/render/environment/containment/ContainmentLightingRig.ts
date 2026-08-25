@@ -45,6 +45,8 @@ export interface ContainmentLightingDiagnostics {
   readonly visibleAuthoredLightCount: number;
   readonly shadowCastingLightCount: number;
   readonly activeParticleCount: number;
+  readonly goopStateApplicationCount: number;
+  readonly elevatorStateApplicationCount: number;
   readonly disposed: boolean;
 }
 
@@ -143,6 +145,11 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   private goopReleaseStateValue: GoopReleaseLightingState = 'normal';
   private goopReleaseManuallyDriven = false;
   private goopStateElapsedSeconds = 0;
+  private lastElevatorState: ElevatorSequenceState | undefined;
+  private lastElevatorProgress = Number.NaN;
+  private lastElevatorStateElapsedSeconds = Number.NaN;
+  private goopStateApplicationCount = 0;
+  private elevatorStateApplicationCount = 0;
   private disposed = false;
 
   constructor(options: ContainmentLightingRigOptions) {
@@ -319,6 +326,8 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       activeParticleCount:
         this.bobImpactEffect.activeParticleCount +
         this.goopReleaseEffect.activeParticleCount,
+      goopStateApplicationCount: this.goopStateApplicationCount,
+      elevatorStateApplicationCount: this.elevatorStateApplicationCount,
       disposed: this.disposed,
     };
   }
@@ -397,7 +406,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
         ),
       );
     }
-    this.syncElevatorLighting();
+    this.syncElevatorLighting(true);
   }
 
   reset(): void {
@@ -411,22 +420,25 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.applyRoomVisibility();
     this.applyBobHatchState();
     this.applyGoopReleaseState();
-    this.syncElevatorLighting();
+    this.syncElevatorLighting(true);
   }
 
   update(deltaSeconds: number): void {
     if (this.disposed) return;
     this.goopStateElapsedSeconds += deltaSeconds;
+    let goopStateChanged = false;
     if (!this.goopReleaseManuallyDriven) {
-      this.setGoopReleaseState(
+      goopStateChanged = this.setGoopReleaseState(
         mapRoomFiveEndingState(
           this.roomFive.endingState,
           this.roomFive.endingProgress,
         ),
       );
     }
+    if (!goopStateChanged && this.goopReleaseStateValue === 'warning') {
+      this.applyGoopReleaseState();
+    }
     this.syncElevatorLighting();
-    this.applyGoopReleaseState();
     this.bobImpactEffect.update(deltaSeconds);
     this.goopReleaseEffect.update(deltaSeconds);
   }
@@ -478,8 +490,8 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     }
   }
 
-  private setGoopReleaseState(state: GoopReleaseLightingState): void {
-    if (this.goopReleaseStateValue === state) return;
+  private setGoopReleaseState(state: GoopReleaseLightingState): boolean {
+    if (this.goopReleaseStateValue === state) return false;
     this.goopReleaseStateValue = state;
     this.goopStateElapsedSeconds = 0;
     if (state === 'opening') {
@@ -488,9 +500,11 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       this.goopReleaseEffect.reset();
     }
     this.applyGoopReleaseState();
+    return true;
   }
 
   private applyGoopReleaseState(): void {
+    this.goopStateApplicationCount += 1;
     const state = this.goopReleaseStateValue;
     const pulse = 0.58 + Math.sin(this.goopStateElapsedSeconds * Math.PI * 3) ** 2 * 0.42;
     let chamberColour = ACID_COLOUR;
@@ -539,12 +553,26 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.lockEmitterMaterial.emissiveIntensity = lockIntensity;
   }
 
-  private syncElevatorLighting(): void {
+  private syncElevatorLighting(force = false): void {
     const state = this.roomFour.elevator.state;
     const progress = this.roomFour.elevator.ascentProgress;
+    const stateElapsedSeconds = this.roomFour.elevator.stateElapsedSeconds;
+    if (!force && state === this.lastElevatorState) {
+      if (state === 'warning') {
+        if (stateElapsedSeconds === this.lastElevatorStateElapsedSeconds) return;
+      } else if (state === 'ascending') {
+        if (progress === this.lastElevatorProgress) return;
+      } else {
+        return;
+      }
+    }
+    this.lastElevatorState = state;
+    this.lastElevatorProgress = progress;
+    this.lastElevatorStateElapsedSeconds = stateElapsedSeconds;
+    this.elevatorStateApplicationCount += 1;
     const warningPulse =
       0.55 +
-      Math.sin(this.roomFour.elevator.stateElapsedSeconds * Math.PI * 3) ** 2 *
+      Math.sin(stateElapsedSeconds * Math.PI * 3) ** 2 *
         0.45;
     let lower = 7;
     let middle = 4;

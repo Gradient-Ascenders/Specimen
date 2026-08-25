@@ -73,6 +73,55 @@ test('lighting prewarm visits every room and restores the authoritative room', a
   scene.dispose();
 });
 
+test('stable lighting does not reapply unchanged room state every fixed tick', () => {
+  const scene = createScene();
+  const initial = scene.lightingDiagnostics;
+
+  for (let tick = 0; tick < 600; tick += 1) {
+    scene.lighting.update(1 / 60);
+  }
+
+  const idle = scene.lightingDiagnostics;
+  assert.equal(
+    idle.goopStateApplicationCount,
+    initial.goopStateApplicationCount,
+  );
+  assert.equal(
+    idle.elevatorStateApplicationCount,
+    initial.elevatorStateApplicationCount,
+  );
+
+  assert.equal(scene.roomFive.beginEnding(), true);
+  scene.lighting.update(1 / 60);
+  const warning = scene.lightingDiagnostics;
+  assert.equal(
+    warning.goopStateApplicationCount,
+    idle.goopStateApplicationCount + 1,
+  );
+  scene.lighting.update(1 / 60);
+  assert.equal(
+    scene.lightingDiagnostics.goopStateApplicationCount,
+    warning.goopStateApplicationCount + 1,
+    'warning pulse remains live',
+  );
+
+  scene.roomFour.elevator.begin();
+  scene.lighting.update(1 / 60);
+  assert.equal(
+    scene.lightingDiagnostics.elevatorStateApplicationCount,
+    idle.elevatorStateApplicationCount + 1,
+  );
+  scene.roomFour.elevator.update(1 / 60, []);
+  scene.lighting.update(1 / 60);
+  assert.equal(
+    scene.lightingDiagnostics.elevatorStateApplicationCount,
+    idle.elevatorStateApplicationCount + 2,
+    'elevator warning pulse remains live',
+  );
+
+  scene.dispose();
+});
+
 test('Room 4 lighting follows only authoritative elevator state and reset', () => {
   const scene = createScene();
   scene.lighting.setActiveRoom(4);
