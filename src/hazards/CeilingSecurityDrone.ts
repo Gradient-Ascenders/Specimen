@@ -7,6 +7,7 @@ import {
   type CollisionWorld,
 } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import type { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import {
   SecurityDrone,
   type SecurityDroneConfig,
@@ -121,6 +122,7 @@ export class CeilingSecurityDrone {
     world: CollisionWorld,
     surfaces: SurfaceRegistry,
     projectiles: DroneProjectileSystem,
+    presentationResources?: SecurityDronePresentationResources,
   ) {
     validateConfig(config, support);
     this.config = config;
@@ -134,7 +136,13 @@ export class CeilingSecurityDrone {
     this.cableAttachmentOffset.set(0, config.drone.colliderSize.y * 0.5, 0);
 
     this.root.name = `${config.drone.id}-ceiling-lifecycle`;
-    this.drone = new SecurityDrone(config.drone, world, surfaces, projectiles);
+    this.drone = new SecurityDrone(
+      config.drone,
+      world,
+      surfaces,
+      projectiles,
+      presentationResources,
+    );
     this.root.add(this.drone.root);
 
     this.mount = createProxy(

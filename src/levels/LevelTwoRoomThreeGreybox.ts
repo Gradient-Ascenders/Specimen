@@ -11,6 +11,10 @@ import {
   type RadioactiveFloorSlimeId,
 } from '../hazards/RadioactiveFloorHazard.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
+import {
+  consolidateCultivationRoomThreeStaticColliders,
+  type CultivationRoomThreeStaticBatchDiagnostics,
+} from '../render/environment/cultivation/CultivationRoomThreeStaticBatching.ts';
 import { LEVEL_TWO_BOB_AIR_DUCT_LAYOUT } from './LevelTwoAirDuctGreybox.ts';
 import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from './CultivationRoomThreeAuthoring.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
@@ -51,6 +55,7 @@ export class LevelTwoRoomThreeGreybox {
   readonly solubleTargetMeshes: THREE.Mesh[] = [];
   readonly lasers: LaserHazardSystem;
   readonly radiationHazard: RadioactiveFloorHazard;
+  readonly staticBatchDiagnostics: CultivationRoomThreeStaticBatchDiagnostics;
 
   private readonly laserPresentation: LaserHazardPresentation;
   private readonly localLaserTargetById: Readonly<
@@ -82,6 +87,11 @@ export class LevelTwoRoomThreeGreybox {
     this.buildRoofDronePlaceholders();
     this.buildFinalSecurityArea();
     this.addCheckpointAnchors();
+    this.staticBatchDiagnostics =
+      consolidateCultivationRoomThreeStaticColliders(
+        this.root,
+        this.collisionMeshes,
+      );
 
     const hazards = this.createLasers();
     this.lasers = new LaserHazardSystem({

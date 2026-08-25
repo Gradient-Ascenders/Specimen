@@ -123,6 +123,48 @@ test('Level 2 preview composes three large connected rooms with unique colliders
   scene.dispose();
 });
 
+test('Room 3 batches only static visuals while preserving collider identity', () => {
+  const scene = createScene();
+  const room = scene.roomThree;
+
+  assert.deepEqual(room.staticBatchDiagnostics, {
+    batchCount: 5,
+    sourceMeshCount: 44,
+    drawCallsRemoved: 39,
+    mergedGeometryCount: 5,
+  });
+  const batches = room.root.children.filter(
+    (object): object is THREE.Mesh =>
+      object instanceof THREE.Mesh &&
+      Array.isArray(object.userData.staticBatchSourceNames),
+  );
+  assert.equal(batches.length, room.staticBatchDiagnostics.batchCount);
+
+  const batchedNames = new Set<string>();
+  for (const batch of batches) {
+    for (const name of batch.userData.staticBatchSourceNames as string[]) {
+      batchedNames.add(name);
+      const collider = findCollider(scene, name);
+      assert.equal(collider.parent, room.root);
+      assert.equal(collider.visible, true);
+      assert.equal(collider.material.visible, false);
+    }
+  }
+  assert.equal(batchedNames.size, room.staticBatchDiagnostics.sourceMeshCount);
+
+  const radiation = findCollider(
+    scene,
+    'cultivation-room-3-radioactive-floor',
+  );
+  assert.equal(radiation.material.visible, true);
+  for (const cable of room.solubleTargetMeshes) {
+    assert.equal(cable.material.visible, true);
+    assert.equal(batchedNames.has(cable.name), false);
+  }
+
+  scene.dispose();
+});
+
 test('Room 3 checkpoint shield blocks distant ground-drone sightlines to Goop spawn', () => {
   const scene = createScene();
   const world = new CollisionWorld();

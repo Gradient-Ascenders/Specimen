@@ -8,7 +8,10 @@ import {
   type CollisionWorld,
 } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
-import { SecurityDronePresentation } from '../render/hazards/SecurityDronePresentation.ts';
+import {
+  SecurityDronePresentation,
+  type SecurityDronePresentationResources,
+} from '../render/hazards/SecurityDronePresentation.ts';
 import type { DroneProjectileSystem } from './DroneProjectileSystem.ts';
 
 const EPSILON = 1e-9;
@@ -133,6 +136,7 @@ export class SecurityDrone {
     world: CollisionWorld,
     surfaces: SurfaceRegistry,
     projectiles: DroneProjectileSystem,
+    presentationResources?: SecurityDronePresentationResources,
   ) {
     validateConfig(config);
     this.config = config;
@@ -162,7 +166,10 @@ export class SecurityDrone {
     this.collider.userData.soluble = false;
     this.collider.userData.surfaceTag = 'default';
     this.collider.material.visible = false;
-    this.presentation = new SecurityDronePresentation(config);
+    this.presentation = new SecurityDronePresentation(
+      config,
+      presentationResources,
+    );
     this.frontIndicator = this.presentation.eye;
     this.root.add(this.collider, this.presentation.root);
     this.world.register(
