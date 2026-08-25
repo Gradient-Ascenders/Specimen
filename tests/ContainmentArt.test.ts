@@ -864,6 +864,39 @@ test('production scene contains no legacy collider outline objects', () => {
   scene.dispose();
 });
 
+test('Level 1 consolidates only room-local static art batches', () => {
+  const scene = new ContainmentLevelScene(() => {});
+
+  assert.equal(scene.staticBatchDiagnostics.length, 5);
+  for (const diagnostics of scene.staticBatchDiagnostics) {
+    assert.ok(diagnostics.batchCount > 0);
+    assert.ok(diagnostics.drawCallsRemoved > 0);
+    assert.ok(diagnostics.sourceMeshCount > diagnostics.batchCount);
+  }
+  assert.ok(
+    scene.teaching.roomOneArt.containmentBoxRoot.getObjectByName(
+      'room-1-containment-lower-instrumentation-base',
+    ),
+  );
+  assert.ok(
+    scene.teaching.roomOneArt.root.getObjectByName(
+      'room-1-door-bevelled-sliding-slab',
+    ),
+  );
+  for (const pivot of Object.values(scene.roomFive.art.panelPivots)) {
+    let meshCount = 0;
+    pivot.traverse((object) => {
+      if (object instanceof THREE.Mesh) meshCount += 1;
+    });
+    assert.ok(
+      meshCount > 0,
+      `${pivot.name} must retain independently controlled presentation meshes`,
+    );
+  }
+
+  scene.dispose();
+});
+
 function textureList(resources: ContainmentArtResources): readonly THREE.DataTexture[] {
   return [
     resources.textures.ceramicNormal,

@@ -9,6 +9,11 @@ import type {
 import type { SlimeBurstDiagnostics } from '../render/slime/SlimeBurstPresentation.ts';
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import {
+  consolidateContainmentRoomStaticVisuals,
+  type ContainmentStaticBatchDiagnostics,
+  type ContainmentStaticBatchResult,
+} from '../render/environment/containment/ContainmentStaticBatching.ts';
+import {
   ContainmentLightingRig,
   type ContainmentCutsceneLighting,
   type ContainmentLightingDiagnostics,
@@ -23,6 +28,73 @@ export type ContainmentHazardFailure =
   | RoomFourHazardFailure
   | RoomFiveHazardFailure;
 
+// These static meshes are intentionally discoverable by authored-name checks
+// and visual/collider alignment diagnostics. Keeping them separate costs only
+// a handful of calls while preserving their inspectable identity.
+const PRESERVED_STATIC_ART_NAMES = {
+  roomOne: new Set([
+    'room-1-ceiling-neutral-diffuser--3.8',
+    'room-1-ceiling-neutral-diffuser-3.8',
+  ]),
+  roomTwo: new Set([
+    'room-2-observation-reinforced-glass',
+    'room-2-upper-structural-cross-members',
+    'room-2-platform-a-height-lesson-durable-composite-tread',
+    'room-2-ceiling-neutral-diffuser-1',
+  ]),
+  roomThree: new Set([
+    'room-3-basin-substantial-perimeter-curbs',
+    'room-3-entry-platform-actuator-column',
+    'room-3-platform-c-underside-actuator-socket',
+    'room-3-to-4-duct-floor-clean-liner',
+    'room-3-to-4-duct-clean-side-liners',
+    'room-3-to-4-duct-service-side-liners',
+    'room-3-to-4-duct-side-transition-seams',
+    'room-3-to-4-duct-ceiling-backing',
+    'room-3-to-4-shaft-end-service-portal-left',
+    'room-3-panel-west-south-lower',
+    'room-3-panel-east-entry-quiet',
+    'room-3-entry-panel-east',
+    'room-3-main-adhesion-replaceable-membrane',
+    'room-3-final-adhesion-replaceable-membrane',
+    'room-3-entry-graphite-jambs',
+    'room-3-ceiling-major-service-trusses',
+    'room-3-ceiling-static-diffuser-1',
+    'room-3-exit-duct-graphite-collar-left',
+  ]),
+  roomFour: new Set([
+    'room-4-major-north-south-structural-ribs',
+    'room-4-elevator-continuous-guide-rails',
+    'room-4-main-vertical-power-trunk',
+    'room-4-south-recessed-maintenance-bay',
+    'room-4-laser-origin-precision-instrument-housings',
+    'room-4-lower-elevator-machinery-base',
+    'room-4-upper-receiving-portal-structural-frame',
+    'room-4-entry-core-sign-recessed-backing',
+    'room-4-service-level-s01-sign-recessed-backing',
+    'room-4-transfer-array-s02-sign-recessed-backing',
+    'room-4-laser-core-sign-recessed-backing',
+    'room-4-room-five-destination-sign-recessed-backing',
+  ]),
+  roomFive: new Set([
+    'room-5-containment-base',
+    'room-5-lower-containment-ring',
+    'room-5-upper-containment-ring',
+    'room-5-structural-clamps',
+    'room-5-upper-service-manifold',
+    'room-5-major-overhead-compound-feed',
+    'room-5-observation-control-room',
+    'room-5-observation-angled-control-console',
+    'room-5-observation-connection',
+    'room-5-soluble-composite-door-structural-frame',
+    'room-5-east-ascent-adhesion-membrane',
+    'room-5-east-ascent-extension-adhesion-membrane',
+    'room-5-east-front-clinical-wall-zone',
+    'room-5-east-upper-rear-clinical-wall-zone',
+    'room-5-ceiling-static-fixture-diffusers',
+  ]),
+} as const;
+
 /** Complete Level 1 scene composition while preserving the teaching-scene API. */
 export class ContainmentLevelScene {
   readonly root = new THREE.Group();
@@ -32,6 +104,8 @@ export class ContainmentLevelScene {
   readonly roomFour: RoomFourGreybox;
   readonly roomFive: RoomFiveGreybox;
   readonly lighting: ContainmentLightingRig;
+  readonly staticBatchDiagnostics: readonly ContainmentStaticBatchDiagnostics[];
+  private readonly staticBatches: readonly ContainmentStaticBatchResult[];
 
   constructor(
     requestHazardFailure: (failure: ContainmentHazardFailure) => void,
@@ -57,6 +131,29 @@ export class ContainmentLevelScene {
       roomFive: this.roomFive,
     });
     this.root.add(this.lighting.root);
+    this.staticBatches = [
+      consolidateContainmentRoomStaticVisuals(this.teaching.roomOneArt.root, {
+        excludedRoots: [this.teaching.roomOneArt.specimenAssembly],
+        preservedNames: PRESERVED_STATIC_ART_NAMES.roomOne,
+      }),
+      consolidateContainmentRoomStaticVisuals(this.teaching.roomTwoArt.root, {
+        preservedNames: PRESERVED_STATIC_ART_NAMES.roomTwo,
+      }),
+      consolidateContainmentRoomStaticVisuals(this.roomThree.art.root, {
+        preservedNames: PRESERVED_STATIC_ART_NAMES.roomThree,
+        cellSize: 4,
+      }),
+      consolidateContainmentRoomStaticVisuals(this.roomFour.art.root, {
+        preservedNames: PRESERVED_STATIC_ART_NAMES.roomFour,
+      }),
+      consolidateContainmentRoomStaticVisuals(this.roomFive.art.root, {
+        excludedRoots: [this.roomFive.art.containmentAssembly],
+        preservedNames: PRESERVED_STATIC_ART_NAMES.roomFive,
+      }),
+    ];
+    this.staticBatchDiagnostics = this.staticBatches.map(
+      ({ diagnostics }) => diagnostics,
+    );
   }
 
   /** Small #38-facing API; callers never need individual fixture objects. */
@@ -189,6 +286,7 @@ export class ContainmentLevelScene {
 
   dispose(): void {
     this.lighting.dispose();
+    for (const staticBatch of this.staticBatches) staticBatch.dispose();
     this.roomFive.dispose();
     this.roomFour.dispose();
     this.roomThree.dispose();
