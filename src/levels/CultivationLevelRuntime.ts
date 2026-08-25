@@ -9,6 +9,12 @@ import { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
+import {
+  beginDebugPanelInspection,
+  finishDebugPanelInspection,
+  handleDebugPanelScrollKey,
+  type DebugPanelInspectionState,
+} from '../debug/DebugPanelInteraction.ts';
 import type {
   CultivationTestPanel,
   CultivationDebugRoomId,
@@ -158,6 +164,7 @@ export class CultivationLevelRuntime {
   private resources: CultivationRuntimeResources | undefined;
   private debugVisible = false;
   private debugInteractionEnabled = true;
+  private debugInspectionState: DebugPanelInspectionState | undefined;
   private debugElapsedSeconds = 0;
   private switchFeedbackSequence = 0;
   private lastDeathSlimeId: PlayableSlimeId | undefined;
@@ -245,6 +252,7 @@ export class CultivationLevelRuntime {
 
   setDebugInteractionEnabled(enabled: boolean): void {
     this.debugInteractionEnabled = enabled;
+    if (!enabled && this.debugVisible) this.closeDebugInspection(false);
     this.applyDebugPresentation();
   }
 
@@ -966,7 +974,9 @@ export class CultivationLevelRuntime {
     resources.goopAcidPresentation.resume();
     this.input.resetState();
     this.input.setEnabled(
-      resources.deathSequence.isPlaying && resources.controller.readModel.state === 'playing',
+      !this.debugVisible &&
+        resources.deathSequence.isPlaying &&
+        resources.controller.readModel.state === 'playing',
     );
   };
 
@@ -1044,6 +1054,7 @@ export class CultivationLevelRuntime {
     delete this.host.dataset.gameState;
     this.resources = undefined;
     this.debugVisible = false;
+    this.debugInspectionState = undefined;
     this.authoredPreviewProgression = undefined;
     this.authoredPreviewRecoveryActiveSlimeId = undefined;
     this.notifyHUD();
@@ -1073,6 +1084,7 @@ export class CultivationLevelRuntime {
     }
     delete this.host.dataset.gameState;
     this.debugVisible = false;
+    this.debugInspectionState = undefined;
     this.authoredPreviewProgression = undefined;
     this.authoredPreviewRecoveryActiveSlimeId = undefined;
     try {
@@ -1326,7 +1338,9 @@ export class CultivationLevelRuntime {
     this.input.resetState();
     this.renderLayer.cameraRig.reset();
     this.retargetCamera(resources);
-    this.input.setEnabled(resources.controller.readModel.state === 'playing');
+    this.input.setEnabled(
+      !this.debugVisible && resources.controller.readModel.state === 'playing',
+    );
     if (this.input.enabled) this.input.requestPointerLock();
     this.notifyHUD(undefined, true);
   };
@@ -1414,11 +1428,46 @@ export class CultivationLevelRuntime {
   }
 
   private readonly onDebugToggle = (event: KeyboardEvent): void => {
-    if (event.code !== DEBUG_TOGGLE_CODE || event.repeat || !this.debugInteractionEnabled) return;
+    const panel = this.resources?.debugPanel;
+    if (
+      this.debugVisible &&
+      panel &&
+      handleDebugPanelScrollKey(event, panel.element)
+    ) {
+      return;
+    }
+    if (
+      event.code !== DEBUG_TOGGLE_CODE ||
+      event.repeat ||
+      !this.debugInteractionEnabled
+    ) {
+      return;
+    }
     event.preventDefault();
-    this.debugVisible = !this.debugVisible;
+    if (this.debugVisible) {
+      const resources = this.requireResources();
+      this.closeDebugInspection(
+        this.lifecycle.state === 'running' &&
+          resources.deathSequence.isPlaying &&
+          resources.controller.readModel.state === 'playing',
+      );
+      return;
+    }
+    if (!panel || !this.input.enabled) return;
+    this.debugInspectionState = beginDebugPanelInspection(this.input);
+    this.debugVisible = true;
     this.applyDebugPresentation();
   };
+
+  private closeDebugInspection(restoreGameplayInput: boolean): void {
+    const state = this.debugInspectionState;
+    this.debugInspectionState = undefined;
+    this.debugVisible = false;
+    this.applyDebugPresentation();
+    if (state) {
+      finishDebugPanelInspection(this.input, state, restoreGameplayInput);
+    }
+  }
 
   private requireResources(): CultivationRuntimeResources {
     if (!this.resources) throw new Error('Cultivation level resources are not loaded.');

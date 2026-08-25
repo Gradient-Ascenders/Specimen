@@ -10,6 +10,12 @@ import { EventBus } from '../core/EventBus.ts';
 import type { Input, InputAction } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import {
+  beginDebugPanelInspection,
+  finishDebugPanelInspection,
+  handleDebugPanelScrollKey,
+  type DebugPanelInspectionState,
+} from '../debug/DebugPanelInteraction.ts';
+import {
   GreyboxTestPanel,
   type DebugRoomId,
 } from '../debug/GreyboxTestPanel.ts';
@@ -238,6 +244,7 @@ export class GreyboxLevelRuntime {
   private debugSampleElapsedSeconds = 0;
   private debugVisible = false;
   private debugInteractionEnabled = true;
+  private debugInspectionState: DebugPanelInspectionState | undefined;
   private slopeRegressionStatus = 'not run';
   private cameraFollowSlimeId: 'bob' | 'goop' | undefined;
   private lastDeathSlimeId: 'bob' | 'goop' | undefined;
@@ -353,6 +360,7 @@ export class GreyboxLevelRuntime {
   /** Allow the application flow to suppress level-owned diagnostics behind menus. */
   setDebugInteractionEnabled(enabled: boolean): void {
     this.debugInteractionEnabled = enabled;
+    if (!enabled && this.debugVisible) this.closeDebugInspection(false);
     const testPanel = this.resources?.testPanel;
     if (testPanel) this.applyDebugPresentation(testPanel);
   }
@@ -1054,7 +1062,8 @@ export class GreyboxLevelRuntime {
     const resources = this.requireResources();
     resources.goopAcidPresentation.resume();
     this.input.setEnabled(
-      resources.deathSequence.isPlaying &&
+      !this.debugVisible &&
+        resources.deathSequence.isPlaying &&
         resources.containmentLevel.state === 'playing',
     );
     this.input.resetState();
@@ -1144,6 +1153,7 @@ export class GreyboxLevelRuntime {
     delete this.host.dataset.gameState;
     this.resources = undefined;
     this.debugVisible = false;
+    this.debugInspectionState = undefined;
     this.debugSampleElapsedSeconds = 0;
     this.landingEventCount = 0;
     this.lastLandingImpactSpeedMetresPerSecond = 0;
@@ -1277,7 +1287,8 @@ export class GreyboxLevelRuntime {
     // owns Goop. Restore that scene-owned visual to Bob's authoritative body.
     resources.testScene.finishDeath(resources.body.position);
     resources.deathScreen.hide();
-    const levelIsPlaying = resources.containmentLevel.state === 'playing';
+    const levelIsPlaying =
+      !this.debugVisible && resources.containmentLevel.state === 'playing';
     this.input.setEnabled(levelIsPlaying);
     if (levelIsPlaying) this.input.requestPointerLock();
     this.host.dataset.gameState = resources.deathSequence.state;
@@ -1543,13 +1554,42 @@ export class GreyboxLevelRuntime {
   }
 
   private readonly onDebugToggle = (event: KeyboardEvent): void => {
+    const testPanel = this.resources?.testPanel;
+    if (
+      this.debugVisible &&
+      testPanel &&
+      handleDebugPanelScrollKey(event, testPanel.element)
+    ) {
+      return;
+    }
     if (event.code !== DEBUG_TOGGLE_CODE || event.repeat) return;
     if (!this.debugInteractionEnabled) return;
     event.preventDefault();
-    const testPanel = this.resources?.testPanel;
     if (!testPanel) return;
-    this.setDebugVisible(!this.debugVisible, testPanel);
+    if (this.debugVisible) {
+      const resources = this.requireResources();
+      this.closeDebugInspection(
+        this.lifecycle.state === 'running' &&
+          resources.deathSequence.isPlaying &&
+          resources.containmentLevel.state === 'playing',
+      );
+      return;
+    }
+    if (!this.input.enabled) return;
+    this.debugInspectionState = beginDebugPanelInspection(this.input);
+    this.setDebugVisible(true, testPanel);
   };
+
+  private closeDebugInspection(restoreGameplayInput: boolean): void {
+    const state = this.debugInspectionState;
+    this.debugInspectionState = undefined;
+    const testPanel = this.resources?.testPanel;
+    if (testPanel) this.setDebugVisible(false, testPanel);
+    else this.debugVisible = false;
+    if (state) {
+      finishDebugPanelInspection(this.input, state, restoreGameplayInput);
+    }
+  }
 
   private async runLightingPrewarm(
     resources: GreyboxRuntimeResources,
