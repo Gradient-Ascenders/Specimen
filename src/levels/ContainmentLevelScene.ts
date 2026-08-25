@@ -77,6 +77,15 @@ export class ContainmentLevelScene {
     ];
   }
 
+  /** Colliders whose authored gameplay transform changes after registration. */
+  get dynamicCollisionMeshes(): readonly THREE.Mesh[] {
+    return [
+      this.roomFour.elevatorPlatform.collisionMesh,
+      this.roomFive.movingPlatformOne.collisionMesh,
+      this.roomFive.movingPlatformTwo.collisionMesh,
+    ];
+  }
+
   /** Authored camera boundaries and opaque camera-only presentation meshes. */
   get cameraObstructionMeshes(): readonly THREE.Mesh[] {
     return [

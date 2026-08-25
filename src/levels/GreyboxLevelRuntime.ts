@@ -17,6 +17,7 @@ import { runDissolveRegression } from '../debug/DissolveRegression.ts';
 import { runSlimeManagerRegression } from '../debug/SlimeManagerRegression.ts';
 import { runTwoBodySwitchingRegression } from '../debug/TwoBodySwitchingRegression.ts';
 import {
+  ColliderTransformMode,
   CollisionLayer,
   CollisionWorld,
 } from '../physics/CollisionWorld.ts';
@@ -714,10 +715,18 @@ export class GreyboxLevelRuntime {
     this.renderLayer.scene.add(testScene.root);
 
     const collisionWorld = new CollisionWorld();
-    collisionWorld.registerAll(testScene.collisionMeshes);
+    collisionWorld.registerAll(
+      testScene.collisionMeshes,
+      undefined,
+      ColliderTransformMode.Static,
+    );
+    for (const mesh of testScene.dynamicCollisionMeshes) {
+      collisionWorld.setTransformMode(mesh, ColliderTransformMode.Dynamic);
+    }
     collisionWorld.registerAll(
       testScene.cameraObstructionMeshes,
       CollisionLayer.CameraObstruction,
+      ColliderTransformMode.Static,
     );
     const surfaceRegistry = new SurfaceRegistry();
     surfaceRegistry.registerAll(testScene.collisionMeshes);

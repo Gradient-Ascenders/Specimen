@@ -163,6 +163,18 @@ export class LevelTwoPreviewScene {
     ];
   }
 
+  /** Colliders whose authored gameplay transform changes after registration. */
+  get dynamicCollisionMeshes(): readonly THREE.Mesh[] {
+    return [
+      ...this.roomOne.platformDrops.map((drop) => drop.mesh),
+      ...this.roomTwo.blockDrops.map((drop) => drop.mesh),
+      ...this.roomOneToTwoPassage.doors.map((door) => door.collisionMesh),
+      ...this.roomTwoToThreeGoopPassage.doors.map(
+        (door) => door.collisionMesh,
+      ),
+    ];
+  }
+
   get solubleTargetMeshes(): readonly THREE.Mesh[] {
     return [
       ...this.roomOne.solubleTargetMeshes,

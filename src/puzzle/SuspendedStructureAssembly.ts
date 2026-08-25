@@ -2,7 +2,10 @@ import * as THREE from 'three';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import { EventBus } from '../core/EventBus.ts';
-import type { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  ColliderTransformMode,
+  type CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry, SurfaceTag } from '../physics/SurfaceRegistry.ts';
 
 const PROGRESS_EPSILON = 1e-10;
@@ -326,7 +329,11 @@ export abstract class SuspendedStructureAssembly {
 
   private ensureCollision(enabled: boolean): void {
     if (enabled) {
-      this.collisionWorld.register(this.collisionMesh);
+      this.collisionWorld.register(
+        this.collisionMesh,
+        undefined,
+        ColliderTransformMode.Dynamic,
+      );
       this.surfaceRegistry.register(this.collisionMesh);
     } else {
       this.collisionWorld.unregister(this.collisionMesh);

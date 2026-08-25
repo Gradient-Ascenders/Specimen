@@ -4,10 +4,87 @@ import test from 'node:test';
 import * as THREE from 'three';
 
 import {
+  ColliderTransformMode,
   CollisionHit,
   CollisionLayer,
   CollisionWorld,
 } from '../src/physics/CollisionWorld.ts';
+
+test('static colliders reuse transform data until explicitly invalidated', () => {
+  const world = new CollisionWorld();
+  const collider = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  collider.name = 'cached-static-collider';
+  collider.position.set(0, 0, 2);
+
+  let transformRefreshes = 0;
+  const updateWorldMatrix = collider.updateWorldMatrix.bind(collider);
+  collider.updateWorldMatrix = (...parameters): void => {
+    transformRefreshes += 1;
+    updateWorldMatrix(...parameters);
+  };
+
+  world.register(
+    collider,
+    CollisionLayer.Movement,
+    ColliderTransformMode.Static,
+  );
+  const hit = new CollisionHit();
+  const origin = new THREE.Vector3();
+  const displacement = new THREE.Vector3(0, 0, 8);
+
+  assert.equal(world.sweepSphere(origin, displacement, 0.2, hit), true);
+  const initialDistance = hit.distance;
+  assert.equal(world.sweepSphere(origin, displacement, 0.2, hit), true);
+  assert.equal(transformRefreshes, 1);
+  assert.equal(hit.distance, initialDistance);
+
+  collider.position.z = 5;
+  collider.scale.set(2, 1, 0.5);
+  world.invalidateTransform(collider);
+
+  assert.equal(world.sweepSphere(origin, displacement, 0.2, hit), true);
+  assert.equal(transformRefreshes, 2);
+  assert.ok(hit.distance > initialDistance);
+
+  collider.geometry.dispose();
+});
+
+test('dynamic colliders refresh parent transforms for every sweep', () => {
+  const world = new CollisionWorld();
+  const parent = new THREE.Group();
+  const collider = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  collider.name = 'moving-child-collider';
+  collider.position.z = 2;
+  parent.add(collider);
+
+  let transformRefreshes = 0;
+  const updateWorldMatrix = collider.updateWorldMatrix.bind(collider);
+  collider.updateWorldMatrix = (...parameters): void => {
+    transformRefreshes += 1;
+    updateWorldMatrix(...parameters);
+  };
+
+  world.register(
+    collider,
+    CollisionLayer.Movement,
+    ColliderTransformMode.Static,
+  );
+  world.setTransformMode(collider, ColliderTransformMode.Dynamic);
+  const hit = new CollisionHit();
+  const origin = new THREE.Vector3();
+  const displacement = new THREE.Vector3(0, 0, 8);
+
+  assert.equal(world.sweepSphere(origin, displacement, 0.2, hit), true);
+  const initialDistance = hit.distance;
+
+  parent.position.z = 3;
+  parent.scale.set(2, 1, 0.5);
+  assert.equal(world.sweepSphere(origin, displacement, 0.2, hit), true);
+  assert.equal(transformRefreshes, 2);
+  assert.ok(hit.distance > initialDistance);
+
+  collider.geometry.dispose();
+});
 
 test('camera obstruction queries ignore movement-only colliders', () => {
   const world = new CollisionWorld();

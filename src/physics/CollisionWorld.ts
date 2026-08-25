@@ -6,10 +6,21 @@ const CONTACT_EPSILON = 1e-7;
 interface RegisteredCollider {
   readonly mesh: THREE.Mesh;
   layerMask: number;
+  transformMode: ColliderTransformMode;
+  transformCacheValid: boolean;
   readonly localBounds: THREE.Box3;
   readonly inverseWorld: THREE.Matrix4;
   readonly normalMatrix: THREE.Matrix3;
+  minimumWorldScale: number;
 }
+
+export const ColliderTransformMode = {
+  Static: 'static',
+  Dynamic: 'dynamic',
+} as const;
+
+export type ColliderTransformMode =
+  (typeof ColliderTransformMode)[keyof typeof ColliderTransformMode];
 
 /**
  * Query layers for the shared authored-geometry registry.
@@ -63,9 +74,10 @@ export class CollisionHit {
  * reliable continuous collision against the authored floor, walls, ledges and
  * slope without introducing a general rigid-body physics engine.
  *
- * Mesh transforms are refreshed for every query, so authored kinematic objects
- * may move later. Non-uniform scaling is handled conservatively by expanding
- * with the smallest world scale component.
+ * Static collider transforms are cached after first use. Authored kinematic
+ * objects must be registered as dynamic so their cache is refreshed for every
+ * query. Non-uniform scaling is handled conservatively by expanding with the
+ * smallest world scale component.
  */
 export class CollisionWorld {
   private readonly colliders: RegisteredCollider[] = [];
@@ -85,10 +97,12 @@ export class CollisionWorld {
   register(
     mesh: THREE.Mesh,
     layerMask = DEFAULT_SOLID_COLLISION_LAYERS,
+    transformMode: ColliderTransformMode = ColliderTransformMode.Dynamic,
   ): void {
     if (this.colliders.some((collider) => collider.mesh === mesh)) return;
 
     this.validateLayerMask(layerMask);
+    this.validateTransformMode(transformMode);
 
     if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
     const boundingBox = mesh.geometry.boundingBox;
@@ -99,17 +113,21 @@ export class CollisionWorld {
     this.colliders.push({
       mesh,
       layerMask,
+      transformMode,
+      transformCacheValid: false,
       localBounds: boundingBox.clone(),
       inverseWorld: new THREE.Matrix4(),
       normalMatrix: new THREE.Matrix3(),
+      minimumWorldScale: 0,
     });
   }
 
   registerAll(
     meshes: readonly THREE.Mesh[],
     layerMask = DEFAULT_SOLID_COLLISION_LAYERS,
+    transformMode: ColliderTransformMode = ColliderTransformMode.Dynamic,
   ): void {
-    for (const mesh of meshes) this.register(mesh, layerMask);
+    for (const mesh of meshes) this.register(mesh, layerMask, transformMode);
   }
 
   unregister(mesh: THREE.Mesh): void {
@@ -124,6 +142,22 @@ export class CollisionWorld {
       throw new Error(`Collider ${mesh.name || '<unnamed>'} is not registered.`);
     }
     collider.layerMask = layerMask;
+  }
+
+  /** Change how a registered collider's transform cache is maintained. */
+  setTransformMode(mesh: THREE.Mesh, transformMode: ColliderTransformMode): void {
+    this.validateTransformMode(transformMode);
+    const collider = this.getRegisteredCollider(mesh);
+    collider.transformMode = transformMode;
+    collider.transformCacheValid = false;
+  }
+
+  /**
+   * Invalidate a static collider after an intentional one-off transform
+   * change. Frequently moving gameplay geometry should use Dynamic mode.
+   */
+  invalidateTransform(mesh: THREE.Mesh): void {
+    this.getRegisteredCollider(mesh).transformCacheValid = false;
   }
 
   clear(): void {
@@ -176,19 +210,18 @@ export class CollisionWorld {
       if (mesh === ignoredCollider) continue;
       if (!mesh.visible) continue;
 
-      mesh.updateWorldMatrix(true, false);
-      collider.inverseWorld.copy(mesh.matrixWorld).invert();
-      collider.normalMatrix.getNormalMatrix(mesh.matrixWorld);
+      if (
+        collider.transformMode === ColliderTransformMode.Dynamic ||
+        !collider.transformCacheValid
+      ) {
+        this.refreshTransformCache(collider);
+      }
 
       this.localStart.copy(origin).applyMatrix4(collider.inverseWorld);
       this.localEnd.copy(this.worldEnd).applyMatrix4(collider.inverseWorld);
       this.localDisplacement.subVectors(this.localEnd, this.localStart);
 
-      const worldElements = mesh.matrixWorld.elements;
-      const scaleX = Math.hypot(worldElements[0], worldElements[1], worldElements[2]);
-      const scaleY = Math.hypot(worldElements[4], worldElements[5], worldElements[6]);
-      const scaleZ = Math.hypot(worldElements[8], worldElements[9], worldElements[10]);
-      const minimumScale = Math.min(scaleX, scaleY, scaleZ);
+      const minimumScale = collider.minimumWorldScale;
       if (minimumScale <= AXIS_EPSILON) continue;
 
       // A world-space sphere transformed through non-uniform scale becomes an
@@ -256,9 +289,40 @@ export class CollisionWorld {
     return Math.abs(this.candidateNormalLocal.z) > 0.5;
   }
 
+  private refreshTransformCache(collider: RegisteredCollider): void {
+    const mesh = collider.mesh;
+    mesh.updateWorldMatrix(true, false);
+    collider.inverseWorld.copy(mesh.matrixWorld).invert();
+    collider.normalMatrix.getNormalMatrix(mesh.matrixWorld);
+
+    const worldElements = mesh.matrixWorld.elements;
+    const scaleX = Math.hypot(worldElements[0], worldElements[1], worldElements[2]);
+    const scaleY = Math.hypot(worldElements[4], worldElements[5], worldElements[6]);
+    const scaleZ = Math.hypot(worldElements[8], worldElements[9], worldElements[10]);
+    collider.minimumWorldScale = Math.min(scaleX, scaleY, scaleZ);
+    collider.transformCacheValid = true;
+  }
+
+  private getRegisteredCollider(mesh: THREE.Mesh): RegisteredCollider {
+    const collider = this.colliders.find((candidate) => candidate.mesh === mesh);
+    if (!collider) {
+      throw new Error(`Collider ${mesh.name || '<unnamed>'} is not registered.`);
+    }
+    return collider;
+  }
+
   private validateLayerMask(layerMask: number): void {
     if (!Number.isInteger(layerMask) || layerMask < 0) {
       throw new Error('Collision layer mask must be a non-negative integer.');
+    }
+  }
+
+  private validateTransformMode(transformMode: string): void {
+    if (
+      transformMode !== ColliderTransformMode.Static &&
+      transformMode !== ColliderTransformMode.Dynamic
+    ) {
+      throw new Error(`Unknown collider transform mode "${transformMode}".`);
     }
   }
 

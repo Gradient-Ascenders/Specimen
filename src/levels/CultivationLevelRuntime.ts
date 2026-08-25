@@ -18,7 +18,10 @@ import {
   type RadiationContactTarget,
 } from '../hazards/RadioactiveHazardSystem.ts';
 import { RoomThreeDroneEncounter } from '../hazards/RoomThreeDroneEncounter.ts';
-import { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  ColliderTransformMode,
+  CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import {
   KinematicBody,
   type JumpInputState,
@@ -520,9 +523,20 @@ export class CultivationLevelRuntime {
 
       const collisionWorld = new CollisionWorld();
       rollback(() => collisionWorld.clear());
-      collisionWorld.registerAll(scene.collisionMeshes);
+      collisionWorld.registerAll(
+        scene.collisionMeshes,
+        undefined,
+        ColliderTransformMode.Static,
+      );
       if (authoredPreview) {
-        collisionWorld.registerAll(authoredPreview.collisionMeshes);
+        collisionWorld.registerAll(
+          authoredPreview.collisionMeshes,
+          undefined,
+          ColliderTransformMode.Static,
+        );
+        for (const mesh of authoredPreview.dynamicCollisionMeshes) {
+          collisionWorld.setTransformMode(mesh, ColliderTransformMode.Dynamic);
+        }
       }
 
       const surfaceRegistry = new SurfaceRegistry();

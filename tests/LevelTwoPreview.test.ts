@@ -20,6 +20,7 @@ import {
   createLevelTwoPreviewProgression,
 } from '../src/levels/LevelTwoPreviewProgression.ts';
 import {
+  ColliderTransformMode,
   CollisionHit,
   CollisionLayer,
   CollisionWorld,
@@ -232,6 +233,80 @@ test('dissolving supports deterministically lands traversal platforms and reset 
   assert.equal(roomTwoDrop.state, 'suspended');
   assert.deepEqual(roomOneDrop.mesh.position.toArray(), roomOneDrop.mesh.userData.suspendedPosition);
   assert.deepEqual(roomTwoDrop.mesh.position.toArray(), roomTwoDrop.mesh.userData.suspendedPosition);
+
+  for (const target of targets) target.dispose();
+  scene.dispose();
+});
+
+test('bulk-static preview registration promotes every animated collider', () => {
+  const scene = createScene();
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  world.registerAll(
+    scene.collisionMeshes,
+    undefined,
+    ColliderTransformMode.Static,
+  );
+  for (const mesh of scene.dynamicCollisionMeshes) {
+    world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
+  }
+  surfaces.registerAll(scene.collisionMeshes);
+
+  const drops = [
+    ...scene.roomOne.platformDrops,
+    ...scene.roomTwo.blockDrops,
+  ];
+  const doors = [
+    ...scene.roomOneToTwoPassage.doors,
+    ...scene.roomTwoToThreeGoopPassage.doors,
+  ];
+  assert.deepEqual(
+    new Set(scene.dynamicCollisionMeshes),
+    new Set([
+      ...drops.map((drop) => drop.mesh),
+      ...doors.map((door) => door.collisionMesh),
+    ]),
+  );
+
+  const targets = scene.solubleTargetMeshes.map((mesh) => {
+    const target = createAuthoredDissolveTarget(mesh, world, surfaces);
+    assert.ok(target);
+    return target;
+  });
+  scene.bindDissolveTargets(targets);
+  for (const drop of drops) {
+    const target = targets.find(
+      (candidate) => candidate.id === drop.solubleTargetId,
+    );
+    assert.ok(target);
+    target.advance(target.dissolveDurationSeconds);
+  }
+
+  scene.update(1, 2, []);
+  const hit = new CollisionHit();
+  const sweepOrigin = new THREE.Vector3();
+  const sweepAcross = new THREE.Vector3(-1.5, 0, 0);
+  const expectDropCollision = (drop: (typeof drops)[number]): void => {
+    const size = drop.mesh.userData.sizeMetres as readonly number[];
+    drop.mesh.getWorldPosition(sweepOrigin);
+    sweepOrigin.x += size[0]! * 0.5 + 1;
+    assert.equal(
+      world.sweepSphere(sweepOrigin, sweepAcross, 0.2, hit),
+      true,
+    );
+    assert.equal(hit.object, drop.mesh);
+  };
+  for (const drop of drops) {
+    assert.equal(drop.state, 'landed');
+    expectDropCollision(drop);
+  }
+
+  for (const target of targets) target.reset();
+  scene.reset();
+  for (const drop of drops) {
+    assert.equal(drop.state, 'suspended');
+    expectDropCollision(drop);
+  }
 
   for (const target of targets) target.dispose();
   scene.dispose();

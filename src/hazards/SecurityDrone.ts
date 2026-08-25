@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
-import { CollisionHit, CollisionLayer, type CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  ColliderTransformMode,
+  CollisionHit,
+  CollisionLayer,
+  type CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { SecurityDronePresentation } from '../render/hazards/SecurityDronePresentation.ts';
 import type { DroneProjectileSystem } from './DroneProjectileSystem.ts';
@@ -160,7 +165,11 @@ export class SecurityDrone {
     this.presentation = new SecurityDronePresentation(config);
     this.frontIndicator = this.presentation.eye;
     this.root.add(this.collider, this.presentation.root);
-    this.world.register(this.collider);
+    this.world.register(
+      this.collider,
+      undefined,
+      ColliderTransformMode.Dynamic,
+    );
     this.surfaces.register(this.collider);
 
     this.model = {
