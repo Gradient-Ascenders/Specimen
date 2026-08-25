@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 
 import { CameraRig } from './CameraRig';
+import {
+  DEFAULT_RENDER_PIXEL_RATIO_CAP,
+  type RenderPixelRatioCap,
+  resolveRenderPixelRatio,
+} from './RenderResolution.ts';
 
-export const MAX_DEVICE_PIXEL_RATIO = 2;
 export const RENDER_EXPOSURE = 1;
 
 const BACKGROUND_COLOUR = 0x07110f;
@@ -13,6 +17,7 @@ export interface RenderDiagnostics {
   readonly drawingBufferWidth: number;
   readonly drawingBufferHeight: number;
   readonly pixelRatio: number;
+  readonly pixelRatioCap: RenderPixelRatioCap;
   readonly drawCalls: number;
   readonly triangles: number;
   readonly sceneObjects: number;
@@ -27,6 +32,7 @@ export interface RenderDiagnostics {
 export interface RenderLayerOptions {
   host: HTMLElement;
   window?: Window;
+  pixelRatioCap?: RenderPixelRatioCap;
 }
 
 /**
@@ -45,6 +51,7 @@ export class RenderLayer {
   private readonly drawingBufferSize = new THREE.Vector2();
   private readonly resizeObserver: ResizeObserver | undefined;
 
+  private pixelRatioCap: RenderPixelRatioCap;
   private viewportWidth = 0;
   private viewportHeight = 0;
   private disposed = false;
@@ -52,6 +59,8 @@ export class RenderLayer {
   constructor(options: RenderLayerOptions) {
     this.host = options.host;
     this.hostWindow = options.window ?? window;
+    this.pixelRatioCap =
+      options.pixelRatioCap ?? DEFAULT_RENDER_PIXEL_RATIO_CAP;
 
     this.scene.name = 'game-scene';
     this.scene.background = new THREE.Color(BACKGROUND_COLOUR);
@@ -90,6 +99,12 @@ export class RenderLayer {
     this.renderer.setAnimationLoop(callback);
   }
 
+  setPixelRatioCap(cap: RenderPixelRatioCap): void {
+    if (this.disposed || cap === this.pixelRatioCap) return;
+    this.pixelRatioCap = cap;
+    this.resize();
+  }
+
   getDiagnostics(): RenderDiagnostics {
     this.renderer.getDrawingBufferSize(this.drawingBufferSize);
     let sceneObjects = 0;
@@ -114,6 +129,7 @@ export class RenderLayer {
       drawingBufferWidth: this.drawingBufferSize.x,
       drawingBufferHeight: this.drawingBufferSize.y,
       pixelRatio: this.renderer.getPixelRatio(),
+      pixelRatioCap: this.pixelRatioCap,
       drawCalls: this.renderer.info.render.calls,
       triangles: this.renderer.info.render.triangles,
       sceneObjects,
@@ -141,9 +157,9 @@ export class RenderLayer {
 
     const width = Math.max(1, Math.floor(this.host.clientWidth));
     const height = Math.max(1, Math.floor(this.host.clientHeight));
-    const pixelRatio = Math.min(
-      Math.max(1, this.hostWindow.devicePixelRatio),
-      MAX_DEVICE_PIXEL_RATIO,
+    const pixelRatio = resolveRenderPixelRatio(
+      this.hostWindow.devicePixelRatio,
+      this.pixelRatioCap,
     );
 
     if (

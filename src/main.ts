@@ -21,7 +21,11 @@ if (!app) {
   throw new Error('Missing #app host element.');
 }
 
-const renderLayer = new RenderLayer({ host: app });
+const settings = new GameSettings();
+const renderLayer = new RenderLayer({
+  host: app,
+  pixelRatioCap: settings.value.renderPixelRatioCap,
+});
 const input = new Input({ pointerLockElement: renderLayer.canvas });
 const levelOneRuntime = new GreyboxLevelRuntime({
   host: app,
@@ -47,7 +51,6 @@ const gameSession = new GameSessionCoordinator({
     requestAnimationFrame(() => transition());
   },
 });
-const settings = new GameSettings();
 const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
 const gameFlow = new GameFlowUI({
   settings,
@@ -77,6 +80,7 @@ const gameFlow = new GameFlowUI({
       renderLayer.cameraRig.setFollowDistanceMetres(
         nextSettings.cameraDistanceMetres,
       );
+      renderLayer.setPixelRatioCap(nextSettings.renderPixelRatioCap);
     },
   },
 });

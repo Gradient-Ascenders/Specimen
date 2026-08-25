@@ -144,6 +144,7 @@ test('settings retain session values across flow transitions', () => {
   settings.setInvertVerticalLook(true);
   settings.setMasterVolume(0.35);
   settings.setCameraDistanceMetres(6.4);
+  settings.setRenderPixelRatioCap(1.5);
 
   const flow = new GameFlowStateModel();
   flow.completeBoot();
@@ -157,6 +158,7 @@ test('settings retain session values across flow transitions', () => {
     invertVerticalLook: true,
     masterVolume: 0.35,
     cameraDistanceMetres: 6.4,
+    renderPixelRatioCap: 1.5,
   });
   assert.deepEqual(snapshots.slice(0, 2), [1, 1.7]);
 
