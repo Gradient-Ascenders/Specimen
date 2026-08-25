@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
 import { CameraRig } from './CameraRig';
 import {
   DEFAULT_RENDER_PIXEL_RATIO_CAP,
@@ -140,6 +141,25 @@ export class RenderLayer {
       textures: this.renderer.info.memory.textures,
       programs: this.renderer.info.programs?.length ?? 0,
     };
+  }
+
+  /** Write cheap renderer counters without the scene traversal used by the debug panel. */
+  writePerformanceSnapshot(
+    target: PerformanceRenderSnapshot,
+    drawingBufferSize: THREE.Vector2,
+  ): void {
+    this.renderer.getDrawingBufferSize(drawingBufferSize);
+    target.viewportWidth = this.viewportWidth;
+    target.viewportHeight = this.viewportHeight;
+    target.drawingBufferWidth = drawingBufferSize.x;
+    target.drawingBufferHeight = drawingBufferSize.y;
+    target.effectiveDpr = this.renderer.getPixelRatio();
+    target.resolutionTier = this.pixelRatioCap;
+    target.drawCalls = this.renderer.info.render.calls;
+    target.triangles = this.renderer.info.render.triangles;
+    target.programs = this.renderer.info.programs?.length ?? 0;
+    target.geometries = this.renderer.info.memory.geometries;
+    target.textures = this.renderer.info.memory.textures;
   }
 
   dispose(): void {

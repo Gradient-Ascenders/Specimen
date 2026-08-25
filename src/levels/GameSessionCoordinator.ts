@@ -1,5 +1,6 @@
 import { EventBus } from '../core/EventBus.ts';
 import type { LoopStats } from '../core/Loop.ts';
+import type { PerformanceGameplaySnapshot } from '../core/PerformanceSnapshot.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
   type SlimeHUDListener,
@@ -83,6 +84,10 @@ export class GameSessionCoordinator {
 
   getSlimeHUDSnapshot(): SlimeHUDSnapshot {
     return this.transitionFailed ? EMPTY_SLIME_HUD_SNAPSHOT : this.runtime.getSlimeHUDSnapshot();
+  }
+
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
+    this.runtime.writePerformanceSnapshot(target);
   }
 
   dispose(): void {

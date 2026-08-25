@@ -10,6 +10,10 @@ import { EventBus } from '../core/EventBus.ts';
 import type { Input, InputAction } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import {
+  writePerformancePosition,
+  type PerformanceGameplaySnapshot,
+} from '../core/PerformanceSnapshot.ts';
+import {
   beginDebugPanelInspection,
   finishDebugPanelInspection,
   handleDebugPanelScrollKey,
@@ -303,6 +307,44 @@ export class GreyboxLevelRuntime {
         .map((entry) => entry.id as PlayableSlimeId),
       activeSlimeId: resources.slimePair.activeSlimeId,
     };
+  }
+
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
+    const resources = this.resources;
+    target.level = LEVEL_ID;
+    target.room = resources?.containmentLevel.activeRoomId ?? 'unloaded';
+    target.gameplayState = resources
+      ? resources.deathSequence.state === 'playing'
+        ? resources.containmentLevel.state
+        : resources.deathSequence.state
+      : this.lifecycle.state;
+    target.cutsceneState =
+      resources?.containmentLevel.state === 'completing'
+        ? 'containment-ending'
+        : 'none';
+    target.activeSlime = resources?.slimePair.activeSlimeId ?? 'none';
+    writePerformancePosition(
+      target.cameraPosition,
+      this.renderLayer.cameraRig.camera.position,
+    );
+    if (!resources) {
+      target.bobPosition.fill(0);
+      target.goopPosition.fill(0);
+      target.collisionRegistered = 0;
+      target.collisionEligible = 0;
+      target.collisionCandidates = 0;
+      target.collisionNarrowChecks = 0;
+      return;
+    }
+    writePerformancePosition(target.bobPosition, resources.body.position);
+    writePerformancePosition(target.goopPosition, resources.goopBody.position);
+    target.collisionRegistered = resources.collisionWorld.colliderCount;
+    target.collisionEligible =
+      resources.collisionWorld.lastSweepEligibleColliderCount;
+    target.collisionCandidates =
+      resources.collisionWorld.lastSweepBroadphaseCandidateCount;
+    target.collisionNarrowChecks =
+      resources.collisionWorld.lastSweepNarrowPhaseCheckCount;
   }
 
   private createSlimeHUDSnapshot(

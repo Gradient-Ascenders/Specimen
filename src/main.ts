@@ -118,6 +118,31 @@ const loop = new Loop({
 
 let bootFrame = 0;
 let shuttingDown = false;
+let performanceRecorder:
+  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
+  | undefined;
+if (debugAvailable) {
+  void Promise.all([
+    import('./debug/PerformanceFlightRecorder.ts'),
+    import('./debug/performance-recorder.css'),
+  ]).then(
+    ([{ PerformanceFlightRecorder }]) => {
+      if (shuttingDown) return;
+      const recorder = new PerformanceFlightRecorder({
+        host: app,
+        renderLayer,
+        gameSession,
+      });
+      performanceRecorder = recorder;
+      loop.setProfiler(recorder);
+    },
+    (error: unknown) => {
+      if (!shuttingDown) {
+        console.error('Performance flight recorder failed to load.', error);
+      }
+    },
+  );
+}
 const startRenderLoop = (): void => {
   if (shuttingDown) return;
   renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
@@ -145,6 +170,7 @@ const shutdown = (): void => {
   unsubscribeTransitionStarted();
   unsubscribeTransitionCompleted();
   unsubscribeTransitionFailed();
+  performanceRecorder?.dispose();
   gameFlow.dispose();
   gameSession.dispose();
   input.dispose();

@@ -4,6 +4,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 
 import { EventBus } from '../src/core/EventBus.ts';
+import type { PerformanceGameplaySnapshot } from '../src/core/PerformanceSnapshot.ts';
 import { CULTIVATION_FOUNDATION_MANIFEST } from '../src/levels/CultivationFoundationManifest.ts';
 import { CultivationLevelScene } from '../src/levels/CultivationLevelScene.ts';
 import { GameSessionCoordinator } from '../src/levels/GameSessionCoordinator.ts';
@@ -48,6 +49,9 @@ class MockRuntime implements GameLevelRuntime {
   }
   getSlimeHUDSnapshot() { return EMPTY_SLIME_HUD_SNAPSHOT; }
   captureProgressionSnapshot(): LevelProgressionSnapshot { return this.progression; }
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
+    target.level = this.id;
+  }
 }
 
 const progression: LevelProgressionSnapshot = {

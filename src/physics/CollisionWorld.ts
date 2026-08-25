@@ -242,6 +242,18 @@ export class CollisionWorld {
     };
   }
 
+  get lastSweepEligibleColliderCount(): number {
+    return this.lastEligibleColliderCount;
+  }
+
+  get lastSweepBroadphaseCandidateCount(): number {
+    return this.lastBroadphaseCandidateCount;
+  }
+
+  get lastSweepNarrowPhaseCheckCount(): number {
+    return this.lastNarrowPhaseCheckCount;
+  }
+
   /**
    * Sweep a sphere from `origin` along `displacement` and write the closest
    * blocking hit into `outHit`.

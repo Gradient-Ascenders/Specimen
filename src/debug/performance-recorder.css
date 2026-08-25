@@ -1,0 +1,31 @@
+.performance-recorder {
+  z-index: 6;
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: calc(100vw - 1.5rem);
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgb(191 167 255 / 24%);
+  border-radius: 0.4rem;
+  color: #d9d1e8;
+  background: rgb(9 6 15 / 86%);
+  font-size: 0.72rem;
+}
+
+.performance-recorder button {
+  padding: 0.28rem 0.45rem;
+  border: 1px solid rgb(191 167 255 / 35%);
+  border-radius: 0.3rem;
+  color: #f4f0ff;
+  background: rgb(81 60 112 / 72%);
+  cursor: pointer;
+}
+
+.performance-recorder button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}

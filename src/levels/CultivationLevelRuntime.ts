@@ -10,6 +10,10 @@ import { EventBus } from '../core/EventBus.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import {
+  writePerformancePosition,
+  type PerformanceGameplaySnapshot,
+} from '../core/PerformanceSnapshot.ts';
+import {
   beginDebugPanelInspection,
   finishDebugPanelInspection,
   handleDebugPanelScrollKey,
@@ -230,6 +234,50 @@ export class CultivationLevelRuntime {
         .map((entry) => entry.id as PlayableSlimeId),
       activeSlimeId: resources.pair.activeSlimeId,
     };
+  }
+
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
+    const resources = this.resources;
+    target.level = 'cultivation-level-2';
+    target.room =
+      this.authoredPreviewRoomId ?? resources?.controller.activeRoomId ?? 'unloaded';
+    target.gameplayState = resources
+      ? resources.deathSequence.state === 'playing'
+        ? resources.controller.state
+        : resources.deathSequence.state
+      : this.lifecycle.state;
+    target.cutsceneState = resources?.roomThreeController?.readModel.complete
+      ? 'room-three-complete'
+      : 'none';
+    target.activeSlime = resources?.pair.activeSlimeId ?? 'none';
+    writePerformancePosition(
+      target.cameraPosition,
+      this.renderLayer.cameraRig.camera.position,
+    );
+    if (!resources) {
+      target.bobPosition.fill(0);
+      target.goopPosition.fill(0);
+      target.collisionRegistered = 0;
+      target.collisionEligible = 0;
+      target.collisionCandidates = 0;
+      target.collisionNarrowChecks = 0;
+      return;
+    }
+    writePerformancePosition(
+      target.bobPosition,
+      resources.pair.bobBody.position,
+    );
+    writePerformancePosition(
+      target.goopPosition,
+      resources.pair.goopBody.position,
+    );
+    target.collisionRegistered = resources.collisionWorld.colliderCount;
+    target.collisionEligible =
+      resources.collisionWorld.lastSweepEligibleColliderCount;
+    target.collisionCandidates =
+      resources.collisionWorld.lastSweepBroadphaseCandidateCount;
+    target.collisionNarrowChecks =
+      resources.collisionWorld.lastSweepNarrowPhaseCheckCount;
   }
 
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void {
