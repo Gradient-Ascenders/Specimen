@@ -38,3 +38,33 @@ jobs:
           path: artifacts/specimen-production.zip
           if-no-files-found: error
           retention-days: 14
+
+  level-one-shader-program-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Use pinned Node.js version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Level 1 shader-program browser regression
+        run: npm run test:browser
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: level-one-shader-program-playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14

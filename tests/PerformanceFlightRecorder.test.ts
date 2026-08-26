@@ -193,7 +193,7 @@ test('recorder disposal disconnects observers, input, and pending GPU queries', 
   }
 });
 
-test('shader guard records only new post-warm program highs with gameplay context', () => {
+test('shader guard records Level 1 highs and ignores Level 2 growth after completion', () => {
   const originalObserver = Object.getOwnPropertyDescriptor(
     globalThis,
     'PerformanceObserver',
@@ -279,6 +279,23 @@ test('shader guard records only new post-warm program highs with gameplay contex
     assert.equal(
       exported.shaderProgramGuard.growthEvents[0]?.gameplay.activeSlime,
       'goop',
+    );
+
+    recorder.completeLevelOneShaderProgramGuard();
+    // Simulate legitimate Level 2 program creation after transitionStarted
+    // disarms the Level 1-only guard.
+    programs.push({});
+    recorder.sampleLevelOneShaderPrograms();
+    assert.deepEqual(recorder.getShaderProgramGuardSnapshot(), {
+      armed: false,
+      baselineProgramCount: 86,
+      highestProgramCount: 88,
+      growthEventCount: 2,
+    });
+    assert.equal(errors.length, 2);
+    assert.match(
+      element.shaderProgramGuardStatus.textContent,
+      /Level 1 shader guard complete/,
     );
     recorder.dispose();
   } finally {

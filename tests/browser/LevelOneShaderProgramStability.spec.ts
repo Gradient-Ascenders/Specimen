@@ -1,0 +1,230 @@
+import { expect, test, type Page } from '@playwright/test';
+
+const GUARD_SELECTOR = '[data-shader-program-guard]';
+const RUNTIME_DIAGNOSTICS_SELECTOR = '[data-runtime-status]';
+
+interface AcidPresentationSample {
+  readonly totalImpacts: number;
+  readonly dropletUploads: number;
+}
+
+const toggleDebugPanel = async (page: Page): Promise<void> => {
+  await page.keyboard.press('F2');
+};
+
+const parseAcidPresentationSample = (text: string): AcidPresentationSample => {
+  const impacts = text.match(/acid impacts soluble \/ world: (\d+) \/ (\d+)/);
+  const work = text.match(
+    /acid presentation work uniforms \/ projectile slots \/ droplet uploads: \d+ \/ \d+ \/ (\d+)/,
+  );
+  expect(impacts, 'Missing acid impact diagnostics').not.toBeNull();
+  expect(work, 'Missing acid droplet-upload diagnostics').not.toBeNull();
+  return {
+    totalImpacts: Number(impacts?.[1]) + Number(impacts?.[2]),
+    dropletUploads: Number(work?.[1]),
+  };
+};
+
+const waitForRenderedFrames = async (page: Page, count = 1): Promise<void> => {
+  await page.evaluate(async (frameCount) => {
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  }, count);
+};
+
+const readStableGuard = async (
+  page: Page,
+  label: string,
+  baseline: number,
+): Promise<number> => {
+  const status = (await page.locator(GUARD_SELECTOR).textContent())?.trim() ?? '';
+  expect(status, `${label}: shader guard reported a regression`).not.toContain(
+    'Cold shader regression',
+  );
+  const counts = status.match(/baseline (\d+) · highest (\d+)/);
+  expect(counts, `${label}: unreadable shader guard: ${status}`).not.toBeNull();
+  const observedBaseline = Number(counts?.[1]);
+  const highest = Number(counts?.[2]);
+  expect(observedBaseline, `${label}: warm baseline changed`).toBe(baseline);
+  expect(highest, `${label}: renderer program count exceeded baseline`).toBeLessThanOrEqual(
+    baseline,
+  );
+  return highest;
+};
+
+const visitRoom = async (page: Page, room: number): Promise<void> => {
+  await page.evaluate((roomId) => {
+    const button = document.querySelector<HTMLButtonElement>(
+      `[data-action="room-teleport"][data-room-id="${roomId}"]`,
+    );
+    if (!button) throw new Error(`Missing Room ${roomId} debug teleport`);
+    button.click();
+  }, room);
+  await waitForRenderedFrames(page);
+};
+
+const sweepCamera = async (page: Page): Promise<void> => {
+  const canvas = page.locator('canvas');
+  const bounds = await canvas.boundingBox();
+  expect(bounds, 'The WebGL canvas has no rendered bounds').not.toBeNull();
+  if (!bounds) return;
+  const pointerLocked = await canvas.evaluate(
+    (element) => document.pointerLockElement === element,
+  );
+  if (!pointerLocked) {
+    await canvas.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
+  }
+  await page.evaluate(() => {
+    for (const [movementX, movementY] of [[180, -80], [-360, 160], [180, -80]]) {
+      const event = new MouseEvent('mousemove', { bubbles: true });
+      Object.defineProperties(event, {
+        movementX: { value: movementX },
+        movementY: { value: movementY },
+      });
+      window.dispatchEvent(event);
+    }
+  });
+  await waitForRenderedFrames(page);
+};
+
+const readAcidPresentationSample = async (
+  page: Page,
+): Promise<AcidPresentationSample> => {
+  await toggleDebugPanel(page);
+  const diagnostics = page.locator(RUNTIME_DIAGNOSTICS_SELECTOR);
+  await expect(diagnostics).toBeVisible();
+  await expect.poll(
+    async () => (await diagnostics.textContent()) ?? '',
+    { message: 'Waiting for acid presentation diagnostics' },
+  ).toContain('acid presentation work uniforms');
+  const text = (await diagnostics.textContent()) ?? '';
+  const sample = parseAcidPresentationSample(text);
+  await toggleDebugPanel(page);
+  return sample;
+};
+
+const waitForAcidImpactPresentation = async (
+  page: Page,
+  before: AcidPresentationSample,
+): Promise<AcidPresentationSample> => {
+  await toggleDebugPanel(page);
+  const diagnostics = page.locator(RUNTIME_DIAGNOSTICS_SELECTOR);
+  await expect(diagnostics).toBeVisible();
+  await expect.poll(
+    async () => (await diagnostics.textContent()) ?? '',
+    { message: 'Waiting for acid presentation diagnostics' },
+  ).toContain('acid presentation work uniforms');
+  await expect.poll(
+    async () => {
+      const sample = parseAcidPresentationSample(
+        (await diagnostics.textContent()) ?? '',
+      );
+      return (
+        sample.totalImpacts > before.totalImpacts &&
+        sample.dropletUploads > before.dropletUploads
+      );
+    },
+    {
+      timeout: 60_000,
+      message: 'Waiting for an acid impact and its droplet presentation upload',
+    },
+  ).toBe(true);
+  const sample = parseAcidPresentationSample(
+    (await diagnostics.textContent()) ?? '',
+  );
+  await toggleDebugPanel(page);
+  return sample;
+};
+
+test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
+  page,
+}) => {
+  test.setTimeout(600_000);
+  await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator(GUARD_SELECTOR)).toBeVisible({ timeout: 120_000 });
+  await expect.poll(
+    async () => (await page.locator(GUARD_SELECTOR).textContent()) ?? '',
+    { timeout: 120_000, message: 'Waiting for Level 1 hidden-boot warm-up' },
+  ).toContain('Shader programs stable');
+
+  const initialStatus =
+    (await page.locator(GUARD_SELECTOR).textContent())?.trim() ?? '';
+  const baselineMatch = initialStatus.match(/baseline (\d+) · highest (\d+)/);
+  expect(
+    baselineMatch,
+    `Unable to read hidden-boot program baseline: ${initialStatus}`,
+  ).not.toBeNull();
+  const baseline = Number(baselineMatch?.[1]);
+  expect(Number(baselineMatch?.[2]), 'Programs grew before traversal began').toBe(
+    baseline,
+  );
+
+  await page.locator('[data-action="start"]').click();
+  await waitForRenderedFrames(page);
+  await readStableGuard(page, 'gameplay start', baseline);
+
+  await visitRoom(page, 1);
+  await sweepCamera(page);
+  await page.keyboard.down('w');
+  await page.keyboard.down('Space');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('w');
+  await page.keyboard.up('Space');
+  await waitForRenderedFrames(page);
+  await readStableGuard(page, 'Room 1 traversal and jump', baseline);
+
+  await visitRoom(page, 2);
+  await sweepCamera(page);
+  await readStableGuard(page, 'Room 2 camera sweep', baseline);
+  await page.keyboard.press('Tab');
+  await waitForRenderedFrames(page);
+  await readStableGuard(page, 'Room 2 Goop switch', baseline);
+  const acidBefore = await readAcidPresentationSample(page);
+  await sweepCamera(page);
+  await page.mouse.down({ button: 'right' });
+  await waitForRenderedFrames(page);
+  await readStableGuard(page, 'Room 2 acid aim', baseline);
+  await page.mouse.click(400, 300, { button: 'left' });
+  await page.mouse.up({ button: 'right' });
+  await waitForRenderedFrames(page);
+  const acidAfter = await waitForAcidImpactPresentation(page, acidBefore);
+  expect(
+    acidAfter.totalImpacts,
+    'The acid checkpoint did not produce an authoritative impact',
+  ).toBeGreaterThan(acidBefore.totalImpacts);
+  expect(
+    acidAfter.dropletUploads,
+    'The acid impact did not upload its droplet presentation',
+  ).toBeGreaterThan(acidBefore.dropletUploads);
+  await readStableGuard(page, 'Room 2 acid impact presentation', baseline);
+
+  await visitRoom(page, 3);
+  await sweepCamera(page);
+  await page.keyboard.down('a');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('a');
+  await waitForRenderedFrames(page);
+  await readStableGuard(page, 'Room 3 traversal and camera sweep', baseline);
+
+  await visitRoom(page, 4);
+  await sweepCamera(page);
+  await page.keyboard.down('w');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('w');
+  await page.keyboard.press('Space');
+  await waitForRenderedFrames(page);
+  await readStableGuard(page, 'Room 4 lift approach', baseline);
+
+  await visitRoom(page, 5);
+  await sweepCamera(page);
+  await page.keyboard.down('d');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('d');
+  await waitForRenderedFrames(page);
+  await readStableGuard(page, 'Room 5 traversal and camera sweep', baseline);
+
+  await expect(page.locator(GUARD_SELECTOR)).toHaveText(
+    `Shader programs stable · baseline ${baseline} · highest ${baseline}`,
+  );
+});

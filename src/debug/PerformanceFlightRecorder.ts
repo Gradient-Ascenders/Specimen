@@ -403,6 +403,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private gpuExtension: DisjointTimerQueryExtension | null = null;
   private gpuContext: WebGL2RenderingContext | null = null;
   private gpuSupportReason = 'recording has not started';
+  private shaderProgramGuardArmed = false;
   private shaderProgramBaseline: number | null = null;
   private highestShaderProgramCount: number | null = null;
 
@@ -467,6 +468,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   /** Arm after prewarm and the hidden boot renders establish Level 1's baseline. */
   armLevelOneShaderProgramGuard(baselineProgramCount: number): void {
     if (this.disposed || this.shaderProgramBaseline !== null) return;
+    this.shaderProgramGuardArmed = true;
     this.shaderProgramBaseline = baselineProgramCount;
     this.highestShaderProgramCount = baselineProgramCount;
     this.updateShaderProgramGuardStatus();
@@ -478,7 +480,10 @@ export class PerformanceFlightRecorder implements LoopProfiler {
    */
   sampleLevelOneShaderPrograms(): void {
     const previousHighest = this.highestShaderProgramCount;
-    if (this.disposed || previousHighest === null) return;
+    if (
+      this.disposed || !this.shaderProgramGuardArmed ||
+      previousHighest === null
+    ) return;
     const currentProgramCount =
       this.renderLayer.renderer.info.programs?.length ?? 0;
     if (currentProgramCount <= previousHighest) return;
@@ -503,11 +508,18 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   getShaderProgramGuardSnapshot(): ShaderProgramGuardSnapshot {
     return {
-      armed: this.shaderProgramBaseline !== null,
+      armed: this.shaderProgramGuardArmed,
       baselineProgramCount: this.shaderProgramBaseline,
       highestProgramCount: this.highestShaderProgramCount,
       growthEventCount: this.shaderProgramGrowthEvents.length,
     };
+  }
+
+  completeLevelOneShaderProgramGuard(): void {
+    if (!this.shaderProgramGuardArmed) return;
+    this.shaderProgramGuardArmed = false;
+    this.shaderProgramGuardStatus.textContent =
+      `Level 1 shader guard complete · baseline ${this.shaderProgramBaseline} · highest ${this.highestShaderProgramCount}`;
   }
 
   start(): void {

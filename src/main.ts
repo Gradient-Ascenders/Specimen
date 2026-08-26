@@ -90,13 +90,24 @@ const gameFlow = new GameFlowUI({
     },
   },
 });
+let warmedLevelOneProgramBaseline: number | undefined;
+let levelOneShaderProgramGuardActive = true;
+let sampleLevelOneShaderPrograms: (() => void) | undefined;
+let performanceRecorder:
+  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
+  | undefined;
 const unsubscribeObjectiveChanged = gameSession.events.on(
   'objectiveChanged',
   ({ objective }) => gameFlow.setObjective(objective),
 );
 const unsubscribeTransitionStarted = gameSession.events.on(
   'transitionStarted',
-  ({ message }) => gameFlow.beginLevelTransition(message),
+  ({ message }) => {
+    levelOneShaderProgramGuardActive = false;
+    sampleLevelOneShaderPrograms = undefined;
+    performanceRecorder?.completeLevelOneShaderProgramGuard();
+    gameFlow.beginLevelTransition(message);
+  },
 );
 const unsubscribeTransitionCompleted = gameSession.events.on(
   'transitionCompleted',
@@ -114,16 +125,12 @@ const loop = new Loop({
   fixedUpdate: (deltaSeconds) => gameSession.fixedUpdate(deltaSeconds),
   render: (interpolationAlpha, stats) => {
     gameSession.render(interpolationAlpha, stats);
-    performanceRecorder?.sampleLevelOneShaderPrograms();
+    sampleLevelOneShaderPrograms?.();
   },
 });
 
 let bootFrame = 0;
 let shuttingDown = false;
-let warmedLevelOneProgramBaseline: number | undefined;
-let performanceRecorder:
-  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
-  | undefined;
 if (debugAvailable) {
   void Promise.all([
     import('./debug/PerformanceFlightRecorder.ts'),
@@ -138,9 +145,14 @@ if (debugAvailable) {
       });
       performanceRecorder = recorder;
       loop.setProfiler(recorder);
-      if (warmedLevelOneProgramBaseline !== undefined) {
+      if (
+        levelOneShaderProgramGuardActive &&
+        warmedLevelOneProgramBaseline !== undefined
+      ) {
         recorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline);
         recorder.sampleLevelOneShaderPrograms();
+        sampleLevelOneShaderPrograms = () =>
+          recorder.sampleLevelOneShaderPrograms();
       }
     },
     (error: unknown) => {
@@ -158,9 +170,13 @@ const startRenderLoop = (): void => {
     bootFrame = requestAnimationFrame(() => {
       warmedLevelOneProgramBaseline =
         renderLayer.renderer.info.programs?.length ?? 0;
-      performanceRecorder?.armLevelOneShaderProgramGuard(
-        warmedLevelOneProgramBaseline,
-      );
+      if (levelOneShaderProgramGuardActive && performanceRecorder) {
+        performanceRecorder.armLevelOneShaderProgramGuard(
+          warmedLevelOneProgramBaseline,
+        );
+        sampleLevelOneShaderPrograms = () =>
+          performanceRecorder?.sampleLevelOneShaderPrograms();
+      }
       gameFlow.completeBoot();
     });
   });
