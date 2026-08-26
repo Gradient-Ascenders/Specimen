@@ -230,6 +230,13 @@ export class GoopAcidPresentation {
         active: false,
       }),
     );
+    // Impacts always use per-instance colours. Reserve that eventual render
+    // state now so Level 1's hidden shader prewarm sees the same attribute
+    // signature as the first gameplay impact.
+    this.dropletMesh.setColorAt(0, this.impactColour.setHex(0xffffff));
+    if (this.dropletMesh.instanceColor) {
+      this.dropletMesh.instanceColor.needsUpdate = true;
+    }
     this.initializeDropletMatrices();
     this.flashes = Array.from(
       { length: IMPACT_FLASH_CAPACITY },

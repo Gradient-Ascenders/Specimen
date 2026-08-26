@@ -29,3 +29,7 @@
   cursor: default;
   opacity: 0.45;
 }
+
+.performance-recorder [data-shader-program-guard] {
+  flex-basis: 100%;
+}

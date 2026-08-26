@@ -252,6 +252,7 @@ test('idle presentation skips inactive pool work and droplet uploads', () => {
       'goop-acid-impact-droplets',
     );
     assert.ok(droplets instanceof THREE.InstancedMesh);
+    assert.ok(droplets.instanceColor);
     const initialMatrixVersion = droplets.instanceMatrix.version;
     const initial = fixture.presentation.getDiagnostics();
 

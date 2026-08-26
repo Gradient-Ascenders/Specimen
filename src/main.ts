@@ -112,12 +112,15 @@ gameSession.load();
 
 const loop = new Loop({
   fixedUpdate: (deltaSeconds) => gameSession.fixedUpdate(deltaSeconds),
-  render: (interpolationAlpha, stats) =>
-    gameSession.render(interpolationAlpha, stats),
+  render: (interpolationAlpha, stats) => {
+    gameSession.render(interpolationAlpha, stats);
+    performanceRecorder?.sampleLevelOneShaderPrograms();
+  },
 });
 
 let bootFrame = 0;
 let shuttingDown = false;
+let warmedLevelOneProgramBaseline: number | undefined;
 let performanceRecorder:
   | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
   | undefined;
@@ -135,6 +138,10 @@ if (debugAvailable) {
       });
       performanceRecorder = recorder;
       loop.setProfiler(recorder);
+      if (warmedLevelOneProgramBaseline !== undefined) {
+        recorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline);
+        recorder.sampleLevelOneShaderPrograms();
+      }
     },
     (error: unknown) => {
       if (!shuttingDown) {
@@ -148,7 +155,14 @@ const startRenderLoop = (): void => {
   renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
   // Present authoritative Room 1 frames before the loading UI yields control.
   bootFrame = requestAnimationFrame(() => {
-    bootFrame = requestAnimationFrame(() => gameFlow.completeBoot());
+    bootFrame = requestAnimationFrame(() => {
+      warmedLevelOneProgramBaseline =
+        renderLayer.renderer.info.programs?.length ?? 0;
+      performanceRecorder?.armLevelOneShaderProgramGuard(
+        warmedLevelOneProgramBaseline,
+      );
+      gameFlow.completeBoot();
+    });
   });
 };
 

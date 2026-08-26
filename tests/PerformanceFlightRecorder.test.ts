@@ -5,6 +5,7 @@ import {
   DEFAULT_PERFORMANCE_RECORDER_CONFIG,
   HitchDetector,
   PerformanceFlightRecorder,
+  type ShaderProgramGrowthEvent,
 } from '../src/debug/PerformanceFlightRecorder.ts';
 import type { LoopStats } from '../src/core/Loop.ts';
 
@@ -49,12 +50,16 @@ class FakeRecorderElement extends EventTarget {
   innerHTML = '';
   removed = false;
   readonly status = new FakeControl();
+  readonly shaderProgramGuardStatus = new FakeControl();
   readonly toggle = new FakeControl();
   readonly marker = new FakeControl();
   readonly exportButton = new FakeControl();
 
   querySelector(selector: string): FakeControl | null {
     if (selector === '[data-recorder-status]') return this.status;
+    if (selector === '[data-shader-program-guard]') {
+      return this.shaderProgramGuardStatus;
+    }
     if (selector === '[data-recorder-action="toggle"]') return this.toggle;
     if (selector === '[data-recorder-action="marker"]') return this.marker;
     if (selector === '[data-recorder-action="export"]') return this.exportButton;
@@ -185,6 +190,99 @@ test('recorder disposal disconnects observers, input, and pending GPU queries', 
   } finally {
     restoreGlobal('PerformanceObserver', originalObserver);
     restoreGlobal('WebGL2RenderingContext', originalWebGl2);
+  }
+});
+
+test('shader guard records only new post-warm program highs with gameplay context', () => {
+  const originalObserver = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'PerformanceObserver',
+  );
+  Object.defineProperty(globalThis, 'PerformanceObserver', {
+    configurable: true,
+    value: class FakeObserver {
+      static readonly supportedEntryTypes: string[] = [];
+    },
+  });
+
+  try {
+    const element = new FakeRecorderElement();
+    const programs: unknown[] = Array.from({ length: 86 }, () => ({}));
+    const errors: unknown[][] = [];
+    const hostWindow = Object.assign(new EventTarget(), {
+      performance,
+      console: { error: (...args: unknown[]) => errors.push(args) },
+      navigator: {
+        userAgent: 'test',
+        platform: 'test',
+        hardwareConcurrency: 4,
+      },
+      location: { href: 'http://test/' },
+      crossOriginIsolated: false,
+    });
+    const recorder = new PerformanceFlightRecorder({
+      host: { append: () => undefined } as unknown as HTMLElement,
+      document: {
+        createElement: () => element,
+      } as unknown as Document,
+      window: hostWindow as unknown as Window,
+      renderLayer: {
+        renderer: {
+          info: { programs },
+          getContext: () => ({
+            getExtension: () => null,
+            getParameter: () => 'test',
+          }),
+        },
+        writePerformanceSnapshot: () => undefined,
+      } as never,
+      gameSession: {
+        writePerformanceSnapshot: (snapshot: {
+          level: string;
+          room: string | number;
+          gameplayState: string;
+          activeSlime: string;
+          cameraPosition: [number, number, number];
+        }) => {
+          snapshot.level = 'level-1';
+          snapshot.room = 3;
+          snapshot.gameplayState = 'playing';
+          snapshot.activeSlime = 'goop';
+          snapshot.cameraPosition.splice(0, 3, 2, 12, 51);
+        },
+      } as never,
+    });
+
+    recorder.armLevelOneShaderProgramGuard(86);
+    recorder.sampleLevelOneShaderPrograms();
+    programs.push({});
+    recorder.sampleLevelOneShaderPrograms();
+    recorder.sampleLevelOneShaderPrograms();
+    programs.push({});
+    recorder.sampleLevelOneShaderPrograms();
+
+    assert.deepEqual(recorder.getShaderProgramGuardSnapshot(), {
+      armed: true,
+      baselineProgramCount: 86,
+      highestProgramCount: 88,
+      growthEventCount: 2,
+    });
+    assert.equal(errors.length, 2);
+    assert.match(element.shaderProgramGuardStatus.textContent, /87 → 88/);
+    assert.match(element.shaderProgramGuardStatus.textContent, /level level-1/);
+    assert.match(element.shaderProgramGuardStatus.textContent, /room 3/);
+
+    const exported = recorder.buildExport() as {
+      shaderProgramGuard: { growthEvents: ShaderProgramGrowthEvent[] };
+    };
+    assert.equal(exported.shaderProgramGuard.growthEvents.length, 2);
+    assert.equal(
+      exported.shaderProgramGuard.growthEvents[0]?.gameplay.activeSlime,
+      'goop',
+    );
+    recorder.dispose();
+  } finally {
+    restoreGlobal('PerformanceObserver', originalObserver);
   }
 });
 

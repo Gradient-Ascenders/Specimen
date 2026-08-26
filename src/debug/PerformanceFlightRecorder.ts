@@ -136,6 +136,21 @@ interface MemorySample {
   readonly jsHeapLimitBytes: number;
 }
 
+export interface ShaderProgramGrowthEvent {
+  readonly timestampMs: number;
+  readonly baselineProgramCount: number;
+  readonly previousHighestProgramCount: number;
+  readonly newProgramCount: number;
+  readonly gameplay: PerformanceGameplaySnapshot;
+}
+
+export interface ShaderProgramGuardSnapshot {
+  readonly armed: boolean;
+  readonly baselineProgramCount: number | null;
+  readonly highestProgramCount: number | null;
+  readonly growthEventCount: number;
+}
+
 interface DisjointTimerQueryExtension {
   readonly TIME_ELAPSED_EXT: number;
   readonly GPU_DISJOINT_EXT: number;
@@ -340,6 +355,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   ).fill(0);
   private readonly performanceEntries: BrowserPerformanceRecord[] = [];
   private readonly memorySamples: MemorySample[] = [];
+  private readonly shaderProgramGrowthEvents: ShaderProgramGrowthEvent[] = [];
   private readonly hitchWindows: HitchWindow[] = [];
   private readonly manualMarkers: ManualMarker[] = [];
   private readonly observers: PerformanceObserver[] = [];
@@ -347,6 +363,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private readonly pendingGpuSequences: number[] = [];
   private readonly drawingBufferSize: THREE.Vector2;
   private readonly status: HTMLElement;
+  private readonly shaderProgramGuardStatus: HTMLElement;
   private readonly toggleButton: HTMLButtonElement;
   private readonly markerButton: HTMLButtonElement;
   private readonly exportButton: HTMLButtonElement;
@@ -386,6 +403,8 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private gpuExtension: DisjointTimerQueryExtension | null = null;
   private gpuContext: WebGL2RenderingContext | null = null;
   private gpuSupportReason = 'recording has not started';
+  private shaderProgramBaseline: number | null = null;
+  private highestShaderProgramCount: number | null = null;
 
   constructor(options: {
     readonly host: HTMLElement;
@@ -411,18 +430,26 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     this.element.className = 'performance-recorder';
     this.element.innerHTML = `
       <span data-recorder-status>Flight recorder idle</span>
+      <span data-shader-program-guard>Shader guard awaiting Level 1 warm-up</span>
       <button type="button" data-recorder-action="toggle">Record <kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.toggle}</kbd></button>
       <button type="button" data-recorder-action="marker" disabled>Mark <kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.marker}</kbd></button>
       <button type="button" data-recorder-action="export" disabled>Export <kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.export}</kbd></button>
     `;
     const status = this.element.querySelector<HTMLElement>('[data-recorder-status]');
+    const shaderProgramGuardStatus = this.element.querySelector<HTMLElement>(
+      '[data-shader-program-guard]',
+    );
     const toggleButton = this.element.querySelector<HTMLButtonElement>('[data-recorder-action="toggle"]');
     const markerButton = this.element.querySelector<HTMLButtonElement>('[data-recorder-action="marker"]');
     const exportButton = this.element.querySelector<HTMLButtonElement>('[data-recorder-action="export"]');
-    if (!status || !toggleButton || !markerButton || !exportButton) {
+    if (
+      !status || !shaderProgramGuardStatus || !toggleButton || !markerButton ||
+      !exportButton
+    ) {
       throw new Error('Missing performance recorder controls.');
     }
     this.status = status;
+    this.shaderProgramGuardStatus = shaderProgramGuardStatus;
     this.toggleButton = toggleButton;
     this.markerButton = markerButton;
     this.exportButton = exportButton;
@@ -435,6 +462,52 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   get enabled(): boolean {
     return this.enabledValue;
+  }
+
+  /** Arm after prewarm and the hidden boot renders establish Level 1's baseline. */
+  armLevelOneShaderProgramGuard(baselineProgramCount: number): void {
+    if (this.disposed || this.shaderProgramBaseline !== null) return;
+    this.shaderProgramBaseline = baselineProgramCount;
+    this.highestShaderProgramCount = baselineProgramCount;
+    this.updateShaderProgramGuardStatus();
+  }
+
+  /**
+   * Cheap debug-only sample. Gameplay context is captured only when a new high
+   * proves that a program was compiled after Level 1's warm boundary.
+   */
+  sampleLevelOneShaderPrograms(): void {
+    const previousHighest = this.highestShaderProgramCount;
+    if (this.disposed || previousHighest === null) return;
+    const currentProgramCount =
+      this.renderLayer.renderer.info.programs?.length ?? 0;
+    if (currentProgramCount <= previousHighest) return;
+
+    this.highestShaderProgramCount = currentProgramCount;
+    const gameplay = createPerformanceGameplaySnapshot();
+    this.gameSession.writePerformanceSnapshot(gameplay);
+    const event: ShaderProgramGrowthEvent = {
+      timestampMs: this.hostWindow.performance.now(),
+      baselineProgramCount: this.shaderProgramBaseline ?? previousHighest,
+      previousHighestProgramCount: previousHighest,
+      newProgramCount: currentProgramCount,
+      gameplay,
+    };
+    pushBounded(this.shaderProgramGrowthEvents, event, 32);
+    this.updateShaderProgramGuardStatus(event);
+    (this.hostWindow as Window & { readonly console?: Console }).console?.error(
+      'Cold shader program regression after Level 1 warm-up.',
+      event,
+    );
+  }
+
+  getShaderProgramGuardSnapshot(): ShaderProgramGuardSnapshot {
+    return {
+      armed: this.shaderProgramBaseline !== null,
+      baselineProgramCount: this.shaderProgramBaseline,
+      highestProgramCount: this.highestShaderProgramCount,
+      growthEventCount: this.shaderProgramGrowthEvents.length,
+    };
   }
 
   start(): void {
@@ -633,6 +706,10 @@ export class PerformanceFlightRecorder implements LoopProfiler {
         entries: this.performanceEntries,
       },
       memorySamples: this.memorySamples,
+      shaderProgramGuard: {
+        ...this.getShaderProgramGuardSnapshot(),
+        growthEvents: this.shaderProgramGrowthEvents,
+      },
       summary: this.buildSummary(windows),
     };
   }
@@ -1116,6 +1193,27 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       `${this.hitchWindows.length + (this.activeWindow ? 1 : 0)} windows`,
       this.gpuExtension ? 'GPU timing on' : 'GPU timing unavailable',
     ].join(' · ');
+  }
+
+  private updateShaderProgramGuardStatus(
+    growth?: ShaderProgramGrowthEvent,
+  ): void {
+    if (growth) {
+      const { gameplay } = growth;
+      this.shaderProgramGuardStatus.textContent = [
+        'Cold shader regression',
+        `${growth.previousHighestProgramCount} → ${growth.newProgramCount}`,
+        `level ${gameplay.level}`,
+        `room ${gameplay.room}`,
+        `${growth.timestampMs.toFixed(1)} ms`,
+        `state ${gameplay.gameplayState}`,
+        `slime ${gameplay.activeSlime}`,
+        `camera ${gameplay.cameraPosition.map((value) => value.toFixed(2)).join(', ')}`,
+      ].join(' · ');
+      return;
+    }
+    this.shaderProgramGuardStatus.textContent =
+      `Shader programs stable · baseline ${this.shaderProgramBaseline} · highest ${this.highestShaderProgramCount}`;
   }
 }
 

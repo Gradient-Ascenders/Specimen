@@ -133,6 +133,23 @@ const LIGHTING_PREWARM_CAMERA_TARGETS: Readonly<
   4: [9, 30.21, 85.5],
   5: [9, 75.21, 94],
 };
+// Distant room geometry can still enter the gameplay camera frustum and is
+// submitted with the currently active room's lights. Keep this list to the
+// exact cross-room renderables observed creating otherwise-cold programs.
+const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
+  Partial<Record<DebugRoomId, readonly string[]>>
+> = {
+  1: [
+    'room-3-first-static-laser-presentation-emitter-start-housing-collar',
+    'room-3-first-static-laser-presentation-emitter-start-active-aperture',
+  ],
+  2: ['room-1-goop-soluble-test-barrier'],
+  3: [
+    'room-2-observation-reinforced-glass',
+    'room-1-goop-soluble-test-barrier',
+  ],
+  5: ['room-3-acid-surface-material-integration-point'],
+};
 
 export interface GreyboxLevelRuntimeOptions {
   host: HTMLElement;
@@ -1842,17 +1859,23 @@ function createRoomCompileSubset(
   subset.name = `containment-room-${roomId}-shader-prewarm-subset`;
   const compiledSignatures = new Set<string>();
   let compiledObjects = 0;
+  const addCompileObject = (object: THREE.Object3D): void => {
+    if (!isRenderableObject(object)) return;
+    const compileSignature = compileObjectSignature(object);
+    if (compiledSignatures.has(compileSignature)) return;
+    compiledSignatures.add(compileSignature);
+    const clone = cloneCompileObject(object);
+    clone.visible = true;
+    subset.add(clone);
+    compiledObjects += 1;
+  };
   for (const source of sources) {
-    source.traverse((object) => {
-      if (!isRenderableObject(object)) return;
-      const compileSignature = compileObjectSignature(object);
-      if (compiledSignatures.has(compileSignature)) return;
-      compiledSignatures.add(compileSignature);
-      const clone = cloneCompileObject(object);
-      clone.visible = true;
-      subset.add(clone);
-      compiledObjects += 1;
-    });
+    source.traverse(addCompileObject);
+  }
+  for (
+    const name of LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES[roomId] ?? []
+  ) {
+    addCompileObject(requiredNamedObject(levelRoot, name));
   }
   subset.userData.compiledObjects = compiledObjects;
   return subset;
