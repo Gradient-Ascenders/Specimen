@@ -41,12 +41,22 @@ export const gameFlowCanPause = (
 
 export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
+export interface GameFlowKeyboardModifiers {
+  readonly altKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly metaKey?: boolean;
+  readonly shiftKey?: boolean;
+}
+
 export const getGameFlowKeyboardAction = (
   code: string,
   state: GameFlowState,
+  modifiers: GameFlowKeyboardModifiers = {},
 ): GameFlowKeyboardAction | null => {
-  if (code === 'KeyP' && state === 'playing') return 'pause';
-  if (code === 'KeyP' && state === 'paused') return 'resume';
+  const hasModifier = modifiers.altKey || modifiers.ctrlKey ||
+    modifiers.metaKey || modifiers.shiftKey;
+  if (!hasModifier && code === 'KeyP' && state === 'playing') return 'pause';
+  if (!hasModifier && code === 'KeyP' && state === 'paused') return 'resume';
   if (code === 'Escape' && (state === 'settings' || state === 'credits')) {
     return 'back';
   }
@@ -866,7 +876,11 @@ export class GameFlowUI {
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
-    const action = getGameFlowKeyboardAction(event.code, this.model.state);
+    const action = getGameFlowKeyboardAction(
+      event.code,
+      this.model.state,
+      event,
+    );
 
     if (action === 'pause') {
       if (!this.actions.isGameplayInputEnabled()) return;

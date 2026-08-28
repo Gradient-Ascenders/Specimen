@@ -86,9 +86,29 @@ test('pause ownership defers to a death flow that disabled gameplay input', () =
   assert.equal(gameFlowCanPause('paused', true), false);
 });
 
-test('pause uses a dedicated key while Escape remains a nested-menu cancel', () => {
+test('pause requires unmodified P while Escape remains a nested-menu cancel', () => {
   assert.equal(getGameFlowKeyboardAction('KeyP', 'playing'), 'pause');
   assert.equal(getGameFlowKeyboardAction('KeyP', 'paused'), 'resume');
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { shiftKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'paused', { shiftKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { altKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { ctrlKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { metaKey: true }),
+    null,
+  );
   assert.equal(getGameFlowKeyboardAction('Escape', 'paused'), null);
   assert.equal(getGameFlowKeyboardAction('Escape', 'settings'), 'back');
   assert.equal(getGameFlowKeyboardAction('Escape', 'credits'), 'back');
