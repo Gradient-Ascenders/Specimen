@@ -23,6 +23,8 @@ export interface SlimeBurstDiagnostics {
   readonly elapsedSeconds: number;
   readonly origin: THREE.Vector3;
   readonly maximumFragmentDistanceMetres: number;
+  readonly resourcesPrimed: boolean;
+  readonly resourcePrimeCount: number;
 }
 
 /**
@@ -44,10 +46,13 @@ export class SlimeBurstPresentation {
   private elapsedSeconds = 0;
   private active = false;
   private maximumFragmentDistanceMetres = 0;
+  private resourcesPrimed = false;
+  private resourcePrimeCount = 0;
 
   constructor(baseColour: THREE.ColorRepresentation = DEFAULT_SLIME_BASE_COLOUR) {
     this.root.name = 'player-slime-death-burst';
     this.root.visible = false;
+    this.geometry.name = 'player-slime-death-droplet-sphere-geometry';
 
     this.material = new THREE.MeshPhysicalMaterial({
       name: 'wet-slime-death-fragment-material',
@@ -85,13 +90,16 @@ export class SlimeBurstPresentation {
       );
     }
     if (this.fragmentMesh.instanceColor) {
+      this.fragmentMesh.instanceColor.name =
+        'player-slime-death-droplet-instance-colours';
       this.fragmentMesh.instanceColor.needsUpdate = true;
     }
+    this.fragmentMesh.instanceMatrix.name =
+      'player-slime-death-droplet-instance-transforms';
 
-    this.core = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.42, 2),
-      this.material,
-    );
+    const coreGeometry = new THREE.IcosahedronGeometry(0.42, 2);
+    coreGeometry.name = 'player-slime-death-rupture-core-geometry';
+    this.core = new THREE.Mesh(coreGeometry, this.material);
     this.core.name = 'player-slime-death-rupture-core';
     this.root.add(this.core, this.fragmentMesh);
     this.writeHiddenInstances();
@@ -103,7 +111,61 @@ export class SlimeBurstPresentation {
       elapsedSeconds: this.elapsedSeconds,
       origin: this.origin.clone(),
       maximumFragmentDistanceMetres: this.maximumFragmentDistanceMetres,
+      resourcesPrimed: this.resourcesPrimed,
+      resourcePrimeCount: this.resourcePrimeCount,
     };
+  }
+
+  /**
+   * Present only the existing burst resources to the loading renderer. The
+   * callback owns the hidden draw; gameplay state and presentation are restored
+   * even if that draw fails.
+   */
+  primeResources(
+    position: Vector3State,
+    render: (root: THREE.Object3D) => void,
+  ): boolean {
+    if (this.resourcesPrimed) return false;
+    if (this.active) {
+      throw new Error('Cannot prime slime burst resources during an active burst.');
+    }
+
+    const previousRootVisible = this.root.visible;
+    const previousRootPosition = this.root.position.clone();
+    const previousCoreVisible = this.core.visible;
+    const previousCoreScale = this.core.scale.clone();
+    const previousCoreFrustumCulled = this.core.frustumCulled;
+    const previousFragmentVisible = this.fragmentMesh.visible;
+    const previousOpacity = this.material.opacity;
+    const previousMaximumDistance = this.maximumFragmentDistanceMetres;
+    let completed = false;
+
+    try {
+      this.root.position.set(position.x, position.y, position.z);
+      this.root.visible = true;
+      this.core.visible = true;
+      this.core.scale.setScalar(1);
+      this.core.frustumCulled = false;
+      this.fragmentMesh.visible = true;
+      this.material.opacity = 1;
+      this.updateInstances(0.1);
+      render(this.root);
+      completed = true;
+      this.resourcesPrimed = true;
+      this.resourcePrimeCount += 1;
+      return true;
+    } finally {
+      this.root.visible = previousRootVisible;
+      this.root.position.copy(previousRootPosition);
+      this.core.visible = previousCoreVisible;
+      this.core.scale.copy(previousCoreScale);
+      this.core.frustumCulled = previousCoreFrustumCulled;
+      this.fragmentMesh.visible = previousFragmentVisible;
+      this.material.opacity = previousOpacity;
+      this.maximumFragmentDistanceMetres = previousMaximumDistance;
+      this.writeHiddenInstances();
+      if (!completed) this.resourcesPrimed = false;
+    }
   }
 
   start(position: Vector3State): boolean {

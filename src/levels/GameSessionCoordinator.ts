@@ -1,5 +1,6 @@
 import { EventBus } from '../core/EventBus.ts';
 import type { LoopStats } from '../core/Loop.ts';
+import type { PerformanceGameplaySnapshot } from '../core/PerformanceSnapshot.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
   type SlimeHUDListener,
@@ -18,7 +19,9 @@ export interface GameSessionEvents {
 
 export interface GameSessionCoordinatorOptions {
   readonly initialRuntime: GameLevelRuntime;
-  readonly createLevelTwo: (progression: LevelProgressionSnapshot) => GameLevelRuntime;
+  readonly createLevelTwo: (
+    progression: LevelProgressionSnapshot,
+  ) => GameLevelRuntime | Promise<GameLevelRuntime>;
   readonly scheduleTransition: (transition: () => void) => void;
 }
 
@@ -83,6 +86,10 @@ export class GameSessionCoordinator {
     return this.transitionFailed ? EMPTY_SLIME_HUD_SNAPSHOT : this.runtime.getSlimeHUDSnapshot();
   }
 
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
+    this.runtime.writePerformanceSnapshot(target);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -135,14 +142,55 @@ export class GameSessionCoordinator {
       transitionGeneration !== this.transitionGeneration
     ) return;
     const previousRuntime = this.runtime;
-    let nextRuntime: GameLevelRuntime | undefined;
 
     try {
       this.unbindRuntime();
       previousRuntime.unload();
       previousRuntime.dispose();
 
-      nextRuntime = this.createLevelTwo(progression);
+      const nextRuntime = this.createLevelTwo(progression);
+      if (isPromiseLike(nextRuntime)) {
+        void Promise.resolve(nextRuntime).then(
+          (resolvedRuntime) => this.finishLevelTwoTransition(
+            resolvedRuntime,
+            previousRuntime,
+            transitionGeneration,
+          ),
+          (error: unknown) => this.failLevelTwoTransition(
+            error,
+            previousRuntime,
+            undefined,
+            transitionGeneration,
+          ),
+        );
+        return;
+      }
+      this.finishLevelTwoTransition(
+        nextRuntime,
+        previousRuntime,
+        transitionGeneration,
+      );
+    } catch (error) {
+      this.failLevelTwoTransition(
+        error,
+        previousRuntime,
+        undefined,
+        transitionGeneration,
+      );
+    }
+  }
+
+  private finishLevelTwoTransition(
+    nextRuntime: GameLevelRuntime,
+    previousRuntime: GameLevelRuntime,
+    transitionGeneration: number,
+  ): void {
+    if (!this.isCurrentTransition(transitionGeneration)) {
+      nextRuntime.dispose();
+      return;
+    }
+
+    try {
       this.runtime = nextRuntime;
       nextRuntime.setDebugInteractionEnabled(
         this.debugInteractionEnabled && !this.transitionPending,
@@ -152,17 +200,39 @@ export class GameSessionCoordinator {
       this.transitionPending = false;
       this.events.emit('transitionCompleted', { levelId: 'level-2' });
     } catch (error) {
-      this.unbindRuntime();
-      nextRuntime?.dispose();
-      this.runtime = nextRuntime ?? previousRuntime;
-      this.transitionPending = false;
-      this.transitionFailed = true;
-      const detail = error instanceof Error ? error.message : String(error);
-      this.events.emit('transitionFailed', {
-        message: `Level 2 could not be started: ${detail}`,
-      });
-      for (const listener of this.hudListeners) listener(EMPTY_SLIME_HUD_SNAPSHOT);
+      this.failLevelTwoTransition(
+        error,
+        previousRuntime,
+        nextRuntime,
+        transitionGeneration,
+      );
     }
+  }
+
+  private failLevelTwoTransition(
+    error: unknown,
+    previousRuntime: GameLevelRuntime,
+    nextRuntime: GameLevelRuntime | undefined,
+    transitionGeneration: number,
+  ): void {
+    if (!this.isCurrentTransition(transitionGeneration)) return;
+    this.unbindRuntime();
+    nextRuntime?.dispose();
+    this.runtime = nextRuntime ?? previousRuntime;
+    this.transitionPending = false;
+    this.transitionFailed = true;
+    const detail = error instanceof Error ? error.message : String(error);
+    this.events.emit('transitionFailed', {
+      message: `Level 2 could not be started: ${detail}`,
+    });
+    for (const listener of this.hudListeners) listener(EMPTY_SLIME_HUD_SNAPSHOT);
+  }
+
+  private isCurrentTransition(transitionGeneration: number): boolean {
+    return (
+      !this.disposed && this.transitionPending &&
+      transitionGeneration === this.transitionGeneration
+    );
   }
 
   private cancelPendingTransition(): void {
@@ -171,3 +241,9 @@ export class GameSessionCoordinator {
     this.transitionGeneration += 1;
   }
 }
+
+const isPromiseLike = <Value>(
+  value: Value | Promise<Value>,
+): value is Promise<Value> => (
+  typeof value === 'object' && value !== null && 'then' in value
+);

@@ -193,18 +193,18 @@ export class SlimePairPresentation {
     slimeId: 'bob' | 'goop',
   ): void {
     const { sprite, material } = locator;
+    if (!shouldShow) {
+      if (sprite.visible) sprite.visible = false;
+      if (material.opacity !== 0) material.opacity = 0;
+      this.setLocatorDiagnostics(slimeId, false, false);
+      return;
+    }
+
     sprite.position.set(
       bodyPosition.x,
       bodyPosition.y + this.locatorHeightMetres,
       bodyPosition.z,
     );
-
-    if (!shouldShow) {
-      sprite.visible = false;
-      material.opacity = 0;
-      this.setLocatorDiagnostics(slimeId, false, false);
-      return;
-    }
 
     this.locatorTarget.copy(sprite.position);
     this.locatorDisplacement.subVectors(this.locatorTarget, camera.position);

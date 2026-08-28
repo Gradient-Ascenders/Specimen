@@ -6,6 +6,9 @@ import {
   MAX_FOLLOW_DISTANCE_METRES,
   MIN_FOLLOW_DISTANCE_METRES,
 } from '../render/CameraRig.ts';
+import {
+  isRenderPixelRatioCap,
+} from '../render/RenderResolution.ts';
 import type { SlimeHUDSnapshot } from '../slimes/SlimeHUDState.ts';
 import {
   formatPassiveInteractionStatus,
@@ -38,12 +41,22 @@ export const gameFlowCanPause = (
 
 export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
+export interface GameFlowKeyboardModifiers {
+  readonly altKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly metaKey?: boolean;
+  readonly shiftKey?: boolean;
+}
+
 export const getGameFlowKeyboardAction = (
   code: string,
   state: GameFlowState,
+  modifiers: GameFlowKeyboardModifiers = {},
 ): GameFlowKeyboardAction | null => {
-  if (code === 'KeyP' && state === 'playing') return 'pause';
-  if (code === 'KeyP' && state === 'paused') return 'resume';
+  const hasModifier = modifiers.altKey || modifiers.ctrlKey ||
+    modifiers.metaKey || modifiers.shiftKey;
+  if (!hasModifier && code === 'KeyP' && state === 'playing') return 'pause';
+  if (!hasModifier && code === 'KeyP' && state === 'paused') return 'resume';
   if (code === 'Escape' && (state === 'settings' || state === 'credits')) {
     return 'back';
   }
@@ -355,6 +368,7 @@ export class GameFlowUI {
   private readonly volumeOutput: HTMLOutputElement;
   private readonly cameraDistanceInput: HTMLInputElement;
   private readonly cameraDistanceOutput: HTMLOutputElement;
+  private readonly renderResolutionInput: HTMLSelectElement;
   private readonly slimeRoster: HTMLElement;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
@@ -400,6 +414,9 @@ export class GameFlowUI {
     );
     this.cameraDistanceOutput = this.requireElement<HTMLOutputElement>(
       '[data-setting-output="camera-distance"]',
+    );
+    this.renderResolutionInput = this.requireElement<HTMLSelectElement>(
+      '[data-setting="render-resolution"]',
     );
     this.slimeRoster = this.requireElement('[data-slime-roster]');
     this.passiveStatus = this.requireElement('[data-passive-status]');
@@ -627,6 +644,17 @@ export class GameFlowUI {
             <input id="master-volume" data-setting="volume" type="range" min="0" max="100" step="5">
             <p class="setting-note">Stored for this session. Audio output is not yet connected.</p>
           </div>
+          <div class="setting-row">
+            <div class="setting-heading">
+              <label for="render-resolution">Render resolution</label>
+            </div>
+            <select id="render-resolution" data-setting="render-resolution">
+              <option value="1">Performance — 1.0× cap</option>
+              <option value="1.5">Balanced — 1.5× cap</option>
+              <option value="2">High — 2.0× cap</option>
+            </select>
+            <p class="setting-note">Limits 3D rendering detail. Interface resolution is unchanged.</p>
+          </div>
           <button class="system-action system-back" data-action="back" data-autofocus>
             <span aria-hidden="true">←</span><span>Back</span>
           </button>
@@ -710,6 +738,11 @@ export class GameFlowUI {
     this.cameraDistanceInput.addEventListener(
       'input',
       this.onCameraDistanceInput,
+      { signal },
+    );
+    this.renderResolutionInput.addEventListener(
+      'change',
+      this.onRenderResolutionChange,
       { signal },
     );
     this.hostWindow.addEventListener('keydown', this.onKeyDown, { signal });
@@ -843,7 +876,11 @@ export class GameFlowUI {
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
-    const action = getGameFlowKeyboardAction(event.code, this.model.state);
+    const action = getGameFlowKeyboardAction(
+      event.code,
+      this.model.state,
+      event,
+    );
 
     if (action === 'pause') {
       if (!this.actions.isGameplayInputEnabled()) return;
@@ -899,6 +936,13 @@ export class GameFlowUI {
     );
   };
 
+  private readonly onRenderResolutionChange = (): void => {
+    const pixelRatioCap = Number(this.renderResolutionInput.value);
+    if (isRenderPixelRatioCap(pixelRatioCap)) {
+      this.settings.setRenderPixelRatioCap(pixelRatioCap);
+    }
+  };
+
   private readonly onSettingsChanged = (
     settings: Readonly<GameSettingsSnapshot>,
   ): void => {
@@ -927,6 +971,7 @@ export class GameFlowUI {
     );
     this.cameraDistanceOutput.value =
       `${settings.cameraDistanceMetres.toFixed(1)} m`;
+    this.renderResolutionInput.value = String(settings.renderPixelRatioCap);
     this.actions.applySettings(settings);
   };
 

@@ -18,6 +18,7 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
   for (const fixtureName of [
     'room-1-ceiling-neutral-diffuser--3.8',
     'room-1-ceiling-neutral-diffuser-3.8',
+    'room-1-to-2-duct-exit-fixture',
     'room-2-ceiling-neutral-diffuser-1',
     'room-3-ceiling-static-diffuser-1',
     'room-4-shaft-zone-2-fixture-2',
@@ -28,9 +29,20 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
 
   const initial = scene.lightingDiagnostics;
   assert.equal(initial.activeRoomId, 1);
-  assert.equal(initial.authoredLightCount, 23);
-  assert.equal(initial.visibleAuthoredLightCount, 8);
+  assert.equal(initial.authoredLightCount, 20);
+  assert.equal(initial.visibleAuthoredLightCount, 5);
   assert.equal(initial.shadowCastingLightCount, 0);
+  const roomOnePointLights: string[] = [];
+  scene.root
+    .getObjectByName('containment-room-1-lighting-rig')
+    ?.traverse((object) => {
+      if (object instanceof THREE.PointLight) roomOnePointLights.push(object.name);
+    });
+  assert.deepEqual(roomOnePointLights.sort(), [
+    'room-1-fluorescent-a-received-light',
+    'room-1-fluorescent-b-received-light',
+    'room-1-to-2-duct-reflected-cue',
+  ]);
 
   scene.lighting.setActiveRoom(3);
   const roomThree = scene.lightingDiagnostics;
@@ -58,7 +70,7 @@ test('lighting prewarm visits every room and restores the authoritative room', a
 
   assert.deepEqual(visitedRooms, [1, 2, 3, 4, 5]);
   assert.equal(scene.lightingDiagnostics.activeRoomId, 1);
-  assert.equal(scene.lightingDiagnostics.visibleAuthoredLightCount, 8);
+  assert.equal(scene.lightingDiagnostics.visibleAuthoredLightCount, 5);
 
   scene.lighting.setActiveRoom(3);
   await assert.rejects(
@@ -69,6 +81,55 @@ test('lighting prewarm visits every room and restores the authoritative room', a
   );
   assert.equal(scene.lightingDiagnostics.activeRoomId, 3);
   assert.equal(scene.lightingDiagnostics.visibleAuthoredLightCount, 5);
+
+  scene.dispose();
+});
+
+test('stable lighting does not reapply unchanged room state every fixed tick', () => {
+  const scene = createScene();
+  const initial = scene.lightingDiagnostics;
+
+  for (let tick = 0; tick < 600; tick += 1) {
+    scene.lighting.update(1 / 60);
+  }
+
+  const idle = scene.lightingDiagnostics;
+  assert.equal(
+    idle.goopStateApplicationCount,
+    initial.goopStateApplicationCount,
+  );
+  assert.equal(
+    idle.elevatorStateApplicationCount,
+    initial.elevatorStateApplicationCount,
+  );
+
+  assert.equal(scene.roomFive.beginEnding(), true);
+  scene.lighting.update(1 / 60);
+  const warning = scene.lightingDiagnostics;
+  assert.equal(
+    warning.goopStateApplicationCount,
+    idle.goopStateApplicationCount + 1,
+  );
+  scene.lighting.update(1 / 60);
+  assert.equal(
+    scene.lightingDiagnostics.goopStateApplicationCount,
+    warning.goopStateApplicationCount + 1,
+    'warning pulse remains live',
+  );
+
+  scene.roomFour.elevator.begin();
+  scene.lighting.update(1 / 60);
+  assert.equal(
+    scene.lightingDiagnostics.elevatorStateApplicationCount,
+    idle.elevatorStateApplicationCount + 1,
+  );
+  scene.roomFour.elevator.update(1 / 60, []);
+  scene.lighting.update(1 / 60);
+  assert.equal(
+    scene.lightingDiagnostics.elevatorStateApplicationCount,
+    idle.elevatorStateApplicationCount + 2,
+    'elevator warning pulse remains live',
+  );
 
   scene.dispose();
 });
@@ -261,7 +322,7 @@ test('lighting effects and attached fixtures dispose once and recreate cleanly',
   assert.equal(goopMaterialDisposals, 1);
 
   const recreated = createScene();
-  assert.equal(recreated.lightingDiagnostics.authoredLightCount, 23);
+  assert.equal(recreated.lightingDiagnostics.authoredLightCount, 20);
   assert.equal(recreated.lightingDiagnostics.activeParticleCount, 0);
   assert.equal(recreated.lightingDiagnostics.disposed, false);
   recreated.dispose();

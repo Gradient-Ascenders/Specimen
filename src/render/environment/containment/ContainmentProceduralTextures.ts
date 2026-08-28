@@ -193,11 +193,16 @@ function normalTexture(
     for (let x = 0; x < TEXTURE_SIZE; x += 1) {
       const dx = (heightAt(x + 1, y) - heightAt(x - 1, y)) * strength;
       const dy = (heightAt(x, y + 1) - heightAt(x, y - 1)) * strength;
-      const normal = new THREE.Vector3(-dx, -dy, 1).normalize();
+      // Match Vector3.normalize() with scalar arithmetic so the four normal
+      // maps do not allocate one short-lived Three.js object per texel.
+      const inverseLength = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+      const normalX = -dx * inverseLength;
+      const normalY = -dy * inverseLength;
+      const normalZ = inverseLength;
       const offset = (y * TEXTURE_SIZE + x) * 4;
-      pixels[offset] = Math.round((normal.x * 0.5 + 0.5) * 255);
-      pixels[offset + 1] = Math.round((normal.y * 0.5 + 0.5) * 255);
-      pixels[offset + 2] = Math.round((normal.z * 0.5 + 0.5) * 255);
+      pixels[offset] = Math.round((normalX * 0.5 + 0.5) * 255);
+      pixels[offset + 1] = Math.round((normalY * 0.5 + 0.5) * 255);
+      pixels[offset + 2] = Math.round((normalZ * 0.5 + 0.5) * 255);
       pixels[offset + 3] = 255;
     }
   }
@@ -455,7 +460,11 @@ function fillRect(
   for (let py = y; py < y + height; py += 1) {
     for (let px = x; px < x + width; px += 1) {
       if (px < 0 || px >= SIGN_ATLAS_WIDTH || py < 0 || py >= SIGN_ATLAS_HEIGHT) continue;
-      pixels.set(colour, (py * SIGN_ATLAS_WIDTH + px) * 4);
+      const offset = (py * SIGN_ATLAS_WIDTH + px) * 4;
+      pixels[offset] = colour[0];
+      pixels[offset + 1] = colour[1];
+      pixels[offset + 2] = colour[2];
+      pixels[offset + 3] = colour[3];
     }
   }
 }

@@ -2,7 +2,6 @@ import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
 import { Loop } from './core/Loop.ts';
-import { CultivationLevelRuntime } from './levels/CultivationLevelRuntime.ts';
 import { GameSessionCoordinator } from './levels/GameSessionCoordinator.ts';
 import { GreyboxLevelRuntime } from './levels/GreyboxLevelRuntime.ts';
 import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
@@ -21,33 +20,43 @@ if (!app) {
   throw new Error('Missing #app host element.');
 }
 
-const renderLayer = new RenderLayer({ host: app });
+const settings = new GameSettings();
+const renderLayer = new RenderLayer({
+  host: app,
+  pixelRatioCap: settings.value.renderPixelRatioCap,
+});
 const input = new Input({ pointerLockElement: renderLayer.canvas });
+const debugAvailable =
+  import.meta.env.DEV ||
+  new URLSearchParams(window.location.search).get('debug') === '1';
 const levelOneRuntime = new GreyboxLevelRuntime({
   host: app,
   input,
   renderLayer,
-  debugAvailable:
-    import.meta.env.DEV ||
-    new URLSearchParams(window.location.search).get('debug') === '1',
+  debugAvailable,
 });
 const gameSession = new GameSessionCoordinator({
   initialRuntime: levelOneRuntime,
-  createLevelTwo: (progression) =>
-    new CultivationLevelRuntime({
+  createLevelTwo: async (progression) => {
+    const [runtimeModule, debugModule] = await Promise.all([
+      import('./levels/CultivationLevelRuntime.ts'),
+      debugAvailable
+        ? import('./debug/CultivationLevelDebug.ts')
+        : Promise.resolve(undefined),
+    ]);
+    return new runtimeModule.CultivationLevelRuntime({
       host: app,
       input,
       renderLayer,
       progression,
-      debugAvailable:
-        import.meta.env.DEV ||
-        new URLSearchParams(window.location.search).get('debug') === '1',
-    }),
+      debugAvailable,
+      debugSupport: debugModule?.CULTIVATION_LEVEL_DEBUG_SUPPORT,
+    });
+  },
   scheduleTransition: (transition) => {
     requestAnimationFrame(() => transition());
   },
 });
-const settings = new GameSettings();
 const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
 const gameFlow = new GameFlowUI({
   settings,
@@ -77,16 +86,28 @@ const gameFlow = new GameFlowUI({
       renderLayer.cameraRig.setFollowDistanceMetres(
         nextSettings.cameraDistanceMetres,
       );
+      renderLayer.setPixelRatioCap(nextSettings.renderPixelRatioCap);
     },
   },
 });
+let warmedLevelOneProgramBaseline: number | undefined;
+let levelOneShaderProgramGuardActive = true;
+let sampleLevelOneShaderPrograms: (() => void) | undefined;
+let performanceRecorder:
+  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
+  | undefined;
 const unsubscribeObjectiveChanged = gameSession.events.on(
   'objectiveChanged',
   ({ objective }) => gameFlow.setObjective(objective),
 );
 const unsubscribeTransitionStarted = gameSession.events.on(
   'transitionStarted',
-  ({ message }) => gameFlow.beginLevelTransition(message),
+  ({ message }) => {
+    levelOneShaderProgramGuardActive = false;
+    sampleLevelOneShaderPrograms = undefined;
+    performanceRecorder?.completeLevelOneShaderProgramGuard();
+    gameFlow.beginLevelTransition(message);
+  },
 );
 const unsubscribeTransitionCompleted = gameSession.events.on(
   'transitionCompleted',
@@ -102,29 +123,83 @@ gameSession.load();
 
 const loop = new Loop({
   fixedUpdate: (deltaSeconds) => gameSession.fixedUpdate(deltaSeconds),
-  render: (interpolationAlpha, stats) =>
-    gameSession.render(interpolationAlpha, stats),
+  render: (interpolationAlpha, stats) => {
+    gameSession.render(interpolationAlpha, stats);
+    sampleLevelOneShaderPrograms?.();
+  },
 });
 
 let bootFrame = 0;
 let shuttingDown = false;
+if (debugAvailable) {
+  void Promise.all([
+    import('./debug/PerformanceFlightRecorder.ts'),
+    import('./debug/performance-recorder.css'),
+  ]).then(
+    ([{ PerformanceFlightRecorder }]) => {
+      if (shuttingDown) return;
+      const recorder = new PerformanceFlightRecorder({
+        host: app,
+        renderLayer,
+        gameSession,
+      });
+      performanceRecorder = recorder;
+      loop.setProfiler(recorder);
+      if (
+        levelOneShaderProgramGuardActive &&
+        warmedLevelOneProgramBaseline !== undefined
+      ) {
+        recorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline);
+        recorder.sampleLevelOneShaderPrograms();
+        sampleLevelOneShaderPrograms = () =>
+          recorder.sampleLevelOneShaderPrograms();
+      }
+    },
+    (error: unknown) => {
+      if (!shuttingDown) {
+        console.error('Performance flight recorder failed to load.', error);
+      }
+    },
+  );
+}
 const startRenderLoop = (): void => {
   if (shuttingDown) return;
   renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
   // Present authoritative Room 1 frames before the loading UI yields control.
   bootFrame = requestAnimationFrame(() => {
-    bootFrame = requestAnimationFrame(() => gameFlow.completeBoot());
+    bootFrame = requestAnimationFrame(() => {
+      warmedLevelOneProgramBaseline =
+        renderLayer.renderer.info.programs?.length ?? 0;
+      if (levelOneShaderProgramGuardActive && performanceRecorder) {
+        performanceRecorder.armLevelOneShaderProgramGuard(
+          warmedLevelOneProgramBaseline,
+        );
+        sampleLevelOneShaderPrograms = () =>
+          performanceRecorder?.sampleLevelOneShaderPrograms();
+      }
+      gameFlow.completeBoot();
+    });
   });
 };
 
 // Let the loading state paint once, then compile every Level 1 light signature
 // before normal rendering or gameplay can begin.
 bootFrame = requestAnimationFrame(() => {
-  void levelOneRuntime.prepareLightingPrograms().then(startRenderLoop, (error) => {
-    if (shuttingDown) return;
-    console.error('Containment lighting prewarm failed.', error);
-    startRenderLoop();
-  });
+  void levelOneRuntime.prepareLightingPrograms().then(
+    () => {
+      if (shuttingDown) return;
+      const verification = levelOneRuntime.levelOnePrewarmVerification;
+      if (verification) {
+        app.dataset.levelOnePrewarm = JSON.stringify(verification);
+      }
+      startRenderLoop();
+    },
+    (error) => {
+      if (shuttingDown) return;
+      console.error('Containment lighting prewarm failed.', error);
+      startRenderLoop();
+    },
+  );
 });
 
 const shutdown = (): void => {
@@ -135,6 +210,7 @@ const shutdown = (): void => {
   unsubscribeTransitionStarted();
   unsubscribeTransitionCompleted();
   unsubscribeTransitionFailed();
+  performanceRecorder?.dispose();
   gameFlow.dispose();
   gameSession.dispose();
   input.dispose();

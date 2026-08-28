@@ -2,8 +2,12 @@ import * as THREE from 'three';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import { EventBus } from '../core/EventBus.ts';
-import type { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  ColliderTransformMode,
+  type CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import type { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import {
   SecurityDrone,
   type SecurityDroneConfig,
@@ -118,6 +122,7 @@ export class CeilingSecurityDrone {
     world: CollisionWorld,
     surfaces: SurfaceRegistry,
     projectiles: DroneProjectileSystem,
+    presentationResources?: SecurityDronePresentationResources,
   ) {
     validateConfig(config, support);
     this.config = config;
@@ -131,7 +136,13 @@ export class CeilingSecurityDrone {
     this.cableAttachmentOffset.set(0, config.drone.colliderSize.y * 0.5, 0);
 
     this.root.name = `${config.drone.id}-ceiling-lifecycle`;
-    this.drone = new SecurityDrone(config.drone, world, surfaces, projectiles);
+    this.drone = new SecurityDrone(
+      config.drone,
+      world,
+      surfaces,
+      projectiles,
+      presentationResources,
+    );
     this.root.add(this.drone.root);
 
     this.mount = createProxy(
@@ -152,7 +163,11 @@ export class CeilingSecurityDrone {
     this.cable.material.metalness = 0.78;
     this.cable.visible = false;
     this.root.add(this.mount, this.cable);
-    world.register(this.mount);
+    world.register(
+      this.mount,
+      undefined,
+      ColliderTransformMode.Dynamic,
+    );
     surfaces.register(this.mount);
 
     this.radiationTarget = {
@@ -367,7 +382,11 @@ export class CeilingSecurityDrone {
     if (visible === this.cableCollisionEnabled) return;
     this.cableCollisionEnabled = visible;
     if (visible) {
-      this.world.register(this.cable);
+      this.world.register(
+        this.cable,
+        undefined,
+        ColliderTransformMode.Dynamic,
+      );
       this.surfaces.register(this.cable);
     } else {
       this.world.unregister(this.cable);

@@ -62,6 +62,9 @@ export interface GoopAcidPresentationDiagnostics {
   readonly projectileSlotCount: number;
   readonly dropletCapacity: number;
   readonly flashCapacity: number;
+  readonly corrosionUniformUpdateCount: number;
+  readonly projectileSlotUpdateCount: number;
+  readonly dropletMatrixUploadCount: number;
 }
 
 interface TargetPresentationState {
@@ -118,7 +121,9 @@ export class GoopAcidPresentation {
   private readonly source: GoopAcidPresentationSource;
   private readonly targets: readonly TargetPresentationState[];
   private readonly targetById = new Map<string, TargetPresentationState>();
+  private readonly activeTargetStates = new Set<TargetPresentationState>();
   private readonly projectileSlots: readonly ProjectilePresentationSlot[];
+  private readonly activeProjectileIndices = new Set<number>();
   private readonly unsubscribeEvents: readonly (() => void)[];
 
   private readonly coreGeometry = new THREE.SphereGeometry(0.11, 16, 10);
@@ -159,7 +164,9 @@ export class GoopAcidPresentation {
     IMPACT_DROPLET_CAPACITY,
   );
   private readonly droplets: readonly ImpactDroplet[];
+  private readonly activeDropletIndices = new Set<number>();
   private readonly flashes: readonly ImpactFlash[];
+  private readonly activeFlashes = new Set<ImpactFlash>();
   private readonly instanceObject = new THREE.Object3D();
   private readonly impactColour = new THREE.Color();
   private readonly impactDirection = new THREE.Vector3();
@@ -169,6 +176,10 @@ export class GoopAcidPresentation {
   private presentationTimeSeconds = 0;
   private nextDropletIndex = 0;
   private nextFlashIndex = 0;
+  private dropletMatricesDirty = false;
+  private corrosionUniformUpdateCount = 0;
+  private projectileSlotUpdateCount = 0;
+  private dropletMatrixUploadCount = 0;
   private suspended = false;
   private transientPresentationSuppressed = true;
   private disposed = false;
@@ -197,10 +208,16 @@ export class GoopAcidPresentation {
     this.projectileSlots = this.source.projectileStates.map(() =>
       this.createProjectileSlot(),
     );
+    for (let index = 0; index < this.source.projectileStates.length; index += 1) {
+      if (this.source.projectileStates[index]?.active) {
+        this.activeProjectileIndices.add(index);
+      }
+    }
 
     this.dropletMesh.name = 'goop-acid-impact-droplets';
     this.dropletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.dropletMesh.frustumCulled = false;
+    this.dropletMesh.count = 0;
     this.root.add(this.dropletMesh);
     this.droplets = Array.from(
       { length: IMPACT_DROPLET_CAPACITY },
@@ -213,6 +230,14 @@ export class GoopAcidPresentation {
         active: false,
       }),
     );
+    // Impacts always use per-instance colours. Reserve that eventual render
+    // state now so Level 1's hidden shader prewarm sees the same attribute
+    // signature as the first gameplay impact.
+    this.dropletMesh.setColorAt(0, this.impactColour.setHex(0xffffff));
+    if (this.dropletMesh.instanceColor) {
+      this.dropletMesh.instanceColor.needsUpdate = true;
+    }
+    this.initializeDropletMatrices();
     this.flashes = Array.from(
       { length: IMPACT_FLASH_CAPACITY },
       () => this.createImpactFlash(),
@@ -229,7 +254,8 @@ export class GoopAcidPresentation {
     options.host.append(this.crosshairElement);
 
     this.unsubscribeEvents = [
-      this.source.events.on('projectileFired', () => {
+      this.source.events.on('projectileFired', ({ projectileId }) => {
+        this.trackProjectile(projectileId);
         if (this.crosshairState !== 'hidden') {
           this.crosshairElement.classList.remove('is-firing');
           // Force a bounded CSS animation restart only at the discrete shot.
@@ -238,11 +264,13 @@ export class GoopAcidPresentation {
         }
       }),
       this.source.events.on('worldImpact', ({ projectileId, point }) => {
+        this.untrackProjectile(projectileId);
         this.spawnImpact(point, projectileId, 'world');
       }),
       this.source.events.on(
         'solubleImpact',
         ({ projectileId, targetId, point, burnStarted }) => {
+          this.untrackProjectile(projectileId);
           this.spawnImpact(
             point,
             projectileId,
@@ -257,6 +285,7 @@ export class GoopAcidPresentation {
         state.burning = true;
         state.burnStartProgress = state.target.progress;
         state.burnElapsedSeconds = 0;
+        this.activeTargetStates.add(state);
       }),
       this.source.events.on('burnCompleted', ({ targetId }) => {
         this.clearBurn(targetId);
@@ -326,7 +355,9 @@ export class GoopAcidPresentation {
       state.burnStrength = 0;
       state.target.clearCorrosionPresentation();
     }
+    this.activeTargetStates.clear();
     for (const slot of this.projectileSlots) this.hideProjectileSlot(slot);
+    this.activeProjectileIndices.clear();
     this.clearImpactEffects();
     this.transientPresentationSuppressed = true;
   }
@@ -354,11 +385,14 @@ export class GoopAcidPresentation {
       activeTrailCount: this.projectileSlots.filter(
         (slot) => slot.trail.visible,
       ).length,
-      activeDropletCount: this.droplets.filter((item) => item.active).length,
-      activeFlashCount: this.flashes.filter((item) => item.active).length,
+      activeDropletCount: this.activeDropletIndices.size,
+      activeFlashCount: this.activeFlashes.size,
       projectileSlotCount: this.projectileSlots.length,
       dropletCapacity: this.droplets.length,
       flashCapacity: this.flashes.length,
+      corrosionUniformUpdateCount: this.corrosionUniformUpdateCount,
+      projectileSlotUpdateCount: this.projectileSlotUpdateCount,
+      dropletMatrixUploadCount: this.dropletMatrixUploadCount,
     };
   }
 
@@ -388,12 +422,18 @@ export class GoopAcidPresentation {
   ): void {
     const visibleIds = this.source.aimReadModel.visibleSolubleIds;
     const selectedId = this.source.aimReadModel.targetedSolubleId;
-    for (const state of this.targets) {
+    const states: Iterable<TargetPresentationState> = aimActive
+      ? this.targets
+      : this.activeTargetStates;
+    for (const state of states) {
       const candidate =
         aimActive &&
         !state.target.completed &&
         visibleIds.includes(state.target.id);
       const selected = candidate && selectedId === state.target.id;
+      const previousAimStrength = state.aimStrength;
+      const previousSelectedStrength = state.selectedStrength;
+      const previousBurnStrength = state.burnStrength;
       state.aimStrength = approach(
         state.aimStrength,
         selected ? 1 : candidate ? CANDIDATE_HIGHLIGHT_STRENGTH : 0,
@@ -427,23 +467,44 @@ export class GoopAcidPresentation {
           )
         : 0;
       state.burnStrength = Math.min(progressFade, timeFade);
-      state.target.setCorrosionPresentation(
-        state.aimStrength,
-        state.selectedStrength,
-        state.burnStrength,
-        this.presentationTimeSeconds,
-      );
+      const visuallyActive =
+        state.aimStrength > 0 ||
+        state.selectedStrength > 0 ||
+        state.burnStrength > 0 ||
+        state.burning;
+      if (visuallyActive) this.activeTargetStates.add(state);
+      else this.activeTargetStates.delete(state);
+
+      const strengthsChanged =
+        state.aimStrength !== previousAimStrength ||
+        state.selectedStrength !== previousSelectedStrength ||
+        state.burnStrength !== previousBurnStrength;
+      const animatedUniformsActive =
+        advanceEffects &&
+        deltaSeconds > 0 &&
+        (state.selectedStrength > 0 || state.burnStrength > 0);
+      if (strengthsChanged || animatedUniformsActive) {
+        state.target.setCorrosionPresentation(
+          state.aimStrength,
+          state.selectedStrength,
+          state.burnStrength,
+          this.presentationTimeSeconds,
+        );
+        this.corrosionUniformUpdateCount += 1;
+      }
     }
   }
 
   private updateProjectiles(interpolationAlpha: number): void {
-    for (let index = 0; index < this.projectileSlots.length; index += 1) {
+    for (const index of this.activeProjectileIndices) {
       const authoritative = this.source.projectileStates[index];
       const slot = this.projectileSlots[index];
       if (!authoritative?.active || !slot) {
         if (slot) this.hideProjectileSlot(slot);
+        this.activeProjectileIndices.delete(index);
         continue;
       }
+      this.projectileSlotUpdateCount += 1;
 
       this.interpolatedPosition.set(
         THREE.MathUtils.lerp(
@@ -508,26 +569,39 @@ export class GoopAcidPresentation {
     deltaSeconds: number,
     advanceEffects: boolean,
   ): void {
-    for (let index = 0; index < this.droplets.length; index += 1) {
+    let dropletMatricesChanged = false;
+    const advanceDroplets = advanceEffects && deltaSeconds > 0;
+    for (const index of this.activeDropletIndices) {
       const droplet = this.droplets[index];
-      if (!droplet?.active) continue;
-      if (advanceEffects) {
+      if (!droplet?.active) {
+        this.activeDropletIndices.delete(index);
+        continue;
+      }
+      if (advanceDroplets) {
         droplet.ageSeconds += deltaSeconds;
         droplet.position.addScaledVector(droplet.velocity, deltaSeconds);
         droplet.velocity.y -= 4.5 * deltaSeconds;
       }
       if (droplet.ageSeconds >= droplet.lifetimeSeconds) {
         droplet.active = false;
+        this.activeDropletIndices.delete(index);
       }
       const remaining = droplet.active
         ? 1 - droplet.ageSeconds / droplet.lifetimeSeconds
         : 0;
-      this.writeDropletMatrix(index, droplet, remaining);
+      if (advanceDroplets || this.dropletMatricesDirty || !droplet.active) {
+        this.writeDropletMatrix(index, droplet, remaining);
+        dropletMatricesChanged = true;
+      }
     }
-    this.dropletMesh.instanceMatrix.needsUpdate = true;
+    this.dropletMatricesDirty = false;
+    if (dropletMatricesChanged) {
+      this.dropletMesh.instanceMatrix.needsUpdate = true;
+      this.dropletMatrixUploadCount += 1;
+    }
+    if (this.activeDropletIndices.size === 0) this.dropletMesh.count = 0;
 
-    for (const flash of this.flashes) {
-      if (!flash.active) continue;
+    for (const flash of this.activeFlashes) {
       if (advanceEffects) flash.ageSeconds += deltaSeconds;
       if (
         flash.ageSeconds >= flash.lifetimeSeconds ||
@@ -571,6 +645,7 @@ export class GoopAcidPresentation {
       this.nextDropletIndex =
         (this.nextDropletIndex + 1) % this.droplets.length;
       droplet.active = true;
+      this.activeDropletIndices.add(dropletIndex);
       droplet.ageSeconds = 0;
       droplet.lifetimeSeconds = lifetime * (0.82 + hash01(seed, index, 1) * 0.36);
       droplet.initialScale = scale * (0.75 + hash01(seed, index, 2) * 0.5);
@@ -585,6 +660,8 @@ export class GoopAcidPresentation {
       );
       this.dropletMesh.setColorAt(dropletIndex, this.impactColour);
     }
+    this.dropletMesh.count = this.droplets.length;
+    this.dropletMatricesDirty = true;
     if (this.dropletMesh.instanceColor) {
       this.dropletMesh.instanceColor.needsUpdate = true;
     }
@@ -611,6 +688,7 @@ export class GoopAcidPresentation {
     if (!flash) return;
     this.nextFlashIndex = (this.nextFlashIndex + 1) % this.flashes.length;
     flash.active = true;
+    this.activeFlashes.add(flash);
     flash.ageSeconds = 0;
     flash.lifetimeSeconds = lifetimeSeconds;
     flash.maximumScale = maximumScale;
@@ -699,11 +777,28 @@ export class GoopAcidPresentation {
     slot.trail.visible = false;
   }
 
+  private trackProjectile(projectileId: number): void {
+    const index = this.source.projectileStates.findIndex(
+      (state) => state.id === projectileId && state.active,
+    );
+    if (index >= 0) this.activeProjectileIndices.add(index);
+  }
+
+  private untrackProjectile(projectileId: number): void {
+    for (const index of this.activeProjectileIndices) {
+      if (this.source.projectileStates[index]?.id !== projectileId) continue;
+      const slot = this.projectileSlots[index];
+      if (slot) this.hideProjectileSlot(slot);
+      this.activeProjectileIndices.delete(index);
+      return;
+    }
+  }
+
   private suppressTransientPresentation(): void {
     if (this.transientPresentationSuppressed) return;
     this.transientPresentationSuppressed = true;
 
-    for (const state of this.targets) {
+    for (const state of this.activeTargetStates) {
       state.aimStrength = 0;
       state.selectedStrength = 0;
       state.burnStrength = 0;
@@ -713,26 +808,44 @@ export class GoopAcidPresentation {
         0,
         this.presentationTimeSeconds,
       );
+      this.corrosionUniformUpdateCount += 1;
+      if (!state.burning) this.activeTargetStates.delete(state);
     }
-    for (const slot of this.projectileSlots) this.hideProjectileSlot(slot);
+    for (const index of this.activeProjectileIndices) {
+      const slot = this.projectileSlots[index];
+      if (slot) this.hideProjectileSlot(slot);
+    }
     this.clearImpactEffects();
   }
 
   private clearImpactEffects(): void {
-    for (let index = 0; index < this.droplets.length; index += 1) {
+    let dropletMatricesChanged = false;
+    for (const index of this.activeDropletIndices) {
       const droplet = this.droplets[index];
       if (!droplet) continue;
       droplet.active = false;
       droplet.ageSeconds = 0;
       droplet.lifetimeSeconds = 0;
       this.writeDropletMatrix(index, droplet, 0);
-      this.dropletMesh.setColorAt(index, this.impactColour.setHex(0x000000));
+      dropletMatricesChanged = true;
+    }
+    this.activeDropletIndices.clear();
+    this.dropletMatricesDirty = false;
+    this.dropletMesh.count = 0;
+    if (dropletMatricesChanged) {
+      this.dropletMesh.instanceMatrix.needsUpdate = true;
+      this.dropletMatrixUploadCount += 1;
+    }
+    for (const flash of this.activeFlashes) this.hideFlash(flash);
+  }
+
+  private initializeDropletMatrices(): void {
+    for (let index = 0; index < this.droplets.length; index += 1) {
+      const droplet = this.droplets[index];
+      if (droplet) this.writeDropletMatrix(index, droplet, 0);
     }
     this.dropletMesh.instanceMatrix.needsUpdate = true;
-    if (this.dropletMesh.instanceColor) {
-      this.dropletMesh.instanceColor.needsUpdate = true;
-    }
-    for (const flash of this.flashes) this.hideFlash(flash);
+    this.dropletMatrixUploadCount += 1;
   }
 
   private writeDropletMatrix(
@@ -749,6 +862,7 @@ export class GoopAcidPresentation {
 
   private hideFlash(flash: ImpactFlash): void {
     flash.active = false;
+    this.activeFlashes.delete(flash);
     flash.target = undefined;
     flash.ageSeconds = 0;
     flash.material.opacity = 0;
@@ -762,6 +876,16 @@ export class GoopAcidPresentation {
     state.burnElapsedSeconds = 0;
     state.burnStartProgress = state.target.progress;
     state.burnStrength = 0;
+    state.target.setCorrosionPresentation(
+      state.aimStrength,
+      state.selectedStrength,
+      0,
+      this.presentationTimeSeconds,
+    );
+    this.corrosionUniformUpdateCount += 1;
+    if (state.aimStrength <= 0 && state.selectedStrength <= 0) {
+      this.activeTargetStates.delete(state);
+    }
   }
 
   private clearFlashesForTarget(targetId: string): void {

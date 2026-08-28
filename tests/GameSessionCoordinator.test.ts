@@ -4,6 +4,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 
 import { EventBus } from '../src/core/EventBus.ts';
+import type { PerformanceGameplaySnapshot } from '../src/core/PerformanceSnapshot.ts';
 import { CULTIVATION_FOUNDATION_MANIFEST } from '../src/levels/CultivationFoundationManifest.ts';
 import { CultivationLevelScene } from '../src/levels/CultivationLevelScene.ts';
 import { GameSessionCoordinator } from '../src/levels/GameSessionCoordinator.ts';
@@ -48,6 +49,9 @@ class MockRuntime implements GameLevelRuntime {
   }
   getSlimeHUDSnapshot() { return EMPTY_SLIME_HUD_SNAPSHOT; }
   captureProgressionSnapshot(): LevelProgressionSnapshot { return this.progression; }
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
+    target.level = this.id;
+  }
 }
 
 const progression: LevelProgressionSnapshot = {
@@ -149,6 +153,81 @@ test('a Level 2 load failure leaves a diagnosable non-running session', () => {
   assert.match(failures[0], /load failed/);
   assert.throws(() => session.restartLevel(), /failed level transition/);
   session.dispose();
+});
+
+test('an asynchronously loaded Level 2 completes through the existing transition', async () => {
+  const levelOne = new MockRuntime('level-1', progression);
+  let resolveLevelTwo!: (runtime: GameLevelRuntime) => void;
+  const levelTwoPromise = new Promise<GameLevelRuntime>((resolve) => {
+    resolveLevelTwo = resolve;
+  });
+  const completed: string[] = [];
+  const session = new GameSessionCoordinator({
+    initialRuntime: levelOne,
+    createLevelTwo: () => levelTwoPromise,
+    scheduleTransition: (transition) => transition(),
+  });
+  session.events.on('transitionCompleted', ({ levelId }) => completed.push(levelId));
+  session.load();
+  session.start();
+
+  levelOne.events.emit('completed', { levelId: 'containment', nextLevelId: 'level-2' });
+  assert.deepEqual(levelOne.calls, ['load', 'start', 'stop', 'unload', 'dispose']);
+  assert.deepEqual(completed, []);
+
+  const levelTwo = new MockRuntime('level-2', progression);
+  resolveLevelTwo(levelTwo);
+  await Promise.resolve();
+
+  assert.deepEqual(levelTwo.calls, ['load']);
+  assert.deepEqual(levelTwo.debugInteractionCalls, [false]);
+  assert.deepEqual(completed, ['level-2']);
+  assert.equal(session.state, 'stopped');
+  session.dispose();
+});
+
+test('a rejected deferred Level 2 import uses transition failure handling', async () => {
+  const levelOne = new MockRuntime('level-1', progression);
+  const failures: string[] = [];
+  const session = new GameSessionCoordinator({
+    initialRuntime: levelOne,
+    createLevelTwo: () => Promise.reject(new Error('chunk unavailable')),
+    scheduleTransition: (transition) => transition(),
+  });
+  session.events.on('transitionFailed', ({ message }) => failures.push(message));
+  session.load();
+  session.start();
+
+  levelOne.events.emit('completed', { levelId: 'containment', nextLevelId: 'level-2' });
+  await Promise.resolve();
+
+  assert.equal(session.state, 'stopped');
+  assert.match(failures[0], /chunk unavailable/);
+  assert.throws(() => session.restartLevel(), /failed level transition/);
+  session.dispose();
+});
+
+test('a deferred Level 2 runtime is disposed if the session ends while loading', async () => {
+  const levelOne = new MockRuntime('level-1', progression);
+  let resolveLevelTwo!: (runtime: GameLevelRuntime) => void;
+  const levelTwoPromise = new Promise<GameLevelRuntime>((resolve) => {
+    resolveLevelTwo = resolve;
+  });
+  const session = new GameSessionCoordinator({
+    initialRuntime: levelOne,
+    createLevelTwo: () => levelTwoPromise,
+    scheduleTransition: (transition) => transition(),
+  });
+  session.load();
+  session.start();
+  levelOne.events.emit('completed', { levelId: 'containment', nextLevelId: 'level-2' });
+  session.dispose();
+
+  const levelTwo = new MockRuntime('level-2', progression);
+  resolveLevelTwo(levelTwo);
+  await Promise.resolve();
+
+  assert.deepEqual(levelTwo.calls, ['dispose']);
 });
 
 test('unload invalidates a pending handoff even if another transition starts', () => {

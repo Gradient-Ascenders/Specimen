@@ -10,6 +10,16 @@ import { EventBus } from '../core/EventBus.ts';
 import type { Input, InputAction } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import {
+  writePerformancePosition,
+  type PerformanceGameplaySnapshot,
+} from '../core/PerformanceSnapshot.ts';
+import {
+  beginDebugPanelInspection,
+  finishDebugPanelInspection,
+  handleDebugPanelScrollKey,
+  type DebugPanelInspectionState,
+} from '../debug/DebugPanelInteraction.ts';
+import {
   GreyboxTestPanel,
   type DebugRoomId,
 } from '../debug/GreyboxTestPanel.ts';
@@ -17,6 +27,7 @@ import { runDissolveRegression } from '../debug/DissolveRegression.ts';
 import { runSlimeManagerRegression } from '../debug/SlimeManagerRegression.ts';
 import { runTwoBodySwitchingRegression } from '../debug/TwoBodySwitchingRegression.ts';
 import {
+  ColliderTransformMode,
   CollisionLayer,
   CollisionWorld,
 } from '../physics/CollisionWorld.ts';
@@ -33,6 +44,7 @@ import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
+import { renderIsolatedPrewarmResources } from '../render/IsolatedResourcePrewarm.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
 import type {
@@ -121,6 +133,28 @@ const LIGHTING_PREWARM_CAMERA_TARGETS: Readonly<
   3: [0, 10.86, 51.4],
   4: [9, 30.21, 85.5],
   5: [9, 75.21, 94],
+};
+// Distant room geometry can still enter the gameplay camera frustum and is
+// submitted with the currently active room's lights. Keep this list to the
+// exact cross-room renderables observed creating otherwise-cold programs.
+const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
+  Partial<Record<DebugRoomId, readonly string[]>>
+> = {
+  1: [
+    'room-3-first-static-laser-presentation-emitter-start-housing-collar',
+    'room-3-first-static-laser-presentation-emitter-start-active-aperture',
+  ],
+  3: ['room-2-observation-reinforced-glass'],
+  5: ['room-3-acid-surface-material-integration-point'],
+};
+// This test barrier is intentionally absent from normal production. Compile
+// it under the relevant future-room light signatures only when debug helpers
+// created it; every real production source above remains mandatory.
+const LIGHTING_PREWARM_OPTIONAL_DEVELOPMENT_RENDERABLE_NAMES: Readonly<
+  Partial<Record<DebugRoomId, readonly string[]>>
+> = {
+  2: ['room-1-goop-soluble-test-barrier'],
+  3: ['room-1-goop-soluble-test-barrier'],
 };
 
 export interface GreyboxLevelRuntimeOptions {
@@ -217,7 +251,27 @@ interface LightingPrewarmProfile {
   readonly durationMs: number;
   readonly programsBefore: number;
   readonly programsAfter: number;
+  readonly measuredFirstUseResourcePrimeDurationMs: number;
+  readonly measuredFirstUseResourcePrimeCount: number;
+  readonly measuredFirstUseResourcePrimeGeometriesBefore: number;
+  readonly measuredFirstUseResourcePrimeGeometriesAfter: number;
+  readonly measuredFirstUseResourcePrimeProgramsBefore: number;
+  readonly measuredFirstUseResourcePrimeProgramsAfter: number;
+  readonly burstResourcePrimeDurationMs: number;
+  readonly burstResourcePrimeGeometriesBefore: number;
+  readonly burstResourcePrimeGeometriesAfter: number;
+  readonly burstResourcePrimeProgramsBefore: number;
+  readonly burstResourcePrimeProgramsAfter: number;
   readonly steps: readonly LightingPrewarmStepProfile[];
+}
+
+export interface LevelOnePrewarmVerification {
+  readonly roomStepsCompleted: number;
+  readonly measuredResourceCount: number;
+  readonly measuredGeometryDelta: number;
+  readonly measuredProgramDelta: number;
+  readonly burstGeometryDelta: number;
+  readonly burstProgramDelta: number;
 }
 
 /** Concrete lifecycle and resource owner for the current Level 1 teaching grey-box. */
@@ -237,6 +291,7 @@ export class GreyboxLevelRuntime {
   private debugSampleElapsedSeconds = 0;
   private debugVisible = false;
   private debugInteractionEnabled = true;
+  private debugInspectionState: DebugPanelInspectionState | undefined;
   private slopeRegressionStatus = 'not run';
   private cameraFollowSlimeId: 'bob' | 'goop' | undefined;
   private lastDeathSlimeId: 'bob' | 'goop' | undefined;
@@ -297,6 +352,44 @@ export class GreyboxLevelRuntime {
     };
   }
 
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
+    const resources = this.resources;
+    target.level = LEVEL_ID;
+    target.room = resources?.containmentLevel.activeRoomId ?? 'unloaded';
+    target.gameplayState = resources
+      ? resources.deathSequence.state === 'playing'
+        ? resources.containmentLevel.state
+        : resources.deathSequence.state
+      : this.lifecycle.state;
+    target.cutsceneState =
+      resources?.containmentLevel.state === 'completing'
+        ? 'containment-ending'
+        : 'none';
+    target.activeSlime = resources?.slimePair.activeSlimeId ?? 'none';
+    writePerformancePosition(
+      target.cameraPosition,
+      this.renderLayer.cameraRig.camera.position,
+    );
+    if (!resources) {
+      target.bobPosition.fill(0);
+      target.goopPosition.fill(0);
+      target.collisionRegistered = 0;
+      target.collisionEligible = 0;
+      target.collisionCandidates = 0;
+      target.collisionNarrowChecks = 0;
+      return;
+    }
+    writePerformancePosition(target.bobPosition, resources.body.position);
+    writePerformancePosition(target.goopPosition, resources.goopBody.position);
+    target.collisionRegistered = resources.collisionWorld.colliderCount;
+    target.collisionEligible =
+      resources.collisionWorld.lastSweepEligibleColliderCount;
+    target.collisionCandidates =
+      resources.collisionWorld.lastSweepBroadphaseCandidateCount;
+    target.collisionNarrowChecks =
+      resources.collisionWorld.lastSweepNarrowPhaseCheckCount;
+  }
+
   private createSlimeHUDSnapshot(
     playerSwitchFeedback?: SlimePlayerSwitchFeedback,
     resetSwitchFeedback = false,
@@ -330,7 +423,7 @@ export class GreyboxLevelRuntime {
     this.lifecycle.start();
   }
 
-  /** Precompile the four distinct Containment lighting signatures while loading. */
+  /** Precompile Containment signatures and prime known cold resources while loading. */
   prepareLightingPrograms(): Promise<void> {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
@@ -338,6 +431,27 @@ export class GreyboxLevelRuntime {
     const promise = this.runLightingPrewarm(resources, generation);
     this.lightingPrewarmPromise = promise;
     return promise;
+  }
+
+  get levelOnePrewarmVerification(): LevelOnePrewarmVerification | undefined {
+    const profile = this.lightingPrewarmProfile;
+    if (!profile) return undefined;
+    return {
+      roomStepsCompleted: profile.steps.length,
+      measuredResourceCount: profile.measuredFirstUseResourcePrimeCount,
+      measuredGeometryDelta:
+        profile.measuredFirstUseResourcePrimeGeometriesAfter -
+        profile.measuredFirstUseResourcePrimeGeometriesBefore,
+      measuredProgramDelta:
+        profile.measuredFirstUseResourcePrimeProgramsAfter -
+        profile.measuredFirstUseResourcePrimeProgramsBefore,
+      burstGeometryDelta:
+        profile.burstResourcePrimeGeometriesAfter -
+        profile.burstResourcePrimeGeometriesBefore,
+      burstProgramDelta:
+        profile.burstResourcePrimeProgramsAfter -
+        profile.burstResourcePrimeProgramsBefore,
+    };
   }
 
   stop(): void {
@@ -352,6 +466,7 @@ export class GreyboxLevelRuntime {
   /** Allow the application flow to suppress level-owned diagnostics behind menus. */
   setDebugInteractionEnabled(enabled: boolean): void {
     this.debugInteractionEnabled = enabled;
+    if (!enabled && this.debugVisible) this.closeDebugInspection(false);
     const testPanel = this.resources?.testPanel;
     if (testPanel) this.applyDebugPresentation(testPanel);
   }
@@ -714,10 +829,18 @@ export class GreyboxLevelRuntime {
     this.renderLayer.scene.add(testScene.root);
 
     const collisionWorld = new CollisionWorld();
-    collisionWorld.registerAll(testScene.collisionMeshes);
+    collisionWorld.registerAll(
+      testScene.collisionMeshes,
+      undefined,
+      ColliderTransformMode.Static,
+    );
+    for (const mesh of testScene.dynamicCollisionMeshes) {
+      collisionWorld.setTransformMode(mesh, ColliderTransformMode.Dynamic);
+    }
     collisionWorld.registerAll(
       testScene.cameraObstructionMeshes,
       CollisionLayer.CameraObstruction,
+      ColliderTransformMode.Static,
     );
     const surfaceRegistry = new SurfaceRegistry();
     surfaceRegistry.registerAll(testScene.collisionMeshes);
@@ -1045,7 +1168,8 @@ export class GreyboxLevelRuntime {
     const resources = this.requireResources();
     resources.goopAcidPresentation.resume();
     this.input.setEnabled(
-      resources.deathSequence.isPlaying &&
+      !this.debugVisible &&
+        resources.deathSequence.isPlaying &&
         resources.containmentLevel.state === 'playing',
     );
     this.input.resetState();
@@ -1135,6 +1259,7 @@ export class GreyboxLevelRuntime {
     delete this.host.dataset.gameState;
     this.resources = undefined;
     this.debugVisible = false;
+    this.debugInspectionState = undefined;
     this.debugSampleElapsedSeconds = 0;
     this.landingEventCount = 0;
     this.lastLandingImpactSpeedMetresPerSecond = 0;
@@ -1268,7 +1393,8 @@ export class GreyboxLevelRuntime {
     // owns Goop. Restore that scene-owned visual to Bob's authoritative body.
     resources.testScene.finishDeath(resources.body.position);
     resources.deathScreen.hide();
-    const levelIsPlaying = resources.containmentLevel.state === 'playing';
+    const levelIsPlaying =
+      !this.debugVisible && resources.containmentLevel.state === 'playing';
     this.input.setEnabled(levelIsPlaying);
     if (levelIsPlaying) this.input.requestPointerLock();
     this.host.dataset.gameState = resources.deathSequence.state;
@@ -1421,6 +1547,8 @@ export class GreyboxLevelRuntime {
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
     const deathStats = deathSequence.diagnostics;
     const burstStats = testScene.deathBurstDiagnostics;
+    const measuredFirstUseGeometryPrimeStats =
+      testScene.measuredFirstUseGeometryPrimeDiagnostics;
     const slimeManagerStats = slimeManager.getDiagnostics();
     const slimeRoster = slimeManager.getRosterState();
     const bobDefinition = slimeManager.getDefinition('bob');
@@ -1447,6 +1575,8 @@ export class GreyboxLevelRuntime {
         `level / checkpoint: ${containmentLevel.state} / ${containmentLevel.activeCheckpointId}`,
         `last level failure / completions: ${containmentLevel.lastFailureId} / ${containmentLevel.completionCount}`,
         `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
+        `death burst resources / primes: ${burstStats.resourcesPrimed ? 'primed' : 'cold'} / ${burstStats.resourcePrimeCount}`,
+        `measured first-use geometries / primes: ${measuredFirstUseGeometryPrimeStats.resourcesPrimed ? 'primed' : 'cold'} ${measuredFirstUseGeometryPrimeStats.uniqueGeometryCount} / ${measuredFirstUseGeometryPrimeStats.resourcePrimeCount}`,
         `active slime: ${slimeManager.activeDefinition?.displayName ?? 'none'} (${slimeManagerStats.activeSlimeId ?? 'none'})`,
         `camera follow slime: ${this.cameraFollowSlimeId ?? 'none'}`,
         `last death slime: ${this.lastDeathSlimeId ?? 'none'}`,
@@ -1467,6 +1597,7 @@ export class GreyboxLevelRuntime {
         `acid presentation crosshair / highlights / selected: ${acidPresentationStats.crosshairState} / ${acidPresentationStats.highlightedTargetCount} / ${acidPresentationStats.selectedTargetCount}`,
         `acid presentation projectile / trails / droplets / flashes: ${acidPresentationStats.activeProjectileCount} / ${acidPresentationStats.activeTrailCount} / ${acidPresentationStats.activeDropletCount} / ${acidPresentationStats.activeFlashCount}`,
         `acid presentation pools projectiles / droplets / flashes / DOM: ${acidPresentationStats.projectileSlotCount} / ${acidPresentationStats.dropletCapacity} / ${acidPresentationStats.flashCapacity} / ${acidPresentationStats.crosshairElementCount}`,
+        `acid presentation work uniforms / projectile slots / droplet uploads: ${acidPresentationStats.corrosionUniformUpdateCount} / ${acidPresentationStats.projectileSlotUpdateCount} / ${acidPresentationStats.dropletMatrixUploadCount}`,
         `dissolve burns active / completed / reset: ${dissolveStats.activeBurnCount} / ${dissolveStats.completedBurnCount} / ${dissolveStats.resetBurnCount}`,
         `dissolve burn targets: ${dissolveStats.activeBurnTargetIds.join(', ') || 'none'}`,
         `dissolve progress: ${(primaryDissolveTarget.progress * 100).toFixed(0)}%`,
@@ -1514,12 +1645,13 @@ export class GreyboxLevelRuntime {
         `teaching-surface regression: ${this.slopeRegressionStatus}`,
         `two-body switching regression: ${this.twoBodySwitchingRegressionStatus}`,
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
-        `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR)`,
+        `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR, ${renderStats.pixelRatioCap.toFixed(1)}× cap)`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
         `scene objects / lights: ${renderStats.sceneObjects} / ${renderStats.sceneLights}`,
         `authored lights active / total / shadow: ${testScene.lightingDiagnostics.visibleAuthoredLightCount} / ${testScene.lightingDiagnostics.authoredLightCount} / ${testScene.lightingDiagnostics.shadowCastingLightCount}`,
         `lighting room / Bob hatch / Goop release: ${testScene.lightingDiagnostics.activeRoomId} / ${testScene.lightingDiagnostics.bobHatchState} / ${testScene.lightingDiagnostics.goopReleaseState}`,
         `lighting particles / manual release drive: ${testScene.lightingDiagnostics.activeParticleCount} / ${testScene.lightingDiagnostics.goopReleaseManuallyDriven ? 'yes' : 'no'}`,
+        `lighting state applications Goop / elevator: ${testScene.lightingDiagnostics.goopStateApplicationCount} / ${testScene.lightingDiagnostics.elevatorStateApplicationCount}`,
         `lighting transition profiles: ${JSON.stringify(this.lightingTransitionProfiles)}`,
         `lighting prewarm profile: ${JSON.stringify(this.lightingPrewarmProfile ?? null)}`,
         `unique materials / instanced meshes: ${renderStats.uniqueMaterials} / ${renderStats.instancedMeshes}`,
@@ -1532,13 +1664,42 @@ export class GreyboxLevelRuntime {
   }
 
   private readonly onDebugToggle = (event: KeyboardEvent): void => {
+    const testPanel = this.resources?.testPanel;
+    if (
+      this.debugVisible &&
+      testPanel &&
+      handleDebugPanelScrollKey(event, testPanel.element)
+    ) {
+      return;
+    }
     if (event.code !== DEBUG_TOGGLE_CODE || event.repeat) return;
     if (!this.debugInteractionEnabled) return;
     event.preventDefault();
-    const testPanel = this.resources?.testPanel;
     if (!testPanel) return;
-    this.setDebugVisible(!this.debugVisible, testPanel);
+    if (this.debugVisible) {
+      const resources = this.requireResources();
+      this.closeDebugInspection(
+        this.lifecycle.state === 'running' &&
+          resources.deathSequence.isPlaying &&
+          resources.containmentLevel.state === 'playing',
+      );
+      return;
+    }
+    if (!this.input.enabled) return;
+    this.debugInspectionState = beginDebugPanelInspection(this.input);
+    this.setDebugVisible(true, testPanel);
   };
+
+  private closeDebugInspection(restoreGameplayInput: boolean): void {
+    const state = this.debugInspectionState;
+    this.debugInspectionState = undefined;
+    const testPanel = this.resources?.testPanel;
+    if (testPanel) this.setDebugVisible(false, testPanel);
+    else this.debugVisible = false;
+    if (state) {
+      finishDebugPanelInspection(this.input, state, restoreGameplayInput);
+    }
+  }
 
   private async runLightingPrewarm(
     resources: GreyboxRuntimeResources,
@@ -1634,10 +1795,81 @@ export class GreyboxLevelRuntime {
       );
 
       if (!isCurrent()) return;
+      const roomOneTarget = LIGHTING_PREWARM_CAMERA_TARGETS[1];
+      prewarmCamera.position.set(
+        roomOneTarget[0],
+        roomOneTarget[1] + 1.2,
+        roomOneTarget[2] - 5,
+      );
+      prewarmCamera.lookAt(
+        roomOneTarget[0],
+        roomOneTarget[1] + 0.5,
+        roomOneTarget[2] + 2,
+      );
+      prewarmCamera.updateMatrixWorld();
+      const measuredFirstUseResourcePrimeGeometriesBefore =
+        renderer.info.memory.geometries;
+      const measuredFirstUseResourcePrimeProgramsBefore =
+        renderer.info.programs?.length ?? 0;
+      const measuredFirstUseResourcePrimeStarted =
+        this.hostWindow.performance.now();
+      resources.testScene.primeMeasuredFirstUseGeometryResources(
+        (measuredResources) => {
+          renderIsolatedPrewarmResources(
+            renderer,
+            this.renderLayer.scene,
+            prewarmCamera,
+            measuredResources,
+          );
+        },
+      );
+      const measuredFirstUseResourcePrimeDurationMs =
+        this.hostWindow.performance.now() -
+        measuredFirstUseResourcePrimeStarted;
+      const measuredFirstUseResourcePrimeProgramsAfter =
+        renderer.info.programs?.length ?? 0;
+      if (
+        measuredFirstUseResourcePrimeProgramsAfter !==
+        measuredFirstUseResourcePrimeProgramsBefore
+      ) {
+        throw new Error(
+          'Measured first-use geometry prewarm created a new shader program.',
+        );
+      }
+      const burstResourcePrimeGeometriesBefore =
+        renderer.info.memory.geometries;
+      const burstResourcePrimeProgramsBefore =
+        renderer.info.programs?.length ?? 0;
+      const burstResourcePrimeStarted = this.hostWindow.performance.now();
+      resources.testScene.primeDeathBurstResources((burstRoot) => {
+        renderIsolatedPrewarmResources(
+          renderer,
+          this.renderLayer.scene,
+          prewarmCamera,
+          [burstRoot],
+        );
+      });
+      const burstResourcePrimeDurationMs =
+        this.hostWindow.performance.now() - burstResourcePrimeStarted;
       this.lightingPrewarmProfile = {
         durationMs: this.hostWindow.performance.now() - started,
         programsBefore,
         programsAfter: renderer.info.programs?.length ?? 0,
+        measuredFirstUseResourcePrimeDurationMs,
+        measuredFirstUseResourcePrimeCount:
+          resources.testScene.measuredFirstUseGeometryPrimeDiagnostics
+            .resourceCount,
+        measuredFirstUseResourcePrimeGeometriesBefore,
+        measuredFirstUseResourcePrimeGeometriesAfter:
+          burstResourcePrimeGeometriesBefore,
+        measuredFirstUseResourcePrimeProgramsBefore,
+        measuredFirstUseResourcePrimeProgramsAfter,
+        burstResourcePrimeDurationMs,
+        burstResourcePrimeGeometriesBefore,
+        burstResourcePrimeGeometriesAfter: renderer.info.memory.geometries,
+        burstResourcePrimeProgramsBefore,
+        burstResourcePrimeProgramsAfter:
+          renderer.info.programs?.length ?? 0,
         steps,
       };
     } finally {
@@ -1749,17 +1981,30 @@ function createRoomCompileSubset(
   subset.name = `containment-room-${roomId}-shader-prewarm-subset`;
   const compiledSignatures = new Set<string>();
   let compiledObjects = 0;
+  const addCompileObject = (object: THREE.Object3D): void => {
+    if (!isRenderableObject(object)) return;
+    const compileSignature = compileObjectSignature(object);
+    if (compiledSignatures.has(compileSignature)) return;
+    compiledSignatures.add(compileSignature);
+    const clone = cloneCompileObject(object);
+    clone.visible = true;
+    subset.add(clone);
+    compiledObjects += 1;
+  };
   for (const source of sources) {
-    source.traverse((object) => {
-      if (!isRenderableObject(object)) return;
-      const compileSignature = compileObjectSignature(object);
-      if (compiledSignatures.has(compileSignature)) return;
-      compiledSignatures.add(compileSignature);
-      const clone = cloneCompileObject(object);
-      clone.visible = true;
-      subset.add(clone);
-      compiledObjects += 1;
-    });
+    source.traverse(addCompileObject);
+  }
+  for (
+    const name of LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES[roomId] ?? []
+  ) {
+    addCompileObject(requiredNamedObject(levelRoot, name));
+  }
+  for (
+    const name of
+      LIGHTING_PREWARM_OPTIONAL_DEVELOPMENT_RENDERABLE_NAMES[roomId] ?? []
+  ) {
+    const optionalDevelopmentObject = levelRoot.getObjectByName(name);
+    if (optionalDevelopmentObject) addCompileObject(optionalDevelopmentObject);
   }
   subset.userData.compiledObjects = compiledObjects;
   return subset;

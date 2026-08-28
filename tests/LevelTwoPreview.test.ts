@@ -20,6 +20,7 @@ import {
   createLevelTwoPreviewProgression,
 } from '../src/levels/LevelTwoPreviewProgression.ts';
 import {
+  ColliderTransformMode,
   CollisionHit,
   CollisionLayer,
   CollisionWorld,
@@ -118,6 +119,48 @@ test('Level 2 preview composes three large connected rooms with unique colliders
   assert.ok(names.includes('cultivation-room-2-to-3-bob-air-duct-ceiling'));
   assert.ok(names.includes('cultivation-room-3-final-safe-floor'));
   assert.ok(names.includes('cultivation-room-1-to-2-lab-passage-floor'));
+
+  scene.dispose();
+});
+
+test('Room 3 batches only static visuals while preserving collider identity', () => {
+  const scene = createScene();
+  const room = scene.roomThree;
+
+  assert.deepEqual(room.staticBatchDiagnostics, {
+    batchCount: 5,
+    sourceMeshCount: 44,
+    drawCallsRemoved: 39,
+    mergedGeometryCount: 5,
+  });
+  const batches = room.root.children.filter(
+    (object): object is THREE.Mesh =>
+      object instanceof THREE.Mesh &&
+      Array.isArray(object.userData.staticBatchSourceNames),
+  );
+  assert.equal(batches.length, room.staticBatchDiagnostics.batchCount);
+
+  const batchedNames = new Set<string>();
+  for (const batch of batches) {
+    for (const name of batch.userData.staticBatchSourceNames as string[]) {
+      batchedNames.add(name);
+      const collider = findCollider(scene, name);
+      assert.equal(collider.parent, room.root);
+      assert.equal(collider.visible, true);
+      assert.equal(collider.material.visible, false);
+    }
+  }
+  assert.equal(batchedNames.size, room.staticBatchDiagnostics.sourceMeshCount);
+
+  const radiation = findCollider(
+    scene,
+    'cultivation-room-3-radioactive-floor',
+  );
+  assert.equal(radiation.material.visible, true);
+  for (const cable of room.solubleTargetMeshes) {
+    assert.equal(cable.material.visible, true);
+    assert.equal(batchedNames.has(cable.name), false);
+  }
 
   scene.dispose();
 });
@@ -232,6 +275,80 @@ test('dissolving supports deterministically lands traversal platforms and reset 
   assert.equal(roomTwoDrop.state, 'suspended');
   assert.deepEqual(roomOneDrop.mesh.position.toArray(), roomOneDrop.mesh.userData.suspendedPosition);
   assert.deepEqual(roomTwoDrop.mesh.position.toArray(), roomTwoDrop.mesh.userData.suspendedPosition);
+
+  for (const target of targets) target.dispose();
+  scene.dispose();
+});
+
+test('bulk-static preview registration promotes every animated collider', () => {
+  const scene = createScene();
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  world.registerAll(
+    scene.collisionMeshes,
+    undefined,
+    ColliderTransformMode.Static,
+  );
+  for (const mesh of scene.dynamicCollisionMeshes) {
+    world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
+  }
+  surfaces.registerAll(scene.collisionMeshes);
+
+  const drops = [
+    ...scene.roomOne.platformDrops,
+    ...scene.roomTwo.blockDrops,
+  ];
+  const doors = [
+    ...scene.roomOneToTwoPassage.doors,
+    ...scene.roomTwoToThreeGoopPassage.doors,
+  ];
+  assert.deepEqual(
+    new Set(scene.dynamicCollisionMeshes),
+    new Set([
+      ...drops.map((drop) => drop.mesh),
+      ...doors.map((door) => door.collisionMesh),
+    ]),
+  );
+
+  const targets = scene.solubleTargetMeshes.map((mesh) => {
+    const target = createAuthoredDissolveTarget(mesh, world, surfaces);
+    assert.ok(target);
+    return target;
+  });
+  scene.bindDissolveTargets(targets);
+  for (const drop of drops) {
+    const target = targets.find(
+      (candidate) => candidate.id === drop.solubleTargetId,
+    );
+    assert.ok(target);
+    target.advance(target.dissolveDurationSeconds);
+  }
+
+  scene.update(1, 2, []);
+  const hit = new CollisionHit();
+  const sweepOrigin = new THREE.Vector3();
+  const sweepAcross = new THREE.Vector3(-1.5, 0, 0);
+  const expectDropCollision = (drop: (typeof drops)[number]): void => {
+    const size = drop.mesh.userData.sizeMetres as readonly number[];
+    drop.mesh.getWorldPosition(sweepOrigin);
+    sweepOrigin.x += size[0]! * 0.5 + 1;
+    assert.equal(
+      world.sweepSphere(sweepOrigin, sweepAcross, 0.2, hit),
+      true,
+    );
+    assert.equal(hit.object, drop.mesh);
+  };
+  for (const drop of drops) {
+    assert.equal(drop.state, 'landed');
+    expectDropCollision(drop);
+  }
+
+  for (const target of targets) target.reset();
+  scene.reset();
+  for (const drop of drops) {
+    assert.equal(drop.state, 'suspended');
+    expectDropCollision(drop);
+  }
 
   for (const target of targets) target.dispose();
   scene.dispose();

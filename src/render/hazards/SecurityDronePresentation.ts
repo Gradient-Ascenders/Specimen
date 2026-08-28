@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 import type {
   SecurityDroneConfig,
@@ -9,6 +10,79 @@ const MODEL_FORWARD = new THREE.Vector3(0, 0, -1);
 const MODEL_UP = new THREE.Vector3(0, 1, 0);
 const EPSILON = 1e-10;
 
+type SharedMaterialRole =
+  | 'armour'
+  | 'armourShadow'
+  | 'mechanism'
+  | 'barrel';
+
+export interface SecurityDronePresentationResourceDiagnostics {
+  readonly geometryCount: number;
+  readonly materialCount: number;
+}
+
+/** Encounter-local immutable resources shared by compatible drone visuals. */
+export class SecurityDronePresentationResources {
+  private readonly geometries = new Map<string, THREE.BufferGeometry>();
+  private readonly materials: Readonly<
+    Record<SharedMaterialRole, THREE.MeshStandardMaterial>
+  > = {
+    armour: new THREE.MeshStandardMaterial({
+      color: 0xe4e9e8,
+      roughness: 0.27,
+      metalness: 0.48,
+    }),
+    armourShadow: new THREE.MeshStandardMaterial({
+      color: 0x778389,
+      roughness: 0.38,
+      metalness: 0.72,
+    }),
+    mechanism: new THREE.MeshStandardMaterial({
+      color: 0x10171a,
+      roughness: 0.34,
+      metalness: 0.82,
+    }),
+    barrel: new THREE.MeshStandardMaterial({
+      color: 0x293338,
+      roughness: 0.24,
+      metalness: 0.9,
+    }),
+  };
+  private disposed = false;
+
+  get diagnostics(): SecurityDronePresentationResourceDiagnostics {
+    return {
+      geometryCount: this.geometries.size,
+      materialCount: Object.keys(this.materials).length,
+    };
+  }
+
+  material(role: SharedMaterialRole): THREE.MeshStandardMaterial {
+    if (this.disposed) throw new Error('Drone presentation resources are disposed.');
+    return this.materials[role];
+  }
+
+  geometry<Geometry extends THREE.BufferGeometry>(
+    key: string,
+    create: () => Geometry,
+  ): Geometry {
+    if (this.disposed) throw new Error('Drone presentation resources are disposed.');
+    const existing = this.geometries.get(key);
+    if (existing) return existing as Geometry;
+    const geometry = create();
+    this.geometries.set(key, geometry);
+    return geometry;
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    for (const geometry of this.geometries.values()) geometry.dispose();
+    for (const material of Object.values(this.materials)) material.dispose();
+    this.geometries.clear();
+    this.disposed = true;
+  }
+}
+
 /**
  * Original clean-laboratory sentry presentation for the deterministic drone.
  * Gameplay continues to use the separate invisible box collider.
@@ -18,13 +92,19 @@ export class SecurityDronePresentation {
   readonly aimHead = new THREE.Group();
   readonly eye: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
 
-  private readonly geometries = new Set<THREE.BufferGeometry>();
+  private readonly resources: SecurityDronePresentationResources;
+  private readonly ownsResources: boolean;
   private readonly materials = new Set<THREE.Material>();
   private readonly localAimDirection = new THREE.Vector3();
   private readonly defaultForward = new THREE.Vector3();
   private disposed = false;
 
-  constructor(config: SecurityDroneConfig) {
+  constructor(
+    config: SecurityDroneConfig,
+    resources?: SecurityDronePresentationResources,
+  ) {
+    this.resources = resources ?? new SecurityDronePresentationResources();
+    this.ownsResources = resources === undefined;
     this.root.name = `${config.id}-presentation`;
     this.root.userData.presentationOnly = true;
     this.aimHead.name = `${config.id}-tracking-head`;
@@ -35,28 +115,16 @@ export class SecurityDronePresentation {
     const height = config.colliderSize.y;
     const depth = config.colliderSize.z;
     const smallest = Math.min(width, height, depth);
-    const armour = this.material(new THREE.MeshStandardMaterial({
-      color: 0xe4e9e8,
-      roughness: 0.27,
-      metalness: 0.48,
-    }));
-    const armourShadow = this.material(new THREE.MeshStandardMaterial({
-      color: 0x778389,
-      roughness: 0.38,
-      metalness: 0.72,
-    }));
-    const mechanism = this.material(new THREE.MeshStandardMaterial({
-      color: 0x10171a,
-      roughness: 0.34,
-      metalness: 0.82,
-    }));
-    const barrel = this.material(new THREE.MeshStandardMaterial({
-      color: 0x293338,
-      roughness: 0.24,
-      metalness: 0.9,
-    }));
+    const dimensionsKey = `${config.type}:${width}:${height}:${depth}`;
+    const armour = this.resources.material('armour');
+    const armourShadow = this.resources.material('armourShadow');
+    const mechanism = this.resources.material('mechanism');
+    const barrel = this.resources.material('barrel');
 
-    const shellGeometry = this.geometry(new THREE.SphereGeometry(0.5, 20, 14));
+    const shellGeometry = this.resources.geometry(
+      'unit-shell',
+      () => new THREE.SphereGeometry(0.5, 20, 14),
+    );
     this.addMesh(
       this.aimHead,
       `${config.id}-armoured-shell`,
@@ -74,34 +142,69 @@ export class SecurityDronePresentation {
       [width * 0.43, height * 0.46, depth * 0.36],
     );
 
-    for (const side of [-1, 1] as const) {
-      this.addMesh(
-        this.aimHead,
-        `${config.id}-${side < 0 ? 'left' : 'right'}-gun-pod`,
+    const podGeometry = this.resources.geometry(
+      `head-pods:${dimensionsKey}`,
+      () => mergeCopies(
         shellGeometry,
-        armourShadow,
-        [side * width * 0.39, -height * 0.01, -depth * 0.06],
-        [width * 0.24, height * 0.48, depth * 0.48],
-      );
-    }
+        ([-1, 1] as const).map((side) => transform(
+          [side * width * 0.39, -height * 0.01, -depth * 0.06],
+          [0, 0, 0],
+          [width * 0.24, height * 0.48, depth * 0.48],
+        )),
+      ),
+    );
+    this.addMesh(
+      this.aimHead,
+      `${config.id}-gun-pods`,
+      podGeometry,
+      armourShadow,
+      [0, 0, 0],
+      [1, 1, 1],
+    );
 
-    const barrelGeometry = this.geometry(new THREE.CylinderGeometry(
-      smallest * 0.055,
-      smallest * 0.072,
-      depth * 0.58,
-      10,
-    ));
+    const barrelGeometry = this.resources.geometry(
+      `barrels:${dimensionsKey}`,
+      () => {
+        const source = new THREE.CylinderGeometry(
+          smallest * 0.055,
+          smallest * 0.072,
+          depth * 0.58,
+          10,
+        );
+        const merged = mergeCopies(
+          source,
+          ([-1, 1] as const).map((side) => transform(
+            [side * width * 0.36, 0, -depth * 0.48],
+            [Math.PI * 0.5, 0, 0],
+            [1, 1, 1],
+          )),
+        );
+        source.dispose();
+        return merged;
+      },
+    );
+    this.addMesh(
+      this.aimHead,
+      `${config.id}-barrels`,
+      barrelGeometry,
+      barrel,
+      [0, 0, 0],
+      [1, 1, 1],
+    );
     for (const side of [-1, 1] as const) {
-      const gun = new THREE.Mesh(barrelGeometry, barrel);
-      gun.name = `${config.id}-${side < 0 ? 'left' : 'right'}-barrel`;
-      gun.position.set(side * width * 0.36, 0, -depth * 0.48);
-      gun.rotation.x = Math.PI * 0.5;
-      gun.userData.presentationOnly = true;
-      this.aimHead.add(gun);
+      const anchor = new THREE.Object3D();
+      anchor.name = `${config.id}-${side < 0 ? 'left' : 'right'}-barrel`;
+      anchor.position.set(side * width * 0.36, 0, -depth * 0.48);
+      anchor.rotation.x = Math.PI * 0.5;
+      anchor.userData.presentationOnly = true;
+      this.aimHead.add(anchor);
     }
 
     this.eye = new THREE.Mesh(
-      this.geometry(new THREE.SphereGeometry(smallest * 0.115, 16, 10)),
+      this.resources.geometry(
+        `indicator:${smallest}`,
+        () => new THREE.SphereGeometry(smallest * 0.115, 16, 10),
+      ) as THREE.SphereGeometry,
       this.material(new THREE.MeshBasicMaterial({
         color: 0xff4057,
         toneMapped: false,
@@ -113,22 +216,10 @@ export class SecurityDronePresentation {
     this.eye.userData.droneId = config.id;
     this.aimHead.add(this.eye);
 
-    const neckGeometry = this.geometry(new THREE.CylinderGeometry(
-      smallest * 0.1,
-      smallest * 0.14,
-      height * 0.48,
-      10,
-    ));
-    const neck = new THREE.Mesh(neckGeometry, mechanism);
-    neck.name = `${config.id}-head-bearing`;
-    neck.position.y = config.type === 'ground' ? -height * 0.39 : height * 0.42;
-    neck.userData.presentationOnly = true;
-    this.root.add(neck);
-
     if (config.type === 'ground') {
-      this.buildGroundBase(config.id, width, height, depth, armourShadow, mechanism);
+      this.buildGroundBase(config.id, dimensionsKey, width, height, depth);
     } else {
-      this.buildCeilingClamp(config.id, width, height, depth, armourShadow, mechanism);
+      this.buildCeilingClamp(config.id, dimensionsKey, width, height, depth);
     }
 
     this.defaultForward.copy(config.forward).normalize();
@@ -179,108 +270,148 @@ export class SecurityDronePresentation {
     if (this.disposed) return;
     this.root.removeFromParent();
     this.root.clear();
-    for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();
-    this.geometries.clear();
     this.materials.clear();
+    if (this.ownsResources) this.resources.dispose();
     this.disposed = true;
   }
 
   private buildGroundBase(
     id: string,
+    dimensionsKey: string,
     width: number,
     height: number,
     depth: number,
-    armour: THREE.MeshStandardMaterial,
-    mechanism: THREE.MeshStandardMaterial,
   ): void {
-    const hubGeometry = this.geometry(new THREE.CylinderGeometry(
-      width * 0.16,
-      width * 0.22,
-      height * 0.18,
-      12,
-    ));
+    const hubGeometry = this.resources.geometry(
+      `ground-hub:${dimensionsKey}`,
+      () => new THREE.CylinderGeometry(
+        width * 0.16,
+        width * 0.22,
+        height * 0.18,
+        12,
+      ),
+    );
     this.addMesh(
       this.root,
       `${id}-tripod-hub`,
       hubGeometry,
-      armour,
+      this.resources.material('armourShadow'),
       [0, -height * 0.49, depth * 0.09],
       [1, 1, 1],
     );
 
-    const legGeometry = this.geometry(new THREE.CylinderGeometry(1, 1.35, 1, 8));
-    const start = new THREE.Vector3(0, -height * 0.48, depth * 0.1);
-    const endpoints = [
-      new THREE.Vector3(-width * 0.37, -height * 0.68, depth * 0.3),
-      new THREE.Vector3(width * 0.37, -height * 0.68, depth * 0.3),
-      new THREE.Vector3(0, -height * 0.68, -depth * 0.32),
-    ];
-    endpoints.forEach((end, index) => {
-      this.addRod(
-        `${id}-tripod-leg-${index + 1}`,
-        start,
-        end,
-        legGeometry,
-        mechanism,
-        Math.min(width, height, depth) * 0.055,
-      );
-    });
+    const bodyGeometry = this.resources.geometry(
+      `ground-mechanism:${dimensionsKey}`,
+      () => {
+        const neck = new THREE.CylinderGeometry(
+          Math.min(width, height, depth) * 0.1,
+          Math.min(width, height, depth) * 0.14,
+          height * 0.48,
+          10,
+        );
+        const leg = new THREE.CylinderGeometry(1, 1.35, 1, 8);
+        const parts = [
+          neck.clone().applyMatrix4(transform(
+            [0, -height * 0.39, 0],
+            [0, 0, 0],
+            [1, 1, 1],
+          )),
+        ];
+        const start = new THREE.Vector3(0, -height * 0.48, depth * 0.1);
+        for (const end of [
+          new THREE.Vector3(-width * 0.37, -height * 0.68, depth * 0.3),
+          new THREE.Vector3(width * 0.37, -height * 0.68, depth * 0.3),
+          new THREE.Vector3(0, -height * 0.68, -depth * 0.32),
+        ]) {
+          parts.push(leg.clone().applyMatrix4(rodTransform(
+            start,
+            end,
+            Math.min(width, height, depth) * 0.055,
+          )));
+        }
+        neck.dispose();
+        leg.dispose();
+        return mergeOwned(parts);
+      },
+    );
+    this.addMesh(
+      this.root,
+      `${id}-ground-mechanism`,
+      bodyGeometry,
+      this.resources.material('mechanism'),
+      [0, 0, 0],
+      [1, 1, 1],
+    );
   }
 
   private buildCeilingClamp(
     id: string,
+    dimensionsKey: string,
     width: number,
     height: number,
     depth: number,
-    armour: THREE.MeshStandardMaterial,
-    mechanism: THREE.MeshStandardMaterial,
   ): void {
-    const clampGeometry = this.geometry(new THREE.CylinderGeometry(
-      width * 0.22,
-      width * 0.15,
-      height * 0.2,
-      12,
-    ));
+    const clampGeometry = this.resources.geometry(
+      `ceiling-clamp:${dimensionsKey}`,
+      () => new THREE.CylinderGeometry(
+        width * 0.22,
+        width * 0.15,
+        height * 0.2,
+        12,
+      ),
+    );
     this.addMesh(
       this.root,
       `${id}-ceiling-clamp`,
       clampGeometry,
-      armour,
+      this.resources.material('armourShadow'),
       [0, height * 0.59, depth * 0.06],
       [1, 1, 1],
     );
-    const braceGeometry = this.geometry(new THREE.CylinderGeometry(1, 1, 1, 8));
-    const top = new THREE.Vector3(0, height * 0.56, depth * 0.06);
-    for (const side of [-1, 1] as const) {
-      this.addRod(
-        `${id}-${side < 0 ? 'left' : 'right'}-ceiling-brace`,
-        top,
-        new THREE.Vector3(side * width * 0.31, height * 0.27, depth * 0.14),
-        braceGeometry,
-        mechanism,
-        Math.min(width, height, depth) * 0.05,
-      );
-    }
-  }
 
-  private addRod(
-    name: string,
-    start: THREE.Vector3,
-    end: THREE.Vector3,
-    geometry: THREE.CylinderGeometry,
-    material: THREE.MeshStandardMaterial,
-    radius: number,
-  ): void {
-    const direction = new THREE.Vector3().subVectors(end, start);
-    const length = direction.length();
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = name;
-    mesh.position.lerpVectors(start, end, 0.5);
-    mesh.quaternion.setFromUnitVectors(MODEL_UP, direction.normalize());
-    mesh.scale.set(radius, length, radius);
-    mesh.userData.presentationOnly = true;
-    this.root.add(mesh);
+    const bodyGeometry = this.resources.geometry(
+      `ceiling-mechanism:${dimensionsKey}`,
+      () => {
+        const neck = new THREE.CylinderGeometry(
+          Math.min(width, height, depth) * 0.1,
+          Math.min(width, height, depth) * 0.14,
+          height * 0.48,
+          10,
+        );
+        const brace = new THREE.CylinderGeometry(1, 1, 1, 8);
+        const parts = [
+          neck.clone().applyMatrix4(transform(
+            [0, height * 0.42, 0],
+            [0, 0, 0],
+            [1, 1, 1],
+          )),
+        ];
+        const top = new THREE.Vector3(0, height * 0.56, depth * 0.06);
+        for (const side of [-1, 1] as const) {
+          parts.push(brace.clone().applyMatrix4(rodTransform(
+            top,
+            new THREE.Vector3(
+              side * width * 0.31,
+              height * 0.27,
+              depth * 0.14,
+            ),
+            Math.min(width, height, depth) * 0.05,
+          )));
+        }
+        neck.dispose();
+        brace.dispose();
+        return mergeOwned(parts);
+      },
+    );
+    this.addMesh(
+      this.root,
+      `${id}-ceiling-mechanism`,
+      bodyGeometry,
+      this.resources.material('mechanism'),
+      [0, 0, 0],
+      [1, 1, 1],
+    );
   }
 
   private addMesh<Geometry extends THREE.BufferGeometry>(
@@ -300,15 +431,52 @@ export class SecurityDronePresentation {
     return mesh;
   }
 
-  private geometry<Geometry extends THREE.BufferGeometry>(
-    geometry: Geometry,
-  ): Geometry {
-    this.geometries.add(geometry);
-    return geometry;
-  }
-
   private material<Material extends THREE.Material>(material: Material): Material {
     this.materials.add(material);
     return material;
   }
+}
+
+function transform(
+  position: readonly [number, number, number],
+  rotation: readonly [number, number, number],
+  scale: readonly [number, number, number],
+): THREE.Matrix4 {
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(...position),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation)),
+    new THREE.Vector3(...scale),
+  );
+}
+
+function rodTransform(
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  radius: number,
+): THREE.Matrix4 {
+  const direction = new THREE.Vector3().subVectors(end, start);
+  const length = direction.length();
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3().lerpVectors(start, end, 0.5),
+    new THREE.Quaternion().setFromUnitVectors(MODEL_UP, direction.normalize()),
+    new THREE.Vector3(radius, length, radius),
+  );
+}
+
+function mergeCopies(
+  source: THREE.BufferGeometry,
+  transforms: readonly THREE.Matrix4[],
+): THREE.BufferGeometry {
+  return mergeOwned(
+    transforms.map((matrix) => source.clone().applyMatrix4(matrix)),
+  );
+}
+
+function mergeOwned(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const merged = mergeGeometries(parts, false);
+  for (const part of parts) part.dispose();
+  if (!merged) throw new Error('Unable to merge compatible drone presentation geometry.');
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  return merged;
 }

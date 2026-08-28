@@ -2,14 +2,46 @@ import * as THREE from 'three';
 
 const AXIS_EPSILON = 1e-9;
 const CONTACT_EPSILON = 1e-7;
+const BROADPHASE_CELL_SIZE_METRES = 10;
+const MAX_GRID_CELLS_PER_COLLIDER = 256;
+
+type BroadphaseZCells = Map<number, RegisteredCollider[]>;
+type BroadphaseYCells = Map<number, BroadphaseZCells>;
+type BroadphaseGrid = Map<number, BroadphaseYCells>;
 
 interface RegisteredCollider {
   readonly mesh: THREE.Mesh;
   layerMask: number;
+  transformMode: ColliderTransformMode;
+  transformCacheValid: boolean;
   readonly localBounds: THREE.Box3;
   readonly inverseWorld: THREE.Matrix4;
   readonly normalMatrix: THREE.Matrix3;
+  readonly worldBounds: THREE.Box3;
+  readonly worldRadiusScale: THREE.Vector3;
+  minimumWorldScale: number;
+  broadphaseStamp: number;
 }
+
+export interface CollisionWorldOptions {
+  /** Disable only for exhaustive reference benchmarks and correctness tests. */
+  readonly broadphaseEnabled?: boolean;
+}
+
+export interface CollisionSweepDiagnostics {
+  readonly registeredColliders: number;
+  readonly eligibleColliders: number;
+  readonly broadphaseCandidates: number;
+  readonly narrowPhaseChecks: number;
+}
+
+export const ColliderTransformMode = {
+  Static: 'static',
+  Dynamic: 'dynamic',
+} as const;
+
+export type ColliderTransformMode =
+  (typeof ColliderTransformMode)[keyof typeof ColliderTransformMode];
 
 /**
  * Query layers for the shared authored-geometry registry.
@@ -63,12 +95,24 @@ export class CollisionHit {
  * reliable continuous collision against the authored floor, walls, ledges and
  * slope without introducing a general rigid-body physics engine.
  *
- * Mesh transforms are refreshed for every query, so authored kinematic objects
- * may move later. Non-uniform scaling is handled conservatively by expanding
- * with the smallest world scale component.
+ * Static collider transforms are cached after first use. Authored kinematic
+ * objects must be registered as dynamic so their cache is refreshed for every
+ * query. Non-uniform scaling is handled conservatively by expanding with the
+ * smallest world scale component.
+ *
+ * Static colliders are indexed in a coarse 10-metre grid that matches the
+ * authored room-scale layout. The much smaller dynamic set is refreshed and
+ * AABB-tested per query. Candidates still enter the narrow phase in registry
+ * order so equal hits retain their existing deterministic winner.
  */
 export class CollisionWorld {
   private readonly colliders: RegisteredCollider[] = [];
+  private readonly broadphaseEnabled: boolean;
+  private readonly staticBroadphaseGrid: BroadphaseGrid = new Map();
+  private readonly globalStaticColliders: RegisteredCollider[] = [];
+  private readonly staticMaximumRadiusScale = new THREE.Vector3(1, 1, 1);
+  private staticBroadphaseDirty = false;
+  private broadphaseStamp = 0;
 
   private readonly localStart = new THREE.Vector3();
   private readonly localEnd = new THREE.Vector3();
@@ -76,19 +120,30 @@ export class CollisionWorld {
   private readonly candidateNormalLocal = new THREE.Vector3();
   private readonly candidateNormalWorld = new THREE.Vector3();
   private readonly worldEnd = new THREE.Vector3();
+  private readonly sweepBounds = new THREE.Box3();
+
+  private lastEligibleColliderCount = 0;
+  private lastBroadphaseCandidateCount = 0;
+  private lastNarrowPhaseCheckCount = 0;
 
   private slabEnter = 0;
   private slabExit = 1;
   private slabUpdatedEnter = false;
   private slabNormalSign = 0;
 
+  constructor(options: CollisionWorldOptions = {}) {
+    this.broadphaseEnabled = options.broadphaseEnabled ?? true;
+  }
+
   register(
     mesh: THREE.Mesh,
     layerMask = DEFAULT_SOLID_COLLISION_LAYERS,
+    transformMode: ColliderTransformMode = ColliderTransformMode.Dynamic,
   ): void {
     if (this.colliders.some((collider) => collider.mesh === mesh)) return;
 
     this.validateLayerMask(layerMask);
+    this.validateTransformMode(transformMode);
 
     if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
     const boundingBox = mesh.geometry.boundingBox;
@@ -99,22 +154,37 @@ export class CollisionWorld {
     this.colliders.push({
       mesh,
       layerMask,
+      transformMode,
+      transformCacheValid: false,
       localBounds: boundingBox.clone(),
       inverseWorld: new THREE.Matrix4(),
       normalMatrix: new THREE.Matrix3(),
+      worldBounds: new THREE.Box3(),
+      worldRadiusScale: new THREE.Vector3(1, 1, 1),
+      minimumWorldScale: 0,
+      broadphaseStamp: 0,
     });
+    if (transformMode === ColliderTransformMode.Static) {
+      this.staticBroadphaseDirty = true;
+    }
   }
 
   registerAll(
     meshes: readonly THREE.Mesh[],
     layerMask = DEFAULT_SOLID_COLLISION_LAYERS,
+    transformMode: ColliderTransformMode = ColliderTransformMode.Dynamic,
   ): void {
-    for (const mesh of meshes) this.register(mesh, layerMask);
+    for (const mesh of meshes) this.register(mesh, layerMask, transformMode);
   }
 
   unregister(mesh: THREE.Mesh): void {
     const index = this.colliders.findIndex((collider) => collider.mesh === mesh);
-    if (index >= 0) this.colliders.splice(index, 1);
+    if (index >= 0) {
+      if (this.colliders[index]?.transformMode === ColliderTransformMode.Static) {
+        this.staticBroadphaseDirty = true;
+      }
+      this.colliders.splice(index, 1);
+    }
   }
 
   setLayerMask(mesh: THREE.Mesh, layerMask: number): void {
@@ -126,12 +196,62 @@ export class CollisionWorld {
     collider.layerMask = layerMask;
   }
 
+  /** Change how a registered collider's transform cache is maintained. */
+  setTransformMode(mesh: THREE.Mesh, transformMode: ColliderTransformMode): void {
+    this.validateTransformMode(transformMode);
+    const collider = this.getRegisteredCollider(mesh);
+    if (
+      collider.transformMode === ColliderTransformMode.Static ||
+      transformMode === ColliderTransformMode.Static
+    ) {
+      this.staticBroadphaseDirty = true;
+    }
+    collider.transformMode = transformMode;
+    collider.transformCacheValid = false;
+  }
+
+  /**
+   * Invalidate a static collider after an intentional one-off transform
+   * change. Frequently moving gameplay geometry should use Dynamic mode.
+   */
+  invalidateTransform(mesh: THREE.Mesh): void {
+    const collider = this.getRegisteredCollider(mesh);
+    collider.transformCacheValid = false;
+    if (collider.transformMode === ColliderTransformMode.Static) {
+      this.staticBroadphaseDirty = true;
+    }
+  }
+
   clear(): void {
     this.colliders.length = 0;
+    this.staticBroadphaseGrid.clear();
+    this.globalStaticColliders.length = 0;
+    this.staticBroadphaseDirty = false;
   }
 
   get colliderCount(): number {
     return this.colliders.length;
+  }
+
+  getLastSweepDiagnostics(): CollisionSweepDiagnostics {
+    return {
+      registeredColliders: this.colliders.length,
+      eligibleColliders: this.lastEligibleColliderCount,
+      broadphaseCandidates: this.lastBroadphaseCandidateCount,
+      narrowPhaseChecks: this.lastNarrowPhaseCheckCount,
+    };
+  }
+
+  get lastSweepEligibleColliderCount(): number {
+    return this.lastEligibleColliderCount;
+  }
+
+  get lastSweepBroadphaseCandidateCount(): number {
+    return this.lastBroadphaseCandidateCount;
+  }
+
+  get lastSweepNarrowPhaseCheckCount(): number {
+    return this.lastNarrowPhaseCheckCount;
   }
 
   /**
@@ -158,6 +278,7 @@ export class CollisionWorld {
 
     this.validateLayerMask(queryMask);
     outHit.reset();
+    this.resetSweepDiagnostics();
 
     if (queryMask === CollisionLayer.None) return false;
 
@@ -168,6 +289,14 @@ export class CollisionWorld {
     let closestCollider: RegisteredCollider | undefined;
 
     this.worldEnd.copy(origin).add(displacement);
+    if (this.broadphaseEnabled) {
+      this.prepareBroadphaseCandidates(
+        origin,
+        radius,
+        queryMask,
+        ignoredCollider,
+      );
+    }
 
     for (const collider of this.colliders) {
       if ((collider.layerMask & queryMask) === 0) continue;
@@ -176,20 +305,30 @@ export class CollisionWorld {
       if (mesh === ignoredCollider) continue;
       if (!mesh.visible) continue;
 
-      mesh.updateWorldMatrix(true, false);
-      collider.inverseWorld.copy(mesh.matrixWorld).invert();
-      collider.normalMatrix.getNormalMatrix(mesh.matrixWorld);
+      this.lastEligibleColliderCount += 1;
+      if (
+        this.broadphaseEnabled &&
+        collider.broadphaseStamp !== this.broadphaseStamp
+      ) {
+        continue;
+      }
+      this.lastBroadphaseCandidateCount += 1;
+
+      if (
+        !this.broadphaseEnabled &&
+        (collider.transformMode === ColliderTransformMode.Dynamic ||
+          !collider.transformCacheValid)
+      ) {
+        this.refreshTransformCache(collider);
+      }
 
       this.localStart.copy(origin).applyMatrix4(collider.inverseWorld);
       this.localEnd.copy(this.worldEnd).applyMatrix4(collider.inverseWorld);
       this.localDisplacement.subVectors(this.localEnd, this.localStart);
 
-      const worldElements = mesh.matrixWorld.elements;
-      const scaleX = Math.hypot(worldElements[0], worldElements[1], worldElements[2]);
-      const scaleY = Math.hypot(worldElements[4], worldElements[5], worldElements[6]);
-      const scaleZ = Math.hypot(worldElements[8], worldElements[9], worldElements[10]);
-      const minimumScale = Math.min(scaleX, scaleY, scaleZ);
+      const minimumScale = collider.minimumWorldScale;
       if (minimumScale <= AXIS_EPSILON) continue;
+      this.lastNarrowPhaseCheckCount += 1;
 
       // A world-space sphere transformed through non-uniform scale becomes an
       // ellipsoid. Expanding by radius / minScale is conservative and avoids
@@ -237,6 +376,193 @@ export class CollisionWorld {
     return true;
   }
 
+  private resetSweepDiagnostics(): void {
+    this.lastEligibleColliderCount = 0;
+    this.lastBroadphaseCandidateCount = 0;
+    this.lastNarrowPhaseCheckCount = 0;
+  }
+
+  private prepareBroadphaseCandidates(
+    origin: THREE.Vector3,
+    radius: number,
+    queryMask: number,
+    ignoredCollider: THREE.Mesh | undefined,
+  ): void {
+    this.advanceBroadphaseStamp();
+    this.ensureStaticBroadphase();
+
+    this.sweepBounds.min.set(
+      Math.min(origin.x, this.worldEnd.x),
+      Math.min(origin.y, this.worldEnd.y),
+      Math.min(origin.z, this.worldEnd.z),
+    );
+    this.sweepBounds.max.set(
+      Math.max(origin.x, this.worldEnd.x),
+      Math.max(origin.y, this.worldEnd.y),
+      Math.max(origin.z, this.worldEnd.z),
+    );
+
+    this.markStaticBroadphaseCandidates(radius);
+    for (const collider of this.colliders) {
+      if (collider.transformMode !== ColliderTransformMode.Dynamic) continue;
+      if ((collider.layerMask & queryMask) === 0) continue;
+      if (collider.mesh === ignoredCollider || !collider.mesh.visible) continue;
+
+      this.refreshTransformCache(collider);
+      this.refreshWorldBounds(collider);
+      if (this.intersectsExpandedSweep(collider, radius)) {
+        collider.broadphaseStamp = this.broadphaseStamp;
+      }
+    }
+  }
+
+  private advanceBroadphaseStamp(): void {
+    this.broadphaseStamp = (this.broadphaseStamp + 1) >>> 0;
+    if (this.broadphaseStamp !== 0) return;
+
+    this.broadphaseStamp = 1;
+    for (const collider of this.colliders) collider.broadphaseStamp = 0;
+  }
+
+  private ensureStaticBroadphase(): void {
+    if (!this.staticBroadphaseDirty) return;
+
+    this.staticBroadphaseGrid.clear();
+    this.globalStaticColliders.length = 0;
+    this.staticMaximumRadiusScale.set(1, 1, 1);
+    for (const collider of this.colliders) {
+      if (collider.transformMode !== ColliderTransformMode.Static) continue;
+      if (!collider.transformCacheValid) this.refreshTransformCache(collider);
+      this.refreshWorldBounds(collider);
+      this.staticMaximumRadiusScale.max(collider.worldRadiusScale);
+      this.insertStaticCollider(collider);
+    }
+    this.staticBroadphaseDirty = false;
+  }
+
+  private refreshWorldBounds(collider: RegisteredCollider): void {
+    collider.worldBounds
+      .copy(collider.localBounds)
+      .applyMatrix4(collider.mesh.matrixWorld);
+  }
+
+  private insertStaticCollider(collider: RegisteredCollider): void {
+    const minimumX = this.worldToCell(collider.worldBounds.min.x);
+    const minimumY = this.worldToCell(collider.worldBounds.min.y);
+    const minimumZ = this.worldToCell(collider.worldBounds.min.z);
+    const maximumX = this.worldToCell(collider.worldBounds.max.x);
+    const maximumY = this.worldToCell(collider.worldBounds.max.y);
+    const maximumZ = this.worldToCell(collider.worldBounds.max.z);
+    const cellCount =
+      (maximumX - minimumX + 1) *
+      (maximumY - minimumY + 1) *
+      (maximumZ - minimumZ + 1);
+
+    if (cellCount > MAX_GRID_CELLS_PER_COLLIDER) {
+      this.globalStaticColliders.push(collider);
+      return;
+    }
+
+    for (let x = minimumX; x <= maximumX; x += 1) {
+      let yCells = this.staticBroadphaseGrid.get(x);
+      if (!yCells) {
+        yCells = new Map();
+        this.staticBroadphaseGrid.set(x, yCells);
+      }
+      for (let y = minimumY; y <= maximumY; y += 1) {
+        let zCells = yCells.get(y);
+        if (!zCells) {
+          zCells = new Map();
+          yCells.set(y, zCells);
+        }
+        for (let z = minimumZ; z <= maximumZ; z += 1) {
+          let cell = zCells.get(z);
+          if (!cell) {
+            cell = [];
+            zCells.set(z, cell);
+          }
+          cell.push(collider);
+        }
+      }
+    }
+  }
+
+  private markStaticBroadphaseCandidates(radius: number): void {
+    const minimumX = this.worldToCell(
+      this.sweepBounds.min.x - radius * this.staticMaximumRadiusScale.x,
+    );
+    const minimumY = this.worldToCell(
+      this.sweepBounds.min.y - radius * this.staticMaximumRadiusScale.y,
+    );
+    const minimumZ = this.worldToCell(
+      this.sweepBounds.min.z - radius * this.staticMaximumRadiusScale.z,
+    );
+    const maximumX = this.worldToCell(
+      this.sweepBounds.max.x + radius * this.staticMaximumRadiusScale.x,
+    );
+    const maximumY = this.worldToCell(
+      this.sweepBounds.max.y + radius * this.staticMaximumRadiusScale.y,
+    );
+    const maximumZ = this.worldToCell(
+      this.sweepBounds.max.z + radius * this.staticMaximumRadiusScale.z,
+    );
+    const queryCellCount =
+      (maximumX - minimumX + 1) *
+      (maximumY - minimumY + 1) *
+      (maximumZ - minimumZ + 1);
+
+    if (queryCellCount > this.colliders.length) {
+      for (const collider of this.colliders) {
+        if (
+          collider.transformMode === ColliderTransformMode.Static &&
+          this.intersectsExpandedSweep(collider, radius)
+        ) {
+          collider.broadphaseStamp = this.broadphaseStamp;
+        }
+      }
+      return;
+    }
+
+    for (const collider of this.globalStaticColliders) {
+      collider.broadphaseStamp = this.broadphaseStamp;
+    }
+    for (let x = minimumX; x <= maximumX; x += 1) {
+      const yCells = this.staticBroadphaseGrid.get(x);
+      if (!yCells) continue;
+      for (let y = minimumY; y <= maximumY; y += 1) {
+        const zCells = yCells.get(y);
+        if (!zCells) continue;
+        for (let z = minimumZ; z <= maximumZ; z += 1) {
+          const cell = zCells.get(z);
+          if (!cell) continue;
+          for (const collider of cell) {
+            collider.broadphaseStamp = this.broadphaseStamp;
+          }
+        }
+      }
+    }
+  }
+
+  private worldToCell(coordinate: number): number {
+    return Math.floor(coordinate / BROADPHASE_CELL_SIZE_METRES);
+  }
+
+  private intersectsExpandedSweep(
+    collider: RegisteredCollider,
+    radius: number,
+  ): boolean {
+    const bounds = collider.worldBounds;
+    const radiusScale = collider.worldRadiusScale;
+    return (
+      bounds.max.x + radius * radiusScale.x >= this.sweepBounds.min.x &&
+      bounds.min.x - radius * radiusScale.x <= this.sweepBounds.max.x &&
+      bounds.max.y + radius * radiusScale.y >= this.sweepBounds.min.y &&
+      bounds.min.y - radius * radiusScale.y <= this.sweepBounds.max.y &&
+      bounds.max.z + radius * radiusScale.z >= this.sweepBounds.min.z &&
+      bounds.min.z - radius * radiusScale.z <= this.sweepBounds.max.z
+    );
+  }
+
   private isBroadVerticalPanelFace(collider: RegisteredCollider): boolean {
     if (Math.abs(this.candidateNormalWorld.y) > 0.5) return false;
 
@@ -256,9 +582,61 @@ export class CollisionWorld {
     return Math.abs(this.candidateNormalLocal.z) > 0.5;
   }
 
+  private refreshTransformCache(collider: RegisteredCollider): void {
+    const mesh = collider.mesh;
+    mesh.updateWorldMatrix(true, false);
+    collider.inverseWorld.copy(mesh.matrixWorld).invert();
+    collider.normalMatrix.getNormalMatrix(mesh.matrixWorld);
+
+    const worldElements = mesh.matrixWorld.elements;
+    const scaleX = Math.hypot(worldElements[0], worldElements[1], worldElements[2]);
+    const scaleY = Math.hypot(worldElements[4], worldElements[5], worldElements[6]);
+    const scaleZ = Math.hypot(worldElements[8], worldElements[9], worldElements[10]);
+    collider.minimumWorldScale = Math.min(scaleX, scaleY, scaleZ);
+    // The exact solver expands the local box by radius / minScale. Preserve
+    // that conservative behaviour in the world-space broadphase, including
+    // the extra reach introduced by rotation and non-uniform scale.
+    if (collider.minimumWorldScale <= AXIS_EPSILON) {
+      collider.worldRadiusScale.set(0, 0, 0);
+    } else {
+      collider.worldRadiusScale.set(
+        (Math.abs(worldElements[0]) +
+          Math.abs(worldElements[4]) +
+          Math.abs(worldElements[8])) /
+          collider.minimumWorldScale,
+        (Math.abs(worldElements[1]) +
+          Math.abs(worldElements[5]) +
+          Math.abs(worldElements[9])) /
+          collider.minimumWorldScale,
+        (Math.abs(worldElements[2]) +
+          Math.abs(worldElements[6]) +
+          Math.abs(worldElements[10])) /
+          collider.minimumWorldScale,
+      );
+    }
+    collider.transformCacheValid = true;
+  }
+
+  private getRegisteredCollider(mesh: THREE.Mesh): RegisteredCollider {
+    const collider = this.colliders.find((candidate) => candidate.mesh === mesh);
+    if (!collider) {
+      throw new Error(`Collider ${mesh.name || '<unnamed>'} is not registered.`);
+    }
+    return collider;
+  }
+
   private validateLayerMask(layerMask: number): void {
     if (!Number.isInteger(layerMask) || layerMask < 0) {
       throw new Error('Collision layer mask must be a non-negative integer.');
+    }
+  }
+
+  private validateTransformMode(transformMode: string): void {
+    if (
+      transformMode !== ColliderTransformMode.Static &&
+      transformMode !== ColliderTransformMode.Dynamic
+    ) {
+      throw new Error(`Unknown collider transform mode "${transformMode}".`);
     }
   }
 
