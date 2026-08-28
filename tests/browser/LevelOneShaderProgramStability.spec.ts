@@ -8,6 +8,21 @@ interface AcidPresentationSample {
   readonly dropletUploads: number;
 }
 
+interface LightingPrewarmProfile {
+  readonly measuredFirstUseResourcePrimeDurationMs: number;
+  readonly measuredFirstUseResourcePrimeCount: number;
+  readonly measuredFirstUseResourcePrimeGeometriesBefore: number;
+  readonly measuredFirstUseResourcePrimeGeometriesAfter: number;
+  readonly measuredFirstUseResourcePrimeProgramsBefore: number;
+  readonly measuredFirstUseResourcePrimeProgramsAfter: number;
+}
+
+const parseLightingPrewarmProfile = (text: string): LightingPrewarmProfile => {
+  const match = text.match(/lighting prewarm profile: (\{[^\n]+\})/);
+  expect(match, 'Missing lighting prewarm profile').not.toBeNull();
+  return JSON.parse(match?.[1] ?? '{}') as LightingPrewarmProfile;
+};
+
 const toggleDebugPanel = async (page: Page): Promise<void> => {
   await page.keyboard.press('F2');
 };
@@ -167,6 +182,25 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   await toggleDebugPanel(page);
   const diagnostics = page.locator(RUNTIME_DIAGNOSTICS_SELECTOR);
   await expect(diagnostics).toBeVisible();
+  await expect.poll(
+    async () => (await diagnostics.textContent()) ?? '',
+    { message: 'Waiting for measured resource prewarm diagnostics' },
+  ).toContain('measured first-use geometries / primes: primed 23 / 1');
+  const prewarmProfile = parseLightingPrewarmProfile(
+    (await diagnostics.textContent()) ?? '',
+  );
+  expect(prewarmProfile.measuredFirstUseResourcePrimeCount).toBe(23);
+  expect(
+    prewarmProfile.measuredFirstUseResourcePrimeGeometriesAfter -
+      prewarmProfile.measuredFirstUseResourcePrimeGeometriesBefore,
+    'The hidden prewarm did not make all 23 measured geometries resident',
+  ).toBe(23);
+  expect(prewarmProfile.measuredFirstUseResourcePrimeProgramsAfter).toBe(
+    prewarmProfile.measuredFirstUseResourcePrimeProgramsBefore,
+  );
+  expect(
+    prewarmProfile.measuredFirstUseResourcePrimeDurationMs,
+  ).toBeGreaterThanOrEqual(0);
   await expect.poll(
     async () => (await diagnostics.textContent()) ?? '',
     { message: 'Waiting for burst resource prewarm diagnostics' },

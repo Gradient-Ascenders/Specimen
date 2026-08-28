@@ -44,6 +44,7 @@ import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { BlobFacing } from '../render/BlobFacing.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
+import { renderIsolatedPrewarmResources } from '../render/IsolatedResourcePrewarm.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
 import type {
@@ -245,6 +246,12 @@ interface LightingPrewarmProfile {
   readonly durationMs: number;
   readonly programsBefore: number;
   readonly programsAfter: number;
+  readonly measuredFirstUseResourcePrimeDurationMs: number;
+  readonly measuredFirstUseResourcePrimeCount: number;
+  readonly measuredFirstUseResourcePrimeGeometriesBefore: number;
+  readonly measuredFirstUseResourcePrimeGeometriesAfter: number;
+  readonly measuredFirstUseResourcePrimeProgramsBefore: number;
+  readonly measuredFirstUseResourcePrimeProgramsAfter: number;
   readonly burstResourcePrimeDurationMs: number;
   readonly burstResourcePrimeGeometriesBefore: number;
   readonly burstResourcePrimeGeometriesAfter: number;
@@ -1505,6 +1512,8 @@ export class GreyboxLevelRuntime {
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
     const deathStats = deathSequence.diagnostics;
     const burstStats = testScene.deathBurstDiagnostics;
+    const measuredFirstUseGeometryPrimeStats =
+      testScene.measuredFirstUseGeometryPrimeDiagnostics;
     const slimeManagerStats = slimeManager.getDiagnostics();
     const slimeRoster = slimeManager.getRosterState();
     const bobDefinition = slimeManager.getDefinition('bob');
@@ -1532,6 +1541,7 @@ export class GreyboxLevelRuntime {
         `last level failure / completions: ${containmentLevel.lastFailureId} / ${containmentLevel.completionCount}`,
         `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
         `death burst resources / primes: ${burstStats.resourcesPrimed ? 'primed' : 'cold'} / ${burstStats.resourcePrimeCount}`,
+        `measured first-use geometries / primes: ${measuredFirstUseGeometryPrimeStats.resourcesPrimed ? 'primed' : 'cold'} ${measuredFirstUseGeometryPrimeStats.uniqueGeometryCount} / ${measuredFirstUseGeometryPrimeStats.resourcePrimeCount}`,
         `active slime: ${slimeManager.activeDefinition?.displayName ?? 'none'} (${slimeManagerStats.activeSlimeId ?? 'none'})`,
         `camera follow slime: ${this.cameraFollowSlimeId ?? 'none'}`,
         `last death slime: ${this.lastDeathSlimeId ?? 'none'}`,
@@ -1762,17 +1772,46 @@ export class GreyboxLevelRuntime {
         roomOneTarget[2] + 2,
       );
       prewarmCamera.updateMatrixWorld();
+      const measuredFirstUseResourcePrimeGeometriesBefore =
+        renderer.info.memory.geometries;
+      const measuredFirstUseResourcePrimeProgramsBefore =
+        renderer.info.programs?.length ?? 0;
+      const measuredFirstUseResourcePrimeStarted =
+        this.hostWindow.performance.now();
+      resources.testScene.primeMeasuredFirstUseGeometryResources(
+        (measuredResources) => {
+          renderIsolatedPrewarmResources(
+            renderer,
+            this.renderLayer.scene,
+            prewarmCamera,
+            measuredResources,
+          );
+        },
+      );
+      const measuredFirstUseResourcePrimeDurationMs =
+        this.hostWindow.performance.now() -
+        measuredFirstUseResourcePrimeStarted;
+      const measuredFirstUseResourcePrimeProgramsAfter =
+        renderer.info.programs?.length ?? 0;
+      if (
+        measuredFirstUseResourcePrimeProgramsAfter !==
+        measuredFirstUseResourcePrimeProgramsBefore
+      ) {
+        throw new Error(
+          'Measured first-use geometry prewarm created a new shader program.',
+        );
+      }
       const burstResourcePrimeGeometriesBefore =
         renderer.info.memory.geometries;
       const burstResourcePrimeProgramsBefore =
         renderer.info.programs?.length ?? 0;
       const burstResourcePrimeStarted = this.hostWindow.performance.now();
       resources.testScene.primeDeathBurstResources((burstRoot) => {
-        renderIsolatedPrewarmResource(
+        renderIsolatedPrewarmResources(
           renderer,
           this.renderLayer.scene,
           prewarmCamera,
-          burstRoot,
+          [burstRoot],
         );
       });
       const burstResourcePrimeDurationMs =
@@ -1781,6 +1820,15 @@ export class GreyboxLevelRuntime {
         durationMs: this.hostWindow.performance.now() - started,
         programsBefore,
         programsAfter: renderer.info.programs?.length ?? 0,
+        measuredFirstUseResourcePrimeDurationMs,
+        measuredFirstUseResourcePrimeCount:
+          resources.testScene.measuredFirstUseGeometryPrimeDiagnostics
+            .resourceCount,
+        measuredFirstUseResourcePrimeGeometriesBefore,
+        measuredFirstUseResourcePrimeGeometriesAfter:
+          burstResourcePrimeGeometriesBefore,
+        measuredFirstUseResourcePrimeProgramsBefore,
+        measuredFirstUseResourcePrimeProgramsAfter,
         burstResourcePrimeDurationMs,
         burstResourcePrimeGeometriesBefore,
         burstResourcePrimeGeometriesAfter: renderer.info.memory.geometries,
@@ -1821,44 +1869,6 @@ export class GreyboxLevelRuntime {
       throw new Error('Teaching level resources are not loaded.');
     }
     return this.resources;
-  }
-}
-
-const ISOLATED_RESOURCE_PREWARM_LAYER = 31;
-
-function renderIsolatedPrewarmResource(
-  renderer: THREE.WebGLRenderer,
-  scene: THREE.Scene,
-  camera: THREE.Camera,
-  resourceRoot: THREE.Object3D,
-): void {
-  const previousCameraLayers = camera.layers.mask;
-  const previousResourceLayers = new Map<THREE.Object3D, number>();
-  const previousLightLayers = new Map<THREE.Light, number>();
-
-  resourceRoot.traverse((object) => {
-    previousResourceLayers.set(object, object.layers.mask);
-    object.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
-  });
-  scene.traverseVisible((object) => {
-    if (!(object instanceof THREE.Light) || !object.layers.test(camera.layers)) {
-      return;
-    }
-    previousLightLayers.set(object, object.layers.mask);
-    object.layers.enable(ISOLATED_RESOURCE_PREWARM_LAYER);
-  });
-  camera.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
-
-  try {
-    renderer.render(scene, camera);
-  } finally {
-    camera.layers.mask = previousCameraLayers;
-    for (const [object, layers] of previousResourceLayers) {
-      object.layers.mask = layers;
-    }
-    for (const [light, layers] of previousLightLayers) {
-      light.layers.mask = layers;
-    }
   }
 }
 

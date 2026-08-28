@@ -28,6 +28,57 @@ export type ContainmentHazardFailure =
   | RoomFourHazardFailure
   | RoomFiveHazardFailure;
 
+/**
+ * Exact first-use geometry owners measured on Intel Iris Xe / ANGLE D3D11.
+ *
+ * Event A was the 354 -> 361 upload batch and Event B was the 444 -> 460
+ * batch in the authoritative DPR1 production trace. Keep this allowlist
+ * explicit: additions require another physical-Iris first-use measurement.
+ */
+export const MEASURED_FIRST_USE_GEOMETRY_OWNER_NAMES = {
+  eventA: [
+    'room-2-upper-step-b-durable-composite-tread',
+    'room-2-production-art-static-batch-16',
+    'duct-segment-c-floor-main',
+    'duct-final-run-floor',
+    'room-2-upper-longitudinal-service-spine',
+    'room-2-production-art-static-batch-17',
+    'room-2-upper-step-b-restrained-safety-inlays',
+  ],
+  eventB: [
+    'room-3-panel-east-upper-entry',
+    'room-1-containment-overhead-service-coupler',
+    'room-2-panel-east-upper-south',
+    'room-2-production-art-static-batch-14',
+    'room-3-production-art-static-batch-18',
+    'room-3-production-art-static-batch-20',
+    'room-1-production-art-static-batch-1',
+    'room-2-production-art-static-batch-15',
+    'room-3-production-art-static-batch-19',
+    'room-3-production-art-static-batch-21',
+    'room-4-north-recessed-ventilation-module',
+    'room-1-vent-route-identifier-backing',
+    'room-2-ascent-route-identifier-backing',
+    'room-1-vent-route-identifier',
+    'room-2-ascent-route-identifier',
+    'room-3-production-art-static-batch-28',
+  ],
+} as const;
+
+const MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST = [
+  ...MEASURED_FIRST_USE_GEOMETRY_OWNER_NAMES.eventA,
+  ...MEASURED_FIRST_USE_GEOMETRY_OWNER_NAMES.eventB,
+] as const;
+
+export interface MeasuredFirstUseGeometryPrimeDiagnostics {
+  readonly ownerNames: readonly string[];
+  readonly resourceCount: number;
+  readonly uniqueGeometryCount: number;
+  readonly instancedResourceCount: number;
+  readonly resourcesPrimed: boolean;
+  readonly resourcePrimeCount: number;
+}
+
 // These static meshes are intentionally discoverable by authored-name checks
 // and visual/collider alignment diagnostics. Keeping them separate costs only
 // a handful of calls while preserving their inspectable identity.
@@ -106,6 +157,9 @@ export class ContainmentLevelScene {
   readonly lighting: ContainmentLightingRig;
   readonly staticBatchDiagnostics: readonly ContainmentStaticBatchDiagnostics[];
   private readonly staticBatches: readonly ContainmentStaticBatchResult[];
+  private readonly measuredFirstUseGeometryResources: readonly THREE.Mesh[];
+  private measuredFirstUseGeometryResourcesPrimed = false;
+  private measuredFirstUseGeometryResourcePrimeCount = 0;
 
   constructor(
     requestHazardFailure: (failure: ContainmentHazardFailure) => void,
@@ -154,6 +208,8 @@ export class ContainmentLevelScene {
     this.staticBatchDiagnostics = this.staticBatches.map(
       ({ diagnostics }) => diagnostics,
     );
+    this.measuredFirstUseGeometryResources =
+      resolveMeasuredFirstUseGeometryResources(this.root);
   }
 
   /** Small #38-facing API; callers never need individual fixture objects. */
@@ -206,6 +262,31 @@ export class ContainmentLevelScene {
 
   get deathBurstDiagnostics(): SlimeBurstDiagnostics {
     return this.teaching.deathBurstDiagnostics;
+  }
+
+  get measuredFirstUseGeometryPrimeDiagnostics(): MeasuredFirstUseGeometryPrimeDiagnostics {
+    return {
+      ownerNames: MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST,
+      resourceCount: this.measuredFirstUseGeometryResources.length,
+      uniqueGeometryCount: new Set(
+        this.measuredFirstUseGeometryResources.map(({ geometry }) => geometry),
+      ).size,
+      instancedResourceCount: this.measuredFirstUseGeometryResources.filter(
+        (resource) => resource instanceof THREE.InstancedMesh,
+      ).length,
+      resourcesPrimed: this.measuredFirstUseGeometryResourcesPrimed,
+      resourcePrimeCount: this.measuredFirstUseGeometryResourcePrimeCount,
+    };
+  }
+
+  primeMeasuredFirstUseGeometryResources(
+    render: (resources: readonly THREE.Mesh[]) => void,
+  ): boolean {
+    if (this.measuredFirstUseGeometryResourcesPrimed) return false;
+    render(this.measuredFirstUseGeometryResources);
+    this.measuredFirstUseGeometryResourcesPrimed = true;
+    this.measuredFirstUseGeometryResourcePrimeCount += 1;
+    return true;
   }
 
   primeDeathBurstResources(
@@ -301,4 +382,29 @@ export class ContainmentLevelScene {
     this.root.removeFromParent();
     this.root.clear();
   }
+}
+
+function resolveMeasuredFirstUseGeometryResources(
+  root: THREE.Object3D,
+): readonly THREE.Mesh[] {
+  const resources = MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST.map((name) => {
+    const object = root.getObjectByName(name);
+    if (!(object instanceof THREE.Mesh)) {
+      throw new Error(
+        `Measured first-use geometry owner is missing or not renderable: ${name}`,
+      );
+    }
+    return object;
+  });
+  const uniqueResources = new Set(resources);
+  const uniqueGeometries = new Set(resources.map(({ geometry }) => geometry));
+  if (
+    uniqueResources.size !== MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST.length ||
+    uniqueGeometries.size !== MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST.length
+  ) {
+    throw new Error(
+      'Measured first-use geometry allowlist must resolve to 23 unique owners and GPU geometries.',
+    );
+  }
+  return resources;
 }
