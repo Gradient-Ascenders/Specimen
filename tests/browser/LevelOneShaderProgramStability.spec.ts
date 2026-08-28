@@ -26,6 +26,31 @@ interface LevelOnePrewarmVerification {
   readonly burstProgramDelta: number;
 }
 
+interface ProductionTraversalRuntime {
+  readonly resources?: {
+    readonly body: { readonly position: unknown };
+    readonly slimePair: { readonly activeBody: unknown };
+    readonly containmentLevel: {
+      setActiveBody(body: unknown): void;
+      teleportToRoomForDebug(roomId: number): void;
+    };
+    readonly blobFacing: { reset(): void };
+    readonly testScene: { setProbePosition(position: unknown): void };
+    readonly acidProjectileSystem: {
+      getDiagnostics(): {
+        readonly solubleImpactCount: number;
+        readonly worldImpactCount: number;
+      };
+    };
+    readonly goopAcidPresentation: {
+      getDiagnostics(): { readonly dropletMatrixUploadCount: number };
+    };
+  };
+  syncContextualCamera(resources: unknown): void;
+}
+
+type AssertProgramsStable = (label: string) => Promise<void>;
+
 const parseLightingPrewarmProfile = (text: string): LightingPrewarmProfile => {
   const match = text.match(/lighting prewarm profile: (\{[^\n]+\})/);
   expect(match, 'Missing lighting prewarm profile').not.toBeNull();
@@ -67,6 +92,41 @@ const readCreatedProgramCount = async (page: Page): Promise<number> =>
       ).__specimenCreatedWebGlProgramCount ?? 0,
   );
 
+const exposeProductionTraversalRuntime = async (
+  page: Page,
+): Promise<() => void> => {
+  // Plain production intentionally has no debug panel. Expose the already
+  // constructed runtime only in the served test bundle so the shared traversal
+  // can use its normal checkpoint recovery without enabling debug helpers.
+  let injectedBundleCount = 0;
+  await page.route('**/assets/index-*.js', async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    const prewarmCall =
+      /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
+    const match = body.match(prewarmCall);
+    if (!match?.[1]) {
+      await route.fulfill({ response, body });
+      return;
+    }
+
+    const runtimeIdentifier = match[1];
+    const instrumentedBody = body.replace(
+      prewarmCall,
+      `(globalThis.__specimenProductionTraversalRuntime=${runtimeIdentifier},${runtimeIdentifier}.prepareLightingPrograms()).then(`,
+    );
+    injectedBundleCount += 1;
+    await route.fulfill({ response, body: instrumentedBody });
+  });
+
+  return () => {
+    expect(
+      injectedBundleCount,
+      'The plain-production traversal runtime was not exposed exactly once',
+    ).toBe(1);
+  };
+};
+
 const readStableGuard = async (
   page: Page,
   label: string,
@@ -88,13 +148,29 @@ const readStableGuard = async (
 };
 
 const visitRoom = async (page: Page, room: number): Promise<void> => {
-  await page.evaluate((roomId) => {
-    const button = document.querySelector<HTMLButtonElement>(
-      `[data-action="room-teleport"][data-room-id="${roomId}"]`,
-    );
-    if (!button) throw new Error(`Missing Room ${roomId} debug teleport`);
-    button.click();
-  }, room);
+  const debugTeleport = page.locator(
+    `[data-action="room-teleport"][data-room-id="${room}"]`,
+  );
+  if ((await debugTeleport.count()) > 0) {
+    await debugTeleport.evaluate((button: HTMLButtonElement) => button.click());
+  } else {
+    await page.evaluate((roomId) => {
+      const runtime = (
+        window as Window & {
+          __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+        }
+      ).__specimenProductionTraversalRuntime;
+      const resources = runtime?.resources;
+      if (!runtime || !resources) {
+        throw new Error('Missing plain-production traversal runtime');
+      }
+      resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
+      resources.containmentLevel.teleportToRoomForDebug(roomId);
+      resources.blobFacing.reset();
+      resources.testScene.setProbePosition(resources.body.position);
+      runtime.syncContextualCamera(resources);
+    }, room);
+  }
   await waitForRenderedFrames(page);
 };
 
@@ -125,6 +201,24 @@ const sweepCamera = async (page: Page): Promise<void> => {
 const readAcidPresentationSample = async (
   page: Page,
 ): Promise<AcidPresentationSample> => {
+  if ((await page.locator(RUNTIME_DIAGNOSTICS_SELECTOR).count()) === 0) {
+    return page.evaluate(() => {
+      const runtime = (
+        window as Window & {
+          __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+        }
+      ).__specimenProductionTraversalRuntime;
+      const resources = runtime?.resources;
+      if (!resources) throw new Error('Missing plain-production acid diagnostics');
+      const acid = resources.acidProjectileSystem.getDiagnostics();
+      const presentation = resources.goopAcidPresentation.getDiagnostics();
+      return {
+        totalImpacts: acid.solubleImpactCount + acid.worldImpactCount,
+        dropletUploads: presentation.dropletMatrixUploadCount,
+      };
+    });
+  }
+
   await toggleDebugPanel(page);
   const diagnostics = page.locator(RUNTIME_DIAGNOSTICS_SELECTOR);
   await expect(diagnostics).toBeVisible();
@@ -142,6 +236,24 @@ const waitForAcidImpactPresentation = async (
   page: Page,
   before: AcidPresentationSample,
 ): Promise<AcidPresentationSample> => {
+  if ((await page.locator(RUNTIME_DIAGNOSTICS_SELECTOR).count()) === 0) {
+    let sample: AcidPresentationSample = before;
+    await expect.poll(
+      async () => {
+        sample = await readAcidPresentationSample(page);
+        return (
+          sample.totalImpacts > before.totalImpacts &&
+          sample.dropletUploads > before.dropletUploads
+        );
+      },
+      {
+        timeout: 60_000,
+        message: 'Waiting for a production acid impact and droplet upload',
+      },
+    ).toBe(true);
+    return sample;
+  }
+
   await toggleDebugPanel(page);
   const diagnostics = page.locator(RUNTIME_DIAGNOSTICS_SELECTOR);
   await expect(diagnostics).toBeVisible();
@@ -169,6 +281,71 @@ const waitForAcidImpactPresentation = async (
   );
   await toggleDebugPanel(page);
   return sample;
+};
+
+const traverseRepresentativeLevelOnePaths = async (
+  page: Page,
+  assertProgramsStable: AssertProgramsStable,
+): Promise<void> => {
+  await visitRoom(page, 1);
+  await sweepCamera(page);
+  await page.keyboard.down('w');
+  await page.keyboard.down('Space');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('w');
+  await page.keyboard.up('Space');
+  await waitForRenderedFrames(page);
+  await assertProgramsStable('Room 1 traversal and jump');
+
+  await visitRoom(page, 2);
+  await sweepCamera(page);
+  await assertProgramsStable('Room 2 camera sweep');
+  await page.keyboard.press('Tab');
+  await waitForRenderedFrames(page);
+  await assertProgramsStable('Room 2 Goop switch');
+  const acidBefore = await readAcidPresentationSample(page);
+  await sweepCamera(page);
+  await page.mouse.down({ button: 'right' });
+  await waitForRenderedFrames(page);
+  await assertProgramsStable('Room 2 acid aim');
+  await page.mouse.click(400, 300, { button: 'left' });
+  await page.mouse.up({ button: 'right' });
+  await waitForRenderedFrames(page);
+  const acidAfter = await waitForAcidImpactPresentation(page, acidBefore);
+  expect(
+    acidAfter.totalImpacts,
+    'The acid checkpoint did not produce an authoritative impact',
+  ).toBeGreaterThan(acidBefore.totalImpacts);
+  expect(
+    acidAfter.dropletUploads,
+    'The acid impact did not upload its droplet presentation',
+  ).toBeGreaterThan(acidBefore.dropletUploads);
+  await assertProgramsStable('Room 2 acid impact presentation');
+
+  await visitRoom(page, 3);
+  await sweepCamera(page);
+  await page.keyboard.down('a');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('a');
+  await waitForRenderedFrames(page);
+  await assertProgramsStable('Room 3 traversal and camera sweep');
+
+  await visitRoom(page, 4);
+  await sweepCamera(page);
+  await page.keyboard.down('w');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('w');
+  await page.keyboard.press('Space');
+  await waitForRenderedFrames(page);
+  await assertProgramsStable('Room 4 lift approach');
+
+  await visitRoom(page, 5);
+  await sweepCamera(page);
+  await page.keyboard.down('d');
+  await waitForRenderedFrames(page);
+  await page.keyboard.up('d');
+  await waitForRenderedFrames(page);
+  await assertProgramsStable('Room 5 traversal and camera sweep');
 };
 
 test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
@@ -226,65 +403,9 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   ).toContain('death burst resources / primes: primed / 1');
   await toggleDebugPanel(page);
 
-  await visitRoom(page, 1);
-  await sweepCamera(page);
-  await page.keyboard.down('w');
-  await page.keyboard.down('Space');
-  await waitForRenderedFrames(page);
-  await page.keyboard.up('w');
-  await page.keyboard.up('Space');
-  await waitForRenderedFrames(page);
-  await readStableGuard(page, 'Room 1 traversal and jump', baseline);
-
-  await visitRoom(page, 2);
-  await sweepCamera(page);
-  await readStableGuard(page, 'Room 2 camera sweep', baseline);
-  await page.keyboard.press('Tab');
-  await waitForRenderedFrames(page);
-  await readStableGuard(page, 'Room 2 Goop switch', baseline);
-  const acidBefore = await readAcidPresentationSample(page);
-  await sweepCamera(page);
-  await page.mouse.down({ button: 'right' });
-  await waitForRenderedFrames(page);
-  await readStableGuard(page, 'Room 2 acid aim', baseline);
-  await page.mouse.click(400, 300, { button: 'left' });
-  await page.mouse.up({ button: 'right' });
-  await waitForRenderedFrames(page);
-  const acidAfter = await waitForAcidImpactPresentation(page, acidBefore);
-  expect(
-    acidAfter.totalImpacts,
-    'The acid checkpoint did not produce an authoritative impact',
-  ).toBeGreaterThan(acidBefore.totalImpacts);
-  expect(
-    acidAfter.dropletUploads,
-    'The acid impact did not upload its droplet presentation',
-  ).toBeGreaterThan(acidBefore.dropletUploads);
-  await readStableGuard(page, 'Room 2 acid impact presentation', baseline);
-
-  await visitRoom(page, 3);
-  await sweepCamera(page);
-  await page.keyboard.down('a');
-  await waitForRenderedFrames(page);
-  await page.keyboard.up('a');
-  await waitForRenderedFrames(page);
-  await readStableGuard(page, 'Room 3 traversal and camera sweep', baseline);
-
-  await visitRoom(page, 4);
-  await sweepCamera(page);
-  await page.keyboard.down('w');
-  await waitForRenderedFrames(page);
-  await page.keyboard.up('w');
-  await page.keyboard.press('Space');
-  await waitForRenderedFrames(page);
-  await readStableGuard(page, 'Room 4 lift approach', baseline);
-
-  await visitRoom(page, 5);
-  await sweepCamera(page);
-  await page.keyboard.down('d');
-  await waitForRenderedFrames(page);
-  await page.keyboard.up('d');
-  await waitForRenderedFrames(page);
-  await readStableGuard(page, 'Room 5 traversal and camera sweep', baseline);
+  await traverseRepresentativeLevelOnePaths(page, async (label) => {
+    await readStableGuard(page, label, baseline);
+  });
 
   await expect(page.locator(GUARD_SELECTOR)).toHaveText(
     `Shader programs stable · baseline ${baseline} · highest ${baseline}`,
@@ -294,11 +415,13 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
 test('plain production completes prewarm before Level 1 traversal', async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(600_000);
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
+  const assertTraversalRuntimeExposed =
+    await exposeProductionTraversalRuntime(page);
   await page.addInitScript(() => {
     let createdPrograms = 0;
     const originalCreateProgram = WebGL2RenderingContext.prototype.createProgram;
@@ -313,6 +436,7 @@ test('plain production completes prewarm before Level 1 traversal', async ({
   });
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  assertTraversalRuntimeExposed();
   const app = page.locator('#app[data-level-one-prewarm]');
   await expect(app).toBeVisible({ timeout: 120_000 });
   const verification = JSON.parse(
@@ -333,14 +457,12 @@ test('plain production completes prewarm before Level 1 traversal', async ({
 
   await page.locator('[data-action="start"]').click();
   await waitForRenderedFrames(page, 2);
-  await sweepCamera(page);
-  await page.keyboard.down('w');
-  await page.keyboard.down('d');
-  await page.waitForTimeout(500);
-  await page.keyboard.up('d');
-  await page.keyboard.up('w');
-  await page.keyboard.press('Space');
-  await waitForRenderedFrames(page, 4);
+  await traverseRepresentativeLevelOnePaths(page, async (label) => {
+    expect(
+      await readCreatedProgramCount(page),
+      `${label}: plain-production WebGL program count changed`,
+    ).toBe(warmedProgramCount);
+  });
 
   expect(await readCreatedProgramCount(page)).toBe(warmedProgramCount);
   expect(
