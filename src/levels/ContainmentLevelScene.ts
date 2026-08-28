@@ -208,6 +208,12 @@ export class ContainmentLevelScene {
     return this.teaching.deathBurstDiagnostics;
   }
 
+  primeDeathBurstResources(
+    render: (root: THREE.Object3D) => void,
+  ): boolean {
+    return this.teaching.primeDeathBurstResources(render);
+  }
+
   copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
     return this.teaching.copySpawnPosition(target);
   }

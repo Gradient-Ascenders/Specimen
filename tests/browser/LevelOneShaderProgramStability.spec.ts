@@ -164,6 +164,15 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   await waitForRenderedFrames(page);
   await readStableGuard(page, 'gameplay start', baseline);
 
+  await toggleDebugPanel(page);
+  const diagnostics = page.locator(RUNTIME_DIAGNOSTICS_SELECTOR);
+  await expect(diagnostics).toBeVisible();
+  await expect.poll(
+    async () => (await diagnostics.textContent()) ?? '',
+    { message: 'Waiting for burst resource prewarm diagnostics' },
+  ).toContain('death burst resources / primes: primed / 1');
+  await toggleDebugPanel(page);
+
   await visitRoom(page, 1);
   await sweepCamera(page);
   await page.keyboard.down('w');

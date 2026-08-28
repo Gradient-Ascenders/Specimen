@@ -245,6 +245,11 @@ interface LightingPrewarmProfile {
   readonly durationMs: number;
   readonly programsBefore: number;
   readonly programsAfter: number;
+  readonly burstResourcePrimeDurationMs: number;
+  readonly burstResourcePrimeGeometriesBefore: number;
+  readonly burstResourcePrimeGeometriesAfter: number;
+  readonly burstResourcePrimeProgramsBefore: number;
+  readonly burstResourcePrimeProgramsAfter: number;
   readonly steps: readonly LightingPrewarmStepProfile[];
 }
 
@@ -397,7 +402,7 @@ export class GreyboxLevelRuntime {
     this.lifecycle.start();
   }
 
-  /** Precompile the four distinct Containment lighting signatures while loading. */
+  /** Precompile Containment signatures and prime known cold resources while loading. */
   prepareLightingPrograms(): Promise<void> {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
@@ -1526,6 +1531,7 @@ export class GreyboxLevelRuntime {
         `level / checkpoint: ${containmentLevel.state} / ${containmentLevel.activeCheckpointId}`,
         `last level failure / completions: ${containmentLevel.lastFailureId} / ${containmentLevel.completionCount}`,
         `death burst active / radius: ${burstStats.active ? 'yes' : 'no'} / ${burstStats.maximumFragmentDistanceMetres.toFixed(2)} m`,
+        `death burst resources / primes: ${burstStats.resourcesPrimed ? 'primed' : 'cold'} / ${burstStats.resourcePrimeCount}`,
         `active slime: ${slimeManager.activeDefinition?.displayName ?? 'none'} (${slimeManagerStats.activeSlimeId ?? 'none'})`,
         `camera follow slime: ${this.cameraFollowSlimeId ?? 'none'}`,
         `last death slime: ${this.lastDeathSlimeId ?? 'none'}`,
@@ -1744,10 +1750,43 @@ export class GreyboxLevelRuntime {
       );
 
       if (!isCurrent()) return;
+      const roomOneTarget = LIGHTING_PREWARM_CAMERA_TARGETS[1];
+      prewarmCamera.position.set(
+        roomOneTarget[0],
+        roomOneTarget[1] + 1.2,
+        roomOneTarget[2] - 5,
+      );
+      prewarmCamera.lookAt(
+        roomOneTarget[0],
+        roomOneTarget[1] + 0.5,
+        roomOneTarget[2] + 2,
+      );
+      prewarmCamera.updateMatrixWorld();
+      const burstResourcePrimeGeometriesBefore =
+        renderer.info.memory.geometries;
+      const burstResourcePrimeProgramsBefore =
+        renderer.info.programs?.length ?? 0;
+      const burstResourcePrimeStarted = this.hostWindow.performance.now();
+      resources.testScene.primeDeathBurstResources((burstRoot) => {
+        renderIsolatedPrewarmResource(
+          renderer,
+          this.renderLayer.scene,
+          prewarmCamera,
+          burstRoot,
+        );
+      });
+      const burstResourcePrimeDurationMs =
+        this.hostWindow.performance.now() - burstResourcePrimeStarted;
       this.lightingPrewarmProfile = {
         durationMs: this.hostWindow.performance.now() - started,
         programsBefore,
         programsAfter: renderer.info.programs?.length ?? 0,
+        burstResourcePrimeDurationMs,
+        burstResourcePrimeGeometriesBefore,
+        burstResourcePrimeGeometriesAfter: renderer.info.memory.geometries,
+        burstResourcePrimeProgramsBefore,
+        burstResourcePrimeProgramsAfter:
+          renderer.info.programs?.length ?? 0,
         steps,
       };
     } finally {
@@ -1782,6 +1821,44 @@ export class GreyboxLevelRuntime {
       throw new Error('Teaching level resources are not loaded.');
     }
     return this.resources;
+  }
+}
+
+const ISOLATED_RESOURCE_PREWARM_LAYER = 31;
+
+function renderIsolatedPrewarmResource(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  resourceRoot: THREE.Object3D,
+): void {
+  const previousCameraLayers = camera.layers.mask;
+  const previousResourceLayers = new Map<THREE.Object3D, number>();
+  const previousLightLayers = new Map<THREE.Light, number>();
+
+  resourceRoot.traverse((object) => {
+    previousResourceLayers.set(object, object.layers.mask);
+    object.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
+  });
+  scene.traverseVisible((object) => {
+    if (!(object instanceof THREE.Light) || !object.layers.test(camera.layers)) {
+      return;
+    }
+    previousLightLayers.set(object, object.layers.mask);
+    object.layers.enable(ISOLATED_RESOURCE_PREWARM_LAYER);
+  });
+  camera.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
+
+  try {
+    renderer.render(scene, camera);
+  } finally {
+    camera.layers.mask = previousCameraLayers;
+    for (const [object, layers] of previousResourceLayers) {
+      object.layers.mask = layers;
+    }
+    for (const [light, layers] of previousLightLayers) {
+      light.layers.mask = layers;
+    }
   }
 }
 
