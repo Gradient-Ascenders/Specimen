@@ -185,11 +185,21 @@ const startRenderLoop = (): void => {
 // Let the loading state paint once, then compile every Level 1 light signature
 // before normal rendering or gameplay can begin.
 bootFrame = requestAnimationFrame(() => {
-  void levelOneRuntime.prepareLightingPrograms().then(startRenderLoop, (error) => {
-    if (shuttingDown) return;
-    console.error('Containment lighting prewarm failed.', error);
-    startRenderLoop();
-  });
+  void levelOneRuntime.prepareLightingPrograms().then(
+    () => {
+      if (shuttingDown) return;
+      const verification = levelOneRuntime.levelOnePrewarmVerification;
+      if (verification) {
+        app.dataset.levelOnePrewarm = JSON.stringify(verification);
+      }
+      startRenderLoop();
+    },
+    (error) => {
+      if (shuttingDown) return;
+      console.error('Containment lighting prewarm failed.', error);
+      startRenderLoop();
+    },
+  );
 });
 
 const shutdown = (): void => {

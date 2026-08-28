@@ -144,12 +144,17 @@ const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
     'room-3-first-static-laser-presentation-emitter-start-housing-collar',
     'room-3-first-static-laser-presentation-emitter-start-active-aperture',
   ],
-  2: ['room-1-goop-soluble-test-barrier'],
-  3: [
-    'room-2-observation-reinforced-glass',
-    'room-1-goop-soluble-test-barrier',
-  ],
+  3: ['room-2-observation-reinforced-glass'],
   5: ['room-3-acid-surface-material-integration-point'],
+};
+// This test barrier is intentionally absent from normal production. Compile
+// it under the relevant future-room light signatures only when debug helpers
+// created it; every real production source above remains mandatory.
+const LIGHTING_PREWARM_OPTIONAL_DEVELOPMENT_RENDERABLE_NAMES: Readonly<
+  Partial<Record<DebugRoomId, readonly string[]>>
+> = {
+  2: ['room-1-goop-soluble-test-barrier'],
+  3: ['room-1-goop-soluble-test-barrier'],
 };
 
 export interface GreyboxLevelRuntimeOptions {
@@ -258,6 +263,15 @@ interface LightingPrewarmProfile {
   readonly burstResourcePrimeProgramsBefore: number;
   readonly burstResourcePrimeProgramsAfter: number;
   readonly steps: readonly LightingPrewarmStepProfile[];
+}
+
+export interface LevelOnePrewarmVerification {
+  readonly roomStepsCompleted: number;
+  readonly measuredResourceCount: number;
+  readonly measuredGeometryDelta: number;
+  readonly measuredProgramDelta: number;
+  readonly burstGeometryDelta: number;
+  readonly burstProgramDelta: number;
 }
 
 /** Concrete lifecycle and resource owner for the current Level 1 teaching grey-box. */
@@ -417,6 +431,27 @@ export class GreyboxLevelRuntime {
     const promise = this.runLightingPrewarm(resources, generation);
     this.lightingPrewarmPromise = promise;
     return promise;
+  }
+
+  get levelOnePrewarmVerification(): LevelOnePrewarmVerification | undefined {
+    const profile = this.lightingPrewarmProfile;
+    if (!profile) return undefined;
+    return {
+      roomStepsCompleted: profile.steps.length,
+      measuredResourceCount: profile.measuredFirstUseResourcePrimeCount,
+      measuredGeometryDelta:
+        profile.measuredFirstUseResourcePrimeGeometriesAfter -
+        profile.measuredFirstUseResourcePrimeGeometriesBefore,
+      measuredProgramDelta:
+        profile.measuredFirstUseResourcePrimeProgramsAfter -
+        profile.measuredFirstUseResourcePrimeProgramsBefore,
+      burstGeometryDelta:
+        profile.burstResourcePrimeGeometriesAfter -
+        profile.burstResourcePrimeGeometriesBefore,
+      burstProgramDelta:
+        profile.burstResourcePrimeProgramsAfter -
+        profile.burstResourcePrimeProgramsBefore,
+    };
   }
 
   stop(): void {
@@ -1963,6 +1998,13 @@ function createRoomCompileSubset(
     const name of LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES[roomId] ?? []
   ) {
     addCompileObject(requiredNamedObject(levelRoot, name));
+  }
+  for (
+    const name of
+      LIGHTING_PREWARM_OPTIONAL_DEVELOPMENT_RENDERABLE_NAMES[roomId] ?? []
+  ) {
+    const optionalDevelopmentObject = levelRoot.getObjectByName(name);
+    if (optionalDevelopmentObject) addCompileObject(optionalDevelopmentObject);
   }
   subset.userData.compiledObjects = compiledObjects;
   return subset;

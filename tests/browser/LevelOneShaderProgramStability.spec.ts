@@ -17,6 +17,15 @@ interface LightingPrewarmProfile {
   readonly measuredFirstUseResourcePrimeProgramsAfter: number;
 }
 
+interface LevelOnePrewarmVerification {
+  readonly roomStepsCompleted: number;
+  readonly measuredResourceCount: number;
+  readonly measuredGeometryDelta: number;
+  readonly measuredProgramDelta: number;
+  readonly burstGeometryDelta: number;
+  readonly burstProgramDelta: number;
+}
+
 const parseLightingPrewarmProfile = (text: string): LightingPrewarmProfile => {
   const match = text.match(/lighting prewarm profile: (\{[^\n]+\})/);
   expect(match, 'Missing lighting prewarm profile').not.toBeNull();
@@ -47,6 +56,16 @@ const waitForRenderedFrames = async (page: Page, count = 1): Promise<void> => {
     }
   }, count);
 };
+
+const readCreatedProgramCount = async (page: Page): Promise<number> =>
+  page.evaluate(
+    () =>
+      (
+        window as Window & {
+          __specimenCreatedWebGlProgramCount?: number;
+        }
+      ).__specimenCreatedWebGlProgramCount ?? 0,
+  );
 
 const readStableGuard = async (
   page: Page,
@@ -270,4 +289,62 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   await expect(page.locator(GUARD_SELECTOR)).toHaveText(
     `Shader programs stable · baseline ${baseline} · highest ${baseline}`,
   );
+});
+
+test('plain production completes prewarm before Level 1 traversal', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const consoleErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    let createdPrograms = 0;
+    const originalCreateProgram = WebGL2RenderingContext.prototype.createProgram;
+    WebGL2RenderingContext.prototype.createProgram = function () {
+      createdPrograms += 1;
+      return originalCreateProgram.call(this);
+    };
+    Object.defineProperty(window, '__specimenCreatedWebGlProgramCount', {
+      configurable: true,
+      get: () => createdPrograms,
+    });
+  });
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const app = page.locator('#app[data-level-one-prewarm]');
+  await expect(app).toBeVisible({ timeout: 120_000 });
+  const verification = JSON.parse(
+    (await app.getAttribute('data-level-one-prewarm')) ?? '{}',
+  ) as LevelOnePrewarmVerification;
+  expect(verification).toEqual({
+    roomStepsCompleted: 5,
+    measuredResourceCount: 23,
+    measuredGeometryDelta: 23,
+    measuredProgramDelta: 0,
+    burstGeometryDelta: 2,
+    burstProgramDelta: 0,
+  });
+  await expect(page.locator('[data-action="start"]')).toBeVisible();
+  await waitForRenderedFrames(page, 2);
+  const warmedProgramCount = await readCreatedProgramCount(page);
+  expect(warmedProgramCount).toBeGreaterThan(0);
+
+  await page.locator('[data-action="start"]').click();
+  await waitForRenderedFrames(page, 2);
+  await sweepCamera(page);
+  await page.keyboard.down('w');
+  await page.keyboard.down('d');
+  await page.waitForTimeout(500);
+  await page.keyboard.up('d');
+  await page.keyboard.up('w');
+  await page.keyboard.press('Space');
+  await waitForRenderedFrames(page, 4);
+
+  expect(await readCreatedProgramCount(page)).toBe(warmedProgramCount);
+  expect(
+    consoleErrors.some((message) =>
+      message.includes('Containment lighting prewarm failed')),
+  ).toBe(false);
 });
