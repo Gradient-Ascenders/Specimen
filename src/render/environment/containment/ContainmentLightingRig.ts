@@ -112,7 +112,6 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
 
   private readonly roomOneFixtureLights: readonly THREE.PointLight[];
   private readonly roomOnePedestalKey: THREE.SpotLight;
-  private readonly roomOneRimLight: THREE.PointLight;
   private readonly roomFourZoneLights: readonly THREE.PointLight[];
   private readonly roomFiveChamberLight: THREE.PointLight;
   private readonly roomFiveRevealLight: THREE.SpotLight;
@@ -176,6 +175,8 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       this.point('room-1-fluorescent-a-received-light', [-3.8, 7.45, -1.5], CLINICAL_COLOUR, 58, 13),
       this.point('room-1-fluorescent-b-received-light', [3.8, 7.45, -1.5], CLINICAL_COLOUR, 58, 13),
     ];
+    // Physical Iris Xe profiling holds Room 1 to these fixture lights plus the
+    // duct-exit cue below. The emissive fixtures carry the removed local cues.
     roomOne.add(...this.roomOneFixtureLights);
     this.roomOnePedestalKey = this.spot(
       'room-1-pedestal-soft-key',
@@ -187,14 +188,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       0.72,
       CLINICAL_COLOUR,
     );
-    this.roomOneRimLight = this.point(
-      'room-1-egg-glass-catchlight',
-      [0, 2.7, 0.95],
-      0x9bd7ff,
-      18,
-      5.5,
-    );
-    roomOne.add(this.roomOnePedestalKey, this.roomOnePedestalKey.target, this.roomOneRimLight);
+    roomOne.add(this.roomOnePedestalKey, this.roomOnePedestalKey.target);
 
     const ductLight = this.point(
       'room-1-to-2-duct-reflected-cue',
@@ -203,21 +197,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       24,
       11,
     );
-    const ductEntranceSpill = this.point(
-      'room-1-to-2-duct-entrance-spill',
-      [-4.8, 6.45, 9.2],
-      0xb9d9e7,
-      9,
-      8,
-    );
-    const ductRampBounce = this.point(
-      'room-1-to-2-duct-ramp-reflected-light',
-      [-4.8, 7.0, 14.5],
-      DUCT_COLOUR,
-      6,
-      11,
-    );
-    roomOne.add(ductEntranceSpill, ductRampBounce, ductLight);
+    roomOne.add(ductLight);
     roomOne.add(
       this.fixture(
         'room-1-to-2-duct-exit-fixture',
@@ -477,16 +457,12 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
 
     if (state === 'establishing') {
       this.roomOnePedestalKey.intensity = 78;
-      this.roomOneRimLight.intensity = 26;
     } else if (state === 'emergence') {
       this.roomOnePedestalKey.intensity = 92;
-      this.roomOneRimLight.intensity = 34;
     } else if (state === 'impact') {
       this.roomOnePedestalKey.intensity = 110;
-      this.roomOneRimLight.intensity = 42;
     } else {
       this.roomOnePedestalKey.intensity = 62;
-      this.roomOneRimLight.intensity = 18;
     }
   }
 
