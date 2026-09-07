@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CultivationLabMaterials } from '../render/environment/cultivation/CultivationLabMaterials.ts';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
@@ -81,6 +82,7 @@ const ROOM_SPAWNS: Readonly<
 /** Development-only composition of the three currently authored Cultivation rooms. */
 export class LevelTwoPreviewScene {
   readonly root = new THREE.Group();
+  readonly roomOneArt = new CultivationLabMaterials();
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
@@ -131,6 +133,10 @@ export class LevelTwoPreviewScene {
       this.roomTwoToThreeGoopPassage.entryDoor,
     );
     this.roomThree = new LevelTwoRoomThreeGreybox(requestFailure);
+    this.roomOneArt.dress(this.roomOne.builder);
+    this.roomOneArt.dress(this.roomOneToTwoPassage.builder);
+    this.roomOneArt.addFixtures(this.roomOne.root, 36, 20, 50, [-12, -8, 2, 6]);
+    this.roomOneArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28);
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;
     this.roomTwo.root.position.z = LEVEL_TWO_ROOM_TWO_OFFSET_Z;
@@ -267,6 +273,7 @@ export class LevelTwoPreviewScene {
   }
 
   dispose(): void {
+    this.roomOneArt.dispose();
     this.roomThree.dispose();
     this.roomTwoToThreeBobAirDuct.dispose();
     this.roomTwoToThreeGoopPassage.dispose();
