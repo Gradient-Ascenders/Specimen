@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
-import type { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  ColliderTransformMode,
+  type CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import {
   DissolveMaterialBundle,
@@ -370,7 +373,11 @@ export class DissolveTarget {
 
   private ensureCollisionEnabled(enabled: boolean): void {
     if (enabled) {
-      this.collisionWorld.register(this.mesh);
+      this.collisionWorld.register(
+        this.mesh,
+        undefined,
+        ColliderTransformMode.Static,
+      );
       this.surfaceRegistry.register(this.mesh);
     } else {
       this.collisionWorld.unregister(this.mesh);

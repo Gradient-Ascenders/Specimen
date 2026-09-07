@@ -5,6 +5,10 @@ import { EventBus } from '../core/EventBus.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { CollisionWorld } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import {
+  SecurityDronePresentationResources,
+  type SecurityDronePresentationResourceDiagnostics,
+} from '../render/hazards/SecurityDronePresentation.ts';
 import type { PlayableSlimeId } from '../levels/LevelProgression.ts';
 import { SlimeDamageSystem, type SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 import {
@@ -90,8 +94,11 @@ export class RoomThreeDroneEncounter {
   readonly groundDrones: readonly GroundSecurityDrone[];
   readonly radiationTargets: readonly RadiationContactTarget[];
   readonly readModel: RoomThreeDroneEncounterReadModel;
+  readonly presentationResourceDiagnostics: SecurityDronePresentationResourceDiagnostics;
 
   private readonly bobBody: KinematicBody;
+  private readonly presentationResources =
+    new SecurityDronePresentationResources();
   private readonly radiationSurface: RoomThreeDroneEncounterOptions['radiationSurface'];
   private readonly slimeEligibility = { bob: true, goop: true };
   private readonly targets: readonly SecurityDroneTarget[];
@@ -178,6 +185,7 @@ export class RoomThreeDroneEncounter {
         options.collisionWorld,
         options.surfaceRegistry,
         this.projectiles,
+        this.presentationResources,
       );
       this.registerDrone(lifecycle.drone.id, lifecycle);
       this.root.add(lifecycle.root);
@@ -189,6 +197,7 @@ export class RoomThreeDroneEncounter {
         options.collisionWorld,
         options.surfaceRegistry,
         this.projectiles,
+        this.presentationResources,
       );
       this.registerDrone(lifecycle.drone.id, lifecycle);
       this.root.add(lifecycle.drone.root);
@@ -207,6 +216,8 @@ export class RoomThreeDroneEncounter {
       allGroundDronesDisabled: false,
     };
     this.readModel = this.model;
+    this.presentationResourceDiagnostics =
+      this.presentationResources.diagnostics;
     this.unsubscribeDamageDeath = this.damage.events.on('died', ({ slimeId }) => {
       options.requestDeath(slimeId);
     });
@@ -264,6 +275,7 @@ export class RoomThreeDroneEncounter {
     for (const drone of this.ceilingDrones) drone.dispose();
     for (const drone of this.groundDrones) drone.dispose();
     this.projectiles.dispose();
+    this.presentationResources.dispose();
     this.damage.dispose();
     this.droneById.clear();
     this.events.clear();

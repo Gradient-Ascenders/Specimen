@@ -5,6 +5,8 @@ import { Input } from '../src/core/Input.ts';
 import {
   gameFlowCanPause,
   GameFlowStateModel,
+  getGameFlowKeyboardAction,
+  parseCreditsInlineParts,
 } from '../src/ui/GameFlowUI.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 
@@ -84,6 +86,35 @@ test('pause ownership defers to a death flow that disabled gameplay input', () =
   assert.equal(gameFlowCanPause('paused', true), false);
 });
 
+test('pause requires unmodified P while Escape remains a nested-menu cancel', () => {
+  assert.equal(getGameFlowKeyboardAction('KeyP', 'playing'), 'pause');
+  assert.equal(getGameFlowKeyboardAction('KeyP', 'paused'), 'resume');
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { shiftKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'paused', { shiftKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { altKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { ctrlKey: true }),
+    null,
+  );
+  assert.equal(
+    getGameFlowKeyboardAction('KeyP', 'playing', { metaKey: true }),
+    null,
+  );
+  assert.equal(getGameFlowKeyboardAction('Escape', 'paused'), null);
+  assert.equal(getGameFlowKeyboardAction('Escape', 'settings'), 'back');
+  assert.equal(getGameFlowKeyboardAction('Escape', 'credits'), 'back');
+  assert.equal(getGameFlowKeyboardAction('Escape', 'playing'), null);
+});
+
 test('flow state subscriptions emit immediately and clean up explicitly', () => {
   const flow = new GameFlowStateModel();
   const states: string[] = [];
@@ -97,6 +128,31 @@ test('flow state subscriptions emit immediately and clean up explicitly', () => 
   assert.deepEqual(states, ['loading', 'title', 'playing']);
 });
 
+test('credits preserve validated source links and inline code labels', () => {
+  assert.deepEqual(
+    parseCreditsInlineParts(
+      'Use [npm package](https://www.npmjs.com/package/three/v/0.185.1) with `Three.js`.',
+    ),
+    [
+      { text: 'Use ' },
+      {
+        text: 'npm package',
+        href: 'https://www.npmjs.com/package/three/v/0.185.1',
+      },
+      { text: ' with ' },
+      { text: 'Three.js' },
+      { text: '.' },
+    ],
+  );
+});
+
+test('credits never activate unsafe link destinations', () => {
+  assert.deepEqual(
+    parseCreditsInlineParts('[source](javascript:alert)'),
+    [{ text: 'source (javascript:alert)' }],
+  );
+});
+
 test('settings retain session values across flow transitions', () => {
   const settings = new GameSettings();
   const snapshots: number[] = [];
@@ -108,6 +164,7 @@ test('settings retain session values across flow transitions', () => {
   settings.setInvertVerticalLook(true);
   settings.setMasterVolume(0.35);
   settings.setCameraDistanceMetres(6.4);
+  settings.setRenderPixelRatioCap(1.5);
 
   const flow = new GameFlowStateModel();
   flow.completeBoot();
@@ -121,6 +178,7 @@ test('settings retain session values across flow transitions', () => {
     invertVerticalLook: true,
     masterVolume: 0.35,
     cameraDistanceMetres: 6.4,
+    renderPixelRatioCap: 1.5,
   });
   assert.deepEqual(snapshots.slice(0, 2), [1, 1.7]);
 

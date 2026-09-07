@@ -5,7 +5,10 @@ import {
   type LaserContactTarget,
 } from '../hazards/LaserHazard';
 import { LaserHazardSystem } from '../hazards/LaserHazardSystem';
-import type { CollisionWorld } from '../physics/CollisionWorld';
+import {
+  ColliderTransformMode,
+  type CollisionWorld,
+} from '../physics/CollisionWorld';
 import type { KinematicBody } from '../physics/KinematicBody';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry';
 import { ElevatorPresentation } from '../render/elevator/ElevatorPresentation';
@@ -111,7 +114,11 @@ export class ElevatorTestRig {
     this.elevatorPresentation = new ElevatorPresentation(this.sequence);
     this.root.add(this.elevatorPresentation.root);
 
-    this.collisionWorld.register(this.platform.collisionMesh);
+    this.collisionWorld.register(
+      this.platform.collisionMesh,
+      undefined,
+      ColliderTransformMode.Dynamic,
+    );
     this.surfaces.register(this.platform.collisionMesh);
 
     const roofY =

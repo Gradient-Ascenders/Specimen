@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
-import type { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  ColliderTransformMode,
+  type CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 
 const PROGRESS_EPSILON = 1e-10;
@@ -118,7 +121,11 @@ export class VerticalBlastDoor {
 
     this.addFrame(options.panelSize);
     this.applyProgress();
-    this.collisionWorld.register(this.collisionMesh);
+    this.collisionWorld.register(
+      this.collisionMesh,
+      undefined,
+      ColliderTransformMode.Dynamic,
+    );
     try {
       this.surfaceRegistry.register(this.collisionMesh);
       this.collisionEnabledValue = true;

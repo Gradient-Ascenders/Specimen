@@ -54,6 +54,30 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
 
   assert.equal(encounter.ceilingDrones.length, 3);
   assert.equal(encounter.groundDrones.length, 4);
+  assert.deepEqual(encounter.presentationResourceDiagnostics, {
+    geometryCount: 11,
+    materialCount: 4,
+  });
+  const presentationGeometries = new Set<THREE.BufferGeometry>();
+  const presentationMaterials = new Set<THREE.Material>();
+  const indicatorMaterials = new Set<THREE.Material>();
+  for (const lifecycle of [
+    ...encounter.ceilingDrones,
+    ...encounter.groundDrones,
+  ]) {
+    indicatorMaterials.add(lifecycle.drone.frontIndicator.material);
+    lifecycle.drone.presentation.root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      presentationGeometries.add(object.geometry);
+      const materials = Array.isArray(object.material)
+        ? object.material
+        : [object.material];
+      for (const material of materials) presentationMaterials.add(material);
+    });
+  }
+  assert.equal(presentationGeometries.size, 11);
+  assert.equal(presentationMaterials.size, 11);
+  assert.equal(indicatorMaterials.size, 7);
   assert.ok([
     ...CULTIVATION_ROOM_THREE_DRONE_AUTHORING.ceilingDrones,
     ...CULTIVATION_ROOM_THREE_DRONE_AUTHORING.groundDrones,

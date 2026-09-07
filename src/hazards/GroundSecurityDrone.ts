@@ -4,6 +4,7 @@ import { EventBus } from '../core/EventBus.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { CollisionWorld } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import type { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import type { DroneProjectileSystem } from './DroneProjectileSystem.ts';
 import {
   SecurityDrone,
@@ -94,6 +95,7 @@ export class GroundSecurityDrone {
     world: CollisionWorld,
     surfaces: SurfaceRegistry,
     projectiles: DroneProjectileSystem,
+    presentationResources?: SecurityDronePresentationResources,
   ) {
     validateConfig(config);
     this.config = config;
@@ -102,7 +104,13 @@ export class GroundSecurityDrone {
     this.initialQuaternion.setFromEuler(config.drone.initialRotation ?? new THREE.Euler());
     this.finalQuaternion.setFromEuler(config.radioactiveFinalRotation);
     this.authoredForward.copy(config.drone.forward).normalize();
-    this.drone = new SecurityDrone(config.drone, world, surfaces, projectiles);
+    this.drone = new SecurityDrone(
+      config.drone,
+      world,
+      surfaces,
+      projectiles,
+      presentationResources,
+    );
     this.radiationTarget = {
       id: config.drone.id,
       kind: 'drone',

@@ -151,6 +151,14 @@ export class CultivationLevelController {
     this.subscribeToTriggers();
   }
 
+  get state(): CultivationLevelState {
+    return this.stateValue;
+  }
+
+  get activeRoomId(): CultivationRoomId {
+    return this.progression.roomId;
+  }
+
   get readModel(): CultivationProgressReadModel {
     const checkpoint = this.checkpoints.activeCheckpoint;
     return {

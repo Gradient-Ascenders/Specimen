@@ -525,6 +525,7 @@ export class RoomOneArt {
     door.name = 'room-1-locked-laboratory-door-assembly';
     door.position.set(4.3, 1.78, 5.65);
     markVisualOnly(door);
+    door.userData.staticBatchExcluded = true;
     door.add(
       createChamferedBox(this.resources, {
         name: 'room-1-door-recessed-cavity',

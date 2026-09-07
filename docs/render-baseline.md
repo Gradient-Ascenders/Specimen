@@ -36,16 +36,21 @@ additional display transform into their output.
 
 ## Pixel and resize policy
 
-The renderer uses the host element's integer CSS dimensions and caps device
-pixel ratio at `2`. This keeps high-density displays sharp while preventing an
-unnecessary quadratic framebuffer cost on very high-DPR screens. The drawing
-buffer is updated without writing inline canvas CSS dimensions.
+The renderer uses the host element's integer CSS dimensions. Its session
+setting offers `1`, `1.5`, and `2` device-pixel-ratio caps, with `2` as the
+high-quality default. The cap limits the effective ratio rather than scaling
+the CSS viewport, so DPR-1 displays are not supersampled and the DOM/UI stays
+at native CSS resolution. On high-DPI displays, the lower tiers provide a
+meaningful quadratic reduction in shaded pixels while retaining the existing
+sharp DPR-2 presentation as the default. The drawing buffer is updated without
+writing inline canvas CSS dimensions.
 
 A `ResizeObserver` catches host layout changes and the window resize listener
-catches viewport and device-pixel-ratio changes. A resize updates renderer
-size, pixel ratio, camera aspect, and the perspective projection matrix only
-when one of those values changes. Width and height are clamped to at least one
-pixel so transient zero-sized layouts cannot create an invalid aspect ratio.
+catches viewport, browser-zoom, and device-pixel-ratio changes. Changing the
+session cap uses that same resize path. A resize updates renderer size, pixel
+ratio, camera aspect, and the perspective projection matrix only when one of
+those values changes. Width and height are clamped to at least one pixel so
+transient zero-sized layouts cannot create an invalid aspect ratio.
 
 ## Camera baseline
 

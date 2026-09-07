@@ -32,8 +32,10 @@ No third-party audio or music has been introduced yet.
 
 ## Fonts
 
-No third-party fonts have been introduced yet; the stylesheet requests locally
-installed and system fallback fonts only.
+| Resource | Author / creator | Source | Licence | Use in Specimen |
+| --- | --- | --- | --- | --- |
+| Michroma | Vernon Adams | [Fontsource package](https://fontsource.org/fonts/michroma) | SIL Open Font License 1.1 | Self-hosted technical display and system-label typeface. |
+| Space Grotesk | Florian Karsten | [Fontsource package](https://fontsource.org/fonts/space-grotesk) | SIL Open Font License 1.1 | Self-hosted body, control and HUD typeface. |
 
 ## Tutorials / references / adapted code
 

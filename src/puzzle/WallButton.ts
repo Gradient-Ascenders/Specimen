@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
-import type { CollisionWorld } from '../physics/CollisionWorld.ts';
+import {
+  ColliderTransformMode,
+  type CollisionWorld,
+} from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { Trigger } from './Trigger.ts';
 
@@ -129,7 +132,11 @@ export class WallButton<Body extends WallButtonBody = WallButtonBody> {
       ({ occupants }) => this.applyOccupancy(occupants),
     );
 
-    this.collisionWorld.register(this.surfaceMesh);
+    this.collisionWorld.register(
+      this.surfaceMesh,
+      undefined,
+      ColliderTransformMode.Static,
+    );
     try {
       this.surfaceRegistry.register(this.surfaceMesh);
     } catch (error) {

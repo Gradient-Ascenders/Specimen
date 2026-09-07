@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import * as THREE from 'three';
@@ -54,6 +55,36 @@ test('Containment procedural textures are compact, deterministic and correctly c
     );
     assert.equal(texture.wrapT, texture.wrapS);
   });
+  assert.deepEqual(
+    Object.fromEntries(
+      firstTextures.map((texture) => [
+        texture.name,
+        createHash('sha256').update(texture.image.data).digest('hex'),
+      ]),
+    ),
+    {
+      'containment-ceramic-micro-normal':
+        '15911a903b368ef75bcb477a5ea53399e559de59b667ffa5a76ad43f4bbbdc8c',
+      'containment-ceramic-roughness':
+        '56c4ff8203f809e13a560d1e75f6bb86fed99cfe62214214ba8dc1c8c831bf46',
+      'containment-graphite-micro-normal':
+        '14504dc0d4c5f9591d85806561d6cbbf7a561463e8ed0f709f0418ed416df7bf',
+      'containment-graphite-roughness':
+        'f872f19a3dccfe32b78df9221f16e2285ffbf4f89aa097dd56423af85ea9bfd9',
+      'containment-sticky-organic-normal':
+        'fe1094eb443f99ea7d04031fe60fb58ff27156c67d35488435ecb2821cef2d0d',
+      'containment-sticky-wet-roughness':
+        '683ddf1166481a2453d7d3f446504881f0b35e410464cbb6c14b6b9ee9c88ffe',
+      'containment-sticky-vent-organic-normal':
+        'fbeff4497daea728edf61a18624884e71148a1e8d9bbaa1444e57f6dc365fdaa',
+      'containment-sticky-vent-roughness':
+        'e934e6fb6f00fd412fcaf097b2ced1258dc8b5e832da4246d3e9f1f25141f91f',
+      'containment-acid-static-foundation-albedo':
+        '3a14713d56e94f4a7c7610630edf2a7ff2d051db6359f3c7ff18e0019f7e30ea',
+      'containment-vector-signage-atlas':
+        'd5ecf2d346484d04d23854dbb8e91c9156d0adc8e4a9e9e07d56f874c73f8a5c',
+    },
+  );
 
   first.dispose();
   second.dispose();
@@ -861,6 +892,39 @@ test('production scene contains no legacy collider outline objects', () => {
     if (object.name.endsWith('-outline')) legacyOutlines.push(object);
   });
   assert.deepEqual(legacyOutlines, []);
+  scene.dispose();
+});
+
+test('Level 1 consolidates only room-local static art batches', () => {
+  const scene = new ContainmentLevelScene(() => {});
+
+  assert.equal(scene.staticBatchDiagnostics.length, 5);
+  for (const diagnostics of scene.staticBatchDiagnostics) {
+    assert.ok(diagnostics.batchCount > 0);
+    assert.ok(diagnostics.drawCallsRemoved > 0);
+    assert.ok(diagnostics.sourceMeshCount > diagnostics.batchCount);
+  }
+  assert.ok(
+    scene.teaching.roomOneArt.containmentBoxRoot.getObjectByName(
+      'room-1-containment-lower-instrumentation-base',
+    ),
+  );
+  assert.ok(
+    scene.teaching.roomOneArt.root.getObjectByName(
+      'room-1-door-bevelled-sliding-slab',
+    ),
+  );
+  for (const pivot of Object.values(scene.roomFive.art.panelPivots)) {
+    let meshCount = 0;
+    pivot.traverse((object) => {
+      if (object instanceof THREE.Mesh) meshCount += 1;
+    });
+    assert.ok(
+      meshCount > 0,
+      `${pivot.name} must retain independently controlled presentation meshes`,
+    );
+  }
+
   scene.dispose();
 });
 

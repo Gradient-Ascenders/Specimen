@@ -1,5 +1,6 @@
 import type { EventBus } from '../core/EventBus.ts';
 import type { LoopStats } from '../core/Loop.ts';
+import type { PerformanceGameplaySnapshot } from '../core/PerformanceSnapshot.ts';
 import type { SlimeHUDListener, SlimeHUDSnapshot } from '../slimes/SlimeHUDState.ts';
 import type { LevelLifecycleState } from './LevelLifecycle.ts';
 import type { LevelProgressionSnapshot } from './LevelProgression.ts';
@@ -25,4 +26,5 @@ export interface GameLevelRuntime {
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void;
   getSlimeHUDSnapshot(): SlimeHUDSnapshot;
   captureProgressionSnapshot(): LevelProgressionSnapshot;
+  writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void;
 }

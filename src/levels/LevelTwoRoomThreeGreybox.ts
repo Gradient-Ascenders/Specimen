@@ -13,6 +13,10 @@ import {
   type RadioactiveFloorSlimeId,
 } from '../hazards/RadioactiveFloorHazard.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
+import {
+  consolidateCultivationRoomThreeStaticColliders,
+  type CultivationRoomThreeStaticBatchDiagnostics,
+} from '../render/environment/cultivation/CultivationRoomThreeStaticBatching.ts';
 import { LEVEL_TWO_BOB_AIR_DUCT_LAYOUT } from './LevelTwoAirDuctGreybox.ts';
 import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from './CultivationRoomThreeAuthoring.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
@@ -53,6 +57,7 @@ export class LevelTwoRoomThreeGreybox {
   readonly solubleTargetMeshes: THREE.Mesh[] = [];
   readonly lasers: LaserHazardSystem;
   readonly radiationHazard: RadioactiveFloorHazard;
+  readonly staticBatchDiagnostics: CultivationRoomThreeStaticBatchDiagnostics;
 
   private readonly laserPresentation: LaserHazardPresentation;
   readonly wallDrops: GreyboxDropPreview[] = [];
@@ -89,6 +94,11 @@ export class LevelTwoRoomThreeGreybox {
     this.buildRoofDronePlaceholders();
     this.buildFinalSecurityArea();
     this.addCheckpointAnchors();
+    this.staticBatchDiagnostics =
+      consolidateCultivationRoomThreeStaticColliders(
+        this.root,
+        this.collisionMeshes,
+      );
 
     const hazards = this.createLasers();
     this.lasers = new LaserHazardSystem({
@@ -460,6 +470,7 @@ export class LevelTwoRoomThreeGreybox {
     for (const [index, name] of ['entry', 'central', 'high', 'cover', 'second-cover'].entries()) {
       const panel = this.root.getObjectByName(`cultivation-room-3-${name}-sticky-transfer`) as THREE.Mesh<THREE.BoxGeometry>;
       const landing = panel.position.clone();
+      panel.userData.dynamicAssembly = true;
       const height = panel.geometry.parameters.height;
       const thinX = panel.geometry.parameters.width < panel.geometry.parameters.depth;
       // Guide rails visually attach the travelling emitters to their panel.

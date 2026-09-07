@@ -9,6 +9,62 @@ import {
   DeathSequence,
 } from '../src/systems/DeathSequence.ts';
 
+test('slime burst primes both cold geometries and instance buffers before first use', () => {
+  const burst = new SlimeBurstPresentation();
+  const before = burst.diagnostics;
+  let primeDraws = 0;
+
+  assert.equal(before.resourcesPrimed, false);
+  assert.equal(before.resourcePrimeCount, 0);
+  assert.equal(before.active, false);
+  assert.equal(burst.root.visible, false);
+
+  assert.equal(
+    burst.primeResources(new THREE.Vector3(2, 3, 4), (root) => {
+      primeDraws += 1;
+      assert.equal(root.visible, true);
+      assert.deepEqual(root.position.toArray(), [2, 3, 4]);
+      const droplets = root.getObjectByName('player-slime-death-droplets');
+      const core = root.getObjectByName('player-slime-death-rupture-core');
+      assert.ok(droplets instanceof THREE.InstancedMesh);
+      assert.ok(core instanceof THREE.Mesh);
+      assert.equal(
+        droplets.geometry.name,
+        'player-slime-death-droplet-sphere-geometry',
+      );
+      assert.equal(
+        core.geometry.name,
+        'player-slime-death-rupture-core-geometry',
+      );
+      assert.equal(
+        droplets.instanceMatrix.name,
+        'player-slime-death-droplet-instance-transforms',
+      );
+      assert.equal(
+        droplets.instanceColor?.name,
+        'player-slime-death-droplet-instance-colours',
+      );
+      assert.equal(burst.diagnostics.active, false);
+    }),
+    true,
+  );
+
+  assert.equal(primeDraws, 1);
+  assert.equal(burst.diagnostics.resourcesPrimed, true);
+  assert.equal(burst.diagnostics.resourcePrimeCount, 1);
+  assert.equal(burst.diagnostics.active, false);
+  assert.equal(burst.root.visible, false);
+  assert.deepEqual(burst.root.position.toArray(), [0, 0, 0]);
+  assert.equal(burst.primeResources(new THREE.Vector3(), () => {
+    primeDraws += 1;
+  }), false);
+  assert.equal(primeDraws, 1);
+  assert.equal(burst.start(new THREE.Vector3(5, 6, 7)), true);
+  assert.deepEqual(burst.root.position.toArray(), [5, 6, 7]);
+
+  burst.dispose();
+});
+
 test('slime burst starts once at the supplied death position and expands', () => {
   const burst = new SlimeBurstPresentation();
   const deathPosition = new THREE.Vector3(3.25, 1.1, -4.5);

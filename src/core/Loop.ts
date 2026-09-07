@@ -22,6 +22,19 @@ export interface LoopOptions {
   maxStepsPerFrame?: number;
   document?: Document;
   window?: Window;
+  profiler?: LoopProfiler;
+}
+
+/** Optional debug-only frame boundary used by the performance flight recorder. */
+export interface LoopProfiler {
+  readonly enabled: boolean;
+  beginFrame(timestampMs: number): void;
+  beginRender(): void;
+  endFrame(
+    stats: Readonly<LoopStats>,
+    updateCpuDurationMs: number,
+    renderCpuDurationMs: number,
+  ): void;
 }
 
 /**
@@ -43,6 +56,7 @@ export class Loop {
   private readonly maxStepsPerFrame: number;
   private readonly hostDocument: Document;
   private readonly hostWindow: Window;
+  private profiler: LoopProfiler | undefined;
 
   private accumulatorSeconds = 0;
   private previousTimestampMs: number | undefined;
@@ -75,6 +89,7 @@ export class Loop {
     this.maxStepsPerFrame = maxStepsPerFrame;
     this.hostDocument = options.document ?? document;
     this.hostWindow = options.window ?? window;
+    this.profiler = options.profiler;
 
     this.stats = {
       fixedDeltaSeconds,
@@ -106,10 +121,22 @@ export class Loop {
       throw new Error('Loop tick timestamp must be finite.');
     }
 
+    const profiling = this.profiler?.enabled === true;
+    if (profiling) this.profiler!.beginFrame(timestampMs);
+
     if (this.previousTimestampMs === undefined) {
       this.previousTimestampMs = timestampMs;
       this.resetPerFrameStats();
+      if (profiling) this.profiler!.beginRender();
+      const renderStartedMs = profiling ? this.hostWindow.performance.now() : 0;
       this.render(0, this.stats);
+      if (profiling) {
+        this.profiler!.endFrame(
+          this.stats,
+          0,
+          this.hostWindow.performance.now() - renderStartedMs,
+        );
+      }
       return;
     }
 
@@ -126,6 +153,7 @@ export class Loop {
 
     this.accumulatorSeconds += frameDeltaSeconds;
 
+    const updateStartedMs = profiling ? this.hostWindow.performance.now() : 0;
     let stepsThisFrame = 0;
     while (
       this.accumulatorSeconds + STEP_EPSILON_SECONDS >=
@@ -168,7 +196,19 @@ export class Loop {
     this.stats.renderFps =
       rawFrameDeltaSeconds > 0 ? 1 / rawFrameDeltaSeconds : 0;
 
+    const updateCpuDurationMs = profiling
+      ? this.hostWindow.performance.now() - updateStartedMs
+      : 0;
+    if (profiling) this.profiler!.beginRender();
+    const renderStartedMs = profiling ? this.hostWindow.performance.now() : 0;
     this.render(interpolationAlpha, this.stats);
+    if (profiling) {
+      this.profiler!.endFrame(
+        this.stats,
+        updateCpuDurationMs,
+        this.hostWindow.performance.now() - renderStartedMs,
+      );
+    }
   }
 
   pause(): void {
@@ -183,6 +223,12 @@ export class Loop {
     this.resetClock();
   }
 
+  /** Attach or detach the optional debug profiler after a lazy module load. */
+  setProfiler(profiler: LoopProfiler | undefined): void {
+    if (this.disposed) return;
+    this.profiler = profiler;
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -192,6 +238,7 @@ export class Loop {
     );
     this.hostWindow.removeEventListener('blur', this.onWindowBlur);
     this.hostWindow.removeEventListener('focus', this.onWindowFocus);
+    this.profiler = undefined;
     this.resetClock();
   }
 

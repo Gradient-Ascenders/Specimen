@@ -5,53 +5,60 @@ import test from 'node:test';
 import {
   BRAND_ASSETS,
   createBrandMarkMarkup,
-  createBrandedLoaderMarkup,
+  createBrandedScannerMarkup,
 } from '../src/ui/Branding.ts';
 
 const repositoryRoot = new URL('../', import.meta.url);
 
 test('canonical brand assets and external lockups are checked in', async () => {
   const canonicalFiles = [
-    'public/brand/specimen-favicon.svg',
-    'public/brand/specimen-mark.svg',
-    'public/brand/specimen-mark-simple.svg',
+    ...Object.values(BRAND_ASSETS).map((asset) => `public/${asset.slice(2)}`),
     'public/brand/specimen-lockup-full.png',
     'public/brand/specimen-lockup-compact.png',
     'public/brand/specimen-containment-emblem.png',
     'public/brand/specimen-app-icon.png',
+    'public/brand/specimen-favicon.svg',
   ];
 
-  await Promise.all(
-    canonicalFiles.map((path) => access(new URL(path, repositoryRoot))),
-  );
+  await Promise.all(canonicalFiles.map((path) => access(new URL(path, repositoryRoot))));
+
+  assert.ok(Object.values(BRAND_ASSETS).every((asset) => asset.startsWith('./')));
 });
 
-test('shared brand markup stays decorative and loaders reuse the simple mark', () => {
-  const detailedMark = createBrandMarkMarkup('detailed', 'test-mark');
-  const loader = createBrandedLoaderMarkup();
+test('game-flow brand marks remain decorative', () => {
+  const detailed = createBrandMarkMarkup('detailed', 'title-brand-mark');
+  const simple = createBrandMarkMarkup('simple', 'pause-brand-mark');
 
-  assert.match(detailedMark, new RegExp(BRAND_ASSETS.detailedMark));
-  assert.match(detailedMark, /alt=""/);
-  assert.match(detailedMark, /aria-hidden="true"/);
-  assert.match(loader, new RegExp(BRAND_ASSETS.simpleMark));
-  assert.match(loader, /brand-loader-ring/);
-  assert.match(loader, /brand-loader-ticks/);
-  assert.doesNotMatch(loader, new RegExp(BRAND_ASSETS.detailedMark));
+  assert.match(detailed, new RegExp(BRAND_ASSETS.detailedMark));
+  assert.match(simple, new RegExp(BRAND_ASSETS.simpleMark));
+  assert.match(detailed, /alt=""/);
+  assert.match(detailed, /aria-hidden="true"/);
+  assert.match(simple, /alt=""/);
+  assert.match(simple, /aria-hidden="true"/);
 });
 
-test('every live game-flow loader uses the shared branded markup', async () => {
+test('the shared scanner animates orbital geometry around a still decorative mark', () => {
+  const scanner = createBrandedScannerMarkup();
+
+  assert.match(scanner, /brand-scanner-orbit--outer/);
+  assert.match(scanner, /brand-scanner-orbit--inner/);
+  assert.match(scanner, /brand-scanner-node/);
+  assert.match(scanner, new RegExp(BRAND_ASSETS.simpleMark));
+  assert.match(scanner, /aria-hidden="true"/);
+});
+
+test('every live game-flow loader uses the shared branded scanner', async () => {
   const gameFlowUi = await readFile(
     new URL('src/ui/GameFlowUI.ts', repositoryRoot),
     'utf8',
   );
 
   assert.doesNotMatch(gameFlowUi, /class="[^"]*\bloading-mark\b[^"]*"/);
-
   for (const panel of ['loading', 'restarting', 'transitioning']) {
     assert.match(
       gameFlowUi,
       new RegExp(
-        `data-flow-panel="${panel}"[\\s\\S]*?\\$\\{createBrandedLoaderMarkup\\(\\)\\}`,
+        `data-flow-panel="${panel}"[\\s\\S]*?\\$\\{createBrandedScannerMarkup\\(\\)\\}`,
       ),
     );
   }
@@ -61,10 +68,7 @@ test('document metadata and README use deployment-safe brand paths', async () =>
   const [indexHtml, readme, favicon] = await Promise.all([
     readFile(new URL('index.html', repositoryRoot), 'utf8'),
     readFile(new URL('README.md', repositoryRoot), 'utf8'),
-    readFile(
-      new URL('public/brand/specimen-favicon.svg', repositoryRoot),
-      'utf8',
-    ),
+    readFile(new URL('public/brand/specimen-favicon.svg', repositoryRoot), 'utf8'),
   ]);
 
   assert.match(indexHtml, /href="\.\/brand\/specimen-favicon\.svg"/);

@@ -152,6 +152,12 @@ export class ContainmentTeachingScene {
     return this.slimeBurst.diagnostics;
   }
 
+  primeDeathBurstResources(
+    render: (root: THREE.Object3D) => void,
+  ): boolean {
+    return this.slimeBurst.primeResources(SPAWN_POSITION, render);
+  }
+
   copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
     return target.copy(SPAWN_POSITION);
   }

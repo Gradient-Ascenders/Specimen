@@ -3,12 +3,17 @@ import {
   MAX_FOLLOW_DISTANCE_METRES,
   MIN_FOLLOW_DISTANCE_METRES,
 } from '../render/CameraRig.ts';
+import {
+  DEFAULT_RENDER_PIXEL_RATIO_CAP,
+  type RenderPixelRatioCap,
+} from '../render/RenderResolution.ts';
 
 export interface GameSettingsSnapshot {
   readonly mouseSensitivity: number;
   readonly invertVerticalLook: boolean;
   readonly masterVolume: number;
   readonly cameraDistanceMetres: number;
+  readonly renderPixelRatioCap: RenderPixelRatioCap;
 }
 
 export type GameSettingsListener = (
@@ -20,6 +25,7 @@ export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
   invertVerticalLook: false,
   masterVolume: 1,
   cameraDistanceMetres: DEFAULT_CAMERA_RIG_CONFIG.followDistanceMetres,
+  renderPixelRatioCap: DEFAULT_RENDER_PIXEL_RATIO_CAP,
 };
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
@@ -56,6 +62,10 @@ export class GameSettings {
     });
   }
 
+  setRenderPixelRatioCap(value: RenderPixelRatioCap): void {
+    this.update({ renderPixelRatioCap: value });
+  }
+
   subscribe(listener: GameSettingsListener): () => void {
     this.listeners.add(listener);
     listener(this.current);
@@ -68,7 +78,8 @@ export class GameSettings {
       next.mouseSensitivity === this.current.mouseSensitivity &&
       next.invertVerticalLook === this.current.invertVerticalLook &&
       next.masterVolume === this.current.masterVolume &&
-      next.cameraDistanceMetres === this.current.cameraDistanceMetres
+      next.cameraDistanceMetres === this.current.cameraDistanceMetres &&
+      next.renderPixelRatioCap === this.current.renderPixelRatioCap
     ) {
       return;
     }
