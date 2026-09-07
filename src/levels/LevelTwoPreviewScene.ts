@@ -52,7 +52,7 @@ export const CULTIVATION_ROOM_OBJECTIVES: Readonly<
 > = {
   1: 'Help Bob reach Room 2',
   2: 'Get Bob and Goop into Room 3',
-  3: 'Disable four drones and bring both slimes to their exits',
+  3: 'Get bob to the other side to push the drones into the acid',
 };
 
 const ROOM_OFFSETS: Readonly<Record<LevelTwoAuthoredRoomId, THREE.Vector3>> = {
@@ -165,9 +165,17 @@ export class LevelTwoPreviewScene {
 
   /** Colliders whose authored gameplay transform changes after registration. */
   get dynamicCollisionMeshes(): readonly THREE.Mesh[] {
+    const wallRoots = new Set<THREE.Object3D>(this.roomThree.wallDrops.map(drop => drop.mesh));
+    const movingWallColliders = this.roomThree.collisionMeshes.filter(mesh => {
+      for (let ancestor: THREE.Object3D | null = mesh; ancestor; ancestor = ancestor.parent) {
+        if (wallRoots.has(ancestor)) return true;
+      }
+      return false;
+    });
     return [
       ...this.roomOne.platformDrops.map((drop) => drop.mesh),
       ...this.roomTwo.blockDrops.map((drop) => drop.mesh),
+      ...movingWallColliders,
       ...this.roomOneToTwoPassage.doors.map((door) => door.collisionMesh),
       ...this.roomTwoToThreeGoopPassage.doors.map(
         (door) => door.collisionMesh,
@@ -186,6 +194,7 @@ export class LevelTwoPreviewScene {
   bindDissolveTargets(targets: readonly DissolveTarget[]): void {
     this.roomOne.bindDissolveTargets(targets);
     this.roomTwo.bindDissolveTargets(targets);
+    this.roomThree.bindDissolveTargets(targets);
   }
 
   copyRoomSpawnPosition(
@@ -207,6 +216,15 @@ export class LevelTwoPreviewScene {
     this.roomResolverPosition.set(position.x, position.y, position.z);
     this.root.worldToLocal(this.roomResolverPosition);
     if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_THREE_OFFSET_Z) return 3;
+    // The final duct section belongs to Room 3's protected arrival
+    // checkpoint. Do not classify the ground-level Goop passage as Room 3 yet.
+    const duct = LEVEL_TWO_BOB_AIR_DUCT_LAYOUT;
+    if (
+      this.roomResolverPosition.z >= LEVEL_TWO_ROOM_THREE_OFFSET_Z - 4 &&
+      Math.abs(this.roomResolverPosition.x - duct.centreXMetres) <= duct.innerWidthMetres / 2 &&
+      this.roomResolverPosition.y >= duct.floorYMetres &&
+      this.roomResolverPosition.y <= duct.floorYMetres + duct.innerHeightMetres
+    ) return 3;
     if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_TWO_OFFSET_Z) return 2;
     return 1;
   }

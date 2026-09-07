@@ -309,13 +309,13 @@ export class LevelTwoRoomOneGreybox {
     });
     this.builder.addVisualBox({
       name: 'cultivation-room-1-broken-vent-frame-south',
-      size: [4.6, 0.6, 0.3],
+      size: [4, 0.6, 0.3],
       position: [-10, 19.65, 1.85],
       material: duct,
     });
     this.builder.addVisualBox({
       name: 'cultivation-room-1-broken-vent-frame-north',
-      size: [4.6, 0.6, 0.3],
+      size: [4, 0.6, 0.3],
       position: [-10, 19.65, 6.15],
       material: duct,
     });

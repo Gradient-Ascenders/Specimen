@@ -90,6 +90,9 @@ export function consolidateCultivationRoomThreeStaticColliders(
 }
 
 function isBatchCandidate(mesh: THREE.Mesh): boolean {
+  for (let ancestor: THREE.Object3D | null = mesh; ancestor; ancestor = ancestor.parent) {
+    if (ancestor.userData.dynamicAssembly === true) return false;
+  }
   if (!mesh.visible || mesh.userData.soluble === true) return false;
   if (mesh.userData.hazardRole === 'radioactive') return false;
   if (mesh.userData.interactionRole || mesh.userData.textureRole === 'acid-floor') {

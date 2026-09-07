@@ -512,8 +512,6 @@ export class CultivationLevelRuntime {
       this.renderLayer.cameraRig.camera,
       resources.collisionWorld,
       this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
-      resources.pair.bobBody.gameplayUp,
-      resources.pair.goopBody.gameplayUp,
     );
     resources.droneProjectilePresentation?.update(interpolationAlpha);
     resources.damageVignette?.update(

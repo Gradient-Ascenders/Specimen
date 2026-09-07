@@ -129,7 +129,7 @@ test('inactive-body locator responds immediately when occluding geometry moves',
   wall.geometry.dispose();
 });
 
-test('first-person Goop aim hides the active body and control ring until aim ends', () => {
+test('first-person Goop aim hides the body without creating a selection ring', () => {
   const presentation = new SlimePairPresentation(0.45);
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1, 5);
@@ -150,7 +150,7 @@ test('first-person Goop aim hides the active body and control ring until aim end
     true,
   );
   assert.equal(goopMesh?.visible, false);
-  assert.equal(activeRing?.visible, false);
+  assert.equal(activeRing, undefined);
 
   presentation.update(
     bobPosition,
@@ -161,51 +161,7 @@ test('first-person Goop aim hides the active body and control ring until aim end
     false,
   );
   assert.equal(goopMesh?.visible, true);
-  assert.equal(activeRing?.visible, true);
-
-  presentation.dispose();
-});
-
-test('active control ring follows the selected slime gameplay-up direction', () => {
-  const presentation = new SlimePairPresentation(0.45);
-  const camera = new THREE.PerspectiveCamera();
-  const collisionWorld = new CollisionWorld();
-  const bobPosition = { x: 2, y: 3, z: 4 };
-  const goopPosition = { x: -2, y: 1, z: -4 };
-  const ring = presentation.root.getObjectByName(
-    'active-slime-control-indicator',
-  );
-  assert.ok(ring);
-
-  presentation.update(
-    bobPosition,
-    goopPosition,
-    'bob',
-    camera,
-    collisionWorld,
-    false,
-    { x: 1, y: 0, z: 0 },
-    { x: 0, y: 1, z: 0 },
-  );
-  assert.ok(ring.position.distanceTo(new THREE.Vector3(1.57, 3, 4)) < 1e-10);
-  const ringNormal = new THREE.Vector3(0, 0, 1)
-    .applyQuaternion(ring.quaternion)
-    .normalize();
-  assert.ok(ringNormal.distanceTo(new THREE.Vector3(1, 0, 0)) < 1e-10);
-
-  presentation.update(
-    bobPosition,
-    goopPosition,
-    'goop',
-    camera,
-    collisionWorld,
-    false,
-    { x: 1, y: 0, z: 0 },
-    { x: 0, y: 0, z: -1 },
-  );
-  assert.ok(ring.position.distanceTo(new THREE.Vector3(-2, 1, -3.57)) < 1e-10);
-  ringNormal.set(0, 0, 1).applyQuaternion(ring.quaternion).normalize();
-  assert.ok(ringNormal.distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-10);
+  assert.equal(presentation.root.getObjectByName('active-slime-control-indicator'), undefined);
 
   presentation.dispose();
 });

@@ -16,6 +16,7 @@ import type { ProximityShutterDoor } from '../puzzle/ProximityShutterDoor.ts';
 import { GreyboxDropPreview } from './GreyboxDropPreview.ts';
 import { LEVEL_TWO_BOB_AIR_DUCT_LAYOUT } from './LevelTwoAirDuctGreybox.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
+import { applyBlenderRoomLayout } from './ApplyBlenderRoomLayout.ts';
 
 export const LEVEL_TWO_ROOM_TWO_BOB_SPAWN = new THREE.Vector3(-3, 0.66, 4);
 export const LEVEL_TWO_ROOM_TWO_GOOP_SPAWN = new THREE.Vector3(3, 0.66, 4);
@@ -39,8 +40,8 @@ const BLOCK_ASSEMBLIES: readonly BlockAssemblyDefinition[] = [
   },
   {
     id: 'cultivation-room-2-block-3',
-    finalPosition: [1, 15.5, 39.5],
-    suspendedPosition: [1, 21, 39.5],
+    finalPosition: [2.5, 15.7, 40],
+    suspendedPosition: [2.5, 21, 40],
   },
 ];
 
@@ -98,6 +99,8 @@ export class LevelTwoRoomTwoGreybox {
   private readonly localLaserTargets: LocalLaserContactTarget[] = [];
   private wallButtonPresentationPressed: boolean | undefined;
   private wallButtonPressProgress = 0;
+  private laserMotionSeconds = 0;
+  private readonly laserOffset = new THREE.Vector3();
 
   constructor(
     requestFailure: (failure: LevelTwoRoomTwoHazardFailure) => void,
@@ -125,6 +128,8 @@ export class LevelTwoRoomTwoGreybox {
     this.buildSuspendedBlocks();
     this.buildBobExitVent();
     this.addProgressionAnchors();
+    applyBlenderRoomLayout(this.builder, 2);
+    this.buildWallPanelling();
 
     const hazards = this.createLasers();
     this.lasers = new LaserHazardSystem({
@@ -137,6 +142,7 @@ export class LevelTwoRoomTwoGreybox {
           slimeId: asSlimeId(target.id),
         }),
     });
+    this.applyLaserMotion();
     this.laserPresentation = new LaserHazardPresentation(hazards);
     this.root.add(this.lasers.root, this.laserPresentation.root);
   }
@@ -173,6 +179,8 @@ export class LevelTwoRoomTwoGreybox {
     this.goopExitDoor.setLocked(!bobHoldingButton);
 
     for (const drop of this.blockDrops) drop.update(deltaSeconds);
+    this.laserMotionSeconds += deltaSeconds;
+    this.applyLaserMotion();
     this.lasers.updateTargets(deltaSeconds, this.localLaserTargets);
     this.laserPresentation.sync();
   }
@@ -189,6 +197,8 @@ export class LevelTwoRoomTwoGreybox {
     this.setWallButtonPresentationPressed(false, true);
     this.goopExitDoor.setLocked(true);
     this.lasers.reset();
+    this.laserMotionSeconds = 0;
+    this.applyLaserMotion();
     this.laserPresentation.sync();
   }
 
@@ -282,6 +292,25 @@ export class LevelTwoRoomTwoGreybox {
       13,
     );
     return radiation;
+  }
+
+  private buildWallPanelling(): void {
+    // Flush seams remain behind the adhesive tiles; no decorative footholds.
+    const seam = new THREE.MeshStandardMaterial({ color: 0x72838d, roughness: .75 });
+    const trim = new THREE.MeshStandardMaterial({ color: 0xd8e6eb, roughness: .45 });
+    const light = new THREE.MeshStandardMaterial({ color: 0xdff9ff, emissive: 0xa8e6ff, emissiveIntensity: 1.4 });
+    for (const side of [-1, 1]) {
+      for (let z = 5; z < 45; z += 5) {
+        this.builder.addVisualBox({ name: `room-2-panel-seam-${side}-${z}`, size: [.012, 23.6, .045], position: [side * 18.79, 12, z], material: seam });
+      }
+      for (const y of [6, 12, 18]) {
+        this.builder.addVisualBox({ name: `room-2-panel-course-${side}-${y}`, size: [.012, .045, 44.6], position: [side * 18.79, y, 22.5], material: seam });
+      }
+      this.builder.addVisualBox({ name: `room-2-upper-service-trim-${side}`, size: [.05, .35, 44.6], position: [side * 18.76, 22.4, 22.5], material: trim });
+      for (const z of [6, 17, 28, 39]) {
+        this.builder.addVisualBox({ name: `room-2-fluorescent-strip-${side}-${z}`, size: [.065, .12, 6], position: [side * 18.72, 22.4, z], material: light });
+      }
+    }
   }
 
   private buildStickyButtonRoute(): WallButtonPresentation {
@@ -444,7 +473,7 @@ export class LevelTwoRoomTwoGreybox {
   }
 
   private buildSuspendedBlocks(): void {
-    const { etch, platform, support, wood } = this.builder.materials;
+    const { platform, support, wood } = this.builder.materials;
 
     for (const definition of BLOCK_ASSEMBLIES) {
       const [suspendedX, , suspendedZ] = definition.suspendedPosition;
@@ -489,17 +518,6 @@ export class LevelTwoRoomTwoGreybox {
       brace.userData.assemblyId = definition.id;
       brace.userData.releaseMode = 'rope-limited-elevated-drop';
       this.solubleTargetMeshes.push(brace);
-
-      const marker = this.builder.addVisualBox({
-        name: `${definition.id}-soluble-marker`,
-        size: [0.9, 0.58, 0.88],
-        position: [suspendedX, 23.1, suspendedZ],
-        material: etch,
-      });
-      marker.userData.presentationOnly = true;
-      marker.userData.targetId = brace.name;
-      brace.add(marker);
-      marker.position.set(0, 0, 0);
 
       this.blockDrops.push(
         new GreyboxDropPreview({
@@ -601,6 +619,16 @@ export class LevelTwoRoomTwoGreybox {
     this.root.add(anchor);
   }
 
+  private applyLaserMotion(): void {
+    const t = this.laserMotionSeconds;
+    // Full height of panel B (3.6–8.4 m), one return trip per 1.6 seconds.
+    this.lasers.hazards[0].setTranslationOffset(this.laserOffset.set(0, -.3 + 2.4 * Math.sin(t * Math.PI * 2 / 1.6), 0));
+    // Horizontal means along Z on this west-facing wall. Keep the final beam
+    // short of Bob's parking button so switching to Goop remains safe.
+    this.lasers.hazards[2].setTranslationOffset(this.laserOffset.set(0, 0, -1.5 + 2.5 * Math.sin(t * Math.PI * 2 / 5)));
+    this.lasers.hazards[3].setTranslationOffset(this.laserOffset.set(0, 0, -.7 + 1.5 * Math.sin(t * Math.PI * 2 / 3.6)));
+  }
+
   private createLasers(): readonly LaserHazard[] {
     return [
       new LaserHazard({
@@ -610,19 +638,20 @@ export class LevelTwoRoomTwoGreybox {
       }),
       new LaserHazard({
         id: 'cultivation-room-2-laser-2-panel-c-vertical',
-        start: new THREE.Vector3(-18.38, 6.8, 19.3),
-        end: new THREE.Vector3(-18.38, 11.1, 19.3),
+        start: new THREE.Vector3(-18.38, 8.8, 17.5),
+        end: new THREE.Vector3(-18.38, 11.1, 17.5),
         timeline: {
           axisWorld: new THREE.Vector3(1, 0, 0),
           repeat: true,
           steps: [
-            { kind: 'hold', durationSeconds: 0.5, enabled: true, angleRadians: -0.18 },
-            { kind: 'sweep', durationSeconds: 1.8, enabled: true, fromAngleRadians: -0.18, toAngleRadians: 0.18 },
-            { kind: 'hold', durationSeconds: 0.5, enabled: true, angleRadians: 0.18 },
-            { kind: 'sweep', durationSeconds: 1.8, enabled: true, fromAngleRadians: 0.18, toAngleRadians: -0.18 },
+            { kind: 'sweep', durationSeconds: 1.25, enabled: true, fromAngleRadians: 0, toAngleRadians: Math.PI * 2 },
           ],
         },
       }),
+      new LaserHazard({ id: 'cultivation-room-2-laser-3-panel-d-gate',
+        start: new THREE.Vector3(-18.38, 9, 23.5), end: new THREE.Vector3(-18.38, 13.4, 23.5) }),
+      new LaserHazard({ id: 'cultivation-room-2-laser-4-button-approach',
+        start: new THREE.Vector3(-18.38, 11.1, 26.4), end: new THREE.Vector3(-18.38, 16.1, 26.4) }),
     ];
   }
 

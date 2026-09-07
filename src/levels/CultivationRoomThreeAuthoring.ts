@@ -27,12 +27,18 @@ function ceiling(
   position: THREE.Vector3,
   forward: THREE.Vector3,
   phase: number,
+  scanHalfAngleRadians = commonDrone.scanHalfAngleRadians,
+  detectionHalfAngleRadians = 35 * DEG,
+  minimumTargetHeightMetres?: number,
 ): CeilingSecurityDroneConfig {
   return {
     drone: {
       ...commonDrone,
       id,
       type: 'ceiling',
+      scanHalfAngleRadians,
+      detectionHalfAngleRadians,
+      minimumTargetHeightMetres,
       initialPosition: position,
       colliderSize: new THREE.Vector3(2.2, 1.35, 2.2),
       forward,
@@ -60,6 +66,9 @@ function ground(
       ...commonDrone,
       id,
       type: 'ground',
+      // The final exposed approach includes the side lanes, not only a narrow
+      // cone down the room centre. Machinery still provides physical cover.
+      detectionHalfAngleRadians: 80 * DEG,
       initialPosition: position,
       colliderSize: new THREE.Vector3(3.6, 1.5, 1.7),
       forward: new THREE.Vector3(0, 0, -1),
@@ -67,10 +76,10 @@ function ground(
       initialScanPhase: phase,
     },
     rearPushCentreLocal: new THREE.Vector3(0, 0, 1.35),
-    rearPushSize: new THREE.Vector3(3.5, 2, 1.4),
-    pushIntentDotThreshold: 0.5,
-    pushProgressPerSecond: 1.25,
-    pushDecayPerSecond: 2,
+    rearPushSize: new THREE.Vector3(4, 2.4, 1.8),
+    pushIntentDotThreshold: 0.25,
+    pushProgressPerSecond: 2.5,
+    pushDecayPerSecond: 1,
     tippingDurationSeconds: 0.75,
     radioactiveFinalPosition: new THREE.Vector3(position.x, 0.55, position.z - 2.5),
     radioactiveFinalRotation: new THREE.Euler(Math.PI * 0.5, 0, 0),
@@ -80,9 +89,11 @@ function ground(
 /** Room 3-local gameplay authoring, parented to the translated greybox room. */
 export const CULTIVATION_ROOM_THREE_DRONE_AUTHORING: RoomThreeDroneEncounterConfig = {
   ceilingDrones: [
-    ceiling('cultivation-room-3-roof-drone-1', new THREE.Vector3(13, 19.5, 18.5), new THREE.Vector3(1, 4.9, -5.5).normalize(), 0),
-    ceiling('cultivation-room-3-roof-drone-2', new THREE.Vector3(-1, 18, 36), new THREE.Vector3(3.5, 5, -6).normalize(), 0.33),
-    ceiling('cultivation-room-3-roof-drone-3', new THREE.Vector3(-12, 19, 55.5), new THREE.Vector3(2, 3.3, -7).normalize(), 0.67),
+    // Watch the wall exits deeper in the room. The vent is behind each
+    // sentry's entire scan/acquisition arc, leaving the entrance unobstructed.
+    ceiling('cultivation-room-3-roof-drone-1', new THREE.Vector3(13, 24, 18.5), new THREE.Vector3(-17, .7, -1).normalize(), 0, 15 * DEG, 20 * DEG),
+    ceiling('cultivation-room-3-roof-drone-2', new THREE.Vector3(-9, 25.3, 32), new THREE.Vector3(-3.44, -0.85, 3).normalize(), 0.33, 90 * DEG, 35 * DEG, 18),
+    ceiling('cultivation-room-3-roof-drone-3', new THREE.Vector3(9, 26.8, 52), new THREE.Vector3(-3.5, -0.5, 3.16).normalize(), 0.67),
   ],
   groundDrones: [
     ground('cultivation-room-3-ground-drone-1', new THREE.Vector3(-6, 1.1, 68), 0),

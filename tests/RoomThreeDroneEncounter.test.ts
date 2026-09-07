@@ -23,7 +23,7 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
     return target;
   });
   const roomThreeCables = targets.filter(
-    (target) => target.mesh.userData.roomId === 3,
+    (target) => target.mesh.userData.authoringRole === 'ceiling-drone-soluble-support-cable',
   );
   assert.equal(roomThreeCables.length, 3);
   assert.ok(roomThreeCables.every(
