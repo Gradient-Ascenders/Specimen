@@ -89,16 +89,16 @@ export class LevelTwoAirDuctGreybox {
     const halfHeight = options.innerHeightMetres * 0.5;
     const halfLength = options.lengthMetres * 0.5;
     const metalFloorLength =
-      options.lengthMetres - stickyEntryLengthMetres;
+      options.lengthMetres - stickyEntryLengthMetres - 0.2;
 
     const stickyEntry = this.builder.addCollider({
       name: `${options.id}-sticky-entry-floor`,
       size: [
         options.innerWidthMetres,
         floorThickness,
-        stickyEntryLengthMetres,
+        stickyEntryLengthMetres - 0.2,
       ],
-      position: [0, -floorThickness * 0.5, stickyEntryLengthMetres * 0.5],
+      position: [0, -floorThickness * 0.5, (stickyEntryLengthMetres + 0.2) * 0.5],
       material: sticky,
       surfaceTag: 'sticky',
       textureRole: 'sticky-vent-tile',
@@ -120,7 +120,7 @@ export class LevelTwoAirDuctGreybox {
     });
     this.addMetalCollider({
       name: `${options.id}-ceiling`,
-      size: [options.innerWidthMetres, wallThickness, options.lengthMetres],
+      size: [options.innerWidthMetres, wallThickness, options.lengthMetres - 0.4],
       position: [
         0,
         options.innerHeightMetres + wallThickness * 0.5,
@@ -130,7 +130,7 @@ export class LevelTwoAirDuctGreybox {
     });
     this.addMetalCollider({
       name: `${options.id}-west-wall`,
-      size: [wallThickness, options.innerHeightMetres, options.lengthMetres],
+      size: [wallThickness, options.innerHeightMetres, options.lengthMetres - 0.4],
       position: [
         -halfWidth - wallThickness * 0.5,
         halfHeight,
@@ -140,7 +140,7 @@ export class LevelTwoAirDuctGreybox {
     });
     this.addMetalCollider({
       name: `${options.id}-east-wall`,
-      size: [wallThickness, options.innerHeightMetres, options.lengthMetres],
+      size: [wallThickness, options.innerHeightMetres, options.lengthMetres - 0.4],
       position: [
         halfWidth + wallThickness * 0.5,
         halfHeight,

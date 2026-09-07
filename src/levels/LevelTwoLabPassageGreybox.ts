@@ -64,13 +64,13 @@ export class LevelTwoLabPassageGreybox {
     this.entryDoor = this.addDoor(
       options,
       'entry',
-      0.25,
+      0.5,
       options.entryInitiallyLocked ?? false,
     );
     this.exitDoor = this.addDoor(
       options,
       'exit',
-      options.lengthMetres - 0.25,
+      options.lengthMetres - 0.5,
       false,
     );
     this.doors = [this.entryDoor, this.exitDoor];
@@ -160,6 +160,12 @@ export class LevelTwoLabPassageGreybox {
       proximityDepthMetres: 7,
     });
     door.root.position.z = z;
+    // Entry indicators must sit on the room-facing side of the room wall,
+    // not inside it now that the shutter itself is recessed into the passage.
+    if (location === 'entry') {
+      door.root.getObjectByName(`${id}-status-housing`)!.position.z -= 0.5;
+      door.statusLight.position.z -= 0.5;
+    }
     door.root.userData.fromRoomId = options.fromRoomId;
     door.root.userData.toRoomId = options.toRoomId;
     door.root.userData.passageDoorLocation = location;
@@ -168,10 +174,10 @@ export class LevelTwoLabPassageGreybox {
 
     const { wall } = this.builder.materials;
     const sideWidth =
-      (options.widthMetres - options.doorwayWidthMetres) * 0.5;
-    const sideOffset = options.doorwayWidthMetres * 0.5 + sideWidth * 0.5;
+      (options.widthMetres - options.doorwayWidthMetres - 0.56) * 0.5;
+    const sideOffset = options.doorwayWidthMetres * 0.5 + 0.28 + sideWidth * 0.5;
     const headerHeight =
-      options.heightMetres - options.doorwayHeightMetres;
+      options.heightMetres - options.doorwayHeightMetres - 0.34;
     this.builder.addCollider({
       name: `${id}-partition-west`,
       size: [sideWidth, options.heightMetres, 0.35],
@@ -187,13 +193,13 @@ export class LevelTwoLabPassageGreybox {
     this.builder.addCollider({
       name: `${id}-partition-header`,
       size: [
-        options.doorwayWidthMetres,
+        options.doorwayWidthMetres + 0.56,
         headerHeight,
         0.35,
       ],
       position: [
         0,
-        options.doorwayHeightMetres + headerHeight * 0.5,
+        options.doorwayHeightMetres + 0.34 + headerHeight * 0.5,
         z,
       ],
       material: wall,

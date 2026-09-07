@@ -636,8 +636,6 @@ export class GreyboxLevelRuntime {
         this.renderLayer.cameraRig.camera,
         resources.collisionWorld,
         this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
-        slimePair.bobBody.gameplayUp,
-        slimePair.goopBody.gameplayUp,
       );
     }
     const cameraDistanceMetres =

@@ -128,7 +128,7 @@ export class ProximityShutterDoor {
 
     const frameDepth = depthMetres + 0.18;
     const frameTop = new THREE.Mesh(
-      new THREE.BoxGeometry(options.widthMetres + 0.45, 0.34, frameDepth),
+      new THREE.BoxGeometry(options.widthMetres + 0.56, 0.34, frameDepth),
       frameMaterial,
     );
     frameTop.name = `${options.id}-frame-top`;

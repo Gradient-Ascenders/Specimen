@@ -36,6 +36,8 @@ export interface SecurityDroneConfig {
   readonly scanSpeedRadiansPerSecond: number;
   readonly detectionHalfAngleRadians: number;
   readonly detectionRangeMetres: number;
+  /** Minimum target height in the drone parent's authoring coordinates. */
+  readonly minimumTargetHeightMetres?: number;
   readonly warningSeconds: number;
   readonly fireIntervalSeconds: number;
   readonly targetLossGraceSeconds: number;
@@ -113,6 +115,7 @@ export class SecurityDrone {
   private readonly displacement = new THREE.Vector3();
   private readonly localAnchor = new THREE.Vector3();
   private readonly worldPosition = new THREE.Vector3();
+  private readonly heightCheckPosition = new THREE.Vector3();
   private readonly hit = new CollisionHit();
   private state: SecurityDroneState = 'scanning';
   private target: SecurityDroneTarget | undefined;
@@ -339,6 +342,7 @@ export class SecurityDrone {
 
   private canSee(target: SecurityDroneTarget): boolean {
     if (target.eligible === false) return false;
+    if (!this.isWithinTargetHeight(target)) return false;
     this.copyAnchor(this.config.detectionAnchor, this.detectionOrigin);
     this.displacement.set(
       target.position.x - this.detectionOrigin.x,
@@ -378,8 +382,16 @@ export class SecurityDrone {
     if (this.scanDirection.lengthSq() > EPSILON) this.scanDirection.normalize();
   }
 
+  private isWithinTargetHeight(target: SecurityDroneTarget): boolean {
+    if (this.config.minimumTargetHeightMetres === undefined) return true;
+    this.heightCheckPosition.set(target.position.x, target.position.y, target.position.z);
+    this.root.parent?.worldToLocal(this.heightCheckPosition);
+    return this.heightCheckPosition.y >= this.config.minimumTargetHeightMetres;
+  }
+
   private fire(): void {
     if (!this.target) return;
+    if (!this.isWithinTargetHeight(this.target)) return;
     this.copyAnchor(this.config.muzzleAnchor, this.muzzlePosition);
     this.targetDirection.set(
       this.target.position.x - this.muzzlePosition.x,
@@ -454,6 +466,9 @@ function write(
 }
 
 function validateConfig(config: SecurityDroneConfig): void {
+  if (config.minimumTargetHeightMetres !== undefined && !Number.isFinite(config.minimumTargetHeightMetres)) {
+    throw new Error('Drone minimum target height must be finite.');
+  }
   if (!config.id) throw new Error('Security drone IDs cannot be empty.');
   if (config.forward.lengthSq() <= EPSILON || config.scanAxis.lengthSq() <= EPSILON) {
     throw new Error(`Security drone "${config.id}" directions must be non-zero.`);

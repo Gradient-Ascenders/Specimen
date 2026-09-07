@@ -174,6 +174,7 @@ export class LevelTwoPreviewScene {
   bindDissolveTargets(targets: readonly DissolveTarget[]): void {
     this.roomOne.bindDissolveTargets(targets);
     this.roomTwo.bindDissolveTargets(targets);
+    this.roomThree.bindDissolveTargets(targets);
   }
 
   copyRoomSpawnPosition(
@@ -195,6 +196,15 @@ export class LevelTwoPreviewScene {
     this.roomResolverPosition.set(position.x, position.y, position.z);
     this.root.worldToLocal(this.roomResolverPosition);
     if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_THREE_OFFSET_Z) return 3;
+    // The final duct section belongs to Room 3's protected arrival
+    // checkpoint. Do not classify the ground-level Goop passage as Room 3 yet.
+    const duct = LEVEL_TWO_BOB_AIR_DUCT_LAYOUT;
+    if (
+      this.roomResolverPosition.z >= LEVEL_TWO_ROOM_THREE_OFFSET_Z - 4 &&
+      Math.abs(this.roomResolverPosition.x - duct.centreXMetres) <= duct.innerWidthMetres / 2 &&
+      this.roomResolverPosition.y >= duct.floorYMetres &&
+      this.roomResolverPosition.y <= duct.floorYMetres + duct.innerHeightMetres
+    ) return 3;
     if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_TWO_OFFSET_Z) return 2;
     return 1;
   }

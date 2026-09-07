@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
+import { GreyboxDropPreview } from './GreyboxDropPreview.ts';
 
 import {
   LaserHazard,
@@ -16,9 +18,9 @@ import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from './CultivationRoomThreeAu
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 
 export const LEVEL_TWO_ROOM_THREE_BOB_SPAWN = new THREE.Vector3(
-  8,
-  19.7,
-  2.8,
+  LEVEL_TWO_BOB_AIR_DUCT_LAYOUT.centreXMetres,
+  LEVEL_TWO_BOB_AIR_DUCT_LAYOUT.floorYMetres + 0.46,
+  -3,
 );
 export const LEVEL_TWO_ROOM_THREE_GOOP_SPAWN = new THREE.Vector3(
   0,
@@ -53,6 +55,11 @@ export class LevelTwoRoomThreeGreybox {
   readonly radiationHazard: RadioactiveFloorHazard;
 
   private readonly laserPresentation: LaserHazardPresentation;
+  readonly wallDrops: GreyboxDropPreview[] = [];
+  private readonly wallTethers: THREE.Mesh[] = [];
+  private readonly wallLaserGroups: THREE.Group[] = [];
+  private laserMotionSeconds = 0;
+  private readonly laserOffset = new THREE.Vector3();
   private readonly localLaserTargetById: Readonly<
     Record<RadioactiveFloorSlimeId, LocalLaserContactTarget>
   > = {
@@ -95,7 +102,21 @@ export class LevelTwoRoomThreeGreybox {
         }),
     });
     this.laserPresentation = new LaserHazardPresentation(hazards);
+    for (const hazard of hazards) {
+      const group = new THREE.Group();
+      group.name = `${hazard.id}-wall-mounted-visuals`;
+      const parts = this.laserPresentation.root.children.filter(child => child.userData.laserHazardId === hazard.id);
+      group.add(...parts);
+      this.laserPresentation.root.add(group);
+      this.wallLaserGroups.push(group);
+    }
     this.root.add(this.lasers.root, this.laserPresentation.root);
+    this.syncWallLasers();
+    this.laserPresentation.sync();
+  }
+
+  bindDissolveTargets(targets: readonly DissolveTarget[]): void {
+    for (const drop of this.wallDrops) drop.bind(targets);
   }
 
   update(
@@ -115,8 +136,35 @@ export class LevelTwoRoomThreeGreybox {
       localTarget.radiusMetres = occupant.radiusMetres;
       this.localLaserTargets.push(localTarget);
     }
+    for (const drop of this.wallDrops) drop.update(deltaSeconds);
+    this.laserMotionSeconds += deltaSeconds;
+    this.syncWallLasers();
     this.lasers.updateTargets(deltaSeconds, this.localLaserTargets);
     this.laserPresentation.sync();
+  }
+
+  private syncWallLasers(): void {
+    // Full six-metre wall height, bottom-to-top in 0.8 seconds.
+    this.lasers.hazards[0].setTranslationOffset(this.laserOffset.set(
+      0, this.wallDrops[0].mesh.position.y - 21 + 3 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 1.6), 0,
+    ));
+    this.lasers.hazards[1].setTranslationOffset(this.laserOffset.set(
+      0, this.wallDrops[1].mesh.position.y - 23, 3.85 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 2),
+    ));
+    this.lasers.hazards[2].setTranslationOffset(this.laserOffset.set(
+      0, this.wallDrops[2].mesh.position.y - 24.825 + 4.475 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 2.4), 0,
+    ));
+    for (let index = 0; index < this.lasers.hazards.length; index++) {
+      const laser = this.lasers.hazards[index];
+      laser.copyStart(this.laserOffset);
+      const exposed = this.wallDrops[index].state !== 'suspended' && this.laserOffset.y < 29.35;
+      laser.setEnabled(exposed);
+      this.wallLaserGroups[index].visible = exposed;
+    }
+    for (let index = 0; index < this.wallDrops.length; index++) {
+      const mesh = this.wallDrops[index].mesh;
+      this.wallTethers[index].visible = mesh.position.y + (mesh.geometry as THREE.BoxGeometry).parameters.height / 2 < 29.65;
+    }
   }
 
   updateRadiation(
@@ -126,12 +174,16 @@ export class LevelTwoRoomThreeGreybox {
   }
 
   reset(): void {
+    for (const drop of this.wallDrops) drop.reset();
     this.radiationHazard.reset();
     this.lasers.reset();
+    this.laserMotionSeconds = 0;
+    this.syncWallLasers();
     this.laserPresentation.sync();
   }
 
   dispose(): void {
+    for (const drop of this.wallDrops) drop.dispose();
     this.radiationHazard.dispose();
     this.laserPresentation.dispose();
     this.lasers.dispose();
@@ -288,19 +340,19 @@ export class LevelTwoRoomThreeGreybox {
       readonly position: readonly [number, number, number];
       readonly routeBeat: string;
     }> = [
-      { id: 'entry', size: [6, 0.5, 7], position: [8, 19, 3.5], routeBeat: 'read-first-sticky-transfer' },
-      { id: 'drone-1-rest', size: [5, 0.5, 4], position: [14, 24.4, 13], routeBeat: 'recover-after-first-sticky-laser' },
-      { id: 'beam-1', size: [3.5, 0.45, 3.5], position: [14, 24.8, 19], routeBeat: 'measured-forward-jump' },
-      { id: 'beam-2', size: [3.5, 0.45, 3.5], position: [9, 23.9, 25], routeBeat: 'measured-diagonal-jump' },
-      { id: 'drone-2-rest', size: [4.5, 0.5, 4], position: [2.5, 23, 30], routeBeat: 'cooperation-pause' },
-      { id: 'central-wall-exit', size: [4, 0.5, 4], position: [-5, 23.7, 43], routeBeat: 'recover-after-second-sticky-laser' },
-      { id: 'beam-3', size: [3.5, 0.45, 3.5], position: [-10, 22.3, 48.5], routeBeat: 'high-wall-approach' },
-      { id: 'drone-3-rest', size: [4, 0.5, 3.5], position: [-15, 25, 57.5], routeBeat: 'recover-after-third-sticky-laser' },
-      { id: 'descent-1', size: [3.5, 0.5, 3.5], position: [-18, 21, 61], routeBeat: 'controlled-descent' },
-      { id: 'descent-2', size: [3.5, 0.5, 3.5], position: [-14, 17, 64.5], routeBeat: 'controlled-descent' },
-      { id: 'descent-3', size: [4, 0.5, 4], position: [-9, 13, 67], routeBeat: 'cross-behind-ground-drones' },
-      { id: 'security-rear-landing', size: [4, 0.5, 4], position: [-3, 8, 69.5], routeBeat: 'approach-ground-drones-from-rear' },
-      { id: 'security-floor-step', size: [4, 0.5, 3.2], position: [2, 3.5, 70.2], routeBeat: 'finish-descent-behind-drones' },
+      { id: 'entry', size: [6, .5, 6.8], position: [8, 18.55, 3.6], routeBeat: 'read-first-drone' },
+      { id: 'launch-island', size: [3, .5, 3], position: [8, 19.4, 9.5], routeBeat: 'straight-warmup-jump' },
+      { id: 'cross-beam', size: [4, .5, 2.5], position: [3.5, 19.9, 14], routeBeat: 'diagonal-to-first-laser-wall' },
+      { id: 'first-wall-exit', size: [4, .5, 3], position: [1, 23.75, 21], routeBeat: 'first-drone-window' },
+      { id: 'offset-island', size: [3, .5, 3], position: [-4, 24, 25.5], routeBeat: 'offset-precision-jump' },
+      { id: 'west-runup', size: [3.5, .5, 3], position: [-9, 22, 30], routeBeat: 'approach-sweeping-wall' },
+      { id: 'west-wall-exit', size: [4, .5, 3.5], position: [-16, 26, 38], routeBeat: 'second-drone-window' },
+      { id: 'west-return-island', size: [3, .5, 3], position: [-10, 26, 38], routeBeat: 'return-from-wall-crest' },
+      { id: 'cross-room-a', size: [3, .5, 3], position: [-5, 25.5, 42], routeBeat: 'long-diagonal' },
+      { id: 'cross-room-b', size: [3, .5, 3], position: [0, 22.7, 46.5], routeBeat: 'drop-to-final-wall-approach' },
+      { id: 'final-wall-exit', size: [4, .5, 3], position: [3, 25.6, 54.5], routeBeat: 'third-drone-window' },
+      { id: 'last-island', size: [3, .5, 3], position: [9, 24.8, 59], routeBeat: 'last-precision-jump' },
+      { id: 'drop-launch', size: [4.5, .5, 3], position: [5, 24, 63], routeBeat: 'drop-behind-ground-drones-no-fall-damage' },
     ];
 
     for (const definition of platforms) {
@@ -320,35 +372,144 @@ export class LevelTwoRoomThreeGreybox {
 
     this.addStickyPanel({
       name: 'cultivation-room-3-entry-sticky-transfer',
-      size: [8, 8, 0.18],
-      position: [8, 21, 10.5],
+      size: [8, 6, 0.18],
+      position: [1, 21, 18],
       material: sticky,
     });
     this.addStickyPanel({
       name: 'cultivation-room-3-central-sticky-transfer',
-      size: [0.18, 8, 9],
-      position: [-1, 20, 36],
+      size: [0.18, 7, 8],
+      position: [-13, 23, 35.5],
       material: sticky,
+    });
+    // Continuous adhesive floor from the wall crest to the landing. The
+    // horizontal surface gives edge adhesion a real new ground to acquire.
+    this.builder.addCollider({
+      name: 'cultivation-room-3-first-wall-sticky-landing',
+      size: [4, .18, 1.55], position: [1, 23.91, 18.725], material: sticky,
+      surfaceTag: 'sticky', textureRole: 'sticky-vent-tile',
     });
     this.addStickyPanel({
       name: 'cultivation-room-3-high-sticky-transfer',
-      size: [8, 8, 0.18],
-      position: [-9, 22, 54],
+      size: [8, 9.65, 0.18],
+      position: [3, 24.825, 51],
       material: sticky,
     });
+    this.buildThirdWallOpening();
+    this.builder.addCollider({
+      name: 'cultivation-room-3-second-wall-sticky-landing',
+      size: [.96, .18, 3.5], position: [-13.52, 26.41, 38], material: sticky,
+      surfaceTag: 'sticky', textureRole: 'sticky-vent-tile',
+    });
+    this.addStickyPanel({
+      name: 'cultivation-room-3-cover-sticky-transfer',
+      size: [.18, 8.35, 7.5], position: [-1.5, 25.475, 24.75], material: sticky,
+    });
+    this.addStickyPanel({
+      name: 'cultivation-room-3-second-cover-sticky-transfer',
+      size: [9.5, 8, .18], position: [-8.25, 25.65, 39.8], material: sticky,
+    });
+    this.configureDropWalls();
 
     // Supports make each rest area read as a maintenance route rather than a
     // collection of arbitrary boxes suspended in an empty room.
     for (const [name, x, y, z, height] of [
-      ['drone-1-rest', 14, 12.2, 13, 24.4],
-      ['drone-2-rest', 2.5, 11.5, 30, 23],
-      ['central-wall-exit', -5, 11.85, 43, 23.7],
+      ['first-wall-exit', 1, 11.8, 21, 23.6],
+      ['west-wall-exit', -16, 13, 38, 26],
+      ['final-wall-exit', 3, 12.8, 54.5, 25.6],
     ] as const) {
       this.builder.addCollider({
         name: `cultivation-room-3-${name}-support`,
         size: [0.8, height, 0.8],
         position: [x, y, z],
         material: support,
+      });
+    }
+  }
+
+  private buildThirdWallOpening(): void {
+    const panel = this.root.getObjectByName('cultivation-room-3-high-sticky-transfer') as THREE.Mesh;
+    // The parent keeps the assembly pose, but only the four solid sections
+    // participate in rendering/collision. There is no invisible box in the hole.
+    this.collisionMeshes.splice(this.collisionMeshes.indexOf(panel), 1);
+    panel.material = new THREE.MeshBasicMaterial({ visible: false });
+    const sections = [
+      { name: 'below-opening', size: [8, 5.85, .18], position: [3, 22.925, 51] },
+      { name: 'above-opening', size: [8, 1.6, .18], position: [3, 28.85, 51] },
+      { name: 'opening-left', size: [2.8, 2.2, .18], position: [.4, 26.95, 51] },
+      { name: 'opening-right', size: [2.8, 2.2, .18], position: [5.6, 26.95, 51] },
+    ] as const;
+    for (const section of sections) {
+      const part = this.builder.addCollider({
+        name: `${panel.name}-${section.name}`, size: section.size, position: section.position,
+        material: this.builder.materials.sticky, surfaceTag: 'sticky',
+        movementFaceMode: 'vertical-sides', textureRole: 'sticky-wall-tile',
+      });
+      Object.assign(part.userData, { levelId: 'cultivation', roomId: 3, routeOwner: 'bob' });
+      panel.attach(part);
+    }
+    const floor = this.builder.addCollider({
+      name: `${panel.name}-opening-floor`, size: [2.4, .18, 1.91],
+      position: [3, 25.76, 52.045], material: this.builder.materials.sticky,
+      surfaceTag: 'sticky', textureRole: 'sticky-vent-tile',
+    });
+    panel.attach(floor);
+  }
+
+  private configureDropWalls(): void {
+    for (const [index, name] of ['entry', 'central', 'high', 'cover', 'second-cover'].entries()) {
+      const panel = this.root.getObjectByName(`cultivation-room-3-${name}-sticky-transfer`) as THREE.Mesh<THREE.BoxGeometry>;
+      const landing = panel.position.clone();
+      const height = panel.geometry.parameters.height;
+      const thinX = panel.geometry.parameters.width < panel.geometry.parameters.depth;
+      // Guide rails visually attach the travelling emitters to their panel.
+      for (const side of index < 3 ? [-1, 1] : []) {
+        const rail = this.builder.addVisualBox({
+          name: `${panel.name}-laser-guide-${side}`,
+          size: index === 1 ? [.3, .1, 7.9] : [.1, height - .1, .3],
+          position: [0, 0, 0], material: this.builder.materials.support,
+        });
+        panel.add(rail);
+        rail.position.set(index === 1 ? .2 : side * 3.85, index === 1 ? side * 3.35 : 0, index === 1 ? 0 : -.2);
+      }
+      const raised = landing.clone();
+      // Store the entire panel above the ceiling underside. Only its wooden
+      // retaining latch protrudes into the room for Goop to shoot.
+      raised.y = 29.85 + height / 2;
+      const brace = this.builder.addCollider({
+        name: `${panel.name}-wooden-latch`,
+        size: thinX ? [.65, .4, 2.4] : [2.4, .4, .65],
+        position: [raised.x, 29.6, raised.z],
+        material: this.builder.materials.wood,
+        interactionRole: 'goop-dissolvable',
+      });
+      Object.assign(brace.userData, {
+        soluble: true, solubleId: brace.name, roomId: 3, levelId: 'cultivation',
+        textureRole: 'wooden-support', dissolveDurationSeconds: .8,
+        releaseMode: 'permanent-sticky-wall-drop',
+      });
+      this.solubleTargetMeshes.push(brace);
+      const lipName = index === 0 ? 'first' : index === 1 ? 'second' : undefined;
+      if (lipName) {
+        const lip = this.root.getObjectByName(`cultivation-room-3-${lipName}-wall-sticky-landing`)!;
+        panel.attach(lip);
+      }
+      const tether = this.builder.addVisualBox({
+        name: `${panel.name}-retaining-cable`, size: [.1, 1, .1],
+        position: [landing.x, 29.65, landing.z], material: this.builder.materials.cable,
+      });
+      this.wallTethers.push(tether);
+      this.wallDrops.push(new GreyboxDropPreview({
+        id: `${panel.name}-drop`, mesh: panel, solubleTargetId: brace.name,
+        suspendedPosition: raised, landingPosition: landing,
+        fallDurationSeconds: .9, fallTiltRadians: 0,
+        tetherMesh: tether, tetherAnchorPosition: new THREE.Vector3(landing.x, 29.65, landing.z),
+        tetherAttachmentOffsetY: height / 2,
+      }));
+      this.builder.addVisualBox({
+        name: `${panel.name}-ceiling-mount`,
+        size: [panel.geometry.parameters.width + .42, .3, panel.geometry.parameters.depth + .42],
+        position: [landing.x, 29.65, landing.z], material: this.builder.materials.support,
       });
     }
   }
@@ -398,9 +559,6 @@ export class LevelTwoRoomThreeGreybox {
       { position: [15, 1.8, 31], size: [5, 3.6, 3] },
       { position: [-7, 2.1, 37], size: [5.5, 4.2, 3.2] },
       { position: [10, 1.7, 43], size: [4.5, 3.4, 3] },
-      { position: [-14, 2, 49], size: [5, 4, 3.2] },
-      { position: [2, 1.8, 55], size: [5.5, 3.6, 3] },
-      { position: [14, 2.2, 61], size: [5, 4.4, 3.2] },
     ];
 
     covers.forEach((cover, index) => {
@@ -451,16 +609,6 @@ export class LevelTwoRoomThreeGreybox {
       });
       this.solubleTargetMeshes.push(cable);
 
-      const marker = this.builder.addVisualBox({
-        name: `${id}-soluble-marker-band`,
-        size: [0.48, 0.32, 0.48],
-        position: [x, cable.position.y, z],
-        material: this.builder.materials.etch,
-      });
-      marker.userData.presentationOnly = true;
-      marker.userData.targetId = cable.name;
-      cable.add(marker);
-      marker.position.set(0, 0, 0);
     }
   }
 
@@ -507,44 +655,18 @@ export class LevelTwoRoomThreeGreybox {
     return [
       new LaserHazard({
         id: 'cultivation-room-3-entry-sticky-laser',
-        start: new THREE.Vector3(4.15, 20.5, 10.35),
-        end: new THREE.Vector3(11.85, 20.5, 10.35),
-        timeline: {
-          axisWorld: new THREE.Vector3(0, 0, 1),
-          repeat: true,
-          steps: [
-            { kind: 'hold', durationSeconds: 1.3, enabled: true, angleRadians: 0 },
-            { kind: 'hold', durationSeconds: 0.9, enabled: false, angleRadians: 0 },
-          ],
-        },
+        start: new THREE.Vector3(-2.85, 21, 17.65),
+        end: new THREE.Vector3(4.85, 21, 17.65),
       }),
       new LaserHazard({
         id: 'cultivation-room-3-central-sticky-laser',
-        start: new THREE.Vector3(-0.65, 20, 31.7),
-        end: new THREE.Vector3(-0.65, 20, 40.3),
-        timeline: {
-          axisWorld: new THREE.Vector3(1, 0, 0),
-          repeat: true,
-          steps: [
-            { kind: 'hold', durationSeconds: 0.45, enabled: true, angleRadians: -0.2 },
-            { kind: 'sweep', durationSeconds: 1.7, enabled: true, fromAngleRadians: -0.2, toAngleRadians: 0.2 },
-            { kind: 'hold', durationSeconds: 0.45, enabled: true, angleRadians: 0.2 },
-            { kind: 'sweep', durationSeconds: 1.7, enabled: true, fromAngleRadians: 0.2, toAngleRadians: -0.2 },
-          ],
-        },
+        start: new THREE.Vector3(-12.65, 19.65, 35.5),
+        end: new THREE.Vector3(-12.65, 26.35, 35.5),
       }),
       new LaserHazard({
         id: 'cultivation-room-3-high-sticky-laser',
-        start: new THREE.Vector3(-12.85, 21.5, 53.65),
-        end: new THREE.Vector3(-5.15, 21.5, 53.65),
-        timeline: {
-          axisWorld: new THREE.Vector3(0, 0, 1),
-          repeat: true,
-          steps: [
-            { kind: 'hold', durationSeconds: 1.1, enabled: true, angleRadians: 0 },
-            { kind: 'hold', durationSeconds: 1, enabled: false, angleRadians: 0 },
-          ],
-        },
+        start: new THREE.Vector3(-0.85, 24.825, 50.65),
+        end: new THREE.Vector3(6.85, 24.825, 50.65),
       }),
     ];
   }
