@@ -165,9 +165,17 @@ export class LevelTwoPreviewScene {
 
   /** Colliders whose authored gameplay transform changes after registration. */
   get dynamicCollisionMeshes(): readonly THREE.Mesh[] {
+    const wallRoots = new Set<THREE.Object3D>(this.roomThree.wallDrops.map(drop => drop.mesh));
+    const movingWallColliders = this.roomThree.collisionMeshes.filter(mesh => {
+      for (let ancestor: THREE.Object3D | null = mesh; ancestor; ancestor = ancestor.parent) {
+        if (wallRoots.has(ancestor)) return true;
+      }
+      return false;
+    });
     return [
       ...this.roomOne.platformDrops.map((drop) => drop.mesh),
       ...this.roomTwo.blockDrops.map((drop) => drop.mesh),
+      ...movingWallColliders,
       ...this.roomOneToTwoPassage.doors.map((door) => door.collisionMesh),
       ...this.roomTwoToThreeGoopPassage.doors.map(
         (door) => door.collisionMesh,

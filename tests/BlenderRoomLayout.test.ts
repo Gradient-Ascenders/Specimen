@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { createAuthoredDissolveTarget } from '../src/abilities/DissolveTarget.ts';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
-import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
+import { ColliderTransformMode, CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from '../src/levels/CultivationRoomThreeAuthoring.ts';
@@ -15,7 +15,8 @@ test('Room 3 wooden latches release independently and remain down until reset', 
   const scene = new LevelTwoPreviewScene(() => {});
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
-  world.registerAll(scene.collisionMeshes);
+  world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+  for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
   surfaces.registerAll(scene.collisionMeshes);
   const targets = scene.roomThree.solubleTargetMeshes.map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces)!);
   scene.roomThree.bindDissolveTargets(targets);
@@ -81,7 +82,8 @@ test('Blender parkour gaps can be landed with the real charged-jump controller',
   scene.root.updateWorldMatrix(true, true);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
-  world.registerAll(scene.collisionMeshes);
+  world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+  for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
   surfaces.registerAll(scene.collisionMeshes);
   const targets = scene.roomThree.solubleTargetMeshes.map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces)!);
   scene.roomThree.bindDissolveTargets(targets);
@@ -139,7 +141,8 @@ test('Blender parkour gaps can be landed with the real charged-jump controller',
 test('Room 3 individual barricades leave an exposed final approach', () => {
   const scene = new LevelTwoPreviewScene(() => {});
   const world = new CollisionWorld();
-  world.registerAll(scene.collisionMeshes);
+  world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+  for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
   for (let i = 1; i <= 7; i++) {
     const cover = scene.root.getObjectByName(`cultivation-room-3-goop-cover-${i}`) as THREE.Mesh;
     const bounds = new THREE.Box3().setFromObject(cover);
@@ -160,7 +163,8 @@ test('Bob jumps directly from the final released block to the vent adhesion', ()
   scene.root.updateWorldMatrix(true, true);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
-  world.registerAll(scene.collisionMeshes);
+  world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+  for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
   surfaces.registerAll(scene.collisionMeshes);
   const start = scene.roomTwo.root.localToWorld(new THREE.Vector3(5.1, 16.46, 41.6));
   const target = scene.roomTwo.root.localToWorld(new THREE.Vector3(8, 18, 44.72));
@@ -185,7 +189,8 @@ test('each hanging drone can detect and fire on its new exposed Bob approach', (
   const scene = new LevelTwoPreviewScene(() => {});
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
-  world.registerAll(scene.collisionMeshes);
+  world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+  for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
   const targets = scene.roomThree.solubleTargetMeshes.map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces)!);
   scene.roomThree.bindDissolveTargets(targets);
   for (const drop of scene.roomThree.wallDrops.slice(0, 3)) targets.find(target => target.id === drop.solubleTargetId)!.advance(1);
@@ -266,7 +271,8 @@ for (const index of [0, 1, 2]) test(`Bob can traverse lowered sticky wall ${inde
   const scene = new LevelTwoPreviewScene(() => {});
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
-  world.registerAll(scene.collisionMeshes);
+  world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+  for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
   surfaces.registerAll(scene.collisionMeshes);
   const targets = scene.roomThree.solubleTargetMeshes.map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces)!);
   scene.roomThree.bindDissolveTargets(targets);

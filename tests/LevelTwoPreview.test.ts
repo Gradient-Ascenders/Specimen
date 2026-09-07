@@ -357,10 +357,19 @@ test('bulk-static preview registration promotes every animated collider', () => 
     ...scene.roomOneToTwoPassage.doors,
     ...scene.roomTwoToThreeGoopPassage.doors,
   ];
+  const colliderSet = new Set(scene.collisionMeshes);
+  const wallColliders: THREE.Mesh[] = [];
+  for (const drop of scene.roomThree.wallDrops) {
+    drop.mesh.traverse(object => {
+      if (object instanceof THREE.Mesh && colliderSet.has(object)) wallColliders.push(object);
+    });
+  }
+  assert.equal(wallColliders.length, 11);
   assert.deepEqual(
     new Set(scene.dynamicCollisionMeshes),
     new Set([
       ...drops.map((drop) => drop.mesh),
+      ...wallColliders,
       ...doors.map((door) => door.collisionMesh),
     ]),
   );
@@ -371,7 +380,7 @@ test('bulk-static preview registration promotes every animated collider', () => 
     return target;
   });
   scene.bindDissolveTargets(targets);
-  for (const drop of drops) {
+  for (const drop of [...drops, ...scene.roomThree.wallDrops]) {
     const target = targets.find(
       (candidate) => candidate.id === drop.solubleTargetId,
     );
@@ -380,6 +389,7 @@ test('bulk-static preview registration promotes every animated collider', () => 
   }
 
   scene.update(1, 2, []);
+  scene.roomThree.update(1, []);
   const hit = new CollisionHit();
   const sweepOrigin = new THREE.Vector3();
   const sweepAcross = new THREE.Vector3(-1.5, 0, 0);
@@ -397,9 +407,26 @@ test('bulk-static preview registration promotes every animated collider', () => 
     assert.equal(drop.state, 'landed');
     expectDropCollision(drop);
   }
+  const expectWallCollision = (): void => {
+    for (const mesh of wallColliders) {
+      const size = (mesh.geometry as THREE.BoxGeometry).parameters;
+      const axis = size.height < size.width && size.height < size.depth ? 'y' : size.width < size.depth ? 'x' : 'z';
+      const half = (axis === 'x' ? size.width : axis === 'y' ? size.height : size.depth) / 2;
+      mesh.getWorldPosition(sweepOrigin);
+      sweepOrigin[axis] += half + .15;
+      const direction = new THREE.Vector3();
+      direction[axis] = -.3;
+      for (const layer of [CollisionLayer.Movement, CollisionLayer.LineOfSight]) {
+        assert.ok(world.sweepSphere(sweepOrigin, direction, .02, hit, layer), mesh.name);
+        assert.equal(hit.object, mesh, `Stale collision/LOS pose for ${mesh.name}`);
+      }
+    }
+  };
+  expectWallCollision();
 
   for (const target of targets) target.reset();
   scene.reset();
+  expectWallCollision();
   for (const drop of drops) {
     assert.equal(drop.state, 'suspended');
     expectDropCollision(drop);
