@@ -1,5 +1,9 @@
 # Level 2 Room 1 material pass
 
+Follow-up: [Room 2](level-two-room-two-material-pass.md) extends this same palette
+through the next chamber and both outgoing routes. The figures below record the
+original Room 1 checkpoint.
+
 ## Scope and live entry point
 
 `LevelTwoPreviewScene` owns the authored Level 2 rooms, instantiated by

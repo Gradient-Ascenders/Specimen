@@ -1,9 +1,21 @@
 import * as THREE from 'three';
+import { createContainmentStickyWallTextures } from '../containment/ContainmentProceduralTextures.ts';
+import { createContainmentStickyWallMaterial } from '../containment/ContainmentArtResources.ts';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 
-/** Original, deterministic facility finishes. One owner for Room 1 and its passage. */
+interface LabFixtureOptions {
+  readonly ceilingOpening?: readonly [number, number, number, number];
+  /** Leave authored adhesive/laser walls free of decorative strips and trim. */
+  readonly wallSides?: readonly (-1 | 1)[];
+  readonly fillHeightMetres?: number;
+  readonly fillPositionsZ?: readonly number[];
+}
+
+/** Original, deterministic facility finishes shared by the dressed Cultivation rooms. */
 export class CultivationLabMaterials {
   readonly textures: THREE.DataTexture[] = [];
+  private readonly stickyMaps = createContainmentStickyWallTextures();
+  readonly sticky = createContainmentStickyWallMaterial(this.stickyMaps);
   readonly wall = this.finish('wall', 0xe2e1d8, 0.76, 0.02);
   readonly floor = this.finish('floor', 0xaeb7b2, 0.84, 0.08);
   readonly ceiling = this.finish('ceiling', 0xcbd0ca, 0.8, 0.06);
@@ -20,6 +32,7 @@ export class CultivationLabMaterials {
   private disposed = false;
 
   constructor() {
+    this.textures.push(this.stickyMaps.stickyNormal, this.stickyMaps.stickyRoughness);
     this.platform.emissive.setHex(0x443300);
     this.platform.emissiveIntensity = 0.28;
     this.rope.metalness = 0;
@@ -29,21 +42,30 @@ export class CultivationLabMaterials {
   }
 
   /** Material identity is an explicit authoring reference, never a gameplay rule. */
-  dress(builder: GreyboxRoomBuilder): void {
+  dress(builder: GreyboxRoomBuilder, servicePanels: readonly string[] = []): void {
     const source = builder.materials;
     builder.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || !(object.geometry instanceof THREE.BoxGeometry)) return;
+      // These unit-height visuals are stretched by the existing drop controller.
+      // Keep their plain metal finish instead of stretching panel seams with them.
+      if (object.name.endsWith('-non-soluble-rope')) return;
       let material: THREE.MeshStandardMaterial | undefined;
       if (object.material === source.wall) {
-        material = object.name.includes('ceiling') ? this.ceiling : this.wall;
+        material = servicePanels.includes(object.name) ? this.duct :
+          object.name.includes('ceiling') ? this.ceiling : this.wall;
       } else if (object.material === source.floor) material = this.floor;
       else if (object.material === source.support) material = this.metal;
       else if (object.material === source.duct) material = this.duct;
       else if (object.material === source.platform) material = this.platform;
       else if (object.material === source.wood) material = this.rope;
+      else if (object.material === source.sticky && object.userData.textureRole === 'sticky-wall-tile') material = this.sticky;
       // Explicit door art parts; status indicators remain owned by the door.
       else if (object.name.endsWith('-shutter-panel')) material = this.duct;
       else if (/-frame-(top|left|right)$/.test(object.name)) material = this.metal;
+      // Updated Room 2's authored service details borrow the same palette.
+      else if (/^room-2-panel-(seam|course)-/.test(object.name)) material = this.metal;
+      else if (object.name.startsWith('room-2-upper-service-trim-')) material = this.duct;
+      else if (object.name.startsWith('room-2-fluorescent-strip-')) material = this.fixture;
       if (material) this.bind(object, material);
     });
   }
@@ -55,27 +77,8 @@ export class CultivationLabMaterials {
     const positions = mesh.geometry.getAttribute('position');
     const normals = mesh.geometry.getAttribute('normal');
     const uv = mesh.geometry.getAttribute('uv');
-    // Doorway walls and the original trim share x/y opening planes. Give only
-    // the non-colliding trim a 15 mm reveal into the opening. Lower the jamb
-    // tops to meet the header, avoiding coplanar overlap between trim pieces.
-    const framePart = mesh.name.match(/-frame-(top|left|right)$/)?.[1];
-    if (framePart) {
-      const clearance = 0.015;
-      for (let i = 0; i < positions.count; i++) {
-        const x = positions.getX(i);
-        const y = positions.getY(i);
-        if (framePart === 'left' && x > 0) positions.setX(i, x + clearance);
-        if (framePart === 'right' && x < 0) positions.setX(i, x - clearance);
-        if ((framePart === 'top' && y < 0) || (framePart !== 'top' && y > 0)) {
-          positions.setY(i, y - clearance);
-        }
-      }
-      positions.needsUpdate = true;
-      mesh.geometry.computeBoundingBox();
-      mesh.geometry.computeBoundingSphere();
-    }
-    const panelWidth = material === this.wall ? 4 : material === this.rope ? 0.5 : 2;
-    const panelHeight = material === this.wall ? 3 : material === this.rope ? 0.5 : 2;
+    const panelWidth = material === this.sticky ? 6.08 : material === this.wall ? 4 : material === this.rope ? 0.5 : 2;
+    const panelHeight = material === this.sticky ? 6.55 : material === this.wall ? 3 : material === this.rope ? 0.5 : 2;
     for (let i = 0; i < uv.count; i++) {
       const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
       const nx = normals.getX(i), ny = normals.getY(i), nz = normals.getZ(i);
@@ -91,7 +94,14 @@ export class CultivationLabMaterials {
     mesh.material = material;
   }
 
-  addFixtures(root: THREE.Group, width: number, height: number, length: number, ceilingOpening?: readonly [number, number, number, number]): void {
+  addFixtures(
+    root: THREE.Group,
+    width: number,
+    height: number,
+    length: number,
+    options: LabFixtureOptions = {},
+  ): void {
+    const { ceilingOpening, wallSides = [-1, 1] } = options;
     const group = new THREE.Group();
     group.name = 'cultivation-lab-presentation';
     group.userData.presentationOnly = true;
@@ -106,7 +116,7 @@ export class CultivationLabMaterials {
     }
     // Wall-mounted luminaires carry the same quiet fluorescent family as Level 1.
     for (let z = 5; z < length; z += 8) {
-      for (const side of [-1, 1]) {
+      for (const side of wallSides) {
         transforms.push(new THREE.Matrix4().compose(new THREE.Vector3(side * (width / 2 - 0.23), 4, z),
           new THREE.Quaternion(), new THREE.Vector3(0.06, 0.16, 2.4)));
       }
@@ -121,7 +131,7 @@ export class CultivationLabMaterials {
     const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
       trim.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(sx, sy, sz)));
     };
-    for (const side of [-1, 1]) {
+    for (const side of wallSides) {
       const x = side * (width / 2 - 0.19);
       box(x, 0.55, length / 2, 0.06, 0.35, length - 0.6);
       box(x, 4, length / 2, 0.04, 0.32, length - 0.6);
@@ -134,10 +144,10 @@ export class CultivationLabMaterials {
     group.add(frames);
     if (height > 10) {
       // Broad local light pools neutralize the old green fill without changing the renderer.
-      for (const z of [10, 38]) {
+      for (const z of options.fillPositionsZ ?? [10, 38]) {
         const light = new THREE.PointLight(0xf3f2e9, 480, 48, 2);
-        light.name = 'cultivation-room-one-neutral-fill';
-        light.position.set(0, 10, z);
+        light.name = `${root.name}-neutral-fill`;
+        light.position.set(0, options.fillHeightMetres ?? 10, z);
         group.add(light);
       }
     }
@@ -146,7 +156,7 @@ export class CultivationLabMaterials {
   }
 
   get diagnostics() {
-    return { materialCount: 8, textureCount: this.textures.length,
+    return { materialCount: 9, textureCount: this.textures.length,
       textureBytes: this.textures.reduce((sum, texture) => sum + (texture.image.data?.byteLength ?? 0), 0),
       dressedMeshCount: this.bindings.length, addedDrawCalls: this.decorations.length * 2 };
   }
@@ -170,7 +180,7 @@ export class CultivationLabMaterials {
     }
     for (const geometry of decorationGeometries) geometry.dispose();
     this.decorations.length = 0;
-    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.rope, this.fixture]) material.dispose();
+    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.rope, this.fixture, this.sticky]) material.dispose();
     for (const texture of this.textures) texture.dispose();
   }
 

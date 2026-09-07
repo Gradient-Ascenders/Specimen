@@ -82,7 +82,7 @@ const ROOM_SPAWNS: Readonly<
 /** Development-only composition of the three currently authored Cultivation rooms. */
 export class LevelTwoPreviewScene {
   readonly root = new THREE.Group();
-  readonly roomOneArt = new CultivationLabMaterials();
+  readonly labArt = new CultivationLabMaterials();
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
@@ -133,10 +133,23 @@ export class LevelTwoPreviewScene {
       this.roomTwoToThreeGoopPassage.entryDoor,
     );
     this.roomThree = new LevelTwoRoomThreeGreybox(requestFailure);
-    this.roomOneArt.dress(this.roomOne.builder);
-    this.roomOneArt.dress(this.roomOneToTwoPassage.builder);
-    this.roomOneArt.addFixtures(this.roomOne.root, 36, 20, 50, [-12, -8, 2, 6]);
-    this.roomOneArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28);
+    this.labArt.dress(this.roomOne.builder);
+    this.labArt.dress(this.roomOneToTwoPassage.builder);
+    this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
+    this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28);
+    this.labArt.dress(this.roomTwo.builder, [
+      'cultivation-room-2-above-bob-vent',
+      'cultivation-room-2-bob-vent-west-jamb',
+      'cultivation-room-2-bob-vent-east-jamb',
+    ]);
+    this.labArt.dress(this.roomTwoToThreeGoopPassage.builder);
+    this.labArt.dress(this.roomTwoToThreeBobAirDuct.builder);
+    this.labArt.addFixtures(this.roomTwo.root, 38, 24, 45, {
+      wallSides: [1],
+      fillHeightMetres: 14,
+      fillPositionsZ: [12, 34],
+    });
+    this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28);
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;
     this.roomTwo.root.position.z = LEVEL_TWO_ROOM_TWO_OFFSET_Z;
@@ -273,7 +286,7 @@ export class LevelTwoPreviewScene {
   }
 
   dispose(): void {
-    this.roomOneArt.dispose();
+    this.labArt.dispose();
     this.roomThree.dispose();
     this.roomTwoToThreeBobAirDuct.dispose();
     this.roomTwoToThreeGoopPassage.dispose();

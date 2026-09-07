@@ -61,8 +61,7 @@ export function createContainmentProceduralTextures(): ContainmentProceduralText
   const graphiteHeight: HeightSampler = (x, y, size) =>
     Math.sin((y / size) * Math.PI * 18) * 0.055 +
     (hashNoise(x, y, 53) - 0.5) * 0.04;
-  const stickyHeight: HeightSampler = (x, y, size) =>
-    organicCellHeight(x, y, size, 4, 6, 91);
+
   const stickyVentHeight: HeightSampler = (x, y, size) =>
     organicCellHeight(x, y, size, 5, 5, 127) * 0.72 +
     Math.sin((x / size) * Math.PI * 8 + y * 0.12) * 0.035;
@@ -77,11 +76,7 @@ export function createContainmentProceduralTextures(): ContainmentProceduralText
     'containment-graphite-roughness',
     (x, y) => 126 + Math.round((hashNoise(x, y, 67) - 0.5) * 22),
   );
-  const stickyNormal = normalTexture('containment-sticky-organic-normal', stickyHeight, 2.7);
-  const stickyRoughness = scalarTexture(
-    'containment-sticky-wet-roughness',
-    (x, y, size) => 54 + Math.round((1 - stickyHeight(x, y, size)) * 38),
-  );
+  const { stickyNormal, stickyRoughness } = createContainmentStickyWallTextures();
   const stickyVentNormal = normalTexture(
     'containment-sticky-vent-organic-normal',
     stickyVentHeight,
@@ -107,6 +102,19 @@ export function createContainmentProceduralTextures(): ContainmentProceduralText
     signageAtlas,
     signRegions,
   };
+}
+
+export function createContainmentStickyWallTextures(): Pick<
+  ContainmentProceduralTextures, 'stickyNormal' | 'stickyRoughness'
+> {
+  const stickyHeight: HeightSampler = (x, y, size) =>
+    organicCellHeight(x, y, size, 4, 6, 91);
+  const stickyNormal = normalTexture('containment-sticky-organic-normal', stickyHeight, 2.7);
+  const stickyRoughness = scalarTexture(
+    'containment-sticky-wet-roughness',
+    (x, y, size) => 54 + Math.round((1 - stickyHeight(x, y, size)) * 38),
+  );
+  return { stickyNormal, stickyRoughness };
 }
 
 function createAcidFoundationAlbedo(): THREE.DataTexture {

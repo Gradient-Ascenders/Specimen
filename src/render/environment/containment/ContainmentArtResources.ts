@@ -208,17 +208,7 @@ export class ContainmentArtResources {
         roughness: 0.45,
         metalness: 0.15,
       }),
-      stickyMembrane: new THREE.MeshStandardMaterial({
-        name: 'containment-sticky-membrane',
-        color: DEFAULT_SLIME_BASE_COLOUR,
-        emissive: 0x061714,
-        emissiveIntensity: 0.05,
-        roughness: 0.24,
-        metalness: 0,
-        normalMap: stickyNormal,
-        roughnessMap: stickyRoughness,
-        normalScale: new THREE.Vector2(0.17, 0.17),
-      }),
+      stickyMembrane: createContainmentStickyWallMaterial({ stickyNormal, stickyRoughness }),
       stickyVentMembrane: new THREE.MeshStandardMaterial({
         name: 'containment-sticky-vent-membrane',
         color: 0x5f742d,
@@ -349,4 +339,21 @@ export class ContainmentArtResources {
       this.textures.signageAtlas,
     ];
   }
+}
+
+/** Identical adhesive-wall finish shared by both laboratory levels. */
+export function createContainmentStickyWallMaterial(
+  { stickyNormal, stickyRoughness }: Pick<ContainmentProceduralTextures, 'stickyNormal' | 'stickyRoughness'>,
+): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    name: 'containment-sticky-membrane',
+    color: DEFAULT_SLIME_BASE_COLOUR,
+    emissive: 0x061714,
+    emissiveIntensity: 0.05,
+    roughness: 0.24,
+    metalness: 0,
+    normalMap: stickyNormal,
+    roughnessMap: stickyRoughness,
+    normalScale: new THREE.Vector2(0.17, 0.17),
+  });
 }
