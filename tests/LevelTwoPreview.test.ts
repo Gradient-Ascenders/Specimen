@@ -914,7 +914,7 @@ test('Room 2 and Room 3 lasers are authored directly against their sticky panels
   assert.deepEqual(CULTIVATION_ROOM_OBJECTIVES, {
     1: 'Help Bob reach Room 2',
     2: 'Get Bob and Goop into Room 3',
-    3: 'Disable four drones and bring both slimes to their exits',
+    3: 'Get bob to the other side to push the drones into the acid',
   });
 
   scene.dispose();
