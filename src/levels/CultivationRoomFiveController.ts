@@ -35,7 +35,8 @@ export class CultivationRoomFiveController {
       this.checkpoint = 'controls';
     }
     if (!this.security.shutdown) {
-      this.leverProgress = bobUsingLever ? Math.min(1, this.leverProgress + dt / 1.5) : 0;
+      this.leverProgress = this.checkpoint === 'controls' && bobUsingLever
+        ? Math.min(1, this.leverProgress + dt / 1.5) : 0;
       if (this.leverProgress >= 1) this.security.release();
     } else {
       this.releaseElapsed = Math.min(4, this.releaseElapsed + dt);

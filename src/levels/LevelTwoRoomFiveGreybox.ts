@@ -234,12 +234,23 @@ export class LevelTwoRoomFiveGreybox {
       this.goopLocal.distanceToSquared(ROOM_FIVE_GOOP_CONTROLS) < 5 * 5, usingLever);
     this.syncPresentation(dt);
   }
+  isAtVoltTerminal(position: { readonly x: number; readonly y: number; readonly z: number }): boolean {
+    this.local.set(position.x, position.y, position.z); this.root.worldToLocal(this.local);
+    const p = this.local;
+    return p.x > 14.5 && p.x < 17.5 && p.y >= 0 && p.y < 1.8 && p.z > 66.5 && p.z < 69.5;
+  }
+  isAtFinalExit(position: { readonly x: number; readonly y: number; readonly z: number }): boolean {
+    this.local.set(position.x, position.y, position.z); this.root.worldToLocal(this.local);
+    const p = this.local;
+    return p.x > 12 && p.x < 20 && p.y >= 0 && p.y < 3 && p.z > 72 && p.z < 79;
+  }
   isAcidAt(position: { readonly x: number; readonly y: number; readonly z: number }): boolean {
     this.local.set(position.x, position.y, position.z); this.root.worldToLocal(this.local);
     const p = this.local;
     const acidDuct = p.x > 37 && p.x < 43 && p.z > 16 && p.z < 140 && p.y < SEWER_FLOOR_Y + .6;
-    const dryReunion = (this.controller.releasing || this.controller.rescued) && p.x > -12 && p.z >= 59 && p.z <= 71;
-    const dryExit = p.x >= 12 && p.x <= 20 && p.z > 71;
+    const dryReunion = (this.controller.releasing || this.controller.rescued)
+      && p.x > -12 && p.x < 28 && p.y >= 0 && p.y < 3 && p.z >= 59 && p.z <= 71;
+    const dryExit = p.x >= 12 && p.x <= 20 && p.y >= 0 && p.y < 3 && p.z > 71 && p.z < 79;
     const contaminatedVent = p.y < .7 && p.y > -.5 && this.acidVentPatches.some(patch => Math.abs(p.x - patch.x) < patch.width / 2 && Math.abs(p.z - patch.z) < patch.length / 2);
     return contaminatedVent || acidDuct || (Math.abs(p.x) < 20 && p.z > 18 && p.z < 80 && p.y < .6 && !dryReunion && !dryExit);
   }

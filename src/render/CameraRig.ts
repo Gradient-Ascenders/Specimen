@@ -767,8 +767,8 @@ export class CameraRig {
 
     this.contextualBoomDirection
       .copy(this.planarBack)
-      .multiplyScalar(Math.cos(profile.pitchRadians))
-      .addScaledVector(this.smoothedUp, Math.sin(profile.pitchRadians))
+      .multiplyScalar(Math.cos(this.effectivePitchRadians))
+      .addScaledVector(this.smoothedUp, Math.sin(this.effectivePitchRadians))
       .normalize();
     this.contextualScreenRight
       .crossVectors(this.smoothedUp, this.contextualBoomDirection)

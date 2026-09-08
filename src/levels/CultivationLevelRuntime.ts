@@ -1387,15 +1387,13 @@ export class CultivationLevelRuntime {
     }
     if (c.rescued && !resources.manager.isAvailable('volt')) this.registerRescuedVolt(resources);
     if (c.rescued && resources.manager.activeSlimeId === 'volt') {
-      this.roomFiveLocal.copy(resources.voltBody.position); room.root.worldToLocal(this.roomFiveLocal);
-      if (Math.abs(this.roomFiveLocal.x - 16) < 1.5 && Math.abs(this.roomFiveLocal.z - 68) < 1.5 && this.roomFiveLocal.y < 1.8) c.powerExit();
+      if (room.isAtVoltTerminal(resources.voltBody.position)) c.powerExit();
     }
     if (c.exitPowered && !c.complete) {
       let allAtExit = true;
       for (let i = 0; i < 3; i++) {
         const body = i === 0 ? resources.pair.bobBody : i === 1 ? resources.pair.goopBody : resources.voltBody;
-        this.roomFiveLocal.copy(body.position); room.root.worldToLocal(this.roomFiveLocal);
-        allAtExit &&= this.roomFiveLocal.x > 12 && this.roomFiveLocal.x < 20 && this.roomFiveLocal.z > 72 && this.roomFiveLocal.y < 3;
+        allAtExit &&= room.isAtFinalExit(body.position);
       }
       if (allAtExit) {
         c.finish(); this.input.setEnabled(false); this.input.releasePointerLock();

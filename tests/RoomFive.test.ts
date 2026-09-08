@@ -129,11 +129,40 @@ test('release control is a lever and the dry reunion floor stays absent until re
     assert.equal(floor.visible, false);
     assert.equal(s.room.isAcidAt(s.room.root.localToWorld(new THREE.Vector3(4, .4, 65))), true);
     const position = s.room.root.localToWorld(new THREE.Vector3(0, 29.66, 28));
+    s.room.update(3, [{ id: 'bob', position }]);
+    assert.equal(s.room.controller.releasing, false, 'early lever use cannot bypass cooperation');
+    assert.equal(s.room.controller.leverProgress, 0);
+    s.room.controller.destroyBrokenDrone();
+    s.room.update(3, [{ id: 'bob', position }]);
+    assert.equal(s.room.controller.releasing, false, 'destroying the drone alone is insufficient');
+    s.room.controller.update(.1, false, true, true, false);
+    assert.equal(s.room.controller.checkpoint, 'controls');
     s.room.update(1.5, [{ id: 'bob', position }]);
     assert.equal(s.room.controller.releasing, true);
     assert.ok(s.room.lever.rotation.x > 1);
     assert.equal(floor.visible, true);
     assert.equal(s.room.isAcidAt(s.room.root.localToWorld(new THREE.Vector3(4, .4, 65))), false);
+  } finally { s.dispose(); }
+});
+
+test('terminal, exit and dry-floor exceptions reject below-floor and out-of-bounds bodies', () => {
+  const s = setup();
+  try {
+    s.room.restoreCheckpoint('rescued');
+    const world = (x: number, y: number, z: number) => s.room.root.localToWorld(new THREE.Vector3(x, y, z));
+    assert.equal(s.room.isAtVoltTerminal(world(16, .66, 68)), true);
+    assert.equal(s.room.isAtFinalExit(world(16, .66, 75)), true);
+    for (const y of [-17, -.01, 3, 10]) {
+      assert.equal(s.room.isAtVoltTerminal(world(16, y, 68)), false);
+      assert.equal(s.room.isAtFinalExit(world(16, y, 75)), false);
+    }
+    for (const x of [11, 21]) assert.equal(s.room.isAtFinalExit(world(x, .66, 75)), false);
+    for (const z of [71, 79, 100]) assert.equal(s.room.isAtFinalExit(world(16, .66, z)), false);
+    for (const [x, z] of [[14, 68], [18, 68], [16, 66], [16, 70]])
+      assert.equal(s.room.isAtVoltTerminal(world(x, .66, z)), false);
+    assert.equal(s.room.isAcidAt(world(16, -.01, 75)), true);
+    assert.equal(s.room.isAcidAt(world(4, -.01, 65)), true);
+    assert.equal(s.room.isAcidAt(world(16, .4, 79.5)), true);
   } finally { s.dispose(); }
 });
 

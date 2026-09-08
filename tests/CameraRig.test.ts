@@ -124,6 +124,23 @@ test('combat framing preserves upward mouse aim through entry and exit', () => {
   assert.equal(rig.getDiagnostics().pitchRadians, pitch);
 });
 
+test('player-pitched contextual dead zone uses the rendered camera plane', () => {
+  for (const look of [-600, 600]) {
+    const rig = new CameraRig(), target = createTarget();
+    rig.setFollowTarget(target, new CollisionWorld());
+    rig.setContextualCamera({ profile: { ...TEST_CONTEXTUAL_PROFILE, pitchRadians: 0,
+      targetHeightMetres: 0, playerControlledPitch: true },
+      anchor: { position: new THREE.Vector3(), previousPosition: new THREE.Vector3() } });
+    rig.queueLookInput(0, look); rig.applyQueuedLookInput(); advanceRig(rig, 6);
+    const before = rig.camera.position.clone();
+    const depthOnly = rig.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(4);
+    target.position.copy(depthOnly); target.previousPosition.copy(depthOnly);
+    advanceRig(rig, 6);
+    assert.ok(rig.camera.position.distanceTo(before) < 1e-6,
+      'motion along the view direction must not create a screen-space framing correction');
+  }
+});
+
 test('vertical pointer look follows pitch convention with inversion off and on', () => {
   const mouseUp = applyVerticalLook(-100, false);
   assert.ok(mouseUp.cameraHeightDelta < 0);
