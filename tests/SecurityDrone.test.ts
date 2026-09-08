@@ -67,6 +67,28 @@ test('cover blocks detection and warning always precedes projectile fire', () =>
   assert.equal(world.colliderCount, 0);
 });
 
+test('flying eye rotates detection and projectile origins together while cover still blocks fire', () => {
+  const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
+  const damage = new SlimeDamageSystem(), projectiles = new DroneProjectileSystem(world, damage);
+  const drone = new SecurityDrone({ ...config(), forward: new THREE.Vector3(1, 0, 0),
+    scanHalfAngleRadians: 1e-9, forwardAnchorMetres: 1.4 }, world, surfaces, projectiles);
+  const cover = new THREE.Mesh(new THREE.BoxGeometry(.2, 3, 3));
+  const target = { slimeId: 'bob' as const, position: new THREE.Vector3(5, 0, 0) };
+  try {
+    cover.position.x = 3; world.register(cover);
+    drone.update(.1, [target]); assert.equal(drone.readModel.state, 'scanning');
+    world.unregister(cover);
+    drone.update(.1, [target]); drone.update(.4, [target]); drone.update(.01, [target]);
+    assert.equal(projectiles.liveCount, 1);
+    const shot = projectiles.states.find(shot => shot.active)!;
+    assert.ok(Math.abs(shot.position.x - 1.4) < 1e-6);
+    assert.ok(Math.abs(shot.position.z) < 1e-6, 'muzzle follows the eye, not the unturned root');
+  } finally {
+    world.unregister(cover); cover.geometry.dispose();
+    drone.dispose(); projectiles.dispose(); damage.dispose();
+  }
+});
+
 test('typed target policy keeps inactive eligible bodies targetable', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();

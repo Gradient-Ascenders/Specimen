@@ -24,31 +24,46 @@ export const createLevelTwoPreviewProgression = (
 ): LevelTwoPreviewProgressionSnapshot => ({
   roomId,
   recoveryRoomIds: { bob: roomId, goop: roomId },
-  bobEnteredRoomThree: roomId === 3,
-  goopEnteredRoomThree: roomId === 3,
+  bobEnteredRoomThree: roomId >= 3,
+  goopEnteredRoomThree: roomId >= 3,
 });
 
 /**
  * Advance authored-preview progression from both persistent body positions.
  *
  * Goop may establish his own Room 2 recovery before Bob without changing the
- * shared objective. Room 3 remains a split checkpoint until both slimes have
- * physically reached their identity-owned entrances.
+ * shared objective. Room 3 keeps both recovery positions in Room 2 until both
+ * slimes physically reach Room 3, so Bob can still return to its release button.
  */
 export const advanceLevelTwoPreviewProgression = (
   previous: LevelTwoPreviewProgressionSnapshot,
   resolvedRooms: LevelTwoPreviewResolvedRooms,
 ): LevelTwoPreviewProgressionSnapshot => {
-  const bobRecoveryRoomId = furthestRoom(
+  let bobRecoveryRoomId = furthestRoom(
     previous.recoveryRoomIds.bob,
     resolvedRooms.bob,
   );
-  const goopRecoveryRoomId = furthestRoom(
+  let goopRecoveryRoomId = furthestRoom(
     previous.recoveryRoomIds.goop,
     resolvedRooms.goop,
   );
-  const bobEnteredRoomThree = bobRecoveryRoomId === 3;
-  const goopEnteredRoomThree = goopRecoveryRoomId === 3;
+  if (previous.roomId < 5 && (resolvedRooms.bob < 5 || resolvedRooms.goop < 5)) {
+    bobRecoveryRoomId = Math.min(4, bobRecoveryRoomId) as LevelTwoAuthoredRoomId;
+    goopRecoveryRoomId = Math.min(4, goopRecoveryRoomId) as LevelTwoAuthoredRoomId;
+  }
+  // Boarding is a shared checkpoint: never restore one body beyond the other.
+  if (previous.roomId < 4 && (resolvedRooms.bob < 4 || resolvedRooms.goop < 4)) {
+    bobRecoveryRoomId = Math.min(3, bobRecoveryRoomId) as LevelTwoAuthoredRoomId;
+    goopRecoveryRoomId = Math.min(3, goopRecoveryRoomId) as LevelTwoAuthoredRoomId;
+  }
+  const bobEnteredRoomThree = resolvedRooms.bob >= 3;
+  const goopEnteredRoomThree = resolvedRooms.goop >= 3;
+  // A solo arrival must still recover beside Room 2's button, where Bob can
+  // release Goop. Promote the recovery pair only once both bodies are across.
+  if (previous.roomId < 3 && (!bobEnteredRoomThree || !goopEnteredRoomThree)) {
+    bobRecoveryRoomId = Math.min(2, bobRecoveryRoomId) as LevelTwoAuthoredRoomId;
+    goopRecoveryRoomId = Math.min(2, goopRecoveryRoomId) as LevelTwoAuthoredRoomId;
+  }
 
   let roomId = previous.roomId;
   if (roomId === 1 && bobRecoveryRoomId >= 2) roomId = 2;
@@ -60,6 +75,8 @@ export const advanceLevelTwoPreviewProgression = (
     roomId = 3;
   }
 
+  if (bobRecoveryRoomId === 4 && goopRecoveryRoomId === 4) roomId = 4;
+  if (bobRecoveryRoomId === 5 && goopRecoveryRoomId === 5) roomId = 5;
   if (
     roomId === previous.roomId &&
     bobRecoveryRoomId === previous.recoveryRoomIds.bob &&

@@ -230,6 +230,15 @@ export class SlimeManager<Body extends object> {
     this.ensureValidActiveSelection();
   }
 
+  /** Restore a level-owned unlock checkpoint (for example an unrescued specimen). */
+  lock(id: SlimeId): void {
+    this.assertNotDisposed('restore a locked slime');
+    if (this.getDefinition(id).initiallyUnlocked) throw new Error('Cannot lock an initial slime.');
+    this.unlockedIds.delete(id);
+    this.unregisterBody(id);
+    this.ensureValidActiveSelection();
+  }
+
   /** Clear level-owned body references without changing progression unlocks. */
   clearLevelRegistrations(): void {
     this.assertNotDisposed('clear level slime registrations');

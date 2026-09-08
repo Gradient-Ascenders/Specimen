@@ -1,6 +1,9 @@
+import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
+import { AcidSurfaceMaterial } from '../containment/AcidSurfaceMaterial.ts';
+import { CultivationPlatformArt } from './CultivationPlatformArt.ts';
 import * as THREE from 'three';
-import { createContainmentStickyWallTextures } from '../containment/ContainmentProceduralTextures.ts';
-import { createContainmentStickyWallMaterial } from '../containment/ContainmentArtResources.ts';
+import { createContainmentStickyWallTextures, createContainmentCeramicTextures, createAcidFoundationAlbedo } from '../containment/ContainmentProceduralTextures.ts';
+import { createContainmentStickyWallMaterial, createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 
 interface LabFixtureOptions {
@@ -21,7 +24,11 @@ export class CultivationLabMaterials {
   readonly ceiling = this.finish('ceiling', 0xcbd0ca, 0.8, 0.06);
   readonly metal = this.finish('metal', 0x465156, 0.68, 0.72);
   readonly duct = this.finish('duct', 0x879391, 0.65, 0.7);
-  readonly platform = this.variant(this.floor, 'platform', 0xd6a928);
+  private readonly platformMaps = createContainmentCeramicTextures();
+  readonly platform = createContainmentPlatformMaterial(this.platformMaps);
+  private readonly acidFoundation = createAcidFoundationAlbedo();
+  readonly acid = new AcidSurfaceMaterial({ foundationMap: this.acidFoundation, microNormalMap: this.platformMaps.ceramicNormal });
+  readonly platformArt = new CultivationPlatformArt(this.platform);
   readonly rope = this.variant(this.metal, 'soluble-rope', 0x744522);
   readonly fixture = new THREE.MeshStandardMaterial({
     name: 'cultivation-lab-neutral-fixture', color: 0xf3f2e9,
@@ -32,9 +39,17 @@ export class CultivationLabMaterials {
   private disposed = false;
 
   constructor() {
+    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.acid, this.sticky]) {
+      optimizeFiniteLightEvaluation(material);
+    }
+    this.acidFoundation.repeat.set(4, 3);
+    this.acid.userData.tileSizeMetres = [32.7, 26.7];
+    this.textures.push(this.acidFoundation);
     this.textures.push(this.stickyMaps.stickyNormal, this.stickyMaps.stickyRoughness);
-    this.platform.emissive.setHex(0x443300);
-    this.platform.emissiveIntensity = 0.28;
+    for (const texture of Object.values(this.platformMaps)) {
+      texture.repeat.set(4, 4);
+      this.textures.push(texture);
+    }
     this.rope.metalness = 0;
     this.rope.roughness = 0.9;
     this.rope.emissive.setHex(0x211006);
@@ -42,8 +57,9 @@ export class CultivationLabMaterials {
   }
 
   /** Material identity is an explicit authoring reference, never a gameplay rule. */
-  dress(builder: GreyboxRoomBuilder, servicePanels: readonly string[] = []): void {
+  dress(builder: GreyboxRoomBuilder, servicePanels: readonly string[] = [], overrides: ReadonlyMap<string, THREE.MeshStandardMaterial> = new Map()): void {
     const source = builder.materials;
+    const platforms: THREE.Mesh[] = [];
     builder.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || !(object.geometry instanceof THREE.BoxGeometry)) return;
       // These unit-height visuals are stretched by the existing drop controller.
@@ -58,6 +74,8 @@ export class CultivationLabMaterials {
       else if (object.material === source.duct) material = this.duct;
       else if (object.material === source.platform) material = this.platform;
       else if (object.material === source.wood) material = this.rope;
+      else if (object.material === source.containment) material = this.duct;
+      else if (object.material === source.sticky && object.userData.environmentRole === 'air-duct-entry') material = this.duct;
       else if (object.material === source.sticky && object.userData.textureRole === 'sticky-wall-tile') material = this.sticky;
       // Explicit door art parts; status indicators remain owned by the door.
       else if (object.name.endsWith('-shutter-panel')) material = this.duct;
@@ -66,19 +84,33 @@ export class CultivationLabMaterials {
       else if (/^room-2-panel-(seam|course)-/.test(object.name)) material = this.metal;
       else if (object.name.startsWith('room-2-upper-service-trim-')) material = this.duct;
       else if (object.name.startsWith('room-2-fluorescent-strip-')) material = this.fixture;
-      if (material) this.bind(object, material);
+      if (object.name === 'cultivation-room-2-button-rest-ledge') material = this.platform;
+      if (object.userData.textureRole === 'acid-floor') material = this.acid;
+      material = overrides.get(object.name) ?? material;
+      if (material === this.platform) {
+        platforms.push(object);
+        material = this.platformArt.hidden;
+      }
+      if (material) {
+        builder.borrowedMaterials.add(material);
+        this.bind(object, material);
+      }
     });
+    for (const platform of platforms) this.platformArt.add(platform);
+    if (builder.root.name === 'cultivation-room-3-greybox') this.platformArt.batchStatic(builder.root);
   }
 
   /** Own presentation geometry copies; collider vertices are never changed. */
-  private bind(mesh: THREE.Mesh, material: THREE.MeshStandardMaterial): void {
+  bind(mesh: THREE.Mesh, material: THREE.MeshStandardMaterial): void {
     this.bindings.push({ mesh, material: mesh.material, geometry: mesh.geometry });
     mesh.geometry = mesh.geometry.clone();
     const positions = mesh.geometry.getAttribute('position');
     const normals = mesh.geometry.getAttribute('normal');
+    if (!mesh.geometry.getAttribute('uv')) mesh.geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(positions.count * 2), 2));
     const uv = mesh.geometry.getAttribute('uv');
-    const panelWidth = material === this.sticky ? 6.08 : material === this.wall ? 4 : material === this.rope ? 0.5 : 2;
-    const panelHeight = material === this.sticky ? 6.55 : material === this.wall ? 3 : material === this.rope ? 0.5 : 2;
+    const tileSize = material.userData.tileSizeMetres as readonly [number, number] | undefined;
+    const panelWidth = tileSize?.[0] ?? ( material === this.sticky ? 6.08 : material === this.wall ? 4 : material === this.rope ? 0.5 : 2);
+    const panelHeight = tileSize?.[1] ?? ( material === this.sticky ? 6.55 : material === this.wall ? 3 : material === this.rope ? 0.5 : 2);
     for (let i = 0; i < uv.count; i++) {
       const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
       const nx = normals.getX(i), ny = normals.getY(i), nz = normals.getZ(i);
@@ -156,7 +188,7 @@ export class CultivationLabMaterials {
   }
 
   get diagnostics() {
-    return { materialCount: 9, textureCount: this.textures.length,
+    return { materialCount: 14, textureCount: this.textures.length,
       textureBytes: this.textures.reduce((sum, texture) => sum + (texture.image.data?.byteLength ?? 0), 0),
       dressedMeshCount: this.bindings.length, addedDrawCalls: this.decorations.length * 2 };
   }
@@ -164,11 +196,17 @@ export class CultivationLabMaterials {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.platformArt.dispose();
+    const displacedBatchMaterials = new Set<THREE.Material>();
     for (const { mesh, material, geometry } of this.bindings) {
+      if (!Array.isArray(mesh.material) && mesh.material.name === 'cultivation-room-3-batched-collider-material') {
+        displacedBatchMaterials.add(mesh.material);
+      }
       mesh.geometry.dispose();
       mesh.geometry = geometry;
       mesh.material = material;
     }
+    for (const material of displacedBatchMaterials) material.dispose();
     this.bindings.length = 0;
     const decorationGeometries = new Set<THREE.BufferGeometry>();
     for (const group of this.decorations) {
@@ -180,7 +218,7 @@ export class CultivationLabMaterials {
     }
     for (const geometry of decorationGeometries) geometry.dispose();
     this.decorations.length = 0;
-    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.rope, this.fixture, this.sticky]) material.dispose();
+    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.rope, this.fixture, this.sticky, this.acid]) material.dispose();
     for (const texture of this.textures) texture.dispose();
   }
 

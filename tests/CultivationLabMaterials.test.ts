@@ -20,7 +20,8 @@ test('Room 1 material pass preserves collider geometry, transforms, metadata and
     assert.deepEqual(snapshot.mesh.position.toArray(), snapshot.position);
     assert.deepEqual(snapshot.mesh.quaternion.toArray(), snapshot.quaternion);
     assert.deepEqual(snapshot.mesh.userData, snapshot.metadata);
-    if (snapshot.metadata.hazardRole) assert.equal(snapshot.mesh.material, snapshot.material);
+    if (snapshot.metadata.textureRole === 'acid-floor') assert.equal(snapshot.mesh.material, art.acid);
+    else if (snapshot.metadata.hazardRole) assert.equal(snapshot.mesh.material, snapshot.material);
   }
   const west = room.root.getObjectByName('cultivation-room-1-west-wall') as THREE.Mesh;
   const east = room.root.getObjectByName('cultivation-room-1-east-wall') as THREE.Mesh;
@@ -95,6 +96,10 @@ test('Room 2 and its two exit routes share the palette without changing gameplay
       assert.equal(art.sticky.roughness, 0.24);
       assert.ok(art.sticky.normalMap);
       assert.ok(art.sticky.roughnessMap);
+    } else if (snapshot.metadata.environmentRole === 'air-duct-entry') {
+      assert.equal(snapshot.mesh.material, art.duct);
+    } else if (snapshot.metadata.textureRole === 'acid-floor') {
+      assert.equal(snapshot.mesh.material, art.acid);
     } else if (snapshot.metadata.surfaceTag === 'sticky' || snapshot.metadata.hazardRole) {
       assert.equal(snapshot.mesh.material, snapshot.material);
     }

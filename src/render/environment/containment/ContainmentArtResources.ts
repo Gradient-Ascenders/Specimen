@@ -95,15 +95,7 @@ export class ContainmentArtResources {
         roughnessMap: ceramicRoughness,
         normalScale: new THREE.Vector2(0.012, 0.012),
       }),
-      secondaryCeramic: new THREE.MeshStandardMaterial({
-        name: 'containment-secondary-ceramic',
-        color: 0xd2d6d4,
-        roughness: 0.61,
-        metalness: 0,
-        normalMap: ceramicNormal,
-        roughnessMap: ceramicRoughness,
-        normalScale: new THREE.Vector2(0.01, 0.01),
-      }),
+      secondaryCeramic: createContainmentPlatformMaterial({ ceramicNormal, ceramicRoughness }),
       clinicalFloor: new THREE.MeshStandardMaterial({
         name: 'containment-clinical-floor',
         color: 0xc2c8c6,
@@ -355,5 +347,20 @@ export function createContainmentStickyWallMaterial(
     normalMap: stickyNormal,
     roughnessMap: stickyRoughness,
     normalScale: new THREE.Vector2(0.17, 0.17),
+  });
+}
+
+/** The composite tread finish used by Level 1 parkour platforms. */
+export function createContainmentPlatformMaterial(
+  { ceramicNormal, ceramicRoughness }: Pick<ContainmentProceduralTextures, 'ceramicNormal' | 'ceramicRoughness'>,
+): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    name: 'containment-secondary-ceramic',
+    color: 0xd2d6d4,
+    roughness: 0.61,
+    metalness: 0,
+    normalMap: ceramicNormal,
+    roughnessMap: ceramicRoughness,
+    normalScale: new THREE.Vector2(0.01, 0.01),
   });
 }

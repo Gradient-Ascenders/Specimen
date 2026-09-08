@@ -1,3 +1,4 @@
+import { AcidLiquidInteractions } from './AcidLiquidInteractions.ts';
 import * as THREE from 'three';
 
 import type { LaserHazard } from '../../../hazards/LaserHazard.ts';
@@ -40,6 +41,7 @@ export class RoomThreeArt {
   readonly root = new THREE.Group();
   readonly acidSurfaceMaterial: AcidSurfaceMaterial;
   readonly acidSurface: THREE.Mesh;
+  readonly acidInteractions: AcidLiquidInteractions;
 
   private readonly resources: ContainmentArtResources;
   private readonly signGeometries = new Set<THREE.BufferGeometry>();
@@ -66,6 +68,7 @@ export class RoomThreeArt {
     this.acidSurface.userData.materialRole = 'replaceable-acid-surface';
     this.acidSurface.userData.authoritativeCollider = 'room-3-acid-floor';
 
+    this.acidInteractions = new AcidLiquidInteractions(this.acidSurfaceMaterial, this.acidSurface);
     this.buildBasin();
     this.buildWallArchitecture();
     this.buildPlatforms();

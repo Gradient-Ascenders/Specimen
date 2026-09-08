@@ -74,6 +74,7 @@ export class LevelTwoRoomThreeGreybox {
   private readonly localLaserTargets: LocalLaserContactTarget[] = [];
   constructor(
     requestFailure: (failure: LevelTwoRoomThreeHazardFailure) => void,
+    prepareArt?: (builder: GreyboxRoomBuilder) => void,
   ) {
     this.root.userData.levelId = 'cultivation';
     this.root.userData.roomId = 3;
@@ -94,6 +95,7 @@ export class LevelTwoRoomThreeGreybox {
     this.buildRoofDronePlaceholders();
     this.buildFinalSecurityArea();
     this.addCheckpointAnchors();
+    prepareArt?.(this.builder);
     this.staticBatchDiagnostics =
       consolidateCultivationRoomThreeStaticColliders(
         this.root,
@@ -156,13 +158,13 @@ export class LevelTwoRoomThreeGreybox {
   private syncWallLasers(): void {
     // Full six-metre wall height, bottom-to-top in 0.8 seconds.
     this.lasers.hazards[0].setTranslationOffset(this.laserOffset.set(
-      0, this.wallDrops[0].mesh.position.y - 21 + 3 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 1.6), 0,
+      0, this.wallDrops[0].mesh.position.y - 21 + 3 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 2), 0,
     ));
     this.lasers.hazards[1].setTranslationOffset(this.laserOffset.set(
-      0, this.wallDrops[1].mesh.position.y - 23, 3.85 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 2),
+      0, this.wallDrops[1].mesh.position.y - 23, 3.85 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 2.5),
     ));
     this.lasers.hazards[2].setTranslationOffset(this.laserOffset.set(
-      0, this.wallDrops[2].mesh.position.y - 24.825 + 4.475 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 2.4), 0,
+      0, this.wallDrops[2].mesh.position.y - 24.825 + 4.475 * Math.sin(this.laserMotionSeconds * Math.PI * 2 / 3), 0,
     ));
     for (let index = 0; index < this.lasers.hazards.length; index++) {
       const laser = this.lasers.hazards[index];
@@ -613,7 +615,7 @@ export class LevelTwoRoomThreeGreybox {
         roomId: 3,
         droneId: id,
         releaseMode: 'temporary-roof-drone-disable',
-        replacementDelaySeconds: 10,
+        replacementDelaySeconds: 15,
         dissolveDurationSeconds: 0.8,
         dissolveCollisionDisableProgress: 0.72,
         dissolveActivationRangeMetres: 0.18,
@@ -630,6 +632,12 @@ export class LevelTwoRoomThreeGreybox {
     this.builder.addCollider({ name: 'cultivation-room-3-exit-wall-east', size: [21, 30, 0.4], position: [13.5, 15, 72], material: wall });
     this.builder.addCollider({ name: 'cultivation-room-3-exit-wall-header', size: [6, 24, 0.4], position: [0, 18, 72], material: wall });
     this.builder.addCollider({ name: 'cultivation-room-3-exit-connector-floor', size: [6, 0.4, 4], position: [0, 0, 74], material: duct });
+    for (const x of [-3.2, 3.2]) {
+      this.builder.addCollider({ name: `cultivation-room-3-exit-connector-side-${x}`,
+        size: [.4, 6.5, 3.8], position: [x, 3.25, 74.1], material: wall });
+    }
+    this.builder.addCollider({ name: 'cultivation-room-3-exit-connector-ceiling',
+      size: [6, .3, 3.8], position: [0, 6.5, 74.1], material: wall });
     this.builder.addVisualBox({ name: 'cultivation-room-3-exit-status-header', size: [6.4, 0.45, 0.5], position: [0, 6.3, 71.7], material: exit });
 
   }

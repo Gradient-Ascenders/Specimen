@@ -87,6 +87,7 @@ export class RoomThreeGreybox {
   }
 
   reset(): void {
+    this.art.acidInteractions.reset();
     this.lasers.reset();
     this.checkpointTrigger.reset();
     this.exitTrigger.reset();

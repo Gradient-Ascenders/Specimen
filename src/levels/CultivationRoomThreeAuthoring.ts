@@ -50,7 +50,8 @@ function ceiling(
     radioactiveImpactRotation: new THREE.Euler(Math.PI * 0.48, 0.12, -0.18),
     hatchPosition: new THREE.Vector3(position.x, 29.55, position.z),
     fallDurationSeconds: 0.65,
-    disabledDurationSeconds: 10,
+    // Includes the 2-second cable warning: 13 seconds idle before deployment.
+    disabledDurationSeconds: 15,
     replacementWarningSeconds: 2,
     reinstallDurationSeconds: 1.75,
   };

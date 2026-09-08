@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import * as THREE from 'three';
+import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
+import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
+import type { RenderLayer } from '../src/render/RenderLayer.ts';
+
+for (const fail of [false, true]) test(`loading preparation preserves scene and renderer ownership (failure=${fail})`, async () => {
+  const preview = new LevelTwoPreviewScene(() => {}), scene = new THREE.Scene(); scene.add(preview.root);
+  const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
+  const ordinary = new THREE.Mesh(shape, shared), instanced = new THREE.InstancedMesh(shape, shared, 1);
+  ordinary.name = instanced.name = 'variant-regression'; scene.add(ordinary, instanced);
+  const variants = new Set<THREE.Material>();
+  const shadowCaster = new THREE.Mesh(shape, shared); shadowCaster.castShadow = true;
+  const depth = new THREE.MeshDepthMaterial(), distance = new THREE.MeshDistanceMaterial();
+  depth.customProgramCacheKey = () => 'custom-depth-regression'; distance.customProgramCacheKey = () => 'custom-distance-regression';
+  shadowCaster.customDepthMaterial = depth; shadowCaster.customDistanceMaterial = distance; preview.roomFive.root.add(shadowCaster);
+  const shadowVariants = new Set<string>();
+  const objects: THREE.Object3D[] = []; scene.traverse(o => objects.push(o));
+  const snapshots = objects.map(o => ({ object: o, parent: o.parent, visible: o.visible, position: o.position.toArray(), quaternion: o.quaternion.toArray() }));
+  let destroyed = 0;
+  const geometries = new Set<THREE.BufferGeometry>();
+  scene.traverse(o => { if (o instanceof THREE.Mesh) geometries.add(o.geometry); });
+  for (const geometry of geometries) geometry.addEventListener('dispose', () => destroyed++);
+  let viewport = new THREE.Vector4(0, 0, 1280, 720), scissor = viewport.clone(), scissorTest = false;
+  let compiles = 0;
+  const priorRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
+  const renderer = {
+    extensions: {has: () => true},
+    shadowMap: { enabled: false, autoUpdate: true, type: THREE.BasicShadowMap as THREE.ShadowMapType },
+    getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},
+    getViewport: (out: THREE.Vector4) => out.copy(viewport), getScissor: (out: THREE.Vector4) => out.copy(scissor), getScissorTest: () => scissorTest,
+    setViewport: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
+    setScissor: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
+    setScissorTest: (value: boolean) => { scissorTest = value; }, initTexture() {}, compile() {}, render() {},
+    async compileAsync(group: THREE.Group) { group.traverse(o => { if (o instanceof THREE.Mesh && !Array.isArray(o.material)) shadowVariants.add(o.material.customProgramCacheKey()); if (o instanceof THREE.Mesh && o.name === 'variant-regression') variants.add(o.material as THREE.Material); }); compiles++; if (fail) throw new Error('driver rejected preparation'); },
+  };
+  const layer = { scene, renderer, cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
+  const queue = new CultivationPreparationQueue(layer, preview);
+  try {
+    const work = queue.prepareInitial();
+    if (fail) await assert.rejects(work, /driver rejected/); else await work;
+    assert.ok(compiles > 0);
+    if (!fail) { assert.equal(variants.size, 2, 'ordinary and instanced meshes must each await their shader variant'); assert.equal(queue.diagnostics.completed, 1); assert.ok(queue.diagnostics.total > 1);
+      const before = compiles; queue.tick(40); assert.equal(compiles, before, "an expensive gameplay frame defers background work");
+    }
+    if (!fail) {
+      const deadline = performance.now() + 30000;
+      while (queue.diagnostics.completed < queue.diagnostics.total && performance.now() < deadline) {
+        queue.tick(0, true); await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      assert.equal(queue.diagnostics.completed, queue.diagnostics.total);
+      assert.ok(shadowVariants.has('custom-depth-regression'), 'custom dissolve depth shaders are prepared');
+      assert.ok(shadowVariants.has('custom-distance-regression'), 'custom dissolve point-shadow shaders are prepared');
+    }
+    assert.deepEqual(viewport.toArray(), [0, 0, 1280, 720]); assert.deepEqual(scissor.toArray(), viewport.toArray());
+    assert.equal(scissorTest, false); assert.equal(renderer.shadowMap.enabled, false); assert.equal(renderer.shadowMap.type, THREE.BasicShadowMap);
+    const after: THREE.Object3D[] = []; scene.traverse(o => after.push(o)); assert.deepEqual(after, objects);
+    for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
+    assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
+  } finally { queue.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose(); globalThis.requestAnimationFrame = priorRaf; }
+});

@@ -15,6 +15,7 @@ interface RegisteredCollider {
   transformMode: ColliderTransformMode;
   transformCacheValid: boolean;
   readonly localBounds: THREE.Box3;
+  readonly cachedWorld: THREE.Matrix4;
   readonly inverseWorld: THREE.Matrix4;
   readonly normalMatrix: THREE.Matrix3;
   readonly worldBounds: THREE.Box3;
@@ -157,6 +158,7 @@ export class CollisionWorld {
       transformMode,
       transformCacheValid: false,
       localBounds: boundingBox.clone(),
+      cachedWorld: new THREE.Matrix4(),
       inverseWorld: new THREE.Matrix4(),
       normalMatrix: new THREE.Matrix3(),
       worldBounds: new THREE.Box3(),
@@ -279,6 +281,7 @@ export class CollisionWorld {
     this.validateLayerMask(queryMask);
     outHit.reset();
     this.resetSweepDiagnostics();
+    this.transformQueryStamp += 1;
 
     if (queryMask === CollisionLayer.None) return false;
 
@@ -409,7 +412,6 @@ export class CollisionWorld {
       if (collider.mesh === ignoredCollider || !collider.mesh.visible) continue;
 
       this.refreshTransformCache(collider);
-      this.refreshWorldBounds(collider);
       if (this.intersectsExpandedSweep(collider, radius)) {
         collider.broadphaseStamp = this.broadphaseStamp;
       }
@@ -582,9 +584,24 @@ export class CollisionWorld {
     return Math.abs(this.candidateNormalLocal.z) > 0.5;
   }
 
+  private transformQueryStamp = 0;
+  private readonly updatedNodes = new WeakMap<THREE.Object3D, number>();
+
+  /** Ancestors are shared by many moving colliders; update each once per synchronous query. */
+  private updateQueryWorldMatrix(object: THREE.Object3D): void {
+    if (this.updatedNodes.get(object) === this.transformQueryStamp) return;
+    if (object.parent) this.updateQueryWorldMatrix(object.parent);
+    object.updateWorldMatrix(false, false);
+    this.updatedNodes.set(object, this.transformQueryStamp);
+  }
+
   private refreshTransformCache(collider: RegisteredCollider): void {
     const mesh = collider.mesh;
-    mesh.updateWorldMatrix(true, false);
+    this.updateQueryWorldMatrix(mesh);
+    // Queries may repeat dozens of times between movement updates. Always refresh
+    // the live world matrix, but only rebuild inverse/normal/bounds when it changes.
+    if (collider.transformCacheValid && collider.cachedWorld.equals(mesh.matrixWorld)) return;
+    collider.cachedWorld.copy(mesh.matrixWorld);
     collider.inverseWorld.copy(mesh.matrixWorld).invert();
     collider.normalMatrix.getNormalMatrix(mesh.matrixWorld);
 
@@ -614,6 +631,7 @@ export class CollisionWorld {
           collider.minimumWorldScale,
       );
     }
+    this.refreshWorldBounds(collider);
     collider.transformCacheValid = true;
   }
 

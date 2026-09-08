@@ -39,6 +39,22 @@ const TEST_CONTEXTUAL_PROFILE: ContextualCameraProfile = {
   framingDampingPerSecond: 8,
 };
 
+test('cinematic up override leaves wall gravity untouched and restores it on handoff', () => {
+  const rig = new CameraRig();
+  const target = createTarget();
+  target.gameplayUp.set(1, 0, 0); target.attached = true;
+  rig.setFollowTarget(target, new CollisionWorld()); rig.update(1, 0);
+  rig.setContextualCamera({ profile: TEST_CONTEXTUAL_PROFILE,
+    anchor: { position: target.position, previousPosition: target.previousPosition },
+    gameplayUpOverride: WORLD_UP });
+  for (let i = 0; i < 180; i++) rig.update(1, 1 / 60);
+  assert.ok(rig.camera.up.y > .999);
+  assert.deepEqual(target.gameplayUp.toArray(), [1, 0, 0]);
+  rig.setContextualCamera(undefined);
+  for (let i = 0; i < 180; i++) rig.update(1, 1 / 60);
+  assert.ok(rig.camera.up.x > .999);
+});
+
 function createTarget(): MutableCameraTarget {
   return {
     position: new THREE.Vector3(0, 0.46, 0),
@@ -92,6 +108,38 @@ function applyVerticalLook(
     viewDirectionY: viewDirection.y,
   };
 }
+
+test('combat framing preserves upward mouse aim through entry and exit', () => {
+  const rig = new CameraRig();
+  const target = createTarget();
+  rig.setFollowTarget(target, new CollisionWorld());
+  rig.setContextualCamera({ profile: { ...TEST_CONTEXTUAL_PROFILE, playerControlledPitch: true }, anchor: target });
+  advanceRig(rig, 1);
+  rig.queueLookInput(0, -600); rig.applyQueuedLookInput();
+  advanceRig(rig, 1);
+  assert.ok(rig.getDiagnostics().pitchRadians < -0.8);
+  assert.ok(rig.camera.getWorldDirection(new THREE.Vector3()).y > .7);
+  const pitch = rig.getDiagnostics().pitchRadians;
+  rig.setContextualCamera(undefined); advanceRig(rig, 1);
+  assert.equal(rig.getDiagnostics().pitchRadians, pitch);
+});
+
+test('player-pitched contextual dead zone uses the rendered camera plane', () => {
+  for (const look of [-600, 600]) {
+    const rig = new CameraRig(), target = createTarget();
+    rig.setFollowTarget(target, new CollisionWorld());
+    rig.setContextualCamera({ profile: { ...TEST_CONTEXTUAL_PROFILE, pitchRadians: 0,
+      targetHeightMetres: 0, playerControlledPitch: true },
+      anchor: { position: new THREE.Vector3(), previousPosition: new THREE.Vector3() } });
+    rig.queueLookInput(0, look); rig.applyQueuedLookInput(); advanceRig(rig, 6);
+    const before = rig.camera.position.clone();
+    const depthOnly = rig.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(4);
+    target.position.copy(depthOnly); target.previousPosition.copy(depthOnly);
+    advanceRig(rig, 6);
+    assert.ok(rig.camera.position.distanceTo(before) < 1e-6,
+      'motion along the view direction must not create a screen-space framing correction');
+  }
+});
 
 test('vertical pointer look follows pitch convention with inversion off and on', () => {
   const mouseUp = applyVerticalLook(-100, false);

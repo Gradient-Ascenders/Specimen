@@ -1,5 +1,12 @@
+import { CultivationMaintenanceArt } from '../render/environment/cultivation/CultivationMaintenanceArt.ts';
+import { CultivationElevatorArt } from '../render/environment/cultivation/CultivationElevatorArt.ts';
+import { AcidLiquidInteractions, type AcidContactBody } from '../render/environment/containment/AcidLiquidInteractions.ts';
+import { CultivationCoverEquipmentArt } from '../render/environment/cultivation/CultivationCoverEquipmentArt.ts';
+import { CultivationChamberMaterials } from '../render/environment/cultivation/CultivationChamberMaterials.ts';
 import * as THREE from 'three';
 import { CultivationLabMaterials } from '../render/environment/cultivation/CultivationLabMaterials.ts';
+import { LevelTwoRoomFourGreybox } from './LevelTwoRoomFourGreybox.ts';
+import { LevelTwoRoomFiveGreybox } from './LevelTwoRoomFiveGreybox.ts';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
@@ -28,7 +35,7 @@ import {
   type LevelTwoRoomThreeHazardFailure,
 } from './LevelTwoRoomThreeGreybox.ts';
 
-export type LevelTwoAuthoredRoomId = 1 | 2 | 3;
+export type LevelTwoAuthoredRoomId = 1 | 2 | 3 | 4 | 5;
 export type LevelTwoPreviewSlimeId = 'bob' | 'goop';
 
 export const LEVEL_TWO_PREVIEW_WORLD_OFFSET_X = 64;
@@ -42,11 +49,14 @@ export const LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z =
 export const LEVEL_TWO_ROOM_THREE_OFFSET_Z =
   LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z +
   LEVEL_TWO_PASSAGE_LENGTH_METRES;
+export const LEVEL_TWO_ROOM_FOUR_OFFSET_Z = LEVEL_TWO_ROOM_THREE_OFFSET_Z + 76;
+export const LEVEL_TWO_ROOM_FIVE_OFFSET_Z = LEVEL_TWO_ROOM_FOUR_OFFSET_Z + 15;
 
 export type LevelTwoPreviewHazardFailure =
   | LevelTwoRoomOneHazardFailure
   | LevelTwoRoomTwoHazardFailure
-  | LevelTwoRoomThreeHazardFailure;
+  | LevelTwoRoomThreeHazardFailure
+  | { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' };
 
 export const CULTIVATION_ROOM_OBJECTIVES: Readonly<
   Record<LevelTwoAuthoredRoomId, string>
@@ -54,12 +64,16 @@ export const CULTIVATION_ROOM_OBJECTIVES: Readonly<
   1: 'Help Bob reach Room 2',
   2: 'Get Bob and Goop into Room 3',
   3: 'Get bob to the other side to push the drones into the acid',
+  4: 'Get Bob and Goop onto the elevator',
+  5: 'Rescue Volt',
 };
 
 const ROOM_OFFSETS: Readonly<Record<LevelTwoAuthoredRoomId, THREE.Vector3>> = {
   1: new THREE.Vector3(0, 0, 0),
   2: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_TWO_OFFSET_Z),
   3: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_THREE_OFFSET_Z),
+  4: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_FOUR_OFFSET_Z),
+  5: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_FIVE_OFFSET_Z),
 };
 
 const ROOM_SPAWNS: Readonly<
@@ -77,15 +91,24 @@ const ROOM_SPAWNS: Readonly<
     bob: LEVEL_TWO_ROOM_THREE_BOB_SPAWN,
     goop: LEVEL_TWO_ROOM_THREE_GOOP_SPAWN,
   },
+  4: { bob: new THREE.Vector3(-1, .66, 2), goop: new THREE.Vector3(1, .66, 2) },
+  5: { bob: new THREE.Vector3(-1, .86, 9.1), goop: new THREE.Vector3(1, .86, 9.1) },
 };
 
 /** Development-only composition of the three currently authored Cultivation rooms. */
 export class LevelTwoPreviewScene {
   readonly root = new THREE.Group();
+  readonly acidInteractions: readonly AcidLiquidInteractions[];
   readonly labArt = new CultivationLabMaterials();
+  readonly coverArt = new CultivationCoverEquipmentArt(this.labArt.platform);
+  readonly chamberArt = new CultivationChamberMaterials();
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
+  readonly roomFour = new LevelTwoRoomFourGreybox();
+  readonly roomFive: LevelTwoRoomFiveGreybox;
+  readonly maintenanceArt: CultivationMaintenanceArt;
+  readonly elevatorArt: CultivationElevatorArt;
   readonly roomOneToTwoPassage = new LevelTwoLabPassageGreybox({
     id: 'cultivation-room-1-to-2-lab-passage',
     fromRoomId: 1,
@@ -132,7 +155,18 @@ export class LevelTwoPreviewScene {
       requestFailure,
       this.roomTwoToThreeGoopPassage.entryDoor,
     );
-    this.roomThree = new LevelTwoRoomThreeGreybox(requestFailure);
+    this.roomThree = new LevelTwoRoomThreeGreybox(requestFailure, builder => {
+      this.labArt.dress(builder, [
+        'cultivation-room-3-above-bob-vent',
+        'cultivation-room-3-bob-vent-west-jamb',
+        'cultivation-room-3-bob-vent-east-jamb',
+      ], new Map([...this.chamberArt.overrides(builder, this.labArt), ...this.coverArt.overrides()]));
+      this.coverArt.build(builder);
+    });
+    this.labArt.addFixtures(this.roomThree.root, 48, 30, 72, {
+      fillHeightMetres: 16, fillPositionsZ: [18, 54],
+    });
+    this.chamberArt.addBoundary(this.roomThree.root);
     this.labArt.dress(this.roomOne.builder);
     this.labArt.dress(this.roomOneToTwoPassage.builder);
     this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
@@ -150,6 +184,9 @@ export class LevelTwoPreviewScene {
       fillPositionsZ: [12, 34],
     });
     this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28);
+    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure);
+    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt);
+    this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt);
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;
     this.roomTwo.root.position.z = LEVEL_TWO_ROOM_TWO_OFFSET_Z;
@@ -161,6 +198,8 @@ export class LevelTwoPreviewScene {
       LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z,
     );
     this.roomThree.root.position.z = LEVEL_TWO_ROOM_THREE_OFFSET_Z;
+    this.roomFour.root.position.z = LEVEL_TWO_ROOM_FOUR_OFFSET_Z;
+    this.roomFive.root.position.z = LEVEL_TWO_ROOM_FIVE_OFFSET_Z;
     this.root.add(
       this.roomOne.root,
       this.roomOneToTwoPassage.root,
@@ -168,6 +207,12 @@ export class LevelTwoPreviewScene {
       this.roomTwoToThreeGoopPassage.root,
       this.roomTwoToThreeBobAirDuct.root,
       this.roomThree.root,
+      this.roomFour.root,
+      this.roomFive.root,
+    );
+    // Cache world-space bounds only after all authored room offsets are applied.
+    this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
+      surface => new AcidLiquidInteractions(this.labArt.acid, surface),
     );
   }
 
@@ -179,6 +224,8 @@ export class LevelTwoPreviewScene {
       ...this.roomTwoToThreeGoopPassage.collisionMeshes,
       ...this.roomTwoToThreeBobAirDuct.collisionMeshes,
       ...this.roomThree.collisionMeshes,
+      ...this.roomFour.collisionMeshes,
+      ...this.roomFive.collisionMeshes,
     ];
   }
 
@@ -192,7 +239,10 @@ export class LevelTwoPreviewScene {
       return false;
     });
     return [
+      ...this.roomFive.dynamicCollisionMeshes,
       ...this.roomOne.platformDrops.map((drop) => drop.mesh),
+      this.roomFour.entrance.collisionMesh, this.roomFour.boardingWall, this.roomFour.arrivalWall, this.roomFour.shield,
+      ...this.roomFour.movingEntranceMeshes,
       ...this.roomTwo.blockDrops.map((drop) => drop.mesh),
       ...movingWallColliders,
       ...this.roomOneToTwoPassage.doors.map((door) => door.collisionMesh),
@@ -207,6 +257,8 @@ export class LevelTwoPreviewScene {
       ...this.roomOne.solubleTargetMeshes,
       ...this.roomTwo.solubleTargetMeshes,
       ...this.roomThree.solubleTargetMeshes,
+      ...this.roomFour.solubleTargetMeshes,
+      ...this.roomFive.solubleTargetMeshes,
     ];
   }
 
@@ -214,6 +266,7 @@ export class LevelTwoPreviewScene {
     this.roomOne.bindDissolveTargets(targets);
     this.roomTwo.bindDissolveTargets(targets);
     this.roomThree.bindDissolveTargets(targets);
+    this.roomFive.bindDissolveTargets(targets);
   }
 
   copyRoomSpawnPosition(
@@ -234,6 +287,8 @@ export class LevelTwoPreviewScene {
   }): LevelTwoAuthoredRoomId {
     this.roomResolverPosition.set(position.x, position.y, position.z);
     this.root.worldToLocal(this.roomResolverPosition);
+    if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z) return 5;
+    if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z) return 4;
     if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_THREE_OFFSET_Z) return 3;
     // The final duct section belongs to Room 3's protected arrival
     // checkpoint. Do not classify the ground-level Goop passage as Room 3 yet.
@@ -254,6 +309,7 @@ export class LevelTwoPreviewScene {
     occupants: readonly LevelTwoRoomTwoOccupant[],
     goopBody?: KinematicBody,
   ): void {
+    this.labArt.acid.update(deltaSeconds);
     this.roomOne.updateRadiation(occupants);
     this.roomTwo.updateRadiation(occupants);
     this.roomThree.updateRadiation(occupants);
@@ -275,18 +331,55 @@ export class LevelTwoPreviewScene {
 
     this.roomOneToTwoPassage.update(deltaSeconds, occupants);
     this.roomTwoToThreeGoopPassage.update(deltaSeconds, occupants);
+    this.roomFour.update(deltaSeconds, occupants);
+    this.roomFive.update(deltaSeconds, occupants);
+  }
+
+  /** Render scope only: collider mesh visibility and all simulation ownership stay intact. */
+  updatePresentationVisibility(cameraPosition: { readonly z: number }, activePosition: { readonly z: number }): void {
+    const cameraZ = cameraPosition.z - this.root.position.z;
+    const bodyZ = activePosition.z - this.root.position.z;
+    const nearZ = Math.min(cameraZ, bodyZ), farZ = Math.max(cameraZ, bodyZ);
+    // Keep both ends of each 28m passage loaded throughout its approach/traversal.
+    // The 12m overlap exceeds the normal camera orbit and prevents doorway popping.
+    const onLift = bodyZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z && bodyZ < LEVEL_TWO_ROOM_FIVE_OFFSET_Z;
+    const departed = onLift && this.roomFour.controller.boardingConfirmed;
+    this.roomOne.root.visible = nearZ <= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z + 12;
+    this.roomOneToTwoPassage.root.visible = nearZ <= LEVEL_TWO_ROOM_TWO_OFFSET_Z + 12 && farZ >= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z - 12;
+    this.roomTwo.root.visible = farZ >= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_THREE_OFFSET_Z + 12;
+    const secondPassage = farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_THREE_OFFSET_Z + 12;
+    this.roomTwoToThreeGoopPassage.root.visible = secondPassage;
+    this.roomTwoToThreeBobAirDuct.root.visible = secondPassage;
+    this.roomThree.root.visible = !departed && farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FOUR_OFFSET_Z + 12;
+    this.roomFour.root.visible = farZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 12;
+    // The closed lift vent occludes the entire lower sector during descent.
+    this.roomFive.root.visible = bodyZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z || cameraZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z ||
+      (this.roomFour.controller.readModel.state === 'complete' && farZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 12);
+  }
+
+  updateAcidInteractions(deltaSeconds: number, bodies: readonly AcidContactBody[]): void {
+    for (const interactions of this.acidInteractions) interactions.update(deltaSeconds, bodies);
   }
 
   reset(): void {
+    for (const interactions of this.acidInteractions) interactions.reset();
     this.roomOne.reset();
     this.roomOneToTwoPassage.reset();
     this.roomTwo.reset();
     this.roomTwoToThreeGoopPassage.reset();
     this.roomThree.reset();
+    this.roomFour.reset();
+    this.roomFive.reset();
   }
 
   dispose(): void {
+    this.maintenanceArt.dispose();
+    this.elevatorArt.dispose();
     this.labArt.dispose();
+    this.roomFive.dispose();
+    this.roomFour.dispose();
+    this.chamberArt.dispose();
+    this.coverArt.dispose();
     this.roomThree.dispose();
     this.roomTwoToThreeBobAirDuct.dispose();
     this.roomTwoToThreeGoopPassage.dispose();

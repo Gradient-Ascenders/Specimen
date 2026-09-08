@@ -17,6 +17,8 @@ export interface ContextualCameraAnchor {
  * Dead-zone values are half-extents in the displayed camera's screen plane.
  */
 export interface ContextualCameraProfile {
+  /** Keep mouse pitch live for gameplay arenas that only change framing. */
+  readonly playerControlledPitch?: boolean;
   readonly id: string;
   readonly distanceMetres: number;
   readonly targetHeightMetres: number;
@@ -31,4 +33,6 @@ export interface ContextualCameraProfile {
 export interface ContextualCameraContext {
   readonly profile: ContextualCameraProfile;
   readonly anchor: ContextualCameraAnchor;
+  /** Cinematic framing may stay upright while the followed slime is attached. */
+  readonly gameplayUpOverride?: ReadonlyCameraVector3;
 }

@@ -55,9 +55,6 @@ type Stroke = readonly [number, number, number, number];
 
 /** Deterministic, compact texture set authored entirely in project code. */
 export function createContainmentProceduralTextures(): ContainmentProceduralTextures {
-  const ceramicHeight: HeightSampler = (x, y) =>
-    (hashNoise(x, y, 17) - 0.5) * 0.045 +
-    Math.sin((x + y * 0.37) * 0.23) * 0.008;
   const graphiteHeight: HeightSampler = (x, y, size) =>
     Math.sin((y / size) * Math.PI * 18) * 0.055 +
     (hashNoise(x, y, 53) - 0.5) * 0.04;
@@ -66,11 +63,7 @@ export function createContainmentProceduralTextures(): ContainmentProceduralText
     organicCellHeight(x, y, size, 5, 5, 127) * 0.72 +
     Math.sin((x / size) * Math.PI * 8 + y * 0.12) * 0.035;
 
-  const ceramicNormal = normalTexture('containment-ceramic-micro-normal', ceramicHeight, 0.65);
-  const ceramicRoughness = scalarTexture(
-    'containment-ceramic-roughness',
-    (x, y) => 158 + Math.round((hashNoise(x, y, 31) - 0.5) * 10),
-  );
+  const { ceramicNormal, ceramicRoughness } = createContainmentCeramicTextures();
   const graphiteNormal = normalTexture('containment-graphite-micro-normal', graphiteHeight, 1.15);
   const graphiteRoughness = scalarTexture(
     'containment-graphite-roughness',
@@ -117,7 +110,7 @@ export function createContainmentStickyWallTextures(): Pick<
   return { stickyNormal, stickyRoughness };
 }
 
-function createAcidFoundationAlbedo(): THREE.DataTexture {
+export function createAcidFoundationAlbedo(): THREE.DataTexture {
   const pixels = new Uint8Array(TEXTURE_SIZE * TEXTURE_SIZE * 4);
   for (let y = 0; y < TEXTURE_SIZE; y += 1) {
     for (let x = 0; x < TEXTURE_SIZE; x += 1) {
@@ -485,4 +478,17 @@ function hashNoise(x: number, y: number, seed: number): number {
 
 function modulo(value: number, divisor: number): number {
   return ((value % divisor) + divisor) % divisor;
+}
+
+/** Shared Level 1 composite tread microdetail. */
+export function createContainmentCeramicTextures() {
+  const ceramicHeight: HeightSampler = (x, y) =>
+    (hashNoise(x, y, 17) - 0.5) * 0.045 +
+    Math.sin((x + y * 0.37) * 0.23) * 0.008;
+  const ceramicNormal = normalTexture('containment-ceramic-micro-normal', ceramicHeight, 0.65);
+  const ceramicRoughness = scalarTexture(
+    'containment-ceramic-roughness',
+    (x, y) => 158 + Math.round((hashNoise(x, y, 31) - 0.5) * 10),
+  );
+  return { ceramicNormal, ceramicRoughness };
 }

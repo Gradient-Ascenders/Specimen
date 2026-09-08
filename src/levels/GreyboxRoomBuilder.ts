@@ -83,6 +83,8 @@ export class GreyboxRoomBuilder {
   readonly collisionMeshes: THREE.Mesh[] = [];
   readonly cameraObstructionMeshes: THREE.Mesh[] = [];
   readonly materials: ContainmentGreyboxMaterials;
+  /** Materials supplied by an external art owner, including merged render batches. */
+  readonly borrowedMaterials = new Set<THREE.Material>();
 
   private readonly cameraObstructionMaterial = new THREE.MeshBasicMaterial({
     visible: false,
@@ -156,6 +158,7 @@ export class GreyboxRoomBuilder {
     ownedMaterials.add(this.cameraObstructionMaterial);
     this.root.removeFromParent();
     this.root.traverse((object) => {
+      if (object instanceof THREE.Light) object.dispose();
       if (!(object instanceof THREE.Mesh || object instanceof THREE.LineSegments)) {
         return;
       }
@@ -165,7 +168,10 @@ export class GreyboxRoomBuilder {
         : [object.material];
       for (const ownedMaterial of materials) ownedMaterials.add(ownedMaterial);
     });
-    for (const ownedMaterial of ownedMaterials) ownedMaterial.dispose();
+    for (const ownedMaterial of ownedMaterials) {
+      if (!this.borrowedMaterials.has(ownedMaterial)) ownedMaterial.dispose();
+    }
+    this.borrowedMaterials.clear();
     this.collisionMeshes.length = 0;
     this.cameraObstructionMeshes.length = 0;
     this.root.clear();

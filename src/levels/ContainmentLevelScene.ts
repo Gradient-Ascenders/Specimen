@@ -350,6 +350,7 @@ export class ContainmentLevelScene {
 
   updateDeath(deltaSeconds: number): void {
     this.teaching.updateDeath(deltaSeconds);
+    this.roomThree.updatePresentation(deltaSeconds);
   }
 
   finishDeath(position: Vector3State): void {
