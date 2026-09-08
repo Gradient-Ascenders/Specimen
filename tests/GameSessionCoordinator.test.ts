@@ -285,3 +285,24 @@ test('replacement runtime inherits disabled debug interaction during transition'
   assert.deepEqual(levelTwo.debugInteractionCalls, [false, true]);
   session.dispose();
 });
+
+for (const outcome of ['complete', 'reject', 'dispose'] as const) test(`GPU preparation holds the level transition: ${outcome}`, async () => {
+  const one = new MockRuntime('level-1', progression);
+  const two = new MockRuntime('level-2', progression) as MockRuntime & { preparePresentation(): Promise<void> };
+  let resolve!: () => void, reject!: (error: Error) => void;
+  two.preparePresentation = () => new Promise<void>((yes, no) => { resolve = yes; reject = no; });
+  const session = new GameSessionCoordinator({ initialRuntime: one, createLevelTwo: () => two, scheduleTransition: run => run() });
+  let completed = 0, failed = 0, rendered = 0;
+  two.render = () => { rendered++; };
+  session.events.on('transitionCompleted', () => completed++);
+  session.events.on('transitionFailed', () => failed++);
+  session.load(); one.events.emit('completed', { levelId: 'level-1', nextLevelId: 'level-2' });
+  assert.equal(completed, 0);
+  session.render(0, {} as Parameters<GameSessionCoordinator['render']>[1]); assert.equal(rendered, 0);
+  if (outcome === 'dispose') session.dispose();
+  if (outcome === 'reject') reject(new Error('GPU preparation failed')); else resolve();
+  await Promise.resolve();
+  assert.equal(completed, outcome === 'complete' ? 1 : 0);
+  assert.equal(failed, outcome === 'reject' ? 1 : 0);
+  session.dispose();
+});

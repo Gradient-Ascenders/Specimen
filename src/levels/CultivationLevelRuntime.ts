@@ -1,3 +1,5 @@
+import { CultivationLightLayout } from '../render/CultivationLightLayout.ts';
+import { CultivationPreparationQueue } from '../render/CultivationPreparationQueue.ts';
 import * as THREE from 'three';
 import type { ElevatorDroneEncounter } from '../hazards/ElevatorDroneEncounter.ts';
 import type { ElevatorEncounterView } from '../ui/ElevatorEncounterView.ts';
@@ -134,6 +136,7 @@ interface CultivationRuntimeResources {
   readonly pair: PersistentSlimePair<KinematicBody>;
   readonly controller: CultivationLevelController;
   readonly radiation: RadioactiveHazardSystem;
+  readonly acidContactBodies: readonly KinematicBody[];
   readonly radiationTargets: readonly RadiationContactTarget[];
   readonly previewOccupants: readonly [
     {
@@ -247,13 +250,35 @@ export class CultivationLevelRuntime {
     return this.authoredPreviewProgression?.roomId;
   }
 
-  load(): void { this.lifecycle.load(); }
+  private presentationPreparation: Promise<void> | undefined;
+  private preparationQueue: CultivationPreparationQueue | undefined;
+  private readonly preparationLightState = new THREE.Group();
+  private lastPreparedDark = false;
+  private lightLayout: CultivationLightLayout | undefined;
+  private lightLayoutKey = '';
+  private constructionMs = 0;
+  preparePresentation(): Promise<void> {
+    const resources = this.requireResources();
+    if (!resources.authoredPreview) return Promise.resolve();
+    this.lightLayout ??= new CultivationLightLayout(this.renderLayer.scene);
+    if (!this.preparationQueue) this.preparationQueue = new CultivationPreparationQueue(this.renderLayer, resources.authoredPreview, this.host);
+    this.preparationQueue.diagnostics.constructionMs = this.constructionMs;
+    return this.presentationPreparation ??= this.preparationQueue.prepareInitial();
+  }
+  load(): void {
+    if (this.lifecycle.state === 'unloaded') this.presentationPreparation = undefined;
+    const started = performance.now();
+    this.lifecycle.load();
+    this.constructionMs = performance.now() - started;
+  }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
   restartLevel(): void { this.lifecycle.restartLevel(); }
-  unload(): void { this.lifecycle.unload(); }
+  unload(): void { this.lightLayout?.dispose(); this.lightLayout = undefined; this.lightLayoutKey = ''; this.preparationQueue?.dispose(); this.preparationQueue = undefined; this.lifecycle.unload(); }
 
   dispose(): void {
+    this.lightLayout?.dispose(); this.lightLayout = undefined;
+    this.preparationQueue?.dispose(); this.preparationQueue = undefined;
     this.lifecycle.dispose();
     this.hudListeners.clear();
     this.events.clear();
@@ -338,9 +363,11 @@ export class CultivationLevelRuntime {
   }
 
   fixedUpdate(deltaSeconds: number): void {
+    if (this.preparationQueue?.diagnostics.pending) { this.input.endFixedUpdate(); return; }
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
     if (!resources.deathSequence.isPlaying) {
+      resources.authoredPreview?.labArt.acid.update(deltaSeconds);
       resources.burst.update(deltaSeconds);
       if (resources.deathSequence.update(deltaSeconds)) resources.deathScreen.show();
       this.input.endFixedUpdate();
@@ -451,6 +478,7 @@ export class CultivationLevelRuntime {
           resources.previewOccupants[1],
         );
       }
+      authoredPreview.updateAcidInteractions(deltaSeconds, resources.acidContactBodies);
       authoredPreview.update(
         deltaSeconds,
         authoredProgression.roomId,
@@ -570,6 +598,22 @@ export class CultivationLevelRuntime {
       this.renderLayer.cameraRig.setContextualCamera(this.roomFourCamera);
     } else this.renderLayer.cameraRig.setContextualCamera(undefined);
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    resources.authoredPreview?.updatePresentationVisibility(
+      this.renderLayer.cameraRig.camera.position, resources.pair.activeBody.position,
+    );
+    if (resources.authoredPreview && this.lightLayout) {
+      const p = resources.authoredPreview;
+      const key = [p.roomOne.root.visible, p.roomOneToTwoPassage.root.visible, p.roomTwo.root.visible,
+        p.roomTwoToThreeGoopPassage.root.visible, p.roomTwoToThreeBobAirDuct.root.visible,
+        p.roomThree.root.visible, p.roomFour.root.visible, p.roomFive.root.visible].join(',');
+      if (key !== this.lightLayoutKey) { this.lightLayout.sync(this.renderLayer.scene); this.lightLayoutKey = key; }
+    }
+    if (this.preparationQueue && !this.preparationQueue.requireCurrent(!!darkRoom)) {
+      this.preparationQueue.tick(0, true); return;
+    }
+    if (resources.roomThreeEncounter && resources.authoredPreview) {
+      resources.roomThreeEncounter.root.visible = resources.authoredPreview.roomThree.root.visible;
+    }
     resources.pairPresentation.update(
       resources.renderedBobPosition,
       resources.renderedGoopPosition,
@@ -596,7 +640,13 @@ export class CultivationLevelRuntime {
         resources.deathSequence.isPlaying &&
         this.roomThreeSlimeEligibility[damageSlimeId],
     );
+    if (darkRoom !== this.lastPreparedDark) {
+      // Shadow passes consume the scene's prior light state; refresh it before a lighting transition.
+      this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
+      this.lastPreparedDark = !!darkRoom;
+    }
     this.renderLayer.render();
+    this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
 
     this.debugElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (this.debugVisible && resources.debugPanel && this.debugElapsedSeconds >= 0.25) {
@@ -877,6 +927,7 @@ export class CultivationLevelRuntime {
             bobBody,
             goopBody,
             radiationSurface: authoredPreview.roomThree.radiationHazard,
+            surfaceMaps: authoredPreview.labArt.metal,
             requestDeath: (slimeId) => this.requestRoomThreeDroneDeath(slimeId),
           })
         : undefined;
@@ -895,6 +946,7 @@ export class CultivationLevelRuntime {
         authoredPreview.roomFour, collisionWorld, surfaceRegistry, bobBody, goopBody,
         previewDissolveTargets, dissolveSystem,
         (slimeId) => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), slimeId),
+        authoredPreview.labArt.metal,
       ) : undefined;
       if (roomFourEncounter) rollback(() => roomFourEncounter.dispose());
       const roomFourView = authoredPreview ? new this.debugSupport!.ElevatorEncounterView() : undefined;
@@ -974,7 +1026,7 @@ export class CultivationLevelRuntime {
       rollback(() => bobVisual.dispose());
       const roomFiveEncounter = authoredPreview ? new this.debugSupport!.RoomFiveDroneEncounter(
         authoredPreview.roomFive, collisionWorld, surfaceRegistry, bobBody, goopBody,
-        id => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), id)) : undefined;
+        id => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), id), authoredPreview.labArt.metal) : undefined;
       if (roomFiveEncounter) { rollback(() => roomFiveEncounter.dispose()); this.renderLayer.scene.add(roomFiveEncounter.presentation.mesh); }
       authoredPreview?.roomFive.bindBurns(dissolveSystem);
       const roomFiveDamage = roomFiveEncounter ? new this.debugSupport!.DamageVignette({ damage: roomFiveEncounter.damage }) : undefined;
@@ -1081,6 +1133,7 @@ export class CultivationLevelRuntime {
         structuralAssemblies, wallButton, blastDoor, buttonDoorCoordinator,
         manager, pair, controller,
         radiation, radiationTargets, previewOccupants,
+        acidContactBodies: [bobBody, goopBody],
         bobVisual, pairPresentation, burst,
         deathSequence, deathScreen, bobFacing: new BlobFacing(), bobVisualState,
         jumpInputState: {

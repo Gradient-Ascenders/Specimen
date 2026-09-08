@@ -1,3 +1,6 @@
+import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
+import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
+import { CultivationMaintenanceArt } from '../src/render/environment/cultivation/CultivationMaintenanceArt.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -218,7 +221,7 @@ test('dark-room lights follow drone power, damage recovery, and the moving Volt 
     assert.equal((s.room.reunionDoor.material as THREE.Material).visible, false);
     assert.equal(s.room.reunionDoor.children.filter(child => child.name.includes('hidden-exit-skin')).length, 3);
     const floor = s.room.root.getObjectByName('room-5-chamber-acid-bed') as THREE.Mesh;
-    assert.equal((floor.material as THREE.MeshStandardMaterial).emissiveIntensity, .12);
+    assert.ok(floor.material instanceof AcidSurfaceMaterial, 'dressed chamber uses the shared dynamic acid shader');
   } finally { s.dispose(); }
 });
 
@@ -241,6 +244,8 @@ test('sewer reboot, paired checkpoints and rescue retries preserve the right sta
 
 function setup() {
   const room = new LevelTwoRoomFiveGreybox(() => {});
+  const lab = new CultivationLabMaterials();
+  const art = new CultivationMaintenanceArt(room, lab);
   room.root.position.set(64, 0, 249); room.root.updateMatrixWorld(true);
   const world = new CollisionWorld(); const surfaces = new SurfaceRegistry();
   world.registerAll(room.collisionMeshes, undefined, ColliderTransformMode.Static); surfaces.registerAll(room.collisionMeshes);
@@ -251,7 +256,7 @@ function setup() {
   const burns = new DissolveSystem(targets); room.bindDissolveTargets(targets); room.bindBurns(burns);
   const encounter = new RoomFiveDroneEncounter(room, world, surfaces, bob, goop, () => true);
   return { room, world, bob, goop, targets, burns, encounter,
-    dispose() { encounter.dispose(); burns.dispose(); for (const target of targets) target.dispose(); room.dispose(); world.clear(); surfaces.clear(); } };
+    dispose() { encounter.dispose(); burns.dispose(); for (const target of targets) target.dispose(); art.dispose(); lab.dispose(); room.dispose(); world.clear(); surfaces.clear(); } };
 }
 
 test('three acid hits wake, progressively damage, and destroy the sewer drone; retry restores it', () => {
@@ -377,7 +382,8 @@ test('flying models do not overlap even with independently shifted patrol clocks
     for (let phase = 0; phase < 48; phase++) {
       for (const patrol of s.encounter.patrols) patrol.elapsed = phase / 4;
       s.encounter.update(.0001);
-      s.encounter.drones.forEach((drone, i) => samples[i].push(new THREE.Box3().setFromObject(drone.root.getObjectByName(`${drone.id}-flying-shell`)!)));
+      // Use rendered vertices: a rotated merged mesh has a looser cached local AABB than its former individual parts.
+      s.encounter.drones.forEach((drone, i) => samples[i].push(new THREE.Box3().setFromObject(drone.root.getObjectByName(`${drone.id}-flying-shell`)!, true)));
     }
     for (let a = 0; a < samples.length; a++) for (let b = a + 1; b < samples.length; b++) {
       for (const first of samples[a]) for (const second of samples[b])

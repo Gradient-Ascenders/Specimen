@@ -35,6 +35,7 @@ export interface RoomThreeDroneEncounterConfig {
 }
 
 export interface RoomThreeDroneEncounterOptions {
+  readonly surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null };
   readonly config: RoomThreeDroneEncounterConfig;
   readonly supportsById: ReadonlyMap<string, DissolveTarget>;
   readonly collisionWorld: CollisionWorld;
@@ -97,8 +98,7 @@ export class RoomThreeDroneEncounter {
   readonly presentationResourceDiagnostics: SecurityDronePresentationResourceDiagnostics;
 
   private readonly bobBody: KinematicBody;
-  private readonly presentationResources =
-    new SecurityDronePresentationResources();
+  private readonly presentationResources: SecurityDronePresentationResources;
   private readonly radiationSurface: RoomThreeDroneEncounterOptions['radiationSurface'];
   private readonly slimeEligibility = { bob: true, goop: true };
   private readonly targets: readonly SecurityDroneTarget[];
@@ -134,6 +134,7 @@ export class RoomThreeDroneEncounter {
         throw new Error(`Ceiling drone "${config.drone.id}" has no registered support target.`);
       }
     }
+    this.presentationResources = new SecurityDronePresentationResources(options.surfaceMaps);
     this.root.name = 'cultivation-room-3-drone-encounter';
     this.bobBody = options.bobBody;
     this.radiationSurface = options.radiationSurface;

@@ -19,7 +19,7 @@ interface Slot { drone: SecurityDrone; target: DissolveTarget; root: THREE.Group
 export class ElevatorDroneEncounter {
   readonly damage = new SlimeDamageSystem();
   readonly projectiles: DroneProjectileSystem;
-  private readonly resources = new SecurityDronePresentationResources();
+  private readonly resources: SecurityDronePresentationResources;
   private readonly slots: Slot[];
   private readonly targets: SecurityDroneTarget[];
   private readonly projectileTargets: DroneProjectileTarget[];
@@ -38,7 +38,9 @@ export class ElevatorDroneEncounter {
   constructor(room: LevelTwoRoomFourGreybox,
     world: CollisionWorld, surfaces: SurfaceRegistry,
     bob: KinematicBody, goop: KinematicBody, targets: readonly DissolveTarget[],
-    dissolve: DissolveSystem, requestDeath: (id: 'bob' | 'goop') => void) {
+    dissolve: DissolveSystem, requestDeath: (id: 'bob' | 'goop') => void,
+    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null }) {
+    this.resources = new SecurityDronePresentationResources(surfaceMaps);
     this.room = room; this.world = world;
     this.bodies = [bob, goop];
     this.projectiles = new DroneProjectileSystem(world, this.damage, {

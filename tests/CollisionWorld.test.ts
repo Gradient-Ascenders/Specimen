@@ -536,3 +536,22 @@ test('broadphase matches exhaustive sweeps across transformed static and dynamic
 
   for (const collider of colliders) collider.geometry.dispose();
 });
+
+test('moving parents and reparenting invalidate cached dynamic query transforms', () => {
+  const world = new CollisionWorld();
+  const parent = new THREE.Group(), other = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2)); parent.add(box);
+  world.register(box);
+  const hit = new CollisionHit(), origin = new THREE.Vector3(-5, 0, 0), delta = new THREE.Vector3(12, 0, 0);
+  assert.ok(world.sweepSphere(origin, delta, .2, hit)); const first = hit.fraction;
+  assert.ok(world.sweepSphere(origin, delta, .2, hit)); assert.equal(hit.fraction, first);
+  parent.position.x = 3;
+  assert.ok(world.sweepSphere(origin, delta, .2, hit)); assert.ok(hit.fraction > first);
+  other.position.x = -2; other.add(box);
+  assert.ok(world.sweepSphere(origin, delta, .2, hit)); assert.ok(hit.fraction < first);
+  other.scale.set(2, 1, 1); other.rotation.z = .2;
+  const reference = new CollisionWorld({ broadphaseEnabled: false }); reference.register(box);
+  const expected = new CollisionHit(); reference.sweepSphere(origin, delta, .2, expected);
+  world.sweepSphere(origin, delta, .2, hit); assert.equal(hit.fraction, expected.fraction);
+  world.clear(); reference.clear(); box.geometry.dispose();
+});

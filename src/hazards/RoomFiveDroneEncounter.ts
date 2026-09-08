@@ -1,3 +1,4 @@
+import { batchMaintenanceScout } from '../render/hazards/BatchMaintenanceScout.ts';
 import * as THREE from 'three';
 import { BeamOcclusion } from '../render/hazards/BeamOcclusion.ts';
 import { SlimeLightSampler } from '../render/slime/SlimeLightSampler.ts';
@@ -30,7 +31,7 @@ export class RoomFiveDroneEncounter {
   readonly patrols: RoomFivePatrol[] = [];
   private readonly networks: SecurityNetwork[] = [];
   private readonly flyers: ReturnType<typeof createRustedSewerDrone>[] = [];
-  private readonly resources = new SecurityDronePresentationResources();
+  private readonly resources: SecurityDronePresentationResources;
   private readonly targets: readonly SecurityDroneTarget[];
   private readonly projectileTargets: readonly DroneProjectileTarget[];
   private readonly beams: THREE.Mesh[] = [];
@@ -53,7 +54,9 @@ export class RoomFiveDroneEncounter {
   private disposed = false;
   readonly room: LevelTwoRoomFiveGreybox;
   constructor(room: LevelTwoRoomFiveGreybox, world: CollisionWorld, surfaces: SurfaceRegistry,
-    bob: KinematicBody, goop: KinematicBody, requestDeath: (id: 'bob' | 'goop') => boolean) {
+    bob: KinematicBody, goop: KinematicBody, requestDeath: (id: 'bob' | 'goop') => boolean,
+    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null }) {
+    this.resources = new SecurityDronePresentationResources(surfaceMaps);
     this.room = room;
     this.world = world;
     this.sewerDamage = new SewerDroneDamage(room.brokenCore);
@@ -111,7 +114,9 @@ export class RoomFiveDroneEncounter {
       drone.root.userData.route = index;
       this.networks.push(network);
       this.patrols.push(new RoomFivePatrol(position.clone(), forward.clone(), partner ? Math.PI : 0));
-      const flyer = createRustedSewerDrone(false); flyer.body.scale.setScalar(.75);
+      const flyer = createRustedSewerDrone(false);
+      batchMaintenanceScout(flyer.body, flyer.eye, surfaceMaps);
+      flyer.body.scale.setScalar(.75);
       flyer.body.name = `${drone.id}-flying-shell`;
       drone.presentation.root.visible = false; drone.root.add(flyer.body); this.flyers.push(flyer);
       // Saturated blue, with stronger opacity so it stays readable without whitening it.
@@ -141,7 +146,7 @@ export class RoomFiveDroneEncounter {
     room.root.traverse(object => {
       if (object instanceof THREE.Mesh) {
         const materials = Array.isArray(object.material) ? object.material : [object.material];
-        object.castShadow = materials.some(material => material.visible && !material.transparent);
+        object.castShadow = !object.userData.shadowProxyReceiver && materials.some(material => material.visible && !material.transparent);
         object.receiveShadow = true;
       }
       if (object instanceof THREE.PointLight || object instanceof THREE.SpotLight) {

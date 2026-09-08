@@ -73,7 +73,7 @@ export class GameSessionCoordinator {
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
-    this.runtime.render(interpolationAlpha, stats);
+    if (!this.transitionPending && !this.transitionFailed) this.runtime.render(interpolationAlpha, stats);
   }
 
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void {
@@ -197,8 +197,15 @@ export class GameSessionCoordinator {
       );
       this.bindRuntime(nextRuntime);
       nextRuntime.load();
-      this.transitionPending = false;
-      this.events.emit('transitionCompleted', { levelId: 'level-2' });
+      const complete = () => {
+        if (!this.isCurrentTransition(transitionGeneration)) return;
+        this.transitionPending = false;
+        this.events.emit('transitionCompleted', { levelId: 'level-2' });
+      };
+      const preparation = nextRuntime.preparePresentation?.();
+      if (preparation) {
+        void preparation.then(complete, error => this.failLevelTwoTransition(error, previousRuntime, nextRuntime, transitionGeneration));
+      } else complete();
     } catch (error) {
       this.failLevelTwoTransition(
         error,

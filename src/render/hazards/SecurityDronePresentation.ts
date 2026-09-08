@@ -50,6 +50,17 @@ export class SecurityDronePresentationResources {
   };
   private disposed = false;
 
+  /** Borrow facility maps; the encounter owns these four materials, never the maps. */
+  constructor(surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null }) {
+    if (!surfaceMaps) return;
+    for (const [role, material] of Object.entries(this.materials)) {
+      material.bumpMap = surfaceMaps.bumpMap;
+      material.roughnessMap = surfaceMaps.roughnessMap;
+      material.bumpScale = 0.004;
+      material.roughness = role === 'armour' ? 0.68 : 0.58;
+    }
+  }
+
   get diagnostics(): SecurityDronePresentationResourceDiagnostics {
     return {
       geometryCount: this.geometries.size,

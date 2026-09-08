@@ -23,6 +23,7 @@ import { DeathSequence } from '../src/systems/DeathSequence.ts';
 
 interface MutableFakeBody {
   readonly position: THREE.Vector3;
+  readonly velocity: THREE.Vector3;
   readonly radiusMetres: number;
   attached: boolean;
   attachmentSurfaceName: string;
@@ -38,6 +39,7 @@ interface MutableFakeBody {
 
 const createFakeBody = (): MutableFakeBody => ({
   position: new THREE.Vector3(0, 0.46, -2.6),
+  velocity: new THREE.Vector3(),
   radiusMetres: 0.45,
   attached: false,
   attachmentSurfaceName: 'none',

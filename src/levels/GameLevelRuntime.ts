@@ -15,6 +15,8 @@ export interface GameLevelRuntime {
   readonly events: EventBus<GameLevelRuntimeEvents>;
   readonly state: LevelLifecycleState;
   load(): void;
+  /** Optional GPU preparation while the transition UI keeps gameplay stopped. */
+  preparePresentation?(): Promise<void>;
   start(): void;
   stop(): void;
   restartLevel(): void;

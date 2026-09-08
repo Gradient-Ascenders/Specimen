@@ -178,7 +178,11 @@ test('Room 3 batches only static visuals while preserving collider identity', ()
   const room = scene.roomThree;
 
   assert.ok(room.staticBatchDiagnostics.batchCount > 0);
-  assert.ok(room.staticBatchDiagnostics.sourceMeshCount > 20);
+  const coverColliders = room.collisionMeshes.filter(mesh => mesh.userData.coverRole);
+  assert.equal(coverColliders.length, 8);
+  assert.ok(room.staticBatchDiagnostics.sourceMeshCount + coverColliders.length > 20);
+  assert.equal(scene.coverArt.diagnostics.drawCalls, 6);
+  for (const cover of coverColliders) assert.equal((cover.material as THREE.Material).visible, false);
   assert.equal(room.staticBatchDiagnostics.drawCallsRemoved,
     room.staticBatchDiagnostics.sourceMeshCount - room.staticBatchDiagnostics.batchCount);
   assert.equal(room.staticBatchDiagnostics.mergedGeometryCount, room.staticBatchDiagnostics.batchCount);
@@ -1127,3 +1131,41 @@ function assertLaserAgainstPanel(laser: LaserHazard, panel: THREE.Mesh): void {
     }
   }
 }
+
+
+test('Rooms 1–3 acid basins sample both slimes in world space without changing hazards or colliders', () => {
+  const failures: unknown[] = [];
+  const scene = new LevelTwoPreviewScene(failure => failures.push(failure));
+  const floors = [scene.roomOne, scene.roomTwo, scene.roomThree].flatMap(room =>
+    room.collisionMeshes.filter(mesh => mesh.userData.textureRole === 'acid-floor'));
+  assert.deepEqual(floors.map(mesh => mesh.name), [1, 2, 3].map(id => `cultivation-room-${id}-radioactive-floor`));
+  const snapshot = floors.map(mesh => ({ geometry: mesh.geometry, matrix: mesh.matrixWorld.clone(), data: JSON.stringify(mesh.userData) }));
+  const bodies = ['bob', 'goop'].map(id => ({ id: id as 'bob' | 'goop', position: new THREE.Vector3(), velocity: new THREE.Vector3(2, 0, 0), radiusMetres: 0.46 }));
+  for (const room of [scene.roomOne, scene.roomTwo, scene.roomThree]) {
+    scene.reset();
+    const bounds = new THREE.Box3().setFromObject(room.radiationHazard.mesh);
+    bounds.getCenter(bodies[0].position);
+    bodies[0].position.y = bounds.max.y + 0.46;
+    bodies[1].position.copy(bodies[0].position).add(new THREE.Vector3(2, 0, 0));
+    const emitted = scene.labArt.acid.interactionDiagnostics.emitted;
+    scene.updateAcidInteractions(1 / 60, bodies);
+    assert.equal(scene.labArt.acid.interactionDiagnostics.emitted - emitted, 2, 'exactly one entry per slime in the translated basin');
+    for (let frame = 0; frame < 30; frame++) {
+      bodies[1].position.x += 0.02;
+      scene.labArt.acid.update(1 / 60);
+      scene.updateAcidInteractions(1 / 60, bodies);
+    }
+    assert.ok(scene.labArt.acid.interactionDiagnostics.emitted > emitted + 2);
+    const failureCount = failures.length;
+    room.updateRadiation(bodies);
+    assert.equal(failures.length, failureCount + 1, 'Bob remains lethal and Goop remains immune');
+    scene.reset();
+    assert.equal(scene.labArt.acid.interactionDiagnostics.active, 0);
+  }
+  floors.forEach((mesh, i) => {
+    assert.equal(mesh.geometry, snapshot[i].geometry);
+    assert.deepEqual(mesh.matrixWorld.elements, snapshot[i].matrix.elements);
+    assert.equal(JSON.stringify(mesh.userData), snapshot[i].data);
+  });
+  scene.dispose();
+});

@@ -8,6 +8,8 @@ vAcidWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
 
 export const acidSurfaceFragmentPars = /* glsl */ `
 uniform float uTime;
+uniform vec4 uRipples[12];
+uniform float uRippleSurfaceY[12];
 uniform vec3 uDeepColour;
 uniform vec3 uMidColour;
 uniform vec3 uFilmColour;
@@ -83,18 +85,25 @@ void evaluateAcidBubbles(
 
   for (int offsetY = -1; offsetY <= 1; offsetY += 1) {
     for (int offsetX = -1; offsetX <= 1; offsetX += 1) {
+      // Maximum radius + ring support is .56 * 1.12 + .047 * 2.6 = .7494m.
+      // Centres stay at least .16 cells from an edge. At the authored 5.2m
+      // scale, neighbouring cells therefore contribute exactly zero.
+      if (uBubbleScale >= 4.684 && (offsetX != 0 || offsetY != 0)) continue;
       vec2 cell = baseCell + vec2(float(offsetX), float(offsetY));
-      vec2 randomPair = acidHash22(cell + vec2(41.7, -13.2));
       float selection = acidHash12(cell + vec2(-8.3, 27.1));
-      float selected = step(0.72, selection);
+      if (selection < 0.72) continue;
+      vec2 randomPair = acidHash22(cell + vec2(41.7, -13.2));
+      vec2 centre = (cell + 0.16 + randomPair * 0.68) * uBubbleScale;
+      vec2 centreOffset = worldCoordinate - centre;
+      if (dot(centreOffset, centreOffset) > 0.5625) continue;
       float lifetimeSeconds = mix(11.0, 18.0, randomPair.y);
       float phaseOffset = acidHash12(cell + vec2(73.1, 5.9));
       float lifePhase = fract(timeSeconds / lifetimeSeconds + phaseOffset);
       float fadeIn = smoothstep(0.04, 0.20, lifePhase);
       float fadeOut = 1.0 - smoothstep(0.72, 0.94, lifePhase);
-      float life = fadeIn * fadeOut * selected;
+      float life = fadeIn * fadeOut;
+      if (life <= 0.0) continue;
 
-      vec2 centre = (cell + 0.16 + randomPair * 0.68) * uBubbleScale;
       float sizeVariation = mix(0.52, 1.12, randomPair.x);
       float growth = smoothstep(0.02, 0.78, lifePhase);
       float radius = mix(0.045, 0.56 * sizeVariation, growth);
@@ -112,6 +121,24 @@ void evaluateAcidBubbles(
       interiorMask = max(interiorMask, interior * life);
     }
   }
+}
+
+// Packed events: world XZ, birth time, strength. Height isolates stacked pools.
+vec2 evaluateAcidInteractions(vec2 worldCoordinate) {
+  vec2 result = vec2(0.0);
+  for (int i = 0; i < 12; i++) {
+    float age = uTime - uRipples[i].z;
+    if (uRipples[i].w <= 0.0 || age < 0.0 || age >= 3.2 || abs(vAcidWorldPosition.y - uRippleSurfaceY[i]) > 0.18) continue;
+    float distanceFromImpact = length(worldCoordinate - uRipples[i].xy);
+    float radius = 0.28 + age * 1.65;
+    float band = distanceFromImpact - radius;
+    if (abs(band) > 1.2) continue;
+    float envelope = exp(-band * band * 9.0) * (1.0 - smoothstep(0.3, 3.2, age));
+    float wave = cos(band * 8.0) * envelope * uRipples[i].w;
+    result.x += wave;
+    result.y += max(0.0, wave) * 0.45;
+  }
+  return vec2(result.x, clamp(result.y, 0.0, 1.0));
 }
 
 AcidSurfaceSample evaluateAcidSurface(vec2 worldCoordinate) {
@@ -178,6 +205,10 @@ AcidSurfaceSample evaluateAcidSurface(vec2 worldCoordinate) {
   colour = mix(colour, uDeepColour * 0.74, bubbleInterior * 0.30);
   colour = mix(colour, uBubbleColour, bubbleRing * 0.48);
 
+  vec2 interaction = evaluateAcidInteractions(worldCoordinate);
+  colour = mix(colour, uBubbleColour, interaction.y * 0.38);
+  float rollingWaves = sin(worldCoordinate.x * 1.1 + worldCoordinate.y * 0.7 + uTime * 0.48) *
+    cos(worldCoordinate.y * 1.35 - worldCoordinate.x * 0.45 - uTime * 0.37) * 0.07;
   AcidSurfaceSample surfaceSample;
   surfaceSample.colour = colour;
   surfaceSample.bodyVariation = bodyVariation;
@@ -191,7 +222,7 @@ AcidSurfaceSample evaluateAcidSurface(vec2 worldCoordinate) {
     filmDetail * 0.11 +
     film * 0.04 -
     bubbleInterior * 0.12 +
-    bubbleRing * 0.045;
+    bubbleRing * 0.045 + rollingWaves + interaction.x * 0.28;
   return surfaceSample;
 }
 `;

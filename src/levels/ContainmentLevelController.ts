@@ -176,6 +176,7 @@ export class ContainmentLevelController {
       return;
     }
 
+    this.scene.roomThree.art.acidInteractions.update(deltaSeconds, this.persistentBodies);
     const roomAtStepStart = this.activeRoomIdValue;
     this.updateRoomBoundaryTriggers();
 
@@ -343,8 +344,10 @@ export class ContainmentLevelController {
       this.activateRoomFiveEntryCheckpoint();
     });
 
-    this.onEntered(this.scene.roomThree.failureVolume, () =>
-      this.requestFailure('room-3:fall'));
+    this.onEntered(this.scene.roomThree.failureVolume, () => {
+      this.scene.roomThree.art.acidInteractions.fallPulse(this.body);
+      this.requestFailure('room-3:fall');
+    });
     this.onEntered(this.scene.roomFour.failureVolume, () =>
       this.requestFailure('room-4:fall'));
     this.onEntered(this.scene.roomFive.failureVolume, () =>

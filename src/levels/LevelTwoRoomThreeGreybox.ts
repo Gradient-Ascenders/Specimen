@@ -74,6 +74,7 @@ export class LevelTwoRoomThreeGreybox {
   private readonly localLaserTargets: LocalLaserContactTarget[] = [];
   constructor(
     requestFailure: (failure: LevelTwoRoomThreeHazardFailure) => void,
+    prepareArt?: (builder: GreyboxRoomBuilder) => void,
   ) {
     this.root.userData.levelId = 'cultivation';
     this.root.userData.roomId = 3;
@@ -94,6 +95,7 @@ export class LevelTwoRoomThreeGreybox {
     this.buildRoofDronePlaceholders();
     this.buildFinalSecurityArea();
     this.addCheckpointAnchors();
+    prepareArt?.(this.builder);
     this.staticBatchDiagnostics =
       consolidateCultivationRoomThreeStaticColliders(
         this.root,
