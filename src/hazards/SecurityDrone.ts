@@ -52,6 +52,8 @@ export interface SecurityDroneConfig {
   readonly cooldownSeconds: number;
   readonly muzzleAnchor: THREE.Vector3;
   readonly detectionAnchor?: THREE.Vector3;
+  /** Flying eye: share one gaze-aligned origin for detection and projectiles. */
+  readonly forwardAnchorMetres?: number;
   readonly targetPolicy: DroneTargetPolicy;
   readonly initialScanPhase: number;
 }
@@ -200,7 +202,7 @@ export class SecurityDrone {
     this.syncReadModel();
   }
 
-  update(deltaSeconds: number, targets: readonly SecurityDroneTarget[]): void {
+  update(deltaSeconds: number, targets: readonly SecurityDroneTarget[], allowFire = true): void {
     this.assertActive('update drone');
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error('Security drone deltaSeconds must be positive and finite.');
@@ -221,7 +223,7 @@ export class SecurityDrone {
       } else {
         this.targetLossElapsed = 0;
         this.trackTarget();
-        if (this.stateElapsed + EPSILON >= this.config.warningSeconds) {
+        if (allowFire && this.stateElapsed + EPSILON >= this.config.warningSeconds) {
           this.transition('firing');
           this.fireElapsed = this.config.fireIntervalSeconds;
         }
@@ -234,7 +236,7 @@ export class SecurityDrone {
         this.loseTarget();
       } else {
         this.fireElapsed += deltaSeconds;
-        while (this.fireElapsed + EPSILON >= this.config.fireIntervalSeconds) {
+        while (allowFire && this.fireElapsed + EPSILON >= this.config.fireIntervalSeconds) {
           this.fireElapsed -= this.config.fireIntervalSeconds;
           this.fire();
         }
@@ -247,6 +249,12 @@ export class SecurityDrone {
       }
     }
     this.syncReadModel();
+  }
+
+  /** Authored patrols supply a world-space gaze before update; LOS and firing stay here. */
+  setPatrolDirection(direction: THREE.Vector3): void {
+    this.baseForward.copy(direction).normalize();
+    this.scanDirection.copy(this.baseForward);
   }
 
   setEnabled(enabled: boolean): void {
@@ -271,6 +279,7 @@ export class SecurityDrone {
     this.root.position.copy(this.config.initialPosition);
     this.root.quaternion.copy(this.initialQuaternion);
     this.scanPhase = normalizePhase(this.config.initialScanPhase);
+    this.baseForward.copy(this.config.forward).normalize();
     this.target = undefined;
     this.targetLossElapsed = 0;
     this.fireElapsed = 0;
@@ -419,6 +428,11 @@ export class SecurityDrone {
   }
 
   private copyAnchor(anchor: THREE.Vector3 | undefined, target: THREE.Vector3): void {
+    if (this.config.forwardAnchorMetres !== undefined) {
+      this.root.getWorldPosition(target);
+      target.addScaledVector(this.scanDirection, this.config.forwardAnchorMetres);
+      return;
+    }
     this.localAnchor.copy(anchor ?? this.config.muzzleAnchor);
     this.root.updateWorldMatrix(true, false);
     target.copy(this.localAnchor).applyMatrix4(this.root.matrixWorld);

@@ -4,8 +4,8 @@ export type PlayableSlimeId = Extract<SlimeId, 'bob' | 'goop'>;
 
 /** Small application-owned handoff; level-owned bodies never cross runtimes. */
 export interface LevelProgressionSnapshot {
-  readonly unlockedSlimeIds: readonly PlayableSlimeId[];
-  readonly activeSlimeId: PlayableSlimeId;
+  readonly unlockedSlimeIds: readonly SlimeId[];
+  readonly activeSlimeId: SlimeId;
 }
 
 export function validateLevelProgressionSnapshot(

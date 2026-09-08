@@ -114,7 +114,7 @@ test('Goop reaching Room 2 early does not advance Bob or the shared objective', 
   });
 });
 
-test('Room 3 remains split until Bob and Goop reach their own entrances', () => {
+test('Room 3 recovery waits for both slimes so Bob can still release Goop', () => {
   const roomTwo = createLevelTwoPreviewProgression(2);
   const bobEnteredFirst = advanceLevelTwoPreviewProgression(roomTwo, {
     bob: 3,
@@ -125,7 +125,7 @@ test('Room 3 remains split until Bob and Goop reach their own entrances', () => 
   assert.equal(bobEnteredFirst.bobEnteredRoomThree, true);
   assert.equal(bobEnteredFirst.goopEnteredRoomThree, false);
   assert.deepEqual(bobEnteredFirst.recoveryRoomIds, {
-    bob: 3,
+    bob: 2,
     goop: 2,
   });
 
@@ -366,12 +366,15 @@ test('bulk-static preview registration promotes every animated collider', () => 
   }
   assert.equal(wallColliders.length, 11);
   assert.deepEqual(
-    new Set(scene.dynamicCollisionMeshes),
+    new Set(scene.dynamicCollisionMeshes.map(mesh => mesh.name)),
     new Set([
       ...drops.map((drop) => drop.mesh),
       ...wallColliders,
+      ...scene.roomFive.dynamicCollisionMeshes,
+      ...scene.roomFour.movingEntranceMeshes,
       ...doors.map((door) => door.collisionMesh),
-    ]),
+      scene.roomFour.entrance.collisionMesh, scene.roomFour.boardingWall, scene.roomFour.arrivalWall, scene.roomFour.shield,
+    ].map(mesh => mesh.name)),
   );
 
   const targets = scene.solubleTargetMeshes.map((mesh) => {
@@ -516,7 +519,7 @@ test('Level 2 preview exposes explicit radiation and soluble-support metadata', 
     assert.equal(floor.userData.textureRole, 'acid-floor');
   }
 
-  assert.equal(scene.solubleTargetMeshes.length, 14);
+  assert.equal(scene.solubleTargetMeshes.length, 30);
   assert.equal(
     scene.roomOne.solubleTargetMeshes.every(
       (target) => target.userData.releaseMode === 'fall-to-radiation',
@@ -534,7 +537,7 @@ test('Level 2 preview exposes explicit radiation and soluble-support metadata', 
       (target) =>
         target.userData.releaseMode === 'permanent-sticky-wall-drop' ||
         (target.userData.releaseMode === 'temporary-roof-drone-disable' &&
-        target.userData.replacementDelaySeconds === 10),
+        target.userData.replacementDelaySeconds === 15),
     ),
     true,
   );
@@ -884,7 +887,7 @@ test('all authored Level 2 debug spawns have lateral and overhead clearance', ()
   const displacement = new THREE.Vector3();
   world.registerAll(scene.collisionMeshes);
 
-  for (const roomId of [1, 2, 3] as const) {
+  for (const roomId of [1, 2, 3, 4] as const) {
     for (const slimeId of ['bob', 'goop'] as const) {
       const spawn = scene.copyRoomSpawnPosition(
         roomId,
@@ -910,6 +913,20 @@ test('all authored Level 2 debug spawns have lateral and overhead clearance', ()
   }
 
   scene.dispose();
+});
+
+test('the direct elevator lobby stays unlocked with its door behind the lift', () => {
+  const scene = createScene();
+  try {
+    const lobby = scene.copyRoomSpawnPosition(4, 'bob', new THREE.Vector3());
+    assert.equal(scene.resolveRoomId(lobby), 4);
+    assert.equal(scene.roomFour.entrance.locked, false);
+    assert.equal(scene.roomFour.entrance.root.position.z, 0);
+    assert.equal(scene.roomFour.root.position.z - scene.roomThree.root.position.z, 76);
+    scene.reset();
+    assert.equal(scene.resolveRoomId(lobby), 4);
+    assert.equal(scene.roomFour.entrance.locked, false);
+  } finally { scene.dispose(); }
 });
 
 test('Room 2 and Room 3 lasers are authored directly against their sticky panels', () => {
@@ -942,6 +959,8 @@ test('Room 2 and Room 3 lasers are authored directly against their sticky panels
     1: 'Help Bob reach Room 2',
     2: 'Get Bob and Goop into Room 3',
     3: 'Get bob to the other side to push the drones into the acid',
+    4: 'Get Bob and Goop onto the elevator',
+    5: 'Rescue Volt',
   });
 
   scene.dispose();

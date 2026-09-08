@@ -1,4 +1,4 @@
-export type CultivationDebugRoomId = 1 | 2 | 3;
+export type CultivationDebugRoomId = 1 | 2 | 3 | 4 | 5;
 
 export class CultivationTestPanel {
   readonly element: HTMLElement;
@@ -16,7 +16,7 @@ export class CultivationTestPanel {
       <div class="test-panel-content">
         <p class="eyebrow">Level 2 grey-box harness</p>
         <h1>Cultivation runtime</h1>
-        <p class="summary">Playtest the authored Rooms 1–3 grey-box and its shared gameplay systems.</p>
+        <p class="summary">Playtest the authored Rooms 1–5 grey-box and its shared gameplay systems.</p>
         <div class="controls">
           <button type="button" data-action="reset">Reset Level 2 <kbd>R</kbd></button>
           <button type="button" data-action="partial-support">Partially dissolve next support</button>
@@ -24,6 +24,8 @@ export class CultivationTestPanel {
           <button type="button" data-action="room-teleport" data-room-id="1">Authored Room 1 <kbd>1</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="2">Authored Room 2 <kbd>2</kbd></button>
           <button type="button" data-action="room-teleport" data-room-id="3">Authored Room 3 <kbd>3</kbd></button>
+          <button type="button" data-action="room-teleport" data-room-id="4">Authored Room 4 <kbd>4</kbd></button>
+          <button type="button" data-action="room-teleport" data-room-id="5">Authored Room 5 <kbd>5</kbd></button>
         </div>
         <p class="eyebrow diagnostics-heading">Runtime diagnostics</p>
         <pre class="runtime-status" data-runtime-status>Waiting for runtime samples…</pre>
@@ -46,7 +48,7 @@ export class CultivationTestPanel {
       !button ||
       !partialSupportButton ||
       !completeSupportButton ||
-      roomButtons.length !== 3 ||
+      roomButtons.length !== 5 ||
       !runtimeStatus
     ) {
       throw new Error('Missing Cultivation debug controls.');
@@ -60,7 +62,7 @@ export class CultivationTestPanel {
         (event.currentTarget as HTMLButtonElement).dataset.roomId ?? '',
         10,
       );
-      if (roomId === 1 || roomId === 2 || roomId === 3) {
+      if (roomId === 1 || roomId === 2 || roomId === 3 || roomId === 4 || roomId === 5) {
         onTeleportRoom?.(roomId);
       }
     };

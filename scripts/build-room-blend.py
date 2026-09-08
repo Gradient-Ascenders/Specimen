@@ -26,6 +26,10 @@ for item in data['objects']:
         indices = item['indices']
         mesh.from_pydata(item['vertices'], [], [indices[i:i + 3] for i in range(0, len(indices), 3)])
         mesh.update()
+        if item.get('vertexColors'):
+            colours = mesh.color_attributes.new(name='AuthoredColor', type='FLOAT_COLOR', domain='POINT')
+            for vertex, colour in zip(colours.data, item['vertexColors']):
+                vertex.color = (*colour, 1)
         obj = bpy.data.objects.new(item['name'], mesh)
         for spec in item['materials']:
             key = json.dumps(spec, sort_keys=True)
@@ -35,6 +39,10 @@ for item in data['objects']:
                 material.use_nodes = True
                 shader = material.node_tree.nodes.get('Principled BSDF')
                 shader.inputs['Base Color'].default_value = (*spec['color'], 1)
+                if spec.get('vertexColors'):
+                    colours = material.node_tree.nodes.new('ShaderNodeVertexColor')
+                    colours.layer_name = 'AuthoredColor'
+                    material.node_tree.links.new(colours.outputs['Color'], shader.inputs['Base Color'])
                 shader.inputs['Roughness'].default_value = spec['roughness']
                 shader.inputs['Metallic'].default_value = spec['metalness']
                 shader.inputs['Emission Color'].default_value = (*spec['emission'], 1)
@@ -45,7 +53,10 @@ for item in data['objects']:
             for face in mesh.polygons[group['start'] // 3:(group['start'] + group['count']) // 3]:
                 face.material_index = group.get('materialIndex', 0)
     elif kind == 'light':
-        light = bpy.data.lights.new(item['name'], 'POINT')
+        light = bpy.data.lights.new(item['name'], item.get('lightType', 'POINT'))
+        if light.type == 'SPOT':
+            light.spot_size = item['angle']
+            light.spot_blend = item['penumbra']
         light.color = item['color']
         light.energy = item['intensity'] * 10
         obj = bpy.data.objects.new(item['name'], light)

@@ -4,8 +4,8 @@ import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 
 export interface LevelTwoLabPassageGreyboxOptions {
   readonly id: string;
-  readonly fromRoomId: 1 | 2;
-  readonly toRoomId: 2 | 3;
+  readonly fromRoomId: 1 | 2 | 3;
+  readonly toRoomId: 2 | 3 | 4;
   readonly widthMetres: number;
   readonly heightMetres: number;
   readonly lengthMetres: number;

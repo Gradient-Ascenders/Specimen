@@ -1,4 +1,8 @@
 import { CultivationTestPanel } from './CultivationTestPanel.ts';
+import { ElevatorDroneEncounter } from '../hazards/ElevatorDroneEncounter.ts';
+import { ElevatorEncounterView } from '../ui/ElevatorEncounterView.ts';
+import { RoomFiveDroneEncounter } from '../hazards/RoomFiveDroneEncounter.ts';
+import { SecurityNetworkView } from '../ui/SecurityNetworkView.ts';
 import {
   RoomThreeDroneEncounter,
   type RoomThreeDroneEncounterOptions,
@@ -17,6 +21,10 @@ import {
 } from '../levels/LevelTwoPreviewProgression.ts';
 
 export interface CultivationLevelDebugSupport {
+  readonly RoomFiveDroneEncounter: typeof RoomFiveDroneEncounter;
+  readonly SecurityNetworkView: typeof SecurityNetworkView;
+  readonly ElevatorDroneEncounter: typeof ElevatorDroneEncounter;
+  readonly ElevatorEncounterView: typeof ElevatorEncounterView;
   readonly PreviewScene: typeof LevelTwoPreviewScene;
   readonly TestPanel: typeof CultivationTestPanel;
   readonly roomObjectives: typeof CULTIVATION_ROOM_OBJECTIVES;
@@ -32,6 +40,9 @@ export interface CultivationLevelDebugSupport {
 
 /** Dependencies loaded only for the explicitly enabled Cultivation debug route. */
 export const CULTIVATION_LEVEL_DEBUG_SUPPORT: CultivationLevelDebugSupport = {
+  RoomFiveDroneEncounter,
+  SecurityNetworkView,
+  ElevatorDroneEncounter, ElevatorEncounterView,
   PreviewScene: LevelTwoPreviewScene,
   TestPanel: CultivationTestPanel,
   roomObjectives: CULTIVATION_ROOM_OBJECTIVES,

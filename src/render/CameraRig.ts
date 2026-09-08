@@ -387,7 +387,7 @@ export class CameraRig {
     // A contextual profile authors visual pitch, but retains the player's
     // normal pitch so returning to ordinary gameplay cannot inherit a hidden
     // mouse movement made during the authored view.
-    if (this.contextualCamera === undefined) {
+    if (this.contextualCamera === undefined || this.contextualCamera.profile.playerControlledPitch) {
       this.pitchRadians = THREE.MathUtils.clamp(
         this.pitchRadians + this.queuedPitchRadians,
         this.config.minimumPitchRadians,
@@ -484,7 +484,7 @@ export class CameraRig {
     const safeAlpha = THREE.MathUtils.clamp(interpolationAlpha, 0, 1);
     const safeDeltaSeconds = Math.max(0, deltaSeconds);
     this.interpolateTarget(target, safeAlpha);
-    this.readTargetUp(target.gameplayUp);
+    this.readTargetUp(this.contextualCamera?.gameplayUpOverride ?? target.gameplayUp);
     this.targetGrounded = target.grounded;
     this.targetAttached = target.attached;
 
@@ -767,8 +767,8 @@ export class CameraRig {
 
     this.contextualBoomDirection
       .copy(this.planarBack)
-      .multiplyScalar(Math.cos(profile.pitchRadians))
-      .addScaledVector(this.smoothedUp, Math.sin(profile.pitchRadians))
+      .multiplyScalar(Math.cos(this.effectivePitchRadians))
+      .addScaledVector(this.smoothedUp, Math.sin(this.effectivePitchRadians))
       .normalize();
     this.contextualScreenRight
       .crossVectors(this.smoothedUp, this.contextualBoomDirection)
@@ -846,7 +846,7 @@ export class CameraRig {
       .copy(this.smoothedTarget)
       .addScaledVector(this.smoothedUp, this.config.targetHeightMetres);
 
-    this.effectivePitchRadians = profile
+    this.effectivePitchRadians = profile && !profile.playerControlledPitch
       ? THREE.MathUtils.lerp(
           this.pitchRadians,
           profile.pitchRadians,
