@@ -376,7 +376,7 @@ export class DissolveTarget {
       this.collisionWorld.register(
         this.mesh,
         undefined,
-        ColliderTransformMode.Static,
+        this.mesh.userData.dissolveDynamicCollider === true ? ColliderTransformMode.Dynamic : ColliderTransformMode.Static,
       );
       this.surfaceRegistry.register(this.mesh);
     } else {

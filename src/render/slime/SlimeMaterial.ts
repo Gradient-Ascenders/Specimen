@@ -85,8 +85,8 @@ export interface SlimeMaterialDeformationState {
  *
  * The shader uses an explicit world-space approximation of RenderLayer's
  * clinical hemisphere fill and directional key. It does not consume arbitrary
- * scene lights; keeping this contract small makes every lighting term visible
- * and explainable. The material owns its uniform values and is disposed by the
+ * scene lights directly. Dark authored rooms can supply sampled, occlusion-aware
+ * local lighting through setEnvironmentLighting. The material owns its uniform values and is disposed by the
  * scene that owns the slime mesh.
  */
 export class SlimeMaterial extends THREE.ShaderMaterial {
@@ -201,5 +201,23 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
     const boundedOpacity = THREE.MathUtils.clamp(opacity, 0, 1);
     this.opacity = boundedOpacity;
     this.slimeUniforms.uOpacity.value = boundedOpacity;
+  }
+
+  setEnvironmentLighting(direction: THREE.Vector3, radiance: THREE.Color, ambient: THREE.Color): void {
+    this.slimeUniforms.uKeyLightDirection.value.copy(direction);
+    this.slimeUniforms.uKeyLightRadiance.value.copy(radiance);
+    this.slimeUniforms.uHemisphereSkyRadiance.value.copy(ambient);
+    this.slimeUniforms.uHemisphereGroundRadiance.value.copy(ambient).multiplyScalar(.6);
+    // A wet rim reflects incident light; it must not act as an emissive outline.
+    this.slimeUniforms.uRimStrength.value = DEFAULT_SLIME_RIM_STRENGTH * Math.min(1,
+      Math.max(radiance.r, radiance.g, radiance.b, ambient.r, ambient.g, ambient.b));
+  }
+
+  restoreDefaultLighting(): void {
+    this.slimeUniforms.uKeyLightDirection.value.copy(KEY_LIGHT_DIRECTION);
+    this.slimeUniforms.uKeyLightRadiance.value.setHex(0xffffff).multiplyScalar(1.15);
+    this.slimeUniforms.uHemisphereSkyRadiance.value.setHex(0xddeeff).multiplyScalar(.48);
+    this.slimeUniforms.uHemisphereGroundRadiance.value.setHex(0x25332e).multiplyScalar(.32);
+    this.slimeUniforms.uRimStrength.value = DEFAULT_SLIME_RIM_STRENGTH;
   }
 }

@@ -162,6 +162,15 @@ export class CultivationLevelScene {
     lighting.add(ambientFill, key, keyTarget);
     this.root.add(lighting);
   }
+
+  setDarkRoomLighting(dark: boolean): void {
+    if (this.root.userData.darkRoomLighting === dark) return;
+    this.root.userData.darkRoomLighting = dark;
+    const ambient = this.root.getObjectByName('cultivation-foundation-ambient-fill') as THREE.HemisphereLight;
+    const key = this.root.getObjectByName('cultivation-foundation-key') as THREE.DirectionalLight;
+    ambient.intensity = dark ? .008 : .9;
+    key.intensity = dark ? 0 : 1.35;
+  }
 }
 
 function validateStructuralAssemblyAuthoring(

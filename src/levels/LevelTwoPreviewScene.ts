@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { LevelTwoRoomFourGreybox } from './LevelTwoRoomFourGreybox.ts';
+import { LevelTwoRoomFiveGreybox } from './LevelTwoRoomFiveGreybox.ts';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
@@ -27,7 +29,7 @@ import {
   type LevelTwoRoomThreeHazardFailure,
 } from './LevelTwoRoomThreeGreybox.ts';
 
-export type LevelTwoAuthoredRoomId = 1 | 2 | 3;
+export type LevelTwoAuthoredRoomId = 1 | 2 | 3 | 4 | 5;
 export type LevelTwoPreviewSlimeId = 'bob' | 'goop';
 
 export const LEVEL_TWO_PREVIEW_WORLD_OFFSET_X = 64;
@@ -41,11 +43,14 @@ export const LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z =
 export const LEVEL_TWO_ROOM_THREE_OFFSET_Z =
   LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z +
   LEVEL_TWO_PASSAGE_LENGTH_METRES;
+export const LEVEL_TWO_ROOM_FOUR_OFFSET_Z = LEVEL_TWO_ROOM_THREE_OFFSET_Z + 76;
+export const LEVEL_TWO_ROOM_FIVE_OFFSET_Z = LEVEL_TWO_ROOM_FOUR_OFFSET_Z + 15;
 
 export type LevelTwoPreviewHazardFailure =
   | LevelTwoRoomOneHazardFailure
   | LevelTwoRoomTwoHazardFailure
-  | LevelTwoRoomThreeHazardFailure;
+  | LevelTwoRoomThreeHazardFailure
+  | { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' };
 
 export const CULTIVATION_ROOM_OBJECTIVES: Readonly<
   Record<LevelTwoAuthoredRoomId, string>
@@ -53,12 +58,16 @@ export const CULTIVATION_ROOM_OBJECTIVES: Readonly<
   1: 'Help Bob reach Room 2',
   2: 'Get Bob and Goop into Room 3',
   3: 'Get bob to the other side to push the drones into the acid',
+  4: 'Get Bob and Goop onto the elevator',
+  5: 'Rescue Volt',
 };
 
 const ROOM_OFFSETS: Readonly<Record<LevelTwoAuthoredRoomId, THREE.Vector3>> = {
   1: new THREE.Vector3(0, 0, 0),
   2: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_TWO_OFFSET_Z),
   3: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_THREE_OFFSET_Z),
+  4: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_FOUR_OFFSET_Z),
+  5: new THREE.Vector3(0, 0, LEVEL_TWO_ROOM_FIVE_OFFSET_Z),
 };
 
 const ROOM_SPAWNS: Readonly<
@@ -76,6 +85,8 @@ const ROOM_SPAWNS: Readonly<
     bob: LEVEL_TWO_ROOM_THREE_BOB_SPAWN,
     goop: LEVEL_TWO_ROOM_THREE_GOOP_SPAWN,
   },
+  4: { bob: new THREE.Vector3(-1, .66, 2), goop: new THREE.Vector3(1, .66, 2) },
+  5: { bob: new THREE.Vector3(-1, .86, 9.1), goop: new THREE.Vector3(1, .86, 9.1) },
 };
 
 /** Development-only composition of the three currently authored Cultivation rooms. */
@@ -84,6 +95,8 @@ export class LevelTwoPreviewScene {
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
+  readonly roomFour = new LevelTwoRoomFourGreybox();
+  readonly roomFive: LevelTwoRoomFiveGreybox;
   readonly roomOneToTwoPassage = new LevelTwoLabPassageGreybox({
     id: 'cultivation-room-1-to-2-lab-passage',
     fromRoomId: 1,
@@ -131,6 +144,7 @@ export class LevelTwoPreviewScene {
       this.roomTwoToThreeGoopPassage.entryDoor,
     );
     this.roomThree = new LevelTwoRoomThreeGreybox(requestFailure);
+    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure);
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;
     this.roomTwo.root.position.z = LEVEL_TWO_ROOM_TWO_OFFSET_Z;
@@ -142,6 +156,8 @@ export class LevelTwoPreviewScene {
       LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z,
     );
     this.roomThree.root.position.z = LEVEL_TWO_ROOM_THREE_OFFSET_Z;
+    this.roomFour.root.position.z = LEVEL_TWO_ROOM_FOUR_OFFSET_Z;
+    this.roomFive.root.position.z = LEVEL_TWO_ROOM_FIVE_OFFSET_Z;
     this.root.add(
       this.roomOne.root,
       this.roomOneToTwoPassage.root,
@@ -149,6 +165,8 @@ export class LevelTwoPreviewScene {
       this.roomTwoToThreeGoopPassage.root,
       this.roomTwoToThreeBobAirDuct.root,
       this.roomThree.root,
+      this.roomFour.root,
+      this.roomFive.root,
     );
   }
 
@@ -160,6 +178,8 @@ export class LevelTwoPreviewScene {
       ...this.roomTwoToThreeGoopPassage.collisionMeshes,
       ...this.roomTwoToThreeBobAirDuct.collisionMeshes,
       ...this.roomThree.collisionMeshes,
+      ...this.roomFour.collisionMeshes,
+      ...this.roomFive.collisionMeshes,
     ];
   }
 
@@ -173,7 +193,10 @@ export class LevelTwoPreviewScene {
       return false;
     });
     return [
+      ...this.roomFive.dynamicCollisionMeshes,
       ...this.roomOne.platformDrops.map((drop) => drop.mesh),
+      this.roomFour.entrance.collisionMesh, this.roomFour.boardingWall, this.roomFour.arrivalWall, this.roomFour.shield,
+      ...this.roomFour.movingEntranceMeshes,
       ...this.roomTwo.blockDrops.map((drop) => drop.mesh),
       ...movingWallColliders,
       ...this.roomOneToTwoPassage.doors.map((door) => door.collisionMesh),
@@ -188,6 +211,8 @@ export class LevelTwoPreviewScene {
       ...this.roomOne.solubleTargetMeshes,
       ...this.roomTwo.solubleTargetMeshes,
       ...this.roomThree.solubleTargetMeshes,
+      ...this.roomFour.solubleTargetMeshes,
+      ...this.roomFive.solubleTargetMeshes,
     ];
   }
 
@@ -195,6 +220,7 @@ export class LevelTwoPreviewScene {
     this.roomOne.bindDissolveTargets(targets);
     this.roomTwo.bindDissolveTargets(targets);
     this.roomThree.bindDissolveTargets(targets);
+    this.roomFive.bindDissolveTargets(targets);
   }
 
   copyRoomSpawnPosition(
@@ -215,6 +241,8 @@ export class LevelTwoPreviewScene {
   }): LevelTwoAuthoredRoomId {
     this.roomResolverPosition.set(position.x, position.y, position.z);
     this.root.worldToLocal(this.roomResolverPosition);
+    if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z) return 5;
+    if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z) return 4;
     if (this.roomResolverPosition.z >= LEVEL_TWO_ROOM_THREE_OFFSET_Z) return 3;
     // The final duct section belongs to Room 3's protected arrival
     // checkpoint. Do not classify the ground-level Goop passage as Room 3 yet.
@@ -256,6 +284,8 @@ export class LevelTwoPreviewScene {
 
     this.roomOneToTwoPassage.update(deltaSeconds, occupants);
     this.roomTwoToThreeGoopPassage.update(deltaSeconds, occupants);
+    this.roomFour.update(deltaSeconds, occupants);
+    this.roomFive.update(deltaSeconds, occupants);
   }
 
   reset(): void {
@@ -264,9 +294,13 @@ export class LevelTwoPreviewScene {
     this.roomTwo.reset();
     this.roomTwoToThreeGoopPassage.reset();
     this.roomThree.reset();
+    this.roomFour.reset();
+    this.roomFive.reset();
   }
 
   dispose(): void {
+    this.roomFive.dispose();
+    this.roomFour.dispose();
     this.roomThree.dispose();
     this.roomTwoToThreeBobAirDuct.dispose();
     this.roomTwoToThreeGoopPassage.dispose();
