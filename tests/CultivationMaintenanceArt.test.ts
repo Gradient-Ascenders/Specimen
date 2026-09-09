@@ -38,6 +38,19 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     before.reset(); room.reset(); check();
     assert.equal(art.acidSurfaces.length, 13);
     assert.ok(art.acidSurfaces.every(mesh => mesh.material === lab.acid));
+    let adhesiveSurfaces = 0;
+    room.root.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) if (material.name === 'cultivation-maintenance-adhesive-tile') {
+        adhesiveSurfaces++;
+        assert.ok(material instanceof THREE.MeshStandardMaterial);
+        assert.equal(material.color.getHex(), 0x79cbdc, 'preserve a light-blue adhesive tint');
+        assert.equal(material.emissiveIntensity, .025, 'keep only a faint tint in darkness');
+        assert.equal(material.normalMap, lab.sticky.normalMap, 'preserve the wet adhesive finish');
+      }
+    });
+    assert.ok(adhesiveSurfaces > 0);
     assert.equal(art.diagnostics.newTextures, 0);
     assert.ok(art.diagnostics.staticMeshesBatched > 180);
     assert.ok(art.diagnostics.batches < 60);

@@ -38,7 +38,8 @@ export class CultivationMaintenanceArt {
     const culvert = variant(lab.floor, 'culvert-lining', 0x526459, .87, .035);
     culvert.side = THREE.BackSide;
     const oxidized = variant(lab.metal, 'worn-service-iron', 0x796b52, .8);
-    const sticky = variant(lab.sticky, 'adhesive-tile', lab.sticky.color.getHex(), lab.sticky.roughness, .12);
+    // A faint blue lift preserves adhesive readability in the dark vent.
+    const sticky = variant(lab.sticky, 'adhesive-tile', 0x79cbdc, lab.sticky.roughness, .025);
     const terminal = variant(lab.metal, 'conductive-terminal', 0xb9a55a, .45, .16);
     // Retain the existing maps. Only the drainage finish adds world-scale runoff shading.
     const compileWet = wet.onBeforeCompile;

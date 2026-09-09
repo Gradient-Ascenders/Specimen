@@ -213,6 +213,17 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
       Math.max(radiance.r, radiance.g, radiance.b, ambient.r, ambient.g, ambient.b));
   }
 
+  /** Mix sampled room lighting with the exterior light while crossing an entrance. */
+  blendDefaultLighting(roomWeight: number): void {
+    const exterior = 1 - THREE.MathUtils.clamp(roomWeight, 0, 1);
+    this.slimeUniforms.uKeyLightDirection.value.lerp(KEY_LIGHT_DIRECTION, exterior).normalize();
+    this.slimeUniforms.uKeyLightRadiance.value.lerp(EXTERIOR_KEY, exterior);
+    this.slimeUniforms.uHemisphereSkyRadiance.value.lerp(EXTERIOR_SKY, exterior);
+    this.slimeUniforms.uHemisphereGroundRadiance.value.lerp(EXTERIOR_GROUND, exterior);
+    this.slimeUniforms.uRimStrength.value = THREE.MathUtils.lerp(
+      this.slimeUniforms.uRimStrength.value, DEFAULT_SLIME_RIM_STRENGTH, exterior);
+  }
+
   restoreDefaultLighting(): void {
     this.slimeUniforms.uKeyLightDirection.value.copy(KEY_LIGHT_DIRECTION);
     this.slimeUniforms.uKeyLightRadiance.value.setHex(0xffffff).multiplyScalar(1.15);
@@ -221,3 +232,6 @@ export class SlimeMaterial extends THREE.ShaderMaterial {
     this.slimeUniforms.uRimStrength.value = DEFAULT_SLIME_RIM_STRENGTH;
   }
 }
+const EXTERIOR_KEY = new THREE.Color(0xffffff).multiplyScalar(1.15);
+const EXTERIOR_SKY = new THREE.Color(0xddeeff).multiplyScalar(.48);
+const EXTERIOR_GROUND = new THREE.Color(0x25332e).multiplyScalar(.32);

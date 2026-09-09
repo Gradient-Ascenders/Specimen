@@ -1,4 +1,5 @@
 import { CultivationLightLayout } from '../render/CultivationLightLayout.ts';
+import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
 import { CultivationPreparationQueue } from '../render/CultivationPreparationQueue.ts';
 import * as THREE from 'three';
 import type { ElevatorDroneEncounter } from '../hazards/ElevatorDroneEncounter.ts';
@@ -546,8 +547,13 @@ export class CultivationLevelRuntime {
     resources.bobVisual.mesh.rotation.set(0, resources.bobFacing.getInterpolatedYaw(interpolationAlpha), 0);
     resources.bobVisual.present();
     const bobMaterial = resources.bobVisual.mesh.material as SlimeMaterial;
-    if (resources.authoredPreview?.resolveRoomId(resources.renderedBobPosition) === 5 && resources.roomFiveEncounter) {
+    const lowerRoom = resources.authoredPreview?.roomFive;
+    const bobVentDepth = lowerRoom
+      ? lowerRoom.root.worldToLocal(this.roomFiveLocal.copy(resources.renderedBobPosition)).z : -Infinity;
+    if (bobVentDepth > -1 && resources.roomFiveEncounter) {
       resources.roomFiveEncounter.lightSlime(bobMaterial, resources.renderedBobPosition);
+      // Fade as Bob rounds either side of the T-junction, not along the entrance.
+      bobMaterial.blendDefaultLighting(ventEntranceLightingWeight(this.roomFiveLocal.x, bobVentDepth));
     } else bobMaterial.restoreDefaultLighting();
     if (resources.manager.isAvailable('volt')) {
       this.interpolate(resources.voltBody, interpolationAlpha, resources.voltVisual.position);
