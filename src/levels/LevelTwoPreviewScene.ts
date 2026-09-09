@@ -345,9 +345,9 @@ export class LevelTwoPreviewScene {
     const onLift = bodyZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z && bodyZ < LEVEL_TWO_ROOM_FIVE_OFFSET_Z;
     const departed = onLift && this.roomFour.controller.boardingConfirmed;
     this.roomOne.root.visible = nearZ <= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z + 12;
-    this.roomOneToTwoPassage.root.visible = nearZ <= LEVEL_TWO_ROOM_TWO_OFFSET_Z + 12 && farZ >= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z - 12;
+    this.roomOneToTwoPassage.root.visible = nearZ <= LEVEL_TWO_ROOM_TWO_OFFSET_Z + 12;
     this.roomTwo.root.visible = farZ >= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_THREE_OFFSET_Z + 12;
-    const secondPassage = farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_THREE_OFFSET_Z + 12;
+    const secondPassage = this.roomTwo.root.visible || (farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_THREE_OFFSET_Z + 12);
     this.roomTwoToThreeGoopPassage.root.visible = secondPassage;
     this.roomTwoToThreeBobAirDuct.root.visible = secondPassage;
     this.roomThree.root.visible = !departed && farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FOUR_OFFSET_Z + 12;

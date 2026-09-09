@@ -1,4 +1,18 @@
 import assert from 'node:assert/strict';
+
+test('dark-room illumination fades rather than snapping at a room boundary', () => {
+  const scene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
+  try {
+    scene.setDarkRoomLighting(false);
+    scene.setDarkRoomLighting(true, 1 / 60);
+    const initial = scene.root.userData.darkRoomBlend;
+    assert.ok(initial > 0 && initial < .1);
+    for (let frame = 0; frame < 120; frame++) scene.setDarkRoomLighting(true, 1 / 60);
+    assert.ok(scene.root.userData.darkRoomBlend > .999);
+    scene.setDarkRoomLighting(false, 1 / 60);
+    assert.ok(scene.root.userData.darkRoomBlend > .9);
+  } finally { scene.dispose(); }
+});
 import test from 'node:test';
 
 import * as THREE from 'three';

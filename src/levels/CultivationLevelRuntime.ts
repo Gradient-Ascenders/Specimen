@@ -571,8 +571,10 @@ export class CultivationLevelRuntime {
       );
     }
     this.input.endPointerUpdate();
-    const darkRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position) === 5;
-    resources.scene.setDarkRoomLighting(darkRoom);
+    const lightingRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position);
+    const darkRoom = lightingRoom === 5 || (lightingRoom === 4
+      && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
+    resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds);
     this.renderLayer.renderer.shadowMap.enabled = darkRoom;
     this.renderLayer.renderer.shadowMap.type = THREE.PCFShadowMap;
     resources.bobVisual.mesh.castShadow = darkRoom;

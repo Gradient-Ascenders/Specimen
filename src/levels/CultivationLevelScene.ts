@@ -163,13 +163,16 @@ export class CultivationLevelScene {
     this.root.add(lighting);
   }
 
-  setDarkRoomLighting(dark: boolean): void {
-    if (this.root.userData.darkRoomLighting === dark) return;
+  setDarkRoomLighting(dark: boolean, deltaSeconds = 1): void {
+    const previous = this.root.userData.darkRoomBlend as number | undefined;
+    const target = dark ? 1 : 0;
+    const blend = previous === undefined ? target : THREE.MathUtils.damp(previous, target, 5, deltaSeconds);
     this.root.userData.darkRoomLighting = dark;
+    this.root.userData.darkRoomBlend = blend;
     const ambient = this.root.getObjectByName('cultivation-foundation-ambient-fill') as THREE.HemisphereLight;
     const key = this.root.getObjectByName('cultivation-foundation-key') as THREE.DirectionalLight;
-    ambient.intensity = dark ? .008 : .9;
-    key.intensity = dark ? 0 : 1.35;
+    ambient.intensity = THREE.MathUtils.lerp(.9, .008, blend);
+    key.intensity = THREE.MathUtils.lerp(1.35, 0, blend);
   }
 }
 

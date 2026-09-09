@@ -14,6 +14,11 @@ test('render scope hides distant rooms while keeping authored collision and spli
     assert.equal(world.sweepSphere(origin, displacement, .46, before), true);
     scene.updatePresentationVisibility({ z: 4 }, { z: 8 });
     assert.equal(scene.roomOne.root.visible, true);
+    assert.equal(scene.roomOneToTwoPassage.root.visible, true, 'exit shutter remains visible from across Room 1');
+    for (const rope of scene.roomOne.solubleTargetMeshes) {
+      assert.equal(rope.children.some(child => child.name.includes('soluble-marker-band')), false);
+      assert.equal(rope.userData.soluble, true, 'wood stays shootable without a green marker');
+    }
     for (const room of [scene.roomTwo, scene.roomThree, scene.roomFour, scene.roomFive]) assert.equal(room.root.visible, false);
     assert.equal(floor.visible, true);
     assert.equal(world.sweepSphere(origin, displacement, .46, after), true);
@@ -24,6 +29,7 @@ test('render scope hides distant rooms while keeping authored collision and spli
     scene.updatePresentationVisibility({ z: 60 }, { z: 65 });
     assert.equal(scene.roomOne.root.visible, true); assert.equal(scene.roomTwo.root.visible, true);
     assert.equal(scene.roomOneToTwoPassage.root.visible, true);
+    assert.equal(scene.roomTwoToThreeGoopPassage.root.visible, true, 'Room 2 exit renders before its proximity trigger');
     scene.updatePresentationVisibility({ z: 135 }, { z: 140 });
     assert.equal(scene.roomTwo.root.visible, true); assert.equal(scene.roomThree.root.visible, true);
     assert.equal(scene.roomTwoToThreeBobAirDuct.root.visible, true);

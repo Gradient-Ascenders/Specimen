@@ -223,7 +223,7 @@ export class LevelTwoRoomOneGreybox {
   }
 
   private buildSuspendedPlatformRoute(): void {
-    const { etch, platform, support, wood } = this.builder.materials;
+    const { platform, support, wood } = this.builder.materials;
 
     for (const definition of PLATFORM_ASSEMBLIES) {
       const [x, suspendedY, z] = definition.suspendedPosition;
@@ -266,17 +266,6 @@ export class LevelTwoRoomOneGreybox {
       rope.userData.assemblyId = definition.id;
       rope.userData.releaseMode = 'fall-to-radiation';
       this.solubleTargetMeshes.push(rope);
-
-      const marker = this.builder.addVisualBox({
-        name: `${definition.id}-soluble-marker-band`,
-        size: [0.68, 0.42, 0.68],
-        position: [x, rope.position.y, z],
-        material: etch,
-      });
-      marker.userData.presentationOnly = true;
-      marker.userData.targetId = rope.name;
-      rope.add(marker);
-      marker.position.set(0, 0, 0);
 
       this.platformDrops.push(
         new GreyboxDropPreview({
