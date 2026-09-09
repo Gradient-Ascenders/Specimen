@@ -47,7 +47,11 @@ export class CultivationPreparationQueue {
     for (let z = 0; z <= 270; z++) for (const offset of [-12, 0, 12]) {
       preview.updatePresentationVisibility({z:z + offset}, {z}); add(z, z >= 242);
       if (this.roots[6].visible) { this.roots[5].visible = false; add(z, z >= 242); }
-      if (z >= 230 && this.roots[6].visible) { this.roots[7].visible = true; add(z, z >= 242); }
+      if (z >= 230 && this.roots[6].visible) {
+        this.roots[7].visible = true; add(z, z >= 242);
+        // Arrival lighting now starts before either slime enters the lower vent.
+        add(z, true);
+      }
     }
     this.roots.forEach((root, i) => root.visible = saved[i]);
     this.diagnostics.total = this.configurations.length;

@@ -4,7 +4,33 @@ import * as THREE from 'three';
 import { BeamOcclusion } from '../src/render/hazards/BeamOcclusion.ts';
 import { SlimeLightSampler } from '../src/render/slime/SlimeLightSampler.ts';
 import { SlimeMaterial } from '../src/render/slime/SlimeMaterial.ts';
+import { ventEntranceLightingWeight } from '../src/render/slime/VentEntranceLighting.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
+
+test('Bob fades progressively into vent lighting and brightens smoothly when backing out', () => {
+  const material = new SlimeMaterial(), world = new CollisionWorld(), sampler = new SlimeLightSampler();
+  const body = new THREE.Vector3();
+  try {
+    let previous = Infinity;
+    for (const depth of [.8, 2, 3.2, 4.4, 5.6, 6.8, 8]) {
+      sampler.apply(material, body, world);
+      material.blendDefaultLighting(ventEntranceLightingWeight(depth, 9.1));
+      const brightness = material.uniforms.uKeyLightRadiance.value.r;
+      assert.ok(brightness < previous); previous = brightness;
+    }
+    assert.equal(previous, 0);
+    assert.equal(ventEntranceLightingWeight(0, 9.1), 0, 'straight entrance remains lit');
+    assert.equal(ventEntranceLightingWeight(-1.6, 9.1), ventEntranceLightingWeight(1.6, 9.1));
+    assert.ok(ventEntranceLightingWeight(-2.4, 9.1) < .2, 'entrance light lingers just past the corner');
+    assert.equal(ventEntranceLightingWeight(-8, 9.1), 1, 'left passage reaches full darkness farther in');
+    assert.equal(ventEntranceLightingWeight(8, 9.1), 1, 'right passage uses the same gradual fade');
+    assert.equal(ventEntranceLightingWeight(0, 30), 1, 'later rooms cannot regain entrance lighting');
+    sampler.apply(material, body, world); material.blendDefaultLighting(.5);
+    assert.ok(Math.abs(material.uniforms.uKeyLightRadiance.value.r - .575) < 1e-8);
+    sampler.apply(material, body, world); material.blendDefaultLighting(0);
+    assert.ok(Math.abs(material.uniforms.uKeyLightRadiance.value.r - 1.15) < 1e-8);
+  } finally { material.dispose(); world.clear(); }
+});
 
 test('beam stops before a cover and recovers its length when the cover is removed', () => {
   const world = new CollisionWorld(), clip = new BeamOcclusion();
