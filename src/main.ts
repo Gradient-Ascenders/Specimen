@@ -111,11 +111,11 @@ const unsubscribeObjectiveChanged = gameSession.events.on(
 );
 const unsubscribeTransitionStarted = gameSession.events.on(
   'transitionStarted',
-  ({ message }) => {
+  ({ levelId, message }) => {
     levelOneShaderProgramGuardActive = false;
     sampleLevelOneShaderPrograms = undefined;
     performanceRecorder?.completeLevelOneShaderProgramGuard();
-    gameFlow.beginLevelTransition(message);
+    gameFlow.beginLevelTransition(message, levelId);
   },
 );
 const unsubscribeTransitionCompleted = gameSession.events.on(
