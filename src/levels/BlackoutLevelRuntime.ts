@@ -18,6 +18,7 @@ import {
 } from '../combat/CombatTargetRegistry.ts';
 import {
   SpecimenProjectileSystem,
+  type SpecimenAttackEvents,
   type SpecimenAttackReadModel,
   type SpecimenProjectileReadState,
 } from '../combat/SpecimenProjectileSystem.ts';
@@ -56,6 +57,7 @@ import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimeGroup } from '../slimes/PersistentSlimeGroup.ts';
 import {
   SpecimenFormController,
+  type SpecimenFormEvents,
   type SpecimenFormReadModel,
 } from '../specimen/SpecimenFormController.ts';
 import { DeathSequence } from '../systems/DeathSequence.ts';
@@ -201,6 +203,20 @@ export class BlackoutLevelRuntime {
 
   get specimenProjectileStates(): readonly SpecimenProjectileReadState[] {
     return this.resources?.specimenAttack.projectileStates ?? [];
+  }
+
+  get specimenFormEvents(): Pick<
+    EventBus<SpecimenFormEvents>,
+    'on'
+  > | undefined {
+    return this.resources?.specimenForm.events;
+  }
+
+  get specimenAttackEvents(): Pick<
+    EventBus<SpecimenAttackEvents>,
+    'on'
+  > | undefined {
+    return this.resources?.specimenAttack.events;
   }
 
   registerCombatTarget(
