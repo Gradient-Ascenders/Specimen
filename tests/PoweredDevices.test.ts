@@ -336,3 +336,48 @@ test('development rig construction failure rolls back device colliders, surfaces
   assert.equal(targets.size, 0);
   targets.dispose();
 });
+
+
+test('device collection checkpoint restore returns moving devices to the exact captured partial pose without resurrecting sustained power', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const targets = new ElectricalTargetRegistry(world);
+  const rig = new BlackoutPoweredDeviceRig({
+    collisionWorld: world,
+    surfaceRegistry: surfaces,
+    targetRegistry: targets,
+    requestFailure: () => {},
+  });
+
+  try {
+    rig.generator.core.setConnectionState(true);
+    rig.recomputePower();
+    rig.updateMechanics(0.6, []);
+    const capturedProgress = rig.platform.platform.progress;
+    const capturedPosition = rig.platform.platform.root.position.clone();
+    const snapshot = rig.devices.capture();
+
+    rig.updateMechanics(0.7, []);
+    assert.notEqual(rig.platform.platform.progress, capturedProgress);
+
+    rig.generator.core.setConnectionState(false);
+    rig.recomputePower();
+
+    for (let index = 0; index < 5; index += 1) {
+      rig.devices.restore(snapshot);
+      assert.ok(
+        Math.abs(rig.platform.platform.progress - capturedProgress) < 1e-12,
+      );
+      assert.ok(rig.platform.platform.root.position.equals(capturedPosition));
+      assert.ok(
+        rig.platform.platform.previousPosition.equals(capturedPosition),
+      );
+      assert.equal(rig.platform.platform.displacement.lengthSq(), 0);
+      assert.equal(rig.generator.core.readModel.connected, false);
+      assert.equal(rig.platform.core.readModel.powered, false);
+    }
+  } finally {
+    rig.dispose();
+    targets.dispose();
+  }
+});
