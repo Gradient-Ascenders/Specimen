@@ -11,6 +11,13 @@ export type CombatTargetKind =
   | 'reinforced'
   | 'weak-point';
 
+export interface FixtureCombatTargetSnapshot {
+  readonly healthUnits: number;
+  readonly enabled: boolean;
+  readonly weakPointOpen: boolean;
+  readonly destroyed: boolean;
+}
+
 export interface FixtureCombatTargetOptions {
   readonly id: string;
   readonly hitMeshes: readonly THREE.Mesh[];
@@ -153,6 +160,39 @@ export class FixtureCombatTarget implements CombatTarget {
       accepted: true,
       destroyed: this.destroyedValue,
     };
+  }
+
+  captureState(): FixtureCombatTargetSnapshot {
+    return {
+      healthUnits: this.healthValue,
+      enabled: this.enabledValue,
+      weakPointOpen: this.weakPointOpenValue,
+      destroyed: this.destroyedValue,
+    };
+  }
+
+  restoreState(snapshot: FixtureCombatTargetSnapshot): void {
+    if (
+      !Number.isFinite(snapshot.healthUnits) ||
+      snapshot.healthUnits < 0 ||
+      snapshot.healthUnits > this.initialHealth ||
+      typeof snapshot.enabled !== 'boolean' ||
+      typeof snapshot.weakPointOpen !== 'boolean' ||
+      typeof snapshot.destroyed !== 'boolean'
+    ) {
+      throw new Error(`Invalid combat target snapshot for "${this.id}".`);
+    }
+
+    this.healthValue = snapshot.healthUnits;
+    this.enabledValue = snapshot.enabled;
+    this.weakPointOpenValue = snapshot.weakPointOpen;
+    this.destroyedValue = snapshot.destroyed;
+
+    if (this.destroyedValue) {
+      this.onDestroyed?.();
+    } else {
+      this.onReset?.();
+    }
   }
 
   reset(): void {
