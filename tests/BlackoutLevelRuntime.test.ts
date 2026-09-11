@@ -516,6 +516,17 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
     assert.equal(runtime.phase, 'merging');
     assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
 
+    input.pointerDeltaX = 20;
+    input.pointerDeltaY = -12;
+    runtime.render(
+      0,
+      { frameDeltaSeconds: 1 / 144 } as Readonly<LoopStats>,
+    );
+    assert.equal(cameraRig.appliedLookX, 0);
+    assert.equal(cameraRig.appliedLookY, 0);
+    assert.equal(cameraRig.queuedLookX, 0);
+    assert.equal(cameraRig.queuedLookY, 0);
+
     input.press('switchSlime');
     for (let index = 0; index < 359; index += 1) {
       runtime.fixedUpdate(1 / 60);
