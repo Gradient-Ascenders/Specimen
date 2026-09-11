@@ -778,6 +778,19 @@ export class BlackoutLevelRuntime {
     resources.visuals.bob.position.copy(resources.group.bobBody.position);
     resources.visuals.goop.position.copy(resources.group.goopBody.position);
     resources.visuals.volt.position.copy(resources.group.voltBody.position);
+
+    // Hide only Volt's body material during his near-first-person aim pose.
+    // The Object3D remains visible so the child point light continues to
+    // illuminate the scene while the mesh cannot obscure the crosshair.
+    const hideVoltBody =
+      resources.manager.activeSlimeId === 'volt' &&
+      resources.electricalSystem.readModel.aimActive;
+    const voltMaterials = Array.isArray(resources.visuals.volt.material)
+      ? resources.visuals.volt.material
+      : [resources.visuals.volt.material];
+    for (const material of voltMaterials) {
+      material.visible = !hideVoltBody;
+    }
   }
 
   private commitCompletion(): void {
