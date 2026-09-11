@@ -207,7 +207,7 @@ export class BlackoutLevelRuntime {
   /** Shared failure hook for hazards authored by later Blackout room issues. */
   requestFailure(): boolean {
     const resources = this.requireResources();
-    if (resources.phase.terminal) return false;
+    if (this.lifecycle.state !== 'running' || resources.phase.terminal) return false;
     if (!resources.deathSequence.requestDeath(
       () => this.restoreActiveCheckpoint(resources, false),
     )) {
