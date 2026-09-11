@@ -378,3 +378,30 @@ test('invalid range configuration is rejected', () => {
     fixture.dispose();
   }
 });
+
+
+test('pause-style aim cancellation preserves the tether while reset clears it idempotently', () => {
+  const fixture = makeFixture();
+  try {
+    fixture.system.update(1 / 60, controls({
+      aimHeld: true,
+      fireHeld: true,
+      firePressed: true,
+    }));
+    assert.equal(fixture.system.connected, true);
+
+    fixture.system.cancelAim();
+    assert.equal(fixture.system.connected, true);
+    assert.equal(fixture.system.readModel.aimActive, false);
+
+    fixture.system.reset('death');
+    assert.equal(fixture.system.connected, false);
+    assert.equal(fixture.target.connected, false);
+    assert.deepEqual(fixture.target.connectionWrites, [true, false]);
+
+    fixture.system.reset('reset');
+    assert.deepEqual(fixture.target.connectionWrites, [true, false]);
+  } finally {
+    fixture.dispose();
+  }
+});
