@@ -321,6 +321,7 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
     // A restart exits the deferred death state so merge takeover can be
     // verified independently.
     runtime.restartLevel();
+    input.requestPointerLock();
     input.press('aimAbility');
     input.press('fireAbility');
     runtime.fixedUpdate(1 / 60);
