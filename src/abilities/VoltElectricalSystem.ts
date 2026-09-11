@@ -367,14 +367,13 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     readVector(voltBody.position, this.voltPosition);
     target.copySocketWorldPosition(this.socketPosition);
     const distance = this.voltPosition.distanceTo(this.socketPosition);
-    if (distance > this.config.tetherBreakRangeMetres + DISTANCE_EPSILON) {
+    if (distance > this.config.tetherBreakRangeMetres) {
       this.disconnect('range-exceeded');
       return;
     }
 
     const unstable =
-      distance + DISTANCE_EPSILON >=
-      this.config.instabilityWarningRangeMetres;
+      distance >= this.config.instabilityWarningRangeMetres;
     if (unstable !== this.readModelValue.connectionUnstable) {
       this.readModelValue.connectionUnstable = unstable;
       this.events.emit('instabilityChanged', {
@@ -455,7 +454,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     const distanceFromVolt = this.voltPosition.distanceTo(this.socketPosition);
     const available = target.isAvailable();
     const inRange =
-      distanceFromVolt <= this.config.acquisitionRangeMetres + DISTANCE_EPSILON;
+      distanceFromVolt <= this.config.acquisitionRangeMetres;
     const unobstructed =
       available &&
       inRange &&
@@ -505,7 +504,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     readVector(voltBody.position, this.voltPosition);
     target.copySocketWorldPosition(this.socketPosition);
     const distance = this.voltPosition.distanceTo(this.socketPosition);
-    if (distance > this.config.acquisitionRangeMetres + DISTANCE_EPSILON) return;
+    if (distance > this.config.acquisitionRangeMetres) return;
 
     this.connectedRegistration = registration;
     target.setConnectionState(true);
@@ -513,8 +512,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     this.readModelValue.connectedTargetName = target.displayName;
     this.readModelValue.tetherDistanceMetres = distance;
     this.readModelValue.connectionUnstable =
-      distance + DISTANCE_EPSILON >=
-      this.config.instabilityWarningRangeMetres;
+      distance >= this.config.instabilityWarningRangeMetres;
     this.readModelValue.beamMode = 'connected';
     writeVectorState(this.readModelValue.beamStart, this.voltPosition);
     writeVectorState(this.readModelValue.beamEnd, this.socketPosition);
