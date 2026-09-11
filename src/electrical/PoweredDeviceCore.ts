@@ -24,6 +24,19 @@ export interface PoweredDeviceReadModel {
   readonly supplyCount: number;
 }
 
+interface MutablePoweredDeviceReadModel {
+  id: string;
+  displayName: string;
+  powerMode: ElectricalPowerMode;
+  compatible: true;
+  available: boolean;
+  connected: boolean;
+  powered: boolean;
+  latched: boolean;
+  blocked: boolean;
+  supplyCount: number;
+}
+
 export interface PoweredDeviceEvents {
   availabilityChanged: {
     readonly id: string;
@@ -77,6 +90,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
   private readonly initialAvailableValue: boolean;
   private readonly initialLatchedValue: boolean;
   private readonly supplySources = new Set<string>();
+  private readonly readModelValue: MutablePoweredDeviceReadModel;
 
   private availableValue: boolean;
   private connectedValue = false;
@@ -113,6 +127,18 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
 
     this.availableValue = this.initialAvailableValue;
     this.latchedValue = this.initialLatchedValue;
+    this.readModelValue = {
+      id: this.id,
+      displayName: this.displayName,
+      powerMode: this.powerModeValue,
+      compatible: true,
+      available: this.availableValue,
+      connected: false,
+      powered: false,
+      latched: this.latchedValue,
+      blocked: false,
+      supplyCount: 0,
+    };
     this.recomputePower();
   }
 
@@ -121,18 +147,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
   }
 
   get readModel(): PoweredDeviceReadModel {
-    return {
-      id: this.id,
-      displayName: this.displayName,
-      powerMode: this.powerModeValue,
-      compatible: true,
-      available: this.availableValue,
-      connected: this.connectedValue,
-      powered: this.poweredValue,
-      latched: this.latchedValue,
-      blocked: this.blockedValue,
-      supplyCount: this.supplySources.size,
-    };
+    return this.readModelValue;
   }
 
   copySocketWorldPosition(target: THREE.Vector3): THREE.Vector3 {
@@ -150,6 +165,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     if (this.connectedValue === nextConnected) return;
 
     this.connectedValue = nextConnected;
+    this.readModelValue.connected = nextConnected;
     if (nextConnected) this.maybeLatch();
     this.events.emit('connectionChanged', {
       id: this.id,
@@ -161,6 +177,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
   setAvailable(available: boolean): void {
     if (this.disposed || this.availableValue === available) return;
     this.availableValue = available;
+    this.readModelValue.available = available;
     this.events.emit('availabilityChanged', {
       id: this.id,
       available,
@@ -184,18 +201,21 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     } else {
       this.supplySources.delete(sourceId);
     }
+    this.readModelValue.supplyCount = this.supplySources.size;
     this.recomputePower();
   }
 
   clearSupplies(): void {
     if (this.supplySources.size === 0) return;
     this.supplySources.clear();
+    this.readModelValue.supplyCount = 0;
     this.recomputePower();
   }
 
   setBlocked(blocked: boolean): void {
     if (this.disposed || this.blockedValue === blocked) return;
     this.blockedValue = blocked;
+    this.readModelValue.blocked = blocked;
     this.events.emit('blockedChanged', {
       id: this.id,
       blocked,
@@ -235,6 +255,11 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     this.latchedValue =
       this.powerModeValue === 'latched' ? snapshot.latched : false;
     this.blockedValue = false;
+    this.readModelValue.available = this.availableValue;
+    this.readModelValue.connected = false;
+    this.readModelValue.supplyCount = 0;
+    this.readModelValue.latched = this.latchedValue;
+    this.readModelValue.blocked = false;
 
     if (previousAvailable !== this.availableValue) {
       this.events.emit('availabilityChanged', {
@@ -271,6 +296,10 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     this.supplySources.clear();
     this.latchedValue = false;
     this.blockedValue = false;
+    this.readModelValue.connected = false;
+    this.readModelValue.supplyCount = 0;
+    this.readModelValue.latched = false;
+    this.readModelValue.blocked = false;
     this.recomputePower();
     this.events.clear();
     this.disposed = true;
@@ -284,6 +313,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
       return;
     }
     this.latchedValue = true;
+    this.readModelValue.latched = true;
     this.events.emit('latchChanged', {
       id: this.id,
       latched: true,
@@ -301,6 +331,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
 
     if (this.poweredValue === nextPowered) return;
     this.poweredValue = nextPowered;
+    this.readModelValue.powered = nextPowered;
     this.events.emit('powerChanged', {
       id: this.id,
       powered: nextPowered,
