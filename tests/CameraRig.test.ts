@@ -453,6 +453,40 @@ test('ground movement follows camera yaw while ignoring pitch', () => {
   assert.equal(rig.getDiagnostics().pitchRadians, 1);
 });
 
+test('each slime restores its own yaw and pitch after camera target swaps', () => {
+  const bob = createTarget();
+  const goop = createTarget();
+  const rig = new CameraRig({
+    horizontalSensitivityRadiansPerPixel: 1,
+    verticalSensitivityRadiansPerPixel: 1,
+    minimumPitchRadians: -1,
+    maximumPitchRadians: 1,
+    initialPitchRadians: 0,
+  });
+  const world = new CollisionWorld();
+  const movement = new THREE.Vector3();
+
+  rig.setFollowTarget(bob, world);
+  rig.setGroundOrbitYawRadians(Math.PI / 2);
+  rig.queueLookInput(0, -0.25);
+  rig.applyQueuedLookInput();
+
+  rig.setFollowTarget(goop, world);
+  rig.setGroundOrbitYawRadians(Math.PI);
+  rig.queueLookInput(0, 0.75);
+  rig.applyQueuedLookInput();
+
+  rig.setFollowTarget(bob, world);
+  rig.copyGroundMovementDirection(0, -1, movement);
+  assert.ok(movement.distanceTo(new THREE.Vector3(-1, 0, 0)) < EPSILON);
+  assert.equal(rig.getDiagnostics().pitchRadians, -0.25);
+
+  rig.setFollowTarget(goop, world);
+  rig.copyGroundMovementDirection(0, -1, movement);
+  assert.ok(movement.distanceTo(new THREE.Vector3(0, 0, 1)) < EPSILON);
+  assert.equal(rig.getDiagnostics().pitchRadians, 0.5);
+});
+
 test('an authored ground heading orients both framing and movement predictably', () => {
   const rig = new CameraRig();
   const movement = new THREE.Vector3();

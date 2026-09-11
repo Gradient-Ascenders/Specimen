@@ -358,7 +358,7 @@ export class LevelTwoRoomThreeGreybox {
       { id: 'first-wall-exit', size: [4, .5, 3], position: [1, 23.75, 21], routeBeat: 'first-drone-window' },
       { id: 'offset-island', size: [3, .5, 3], position: [-4, 24, 25.5], routeBeat: 'offset-precision-jump' },
       { id: 'west-runup', size: [3.5, .5, 3], position: [-9, 22, 30], routeBeat: 'approach-sweeping-wall' },
-      { id: 'west-wall-exit', size: [4, .5, 3.5], position: [-16, 26, 38], routeBeat: 'second-drone-window' },
+      { id: 'west-wall-exit', size: [4, .5, 3.5], position: [-16, 26.25, 38], routeBeat: 'second-drone-window' },
       { id: 'west-return-island', size: [3, .5, 3], position: [-10, 26, 38], routeBeat: 'return-from-wall-crest' },
       { id: 'cross-room-a', size: [3, .5, 3], position: [-5, 25.5, 42], routeBeat: 'long-diagonal' },
       { id: 'cross-room-b', size: [3, .5, 3], position: [0, 22.7, 46.5], routeBeat: 'drop-to-final-wall-approach' },
