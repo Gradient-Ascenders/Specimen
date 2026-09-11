@@ -571,3 +571,58 @@ test('reset invoked from a destruction reaction clears the pool and aborts remai
     fixture.dispose();
   }
 });
+
+
+test('splash LOS accepts the candidate target own pre-registered default-layer collider as the terminal hit', () => {
+  const fixture = createFixture();
+  const direct = addTarget(
+    fixture,
+    'solid-los-direct',
+    new THREE.Vector3(0, 0.675, 5),
+    { healthUnits: 10 },
+  );
+
+  const candidateMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 1.2, 0.5),
+  );
+  candidateMesh.name = 'solid-los-candidate-collider';
+  candidateMesh.position.set(1.4, 0.675, 5);
+  fixture.world.register(
+    candidateMesh,
+    DEFAULT_SOLID_COLLISION_LAYERS,
+    ColliderTransformMode.Static,
+  );
+  const candidate = new FixtureCombatTarget({
+    id: 'solid-los-candidate',
+    hitMeshes: [candidateMesh],
+    healthUnits: 10,
+  });
+  const unregisterCandidate = fixture.registry.register(candidate);
+
+  try {
+    fixture.system.update(1.5, controls({
+      firePressed: true,
+      fireHeld: true,
+    }));
+    fixture.system.update(1 / 60, controls({
+      fireReleased: true,
+    }));
+    fixture.system.update(0.2, controls());
+
+    assert.equal(direct.target.healthUnits, 7);
+    assert.ok(
+      candidate.healthUnits < 10,
+      'candidate own LineOfSight collider must terminate visibility rather than self-occlude',
+    );
+  } finally {
+    unregisterCandidate();
+    fixture.world.unregister(candidateMesh);
+    candidateMesh.geometry.dispose();
+    const materials = Array.isArray(candidateMesh.material)
+      ? candidateMesh.material
+      : [candidateMesh.material];
+    for (const material of materials) material.dispose();
+    direct.dispose();
+    fixture.dispose();
+  }
+});
