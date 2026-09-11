@@ -160,3 +160,33 @@ test('context menu prevention is scoped to the game canvas boundary', () => {
   pointerLockElement.dispatchEvent(afterDispose);
   assert.equal(afterDispose.defaultPrevented, false);
 });
+
+
+test('maintenance drone mount uses M and descend supports either Shift key without stale hold state', () => {
+  const { input, hostWindow } = createInput();
+
+  dispatchKey(hostWindow, 'keydown', 'KeyM');
+  assert.equal(input.isDown('mountDrone'), true);
+  assert.equal(input.wasPressed('mountDrone'), true);
+  input.endFixedUpdate();
+  dispatchKey(hostWindow, 'keyup', 'KeyM');
+  assert.equal(input.wasReleased('mountDrone'), true);
+
+  dispatchKey(hostWindow, 'keydown', 'ShiftLeft');
+  assert.equal(input.isDown('droneDescend'), true);
+  input.endFixedUpdate();
+
+  dispatchKey(hostWindow, 'keydown', 'ShiftRight');
+  assert.equal(input.isDown('droneDescend'), true);
+  dispatchKey(hostWindow, 'keyup', 'ShiftLeft');
+  assert.equal(
+    input.isDown('droneDescend'),
+    true,
+    'releasing one Shift must preserve the other held binding',
+  );
+  dispatchKey(hostWindow, 'keyup', 'ShiftRight');
+  assert.equal(input.isDown('droneDescend'), false);
+  assert.equal(input.wasReleased('droneDescend'), true);
+
+  input.dispose();
+});
