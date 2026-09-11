@@ -1,23 +1,14 @@
 import type { SlimeId } from '../slimes/SlimeRoster.ts';
 
 export type BlackoutCheckpointId =
-  | 'cp1'
-  | 'cp2'
-  | 'cp3'
-  | 'cp4'
-  | 'cp5'
-  | 'cp6'
-  | 'cp7'
-  | 'cp8'
-  | 'cp9';
+  | 'cp1' | 'cp2' | 'cp3' | 'cp4' | 'cp5' | 'cp6' | 'cp7' | 'cp8' | 'cp9';
+
+export const BLACKOUT_CHECKPOINT_IDS: readonly BlackoutCheckpointId[] = [
+  'cp1', 'cp2', 'cp3', 'cp4', 'cp5', 'cp6', 'cp7', 'cp8', 'cp9',
+];
 
 export type BlackoutRoomId =
-  | 'room-1'
-  | 'room-2'
-  | 'room-3'
-  | 'room-4a'
-  | 'room-4b'
-  | 'ending';
+  | 'room-1' | 'room-2' | 'room-3' | 'room-4a' | 'room-4b' | 'ending';
 
 export type BlackoutPhase =
   | 'three-slime'
@@ -30,6 +21,7 @@ export type BlackoutPhase =
   | 'complete';
 
 export type BlackoutSlimeId = Extract<SlimeId, 'bob' | 'goop' | 'volt'>;
+export type BlackoutPosition = readonly [number, number, number];
 
 export type SerializablePrimitive = string | number | boolean | null;
 export type SerializableValue =
@@ -45,15 +37,15 @@ export interface BlackoutRoomState {
 
 export interface BlackoutConnectionState {
   /**
-   * Live Volt tethers are intentionally transient across Retry/restart.
-   * Future electrical-device participants restore authored/latched device state
-   * separately while this value returns to null.
+   * Live Volt tethers are transient across failure/reset. Future electrical
+   * device participants restore authored/latched device state separately.
    */
   readonly voltTargetId: string | null;
 }
 
 export interface BlackoutRuntimeSnapshot {
   readonly checkpointId: BlackoutCheckpointId;
+  readonly bodyPositions: Readonly<Record<BlackoutSlimeId, BlackoutPosition>>;
   readonly activeSlimeId: BlackoutSlimeId;
   readonly room: BlackoutRoomState;
   readonly connections: BlackoutConnectionState;
