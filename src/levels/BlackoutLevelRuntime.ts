@@ -14,6 +14,10 @@ import {
 } from '../physics/CollisionWorld.ts';
 import { KinematicBody, type JumpInputState } from '../physics/KinematicBody.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import {
+  PuzzleRegistry,
+  type ResettablePuzzleComponent,
+} from '../puzzle/PuzzleRegistry.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
@@ -59,6 +63,7 @@ interface BlackoutRuntimeResources {
   readonly scene: BlackoutLevelScene;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
+  readonly puzzleRegistry: PuzzleRegistry;
   readonly manager: SlimeManager<KinematicBody>;
   readonly group: PersistentSlimeGroup<KinematicBody>;
   readonly checkpoints: BlackoutCheckpointManager<KinematicBody>;
@@ -176,6 +181,14 @@ export class BlackoutLevelRuntime {
 
   registerCheckpointParticipant(participant: BlackoutCheckpointParticipant): () => void {
     return this.requireResources().checkpoints.registerParticipant(participant);
+  }
+
+  registerPuzzleComponent(
+    id: string,
+    component: ResettablePuzzleComponent,
+    groupId = 'default',
+  ): void {
+    this.requireResources().puzzleRegistry.register(id, component, groupId);
   }
 
   activateCheckpoint(checkpointId: BlackoutCheckpointId): void {
@@ -366,6 +379,7 @@ export class BlackoutLevelRuntime {
     const scene = new BlackoutLevelScene();
     const collisionWorld = new CollisionWorld();
     const surfaceRegistry = new SurfaceRegistry();
+    const puzzleRegistry = new PuzzleRegistry();
     const rollbackActions: Array<() => void> = [];
     const rollback = (action: () => void): void => {
       rollbackActions.push(action);
@@ -469,6 +483,7 @@ export class BlackoutLevelRuntime {
         scene,
         collisionWorld,
         surfaceRegistry,
+        puzzleRegistry,
         manager,
         group,
         checkpoints,
@@ -534,6 +549,7 @@ export class BlackoutLevelRuntime {
     resources.deathSequence.reset();
     resources.deathScreen.hide();
     resources.checkpoints.resetToInitial();
+    resources.puzzleRegistry.reset();
     const snapshot = resources.checkpoints.recover(resources.group);
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
@@ -563,6 +579,7 @@ export class BlackoutLevelRuntime {
     for (const visual of Object.values(resources.visuals)) {
       disposeSlimeVisual(visual);
     }
+    resources.puzzleRegistry.clear();
     resources.manager.clearLevelRegistrations();
     resources.manager.dispose();
     resources.scene.dispose();
