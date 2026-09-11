@@ -10,18 +10,23 @@ import type { LevelLifecycleState } from './LevelLifecycle.ts';
 import type { GameLevelRuntime } from './GameLevelRuntime.ts';
 import type { LevelProgressionSnapshot } from './LevelProgression.ts';
 
+export type SessionLevelId = 'level-2' | 'level-3';
+
 export interface GameSessionEvents {
   objectiveChanged: { readonly roomId: string | number; readonly objective: string };
-  transitionStarted: { readonly message: 'Entering Level 2…' };
-  transitionCompleted: { readonly levelId: 'level-2' };
-  transitionFailed: { readonly message: string };
+  transitionStarted: { readonly levelId: SessionLevelId; readonly message: string };
+  transitionCompleted: { readonly levelId: SessionLevelId };
+  transitionFailed: { readonly levelId: SessionLevelId; readonly message: string };
 }
+
+type RuntimeFactory = (
+  progression: LevelProgressionSnapshot,
+) => GameLevelRuntime | Promise<GameLevelRuntime>;
 
 export interface GameSessionCoordinatorOptions {
   readonly initialRuntime: GameLevelRuntime;
-  readonly createLevelTwo: (
-    progression: LevelProgressionSnapshot,
-  ) => GameLevelRuntime | Promise<GameLevelRuntime>;
+  readonly createLevelTwo: RuntimeFactory;
+  readonly createLevelThree?: RuntimeFactory;
   readonly scheduleTransition: (transition: () => void) => void;
 }
 
@@ -30,7 +35,8 @@ export class GameSessionCoordinator {
   readonly events = new EventBus<GameSessionEvents>();
 
   private runtime: GameLevelRuntime;
-  private readonly createLevelTwo: GameSessionCoordinatorOptions['createLevelTwo'];
+  private readonly createLevelTwo: RuntimeFactory;
+  private readonly createLevelThree: RuntimeFactory | undefined;
   private readonly scheduleTransition: GameSessionCoordinatorOptions['scheduleTransition'];
   private readonly hudListeners = new Set<SlimeHUDListener>();
   private unsubscribeRuntimeEvents: readonly (() => void)[] = [];
@@ -44,6 +50,7 @@ export class GameSessionCoordinator {
   constructor(options: GameSessionCoordinatorOptions) {
     this.runtime = options.initialRuntime;
     this.createLevelTwo = options.createLevelTwo;
+    this.createLevelThree = options.createLevelThree;
     this.scheduleTransition = options.scheduleTransition;
     this.bindRuntime(this.runtime);
   }
@@ -119,28 +126,42 @@ export class GameSessionCoordinator {
 
   private onLevelCompleted(nextLevelId: string): void {
     if (
-      nextLevelId !== 'level-2' || this.transitionPending ||
-      this.transitionFailed || this.disposed
+      (nextLevelId !== 'level-2' && nextLevelId !== 'level-3') ||
+      this.transitionPending || this.transitionFailed || this.disposed
     ) return;
+
+    const target = nextLevelId as SessionLevelId;
+    const factory = target === 'level-2' ? this.createLevelTwo : this.createLevelThree;
+    if (!factory) {
+      this.transitionFailed = true;
+      this.events.emit('transitionFailed', {
+        levelId: target,
+        message: `${displayName(target)} could not be started: runtime factory unavailable.`,
+      });
+      for (const listener of this.hudListeners) listener(EMPTY_SLIME_HUD_SNAPSHOT);
+      return;
+    }
 
     const progression = this.runtime.captureProgressionSnapshot();
     if (this.runtime.state === 'running') this.runtime.stop();
     this.transitionPending = true;
     const transitionGeneration = ++this.transitionGeneration;
     this.runtime.setDebugInteractionEnabled(false);
-    this.events.emit('transitionStarted', { message: 'Entering Level 2…' });
+    this.events.emit('transitionStarted', {
+      levelId: target,
+      message: `Entering ${displayName(target)}…`,
+    });
     this.scheduleTransition(() =>
-      this.performLevelTwoTransition(progression, transitionGeneration));
+      this.performTransition(target, factory, progression, transitionGeneration));
   }
 
-  private performLevelTwoTransition(
+  private performTransition(
+    target: SessionLevelId,
+    factory: RuntimeFactory,
     progression: LevelProgressionSnapshot,
     transitionGeneration: number,
   ): void {
-    if (
-      this.disposed || !this.transitionPending ||
-      transitionGeneration !== this.transitionGeneration
-    ) return;
+    if (!this.isCurrentTransition(transitionGeneration)) return;
     const previousRuntime = this.runtime;
 
     try {
@@ -148,15 +169,17 @@ export class GameSessionCoordinator {
       previousRuntime.unload();
       previousRuntime.dispose();
 
-      const nextRuntime = this.createLevelTwo(progression);
+      const nextRuntime = factory(progression);
       if (isPromiseLike(nextRuntime)) {
         void Promise.resolve(nextRuntime).then(
-          (resolvedRuntime) => this.finishLevelTwoTransition(
+          (resolvedRuntime) => this.finishTransition(
+            target,
             resolvedRuntime,
             previousRuntime,
             transitionGeneration,
           ),
-          (error: unknown) => this.failLevelTwoTransition(
+          (error: unknown) => this.failTransition(
+            target,
             error,
             previousRuntime,
             undefined,
@@ -165,13 +188,15 @@ export class GameSessionCoordinator {
         );
         return;
       }
-      this.finishLevelTwoTransition(
+      this.finishTransition(
+        target,
         nextRuntime,
         previousRuntime,
         transitionGeneration,
       );
     } catch (error) {
-      this.failLevelTwoTransition(
+      this.failTransition(
+        target,
         error,
         previousRuntime,
         undefined,
@@ -180,7 +205,8 @@ export class GameSessionCoordinator {
     }
   }
 
-  private finishLevelTwoTransition(
+  private finishTransition(
+    target: SessionLevelId,
     nextRuntime: GameLevelRuntime,
     previousRuntime: GameLevelRuntime,
     transitionGeneration: number,
@@ -200,14 +226,24 @@ export class GameSessionCoordinator {
       const complete = () => {
         if (!this.isCurrentTransition(transitionGeneration)) return;
         this.transitionPending = false;
-        this.events.emit('transitionCompleted', { levelId: 'level-2' });
+        this.events.emit('transitionCompleted', { levelId: target });
       };
       const preparation = nextRuntime.preparePresentation?.();
       if (preparation) {
-        void preparation.then(complete, error => this.failLevelTwoTransition(error, previousRuntime, nextRuntime, transitionGeneration));
+        void preparation.then(
+          complete,
+          error => this.failTransition(
+            target,
+            error,
+            previousRuntime,
+            nextRuntime,
+            transitionGeneration,
+          ),
+        );
       } else complete();
     } catch (error) {
-      this.failLevelTwoTransition(
+      this.failTransition(
+        target,
         error,
         previousRuntime,
         nextRuntime,
@@ -216,7 +252,8 @@ export class GameSessionCoordinator {
     }
   }
 
-  private failLevelTwoTransition(
+  private failTransition(
+    target: SessionLevelId,
     error: unknown,
     previousRuntime: GameLevelRuntime,
     nextRuntime: GameLevelRuntime | undefined,
@@ -230,7 +267,8 @@ export class GameSessionCoordinator {
     this.transitionFailed = true;
     const detail = error instanceof Error ? error.message : String(error);
     this.events.emit('transitionFailed', {
-      message: `Level 2 could not be started: ${detail}`,
+      levelId: target,
+      message: `${displayName(target)} could not be started: ${detail}`,
     });
     for (const listener of this.hudListeners) listener(EMPTY_SLIME_HUD_SNAPSHOT);
   }
@@ -248,6 +286,9 @@ export class GameSessionCoordinator {
     this.transitionGeneration += 1;
   }
 }
+
+const displayName = (levelId: SessionLevelId): string =>
+  levelId === 'level-2' ? 'Level 2' : 'Level 3';
 
 const isPromiseLike = <Value>(
   value: Value | Promise<Value>,
