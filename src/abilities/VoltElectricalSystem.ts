@@ -165,9 +165,12 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
   private readonly socketPosition = new THREE.Vector3();
   private readonly bodyToSocketDirection = new THREE.Vector3();
   private readonly aimRangePoint = new THREE.Vector3();
+  private readonly searchBeamEnd = new THREE.Vector3();
+  private readonly searchBeamDirection = new THREE.Vector3();
   private readonly targetHit = new CollisionHit();
   private readonly worldHit = new CollisionHit();
   private readonly bodyLineOfSightHit = new CollisionHit();
+  private readonly searchBeamHit = new CollisionHit();
 
   private connectedRegistration: ElectricalTargetRegistration | undefined;
   private selectedRegistration: ElectricalTargetRegistration | undefined;
@@ -281,7 +284,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     this.setSearching(searching);
     this.readModelValue.beamMode = searching ? 'search' : 'none';
     this.writeVoltBeamStart();
-    writeVectorState(this.readModelValue.beamEnd, this.aimRangePoint);
+    writeVectorState(this.readModelValue.beamEnd, this.searchBeamEnd);
 
     if (
       searching &&
@@ -439,6 +442,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
         .add(this.aimOrigin);
     }
     writeVectorState(this.readModelValue.aimPoint, this.aimRangePoint);
+    this.resolveSearchBeamEnd();
 
     const registration =
       targetVisible && this.targetHit.object
@@ -464,6 +468,32 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     this.readModelValue.selectedTargetId = target.id;
     this.readModelValue.selectedTargetName = target.displayName;
     this.readModelValue.selectedTargetValid = unobstructed;
+  }
+
+  private resolveSearchBeamEnd(): void {
+    this.searchBeamDirection.subVectors(this.aimRangePoint, this.voltPosition);
+    const distance = this.searchBeamDirection.length();
+    if (distance <= DISTANCE_EPSILON) {
+      this.searchBeamEnd.copy(this.voltPosition);
+      return;
+    }
+
+    this.searchBeamDirection.multiplyScalar(1 / distance);
+    const blocked = this.collisionWorld.raycast(
+      this.voltPosition,
+      this.searchBeamDirection,
+      distance,
+      this.searchBeamHit,
+      CollisionLayer.LineOfSight,
+    );
+    if (
+      blocked &&
+      this.searchBeamHit.distance + DISTANCE_EPSILON < distance
+    ) {
+      this.searchBeamEnd.copy(this.searchBeamHit.point);
+    } else {
+      this.searchBeamEnd.copy(this.aimRangePoint);
+    }
   }
 
   private hasInitialLineOfSight(
