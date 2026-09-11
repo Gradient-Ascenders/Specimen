@@ -629,6 +629,9 @@ export class SpecimenProjectileSystem {
         slot.damageUnits,
         hit.point,
       );
+      // Recovery/reset is allowed to run inside a destruction reaction. If it
+      // cleared this slot, abort the remainder of the blast immediately.
+      if (!slot.read.active) return;
     }
 
     for (const candidate of this.splashCandidates) {
@@ -641,6 +644,7 @@ export class SpecimenProjectileSystem {
         candidate.damageUnits,
         hit.point,
       );
+      if (!slot.read.active) return;
     }
 
     this.events.emit('impact', {
