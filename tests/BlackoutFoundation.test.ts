@@ -41,16 +41,24 @@ const positions = (z = 0) => ({
 const checkpoint = (
   id: BlackoutCheckpointDefinition['id'] = 'cp1',
   z = 0,
-): BlackoutCheckpointDefinition => ({
-  id,
-  bodyPositions: positions(z),
-  activeSlimeId: 'volt',
-  room: {
-    roomId: id === 'cp8' ? 'room-4b' : 'room-1',
-    phase: id === 'cp8' ? 'specimen' : 'three-slime',
-    local: {},
-  },
-});
+): BlackoutCheckpointDefinition => {
+  const specimen = id === 'cp8' || id === 'cp9';
+  return {
+    id,
+    bodyPositions: positions(z),
+    activeSlimeId: specimen ? 'bob' : 'volt',
+    controlledForm: specimen ? 'specimen' : 'group',
+    specimenPosition: specimen
+      ? new THREE.Vector3(0, 0.685, z)
+      : undefined,
+    specimenClearanceRadius: specimen ? 0.675 : undefined,
+    room: {
+      roomId: specimen ? 'room-4b' : 'room-1',
+      phase: id === 'cp9' ? 'boss' : specimen ? 'specimen' : 'three-slime',
+      local: {},
+    },
+  };
+};
 
 function makeGroup() {
   const manager = new SlimeManager<TestBody>(BLACKOUT_SLIME_DEFINITIONS);
@@ -66,7 +74,12 @@ function makeGroup() {
     spawnPositions: starts,
     initialActiveSlimeId: 'volt',
   });
-  return { manager, bodies, group };
+  return {
+    manager,
+    bodies,
+    group,
+    specimen: new TestBody(new THREE.Vector3(0, 0.685, 60)),
+  };
 }
 
 test('Level 3 group registers all three bodies once and switching preserves inactive positions', () => {
@@ -88,7 +101,7 @@ test('Level 3 group registers all three bodies once and switching preserves inac
 });
 
 test('Level 3 checkpoint recovery clears transients, restores participant state, bodies, and ownership', () => {
-  const { bodies, group } = makeGroup();
+  const { bodies, group, specimen } = makeGroup();
   const manager = new BlackoutCheckpointManager<TestBody>(
     checkpoint(),
     () => true,
@@ -117,7 +130,7 @@ test('Level 3 checkpoint recovery clears transients, restores participant state,
   participantState = { doorOpen: true, hazardActive: false };
   liveTransient = true;
 
-  const restored = manager.recover(group);
+  const restored = manager.recover(group, specimen);
   assert.deepEqual(order, ['transient', 'restore']);
   assert.equal(liveTransient, false);
   assert.deepEqual(participantState, { doorOpen: false, hazardActive: true });
@@ -126,10 +139,12 @@ test('Level 3 checkpoint recovery clears transients, restores participant state,
   assert.deepEqual(bodies.volt.position, positions().volt);
   assert.equal(group.activeSlimeId, 'volt');
   assert.equal(restored.connections.voltTargetId, null);
+  assert.equal(restored.controlledForm, 'group');
+  assert.equal(restored.specimenPosition, null);
 });
 
 test('checkpoint snapshots are independent, use authored safe anchors, and recover idempotently', () => {
-  const { bodies, group } = makeGroup();
+  const { bodies, group, specimen } = makeGroup();
   const manager = new BlackoutCheckpointManager<TestBody>(checkpoint(), () => true);
   manager.registerCheckpoint(checkpoint('cp2', 10));
 
@@ -148,8 +163,8 @@ test('checkpoint snapshots are independent, use authored safe anchors, and recov
   mutable[0] = 999;
   assert.notEqual(manager.activeCheckpoint.bodyPositions.bob[0], 999);
 
-  manager.recover(group);
-  manager.recover(group);
+  manager.recover(group, specimen);
+  manager.recover(group, specimen);
   assert.equal(group.activeSlimeId, 'bob');
   assert.deepEqual(bodies.bob.position.toArray(), [-2, 0.46, 10]);
   assert.deepEqual(bodies.goop.position.toArray(), [0, 0.46, 10]);
@@ -160,7 +175,7 @@ test('checkpoint snapshots are independent, use authored safe anchors, and recov
 });
 
 test('all CP1-CP9 identifiers are structurally registerable and unsafe restores are rejected before movement', () => {
-  const { bodies, group } = makeGroup();
+  const { bodies, group, specimen } = makeGroup();
   let safe = true;
   const manager = new BlackoutCheckpointManager<TestBody>(
     checkpoint('cp1'),
@@ -172,8 +187,32 @@ test('all CP1-CP9 identifiers are structurally registerable and unsafe restores 
   manager.activate('cp9');
   const before = bodies.bob.position.clone();
   safe = false;
-  assert.throws(() => manager.recover(group), /unsafe restored bob spawn/);
+  assert.throws(() => manager.recover(group, specimen), /unsafe restored Specimen spawn/);
   assert.deepEqual(bodies.bob.position, before);
+});
+
+test('merged checkpoint recovery validates and moves only Specimen while preserving original body identity', () => {
+  const { bodies, group, specimen } = makeGroup();
+  const manager = new BlackoutCheckpointManager<TestBody>(
+    checkpoint('cp1'),
+    () => true,
+  );
+  manager.registerCheckpoint(checkpoint('cp8', 65));
+  manager.activate('cp8');
+
+  const bobBefore = bodies.bob.position.clone();
+  const goopBefore = bodies.goop.position.clone();
+  const voltBefore = bodies.volt.position.clone();
+
+  const snapshot = manager.recover(group, specimen);
+
+  assert.equal(snapshot.controlledForm, 'specimen');
+  assert.deepEqual(snapshot.specimenPosition, [0, 0.685, 65]);
+  assert.deepEqual(specimen.position.toArray(), [0, 0.685, 65]);
+  assert.deepEqual(bodies.bob.position, bobBefore);
+  assert.deepEqual(bodies.goop.position, goopBefore);
+  assert.deepEqual(bodies.volt.position, voltBefore);
+  assert.equal(specimen.recoveries, 1);
 });
 
 test('Blackout phase hooks reject illegal transitions and completion is terminal', () => {
@@ -197,7 +236,7 @@ test('Blackout phase hooks reject illegal transitions and completion is terminal
 
 
 test('full restart restores participant state captured at Level 3 entry, not later mutations', () => {
-  const { group } = makeGroup();
+  const { group, specimen } = makeGroup();
   const manager = new BlackoutCheckpointManager<TestBody>(checkpoint(), () => true);
   let deviceState: SerializableValue = { powered: false, doorOpen: false };
   manager.registerParticipant({
@@ -214,7 +253,7 @@ test('full restart restores participant state captured at Level 3 entry, not lat
   deviceState = { powered: false, doorOpen: true };
 
   manager.resetToInitial();
-  manager.recover(group);
+  manager.recover(group, specimen);
 
   assert.deepEqual(deviceState, { powered: false, doorOpen: false });
   assert.equal(manager.activeCheckpoint.checkpointId, 'cp1');
@@ -238,7 +277,7 @@ test('Level 3 progression requires the rescued three-slime roster and preserves 
 
 
 test('full restart preserves the active identity handed off at Level 3 entry', () => {
-  const { group } = makeGroup();
+  const { group, specimen } = makeGroup();
   const manager = new BlackoutCheckpointManager<TestBody>(
     checkpoint(),
     () => true,
@@ -248,7 +287,7 @@ test('full restart preserves the active identity handed off at Level 3 entry', (
   group.activate('bob');
   manager.activate('cp1', 'bob');
   manager.resetToInitial();
-  manager.recover(group);
+  manager.recover(group, specimen);
 
   assert.equal(group.activeSlimeId, 'goop');
 });

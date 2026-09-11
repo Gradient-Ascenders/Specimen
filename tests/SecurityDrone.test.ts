@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import * as THREE from 'three';
 
+import { SecurityDroneCombatTarget } from '../src/combat/CombatTargetAdapters.ts';
 import { DroneProjectileSystem } from '../src/hazards/DroneProjectileSystem.ts';
 import { SecurityDrone, type SecurityDroneConfig } from '../src/hazards/SecurityDrone.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
@@ -232,4 +233,62 @@ test('laboratory sentry presentation tracks the same direction used to fire', ()
   projectiles.dispose();
   damage.dispose();
   assert.equal(drone.root.children.length, 0);
+});
+
+
+test('opt-in Specimen combat adapter disables a real SecurityDrone, clears shots, removes collision, and resets in place', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const damage = new SlimeDamageSystem();
+  const projectiles = new DroneProjectileSystem(world, damage);
+  const drone = new SecurityDrone(config(), world, surfaces, projectiles);
+  const combat = new SecurityDroneCombatTarget({
+    drone,
+    healthUnits: 2,
+  });
+
+  try {
+    assert.equal(world.colliderCount, 1);
+    assert.equal(surfaces.registeredCount, 1);
+    assert.equal(drone.presentation.root.visible, true);
+
+    projectiles.spawn(
+      drone.id,
+      drone.collider,
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 0, z: 1 },
+    );
+    assert.equal(projectiles.liveCount, 1);
+
+    const result = combat.applyImpact({
+      projectileId: 1,
+      targetId: combat.id,
+      kind: 'direct',
+      chargeAmount: 1,
+      fullyCharged: true,
+      damageUnits: 2,
+      point: { x: 0, y: 0, z: 0 },
+      direction: { x: 0, y: 0, z: 1 },
+    });
+
+    assert.equal(result.destroyed, true);
+    assert.equal(projectiles.liveCount, 0);
+    assert.equal(drone.readModel.enabled, false);
+    assert.equal(drone.presentation.root.visible, false);
+    assert.equal(world.colliderCount, 0);
+    assert.equal(surfaces.registeredCount, 0);
+
+    combat.reset();
+
+    assert.equal(combat.destroyed, false);
+    assert.equal(drone.readModel.enabled, true);
+    assert.equal(drone.presentation.root.visible, true);
+    assert.equal(world.colliderCount, 1);
+    assert.equal(surfaces.registeredCount, 1);
+    assert.equal(projectiles.liveCount, 0);
+  } finally {
+    drone.dispose();
+    projectiles.dispose();
+    damage.dispose();
+  }
 });

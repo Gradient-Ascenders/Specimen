@@ -1,4 +1,5 @@
 import type { SlimeId } from '../slimes/SlimeRoster.ts';
+import type { ControlledForm } from '../specimen/SpecimenTypes.ts';
 
 export type BlackoutCheckpointId =
   | 'cp1' | 'cp2' | 'cp3' | 'cp4' | 'cp5' | 'cp6' | 'cp7' | 'cp8' | 'cp9';
@@ -47,6 +48,8 @@ export interface BlackoutRuntimeSnapshot {
   readonly checkpointId: BlackoutCheckpointId;
   readonly bodyPositions: Readonly<Record<BlackoutSlimeId, BlackoutPosition>>;
   readonly activeSlimeId: BlackoutSlimeId;
+  readonly controlledForm: ControlledForm;
+  readonly specimenPosition: BlackoutPosition | null;
   readonly room: BlackoutRoomState;
   readonly connections: BlackoutConnectionState;
   readonly participantState: Readonly<Record<string, SerializableValue>>;

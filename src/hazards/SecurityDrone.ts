@@ -134,6 +134,7 @@ export class SecurityDrone {
   private targetLossElapsed = 0;
   private fireElapsed = 0;
   private enabled = true;
+  private collisionEnabled = true;
   private disposed = false;
 
   constructor(
@@ -273,9 +274,43 @@ export class SecurityDrone {
     this.syncReadModel();
   }
 
+  /**
+   * Opt-in combat adapter hook. Normal room drones never call this.
+   * Removing the collider also removes its authored surface registration.
+   */
+  setCollisionEnabled(enabled: boolean): void {
+    if (this.disposed || this.collisionEnabled === enabled) return;
+    this.collisionEnabled = enabled;
+    if (enabled) {
+      this.world.register(
+        this.collider,
+        undefined,
+        ColliderTransformMode.Dynamic,
+      );
+      this.surfaces.register(this.collider);
+    } else {
+      this.world.unregister(this.collider);
+      this.surfaces.unregister(this.collider);
+    }
+  }
+
+  /** Presentation-only visibility hook for explicit destructible-drone adapters. */
+  setPresentationVisible(visible: boolean): void {
+    if (this.disposed) return;
+    this.presentation.root.visible = visible;
+  }
+
+  /** Clear hostile shots owned by this drone without changing AI state. */
+  clearOwnedProjectiles(): void {
+    if (this.disposed) return;
+    this.projectiles.despawnOwner(this.id);
+  }
+
   reset(): void {
     if (this.disposed) return;
     this.projectiles.despawnOwner(this.id);
+    this.setCollisionEnabled(true);
+    this.setPresentationVisible(true);
     this.root.position.copy(this.config.initialPosition);
     this.root.quaternion.copy(this.initialQuaternion);
     this.scanPhase = normalizePhase(this.config.initialScanPhase);
@@ -294,8 +329,11 @@ export class SecurityDrone {
   dispose(): void {
     if (this.disposed) return;
     this.projectiles.despawnOwner(this.id);
-    this.world.unregister(this.collider);
-    this.surfaces.unregister(this.collider);
+    if (this.collisionEnabled) {
+      this.world.unregister(this.collider);
+      this.surfaces.unregister(this.collider);
+      this.collisionEnabled = false;
+    }
     this.events.clear();
     this.root.removeFromParent();
     this.root.clear();

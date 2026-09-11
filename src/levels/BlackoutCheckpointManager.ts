@@ -9,13 +9,17 @@ import type {
   BlackoutSlimeId,
   SerializableValue,
 } from './BlackoutRuntimeState.ts';
+import type { ControlledForm } from '../specimen/SpecimenTypes.ts';
 
 export interface BlackoutCheckpointDefinition {
   readonly id: BlackoutCheckpointId;
   readonly bodyPositions: Readonly<Record<BlackoutSlimeId, THREE.Vector3>>;
   readonly activeSlimeId: BlackoutSlimeId;
   readonly room: BlackoutRoomState;
+  readonly controlledForm?: ControlledForm;
+  readonly specimenPosition?: THREE.Vector3;
   readonly clearanceRadius?: number;
+  readonly specimenClearanceRadius?: number;
 }
 
 export interface BlackoutCheckpointParticipant {
@@ -32,7 +36,10 @@ interface RegisteredCheckpoint {
   readonly bodyPositions: Readonly<Record<BlackoutSlimeId, THREE.Vector3>>;
   readonly activeSlimeId: BlackoutSlimeId;
   readonly room: BlackoutRoomState;
+  readonly controlledForm: ControlledForm;
+  readonly specimenPosition: THREE.Vector3 | undefined;
   readonly clearanceRadius: number;
+  readonly specimenClearanceRadius: number;
 }
 
 /**
@@ -98,6 +105,22 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
     if (!Number.isFinite(clearanceRadius) || clearanceRadius <= 0) {
       throw new Error('Blackout checkpoint clearance radius must be positive and finite.');
     }
+    const controlledForm = definition.controlledForm ?? 'group';
+    const specimenClearanceRadius =
+      definition.specimenClearanceRadius ?? 0.675;
+    if (
+      !Number.isFinite(specimenClearanceRadius) ||
+      specimenClearanceRadius <= 0
+    ) {
+      throw new Error(
+        'Blackout Specimen checkpoint clearance radius must be positive and finite.',
+      );
+    }
+    if (controlledForm === 'specimen' && !definition.specimenPosition) {
+      throw new Error(
+        `Specimen checkpoint "${definition.id}" requires specimenPosition.`,
+      );
+    }
     const checkpoint: RegisteredCheckpoint = {
       id: definition.id,
       bodyPositions: {
@@ -107,7 +130,10 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
       },
       activeSlimeId: definition.activeSlimeId,
       room: cloneRoomState(definition.room),
+      controlledForm,
+      specimenPosition: definition.specimenPosition?.clone(),
       clearanceRadius,
+      specimenClearanceRadius,
     };
     this.assertSafe(checkpoint);
     this.checkpoints.set(checkpoint.id, checkpoint);
@@ -127,7 +153,10 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
     );
   }
 
-  recover(group: PersistentSlimeGroup<Body>): BlackoutRuntimeSnapshot {
+  recover(
+    group: PersistentSlimeGroup<Body>,
+    specimenBody: Body,
+  ): BlackoutRuntimeSnapshot {
     // Transients are cleared first. Participant restore then returns doors,
     // hazards, powered devices and room-local systems to deterministic state.
     for (const participant of this.participants.values()) participant.resetTransient?.();
@@ -141,17 +170,26 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
     }
 
     // Validate against the fully-restored authored room before moving any body.
-    this.assertSafeSnapshot(snapshot, checkpoint.clearanceRadius);
+    this.assertSafeSnapshot(snapshot, checkpoint);
 
-    group.setRecoveryState({
-      positions: {
-        bob: tupleToVector(snapshot.bodyPositions.bob),
-        goop: tupleToVector(snapshot.bodyPositions.goop),
-        volt: tupleToVector(snapshot.bodyPositions.volt),
-      },
-      activeSlimeId: snapshot.activeSlimeId,
-    });
-    group.restoreRecoveryState();
+    if (snapshot.controlledForm === 'group') {
+      group.setRecoveryState({
+        positions: {
+          bob: tupleToVector(snapshot.bodyPositions.bob),
+          goop: tupleToVector(snapshot.bodyPositions.goop),
+          volt: tupleToVector(snapshot.bodyPositions.volt),
+        },
+        activeSlimeId: snapshot.activeSlimeId,
+      });
+      group.restoreRecoveryState();
+    } else {
+      if (!snapshot.specimenPosition) {
+        throw new Error(
+          `Checkpoint "${snapshot.checkpointId}" is missing Specimen spawn state.`,
+        );
+      }
+      specimenBody.recoverAt(tupleToVector(snapshot.specimenPosition));
+    }
     return snapshot;
   }
 
@@ -183,6 +221,10 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
         volt: toTuple(checkpoint.bodyPositions.volt),
       },
       activeSlimeId,
+      controlledForm: checkpoint.controlledForm,
+      specimenPosition: checkpoint.specimenPosition
+        ? toTuple(checkpoint.specimenPosition)
+        : null,
       room: cloneRoomState(roomState),
       connections: { voltTargetId: null },
       participantState: this.captureParticipants(),
@@ -204,6 +246,21 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
   }
 
   private assertSafe(checkpoint: RegisteredCheckpoint): void {
+    if (checkpoint.controlledForm === 'specimen') {
+      if (
+        !checkpoint.specimenPosition ||
+        !this.isSpawnSafe(
+          checkpoint.specimenPosition,
+          checkpoint.specimenClearanceRadius,
+        )
+      ) {
+        throw new Error(
+          `Checkpoint "${checkpoint.id}" has an unsafe Specimen spawn.`,
+        );
+      }
+      return;
+    }
+
     for (const id of ['bob', 'goop', 'volt'] as const) {
       if (!this.isSpawnSafe(checkpoint.bodyPositions[id], checkpoint.clearanceRadius)) {
         throw new Error(`Checkpoint "${checkpoint.id}" has an unsafe ${id} spawn.`);
@@ -211,10 +268,35 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
     }
   }
 
-  private assertSafeSnapshot(snapshot: BlackoutRuntimeSnapshot, clearanceRadius: number): void {
+  private assertSafeSnapshot(
+    snapshot: BlackoutRuntimeSnapshot,
+    checkpoint: RegisteredCheckpoint,
+  ): void {
+    if (snapshot.controlledForm === 'specimen') {
+      if (
+        !snapshot.specimenPosition ||
+        !this.isSpawnSafe(
+          tupleToVector(snapshot.specimenPosition),
+          checkpoint.specimenClearanceRadius,
+        )
+      ) {
+        throw new Error(
+          `Checkpoint "${snapshot.checkpointId}" has an unsafe restored Specimen spawn.`,
+        );
+      }
+      return;
+    }
+
     for (const id of ['bob', 'goop', 'volt'] as const) {
-      if (!this.isSpawnSafe(tupleToVector(snapshot.bodyPositions[id]), clearanceRadius)) {
-        throw new Error(`Checkpoint "${snapshot.checkpointId}" has an unsafe restored ${id} spawn.`);
+      if (
+        !this.isSpawnSafe(
+          tupleToVector(snapshot.bodyPositions[id]),
+          checkpoint.clearanceRadius,
+        )
+      ) {
+        throw new Error(
+          `Checkpoint "${snapshot.checkpointId}" has an unsafe restored ${id} spawn.`,
+        );
       }
     }
   }
@@ -245,6 +327,10 @@ function cloneSnapshot(snapshot: BlackoutRuntimeSnapshot): BlackoutRuntimeSnapsh
       volt: [...snapshot.bodyPositions.volt] as [number, number, number],
     },
     activeSlimeId: snapshot.activeSlimeId,
+    controlledForm: snapshot.controlledForm,
+    specimenPosition: snapshot.specimenPosition
+      ? [...snapshot.specimenPosition] as [number, number, number]
+      : null,
     room: cloneRoomState(snapshot.room),
     connections: { ...snapshot.connections },
     participantState: cloneSerializable(snapshot.participantState) as Readonly<Record<string, SerializableValue>>,

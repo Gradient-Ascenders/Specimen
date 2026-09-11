@@ -1869,3 +1869,72 @@ kbd {
   border-color: rgb(255 171 69 / 58%);
   color: #ffd28a;
 }
+
+
+/* Minimal Specimen combat verification UI. Final HUD/VFX ownership remains #133/#136/#137. */
+.specimen-combat-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  pointer-events: none;
+}
+
+.specimen-combat-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #e8ff72;
+  font-family: var(--ui-font-display);
+  font-size: 1.05rem;
+  line-height: 1;
+  text-shadow:
+    0 0 0.35rem rgb(215 255 74 / 72%),
+    0 0 0.9rem rgb(255 72 54 / 40%);
+}
+
+.specimen-combat-label {
+  position: absolute;
+  left: 1.25rem;
+  bottom: 1.25rem;
+  padding: 0.42rem 0.58rem;
+  border: 1px solid rgb(255 88 74 / 32%);
+  border-radius: var(--ui-radius-sm);
+  color: #ffb2a7;
+  background: rgb(10 6 8 / 70%);
+  font-family: var(--ui-font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+}
+
+.specimen-combat-charge {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(4.5rem, 9vh, 7rem);
+  width: min(14rem, 32vw);
+  height: 0.42rem;
+  transform: translateX(-50%);
+  appearance: none;
+  border: 1px solid rgb(255 103 84 / 34%);
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgb(8 7 10 / 76%);
+}
+
+.specimen-combat-charge::-webkit-progress-bar {
+  background: rgb(8 7 10 / 76%);
+}
+
+.specimen-combat-charge::-webkit-progress-value {
+  background: linear-gradient(90deg, #ff5e48, #e4ff58);
+}
+
+.specimen-combat-charge::-moz-progress-bar {
+  background: linear-gradient(90deg, #ff5e48, #e4ff58);
+}
+
+.specimen-combat-charge[data-state='full'] {
+  box-shadow:
+    0 0 0.4rem rgb(229 255 88 / 60%),
+    0 0 0.9rem rgb(255 78 61 / 38%);
+}
