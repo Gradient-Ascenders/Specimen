@@ -467,16 +467,19 @@ export class BlackoutLevelRuntime {
         onRetry: this.retryAfterDeath,
         backgroundElements: [this.renderLayer.canvas],
       });
-      this.host.append(deathScreen.element);
       rollback(() => deathScreen.dispose());
+      this.host.append(deathScreen.element);
       const visuals = {
         bob: createSlimeVisual(0x44c7d8, 0x123941),
         goop: createSlimeVisual(0x7ad13d, 0x233d12),
         volt: createSlimeVisual(0xffdf45, 0x6d5600),
       } as const;
       for (const visual of Object.values(visuals)) {
-        this.renderLayer.scene.add(visual);
+        // Arm cleanup before attachment. THREE.Scene.add mutates parentage
+        // before returning, so an injected/observer failure after attachment
+        // must still remove and dispose the just-added visual.
         rollback(() => disposeSlimeVisual(visual));
+        this.renderLayer.scene.add(visual);
       }
       const voltLight = new THREE.PointLight(0xffdf75, 2.2, 8, 2);
       voltLight.name = 'blackout-volt-foundation-light';
