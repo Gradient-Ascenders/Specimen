@@ -157,3 +157,33 @@ test('collection repeated reset and disposal leave target registrations bounded'
   fixture.collection.dispose();
   fixture.targets.dispose();
 });
+
+
+test('recomputing an unchanged powered graph emits no duplicate power transitions', () => {
+  const fixture = createCollectionFixture();
+  const transitions: boolean[] = [];
+  fixture.light.core.events.on('powerChanged', ({ powered }) => {
+    transitions.push(powered);
+  });
+
+  try {
+    fixture.collection.addSupplyLink('generator-a', 'light');
+    fixture.generatorA.core.setConnectionState(true);
+    fixture.collection.recomputePower();
+    assert.deepEqual(transitions, [true]);
+
+    for (let index = 0; index < 10; index += 1) {
+      fixture.collection.recomputePower();
+    }
+    assert.deepEqual(transitions, [true]);
+
+    assert.equal(
+      fixture.collection.removeSupplyLink('generator-a', 'light'),
+      true,
+    );
+    assert.deepEqual(transitions, [true, false]);
+    assert.equal(fixture.light.core.readModel.powered, false);
+  } finally {
+    fixture.dispose();
+  }
+});
