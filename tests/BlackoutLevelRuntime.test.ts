@@ -630,7 +630,7 @@ test('Blackout Specimen tap attack uses the bounded pool and death clears combat
   }
 });
 
-test('CP8 recovery restores stable Specimen directly, restart returns the group, and split restores Bob ownership', () => {
+test('CP8 recovery restores stable Specimen, Sentinel exclusively owns boss defeat, and recovery resets the encounter', () => {
   const originalDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -673,23 +673,37 @@ test('CP8 recovery restores stable Specimen directly, restart returns the group,
       65,
     ]);
     assert.equal(runtime.getSlimeHUDSnapshot().activeFormLabel, 'SPECIMEN');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'idle');
 
     assert.equal(runtime.transitionPhase('boss'), true);
-    assert.equal(runtime.transitionPhase('boss-defeated'), true);
-    assert.equal(runtime.beginSplit(), true);
+    assert.equal(runtime.phase, 'boss');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'intro');
+
+    // No external caller may skip the Sentinel state machine.
+    assert.equal(runtime.transitionPhase('boss-defeated'), false);
     assert.equal(runtime.beginSplit(), false);
-    assert.equal(runtime.completeSplit(), true);
-    assert.equal(runtime.completeSplit(), false);
-    assert.equal(runtime.phase, 'escape');
-    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
-    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'bob');
+
+    for (let index = 0; index < 30; index += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.equal(runtime.sentinelBossReadModel?.state, 'intro');
+
+    assert.equal(runtime.requestFailure(), true);
+    runtime.recoverActiveCheckpoint();
+    assert.equal(runtime.phase, 'specimen');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'idle');
+    assert.equal(runtime.sentinelBossReadModel?.armourLayersRemaining, 3);
+    assert.equal(runtime.sentinelBossReadModel?.coreHealth, 1);
+    assert.equal(runtime.sentinelBossReadModel?.currentAttackId, null);
 
     runtime.restartLevel();
     assert.equal(runtime.phase, 'three-slime');
     assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
     assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'goop');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'idle');
 
     runtime.dispose();
+    assert.equal(scene.children.length, 0);
   } finally {
     Object.defineProperty(globalThis, 'document', {
       configurable: true,
