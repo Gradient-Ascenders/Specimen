@@ -630,7 +630,7 @@ test('Blackout Specimen tap attack uses the bounded pool and death clears combat
   }
 });
 
-test('CP8 recovery restores stable Specimen directly, restart returns the group, and split restores Bob ownership', () => {
+test('CP8 recovery restores stable Specimen, Sentinel exclusively owns boss defeat, and recovery resets the encounter', () => {
   const originalDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -673,23 +673,120 @@ test('CP8 recovery restores stable Specimen directly, restart returns the group,
       65,
     ]);
     assert.equal(runtime.getSlimeHUDSnapshot().activeFormLabel, 'SPECIMEN');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'idle');
 
     assert.equal(runtime.transitionPhase('boss'), true);
-    assert.equal(runtime.transitionPhase('boss-defeated'), true);
-    assert.equal(runtime.beginSplit(), true);
+    assert.equal(runtime.phase, 'boss');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'intro');
+
+    // No external caller may skip the Sentinel state machine.
+    assert.equal(runtime.transitionPhase('boss-defeated'), false);
     assert.equal(runtime.beginSplit(), false);
-    assert.equal(runtime.completeSplit(), true);
-    assert.equal(runtime.completeSplit(), false);
-    assert.equal(runtime.phase, 'escape');
-    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
-    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'bob');
+
+    for (let index = 0; index < 30; index += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.equal(runtime.sentinelBossReadModel?.state, 'intro');
+
+    assert.equal(runtime.requestFailure(), true);
+    runtime.recoverActiveCheckpoint();
+    assert.equal(runtime.phase, 'specimen');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'idle');
+    assert.equal(runtime.sentinelBossReadModel?.armourLayersRemaining, 3);
+    assert.equal(runtime.sentinelBossReadModel?.coreHealth, 1);
+    assert.equal(runtime.sentinelBossReadModel?.currentAttackId, null);
 
     runtime.restartLevel();
     assert.equal(runtime.phase, 'three-slime');
     assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
     assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'goop');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'idle');
 
     runtime.dispose();
+    assert.equal(scene.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+
+test('optional CP9 rejects idle/live-attack capture and restores only from a stable active Sentinel boundary', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFakeCameraRig();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'bob',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+    runtime.activateCheckpoint('cp8');
+    runtime.recoverActiveCheckpoint();
+
+    assert.throws(
+      () => runtime.activateCheckpoint('cp9'),
+      /stable boundary during an active Sentinel fight/,
+    );
+
+    assert.equal(runtime.transitionPhase('boss'), true);
+    assert.equal(runtime.sentinelBossReadModel?.state, 'intro');
+    assert.throws(
+      () => runtime.activateCheckpoint('cp9'),
+      /stable boundary during an active Sentinel fight/,
+    );
+
+    // Intro completion enters phase 1 before its first attack starts, which is
+    // an explicit stable checkpoint boundary.
+    for (let index = 0; index < 150; index += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.equal(runtime.sentinelBossReadModel?.state, 'phase-1');
+    assert.equal(runtime.sentinelBossReadModel?.currentAttackId, null);
+
+    runtime.activateCheckpoint('cp9');
+    assert.equal(runtime.activeCheckpoint?.checkpointId, 'cp9');
+    assert.equal(runtime.activeCheckpoint?.room.phase, 'boss');
+
+    // The next step starts the sweep, so CP9 capture becomes unsafe again.
+    runtime.fixedUpdate(1 / 60);
+    assert.notEqual(runtime.sentinelBossReadModel?.currentAttackId, null);
+    assert.throws(
+      () => runtime.activateCheckpoint('cp9'),
+      /stable boundary during an active Sentinel fight/,
+    );
+
+    runtime.recoverActiveCheckpoint();
+    assert.equal(runtime.phase, 'boss');
+    assert.equal(runtime.sentinelBossReadModel?.state, 'phase-1');
+    assert.equal(runtime.sentinelBossReadModel?.currentAttackId, null);
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'specimen');
+
+    runtime.dispose();
+    assert.equal(scene.children.length, 0);
   } finally {
     Object.defineProperty(globalThis, 'document', {
       configurable: true,

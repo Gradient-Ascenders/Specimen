@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 
 import {
+  SentinelBossDevelopmentRig,
+} from '../boss/SentinelBossDevelopmentRig.ts';
+import type {
+  SentinelBossEvents,
+  SentinelBossReadModel,
+} from '../boss/SentinelBossTypes.ts';
+import {
   ElectricalTargetRegistry,
   type ElectricalConnectionTarget,
   type ElectricalTargetRegistrationOptions,
@@ -110,6 +117,7 @@ interface BlackoutRuntimeResources {
   readonly specimenCarrierBody: PoweredCarrierBody;
   readonly combatTargets: CombatTargetRegistry;
   readonly combatRig: SpecimenCombatDevelopmentRig;
+  readonly sentinelRig: SentinelBossDevelopmentRig;
   readonly specimenBody: KinematicBody;
   readonly specimenForm: SpecimenFormController;
   readonly specimenAttack: SpecimenProjectileSystem;
@@ -119,6 +127,7 @@ interface BlackoutRuntimeResources {
   readonly unregisterElectricalCheckpointParticipant: () => void;
   readonly unregisterPoweredDevicesCheckpointParticipant: () => void;
   readonly unregisterCombatCheckpointParticipant: () => void;
+  readonly unregisterSentinelCheckpointParticipant: () => void;
   readonly manager: SlimeManager<KinematicBody>;
   readonly group: PersistentSlimeGroup<KinematicBody>;
   readonly checkpoints: BlackoutCheckpointManager<KinematicBody>;
@@ -219,6 +228,17 @@ export class BlackoutLevelRuntime {
     return this.resources?.specimenAttack.events;
   }
 
+  get sentinelBossReadModel(): SentinelBossReadModel | undefined {
+    return this.resources?.sentinelRig.controller.readModel;
+  }
+
+  get sentinelBossEvents(): Pick<
+    EventBus<SentinelBossEvents>,
+    'on'
+  > | undefined {
+    return this.resources?.sentinelRig.controller.events;
+  }
+
   registerCombatTarget(
     target: CombatTarget,
     options?: CombatTargetRegistrationOptions,
@@ -313,6 +333,7 @@ export class BlackoutLevelRuntime {
 
   activateCheckpoint(checkpointId: BlackoutCheckpointId): void {
     const resources = this.requireResources();
+    this.assertCheckpointActivationAllowed(resources, checkpointId);
     resources.checkpoints.activate(checkpointId, resources.group.activeSlimeId);
     const snapshot = resources.checkpoints.activeCheckpoint;
     this.currentRoom = snapshot.room;
@@ -325,6 +346,7 @@ export class BlackoutLevelRuntime {
 
   captureCheckpoint(checkpointId: BlackoutCheckpointId, room: BlackoutRoomState): void {
     const resources = this.requireResources();
+    this.assertCheckpointActivationAllowed(resources, checkpointId);
     resources.checkpoints.activate(
       checkpointId,
       resources.group.activeSlimeId,
@@ -352,6 +374,7 @@ export class BlackoutLevelRuntime {
     }
     resources.electricalSystem.reset('death');
     resources.specimenAttack.reset();
+    resources.sentinelRig.controller.cancelTransient('death');
     resources.specimenPresentation.suspend();
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
@@ -386,6 +409,7 @@ export class BlackoutLevelRuntime {
     resources.electricalSystem.disconnect('merge');
     resources.electricalSystem.cancelAim();
     resources.specimenAttack.reset();
+    resources.sentinelRig.controller.cancelTransient('phase-change');
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(
       resources.electricalSystem.readModel,
@@ -460,31 +484,58 @@ export class BlackoutLevelRuntime {
   }
 
   /**
-   * Boss/ending integration hook. Merge and split body handoffs must use the
-   * dedicated methods above so phase and controlled-form state cannot diverge.
+   * Boss/ending integration hook. Sentinel owns the local boss state machine;
+   * Blackout owns only the macro specimen -> boss -> boss-defeated transition.
    */
   transitionPhase(next: BlackoutPhase): boolean {
     if (next === 'merging') return this.beginMerge();
     if (next === 'splitting') return this.beginSplit();
     if (next === 'escape') return false;
     if (next === 'specimen') return false;
+    if (next === 'boss-defeated') {
+      // Only Sentinel's one-shot defeat request may commit this phase.
+      return false;
+    }
 
     const resources = this.requireResources();
     if (
-      (next === 'boss' || next === 'boss-defeated') &&
+      next === 'boss' &&
       resources.specimenForm.readModel.controlledForm !== 'specimen'
     ) {
       return false;
     }
-    if (!resources.phase.transition(next)) return false;
 
-    if (next === 'boss-defeated') {
+    if (next === 'boss') {
+      if (resources.sentinelRig.controller.readModel.state !== 'idle') {
+        return false;
+      }
+      if (!resources.phase.transition('boss')) return false;
+      if (!resources.sentinelRig.controller.start()) {
+        resources.phase.restore('specimen');
+        return false;
+      }
       resources.specimenAttack.reset();
       this.renderLayer.cameraRig.setAimPresentationActive(false, true);
-    } else if (next === 'complete') {
+      this.currentRoom = {
+        ...this.currentRoom,
+        roomId: 'room-4b',
+        phase: 'boss',
+      };
+      resources.sentinelRig.syncPresentation();
+      this.events.emit('objectiveChanged', {
+        roomId: this.currentRoom.roomId,
+        objective: objectiveFor(this.currentRoom),
+      });
+      return true;
+    }
+
+    if (!resources.phase.transition(next)) return false;
+
+    if (next === 'complete') {
       resources.electricalSystem.disconnect('completion');
       resources.electricalSystem.cancelAim();
       resources.specimenAttack.reset();
+      resources.sentinelRig.controller.cancelTransient('phase-change');
       resources.poweredDeviceRig.recomputePower();
       this.renderLayer.cameraRig.setAimPresentationActive(false, true);
     }
@@ -493,9 +544,7 @@ export class BlackoutLevelRuntime {
       ...this.currentRoom,
       phase: next,
       roomId:
-        next === 'boss' || next === 'boss-defeated' ? 'room-4b'
-        : next === 'complete' ? 'ending'
-        : this.currentRoom.roomId,
+        next === 'complete' ? 'ending' : this.currentRoom.roomId,
     };
     if (next === 'complete') this.commitCompletion();
     return true;
@@ -669,6 +718,29 @@ export class BlackoutLevelRuntime {
       resources.specimenAttack.readModel.aimActive,
     );
     resources.specimenPresentation.update(specimenGameplay);
+
+    if (resources.phase.phase === 'boss') {
+      resources.sentinelRig.controller.update(deltaSeconds, {
+        specimen: resources.specimenBody,
+        requestFailure: () => this.requestFailure(),
+      });
+      resources.sentinelRig.syncPresentation();
+
+      if (!resources.deathSequence.isPlaying) {
+        this.syncVisuals(resources);
+        this.input.endFixedUpdate();
+        return;
+      }
+
+      // A valid final charged hit is committed before any later environment
+      // hazard in this same fixed step can fail the player.
+      if (resources.sentinelRig.controller.consumeDefeatRequest()) {
+        this.commitBossDefeat(resources);
+        this.syncVisuals(resources);
+        this.input.endFixedUpdate();
+        return;
+      }
+    }
 
     // Power is propagated from the freshly-updated Volt connection, then
     // mechanics advance once. Device motion can move the connected socket, so
@@ -954,6 +1026,17 @@ export class BlackoutLevelRuntime {
         combatRig,
       );
 
+      const sentinelRig = new SentinelBossDevelopmentRig({
+        collisionWorld,
+        targetRegistry: combatTargets,
+      });
+      rollback(() => sentinelRig.dispose());
+      scene.root.add(sentinelRig.root);
+      puzzleRegistry.register(
+        'sentinel-boss-development-rig',
+        sentinelRig,
+      );
+
       const specimenAttack = new SpecimenProjectileSystem({
         collisionWorld,
         targetRegistry: combatTargets,
@@ -999,6 +1082,10 @@ export class BlackoutLevelRuntime {
         checkpoints.registerParticipant(combatRig);
       rollback(unregisterCombatCheckpointParticipant);
 
+      const unregisterSentinelCheckpointParticipant =
+        checkpoints.registerParticipant(sentinelRig.controller);
+      rollback(unregisterSentinelCheckpointParticipant);
+
       const electricalPresentation = new VoltElectricalPresentation({
         scene: this.renderLayer.scene,
         host: this.host,
@@ -1018,6 +1105,7 @@ export class BlackoutLevelRuntime {
         specimenCarrierBody,
         combatTargets,
         combatRig,
+        sentinelRig,
         specimenBody,
         specimenForm,
         specimenAttack,
@@ -1027,6 +1115,7 @@ export class BlackoutLevelRuntime {
         unregisterElectricalCheckpointParticipant,
         unregisterPoweredDevicesCheckpointParticipant,
         unregisterCombatCheckpointParticipant,
+        unregisterSentinelCheckpointParticipant,
         manager,
         group,
         checkpoints,
@@ -1114,6 +1203,7 @@ export class BlackoutLevelRuntime {
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
     resources.specimenForm.restore(snapshot.controlledForm);
+    resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);
     clearJump(resources.jump, false);
     this.completionEmitted = false;
@@ -1143,6 +1233,8 @@ export class BlackoutLevelRuntime {
     resources.unregisterElectricalCheckpointParticipant();
     resources.unregisterPoweredDevicesCheckpointParticipant();
     resources.unregisterCombatCheckpointParticipant();
+    resources.unregisterSentinelCheckpointParticipant();
+    resources.sentinelRig.dispose();
     resources.combatRig.dispose();
     resources.combatTargets.dispose();
     resources.specimenForm.dispose();
@@ -1185,6 +1277,7 @@ export class BlackoutLevelRuntime {
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
     resources.specimenForm.restore(snapshot.controlledForm);
+    resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);
     clearJump(resources.jump, true);
     this.renderLayer.cameraRig.reset();
@@ -1220,6 +1313,25 @@ export class BlackoutLevelRuntime {
       this.input.requestPointerLock();
     }
   };
+
+  private assertCheckpointActivationAllowed(
+    resources: BlackoutRuntimeResources,
+    checkpointId: BlackoutCheckpointId,
+  ): void {
+    if (checkpointId !== 'cp9') return;
+
+    const boss = resources.sentinelRig.controller;
+    if (
+      resources.phase.phase !== 'boss' ||
+      boss.readModel.state === 'idle' ||
+      boss.readModel.state === 'defeated' ||
+      !boss.checkpointSafe
+    ) {
+      throw new Error(
+        'CP9 may only be captured at a stable boundary during an active Sentinel fight.',
+      );
+    }
+  }
 
   private retargetCamera(resources: BlackoutRuntimeResources): void {
     const target =
@@ -1316,6 +1428,33 @@ export class BlackoutLevelRuntime {
       }
     }
     return true;
+  }
+
+  private commitBossDefeat(resources: BlackoutRuntimeResources): void {
+    if (resources.phase.phase !== 'boss') return;
+    if (!resources.phase.transition('boss-defeated')) {
+      throw new Error('Sentinel defeat could not commit Blackout boss-defeated phase.');
+    }
+
+    resources.specimenAttack.reset();
+    resources.sentinelRig.controller.cancelTransient('defeat');
+    resources.sentinelRig.droneSquad.clear();
+    resources.sentinelRig.syncPresentation();
+    this.renderLayer.cameraRig.setAimPresentationActive(false, true);
+    this.input.resetState();
+    this.currentRoom = {
+      ...this.currentRoom,
+      roomId: 'room-4b',
+      phase: 'boss-defeated',
+      local: {
+        ...this.currentRoom.local,
+        sentinelDefeated: true,
+      },
+    };
+    this.events.emit('objectiveChanged', {
+      roomId: this.currentRoom.roomId,
+      objective: objectiveFor(this.currentRoom),
+    });
   }
 
   private commitCompletion(): void {
