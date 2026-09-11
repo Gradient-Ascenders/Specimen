@@ -271,6 +271,7 @@ export class BlackoutLevelRuntime {
       return false;
     }
     resources.electricalSystem.reset('death');
+    resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     this.input.setEnabled(false);
@@ -290,10 +291,12 @@ export class BlackoutLevelRuntime {
     if (next === 'merging') {
       resources.electricalSystem.disconnect('merge');
       resources.electricalSystem.cancelAim();
+      resources.poweredDeviceRig.recomputePower();
       this.renderLayer.cameraRig.setAimPresentationActive(false);
     } else if (next === 'complete') {
       resources.electricalSystem.disconnect('completion');
       resources.electricalSystem.cancelAim();
+      resources.poweredDeviceRig.recomputePower();
       this.renderLayer.cameraRig.setAimPresentationActive(false);
     }
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
@@ -872,6 +875,7 @@ export class BlackoutLevelRuntime {
     this.completionEmitted = true;
     resources.electricalSystem.disconnect('completion');
     resources.electricalSystem.cancelAim();
+    resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     this.input.setEnabled(false);
