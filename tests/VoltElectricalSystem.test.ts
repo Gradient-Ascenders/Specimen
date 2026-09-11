@@ -37,16 +37,22 @@ class TestManager {
 }
 
 class TestTarget implements ElectricalConnectionTarget {
+  readonly id: string;
+  readonly displayName: string;
+  readonly mesh: THREE.Mesh;
   readonly hitMeshes: readonly THREE.Mesh[];
   available = true;
   connected = false;
   connectionWrites: boolean[] = [];
 
   constructor(
-    readonly id: string,
-    readonly displayName: string,
-    readonly mesh: THREE.Mesh,
+    id: string,
+    displayName: string,
+    mesh: THREE.Mesh,
   ) {
+    this.id = id;
+    this.displayName = displayName;
+    this.mesh = mesh;
     this.hitMeshes = [mesh];
   }
 
