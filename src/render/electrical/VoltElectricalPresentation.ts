@@ -116,7 +116,6 @@ export class VoltElectricalPresentation {
     this.positions[5] = readModel.beamEnd.z;
     const attribute = this.beamGeometry.getAttribute('position');
     attribute.needsUpdate = true;
-    this.beamGeometry.computeBoundingSphere();
   }
 
   suspendAim(): void {
