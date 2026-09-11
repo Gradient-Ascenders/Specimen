@@ -518,42 +518,49 @@ export class BlackoutLevelRuntime {
     }
 
     if (resources.phase.phase === 'merging') {
-      if (resources.specimenForm.updateMerge(deltaSeconds)) {
-        if (
-          !this.isSpawnSafe(
-            resources,
-            BLACKOUT_SPECIMEN_MERGE_ANCHOR,
-            BLACKOUT_SPECIMEN_RADIUS_METRES,
-          )
-        ) {
-          resources.specimenForm.restore('group');
-          resources.phase.restore('three-slime');
-          this.currentRoom = {
-            ...this.currentRoom,
-            roomId: 'room-3',
-            phase: 'three-slime',
-          };
-          this.renderLayer.cameraRig.reset();
-          this.retargetCamera(resources);
-          this.notifyHUD(undefined, true);
-          this.events.emit('objectiveChanged', {
-            roomId: this.currentRoom.roomId,
-            objective: objectiveFor(this.currentRoom),
-          });
-        } else {
-          resources.specimenBody.recoverAt(BLACKOUT_SPECIMEN_MERGE_ANCHOR);
-          if (!resources.phase.transition('specimen')) {
-            throw new Error('Merge completed without a legal Specimen phase transition.');
-          }
-          this.currentRoom = {
-            roomId: 'room-4a',
-            phase: 'specimen',
-            local: { ...this.currentRoom.local, merged: true },
-          };
-          this.renderLayer.cameraRig.reset();
-          this.retargetCamera(resources);
-          this.notifyHUD(undefined, true);
+      const form = resources.specimenForm.readModel;
+      const willComplete =
+        form.mergeProgress +
+          deltaSeconds / form.mergeDurationSeconds >=
+        1 - 1e-9;
+
+      if (
+        willComplete &&
+        !this.isSpawnSafe(
+          resources,
+          BLACKOUT_SPECIMEN_MERGE_ANCHOR,
+          BLACKOUT_SPECIMEN_RADIUS_METRES,
+        )
+      ) {
+        // Completion is guarded before the form controller can emit its
+        // mergeCompleted event or hand ownership to Specimen.
+        resources.specimenForm.restore('group');
+        resources.phase.restore('three-slime');
+        this.currentRoom = {
+          ...this.currentRoom,
+          roomId: 'room-3',
+          phase: 'three-slime',
+        };
+        this.renderLayer.cameraRig.reset();
+        this.retargetCamera(resources);
+        this.notifyHUD(undefined, true);
+        this.events.emit('objectiveChanged', {
+          roomId: this.currentRoom.roomId,
+          objective: objectiveFor(this.currentRoom),
+        });
+      } else if (resources.specimenForm.updateMerge(deltaSeconds)) {
+        resources.specimenBody.recoverAt(BLACKOUT_SPECIMEN_MERGE_ANCHOR);
+        if (!resources.phase.transition('specimen')) {
+          throw new Error('Merge completed without a legal Specimen phase transition.');
         }
+        this.currentRoom = {
+          roomId: 'room-4a',
+          phase: 'specimen',
+          local: { ...this.currentRoom.local, merged: true },
+        };
+        this.renderLayer.cameraRig.reset();
+        this.retargetCamera(resources);
+        this.notifyHUD(undefined, true);
       }
       resources.poweredDeviceRig.updateMechanics(deltaSeconds, []);
       resources.poweredDeviceRig.updateHazards(deltaSeconds, []);
