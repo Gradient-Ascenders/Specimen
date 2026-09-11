@@ -451,9 +451,8 @@ export class CollisionWorld {
       this.localEnd.copy(this.worldEnd).applyMatrix4(collider.inverseWorld);
       this.localDisplacement.subVectors(this.localEnd, this.localStart);
 
-      const fraction = this.sweepExpandedLocalBox(
+      const fraction = this.raycastLocalBox(
         collider.localBounds,
-        0,
         this.localStart,
         this.localDisplacement,
         this.candidateNormalLocal,
@@ -756,6 +755,104 @@ export class CollisionWorld {
     ) {
       throw new Error(`Unknown collider transform mode "${transformMode}".`);
     }
+  }
+
+  private raycastLocalBox(
+    bounds: THREE.Box3,
+    start: THREE.Vector3,
+    displacement: THREE.Vector3,
+    outNormal: THREE.Vector3,
+  ): number | undefined {
+    const startsInside =
+      start.x >= bounds.min.x - CONTACT_EPSILON &&
+      start.x <= bounds.max.x + CONTACT_EPSILON &&
+      start.y >= bounds.min.y - CONTACT_EPSILON &&
+      start.y <= bounds.max.y + CONTACT_EPSILON &&
+      start.z >= bounds.min.z - CONTACT_EPSILON &&
+      start.z <= bounds.max.z + CONTACT_EPSILON;
+
+    if (startsInside) {
+      this.closestExpandedFaceNormal(
+        start,
+        bounds.min.x,
+        bounds.min.y,
+        bounds.min.z,
+        bounds.max.x,
+        bounds.max.y,
+        bounds.max.z,
+        outNormal,
+      );
+      return 0;
+    }
+
+    let enter = 0;
+    let exit = 1;
+    let enterAxis = -1;
+    let enterSign = 0;
+
+    if (!this.updateSlab(
+      start.x,
+      displacement.x,
+      bounds.min.x,
+      bounds.max.x,
+      enter,
+      exit,
+    )) {
+      return undefined;
+    }
+    enter = this.slabEnter;
+    exit = this.slabExit;
+    if (this.slabUpdatedEnter) {
+      enterAxis = 0;
+      enterSign = this.slabNormalSign;
+    }
+
+    if (!this.updateSlab(
+      start.y,
+      displacement.y,
+      bounds.min.y,
+      bounds.max.y,
+      enter,
+      exit,
+    )) {
+      return undefined;
+    }
+    enter = this.slabEnter;
+    exit = this.slabExit;
+    if (this.slabUpdatedEnter) {
+      enterAxis = 1;
+      enterSign = this.slabNormalSign;
+    }
+
+    if (!this.updateSlab(
+      start.z,
+      displacement.z,
+      bounds.min.z,
+      bounds.max.z,
+      enter,
+      exit,
+    )) {
+      return undefined;
+    }
+    enter = this.slabEnter;
+    if (this.slabUpdatedEnter) {
+      enterAxis = 2;
+      enterSign = this.slabNormalSign;
+    }
+
+    if (
+      enterAxis < 0 ||
+      enter < -CONTACT_EPSILON ||
+      enter > 1 + CONTACT_EPSILON
+    ) {
+      return undefined;
+    }
+
+    outNormal.set(0, 0, 0);
+    if (enterAxis === 0) outNormal.x = enterSign;
+    if (enterAxis === 1) outNormal.y = enterSign;
+    if (enterAxis === 2) outNormal.z = enterSign;
+    return THREE.MathUtils.clamp(enter, 0, 1);
   }
 
   private sweepExpandedLocalBox(
