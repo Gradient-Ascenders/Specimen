@@ -306,3 +306,38 @@ for (const outcome of ['complete', 'reject', 'dispose'] as const) test(`GPU prep
   assert.equal(failed, outcome === 'reject' ? 1 : 0);
   session.dispose();
 });
+
+
+test('Level 2 completion replaces it with exactly one Level 3 runtime and preserves the three-slime handoff', () => {
+  const levelThreeProgression: LevelProgressionSnapshot = {
+    unlockedSlimeIds: ['bob', 'goop', 'volt'],
+    activeSlimeId: 'volt',
+  };
+  const levelTwo = new MockRuntime('level-2', levelThreeProgression);
+  let created = 0;
+  let received: LevelProgressionSnapshot | undefined;
+  const completed: string[] = [];
+  const session = new GameSessionCoordinator({
+    initialRuntime: levelTwo,
+    createLevelTwo: (snapshot) => new MockRuntime('unexpected-level-2', snapshot),
+    createLevelThree: (snapshot) => {
+      created += 1;
+      received = snapshot;
+      return new MockRuntime('level-3', snapshot);
+    },
+    scheduleTransition: (transition) => transition(),
+  });
+  session.events.on('transitionCompleted', ({ levelId }) => completed.push(levelId));
+  session.load();
+  session.start();
+
+  levelTwo.events.emit('completed', { levelId: 'level-2', nextLevelId: 'level-3' });
+  levelTwo.events.emit('completed', { levelId: 'level-2', nextLevelId: 'level-3' });
+
+  assert.equal(created, 1);
+  assert.deepEqual(received, levelThreeProgression);
+  assert.deepEqual(levelTwo.calls, ['load', 'start', 'stop', 'unload', 'dispose']);
+  assert.deepEqual(completed, ['level-3']);
+  assert.equal(session.state, 'stopped');
+  session.dispose();
+});
