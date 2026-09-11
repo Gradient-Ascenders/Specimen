@@ -377,7 +377,8 @@ export class BlackoutLevelRuntime {
       aimHeld: this.input.isDown('aimAbility'),
       fireHeld: this.input.isDown('fireAbility'),
       firePressed: this.input.wasPressed('fireAbility'),
-      gameplayInputEnabled: this.input.enabled,
+      gameplayInputEnabled:
+        this.input.enabled && this.currentRoom.phase === 'three-slime',
       pointerLocked: this.input.pointerLocked,
     });
     this.renderLayer.cameraRig.setAimPresentationActive(
