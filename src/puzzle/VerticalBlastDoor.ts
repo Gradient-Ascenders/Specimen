@@ -38,6 +38,11 @@ export interface VerticalBlastDoorEvents {
   reset: { readonly door: VerticalBlastDoor };
 }
 
+export interface VerticalBlastDoorSnapshot {
+  readonly progress: number;
+  readonly desiredOpen: boolean;
+}
+
 export interface VerticalBlastDoorOptions {
   readonly id: string;
   readonly collisionWorld: CollisionWorld;
@@ -159,6 +164,35 @@ export class VerticalBlastDoor {
     return this.obstructingIds;
   }
 
+  captureState(): VerticalBlastDoorSnapshot {
+    return {
+      progress: this.progressValue,
+      desiredOpen: this.targetOpen,
+    };
+  }
+
+  /**
+   * Restore exact panel progress/request state while discarding transient
+   * obstruction bookkeeping. Obstruction is derived again from current bodies.
+   */
+  restoreState(snapshot: VerticalBlastDoorSnapshot): void {
+    if (this.disposed) return;
+    if (
+      !Number.isFinite(snapshot.progress) ||
+      snapshot.progress < 0 ||
+      snapshot.progress > 1
+    ) {
+      throw new Error('Blast door restore progress must be between 0 and 1.');
+    }
+
+    this.progressValue = snapshot.progress;
+    this.targetOpen = snapshot.desiredOpen;
+    this.obstructingIds.clear();
+    this.scratchObstructingIds.clear();
+    this.applyProgress();
+    this.setState(this.resolveRestoredState());
+  }
+
   setOpen(open: boolean): void {
     if (this.disposed || this.targetOpen === open) return;
     this.targetOpen = open;
@@ -224,12 +258,7 @@ export class VerticalBlastDoor {
 
   reset(): void {
     if (this.disposed) return;
-    this.targetOpen = false;
-    this.progressValue = 0;
-    this.obstructingIds.clear();
-    this.scratchObstructingIds.clear();
-    this.applyProgress();
-    this.setState('closed');
+    this.restoreState({ progress: 0, desiredOpen: false });
     this.events.emit('reset', { door: this });
   }
 
@@ -342,6 +371,16 @@ export class VerticalBlastDoor {
       this.travelDistance * this.progressValue,
     );
     this.collisionMesh.updateWorldMatrix(true, false);
+  }
+
+  private resolveRestoredState(): VerticalBlastDoorState {
+    if (this.progressValue <= PROGRESS_EPSILON && !this.targetOpen) {
+      return 'closed';
+    }
+    if (this.progressValue >= 1 - PROGRESS_EPSILON && this.targetOpen) {
+      return 'open';
+    }
+    return this.targetOpen ? 'opening' : 'closing';
   }
 
   private setState(state: VerticalBlastDoorState): void {
