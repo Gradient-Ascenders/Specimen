@@ -57,6 +57,7 @@ export const CollisionLayer = {
   CameraObstruction: 1 << 1,
   Projectile: 1 << 2,
   LineOfSight: 1 << 3,
+  ElectricalTarget: 1 << 4,
 } as const;
 
 export const DEFAULT_SOLID_COLLISION_LAYERS =
@@ -376,6 +377,105 @@ export class CollisionWorld {
     outHit.fraction = THREE.MathUtils.clamp(closestFraction, 0, 1);
     outHit.distance = displacementLength * outHit.fraction;
     outHit.point.copy(origin).addScaledVector(displacement, outHit.fraction);
+    return true;
+  }
+
+  /**
+   * Cast an exact zero-radius segment ray through registered collider bounds.
+   *
+   * This query deliberately keeps sphere-sweep diagnostics untouched so adding
+   * ability targeting cannot make movement/camera performance counters lie.
+   * Callers own and reuse `outHit`.
+   */
+  raycast(
+    origin: THREE.Vector3,
+    direction: THREE.Vector3,
+    maximumDistance: number,
+    outHit: CollisionHit,
+    queryMask = CollisionLayer.LineOfSight,
+    ignoredCollider?: THREE.Mesh,
+  ): boolean {
+    if (!Number.isFinite(maximumDistance) || maximumDistance <= 0) {
+      throw new Error('Raycast maximum distance must be a positive finite number.');
+    }
+    if (
+      !Number.isFinite(direction.x) ||
+      !Number.isFinite(direction.y) ||
+      !Number.isFinite(direction.z) ||
+      direction.lengthSq() <= AXIS_EPSILON * AXIS_EPSILON
+    ) {
+      throw new Error('Raycast direction must be a non-zero finite vector.');
+    }
+
+    this.validateLayerMask(queryMask);
+    outHit.reset();
+    this.transformQueryStamp += 1;
+    if (queryMask === CollisionLayer.None) return false;
+
+    this.worldEnd
+      .copy(direction)
+      .normalize()
+      .multiplyScalar(maximumDistance)
+      .add(origin);
+
+    if (this.broadphaseEnabled) {
+      this.prepareBroadphaseCandidates(
+        origin,
+        0,
+        queryMask,
+        ignoredCollider,
+      );
+    }
+
+    let closestFraction = Number.POSITIVE_INFINITY;
+    let closestCollider: RegisteredCollider | undefined;
+
+    for (const collider of this.colliders) {
+      if ((collider.layerMask & queryMask) === 0) continue;
+      if (collider.mesh === ignoredCollider || !collider.mesh.visible) continue;
+      if (
+        this.broadphaseEnabled &&
+        collider.broadphaseStamp !== this.broadphaseStamp
+      ) {
+        continue;
+      }
+      if (
+        !this.broadphaseEnabled &&
+        (collider.transformMode === ColliderTransformMode.Dynamic ||
+          !collider.transformCacheValid)
+      ) {
+        this.refreshTransformCache(collider);
+      }
+
+      this.localStart.copy(origin).applyMatrix4(collider.inverseWorld);
+      this.localEnd.copy(this.worldEnd).applyMatrix4(collider.inverseWorld);
+      this.localDisplacement.subVectors(this.localEnd, this.localStart);
+
+      const fraction = this.sweepExpandedLocalBox(
+        collider.localBounds,
+        0,
+        this.localStart,
+        this.localDisplacement,
+        this.candidateNormalLocal,
+      );
+      if (fraction === undefined || fraction >= closestFraction) continue;
+
+      closestFraction = fraction;
+      closestCollider = collider;
+      outHit.normal
+        .copy(this.candidateNormalLocal)
+        .applyMatrix3(collider.normalMatrix)
+        .normalize();
+    }
+
+    if (!closestCollider || !Number.isFinite(closestFraction)) return false;
+
+    outHit.object = closestCollider.mesh;
+    outHit.fraction = THREE.MathUtils.clamp(closestFraction, 0, 1);
+    outHit.distance = maximumDistance * outHit.fraction;
+    outHit.point
+      .copy(origin)
+      .lerp(this.worldEnd, outHit.fraction);
     return true;
   }
 
