@@ -45,6 +45,7 @@ interface RegisteredCheckpoint {
 export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
   private readonly checkpoints = new Map<BlackoutCheckpointId, RegisteredCheckpoint>();
   private readonly participants = new Map<string, BlackoutCheckpointParticipant>();
+  private readonly initialParticipantState = new Map<string, SerializableValue>();
   private readonly isSpawnSafe: SpawnSafetyCheck;
   private readonly initialCheckpointId: BlackoutCheckpointId;
   private activeSnapshot: BlackoutRuntimeSnapshot;
@@ -68,14 +69,19 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
       throw new Error('Blackout checkpoint participant IDs must be unique and non-empty.');
     }
     this.participants.set(participant.id, participant);
+    const initialState = cloneSerializable(participant.capture());
+    this.initialParticipantState.set(participant.id, initialState);
     this.activeSnapshot = {
       ...this.activeSnapshot,
       participantState: {
         ...this.activeSnapshot.participantState,
-        [participant.id]: cloneSerializable(participant.capture()),
+        [participant.id]: cloneSerializable(initialState),
       },
     };
-    return () => this.participants.delete(participant.id);
+    return () => {
+      this.participants.delete(participant.id);
+      this.initialParticipantState.delete(participant.id);
+    };
   }
 
   registerCheckpoint(definition: BlackoutCheckpointDefinition): void {
@@ -158,7 +164,15 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
   }
 
   resetToInitial(): void {
-    this.activeSnapshot = this.createSnapshot(this.getCheckpoint(this.initialCheckpointId));
+    const initial = this.createSnapshot(this.getCheckpoint(this.initialCheckpointId));
+    const participantState: Record<string, SerializableValue> = {};
+    for (const [id, state] of this.initialParticipantState) {
+      participantState[id] = cloneSerializable(state);
+    }
+    this.activeSnapshot = {
+      ...initial,
+      participantState,
+    };
   }
 
   private createSnapshot(
