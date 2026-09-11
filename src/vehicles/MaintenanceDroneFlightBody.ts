@@ -34,6 +34,7 @@ export class MaintenanceDroneFlightBody {
   private readonly root: THREE.Object3D;
   private readonly config: MaintenanceDroneFlightConfig;
   private readonly centreOffset = new THREE.Vector3();
+  private readonly rootWorldTarget = new THREE.Vector3();
   private readonly centre = new THREE.Vector3();
   private readonly previousCentre = new THREE.Vector3();
   private readonly velocityValue = new THREE.Vector3();
@@ -44,10 +45,12 @@ export class MaintenanceDroneFlightBody {
   private readonly velocityDelta = new THREE.Vector3();
   private readonly hit = new CollisionHit();
   private supportedValue = false;
+  private readonly authoredYawRadians: number;
 
   constructor(options: MaintenanceDroneFlightBodyOptions) {
     this.world = options.world;
     this.root = options.root;
+    this.authoredYawRadians = options.root.rotation.y;
     this.config = {
       ...DEFAULT_MAINTENANCE_DRONE_FLIGHT_CONFIG,
       ...options.config,
@@ -315,14 +318,18 @@ export class MaintenanceDroneFlightBody {
   }
 
   private syncRootFromCentre(): void {
-    this.root.position.set(
+    this.rootWorldTarget.set(
       this.centre.x - this.centreOffset.x,
       this.centre.y - this.centreOffset.y,
       this.centre.z - this.centreOffset.z,
     );
-    // Gameplay flight never banks, pitches or rolls.
-    this.root.rotation.x = 0;
-    this.root.rotation.z = 0;
+    if (this.root.parent) {
+      this.root.parent.updateWorldMatrix(true, false);
+      this.root.parent.worldToLocal(this.rootWorldTarget);
+    }
+    this.root.position.copy(this.rootWorldTarget);
+    // Gameplay flight never banks, pitches or rolls. Preserve authored yaw.
+    this.root.rotation.set(0, this.authoredYawRadians, 0);
     this.root.updateWorldMatrix(true, true);
   }
 
