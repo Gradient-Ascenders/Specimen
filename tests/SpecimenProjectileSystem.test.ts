@@ -520,3 +520,54 @@ test('death/reset clears charge, cooldown, and every pooled projectile without r
     fixture.dispose();
   }
 });
+
+
+test('reset invoked from a destruction reaction clears the pool and aborts remaining splash work safely', () => {
+  const fixture = createFixture();
+  let direct: ReturnType<typeof addTarget> | undefined;
+  const splash = addTarget(
+    fixture,
+    'reset-splash',
+    new THREE.Vector3(1, 0.675, 5),
+    { healthUnits: 5 },
+  );
+  direct = addTarget(
+    fixture,
+    'reset-direct',
+    new THREE.Vector3(0, 0.675, 5),
+    {
+      healthUnits: 1,
+      onDestroyed: () => {
+        fixture.system.reset();
+      },
+    },
+  );
+
+  try {
+    fixture.system.update(1.5, controls({
+      firePressed: true,
+      fireHeld: true,
+    }));
+    fixture.system.update(1 / 60, controls({
+      fireReleased: true,
+    }));
+    fixture.system.update(0.2, controls());
+
+    assert.equal(direct.target.destroyed, true);
+    assert.equal(splash.target.healthUnits, 5);
+    assert.equal(fixture.system.readModel.liveProjectileCount, 0);
+    assert.equal(
+      fixture.system.projectileStates.every((state) => !state.active),
+      true,
+    );
+
+    // Repeated recovery/reset remains idempotent after the callback-driven one.
+    fixture.system.reset();
+    fixture.system.reset();
+    assert.equal(fixture.system.readModel.liveProjectileCount, 0);
+  } finally {
+    direct?.dispose();
+    splash.dispose();
+    fixture.dispose();
+  }
+});
