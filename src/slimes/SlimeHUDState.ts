@@ -16,6 +16,9 @@ export interface SlimePlayerSwitchFeedback {
 export interface SlimeHUDSnapshot {
   readonly roster: readonly SlimeRosterState[];
   readonly activeSlimeId: SlimeId | undefined;
+  /** Optional Level 3 controlled-form override used while the merged body owns input. */
+  readonly controlledForm?: 'slime' | 'specimen';
+  readonly activeFormLabel?: string;
   readonly passiveInteractions: readonly SlimePassiveInteraction[];
   readonly playerSwitchFeedback: SlimePlayerSwitchFeedback | undefined;
   /** One-shot presentation reset emitted by recovery/restart boundaries. */
