@@ -154,6 +154,43 @@ test('Room 3 individual barricades leave an exposed final approach', () => {
   world.clear();
 });
 
+test('Room 3 second sticky wall joins its platform without an exposed sticky edge', () => {
+  const scene = new LevelTwoPreviewScene(() => {});
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+  surfaces.registerAll(scene.collisionMeshes);
+  const targets = scene.roomThree.solubleTargetMeshes.map(
+    (mesh) => createAuthoredDissolveTarget(mesh, world, surfaces)!,
+  );
+  scene.roomThree.bindDissolveTargets(targets);
+  const secondDrop = scene.roomThree.wallDrops[1];
+  targets.find((target) => target.id === secondDrop.solubleTargetId)!.advance(1);
+  scene.roomThree.update(1, []);
+  assert.equal(secondDrop.state, 'landed');
+  scene.root.updateWorldMatrix(true, true);
+  const names = [
+    'cultivation-room-3-central-sticky-transfer',
+    'cultivation-room-3-second-wall-sticky-landing',
+    'cultivation-room-3-bob-west-wall-exit',
+    'cultivation-room-3-west-wall-exit-support',
+  ] as const;
+  const bounds = names.map((name) => {
+    const mesh = scene.collisionMeshes.find((candidate) => candidate.name === name);
+    assert.ok(mesh, `Missing collider ${name}`);
+    return new THREE.Box3().setFromObject(mesh);
+  });
+
+  assert.ok(Math.abs(bounds[0].max.y - bounds[1].max.y) < 1e-6);
+  assert.ok(Math.abs(bounds[1].max.y - bounds[2].max.y) < 1e-6);
+  assert.ok(Math.abs(bounds[2].min.y - bounds[3].max.y) < 1e-6);
+
+  scene.dispose();
+  for (const target of targets) target.dispose();
+  world.clear();
+  surfaces.clear();
+});
+
 test('Bob jumps directly from the final released block to the vent adhesion', () => {
   const scene = new LevelTwoPreviewScene(() => {});
   assert.equal(scene.root.getObjectByName('cultivation-room-2-vent-takeoff-platform'), undefined);
