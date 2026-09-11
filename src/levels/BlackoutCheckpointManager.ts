@@ -48,16 +48,22 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
   private readonly initialParticipantState = new Map<string, SerializableValue>();
   private readonly isSpawnSafe: SpawnSafetyCheck;
   private readonly initialCheckpointId: BlackoutCheckpointId;
+  private readonly initialActiveSlimeId: BlackoutSlimeId;
   private activeSnapshot: BlackoutRuntimeSnapshot;
 
   constructor(
     initialCheckpoint: BlackoutCheckpointDefinition,
     isSpawnSafe: SpawnSafetyCheck,
+    initialActiveSlimeId: BlackoutSlimeId = initialCheckpoint.activeSlimeId,
   ) {
     this.initialCheckpointId = initialCheckpoint.id;
+    this.initialActiveSlimeId = initialActiveSlimeId;
     this.isSpawnSafe = isSpawnSafe;
     this.registerCheckpoint(initialCheckpoint);
-    this.activeSnapshot = this.createSnapshot(this.getCheckpoint(initialCheckpoint.id));
+    this.activeSnapshot = this.createSnapshot(
+      this.getCheckpoint(initialCheckpoint.id),
+      initialActiveSlimeId,
+    );
   }
 
   get activeCheckpoint(): BlackoutRuntimeSnapshot {
@@ -150,7 +156,10 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
   }
 
   resetToInitial(): void {
-    const initial = this.createSnapshot(this.getCheckpoint(this.initialCheckpointId));
+    const initial = this.createSnapshot(
+      this.getCheckpoint(this.initialCheckpointId),
+      this.initialActiveSlimeId,
+    );
     const participantState: Record<string, SerializableValue> = {};
     for (const [id, state] of this.initialParticipantState) {
       participantState[id] = cloneSerializable(state);
