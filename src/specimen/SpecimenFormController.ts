@@ -1,6 +1,5 @@
 import { EventBus } from '../core/EventBus.ts';
-
-export type ControlledForm = 'group' | 'specimen';
+import type { ControlledForm } from './SpecimenTypes.ts';
 
 export interface SpecimenFormReadModel {
   readonly controlledForm: ControlledForm;
