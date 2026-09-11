@@ -598,6 +598,7 @@ export class BlackoutLevelRuntime {
   ): void {
     this.input.setEnabled(false);
     this.input.resetState();
+    resources.puzzleRegistry.reset();
     const snapshot = resources.checkpoints.recover(resources.group);
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
