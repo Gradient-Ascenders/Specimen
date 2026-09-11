@@ -196,12 +196,14 @@ test('Bob and Goop cannot aim or operate Volt, while an established tether survi
       ColliderTransformMode.Static,
     );
     fixture.manager.activeSlimeId = 'goop';
+    fixture.mesh.position.z = 16;
     fixture.aimDirection.set(1, 0, 0);
     fixture.system.update(1 / 60, controls());
 
     assert.equal(fixture.system.connected, true);
     assert.equal(fixture.target.connected, true);
     assert.equal(fixture.system.readModel.connectedTargetId, 'target');
+    assert.equal(fixture.system.readModel.connectionUnstable, true);
   } finally {
     blocker.geometry.dispose();
     fixture.dispose();
@@ -401,6 +403,95 @@ test('pause-style aim cancellation preserves the tether while reset clears it id
 
     fixture.system.reset('reset');
     assert.deepEqual(fixture.target.connectionWrites, [true, false]);
+  } finally {
+    fixture.dispose();
+  }
+});
+
+
+test('camera-world obstruction clips search and prevents acquiring a target behind it', () => {
+  const fixture = makeFixture(10);
+  const blocker = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 0.5));
+  blocker.position.z = 5;
+  fixture.world.register(
+    blocker,
+    CollisionLayer.LineOfSight,
+    ColliderTransformMode.Static,
+  );
+
+  try {
+    fixture.system.update(1 / 60, controls({
+      aimHeld: true,
+      fireHeld: true,
+      firePressed: true,
+    }));
+
+    assert.equal(fixture.system.connected, false);
+    assert.equal(fixture.system.readModel.selectedTargetId, undefined);
+    assert.equal(fixture.system.readModel.beamMode, 'search');
+    assert.ok(fixture.system.readModel.beamEnd.z < 6);
+  } finally {
+    blocker.geometry.dispose();
+    fixture.dispose();
+  }
+});
+
+test('unregistered lookalike geometry is never electrically compatible', () => {
+  const world = new CollisionWorld();
+  const registry = new ElectricalTargetRegistry(world);
+  const manager = new TestManager();
+  const lookalike = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  lookalike.name = 'yellow-terminal-looking-mesh';
+  lookalike.position.z = 8;
+  world.register(
+    lookalike,
+    CollisionLayer.LineOfSight,
+    ColliderTransformMode.Static,
+  );
+  const system = new VoltElectricalSystem({
+    slimeManager: manager,
+    collisionWorld: world,
+    targetRegistry: registry,
+    aimRayProvider: {
+      copyAimRay: (origin, direction) => {
+        origin.set(0, 0, 0);
+        direction.set(0, 0, 1);
+      },
+    },
+  });
+
+  try {
+    system.update(1 / 60, controls({
+      aimHeld: true,
+      fireHeld: true,
+      firePressed: true,
+    }));
+    assert.equal(system.connected, false);
+    assert.equal(system.readModel.selectedTargetId, undefined);
+  } finally {
+    system.dispose();
+    registry.dispose();
+    lookalike.geometry.dispose();
+  }
+});
+
+test('pointer lock loss cancels search without breaking an established connection', () => {
+  const fixture = makeFixture();
+  try {
+    fixture.system.update(1 / 60, controls({
+      aimHeld: true,
+      fireHeld: true,
+      firePressed: true,
+    }));
+    assert.equal(fixture.system.connected, true);
+
+    fixture.system.update(1 / 60, controls({
+      aimHeld: true,
+      pointerLocked: false,
+    }));
+    assert.equal(fixture.system.connected, true);
+    assert.equal(fixture.system.readModel.aimActive, false);
+    assert.equal(fixture.system.readModel.searching, false);
   } finally {
     fixture.dispose();
   }
