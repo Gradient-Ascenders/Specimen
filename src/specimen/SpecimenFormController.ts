@@ -1,6 +1,8 @@
 import { EventBus } from '../core/EventBus.ts';
 import type { ControlledForm } from './SpecimenTypes.ts';
 
+const MERGE_TIME_EPSILON_SECONDS = 1e-9;
+
 export interface SpecimenFormReadModel {
   readonly controlledForm: ControlledForm;
   readonly mergeActive: boolean;
@@ -96,10 +98,11 @@ export class SpecimenFormController {
       throw new Error('Specimen merge deltaSeconds must be positive and finite.');
     }
 
-    this.mergeElapsedSeconds = Math.min(
-      this.mergeDurationSeconds,
-      this.mergeElapsedSeconds + deltaSeconds,
-    );
+    const nextElapsed = this.mergeElapsedSeconds + deltaSeconds;
+    this.mergeElapsedSeconds =
+      nextElapsed + MERGE_TIME_EPSILON_SECONDS >= this.mergeDurationSeconds
+        ? this.mergeDurationSeconds
+        : nextElapsed;
     const progress =
       this.mergeElapsedSeconds / this.mergeDurationSeconds;
     if (progress !== this.readModelValue.mergeProgress) {
