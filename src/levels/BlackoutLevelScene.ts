@@ -5,15 +5,21 @@ import { BLACKOUT_FOUNDATION_LENGTH_METRES } from './BlackoutFoundationManifest.
 
 export class BlackoutElectricalFixtureTarget
 implements ElectricalConnectionTarget {
+  readonly id: string;
+  readonly displayName: string;
+  readonly mesh: THREE.Mesh;
   readonly hitMeshes: readonly THREE.Mesh[];
   private available = true;
   private connected = false;
 
   constructor(
-    readonly id: string,
-    readonly displayName: string,
-    readonly mesh: THREE.Mesh,
+    id: string,
+    displayName: string,
+    mesh: THREE.Mesh,
   ) {
+    this.id = id;
+    this.displayName = displayName;
+    this.mesh = mesh;
     this.hitMeshes = [mesh];
   }
 
