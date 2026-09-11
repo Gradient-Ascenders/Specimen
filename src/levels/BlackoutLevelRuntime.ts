@@ -9,6 +9,7 @@ import {
 } from '../core/PerformanceSnapshot.ts';
 import {
   ColliderTransformMode,
+  CollisionHit,
   CollisionWorld,
 } from '../physics/CollisionWorld.ts';
 import { KinematicBody, type JumpInputState } from '../physics/KinematicBody.ts';
@@ -65,7 +66,7 @@ interface BlackoutRuntimeResources {
   readonly voltLight: THREE.PointLight;
   readonly movement: THREE.Vector3;
   readonly jump: JumpInputState;
-  readonly safetyHit: import('../physics/CollisionWorld.ts').CollisionHit;
+  readonly safetyHit: CollisionHit;
   readonly safetyDisplacement: THREE.Vector3;
 }
 
@@ -308,10 +309,10 @@ export class BlackoutLevelRuntime {
     this.input.endFixedUpdate();
   }
 
-  render(_interpolationAlpha: number, _stats: Readonly<LoopStats>): void {
+  render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
     if (this.resources) this.syncVisuals(this.resources);
     this.input.endPointerUpdate();
-    this.renderLayer.cameraRig.update(1, _stats.frameDeltaSeconds);
+    this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     this.renderLayer.render();
   }
 
@@ -390,7 +391,7 @@ export class BlackoutLevelRuntime {
         initialActiveSlimeId: initialActive,
       });
 
-      const safetyHit = new (awaitCollisionHit())();
+      const safetyHit = new CollisionHit();
       const safetyDisplacement = new THREE.Vector3();
       const isSpawnSafe = (position: THREE.Vector3, clearanceRadius: number): boolean => {
         const directions: readonly (readonly [number, number, number])[] = [
@@ -599,10 +600,4 @@ function objectiveFor(room: BlackoutRoomState): string {
     case 'room-4b': return 'Defeat the facility defence system';
     case 'ending': return room.phase === 'complete' ? 'Escape complete' : 'Escape the facility';
   }
-}
-
-// Kept as a function so the runtime allocates exactly one reusable hit record.
-import { CollisionHit } from '../physics/CollisionWorld.ts';
-function awaitCollisionHit(): typeof CollisionHit {
-  return CollisionHit;
 }
