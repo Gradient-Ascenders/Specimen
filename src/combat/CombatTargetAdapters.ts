@@ -1,0 +1,213 @@
+import * as THREE from 'three';
+
+import type {
+  CombatImpact,
+  CombatImpactResult,
+  CombatTarget,
+} from './CombatTargetRegistry.ts';
+
+export type CombatTargetKind =
+  | 'ordinary'
+  | 'reinforced'
+  | 'weak-point';
+
+export interface FixtureCombatTargetOptions {
+  readonly id: string;
+  readonly hitMeshes: readonly THREE.Mesh[];
+  readonly kind?: CombatTargetKind;
+  readonly healthUnits?: number;
+  readonly initiallyEnabled?: boolean;
+  readonly weakPointInitiallyOpen?: boolean;
+  readonly splashAnchor?: THREE.Object3D;
+  readonly onDestroyed?: () => void;
+  readonly onReset?: () => void;
+}
+
+/**
+ * Small reset-safe target authority used by development fixtures and as the
+ * behaviour core for authored adapters.
+ */
+export class FixtureCombatTarget implements CombatTarget {
+  readonly id: string;
+  readonly hitMeshes: readonly THREE.Mesh[];
+
+  private readonly kind: CombatTargetKind;
+  private readonly initialHealth: number;
+  private readonly initiallyEnabled: boolean;
+  private readonly weakPointInitiallyOpen: boolean;
+  private readonly splashAnchor: THREE.Object3D;
+  private readonly onDestroyed: (() => void) | undefined;
+  private readonly onReset: (() => void) | undefined;
+
+  private healthValue: number;
+  private enabledValue: boolean;
+  private weakPointOpenValue: boolean;
+  private destroyedValue = false;
+
+  constructor(options: FixtureCombatTargetOptions) {
+    if (!options.id.trim()) throw new Error('Combat fixture ID must be non-empty.');
+    if (options.hitMeshes.length === 0) {
+      throw new Error('Combat fixture requires at least one hit mesh.');
+    }
+    const healthUnits = options.healthUnits ?? 1;
+    if (!Number.isFinite(healthUnits) || healthUnits <= 0) {
+      throw new Error('Combat fixture health must be positive and finite.');
+    }
+
+    this.id = options.id;
+    this.hitMeshes = [...options.hitMeshes];
+    this.kind = options.kind ?? 'ordinary';
+    this.initialHealth = healthUnits;
+    this.initiallyEnabled = options.initiallyEnabled ?? true;
+    this.weakPointInitiallyOpen = options.weakPointInitiallyOpen ?? true;
+    this.splashAnchor = options.splashAnchor ?? this.hitMeshes[0]!;
+    this.onDestroyed = options.onDestroyed;
+    this.onReset = options.onReset;
+
+    this.healthValue = this.initialHealth;
+    this.enabledValue = this.initiallyEnabled;
+    this.weakPointOpenValue = this.weakPointInitiallyOpen;
+  }
+
+  get healthUnits(): number {
+    return this.healthValue;
+  }
+
+  get destroyed(): boolean {
+    return this.destroyedValue;
+  }
+
+  get enabled(): boolean {
+    return this.enabledValue;
+  }
+
+  get weakPointOpen(): boolean {
+    return this.weakPointOpenValue;
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabledValue = enabled;
+  }
+
+  setWeakPointOpen(open: boolean): void {
+    this.weakPointOpenValue = open;
+  }
+
+  isCombatActive(): boolean {
+    return this.enabledValue && !this.destroyedValue;
+  }
+
+  copySplashWorldPosition(target: THREE.Vector3): THREE.Vector3 {
+    return this.splashAnchor.getWorldPosition(target);
+  }
+
+  applyImpact(impact: CombatImpact): CombatImpactResult {
+    if (!this.isCombatActive()) {
+      return {
+        accepted: false,
+        destroyed: this.destroyedValue,
+        rejectionReason: 'inactive',
+      };
+    }
+
+    if (this.kind === 'reinforced') {
+      if (impact.kind !== 'direct' || !impact.fullyCharged) {
+        return {
+          accepted: false,
+          destroyed: false,
+          rejectionReason: 'armour',
+        };
+      }
+    } else if (this.kind === 'weak-point') {
+      if (!this.weakPointOpenValue) {
+        return {
+          accepted: false,
+          destroyed: false,
+          rejectionReason: 'weak-point-closed',
+        };
+      }
+      if (impact.kind !== 'direct') {
+        return {
+          accepted: false,
+          destroyed: false,
+          rejectionReason: 'splash-not-allowed',
+        };
+      }
+    }
+
+    if (!Number.isFinite(impact.damageUnits) || impact.damageUnits <= 0) {
+      return {
+        accepted: false,
+        destroyed: false,
+        rejectionReason: 'invulnerable',
+      };
+    }
+
+    this.healthValue = Math.max(0, this.healthValue - impact.damageUnits);
+    if (this.healthValue === 0 && !this.destroyedValue) {
+      this.destroyedValue = true;
+      this.onDestroyed?.();
+    }
+
+    return {
+      accepted: true,
+      destroyed: this.destroyedValue,
+    };
+  }
+
+  reset(): void {
+    this.healthValue = this.initialHealth;
+    this.enabledValue = this.initiallyEnabled;
+    this.weakPointOpenValue = this.weakPointInitiallyOpen;
+    this.destroyedValue = false;
+    this.onReset?.();
+  }
+}
+
+export interface CombatDroneOwner {
+  /** Disable/enable AI and owned firing. */
+  setEnabled(enabled: boolean): void;
+  /** Remove/restore authoritative body collision. */
+  setCollisionEnabled(enabled: boolean): void;
+  /** Hide/restore presentation through the owner. */
+  setVisible(visible: boolean): void;
+  /** Clear all hostile shots owned by this drone. */
+  clearOwnedProjectiles(): void;
+}
+
+export interface CombatDroneTargetOptions {
+  readonly id: string;
+  readonly hitMeshes: readonly THREE.Mesh[];
+  readonly owner: CombatDroneOwner;
+  readonly healthUnits?: number;
+  readonly kind?: Exclude<CombatTargetKind, 'weak-point'>;
+  readonly splashAnchor?: THREE.Object3D;
+}
+
+/**
+ * Opt-in drone adapter. Existing SecurityDrone instances are not globally made
+ * destructible; room/boss authoring must explicitly wrap compatible owners.
+ */
+export class CombatDroneTarget extends FixtureCombatTarget {
+  constructor(options: CombatDroneTargetOptions) {
+    super({
+      id: options.id,
+      hitMeshes: options.hitMeshes,
+      kind: options.kind ?? 'ordinary',
+      healthUnits: options.healthUnits ?? 2,
+      splashAnchor: options.splashAnchor,
+      onDestroyed: () => {
+        options.owner.clearOwnedProjectiles();
+        options.owner.setEnabled(false);
+        options.owner.setCollisionEnabled(false);
+        options.owner.setVisible(false);
+      },
+      onReset: () => {
+        options.owner.clearOwnedProjectiles();
+        options.owner.setVisible(true);
+        options.owner.setCollisionEnabled(true);
+        options.owner.setEnabled(true);
+      },
+    });
+  }
+}
