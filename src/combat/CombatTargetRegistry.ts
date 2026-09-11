@@ -30,6 +30,7 @@ export type CombatImpactRejectionReason =
   | 'armour'
   | 'weak-point-closed'
   | 'splash-not-allowed'
+  | 'charge-required'
   | 'invulnerable';
 
 export interface CombatImpactResult {
