@@ -166,6 +166,7 @@ class RuntimeFakeElement {
 class RuntimeFakeInput {
   private readonly held = new Set<InputAction>();
   private readonly pressed = new Set<InputAction>();
+  private readonly released = new Set<InputAction>();
   enabled = true;
   pointerLocked = true;
   pointerDeltaX = 0;
@@ -180,8 +181,8 @@ class RuntimeFakeInput {
     return this.pressed.has(action);
   }
 
-  wasReleased(_action: InputAction): boolean {
-    return false;
+  wasReleased(action: InputAction): boolean {
+    return this.released.has(action);
   }
 
   press(action: InputAction): void {
@@ -190,7 +191,7 @@ class RuntimeFakeInput {
   }
 
   release(action: InputAction): void {
-    this.held.delete(action);
+    if (this.held.delete(action)) this.released.add(action);
   }
 
   setEnabled(enabled: boolean): void {
@@ -201,10 +202,12 @@ class RuntimeFakeInput {
   resetState(): void {
     this.held.clear();
     this.pressed.clear();
+    this.released.clear();
   }
 
   endFixedUpdate(): void {
     this.pressed.clear();
+    this.released.clear();
     this.endPointerUpdate();
   }
 
