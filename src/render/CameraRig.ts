@@ -123,6 +123,11 @@ export interface CameraRigDiagnostics {
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const CAMERA_BASIS_EPSILON_SQ = 1e-10;
 
+interface SavedTargetView {
+  readonly planarBack: THREE.Vector3;
+  readonly pitchRadians: number;
+}
+
 /**
  * Platforming-oriented third-person orbit/follow camera.
  *
@@ -141,6 +146,7 @@ export class CameraRig {
   private readonly config: CameraRigConfig;
   private followTarget: CameraFollowTarget | undefined;
   private obstructionWorld: CollisionWorld | undefined;
+  private savedViewByTarget = new WeakMap<CameraFollowTarget, SavedTargetView>();
 
   private readonly interpolatedTarget = new THREE.Vector3();
   private readonly smoothedTarget = new THREE.Vector3();
@@ -208,6 +214,25 @@ export class CameraRig {
     target: CameraFollowTarget,
     obstructionWorld: CollisionWorld,
   ): void {
+    if (this.followTarget !== target) {
+      if (this.followTarget) {
+        // Attribute pointer motion received since the previous fixed update to
+        // the slime that owned the camera when the motion occurred.
+        this.applyQueuedLookInput();
+        this.savedViewByTarget.set(this.followTarget, {
+          planarBack: this.planarBack.clone(),
+          pitchRadians: this.pitchRadians,
+        });
+      }
+
+      const savedView = this.savedViewByTarget.get(target);
+      if (savedView) {
+        this.planarBack.copy(savedView.planarBack);
+        this.pitchRadians = savedView.pitchRadians;
+        this.effectivePitchRadians = savedView.pitchRadians;
+      }
+    }
+
     this.followTarget = target;
     this.obstructionWorld = obstructionWorld;
     this.initialized = false;
@@ -220,6 +245,10 @@ export class CameraRig {
   }
 
   reset(): void {
+    this.savedViewByTarget = new WeakMap<
+      CameraFollowTarget,
+      SavedTargetView
+    >();
     this.pitchRadians = this.config.initialPitchRadians;
     this.effectivePitchRadians = this.pitchRadians;
     this.queuedYawRadians = 0;
