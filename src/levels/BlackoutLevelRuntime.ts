@@ -13,6 +13,7 @@ import { EventBus } from '../core/EventBus.ts';
 import {
   BlackoutPoweredDeviceRig,
 } from '../electrical/BlackoutPoweredDeviceRig.ts';
+import type { PoweredDeviceReadModel } from '../electrical/PoweredDeviceCore.ts';
 import type { PoweredCarrierBody } from '../electrical/PoweredDevices.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
@@ -150,6 +151,12 @@ export class BlackoutLevelRuntime {
 
   get voltElectricalReadModel(): VoltElectricalReadModel | undefined {
     return this.resources?.electricalSystem.readModel;
+  }
+
+  getPoweredDeviceReadModel(
+    id: string,
+  ): PoweredDeviceReadModel | undefined {
+    return this.resources?.poweredDeviceRig.devices.getReadModel(id);
   }
 
   load(): void { this.lifecycle.load(); }
