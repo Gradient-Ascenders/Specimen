@@ -739,7 +739,10 @@ export class SpecimenProjectileSystem {
     // Projectile queries. Reaching that candidate's own surface is successful
     // terminal visibility, not self-occlusion. Any other first hit remains
     // intervening cover.
-    return candidate.target.hitMeshes.includes(this.splashHit.object);
+    return (
+      this.splashHit.object !== null &&
+      candidate.target.hitMeshes.includes(this.splashHit.object)
+    );
   }
 
   private applyTargetImpact(
