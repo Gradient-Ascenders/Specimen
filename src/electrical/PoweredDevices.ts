@@ -323,6 +323,9 @@ export class PoweredPlatformDevice implements ElectricalDevice {
   private readonly routePolicy: PoweredPlatformRoutePolicy;
   private readonly initialMechanicalPermission: boolean;
   private readonly proposedDisplacement = new THREE.Vector3();
+  private readonly carrierOrigin = new THREE.Vector3();
+  private readonly proposedPlatformPosition = new THREE.Vector3();
+  private readonly platformHalfSize = new THREE.Vector3();
   private readonly carrierHit = new CollisionHit();
   private readonly sweptBounds = new THREE.Box3();
   private readonly scratchClosest = new THREE.Vector3();
@@ -349,6 +352,7 @@ export class PoweredPlatformDevice implements ElectricalDevice {
       initialTarget: 'end',
     });
     this.root = this.platform.root;
+    this.platformHalfSize.copy(this.platform.size).multiplyScalar(0.5);
     this.collisionWorld.register(
       this.platform.collisionMesh,
       DEFAULT_SOLID_COLLISION_LAYERS,
@@ -485,7 +489,7 @@ export class PoweredPlatformDevice implements ElectricalDevice {
         this.supportedBodies.push(body);
         if (
           this.collisionWorld.sweepSphere(
-            new THREE.Vector3(
+            this.carrierOrigin.set(
               body.position.x,
               body.position.y,
               body.position.z,
@@ -521,11 +525,11 @@ export class PoweredPlatformDevice implements ElectricalDevice {
   }
 
   private copySweptPlatformBounds(target: THREE.Box3): void {
-    const half = this.platform.size.clone().multiplyScalar(0.5);
+    const half = this.platformHalfSize;
     const current = this.platform.root.position;
-    const proposed = this.proposedDisplacement
-      .clone()
-      .add(current);
+    const proposed = this.proposedPlatformPosition
+      .copy(current)
+      .add(this.proposedDisplacement);
     target.min.set(
       Math.min(current.x, proposed.x) - half.x,
       Math.min(current.y, proposed.y) - half.y,
