@@ -168,8 +168,11 @@ export class BlackoutLevelRuntime {
       if (!enabled) {
         this.input.resetState();
         this.resources.electricalSystem.cancelAim();
-        this.resources.electricalPresentation.suspendAim();
+        this.resources.electricalPresentation.update(
+          this.resources.electricalSystem.readModel,
+        );
         this.renderLayer.cameraRig.setAimPresentationActive(false);
+        this.syncVisuals(this.resources);
       }
     }
   }
@@ -657,8 +660,9 @@ export class BlackoutLevelRuntime {
   private readonly stopResources = (): void => {
     const resources = this.requireResources();
     resources.electricalSystem.cancelAim();
-    resources.electricalPresentation.suspendAim();
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
+    this.syncVisuals(resources);
     this.input.setEnabled(false);
     this.input.resetState();
   };
