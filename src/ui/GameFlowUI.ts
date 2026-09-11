@@ -479,9 +479,12 @@ export class GameFlowUI {
     this.syncState();
   }
 
-  finishLevelTransition(): void {
+  finishLevelTransition(levelId: 'level-2' | 'level-3' = 'level-2'): void {
     if (this.model.state !== 'transitioning') return;
-    this.transitionMessage.textContent = 'Level 2 ready';
+    const levelName = levelId === 'level-2' ? 'Level 2' : 'Level 3';
+    this.transitionMessage.textContent = `${levelName} ready`;
+    const label = this.transitionContinueButton.querySelector('span');
+    if (label) label.textContent = `Enter ${levelName}`;
     this.transitionContinueButton.hidden = false;
     this.transitionContinueButton.focus();
   }
