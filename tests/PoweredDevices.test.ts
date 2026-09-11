@@ -381,3 +381,48 @@ test('device collection checkpoint restore returns moving devices to the exact c
     targets.dispose();
   }
 });
+
+
+test('laser junction can explicitly activate only its authored circuit when powered', () => {
+  const controlled = new LaserHazard({
+    id: 'powered-activation-controlled',
+    start: { x: 0, y: 0, z: 0 },
+    end: { x: 4, y: 0, z: 0 },
+    enabled: true,
+  });
+  const neighbour = new LaserHazard({
+    id: 'powered-activation-neighbour',
+    start: { x: 0, y: 1, z: 0 },
+    end: { x: 4, y: 1, z: 0 },
+    enabled: true,
+  });
+  const junction = new LaserJunctionDevice({
+    id: 'activation-junction',
+    displayName: 'Activation Junction',
+    position: new THREE.Vector3(),
+    hazards: [controlled],
+    mode: 'activate-when-powered',
+  });
+
+  try {
+    junction.syncPowerOutputs();
+    assert.equal(controlled.circuitGateEnabled, false);
+    assert.equal(controlled.enabled, false);
+    assert.equal(neighbour.enabled, true);
+
+    junction.core.setConnectionState(true);
+    junction.syncPowerOutputs();
+    assert.equal(controlled.circuitGateEnabled, true);
+    assert.equal(controlled.enabled, true);
+    assert.equal(neighbour.enabled, true);
+
+    junction.core.setConnectionState(false);
+    junction.syncPowerOutputs();
+    assert.equal(controlled.circuitGateEnabled, false);
+    assert.equal(neighbour.enabled, true);
+  } finally {
+    junction.dispose();
+    controlled.dispose();
+    neighbour.dispose();
+  }
+});
