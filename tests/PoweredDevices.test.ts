@@ -23,13 +23,18 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 class TestCarrier implements PoweredCarrierBody {
   readonly id: string;
   readonly position = new THREE.Vector3();
-  readonly radiusMetres = 0.45;
+  readonly radiusMetres: number;
   supportCollider: THREE.Mesh | null = null;
   carrierApplications = 0;
 
-  constructor(id: string, position = new THREE.Vector3()) {
+  constructor(
+    id: string,
+    position = new THREE.Vector3(),
+    radiusMetres = 0.45,
+  ) {
     this.id = id;
     this.position.copy(position);
+    this.radiusMetres = radiusMetres;
   }
 
   isSupportedBy(collider: THREE.Mesh): boolean {
@@ -475,5 +480,46 @@ test('full device-rig reset restores authored platform, lift, bridge, and door t
   } finally {
     rig.dispose();
     targets.dispose();
+  }
+});
+
+
+test('powered carrier transport applies unchanged to the 0.675 m Specimen body contract', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const platform = new PoweredPlatformDevice({
+    id: 'specimen-carrier-platform',
+    displayName: 'Specimen Carrier Platform',
+    collisionWorld: world,
+    surfaceRegistry: surfaces,
+    start: new THREE.Vector3(0, 0.2, 0),
+    end: new THREE.Vector3(0, 0.2, 4),
+    size: new THREE.Vector3(3, 0.3, 3),
+    travelDurationSeconds: 2,
+    routePolicy: 'one-way',
+  });
+  const specimen = new TestCarrier(
+    'specimen',
+    new THREE.Vector3(0, 1.025, 0),
+    0.675,
+  );
+  specimen.supportCollider = platform.platform.collisionMesh;
+
+  try {
+    platform.core.setConnectionState(true);
+    const before = specimen.position.clone();
+    platform.updateMechanics(0.5, [specimen]);
+
+    assert.equal(specimen.radiusMetres, 0.675);
+    assert.equal(specimen.carrierApplications, 1);
+    assert.ok(specimen.position.z > before.z);
+    assert.ok(
+      Math.abs(
+        specimen.position.z -
+          (before.z + platform.platform.displacement.z),
+      ) < 1e-12,
+    );
+  } finally {
+    platform.dispose();
   }
 });
