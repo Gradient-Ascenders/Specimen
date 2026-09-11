@@ -23,6 +23,8 @@ import {
 } from '../slimes/SlimeHUDState.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimeGroup } from '../slimes/PersistentSlimeGroup.ts';
+import { DeathSequence } from '../systems/DeathSequence.ts';
+import { DeathScreen } from '../ui/DeathScreen.ts';
 import {
   BlackoutCheckpointManager,
   type BlackoutCheckpointParticipant,
@@ -61,6 +63,8 @@ interface BlackoutRuntimeResources {
   readonly group: PersistentSlimeGroup<KinematicBody>;
   readonly checkpoints: BlackoutCheckpointManager<KinematicBody>;
   readonly phase: BlackoutPhaseController;
+  readonly deathSequence: DeathSequence;
+  readonly deathScreen: DeathScreen;
   readonly visuals: Readonly<Record<'bob' | 'goop' | 'volt', THREE.Mesh>>;
   readonly voltLight: THREE.PointLight;
   readonly movement: THREE.Vector3;
@@ -133,7 +137,11 @@ export class BlackoutLevelRuntime {
   setDebugInteractionEnabled(enabled: boolean): void {
     this.debugInteractionEnabled = enabled;
     if (this.lifecycle.state === 'running' && this.resources) {
-      this.input.setEnabled(enabled && !this.resources.phase.terminal);
+      this.input.setEnabled(
+        enabled &&
+        !this.resources.phase.terminal &&
+        this.resources.deathSequence.isPlaying,
+      );
       if (!enabled) this.input.resetState();
     }
   }
@@ -193,29 +201,23 @@ export class BlackoutLevelRuntime {
   }
 
   recoverActiveCheckpoint(): void {
+    this.restoreActiveCheckpoint(this.requireResources(), true);
+  }
+
+  /** Shared failure hook for hazards authored by later Blackout room issues. */
+  requestFailure(): boolean {
     const resources = this.requireResources();
+    if (resources.phase.terminal) return false;
+    if (!resources.deathSequence.requestDeath(
+      () => this.restoreActiveCheckpoint(resources, false),
+    )) {
+      return false;
+    }
     this.input.setEnabled(false);
     this.input.resetState();
-    const snapshot = resources.checkpoints.recover(resources.group);
-    this.currentRoom = snapshot.room;
-    resources.phase.restore(snapshot.room.phase);
-    resources.movement.set(0, 0, 0);
-    clearJump(resources.jump, true);
-    this.renderLayer.cameraRig.reset();
-    this.retargetCamera(resources);
-    this.syncVisuals(resources);
-    this.notifyHUD(undefined, true);
-    this.events.emit('objectiveChanged', {
-      roomId: snapshot.room.roomId,
-      objective: objectiveFor(snapshot.room),
-    });
-    if (
-      this.lifecycle.state === 'running' &&
-      this.debugInteractionEnabled &&
-      !resources.phase.terminal
-    ) {
-      this.input.setEnabled(true);
-    }
+    this.input.releasePointerLock();
+    this.host.dataset.gameState = resources.deathSequence.state;
+    return true;
   }
 
   /**
@@ -242,6 +244,14 @@ export class BlackoutLevelRuntime {
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
     if (resources.phase.terminal) {
+      this.input.endFixedUpdate();
+      return;
+    }
+    if (!resources.deathSequence.isPlaying) {
+      if (resources.deathSequence.update(deltaSeconds)) {
+        resources.deathScreen.show();
+        this.host.dataset.gameState = resources.deathSequence.state;
+      }
       this.input.endFixedUpdate();
       return;
     }
@@ -306,7 +316,7 @@ export class BlackoutLevelRuntime {
     // teleports, recreates or unregisters them.
     for (const slimeBody of resources.group.bodies) {
       if (slimeBody.position.y < OUT_OF_BOUNDS_Y) {
-        this.recoverActiveCheckpoint();
+        this.requestFailure();
         this.input.endFixedUpdate();
         return;
       }
@@ -425,6 +435,12 @@ export class BlackoutLevelRuntime {
       checkpoints.activate('cp1', initialActive);
 
       const phase = new BlackoutPhaseController('three-slime');
+      const deathSequence = new DeathSequence();
+      const deathScreen = new DeathScreen({
+        onRetry: this.retryAfterDeath,
+        backgroundElements: [this.renderLayer.canvas],
+      });
+      this.host.append(deathScreen.element);
       const visuals = {
         bob: createSlimeVisual(0x44c7d8, 0x123941),
         goop: createSlimeVisual(0x7ad13d, 0x233d12),
@@ -444,6 +460,8 @@ export class BlackoutLevelRuntime {
         group,
         checkpoints,
         phase,
+        deathSequence,
+        deathScreen,
         visuals,
         voltLight,
         movement: new THREE.Vector3(),
@@ -473,7 +491,11 @@ export class BlackoutLevelRuntime {
   private readonly startResources = (): void => {
     const resources = this.requireResources();
     this.input.resetState();
-    this.input.setEnabled(this.debugInteractionEnabled && !resources.phase.terminal);
+    this.input.setEnabled(
+      this.debugInteractionEnabled &&
+      !resources.phase.terminal &&
+      resources.deathSequence.isPlaying,
+    );
   };
 
   private readonly stopResources = (): void => {
@@ -484,6 +506,8 @@ export class BlackoutLevelRuntime {
   private readonly restartResources = (): void => {
     const resources = this.requireResources();
     this.input.resetState();
+    resources.deathSequence.reset();
+    resources.deathScreen.hide();
     resources.checkpoints.resetToInitial();
     const snapshot = resources.checkpoints.recover(resources.group);
     this.currentRoom = snapshot.room;
@@ -508,6 +532,8 @@ export class BlackoutLevelRuntime {
     this.input.resetState();
     this.input.releasePointerLock();
     this.renderLayer.cameraRig.clearFollowTarget();
+    resources.deathSequence.reset();
+    resources.deathScreen.dispose();
 
     for (const visual of Object.values(resources.visuals)) {
       visual.removeFromParent();
@@ -525,6 +551,51 @@ export class BlackoutLevelRuntime {
     this.currentRoom = { roomId: 'room-1', phase: 'three-slime', local: {} };
     this.completionEmitted = false;
     this.notifyHUD(undefined, true);
+  };
+
+  private restoreActiveCheckpoint(
+    resources: BlackoutRuntimeResources,
+    resumeInput: boolean,
+  ): void {
+    this.input.setEnabled(false);
+    this.input.resetState();
+    const snapshot = resources.checkpoints.recover(resources.group);
+    this.currentRoom = snapshot.room;
+    resources.phase.restore(snapshot.room.phase);
+    resources.movement.set(0, 0, 0);
+    clearJump(resources.jump, true);
+    this.renderLayer.cameraRig.reset();
+    this.retargetCamera(resources);
+    this.syncVisuals(resources);
+    this.notifyHUD(undefined, true);
+    this.events.emit('objectiveChanged', {
+      roomId: snapshot.room.roomId,
+      objective: objectiveFor(snapshot.room),
+    });
+    if (
+      resumeInput &&
+      this.lifecycle.state === 'running' &&
+      this.debugInteractionEnabled &&
+      !resources.phase.terminal &&
+      resources.deathSequence.isPlaying
+    ) {
+      this.input.setEnabled(true);
+    }
+  }
+
+  private readonly retryAfterDeath = (): void => {
+    const resources = this.requireResources();
+    if (!resources.deathSequence.completeRetry()) return;
+    resources.deathScreen.hide();
+    this.host.dataset.gameState = 'playing';
+    if (
+      this.lifecycle.state === 'running' &&
+      this.debugInteractionEnabled &&
+      !resources.phase.terminal
+    ) {
+      this.input.setEnabled(true);
+      this.input.requestPointerLock();
+    }
   };
 
   private retargetCamera(resources: BlackoutRuntimeResources): void {
