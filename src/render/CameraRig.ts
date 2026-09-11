@@ -65,7 +65,7 @@ export interface CameraRigConfig extends CameraLookSettings {
   obstructionBufferMetres: number;
   /** Follow errors beyond this are treated as teleports/checkpoint resets. */
   teleportSnapDistanceMetres: number;
-  /** Fixed near-pivot distance used by Goop's first-person aim pose. */
+  /** Fixed near-pivot distance used by first-person ability aim poses. */
   aimFirstPersonDistanceMetres: number;
   /** Optional sideways framing offset retained for authored aim variants. */
   aimShoulderOffsetMetres: number;
@@ -338,7 +338,7 @@ export class CameraRig {
   }
 
   /**
-   * Blend the existing collision-aware boom into Goop's first-person aim pose.
+   * Blend the existing collision-aware boom into an ability first-person aim pose.
    * This never changes the camera ray, FOV, orbit, or target authority.
    */
   setAimPresentationActive(active: boolean, immediate = false): void {
