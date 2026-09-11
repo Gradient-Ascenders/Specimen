@@ -405,14 +405,36 @@ implements BlackoutCheckpointParticipant {
     return true;
   }
 
-  cancelTransient(reason: MaintenanceDroneRecoveryReason): void {
+  suspendInput(): void {
     if (this.disposed) return;
     this.flight.park();
     this.model.mountAvailable = false;
+    this.syncModel();
+  }
+
+  cancelTransient(reason: MaintenanceDroneRecoveryReason): void {
+    if (this.disposed) return;
+    this.suspendInput();
     if (reason === 'death') {
       // Checkpoint recovery will restore the authoritative stable state.
       this.recoveryReasonValue = reason;
     }
+    this.syncModel();
+  }
+
+  recoverImmediately(reason: MaintenanceDroneRecoveryReason): void {
+    if (this.disposed) return;
+    this.authoring.recoveryAnchor.getWorldPosition(this.recoveryPosition);
+    this.voltMountedValue = false;
+    this.pendingMountedRestore = false;
+    this.startupElapsedSeconds = 0;
+    this.recoveryElapsedSeconds = 0;
+    this.recoveryReasonValue = undefined;
+    this.flight.teleport(this.recoveryPosition);
+    this.setState(
+      this.model.startupCompleted ? 'grounded-idle' : 'damaged-idle',
+    );
+    this.events.emit('recoveryCompleted', { reason });
     this.syncModel();
   }
 
@@ -573,6 +595,7 @@ implements BlackoutCheckpointParticipant {
     this.events.emit('startupCompleted', {});
     this.events.emit('mounted', {});
     if (!this.model.tutorialCompleted) {
+      this.model.tutorialCompleted = true;
       this.events.emit('firstMountTutorialRequested', {});
     }
   }
@@ -617,7 +640,10 @@ implements BlackoutCheckpointParticipant {
     this.model.parked = state === 'parked-hover';
     this.model.powered = this.model.mounted;
     this.model.lightEnabled = this.model.powered;
-    if (state !== 'starting' && !this.model.startupCompleted) {
+    if (
+      (state === 'damaged-idle' || state === 'grounded-idle') &&
+      !this.model.startupCompleted
+    ) {
       this.model.startupProgress = 0;
     }
   }
