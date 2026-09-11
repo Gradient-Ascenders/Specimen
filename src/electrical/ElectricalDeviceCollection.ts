@@ -71,6 +71,12 @@ implements ResettablePuzzleComponent, BlackoutCheckpointParticipant {
     if (!registration) return false;
 
     registration.unregisterTarget();
+
+    // Remove this source's contribution before deleting its outgoing links.
+    for (const recipientId of this.outgoing.get(id) ?? []) {
+      this.registrations.get(recipientId)?.device.core.setSupply(id, false);
+    }
+
     this.registrations.delete(id);
     const orderIndex = this.deviceOrder.indexOf(registration.device);
     if (orderIndex >= 0) this.deviceOrder.splice(orderIndex, 1);
@@ -115,6 +121,22 @@ implements ResettablePuzzleComponent, BlackoutCheckpointParticipant {
     this.recomputePower();
   }
 
+  removeSupplyLink(sourceId: string, recipientId: string): boolean {
+    this.assertNotDisposed('unwire electrical devices');
+    const recipients = this.outgoing.get(sourceId);
+    if (!recipients) return false;
+    const index = recipients.indexOf(recipientId);
+    if (index < 0) return false;
+
+    recipients.splice(index, 1);
+    this.registrations
+      .get(recipientId)
+      ?.device.core.setSupply(sourceId, false);
+    this.rebuildTopologicalOrder();
+    this.recomputePower();
+    return true;
+  }
+
   getDevice<T extends ElectricalDevice = ElectricalDevice>(
     id: string,
   ): T | undefined {
@@ -124,15 +146,18 @@ implements ResettablePuzzleComponent, BlackoutCheckpointParticipant {
   recomputePower(): void {
     if (this.disposed) return;
 
-    for (const device of this.deviceOrder) {
-      device.core.clearSupplies();
-    }
-
+    // Topological order guarantees an upstream node has already had every one
+    // of its own supplies refreshed before its output is copied downstream.
+    // Diffing each stable source ID avoids false off/on transitions on every
+    // fixed-step recompute.
     for (const source of this.topologicalOrder) {
-      if (!source.canSupply || !source.core.readModel.powered) continue;
+      const supplied = source.canSupply && source.core.readModel.powered;
       const recipients = this.outgoing.get(source.id) ?? [];
       for (const recipientId of recipients) {
-        this.requireDevice(recipientId).core.setSupply(source.id, true);
+        this.requireDevice(recipientId).core.setSupply(
+          source.id,
+          supplied,
+        );
       }
     }
 
