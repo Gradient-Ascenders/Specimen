@@ -655,3 +655,32 @@ test('raycast does not overwrite movement sweep diagnostics', () => {
   movement.geometry.dispose();
   target.geometry.dispose();
 });
+
+
+test('raycast reports a zero-distance hit when the origin starts inside a collider', () => {
+  const world = new CollisionWorld();
+  const collider = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
+  collider.name = 'inside-ray-collider';
+  world.register(
+    collider,
+    CollisionLayer.LineOfSight,
+    ColliderTransformMode.Static,
+  );
+  const hit = new CollisionHit();
+
+  assert.equal(
+    world.raycast(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 1),
+      5,
+      hit,
+      CollisionLayer.LineOfSight,
+    ),
+    true,
+  );
+  assert.equal(hit.object, collider);
+  assert.equal(hit.distance, 0);
+  assert.equal(hit.fraction, 0);
+
+  collider.geometry.dispose();
+});
