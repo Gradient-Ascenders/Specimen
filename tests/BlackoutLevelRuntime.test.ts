@@ -4,6 +4,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 
 import type { Input, InputAction } from '../src/core/Input.ts';
+import type { LoopStats } from '../src/core/Loop.ts';
 import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
 
@@ -204,9 +205,14 @@ class RuntimeFakeInput {
 
   endFixedUpdate(): void {
     this.pressed.clear();
+    this.endPointerUpdate();
   }
 
-  endPointerUpdate(): void {}
+  endPointerUpdate(): void {
+    this.pointerDeltaX = 0;
+    this.pointerDeltaY = 0;
+  }
+
   requestPointerLock(): void { this.pointerLocked = true; }
   releasePointerLock(): void { this.pointerLocked = false; }
 }
@@ -216,12 +222,25 @@ class RuntimeFakeCameraRig {
   readonly aimOrigin = new THREE.Vector3(2, 0.46, 2);
   readonly aimDirection = new THREE.Vector3(-2, 0.64, 6).normalize();
   aimActive = false;
+  queuedLookX = 0;
+  queuedLookY = 0;
+  appliedLookX = 0;
+  appliedLookY = 0;
 
   setFollowTarget(): void {}
   clearFollowTarget(): void {}
   reset(): void {}
-  queueLookInput(): void {}
-  applyQueuedLookInput(): void {}
+  queueLookInput(deltaX: number, deltaY: number): void {
+    this.queuedLookX += deltaX;
+    this.queuedLookY += deltaY;
+  }
+
+  applyQueuedLookInput(): void {
+    this.appliedLookX += this.queuedLookX;
+    this.appliedLookY += this.queuedLookY;
+    this.queuedLookX = 0;
+    this.queuedLookY = 0;
+  }
 
   copyGroundMovementDirection(
     _x: number,
@@ -249,7 +268,9 @@ class RuntimeFakeCameraRig {
     this.aimActive = active;
   }
 
-  update(): void {}
+  update(): void {
+    this.applyQueuedLookInput();
+  }
 }
 
 test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause and clears it on restart/death/dispose', () => {
@@ -347,6 +368,72 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
 
     runtime.dispose();
     assert.equal(runtime.state, 'disposed');
+    assert.equal(scene.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+
+test('Blackout render consumes pointer movement on a frame with zero fixed steps', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFakeCameraRig();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'volt',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+
+    // Simulate a 144 Hz render frame arriving before the next 60 Hz fixed
+    // update. The sample must be queued before endPointerUpdate clears it.
+    input.pointerDeltaX = 12;
+    input.pointerDeltaY = -7;
+    runtime.render(
+      0,
+      {
+        frameDeltaSeconds: 1 / 144,
+      } as Readonly<LoopStats>,
+    );
+
+    assert.equal(cameraRig.appliedLookX, 12);
+    assert.equal(cameraRig.appliedLookY, -7);
+    assert.equal(cameraRig.queuedLookX, 0);
+    assert.equal(cameraRig.queuedLookY, 0);
+    assert.equal(input.pointerDeltaX, 0);
+    assert.equal(input.pointerDeltaY, 0);
+
+    // A later fixed update cannot consume the already-rendered sample again.
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(cameraRig.appliedLookX, 12);
+    assert.equal(cameraRig.appliedLookY, -7);
+
+    runtime.dispose();
     assert.equal(scene.children.length, 0);
   } finally {
     Object.defineProperty(globalThis, 'document', {
