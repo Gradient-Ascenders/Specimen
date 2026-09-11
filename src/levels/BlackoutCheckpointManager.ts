@@ -107,34 +107,18 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
     this.checkpoints.set(checkpoint.id, checkpoint);
   }
 
-  activate(checkpointId: BlackoutCheckpointId, activeSlimeId?: BlackoutSlimeId): void {
-    const checkpoint = this.getCheckpoint(checkpointId);
-    this.assertSafe(checkpoint);
-    this.activeSnapshot = this.createSnapshot(checkpoint, activeSlimeId);
-  }
-
-  captureCurrent(
+  activate(
     checkpointId: BlackoutCheckpointId,
-    group: PersistentSlimeGroup<Body>,
-    room: BlackoutRoomState,
+    activeSlimeId?: BlackoutSlimeId,
+    roomState?: BlackoutRoomState,
   ): void {
     const checkpoint = this.getCheckpoint(checkpointId);
-    const candidate: BlackoutRuntimeSnapshot = {
-      checkpointId,
-      bodyPositions: {
-        bob: toTuple(group.bobBody.position),
-        goop: toTuple(group.goopBody.position),
-        volt: toTuple(group.voltBody.position),
-      },
-      activeSlimeId: group.activeSlimeId,
-      room: cloneRoomState(room),
-      connections: { voltTargetId: null },
-      participantState: this.captureParticipants(),
-    };
-    // Validate before committing the snapshot so a failed activation cannot
-    // poison the previously-safe recovery state.
-    this.assertSafeSnapshot(candidate, checkpoint.clearanceRadius);
-    this.activeSnapshot = candidate;
+    this.assertSafe(checkpoint);
+    this.activeSnapshot = this.createSnapshot(
+      checkpoint,
+      activeSlimeId,
+      roomState,
+    );
   }
 
   recover(group: PersistentSlimeGroup<Body>): BlackoutRuntimeSnapshot {
@@ -178,6 +162,7 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
   private createSnapshot(
     checkpoint: RegisteredCheckpoint,
     activeSlimeId = checkpoint.activeSlimeId,
+    roomState: BlackoutRoomState = checkpoint.room,
   ): BlackoutRuntimeSnapshot {
     return {
       checkpointId: checkpoint.id,
@@ -187,7 +172,7 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
         volt: toTuple(checkpoint.bodyPositions.volt),
       },
       activeSlimeId,
-      room: cloneRoomState(checkpoint.room),
+      room: cloneRoomState(roomState),
       connections: { voltTargetId: null },
       participantState: this.captureParticipants(),
     };
