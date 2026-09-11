@@ -298,6 +298,19 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
     runtime.activateCheckpoint('cp2');
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
 
+    runtime.recoverActiveCheckpoint();
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+
+    input.requestPointerLock();
+    input.press('aimAbility');
+    input.press('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+
+    input.release('aimAbility');
+    input.release('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+
     input.press('switchSlime');
     runtime.fixedUpdate(1 / 60);
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
