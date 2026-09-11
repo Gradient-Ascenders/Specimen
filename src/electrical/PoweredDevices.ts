@@ -272,7 +272,11 @@ export class PoweredDoorDevice implements ElectricalDevice {
     );
   }
 
-  syncPowerOutputs(): void {}
+  syncPowerOutputs(): void {
+    this.door.setOpen(
+      this.core.readModel.powered && this.mechanicalPermission,
+    );
+  }
 
   dispose(): void {
     if (this.disposed) return;
