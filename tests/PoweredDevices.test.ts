@@ -305,3 +305,34 @@ test('development rig contains all eight device types and remains resource-stabl
     assert.equal(surfaces.registeredCount, 0);
   }
 });
+
+
+test('development rig construction failure rolls back device colliders, surfaces, targets, and laser resources', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const targets = new ElectricalTargetRegistry(world);
+  const originalRegister = surfaces.register.bind(surfaces);
+  let registrations = 0;
+  surfaces.register = ((mesh: THREE.Mesh) => {
+    registrations += 1;
+    if (registrations === 3) {
+      throw new Error('injected powered-rig surface failure');
+    }
+    originalRegister(mesh);
+  }) as typeof surfaces.register;
+
+  assert.throws(
+    () => new BlackoutPoweredDeviceRig({
+      collisionWorld: world,
+      surfaceRegistry: surfaces,
+      targetRegistry: targets,
+      requestFailure: () => {},
+    }),
+    /injected powered-rig surface failure/,
+  );
+
+  assert.equal(world.colliderCount, 0);
+  assert.equal(surfaces.registeredCount, 0);
+  assert.equal(targets.size, 0);
+  targets.dispose();
+});
