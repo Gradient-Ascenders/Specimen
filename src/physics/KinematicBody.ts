@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 
 import type { EventBus } from '../core/EventBus.ts';
-import { CollisionHit, CollisionWorld } from './CollisionWorld.ts';
+import {
+  CollisionHit,
+  CollisionLayer,
+  CollisionWorld,
+} from './CollisionWorld.ts';
 import type { MovementEvents } from './MovementEvents.ts';
 import {
   type SurfaceRegistry,
@@ -46,6 +50,8 @@ export interface KinematicBodyConfig {
   groundProbeDistanceMetres: number;
   minimumGroundNormalDot: number;
   maxCollisionIterations: number;
+  /** Collision layers used by locomotion, support probes and carrier sweeps. */
+  movementCollisionMask: number;
 
   /** Whether this body may attach to authored sticky surfaces. */
   adhesionEnabled: boolean;
@@ -94,6 +100,7 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   groundProbeDistanceMetres: 0.08,
   minimumGroundNormalDot: Math.cos(THREE.MathUtils.degToRad(50)),
   maxCollisionIterations: 3,
+  movementCollisionMask: CollisionLayer.Movement,
   adhesionEnabled: true,
   reboundEnabled: true,
   chargedJumpEnabled: true,
@@ -521,7 +528,7 @@ export class KinematicBody {
         this.carrierRemainingDisplacement,
         queryRadius,
         this.carrierHit,
-        undefined,
+        this.config.movementCollisionMask,
         carrierCollider,
       );
 
@@ -567,6 +574,56 @@ export class KinematicBody {
       }
     }
   }
+
+  /**
+   * Synchronize this existing gameplay body to an authored kinematic owner.
+   *
+   * Maintenance-drone mounting uses the real Volt body so camera/electrical
+   * systems keep one identity. Unlike checkpoint recovery this preserves an
+   * explicit previous pose for interpolation and deliberately does not probe
+   * support or synthesize a recovery event.
+   */
+  syncKinematicPose(
+    position: ReadonlyVector3State,
+    previousPosition: ReadonlyVector3State = position,
+  ): void {
+    for (const [name, value] of [
+      ['position.x', position.x],
+      ['position.y', position.y],
+      ['position.z', position.z],
+      ['previousPosition.x', previousPosition.x],
+      ['previousPosition.y', previousPosition.y],
+      ['previousPosition.z', previousPosition.z],
+    ] as const) {
+      if (!Number.isFinite(value)) {
+        throw new Error(`${name} must be finite.`);
+      }
+    }
+
+    this.currentPosition.set(position.x, position.y, position.z);
+    this.previousPositionValue.set(
+      previousPosition.x,
+      previousPosition.y,
+      previousPosition.z,
+    );
+    this.velocityValue.set(0, 0, 0);
+    this.groundedValue = false;
+    this.supportColliderValue = null;
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.stickyJumpGravityActiveValue = false;
+    this.stickyJumpGravityRemainingSecondsValue = 0;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(WORLD_UP);
+    this.supportSurfaceTagValue = 'default';
+    this.supportTractionMultiplier = 1;
+    this.cancelJumpCharge();
+    this.clearJumpBuffer();
+    this.coyoteTimeRemainingSecondsValue = 0;
+    this.groundReacquireDelaySeconds = 0;
+    this.airborneSeconds = 0;
+  }
+
 
   /**
    * Checkpoint recovery adapter.
@@ -1013,6 +1070,7 @@ export class KinematicBody {
         this.remainingDisplacement,
         queryRadius,
         this.movementHit,
+        this.config.movementCollisionMask,
       );
 
       if (!hit) {
@@ -1299,6 +1357,7 @@ export class KinematicBody {
         this.groundProbeDisplacement,
         this.config.radiusMetres + this.config.skinWidthMetres,
         this.groundHit,
+        this.config.movementCollisionMask,
       );
 
       if (hasAttachmentSupport) {
@@ -1347,6 +1406,7 @@ export class KinematicBody {
       this.groundProbeDisplacement,
       this.config.radiusMetres + this.config.skinWidthMetres,
       this.groundHit,
+      this.config.movementCollisionMask,
     );
 
     if (!hasGroundHit) return;
@@ -1400,6 +1460,7 @@ export class KinematicBody {
         this.edgeProbeDisplacement,
         this.config.radiusMetres + this.config.skinWidthMetres,
         this.edgeHit,
+        this.config.movementCollisionMask,
       )
     ) {
       return false;
@@ -1540,6 +1601,15 @@ export class KinematicBody {
     ) {
       throw new Error(
         'adhesionEnabled, reboundEnabled, and chargedJumpEnabled must be boolean values.',
+      );
+    }
+
+    if (
+      !Number.isInteger(config.movementCollisionMask) ||
+      config.movementCollisionMask <= CollisionLayer.None
+    ) {
+      throw new Error(
+        'movementCollisionMask must be a positive integer collision mask.',
       );
     }
 
