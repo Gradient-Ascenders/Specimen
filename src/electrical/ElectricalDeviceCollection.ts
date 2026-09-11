@@ -6,6 +6,7 @@ import type {
   ElectricalDevice,
   PoweredCarrierBody,
 } from './PoweredDevices.ts';
+import type { PoweredDeviceReadModel } from './PoweredDeviceCore.ts';
 
 interface RegisteredDevice {
   readonly device: ElectricalDevice;
@@ -135,6 +136,10 @@ implements ResettablePuzzleComponent, BlackoutCheckpointParticipant {
     this.rebuildTopologicalOrder();
     this.recomputePower();
     return true;
+  }
+
+  getReadModel(id: string): PoweredDeviceReadModel | undefined {
+    return this.registrations.get(id)?.device.core.readModel;
   }
 
   getDevice<T extends ElectricalDevice = ElectricalDevice>(
