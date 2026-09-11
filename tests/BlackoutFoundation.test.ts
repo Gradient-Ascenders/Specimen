@@ -235,3 +235,20 @@ test('Level 3 progression requires the rescued three-slime roster and preserves 
     activeSlimeId: 'volt',
   }));
 });
+
+
+test('full restart preserves the active identity handed off at Level 3 entry', () => {
+  const { group } = makeGroup();
+  const manager = new BlackoutCheckpointManager<TestBody>(
+    checkpoint(),
+    () => true,
+    'goop',
+  );
+
+  group.activate('bob');
+  manager.activate('cp1', 'bob');
+  manager.resetToInitial();
+  manager.recover(group);
+
+  assert.equal(group.activeSlimeId, 'goop');
+});
