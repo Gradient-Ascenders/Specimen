@@ -10,6 +10,17 @@ import {
   type VoltElectricalReadModel,
 } from '../abilities/VoltElectricalSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
+import { SpecimenCombatDevelopmentRig } from '../combat/SpecimenCombatDevelopmentRig.ts';
+import {
+  CombatTargetRegistry,
+  type CombatTarget,
+  type CombatTargetRegistrationOptions,
+} from '../combat/CombatTargetRegistry.ts';
+import {
+  SpecimenProjectileSystem,
+  type SpecimenAttackReadModel,
+  type SpecimenProjectileReadState,
+} from '../combat/SpecimenProjectileSystem.ts';
 import {
   BlackoutPoweredDeviceRig,
 } from '../electrical/BlackoutPoweredDeviceRig.ts';
@@ -34,6 +45,7 @@ import {
 } from '../puzzle/PuzzleRegistry.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { VoltElectricalPresentation } from '../render/electrical/VoltElectricalPresentation.ts';
+import { SpecimenCombatPresentation } from '../render/specimen/SpecimenCombatPresentation.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
   type SlimeHUDListener,
@@ -42,13 +54,22 @@ import {
 } from '../slimes/SlimeHUDState.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimeGroup } from '../slimes/PersistentSlimeGroup.ts';
+import {
+  SpecimenFormController,
+  type SpecimenFormReadModel,
+} from '../specimen/SpecimenFormController.ts';
 import { DeathSequence } from '../systems/DeathSequence.ts';
 import { DeathScreen } from '../ui/DeathScreen.ts';
 import {
   BlackoutCheckpointManager,
   type BlackoutCheckpointParticipant,
 } from './BlackoutCheckpointManager.ts';
-import { BLACKOUT_CHECKPOINTS } from './BlackoutFoundationManifest.ts';
+import {
+  BLACKOUT_CHECKPOINTS,
+  BLACKOUT_SPECIMEN_MERGE_ANCHOR,
+  BLACKOUT_SPECIMEN_RADIUS_METRES,
+  BLACKOUT_SPLIT_BODY_POSITIONS,
+} from './BlackoutFoundationManifest.ts';
 import { BlackoutLevelScene } from './BlackoutLevelScene.ts';
 import { BLACKOUT_SLIME_DEFINITIONS } from './BlackoutSlimeDefinitions.ts';
 import {
@@ -83,9 +104,19 @@ interface BlackoutRuntimeResources {
   readonly electricalSystem: VoltElectricalSystem<KinematicBody>;
   readonly electricalPresentation: VoltElectricalPresentation;
   readonly poweredDeviceRig: BlackoutPoweredDeviceRig;
-  readonly carrierBodies: readonly PoweredCarrierBody[];
+  readonly groupCarrierBodies: readonly PoweredCarrierBody[];
+  readonly specimenCarrierBody: PoweredCarrierBody;
+  readonly combatTargets: CombatTargetRegistry;
+  readonly combatRig: SpecimenCombatDevelopmentRig;
+  readonly specimenBody: KinematicBody;
+  readonly specimenForm: SpecimenFormController;
+  readonly specimenAttack: SpecimenProjectileSystem;
+  readonly specimenPresentation: SpecimenCombatPresentation;
+  readonly specimenVisual: THREE.Mesh;
+  readonly specimenLight: THREE.PointLight;
   readonly unregisterElectricalCheckpointParticipant: () => void;
   readonly unregisterPoweredDevicesCheckpointParticipant: () => void;
+  readonly unregisterCombatCheckpointParticipant: () => void;
   readonly manager: SlimeManager<KinematicBody>;
   readonly group: PersistentSlimeGroup<KinematicBody>;
   readonly checkpoints: BlackoutCheckpointManager<KinematicBody>;
@@ -159,6 +190,26 @@ export class BlackoutLevelRuntime {
     return this.resources?.poweredDeviceRig.devices.getReadModel(id);
   }
 
+
+  get specimenFormReadModel(): SpecimenFormReadModel | undefined {
+    return this.resources?.specimenForm.readModel;
+  }
+
+  get specimenAttackReadModel(): SpecimenAttackReadModel | undefined {
+    return this.resources?.specimenAttack.readModel;
+  }
+
+  get specimenProjectileStates(): readonly SpecimenProjectileReadState[] {
+    return this.resources?.specimenAttack.projectileStates ?? [];
+  }
+
+  registerCombatTarget(
+    target: CombatTarget,
+    options?: CombatTargetRegistrationOptions,
+  ): () => void {
+    return this.requireResources().combatTargets.register(target, options);
+  }
+
   load(): void { this.lifecycle.load(); }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
@@ -200,9 +251,15 @@ export class BlackoutLevelRuntime {
   getSlimeHUDSnapshot(): SlimeHUDSnapshot {
     const resources = this.resources;
     if (!resources) return EMPTY_SLIME_HUD_SNAPSHOT;
+    const specimenControlled =
+      resources.specimenForm.readModel.controlledForm === 'specimen';
     return {
       roster: resources.manager.getRosterState(),
-      activeSlimeId: resources.manager.activeSlimeId,
+      activeSlimeId: specimenControlled
+        ? undefined
+        : resources.manager.activeSlimeId,
+      controlledForm: specimenControlled ? 'specimen' : 'slime',
+      activeFormLabel: specimenControlled ? 'SPECIMEN' : undefined,
       passiveInteractions: [],
       playerSwitchFeedback: undefined,
       resetSwitchFeedback: false,
@@ -278,6 +335,8 @@ export class BlackoutLevelRuntime {
       return false;
     }
     resources.electricalSystem.reset('death');
+    resources.specimenAttack.reset();
+    resources.specimenPresentation.suspend();
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
@@ -288,32 +347,138 @@ export class BlackoutLevelRuntime {
     return true;
   }
 
+  /** Begin the guarded six-second fixed-step merge. */
+  beginMerge(): boolean {
+    const resources = this.requireResources();
+    if (resources.phase.phase !== 'three-slime') return false;
+    if (
+      !this.isSpawnSafe(
+        resources,
+        BLACKOUT_SPECIMEN_MERGE_ANCHOR,
+        BLACKOUT_SPECIMEN_RADIUS_METRES,
+      )
+    ) {
+      return false;
+    }
+    if (!resources.specimenForm.beginMerge()) return false;
+    if (!resources.phase.transition('merging')) {
+      resources.specimenForm.restore('group');
+      return false;
+    }
+
+    this.input.resetState();
+    resources.electricalSystem.disconnect('merge');
+    resources.electricalSystem.cancelAim();
+    resources.specimenAttack.reset();
+    resources.poweredDeviceRig.recomputePower();
+    resources.electricalPresentation.update(
+      resources.electricalSystem.readModel,
+    );
+    this.renderLayer.cameraRig.setAimPresentationActive(false, true);
+    resources.movement.set(0, 0, 0);
+    clearJump(resources.jump, true);
+    this.currentRoom = {
+      roomId: 'room-4a',
+      phase: 'merging',
+      local: { ...this.currentRoom.local },
+    };
+    this.notifyHUD(undefined, true);
+    return true;
+  }
+
+  /** Begin split staging after the boss has been defeated. */
+  beginSplit(): boolean {
+    const resources = this.requireResources();
+    if (resources.phase.phase !== 'boss-defeated') return false;
+    if (!this.areSplitAnchorsSafe(resources)) return false;
+    if (!resources.specimenForm.beginSplit()) return false;
+    if (!resources.phase.transition('splitting')) {
+      resources.specimenForm.restore('specimen');
+      return false;
+    }
+
+    this.input.resetState();
+    resources.specimenAttack.reset();
+    this.renderLayer.cameraRig.setAimPresentationActive(false, true);
+    this.currentRoom = {
+      roomId: 'ending',
+      phase: 'splitting',
+      local: { ...this.currentRoom.local },
+    };
+    this.notifyHUD(undefined, true);
+    return true;
+  }
+
   /**
-   * Integration hook for #127 and the boss/split issues. Illegal or duplicate
-   * transitions are rejected; completion commits before its one-shot event.
+   * Presentation/cinematic owner calls this when split staging finishes.
+   * All three anchors are validated before any original body is moved.
+   */
+  completeSplit(): boolean {
+    const resources = this.requireResources();
+    if (resources.phase.phase !== 'splitting') return false;
+    if (!this.areSplitAnchorsSafe(resources)) return false;
+    if (!resources.specimenForm.completeSplit()) return false;
+
+    resources.group.setRecoveryState({
+      positions: {
+        bob: BLACKOUT_SPLIT_BODY_POSITIONS.bob,
+        goop: BLACKOUT_SPLIT_BODY_POSITIONS.goop,
+        volt: BLACKOUT_SPLIT_BODY_POSITIONS.volt,
+      },
+      activeSlimeId: 'bob',
+    });
+    resources.group.restoreRecoveryState();
+    if (!resources.phase.transition('escape')) {
+      throw new Error('Split completed without a legal escape phase transition.');
+    }
+    this.currentRoom = {
+      roomId: 'ending',
+      phase: 'escape',
+      local: { ...this.currentRoom.local, splitComplete: true },
+    };
+    this.renderLayer.cameraRig.reset();
+    this.retargetCamera(resources);
+    this.syncVisuals(resources);
+    this.notifyHUD(undefined, true);
+    return true;
+  }
+
+  /**
+   * Boss/ending integration hook. Merge and split body handoffs must use the
+   * dedicated methods above so phase and controlled-form state cannot diverge.
    */
   transitionPhase(next: BlackoutPhase): boolean {
+    if (next === 'merging') return this.beginMerge();
+    if (next === 'splitting') return this.beginSplit();
+    if (next === 'escape') return false;
+    if (next === 'specimen') return false;
+
     const resources = this.requireResources();
+    if (
+      (next === 'boss' || next === 'boss-defeated') &&
+      resources.specimenForm.readModel.controlledForm !== 'specimen'
+    ) {
+      return false;
+    }
     if (!resources.phase.transition(next)) return false;
-    if (next === 'merging') {
-      resources.electricalSystem.disconnect('merge');
-      resources.electricalSystem.cancelAim();
-      resources.poweredDeviceRig.recomputePower();
-      this.renderLayer.cameraRig.setAimPresentationActive(false);
+
+    if (next === 'boss-defeated') {
+      resources.specimenAttack.reset();
+      this.renderLayer.cameraRig.setAimPresentationActive(false, true);
     } else if (next === 'complete') {
       resources.electricalSystem.disconnect('completion');
       resources.electricalSystem.cancelAim();
+      resources.specimenAttack.reset();
       resources.poweredDeviceRig.recomputePower();
-      this.renderLayer.cameraRig.setAimPresentationActive(false);
+      this.renderLayer.cameraRig.setAimPresentationActive(false, true);
     }
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.currentRoom = {
       ...this.currentRoom,
       phase: next,
       roomId:
-        next === 'specimen' || next === 'merging' ? 'room-4a'
-        : next === 'boss' || next === 'boss-defeated' ? 'room-4b'
-        : next === 'splitting' || next === 'escape' || next === 'complete' ? 'ending'
+        next === 'boss' || next === 'boss-defeated' ? 'room-4b'
+        : next === 'complete' ? 'ending'
         : this.currentRoom.roomId,
     };
     if (next === 'complete') this.commitCompletion();
@@ -332,6 +497,56 @@ export class BlackoutLevelRuntime {
         resources.deathScreen.show();
         this.host.dataset.gameState = resources.deathSequence.state;
       }
+      this.input.endFixedUpdate();
+      return;
+    }
+
+    if (resources.phase.phase === 'merging') {
+      if (resources.specimenForm.updateMerge(deltaSeconds)) {
+        if (
+          !this.isSpawnSafe(
+            resources,
+            BLACKOUT_SPECIMEN_MERGE_ANCHOR,
+            BLACKOUT_SPECIMEN_RADIUS_METRES,
+          )
+        ) {
+          resources.specimenForm.restore('group');
+          resources.phase.restore('three-slime');
+          this.currentRoom = {
+            ...this.currentRoom,
+            roomId: 'room-3',
+            phase: 'three-slime',
+          };
+        } else {
+          resources.specimenBody.recoverAt(BLACKOUT_SPECIMEN_MERGE_ANCHOR);
+          if (!resources.phase.transition('specimen')) {
+            throw new Error('Merge completed without a legal Specimen phase transition.');
+          }
+          this.currentRoom = {
+            roomId: 'room-4a',
+            phase: 'specimen',
+            local: { ...this.currentRoom.local, merged: true },
+          };
+          this.renderLayer.cameraRig.reset();
+          this.retargetCamera(resources);
+          this.notifyHUD(undefined, true);
+        }
+      }
+      resources.poweredDeviceRig.updateMechanics(deltaSeconds, []);
+      resources.poweredDeviceRig.updateHazards(deltaSeconds, []);
+      this.syncVisuals(resources);
+      this.input.endFixedUpdate();
+      return;
+    }
+
+    if (
+      resources.phase.phase === 'splitting' ||
+      resources.phase.phase === 'boss-defeated'
+    ) {
+      resources.specimenAttack.cancelInput();
+      resources.poweredDeviceRig.updateMechanics(deltaSeconds, []);
+      resources.poweredDeviceRig.updateHazards(deltaSeconds, []);
+      this.syncVisuals(resources);
       this.input.endFixedUpdate();
       return;
     }
@@ -363,7 +578,12 @@ export class BlackoutLevelRuntime {
     const moveZ = (this.input.isDown('moveBackward') ? 1 : 0) -
       (this.input.isDown('moveForward') ? 1 : 0);
 
-    const body = resources.group.activeBody;
+    const specimenGameplay =
+      resources.phase.phase === 'specimen' ||
+      resources.phase.phase === 'boss';
+    const body = specimenGameplay
+      ? resources.specimenBody
+      : resources.group.activeBody;
     if (!switched) {
       this.renderLayer.cameraRig.queueLookInput(
         this.input.pointerDeltaX,
@@ -404,20 +624,39 @@ export class BlackoutLevelRuntime {
     );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
 
+    resources.specimenAttack.update(deltaSeconds, {
+      active: specimenGameplay,
+      aimHeld: this.input.isDown('aimAbility'),
+      fireHeld: this.input.isDown('fireAbility'),
+      firePressed: this.input.wasPressed('fireAbility'),
+      fireReleased: this.input.wasReleased('fireAbility'),
+      gameplayInputEnabled: this.input.enabled,
+      pointerLocked: this.input.pointerLocked,
+      cancelled: this.input.wasClearedSinceFixedUpdate,
+    });
+    this.renderLayer.cameraRig.setAimPresentationActive(
+      resources.electricalSystem.readModel.aimActive ||
+      resources.specimenAttack.readModel.aimActive,
+    );
+    resources.specimenPresentation.update(specimenGameplay);
+
     // Power is propagated from the freshly-updated Volt connection, then
     // mechanics advance once. Device motion can move the connected socket, so
     // revalidate the tether without consuming input a second time and rebuild
     // power before lethal hazards are evaluated.
     resources.poweredDeviceRig.recomputePower();
+    const participatingCarriers = specimenGameplay
+      ? [resources.specimenCarrierBody]
+      : resources.groupCarrierBodies;
     resources.poweredDeviceRig.updateMechanics(
       deltaSeconds,
-      resources.carrierBodies,
+      participatingCarriers,
     );
     resources.electricalSystem.revalidateConnection();
     resources.poweredDeviceRig.recomputePower();
     resources.poweredDeviceRig.updateHazards(
       deltaSeconds,
-      resources.carrierBodies,
+      participatingCarriers,
     );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
 
@@ -427,11 +666,13 @@ export class BlackoutLevelRuntime {
       return;
     }
 
-    // Inactive Level 3 bodies deliberately keep their exact positions while
-    // preserving their colliders/passive state. A switch itself never updates,
-    // teleports, recreates or unregisters them.
-    for (const slimeBody of resources.group.bodies) {
-      if (slimeBody.position.y < OUT_OF_BOUNDS_Y) {
+    // Only the participating controlled form can fail hazards/out-of-bounds.
+    // Hidden original bodies remain exact objects while merged but are inert.
+    const participatingBodies = specimenGameplay
+      ? [resources.specimenBody]
+      : resources.group.bodies;
+    for (const participatingBody of participatingBodies) {
+      if (participatingBody.position.y < OUT_OF_BOUNDS_Y) {
         this.requestFailure();
         this.input.endFixedUpdate();
         return;
@@ -448,6 +689,9 @@ export class BlackoutLevelRuntime {
       this.syncVisuals(resources);
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
+      );
+      resources.specimenPresentation.update(
+        resources.specimenForm.readModel.controlledForm === 'specimen',
       );
 
       // Render frames can run without a fixed update when the display refresh
@@ -478,7 +722,10 @@ export class BlackoutLevelRuntime {
     target.room = this.currentRoom.roomId;
     target.gameplayState = resources?.phase.phase ?? this.lifecycle.state;
     target.cutsceneState = 'none';
-    target.activeSlime = resources?.manager.activeSlimeId ?? 'none';
+    target.activeSlime =
+      resources?.specimenForm.readModel.controlledForm === 'specimen'
+        ? 'specimen'
+        : resources?.manager.activeSlimeId ?? 'none';
     writePerformancePosition(target.cameraPosition, this.renderLayer.cameraRig.camera.position);
     if (!resources) {
       target.bobPosition.fill(0);
@@ -553,6 +800,22 @@ export class BlackoutLevelRuntime {
         initialActiveSlimeId: initialActive,
       });
 
+      const specimenBody = new KinematicBody({
+        world: collisionWorld,
+        surfaces: surfaceRegistry,
+        initialPosition: BLACKOUT_SPECIMEN_MERGE_ANCHOR,
+        config: {
+          radiusMetres: BLACKOUT_SPECIMEN_RADIUS_METRES,
+          adhesionEnabled: true,
+          reboundEnabled: true,
+          chargedJumpEnabled: true,
+        },
+      });
+      const specimenForm = new SpecimenFormController({
+        mergeDurationSeconds: 6,
+      });
+      rollback(() => specimenForm.dispose());
+
       const safetyHit = new CollisionHit();
       const safetyDisplacement = new THREE.Vector3();
       const isSpawnSafe = (position: THREE.Vector3, clearanceRadius: number): boolean => {
@@ -608,6 +871,14 @@ export class BlackoutLevelRuntime {
       voltLight.castShadow = false;
       visuals.volt.add(voltLight);
 
+      const specimenVisual = createSpecimenVisual();
+      rollback(() => disposeSlimeVisual(specimenVisual));
+      this.renderLayer.scene.add(specimenVisual);
+      const specimenLight = new THREE.PointLight(0xff584a, 2.4, 10, 2);
+      specimenLight.name = 'blackout-specimen-light';
+      specimenLight.castShadow = false;
+      specimenVisual.add(specimenLight);
+
       const electricalTargets = new ElectricalTargetRegistry(collisionWorld);
       rollback(() => electricalTargets.dispose());
 
@@ -626,11 +897,42 @@ export class BlackoutLevelRuntime {
         poweredDeviceRig,
       );
 
-      const carrierBodies: readonly PoweredCarrierBody[] = [
+      const groupCarrierBodies: readonly PoweredCarrierBody[] = [
         createPoweredCarrierBody('bob', group.bobBody),
         createPoweredCarrierBody('goop', group.goopBody),
         createPoweredCarrierBody('volt', group.voltBody),
       ];
+      const specimenCarrierBody =
+        createPoweredCarrierBody('specimen', specimenBody);
+
+      const combatTargets = new CombatTargetRegistry(collisionWorld);
+      rollback(() => combatTargets.dispose());
+      const combatRig = new SpecimenCombatDevelopmentRig({
+        collisionWorld,
+        surfaceRegistry,
+        targetRegistry: combatTargets,
+      });
+      rollback(() => combatRig.dispose());
+      scene.root.add(combatRig.root);
+      puzzleRegistry.register(
+        'specimen-combat-development-rig',
+        combatRig,
+      );
+
+      const specimenAttack = new SpecimenProjectileSystem({
+        collisionWorld,
+        targetRegistry: combatTargets,
+        body: specimenBody,
+        aimRayProvider: this.renderLayer.cameraRig,
+      });
+      rollback(() => specimenAttack.dispose());
+
+      const specimenPresentation = new SpecimenCombatPresentation({
+        scene: this.renderLayer.scene,
+        host: this.host,
+        source: specimenAttack,
+      });
+      rollback(() => specimenPresentation.dispose());
 
       const electricalSystem = new VoltElectricalSystem<KinematicBody>({
         slimeManager: manager,
@@ -658,6 +960,10 @@ export class BlackoutLevelRuntime {
         checkpoints.registerParticipant(poweredDeviceRig.devices);
       rollback(unregisterPoweredDevicesCheckpointParticipant);
 
+      const unregisterCombatCheckpointParticipant =
+        checkpoints.registerParticipant(combatRig);
+      rollback(unregisterCombatCheckpointParticipant);
+
       const electricalPresentation = new VoltElectricalPresentation({
         scene: this.renderLayer.scene,
         host: this.host,
@@ -673,9 +979,19 @@ export class BlackoutLevelRuntime {
         electricalSystem,
         electricalPresentation,
         poweredDeviceRig,
-        carrierBodies,
+        groupCarrierBodies,
+        specimenCarrierBody,
+        combatTargets,
+        combatRig,
+        specimenBody,
+        specimenForm,
+        specimenAttack,
+        specimenPresentation,
+        specimenVisual,
+        specimenLight,
         unregisterElectricalCheckpointParticipant,
         unregisterPoweredDevicesCheckpointParticipant,
+        unregisterCombatCheckpointParticipant,
         manager,
         group,
         checkpoints,
@@ -736,6 +1052,8 @@ export class BlackoutLevelRuntime {
   private readonly stopResources = (): void => {
     const resources = this.requireResources();
     resources.electricalSystem.cancelAim();
+    resources.specimenAttack.cancelInput();
+    resources.specimenPresentation.suspend();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     this.syncVisuals(resources);
@@ -749,13 +1067,18 @@ export class BlackoutLevelRuntime {
     resources.deathSequence.reset();
     resources.deathScreen.hide();
     resources.electricalSystem.reset('restart');
+    resources.specimenAttack.reset();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     resources.checkpoints.resetToInitial();
     resources.puzzleRegistry.reset();
-    const snapshot = resources.checkpoints.recover(resources.group);
+    const snapshot = resources.checkpoints.recover(
+      resources.group,
+      resources.specimenBody,
+    );
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
+    resources.specimenForm.restore(snapshot.controlledForm);
     resources.movement.set(0, 0, 0);
     clearJump(resources.jump, false);
     this.completionEmitted = false;
@@ -779,15 +1102,22 @@ export class BlackoutLevelRuntime {
     resources.deathSequence.reset();
     resources.deathScreen.dispose();
     resources.electricalPresentation.dispose();
+    resources.specimenPresentation.dispose();
+    resources.specimenAttack.dispose();
     resources.electricalSystem.dispose();
     resources.unregisterElectricalCheckpointParticipant();
     resources.unregisterPoweredDevicesCheckpointParticipant();
+    resources.unregisterCombatCheckpointParticipant();
+    resources.combatRig.dispose();
+    resources.combatTargets.dispose();
+    resources.specimenForm.dispose();
     resources.poweredDeviceRig.dispose();
     resources.electricalTargets.dispose();
 
     for (const visual of Object.values(resources.visuals)) {
       disposeSlimeVisual(visual);
     }
+    disposeSlimeVisual(resources.specimenVisual);
     resources.puzzleRegistry.clear();
     resources.manager.clearLevelRegistrations();
     resources.manager.dispose();
@@ -808,12 +1138,18 @@ export class BlackoutLevelRuntime {
     this.input.setEnabled(false);
     this.input.resetState();
     resources.electricalSystem.reset('reset');
+    resources.specimenAttack.reset();
+    resources.specimenPresentation.suspend();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     resources.puzzleRegistry.reset();
-    const snapshot = resources.checkpoints.recover(resources.group);
+    const snapshot = resources.checkpoints.recover(
+      resources.group,
+      resources.specimenBody,
+    );
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
+    resources.specimenForm.restore(snapshot.controlledForm);
     resources.movement.set(0, 0, 0);
     clearJump(resources.jump, true);
     this.renderLayer.cameraRig.reset();
@@ -851,8 +1187,12 @@ export class BlackoutLevelRuntime {
   };
 
   private retargetCamera(resources: BlackoutRuntimeResources): void {
+    const target =
+      resources.specimenForm.readModel.controlledForm === 'specimen'
+        ? resources.specimenBody
+        : resources.group.activeBody;
     this.renderLayer.cameraRig.setFollowTarget(
-      resources.group.activeBody,
+      target,
       resources.collisionWorld,
     );
   }
@@ -861,11 +1201,21 @@ export class BlackoutLevelRuntime {
     resources.visuals.bob.position.copy(resources.group.bobBody.position);
     resources.visuals.goop.position.copy(resources.group.goopBody.position);
     resources.visuals.volt.position.copy(resources.group.voltBody.position);
+    resources.specimenVisual.position.copy(resources.specimenBody.position);
 
-    // Hide only Volt's body material during his near-first-person aim pose.
-    // The Object3D remains visible so the child point light continues to
-    // illuminate the scene while the mesh cannot obscure the crosshair.
+    const specimenControlled =
+      resources.specimenForm.readModel.controlledForm === 'specimen';
+    const merging = resources.phase.phase === 'merging';
+    for (const visual of Object.values(resources.visuals)) {
+      visual.visible = !specimenControlled || merging;
+    }
+    resources.specimenVisual.visible = specimenControlled;
+    resources.voltLight.visible = !specimenControlled;
+    resources.specimenLight.visible = specimenControlled;
+
+    // Aim presentation hides only the currently controlled body material.
     const hideVoltBody =
+      !specimenControlled &&
       resources.manager.activeSlimeId === 'volt' &&
       resources.electricalSystem.readModel.aimActive;
     const voltMaterials = Array.isArray(resources.visuals.volt.material)
@@ -874,6 +1224,63 @@ export class BlackoutLevelRuntime {
     for (const material of voltMaterials) {
       material.visible = !hideVoltBody;
     }
+
+    const specimenMaterials = Array.isArray(resources.specimenVisual.material)
+      ? resources.specimenVisual.material
+      : [resources.specimenVisual.material];
+    for (const material of specimenMaterials) {
+      material.visible =
+        !(specimenControlled && resources.specimenAttack.readModel.aimActive);
+    }
+    resources.specimenPresentation.update(specimenControlled);
+  }
+
+  private isSpawnSafe(
+    resources: BlackoutRuntimeResources,
+    position: THREE.Vector3,
+    clearanceRadius: number,
+  ): boolean {
+    const directions: readonly (readonly [number, number, number])[] = [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+      [0, 1, 0],
+    ];
+    for (const [x, y, z] of directions) {
+      resources.safetyDisplacement.set(x, y, z).multiplyScalar(0.02);
+      if (
+        resources.collisionWorld.sweepSphere(
+          position,
+          resources.safetyDisplacement,
+          clearanceRadius,
+          resources.safetyHit,
+        ) &&
+        resources.safetyHit.fraction <= 1e-5
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private areSplitAnchorsSafe(resources: BlackoutRuntimeResources): boolean {
+    for (const id of ['bob', 'goop', 'volt'] as const) {
+      if (
+        !this.isSpawnSafe(
+          resources,
+          BLACKOUT_SPLIT_BODY_POSITIONS[id],
+          resources.group[id === 'bob'
+            ? 'bobBody'
+            : id === 'goop'
+              ? 'goopBody'
+              : 'voltBody'].radiusMetres,
+        )
+      ) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private commitCompletion(): void {
@@ -882,6 +1289,7 @@ export class BlackoutLevelRuntime {
     this.completionEmitted = true;
     resources.electricalSystem.disconnect('completion');
     resources.electricalSystem.cancelAim();
+    resources.specimenAttack.reset();
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
@@ -903,7 +1311,18 @@ export class BlackoutLevelRuntime {
     const snapshot: SlimeHUDSnapshot = resources
       ? {
           roster: resources.manager.getRosterState(),
-          activeSlimeId: resources.manager.activeSlimeId,
+          activeSlimeId:
+            resources.specimenForm.readModel.controlledForm === 'specimen'
+              ? undefined
+              : resources.manager.activeSlimeId,
+          controlledForm:
+            resources.specimenForm.readModel.controlledForm === 'specimen'
+              ? 'specimen'
+              : 'slime',
+          activeFormLabel:
+            resources.specimenForm.readModel.controlledForm === 'specimen'
+              ? 'SPECIMEN'
+              : undefined,
           passiveInteractions: [],
           playerSwitchFeedback: feedback,
           resetSwitchFeedback,
@@ -919,7 +1338,7 @@ export class BlackoutLevelRuntime {
 }
 
 function createPoweredCarrierBody(
-  id: 'bob' | 'goop' | 'volt',
+  id: 'bob' | 'goop' | 'volt' | 'specimen',
   body: KinematicBody,
 ): PoweredCarrierBody {
   return {
@@ -931,6 +1350,21 @@ function createPoweredCarrierBody(
       body.applyCarrierDisplacement(displacement, carrierCollider);
     },
   };
+}
+
+function createSpecimenVisual(): THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> {
+  const visual = new THREE.Mesh(
+    new THREE.SphereGeometry(BLACKOUT_SPECIMEN_RADIUS_METRES, 24, 16),
+    new THREE.MeshStandardMaterial({
+      color: 0xb92f35,
+      emissive: 0x4b1015,
+      emissiveIntensity: 0.9,
+      roughness: 0.32,
+    }),
+  );
+  visual.name = 'blackout-specimen-body';
+  visual.visible = false;
+  return visual;
 }
 
 function createSlimeVisual(colour: number, emissive: number): THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> {
