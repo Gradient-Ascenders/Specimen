@@ -178,6 +178,12 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     if (this.disposed || this.availableValue === available) return;
     this.availableValue = available;
     this.readModelValue.available = available;
+    if (
+      available &&
+      (this.connectedValue || this.supplySources.size > 0)
+    ) {
+      this.maybeLatch();
+    }
     this.events.emit('availabilityChanged', {
       id: this.id,
       available,
@@ -197,7 +203,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     if (hadSource === supplied) return;
     if (supplied) {
       this.supplySources.add(sourceId);
-      this.maybeLatch();
+      if (this.availableValue) this.maybeLatch();
     } else {
       this.supplySources.delete(sourceId);
     }
