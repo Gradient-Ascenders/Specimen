@@ -187,12 +187,24 @@ implements ResettablePuzzleComponent, BlackoutCheckpointParticipant {
 
   restore(state: SerializableValue): void {
     const snapshot = readSnapshot(state);
-    this.ordinary.restoreState(snapshot.targets[this.ordinary.id]);
-    this.reinforced.restoreState(snapshot.targets[this.reinforced.id]);
-    this.weakPoint.restoreState(snapshot.targets[this.weakPoint.id]);
-    this.splash.restoreState(snapshot.targets[this.splash.id]);
-    this.covered.restoreState(snapshot.targets[this.covered.id]);
-    this.drone.restoreState(snapshot.targets[this.drone.id]);
+    this.ordinary.restoreState(
+      snapshot.targets['specimen-target-ordinary'],
+    );
+    this.reinforced.restoreState(
+      snapshot.targets['specimen-target-reinforced'],
+    );
+    this.weakPoint.restoreState(
+      snapshot.targets['specimen-target-weak-point'],
+    );
+    this.splash.restoreState(
+      snapshot.targets['specimen-target-splash'],
+    );
+    this.covered.restoreState(
+      snapshot.targets['specimen-target-covered'],
+    );
+    this.drone.restoreState(
+      snapshot.targets['specimen-target-drone'],
+    );
   }
 
   resetTransient(): void {}
