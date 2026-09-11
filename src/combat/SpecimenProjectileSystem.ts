@@ -681,7 +681,13 @@ export class SpecimenProjectileSystem {
       );
       const damageUnits = slot.damageUnits * attenuation;
       if (damageUnits <= EPSILON) continue;
-      if (!this.hasSplashLineOfSight(impactPoint, this.splashTargetPosition)) {
+      if (
+        !this.hasSplashLineOfSight(
+          impactPoint,
+          this.splashTargetPosition,
+          registration,
+        )
+      ) {
         continue;
       }
 
@@ -702,6 +708,7 @@ export class SpecimenProjectileSystem {
   private hasSplashLineOfSight(
     impactPoint: THREE.Vector3,
     targetPoint: THREE.Vector3,
+    candidate: CombatTargetRegistration,
   ): boolean {
     this.splashDirection.subVectors(targetPoint, impactPoint);
     const distance = this.splashDirection.length();
@@ -714,13 +721,25 @@ export class SpecimenProjectileSystem {
       EPSILON,
       distance - SPLASH_ORIGIN_OFFSET_METRES,
     );
-    return !this.world.raycast(
-      this.splashLosOrigin,
-      this.splashDirection,
-      maximumDistance,
-      this.splashHit,
-      CollisionLayer.LineOfSight,
-    );
+
+    if (
+      !this.world.raycast(
+        this.splashLosOrigin,
+        this.splashDirection,
+        maximumDistance,
+        this.splashHit,
+        CollisionLayer.LineOfSight,
+      )
+    ) {
+      return true;
+    }
+
+    // A real combat target may reuse an existing solid collider (for example
+    // SecurityDrone.collider), which participates in LineOfSight as well as
+    // Projectile queries. Reaching that candidate's own surface is successful
+    // terminal visibility, not self-occlusion. Any other first hit remains
+    // intervening cover.
+    return candidate.target.hitMeshes.includes(this.splashHit.object);
   }
 
   private applyTargetImpact(
