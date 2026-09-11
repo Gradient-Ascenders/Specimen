@@ -23,7 +23,6 @@ import {
 } from '../slimes/SlimeHUDState.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimeGroup } from '../slimes/PersistentSlimeGroup.ts';
-import type { SlimeId } from '../slimes/SlimeRoster.ts';
 import {
   BlackoutCheckpointManager,
   type BlackoutCheckpointParticipant,
@@ -133,6 +132,10 @@ export class BlackoutLevelRuntime {
 
   setDebugInteractionEnabled(enabled: boolean): void {
     this.debugInteractionEnabled = enabled;
+    if (this.lifecycle.state === 'running' && this.resources) {
+      this.input.setEnabled(enabled && !this.resources.phase.terminal);
+      if (!enabled) this.input.resetState();
+    }
   }
 
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void {
@@ -206,7 +209,11 @@ export class BlackoutLevelRuntime {
       roomId: snapshot.room.roomId,
       objective: objectiveFor(snapshot.room),
     });
-    if (this.lifecycle.state === 'running' && !resources.phase.terminal) {
+    if (
+      this.lifecycle.state === 'running' &&
+      this.debugInteractionEnabled &&
+      !resources.phase.terminal
+    ) {
       this.input.setEnabled(true);
     }
   }
@@ -466,7 +473,7 @@ export class BlackoutLevelRuntime {
   private readonly startResources = (): void => {
     const resources = this.requireResources();
     this.input.resetState();
-    this.input.setEnabled(!resources.phase.terminal);
+    this.input.setEnabled(this.debugInteractionEnabled && !resources.phase.terminal);
   };
 
   private readonly stopResources = (): void => {
