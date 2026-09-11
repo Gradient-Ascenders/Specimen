@@ -78,8 +78,11 @@ A live tether is transient and is never serialized into a checkpoint snapshot.
 - unload disconnects before targets are unregistered and disposes all owned
   electrical presentation/registry resources.
 
-Electrical devices added by #123 own their own serializable powered/latching
-state. Restoring device state must never resurrect the live Volt tether.
+Issue #123 supplies the reusable powered-device layer. Devices implement this
+same target contract while keeping direct Volt connection, upstream supply,
+effective power and authored latch state separate. Device snapshots contain
+local/latch/mechanical state only; restoring them never resurrects the live Volt
+tether.
 
 ## Presentation boundary
 
@@ -90,6 +93,8 @@ reused line buffer, one crosshair, connected-target text, and unstable text.
 Issues #131 and #136 may replace or extend those visuals/HUD elements without
 moving connection authority out of the gameplay system.
 
-The Blackout foundation includes clearly labelled development-only compatible,
-obstructed, moving, removable, and incompatible fixtures. Room 1 replaces this
-harness with authored puzzle content.
+The Blackout foundation now composes the #123 powered-device development rig
+instead of the temporary #122 target-only fixtures. The real terminal,
+generator, moving devices, light, door, bridge and laser junction all register
+through `ElectricalTargetRegistry`. Room authoring replaces that harness while
+reusing the same target/device contracts.
