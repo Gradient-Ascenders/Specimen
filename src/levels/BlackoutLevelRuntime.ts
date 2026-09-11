@@ -192,7 +192,11 @@ export class BlackoutLevelRuntime {
 
   captureCheckpoint(checkpointId: BlackoutCheckpointId, room: BlackoutRoomState): void {
     const resources = this.requireResources();
-    resources.checkpoints.captureCurrent(checkpointId, resources.group, room);
+    resources.checkpoints.activate(
+      checkpointId,
+      resources.group.activeSlimeId,
+      room,
+    );
     this.currentRoom = {
       roomId: room.roomId,
       phase: room.phase,
