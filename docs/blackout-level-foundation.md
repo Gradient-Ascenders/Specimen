@@ -30,7 +30,13 @@ BlackoutCheckpointManager supports the complete CP1-CP9 identifier set:
 
 Snapshots contain only plain serializable data: checkpoint ID, three body positions, active identity, room/phase state, connection state, and registered participant state. Three.js objects, callbacks, live meshes, projectiles, and live electrical arcs never enter the snapshot.
 
-Room/device systems that need checkpoint persistence implement BlackoutCheckpointParticipant. capture() returns serializable state, resetTransient() clears live transient resources, and restore() applies the captured authored state.
+Room/device systems that need checkpoint persistence implement
+BlackoutCheckpointParticipant. capture() returns serializable state,
+resetTransient() clears live transient resources, and restore() applies the
+captured authored state. Issue #123 registers the complete electrical-device
+network as one participant: every device-local snapshot is restored before
+derived upstream power is recomputed once, so restoration cannot depend on
+device registration order.
 
 ## Recovery order
 

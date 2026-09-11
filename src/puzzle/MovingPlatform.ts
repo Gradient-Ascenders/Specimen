@@ -23,6 +23,11 @@ export interface ReadonlyMovingPlatformVector3 {
   readonly z: number;
 }
 
+export interface MovingPlatformSnapshot {
+  readonly progress: number;
+  readonly target: 'start' | 'end';
+}
+
 export interface MovingPlatformOptions {
   readonly id: string;
   readonly start: THREE.Vector3;
@@ -167,6 +172,74 @@ export class MovingPlatform {
 
   get travelDurationSeconds(): number {
     return this.travelDurationSecondsValue;
+  }
+
+  get target(): 'start' | 'end' {
+    return this.targetEnd ? 'end' : 'start';
+  }
+
+  captureState(): MovingPlatformSnapshot {
+    return {
+      progress: this.progressValue,
+      target: this.target,
+    };
+  }
+
+  /**
+   * Restore an exact route pose without producing one stale carrier delta.
+   * Current and previous transforms are committed together.
+   */
+  restoreState(snapshot: MovingPlatformSnapshot): void {
+    if (
+      !Number.isFinite(snapshot.progress) ||
+      snapshot.progress < 0 ||
+      snapshot.progress > 1
+    ) {
+      throw new Error('Platform restore progress must be between 0 and 1.');
+    }
+    if (snapshot.target !== 'start' && snapshot.target !== 'end') {
+      throw new Error('Platform restore target must be start or end.');
+    }
+
+    this.progressValue = snapshot.progress;
+    this.targetEnd = snapshot.target === 'end';
+    this.snapProgressToBoundary();
+    this.root.position.lerpVectors(
+      this.startValue,
+      this.endValue,
+      this.progressValue,
+    );
+    this.previousPositionValue.copy(this.root.position);
+    this.displacement.set(0, 0, 0);
+    this.setState(this.resolveState());
+  }
+
+  /**
+   * Preview the next route displacement without mutating platform state.
+   * Powered carriers use this for body/ceiling obstruction preflight.
+   */
+  copyProposedDisplacement(
+    deltaSeconds: number,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0) {
+      throw new Error(
+        'Platform preview deltaSeconds must be non-negative and finite.',
+      );
+    }
+    const progressStep =
+      deltaSeconds / this.travelDurationSecondsValue;
+    const nextProgress = this.targetEnd
+      ? Math.min(1, this.progressValue + progressStep)
+      : Math.max(0, this.progressValue - progressStep);
+    return target
+      .lerpVectors(this.startValue, this.endValue, nextProgress)
+      .sub(this.root.position);
+  }
+
+  /** Clear carrier displacement while holding the exact current pose. */
+  hold(): void {
+    this.update(0);
   }
 
   setActive(active: boolean): void {
