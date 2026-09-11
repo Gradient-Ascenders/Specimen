@@ -279,6 +279,7 @@ test('camera selection and Volt-to-socket LOS are both required only at acquisit
     assert.equal(fixture.system.connected, false);
     assert.equal(fixture.system.readModel.selectedTargetId, 'target');
     assert.equal(fixture.system.readModel.selectedTargetValid, false);
+    assert.ok(fixture.system.readModel.beamEnd.z < 6);
   } finally {
     blocker.geometry.dispose();
     fixture.dispose();
