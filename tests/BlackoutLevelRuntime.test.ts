@@ -477,3 +477,212 @@ test('Blackout render consumes pointer movement on a frame with zero fixed steps
     });
   }
 });
+
+
+test('Blackout merge hands control to Specimen once, disables switching, and exposes merged HUD state', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFakeCameraRig();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'volt',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+
+    assert.equal(runtime.beginMerge(), true);
+    assert.equal(runtime.beginMerge(), false);
+    assert.equal(runtime.phase, 'merging');
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
+
+    input.press('switchSlime');
+    for (let index = 0; index < 359; index += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.equal(runtime.phase, 'merging');
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
+
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.phase, 'specimen');
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'specimen');
+    assert.equal(runtime.specimenFormReadModel?.mergeProgress, 1);
+
+    const hud = runtime.getSlimeHUDSnapshot();
+    assert.equal(hud.controlledForm, 'specimen');
+    assert.equal(hud.activeFormLabel, 'SPECIMEN');
+    assert.equal(hud.activeSlimeId, undefined);
+
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'specimen');
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, undefined);
+
+    runtime.dispose();
+    assert.equal(scene.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+test('Blackout Specimen tap attack uses the bounded pool and death clears combat immediately', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFakeCameraRig();
+    cameraRig.aimOrigin.set(0, 0.675, 62);
+    cameraRig.aimDirection.set(0, 0, 1);
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'bob',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+    assert.equal(runtime.beginMerge(), true);
+    for (let index = 0; index < 360; index += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.equal(runtime.phase, 'specimen');
+
+    input.press('aimAbility');
+    input.press('fireAbility');
+    input.release('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+
+    assert.equal(runtime.specimenAttackReadModel?.aimActive, true);
+    assert.equal(runtime.specimenAttackReadModel?.charging, false);
+    assert.equal(runtime.specimenAttackReadModel?.liveProjectileCount, 1);
+    assert.equal(runtime.specimenProjectileStates.length, 12);
+    assert.equal(
+      runtime.specimenProjectileStates.filter((state) => state.active).length,
+      1,
+    );
+
+    assert.equal(runtime.requestFailure(), true);
+    assert.equal(runtime.specimenAttackReadModel?.aimActive, false);
+    assert.equal(runtime.specimenAttackReadModel?.chargeAmount, 0);
+    assert.equal(runtime.specimenAttackReadModel?.liveProjectileCount, 0);
+    assert.equal(
+      runtime.specimenProjectileStates.every((state) => !state.active),
+      true,
+    );
+
+    runtime.dispose();
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+test('CP8 recovery restores stable Specimen directly, restart returns the group, and split restores Bob ownership', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFakeCameraRig();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'goop',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+
+    runtime.activateCheckpoint('cp8');
+    runtime.recoverActiveCheckpoint();
+    assert.equal(runtime.phase, 'specimen');
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'specimen');
+    assert.equal(runtime.activeCheckpoint?.controlledForm, 'specimen');
+    assert.deepEqual(runtime.activeCheckpoint?.specimenPosition, [
+      0,
+      0.685,
+      65,
+    ]);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeFormLabel, 'SPECIMEN');
+
+    assert.equal(runtime.transitionPhase('boss'), true);
+    assert.equal(runtime.transitionPhase('boss-defeated'), true);
+    assert.equal(runtime.beginSplit(), true);
+    assert.equal(runtime.beginSplit(), false);
+    assert.equal(runtime.completeSplit(), true);
+    assert.equal(runtime.completeSplit(), false);
+    assert.equal(runtime.phase, 'escape');
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'bob');
+
+    runtime.restartLevel();
+    assert.equal(runtime.phase, 'three-slime');
+    assert.equal(runtime.specimenFormReadModel?.controlledForm, 'group');
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'goop');
+
+    runtime.dispose();
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
