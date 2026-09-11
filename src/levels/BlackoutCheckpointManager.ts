@@ -128,12 +128,14 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
 
     const snapshot = cloneSnapshot(this.activeSnapshot);
     const checkpoint = this.getCheckpoint(snapshot.checkpointId);
-    this.assertSafeSnapshot(snapshot, checkpoint.clearanceRadius);
 
     for (const [id, participant] of this.participants) {
       const state = snapshot.participantState[id];
       if (state !== undefined) participant.restore(cloneSerializable(state));
     }
+
+    // Validate against the fully-restored authored room before moving any body.
+    this.assertSafeSnapshot(snapshot, checkpoint.clearanceRadius);
 
     group.setRecoveryState({
       positions: {
