@@ -10,6 +10,11 @@ import {
   type VoltElectricalReadModel,
 } from '../abilities/VoltElectricalSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
+import {
+  BlackoutPoweredDeviceRig,
+} from '../electrical/BlackoutPoweredDeviceRig.ts';
+import type { PoweredDeviceReadModel } from '../electrical/PoweredDeviceCore.ts';
+import type { PoweredCarrierBody } from '../electrical/PoweredDevices.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import {
@@ -77,7 +82,10 @@ interface BlackoutRuntimeResources {
   readonly electricalTargets: ElectricalTargetRegistry;
   readonly electricalSystem: VoltElectricalSystem<KinematicBody>;
   readonly electricalPresentation: VoltElectricalPresentation;
+  readonly poweredDeviceRig: BlackoutPoweredDeviceRig;
+  readonly carrierBodies: readonly PoweredCarrierBody[];
   readonly unregisterElectricalCheckpointParticipant: () => void;
+  readonly unregisterPoweredDevicesCheckpointParticipant: () => void;
   readonly manager: SlimeManager<KinematicBody>;
   readonly group: PersistentSlimeGroup<KinematicBody>;
   readonly checkpoints: BlackoutCheckpointManager<KinematicBody>;
@@ -143,6 +151,12 @@ export class BlackoutLevelRuntime {
 
   get voltElectricalReadModel(): VoltElectricalReadModel | undefined {
     return this.resources?.electricalSystem.readModel;
+  }
+
+  getPoweredDeviceReadModel(
+    id: string,
+  ): PoweredDeviceReadModel | undefined {
+    return this.resources?.poweredDeviceRig.devices.getReadModel(id);
   }
 
   load(): void { this.lifecycle.load(); }
@@ -264,6 +278,7 @@ export class BlackoutLevelRuntime {
       return false;
     }
     resources.electricalSystem.reset('death');
+    resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     this.input.setEnabled(false);
@@ -283,10 +298,12 @@ export class BlackoutLevelRuntime {
     if (next === 'merging') {
       resources.electricalSystem.disconnect('merge');
       resources.electricalSystem.cancelAim();
+      resources.poweredDeviceRig.recomputePower();
       this.renderLayer.cameraRig.setAimPresentationActive(false);
     } else if (next === 'complete') {
       resources.electricalSystem.disconnect('completion');
       resources.electricalSystem.cancelAim();
+      resources.poweredDeviceRig.recomputePower();
       this.renderLayer.cameraRig.setAimPresentationActive(false);
     }
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
@@ -318,8 +335,6 @@ export class BlackoutLevelRuntime {
       this.input.endFixedUpdate();
       return;
     }
-
-    resources.scene.updateElectricalFixtures(deltaSeconds);
 
     let switched = false;
     if (
@@ -388,6 +403,29 @@ export class BlackoutLevelRuntime {
       resources.electricalSystem.readModel.aimActive,
     );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
+
+    // Power is propagated from the freshly-updated Volt connection, then
+    // mechanics advance once. Device motion can move the connected socket, so
+    // revalidate the tether without consuming input a second time and rebuild
+    // power before lethal hazards are evaluated.
+    resources.poweredDeviceRig.recomputePower();
+    resources.poweredDeviceRig.updateMechanics(
+      deltaSeconds,
+      resources.carrierBodies,
+    );
+    resources.electricalSystem.revalidateConnection();
+    resources.poweredDeviceRig.recomputePower();
+    resources.poweredDeviceRig.updateHazards(
+      deltaSeconds,
+      resources.carrierBodies,
+    );
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
+
+    if (!resources.deathSequence.isPlaying) {
+      this.syncVisuals(resources);
+      this.input.endFixedUpdate();
+      return;
+    }
 
     // Inactive Level 3 bodies deliberately keep their exact positions while
     // preserving their colliders/passive state. A switch itself never updates,
@@ -572,14 +610,27 @@ export class BlackoutLevelRuntime {
 
       const electricalTargets = new ElectricalTargetRegistry(collisionWorld);
       rollback(() => electricalTargets.dispose());
-      for (const target of scene.electricalTargets) {
-        electricalTargets.register(target, {
-          transformMode:
-            target.id === 'fixture-moving'
-              ? ColliderTransformMode.Dynamic
-              : ColliderTransformMode.Static,
-        });
-      }
+
+      const poweredDeviceRig = new BlackoutPoweredDeviceRig({
+        collisionWorld,
+        surfaceRegistry,
+        targetRegistry: electricalTargets,
+        requestFailure: () => {
+          this.requestFailure();
+        },
+      });
+      rollback(() => poweredDeviceRig.dispose());
+      scene.root.add(poweredDeviceRig.root);
+      puzzleRegistry.register(
+        'blackout-powered-device-rig',
+        poweredDeviceRig,
+      );
+
+      const carrierBodies: readonly PoweredCarrierBody[] = [
+        createPoweredCarrierBody('bob', group.bobBody),
+        createPoweredCarrierBody('goop', group.goopBody),
+        createPoweredCarrierBody('volt', group.voltBody),
+      ];
 
       const electricalSystem = new VoltElectricalSystem<KinematicBody>({
         slimeManager: manager,
@@ -603,6 +654,10 @@ export class BlackoutLevelRuntime {
         });
       rollback(unregisterElectricalCheckpointParticipant);
 
+      const unregisterPoweredDevicesCheckpointParticipant =
+        checkpoints.registerParticipant(poweredDeviceRig.devices);
+      rollback(unregisterPoweredDevicesCheckpointParticipant);
+
       const electricalPresentation = new VoltElectricalPresentation({
         scene: this.renderLayer.scene,
         host: this.host,
@@ -617,7 +672,10 @@ export class BlackoutLevelRuntime {
         electricalTargets,
         electricalSystem,
         electricalPresentation,
+        poweredDeviceRig,
+        carrierBodies,
         unregisterElectricalCheckpointParticipant,
+        unregisterPoweredDevicesCheckpointParticipant,
         manager,
         group,
         checkpoints,
@@ -723,6 +781,8 @@ export class BlackoutLevelRuntime {
     resources.electricalPresentation.dispose();
     resources.electricalSystem.dispose();
     resources.unregisterElectricalCheckpointParticipant();
+    resources.unregisterPoweredDevicesCheckpointParticipant();
+    resources.poweredDeviceRig.dispose();
     resources.electricalTargets.dispose();
 
     for (const visual of Object.values(resources.visuals)) {
@@ -822,6 +882,7 @@ export class BlackoutLevelRuntime {
     this.completionEmitted = true;
     resources.electricalSystem.disconnect('completion');
     resources.electricalSystem.cancelAim();
+    resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     this.input.setEnabled(false);
@@ -855,6 +916,21 @@ export class BlackoutLevelRuntime {
     if (!this.resources) throw new Error('Blackout runtime resources are not loaded.');
     return this.resources;
   }
+}
+
+function createPoweredCarrierBody(
+  id: 'bob' | 'goop' | 'volt',
+  body: KinematicBody,
+): PoweredCarrierBody {
+  return {
+    id,
+    position: body.position,
+    radiusMetres: body.radiusMetres,
+    isSupportedBy: (collider) => body.isSupportedBy(collider),
+    applyCarrierDisplacement: (displacement, carrierCollider) => {
+      body.applyCarrierDisplacement(displacement, carrierCollider);
+    },
+  };
 }
 
 function createSlimeVisual(colour: number, emissive: number): THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> {

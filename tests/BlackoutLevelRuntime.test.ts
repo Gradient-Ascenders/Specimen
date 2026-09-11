@@ -312,6 +312,14 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
     input.press('fireAbility');
     runtime.fixedUpdate(1 / 60);
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-terminal')?.powered,
+      true,
+    );
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-door')?.powered,
+      true,
+    );
 
     input.release('aimAbility');
     input.release('fireAbility');
@@ -321,6 +329,14 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
 
     runtime.recoverActiveCheckpoint();
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-terminal')?.powered,
+      false,
+    );
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-door')?.powered,
+      false,
+    );
 
     input.requestPointerLock();
     input.press('aimAbility');
@@ -335,6 +351,10 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
     input.press('switchSlime');
     runtime.fixedUpdate(1 / 60);
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-door')?.powered,
+      true,
+    );
 
     runtime.stop();
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
@@ -343,6 +363,10 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
 
     runtime.restartLevel();
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-door')?.powered,
+      false,
+    );
 
     input.press('aimAbility');
     input.press('fireAbility');
@@ -351,6 +375,10 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
 
     assert.equal(runtime.requestFailure(), true);
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-door')?.powered,
+      false,
+    );
 
     // A restart exits the deferred death state so merge takeover can be
     // verified independently.
@@ -363,6 +391,10 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
 
     assert.equal(runtime.transitionPhase('merging'), true);
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+    assert.equal(
+      runtime.getPoweredDeviceReadModel('fixture-door')?.powered,
+      false,
+    );
     runtime.fixedUpdate(1 / 60);
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
 

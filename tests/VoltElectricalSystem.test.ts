@@ -497,3 +497,31 @@ test('pointer lock loss cancels search without breaking an established connectio
     fixture.dispose();
   }
 });
+
+
+test('input-free revalidation breaks a tether moved beyond range without advancing search state', () => {
+  const fixture = makeFixture(10);
+  try {
+    fixture.system.update(1 / 60, controls({
+      aimHeld: true,
+      fireHeld: true,
+      firePressed: true,
+    }));
+    assert.equal(fixture.system.connected, true);
+
+    fixture.system.update(1 / 60, controls());
+    assert.equal(fixture.system.readModel.searching, false);
+    assert.equal(fixture.system.readModel.aimActive, false);
+
+    fixture.mesh.position.z =
+      DEFAULT_VOLT_ELECTRICAL_CONFIG.tetherBreakRangeMetres + 0.1;
+    fixture.system.revalidateConnection();
+
+    assert.equal(fixture.system.connected, false);
+    assert.equal(fixture.target.connected, false);
+    assert.equal(fixture.system.readModel.searching, false);
+    assert.equal(fixture.system.readModel.aimActive, false);
+  } finally {
+    fixture.dispose();
+  }
+});

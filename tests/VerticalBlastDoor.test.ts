@@ -272,3 +272,31 @@ test('repeated construction and disposal leave no registered blast-door resource
     assert.equal(surfaceRegistry.registeredCount, 0);
   }
 });
+
+
+test('blast door snapshot restores partial panel pose and requested state without transient obstruction', () => {
+  const fixture = createDoor('checkpoint-door');
+  const obstacle: BlastDoorObstacle = {
+    id: 'volt',
+    position: new THREE.Vector3(0, 2, 0),
+    radiusMetres: 0.45,
+  };
+
+  fixture.door.setOpen(true);
+  fixture.door.update(0.42, []);
+  const snapshot = fixture.door.captureState();
+  const checkpointPosition = fixture.door.collisionMesh.position.clone();
+
+  fixture.door.setOpen(false);
+  fixture.door.update(0.1, [obstacle]);
+  fixture.door.update(0.1, [obstacle]);
+
+  fixture.door.restoreState(snapshot);
+
+  assert.ok(fixture.door.collisionMesh.position.equals(checkpointPosition));
+  assert.equal(fixture.door.progress, 0.42);
+  assert.equal(fixture.door.desiredOpen, true);
+  assert.equal(fixture.door.state, 'opening');
+  assert.equal(fixture.door.obstructionIds.size, 0);
+  fixture.door.dispose();
+});

@@ -44,3 +44,40 @@ test('moving platform restores an authored midpoint and travel direction', () =>
 
   platform.dispose();
 });
+
+
+test('moving platform snapshot restore commits current/previous transforms together with zero stale displacement', () => {
+  const platform = new MovingPlatform({
+    id: 'snapshot-platform',
+    start: new THREE.Vector3(0, 1, 0),
+    end: new THREE.Vector3(0, 1, 8),
+    travelDurationSeconds: 4,
+    initialTarget: 'end',
+  });
+
+  platform.update(1.25);
+  const snapshot = platform.captureState();
+  const checkpointPosition = platform.root.position.clone();
+  assert.ok(platform.displacement.lengthSq() > 0);
+
+  const preview = new THREE.Vector3();
+  platform.copyProposedDisplacement(0.5, preview);
+  assert.ok(preview.z > 0);
+  assert.ok(platform.root.position.equals(checkpointPosition));
+
+  platform.update(1);
+  platform.setActive(false);
+  platform.update(0.5);
+  assert.ok(!platform.root.position.equals(checkpointPosition));
+
+  platform.restoreState(snapshot);
+  assert.ok(platform.root.position.equals(checkpointPosition));
+  assert.ok(platform.previousPosition.equals(checkpointPosition));
+  assert.equal(platform.displacement.lengthSq(), 0);
+  assert.equal(platform.target, 'end');
+
+  platform.hold();
+  assert.ok(platform.root.position.equals(checkpointPosition));
+  assert.equal(platform.displacement.lengthSq(), 0);
+  platform.dispose();
+});

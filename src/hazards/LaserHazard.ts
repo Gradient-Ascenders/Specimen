@@ -110,6 +110,7 @@ export class LaserHazard {
   private readonly initialEnabled: boolean;
   private readonly timeline: LaserTimelineDefinition | undefined;
   private enabledValue: boolean;
+  private circuitGateEnabledValue = true;
   private sequenceStateValue: LaserSequenceState = 'static';
   private stepIndexValue = 0;
   private stepElapsedSeconds = 0;
@@ -232,8 +233,18 @@ export class LaserHazard {
     return this.endValue;
   }
 
+  /** Effective lethal/visible state after authored timing and circuit gating. */
   get enabled(): boolean {
+    return this.enabledValue && this.circuitGateEnabledValue;
+  }
+
+  /** Authored/manual state before the external electrical circuit gate. */
+  get authoredEnabled(): boolean {
     return this.enabledValue;
+  }
+
+  get circuitGateEnabled(): boolean {
+    return this.circuitGateEnabledValue;
   }
 
   get sequenceState(): LaserSequenceState {
@@ -273,6 +284,16 @@ export class LaserHazard {
    */
   setEnabled(enabled: boolean): void {
     this.enabledValue = enabled;
+    this.updateProxyVisibility();
+  }
+
+  /**
+   * Durable external circuit gate. Pattern timelines keep advancing and may
+   * change authored enabled state while this gate is false.
+   */
+  setCircuitGateEnabled(enabled: boolean): void {
+    if (this.circuitGateEnabledValue === enabled) return;
+    this.circuitGateEnabledValue = enabled;
     this.updateProxyVisibility();
   }
 
@@ -350,7 +371,7 @@ export class LaserHazard {
    * capsule test that closely matches the visible cylinder and its end caps.
    */
   intersects(target: LaserContactTarget): boolean {
-    if (!this.enabledValue) return false;
+    if (!this.enabled) return false;
 
     if (
       !Number.isFinite(target.radiusMetres) ||
@@ -396,6 +417,7 @@ export class LaserHazard {
   /** Restore authored pose, enabled state and sequence timer. */
   reset(): void {
     this.translationOffset.set(0, 0, 0);
+    this.circuitGateEnabledValue = true;
     this.currentAngleRadians = 0;
     this.enabledValue = this.initialEnabled;
     this.stepIndexValue = 0;
@@ -572,7 +594,7 @@ export class LaserHazard {
   private updateProxyVisibility(): void {
     // Emitter hardware remains visible when the beam is disabled so the player
     // can read where a hazard can originate. Final presentation belongs to #67.
-    this.beamMesh.visible = this.enabledValue;
+    this.beamMesh.visible = this.enabled;
     this.startEmitter.visible = true;
     this.endEmitter.visible = true;
   }
