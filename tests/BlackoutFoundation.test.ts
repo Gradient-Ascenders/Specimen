@@ -127,16 +127,16 @@ test('Level 3 checkpoint recovery clears transients, restores participant state,
   assert.equal(restored.connections.voltTargetId, null);
 });
 
-test('captured checkpoint data is independent plain state and repeated recovery is idempotent', () => {
+test('checkpoint snapshots are independent, use authored safe anchors, and recover idempotently', () => {
   const { bodies, group } = makeGroup();
   const manager = new BlackoutCheckpointManager<TestBody>(checkpoint(), () => true);
   manager.registerCheckpoint(checkpoint('cp2', 10));
 
-  bodies.bob.position.set(-1, 0.46, 10);
-  bodies.goop.position.set(0, 0.46, 10);
-  bodies.volt.position.set(1, 0.46, 10);
+  bodies.bob.position.set(-1, 0.46, 7);
+  bodies.goop.position.set(0, 0.46, 8);
+  bodies.volt.position.set(1, 0.46, 9);
   group.activate('bob');
-  manager.captureCurrent('cp2', group, {
+  manager.activate('cp2', group.activeSlimeId, {
     roomId: 'room-1',
     phase: 'three-slime',
     local: { tutorialComplete: true },
@@ -150,7 +150,9 @@ test('captured checkpoint data is independent plain state and repeated recovery 
   manager.recover(group);
   manager.recover(group);
   assert.equal(group.activeSlimeId, 'bob');
-  assert.deepEqual(bodies.bob.position.toArray(), [-1, 0.46, 10]);
+  assert.deepEqual(bodies.bob.position.toArray(), [-2, 0.46, 10]);
+  assert.deepEqual(bodies.goop.position.toArray(), [0, 0.46, 10]);
+  assert.deepEqual(bodies.volt.position.toArray(), [2, 0.46, 10]);
   assert.equal(bodies.bob.recoveries, 2);
   assert.equal(bodies.goop.recoveries, 2);
   assert.equal(bodies.volt.recoveries, 2);
