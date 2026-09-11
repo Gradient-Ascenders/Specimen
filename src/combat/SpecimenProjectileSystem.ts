@@ -225,6 +225,7 @@ export class SpecimenProjectileSystem {
   private chargeSeconds = 0;
   private fullChargeCueEmitted = false;
   private cooldownRemainingSeconds = 0;
+  private cooldownDurationSeconds = 0;
   private nextProjectileId = 1;
   private disposed = false;
 
@@ -356,6 +357,7 @@ export class SpecimenProjectileSystem {
       if (slot.read.active) this.deactivate(slot, 'reset');
     }
     this.cooldownRemainingSeconds = 0;
+    this.cooldownDurationSeconds = 0;
     this.syncLiveCount();
     this.syncCooldownReadModel();
   }
@@ -527,11 +529,12 @@ export class SpecimenProjectileSystem {
       radiusMetres,
     );
 
-    this.cooldownRemainingSeconds = THREE.MathUtils.lerp(
+    this.cooldownDurationSeconds = THREE.MathUtils.lerp(
       this.config.minimumCooldownSeconds,
       this.config.maximumCooldownSeconds,
       chargeAmount,
     );
+    this.cooldownRemainingSeconds = this.cooldownDurationSeconds;
     this.events.emit('projectileFired', {
       projectileId: slot.read.id,
       chargeAmount,
@@ -801,12 +804,14 @@ export class SpecimenProjectileSystem {
   private syncCooldownReadModel(): void {
     this.readModelValue.cooldownRemainingSeconds =
       this.cooldownRemainingSeconds;
-    const maximum = this.config.maximumCooldownSeconds;
     this.readModelValue.cooldownProgress =
-      maximum <= EPSILON
+      this.cooldownRemainingSeconds <= EPSILON ||
+      this.cooldownDurationSeconds <= EPSILON
         ? 1
         : THREE.MathUtils.clamp(
-            1 - this.cooldownRemainingSeconds / maximum,
+            1 -
+              this.cooldownRemainingSeconds /
+                this.cooldownDurationSeconds,
             0,
             1,
           );
