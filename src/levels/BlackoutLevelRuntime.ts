@@ -333,6 +333,7 @@ export class BlackoutLevelRuntime {
 
   activateCheckpoint(checkpointId: BlackoutCheckpointId): void {
     const resources = this.requireResources();
+    this.assertCheckpointActivationAllowed(resources, checkpointId);
     resources.checkpoints.activate(checkpointId, resources.group.activeSlimeId);
     const snapshot = resources.checkpoints.activeCheckpoint;
     this.currentRoom = snapshot.room;
@@ -345,6 +346,7 @@ export class BlackoutLevelRuntime {
 
   captureCheckpoint(checkpointId: BlackoutCheckpointId, room: BlackoutRoomState): void {
     const resources = this.requireResources();
+    this.assertCheckpointActivationAllowed(resources, checkpointId);
     resources.checkpoints.activate(
       checkpointId,
       resources.group.activeSlimeId,
@@ -1311,6 +1313,25 @@ export class BlackoutLevelRuntime {
       this.input.requestPointerLock();
     }
   };
+
+  private assertCheckpointActivationAllowed(
+    resources: BlackoutRuntimeResources,
+    checkpointId: BlackoutCheckpointId,
+  ): void {
+    if (checkpointId !== 'cp9') return;
+
+    const boss = resources.sentinelRig.controller;
+    if (
+      resources.phase.phase !== 'boss' ||
+      boss.readModel.state === 'idle' ||
+      boss.readModel.state === 'defeated' ||
+      !boss.checkpointSafe
+    ) {
+      throw new Error(
+        'CP9 may only be captured at a stable boundary during an active Sentinel fight.',
+      );
+    }
+  }
 
   private retargetCamera(resources: BlackoutRuntimeResources): void {
     const target =
