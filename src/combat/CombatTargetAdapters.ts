@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import type { SecurityDrone } from '../hazards/SecurityDrone.ts';
 import type {
   CombatImpact,
   CombatImpactResult,
@@ -247,6 +248,48 @@ export class CombatDroneTarget extends FixtureCombatTarget {
         options.owner.setVisible(true);
         options.owner.setCollisionEnabled(true);
         options.owner.setEnabled(true);
+      },
+    });
+  }
+}
+
+
+export interface SecurityDroneCombatTargetOptions {
+  readonly drone: SecurityDrone;
+  readonly healthUnits?: number;
+  readonly kind?: Exclude<CombatTargetKind, 'weak-point'>;
+  readonly id?: string;
+  readonly hitMeshes?: readonly THREE.Mesh[];
+}
+
+/**
+ * Concrete opt-in adapter for the existing SecurityDrone owner.
+ *
+ * Registration remains explicit, so legacy room drones keep their original
+ * non-destructible behavior unless room/boss authoring wraps them here.
+ */
+export class SecurityDroneCombatTarget extends CombatDroneTarget {
+  constructor(options: SecurityDroneCombatTargetOptions) {
+    const drone = options.drone;
+    super({
+      id: options.id ?? `${drone.id}-combat-target`,
+      hitMeshes: options.hitMeshes ?? [drone.collider],
+      healthUnits: options.healthUnits,
+      kind: options.kind,
+      splashAnchor: drone.root,
+      owner: {
+        setEnabled: (enabled) => {
+          drone.setEnabled(enabled);
+        },
+        setCollisionEnabled: (enabled) => {
+          drone.setCollisionEnabled(enabled);
+        },
+        setVisible: (visible) => {
+          drone.setPresentationVisible(visible);
+        },
+        clearOwnedProjectiles: () => {
+          drone.clearOwnedProjectiles();
+        },
       },
     });
   }
