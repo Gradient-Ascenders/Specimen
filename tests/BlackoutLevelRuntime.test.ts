@@ -318,6 +318,19 @@ test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause
     assert.equal(runtime.requestFailure(), true);
     assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
 
+    // A restart exits the deferred death state so merge takeover can be
+    // verified independently.
+    runtime.restartLevel();
+    input.press('aimAbility');
+    input.press('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+
+    assert.equal(runtime.transitionPhase('merging'), true);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+
     runtime.dispose();
     assert.equal(runtime.state, 'disposed');
     assert.equal(scene.children.length, 0);
