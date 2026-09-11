@@ -9,6 +9,7 @@ import {
 import type { ReadonlyVector3State } from '../physics/KinematicBody.ts';
 import {
   type CombatImpact,
+  type CombatImpactRejectionReason,
   type CombatTargetRegistration,
   type CombatTargetRegistry,
 } from './CombatTargetRegistry.ts';
@@ -173,7 +174,7 @@ export interface SpecimenAttackEvents {
     readonly impact: CombatImpact;
     readonly accepted: boolean;
     readonly destroyed: boolean;
-    readonly rejectionReason?: string;
+    readonly rejectionReason?: CombatImpactRejectionReason;
   };
   projectileDespawned: {
     readonly projectileId: number;
