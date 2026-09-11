@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import * as THREE from 'three';
 
-import type { Input } from '../src/core/Input.ts';
+import type { Input, InputAction } from '../src/core/Input.ts';
 import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
 
@@ -113,6 +113,210 @@ test('failed Blackout construction rolls back a visual even when scene.add attac
     assert.equal(cameraClearCount, 1);
     assert.deepEqual(inputStates, [false]);
     assert.equal(pointerReleaseCount, 1);
+
+    runtime.dispose();
+    assert.equal(runtime.state, 'disposed');
+    assert.equal(scene.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+
+class RuntimeFakeElement {
+  readonly dataset: Record<string, string> = {};
+  readonly children: RuntimeFakeElement[] = [];
+  readonly retryButton = new FakeButton();
+  className = '';
+  hidden = false;
+  inert = false;
+  innerHTML = '';
+  textContent: string | null = '';
+  isConnected = false;
+  offsetWidth = 1;
+  removed = false;
+  readonly classList = {
+    add: (..._tokens: string[]) => {},
+    remove: (..._tokens: string[]) => {},
+  };
+
+  setAttribute(_name: string, _value: string): void {}
+
+  querySelector(selector: string): FakeButton | null {
+    return selector === '.death-retry' ? this.retryButton : null;
+  }
+
+  append(...children: RuntimeFakeElement[]): void {
+    for (const child of children) {
+      child.isConnected = true;
+      this.children.push(child);
+    }
+  }
+
+  remove(): void {
+    this.isConnected = false;
+    this.removed = true;
+  }
+}
+
+class RuntimeFakeInput {
+  private readonly held = new Set<InputAction>();
+  private readonly pressed = new Set<InputAction>();
+  enabled = true;
+  pointerLocked = true;
+  pointerDeltaX = 0;
+  pointerDeltaY = 0;
+  wasClearedSinceFixedUpdate = false;
+
+  isDown(action: InputAction): boolean {
+    return this.held.has(action);
+  }
+
+  wasPressed(action: InputAction): boolean {
+    return this.pressed.has(action);
+  }
+
+  wasReleased(_action: InputAction): boolean {
+    return false;
+  }
+
+  press(action: InputAction): void {
+    this.held.add(action);
+    this.pressed.add(action);
+  }
+
+  release(action: InputAction): void {
+    this.held.delete(action);
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) this.resetState();
+  }
+
+  resetState(): void {
+    this.held.clear();
+    this.pressed.clear();
+  }
+
+  endFixedUpdate(): void {
+    this.pressed.clear();
+  }
+
+  endPointerUpdate(): void {}
+  requestPointerLock(): void { this.pointerLocked = true; }
+  releasePointerLock(): void { this.pointerLocked = false; }
+}
+
+class RuntimeFakeCameraRig {
+  readonly camera = new THREE.PerspectiveCamera();
+  readonly aimOrigin = new THREE.Vector3(2, 0.46, 2);
+  readonly aimDirection = new THREE.Vector3(-2, 0.64, 6).normalize();
+  aimActive = false;
+
+  setFollowTarget(): void {}
+  clearFollowTarget(): void {}
+  reset(): void {}
+  queueLookInput(): void {}
+  applyQueuedLookInput(): void {}
+
+  copyGroundMovementDirection(
+    _x: number,
+    _z: number,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    return target.set(0, 0, 0);
+  }
+
+  copySurfaceMovementDirection(
+    _x: number,
+    _z: number,
+    _up: unknown,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    return target.set(0, 0, 0);
+  }
+
+  copyAimRay(origin: THREE.Vector3, direction: THREE.Vector3): void {
+    origin.copy(this.aimOrigin);
+    direction.copy(this.aimDirection);
+  }
+
+  setAimPresentationActive(active: boolean): void {
+    this.aimActive = active;
+  }
+
+  update(): void {}
+}
+
+test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause and clears it on restart/death/dispose', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFakeCameraRig();
+    const canvas = new RuntimeFakeElement();
+    const renderLayer = {
+      scene,
+      canvas,
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const host = new RuntimeFakeElement();
+
+    const runtime = new BlackoutLevelRuntime({
+      host: host as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'volt',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+
+    input.press('aimAbility');
+    input.press('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+
+    input.release('aimAbility');
+    input.release('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    runtime.activateCheckpoint('cp2');
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+
+    runtime.stop();
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+    assert.equal(cameraRig.aimActive, false);
+    runtime.start();
+
+    runtime.restartLevel();
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
+
+    input.press('aimAbility');
+    input.press('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+
+    assert.equal(runtime.requestFailure(), true);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined);
 
     runtime.dispose();
     assert.equal(runtime.state, 'disposed');
