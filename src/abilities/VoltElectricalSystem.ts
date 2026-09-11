@@ -297,6 +297,18 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     }
   }
 
+  /**
+   * Revalidate only the established tether after authored device motion.
+   *
+   * This consumes no input and advances no aim/search state, allowing Level 3
+   * to move a connected socket and deterministically break range before hazard
+   * evaluation without calling update() twice in one fixed step.
+   */
+  revalidateConnection(): void {
+    this.assertNotDisposed('revalidate Volt electrical connection');
+    this.maintainConnection();
+  }
+
   /** Cancel transient aim/search while preserving an established tether. */
   cancelAim(): void {
     if (this.disposed) return;
