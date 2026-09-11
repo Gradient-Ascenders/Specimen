@@ -125,3 +125,26 @@ test('powered core disposal is idempotent', () => {
     : [fixture.mesh.material];
   for (const material of materials) material.dispose();
 });
+
+
+test('powered device exposes one stable read-model object across state transitions', () => {
+  const fixture = createCore();
+  try {
+    const model = fixture.core.readModel;
+    fixture.core.setConnectionState(true);
+    assert.equal(fixture.core.readModel, model);
+    assert.equal(model.connected, true);
+    assert.equal(model.powered, true);
+
+    fixture.core.setBlocked(true);
+    assert.equal(fixture.core.readModel, model);
+    assert.equal(model.blocked, true);
+
+    fixture.core.setConnectionState(false);
+    assert.equal(fixture.core.readModel, model);
+    assert.equal(model.connected, false);
+    assert.equal(model.powered, false);
+  } finally {
+    fixture.dispose();
+  }
+});
