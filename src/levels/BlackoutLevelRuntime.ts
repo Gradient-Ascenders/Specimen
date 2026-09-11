@@ -533,6 +533,13 @@ export class BlackoutLevelRuntime {
             roomId: 'room-3',
             phase: 'three-slime',
           };
+          this.renderLayer.cameraRig.reset();
+          this.retargetCamera(resources);
+          this.notifyHUD(undefined, true);
+          this.events.emit('objectiveChanged', {
+            roomId: this.currentRoom.roomId,
+            objective: objectiveFor(this.currentRoom),
+          });
         } else {
           resources.specimenBody.recoverAt(BLACKOUT_SPECIMEN_MERGE_ANCHOR);
           if (!resources.phase.transition('specimen')) {
@@ -715,10 +722,15 @@ export class BlackoutLevelRuntime {
       // displacement before clearing it so those render-only samples still
       // reach CameraRig.update(). This mirrors the Level 1/2 input contract and
       // prevents Volt's centre-ray aim from becoming refresh-rate dependent.
+      const lookInputActive =
+        resources.phase.phase === 'three-slime' ||
+        resources.phase.phase === 'escape' ||
+        resources.phase.phase === 'specimen' ||
+        resources.phase.phase === 'boss';
       if (
         this.lifecycle.state === 'running' &&
         resources.deathSequence.isPlaying &&
-        !resources.phase.terminal &&
+        lookInputActive &&
         this.input.enabled
       ) {
         this.renderLayer.cameraRig.queueLookInput(
