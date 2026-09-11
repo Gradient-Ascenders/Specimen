@@ -128,7 +128,7 @@ export class PoweredLightDevice implements ElectricalDevice {
   }
 
   captureState(): SerializableValue {
-    return { core: this.core.captureLocalState() };
+    return { core: serializeCoreSnapshot(this.core.captureLocalState()) };
   }
 
   restoreState(state: SerializableValue): void {
@@ -171,11 +171,6 @@ export interface PoweredDoorOptions {
   readonly powerMode?: ElectricalPowerMode;
   readonly initialLatched?: boolean;
   readonly initialMechanicalPermission?: boolean;
-}
-
-interface PoweredDoorSnapshot extends CoreSnapshotEnvelope {
-  readonly door: VerticalBlastDoorSnapshot;
-  readonly mechanicalPermission: boolean;
 }
 
 export class PoweredDoorDevice implements ElectricalDevice {
@@ -235,8 +230,8 @@ export class PoweredDoorDevice implements ElectricalDevice {
 
   captureState(): SerializableValue {
     return {
-      core: this.core.captureLocalState(),
-      door: this.door.captureState(),
+      core: serializeCoreSnapshot(this.core.captureLocalState()),
+      door: serializeDoorSnapshot(this.door.captureState()),
       mechanicalPermission: this.mechanicalPermission,
     };
   }
@@ -302,12 +297,6 @@ export interface PoweredPlatformOptions {
   readonly powerMode?: ElectricalPowerMode;
   readonly initialLatched?: boolean;
   readonly initialMechanicalPermission?: boolean;
-}
-
-interface PoweredPlatformSnapshot extends CoreSnapshotEnvelope {
-  readonly platform: MovingPlatformSnapshot;
-  readonly shuttleTarget: 'start' | 'end';
-  readonly mechanicalPermission: boolean;
 }
 
 export class PoweredPlatformDevice implements ElectricalDevice {
@@ -385,8 +374,8 @@ export class PoweredPlatformDevice implements ElectricalDevice {
 
   captureState(): SerializableValue {
     return {
-      core: this.core.captureLocalState(),
-      platform: this.platform.captureState(),
+      core: serializeCoreSnapshot(this.core.captureLocalState()),
+      platform: serializePlatformSnapshot(this.platform.captureState()),
       shuttleTarget: this.shuttleTarget,
       mechanicalPermission: this.mechanicalPermission,
     };
@@ -572,11 +561,6 @@ export interface RotatingBridgeOptions {
   readonly initialMechanicalPermission?: boolean;
 }
 
-interface RotatingBridgeSnapshot extends CoreSnapshotEnvelope {
-  readonly progress: number;
-  readonly mechanicalPermission: boolean;
-}
-
 export class RotatingBridgeDevice implements ElectricalDevice {
   readonly id: string;
   readonly root = new THREE.Group();
@@ -671,7 +655,7 @@ export class RotatingBridgeDevice implements ElectricalDevice {
 
   captureState(): SerializableValue {
     return {
-      core: this.core.captureLocalState(),
+      core: serializeCoreSnapshot(this.core.captureLocalState()),
       progress: this.progressValue,
       mechanicalPermission: this.mechanicalPermission,
     };
@@ -843,7 +827,7 @@ export class LaserJunctionDevice implements ElectricalDevice {
   }
 
   captureState(): SerializableValue {
-    return { core: this.core.captureLocalState() };
+    return { core: serializeCoreSnapshot(this.core.captureLocalState()) };
   }
 
   restoreState(state: SerializableValue): void {
@@ -910,7 +894,7 @@ class RelayDeviceBase implements ElectricalDevice {
   }
 
   captureState(): SerializableValue {
-    return { core: this.core.captureLocalState() };
+    return { core: serializeCoreSnapshot(this.core.captureLocalState()) };
   }
 
   restoreState(state: SerializableValue): void {
@@ -958,6 +942,33 @@ function createTargetMesh(name: string): THREE.Mesh<THREE.BoxGeometry, THREE.Mes
   mesh.name = name;
   mesh.userData.authoringRole = 'electrical-target';
   return mesh;
+}
+
+function serializeCoreSnapshot(
+  snapshot: PoweredDeviceLocalSnapshot,
+): SerializableValue {
+  return {
+    available: snapshot.available,
+    latched: snapshot.latched,
+  };
+}
+
+function serializePlatformSnapshot(
+  snapshot: MovingPlatformSnapshot,
+): SerializableValue {
+  return {
+    progress: snapshot.progress,
+    target: snapshot.target,
+  };
+}
+
+function serializeDoorSnapshot(
+  snapshot: VerticalBlastDoorSnapshot,
+): SerializableValue {
+  return {
+    progress: snapshot.progress,
+    desiredOpen: snapshot.desiredOpen,
+  };
 }
 
 function readCoreSnapshot(
