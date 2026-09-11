@@ -68,6 +68,13 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
       throw new Error('Blackout checkpoint participant IDs must be unique and non-empty.');
     }
     this.participants.set(participant.id, participant);
+    this.activeSnapshot = {
+      ...this.activeSnapshot,
+      participantState: {
+        ...this.activeSnapshot.participantState,
+        [participant.id]: cloneSerializable(participant.capture()),
+      },
+    };
     return () => this.participants.delete(participant.id);
   }
 
@@ -106,8 +113,7 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
     room: BlackoutRoomState,
   ): void {
     const checkpoint = this.getCheckpoint(checkpointId);
-    const participantState = this.captureParticipants();
-    this.activeSnapshot = {
+    const candidate: BlackoutRuntimeSnapshot = {
       checkpointId,
       bodyPositions: {
         bob: toTuple(group.bobBody.position),
@@ -117,16 +123,12 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
       activeSlimeId: group.activeSlimeId,
       room: cloneRoomState(room),
       connections: { voltTargetId: null },
-      participantState,
+      participantState: this.captureParticipants(),
     };
-    // Captured body state still has to respect the authored checkpoint's
-    // clearance policy so a checkpoint cannot save an unrecoverable pose.
-    for (const id of ['bob', 'goop', 'volt'] as const) {
-      const position = tupleToVector(this.activeSnapshot.bodyPositions[id]);
-      if (!this.isSpawnSafe(position, checkpoint.clearanceRadius)) {
-        throw new Error(`Checkpoint "${checkpointId}" captured an unsafe ${id} position.`);
-      }
-    }
+    // Validate before committing the snapshot so a failed activation cannot
+    // poison the previously-safe recovery state.
+    this.assertSafeSnapshot(candidate, checkpoint.clearanceRadius);
+    this.activeSnapshot = candidate;
   }
 
   recover(group: PersistentSlimeGroup<Body>): BlackoutRuntimeSnapshot {
