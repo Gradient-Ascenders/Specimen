@@ -155,6 +155,7 @@ test('tap, partial, and full charge all derive damage cooldown and splash from o
       Math.abs(fixture.system.readModel.cooldownRemainingSeconds - 0.35) <
         0.02,
     );
+    assert.equal(fixture.system.readModel.cooldownProgress, 0);
 
     readyCooldown(fixture.system);
     fixture.system.update(0.75, controls({
@@ -170,6 +171,7 @@ test('tap, partial, and full charge all derive damage cooldown and splash from o
     assert.ok(Math.abs(fired[1]!.chargeAmount - 0.5) < 1e-12);
     assert.ok(Math.abs(fired[1]!.damageUnits - 2) < 1e-12);
     assert.ok(Math.abs(fired[1]!.splashRadiusMetres - 1.5) < 1e-12);
+    assert.equal(fixture.system.readModel.cooldownProgress, 0);
 
     readyCooldown(fixture.system);
     fixture.system.update(1.5, controls({
