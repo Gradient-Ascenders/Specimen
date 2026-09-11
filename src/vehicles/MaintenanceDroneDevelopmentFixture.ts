@@ -43,11 +43,11 @@ export class MaintenanceDroneDevelopmentFixture {
     this.droneRoot.add(this.mountAnchor);
 
     this.riderAnchor.name = 'maintenance-drone-rider-anchor';
-    this.riderAnchor.position.set(0, 0.78, 0);
+    this.riderAnchor.position.set(0, 0.72, 0);
     this.droneRoot.add(this.riderAnchor);
 
     this.dismountAnchor.name = 'maintenance-drone-dismount-anchor';
-    this.dismountAnchor.position.set(0, 0.84, 0);
+    this.dismountAnchor.position.set(0, 0.72, 0);
     this.droneRoot.add(this.dismountAnchor);
 
     this.recoveryAnchor.name = 'maintenance-drone-recovery-anchor';
