@@ -4,6 +4,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 
 import { BLACKOUT_SLIME_DEFINITIONS } from '../src/levels/BlackoutSlimeDefinitions.ts';
+import { validateLevelThreeProgressionSnapshot } from '../src/levels/LevelProgression.ts';
 import {
   BlackoutCheckpointManager,
   type BlackoutCheckpointDefinition,
@@ -217,4 +218,20 @@ test('full restart restores participant state captured at Level 3 entry, not lat
 
   assert.deepEqual(deviceState, { powered: false, doorOpen: false });
   assert.equal(manager.activeCheckpoint.checkpointId, 'cp1');
+});
+
+
+test('Level 3 progression requires the rescued three-slime roster and preserves any active member', () => {
+  assert.throws(
+    () => validateLevelThreeProgressionSnapshot({
+      unlockedSlimeIds: ['bob', 'goop'],
+      activeSlimeId: 'goop',
+    }),
+    /requires volt to be unlocked/,
+  );
+
+  assert.doesNotThrow(() => validateLevelThreeProgressionSnapshot({
+    unlockedSlimeIds: ['bob', 'goop', 'volt'],
+    activeSlimeId: 'volt',
+  }));
 });
