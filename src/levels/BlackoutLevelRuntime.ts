@@ -483,7 +483,6 @@ export class BlackoutLevelRuntime {
         safetyDisplacement,
       };
 
-      rollbackActions.length = 0;
       this.currentRoom = checkpoints.activeCheckpoint.room;
       this.completionEmitted = false;
       this.syncVisuals(this.resources);
@@ -494,6 +493,7 @@ export class BlackoutLevelRuntime {
         roomId: this.currentRoom.roomId,
         objective: objectiveFor(this.currentRoom),
       });
+      rollbackActions.length = 0;
     } catch (error) {
       for (let index = rollbackActions.length - 1; index >= 0; index -= 1) {
         try {
@@ -507,6 +507,7 @@ export class BlackoutLevelRuntime {
       surfaceRegistry.clear();
       this.renderLayer.cameraRig.clearFollowTarget();
       this.input.setEnabled(false);
+      this.resources = undefined;
       this.input.releasePointerLock();
       throw error;
     }
