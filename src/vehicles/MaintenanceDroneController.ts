@@ -107,6 +107,7 @@ implements BlackoutCheckpointParticipant {
   private readonly voltRadiusMetres: number;
   private readonly model: MutableMaintenanceDroneReadModel;
   private readonly anchorPosition = new THREE.Vector3();
+  private readonly previousAnchorPosition = new THREE.Vector3();
   private readonly recoveryPosition = new THREE.Vector3();
   private readonly startupOrigin = new THREE.Vector3();
   private startupElapsedSeconds = 0;
@@ -288,9 +289,17 @@ implements BlackoutCheckpointParticipant {
   syncMountedVolt(voltBody: KinematicBody): void {
     if (!this.voltMountedValue) return;
     this.authoring.riderAnchor.getWorldPosition(this.anchorPosition);
+    this.previousAnchorPosition.set(
+      this.anchorPosition.x -
+        (this.flight.position.x - this.flight.previousPosition.x),
+      this.anchorPosition.y -
+        (this.flight.position.y - this.flight.previousPosition.y),
+      this.anchorPosition.z -
+        (this.flight.position.z - this.flight.previousPosition.z),
+    );
     voltBody.syncKinematicPose(
       this.anchorPosition,
-      this.anchorPosition,
+      this.previousAnchorPosition,
     );
   }
 
