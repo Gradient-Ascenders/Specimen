@@ -451,7 +451,11 @@ export class BlackoutLevelRuntime {
         return true;
       };
 
-      const checkpoints = new BlackoutCheckpointManager<KinematicBody>(cp1, isSpawnSafe);
+      const checkpoints = new BlackoutCheckpointManager<KinematicBody>(
+        cp1,
+        isSpawnSafe,
+        initialActive,
+      );
       for (const checkpoint of BLACKOUT_CHECKPOINTS.slice(1)) {
         checkpoints.registerCheckpoint(checkpoint);
       }
