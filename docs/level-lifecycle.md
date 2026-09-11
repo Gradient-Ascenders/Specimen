@@ -108,13 +108,18 @@ diagnosis and verification.
 
 Issue #93 adds `GameSessionCoordinator` above the concrete level runtimes. The
 coordinator owns the current runtime, forwards lifecycle/render/HUD operations,
-and performs the Containment-to-Cultivation replacement from an explicit
-progression snapshot. Concrete level resources remain level-owned; see
-`docs/cultivation-level-foundation.md` for transition and recovery details.
+and replaces completed runtimes from an explicit progression snapshot. Issue
+#121 extends that same ownership boundary through Cultivation into Blackout:
+Level 2 emits `level-3`, the coordinator disposes Level 2, and then constructs
+the dedicated Level 3 runtime without transferring live bodies or scene
+resources. Concrete resources remain level-owned; see
+`docs/cultivation-level-foundation.md` and
+`docs/blackout-level-foundation.md`.
 
 ## Current limits
 
-Each concrete runtime still owns only its own level. The application coordinator
-currently supports the single authored Containment-to-Cultivation handoff; it is
-not a general route graph or asynchronous asset manager. Cultivation Rooms 4–5
-remain unplanned, and there is no transition beyond the Level 2 foundation.
+Each concrete runtime still owns only its own level. The coordinator supports the
+authored Containment -> Cultivation -> Blackout route, including asynchronous
+runtime creation and presentation preparation where supplied, but it is not a
+general route graph. Blackout room mechanics, merge gameplay, Specimen combat,
+and the boss remain owned by their dedicated Level 3 feature issues.

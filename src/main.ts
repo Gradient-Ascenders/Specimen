@@ -53,6 +53,15 @@ const gameSession = new GameSessionCoordinator({
       debugSupport: debugModule?.CULTIVATION_LEVEL_DEBUG_SUPPORT,
     });
   },
+  createLevelThree: async (progression) => {
+    const runtimeModule = await import('./levels/BlackoutLevelRuntime.ts');
+    return new runtimeModule.BlackoutLevelRuntime({
+      host: app,
+      input,
+      renderLayer,
+      progression,
+    });
+  },
   scheduleTransition: (transition) => {
     requestAnimationFrame(() => transition());
   },
@@ -102,16 +111,16 @@ const unsubscribeObjectiveChanged = gameSession.events.on(
 );
 const unsubscribeTransitionStarted = gameSession.events.on(
   'transitionStarted',
-  ({ message }) => {
+  ({ levelId, message }) => {
     levelOneShaderProgramGuardActive = false;
     sampleLevelOneShaderPrograms = undefined;
     performanceRecorder?.completeLevelOneShaderProgramGuard();
-    gameFlow.beginLevelTransition(message);
+    gameFlow.beginLevelTransition(message, levelId);
   },
 );
 const unsubscribeTransitionCompleted = gameSession.events.on(
   'transitionCompleted',
-  () => gameFlow.finishLevelTransition(),
+  ({ levelId }) => gameFlow.finishLevelTransition(levelId),
 );
 const unsubscribeTransitionFailed = gameSession.events.on(
   'transitionFailed',

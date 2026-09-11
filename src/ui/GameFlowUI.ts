@@ -372,7 +372,9 @@ export class GameFlowUI {
   private readonly slimeRoster: HTMLElement;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
+  private readonly transitionRuntimeLabel: HTMLElement;
   private readonly transitionMessage: HTMLElement;
+  private readonly transitionCopy: HTMLElement;
   private readonly transitionFailureMessage: HTMLElement;
   private readonly transitionContinueButton: HTMLButtonElement;
   private readonly unsubscribeSettings: () => void;
@@ -421,12 +423,14 @@ export class GameFlowUI {
     this.slimeRoster = this.requireElement('[data-slime-roster]');
     this.passiveStatus = this.requireElement('[data-passive-status]');
     this.switchFeedback = this.requireElement('[data-switch-feedback]');
+    this.transitionRuntimeLabel = this.requireElement('[data-transition-runtime-label]');
     this.transitionMessage = this.requireElement('[data-transition-message]');
+    this.transitionCopy = this.requireElement('[data-transition-copy]');
     this.transitionFailureMessage = this.requireElement(
       '[data-transition-failure-message]',
     );
     this.transitionContinueButton = this.requireElement<HTMLButtonElement>(
-      '[data-action="enter-level-two"]',
+      '[data-action="enter-level"]',
     );
 
     for (const panel of this.element.querySelectorAll<HTMLElement>(
@@ -470,18 +474,31 @@ export class GameFlowUI {
     this.objective.textContent = nextObjective;
   }
 
-  beginLevelTransition(message: string): void {
+  beginLevelTransition(
+    message: string,
+    levelId: 'level-2' | 'level-3' = 'level-2',
+  ): void {
     if (!this.model.beginLevelTransition()) return;
+    const levelTwo = levelId === 'level-2';
+    this.transitionRuntimeLabel.textContent = levelTwo
+      ? 'Cultivation runtime · 02'
+      : 'Blackout runtime · 03';
     this.transitionMessage.textContent = message;
+    this.transitionCopy.textContent = levelTwo
+      ? 'Transferring the specimen pair.'
+      : 'Transferring the three-specimen roster.';
     this.transitionContinueButton.hidden = true;
     this.switchFeedbackModel.clear();
     this.switchFeedback.textContent = '';
     this.syncState();
   }
 
-  finishLevelTransition(): void {
+  finishLevelTransition(levelId: 'level-2' | 'level-3' = 'level-2'): void {
     if (this.model.state !== 'transitioning') return;
-    this.transitionMessage.textContent = 'Level 2 ready';
+    const levelName = levelId === 'level-2' ? 'Level 2' : 'Level 3';
+    this.transitionMessage.textContent = `${levelName} ready`;
+    const label = this.transitionContinueButton.querySelector('span');
+    if (label) label.textContent = `Enter ${levelName}`;
     this.transitionContinueButton.hidden = false;
     this.transitionContinueButton.focus();
   }
@@ -692,11 +709,11 @@ export class GameFlowUI {
       <section class="flow-screen" data-flow-panel="transitioning" aria-labelledby="transition-heading" hidden>
         <div class="system-state">
           ${createBrandedScannerMarkup()}
-          <p class="system-label">Cultivation runtime · 02</p>
+          <p class="system-label" data-transition-runtime-label>Cultivation runtime · 02</p>
           <h1 id="transition-heading" data-transition-message>Entering Level 2…</h1>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <p class="system-copy" role="status" aria-live="polite">Transferring the specimen pair.</p>
-          <button class="system-action primary-action transition-action" type="button" data-action="enter-level-two" hidden>
+          <p class="system-copy" data-transition-copy role="status" aria-live="polite">Transferring the specimen pair.</p>
+          <button class="system-action primary-action transition-action" type="button" data-action="enter-level" hidden>
             <span>Enter Level 2</span><span aria-hidden="true">→</span>
           </button>
         </div>
@@ -854,7 +871,7 @@ export class GameFlowUI {
       case 'restart':
         this.restart();
         break;
-      case 'enter-level-two':
+      case 'enter-level':
         if (this.model.state !== 'transitioning' || target.hidden) break;
         this.actions.startGameplay();
         if (this.model.finishLevelTransition()) {
