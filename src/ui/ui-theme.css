@@ -1820,3 +1820,52 @@ kbd {
     transition: none;
   }
 }
+
+
+/* Minimal Volt electrical verification UI. Final HUD/VFX ownership remains #131/#136. */
+.volt-electrical-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+}
+
+.volt-electrical-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #ffe76a;
+  font-family: var(--ui-font-display);
+  font-size: 1rem;
+  line-height: 1;
+  text-shadow: 0 0 0.5rem rgb(255 223 69 / 55%);
+}
+
+.volt-electrical-crosshair[data-state='valid'] {
+  text-shadow:
+    0 0 0.35rem rgb(255 235 120 / 82%),
+    0 0 0.9rem rgb(255 223 69 / 52%);
+}
+
+.volt-electrical-status {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(4.5rem, 9vh, 7rem);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgb(255 223 69 / 28%);
+  border-radius: var(--ui-radius-sm);
+  color: #f6eaa2;
+  background: rgb(8 7 10 / 72%);
+  font-family: var(--ui-font-display);
+  font-size: 0.58rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.volt-electrical-status[data-state='unstable'] {
+  border-color: rgb(255 171 69 / 58%);
+  color: #ffd28a;
+}

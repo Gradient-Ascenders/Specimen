@@ -555,3 +555,132 @@ test('moving parents and reparenting invalidate cached dynamic query transforms'
   world.sweepSphere(origin, delta, .2, hit); assert.equal(hit.fraction, expected.fraction);
   world.clear(); reference.clear(); box.geometry.dispose();
 });
+
+
+test('exact raycast respects query layers, closest hit, and dynamic transforms', () => {
+  const world = new CollisionWorld();
+  const worldBlocker = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  worldBlocker.name = 'ray-world-blocker';
+  worldBlocker.position.set(0, 0, 2);
+  const electricalTarget = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  electricalTarget.name = 'ray-electrical-target';
+  electricalTarget.position.set(0, 0, 5);
+
+  world.register(
+    worldBlocker,
+    CollisionLayer.LineOfSight,
+    ColliderTransformMode.Static,
+  );
+  world.register(
+    electricalTarget,
+    CollisionLayer.ElectricalTarget,
+    ColliderTransformMode.Dynamic,
+  );
+
+  const origin = new THREE.Vector3();
+  const direction = new THREE.Vector3(0, 0, 1);
+  const hit = new CollisionHit();
+
+  assert.equal(
+    world.raycast(
+      origin,
+      direction,
+      10,
+      hit,
+      CollisionLayer.LineOfSight,
+    ),
+    true,
+  );
+  assert.equal(hit.object, worldBlocker);
+  assert.ok(Math.abs(hit.distance - 1.5) < 1e-6);
+
+  assert.equal(
+    world.raycast(
+      origin,
+      direction,
+      10,
+      hit,
+      CollisionLayer.ElectricalTarget,
+    ),
+    true,
+  );
+  assert.equal(hit.object, electricalTarget);
+  assert.ok(Math.abs(hit.distance - 4.5) < 1e-6);
+
+  electricalTarget.position.z = 7;
+  assert.equal(
+    world.raycast(
+      origin,
+      direction,
+      10,
+      hit,
+      CollisionLayer.ElectricalTarget,
+    ),
+    true,
+  );
+  assert.ok(Math.abs(hit.distance - 6.5) < 1e-6);
+
+  worldBlocker.geometry.dispose();
+  electricalTarget.geometry.dispose();
+});
+
+test('raycast does not overwrite movement sweep diagnostics', () => {
+  const world = new CollisionWorld();
+  const movement = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  movement.position.z = 2;
+  const target = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  target.position.z = 4;
+  world.register(movement, CollisionLayer.Movement);
+  world.register(target, CollisionLayer.ElectricalTarget);
+
+  const hit = new CollisionHit();
+  world.sweepSphere(
+    new THREE.Vector3(),
+    new THREE.Vector3(0, 0, 5),
+    0.2,
+    hit,
+    CollisionLayer.Movement,
+  );
+  const before = world.getLastSweepDiagnostics();
+
+  world.raycast(
+    new THREE.Vector3(),
+    new THREE.Vector3(0, 0, 1),
+    10,
+    hit,
+    CollisionLayer.ElectricalTarget,
+  );
+
+  assert.deepEqual(world.getLastSweepDiagnostics(), before);
+  movement.geometry.dispose();
+  target.geometry.dispose();
+});
+
+
+test('raycast reports a zero-distance hit when the origin starts inside a collider', () => {
+  const world = new CollisionWorld();
+  const collider = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
+  collider.name = 'inside-ray-collider';
+  world.register(
+    collider,
+    CollisionLayer.LineOfSight,
+    ColliderTransformMode.Static,
+  );
+  const hit = new CollisionHit();
+
+  assert.equal(
+    world.raycast(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 1),
+      5,
+      hit,
+      CollisionLayer.LineOfSight,
+    ),
+    true,
+  );
+  assert.equal(hit.object, collider);
+  assert.equal(hit.distance, 0);
+  assert.equal(hit.fraction, 0);
+
+  collider.geometry.dispose();
+});

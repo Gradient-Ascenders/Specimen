@@ -37,21 +37,26 @@ Room/device systems that need checkpoint persistence implement BlackoutCheckpoin
 Recovery is transactional and ordered:
 
 1. suspend player input;
-2. reset PuzzleRegistry components to their authored geometry/state;
-3. clear participant transients such as live Volt arcs/projectiles;
-4. clone the authoritative snapshot;
-5. restore registered doors, hazards, devices, and room-local participants;
-6. validate all three spawn anchors against that restored room before moving any body;
-7. recover Bob, Goop, and Volt together;
-8. restore active identity and phase;
-9. reset camera/input presentation and HUD;
-10. resume gameplay only after recovery succeeds.
+2. explicitly disconnect live systems whose teardown can notify room devices (Volt's tether is cleared here by #122);
+3. reset PuzzleRegistry components to their authored geometry/state;
+4. run checkpoint-participant transient cleanup as an idempotent safeguard;
+5. clone the authoritative snapshot;
+6. restore registered doors, hazards, devices, and room-local participants;
+7. validate all three spawn anchors against that restored room before moving any body;
+8. recover Bob, Goop, and Volt together;
+9. restore active identity and phase;
+10. reset camera/input presentation and HUD;
+11. resume gameplay only after recovery succeeds.
 
 A failed safety validation leaves all three bodies unmoved. PuzzleRegistry remains
 the reset authority for authored resettable geometry; checkpoint participants
 add serializable state only where a plain reset is insufficient.
 
-Live Volt tethers intentionally do not survive Retry or restart. This matches the Blackout design reset rule: the arc is removed and Volt disconnects; the electrical-device participant restores its checkpoint-authored powered or latched state independently.
+Live Volt tethers intentionally do not survive Retry or restart. #122 disconnects
+the authoritative tether before PuzzleRegistry reset so a device's disconnect
+notification cannot overwrite restored state. The checkpoint participant still
+performs transient cleanup later as an idempotent safeguard. Electrical-device
+participants restore checkpoint-authored powered or latched state independently.
 
 Failure uses the existing DeathSequence deferred Retry path. The failure request retains checkpoint recovery until the player chooses Retry rather than mutating the room during the fatal fixed step.
 

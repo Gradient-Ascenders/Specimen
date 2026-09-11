@@ -1,5 +1,14 @@
 import * as THREE from 'three';
 
+import {
+  ElectricalTargetRegistry,
+  type ElectricalConnectionTarget,
+  type ElectricalTargetRegistrationOptions,
+} from '../abilities/ElectricalTargetRegistry.ts';
+import {
+  VoltElectricalSystem,
+  type VoltElectricalReadModel,
+} from '../abilities/VoltElectricalSystem.ts';
 import { EventBus } from '../core/EventBus.ts';
 import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
@@ -19,6 +28,7 @@ import {
   type ResettablePuzzleComponent,
 } from '../puzzle/PuzzleRegistry.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
+import { VoltElectricalPresentation } from '../render/electrical/VoltElectricalPresentation.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
   type SlimeHUDListener,
@@ -64,6 +74,10 @@ interface BlackoutRuntimeResources {
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
   readonly puzzleRegistry: PuzzleRegistry;
+  readonly electricalTargets: ElectricalTargetRegistry;
+  readonly electricalSystem: VoltElectricalSystem<KinematicBody>;
+  readonly electricalPresentation: VoltElectricalPresentation;
+  readonly unregisterElectricalCheckpointParticipant: () => void;
   readonly manager: SlimeManager<KinematicBody>;
   readonly group: PersistentSlimeGroup<KinematicBody>;
   readonly checkpoints: BlackoutCheckpointManager<KinematicBody>;
@@ -127,6 +141,10 @@ export class BlackoutLevelRuntime {
     return this.resources?.checkpoints.activeCheckpoint;
   }
 
+  get voltElectricalReadModel(): VoltElectricalReadModel | undefined {
+    return this.resources?.electricalSystem.readModel;
+  }
+
   load(): void { this.lifecycle.load(); }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
@@ -147,7 +165,15 @@ export class BlackoutLevelRuntime {
         !this.resources.phase.terminal &&
         this.resources.deathSequence.isPlaying,
       );
-      if (!enabled) this.input.resetState();
+      if (!enabled) {
+        this.input.resetState();
+        this.resources.electricalSystem.cancelAim();
+        this.resources.electricalPresentation.update(
+          this.resources.electricalSystem.readModel,
+        );
+        this.renderLayer.cameraRig.setAimPresentationActive(false);
+        this.syncVisuals(this.resources);
+      }
     }
   }
 
@@ -181,6 +207,13 @@ export class BlackoutLevelRuntime {
 
   registerCheckpointParticipant(participant: BlackoutCheckpointParticipant): () => void {
     return this.requireResources().checkpoints.registerParticipant(participant);
+  }
+
+  registerElectricalTarget(
+    target: ElectricalConnectionTarget,
+    options?: ElectricalTargetRegistrationOptions,
+  ): () => void {
+    return this.requireResources().electricalTargets.register(target, options);
   }
 
   registerPuzzleComponent(
@@ -230,6 +263,9 @@ export class BlackoutLevelRuntime {
     )) {
       return false;
     }
+    resources.electricalSystem.reset('death');
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
+    this.renderLayer.cameraRig.setAimPresentationActive(false);
     this.input.setEnabled(false);
     this.input.resetState();
     this.input.releasePointerLock();
@@ -244,6 +280,16 @@ export class BlackoutLevelRuntime {
   transitionPhase(next: BlackoutPhase): boolean {
     const resources = this.requireResources();
     if (!resources.phase.transition(next)) return false;
+    if (next === 'merging') {
+      resources.electricalSystem.disconnect('merge');
+      resources.electricalSystem.cancelAim();
+      this.renderLayer.cameraRig.setAimPresentationActive(false);
+    } else if (next === 'complete') {
+      resources.electricalSystem.disconnect('completion');
+      resources.electricalSystem.cancelAim();
+      this.renderLayer.cameraRig.setAimPresentationActive(false);
+    }
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.currentRoom = {
       ...this.currentRoom,
       phase: next,
@@ -272,6 +318,8 @@ export class BlackoutLevelRuntime {
       this.input.endFixedUpdate();
       return;
     }
+
+    resources.scene.updateElectricalFixtures(deltaSeconds);
 
     let switched = false;
     if (
@@ -328,6 +376,19 @@ export class BlackoutLevelRuntime {
       body.update(deltaSeconds, resources.movement, resources.jump);
     }
 
+    resources.electricalSystem.update(deltaSeconds, {
+      aimHeld: this.input.isDown('aimAbility'),
+      fireHeld: this.input.isDown('fireAbility'),
+      firePressed: this.input.wasPressed('fireAbility'),
+      gameplayInputEnabled:
+        this.input.enabled && this.currentRoom.phase === 'three-slime',
+      pointerLocked: this.input.pointerLocked,
+    });
+    this.renderLayer.cameraRig.setAimPresentationActive(
+      resources.electricalSystem.readModel.aimActive,
+    );
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
+
     // Inactive Level 3 bodies deliberately keep their exact positions while
     // preserving their colliders/passive state. A switch itself never updates,
     // teleports, recreates or unregisters them.
@@ -344,7 +405,30 @@ export class BlackoutLevelRuntime {
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
-    if (this.resources) this.syncVisuals(this.resources);
+    const resources = this.resources;
+    if (resources) {
+      this.syncVisuals(resources);
+      resources.electricalPresentation.update(
+        resources.electricalSystem.readModel,
+      );
+
+      // Render frames can run without a fixed update when the display refresh
+      // rate exceeds the 60 Hz simulation rate. Queue the current pointer
+      // displacement before clearing it so those render-only samples still
+      // reach CameraRig.update(). This mirrors the Level 1/2 input contract and
+      // prevents Volt's centre-ray aim from becoming refresh-rate dependent.
+      if (
+        this.lifecycle.state === 'running' &&
+        resources.deathSequence.isPlaying &&
+        !resources.phase.terminal &&
+        this.input.enabled
+      ) {
+        this.renderLayer.cameraRig.queueLookInput(
+          this.input.pointerDeltaX,
+          this.input.pointerDeltaY,
+        );
+      }
+    }
     this.input.endPointerUpdate();
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     this.renderLayer.render();
@@ -486,11 +570,54 @@ export class BlackoutLevelRuntime {
       voltLight.castShadow = false;
       visuals.volt.add(voltLight);
 
+      const electricalTargets = new ElectricalTargetRegistry(collisionWorld);
+      rollback(() => electricalTargets.dispose());
+      for (const target of scene.electricalTargets) {
+        electricalTargets.register(target, {
+          transformMode:
+            target.id === 'fixture-moving'
+              ? ColliderTransformMode.Dynamic
+              : ColliderTransformMode.Static,
+        });
+      }
+
+      const electricalSystem = new VoltElectricalSystem<KinematicBody>({
+        slimeManager: manager,
+        collisionWorld,
+        targetRegistry: electricalTargets,
+        aimRayProvider: this.renderLayer.cameraRig,
+      });
+      rollback(() => electricalSystem.dispose());
+
+      const unregisterElectricalCheckpointParticipant =
+        checkpoints.registerParticipant({
+          id: 'volt-electrical-connection',
+          capture: () => ({ connected: false }),
+          restore: () => {
+            // Live tethers are intentionally transient. Device participants
+            // restore authored/latching state independently.
+          },
+          resetTransient: () => {
+            electricalSystem.disconnect('reset');
+          },
+        });
+      rollback(unregisterElectricalCheckpointParticipant);
+
+      const electricalPresentation = new VoltElectricalPresentation({
+        scene: this.renderLayer.scene,
+        host: this.host,
+      });
+      rollback(() => electricalPresentation.dispose());
+
       this.resources = {
         scene,
         collisionWorld,
         surfaceRegistry,
         puzzleRegistry,
+        electricalTargets,
+        electricalSystem,
+        electricalPresentation,
+        unregisterElectricalCheckpointParticipant,
         manager,
         group,
         checkpoints,
@@ -508,6 +635,9 @@ export class BlackoutLevelRuntime {
       this.currentRoom = checkpoints.activeCheckpoint.room;
       this.completionEmitted = false;
       this.syncVisuals(this.resources);
+      this.resources.electricalPresentation.update(
+        this.resources.electricalSystem.readModel,
+      );
       this.retargetCamera(this.resources);
       this.host.dataset.gameState = 'playing';
       this.notifyHUD(undefined, true);
@@ -546,6 +676,11 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    const resources = this.requireResources();
+    resources.electricalSystem.cancelAim();
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
+    this.renderLayer.cameraRig.setAimPresentationActive(false);
+    this.syncVisuals(resources);
     this.input.setEnabled(false);
     this.input.resetState();
   };
@@ -555,6 +690,9 @@ export class BlackoutLevelRuntime {
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
+    resources.electricalSystem.reset('restart');
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
+    this.renderLayer.cameraRig.setAimPresentationActive(false);
     resources.checkpoints.resetToInitial();
     resources.puzzleRegistry.reset();
     const snapshot = resources.checkpoints.recover(resources.group);
@@ -582,6 +720,10 @@ export class BlackoutLevelRuntime {
     this.renderLayer.cameraRig.clearFollowTarget();
     resources.deathSequence.reset();
     resources.deathScreen.dispose();
+    resources.electricalPresentation.dispose();
+    resources.electricalSystem.dispose();
+    resources.unregisterElectricalCheckpointParticipant();
+    resources.electricalTargets.dispose();
 
     for (const visual of Object.values(resources.visuals)) {
       disposeSlimeVisual(visual);
@@ -605,6 +747,9 @@ export class BlackoutLevelRuntime {
   ): void {
     this.input.setEnabled(false);
     this.input.resetState();
+    resources.electricalSystem.reset('reset');
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
+    this.renderLayer.cameraRig.setAimPresentationActive(false);
     resources.puzzleRegistry.reset();
     const snapshot = resources.checkpoints.recover(resources.group);
     this.currentRoom = snapshot.room;
@@ -656,12 +801,29 @@ export class BlackoutLevelRuntime {
     resources.visuals.bob.position.copy(resources.group.bobBody.position);
     resources.visuals.goop.position.copy(resources.group.goopBody.position);
     resources.visuals.volt.position.copy(resources.group.voltBody.position);
+
+    // Hide only Volt's body material during his near-first-person aim pose.
+    // The Object3D remains visible so the child point light continues to
+    // illuminate the scene while the mesh cannot obscure the crosshair.
+    const hideVoltBody =
+      resources.manager.activeSlimeId === 'volt' &&
+      resources.electricalSystem.readModel.aimActive;
+    const voltMaterials = Array.isArray(resources.visuals.volt.material)
+      ? resources.visuals.volt.material
+      : [resources.visuals.volt.material];
+    for (const material of voltMaterials) {
+      material.visible = !hideVoltBody;
+    }
   }
 
   private commitCompletion(): void {
     const resources = this.requireResources();
     if (this.completionEmitted || !resources.phase.terminal) return;
     this.completionEmitted = true;
+    resources.electricalSystem.disconnect('completion');
+    resources.electricalSystem.cancelAim();
+    resources.electricalPresentation.update(resources.electricalSystem.readModel);
+    this.renderLayer.cameraRig.setAimPresentationActive(false);
     this.input.setEnabled(false);
     this.input.releasePointerLock();
     this.host.dataset.gameState = 'complete';
