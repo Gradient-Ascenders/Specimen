@@ -362,6 +362,10 @@ export class BlackoutLevelRuntime {
     const scene = new BlackoutLevelScene();
     const collisionWorld = new CollisionWorld();
     const surfaceRegistry = new SurfaceRegistry();
+    const rollbackActions: Array<() => void> = [];
+    const rollback = (action: () => void): void => {
+      rollbackActions.push(action);
+    };
 
     try {
       this.renderLayer.scene.add(scene.root);
@@ -376,6 +380,7 @@ export class BlackoutLevelRuntime {
         BLACKOUT_SLIME_DEFINITIONS,
         this.initialProgression.activeSlimeId,
       );
+      rollback(() => manager.dispose());
       const cp1 = BLACKOUT_CHECKPOINTS[0]!;
       const makeBody = (id: 'bob' | 'goop' | 'volt') => {
         const definition = manager.getDefinition(id);
@@ -441,12 +446,16 @@ export class BlackoutLevelRuntime {
         backgroundElements: [this.renderLayer.canvas],
       });
       this.host.append(deathScreen.element);
+      rollback(() => deathScreen.dispose());
       const visuals = {
         bob: createSlimeVisual(0x44c7d8, 0x123941),
         goop: createSlimeVisual(0x7ad13d, 0x233d12),
         volt: createSlimeVisual(0xffdf45, 0x6d5600),
       } as const;
-      for (const visual of Object.values(visuals)) this.renderLayer.scene.add(visual);
+      for (const visual of Object.values(visuals)) {
+        this.renderLayer.scene.add(visual);
+        rollback(() => disposeSlimeVisual(visual));
+      }
       const voltLight = new THREE.PointLight(0xffdf75, 2.2, 8, 2);
       voltLight.name = 'blackout-volt-foundation-light';
       voltLight.castShadow = false;
@@ -470,6 +479,7 @@ export class BlackoutLevelRuntime {
         safetyDisplacement,
       };
 
+      rollbackActions.length = 0;
       this.currentRoom = checkpoints.activeCheckpoint.room;
       this.completionEmitted = false;
       this.syncVisuals(this.resources);
@@ -481,9 +491,19 @@ export class BlackoutLevelRuntime {
         objective: objectiveFor(this.currentRoom),
       });
     } catch (error) {
+      for (let index = rollbackActions.length - 1; index >= 0; index -= 1) {
+        try {
+          rollbackActions[index]?.();
+        } catch {
+          // Preserve the construction error while best-effort cleanup continues.
+        }
+      }
       scene.dispose();
       collisionWorld.clear();
       surfaceRegistry.clear();
+      this.renderLayer.cameraRig.clearFollowTarget();
+      this.input.setEnabled(false);
+      this.input.releasePointerLock();
       throw error;
     }
   };
@@ -536,10 +556,7 @@ export class BlackoutLevelRuntime {
     resources.deathScreen.dispose();
 
     for (const visual of Object.values(resources.visuals)) {
-      visual.removeFromParent();
-      visual.geometry.dispose();
-      const materials = Array.isArray(visual.material) ? visual.material : [visual.material];
-      for (const material of materials) material.dispose();
+      disposeSlimeVisual(visual);
     }
     resources.manager.clearLevelRegistrations();
     resources.manager.dispose();
@@ -660,6 +677,15 @@ function createSlimeVisual(colour: number, emissive: number): THREE.Mesh<THREE.S
   );
   visual.name = 'blackout-foundation-slime';
   return visual;
+}
+
+function disposeSlimeVisual(visual: THREE.Mesh): void {
+  visual.removeFromParent();
+  visual.geometry.dispose();
+  const materials = Array.isArray(visual.material)
+    ? visual.material
+    : [visual.material];
+  for (const material of materials) material.dispose();
 }
 
 function clearJump(state: JumpInputState, cancelled: boolean): void {
