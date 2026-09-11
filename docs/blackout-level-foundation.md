@@ -37,16 +37,19 @@ Room/device systems that need checkpoint persistence implement BlackoutCheckpoin
 Recovery is transactional and ordered:
 
 1. suspend player input;
-2. clear participant transients such as live Volt arcs/projectiles;
-3. clone the authoritative snapshot;
-4. validate all three restored spawn positions before moving any body;
+2. reset PuzzleRegistry components to their authored geometry/state;
+3. clear participant transients such as live Volt arcs/projectiles;
+4. clone the authoritative snapshot;
 5. restore registered doors, hazards, devices, and room-local participants;
-6. recover Bob, Goop, and Volt together;
-7. restore active identity and phase;
-8. reset camera/input presentation and HUD;
-9. resume gameplay only after recovery succeeds.
+6. validate all three spawn anchors against that restored room before moving any body;
+7. recover Bob, Goop, and Volt together;
+8. restore active identity and phase;
+9. reset camera/input presentation and HUD;
+10. resume gameplay only after recovery succeeds.
 
-A failed safety validation leaves all three bodies unmoved.
+A failed safety validation leaves all three bodies unmoved. PuzzleRegistry remains
+the reset authority for authored resettable geometry; checkpoint participants
+add serializable state only where a plain reset is insufficient.
 
 Live Volt tethers intentionally do not survive Retry or restart. This matches the Blackout design reset rule: the arc is removed and Volt disconnects; the electrical-device participant restores its checkpoint-authored powered or latched state independently.
 
