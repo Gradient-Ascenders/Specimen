@@ -426,3 +426,54 @@ test('laser junction can explicitly activate only its authored circuit when powe
     neighbour.dispose();
   }
 });
+
+
+test('full device-rig reset restores authored platform, lift, bridge, and door transforms exactly', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const targets = new ElectricalTargetRegistry(world);
+  const rig = new BlackoutPoweredDeviceRig({
+    collisionWorld: world,
+    surfaceRegistry: surfaces,
+    targetRegistry: targets,
+    requestFailure: () => {},
+  });
+
+  const platformStart = rig.platform.platform.root.position.clone();
+  const liftStart = rig.lift.platform.root.position.clone();
+  const bridgeStartRotation = rig.bridge.root.rotation.y;
+  const doorClosedPosition = rig.door.door.collisionMesh.position.clone();
+
+  try {
+    rig.generator.core.setConnectionState(true);
+    rig.bridge.core.setConnectionState(true);
+    rig.terminal.core.setConnectionState(true);
+    rig.recomputePower();
+
+    rig.updateMechanics(0.8, []);
+    assert.ok(!rig.platform.platform.root.position.equals(platformStart));
+    assert.ok(!rig.lift.platform.root.position.equals(liftStart));
+    assert.ok(rig.bridge.progress > 0);
+    assert.ok(
+      !rig.door.door.collisionMesh.position.equals(doorClosedPosition),
+    );
+
+    rig.reset();
+
+    assert.ok(rig.platform.platform.root.position.equals(platformStart));
+    assert.ok(rig.platform.platform.previousPosition.equals(platformStart));
+    assert.equal(rig.platform.platform.displacement.lengthSq(), 0);
+    assert.ok(rig.lift.platform.root.position.equals(liftStart));
+    assert.ok(rig.lift.platform.previousPosition.equals(liftStart));
+    assert.equal(rig.lift.platform.displacement.lengthSq(), 0);
+    assert.equal(rig.bridge.progress, 0);
+    assert.equal(rig.bridge.root.rotation.y, bridgeStartRotation);
+    assert.ok(
+      rig.door.door.collisionMesh.position.equals(doorClosedPosition),
+    );
+    assert.equal(rig.door.door.progress, 0);
+  } finally {
+    rig.dispose();
+    targets.dispose();
+  }
+});
