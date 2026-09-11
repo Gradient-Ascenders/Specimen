@@ -58,6 +58,8 @@ export const CollisionLayer = {
   Projectile: 1 << 2,
   LineOfSight: 1 << 3,
   ElectricalTarget: 1 << 4,
+  /** Volt-only support surface for the Room 1 maintenance drone. */
+  MaintenanceDroneSupport: 1 << 5,
 } as const;
 
 export const DEFAULT_SOLID_COLLISION_LAYERS =
