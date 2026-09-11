@@ -577,9 +577,8 @@ export class RotatingBridgeDevice implements ElectricalDevice {
   private readonly rotationDurationSeconds: number;
   private readonly initialMechanicalPermission: boolean;
   private readonly sweptBounds = new THREE.Box3();
-  private readonly currentBounds = new THREE.Box3();
-  private readonly proposedBounds = new THREE.Box3();
   private readonly scratchClosest = new THREE.Vector3();
+  private readonly horizontalSweepRadius: number;
   private progressValue = 0;
   private mechanicalPermission: boolean;
   private disposed = false;
@@ -595,6 +594,10 @@ export class RotatingBridgeDevice implements ElectricalDevice {
     this.collisionWorld = options.collisionWorld;
     this.surfaceRegistry = options.surfaceRegistry;
     this.size = options.size.clone();
+    this.horizontalSweepRadius = Math.hypot(
+      this.size.x * 0.5,
+      this.size.z * 0.5,
+    );
     this.startAngle = options.startAngleRadians ?? 0;
     this.endAngle = options.endAngleRadians;
     this.rotationDurationSeconds = options.rotationDurationSeconds ?? 2;
@@ -706,19 +709,21 @@ export class RotatingBridgeDevice implements ElectricalDevice {
       1,
       this.progressValue + deltaSeconds / this.rotationDurationSeconds,
     );
-    const currentAngle = THREE.MathUtils.lerp(
-      this.startAngle,
-      this.endAngle,
-      this.progressValue,
+    // Use the full horizontal rotation radius as the swept bound. This is
+    // intentionally conservative: bridge rotation never carries riders, so a
+    // body anywhere in the deck's possible arc pauses motion instead of being
+    // intersected by an intermediate orientation.
+    const halfY = this.size.y * 0.5;
+    this.sweptBounds.min.set(
+      this.root.position.x - this.horizontalSweepRadius,
+      this.root.position.y - halfY,
+      this.root.position.z - this.horizontalSweepRadius,
     );
-    const proposedAngle = THREE.MathUtils.lerp(
-      this.startAngle,
-      this.endAngle,
-      nextProgress,
+    this.sweptBounds.max.set(
+      this.root.position.x + this.horizontalSweepRadius,
+      this.root.position.y + halfY,
+      this.root.position.z + this.horizontalSweepRadius,
     );
-    this.copyAngleBounds(currentAngle, this.currentBounds);
-    this.copyAngleBounds(proposedAngle, this.proposedBounds);
-    this.sweptBounds.copy(this.currentBounds).union(this.proposedBounds);
 
     for (const body of bodies) {
       if (
@@ -759,25 +764,6 @@ export class RotatingBridgeDevice implements ElectricalDevice {
     this.root.updateWorldMatrix(true, true);
   }
 
-  private copyAngleBounds(angle: number, target: THREE.Box3): void {
-    const halfX = this.size.x * 0.5;
-    const halfY = this.size.y * 0.5;
-    const halfZ = this.size.z * 0.5;
-    const cosine = Math.abs(Math.cos(angle));
-    const sine = Math.abs(Math.sin(angle));
-    const worldHalfX = cosine * halfX + sine * halfZ;
-    const worldHalfZ = sine * halfX + cosine * halfZ;
-    target.min.set(
-      this.root.position.x - worldHalfX,
-      this.root.position.y - halfY,
-      this.root.position.z - worldHalfZ,
-    );
-    target.max.set(
-      this.root.position.x + worldHalfX,
-      this.root.position.y + halfY,
-      this.root.position.z + worldHalfZ,
-    );
-  }
 }
 
 export type LaserJunctionMode =
