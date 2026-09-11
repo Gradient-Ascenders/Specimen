@@ -405,11 +405,29 @@ export class BlackoutLevelRuntime {
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
-    if (this.resources) {
-      this.syncVisuals(this.resources);
-      this.resources.electricalPresentation.update(
-        this.resources.electricalSystem.readModel,
+    const resources = this.resources;
+    if (resources) {
+      this.syncVisuals(resources);
+      resources.electricalPresentation.update(
+        resources.electricalSystem.readModel,
       );
+
+      // Render frames can run without a fixed update when the display refresh
+      // rate exceeds the 60 Hz simulation rate. Queue the current pointer
+      // displacement before clearing it so those render-only samples still
+      // reach CameraRig.update(). This mirrors the Level 1/2 input contract and
+      // prevents Volt's centre-ray aim from becoming refresh-rate dependent.
+      if (
+        this.lifecycle.state === 'running' &&
+        resources.deathSequence.isPlaying &&
+        !resources.phase.terminal &&
+        this.input.enabled
+      ) {
+        this.renderLayer.cameraRig.queueLookInput(
+          this.input.pointerDeltaX,
+          this.input.pointerDeltaY,
+        );
+      }
     }
     this.input.endPointerUpdate();
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
