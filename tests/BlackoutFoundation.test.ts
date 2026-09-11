@@ -191,3 +191,28 @@ test('Blackout phase hooks reject illegal transitions and completion is terminal
   assert.equal(phase.transition('escape'), false);
   assert.equal(phase.phase, 'complete');
 });
+
+
+test('full restart restores participant state captured at Level 3 entry, not later mutations', () => {
+  const { group } = makeGroup();
+  const manager = new BlackoutCheckpointManager<TestBody>(checkpoint(), () => true);
+  let deviceState: SerializableValue = { powered: false, doorOpen: false };
+  manager.registerParticipant({
+    id: 'device',
+    capture: () => deviceState,
+    restore: (state) => {
+      deviceState = state;
+    },
+  });
+
+  deviceState = { powered: true, doorOpen: true };
+  manager.registerCheckpoint(checkpoint('cp2', 10));
+  manager.activate('cp2');
+  deviceState = { powered: false, doorOpen: true };
+
+  manager.resetToInitial();
+  manager.recover(group);
+
+  assert.deepEqual(deviceState, { powered: false, doorOpen: false });
+  assert.equal(manager.activeCheckpoint.checkpointId, 'cp1');
+});
