@@ -1,0 +1,146 @@
+{
+  "acid-green.png": {
+    "bytes": 888270,
+    "sha256": "b976c01b2d61c17af5ca846ae4346427bbe055aca32043107112c30c17df8abc"
+  },
+  "alarm.png": {
+    "bytes": 861126,
+    "sha256": "c77b4be7331fd618f172547f19c2521555b57eccb91d5cbdc9109adba25003e8"
+  },
+  "bob-concept-reference.png": {
+    "bytes": 2344526,
+    "sha256": "67184e65dccaae69bda324e237a12ed39de7bd8b7b897e3fb942c9be48a0653e"
+  },
+  "candidate-b-mild-transmission.png": {
+    "bytes": 672381,
+    "sha256": "190d01f09f61b33ae3153a1793e28967255b4881f858df76d08e084c10e66126"
+  },
+  "clinical.png": {
+    "bytes": 876385,
+    "sha256": "d884fa477d448e828679586bd735ee9f7ee232773c3f55d81d14eebed3b38201"
+  },
+  "close-face.png": {
+    "bytes": 913807,
+    "sha256": "b2302afa76cd4f3875f1509087e0130a97484742be860c9fd37e1be24ba460a8"
+  },
+  "close-highlight.png": {
+    "bytes": 865796,
+    "sha256": "ac96eef00346538298f86fa26d5e7890a73b391c332083911ec4ad96df79c797"
+  },
+  "close-thin-edge.png": {
+    "bytes": 865229,
+    "sha256": "5a2f5c7862b46fe3520189a216f1e90f5f4b8ad9091ebe40e932cabb70541425"
+  },
+  "concept-vs-lookdev.png": {
+    "bytes": 2309362,
+    "sha256": "463e9ad8abf40b466e2e595d043f0dd48b52798b2a75da8459251384019b107a"
+  },
+  "containment-reveal.png": {
+    "bytes": 824782,
+    "sha256": "f4e44970f6c28889359a8cb984d56ed61fc021991e5ed6b652441e5c1602a66b"
+  },
+  "cycles-three-quarter.png": {
+    "bytes": 886762,
+    "sha256": "a035aedff768158fb47758469f12a43a7acb71774832c856fa94e72e75504993"
+  },
+  "cycles-vs-eevee.png": {
+    "bytes": 1214021,
+    "sha256": "ce2470f6a2120480fa13a38ea3417902b5fa6f1190601d766b7cc2bd3b6a0b8a"
+  },
+  "flat-grey-production.png": {
+    "bytes": 818304,
+    "sha256": "d790801b5f81a199f46d1884b64a5634a4f84fd8af94070739daee66c04a6830"
+  },
+  "gameplay-distance.png": {
+    "bytes": 812599,
+    "sha256": "a805e4937e386dbd1d831ea07bf8f5f5889a096d5efb59874107671d35b22421"
+  },
+  "inclusion-diagnostic-comparison.png": {
+    "bytes": 478417,
+    "sha256": "e5bc5b72446a5718a92000e7b1dfdf9522b0ce623e536ddd1549f2ad8204db4b"
+  },
+  "inclusions-b-actual-forms.png": {
+    "bytes": 671344,
+    "sha256": "6de407c738f50974f3dd9b46a6ed4863af9fb46e4b32308f513a76b215fb2b78"
+  },
+  "iterations/01-colour-depth.png": {
+    "bytes": 649018,
+    "sha256": "220b75edee9d114878ae3661d57b138441266880176287a541dc4912c32a0d72"
+  },
+  "iterations/02-wet-highlight.png": {
+    "bytes": 668625,
+    "sha256": "10ae5a4f593e4becc3d64f2702de1b56ed32c2bc2efc1fd1d59f8d7e4d1b2d4d"
+  },
+  "iterations/03-soft-edge.png": {
+    "bytes": 661866,
+    "sha256": "44f7f33d90853d492faec30d363b4cffbf04b0e224097d523ea1e6f4c171880a"
+  },
+  "iterations/04-cloud-depth.png": {
+    "bytes": 665888,
+    "sha256": "556195eb38f5ee997126e6569c633f583dd344812ec7f3d206481900aa15209d"
+  },
+  "iterations/05-eyes.png": {
+    "bytes": 671343,
+    "sha256": "776096fdefc614e634aac043787845aec7e7ccf709a0c284b89d3e08f8f42fbf"
+  },
+  "iterations/06-shader-inclusions.png": {
+    "bytes": 671690,
+    "sha256": "75ffe2b06d567ce10455697f8c504686c3cb2edfc9d1cc5c34615ec2edd40d39"
+  },
+  "iterations/pre-final-eevee-front.png": {
+    "bytes": 661379,
+    "sha256": "dbef26bf05d5ed5be1b36ac934cdf822df0e62fb2851db7ede33e09280157c4a"
+  },
+  "iterations/pre-final-eevee-three-quarter.png": {
+    "bytes": 720015,
+    "sha256": "e8f0a14f63d28d030be569e25ff514a99366f1a3905f6a036d7fdc9cfb3f1834"
+  },
+  "iterations/pre-refinement-close-face.png": {
+    "bytes": 1139393,
+    "sha256": "696c854a3756ee5359b1fdcc69b01c16d0b938f402ea126115fb41736e1ada6b"
+  },
+  "iterations/pre-refinement-close-highlight.png": {
+    "bytes": 1085711,
+    "sha256": "a024b90524fedbd2f035d94cc1a5ba83c7685bb57df7b91ab477c7ff8eaed3f1"
+  },
+  "iterations/pre-refinement-close-thin-edge.png": {
+    "bytes": 1048464,
+    "sha256": "fb5c6dee3aedd4c76df7c4a04341be52d02a3dfcb371f4bff8a5de5d113c160c"
+  },
+  "iterations/pre-refinement-gameplay-distance.png": {
+    "bytes": 1008209,
+    "sha256": "c4044d11ff7f6c1ec815435a4a0ad4533ab3b382c5b92bbd259470b9d014713a"
+  },
+  "iterations/pre-refinement-neutral-side.png": {
+    "bytes": 1058236,
+    "sha256": "1fc8c8c14f9907afeb56acc461910065cb0e1b53966871c4c06f76448b2a07a6"
+  },
+  "iterations/pre-refinement-neutral-three-quarter.png": {
+    "bytes": 1092559,
+    "sha256": "ebc1b44bce384746775446e765b769b0523bcabdd719193137b5ce5f274c72d7"
+  },
+  "lighting-sheet.png": {
+    "bytes": 1513325,
+    "sha256": "0853b2d6d577ffc70f8903d34f04c915c6fdd1228805d59a29dcdfe3aac9d2ef"
+  },
+  "neutral-front.png": {
+    "bytes": 862424,
+    "sha256": "681be1ed23e572301a207eec485dead991f91c741563f13dd4e02f42168ced70"
+  },
+  "neutral-inspection-sheet.png": {
+    "bytes": 1730224,
+    "sha256": "e34397569e77cfea7bd6f9817afec0c283df686d2c638ace01f319356884c82c"
+  },
+  "neutral-side.png": {
+    "bytes": 856026,
+    "sha256": "c4dabdd280ec07ae3bde381a4bf60ce10fdfe6613efa6f98e5380f69d38136ce"
+  },
+  "neutral-three-quarter.png": {
+    "bytes": 876905,
+    "sha256": "616bb3addd093c0bb256242b3ac0fb64c30a5ec19b77584a16c3a820d9d435b6"
+  },
+  "scale-and-grey.png": {
+    "bytes": 706794,
+    "sha256": "af702f683504cf6df0004747d67abfaf9de01fe583111922b8012a7a3a1e481e"
+  }
+}
