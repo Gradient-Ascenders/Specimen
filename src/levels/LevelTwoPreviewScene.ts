@@ -192,7 +192,7 @@ export class LevelTwoPreviewScene {
     this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);
     this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure);
-    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt);
+    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
     this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt);
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;

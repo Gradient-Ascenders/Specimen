@@ -3,12 +3,14 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { LevelTwoRoomFiveGreybox } from '../src/levels/LevelTwoRoomFiveGreybox.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
+import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../src/render/environment/cultivation/CultivationMaintenanceArt.ts';
 import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
 
 test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and checkpoint/reset transforms', () => {
   const before = new LevelTwoRoomFiveGreybox(() => {}), room = new LevelTwoRoomFiveGreybox(() => {});
-  const lab = new CultivationLabMaterials(), art = new CultivationMaintenanceArt(room, lab);
+  const lab = new CultivationLabMaterials(), contamination = new CultivationContaminationArt(lab);
+  const art = new CultivationMaintenanceArt(room, lab, contamination);
   const check = () => {
     assert.equal(room.collisionMeshes.length, before.collisionMeshes.length);
     room.collisionMeshes.forEach((mesh, i) => {
@@ -37,17 +39,26 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     }
     before.reset(); room.reset(); check();
     assert.equal(art.acidSurfaces.length, 13);
-    assert.ok(art.acidSurfaces.every(mesh => mesh.material === lab.acid));
+    assert.ok(art.acidSurfaces.filter(mesh => !mesh.name.startsWith('room-5-vent-acid-')).every(mesh => mesh.material === lab.acid));
+    assert.ok(art.acidSurfaces.filter(mesh => mesh.name.startsWith('room-5-vent-acid-')).every(mesh => (mesh.material as THREE.Material).name === 'cultivation-access-stagnant-waste'));
+    const waste = art.acidSurfaces.find(mesh => mesh.name.startsWith('room-5-vent-acid-'))!.material as THREE.Material;
+    const shader = { uniforms: {} as Record<string, THREE.IUniform>, vertexShader: THREE.ShaderLib.standard.vertexShader,
+      fragmentShader: THREE.ShaderLib.standard.fragmentShader };
+    waste.onBeforeCompile(shader, null as never);
+    lab.acid.update(.5); lab.acid.disturb(35, 9.1, .22, 1);
+    assert.equal(shader.uniforms.uTime.value, .5, 'tunnel waste shares the live liquid clock');
+    assert.ok(shader.uniforms.uRipples.value.some((r: THREE.Vector4) => r.w > 0), 'Goop wakes reach the tunnel variant');
+    assert.equal(lab.acid.diagnostics.flowSpeed, .26, 'sewer and earlier room liquid remains unchanged');
     let adhesiveSurfaces = 0;
     room.root.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) if (material.name === 'cultivation-maintenance-adhesive-tile') {
+      for (const material of materials) if (material.name === 'cultivation-access-damp-adhesive') {
         adhesiveSurfaces++;
         assert.ok(material instanceof THREE.MeshStandardMaterial);
         assert.equal(material.map, lab.sticky.map, 'share the jade adhesive route cue');
         assert.equal(material.emissive.getHex(), lab.sticky.emissive.getHex());
-        assert.equal(material.emissiveIntensity, lab.sticky.emissiveIntensity);
+        assert.equal(material.emissiveIntensity, .18);
         assert.equal(object.geometry.getAttribute('membranePanel').count, object.geometry.getAttribute('position').count);
         assert.equal(material.normalMap, lab.sticky.normalMap, 'preserve the wet adhesive finish');
       }
@@ -60,5 +71,5 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     const batch = room.root.children.find(o => o.name.startsWith('room-5-art-static')) as THREE.Mesh;
     batch.geometry.addEventListener('dispose', () => disposal++);
     art.dispose(); art.dispose(); assert.equal(disposal, 1);
-  } finally { art.dispose(); lab.dispose(); room.dispose(); before.dispose(); }
+  } finally { art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); before.dispose(); }
 });
