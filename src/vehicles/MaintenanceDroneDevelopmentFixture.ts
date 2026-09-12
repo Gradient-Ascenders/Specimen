@@ -20,7 +20,7 @@ export class MaintenanceDroneDevelopmentFixture {
   constructor() {
     this.root.name = 'maintenance-drone-development-fixture';
     this.droneRoot.name = 'maintenance-drone-root';
-    this.droneRoot.position.set(3.5, 0.95, 2);
+    this.droneRoot.position.set(3.5, 0.26, 2);
     this.root.add(this.droneRoot);
 
     this.collider = new THREE.Mesh(
