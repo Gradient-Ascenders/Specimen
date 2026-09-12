@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelTwoRoomFourGreybox } from '../../../levels/LevelTwoRoomFourGreybox.ts';
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
+import type { CultivationContaminationArt } from './CultivationContaminationArt.ts';
 import type { CultivationChamberMaterials } from './CultivationChamberMaterials.ts';
 import { mapCultivationPlatformWear } from './CultivationPlatformWear.ts';
 
@@ -12,11 +13,21 @@ export class CultivationElevatorArt {
   private readonly materials: THREE.MeshStandardMaterial[] = [];
   private readonly meshes: THREE.Mesh[] = [];
   private readonly geometries = new Set<THREE.BufferGeometry>();
+  private readonly lightColours = new Map<THREE.Light, THREE.Color>();
   private disposed = false;
 
-  constructor(room: LevelTwoRoomFourGreybox, lab: CultivationLabMaterials, chamber: CultivationChamberMaterials) {
+  constructor(room: LevelTwoRoomFourGreybox, lab: CultivationLabMaterials, chamber: CultivationChamberMaterials,
+    contamination: CultivationContaminationArt) {
     const variant = (source: THREE.MeshStandardMaterial, name: string, colour: number, roughness: number) => {
       const material = source.clone();
+      // Cloning does not retain shader hooks. Reuse the established wear, but
+      // anchor its coordinates to the assembly: shaft modules and the entrance move.
+      material.onBeforeCompile = (shader, renderer) => {
+        source.onBeforeCompile(shader, renderer);
+        shader.vertexShader = shader.vertexShader.replaceAll(
+          '(modelMatrix * vec4(transformed, 1.0)).xyz', 'transformed');
+      };
+      material.customProgramCacheKey = () => `${source.customProgramCacheKey()}-lift-local-wear-v1`;
       material.name = `cultivation-elevator-${name}`;
       material.color.setHex(colour); material.roughness = roughness;
       this.materials.push(material);
@@ -28,26 +39,65 @@ export class CultivationElevatorArt {
     deck.bumpMap = null;
     deck.normalMap = lab.platform.normalMap;
     deck.normalScale.copy(lab.platform.normalScale);
-    const shaft = variant(lab.metal, 'shaft-backing', 0x303d40, 0.85);
-    const panel = variant(lab.wall, 'service-panels', 0xbfc9c4, 0.86);
+    const worn = contamination.finishes;
+    const floor = variant(worn.floor, 'boarding-floor', 0xaaafa9, .94);
+    const ceiling = variant(worn.ceiling, 'boarding-ceiling', 0xa4a8a5, .94);
+    const shaft = variant(worn.metal, 'shaft-backing', 0x4b5048, .94);
+    const panel = variant(worn.wall, 'service-panels', 0xc0bfba, .92);
+    const metal = variant(worn.metal, 'oxidized-hardware', 0x606960, .95);
+    metal.roughnessMap = lab.pole.roughnessMap;
+    metal.bumpMap = lab.pole.bumpMap;
+    metal.bumpScale = .012;
+    metal.metalness = .35;
+    metal.userData.tileSizeMetres = [2, 2];
+    const metalShader = metal.onBeforeCompile;
+    metal.onBeforeCompile = (shader, renderer) => {
+      metalShader(shader, renderer);
+      shader.uniforms.liftOxidation = { value: lab.pole.map };
+      shader.fragmentShader = 'uniform sampler2D liftOxidation;\n' + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        vec3 oxidation = texture2D(liftOxidation, vMapUv).rgb;
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuse * oxidation, .38);
+      `);
+    };
+    metal.customProgramCacheKey = () => 'cultivation-lift-oxidation-v1';
+    const panelShader = panel.onBeforeCompile;
+    panel.onBeforeCompile = (shader, renderer) => {
+      panelShader(shader, renderer);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        vec2 liftP = vec2(vCultivationPosition.x + vCultivationPosition.z, vCultivationPosition.y);
+        float liftGrime = smoothstep(.42, .72,
+          cultivationNoise(liftP * vec2(.65, .32) + vec2(31.0, 7.0)) * .7 +
+          cultivationNoise(liftP * 1.9) * .3);
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(.55, .49, .38), liftGrime * .48);
+      `);
+    };
+    panel.customProgramCacheKey = () => 'cultivation-lift-panel-grime-v1';
     // Existing local lift lighting does not reach the distant shaft modules.
     // A restrained finish lift keeps their silhouettes readable without new lights.
-    panel.emissive.setHex(0x8a9b94); panel.emissiveIntensity = 0.12;
-    const teal = variant(lab.metal, 'service-teal', 0x39776f, 0.76);
+    panel.emissive.setHex(0x9b998a); panel.emissiveIntensity = 0.045;
+    const teal = variant(worn.metal, 'service-teal', 0x527367, 0.92);
     const lamp = variant(lab.fixture, 'shaft-marker', 0xb7d8cd, 0.45);
     lamp.emissive.setHex(0x9dcec1); lamp.emissiveIntensity = 0.65;
     const overrides = new Map<string, THREE.MeshStandardMaterial>();
     room.root.traverse(object => {
+      if (object instanceof THREE.PointLight && /^room-4-(lift|boarding)-light$/.test(object.name)) {
+        this.lightColours.set(object, object.color.clone());
+        object.color.setHex(0xc8cdcd);
+      }
       if (!(object instanceof THREE.Mesh)) return;
+      if (object.material === room.builder.materials.support) overrides.set(object.name, metal);
+      if (object.material === room.builder.materials.wall) overrides.set(object.name, object.name.includes('ceiling') ? ceiling : panel);
+      if (/-frame-(top|left|right)$/.test(object.name)) overrides.set(object.name, metal);
       if (object.material === room.builder.materials.duct) overrides.set(object.name, shaft);
       if (object.material === room.builder.materials.platform) overrides.set(object.name, chamber.warning);
       if (object.userData.textureRole === 'soluble-cable') overrides.set(object.name, chamber.cable);
-      if (object.name.startsWith('room-4-shaft-beam-')) overrides.set(object.name, lab.metal);
-      if (object.name.startsWith('room-4-rail-')) overrides.set(object.name, lab.metal);
-      if (object.name === 'room-4-boarding-floor') overrides.set(object.name, lab.floor);
+      if (object.name.startsWith('room-4-shaft-beam-')) overrides.set(object.name, metal);
+      if (object.name.startsWith('room-4-rail-')) overrides.set(object.name, metal);
+      if (object.name === 'room-4-boarding-floor') overrides.set(object.name, floor);
       if (object.name === 'room-4-lift-tread') overrides.set(object.name, deck);
       if (object.name.includes('carriage') || object.name.includes('motor')) overrides.set(object.name, teal);
-      if (object.name.endsWith('-shutter-panel')) overrides.set(object.name, lab.duct);
+      if (object.name.endsWith('-shutter-panel')) overrides.set(object.name, shaft);
     });
     lab.dress(room.builder, [], overrides);
     this.fitBoardingFrame(room);
@@ -61,10 +111,11 @@ export class CultivationElevatorArt {
       const vertices = geometry.getAttribute('position'), normals = geometry.getAttribute('normal');
       const uv = geometry.getAttribute('uv');
       for (let i = 0; i < uv.count; i++) {
-        const x = vertices.getX(i), y = vertices.getY(i), z = vertices.getZ(i);
+        const x = vertices.getX(i) + position[0], y = vertices.getY(i) + position[1], z = vertices.getZ(i) + position[2];
         const nx = normals.getX(i), ny = normals.getY(i);
         // Metre-based UVs keep long shaft panels and small hatches at the same density.
-        uv.setXY(i, (Math.abs(nx) > .5 ? z : x) / 2, (Math.abs(ny) > .5 ? z : y) / 2);
+        const tile = material.userData.tileSizeMetres ?? [2, 2];
+        uv.setXY(i, (Math.abs(nx) > .5 ? -nx * z : x) / tile[0], (Math.abs(ny) > .5 ? z : y) / tile[1]);
       }
       geometry.translate(...position);
       const list = parts.get(material) ?? [];
@@ -88,10 +139,10 @@ export class CultivationElevatorArt {
       const x = side * 4.985;
       for (const z of [7.5, 11.5]) {
         box(module, panel, [.025, 6.8, 3.5], [x, 3.9, z]);
-        box(module, lab.metal, [.055, .12, 3.5], [x - side * .025, .55, z]);
+        box(module, metal, [.055, .12, 3.5], [x - side * .025, .55, z]);
         box(module, teal, [.055, .2, 3.5], [x - side * .025, 6.8, z]);
         // Recess-like service hatch with six dark louvres, contained against the wall.
-        box(module, lab.metal, [.06, 1.3, 1.3], [x - side * .025, 3.8, z]);
+        box(module, metal, [.06, 1.3, 1.3], [x - side * .025, 3.8, z]);
         for (let row = 0; row < 6; row++) {
           box(module, panel, [.075, .07, 1.12], [x - side * .035, 3.28 + row * .2, z]);
         }
@@ -101,9 +152,9 @@ export class CultivationElevatorArt {
     // The forward wall is the usual gameplay view. Leave the central arrival vent clear.
     for (const x of [-3.05, 3.05]) {
       box(module, panel, [3.4, 6.8, .025], [x, 3.9, 14.775]);
-      box(module, lab.metal, [3.4, .12, .055], [x, .55, 14.75]);
+      box(module, metal, [3.4, .12, .055], [x, .55, 14.75]);
       box(module, teal, [3.4, .2, .055], [x, 6.8, 14.75]);
-      box(module, lab.metal, [1.3, 1.3, .06], [x, 3.8, 14.74]);
+      box(module, metal, [1.3, 1.3, .06], [x, 3.8, 14.74]);
       for (let row = 0; row < 6; row++) {
         box(module, panel, [1.12, .07, .075], [x, 3.28 + row * .2, 14.725]);
       }
@@ -118,11 +169,11 @@ export class CultivationElevatorArt {
     // Low-profile tread ribs and perimeter fasteners stay within the existing deck.
     for (const x of [-3.4, -1.7, 0, 1.7, 3.4]) for (const z of [6.5, 8.2, 9.9, 11.6, 13.3]) {
       for (let rib = 0; rib < 4; rib++) {
-        box(deckParts, lab.metal, [.9, .008, .025], [x, .245, z + rib * .12]);
+        box(deckParts, metal, [.9, .008, .025], [x, .245, z + rib * .12]);
       }
     }
     for (const x of [-4.6, 4.6]) for (const z of [6, 8, 10, 12, 14]) {
-      box(deckParts, lab.metal, [.08, .015, .08], [x, .27, z]);
+      box(deckParts, metal, [.08, .015, .08], [x, .27, z]);
     }
     attach(room.root, merge(deckParts), 'room-4-art-tread');
     // Attach finish plates to moving hardware, so their original motion/reset owns them.
@@ -180,6 +231,8 @@ export class CultivationElevatorArt {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const [light, colour] of this.lightColours) light.color.copy(colour);
+    this.lightColours.clear();
     for (const mesh of this.meshes) mesh.removeFromParent();
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();
