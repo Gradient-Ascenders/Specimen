@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { createIndustrialDroneGeometry } from './IndustrialDroneGeometry.ts';
 
 import type {
   SecurityDroneConfig,
@@ -23,6 +24,7 @@ export interface SecurityDronePresentationResourceDiagnostics {
 
 /** Encounter-local immutable resources shared by compatible drone visuals. */
 export class SecurityDronePresentationResources {
+  readonly industrial: boolean;
   private readonly geometries = new Map<string, THREE.BufferGeometry>();
   private readonly materials: Readonly<
     Record<SharedMaterialRole, THREE.MeshStandardMaterial>
@@ -51,7 +53,8 @@ export class SecurityDronePresentationResources {
   private disposed = false;
 
   /** Borrow facility maps; the encounter owns these four materials, never the maps. */
-  constructor(surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }) {
+  constructor(surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }, industrial = false) {
+    this.industrial = industrial;
     if (!surfaceMaps) return;
     for (const [role, material] of Object.entries(this.materials)) {
       material.bumpMap = surfaceMaps.bumpMap;
@@ -132,81 +135,90 @@ export class SecurityDronePresentation {
     const depth = config.colliderSize.z;
     const smallest = Math.min(width, height, depth);
     const dimensionsKey = `${config.type}:${width}:${height}:${depth}`;
-    const armour = this.resources.material('armour');
-    const armourShadow = this.resources.material('armourShadow');
-    const mechanism = this.resources.material('mechanism');
-    const barrel = this.resources.material('barrel');
+    if (this.resources.industrial) {
+      const names = { armour: 'armoured-shell', armourShadow: 'gun-pods', mechanism: 'dark-face', barrel: 'barrels' } as const;
+      for (const role of ['armour', 'armourShadow', 'mechanism', 'barrel'] as const) {
+        this.addMesh(this.aimHead, `${config.id}-${names[role]}`,
+          this.resources.geometry(`industrial-${role}:${dimensionsKey}`, () => createIndustrialDroneGeometry(config, role)),
+          this.resources.material(role), [0, 0, 0], [1, 1, 1]);
+      }
+    } else {
+      const armour = this.resources.material('armour');
+      const armourShadow = this.resources.material('armourShadow');
+      const mechanism = this.resources.material('mechanism');
+      const barrel = this.resources.material('barrel');
 
-    const shellGeometry = this.resources.geometry(
-      'unit-shell',
-      () => new THREE.SphereGeometry(0.5, 20, 14),
-    );
-    this.addMesh(
-      this.aimHead,
-      `${config.id}-armoured-shell`,
-      shellGeometry,
-      armour,
-      [0, 0.04 * height, 0.04 * depth],
-      [width * 0.72, height * 0.82, depth * 0.68],
-    );
-    this.addMesh(
-      this.aimHead,
-      `${config.id}-dark-face`,
-      shellGeometry,
-      mechanism,
-      [0, 0.03 * height, -depth * 0.3],
-      [width * 0.43, height * 0.46, depth * 0.36],
-    );
-
-    const podGeometry = this.resources.geometry(
-      `head-pods:${dimensionsKey}`,
-      () => mergeCopies(
+      const shellGeometry = this.resources.geometry(
+        'unit-shell',
+        () => new THREE.SphereGeometry(0.5, 20, 14),
+      );
+      this.addMesh(
+        this.aimHead,
+        `${config.id}-armoured-shell`,
         shellGeometry,
-        ([-1, 1] as const).map((side) => transform(
-          [side * width * 0.39, -height * 0.01, -depth * 0.06],
-          [0, 0, 0],
-          [width * 0.24, height * 0.48, depth * 0.48],
-        )),
-      ),
-    );
-    this.addMesh(
-      this.aimHead,
-      `${config.id}-gun-pods`,
-      podGeometry,
-      armourShadow,
-      [0, 0, 0],
-      [1, 1, 1],
-    );
+        armour,
+        [0, 0.04 * height, 0.04 * depth],
+        [width * 0.72, height * 0.82, depth * 0.68],
+      );
+      this.addMesh(
+        this.aimHead,
+        `${config.id}-dark-face`,
+        shellGeometry,
+        mechanism,
+        [0, 0.03 * height, -depth * 0.3],
+        [width * 0.43, height * 0.46, depth * 0.36],
+      );
 
-    const barrelGeometry = this.resources.geometry(
-      `barrels:${dimensionsKey}`,
-      () => {
-        const source = new THREE.CylinderGeometry(
-          smallest * 0.055,
-          smallest * 0.072,
-          depth * 0.58,
-          10,
-        );
-        const merged = mergeCopies(
-          source,
+      const podGeometry = this.resources.geometry(
+        `head-pods:${dimensionsKey}`,
+        () => mergeCopies(
+          shellGeometry,
           ([-1, 1] as const).map((side) => transform(
-            [side * width * 0.36, 0, -depth * 0.48],
-            [Math.PI * 0.5, 0, 0],
-            [1, 1, 1],
+            [side * width * 0.39, -height * 0.01, -depth * 0.06],
+            [0, 0, 0],
+            [width * 0.24, height * 0.48, depth * 0.48],
           )),
-        );
-        source.dispose();
-        return merged;
-      },
-    );
-    this.addMesh(
-      this.aimHead,
-      `${config.id}-barrels`,
-      barrelGeometry,
-      barrel,
-      [0, 0, 0],
-      [1, 1, 1],
-    );
+        ),
+      );
+      this.addMesh(
+        this.aimHead,
+        `${config.id}-gun-pods`,
+        podGeometry,
+        armourShadow,
+        [0, 0, 0],
+        [1, 1, 1],
+      );
+
+      const barrelGeometry = this.resources.geometry(
+        `barrels:${dimensionsKey}`,
+        () => {
+          const source = new THREE.CylinderGeometry(
+            smallest * 0.055,
+            smallest * 0.072,
+            depth * 0.58,
+            10,
+          );
+          const merged = mergeCopies(
+            source,
+            ([-1, 1] as const).map((side) => transform(
+              [side * width * 0.36, 0, -depth * 0.48],
+              [Math.PI * 0.5, 0, 0],
+              [1, 1, 1],
+            )),
+          );
+          source.dispose();
+          return merged;
+        },
+      );
+      this.addMesh(
+        this.aimHead,
+        `${config.id}-barrels`,
+        barrelGeometry,
+        barrel,
+        [0, 0, 0],
+        [1, 1, 1],
+      );
+    }
     for (const side of [-1, 1] as const) {
       const anchor = new THREE.Object3D();
       anchor.name = `${config.id}-${side < 0 ? 'left' : 'right'}-barrel`;
@@ -219,7 +231,8 @@ export class SecurityDronePresentation {
     this.eye = new THREE.Mesh(
       this.resources.geometry(
         `indicator:${smallest}`,
-        () => new THREE.SphereGeometry(smallest * 0.115, 16, 10),
+        () => new THREE.SphereGeometry(smallest * (this.resources.industrial ? .085 : .115), 16, 10)
+          .scale(1, 1, this.resources.industrial ? .22 : 1),
       ) as THREE.SphereGeometry,
       this.material(new THREE.MeshBasicMaterial({
         color: 0xff4057,
@@ -232,7 +245,13 @@ export class SecurityDronePresentation {
     this.eye.userData.droneId = config.id;
     this.aimHead.add(this.eye);
 
-    if (config.type === 'ground') {
+    if (this.resources.industrial) {
+      for (const role of ['mount', 'linkage'] as const) {
+        this.addMesh(this.root, `${config.id}-${role}`,
+          this.resources.geometry(`industrial-${role}:${dimensionsKey}`, () => createIndustrialDroneGeometry(config, role)),
+          this.resources.material(role === 'mount' ? 'armourShadow' : 'mechanism'), [0, 0, 0], [1, 1, 1]);
+      }
+    } else if (config.type === 'ground') {
       this.buildGroundBase(config.id, dimensionsKey, width, height, depth);
     } else {
       this.buildCeilingClamp(config.id, dimensionsKey, width, height, depth);
