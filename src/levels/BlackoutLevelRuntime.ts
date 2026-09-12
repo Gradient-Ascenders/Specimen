@@ -759,6 +759,13 @@ export class BlackoutLevelRuntime {
         resources.group.activeSlimeId === 'volt' &&
         resources.maintenanceDrone.voltMounted;
 
+      if (
+        controllingMountedVolt &&
+        this.input.wasClearedSinceFixedUpdate
+      ) {
+        resources.maintenanceDrone.suspendInput();
+      }
+
       if (controllingMountedVolt) {
         this.renderLayer.cameraRig.copyGroundMovementDirection(
           moveX,
@@ -910,10 +917,13 @@ export class BlackoutLevelRuntime {
     }
 
     if (
-      !resources.maintenanceDrone.voltMounted &&
       resources.maintenanceDrone.readModel.position.y < OUT_OF_BOUNDS_Y
     ) {
-      resources.maintenanceDrone.requestRecovery('out-of-bounds');
+      if (resources.maintenanceDrone.voltMounted) {
+        this.requestFailure();
+      } else {
+        resources.maintenanceDrone.requestRecovery('out-of-bounds');
+      }
     }
 
     // Only the participating controlled form can fail hazards/out-of-bounds.
