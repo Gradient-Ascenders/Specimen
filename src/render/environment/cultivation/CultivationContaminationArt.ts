@@ -12,6 +12,7 @@ export class CultivationContaminationArt {
   readonly finishes: Record<Finish, THREE.MeshStandardMaterial>;
   readonly glass: THREE.MeshStandardMaterial;
   readonly roots: THREE.Group[] = [];
+  private readonly geometries = new Set<THREE.BufferGeometry>();
   private readonly dark = new THREE.MeshStandardMaterial({ name: 'cultivation-service-recess', color: 0x242b2b, roughness: .86 });
   private readonly growth = new THREE.MeshStandardMaterial({ name: 'cultivation-dry-root-growth', color: 0x535a3c, roughness: .96, side: THREE.DoubleSide });
   private readonly mineral = new THREE.MeshStandardMaterial({ name: 'cultivation-mineral-deposit', color: 0xaca596, roughness: .65, metalness: .16 });
@@ -180,6 +181,9 @@ export class CultivationContaminationArt {
       mesh.userData.presentationOnly = true;
       group.add(mesh);
     }
+    // Later surface cleanup may replace geometry or attach its own proxies.
+    // Retain allocation ownership independently of the live scene graph.
+    group.traverse(object => { if (object instanceof THREE.Mesh) this.geometries.add(object.geometry); });
     root.add(group); this.roots.push(group);
     this.lightRoom(root, room);
   }
@@ -383,9 +387,10 @@ export class CultivationContaminationArt {
     this.disposed=true;
     for(const root of this.roots) {
       root.removeFromParent();
-      root.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.dispose();});
       root.clear();
     }
+    for (const geometry of this.geometries) geometry.dispose();
+    this.geometries.clear();
     for(const material of [...Object.values(this.finishes),this.glass,this.dark,this.growth,this.mineral,this.amber,this.cool]) material.dispose();
     for(const texture of this.textures)texture.dispose();
   }
