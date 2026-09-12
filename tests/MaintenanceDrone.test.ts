@@ -130,9 +130,20 @@ test('only Volt can mount and first startup/tutorial fire exactly once', () => {
 
     assert.equal(fixture.controller.readModel.state, 'mounted');
     assert.equal(fixture.controller.readModel.startupCompleted, true);
-    assert.equal(fixture.controller.readModel.tutorialCompleted, true);
+    assert.equal(fixture.controller.readModel.tutorialCompleted, false);
+    assert.equal(
+      fixture.controller.readModel.firstMountTutorialAvailable,
+      true,
+    );
     assert.equal(startupCompleted, 1);
     assert.equal(tutorial, 1);
+
+    fixture.controller.markTutorialCompleted();
+    assert.equal(fixture.controller.readModel.tutorialCompleted, true);
+    assert.equal(
+      fixture.controller.readModel.firstMountTutorialAvailable,
+      false,
+    );
 
     assert.equal(fixture.controller.requestDismount(fixture.volt), true);
     for (let step = 0; step < 120; step += 1) {
@@ -338,9 +349,15 @@ test('mid-air dismount is allowed, drone loses power, and supported Volt follows
     assert.equal(fixture.controller.voltMounted, false);
 
     let carriedDown = false;
+    let landingSupportOffsetPreserved = false;
     for (let step = 0; step < 180; step += 1) {
       fixture.volt.update(DT, STILL);
       const voltBefore = fixture.volt.position.y;
+      const supportedBeforeDroneStep =
+        fixture.volt.isSupportedBy(fixture.controller.collider);
+      const supportOffsetBeforeDroneStep =
+        fixture.volt.position.y -
+        fixture.controller.readModel.position.y;
       fixture.controller.update(DT, {
         horizontalDirection: STILL,
         ascendHeld: false,
@@ -348,14 +365,31 @@ test('mid-air dismount is allowed, drone loses power, and supported Volt follows
         aimHeld: false,
         controllingVolt: true,
       });
+      const landed =
+        fixture.controller.readModel.state === 'grounded-idle';
       fixture.controller.applyFallingSupportToVolt(fixture.volt);
       if (fixture.volt.position.y < voltBefore - 1e-5) carriedDown = true;
-      if (fixture.controller.readModel.state === 'grounded-idle') break;
+      if (landed && supportedBeforeDroneStep) {
+        const supportOffsetAfterLanding =
+          fixture.volt.position.y -
+          fixture.controller.readModel.position.y;
+        assert.ok(
+          Math.abs(
+            supportOffsetAfterLanding -
+              supportOffsetBeforeDroneStep,
+          ) < 1e-6,
+          'the final landing step must carry supported Volt by the same displacement as the drone',
+        );
+        landingSupportOffsetPreserved = true;
+        break;
+      }
+      if (landed) break;
     }
 
     assert.ok(fixture.controller.readModel.position.y < droneYBefore);
     assert.equal(fixture.controller.readModel.state, 'grounded-idle');
     assert.equal(carriedDown, true);
+    assert.equal(landingSupportOffsetPreserved, true);
   } finally {
     fixture.dispose();
   }
@@ -420,6 +454,7 @@ test('checkpoint snapshot preserves stable mounted/parked learning state but nev
         controllingVolt: true,
       });
     }
+    fixture.controller.markTutorialCompleted();
     fixture.controller.parkForSwitch();
     const snapshot = fixture.controller.capture();
 

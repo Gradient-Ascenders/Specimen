@@ -40,6 +40,7 @@ export interface MaintenanceDroneReadModel {
   readonly startupProgress: number;
   readonly startupCompleted: boolean;
   readonly tutorialCompleted: boolean;
+  readonly firstMountTutorialAvailable: boolean;
   readonly supported: boolean;
   readonly lightEnabled: boolean;
   readonly position: ReadonlyVector3State;

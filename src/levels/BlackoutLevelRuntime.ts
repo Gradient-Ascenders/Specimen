@@ -829,6 +829,10 @@ export class BlackoutLevelRuntime {
         resources.maintenanceDrone.syncMountedVolt(
           resources.group.voltBody,
         );
+      } else {
+        resources.maintenanceDrone.applyFallingSupportToVolt(
+          resources.group.voltBody,
+        );
       }
     }
 

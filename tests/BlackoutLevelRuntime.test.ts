@@ -859,7 +859,17 @@ test('Blackout maintenance drone mounts only Volt, parks exactly across slime sw
     }
     assert.equal(runtime.maintenanceDroneReadModel?.state, 'mounted');
     assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, true);
+    assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, false);
+    assert.equal(
+      runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+      true,
+    );
+    runtime.markMaintenanceDroneTutorialCompleted();
     assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, true);
+    assert.equal(
+      runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+      false,
+    );
 
     input.press('aimAbility');
     input.press('fireAbility');
@@ -1103,6 +1113,7 @@ test('maintenance drone checkpoint recovery restores parked mount state and rest
     for (let step = 0; step < 90; step += 1) {
       runtime.fixedUpdate(1 / 60);
     }
+    runtime.markMaintenanceDroneTutorialCompleted();
     input.press('switchSlime');
     runtime.fixedUpdate(1 / 60);
     assert.equal(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
@@ -1123,6 +1134,11 @@ test('maintenance drone checkpoint recovery restores parked mount state and rest
     runtime.recoverActiveCheckpoint();
     assert.equal(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
     assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, true);
+    assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, true);
+    assert.equal(
+      runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+      false,
+    );
     assert.deepEqual(
       [
         runtime.maintenanceDroneReadModel!.position.x,

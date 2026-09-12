@@ -98,9 +98,12 @@ The controller exposes stable `startupProgress` and emits:
 - `startupCompleted`;
 - `firstMountTutorialRequested`.
 
-The tutorial request is committed once when first startup finishes. Checkpoints
-captured afterward persist both startup/tutorial completion so Retry cannot spam
-the teaching prompt.
+When first startup finishes, the controller sets
+`firstMountTutorialAvailable = true` and emits the tutorial request once. The
+presentation layer calls `markTutorialCompleted()` after it has actually shown
+the teaching prompt. Checkpoints persist that acknowledgement; if presentation
+has not acknowledged it yet, the stable availability flag remains true after
+recovery without replaying the one-shot event.
 
 Later remounts enter `mounted` immediately.
 

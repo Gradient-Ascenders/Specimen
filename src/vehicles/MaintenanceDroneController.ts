@@ -63,6 +63,7 @@ interface MutableMaintenanceDroneReadModel {
   startupProgress: number;
   startupCompleted: boolean;
   tutorialCompleted: boolean;
+  firstMountTutorialAvailable: boolean;
   supported: boolean;
   lightEnabled: boolean;
   readonly position: MutableReadVector;
@@ -110,11 +111,14 @@ implements BlackoutCheckpointParticipant {
   private readonly previousAnchorPosition = new THREE.Vector3();
   private readonly recoveryPosition = new THREE.Vector3();
   private readonly startupOrigin = new THREE.Vector3();
+  private readonly startupDisplacement = new THREE.Vector3();
+  private readonly fallingSupportDisplacement = new THREE.Vector3();
   private startupElapsedSeconds = 0;
   private recoveryElapsedSeconds = 0;
   private recoveryReasonValue: MaintenanceDroneRecoveryReason | undefined;
   private voltMountedValue = false;
   private pendingMountedRestore = false;
+  private fallingSupportStepPending = false;
   private disposed = false;
 
   constructor(options: MaintenanceDroneControllerOptions) {
@@ -158,6 +162,7 @@ implements BlackoutCheckpointParticipant {
       startupProgress: 0,
       startupCompleted: false,
       tutorialCompleted: false,
+      firstMountTutorialAvailable: false,
       supported: false,
       lightEnabled: false,
       position: { x: 0, y: 0, z: 0 },
@@ -261,6 +266,8 @@ implements BlackoutCheckpointParticipant {
       );
     }
 
+    this.fallingSupportStepPending = false;
+
     if (this.model.state === 'starting') {
       this.updateStartup(deltaSeconds);
     } else if (this.model.state === 'mounted') {
@@ -281,7 +288,9 @@ implements BlackoutCheckpointParticipant {
     } else if (this.model.state === 'parked-hover') {
       this.flight.park();
     } else if (this.model.state === 'unpowered-falling') {
-      if (this.flight.updateFalling(deltaSeconds)) {
+      const landed = this.flight.updateFalling(deltaSeconds);
+      this.fallingSupportStepPending = true;
+      if (landed) {
         this.setState('grounded-idle');
         this.events.emit('landed', {});
       }
@@ -380,6 +389,7 @@ implements BlackoutCheckpointParticipant {
     );
     voltBody.syncKinematicPose(this.anchorPosition, previous);
     this.voltMountedValue = false;
+    this.fallingSupportStepPending = false;
     this.flight.park();
     this.setState('unpowered-falling');
     this.events.emit('dismounted', {});
@@ -388,14 +398,18 @@ implements BlackoutCheckpointParticipant {
   }
 
   applyFallingSupportToVolt(voltBody: KinematicBody): void {
-    if (this.model.state !== 'unpowered-falling') return;
+    if (!this.fallingSupportStepPending) return;
+    this.fallingSupportStepPending = false;
     if (!voltBody.isSupportedBy(this.collider)) return;
-    const displacement = {
-      x: this.flight.position.x - this.flight.previousPosition.x,
-      y: this.flight.position.y - this.flight.previousPosition.y,
-      z: this.flight.position.z - this.flight.previousPosition.z,
-    };
-    voltBody.applyCarrierDisplacement(displacement, this.collider);
+    this.fallingSupportDisplacement.set(
+      this.flight.position.x - this.flight.previousPosition.x,
+      this.flight.position.y - this.flight.previousPosition.y,
+      this.flight.position.z - this.flight.previousPosition.z,
+    );
+    voltBody.applyCarrierDisplacement(
+      this.fallingSupportDisplacement,
+      this.collider,
+    );
   }
 
   requestRecovery(reason: MaintenanceDroneRecoveryReason): boolean {
@@ -409,6 +423,7 @@ implements BlackoutCheckpointParticipant {
 
     this.voltMountedValue = false;
     this.pendingMountedRestore = false;
+    this.fallingSupportStepPending = false;
     this.flight.park();
     this.recoveryElapsedSeconds = 0;
     this.recoveryReasonValue = reason;
@@ -445,6 +460,7 @@ implements BlackoutCheckpointParticipant {
     this.authoring.recoveryAnchor.getWorldPosition(this.recoveryPosition);
     this.voltMountedValue = false;
     this.pendingMountedRestore = false;
+    this.fallingSupportStepPending = false;
     this.startupElapsedSeconds = 0;
     this.recoveryElapsedSeconds = 0;
     this.recoveryReasonValue = undefined;
@@ -500,11 +516,14 @@ implements BlackoutCheckpointParticipant {
     const snapshot = readSnapshot(state);
     this.flight.teleport(tupleToVector(snapshot.position));
     this.flight.park();
+    this.fallingSupportStepPending = false;
     this.startupElapsedSeconds = 0;
     this.recoveryElapsedSeconds = 0;
     this.recoveryReasonValue = undefined;
     this.model.startupCompleted = snapshot.startupCompleted;
     this.model.tutorialCompleted = snapshot.tutorialCompleted;
+    this.model.firstMountTutorialAvailable =
+      snapshot.startupCompleted && !snapshot.tutorialCompleted;
     this.voltMountedValue = false;
     this.pendingMountedRestore = snapshot.voltMounted;
     this.setState(snapshot.stableState);
@@ -515,6 +534,7 @@ implements BlackoutCheckpointParticipant {
   resetTransient(): void {
     if (this.disposed) return;
     this.flight.park();
+    this.fallingSupportStepPending = false;
     this.model.mountAvailable = false;
     this.recoveryReasonValue = undefined;
     this.recoveryElapsedSeconds = 0;
@@ -561,6 +581,7 @@ implements BlackoutCheckpointParticipant {
     this.recoveryReasonValue = undefined;
     this.model.startupCompleted = false;
     this.model.tutorialCompleted = false;
+    this.model.firstMountTutorialAvailable = false;
     this.model.startupProgress = 0;
     this.model.mountAvailable = false;
     this.setState('damaged-idle');
@@ -568,8 +589,9 @@ implements BlackoutCheckpointParticipant {
   }
 
   markTutorialCompleted(): void {
-    if (this.disposed) return;
+    if (this.disposed || !this.model.startupCompleted) return;
     this.model.tutorialCompleted = true;
+    this.model.firstMountTutorialAvailable = false;
   }
 
   dispose(): void {
@@ -577,6 +599,7 @@ implements BlackoutCheckpointParticipant {
     this.flight.park();
     this.voltMountedValue = false;
     this.pendingMountedRestore = false;
+    this.fallingSupportStepPending = false;
     this.model.mountAvailable = false;
     this.world.unregister(this.collider);
     this.setState('disposed');
@@ -595,11 +618,12 @@ implements BlackoutCheckpointParticipant {
     const desiredY =
       this.startupOrigin.y +
       this.config.startupRiseMetres * progress;
-    this.flight.moveKinematically({
-      x: 0,
-      y: desiredY - this.flight.position.y,
-      z: 0,
-    });
+    this.startupDisplacement.set(
+      0,
+      desiredY - this.flight.position.y,
+      0,
+    );
+    this.flight.moveKinematically(this.startupDisplacement);
     this.enforceMountedRiderClearance();
     this.model.startupProgress = progress;
 
@@ -616,7 +640,7 @@ implements BlackoutCheckpointParticipant {
     this.events.emit('startupCompleted', {});
     this.events.emit('mounted', {});
     if (!this.model.tutorialCompleted) {
-      this.model.tutorialCompleted = true;
+      this.model.firstMountTutorialAvailable = true;
       this.events.emit('firstMountTutorialRequested', {});
     }
   }
