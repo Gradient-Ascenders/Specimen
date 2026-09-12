@@ -580,3 +580,70 @@ test('checkpoint capture during a parked incomplete startup normalizes to an unm
     fixture.dispose();
   }
 });
+
+
+test('mounted rider clearance prevents the drone from moving Volt into low ceiling geometry', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const floor = createFloor(world);
+  surfaces.register(floor);
+  const authoring = new MaintenanceDroneDevelopmentFixture();
+  const volt = createVolt(world, surfaces);
+  const controller = new MaintenanceDroneController({
+    world,
+    authoring: authoring.authoring,
+    voltRadiusMetres: volt.radiusMetres,
+    isVoltPlacementSafe: (position, radius) =>
+      position.y + radius <= 1.65,
+  });
+
+  try {
+    assert.equal(
+      controller.requestMount('volt', volt.position),
+      true,
+    );
+
+    for (let step = 0; step < 90; step += 1) {
+      controller.update(DT, {
+        horizontalDirection: STILL,
+        ascendHeld: false,
+        descendHeld: false,
+        aimHeld: false,
+        controllingVolt: true,
+      });
+      controller.syncMountedVolt(volt);
+    }
+
+    assert.equal(controller.readModel.state, 'mounted');
+    assert.ok(
+      volt.position.y + volt.radiusMetres <= 1.65 + 1e-9,
+      'mounted rider must remain outside the authored ceiling clearance',
+    );
+
+    const before = controller.readModel.position.y;
+    for (let step = 0; step < 30; step += 1) {
+      controller.update(DT, {
+        horizontalDirection: STILL,
+        ascendHeld: true,
+        descendHeld: false,
+        aimHeld: false,
+        controllingVolt: true,
+      });
+      controller.syncMountedVolt(volt);
+    }
+    assert.ok(
+      controller.readModel.position.y <= before + 1e-9,
+      'blocked ascent must revert instead of clipping Volt upward',
+    );
+  } finally {
+    controller.dispose();
+    authoring.dispose();
+    world.unregister(floor);
+    surfaces.unregister(floor);
+    floor.geometry.dispose();
+    const materials = Array.isArray(floor.material)
+      ? floor.material
+      : [floor.material];
+    for (const material of materials) material.dispose();
+  }
+});
