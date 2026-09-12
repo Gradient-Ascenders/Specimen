@@ -36,6 +36,9 @@ export class MaintenanceDroneFlightBody {
   private readonly centreOffset = new THREE.Vector3();
   private readonly rootWorldTarget = new THREE.Vector3();
   private readonly centre = new THREE.Vector3();
+  private readonly collisionSampleOrigin = new THREE.Vector3();
+  private readonly collisionSampleOffsets: readonly THREE.Vector3[];
+  private readonly collisionSphereRadiusMetres: number;
   private readonly previousCentre = new THREE.Vector3();
   private readonly velocityValue = new THREE.Vector3();
   private readonly displacement = new THREE.Vector3();
@@ -44,6 +47,7 @@ export class MaintenanceDroneFlightBody {
   private readonly horizontalVelocity = new THREE.Vector3();
   private readonly velocityDelta = new THREE.Vector3();
   private readonly hit = new CollisionHit();
+  private readonly candidateHit = new CollisionHit();
   private supportedValue = false;
   private readonly authoredYawRadians: number;
 
@@ -68,15 +72,44 @@ export class MaintenanceDroneFlightBody {
 
     const worldBounds = new THREE.Box3().setFromObject(options.collider);
     const size = worldBounds.getSize(new THREE.Vector3());
+    const halfSize = size.multiplyScalar(0.5);
     this.clearanceRadiusMetres =
-      Math.max(size.x, size.y, size.z) * 0.5 +
+      Math.max(halfSize.x, halfSize.z) +
+      this.config.collisionSkinMetres;
+    this.collisionSphereRadiusMetres =
+      Math.min(halfSize.x, halfSize.y, halfSize.z) +
       this.config.collisionSkinMetres;
     if (
       !Number.isFinite(this.clearanceRadiusMetres) ||
-      this.clearanceRadiusMetres <= 0
+      this.clearanceRadiusMetres <= 0 ||
+      !Number.isFinite(this.collisionSphereRadiusMetres) ||
+      this.collisionSphereRadiusMetres <= 0
     ) {
       throw new Error('Maintenance drone collider produced invalid clearance.');
     }
+
+    // Approximate the authored AABB with a bounded compound of spheres rather
+    // than one oversized sphere. The footprint remains wide enough to be
+    // physically excluded by the maintenance vent while the thin drone can
+    // still settle at its authored height on floors/ledges.
+    const sphereCoreRadius = Math.max(
+      0,
+      this.collisionSphereRadiusMetres -
+        this.config.collisionSkinMetres,
+    );
+    const xExtent = Math.max(0, halfSize.x - sphereCoreRadius);
+    const yExtent = Math.max(0, halfSize.y - sphereCoreRadius);
+    const zExtent = Math.max(0, halfSize.z - sphereCoreRadius);
+    const xs = sampleAxis(xExtent);
+    const ys = sampleAxis(yExtent);
+    const zs = sampleAxis(zExtent);
+    const offsets: THREE.Vector3[] = [];
+    for (const x of xs) {
+      for (const y of ys) {
+        for (const z of zs) offsets.push(new THREE.Vector3(x, y, z));
+      }
+    }
+    this.collisionSampleOffsets = offsets;
 
     const rootWorld = options.root.getWorldPosition(new THREE.Vector3());
     worldBounds.getCenter(this.centre);
@@ -270,15 +303,7 @@ export class MaintenanceDroneFlightBody {
     ) {
       if (this.remaining.lengthSq() <= EPSILON_SQ) break;
 
-      if (
-        !this.world.sweepSphere(
-          this.centre,
-          this.remaining,
-          this.clearanceRadiusMetres,
-          this.hit,
-          CollisionLayer.Movement,
-        )
-      ) {
+      if (!this.sweepCompound(this.remaining)) {
         this.centre.add(this.remaining);
         this.remaining.set(0, 0, 0);
         break;
@@ -315,6 +340,38 @@ export class MaintenanceDroneFlightBody {
     }
 
     this.syncRootFromCentre();
+  }
+
+  private sweepCompound(displacement: THREE.Vector3): boolean {
+    let found = false;
+    let closestFraction = Number.POSITIVE_INFINITY;
+    this.hit.reset();
+
+    for (const offset of this.collisionSampleOffsets) {
+      this.collisionSampleOrigin.copy(this.centre).add(offset);
+      if (
+        !this.world.sweepSphere(
+          this.collisionSampleOrigin,
+          displacement,
+          this.collisionSphereRadiusMetres,
+          this.candidateHit,
+          CollisionLayer.Movement,
+        )
+      ) {
+        continue;
+      }
+      if (this.candidateHit.fraction >= closestFraction) continue;
+
+      closestFraction = this.candidateHit.fraction;
+      found = true;
+      this.hit.object = this.candidateHit.object;
+      this.hit.fraction = this.candidateHit.fraction;
+      this.hit.distance = this.candidateHit.distance;
+      this.hit.point.copy(this.candidateHit.point);
+      this.hit.normal.copy(this.candidateHit.normal);
+    }
+
+    return found;
   }
 
   private syncRootFromCentre(): void {
@@ -374,4 +431,10 @@ function clampVectorLength(vector: THREE.Vector3, maximum: number): void {
   const length = vector.length();
   if (length <= maximum || length <= EPSILON_SQ) return;
   vector.multiplyScalar(maximum / length);
+}
+
+
+function sampleAxis(extent: number): readonly number[] {
+  if (extent <= 1e-9) return [0];
+  return [-extent, 0, extent];
 }
