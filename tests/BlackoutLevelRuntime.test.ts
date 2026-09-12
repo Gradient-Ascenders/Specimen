@@ -971,7 +971,7 @@ test('mounted Volt ascends/descends, aim freezes the drone, and existing electri
     assert.ok(raisedY > baseY);
 
     input.press('droneDescend');
-    for (let step = 0; step < 20; step += 1) {
+    for (let step = 0; step < 40; step += 1) {
       runtime.fixedUpdate(1 / 60);
     }
     input.release('droneDescend');
