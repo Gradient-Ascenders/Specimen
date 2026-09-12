@@ -158,7 +158,7 @@ test('recorder disposal disconnects observers, input, and pending GPU queries', 
     recorder.start();
     const markerShortcut = new Event('keydown', { cancelable: true });
     Object.defineProperties(markerShortcut, {
-      code: { value: 'KeyM' },
+      code: { value: 'KeyH' },
       shiftKey: { value: true },
       altKey: { value: false },
       ctrlKey: { value: false },
