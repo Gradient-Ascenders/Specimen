@@ -14,8 +14,8 @@ test('compatible light layouts preserve authored illumination and add no shadow 
     authored.forEach((l,i) => l.visible = i < visible); layout.sync(scene); assert.equal(count(),expected);
   }
   spot.visible = true;
-  for (const visible of [7, 9, 11, 13, 15, 13]) {
-    authored.forEach((l,i) => l.visible = i < visible); layout.sync(scene); assert.equal(count(),15);
+  for (const visible of [7, 9, 11, 13, 15, 17, 15]) {
+    authored.forEach((l,i) => l.visible = i < visible); layout.sync(scene); assert.equal(count(),17);
   }
   layout.root.traverse(o => {if(o instanceof THREE.Light){assert.equal(o.intensity,0);assert.equal(o.color.getHex(),0);assert.equal(o.castShadow,false);}});
   assert.deepEqual(authored.map(l => [l.color.getHex(),l.intensity,l.distance,l.castShadow]),snapshot);

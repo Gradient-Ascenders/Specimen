@@ -6,7 +6,6 @@ import type { RenderLayer } from './RenderLayer.ts';
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
 interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
 interface Step { label?: string; run: () => void | Promise<unknown>; }
-class ShadowLayoutLight extends THREE.Light {}
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
 export class CultivationPreparationQueue {
@@ -204,20 +203,13 @@ export class CultivationPreparationQueue {
 
   private *steps(config: Configuration): Generator<Step> {
     const scene = new THREE.Scene(); scene.fog = this.layer.scene.fog; scene.environment = this.layer.scene.environment;
-    // WebGLShadowMap renders depth/distance materials with no scene lighting.
-    // Compiling them against the colour-pass lights produces unused variants
-    // and leaves the actual first shadow draw to compile synchronously.
-    const shadowScene = new THREE.Scene();
-    // Shadow rendering keeps USE_SHADOWMAP enabled even though its light
-    // uniform arrays are empty. A zero-energy generic light supplies that flag
-    // without entering the directional/point/spot arrays used by colour shaders.
-    const shadowLayout = new ShadowLayoutLight(0, 0); shadowLayout.castShadow = true;
-    shadowScene.add(shadowLayout);
     const drawables: Drawable[] = [];
     const visit = (o: THREE.Object3D, foundation = false) => {
       foundation ||= o.name === 'cultivation-level-2-foundation';
       const index = this.roots.indexOf(o as THREE.Group);
       if (index !== -1 && !config.visible[index]) return;
+      const room = o.userData.presentationRoom as number | undefined;
+      if (room !== undefined && !config.visible[room === 3 ? 5 : room === 4 ? 6 : 7]) return;
       if (o.name === 'cultivation-shader-light-padding') return;
       if (o.name.startsWith('cultivation-room-3-drone-') && !config.visible[5]) return;
       if (o instanceof THREE.Light) {
@@ -237,6 +229,10 @@ export class CultivationPreparationQueue {
     let collected = 0;
     for (const source of drawables) {
       const materials = Array.isArray(source.material) ? source.material : [source.material];
+      // Collider-only originals and replaced art never submit a visible draw.
+      // Their replacement meshes are collected separately; uploading/priming
+      // the hidden originals only lengthens startup and background slices.
+      if (!materials.some(material => material.visible)) continue;
       const geometry = source.geometry;
       const feature = source.type + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
         Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize).sort().join(',') + ':' + Object.keys(geometry.morphAttributes).join(',');
@@ -284,11 +280,16 @@ export class CultivationPreparationQueue {
           const m = material as THREE.MeshStandardMaterial;
           const side = m.shadowSide ?? (m.side === THREE.FrontSide ? THREE.BackSide : m.side === THREE.BackSide ? THREE.FrontSide : THREE.DoubleSide);
           const custom = distance ? source.customDistanceMaterial : source.customDepthMaterial;
-          const key = (custom?.customProgramCacheKey() ?? '') + 'shadow:' + distance + ':' + side + ':' + feature + ':' + m.alphaTest + ':' + (m.displacementMap?.uuid ?? '');
+          const alphaTest = m.alphaToCoverage ? .5 : m.alphaTest;
+          const key = (custom?.customProgramCacheKey() ?? '') + 'shadow:' + distance + ':' + side + ':' + feature + ':' +
+            alphaTest + ':' + (m.map?.channel ?? 'none') + ':' + (m.alphaMap?.channel ?? 'none') + ':' +
+            m.wireframe + ':' + (m.displacementMap?.uuid ?? '');
           if (seen.has(key)) continue; seen.add(key);
           const shadow = (custom ? custom.clone() : distance ? new THREE.MeshDistanceMaterial() : new THREE.MeshDepthMaterial()) as THREE.MeshDepthMaterial | THREE.MeshDistanceMaterial;
           if (custom) { shadow.onBeforeCompile = custom.onBeforeCompile; const key = custom.customProgramCacheKey(); shadow.customProgramCacheKey = () => key; }
-          shadow.side = side; shadow.map = m.map; shadow.alphaMap = m.alphaMap; shadow.alphaTest = m.alphaTest;
+          shadow.side = side; shadow.map = m.map; shadow.alphaMap = m.alphaMap; shadow.alphaTest = alphaTest;
+          // Three also assigns this dynamically on distance materials.
+          Object.assign(shadow, {wireframe: m.wireframe});
           shadow.displacementMap = m.displacementMap; shadow.displacementScale = m.displacementScale; shadow.displacementBias = m.displacementBias;
           this.retained.push(shadow);
           const shadowProxy = source.clone(false) as THREE.Mesh; shadowProxy.material = shadow; shadowProxy.castShadow = false; shadowProxy.frustumCulled = false; shadowProxy.visible = true;
@@ -298,9 +299,10 @@ export class CultivationPreparationQueue {
         }
       }
     }
-    // The first shadow frame has empty light arrays; later frames can retain
-    // the previous colour pass's layout. Warm both renderer states.
-    const passes = [[programs, false, scene], [shadows, true, shadowScene], [shadows, true, scene]] as const;
+    // CultivationLevelRuntime refreshes the live light state before enabling
+    // shadows. Only that layout is used by gameplay; an extra empty-light pass
+    // would compile and draw an entire unused set of depth/distance programs.
+    const passes = [[programs, false, scene], [shadows, true, scene]] as const;
     for (const [objects, shadowTarget, targetScene] of passes) {
       for (let i = 0; i < objects.length;) {
         // A requested room can submit a larger compiler batch while the loading
@@ -316,7 +318,7 @@ export class CultivationPreparationQueue {
         }};
       }
     }
-    for (const [objects, shadowTarget, targetScene] of [[primes, false, scene], [shadows, true, shadowScene], [shadows, true, scene]] as const) for (let i = 0; i < objects.length;) {
+    for (const [objects, shadowTarget, targetScene] of [[primes, false, scene], [shadows, true, scene]] as const) for (let i = 0; i < objects.length;) {
       const batch = objects.slice(i, i + (this.priority === config ? 16 : 1));
       i += batch.length;
       yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + batch[0].name, run: () => {
@@ -327,7 +329,7 @@ export class CultivationPreparationQueue {
         this.diagnostics.primeMs += performance.now()-start;
       }};
     }
-    } finally { padding.dispose(); scene.clear(); shadowScene.clear(); }
+    } finally { padding.dispose(); scene.clear(); }
   }
 
   /** State is restored synchronously, before compileAsync yields to gameplay. */

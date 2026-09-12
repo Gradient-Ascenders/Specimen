@@ -1,4 +1,5 @@
 import { batchMaintenanceScout } from '../render/hazards/BatchMaintenanceScout.ts';
+import { CultivationPlatformBoosters } from '../render/environment/cultivation/CultivationPlatformBoosters.ts';
 import * as THREE from 'three';
 import { BeamOcclusion } from '../render/hazards/BeamOcclusion.ts';
 import { SlimeLightSampler } from '../render/slime/SlimeLightSampler.ts';
@@ -45,6 +46,7 @@ export class RoomFiveDroneEncounter {
   private readonly searchLights: THREE.SpotLight[] = [];
   private readonly sewerLight = new THREE.PointLight(0xff7935, 0, 8);
   private readonly sewerLighting: CultivationSewerLighting;
+  private readonly platformBoosters: CultivationPlatformBoosters;
   private readonly unsubscribe: () => void;
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly direction = new THREE.Vector3();
@@ -62,6 +64,7 @@ export class RoomFiveDroneEncounter {
     this.room = room;
     this.world = world;
     this.sewerLighting = new CultivationSewerLighting(room.root, surfaceMaps);
+    this.platformBoosters = new CultivationPlatformBoosters(room, surfaceMaps);
     this.sewerDamage = new SewerDroneDamage(room.brokenCore);
     this.sewerLight.name = 'room-5-rusted-drone-light';
     // Keep the light registered after dissolution: removing a light changes shader
@@ -166,6 +169,7 @@ export class RoomFiveDroneEncounter {
     if (this.disposed) return;
     this.damage.update(dt);
     this.sewerLighting.update(dt);
+    this.platformBoosters.update(dt, this.targets[0].position);
     this.presentationStep++;
     for (let i = 0; i < this.drones.length; i++) {
       const drone = this.drones[i];
@@ -246,6 +250,7 @@ export class RoomFiveDroneEncounter {
     this.brokenDrone.setCollisionEnabled(false);
     this.sewerTime = 0;
     this.sewerLighting.reset();
+    this.platformBoosters.reset();
     this.room.brokenCore.position.copy(SEWER_DRONE_POSITION);
     this.room.brokenCore.rotation.set(.2, 0, 1.1);
     this.updateSewerLightPosition();
@@ -260,6 +265,7 @@ export class RoomFiveDroneEncounter {
     this.brokenDrone.dispose(); this.presentation.dispose(); this.projectiles.dispose(); this.damage.dispose(); this.resources.dispose();
     this.sewerDamage.dispose();
     this.sewerLighting.dispose();
+    this.platformBoosters.dispose();
     this.sewerLight.removeFromParent(); this.sewerLight.dispose();
     for (const light of this.searchLights) { light.target.removeFromParent(); light.removeFromParent(); light.dispose(); }
     for (const flyer of this.flyers) {

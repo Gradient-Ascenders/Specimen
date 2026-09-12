@@ -8,6 +8,30 @@ import { CultivationMaintenanceArt } from '../src/render/environment/cultivation
 import { SewerDroneDamage } from '../src/render/hazards/SewerDroneDamage.ts';
 import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
+import { createRustedSewerDrone } from '../src/levels/RustedSewerDrone.ts';
+import { batchMaintenanceScout } from '../src/render/hazards/BatchMaintenanceScout.ts';
+
+test('patrol drone detailing retains its envelope and live eye with batched machinery and clear motor faces', () => {
+  const {body, eye} = createRustedSewerDrone(false);
+  body.scale.setScalar(.75);
+  const bounds = new THREE.Box3().setFromObject(body, true), eyeMaterial = eye.material;
+  const eyePosition = eye.position.clone(), positions = Array.from(body.geometry.attributes.position.array);
+  const materials = new Set<THREE.Material>();
+  body.traverse(o => { if (o instanceof THREE.Mesh) materials.add(o.material); });
+  try {
+    batchMaintenanceScout(body, eye);
+    const after = new THREE.Box3().setFromObject(body, true);
+    assert.ok(after.min.distanceTo(bounds.min) < 1e-6 && after.max.distanceTo(bounds.max) < 1e-6);
+    assert.deepEqual(Array.from(body.geometry.attributes.position.array), positions);
+    assert.equal(eye.material, eyeMaterial); assert.deepEqual(eye.position, eyePosition);
+    assert.equal(body.children.length, 3, 'one eye and two shared machinery batches');
+    assert.deepEqual(auditOpaqueSurfaces(body, .01).conflicts, [], 'motor clearance at the actual patrol scale');
+    body.traverse(o => { if (o instanceof THREE.Mesh) assert.ok(materials.has(o.material)); });
+  } finally {
+    body.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+    for (const material of materials) material.dispose();
+  }
+});
 
 test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and checkpoint/reset transforms', () => {
   const before = new LevelTwoRoomFiveGreybox(() => {}), room = new LevelTwoRoomFiveGreybox(() => {});
@@ -84,7 +108,37 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     assert.ok(adhesiveSurfaces > 0);
     assert.equal(art.diagnostics.newTextures, 0);
     assert.ok(art.diagnostics.staticMeshesBatched > 180);
-    assert.ok(art.diagnostics.batches < 80, 'sewer hardware stays spatially batched within the expanded art budget');
+    assert.ok(art.diagnostics.batches < 90, 'sewer and chamber hardware stay spatially batched');
+    const chamberBatches = room.root.children.filter(o => o.name.startsWith('room-5-drone-chamber-hardware-')) as THREE.Mesh[];
+    assert.ok(chamberBatches.length > 0 && chamberBatches.length <= 6);
+    assert.ok(chamberBatches.every(mesh => mesh.userData.shadowProxyReceiver), 'existing structural hulls cover detail shadows');
+    const chamberMaterials = new Set<THREE.MeshStandardMaterial>();
+    room.root.traverse(o => {
+      if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshStandardMaterial && o.material.name.startsWith('cultivation-drone-chamber-'))
+        chamberMaterials.add(o.material);
+    });
+    const panels = [...chamberMaterials].find(m => m.name.endsWith('stained-panels'))!;
+    assert.equal(panels.map, contamination.finishes.wall.map, 'reuse the earlier rooms weathering');
+    assert.equal(panels.emissiveIntensity, .065, 'retain the chamber wall emission');
+    assert.equal(panels.emissive.getHex(), 0xcdd2c9);
+    const platformArt = room.root.getObjectByName('cultivation-static-platform-art')!;
+    const whiteDecks: THREE.Mesh[] = [];
+    platformArt.traverse(o => {
+      if (!(o instanceof THREE.Mesh) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
+      if (o.material.map === lab.platform.map) {
+        whiteDecks.push(o);
+        assert.equal(o.material.name, 'cultivation-drone-chamber-dirty-white-deck');
+        assert.equal(o.material.roughnessMap, lab.platform.roughnessMap);
+        assert.equal(o.material.color.getHex(), 0xe1dfd6);
+      }
+    });
+    assert.ok(whiteDecks.length > 0);
+    const landing = room.root.getObjectByName('room-5-bob-shaft-landing-tile') as THREE.Mesh;
+    assert.equal(landing.userData.surfaceTag, 'default', 'the entrance tile is not adhesive');
+    assert.equal(landing.userData.textureRole, undefined);
+    assert.equal(room.root.getObjectByName('room-5-bob-shaft-climb')!.userData.surfaceTag, 'sticky', 'retain the required vertical climb');
+    let chamberDisposals = 0;
+    for (const mesh of chamberBatches) mesh.geometry.addEventListener('dispose', () => chamberDisposals++);
     const damage = new SewerDroneDamage(room.brokenCore);
     try {
       for (const hits of [0, 1, 2, 0]) {
@@ -106,5 +160,6 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     const batch = room.root.children.find(o => o.name.startsWith('room-5-art-static')) as THREE.Mesh;
     batch.geometry.addEventListener('dispose', () => disposal++);
     art.dispose(); art.dispose(); assert.equal(disposal, 1);
+    assert.equal(chamberDisposals, chamberBatches.length);
   } finally { art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); before.dispose(); }
 });

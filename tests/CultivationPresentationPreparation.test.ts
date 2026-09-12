@@ -12,6 +12,17 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
   const ordinary = new THREE.Mesh(shape, shared), instanced = new THREE.InstancedMesh(shape, shared, 1);
   ordinary.name = instanced.name = 'variant-regression'; scene.add(ordinary, instanced);
+  const hidden = new THREE.Mesh(shape, new THREE.MeshBasicMaterial({visible:false}));
+  hidden.name = 'hidden-collider-regression'; scene.add(hidden);
+  const projectile = new THREE.InstancedMesh(shape, new THREE.MeshBasicMaterial(), 1);
+  projectile.name = 'room-four-projectile-regression'; projectile.userData.presentationRoom = 4; scene.add(projectile);
+  const preparedOwners = new Set<string>();
+  const mapsInShadow = new Set<boolean>();
+  const mappedMaterial = new THREE.MeshStandardMaterial({map:new THREE.Texture()});
+  const mappedCaster = new THREE.InstancedMesh(shape, mappedMaterial, 1);
+  const plainCaster = new THREE.InstancedMesh(shape, shared, 1);
+  mappedCaster.name = plainCaster.name = 'shadow-map-regression';
+  mappedCaster.castShadow = plainCaster.castShadow = true; preview.roomFive.root.add(mappedCaster, plainCaster);
   const variants = new Set<THREE.Material>();
   const shadowCaster = new THREE.Mesh(shape, shared); shadowCaster.castShadow = true;
   const depth = new THREE.MeshDepthMaterial(), distance = new THREE.MeshDistanceMaterial();
@@ -42,16 +53,18 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     setScissor: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
     setScissorTest: (value: boolean) => { scissorTest = value; }, initTexture() {}, compile() {}, render() {},
     async compileAsync(group: THREE.Group, _camera: THREE.Camera, targetScene: THREE.Scene) {
+      group.traverse(o => {
+        preparedOwners.add(o.name);
+        if (o instanceof THREE.Mesh && o.name === 'shadow-map-regression' &&
+          (o.material instanceof THREE.MeshDepthMaterial || o.material instanceof THREE.MeshDistanceMaterial)) mapsInShadow.add(!!o.material.map);
+      });
       if (group.children.some(o => o instanceof THREE.Mesh &&
         (o.material instanceof THREE.MeshDepthMaterial || o.material instanceof THREE.MeshDistanceMaterial))) {
         const lights: THREE.Light[] = [];
         targetScene.traverseVisible(o => { if (o instanceof THREE.Light) lights.push(o); });
-        if (lights.length === 1 && lights[0].type === 'Light') {
-          shadowLayouts.add('first-frame');
-          assert.equal(lights[0].intensity, 0);
-          assert.equal(lights[0].castShadow, true, 'retain the shadow-pass shader define');
-          assert.equal(targetScene.fog, null); assert.equal(targetScene.environment, null);
-        } else shadowLayouts.add('following-frame');
+        assert.ok(lights.some(light => light.castShadow), 'retain the live shadow-light layout');
+        assert.equal(lights.some(light => light.type === 'Light'), false, 'do not warm an unused empty-light shadow layout');
+        shadowLayouts.add('live-layout');
       }
       group.traverse(o => { if (o instanceof THREE.Mesh && !Array.isArray(o.material)) shadowVariants.add(o.material.customProgramCacheKey()); if (o instanceof THREE.Mesh && o.name === 'variant-regression') variants.add(o.material as THREE.Material); });
       compiles++;
@@ -68,6 +81,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
     assert.ok(compiles > 0);
+    assert.equal(preparedOwners.has(hidden.name), false, 'hidden collider materials never enter the compiler');
+    if (!fail) assert.equal(preparedOwners.has(projectile.name), mode === 'startup', 'projectile preparation follows its owning room');
     if (!fail && mode !== 'startup') { assert.equal(variants.size, 2, 'ordinary and instanced meshes must each await their shader variant'); assert.equal(queue.diagnostics.completed, 1); assert.ok(queue.diagnostics.total > 1);
       const before = compiles; queue.tick(40); assert.equal(compiles, before, "an expensive gameplay frame defers background work");
       if (mode !== 'lift') {
@@ -139,9 +154,11 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
         'suspended preparation resumes and completes exactly once');
       assert.ok(shadowVariants.has('custom-depth-regression'), 'custom dissolve depth shaders are prepared');
       assert.ok(shadowVariants.has('custom-distance-regression'), 'custom dissolve point-shadow shaders are prepared');
+      assert.deepEqual(mapsInShadow, new Set([true, false]), 'mapped and unmapped shadows are both prepared');
     }
     if (mode === 'startup') {
-      assert.deepEqual(shadowLayouts, new Set(['first-frame', 'following-frame']));
+      assert.deepEqual(shadowLayouts, new Set(['live-layout']));
+      assert.deepEqual(mapsInShadow, new Set([true, false]));
       assert.equal(queue.diagnostics.completed, 2, 'startup prepares the initial view and lift/maintenance superset');
       const preparedCompiles = compiles;
       for (const z of [251, 270, 251, 270]) {
@@ -157,5 +174,10 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     const after: THREE.Object3D[] = []; scene.traverse(o => after.push(o)); assert.deepEqual(after, objects);
     for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
-  } finally { queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose(); globalThis.requestAnimationFrame = priorRaf; }
+  } finally {
+    queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
+    hidden.material.dispose(); projectile.material.dispose(); mappedMaterial.map!.dispose(); mappedMaterial.dispose();
+    mappedCaster.dispose(); plainCaster.dispose(); projectile.dispose();
+    globalThis.requestAnimationFrame = priorRaf;
+  }
 });

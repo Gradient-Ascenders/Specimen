@@ -275,7 +275,7 @@ export class CultivationLevelRuntime {
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
   restartLevel(): void { this.lifecycle.restartLevel(); }
-  unload(): void { this.lightLayout?.dispose(); this.lightLayout = undefined; this.lightLayoutKey = ''; this.preparationQueue?.dispose(); this.preparationQueue = undefined; this.lifecycle.unload(); }
+  unload(): void { this.lightLayout?.dispose(); this.lightLayout = undefined; this.lightLayoutKey = ''; this.lastPreparedDark = false; this.preparationQueue?.dispose(); this.preparationQueue = undefined; this.lifecycle.unload(); }
 
   dispose(): void {
     this.lightLayout?.dispose(); this.lightLayout = undefined;
@@ -611,6 +611,12 @@ export class CultivationLevelRuntime {
     resources.authoredPreview?.updatePresentationVisibility(
       this.renderLayer.cameraRig.camera.position, resources.pair.activeBody.position,
     );
+    if (resources.authoredPreview) {
+      const p = resources.authoredPreview;
+      if (resources.droneProjectilePresentation) resources.droneProjectilePresentation.mesh.visible = p.roomThree.root.visible;
+      if (resources.roomFourProjectiles) resources.roomFourProjectiles.mesh.visible = p.roomFour.root.visible;
+      if (resources.roomFiveEncounter) resources.roomFiveEncounter.presentation.mesh.visible = p.roomFive.root.visible;
+    }
     if (resources.authoredPreview && this.lightLayout) {
       const p = resources.authoredPreview;
       const key = [p.roomOne.root.visible, p.roomOneToTwoPassage.root.visible, p.roomTwo.root.visible,
@@ -963,7 +969,12 @@ export class CultivationLevelRuntime {
       if (roomFourView) { rollback(() => roomFourView.dispose()); this.host.append(roomFourView.element); }
       const roomFourProjectiles = roomFourEncounter
         ? new this.debugSupport!.DroneProjectilePresentation(roomFourEncounter.projectiles.states) : undefined;
-      if (roomFourProjectiles) { rollback(() => roomFourProjectiles.dispose()); this.renderLayer.scene.add(roomFourProjectiles.mesh); }
+      if (roomFourProjectiles) {
+        rollback(() => roomFourProjectiles.dispose());
+        roomFourProjectiles.mesh.name = 'cultivation-room-4-drone-projectiles';
+        roomFourProjectiles.mesh.userData.presentationRoom = 4;
+        this.renderLayer.scene.add(roomFourProjectiles.mesh);
+      }
       const roomFourDamage = roomFourEncounter
         ? new this.debugSupport!.DamageVignette({ damage: roomFourEncounter.damage }) : undefined;
       if (roomFourDamage) { rollback(() => roomFourDamage.dispose()); this.host.append(roomFourDamage.element); }
@@ -1037,7 +1048,12 @@ export class CultivationLevelRuntime {
       const roomFiveEncounter = authoredPreview ? new this.debugSupport!.RoomFiveDroneEncounter(
         authoredPreview.roomFive, collisionWorld, surfaceRegistry, bobBody, goopBody,
         id => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), id), authoredPreview.labArt.metal) : undefined;
-      if (roomFiveEncounter) { rollback(() => roomFiveEncounter.dispose()); this.renderLayer.scene.add(roomFiveEncounter.presentation.mesh); }
+      if (roomFiveEncounter) {
+        rollback(() => roomFiveEncounter.dispose());
+        roomFiveEncounter.presentation.mesh.name = 'cultivation-room-5-drone-projectiles';
+        roomFiveEncounter.presentation.mesh.userData.presentationRoom = 5;
+        this.renderLayer.scene.add(roomFiveEncounter.presentation.mesh);
+      }
       authoredPreview?.roomFive.bindBurns(dissolveSystem);
       const roomFiveDamage = roomFiveEncounter ? new this.debugSupport!.DamageVignette({ damage: roomFiveEncounter.damage }) : undefined;
       if (roomFiveDamage) { rollback(() => roomFiveDamage.dispose()); this.host.append(roomFiveDamage.element); }
@@ -1059,6 +1075,7 @@ export class CultivationLevelRuntime {
         : undefined;
       if (droneProjectilePresentation) {
         rollback(() => droneProjectilePresentation.dispose());
+        droneProjectilePresentation.mesh.userData.presentationRoom = 3;
         this.renderLayer.scene.add(droneProjectilePresentation.mesh);
       }
       const damageVignette = roomThreeEncounter

@@ -4,6 +4,7 @@ import type { LevelTwoRoomFiveGreybox } from '../../../levels/LevelTwoRoomFiveGr
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
 import { CultivationAccessTunnelArt } from './CultivationAccessTunnelArt.ts';
 import { CultivationSewerArt } from './CultivationSewerArt.ts';
+import { CultivationDroneChamberArt } from './CultivationDroneChamberArt.ts';
 import type { CultivationContaminationArt } from './CultivationContaminationArt.ts';
 import { CultivationVoltPodArt } from './CultivationVoltPodArt.ts';
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
@@ -19,6 +20,7 @@ export class CultivationMaintenanceArt {
   private disposed = false;
   private readonly accessArt: CultivationAccessTunnelArt;
   private readonly sewerArt: CultivationSewerArt;
+  private readonly chamberArt: CultivationDroneChamberArt;
   private readonly podArt: CultivationVoltPodArt;
   readonly diagnostics = { newTextures: 0, variants: 0, staticMeshesBatched: 0, batches: 0 };
 
@@ -26,6 +28,7 @@ export class CultivationMaintenanceArt {
     const b = room.builder, m = b.materials;
     this.accessArt = new CultivationAccessTunnelArt(lab, contamination);
     this.sewerArt = new CultivationSewerArt(lab, contamination);
+    this.chamberArt = new CultivationDroneChamberArt(lab, contamination);
     const variant = (source: THREE.MeshStandardMaterial, name: string, colour: number, roughness: number, lift = .045) => {
       const material = source.clone();
       material.name = `cultivation-maintenance-${name}`;
@@ -89,12 +92,13 @@ export class CultivationMaintenanceArt {
       else if (/sewer-pipe|control-.*-cabinet|pod-(base|cap)/.test(name)) finish = teal;
       else if (/safe-.*-deck|release-quiet-walk|rescue-shortcut|reunion-ramp$/.test(name)) finish = deck;
       else if (name === 'room-5-volt-conductive-terminal') finish = terminal;
-      finish = this.accessArt.finishFor(object) ?? this.sewerArt.finishFor(object) ?? finish;
+      finish = this.chamberArt.finishFor(object) ?? this.accessArt.finishFor(object) ?? this.sewerArt.finishFor(object) ?? finish;
       // Retain animated contacts, network signals, glass and the approved damaged drone.
       if (object === room.brokenCore || object.parent === room.brokenCore || object.userData.soluble) finish = undefined;
       if (!finish) return;
       b.borrowedMaterials.add(finish);
       lab.bind(object, finish);
+      this.chamberArt.mapShield(object, room);
       // Parent-local and dynamic pieces must follow their existing owner. Batch only static direct children.
       if (object.parent === room.root && object.visible && !dynamic.has(object) && object.children.length === 0 && !this.acidSurfaces.includes(object)) candidates.push(object);
     });
@@ -106,7 +110,11 @@ export class CultivationMaintenanceArt {
     }
     lab.platformArt.batchStatic(room.root, 10);
     const platformBatch = room.root.children.find(o => o.name === 'cultivation-static-platform-art');
-    platformBatch?.traverse(o => { if (o instanceof THREE.Mesh) o.userData.shadowProxyReceiver = true; });
+    platformBatch?.traverse(o => {
+      if (!(o instanceof THREE.Mesh)) return;
+      o.userData.shadowProxyReceiver = true;
+      if (o.material === lab.platform) o.material = this.chamberArt.deck;
+    });
     // The same deck silhouettes cast shadows through low-poly hulls. Ceramic
     // bevels and underside fittings remain fully detailed in the visible pass.
     const hullMaterial = new THREE.MeshBasicMaterial({colorWrite:false, depthWrite:false});
@@ -159,7 +167,6 @@ export class CultivationMaintenanceArt {
       box(lab.platformArt.warning, [x, -11.19, z], [.1, .012, 1.4]);
     }
     for (const z of [26, 42, 58, 74]) for (const x of [-19.97, 19.97]) {
-      box(teal, [x, 15, z], [.025, .4, 5]);
       box(metal, [x, 19, z], [.04, 36, .12]);
     }
     // Warning markings identify the final terminal approach.
@@ -173,14 +180,15 @@ export class CultivationMaintenanceArt {
     }
     this.accessArt.addDetails(room.root);
     this.sewerArt.addDetails(room, lab);
-    this.diagnostics.variants = this.materials.length + this.accessArt.materialCount + this.sewerArt.materialCount;
+    this.chamberArt.addDetails(room);
+    this.diagnostics.variants = this.materials.length + this.accessArt.materialCount + this.sewerArt.materialCount + this.chamberArt.materialCount;
     this.diagnostics.staticMeshesBatched = candidates.length;
-    this.diagnostics.batches = this.batches.length + this.accessArt.batchCount + this.sewerArt.batchCount;
+    this.diagnostics.batches = this.batches.length + this.accessArt.batchCount + this.sewerArt.batchCount + this.chamberArt.batchCount;
   }
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
-    this.podArt.dispose(); this.accessArt.dispose(); this.sewerArt.dispose();
+    this.podArt.dispose(); this.accessArt.dispose(); this.sewerArt.dispose(); this.chamberArt.dispose();
     for (const { mesh, material } of this.originals) mesh.material = material;
     for (const mesh of this.batches) {
       mesh.removeFromParent(); mesh.geometry.dispose();

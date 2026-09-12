@@ -81,7 +81,7 @@ export class LevelTwoRoomFiveGreybox {
     box('bob-shaft-front-upper', [2.2, 10, .3], [-12, 7.4, 15.65], m.duct);
     box('bob-shaft-roof', [2.8, .3, 2.15], [-12, 12.55, 16.675], m.duct);
     box('bob-approach-roof', [2.8, .3, 5.3], [-12, 2.55, 12.85], m.duct);
-    box('bob-shaft-sticky-lip', [2.2, .3, 2.35], [-12, 9.85, 19.325], m.sticky, true).userData.textureRole = 'sticky-vent-tile';
+    box('bob-shaft-landing-tile', [2.2, .3, 2.35], [-12, 9.85, 19.325], m.floor);
     for (const x of [-13.55, -10.45]) box(`bob-exit-shoulder-${x}`, [.9, 3.5, .5], [x, 11.75, 18], m.duct);
     box('bob-exit-header', [2.2, 1.1, .5], [-12, 12.95, 18], m.duct);
     // Flat dead-end duct. Only its final floor panel is missing, exposing the sewer below.
