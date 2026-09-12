@@ -135,11 +135,19 @@ implements BlackoutCheckpointParticipant {
       collider: options.authoring.collider,
     });
 
-    this.world.register(
-      this.collider,
-      CollisionLayer.MaintenanceDroneSupport,
-      ColliderTransformMode.Dynamic,
-    );
+    try {
+      this.world.register(
+        this.collider,
+        CollisionLayer.MaintenanceDroneSupport,
+        ColliderTransformMode.Dynamic,
+      );
+    } catch (error) {
+      // CollisionWorld registration can be observed/injected after mutation.
+      // Quarantine partial construction so a failed Level 3 load cannot leave
+      // an invisible support collider behind.
+      this.world.unregister(this.collider);
+      throw error;
+    }
 
     this.model = {
       state: 'damaged-idle',
@@ -451,6 +459,8 @@ implements BlackoutCheckpointParticipant {
     this.assertActive('capture');
     const transient =
       this.model.state === 'starting' ||
+      (this.model.state === 'parked-hover' &&
+        !this.model.startupCompleted) ||
       this.model.state === 'unpowered-falling' ||
       this.model.state === 'shorted' ||
       this.model.state === 'recovering';
@@ -771,6 +781,19 @@ function readSnapshot(value: SerializableValue): MaintenanceDroneSnapshot {
     typeof voltMounted !== 'boolean'
   ) {
     throw new Error('Invalid maintenance drone checkpoint snapshot.');
+  }
+
+  const mountedStableState =
+    stableState === 'mounted' || stableState === 'parked-hover';
+  if (mountedStableState !== voltMounted) {
+    throw new Error(
+      'Invalid maintenance drone checkpoint mounted-state ownership.',
+    );
+  }
+  if (mountedStableState && !startupCompleted) {
+    throw new Error(
+      'Invalid maintenance drone checkpoint: mounted stable state requires completed startup.',
+    );
   }
 
   return {
