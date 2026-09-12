@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelTwoRoomFourGreybox } from '../../../levels/LevelTwoRoomFourGreybox.ts';
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
 import type { CultivationChamberMaterials } from './CultivationChamberMaterials.ts';
+import { mapCultivationPlatformWear } from './CultivationPlatformWear.ts';
 
 type Size = readonly [number, number, number];
 
@@ -22,7 +23,11 @@ export class CultivationElevatorArt {
       return material;
     };
     const deck = variant(lab.floor, 'reinforced-deck', 0x7e8b87, 0.94);
-    deck.bumpScale = 0.028;
+    deck.map = lab.platform.map;
+    deck.roughnessMap = lab.platform.roughnessMap;
+    deck.bumpMap = null;
+    deck.normalMap = lab.platform.normalMap;
+    deck.normalScale.copy(lab.platform.normalScale);
     const shaft = variant(lab.metal, 'shaft-backing', 0x303d40, 0.85);
     const panel = variant(lab.wall, 'service-panels', 0xbfc9c4, 0.86);
     // Existing local lift lighting does not reach the distant shaft modules.
@@ -45,6 +50,8 @@ export class CultivationElevatorArt {
       if (object.name.endsWith('-shutter-panel')) overrides.set(object.name, lab.duct);
     });
     lab.dress(room.builder, [], overrides);
+    const tread = room.root.getObjectByName('room-4-lift-tread') as THREE.Mesh;
+    mapCultivationPlatformWear(tread.geometry, tread.name, 12);
 
     // Group boxes by finish once. Each scrolling module reuses the same merged geometry.
     type Parts = Map<THREE.Material, THREE.BufferGeometry[]>;

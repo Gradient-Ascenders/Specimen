@@ -120,7 +120,7 @@ test('Room 2 and its two exit routes share the palette without changing gameplay
   const v = Array.from({length: 4}, (_, i) => uv.getY(8 + i));
   assert.ok(Math.abs(Math.max(...v) - Math.min(...v) - 13.15) < 1e-5);
   const tether = room.root.getObjectByName('cultivation-room-2-block-1-non-soluble-rope') as THREE.Mesh;
-  assert.equal(tether.material, room.builder.materials.support);
+  assert.equal(tether.material, art.pole);
   const button = room.root.getObjectByName('cultivation-room-2-wall-button-pad') as THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
   room.update(0.6, [{id: 'bob', position: new THREE.Vector3(), radiusMetres: 0.45,
     attached: true, supportCollider: room.wallButton}]);

@@ -69,6 +69,7 @@ export class CultivationMaintenanceArt {
         platforms.push(object); return;
       }
       let finish = sourceToFinish.get(object.material);
+      if (/room-5-route-\d+-hanger-|room-5-safe-\d+-suspension-/.test(name)) finish = lab.pole;
       if (object.userData.textureRole === 'acid-floor' || object.material === m.acid) {
         finish = lab.acid; this.acidSurfaces.push(object);
       } else if (object.userData.surfaceTag === 'sticky') finish = sticky;
