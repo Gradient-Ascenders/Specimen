@@ -8,6 +8,7 @@ import { ROOM_FIVE_JUMPS } from '../levels/RoomFiveParkour.ts';
 import { createRustedSewerDrone } from '../levels/RustedSewerDrone.ts';
 import type { SecurityNetwork } from '../puzzle/SecurityNetworkController.ts';
 import { SewerDroneDamage } from '../render/hazards/SewerDroneDamage.ts';
+import { CultivationSewerLighting } from '../render/environment/cultivation/CultivationSewerLighting.ts';
 import { SEWER_DRONE_POSITION } from '../levels/RoomFiveSewer.ts';
 import { SecurityDrone, type SecurityDroneTarget } from './SecurityDrone.ts';
 import { DroneProjectileSystem, type DroneProjectileTarget } from './DroneProjectileSystem.ts';
@@ -42,7 +43,8 @@ export class RoomFiveDroneEncounter {
   private readonly world: CollisionWorld;
   private readonly slimeLighting = new SlimeLightSampler();
   private readonly searchLights: THREE.SpotLight[] = [];
-  private readonly sewerLight = new THREE.PointLight(0xff7935, 2, 8);
+  private readonly sewerLight = new THREE.PointLight(0xff7935, 0, 8);
+  private readonly sewerLighting: CultivationSewerLighting;
   private readonly unsubscribe: () => void;
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly direction = new THREE.Vector3();
@@ -59,6 +61,7 @@ export class RoomFiveDroneEncounter {
     this.resources = new SecurityDronePresentationResources(surfaceMaps);
     this.room = room;
     this.world = world;
+    this.sewerLighting = new CultivationSewerLighting(room.root, surfaceMaps);
     this.sewerDamage = new SewerDroneDamage(room.brokenCore);
     this.sewerLight.name = 'room-5-rusted-drone-light';
     // Keep the light registered after dissolution: removing a light changes shader
@@ -162,6 +165,7 @@ export class RoomFiveDroneEncounter {
   update(dt: number): void {
     if (this.disposed) return;
     this.damage.update(dt);
+    this.sewerLighting.update(dt);
     this.presentationStep++;
     for (let i = 0; i < this.drones.length; i++) {
       const drone = this.drones[i];
@@ -194,7 +198,8 @@ export class RoomFiveDroneEncounter {
       search.target.position.copy(search.position).addScaledVector(this.direction, ROOM_FIVE_DRONE_VIEW_RANGE);
     }
     const sewerState = this.room.controller.brokenDroneState;
-    this.sewerLight.intensity = sewerState === 'destroyed' ? 0 : sewerState === 'active' ? 45 : sewerState === 'rebooting' ? 18 : 2;
+    this.sewerLight.intensity = sewerState === 'active' ? 45 : sewerState === 'rebooting'
+      ? 18 * THREE.MathUtils.smoothstep(this.room.controller.rebootElapsed, .9, 1.5) : 0;
     const shell = this.room.brokenCore;
     this.sewerDamage.update(dt, this.room.controller.brokenDroneHits);
     if (sewerState === 'rebooting' || sewerState === 'active') {
@@ -215,6 +220,7 @@ export class RoomFiveDroneEncounter {
       this.brokenDrone.frontIndicator.material.color.setHex(Math.sin(this.room.controller.rebootElapsed * 35) > 0 ? 0xffa13b : 0x202020);
     }
     this.room.sewer.eye.material.color.copy(this.brokenDrone.frontIndicator.material.color);
+    if (sewerState === 'dormant') this.room.sewer.eye.material.color.setHex(0x080b07);
     this.projectiles.update(dt, this.projectileTargets);
   }
   private updateSewerLightPosition(): void {
@@ -239,11 +245,13 @@ export class RoomFiveDroneEncounter {
     this.brokenDrone.setPresentationVisible(false);
     this.brokenDrone.setCollisionEnabled(false);
     this.sewerTime = 0;
+    this.sewerLighting.reset();
     this.room.brokenCore.position.copy(SEWER_DRONE_POSITION);
     this.room.brokenCore.rotation.set(.2, 0, 1.1);
     this.updateSewerLightPosition();
     this.sewerDamage.reset(this.room.controller.brokenDroneHits);
-    this.sewerLight.intensity = this.room.controller.brokenDroneState === 'destroyed' ? 0 : 2;
+    this.sewerLight.intensity = 0;
+    this.room.sewer.eye.material.color.setHex(0x080b07);
   }
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
@@ -251,6 +259,7 @@ export class RoomFiveDroneEncounter {
     for (const drone of this.drones) drone.dispose();
     this.brokenDrone.dispose(); this.presentation.dispose(); this.projectiles.dispose(); this.damage.dispose(); this.resources.dispose();
     this.sewerDamage.dispose();
+    this.sewerLighting.dispose();
     this.sewerLight.removeFromParent(); this.sewerLight.dispose();
     for (const light of this.searchLights) { light.target.removeFromParent(); light.removeFromParent(); light.dispose(); }
     for (const flyer of this.flyers) {

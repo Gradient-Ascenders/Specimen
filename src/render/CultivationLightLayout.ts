@@ -18,10 +18,10 @@ export class CultivationLightLayout {
     });
     // Keep compatible small layouts without inflating the elevator's two lights
     // to the seventeen needed by Room 3. Zero-radiance slots still cost GPU work.
-    // Room 5 has eleven point lights including the access-tunnel fixtures.
+    // Room 5 has thirteen point lights including the access and sewer fixtures.
     // Reserve the two elevator slots too: crossing its visibility boundary must
     // not recompile every maintenance shader (including nine searchlight shadows).
-    const target = searchlights ? Math.max(13, points) : [2, 8, 17].find(count => count >= points) ?? points;
+    const target = searchlights ? Math.max(15, points) : [2, 8, 17].find(count => count >= points) ?? points;
     this.points.forEach((light, i) => light.visible = i < Math.max(0, target - points));
     this.root.visible = true;
   }

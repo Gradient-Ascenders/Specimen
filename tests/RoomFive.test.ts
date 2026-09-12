@@ -181,9 +181,9 @@ test('dark-room lights follow drone power, damage recovery, and the moving Volt 
     };
     const initialLights = visibleLightCount();
     s.encounter.update(1 / 60); const dormant = light.intensity;
-    assert.ok(dormant > 0);
+    assert.equal(dormant, 0, 'the dormant drone must not advertise its position');
     s.room.controller.hitBrokenDrone(); s.encounter.update(1 / 60);
-    assert.ok(light.intensity > dormant * 10);
+    assert.equal(light.intensity, 45);
     s.room.controller.destroyBrokenDrone(); s.encounter.update(1 / 60); assert.equal(light.intensity, 0);
     s.room.brokenCore.visible = false;
     assert.equal(visibleLightCount(), initialLights, 'destroying the shell must not change renderer light variants');
