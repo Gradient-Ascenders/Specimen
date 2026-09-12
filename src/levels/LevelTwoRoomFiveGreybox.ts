@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomFiveVentWaste } from './RoomFiveVentWaste.ts';
 import { addRoomFiveCover } from './RoomFiveCover.ts';
 import { addRoomFiveParkour } from './RoomFiveParkour.ts';
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
@@ -27,7 +28,7 @@ export class LevelTwoRoomFiveGreybox {
   readonly controller = new CultivationRoomFiveController();
   readonly solubleTargetMeshes: THREE.Mesh[] = [];
   readonly dynamicCollisionMeshes: THREE.Mesh[] = [];
-  private readonly acidVentPatches: { x: number; z: number; width: number; length: number }[] = [];
+  private readonly acidVentPatches: RoomFiveVentWaste[] = [];
   readonly controls = new Map<SecurityNetwork, THREE.Mesh>();
   readonly lever: THREE.Mesh;
   private readonly reunionFloors: THREE.Mesh[] = [];
@@ -80,7 +81,7 @@ export class LevelTwoRoomFiveGreybox {
     box('bob-shaft-front-upper', [2.2, 10, .3], [-12, 7.4, 15.65], m.duct);
     box('bob-shaft-roof', [2.8, .3, 2.15], [-12, 12.55, 16.675], m.duct);
     box('bob-approach-roof', [2.8, .3, 5.3], [-12, 2.55, 12.85], m.duct);
-    box('bob-shaft-sticky-lip', [2.2, .3, 2.35], [-12, 9.85, 19.325], m.sticky, true).userData.textureRole = 'sticky-vent-tile';
+    box('bob-shaft-landing-tile', [2.2, .3, 2.35], [-12, 9.85, 19.325], m.floor);
     for (const x of [-13.55, -10.45]) box(`bob-exit-shoulder-${x}`, [.9, 3.5, .5], [x, 11.75, 18], m.duct);
     box('bob-exit-header', [2.2, 1.1, .5], [-12, 12.95, 18], m.duct);
     // Flat dead-end duct. Only its final floor panel is missing, exposing the sewer below.
@@ -95,14 +96,12 @@ export class LevelTwoRoomFiveGreybox {
     for (const x of [38.55, 41.45]) box(`drop-ceiling-flange-x-${x}`, [.7, .25, 3.6], [x, -2.2, 20], m.duct);
     for (const z of [18.55, 21.45]) box(`drop-ceiling-flange-z-${z}`, [2.2, .25, .7], [40, -2.2, z], m.duct);
     for (let i = 0; i < 6; i++) {
-      const patch = { x: 18 + i * 2, z: 9.1 + (i % 2 ? .15 : -.15), width: .7 + i * .2, length: .35 + i * .28 };
-      this.acidVentPatches.push(patch);
+      this.acidVentPatches.push(new RoomFiveVentWaste(18 + i * 2, 9.1 + (i % 2 ? .15 : -.15),
+        .7 + i * .2, .35 + i * .28, i));
     }
-    this.acidVentPatches.push({ x: 35, z: 9.1, width: 12.2, length: 2.2 }, { x: 40, z: 14.55, width: 2.2, length: 8.7 });
-    for (const [i, patch] of this.acidVentPatches.entries()) b.addVisualBox({
-      name: `room-5-vent-acid-${i}`, size: [patch.width, .015, patch.length],
-      position: [patch.x, .212, patch.z], material: m.acid, textureRole: 'acid-floor',
-    });
+    this.acidVentPatches.push(new RoomFiveVentWaste(35, 9.1, 12.2, 2.2, 6, true),
+      new RoomFiveVentWaste(40, 14.55, 2.2, 8.7, 7, true));
+    for (const [i, patch] of this.acidVentPatches.entries()) b.root.add(patch.createMesh(m.acid, i));
     this.sewer = new RoomFiveSewer(b);
     this.brokenCore = this.sewer.drone;
     this.reunionDoor = this.sewer.door;
@@ -143,7 +142,7 @@ export class LevelTwoRoomFiveGreybox {
     addRoomFiveParkour(b);
     // Leave the final safe platform away from the cage and patrol arena.
     box('release-quiet-walk', [3, .5, 8], [0, 28.75, 30.5], m.support);
-    b.addLight('room-5-release-wayfinding', [0, 32, 27], 0xffe3a0, 60, 9);
+    b.addLight('room-5-release-wayfinding', [0, 32, 27], 0xffe3a0, 40, 8);
     this.lever = box('manual-release-lever', [.16, 1, .16], [0, 30, 27.35], m.cable);
     this.lever.geometry.translate(0, .5, 0);
     const grip = b.addVisualBox({ name: 'room-5-release-lever-grip', size: [.85, .22, .25],
@@ -164,7 +163,7 @@ export class LevelTwoRoomFiveGreybox {
     }
     this.captiveVolt = new THREE.Mesh(new THREE.SphereGeometry(.65, 20, 12), new THREE.MeshStandardMaterial({ color: 0xffe85c, emissive: 0xffd21a, emissiveIntensity: 1.5 }));
     this.captiveVolt.name = 'room-5-captive-volt'; this.pod.add(this.captiveVolt);
-    const voltGlow = b.addLight('room-5-volt-glow', [0, 0, 0], 0xffdc35, 70, 14);
+    const voltGlow = b.addLight('room-5-volt-glow', [0, 0, 0], 0xffdc35, 50, 12);
     this.pod.add(voltGlow);
     voltGlow.castShadow = true; voltGlow.shadow.mapSize.set(512, 512);
     voltGlow.shadow.bias = -.0002; voltGlow.shadow.normalBias = .025;
@@ -251,7 +250,7 @@ export class LevelTwoRoomFiveGreybox {
     const dryReunion = (this.controller.releasing || this.controller.rescued)
       && p.x > -12 && p.x < 28 && p.y >= 0 && p.y < 3 && p.z >= 59 && p.z <= 71;
     const dryExit = p.x >= 12 && p.x <= 20 && p.y >= 0 && p.y < 3 && p.z > 71 && p.z < 79;
-    const contaminatedVent = p.y < .7 && p.y > -.5 && this.acidVentPatches.some(patch => Math.abs(p.x - patch.x) < patch.width / 2 && Math.abs(p.z - patch.z) < patch.length / 2);
+    const contaminatedVent = p.y < .7 && p.y > -.5 && this.acidVentPatches.some(patch => patch.contains(p.x, p.z));
     return contaminatedVent || acidDuct || (Math.abs(p.x) < 20 && p.z > 18 && p.z < 80 && p.y < .6 && !dryReunion && !dryExit);
   }
   syncPresentation(dt = 1): void {

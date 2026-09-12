@@ -1,9 +1,12 @@
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
 import { AcidSurfaceMaterial } from '../containment/AcidSurfaceMaterial.ts';
+import { createCultivationStickyRouteGeometry } from './CultivationStickyRouteGeometry.ts';
 import { CultivationPlatformArt } from './CultivationPlatformArt.ts';
+import { createCultivationPlatformWear } from './CultivationPlatformWear.ts';
+import { createCultivationMembraneMaterial, createCultivationMembraneTextures, mapCultivationMembranePanel } from './CultivationMembraneMaterial.ts';
 import * as THREE from 'three';
-import { createContainmentStickyWallTextures, createContainmentCeramicTextures, createAcidFoundationAlbedo } from '../containment/ContainmentProceduralTextures.ts';
-import { createContainmentStickyWallMaterial, createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
+import { createContainmentCeramicTextures, createAcidFoundationAlbedo } from '../containment/ContainmentProceduralTextures.ts';
+import { createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 
 interface LabFixtureOptions {
@@ -17,8 +20,8 @@ interface LabFixtureOptions {
 /** Original, deterministic facility finishes shared by the dressed Cultivation rooms. */
 export class CultivationLabMaterials {
   readonly textures: THREE.DataTexture[] = [];
-  private readonly stickyMaps = createContainmentStickyWallTextures();
-  readonly sticky = createContainmentStickyWallMaterial(this.stickyMaps);
+  private readonly stickyMaps = createCultivationMembraneTextures();
+  readonly sticky = createCultivationMembraneMaterial(this.stickyMaps);
   readonly wall = this.finish('wall', 0xe2e1d8, 0.76, 0.02);
   readonly floor = this.finish('floor', 0xaeb7b2, 0.84, 0.08);
   readonly ceiling = this.finish('ceiling', 0xcbd0ca, 0.8, 0.06);
@@ -26,6 +29,11 @@ export class CultivationLabMaterials {
   readonly duct = this.finish('duct', 0x879391, 0.65, 0.7);
   private readonly platformMaps = createContainmentCeramicTextures();
   readonly platform = createContainmentPlatformMaterial(this.platformMaps);
+  private readonly deckWear = createCultivationPlatformWear('deck');
+  private readonly poleWear = createCultivationPlatformWear('pole');
+  readonly pole = new THREE.MeshStandardMaterial({ name: 'cultivation-oxidized-platform-pole',
+    map: this.poleWear.albedo, roughnessMap: this.poleWear.roughness,
+    bumpMap: this.poleWear.roughness, bumpScale: .012, roughness: .95, metalness: .35 });
   private readonly acidFoundation = createAcidFoundationAlbedo();
   readonly acid = new AcidSurfaceMaterial({ foundationMap: this.acidFoundation, microNormalMap: this.platformMaps.ceramicNormal });
   readonly platformArt = new CultivationPlatformArt(this.platform);
@@ -39,13 +47,28 @@ export class CultivationLabMaterials {
   private disposed = false;
 
   constructor() {
-    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.acid, this.sticky]) {
+    this.platform.map = this.deckWear.albedo;
+    this.platform.roughnessMap = this.deckWear.roughness;
+    this.platform.roughness = .9;
+    this.pole.userData.tileSizeMetres = [.5, 2];
+    // Unit-height tethers extend during a drop. Keep rust at metre scale and
+    // anchored at the upper end, rather than stretching it into wood-like stripes.
+    this.pole.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
+        vMapUv.y += (position.y - 0.5) * (length(modelMatrix[1].xyz) - 1.0) / 2.0;
+        vRoughnessMapUv = vMapUv;
+        vBumpMapUv = vMapUv;
+      `);
+    };
+    this.pole.customProgramCacheKey = () => 'cultivation-anchored-pole-oxidation-v1';
+    this.textures.push(...Object.values(this.deckWear), ...Object.values(this.poleWear));
+    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.pole, this.acid, this.sticky]) {
       optimizeFiniteLightEvaluation(material);
     }
     this.acidFoundation.repeat.set(4, 3);
     this.acid.userData.tileSizeMetres = [32.7, 26.7];
     this.textures.push(this.acidFoundation);
-    this.textures.push(this.stickyMaps.stickyNormal, this.stickyMaps.stickyRoughness);
+    this.textures.push(...Object.values(this.stickyMaps));
     for (const texture of Object.values(this.platformMaps)) {
       texture.repeat.set(4, 4);
       this.textures.push(texture);
@@ -62,9 +85,16 @@ export class CultivationLabMaterials {
     const platforms: THREE.Mesh[] = [];
     builder.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || !(object.geometry instanceof THREE.BoxGeometry)) return;
-      // These unit-height visuals are stretched by the existing drop controller.
-      // Keep their plain metal finish instead of stretching panel seams with them.
-      if (object.name.endsWith('-non-soluble-rope')) return;
+      // The drop controller stretches this unit-height pole. Its local mapping
+      // keeps oxidation attached to it without introducing stretched panel seams.
+      if (object.name.endsWith('-non-soluble-rope')) {
+        builder.borrowedMaterials.add(this.pole);
+        this.bind(object, this.pole);
+        const uv = object.geometry.getAttribute('uv');
+        for (let i = 0; i < uv.count; i++) uv.setXY(i,
+          uv.getX(i) + object.position.x * .37, uv.getY(i) + object.position.z * .29);
+        return;
+      }
       let material: THREE.MeshStandardMaterial | undefined;
       if (object.material === source.wall) {
         material = servicePanels.includes(object.name) ? this.duct :
@@ -96,6 +126,18 @@ export class CultivationLabMaterials {
         this.bind(object, material);
       }
     });
+    if (builder.root.name === 'cultivation-room-2-greybox') {
+      const panels = builder.collisionMeshes.filter(mesh => /^cultivation-room-2-sticky-route-[a-e]$/.test(mesh.name)) as THREE.Mesh<THREE.BoxGeometry>[];
+      if (panels.length) {
+        const skin = new THREE.Mesh(createCultivationStickyRouteGeometry(panels), this.sticky);
+        skin.name = 'cultivation-room-2-continuous-sticky-route';
+        skin.userData.presentationOnly = true;
+        builder.root.add(skin);
+        this.decorations.push(skin);
+        builder.borrowedMaterials.add(this.platformArt.hidden);
+        for (const panel of panels) panel.material = this.platformArt.hidden;
+      }
+    }
     for (const platform of platforms) this.platformArt.add(platform);
     if (builder.root.name === 'cultivation-room-3-greybox') this.platformArt.batchStatic(builder.root);
   }
@@ -115,7 +157,7 @@ export class CultivationLabMaterials {
       const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
       const nx = normals.getX(i), ny = normals.getY(i), nz = normals.getZ(i);
       // Offset static panels into their authored bay grid; moving parts use local UVs.
-      const moving = material === this.platform || material === this.rope || mesh.userData.doorId;
+      const moving = material === this.platform || material === this.rope || material === this.pole || mesh.userData.doorId;
       const px = x + (moving ? 0 : mesh.position.x);
       const py = y + (moving ? 0 : mesh.position.y);
       const pz = z + (moving ? 0 : mesh.position.z);
@@ -123,6 +165,7 @@ export class CultivationLabMaterials {
         (Math.abs(ny) > 0.5 ? -ny * pz : py) / panelHeight);
     }
     uv.needsUpdate = true;
+    if (material.userData.cultivationMembrane) mapCultivationMembranePanel(mesh.geometry);
     mesh.material = material;
   }
 
@@ -188,7 +231,7 @@ export class CultivationLabMaterials {
   }
 
   get diagnostics() {
-    return { materialCount: 14, textureCount: this.textures.length,
+    return { materialCount: 15, textureCount: this.textures.length,
       textureBytes: this.textures.reduce((sum, texture) => sum + (texture.image.data?.byteLength ?? 0), 0),
       dressedMeshCount: this.bindings.length, addedDrawCalls: this.decorations.length * 2 };
   }
@@ -218,7 +261,7 @@ export class CultivationLabMaterials {
     }
     for (const geometry of decorationGeometries) geometry.dispose();
     this.decorations.length = 0;
-    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.rope, this.fixture, this.sticky, this.acid]) material.dispose();
+    for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.pole, this.rope, this.fixture, this.sticky, this.acid]) material.dispose();
     for (const texture of this.textures) texture.dispose();
   }
 

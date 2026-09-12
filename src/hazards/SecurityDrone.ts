@@ -113,6 +113,7 @@ export class SecurityDrone {
   private readonly world: CollisionWorld;
   private readonly surfaces: SurfaceRegistry;
   private readonly projectiles: DroneProjectileSystem;
+  private readonly projectileCollisionProxy: THREE.Mesh | undefined;
   private readonly model: MutableReadModel;
   private readonly initialQuaternion = new THREE.Quaternion();
   private readonly maximumAcquisitionAngleCos: number;
@@ -143,6 +144,8 @@ export class SecurityDrone {
     surfaces: SurfaceRegistry,
     projectiles: DroneProjectileSystem,
     presentationResources?: SecurityDronePresentationResources,
+    /** Optional authored damage envelope, when projectile and movement bodies differ. */
+    projectileCollisionProxy?: THREE.Mesh,
   ) {
     validateConfig(config);
     this.config = config;
@@ -150,6 +153,7 @@ export class SecurityDrone {
     this.world = world;
     this.surfaces = surfaces;
     this.projectiles = projectiles;
+    this.projectileCollisionProxy = projectileCollisionProxy;
     this.baseForward.copy(config.forward).normalize();
     this.scanAxis.copy(config.scanAxis).normalize();
     this.maximumAcquisitionAngleCos = Math.cos(Math.min(
@@ -461,7 +465,7 @@ export class SecurityDrone {
       this.target.position.y - this.muzzlePosition.y,
       this.target.position.z - this.muzzlePosition.z,
     );
-    if (!this.projectiles.spawn(this.id, this.collider, this.muzzlePosition, this.targetDirection)) return;
+    if (!this.projectiles.spawn(this.id, this.projectileCollisionProxy ?? this.collider, this.muzzlePosition, this.targetDirection)) return;
     this.events.emit('fired', { droneId: this.id, slimeId: this.target.slimeId });
   }
 

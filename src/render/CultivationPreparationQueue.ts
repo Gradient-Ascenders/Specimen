@@ -4,13 +4,13 @@ import type { LevelTwoPreviewScene } from '../levels/LevelTwoPreviewScene.ts';
 import type { RenderLayer } from './RenderLayer.ts';
 
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
-interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; }
+interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
 interface Step { label?: string; run: () => void | Promise<unknown>; }
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
 export class CultivationPreparationQueue {
   readonly diagnostics = { constructionMs: 0, initialMs: 0, workMs: 0, textureMs: 0, compileWaitMs: 0, primeMs: 0, maxStepMs: 0,
-    slowSteps: [] as {label: string; ms: number; z: number; dark: boolean}[], completed: 0, total: 0, pending: false, configurations: [] as {z: number; dark: boolean; elapsedMs: number}[] };
+    slowSteps: [] as {label: string; ms: number; z: number; dark: boolean}[], completed: 0, reused: 0, total: 0, pending: false, configurations: [] as {z: number; dark: boolean; elapsedMs: number}[] };
   private readonly roots: THREE.Group[];
   private readonly configurations: Configuration[] = [];
   private readonly textures = new Set<THREE.Texture>();
@@ -22,10 +22,12 @@ export class CultivationPreparationQueue {
   private readonly backgroundSupported: boolean;
   private active: Configuration | undefined;
   private iterator: Generator<Step> | undefined;
+  private readonly suspended = new Map<Configuration, {iterator: Generator<Step>; elapsedMs: number}>();
   private busy = false;
   private disposed = false;
   private failure: unknown;
   private priority: Configuration | undefined;
+  private upcoming: Configuration | undefined;
   private configStarted = 0;
   private lastTick = -1;
   private readonly overlay: HTMLDivElement | undefined;
@@ -65,6 +67,27 @@ export class CultivationPreparationQueue {
   }
   private key(visible: boolean[], dark: boolean): string { return visible.join(',') + ':' + dark; }
 
+  private lightingKey(scene: THREE.Scene): string {
+    const counts = new Map<string, number>();
+    scene.traverseVisible(object => {
+      if (!(object instanceof THREE.Light) || !object.layers.test(this.camera.layers)) return;
+      const key = `${object.type}:${object.castShadow}:${object instanceof THREE.SpotLight && !!object.map}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([key, count]) => `${key}=${count}`).join(',');
+  }
+
+  private complete(config: Configuration, elapsedMs: number): void {
+    config.ready = true; this.diagnostics.completed++;
+    this.diagnostics.configurations.push({z:config.z, dark:config.dark, elapsedMs});
+  }
+
+  /** Prepare the destination during the lift ride, while its shutter is closed. */
+  anticipateLiftExit(): void {
+    this.upcoming = this.configurations.find(config => config.dark &&
+      config.visible.every((visible, i) => visible === (i === 6 || i === 7)));
+  }
+
   /** Called after visibility selection, before any unprepared scene can be rendered. */
   requireCurrent(dark: boolean): boolean {
     const key = this.key(this.roots.map(root => root.visible), dark);
@@ -72,6 +95,23 @@ export class CultivationPreparationQueue {
     if (!config) {
       config = {key, visible:this.roots.map(root => root.visible), dark, z: this.preview.root.worldToLocal(this.layer.cameraRig.camera.position.clone()).z, ready:false};
       this.configurations.push(config); this.diagnostics.total++;
+    }
+    // Culling an already prepared neighboring room does not introduce assets.
+    // If the padded light layout also matches, every remaining program and
+    // buffer is ready. Do not put up another loading screen just to prime it again.
+    if (!config.ready) {
+      const lightingKey = this.lightingKey(this.layer.scene);
+      const covered = this.configurations.some(prepared => prepared.ready && prepared.dark === dark &&
+        prepared.lightingKey === lightingKey && config!.visible.every((visible, i) => !visible || prepared.visible[i]));
+      if (covered) {
+        // A speculative pass may already be queued. Its materials stay retained
+        // until disposal, including any batch whose compileAsync is still pending.
+        if (config === this.active) { this.iterator?.return(undefined); this.iterator = undefined; }
+        this.suspended.get(config)?.iterator.return(undefined);
+        this.suspended.delete(config);
+        config.lightingKey = lightingKey;
+        this.complete(config, 0); this.diagnostics.reused++;
+      }
     }
     this.priority = config.ready ? undefined : config;
     this.diagnostics.pending = !config.ready;
@@ -84,35 +124,69 @@ export class CultivationPreparationQueue {
 
   async prepareInitial(): Promise<void> {
     const started = performance.now();
-    this.priority = this.configurations[0];
-    while (!this.disposed && !this.configurations[0].ready) {
+    await this.prepareConfiguration(this.configurations[0]);
+    this.diagnostics.initialMs = performance.now() - started;
+  }
+
+  /** Pay the expensive maintenance/shadow first draws during level startup,
+   * before a debug jump or lift arrival can expose the in-game loading overlay. */
+  async prepareStartup(): Promise<void> {
+    const started = performance.now();
+    await this.prepareInitial();
+    this.anticipateLiftExit();
+    if (this.upcoming) await this.prepareConfiguration(this.upcoming);
+    this.priority = undefined;
+    this.diagnostics.initialMs = performance.now() - started;
+  }
+
+  private async prepareConfiguration(config: Configuration): Promise<void> {
+    this.priority = config;
+    while (!this.disposed && !config.ready) {
       if (this.failure) throw this.failure;
       this.tick(0, true);
       // RAF yields to painting and the browser's asynchronous shader compiler.
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     }
-    this.diagnostics.initialMs = performance.now() - started;
   }
 
   tick(frameMs: number, foreground = false): void {
     if (this.disposed || this.busy || this.failure) return;
     const now = performance.now();
-    if (!foreground && (!this.backgroundSupported || frameMs > 20 || now - this.lastTick < 15)) return;
+    const approaching = !!this.upcoming && !this.upcoming.ready;
+    // Slow machines still need preparation to advance before the next doorway.
+    // Use sparse, smaller slices instead of starving it below 50 fps.
+    // An imminent destination also progresses without the optional parallel
+    // compiler extension. Otherwise those devices defer the entire exit to arrival.
+    if (!foreground && ((!this.backgroundSupported && !approaching) ||
+      now - this.lastTick < (frameMs > 20 ? approaching ? 50 : 250 : 15))) return;
     this.lastTick = now;
-    const budget = foreground ? 5 : 1.5;
+    const budget = foreground ? 5 : frameMs > 20 ? .5 : 1.5;
     while (performance.now() - now < budget && !this.busy && !this.disposed) {
+      const requested = this.priority && !this.priority.ready ? this.priority :
+        this.upcoming && !this.upcoming.ready ? this.upcoming : undefined;
+      // A debug jump or doorway crossing can request a different room while a
+      // background configuration is underway. Keep that work resumable, but do
+      // not make the loading screen wait for an unrelated room to finish.
+      if (this.iterator && requested && requested !== this.active) {
+        this.suspended.set(this.active!, {iterator:this.iterator, elapsedMs:performance.now()-this.configStarted});
+        this.iterator = undefined;
+      }
       if (!this.iterator) {
-        this.active = this.priority && !this.priority.ready ? this.priority : this.configurations.find(c => !c.ready);
+        this.active = requested ?? this.configurations.find(c => !c.ready);
         if (!this.active) return;
-        this.configStarted = performance.now(); this.iterator = this.steps(this.active);
+        const suspended = this.suspended.get(this.active);
+        this.suspended.delete(this.active);
+        this.configStarted = performance.now() - (suspended?.elapsedMs ?? 0);
+        this.iterator = suspended?.iterator ?? this.steps(this.active);
       }
       const started = performance.now(); let label = 'collect';
       try {
         const step = this.iterator.next();
         if (step.done) {
-          this.active!.ready = true; this.diagnostics.completed++;
-          this.diagnostics.configurations.push({z:this.active!.z, dark:this.active!.dark, elapsedMs:performance.now()-this.configStarted});
-          this.iterator = undefined; continue;
+          this.complete(this.active!, performance.now()-this.configStarted);
+          this.iterator = undefined;
+          if (this.active === requested) return;
+          continue;
         }
         label = step.value.label ?? label;
         const result = step.value.run();
@@ -134,6 +208,8 @@ export class CultivationPreparationQueue {
       foundation ||= o.name === 'cultivation-level-2-foundation';
       const index = this.roots.indexOf(o as THREE.Group);
       if (index !== -1 && !config.visible[index]) return;
+      const room = o.userData.presentationRoom as number | undefined;
+      if (room !== undefined && !config.visible[room === 3 ? 5 : room === 4 ? 6 : 7]) return;
       if (o.name === 'cultivation-shader-light-padding') return;
       if (o.name.startsWith('cultivation-room-3-drone-') && !config.visible[5]) return;
       if (o instanceof THREE.Light) {
@@ -145,12 +221,18 @@ export class CultivationPreparationQueue {
     };
     visit(this.layer.scene);
     const padding = new CultivationLightLayout(scene);
+    config.lightingKey = this.lightingKey(scene);
+    try {
     const seen = new Set<string>();
     const materialCopies = new Map<string, THREE.Material>();
     const programs: Drawable[] = [], primes: Drawable[] = [], shadows: THREE.Mesh[] = [];
     let collected = 0;
     for (const source of drawables) {
       const materials = Array.isArray(source.material) ? source.material : [source.material];
+      // Collider-only originals and replaced art never submit a visible draw.
+      // Their replacement meshes are collected separately; uploading/priming
+      // the hidden originals only lengthens startup and background slices.
+      if (!materials.some(material => material.visible)) continue;
       const geometry = source.geometry;
       const feature = source.type + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
         Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize).sort().join(',') + ':' + Object.keys(geometry.morphAttributes).join(',');
@@ -198,11 +280,16 @@ export class CultivationPreparationQueue {
           const m = material as THREE.MeshStandardMaterial;
           const side = m.shadowSide ?? (m.side === THREE.FrontSide ? THREE.BackSide : m.side === THREE.BackSide ? THREE.FrontSide : THREE.DoubleSide);
           const custom = distance ? source.customDistanceMaterial : source.customDepthMaterial;
-          const key = (custom?.customProgramCacheKey() ?? '') + 'shadow:' + distance + ':' + side + ':' + feature + ':' + m.alphaTest + ':' + (m.displacementMap?.uuid ?? '');
+          const alphaTest = m.alphaToCoverage ? .5 : m.alphaTest;
+          const key = (custom?.customProgramCacheKey() ?? '') + 'shadow:' + distance + ':' + side + ':' + feature + ':' +
+            alphaTest + ':' + (m.map?.channel ?? 'none') + ':' + (m.alphaMap?.channel ?? 'none') + ':' +
+            m.wireframe + ':' + (m.displacementMap?.uuid ?? '');
           if (seen.has(key)) continue; seen.add(key);
           const shadow = (custom ? custom.clone() : distance ? new THREE.MeshDistanceMaterial() : new THREE.MeshDepthMaterial()) as THREE.MeshDepthMaterial | THREE.MeshDistanceMaterial;
           if (custom) { shadow.onBeforeCompile = custom.onBeforeCompile; const key = custom.customProgramCacheKey(); shadow.customProgramCacheKey = () => key; }
-          shadow.side = side; shadow.map = m.map; shadow.alphaMap = m.alphaMap; shadow.alphaTest = m.alphaTest;
+          shadow.side = side; shadow.map = m.map; shadow.alphaMap = m.alphaMap; shadow.alphaTest = alphaTest;
+          // Three also assigns this dynamically on distance materials.
+          Object.assign(shadow, {wireframe: m.wireframe});
           shadow.displacementMap = m.displacementMap; shadow.displacementScale = m.displacementScale; shadow.displacementBias = m.displacementBias;
           this.retained.push(shadow);
           const shadowProxy = source.clone(false) as THREE.Mesh; shadowProxy.material = shadow; shadowProxy.castShadow = false; shadowProxy.frustumCulled = false; shadowProxy.visible = true;
@@ -212,26 +299,37 @@ export class CultivationPreparationQueue {
         }
       }
     }
-    for (const [objects, shadowTarget] of [[programs, false], [shadows, true]] as const) {
-      for (let i = 0; i < objects.length; i += 8) {
-        const group = new THREE.Group(); group.add(...objects.slice(i, i + 8));
+    // CultivationLevelRuntime refreshes the live light state before enabling
+    // shadows. Only that layout is used by gameplay; an extra empty-light pass
+    // would compile and draw an entire unused set of depth/distance programs.
+    const passes = [[programs, false, scene], [shadows, true, scene]] as const;
+    for (const [objects, shadowTarget, targetScene] of passes) {
+      for (let i = 0; i < objects.length;) {
+        // A requested room can submit a larger compiler batch while the loading
+        // screen is already up. Background work keeps its small gameplay slices.
+        const batch = objects.slice(i, i + (this.priority === config ? 32 : 8));
+        i += batch.length;
+        const group = new THREE.Group(); group.add(...batch);
         yield {label: shadowTarget ? 'shadow-compile' : 'compile', run: () => {
           const start = performance.now();
-          return this.withState(config.dark, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, scene)).then(() => {
+          return this.withState(config.dark, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, targetScene)).then(() => {
             this.diagnostics.compileWaitMs += performance.now()-start; group.clear();
           });
         }};
       }
     }
-    for (const [objects, shadowTarget] of [[primes, false], [shadows, true]] as const) for (const proxy of objects) {
-      yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + proxy.name, run: () => {
-        const start = performance.now(); scene.add(proxy);
-        try { this.withState(config.dark, shadowTarget, () => this.layer.renderer.render(scene, this.camera)); }
-        finally { proxy.removeFromParent(); }
+    for (const [objects, shadowTarget, targetScene] of [[primes, false, scene], [shadows, true, scene]] as const) for (let i = 0; i < objects.length;) {
+      const batch = objects.slice(i, i + (this.priority === config ? 16 : 1));
+      i += batch.length;
+      yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + batch[0].name, run: () => {
+        const start = performance.now();
+        targetScene.add(...batch);
+        try { this.withState(config.dark, shadowTarget, () => this.layer.renderer.render(targetScene, this.camera)); }
+        finally { for (const proxy of batch) proxy.removeFromParent(); }
         this.diagnostics.primeMs += performance.now()-start;
       }};
     }
-    padding.dispose(); scene.clear();
+    } finally { padding.dispose(); scene.clear(); }
   }
 
   /** State is restored synchronously, before compileAsync yields to gameplay. */
@@ -251,6 +349,8 @@ export class CultivationPreparationQueue {
   }
   dispose(): void {
     this.disposed = true; this.iterator?.return(undefined); this.iterator = undefined;
+    for (const work of this.suspended.values()) work.iterator.return(undefined);
+    this.suspended.clear();
     this.overlay?.remove();
     if (!this.busy) this.releaseResources();
   }

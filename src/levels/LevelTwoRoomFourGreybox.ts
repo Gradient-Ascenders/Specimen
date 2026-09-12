@@ -18,7 +18,7 @@ export class LevelTwoRoomFourGreybox {
   readonly boardingWall: THREE.Mesh;
   readonly boardingGuard: THREE.Mesh;
   readonly arrivalWall: THREE.Mesh;
-  readonly cableRoots: THREE.Group[] = [];
+  readonly droneRoots: THREE.Group[] = [];
   readonly solubleTargetMeshes: THREE.Mesh[] = [];
   readonly shield: THREE.Mesh;
   readonly movingEntranceMeshes: THREE.Mesh[] = [];
@@ -55,9 +55,6 @@ export class LevelTwoRoomFourGreybox {
     box('destination-vent-header', [2.2, 41.6, .4], [0, 23.2, 15], m.duct);
     this.arrivalWall = box('destination-vent-shutter', [2.2, 2.2, .4], [0, 1.3, 15.025], m.duct);
     box('winch-roof', [10, .4, 10], [0, 44.4, 10], m.duct);
-    for (const [i, [x, z]] of ROOM_FOUR_ANCHORS.entries()) {
-      b.addVisualBox({ name: `room-4-roof-winch-${i}`, size: [.9, .5, .9], position: [x, 44.05, z], material: m.support });
-    }
     for (const x of [-4.9, 4.9]) box(`rail-${x}`, [.18, 1.2, 10], [x, .8, 10], m.platform);
     b.addVisualBox({ name: 'room-4-underdeck-motor', size: [3, 1.2, 3], position: [0, -1.2, 10], material: m.containment });
     box('boarding-ceiling', [10, .3, 5], [0, 6.5, 2.5]);
@@ -79,7 +76,7 @@ export class LevelTwoRoomFourGreybox {
           position: [x, 0, 10], material: m.platform });
         group.add(beam);
         const pipe = b.addVisualBox({ name: `room-4-shaft-pipe-${i}-${x}`, size: [.2, 7.8, .2],
-          position: [x, 3.9, 13.8], material: m.support });
+          position: [x, 3.9, 13.65], material: m.support });
         group.add(pipe);
       }
       this.modules.push(group); this.root.add(group);
@@ -88,13 +85,14 @@ export class LevelTwoRoomFourGreybox {
       const group = new THREE.Group(); group.name = `room-4-drone-anchor-${i + 1}`;
       const [x, z] = ROOM_FOUR_ANCHORS[ROOM_FOUR_SPAWNS[i].anchor];
       group.position.set(x, 30, z); group.visible = false;
-      const cable = b.addVisualBox({ name: `room-4-cable-${i + 1}`, size: [.28, 6, .28],
-        position: [0, 3.5, 0], material: m.cable, textureRole: 'soluble-cable' });
-      Object.assign(cable.userData, { roomId: 4, soluble: true, solubleId: cable.name,
-        dissolveDurationSeconds: .8, dissolveCollisionDisableProgress: .95,
-        textureRole: 'soluble-cable' });
-      group.add(cable); this.root.add(group);
-      this.cableRoots.push(group); this.solubleTargetMeshes.push(cable);
+      // One damage envelope follows the free-flying runtime drone.
+      const body = b.addVisualBox({ name: `room-4-drone-target-${i + 1}`, size: [2.05, 1.85, 1.85],
+        position: [0, -.15, 0], material: new THREE.MeshStandardMaterial({ visible: false }) });
+      Object.assign(body.userData, { roomId: 4, soluble: true, solubleId: body.name,
+        authoringRole: 'acid-vulnerable-lift-drone', dissolveDynamicCollider: true,
+        dissolveDurationSeconds: .8, dissolveCollisionDisableProgress: .95 });
+      group.add(body); this.root.add(group);
+      this.droneRoots.push(group); this.solubleTargetMeshes.push(body);
     }
     b.addLight('room-4-lift-light', [0, 5, 10], 0xc8eaff, 65, 18);
     b.addLight('room-4-boarding-light', [0, 4, 2], 0xc8eaff, 22, 10);
@@ -136,17 +134,7 @@ export class LevelTwoRoomFourGreybox {
     this.arrivalWall.position.y = 1.3;
     this.shield.position.x = -11;
     for (let i = 0; i < this.modules.length; i++) this.modules[i].position.y = i * 8 - 8;
-    for (const root of this.cableRoots) { root.visible = false; root.position.y = 30; }
-    this.syncCables();
-  }
-  syncCables(): void {
-    for (let i = 0; i < this.cableRoots.length; i++) {
-      const bottom = .55;
-      const length = 44 - this.cableRoots[i].position.y - bottom;
-      const cable = this.solubleTargetMeshes[i];
-      cable.scale.y = length / 6;
-      cable.position.y = bottom + length / 2;
-    }
+    for (const root of this.droneRoots) { root.visible = false; root.position.y = 30; }
   }
   dispose(): void { this.entrance.dispose(); this.builder.dispose(); }
 }

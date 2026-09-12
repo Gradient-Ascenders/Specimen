@@ -4,12 +4,14 @@ import * as THREE from 'three';
 import { LevelTwoRoomFourGreybox } from '../src/levels/LevelTwoRoomFourGreybox.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 import { CultivationChamberMaterials } from '../src/render/environment/cultivation/CultivationChamberMaterials.ts';
+import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationElevatorArt } from '../src/render/environment/cultivation/CultivationElevatorArt.ts';
 
 test('elevator art preserves collider geometry and the full descent/reset transforms', () => {
   const baseline = new LevelTwoRoomFourGreybox(), room = new LevelTwoRoomFourGreybox();
   const lab = new CultivationLabMaterials(), chamber = new CultivationChamberMaterials();
-  const art = new CultivationElevatorArt(room, lab, chamber);
+  const contamination = new CultivationContaminationArt(lab);
+  const art = new CultivationElevatorArt(room, lab, chamber, contamination);
   const occupants = [{ id: 'bob', position: new THREE.Vector3(-2, .66, 9), radiusMetres: .46 },
     { id: 'goop', position: new THREE.Vector3(2, .66, 9), radiusMetres: .46 }];
   const check = () => {
@@ -47,5 +49,5 @@ test('elevator art preserves collider geometry and the full descent/reset transf
     art.dispose(); art.dispose();
     assert.equal(geometryDisposals, 1);
     assert.equal(room.root.getObjectByName(first.name), undefined);
-  } finally { art.dispose(); lab.dispose(); chamber.dispose(); room.dispose(); baseline.dispose(); }
+  } finally { art.dispose(); contamination.dispose(); lab.dispose(); chamber.dispose(); room.dispose(); baseline.dispose(); }
 });

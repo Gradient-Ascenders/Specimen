@@ -29,7 +29,7 @@ export class CultivationRoomFourController {
   get objective(): string {
     if (this.model.state === 'complete') return 'Enter Room 5';
     if (this.model.state === 'arrival') return 'Lower sector reached';
-    if (this.model.elapsed >= 15) return 'Dissolve the support cables';
+    if (this.model.elapsed >= 15) return 'Shoot the drones with Goop';
     return this.running ? 'Descend to the lower sector' : 'Get Bob and Goop onto the elevator';
   }
   update(dt: number, bobPresent: boolean, goopPresent: boolean): void {

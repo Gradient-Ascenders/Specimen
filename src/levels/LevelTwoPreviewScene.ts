@@ -1,3 +1,5 @@
+import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
+import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../render/environment/cultivation/CultivationMaintenanceArt.ts';
 import { CultivationElevatorArt } from '../render/environment/cultivation/CultivationElevatorArt.ts';
 import { AcidLiquidInteractions, type AcidContactBody } from '../render/environment/containment/AcidLiquidInteractions.ts';
@@ -100,6 +102,7 @@ export class LevelTwoPreviewScene {
   readonly root = new THREE.Group();
   readonly acidInteractions: readonly AcidLiquidInteractions[];
   readonly labArt = new CultivationLabMaterials();
+  readonly contaminationArt = new CultivationContaminationArt(this.labArt);
   readonly coverArt = new CultivationCoverEquipmentArt(this.labArt.platform);
   readonly chamberArt = new CultivationChamberMaterials();
   readonly roomOne: LevelTwoRoomOneGreybox;
@@ -109,6 +112,7 @@ export class LevelTwoPreviewScene {
   readonly roomFive: LevelTwoRoomFiveGreybox;
   readonly maintenanceArt: CultivationMaintenanceArt;
   readonly elevatorArt: CultivationElevatorArt;
+  readonly surfaceCleanup: CultivationSurfaceCleanup;
   readonly roomOneToTwoPassage = new LevelTwoLabPassageGreybox({
     id: 'cultivation-room-1-to-2-lab-passage',
     fromRoomId: 1,
@@ -160,14 +164,14 @@ export class LevelTwoPreviewScene {
         'cultivation-room-3-above-bob-vent',
         'cultivation-room-3-bob-vent-west-jamb',
         'cultivation-room-3-bob-vent-east-jamb',
-      ], new Map([...this.chamberArt.overrides(builder, this.labArt), ...this.coverArt.overrides()]));
+      ], new Map([...this.contaminationArt.overrides(builder), ...this.chamberArt.overrides(builder, this.labArt), ...this.coverArt.overrides()]));
       this.coverArt.build(builder);
     });
     this.labArt.addFixtures(this.roomThree.root, 48, 30, 72, {
       fillHeightMetres: 16, fillPositionsZ: [18, 54],
     });
     this.chamberArt.addBoundary(this.roomThree.root);
-    this.labArt.dress(this.roomOne.builder);
+    this.labArt.dress(this.roomOne.builder, [], this.contaminationArt.overrides(this.roomOne.builder));
     this.labArt.dress(this.roomOneToTwoPassage.builder);
     this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
     this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28);
@@ -175,7 +179,7 @@ export class LevelTwoPreviewScene {
       'cultivation-room-2-above-bob-vent',
       'cultivation-room-2-bob-vent-west-jamb',
       'cultivation-room-2-bob-vent-east-jamb',
-    ]);
+    ], this.contaminationArt.overrides(this.roomTwo.builder));
     this.labArt.dress(this.roomTwoToThreeGoopPassage.builder);
     this.labArt.dress(this.roomTwoToThreeBobAirDuct.builder);
     this.labArt.addFixtures(this.roomTwo.root, 38, 24, 45, {
@@ -184,9 +188,12 @@ export class LevelTwoPreviewScene {
       fillPositionsZ: [12, 34],
     });
     this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28);
+    this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
+    this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning);
+    this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);
     this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure);
-    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt);
-    this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt);
+    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
+    this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt);
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;
     this.roomTwo.root.position.z = LEVEL_TWO_ROOM_TWO_OFFSET_Z;
@@ -210,6 +217,7 @@ export class LevelTwoPreviewScene {
       this.roomFour.root,
       this.roomFive.root,
     );
+    this.surfaceCleanup = new CultivationSurfaceCleanup(this);
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),
@@ -373,9 +381,11 @@ export class LevelTwoPreviewScene {
   }
 
   dispose(): void {
+    this.surfaceCleanup.dispose();
     this.maintenanceArt.dispose();
     this.elevatorArt.dispose();
     this.labArt.dispose();
+    this.contaminationArt.dispose();
     this.roomFive.dispose();
     this.roomFour.dispose();
     this.chamberArt.dispose();

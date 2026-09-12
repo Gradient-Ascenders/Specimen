@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mapCultivationPlatformWear } from './CultivationPlatformWear.ts';
 
 /** Level 1 platform silhouette, attached to the existing collider for moving decks. */
 export class CultivationPlatformArt {
@@ -21,6 +22,7 @@ export class CultivationPlatformArt {
     const box = (material: THREE.Material, size: [number, number, number], position: [number, number, number], radius = 0.025) => {
       const geometry = new RoundedBoxGeometry(...size, 2, Math.min(radius, ...size.map(n => n / 3)));
       geometry.translate(...position);
+      if (material === this.tread) mapCultivationPlatformWear(geometry, platform.name);
       const group = parts.get(material) ?? []; group.push(geometry); parts.set(material, group);
     };
     const top = h / 2;
@@ -56,6 +58,7 @@ export class CultivationPlatformArt {
     root.userData.presentationOnly = true;
     for (const [material, scale, offset] of [[this.tread, .32, 0], [this.frame, .36, -.16]] as const) {
       const geometry = platform.geometry.clone(); geometry.scale(1, scale, 1); geometry.translate(0, offset, 0);
+      if (material === this.tread) mapCultivationPlatformWear(geometry, platform.name);
       root.add(new THREE.Mesh(geometry, material));
     }
     for (const x of [-.6, .6]) {

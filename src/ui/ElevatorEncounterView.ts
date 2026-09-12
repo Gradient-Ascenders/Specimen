@@ -16,7 +16,7 @@ export class ElevatorEncounterView {
     const text = m.elapsed === 0
       ? `SPECIMEN COUNT\nBOB: ${m.bobPresent ? 'PRESENT' : 'REQUIRED'}  GOOP: ${m.goopPresent ? 'PRESENT' : 'REQUIRED'}\n${controller.boardingConfirmed ? 'DESCENT AUTHORIZED' : 'Board together'}`
       : m.state === 'complete' ? 'ACCESS GRANTED — ENTER ROOM 5'
-      : `LOWER SECTOR  ${Math.floor(controller.progress * 100)}%\n${m.state === 'arrival' ? 'SECURING ARRIVAL' : m.elapsed < 4 ? 'DESCEND TO LOWER SECTOR' : m.elapsed >= 15 && m.elapsed < 20 ? 'DISSOLVE THE SUPPORT CABLES' : ' '}`;
+      : `LOWER SECTOR  ${Math.floor(controller.progress * 100)}%\n${m.state === 'arrival' ? 'SECURING ARRIVAL' : m.elapsed < 4 ? 'DESCEND TO LOWER SECTOR' : m.elapsed >= 15 && m.elapsed < 20 ? 'SHOOT THE DRONES WITH GOOP' : ' '}`;
     if (text !== this.lastText) { this.lastText = text; this.element.textContent = text; }
   }
   dispose(): void { this.element.remove(); }

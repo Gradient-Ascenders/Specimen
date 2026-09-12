@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import * as THREE from 'three';
 
+import { SecurityDronePresentationResources } from '../src/render/hazards/SecurityDronePresentation.ts';
 import { SecurityDroneCombatTarget } from '../src/combat/CombatTargetAdapters.ts';
 import { DroneProjectileSystem } from '../src/hazards/DroneProjectileSystem.ts';
 import { SecurityDrone, type SecurityDroneConfig } from '../src/hazards/SecurityDrone.ts';
@@ -197,43 +198,47 @@ test('tracking cannot ratchet a target beyond the authored scan envelope', () =>
   damage.dispose();
 });
 
-test('laboratory sentry presentation tracks the same direction used to fire', () => {
-  const world = new CollisionWorld();
-  const surfaces = new SurfaceRegistry();
-  const damage = new SlimeDamageSystem();
-  const projectiles = new DroneProjectileSystem(world, damage);
-  const drone = new SecurityDrone(config(), world, surfaces, projectiles);
-  const target = {
-    slimeId: 'bob' as const,
-    position: new THREE.Vector3(1, 0, 5),
-  };
+for (const industrial of [false, true]) {
+  test(`sentry presentation tracks firing direction (industrial: ${industrial})`, () => {
+    const world = new CollisionWorld();
+    const surfaces = new SurfaceRegistry();
+    const damage = new SlimeDamageSystem();
+    const projectiles = new DroneProjectileSystem(world, damage);
+    const resources = new SecurityDronePresentationResources(undefined, industrial);
+    const drone = new SecurityDrone(config(), world, surfaces, projectiles, resources);
+    const target = {
+      slimeId: 'bob' as const,
+      position: new THREE.Vector3(1, 0, 5),
+    };
 
-  drone.update(0.1, [target]);
-  drone.root.updateWorldMatrix(true, true);
-  const headPosition = drone.presentation.aimHead.getWorldPosition(new THREE.Vector3());
-  const eyeDirection = drone.frontIndicator
-    .getWorldPosition(new THREE.Vector3())
-    .sub(headPosition)
-    .normalize();
-  const trackedDirection = new THREE.Vector3(
-    drone.readModel.scanDirection.x,
-    drone.readModel.scanDirection.y,
-    drone.readModel.scanDirection.z,
-  ).normalize();
-  const presentationNames: string[] = [];
-  drone.presentation.root.traverse((object) => presentationNames.push(object.name));
+    drone.update(0.1, [target]);
+    drone.root.updateWorldMatrix(true, true);
+    const headPosition = drone.presentation.aimHead.getWorldPosition(new THREE.Vector3());
+    const eyeDirection = drone.frontIndicator
+      .getWorldPosition(new THREE.Vector3())
+      .sub(headPosition)
+      .normalize();
+    const trackedDirection = new THREE.Vector3(
+      drone.readModel.scanDirection.x,
+      drone.readModel.scanDirection.y,
+      drone.readModel.scanDirection.z,
+    ).normalize();
+    const presentationNames: string[] = [];
+    drone.presentation.root.traverse((object) => presentationNames.push(object.name));
 
-  assert.equal(drone.collider.material.visible, false);
-  assert.ok(presentationNames.some((name) => name.endsWith('-armoured-shell')));
-  assert.ok(presentationNames.some((name) => name.endsWith('-left-barrel')));
-  assert.ok(presentationNames.some((name) => name.endsWith('-right-barrel')));
-  assert.ok(eyeDirection.dot(trackedDirection) > 0.999);
+    assert.equal(drone.collider.material.visible, false);
+    assert.ok(presentationNames.some((name) => name.endsWith('-armoured-shell')));
+    assert.ok(presentationNames.some((name) => name.endsWith('-left-barrel')));
+    assert.ok(presentationNames.some((name) => name.endsWith('-right-barrel')));
+    assert.ok(eyeDirection.dot(trackedDirection) > 0.999);
 
-  drone.dispose();
-  projectiles.dispose();
-  damage.dispose();
-  assert.equal(drone.root.children.length, 0);
-});
+    drone.dispose();
+    resources.dispose();
+    projectiles.dispose();
+    damage.dispose();
+    assert.equal(drone.root.children.length, 0);
+  });
+}
 
 
 test('opt-in Specimen combat adapter disables a real SecurityDrone, clears shots, removes collision, and resets in place', () => {

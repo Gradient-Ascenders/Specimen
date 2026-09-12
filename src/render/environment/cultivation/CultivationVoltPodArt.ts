@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelTwoRoomFiveGreybox } from '../../../levels/LevelTwoRoomFiveGreybox.ts';
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
+import { mapCultivationPlatformWear } from './CultivationPlatformWear.ts';
 
 /** Level 1 containment vocabulary, fitted to the existing moving pod and pane colliders. */
 export class CultivationVoltPodArt {
@@ -18,6 +19,7 @@ export class CultivationVoltPodArt {
       const parts = new Map<THREE.Material, THREE.BufferGeometry[]>();
       draw((material, size, at) => {
         const g = new RoundedBoxGeometry(...size, 1, Math.min(.06, ...size.map(n => n / 3))); g.translate(...at);
+        if (material === lab.platform) mapCultivationPlatformWear(g, parent.name);
         const list = parts.get(material) ?? []; list.push(g); parts.set(material, list);
       });
       const root = new THREE.Group(); root.name = 'room-5-level-one-containment-art'; root.userData.presentationOnly = true;

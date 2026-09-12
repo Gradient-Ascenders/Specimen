@@ -39,22 +39,32 @@ Target acquisition begins at 12 metres; firing is gated until
 8 metres. Unresolved drones creep toward a critical five-metre height. Shots
 travel at 24 metres/second and deal 15 damage. Acquisition warns for 0.8 seconds;
 volleys repeat every 0.9 seconds. Drones are 50% larger than the initial version.
-Their soluble cables stretch from the top of the drone to roof winches at 44 metres,
-updating collision and appearance together. At most eight approaching/firing drones are
+Their scuffed industrial shells have split armor plates, recessed sensors, vented
+gun pods and short barrels. They fly down without cables or ceiling brackets.
+Two small booster plumes flicker during descent and hovering, with a slight visual
+bob. Shared low-poly geometry and an unlit material provide the effect without
+particle simulation, textures, extra lights, or shadow passes. At most eight approaching/firing drones are
 admitted; overdue spawns wait for capacity. Target preference follows the active
 slime with a 1.5-second retarget cooldown. Both bodies remain damageable.
 
-One acid hit starts the existing 0.8-second automatic dissolve and immediately
-disables that drone. Its solid wreck falls onto the deck or an earlier wreck,
-remains jumpable after arrival, and clears on restart. A swept falling-body hit
+One acid hit on the drone body starts a 0.8-second corrosion reaction and immediately
+disables that drone. The sensor flashes acid green and the boosters cut out before
+the drone falls. Goop's normal candidate and selected-target highlight is shared
+with the visible armor and engine housings, including its aim-release/reset fade.
+The body owns the acid hitbox and crosshair target; its physical collider remains
+separate, and outgoing shots ignore the drone's own damage envelope. The wreck tips as it falls, then breaks into six small metal
+fragments and a short spark burst on deck impact. Its collider is removed at impact;
+the fragments are visual only and clear within 0.9 seconds, so successive waves
+cannot leave permanent piles or invisible obstacles. A swept falling-body hit
 ejects Bob or Goop fully clear with the dropping-platform 24m/s sideways and
-12m/s upward knockback. Drone bodies are acid-resistant. Arrival clears all
-remaining live threats without requiring every cable to be destroyed.
+12m/s upward knockback. Arrival clears all remaining live threats without requiring
+every drone to be destroyed. Wrecks already
+falling finish their impact and cleanup through arrival.
 Centre-front wrecks drift sideways while falling, keeping the vent approach
-clear. Reset restores their original winch coordinates as well as their height.
+clear. Reset restores their original flight lanes and height.
 
 Retry resets both bodies to the boarding checkpoint, cancels burns/projectiles,
-restores all cables, hides pending targets, restores health, and resets the clock
+restores the drones, hides pending targets and boosters, restores health, and resets the clock
 and doors. Neither Room 3 nor Room 4 advances a single slime's checkpoint ahead
 of the other. Bob arriving alone in Room 3 still recovers at Room 2's entrance,
 where he can return to the button and let Goop through.

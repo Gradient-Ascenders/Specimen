@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { CultivationRoomFourController, ROOM_FOUR_SPAWNS } from '../src/levels/CultivationRoomFourController.ts';
 import { LevelTwoRoomFourGreybox } from '../src/levels/LevelTwoRoomFourGreybox.ts';
 import { ElevatorDroneEncounter } from '../src/hazards/ElevatorDroneEncounter.ts';
-import { CollisionWorld, ColliderTransformMode, CollisionHit } from '../src/physics/CollisionWorld.ts';
+import { CollisionWorld, ColliderTransformMode, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { createAuthoredDissolveTarget } from '../src/abilities/DissolveTarget.ts';
@@ -58,7 +58,7 @@ function fixture() {
     dispose() { encounter.dispose(); dissolve.dispose(); for (const t of targets) t.dispose(); room.dispose(); } };
 }
 
-test('all 12 scheduled cables spawn once, dissolve from one hit, and reset without leaks', () => {
+test('all 12 scheduled drones spawn once, corrode from one hit, and reset without leaks', () => {
   const f = fixture();
   try {
     const baseline = f.world.colliderCount;
@@ -77,6 +77,8 @@ test('all 12 scheduled cables spawn once, dissolve from one hit, and reset witho
         }
       }
       assert.equal(next, 12); assert.ok(f.targets.every(t => t.completed));
+      assert.ok(f.room.droneRoots.every(root => !root.visible), 'all wrecks clear between waves');
+      assert.equal(f.room.root.getObjectByName('lift-drone-impact-debris')!.visible, false);
       assert.equal(f.encounter.projectiles.liveCount, 0);
       assert.equal(f.room.controller.readModel.state, 'complete');
       f.reset(); assert.equal(f.world.colliderCount, baseline);
@@ -89,7 +91,7 @@ test('uncleared drones overlap waves with a bounded cap and arrival removes ever
   const f = fixture();
   try {
     for (let i = 0; i < 3000; i++) f.step();
-    const active = f.room.cableRoots.filter(root => root.visible);
+    const active = f.room.droneRoots.filter(root => root.visible);
     assert.equal(active.length, 8);
     assert.ok(f.encounter.diagnostics().includes('pending'));
     for (let i = 0; i < 1000; i++) f.step();
@@ -97,18 +99,19 @@ test('uncleared drones overlap waves with a bounded cap and arrival removes ever
     assert.equal(f.encounter.projectiles.liveCount, 0);
     assert.ok(f.targets.every(t => !t.mesh.visible));
     f.reset();
-    // Hidden, unspawned cables must not intercept a shot through their authored location.
+    // Hidden, unspawned drones must not intercept a shot through their authored location.
     assert.equal(f.world.sweepSphere(new THREE.Vector3(0, 33, 10), new THREE.Vector3(0, 0, 4), .05, new CollisionHit()), false);
   } finally { f.dispose(); }
 });
 
-test('a real upward acid projectile can intercept and sever the descending cable', () => {
+test('a real upward acid projectile hits the drone body and starts its destruction', () => {
   const f = fixture();
-  const aimPoint = new THREE.Vector3(0, 28, 13);
+  const aimPoint = new THREE.Vector3();
   const acid = new AcidProjectileSystem({
     slimeManager: { activeSlimeId: 'goop', activeBody: f.goop, canActiveUseAbility: () => true },
     collisionWorld: f.world, dissolveSystem: f.dissolve,
     aimRayProvider: { copyAimRay(origin, direction) {
+      f.targets[0].copyWorldBoundsCenter(aimPoint);
       origin.copy(f.goop.position); direction.copy(aimPoint).sub(origin).normalize();
     } },
     isTargetEnabled: target => target.mesh.parent?.visible === true,
@@ -116,7 +119,7 @@ test('a real upward acid projectile can intercept and sever the descending cable
   const impacts: unknown[] = [];
   acid.events.on('worldImpact', event => impacts.push(event));
   try {
-    while (f.room.controller.readModel.elapsed < 16) f.step();
+    while (f.room.controller.readModel.elapsed < 19.2) f.step();
     for (let i = 0; i < 180; i++) {
       acid.update(1 / 60, { gameplayInputEnabled: true, pointerLocked: true, aimHeld: true, firePressed: i === 0 });
       f.step();
@@ -124,26 +127,90 @@ test('a real upward acid projectile can intercept and sever the descending cable
     assert.equal(acid.getDiagnostics().firedCount, 1);
     assert.equal(acid.getDiagnostics().solubleImpactCount, 1, JSON.stringify({ diagnostics: acid.getDiagnostics(), impacts }));
     assert.equal(f.targets[0].completed, true);
+    assert.equal(f.room.droneRoots[0].getObjectByName('lift-drone-booster-flames')!.visible, false);
   } finally { acid.dispose(); f.dispose(); }
 });
 
-test('cables stay connected to their roof winches throughout descent and reset', () => {
+test('live drones fire out of their damage envelopes and can still hit the player', () => {
+  const f = fixture();
+  const selfHits: string[] = [], slimeHits: string[] = [];
+  f.encounter.projectiles.events.on('worldImpact', ({ ownerDroneId, objectName }) => {
+    if (objectName === ownerDroneId.replace('drone-', 'drone-target-')) selfHits.push(objectName);
+  });
+  f.encounter.projectiles.events.on('slimeImpact', ({ slimeId }) => slimeHits.push(slimeId));
+  try {
+    while (f.room.controller.readModel.elapsed < 24) f.step();
+    assert.deepEqual(selfHits, []);
+    assert.ok(slimeHits.includes('goop'), 'changing acid targets must not disable enemy fire');
+  } finally { f.dispose(); }
+});
+
+test('body aiming ignores empty space above the drone and does not block the drone own sightline', () => {
   const f = fixture();
   try {
-    const bounds = new THREE.Box3();
-    for (let i = 0; i < 1300; i++) {
-      f.step();
-      if (i % 60 !== 0) continue;
-      for (let n = 0; n < f.targets.length; n++) {
-        f.targets[n].mesh.updateWorldMatrix(true, false);
-        bounds.copy(f.targets[n].mesh.geometry.boundingBox!).applyMatrix4(f.targets[n].mesh.matrixWorld);
-        assert.ok(Math.abs(bounds.max.y - 44) < 1e-6);
-        assert.ok(Math.abs(bounds.min.y - (f.room.cableRoots[n].position.y + .55)) < 1e-6);
-      }
-    }
+    while (f.room.controller.readModel.elapsed < 19.2) f.step();
+    const root = f.room.droneRoots[0], hit = new CollisionHit();
+    const start = new THREE.Vector3(root.position.x, root.position.y + 3, root.position.z - 1.2);
+    assert.equal(f.world.sweepSphere(start, new THREE.Vector3(0, 0, 2.4), .04, hit,
+      CollisionLayer.Projectile), false, 'shooting through the tether cannot disable the drone');
+    start.y = root.position.y;
+    assert.ok(f.world.sweepSphere(start, new THREE.Vector3(0, 0, 2.4), .04, hit, CollisionLayer.Projectile));
+    assert.equal(hit.object, f.targets[0].mesh);
+    assert.ok(f.world.sweepSphere(start, new THREE.Vector3(0, 0, 2.4), .04, hit, CollisionLayer.CameraObstruction));
+    assert.equal(hit.object, f.targets[0].mesh, 'crosshair resolves the body target');
+    const dronePosition = new THREE.Vector3(root.position.x, root.position.y, root.position.z);
+    assert.equal(f.world.sweepSphere(dronePosition, new THREE.Vector3(0, -3, 0), .001, hit,
+      CollisionLayer.LineOfSight, root.getObjectByName('room-4-drone-1-body') as THREE.Mesh), false);
     f.reset();
-    assert.equal(f.room.cableRoots[0].position.y, 30);
-    assert.equal(f.room.root.getObjectByName('room-4-arrival-proximity-shutter'), undefined);
+    assert.ok(f.targets.every(target => !target.mesh.visible));
+    assert.ok(f.room.droneRoots.every(root => !root.getObjectByName('lift-drone-booster-flames')!.visible));
+  } finally { f.dispose(); }
+});
+
+test('visible drone armor shares its own target highlight and reset without dissolving the wreck', () => {
+  const f = fixture();
+  let disposals = 0;
+  try {
+    const armor = f.room.droneRoots[0].getObjectByName('room-4-drone-1-armoured-shell') as THREE.Mesh;
+    const other = f.room.droneRoots[1].getObjectByName('room-4-drone-2-armoured-shell') as THREE.Mesh;
+    assert.notEqual(armor.material, other.material, 'selection cannot leak between drones');
+    const compile = (mesh: THREE.Mesh) => {
+      const shader = { uniforms: {} as Record<string, THREE.IUniform>,
+        vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
+      (mesh.material as THREE.Material).onBeforeCompile(shader, null as never);
+      return shader.uniforms;
+    };
+    const uniforms = compile(armor), otherUniforms = compile(other);
+    f.targets[0].setCorrosionPresentation(.34, 1, .5, 2);
+    assert.equal(uniforms.uAimHighlightStrength.value, .34);
+    assert.equal(uniforms.uAimSelectedStrength.value, 1);
+    assert.equal(uniforms.uBurnHighlightStrength.value, .5);
+    assert.equal(otherUniforms.uAimHighlightStrength.value, 0);
+    f.targets[0].advance(.8);
+    assert.equal(uniforms.uDissolveAmount.value, 0, 'wreck remains visible until impact');
+    f.reset();
+    assert.equal(uniforms.uAimHighlightStrength.value, 0);
+    assert.equal(uniforms.uAimSelectedStrength.value, 0);
+    (armor.material as THREE.Material).addEventListener('dispose', () => disposals++);
+  } finally { f.dispose(); }
+  assert.equal(disposals, 1);
+});
+
+test('flying drones have no suspension geometry and boosters stop when disabled or reset', () => {
+  const f = fixture();
+  try {
+    assert.equal(f.room.root.getObjectByName('room-4-cable-1'), undefined);
+    assert.equal(f.room.root.getObjectByName('room-4-roof-winch-0'), undefined);
+    while (f.room.controller.readModel.elapsed < 16) f.step();
+    const root = f.room.droneRoots[0];
+    const flames = root.getObjectByName('lift-drone-booster-flames')!;
+    assert.equal(flames.visible, true);
+    f.dissolve.startBurn(f.targets[0]); f.step();
+    assert.equal(flames.visible, false);
+    f.reset();
+    assert.equal(flames.visible, false);
+    assert.equal(root.position.y, 30);
+    assert.equal(root.getObjectByName('room-4-drone-1-presentation')!.position.y, 0);
   } finally { f.dispose(); }
 });
 
@@ -154,7 +221,7 @@ test('each later wave descends faster while the first keeps its original speed',
       f.room.controller.update(1.5, true, true);
       f.room.controller.update(ROOM_FOUR_SPAWNS[index].time, true, true);
       f.encounter.update(.25, 'goop');
-      assert.equal(f.room.cableRoots[index].position.y, 30 - speed * .25);
+      assert.equal(f.room.droneRoots[index].position.y, 30 - speed * .25);
     } finally { f.dispose(); }
   }
 });
@@ -186,38 +253,65 @@ test('the entrance stays unlocked and scrolls continuously out of view during de
   } finally { room.dispose(); }
 });
 
-test('severed drones stack on the lift, eject both bodies, remain jumpable at arrival and clear on reset', () => {
+test('severed drones eject struck bodies, break up on impact and leave no stacked or invisible obstacles', () => {
   const f = fixture();
   try {
     while (f.room.controller.readModel.elapsed < 16) f.step();
-    const anchor = f.room.cableRoots[0];
+    const anchor = f.room.droneRoots[0];
     f.goop.teleport(new THREE.Vector3(2.8, .7, anchor.position.z));
     f.bob.teleport(new THREE.Vector3(2.8, .7, anchor.position.z));
     f.dissolve.startBurn(f.targets[0]);
-    for (let i = 0; i < 180; i++) f.step();
-    assert.ok(f.encounter.diagnostics().includes('1: settled'));
+    for (let i = 0; i < 180 && !f.encounter.diagnostics().startsWith('1: gone'); i++) f.step();
+    assert.ok(f.encounter.diagnostics().startsWith('1: gone'));
+    assert.equal(anchor.visible, false);
+    const debris = f.room.root.getObjectByName('lift-drone-impact-debris')!;
+    assert.equal(debris.visible, true, 'impact is visible before cleanup');
     for (const body of [f.bob, f.goop]) {
       assert.ok(Math.hypot(body.velocity.x, body.velocity.z) >= 24 - 1e-8);
       assert.ok(body.velocity.y >= 12 - 1e-8);
       assert.ok(Math.abs(body.position.x - anchor.position.x) > .9 + body.radiusMetres ||
         Math.abs(body.position.z - anchor.position.z) > .9 + body.radiusMetres);
     }
-    // Put the next scheduled wreck above the first: its bottom must land on the first's top.
-    f.room.cableRoots[1].position.x = anchor.position.x;
-    f.room.cableRoots[1].position.z = anchor.position.z;
+    // Visibility alone must not be masking a registered wreck collider.
+    const count = f.world.colliderCount;
+    const collider = anchor.getObjectByName('room-4-drone-1-body') as THREE.Mesh;
+    f.world.unregister(collider);
+    assert.equal(f.world.colliderCount, count);
+    for (let i = 0; i < 60; i++) f.step();
+    assert.equal(debris.visible, false, 'fragments clear within a second');
+
+    f.room.droneRoots[1].position.x = anchor.position.x;
+    f.room.droneRoots[1].position.z = anchor.position.z;
     f.dissolve.startBurn(f.targets[1]);
     for (let i = 0; i < 180; i++) f.step();
+    assert.ok(f.encounter.diagnostics().split('\n')[1].startsWith('2: gone'));
     const hit = new CollisionHit();
     assert.ok(f.world.sweepSphere(new THREE.Vector3(anchor.position.x, 4, anchor.position.z),
       new THREE.Vector3(0, -4, 0), .1, hit));
-    assert.ok(hit.object?.name.includes('room-4-drone-2'), hit.object?.name);
-    for (let i = 0; i < 3000; i++) f.step();
-    assert.ok(f.encounter.diagnostics().includes('2: settled'));
-    assert.ok(f.world.sweepSphere(new THREE.Vector3(anchor.position.x, 4, anchor.position.z),
-      new THREE.Vector3(0, -4, 0), .1, hit));
-    assert.ok(hit.object?.name.includes('room-4-drone-2'));
+    assert.ok(!hit.object?.name.includes('drone'), hit.object?.name);
     f.reset();
-    assert.ok(!f.encounter.diagnostics().includes('settled'));
+    assert.equal(debris.visible, false);
+    const presentation = anchor.getObjectByName('room-4-drone-1-presentation')!;
+    assert.equal(presentation.rotation.x, 0);
+    assert.equal(presentation.rotation.z, 0);
+  } finally { f.dispose(); }
+});
+
+test('arrival lets an already falling wreck finish its impact and cleanup', () => {
+  const f = fixture();
+  try {
+    while (f.room.controller.readModel.elapsed < 16) f.step();
+    f.dissolve.startBurn(f.targets[0]);
+    for (let i = 0; i < 120 && !f.encounter.diagnostics().startsWith('1: falling'); i++) f.step();
+    assert.ok(f.encounter.diagnostics().startsWith('1: falling'));
+    f.room.controller.restoreArrival();
+    for (let i = 0; i < 240 && !f.encounter.diagnostics().startsWith('1: gone'); i++) f.step();
+    assert.ok(f.encounter.diagnostics().startsWith('1: gone'));
+    const debris = f.room.root.getObjectByName('lift-drone-impact-debris')!;
+    assert.equal(debris.visible, true);
+    f.reset();
+    assert.equal(debris.visible, false, 'retry cancels an impact still in progress');
+    assert.ok(f.encounter.diagnostics().startsWith('1: pending'));
   } finally { f.dispose(); }
 });
 

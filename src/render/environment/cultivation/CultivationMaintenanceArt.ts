@@ -2,8 +2,13 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelTwoRoomFiveGreybox } from '../../../levels/LevelTwoRoomFiveGreybox.ts';
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
+import { CultivationAccessTunnelArt } from './CultivationAccessTunnelArt.ts';
+import { CultivationSewerArt } from './CultivationSewerArt.ts';
+import { CultivationDroneChamberArt } from './CultivationDroneChamberArt.ts';
+import type { CultivationContaminationArt } from './CultivationContaminationArt.ts';
 import { CultivationVoltPodArt } from './CultivationVoltPodArt.ts';
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
+import { configureCultivationMembraneMaterial } from './CultivationMembraneMaterial.ts';
 
 /** Room-specific dressing of the shared facility library. No gameplay or frame updates. */
 export class CultivationMaintenanceArt {
@@ -13,11 +18,17 @@ export class CultivationMaintenanceArt {
   private readonly hidden = new THREE.MeshStandardMaterial({ visible: false });
   private readonly originals: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[] = [];
   private disposed = false;
+  private readonly accessArt: CultivationAccessTunnelArt;
+  private readonly sewerArt: CultivationSewerArt;
+  private readonly chamberArt: CultivationDroneChamberArt;
   private readonly podArt: CultivationVoltPodArt;
   readonly diagnostics = { newTextures: 0, variants: 0, staticMeshesBatched: 0, batches: 0 };
 
-  constructor(room: LevelTwoRoomFiveGreybox, lab: CultivationLabMaterials) {
+  constructor(room: LevelTwoRoomFiveGreybox, lab: CultivationLabMaterials, contamination: CultivationContaminationArt) {
     const b = room.builder, m = b.materials;
+    this.accessArt = new CultivationAccessTunnelArt(lab, contamination);
+    this.sewerArt = new CultivationSewerArt(lab, contamination);
+    this.chamberArt = new CultivationDroneChamberArt(lab, contamination);
     const variant = (source: THREE.MeshStandardMaterial, name: string, colour: number, roughness: number, lift = .045) => {
       const material = source.clone();
       material.name = `cultivation-maintenance-${name}`;
@@ -25,6 +36,7 @@ export class CultivationMaintenanceArt {
       material.emissive.setHex(colour); material.emissiveIntensity = lift;
       material.emissiveMap = material.map;
       material.userData.tileSizeMetres = source === lab.wall ? [4, 3] : source === lab.sticky ? [6.08, 6.55] : [2, 2];
+      if (source === lab.sticky) configureCultivationMembraneMaterial(material);
       optimizeFiniteLightEvaluation(material);
       this.materials.push(material); b.borrowedMaterials.add(material);
       return material;
@@ -38,8 +50,9 @@ export class CultivationMaintenanceArt {
     const culvert = variant(lab.floor, 'culvert-lining', 0x526459, .87, .035);
     culvert.side = THREE.BackSide;
     const oxidized = variant(lab.metal, 'worn-service-iron', 0x796b52, .8);
-    // A faint blue lift preserves adhesive readability in the dark vent.
-    const sticky = variant(lab.sticky, 'adhesive-tile', 0x79cbdc, lab.sticky.roughness, .025);
+    // Preserve the same jade route cue in the dim maintenance section.
+    const sticky = variant(lab.sticky, 'adhesive-tile', 0xffffff, lab.sticky.roughness, .14);
+    sticky.emissive.copy(lab.sticky.emissive);
     const terminal = variant(lab.metal, 'conductive-terminal', 0xb9a55a, .45, .16);
     // Retain the existing maps. Only the drainage finish adds world-scale runoff shading.
     const compileWet = wet.onBeforeCompile;
@@ -69,6 +82,7 @@ export class CultivationMaintenanceArt {
         platforms.push(object); return;
       }
       let finish = sourceToFinish.get(object.material);
+      if (/room-5-route-\d+-hanger-|room-5-safe-\d+-suspension-/.test(name)) finish = lab.pole;
       if (object.userData.textureRole === 'acid-floor' || object.material === m.acid) {
         finish = lab.acid; this.acidSurfaces.push(object);
       } else if (object.userData.surfaceTag === 'sticky') finish = sticky;
@@ -78,13 +92,15 @@ export class CultivationMaintenanceArt {
       else if (/sewer-pipe|control-.*-cabinet|pod-(base|cap)/.test(name)) finish = teal;
       else if (/safe-.*-deck|release-quiet-walk|rescue-shortcut|reunion-ramp$/.test(name)) finish = deck;
       else if (name === 'room-5-volt-conductive-terminal') finish = terminal;
+      finish = this.chamberArt.finishFor(object) ?? this.accessArt.finishFor(object) ?? this.sewerArt.finishFor(object) ?? finish;
       // Retain animated contacts, network signals, glass and the approved damaged drone.
       if (object === room.brokenCore || object.parent === room.brokenCore || object.userData.soluble) finish = undefined;
       if (!finish) return;
       b.borrowedMaterials.add(finish);
       lab.bind(object, finish);
+      this.chamberArt.mapShield(object, room);
       // Parent-local and dynamic pieces must follow their existing owner. Batch only static direct children.
-      if (object.parent === room.root && object.visible && !dynamic.has(object) && object.children.length === 0 && finish !== lab.acid) candidates.push(object);
+      if (object.parent === room.root && object.visible && !dynamic.has(object) && object.children.length === 0 && !this.acidSurfaces.includes(object)) candidates.push(object);
     });
     for (const platform of platforms) {
       this.originals.push({ mesh: platform, material: platform.material });
@@ -94,7 +110,11 @@ export class CultivationMaintenanceArt {
     }
     lab.platformArt.batchStatic(room.root, 10);
     const platformBatch = room.root.children.find(o => o.name === 'cultivation-static-platform-art');
-    platformBatch?.traverse(o => { if (o instanceof THREE.Mesh) o.userData.shadowProxyReceiver = true; });
+    platformBatch?.traverse(o => {
+      if (!(o instanceof THREE.Mesh)) return;
+      o.userData.shadowProxyReceiver = true;
+      if (o.material === lab.platform) o.material = this.chamberArt.deck;
+    });
     // The same deck silhouettes cast shadows through low-poly hulls. Ceramic
     // bevels and underside fittings remain fully detailed in the visible pass.
     const hullMaterial = new THREE.MeshBasicMaterial({colorWrite:false, depthWrite:false});
@@ -126,7 +146,7 @@ export class CultivationMaintenanceArt {
       mesh.updateMatrix();
       let geometry = mesh.geometry.clone();
       if (geometry.index) { const indexed = geometry; geometry = indexed.toNonIndexed(); indexed.dispose(); }
-      for (const attribute of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv'].includes(attribute)) geometry.deleteAttribute(attribute);
+      for (const attribute of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv', 'membranePanel'].includes(attribute)) geometry.deleteAttribute(attribute);
       geometry.applyMatrix4(mesh.matrix); part.geometries.push(geometry);
       this.originals.push({ mesh, material: mesh.material }); mesh.material = this.hidden;
     }
@@ -145,14 +165,11 @@ export class CultivationMaintenanceArt {
     };
     for (const z of [24, 40, 56, 72, 88, 104, 120, 136]) for (const x of [36.94, 43.06]) {
       box(lab.platformArt.warning, [x, -11.19, z], [.1, .012, 1.4]);
-      box(teal, [x < 40 ? 31.8 : 48.2, -8.15, z], [.12, .18, 1.8]);
     }
     for (const z of [26, 42, 58, 74]) for (const x of [-19.97, 19.97]) {
-      box(teal, [x, 15, z], [.025, .4, 5]);
       box(metal, [x, 19, z], [.04, 36, .12]);
     }
-    // Quiet guide markings keep the fork and final terminal legible in the existing darkness.
-    for (const x of [-9, -5, 5, 13, 21, 29, 37]) box(teal, [x, .208, 8.1], [1.1, .01, .1]);
+    // Warning markings identify the final terminal approach.
     for (const x of [13.9, 18.1]) box(lab.platformArt.warning, [x, .01, 68], [.12, .02, 2.2]);
     for (const [material, transforms] of accents) {
       b.borrowedMaterials.add(material);
@@ -161,14 +178,17 @@ export class CultivationMaintenanceArt {
       transforms.forEach((matrix, i) => mesh.setMatrixAt(i, matrix)); mesh.computeBoundingSphere();
       room.root.add(mesh); this.batches.push(mesh);
     }
-    this.diagnostics.variants = this.materials.length;
+    this.accessArt.addDetails(room.root);
+    this.sewerArt.addDetails(room, lab);
+    this.chamberArt.addDetails(room);
+    this.diagnostics.variants = this.materials.length + this.accessArt.materialCount + this.sewerArt.materialCount + this.chamberArt.materialCount;
     this.diagnostics.staticMeshesBatched = candidates.length;
-    this.diagnostics.batches = this.batches.length;
+    this.diagnostics.batches = this.batches.length + this.accessArt.batchCount + this.sewerArt.batchCount + this.chamberArt.batchCount;
   }
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
-    this.podArt.dispose();
+    this.podArt.dispose(); this.accessArt.dispose(); this.sewerArt.dispose(); this.chamberArt.dispose();
     for (const { mesh, material } of this.originals) mesh.material = material;
     for (const mesh of this.batches) {
       mesh.removeFromParent(); mesh.geometry.dispose();

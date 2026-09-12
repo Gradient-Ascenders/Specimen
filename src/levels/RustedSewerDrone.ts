@@ -27,9 +27,10 @@ export function createRustedSewerDrone(rusted = true): { body: THREE.Mesh; eye: 
     add(new THREE.BoxGeometry(1.1, .18, .32), worn, side * 1.2, .1, .15);
     const guard = add(new THREE.TorusGeometry(.64, .08, 8, 24, rusted && side < 0 ? Math.PI * 1.65 : Math.PI * 2), worn, side * 1.65, .12, .15);
     guard.rotation.x = Math.PI / 2;
-    add(new THREE.CylinderGeometry(.18, .22, .22, 12), dark, side * 1.65, .08, .15);
+    add(new THREE.CylinderGeometry(.18, .22, .22, 12), dark, side * 1.65, .07, .15);
+    // Stacked rotor blades and a recessed hub avoid coplanar crossing faces.
     for (const angle of [0, Math.PI / 2]) {
-      const blade = add(new THREE.BoxGeometry(1.05, .055, .13), dark, side * 1.65, .22, .15); blade.rotation.y = angle;
+      const blade = add(new THREE.BoxGeometry(1.05, .055, .13), dark, side * 1.65, .235 + (angle ? .07 : 0), .15); blade.rotation.y = angle;
     }
     const barrel = add(new THREE.CylinderGeometry(.11, .14, .9, 10), worn, side * .55, -.25, -1);
     barrel.rotation.x = Math.PI / 2;

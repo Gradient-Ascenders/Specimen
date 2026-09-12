@@ -522,7 +522,7 @@ export class LevelTwoRoomThreeGreybox {
       this.builder.addVisualBox({
         name: `${panel.name}-ceiling-mount`,
         size: [panel.geometry.parameters.width + .42, .3, panel.geometry.parameters.depth + .42],
-        position: [landing.x, 29.65, landing.z], material: this.builder.materials.support,
+        position: [landing.x, 29.675, landing.z], material: this.builder.materials.support,
       });
     }
   }

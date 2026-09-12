@@ -49,13 +49,14 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
     goopBody: goop,
     requestDeath: () => true,
     radiationSurface: scene.roomThree.radiationHazard,
+    surfaceMaps: scene.coverArt.droneSurfaceMaps,
   });
   scene.roomThree.root.add(encounter.root);
 
   assert.equal(encounter.ceilingDrones.length, 3);
   assert.equal(encounter.groundDrones.length, 4);
   assert.deepEqual(encounter.presentationResourceDiagnostics, {
-    geometryCount: 11,
+    geometryCount: 14,
     materialCount: 4,
   });
   const presentationGeometries = new Set<THREE.BufferGeometry>();
@@ -75,9 +76,16 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
       for (const material of materials) presentationMaterials.add(material);
     });
   }
-  assert.equal(presentationGeometries.size, 11);
+  assert.equal(presentationGeometries.size, 14);
   assert.equal(presentationMaterials.size, 11);
   assert.equal(indicatorMaterials.size, 7);
+  for (const lifecycle of [...encounter.ceilingDrones, ...encounter.groundDrones]) {
+    const shell = lifecycle.drone.presentation.root.getObjectByName(`${lifecycle.drone.id}-armoured-shell`) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+    assert.equal(shell.material.map, scene.coverArt.droneSurfaceMaps.scuffMap);
+    assert.equal(lifecycle.drone.frontIndicator.material.map, null);
+  }
+  let scuffMapDisposals = 0;
+  scene.coverArt.droneSurfaceMaps.scuffMap.addEventListener('dispose', () => scuffMapDisposals++);
   assert.ok([
     ...CULTIVATION_ROOM_THREE_DRONE_AUTHORING.ceilingDrones,
     ...CULTIVATION_ROOM_THREE_DRONE_AUTHORING.groundDrones,
@@ -103,10 +111,12 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   assert.ok(encounter.damage.health.every((health) => health.health === health.maximumHealth));
 
   encounter.dispose();
+  assert.equal(scuffMapDisposals, 0, 'encounter must not dispose borrowed wear maps');
   assert.equal(world.colliderCount, baselineColliders);
   assert.equal(surfaces.registeredCount, baselineSurfaces);
   for (const target of targets) target.dispose();
   scene.dispose();
+  assert.equal(scuffMapDisposals, 1);
   world.clear();
   surfaces.clear();
 });

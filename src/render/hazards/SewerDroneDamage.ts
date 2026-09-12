@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DroneBreakupPresentation } from './DroneBreakupPresentation.ts';
 
 /** Fixed-size spark pool and progressive missing hardware; no gameplay health authority. */
 export class SewerDroneDamage {
@@ -8,8 +9,11 @@ export class SewerDroneDamage {
   private readonly body: THREE.Mesh;
   private elapsed = 0;
   private previousHits = -1;
+  private readonly breakup = new DroneBreakupPresentation(1, 2.8);
   constructor(body: THREE.Mesh) {
     this.body = body;
+    this.breakup.root.name = 'room-5-sewer-drone-debris';
+    body.parent!.add(this.breakup.root);
     this.parts = body.children.filter(part => typeof part.userData.damageStage === 'number');
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage));
@@ -21,6 +25,10 @@ export class SewerDroneDamage {
   update(dt: number, hits: number): void {
     this.elapsed += dt;
     if (hits !== this.previousHits) {
+      if (hits === 3 && this.previousHits >= 0 && this.previousHits < 3) {
+        this.breakup.burst(0, this.body.position.x, this.body.position.y, this.body.position.z, -12);
+        this.body.visible = false;
+      } else if (hits < 3) this.breakup.reset();
       this.previousHits = hits; this.elapsed = 0;
       for (const part of this.parts) part.visible = hits < part.userData.damageStage;
       const materials = Array.isArray(this.body.material) ? this.body.material : [this.body.material];
@@ -28,6 +36,9 @@ export class SewerDroneDamage {
         material.color.setHex(hits === 0 ? 0xffffff : hits === 1 ? 0xc6b4a8 : 0x948a82);
       }
     }
+    // The burn coordinator may refresh visibility while its final reaction ends.
+    if (hits === 3) this.body.visible = false;
+    this.breakup.update(dt);
     this.sparks.visible = hits > 0 && hits < 3;
     if (!this.sparks.visible) return;
     const pulse = this.elapsed < .35 ? 1 : ((this.elapsed * (hits === 1 ? 4 : 8)) % 1 < .55 ? 1 : .08);
@@ -44,7 +55,13 @@ export class SewerDroneDamage {
     }
     this.sparks.geometry.getAttribute('position').needsUpdate = true;
   }
+  reset(hits: number): void {
+    this.breakup.reset();
+    this.previousHits = -1;
+    this.update(0, hits);
+  }
   dispose(): void {
+    this.breakup.dispose();
     this.sparks.removeFromParent(); this.sparks.geometry.dispose(); this.sparks.material.dispose();
   }
 }
