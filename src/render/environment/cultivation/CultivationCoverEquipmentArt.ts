@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
+import { createCultivationEquipmentWear } from './CultivationEquipmentWear.ts';
 
 export const COVER_EQUIPMENT = [
   { name: 'cultivation-room-3-goop-checkpoint-shield', identity: 'Decontamination unit', label: 'DECON', yawDegrees: 0, size: [8, 4.5, 1] },
@@ -20,7 +21,11 @@ type Triple = [number, number, number];
 /** Static laboratory props; original cover boxes remain the only gameplay geometry. */
 export class CultivationCoverEquipmentArt {
   readonly material = new THREE.MeshStandardMaterial({ name: 'cover-collider-hidden', visible: false });
-  readonly textures: readonly THREE.Texture[] = [];
+  private readonly wear = createCultivationEquipmentWear();
+  private readonly droneWear = createCultivationEquipmentWear(true);
+  readonly textures: readonly THREE.Texture[] = [...Object.values(this.wear), ...Object.values(this.droneWear)];
+  readonly droneSurfaceMaps = { scuffMap: this.droneWear.albedo,
+    bumpMap: this.droneWear.roughness, roughnessMap: this.droneWear.roughness };
   readonly root = new THREE.Group();
   readonly propBounds = new Map<string, THREE.Box3>();
   private readonly finishes: Record<Finish, THREE.MeshStandardMaterial>;
@@ -44,6 +49,11 @@ export class CultivationCoverEquipmentArt {
     };
     this.finishes.display.emissive.setHex(0x153a40);
     this.finishes.display.emissiveIntensity = 0.15;
+    for (const role of ['shell', 'metal', 'dark', 'teal', 'yellow'] as const) {
+      this.finishes[role].map = this.wear.albedo;
+      this.finishes[role].roughnessMap = this.wear.roughness;
+      this.finishes[role].roughness = role === 'shell' ? .88 : .78;
+    }
     this.root.name = 'cultivation-room-3-laboratory-cover-props';
     this.root.userData.presentationOnly = true;
   }
@@ -67,9 +77,17 @@ export class CultivationCoverEquipmentArt {
         ? [item.size[2], item.size[1], item.size[0]] : item.size;
       const orientation = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(item.yawDegrees));
       const bottom = -h / 2;
+      let panelIndex = 0;
       const add = (role: Finish, geometry: THREE.BufferGeometry, position: Triple, rotation?: Triple) => {
         let g = geometry;
         if (g.index) { g = geometry.toNonIndexed(); geometry.dispose(); }
+        if (role !== 'display') {
+          const variant = (index * 3 + panelIndex++ + Math.round((position[0] / w + .5) * 3)) % 4;
+          const uv = g.getAttribute('uv');
+          for (let i = 0; i < uv.count; i++) uv.setXY(i,
+            (THREE.MathUtils.clamp(uv.getX(i), 0, 1) * .984 + .008 + variant % 2) / 2,
+            (THREE.MathUtils.clamp(uv.getY(i), 0, 1) * .984 + .008 + Math.floor(variant / 2)) / 2);
+        }
         if (rotation) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...rotation)));
         g.translate(...position);
         g.applyMatrix4(orientation);
@@ -216,7 +234,7 @@ export class CultivationCoverEquipmentArt {
   }
 
   get diagnostics() {
-    return { propCount: this.propBounds.size, drawCalls: this.root.children.length, triangles: this.triangleCount, newTextures: 0 };
+    return { propCount: this.propBounds.size, drawCalls: this.root.children.length, triangles: this.triangleCount, newTextures: this.textures.length };
   }
 
   dispose(): void {
@@ -227,5 +245,6 @@ export class CultivationCoverEquipmentArt {
     this.root.clear();
     Object.values(this.finishes).forEach(material => material.dispose());
     this.material.dispose();
+    this.textures.forEach(texture => texture.dispose());
   }
 }

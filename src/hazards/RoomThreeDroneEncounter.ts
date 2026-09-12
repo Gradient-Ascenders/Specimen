@@ -35,7 +35,7 @@ export interface RoomThreeDroneEncounterConfig {
 }
 
 export interface RoomThreeDroneEncounterOptions {
-  readonly surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null };
+  readonly surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture };
   readonly config: RoomThreeDroneEncounterConfig;
   readonly supportsById: ReadonlyMap<string, DissolveTarget>;
   readonly collisionWorld: CollisionWorld;

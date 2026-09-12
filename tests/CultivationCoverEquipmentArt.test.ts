@@ -40,8 +40,12 @@ test('all eight unique equipment models preserve cover geometry and sightline vo
  }
  assert.equal(art.diagnostics.drawCalls,6);
  assert.equal(art.diagnostics.propCount,8);
- assert.equal(art.diagnostics.newTextures,0);
+ assert.equal(art.diagnostics.newTextures,4);
+ let disposedTextures=0;
+ for(const texture of art.textures)texture.addEventListener('dispose',()=>disposedTextures++);
  let disposed=0;art.material.addEventListener('dispose',()=>disposed++);
  room.reset();lab.dispose();art.dispose();room.dispose();baseline.dispose();
  assert.equal(disposed,1);
+ art.dispose();
+ assert.equal(disposedTextures,4);
 });

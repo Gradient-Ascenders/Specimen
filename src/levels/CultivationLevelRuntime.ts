@@ -936,7 +936,7 @@ export class CultivationLevelRuntime {
             bobBody,
             goopBody,
             radiationSurface: authoredPreview.roomThree.radiationHazard,
-            surfaceMaps: authoredPreview.labArt.metal,
+            surfaceMaps: authoredPreview.coverArt.droneSurfaceMaps,
             requestDeath: (slimeId) => this.requestRoomThreeDroneDeath(slimeId),
           })
         : undefined;
