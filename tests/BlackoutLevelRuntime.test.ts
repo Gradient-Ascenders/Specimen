@@ -208,6 +208,7 @@ class RuntimeFakeInput {
   endFixedUpdate(): void {
     this.pressed.clear();
     this.released.clear();
+    this.wasClearedSinceFixedUpdate = false;
     this.endPointerUpdate();
   }
 
@@ -784,6 +785,398 @@ test('optional CP9 rejects idle/live-attack capture and restores only from a sta
     assert.equal(runtime.sentinelBossReadModel?.state, 'phase-1');
     assert.equal(runtime.sentinelBossReadModel?.currentAttackId, null);
     assert.equal(runtime.specimenFormReadModel?.controlledForm, 'specimen');
+
+    runtime.dispose();
+    assert.equal(scene.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+
+class RuntimeFlightCameraRig extends RuntimeFakeCameraRig {
+  override copyGroundMovementDirection(
+    x: number,
+    z: number,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    return target.set(x, 0, -z);
+  }
+
+  override copySurfaceMovementDirection(
+    x: number,
+    z: number,
+    _up: unknown,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    return target.set(x, 0, -z);
+  }
+}
+
+test('Blackout maintenance drone mounts only Volt, parks exactly across slime switches, and resumes safely', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFlightCameraRig();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'volt',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.maintenanceDroneReadModel?.mountAvailable, true);
+
+    input.press('mountDrone');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'starting');
+
+    for (let step = 0; step < 90; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'mounted');
+    assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, true);
+    assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, false);
+    assert.equal(
+      runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+      true,
+    );
+    runtime.markMaintenanceDroneTutorialCompleted();
+    assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, true);
+    assert.equal(
+      runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+      false,
+    );
+
+    input.press('aimAbility');
+    input.press('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(
+      runtime.voltElectricalReadModel?.connectedTargetId,
+      'fixture-terminal',
+    );
+    input.release('aimAbility');
+    input.release('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+
+    input.press('moveForward');
+    for (let step = 0; step < 30; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    input.release('moveForward');
+    runtime.fixedUpdate(1 / 60);
+    const movingZ = runtime.maintenanceDroneReadModel!.position.z;
+    assert.notEqual(movingZ, 2);
+
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'bob');
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
+    assert.equal(runtime.maintenanceDroneReadModel?.lightEnabled, true);
+    assert.equal(runtime.maintenanceDroneReadModel?.mountAvailable, false);
+    assert.equal(
+      runtime.voltElectricalReadModel?.connectedTargetId,
+      'fixture-terminal',
+      'parked Volt must preserve the established electrical tether',
+    );
+    const parked = [
+      runtime.maintenanceDroneReadModel!.position.x,
+      runtime.maintenanceDroneReadModel!.position.y,
+      runtime.maintenanceDroneReadModel!.position.z,
+    ] as const;
+
+    for (let step = 0; step < 120; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.deepEqual(
+      [
+        runtime.maintenanceDroneReadModel!.position.x,
+        runtime.maintenanceDroneReadModel!.position.y,
+        runtime.maintenanceDroneReadModel!.position.z,
+      ],
+      [...parked],
+    );
+
+    input.press('mountDrone');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(
+      runtime.maintenanceDroneReadModel?.state,
+      'parked-hover',
+      'Bob M input must not alter the drone',
+    );
+
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'goop');
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
+
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'volt');
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'mounted');
+    assert.equal(runtime.maintenanceDroneReadModel?.horizontalSpeed, 0);
+    assert.equal(runtime.maintenanceDroneReadModel?.verticalSpeed, 0);
+
+    runtime.dispose();
+    assert.equal(scene.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+test('mounted Volt ascends/descends, aim freezes the drone, and existing electrical aim remains active', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFlightCameraRig();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'volt',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+    runtime.fixedUpdate(1 / 60);
+    input.press('mountDrone');
+    runtime.fixedUpdate(1 / 60);
+    for (let step = 0; step < 90; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+
+    const baseY = runtime.maintenanceDroneReadModel!.position.y;
+    input.press('jump');
+    for (let step = 0; step < 30; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    input.release('jump');
+    runtime.fixedUpdate(1 / 60);
+    const raisedY = runtime.maintenanceDroneReadModel!.position.y;
+    assert.ok(raisedY > baseY);
+
+    input.press('droneDescend');
+    for (let step = 0; step < 40; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    input.release('droneDescend');
+    runtime.fixedUpdate(1 / 60);
+    assert.ok(runtime.maintenanceDroneReadModel!.position.y < raisedY);
+
+    input.press('moveForward');
+    for (let step = 0; step < 10; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.ok(runtime.maintenanceDroneReadModel!.horizontalSpeed > 0);
+
+    // Focus/menu input clearing is an immediate velocity-cancellation boundary.
+    input.resetState();
+    input.wasClearedSinceFixedUpdate = true;
+    const beforeClear = [
+      runtime.maintenanceDroneReadModel!.position.x,
+      runtime.maintenanceDroneReadModel!.position.y,
+      runtime.maintenanceDroneReadModel!.position.z,
+    ] as const;
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.maintenanceDroneReadModel?.horizontalSpeed, 0);
+    assert.equal(runtime.maintenanceDroneReadModel?.verticalSpeed, 0);
+    assert.deepEqual(
+      [
+        runtime.maintenanceDroneReadModel!.position.x,
+        runtime.maintenanceDroneReadModel!.position.y,
+        runtime.maintenanceDroneReadModel!.position.z,
+      ],
+      [...beforeClear],
+    );
+
+    input.press('moveForward');
+    for (let step = 0; step < 10; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    const beforeAim = [
+      runtime.maintenanceDroneReadModel!.position.x,
+      runtime.maintenanceDroneReadModel!.position.y,
+      runtime.maintenanceDroneReadModel!.position.z,
+    ] as const;
+
+    input.press('aimAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.aimActive, true);
+    assert.deepEqual(
+      [
+        runtime.maintenanceDroneReadModel!.position.x,
+        runtime.maintenanceDroneReadModel!.position.y,
+        runtime.maintenanceDroneReadModel!.position.z,
+      ],
+      [...beforeAim],
+    );
+    assert.equal(runtime.maintenanceDroneReadModel?.horizontalSpeed, 0);
+    assert.equal(runtime.maintenanceDroneReadModel?.verticalSpeed, 0);
+
+    // Render-only pointer sampling remains intact while mounted/aiming.
+    input.pointerDeltaX = 9;
+    input.pointerDeltaY = -4;
+    runtime.render(
+      0,
+      { frameDeltaSeconds: 1 / 144 } as Readonly<LoopStats>,
+    );
+    assert.equal(cameraRig.appliedLookX, 9);
+    assert.equal(cameraRig.appliedLookY, -4);
+
+    runtime.dispose();
+    assert.equal(scene.children.length, 0);
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
+
+test('maintenance drone checkpoint recovery survives death cancellation and repeated restart', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const cameraRig = new RuntimeFlightCameraRig();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig,
+      render: () => {},
+    } as unknown as RenderLayer;
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: new RuntimeFakeElement() as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'volt',
+      },
+    });
+
+    runtime.load();
+    runtime.start();
+    runtime.fixedUpdate(1 / 60);
+    input.press('mountDrone');
+    runtime.fixedUpdate(1 / 60);
+    for (let step = 0; step < 90; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    runtime.markMaintenanceDroneTutorialCompleted();
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
+
+    runtime.activateCheckpoint('cp1');
+    const captured = [
+      runtime.maintenanceDroneReadModel!.position.x,
+      runtime.maintenanceDroneReadModel!.position.y,
+      runtime.maintenanceDroneReadModel!.position.z,
+    ] as const;
+
+    assert.equal(runtime.requestMaintenanceDroneRecovery('acid'), true);
+    for (let step = 0; step < 80; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.notEqual(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
+
+    runtime.recoverActiveCheckpoint();
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
+    assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, true);
+    assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, true);
+    assert.equal(
+      runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+      false,
+    );
+    assert.deepEqual(
+      [
+        runtime.maintenanceDroneReadModel!.position.x,
+        runtime.maintenanceDroneReadModel!.position.y,
+        runtime.maintenanceDroneReadModel!.position.z,
+      ],
+      [...captured],
+    );
+
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'volt');
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'mounted');
+
+    input.press('moveForward');
+    for (let step = 0; step < 10; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.ok(runtime.maintenanceDroneReadModel!.horizontalSpeed > 0);
+
+    assert.equal(runtime.requestFailure(), true);
+    assert.equal(runtime.maintenanceDroneReadModel?.horizontalSpeed, 0);
+    assert.equal(runtime.maintenanceDroneReadModel?.verticalSpeed, 0);
+
+    for (let restart = 0; restart < 3; restart += 1) {
+      runtime.restartLevel();
+      assert.equal(runtime.maintenanceDroneReadModel?.state, 'damaged-idle');
+      assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, false);
+      assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, false);
+      assert.equal(
+        runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+        false,
+      );
+      runtime.fixedUpdate(1 / 60);
+      assert.equal(runtime.maintenanceDroneReadModel?.mountAvailable, true);
+    }
 
     runtime.dispose();
     assert.equal(scene.children.length, 0);

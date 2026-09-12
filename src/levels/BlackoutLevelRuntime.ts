@@ -43,6 +43,7 @@ import {
 import {
   ColliderTransformMode,
   CollisionHit,
+  CollisionLayer,
   CollisionWorld,
 } from '../physics/CollisionWorld.ts';
 import { KinematicBody, type JumpInputState } from '../physics/KinematicBody.ts';
@@ -69,6 +70,17 @@ import {
 } from '../specimen/SpecimenFormController.ts';
 import { DeathSequence } from '../systems/DeathSequence.ts';
 import { DeathScreen } from '../ui/DeathScreen.ts';
+import {
+  MaintenanceDroneController,
+} from '../vehicles/MaintenanceDroneController.ts';
+import {
+  MaintenanceDroneDevelopmentFixture,
+} from '../vehicles/MaintenanceDroneDevelopmentFixture.ts';
+import type {
+  MaintenanceDroneEvents,
+  MaintenanceDroneReadModel,
+  MaintenanceDroneRecoveryReason,
+} from '../vehicles/MaintenanceDroneTypes.ts';
 import {
   BlackoutCheckpointManager,
   type BlackoutCheckpointParticipant,
@@ -118,6 +130,8 @@ interface BlackoutRuntimeResources {
   readonly combatTargets: CombatTargetRegistry;
   readonly combatRig: SpecimenCombatDevelopmentRig;
   readonly sentinelRig: SentinelBossDevelopmentRig;
+  readonly maintenanceDroneFixture: MaintenanceDroneDevelopmentFixture;
+  readonly maintenanceDrone: MaintenanceDroneController;
   readonly specimenBody: KinematicBody;
   readonly specimenForm: SpecimenFormController;
   readonly specimenAttack: SpecimenProjectileSystem;
@@ -128,6 +142,7 @@ interface BlackoutRuntimeResources {
   readonly unregisterPoweredDevicesCheckpointParticipant: () => void;
   readonly unregisterCombatCheckpointParticipant: () => void;
   readonly unregisterSentinelCheckpointParticipant: () => void;
+  readonly unregisterMaintenanceDroneCheckpointParticipant: () => void;
   readonly manager: SlimeManager<KinematicBody>;
   readonly group: PersistentSlimeGroup<KinematicBody>;
   readonly checkpoints: BlackoutCheckpointManager<KinematicBody>;
@@ -239,6 +254,23 @@ export class BlackoutLevelRuntime {
     return this.resources?.sentinelRig.controller.events;
   }
 
+  get maintenanceDroneReadModel(): MaintenanceDroneReadModel | undefined {
+    return this.resources?.maintenanceDrone.readModel;
+  }
+
+  get maintenanceDroneEvents(): Pick<
+    EventBus<MaintenanceDroneEvents>,
+    'on'
+  > | undefined {
+    return this.resources?.maintenanceDrone.events;
+  }
+
+  requestMaintenanceDroneRecovery(
+    reason: MaintenanceDroneRecoveryReason,
+  ): boolean {
+    return this.requireResources().maintenanceDrone.requestRecovery(reason);
+  }
+
   registerCombatTarget(
     target: CombatTarget,
     options?: CombatTargetRegistrationOptions,
@@ -316,6 +348,10 @@ export class BlackoutLevelRuntime {
     return this.requireResources().checkpoints.registerParticipant(participant);
   }
 
+  markMaintenanceDroneTutorialCompleted(): void {
+    this.requireResources().maintenanceDrone.markTutorialCompleted();
+  }
+
   registerElectricalTarget(
     target: ElectricalConnectionTarget,
     options?: ElectricalTargetRegistrationOptions,
@@ -375,6 +411,7 @@ export class BlackoutLevelRuntime {
     resources.electricalSystem.reset('death');
     resources.specimenAttack.reset();
     resources.sentinelRig.controller.cancelTransient('death');
+    resources.maintenanceDrone.cancelTransient('death');
     resources.specimenPresentation.suspend();
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
@@ -410,6 +447,7 @@ export class BlackoutLevelRuntime {
     resources.electricalSystem.cancelAim();
     resources.specimenAttack.reset();
     resources.sentinelRig.controller.cancelTransient('phase-change');
+    resources.maintenanceDrone.recoverImmediately('checkpoint');
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(
       resources.electricalSystem.readModel,
@@ -632,12 +670,27 @@ export class BlackoutLevelRuntime {
 
     let switched = false;
     if (
-      this.currentRoom.phase === 'three-slime' || this.currentRoom.phase === 'escape'
+      this.currentRoom.phase === 'three-slime' ||
+      this.currentRoom.phase === 'escape'
     ) {
       if (this.input.wasPressed('switchSlime')) {
         const previous = resources.group.activeSlimeId;
+        const parkedForSwitch =
+          previous === 'volt' &&
+          resources.maintenanceDrone.voltMounted
+            ? resources.maintenanceDrone.parkForSwitch()
+            : false;
         switched = resources.group.switchNext();
+        if (!switched && parkedForSwitch) {
+          resources.maintenanceDrone.resumeMountedControl();
+        }
         if (switched) {
+          if (
+            resources.group.activeSlimeId === 'volt' &&
+            resources.maintenanceDrone.voltMounted
+          ) {
+            resources.maintenanceDrone.resumeMountedControl();
+          }
           this.input.resetState();
           resources.movement.set(0, 0, 0);
           clearJump(resources.jump, true);
@@ -652,9 +705,39 @@ export class BlackoutLevelRuntime {
       }
     }
 
-    const moveX = (this.input.isDown('moveRight') ? 1 : 0) -
+    const droneGameplayEnabled =
+      this.input.enabled &&
+      this.currentRoom.roomId === 'room-1' &&
+      this.currentRoom.phase === 'three-slime';
+    resources.maintenanceDrone.updateMountAvailability(
+      resources.group.activeSlimeId,
+      resources.group.voltBody.position,
+      droneGameplayEnabled,
+    );
+
+    if (
+      !switched &&
+      droneGameplayEnabled &&
+      this.input.wasPressed('mountDrone') &&
+      resources.group.activeSlimeId === 'volt'
+    ) {
+      if (resources.maintenanceDrone.voltMounted) {
+        resources.maintenanceDrone.requestDismount(
+          resources.group.voltBody,
+        );
+      } else {
+        resources.maintenanceDrone.requestMount(
+          'volt',
+          resources.group.voltBody.position,
+        );
+      }
+    }
+
+    const moveX =
+      (this.input.isDown('moveRight') ? 1 : 0) -
       (this.input.isDown('moveLeft') ? 1 : 0);
-    const moveZ = (this.input.isDown('moveBackward') ? 1 : 0) -
+    const moveZ =
+      (this.input.isDown('moveBackward') ? 1 : 0) -
       (this.input.isDown('moveForward') ? 1 : 0);
 
     const specimenGameplay =
@@ -663,32 +746,101 @@ export class BlackoutLevelRuntime {
     const body = specimenGameplay
       ? resources.specimenBody
       : resources.group.activeBody;
+
     if (!switched) {
       this.renderLayer.cameraRig.queueLookInput(
         this.input.pointerDeltaX,
         this.input.pointerDeltaY,
       );
       this.renderLayer.cameraRig.applyQueuedLookInput();
-      if (body.usingSurfaceGravity) {
-        this.renderLayer.cameraRig.copySurfaceMovementDirection(
-          moveX,
-          moveZ,
-          body.gameplayUp,
-          resources.movement,
-        );
-      } else {
+
+      const controllingMountedVolt =
+        !specimenGameplay &&
+        resources.group.activeSlimeId === 'volt' &&
+        resources.maintenanceDrone.voltMounted;
+
+      if (
+        controllingMountedVolt &&
+        this.input.wasClearedSinceFixedUpdate
+      ) {
+        resources.maintenanceDrone.suspendInput();
+      }
+
+      if (controllingMountedVolt) {
         this.renderLayer.cameraRig.copyGroundMovementDirection(
           moveX,
           moveZ,
           resources.movement,
         );
+        clearJump(resources.jump, true);
+        resources.maintenanceDrone.update(deltaSeconds, {
+          horizontalDirection: resources.movement,
+          ascendHeld: this.input.isDown('jump'),
+          descendHeld: this.input.isDown('droneDescend'),
+          aimHeld: this.input.isDown('aimAbility'),
+          controllingVolt: true,
+        });
+        resources.maintenanceDrone.syncMountedVolt(
+          resources.group.voltBody,
+        );
+      } else {
+        if (body.usingSurfaceGravity) {
+          this.renderLayer.cameraRig.copySurfaceMovementDirection(
+            moveX,
+            moveZ,
+            body.gameplayUp,
+            resources.movement,
+          );
+        } else {
+          this.renderLayer.cameraRig.copyGroundMovementDirection(
+            moveX,
+            moveZ,
+            resources.movement,
+          );
+        }
+        resources.jump.pressed = this.input.wasPressed('jump');
+        resources.jump.held = this.input.isDown('jump');
+        resources.jump.released = this.input.wasReleased('jump');
+        resources.jump.cancelled =
+          this.input.wasClearedSinceFixedUpdate;
+        body.update(deltaSeconds, resources.movement, resources.jump);
+
+        resources.maintenanceDrone.update(deltaSeconds, {
+          horizontalDirection: resources.movement.set(0, 0, 0),
+          ascendHeld: false,
+          descendHeld: false,
+          aimHeld: false,
+          controllingVolt: false,
+        });
+        resources.maintenanceDrone.applyFallingSupportToVolt(
+          resources.group.voltBody,
+        );
       }
-      resources.jump.pressed = this.input.wasPressed('jump');
-      resources.jump.held = this.input.isDown('jump');
-      resources.jump.released = this.input.wasReleased('jump');
-      resources.jump.cancelled = this.input.wasClearedSinceFixedUpdate;
-      body.update(deltaSeconds, resources.movement, resources.jump);
+    } else {
+      resources.maintenanceDrone.update(deltaSeconds, {
+        horizontalDirection: resources.movement.set(0, 0, 0),
+        ascendHeld: false,
+        descendHeld: false,
+        aimHeld: false,
+        controllingVolt:
+          resources.group.activeSlimeId === 'volt',
+      });
+      if (resources.maintenanceDrone.voltMounted) {
+        resources.maintenanceDrone.syncMountedVolt(
+          resources.group.voltBody,
+        );
+      } else {
+        resources.maintenanceDrone.applyFallingSupportToVolt(
+          resources.group.voltBody,
+        );
+      }
     }
+
+    resources.maintenanceDrone.updateMountAvailability(
+      resources.group.activeSlimeId,
+      resources.group.voltBody.position,
+      droneGameplayEnabled,
+    );
 
     resources.electricalSystem.update(deltaSeconds, {
       aimHeld: this.input.isDown('aimAbility'),
@@ -766,6 +918,16 @@ export class BlackoutLevelRuntime {
       this.syncVisuals(resources);
       this.input.endFixedUpdate();
       return;
+    }
+
+    if (
+      resources.maintenanceDrone.readModel.position.y < OUT_OF_BOUNDS_Y
+    ) {
+      if (resources.maintenanceDrone.voltMounted) {
+        this.requestFailure();
+      } else {
+        resources.maintenanceDrone.requestRecovery('out-of-bounds');
+      }
     }
 
     // Only the participating controlled form can fail hazards/out-of-bounds.
@@ -883,6 +1045,11 @@ export class BlackoutLevelRuntime {
           surfaces: surfaceRegistry,
           initialPosition: cp1.bodyPositions[id],
           config: {
+            movementCollisionMask:
+              CollisionLayer.Movement |
+              (id === 'volt'
+                ? CollisionLayer.MaintenanceDroneSupport
+                : CollisionLayer.None),
             adhesionEnabled: definition.abilities.adhesion,
             reboundEnabled: definition.abilities.rebound,
             chargedJumpEnabled: definition.jumpMode === 'charged',
@@ -952,6 +1119,19 @@ export class BlackoutLevelRuntime {
         checkpoints.registerCheckpoint(checkpoint);
       }
       checkpoints.activate('cp1', initialActive);
+
+      const maintenanceDroneFixture =
+        new MaintenanceDroneDevelopmentFixture();
+      rollback(() => maintenanceDroneFixture.dispose());
+      scene.root.add(maintenanceDroneFixture.root);
+
+      const maintenanceDrone = new MaintenanceDroneController({
+        world: collisionWorld,
+        authoring: maintenanceDroneFixture.authoring,
+        isVoltPlacementSafe: isSpawnSafe,
+        voltRadiusMetres: group.voltBody.radiusMetres,
+      });
+      rollback(() => maintenanceDrone.dispose());
 
       const phase = new BlackoutPhaseController('three-slime');
       const deathSequence = new DeathSequence();
@@ -1086,6 +1266,10 @@ export class BlackoutLevelRuntime {
         checkpoints.registerParticipant(sentinelRig.controller);
       rollback(unregisterSentinelCheckpointParticipant);
 
+      const unregisterMaintenanceDroneCheckpointParticipant =
+        checkpoints.registerParticipant(maintenanceDrone);
+      rollback(unregisterMaintenanceDroneCheckpointParticipant);
+
       const electricalPresentation = new VoltElectricalPresentation({
         scene: this.renderLayer.scene,
         host: this.host,
@@ -1106,6 +1290,8 @@ export class BlackoutLevelRuntime {
         combatTargets,
         combatRig,
         sentinelRig,
+        maintenanceDroneFixture,
+        maintenanceDrone,
         specimenBody,
         specimenForm,
         specimenAttack,
@@ -1116,6 +1302,7 @@ export class BlackoutLevelRuntime {
         unregisterPoweredDevicesCheckpointParticipant,
         unregisterCombatCheckpointParticipant,
         unregisterSentinelCheckpointParticipant,
+        unregisterMaintenanceDroneCheckpointParticipant,
         manager,
         group,
         checkpoints,
@@ -1177,6 +1364,7 @@ export class BlackoutLevelRuntime {
     const resources = this.requireResources();
     resources.electricalSystem.cancelAim();
     resources.specimenAttack.cancelInput();
+    resources.maintenanceDrone.suspendInput();
     resources.specimenPresentation.suspend();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
@@ -1199,6 +1387,10 @@ export class BlackoutLevelRuntime {
     const snapshot = resources.checkpoints.recover(
       resources.group,
       resources.specimenBody,
+    );
+    resources.maintenanceDrone.reconcileAfterBodyRecovery(
+      resources.group.activeSlimeId,
+      resources.group.voltBody,
     );
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
@@ -1234,6 +1426,9 @@ export class BlackoutLevelRuntime {
     resources.unregisterPoweredDevicesCheckpointParticipant();
     resources.unregisterCombatCheckpointParticipant();
     resources.unregisterSentinelCheckpointParticipant();
+    resources.unregisterMaintenanceDroneCheckpointParticipant();
+    resources.maintenanceDrone.dispose();
+    resources.maintenanceDroneFixture.dispose();
     resources.sentinelRig.dispose();
     resources.combatRig.dispose();
     resources.combatTargets.dispose();
@@ -1273,6 +1468,10 @@ export class BlackoutLevelRuntime {
     const snapshot = resources.checkpoints.recover(
       resources.group,
       resources.specimenBody,
+    );
+    resources.maintenanceDrone.reconcileAfterBodyRecovery(
+      resources.group.activeSlimeId,
+      resources.group.voltBody,
     );
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);

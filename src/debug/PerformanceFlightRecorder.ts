@@ -10,13 +10,13 @@ import type { RenderLayer } from '../render/RenderLayer.ts';
 
 export const PERFORMANCE_RECORDER_KEYS = {
   toggle: 'KeyP',
-  marker: 'KeyM',
+  marker: 'KeyH',
   export: 'KeyE',
 } as const;
 
 export const PERFORMANCE_RECORDER_SHORTCUT_LABELS = {
   toggle: 'Shift+P',
-  marker: 'Shift+M',
+  marker: 'Shift+H',
   export: 'Shift+E',
 } as const;
 

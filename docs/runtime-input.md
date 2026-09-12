@@ -49,6 +49,8 @@ codes.
 | `moveRight` | `D` |
 | `jump` | `Space` |
 | `switchSlime` | `Tab` |
+| `mountDrone` | `M` |
+| `droneDescend` | Left or Right `Shift` |
 | `aimAbility` | Right Mouse Button |
 | `fireAbility` | Left Mouse Button while aiming |
 | `debugReset` | `R` |
@@ -137,3 +139,21 @@ boundaries actually exist.
    change, while the fixed gameplay step remains `16.67 ms`.
 6. Run the production build and confirm there are no new console errors or asset
    404s.
+
+
+## Level 3 maintenance-drone input
+
+Issue #146 reuses the named-input boundary for Volt's maintenance drone. While
+Volt is mounted, `moveForward`/`moveBackward`/`moveLeft`/`moveRight`
+remain camera-relative horizontal flight, `jump` (Space) becomes ascend,
+`droneDescend` (either Shift key) becomes descend, and `mountDrone` (M)
+becomes dismount. Bob and Goop never receive gameplay mount authority even
+though the browser input action remains globally mapped.
+
+Mounted aim continues using the existing RMB/LMB `aimAbility` and
+`fireAbility` actions. Aim freezes authoritative drone velocity so mouse
+camera movement cannot create flight drift.
+
+The performance flight recorder manual hitch marker moved from Shift+M to
+Shift+H so a legitimate descend+mount/dismount chord cannot trigger debug
+instrumentation.

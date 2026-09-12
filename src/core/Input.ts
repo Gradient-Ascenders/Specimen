@@ -5,6 +5,8 @@ export type InputAction =
   | 'moveRight'
   | 'jump'
   | 'switchSlime'
+  | 'mountDrone'
+  | 'droneDescend'
   | 'aimAbility'
   | 'fireAbility'
   | 'debugReset'
@@ -31,6 +33,11 @@ export const DEFAULT_ACTION_BINDINGS = {
   moveRight: [{ kind: 'key', code: 'KeyD' }],
   jump: [{ kind: 'key', code: 'Space' }],
   switchSlime: [{ kind: 'key', code: 'Tab' }],
+  mountDrone: [{ kind: 'key', code: 'KeyM' }],
+  droneDescend: [
+    { kind: 'key', code: 'ShiftLeft' },
+    { kind: 'key', code: 'ShiftRight' },
+  ],
   aimAbility: [{ kind: 'mouseButton', button: 2 }],
   fireAbility: [{ kind: 'mouseButton', button: 0 }],
   debugReset: [{ kind: 'key', code: 'KeyR' }],
