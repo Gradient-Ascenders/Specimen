@@ -91,7 +91,6 @@ export class CultivationElevatorArt {
       if (/-frame-(top|left|right)$/.test(object.name)) overrides.set(object.name, metal);
       if (object.material === room.builder.materials.duct) overrides.set(object.name, shaft);
       if (object.material === room.builder.materials.platform) overrides.set(object.name, chamber.warning);
-      if (object.userData.textureRole === 'soluble-cable') overrides.set(object.name, chamber.cable);
       if (object.name.startsWith('room-4-shaft-beam-')) overrides.set(object.name, metal);
       if (object.name.startsWith('room-4-rail-')) overrides.set(object.name, metal);
       if (object.name === 'room-4-boarding-floor') overrides.set(object.name, floor);

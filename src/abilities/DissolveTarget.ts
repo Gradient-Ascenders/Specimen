@@ -170,6 +170,12 @@ export class DissolveTarget {
     return this.dissolveMaterials.diagnostics;
   }
 
+  /** Visible multipart art can borrow this target's existing aim/burn uniforms.
+   * The caller owns/disposes the returned material; it does not dissolve the art. */
+  createCorrosionMaterial(source: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+    return this.dissolveMaterials.createCorrosionMaterial(source);
+  }
+
   /** Presentation-only input; cannot mutate gameplay progress or collision. */
   setCorrosionPresentation(
     aimStrength: number,

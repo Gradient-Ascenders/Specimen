@@ -179,6 +179,14 @@ export class DissolveMaterialBundle {
     );
   }
 
+  /** Caller owns this visible proxy material. Share aim/burn feedback, but keep
+   * the proxy intact when its separate gameplay hitbox finishes dissolving. */
+  createCorrosionMaterial(sourceMaterial: THREE.MeshStandardMaterial): DissolveMaterial {
+    return new DissolveMaterial({ sourceMaterial,
+      maskUniforms: { ...this.maskUniforms, uDissolveAmount: { value: 0 } },
+      presentationUniforms: this.presentationUniforms });
+  }
+
   get dissolveAmount(): number {
     return this.maskUniforms.uDissolveAmount.value;
   }

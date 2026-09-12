@@ -955,7 +955,7 @@ export class CultivationLevelRuntime {
         authoredPreview.roomFour, collisionWorld, surfaceRegistry, bobBody, goopBody,
         previewDissolveTargets, dissolveSystem,
         (slimeId) => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), slimeId),
-        authoredPreview.labArt.metal,
+        authoredPreview.coverArt.droneSurfaceMaps,
       ) : undefined;
       if (roomFourEncounter) rollback(() => roomFourEncounter.dispose());
       const roomFourView = authoredPreview ? new this.debugSupport!.ElevatorEncounterView() : undefined;

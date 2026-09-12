@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import type { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
-import { ColliderTransformMode, type CollisionWorld } from '../physics/CollisionWorld.ts';
+import { ColliderTransformMode, CollisionLayer, DEFAULT_SOLID_COLLISION_LAYERS, type CollisionWorld } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
+import { LiftDroneFlightPresentation } from '../render/hazards/LiftDroneFlightPresentation.ts';
+import { DroneBreakupPresentation } from '../render/hazards/DroneBreakupPresentation.ts';
 import { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import { SlimeDamageSystem } from '../systems/SlimeDamageSystem.ts';
 import { DroneProjectileSystem, type DroneProjectileTarget } from './DroneProjectileSystem.ts';
@@ -12,13 +14,17 @@ import { ROOM_FOUR_SPAWNS } from '../levels/CultivationRoomFourController.ts';
 import { ROOM_FOUR_ANCHORS } from '../levels/LevelTwoRoomFourGreybox.ts';
 import type { LevelTwoRoomFourGreybox } from '../levels/LevelTwoRoomFourGreybox.ts';
 
-type DronePhase = 'pending' | 'approaching' | 'firing' | 'corroding' | 'falling' | 'settled' | 'gone';
-interface Slot { drone: SecurityDrone; target: DissolveTarget; root: THREE.Group; phase: DronePhase; fallTime: number; ejected: number }
+type DronePhase = 'pending' | 'approaching' | 'firing' | 'corroding' | 'falling' | 'gone';
+interface Slot { flight: LiftDroneFlightPresentation; drone: SecurityDrone; target: DissolveTarget; root: THREE.Group; phase: DronePhase; fallTime: number; ejected: number }
 
-/** Bounded reusable cable targets; no per-frame construction or full-scene raycasts. */
+/** Bounded reusable drone targets; no per-frame construction or full-scene raycasts. */
 export class ElevatorDroneEncounter {
   readonly damage = new SlimeDamageSystem();
   readonly projectiles: DroneProjectileSystem;
+  private readonly flameMaterial = new THREE.MeshBasicMaterial({ vertexColors: true,
+    transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false,
+    side: THREE.DoubleSide, forceSinglePass: true, toneMapped: false });
+  private readonly breakup: DroneBreakupPresentation;
   private readonly resources: SecurityDronePresentationResources;
   private readonly slots: Slot[];
   private readonly targets: SecurityDroneTarget[];
@@ -39,9 +45,11 @@ export class ElevatorDroneEncounter {
     world: CollisionWorld, surfaces: SurfaceRegistry,
     bob: KinematicBody, goop: KinematicBody, targets: readonly DissolveTarget[],
     dissolve: DissolveSystem, requestDeath: (id: 'bob' | 'goop') => void,
-    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null }) {
-    this.resources = new SecurityDronePresentationResources(surfaceMaps);
+    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }) {
+    this.resources = new SecurityDronePresentationResources(surfaceMaps, true);
     this.room = room; this.world = world;
+    this.breakup = new DroneBreakupPresentation(room.droneRoots.length);
+    room.root.add(this.breakup.root);
     this.bodies = [bob, goop];
     this.projectiles = new DroneProjectileSystem(world, this.damage, {
       speedMetresPerSecond: 24, lifetimeSeconds: 2, maximumRangeMetres: 40, damage: 15,
@@ -53,9 +61,9 @@ export class ElevatorDroneEncounter {
     }));
     this.projectileTargets = [bob, goop].map((body, i) => ({ slimeId: i === 0 ? 'bob' : 'goop',
       position: body.position, previousPosition: body.previousPosition, radiusMetres: body.radiusMetres }));
-    this.slots = room.cableRoots.map((root, i) => {
+    this.slots = room.droneRoots.map((root, i) => {
       const target = targets.find(t => t.mesh === room.solubleTargetMeshes[i]);
-      if (!target) throw new Error(`Missing elevator cable ${i + 1}`);
+      if (!target) throw new Error(`Missing elevator drone target ${i + 1}`);
       const drone = new SecurityDrone({ id: `room-4-drone-${i + 1}`, type: 'ceiling',
         initialPosition: new THREE.Vector3(), colliderSize: new THREE.Vector3(1.2, .7, 1.2),
         forward: new THREE.Vector3(0, -1, 0), scanAxis: new THREE.Vector3(0, 0, 1),
@@ -64,16 +72,20 @@ export class ElevatorDroneEncounter {
         warningSeconds: .8, fireIntervalSeconds: .9, targetLossGraceSeconds: .02,
         cooldownSeconds: .6, muzzleAnchor: new THREE.Vector3(0, -.5, 0),
         targetPolicy: 'both', initialScanPhase: .5,
-      }, world, surfaces, this.projectiles, this.resources);
+      }, world, surfaces, this.projectiles, this.resources, target.mesh);
+      drone.collider.userData.authoringRole = 'lift-drone-movement-body';
       root.add(drone.root);
       drone.root.scale.setScalar(1.5);
-      return { drone, target, root, phase: 'pending', fallTime: 0, ejected: 0 };
+      const flight = new LiftDroneFlightPresentation(drone.presentation, this.resources, this.flameMaterial, target, i * 1.7);
+      return { flight, drone, target, root, phase: 'pending', fallTime: 0, ejected: 0 };
     });
     this.unsubscribers.push(this.damage.events.on('died', ({ slimeId }) => requestDeath(slimeId)));
     this.unsubscribers.push(dissolve.events.on('burnStarted', ({ target }) => {
       const slot = this.slots.find(s => s.target === target);
       if (!slot || (slot.phase !== 'approaching' && slot.phase !== 'firing')) return;
       slot.phase = 'corroding'; slot.drone.setEnabled(false);
+      slot.drone.frontIndicator.material.color.setHex(0xa5ff67);
+      slot.drone.frontIndicator.scale.setScalar(1.6);
     }));
     this.reset();
   }
@@ -84,7 +96,7 @@ export class ElevatorDroneEncounter {
     if (controller.readModel.elapsed >= 60) {
       if (!this.ended) { this.ended = true; this.cancelTransientState();
         for (const slot of this.slots) {
-          if (slot.phase === 'settled' || slot.phase === 'falling') continue;
+          if (slot.phase === 'falling') continue;
           slot.phase = 'gone'; slot.root.visible = false;
           slot.target.mesh.visible = false; slot.drone.collider.visible = false;
           this.world.unregister(slot.target.mesh); } }
@@ -121,31 +133,37 @@ export class ElevatorDroneEncounter {
       }
       if (slot.phase === 'corroding' && slot.target.completed) {
         slot.phase = 'falling'; slot.fallTime = 0;
+        slot.drone.frontIndicator.material.color.setHex(0x26352a);
+        slot.drone.frontIndicator.scale.setScalar(.78);
       }
       if (slot.phase === 'falling') {
         const previousY = slot.root.position.y + slot.drone.root.position.y;
         slot.fallTime += dt;
-        // A severed centre-front winch sheds its wreck sideways, leaving the
-        // maintenance vent and its approach permanently clear.
+        // A downed centre-front drone tumbles sideways, leaving the
+        // maintenance vent and its approach clear during the fall.
         const [authoredX, authoredZ] = ROOM_FOUR_ANCHORS[ROOM_FOUR_SPAWNS[i].anchor];
         if (authoredZ > 11 && Math.abs(authoredX) < 2) {
           slot.root.position.x = THREE.MathUtils.lerp(authoredX, i % 2 ? -2.8 : 2.8, Math.min(1, slot.fallTime / .45));
         }
-        let supportY = .24;
-        for (const other of this.slots) {
-          if (other === slot || other.phase !== 'settled') continue;
-          if (Math.abs(other.root.position.x - slot.root.position.x) < 1.8 &&
-            Math.abs(other.root.position.z - slot.root.position.z) < 1.8) {
-            supportY = Math.max(supportY, other.root.position.y + other.drone.root.position.y + .525);
-          }
-        }
+        const supportY = .24;
         const y = Math.max(supportY + .525, slot.root.position.y - 12 * slot.fallTime * slot.fallTime);
         slot.drone.root.position.y = y - slot.root.position.y;
         this.ejectStruckBodies(slot, previousY, y);
-        if (y <= supportY + .525 + 1e-8) slot.phase = 'settled';
+        slot.drone.presentation.root.rotation.set(Math.min(.5, slot.fallTime * .6), 0,
+          Math.sin(i + 1) * Math.min(.9, slot.fallTime * 1.6));
+        if (y <= supportY + .525 + 1e-8) {
+          // Impact finishes the wreck's gameplay lifetime. Short, pooled fragments
+          // replace the body so subsequent waves cannot build a permanent pile.
+          slot.phase = 'gone';
+          slot.drone.setCollisionEnabled(false);
+          slot.root.visible = false;
+          slot.drone.collider.visible = false;
+          this.breakup.burst(i, slot.root.position.x, supportY, slot.root.position.z);
+        }
       }
+      slot.flight.update(dt, slot.phase === 'approaching' || slot.phase === 'firing', slot.phase === 'approaching');
     }
-    this.room.syncCables();
+    this.breakup.update(dt);
     this.projectiles.update(dt, this.projectileTargets);
   }
 
@@ -171,42 +189,40 @@ export class ElevatorDroneEncounter {
         best = distance; this.ejection.set(x, this.local.y, z); this.impulse.set(sx * 24, 12, sz * 24);
       }
       if (!Number.isFinite(best)) continue;
-      for (const other of this.slots) {
-        if (other.phase !== 'settled') continue;
-        if (Math.abs(this.ejection.x - other.root.position.x) < .9 + r &&
-          Math.abs(this.ejection.z - other.root.position.z) < .9 + r) {
-          this.ejection.y = Math.max(this.ejection.y, other.root.position.y + other.drone.root.position.y + .525 + r + .02);
-        }
-      }
       body.teleport(this.room.root.localToWorld(this.ejection)); body.applyKnockback(this.impulse);
       slot.ejected |= 1 << i;
     }
   }
 
   diagnostics(): string {
-    return this.slots.map((s, i) => `${i + 1}: ${s.phase}, anchor=${ROOM_FOUR_SPAWNS[i].anchor}, height=${s.root.position.y.toFixed(1)}, cable=${s.target.progress.toFixed(2)}`).join('\n');
+    return this.slots.map((s, i) => `${i + 1}: ${s.phase}, anchor=${ROOM_FOUR_SPAWNS[i].anchor}, height=${s.root.position.y.toFixed(1)}, corrosion=${s.target.progress.toFixed(2)}`).join('\n');
   }
   cancelTransientState(): void {
     this.projectiles.reset();
     for (const slot of this.slots) slot.drone.setEnabled(false);
   }
   reset(): void {
-    this.ended = false; this.retargetCooldown = 0; this.projectiles.reset(); this.damage.reset();
+    this.ended = false; this.retargetCooldown = 0; this.projectiles.reset(); this.damage.reset(); this.breakup.reset();
     for (const [i, slot] of this.slots.entries()) {
-      slot.drone.reset(); slot.drone.setEnabled(false);
+      slot.drone.reset(); slot.drone.setEnabled(false); slot.flight.reset();
+      slot.drone.presentation.root.rotation.set(0, 0, 0);
       const [x, z] = ROOM_FOUR_ANCHORS[ROOM_FOUR_SPAWNS[i].anchor];
       slot.root.visible = false; slot.root.position.set(x, 30, z);
       slot.target.mesh.visible = false; slot.drone.collider.visible = false;
       slot.phase = 'pending'; slot.fallTime = 0; slot.ejected = 0;
       this.world.register(slot.drone.collider, undefined, ColliderTransformMode.Dynamic);
       this.world.setTransformMode(slot.target.mesh, ColliderTransformMode.Dynamic);
+      // The damage envelope owns acid/aim queries. Physical bodies still block
+      // movement and other drones' sightlines, without occluding their own target.
+      this.world.setLayerMask(slot.target.mesh, CollisionLayer.Projectile | CollisionLayer.CameraObstruction);
+      this.world.setLayerMask(slot.drone.collider,
+        DEFAULT_SOLID_COLLISION_LAYERS & ~(CollisionLayer.Projectile | CollisionLayer.CameraObstruction));
     }
-    this.room.syncCables();
   }
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
     for (const unsubscribe of this.unsubscribers) unsubscribe();
-    for (const slot of this.slots) slot.drone.dispose();
-    this.projectiles.dispose(); this.damage.dispose(); this.resources.dispose();
+    for (const slot of this.slots) { slot.flight.dispose(); slot.drone.dispose(); }
+    this.projectiles.dispose(); this.damage.dispose(); this.breakup.dispose(); this.resources.dispose(); this.flameMaterial.dispose();
   }
 }
