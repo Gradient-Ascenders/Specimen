@@ -21,20 +21,19 @@ export class CultivationDroneChamberArt {
       emission: number, intensity: number) => {
       const m = new THREE.MeshStandardMaterial().copy(source);
       m.name = `cultivation-drone-chamber-${name}`; m.color.setHex(color); m.roughness = .92;
-      // Retain the previous chamber finishes' visibility under the existing lights.
+      // A restrained visibility floor leaves the chamber's practical lights dominant.
       m.emissive.setHex(emission); m.emissiveIntensity = intensity; m.emissiveMap = m.map;
       m.onBeforeCompile = source.onBeforeCompile;
       const key = source.customProgramCacheKey(); m.customProgramCacheKey = () => key;
       this.materials.push(m); return m;
     };
-    this.wall = finish(contamination.finishes.wall, 'stained-panels', 0xbcbdb0, 0xcdd2c9, .065);
-    this.ceiling = finish(contamination.finishes.ceiling, 'soot-stained-ceiling', 0x828b80, 0x3e4e51, .045);
-    this.enamel = finish(lab.platform, 'solid-shield-panels', 0xafa79b, 0xafa79b, .065);
-    this.iron = finish(lab.pole, 'corroded-fittings', 0xc3a88a, 0x3e4e51, .045);
-    // Match the shared dirty ceramic deck, with the material visibility lift
-    // already used by maintenance floors. This does not add or alter lights.
-    this.deck = finish(lab.platform, 'dirty-white-deck', 0xe1dfd6, 0xe1dfd6, .085);
-    this.landing = finish(contamination.finishes.floor, 'dirty-landing-tile', 0xd3cfc3, 0xd3cfc3, .085);
+    this.wall = finish(contamination.finishes.wall, 'stained-panels', 0xbcbdb0, 0xcdd2c9, .025);
+    this.ceiling = finish(contamination.finishes.ceiling, 'soot-stained-ceiling', 0x828b80, 0x3e4e51, .018);
+    this.enamel = finish(lab.platform, 'solid-shield-panels', 0xafa79b, 0xafa79b, .03);
+    this.iron = finish(lab.pole, 'corroded-fittings', 0xc3a88a, 0x3e4e51, .018);
+    // Keep the dirty white landing surfaces slightly more readable than the shell.
+    this.deck = finish(lab.platform, 'dirty-white-deck', 0xe1dfd6, 0xe1dfd6, .055);
+    this.landing = finish(contamination.finishes.floor, 'dirty-landing-tile', 0xd3cfc3, 0xd3cfc3, .055);
     this.addUnevenWear(this.wall, .45);
     this.addUnevenWear(this.enamel);
   }

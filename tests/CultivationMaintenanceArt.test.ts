@@ -11,20 +11,24 @@ import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/Col
 import { createRustedSewerDrone } from '../src/levels/RustedSewerDrone.ts';
 import { batchMaintenanceScout } from '../src/render/hazards/BatchMaintenanceScout.ts';
 
-test('patrol drone detailing retains its envelope and live eye with batched machinery and clear motor faces', () => {
+test('patrol drone detailing fits its envelope and retains its live eye with batched machinery and clear motor faces', () => {
   const {body, eye} = createRustedSewerDrone(false);
   body.scale.setScalar(.75);
   const bounds = new THREE.Box3().setFromObject(body, true), eyeMaterial = eye.material;
-  const eyePosition = eye.position.clone(), positions = Array.from(body.geometry.attributes.position.array);
+  const eyePosition = eye.position.clone(), oldGeometry = body.geometry;
+  let retiredHull = 0; oldGeometry.addEventListener('dispose', () => retiredHull++);
   const materials = new Set<THREE.Material>();
   body.traverse(o => { if (o instanceof THREE.Mesh) materials.add(o.material); });
   try {
     batchMaintenanceScout(body, eye);
     const after = new THREE.Box3().setFromObject(body, true);
-    assert.ok(after.min.distanceTo(bounds.min) < 1e-6 && after.max.distanceTo(bounds.max) < 1e-6);
-    assert.deepEqual(Array.from(body.geometry.attributes.position.array), positions);
+    assert.ok(bounds.containsBox(after), 'new armour and fans stay inside the previous visual envelope');
+    assert.notEqual(body.geometry, oldGeometry);
+    assert.equal(retiredHull, 1, 'replaced hull is disposed');
     assert.equal(eye.material, eyeMaterial); assert.deepEqual(eye.position, eyePosition);
-    assert.equal(body.children.length, 3, 'one eye and two shared machinery batches');
+    assert.equal(body.children.length, 4, 'one eye, two machinery batches and one shared sensor batch');
+    const markers = body.children.find(o => o !== eye && o instanceof THREE.Mesh && o.material === eyeMaterial);
+    assert.ok(markers, 'sensor markers share live network status without extra lights');
     assert.deepEqual(auditOpaqueSurfaces(body, .01).conflicts, [], 'motor clearance at the actual patrol scale');
     body.traverse(o => { if (o instanceof THREE.Mesh) assert.ok(materials.has(o.material)); });
   } finally {
@@ -119,7 +123,7 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     });
     const panels = [...chamberMaterials].find(m => m.name.endsWith('stained-panels'))!;
     assert.equal(panels.map, contamination.finishes.wall.map, 'reuse the earlier rooms weathering');
-    assert.equal(panels.emissiveIntensity, .065, 'retain the chamber wall emission');
+    assert.equal(panels.emissiveIntensity, .025, 'keep chamber wall emission subdued');
     assert.equal(panels.emissive.getHex(), 0xcdd2c9);
     const platformArt = room.root.getObjectByName('cultivation-static-platform-art')!;
     const whiteDecks: THREE.Mesh[] = [];

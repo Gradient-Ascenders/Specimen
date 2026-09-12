@@ -142,7 +142,7 @@ export class LevelTwoRoomFiveGreybox {
     addRoomFiveParkour(b);
     // Leave the final safe platform away from the cage and patrol arena.
     box('release-quiet-walk', [3, .5, 8], [0, 28.75, 30.5], m.support);
-    b.addLight('room-5-release-wayfinding', [0, 32, 27], 0xffe3a0, 60, 9);
+    b.addLight('room-5-release-wayfinding', [0, 32, 27], 0xffe3a0, 40, 8);
     this.lever = box('manual-release-lever', [.16, 1, .16], [0, 30, 27.35], m.cable);
     this.lever.geometry.translate(0, .5, 0);
     const grip = b.addVisualBox({ name: 'room-5-release-lever-grip', size: [.85, .22, .25],
@@ -163,7 +163,7 @@ export class LevelTwoRoomFiveGreybox {
     }
     this.captiveVolt = new THREE.Mesh(new THREE.SphereGeometry(.65, 20, 12), new THREE.MeshStandardMaterial({ color: 0xffe85c, emissive: 0xffd21a, emissiveIntensity: 1.5 }));
     this.captiveVolt.name = 'room-5-captive-volt'; this.pod.add(this.captiveVolt);
-    const voltGlow = b.addLight('room-5-volt-glow', [0, 0, 0], 0xffdc35, 70, 14);
+    const voltGlow = b.addLight('room-5-volt-glow', [0, 0, 0], 0xffdc35, 50, 12);
     this.pod.add(voltGlow);
     voltGlow.castShadow = true; voltGlow.shadow.mapSize.set(512, 512);
     voltGlow.shadow.bias = -.0002; voltGlow.shadow.normalBias = .025;

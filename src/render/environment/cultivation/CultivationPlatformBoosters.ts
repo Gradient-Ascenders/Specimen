@@ -91,7 +91,7 @@ export class CultivationPlatformBoosters {
     exhaust.computeBoundingSphere(); this.root.add(exhaust); this.meshes.push(exhaust);
     // Two stable slots, no shadow maps and no per-platform light proliferation.
     for (let i = 0; i < 2; i++) {
-      const light = new THREE.PointLight(0xffa65b, 0, 7, 2);
+      const light = new THREE.PointLight(0xffa65b, 0, 6, 2);
       light.name = `room-5-platform-booster-spill-${i}`;
       this.root.add(light); this.lamps.push({light, jet: -1});
     }
@@ -114,7 +114,7 @@ export class CultivationPlatformBoosters {
           lamp.jet = target; lamp.light.position.copy(nearest.position); lamp.light.position.y -= .15;
         }
       } else {
-        const power = target < 0 ? 0 : 8 * (.96 + .04 * Math.sin(this.clock.value * 9 + target));
+        const power = target < 0 ? 0 : 6 * (.96 + .04 * Math.sin(this.clock.value * 9 + target));
         lamp.light.intensity = THREE.MathUtils.damp(lamp.light.intensity, power, 8, dt);
       }
     }

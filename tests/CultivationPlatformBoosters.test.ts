@@ -23,9 +23,9 @@ test('boosters preserve all platforms and collision while reusing two fading lig
       player.set(...stop as [number, number, number]); room.root.localToWorld(player);
       for (let i = 0; i < 120; i++) art.update(1 / 60, player);
       assert.deepEqual(art.root.children.filter(o => o instanceof THREE.PointLight), lamps, 'light identities and count remain stable');
-      assert.ok(lamps.every(l => !l.castShadow && l.visible && l.intensity >= 0 && l.intensity <= 8));
+      assert.ok(lamps.every(l => !l.castShadow && l.visible && l.intensity >= 0 && l.intensity <= 6));
       if (stop[0] === 40) assert.ok(lamps.every(l => l.intensity === 0), 'no booster spill follows the player into the sewer');
-      else assert.ok(lamps.every(l => l.intensity > 7));
+      else assert.ok(lamps.every(l => l.intensity > 5));
     }
     art.reset();
     assert.ok(lamps.every(l => l.intensity === 0));
