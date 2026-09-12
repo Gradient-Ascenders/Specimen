@@ -91,9 +91,11 @@ test('Room 2 and its two exit routes share the palette without changing gameplay
     assert.deepEqual(snapshot.mesh.quaternion.toArray(), snapshot.quaternion);
     assert.deepEqual(snapshot.mesh.scale.toArray(), snapshot.scale);
     if (snapshot.metadata.textureRole === 'sticky-wall-tile') {
-      assert.equal(snapshot.mesh.material, art.sticky);
-      assert.equal(art.sticky.color.getHex(), 0x72ead0);
-      assert.equal(art.sticky.roughness, 0.24);
+      assert.equal(snapshot.mesh.material, /^cultivation-room-2-sticky-route-[a-e]$/.test(snapshot.mesh.name)
+        ? art.platformArt.hidden : art.sticky);
+      assert.equal(art.sticky.map?.name, 'cultivation-aged-membrane-albedo');
+      assert.ok(art.sticky.roughness >= .6, 'aged membrane avoids mirror-like glare');
+      assert.equal(art.sticky.transparent, false, 'wear does not suggest holes in a climbable surface');
       assert.ok(art.sticky.normalMap);
       assert.ok(art.sticky.roughnessMap);
     } else if (snapshot.metadata.environmentRole === 'air-duct-entry') {
@@ -104,6 +106,12 @@ test('Room 2 and its two exit routes share the palette without changing gameplay
       assert.equal(snapshot.mesh.material, snapshot.material);
     }
   }
+  const skin = room.root.getObjectByName('cultivation-room-2-continuous-sticky-route') as THREE.Mesh;
+  assert.equal(skin.material, art.sticky);
+  assert.equal(skin.userData.presentationOnly, true);
+  assert.equal(room.collisionMeshes.includes(skin), false);
+  let skinDisposals = 0;
+  skin.geometry.addEventListener('dispose', () => skinDisposals++);
   assert.equal(room.lasers.hazards.length, 4);
   const wallSeam = room.root.getObjectByName('room-2-panel-seam-1-5') as THREE.Mesh;
   assert.equal(wallSeam.material, art.metal);
@@ -134,6 +142,8 @@ test('Room 2 and its two exit routes share the palette without changing gameplay
     assert.equal(snapshot.mesh.material, snapshot.material);
     assert.equal(snapshot.mesh.geometry, snapshot.geometry);
   }
+  assert.equal(skin.parent, null);
+  assert.equal(skinDisposals, 1);
   room.dispose();
   passage.dispose();
   duct.dispose();

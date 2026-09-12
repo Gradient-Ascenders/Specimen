@@ -45,8 +45,10 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
       for (const material of materials) if (material.name === 'cultivation-maintenance-adhesive-tile') {
         adhesiveSurfaces++;
         assert.ok(material instanceof THREE.MeshStandardMaterial);
-        assert.equal(material.color.getHex(), 0x79cbdc, 'preserve a light-blue adhesive tint');
-        assert.equal(material.emissiveIntensity, .025, 'keep only a faint tint in darkness');
+        assert.equal(material.map, lab.sticky.map, 'share the jade adhesive route cue');
+        assert.equal(material.emissive.getHex(), lab.sticky.emissive.getHex());
+        assert.equal(material.emissiveIntensity, lab.sticky.emissiveIntensity);
+        assert.equal(object.geometry.getAttribute('membranePanel').count, object.geometry.getAttribute('position').count);
         assert.equal(material.normalMap, lab.sticky.normalMap, 'preserve the wet adhesive finish');
       }
     });

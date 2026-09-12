@@ -4,6 +4,7 @@ import type { LevelTwoRoomFiveGreybox } from '../../../levels/LevelTwoRoomFiveGr
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
 import { CultivationVoltPodArt } from './CultivationVoltPodArt.ts';
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
+import { configureCultivationMembraneMaterial } from './CultivationMembraneMaterial.ts';
 
 /** Room-specific dressing of the shared facility library. No gameplay or frame updates. */
 export class CultivationMaintenanceArt {
@@ -25,6 +26,7 @@ export class CultivationMaintenanceArt {
       material.emissive.setHex(colour); material.emissiveIntensity = lift;
       material.emissiveMap = material.map;
       material.userData.tileSizeMetres = source === lab.wall ? [4, 3] : source === lab.sticky ? [6.08, 6.55] : [2, 2];
+      if (source === lab.sticky) configureCultivationMembraneMaterial(material);
       optimizeFiniteLightEvaluation(material);
       this.materials.push(material); b.borrowedMaterials.add(material);
       return material;
@@ -38,8 +40,9 @@ export class CultivationMaintenanceArt {
     const culvert = variant(lab.floor, 'culvert-lining', 0x526459, .87, .035);
     culvert.side = THREE.BackSide;
     const oxidized = variant(lab.metal, 'worn-service-iron', 0x796b52, .8);
-    // A faint blue lift preserves adhesive readability in the dark vent.
-    const sticky = variant(lab.sticky, 'adhesive-tile', 0x79cbdc, lab.sticky.roughness, .025);
+    // Preserve the same jade route cue in the dim maintenance section.
+    const sticky = variant(lab.sticky, 'adhesive-tile', 0xffffff, lab.sticky.roughness, .14);
+    sticky.emissive.copy(lab.sticky.emissive);
     const terminal = variant(lab.metal, 'conductive-terminal', 0xb9a55a, .45, .16);
     // Retain the existing maps. Only the drainage finish adds world-scale runoff shading.
     const compileWet = wet.onBeforeCompile;
@@ -127,7 +130,7 @@ export class CultivationMaintenanceArt {
       mesh.updateMatrix();
       let geometry = mesh.geometry.clone();
       if (geometry.index) { const indexed = geometry; geometry = indexed.toNonIndexed(); indexed.dispose(); }
-      for (const attribute of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv'].includes(attribute)) geometry.deleteAttribute(attribute);
+      for (const attribute of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv', 'membranePanel'].includes(attribute)) geometry.deleteAttribute(attribute);
       geometry.applyMatrix4(mesh.matrix); part.geometries.push(geometry);
       this.originals.push({ mesh, material: mesh.material }); mesh.material = this.hidden;
     }

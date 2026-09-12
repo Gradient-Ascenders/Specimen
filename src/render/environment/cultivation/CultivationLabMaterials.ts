@@ -1,10 +1,12 @@
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
 import { AcidSurfaceMaterial } from '../containment/AcidSurfaceMaterial.ts';
+import { createCultivationStickyRouteGeometry } from './CultivationStickyRouteGeometry.ts';
 import { CultivationPlatformArt } from './CultivationPlatformArt.ts';
 import { createCultivationPlatformWear } from './CultivationPlatformWear.ts';
+import { createCultivationMembraneMaterial, createCultivationMembraneTextures, mapCultivationMembranePanel } from './CultivationMembraneMaterial.ts';
 import * as THREE from 'three';
-import { createContainmentStickyWallTextures, createContainmentCeramicTextures, createAcidFoundationAlbedo } from '../containment/ContainmentProceduralTextures.ts';
-import { createContainmentStickyWallMaterial, createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
+import { createContainmentCeramicTextures, createAcidFoundationAlbedo } from '../containment/ContainmentProceduralTextures.ts';
+import { createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 
 interface LabFixtureOptions {
@@ -18,8 +20,8 @@ interface LabFixtureOptions {
 /** Original, deterministic facility finishes shared by the dressed Cultivation rooms. */
 export class CultivationLabMaterials {
   readonly textures: THREE.DataTexture[] = [];
-  private readonly stickyMaps = createContainmentStickyWallTextures();
-  readonly sticky = createContainmentStickyWallMaterial(this.stickyMaps);
+  private readonly stickyMaps = createCultivationMembraneTextures();
+  readonly sticky = createCultivationMembraneMaterial(this.stickyMaps);
   readonly wall = this.finish('wall', 0xe2e1d8, 0.76, 0.02);
   readonly floor = this.finish('floor', 0xaeb7b2, 0.84, 0.08);
   readonly ceiling = this.finish('ceiling', 0xcbd0ca, 0.8, 0.06);
@@ -66,7 +68,7 @@ export class CultivationLabMaterials {
     this.acidFoundation.repeat.set(4, 3);
     this.acid.userData.tileSizeMetres = [32.7, 26.7];
     this.textures.push(this.acidFoundation);
-    this.textures.push(this.stickyMaps.stickyNormal, this.stickyMaps.stickyRoughness);
+    this.textures.push(...Object.values(this.stickyMaps));
     for (const texture of Object.values(this.platformMaps)) {
       texture.repeat.set(4, 4);
       this.textures.push(texture);
@@ -124,6 +126,18 @@ export class CultivationLabMaterials {
         this.bind(object, material);
       }
     });
+    if (builder.root.name === 'cultivation-room-2-greybox') {
+      const panels = builder.collisionMeshes.filter(mesh => /^cultivation-room-2-sticky-route-[a-e]$/.test(mesh.name)) as THREE.Mesh<THREE.BoxGeometry>[];
+      if (panels.length) {
+        const skin = new THREE.Mesh(createCultivationStickyRouteGeometry(panels), this.sticky);
+        skin.name = 'cultivation-room-2-continuous-sticky-route';
+        skin.userData.presentationOnly = true;
+        builder.root.add(skin);
+        this.decorations.push(skin);
+        builder.borrowedMaterials.add(this.platformArt.hidden);
+        for (const panel of panels) panel.material = this.platformArt.hidden;
+      }
+    }
     for (const platform of platforms) this.platformArt.add(platform);
     if (builder.root.name === 'cultivation-room-3-greybox') this.platformArt.batchStatic(builder.root);
   }
@@ -151,6 +165,7 @@ export class CultivationLabMaterials {
         (Math.abs(ny) > 0.5 ? -ny * pz : py) / panelHeight);
     }
     uv.needsUpdate = true;
+    if (material.userData.cultivationMembrane) mapCultivationMembranePanel(mesh.geometry);
     mesh.material = material;
   }
 
