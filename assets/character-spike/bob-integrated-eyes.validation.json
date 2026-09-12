@@ -1,0 +1,163 @@
+{
+  "status": "Integrated facial architecture candidate; awaiting user approval",
+  "blender_version": "5.2.1 LTS",
+  "original_sha256": {
+    "bob-production-base.blend": "d5114706ef63011202cf7af9ed03ef31c08f0d770b7aa6e9d3dd66425616dade",
+    "bob-material-lookdev.blend": "9d7f24e410fbf5e93cb8ee8fb570f30f2d808a90e6ea688ca464ea2950c44295"
+  },
+  "architecture": "One connected closed body mesh; gel/eye/catchlight material face regions; one set of body keys; no separate eye objects, masks, drivers or modifiers.",
+  "neutral_preservation": {
+    "max_original_vertex_drift": 0.0,
+    "max_surface_drift": 1.3328003944934608e-07,
+    "max_uv_interpolation_drift": 1.3328003749250113e-07,
+    "material_node_graphs_unchanged": true,
+    "regions": {
+      "Bob-Eye-Left": {
+        "projected_area_ratio": 1.0000000114286047,
+        "body_region_faces": 692
+      },
+      "Bob-Eye-Right": {
+        "projected_area_ratio": 1.000000006051261,
+        "body_region_faces": 565
+      },
+      "Bob-Catchlight-Left": {
+        "projected_area_ratio": 1.0000000975125434,
+        "body_region_faces": 64
+      },
+      "Bob-Catchlight-Right": {
+        "projected_area_ratio": 0.9999999686200882,
+        "body_region_faces": 55
+      }
+    }
+  },
+  "source": {
+    "vertices": 3985,
+    "polygons": 5685,
+    "triangles": 7966,
+    "connected_components": 1,
+    "materials": [
+      "Bob-Gel-A-Opaque",
+      "Bob-Eye-Wet-Navy",
+      "Bob-Catchlight-Soft-White"
+    ]
+  },
+  "poses": {
+    "Basis": {
+      "0": {
+        "volume_ratio": 1.0,
+        "minimum_polygon_area": 5.932841024014479e-11,
+        "nonadjacent_intersections": 0
+      }
+    },
+    "Squash": {
+      "0.25": {
+        "volume_ratio": 1.022483875488442,
+        "minimum_polygon_area": 5.901387017948068e-11,
+        "nonadjacent_intersections": 0
+      },
+      "0.5": {
+        "volume_ratio": 1.0365151991628854,
+        "minimum_polygon_area": 5.709569969591932e-11,
+        "nonadjacent_intersections": 0
+      },
+      "0.75": {
+        "volume_ratio": 1.0413937308978163,
+        "minimum_polygon_area": 5.5314926250549235e-11,
+        "nonadjacent_intersections": 0
+      },
+      "1.0": {
+        "volume_ratio": 1.0364188011519286,
+        "minimum_polygon_area": 5.451091314445655e-11,
+        "nonadjacent_intersections": 0
+      }
+    },
+    "Stretch": {
+      "0.25": {
+        "volume_ratio": 1.0359408010750897,
+        "minimum_polygon_area": 5.869060099028545e-11,
+        "nonadjacent_intersections": 0
+      },
+      "0.5": {
+        "volume_ratio": 1.0466333656961977,
+        "minimum_polygon_area": 5.836022637373262e-11,
+        "nonadjacent_intersections": 0
+      },
+      "0.75": {
+        "volume_ratio": 1.0339926299611928,
+        "minimum_polygon_area": 5.833718924597164e-11,
+        "nonadjacent_intersections": 0
+      },
+      "1.0": {
+        "volume_ratio": 0.9999332575598642,
+        "minimum_polygon_area": 5.940504338441954e-11,
+        "nonadjacent_intersections": 0
+      }
+    },
+    "Cling": {
+      "0.25": {
+        "volume_ratio": 1.0078942883147872,
+        "minimum_polygon_area": 5.968288363522589e-11,
+        "nonadjacent_intersections": 0
+      },
+      "0.5": {
+        "volume_ratio": 1.0108111048081077,
+        "minimum_polygon_area": 6.004904212764117e-11,
+        "nonadjacent_intersections": 0
+      },
+      "0.75": {
+        "volume_ratio": 1.008335262571995,
+        "minimum_polygon_area": 5.857465207315116e-11,
+        "nonadjacent_intersections": 0
+      },
+      "1.0": {
+        "volume_ratio": 1.0000511480945948,
+        "minimum_polygon_area": 5.838679539849068e-11,
+        "nonadjacent_intersections": 0
+      }
+    }
+  },
+  "glb": {
+    "sha256": "7ff7e778424cef4df5579189feffcf317849afd1e23d7cd0c7316f48118b2ed8",
+    "bytes": 551680,
+    "meshes": 1,
+    "nodes": 2,
+    "material_primitives": 3,
+    "material_names": [
+      "Bob-Gel-A-Opaque",
+      "Bob-Eye-Wet-Navy",
+      "Bob-Catchlight-Soft-White"
+    ],
+    "morph_names": [
+      "Squash",
+      "Stretch",
+      "Cling"
+    ],
+    "vertices_with_uv_material_splits": 4772,
+    "shared_vertex_duplicates_checked": 787,
+    "matching_seam_morph_deltas": true,
+    "animations": 0,
+    "textures": 0
+  },
+  "roundtrip": {
+    "mesh_objects": 1,
+    "vertices": 3985,
+    "triangles": 7966,
+    "morph_names": [
+      "Squash",
+      "Stretch",
+      "Cling"
+    ],
+    "materials_preserved": true,
+    "uv_preserved": true,
+    "min_normal_dot": 0.9999998211860657,
+    "max_position_drift_all_weights": 5.960464477539063e-08,
+    "tested_weights": [
+      0,
+      0.25,
+      0.5,
+      0.75,
+      1
+    ],
+    "no_separate_eye_objects": true
+  }
+}
