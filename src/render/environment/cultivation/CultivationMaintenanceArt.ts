@@ -156,7 +156,7 @@ export class CultivationMaintenanceArt {
       box(metal, [x, 19, z], [.04, 36, .12]);
     }
     // Quiet guide markings keep the fork and final terminal legible in the existing darkness.
-    for (const x of [-9, -5, 5, 13, 21, 29, 37]) box(teal, [x, .208, 8.1], [1.1, .01, .1]);
+    for (const x of [-9, -5, 5, 13, 21]) box(teal, [x, .208, 8.1], [1.1, .01, .1]);
     for (const x of [13.9, 18.1]) box(lab.platformArt.warning, [x, .01, 68], [.12, .02, 2.2]);
     for (const [material, transforms] of accents) {
       b.borrowedMaterials.add(material);

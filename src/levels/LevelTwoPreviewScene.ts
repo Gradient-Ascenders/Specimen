@@ -1,3 +1,4 @@
+import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../render/environment/cultivation/CultivationMaintenanceArt.ts';
 import { CultivationElevatorArt } from '../render/environment/cultivation/CultivationElevatorArt.ts';
@@ -111,6 +112,7 @@ export class LevelTwoPreviewScene {
   readonly roomFive: LevelTwoRoomFiveGreybox;
   readonly maintenanceArt: CultivationMaintenanceArt;
   readonly elevatorArt: CultivationElevatorArt;
+  readonly surfaceCleanup: CultivationSurfaceCleanup;
   readonly roomOneToTwoPassage = new LevelTwoLabPassageGreybox({
     id: 'cultivation-room-1-to-2-lab-passage',
     fromRoomId: 1,
@@ -215,6 +217,7 @@ export class LevelTwoPreviewScene {
       this.roomFour.root,
       this.roomFive.root,
     );
+    this.surfaceCleanup = new CultivationSurfaceCleanup(this);
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),
@@ -378,6 +381,7 @@ export class LevelTwoPreviewScene {
   }
 
   dispose(): void {
+    this.surfaceCleanup.dispose();
     this.maintenanceArt.dispose();
     this.elevatorArt.dispose();
     this.labArt.dispose();

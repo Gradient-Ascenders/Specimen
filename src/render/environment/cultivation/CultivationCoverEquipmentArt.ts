@@ -176,7 +176,7 @@ export class CultivationCoverEquipmentArt {
             box('metal', [w * 0.19, 0.08, 0.15], [x, y, front - 0.16], 0.025);
             box('teal', [0.16, 0.08, 0.035], [x - w * 0.14, y + h * 0.045, front - 0.16], 0);
           }
-          box('teal', [0.15, h, d * 0.98], [0, 0.02, 0]);
+          box('teal', [0.15, h, d - .2], [0, 0.02, 0]);
           box('teal', [w * 0.35, 0.42, d * 0.7], [-w * 0.27, h / 2 + 0.09, 0]);
           break;
         case 5: // Rounded process housing with actual circular lid and motor tower.

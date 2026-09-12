@@ -72,7 +72,7 @@ export class RoomFiveSewer {
     for (let i = 17; i < 20; i++) {
       const angle = (i + .5) * Math.PI / 20;
       const panel = b.addVisualBox({ name: `room-5-sewer-hidden-exit-skin-${i}`,
-        size: [2 * 10 * Math.tan(Math.PI / 40), .35, 4],
+        size: [2 * 10 * Math.tan(Math.PI / 40), .35, 3.96],
         position: [40 + 10 * Math.cos(angle), -12 + 10 * Math.sin(angle), 124], material: m.duct });
       panel.rotation.z = angle + Math.PI / 2;
       panel.position.sub(this.door.position); this.door.add(panel);

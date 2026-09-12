@@ -79,7 +79,7 @@ export class LevelTwoRoomFourGreybox {
           position: [x, 0, 10], material: m.platform });
         group.add(beam);
         const pipe = b.addVisualBox({ name: `room-4-shaft-pipe-${i}-${x}`, size: [.2, 7.8, .2],
-          position: [x, 3.9, 13.8], material: m.support });
+          position: [x, 3.9, 13.65], material: m.support });
         group.add(pipe);
       }
       this.modules.push(group); this.root.add(group);
