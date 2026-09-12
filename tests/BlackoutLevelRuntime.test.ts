@@ -1076,7 +1076,7 @@ test('mounted Volt ascends/descends, aim freezes the drone, and existing electri
   }
 });
 
-test('maintenance drone checkpoint recovery restores parked mount state and restart returns damaged baseline', () => {
+test('maintenance drone checkpoint recovery survives death cancellation and repeated restart', () => {
   const originalDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -1148,10 +1148,35 @@ test('maintenance drone checkpoint recovery restores parked mount state and rest
       [...captured],
     );
 
-    runtime.restartLevel();
-    assert.equal(runtime.maintenanceDroneReadModel?.state, 'damaged-idle');
-    assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, false);
-    assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, false);
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    input.press('switchSlime');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'volt');
+    assert.equal(runtime.maintenanceDroneReadModel?.state, 'mounted');
+
+    input.press('moveForward');
+    for (let step = 0; step < 10; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.ok(runtime.maintenanceDroneReadModel!.horizontalSpeed > 0);
+
+    assert.equal(runtime.requestFailure(), true);
+    assert.equal(runtime.maintenanceDroneReadModel?.horizontalSpeed, 0);
+    assert.equal(runtime.maintenanceDroneReadModel?.verticalSpeed, 0);
+
+    for (let restart = 0; restart < 3; restart += 1) {
+      runtime.restartLevel();
+      assert.equal(runtime.maintenanceDroneReadModel?.state, 'damaged-idle');
+      assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, false);
+      assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, false);
+      assert.equal(
+        runtime.maintenanceDroneReadModel?.firstMountTutorialAvailable,
+        false,
+      );
+      runtime.fixedUpdate(1 / 60);
+      assert.equal(runtime.maintenanceDroneReadModel?.mountAvailable, true);
+    }
 
     runtime.dispose();
     assert.equal(scene.children.length, 0);

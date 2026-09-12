@@ -435,6 +435,28 @@ test('acid short and inaccessible recovery always return a usable authored drone
       });
     }
     assert.equal(fixture.controller.readModel.state, 'damaged-idle');
+
+    assert.equal(
+      fixture.controller.requestRecovery('out-of-bounds'),
+      true,
+    );
+    for (let step = 0; step < 20; step += 1) {
+      fixture.controller.update(DT, {
+        horizontalDirection: STILL,
+        ascendHeld: false,
+        descendHeld: false,
+        aimHeld: false,
+        controllingVolt: false,
+      });
+    }
+    assert.equal(fixture.controller.readModel.state, 'damaged-idle');
+    assert.ok(
+      new THREE.Vector3(
+        fixture.controller.readModel.position.x,
+        fixture.controller.readModel.position.y,
+        fixture.controller.readModel.position.z,
+      ).distanceTo(recovery) < 1e-9,
+    );
   } finally {
     fixture.dispose();
   }
@@ -485,6 +507,8 @@ test('checkpoint snapshot preserves stable mounted/parked learning state but nev
 test('authored drone clearance cannot pass a vent gap that ordinary Volt can traverse', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
+  const floor = createFloor(world);
+  surfaces.register(floor);
   const left = new THREE.Mesh(new THREE.BoxGeometry(4, 5, 0.3));
   const right = new THREE.Mesh(new THREE.BoxGeometry(4, 5, 0.3));
   left.name = 'vent-left-frame';
@@ -540,7 +564,13 @@ test('authored drone clearance cannot pass a vent gap that ordinary Volt can tra
       'ordinary Volt-sized body should fit through the opening',
     );
   } finally {
-    for (const mesh of [left, right, droneCollider]) {
+    world.unregister(floor);
+    surfaces.unregister(floor);
+    world.unregister(left);
+    world.unregister(right);
+    surfaces.unregister(left);
+    surfaces.unregister(right);
+    for (const mesh of [floor, left, right, droneCollider]) {
       mesh.geometry.dispose();
       const materials = Array.isArray(mesh.material)
         ? mesh.material

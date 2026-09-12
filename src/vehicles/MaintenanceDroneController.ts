@@ -576,6 +576,7 @@ implements BlackoutCheckpointParticipant {
     this.flight.teleport(this.recoveryPosition);
     this.voltMountedValue = false;
     this.pendingMountedRestore = false;
+    this.fallingSupportStepPending = false;
     this.startupElapsedSeconds = 0;
     this.recoveryElapsedSeconds = 0;
     this.recoveryReasonValue = undefined;
