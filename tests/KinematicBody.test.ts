@@ -9,7 +9,10 @@ import {
   KinematicBody,
 } from '../src/physics/KinematicBody.ts';
 import type { MovementEvents } from '../src/physics/MovementEvents.ts';
-import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
+import {
+  CollisionLayer,
+  CollisionWorld,
+} from '../src/physics/CollisionWorld.ts';
 import {
   DEFAULT_SURFACE_DEFINITIONS,
   SurfaceRegistry,
@@ -999,4 +1002,87 @@ test('authored sticky route carries movement around a vertical corner', () => {
 
   perimeterPatch.geometry.dispose();
   ledgeFascia.geometry.dispose();
+});
+
+
+test('maintenance drone support collision is opt-in and therefore cannot carry ordinary bodies', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const support = new THREE.Mesh(new THREE.BoxGeometry(4, 0.3, 4));
+  support.name = 'maintenance-drone-support-only';
+  support.position.y = 0;
+  world.register(
+    support,
+    CollisionLayer.MaintenanceDroneSupport,
+  );
+
+  const ordinary = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(0, 1.2, 0),
+  });
+  const volt = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(0, 1.2, 0),
+    config: {
+      movementCollisionMask:
+        CollisionLayer.Movement |
+        CollisionLayer.MaintenanceDroneSupport,
+      adhesionEnabled: false,
+      reboundEnabled: false,
+      chargedJumpEnabled: false,
+    },
+  });
+
+  for (let step = 0; step < 90; step += 1) {
+    ordinary.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+    volt.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  }
+
+  assert.ok(
+    ordinary.position.y < -1,
+    'default movement mask must ignore maintenance-drone support',
+  );
+  assert.equal(volt.grounded, true);
+  assert.equal(volt.supportCollider, support);
+
+  world.unregister(support);
+  support.geometry.dispose();
+  const materials = Array.isArray(support.material)
+    ? support.material
+    : [support.material];
+  for (const material of materials) material.dispose();
+});
+
+test('syncKinematicPose keeps explicit interpolation endpoints while clearing locomotion transients', () => {
+  const { body, floor } = createGroundBody();
+
+  body.applyKnockback({ x: 3, y: 4, z: 1 });
+  body.syncKinematicPose(
+    { x: 5, y: 3, z: 2 },
+    { x: 4.5, y: 2.8, z: 1.8 },
+  );
+
+  assert.deepEqual(
+    [body.position.x, body.position.y, body.position.z],
+    [5, 3, 2],
+  );
+  assert.deepEqual(
+    [
+      body.previousPosition.x,
+      body.previousPosition.y,
+      body.previousPosition.z,
+    ],
+    [4.5, 2.8, 1.8],
+  );
+  assert.deepEqual(
+    [body.velocity.x, body.velocity.y, body.velocity.z],
+    [0, 0, 0],
+  );
+  assert.equal(body.grounded, false);
+  assert.equal(body.attached, false);
+  assert.equal(body.supportCollider, null);
+
+  floor.geometry.dispose();
 });
