@@ -1,0 +1,241 @@
+{
+  "blender_version": "5.2.1 LTS",
+  "approved_source_sha256": "2dceb638f45ef6bb5bfb9217fa26189d63fef47bc30c2267518a12b3c77f9538",
+  "meshes": {
+    "Bob-Body": {
+      "vertices": 2948,
+      "faces": 3110,
+      "triangles": 5892,
+      "quads": 2782,
+      "boundary_edges": 0,
+      "components": 1,
+      "bounds": [
+        [
+          -1.2463475465774536,
+          1.138568639755249
+        ],
+        [
+          -0.9666173458099365,
+          0.7302347421646118
+        ],
+        [
+          0.15392042696475983,
+          2.0608370304107666
+        ]
+      ],
+      "self_intersections": 0,
+      "degenerate_uv_triangles": 0
+    },
+    "Bob-Eye-Left": {
+      "vertices": 193,
+      "faces": 192,
+      "triangles": 336,
+      "quads": 144,
+      "boundary_edges": 48,
+      "components": 1,
+      "bounds": [
+        [
+          -0.5565787553787231,
+          -0.22342126071453094
+        ],
+        [
+          -0.7864291667938232,
+          -0.4049534797668457
+        ],
+        [
+          0.8116392493247986,
+          1.3343607187271118
+        ]
+      ],
+      "self_intersections": 0,
+      "degenerate_uv_triangles": 0
+    },
+    "Bob-Eye-Right": {
+      "vertices": 193,
+      "faces": 192,
+      "triangles": 336,
+      "quads": 144,
+      "boundary_edges": 48,
+      "components": 1,
+      "bounds": [
+        [
+          0.09638416022062302,
+          0.42361584305763245
+        ],
+        [
+          -0.7836675643920898,
+          -0.4215223789215088
+        ],
+        [
+          0.787372350692749,
+          1.2906277179718018
+        ]
+      ],
+      "self_intersections": 0,
+      "degenerate_uv_triangles": 0
+    },
+    "Bob-Catchlight-Left": {
+      "vertices": 49,
+      "faces": 48,
+      "triangles": 72,
+      "quads": 24,
+      "boundary_edges": 24,
+      "components": 1,
+      "bounds": [
+        [
+          -0.4106261730194092,
+          -0.33571138978004456
+        ],
+        [
+          -0.5846579670906067,
+          -0.47486454248428345
+        ],
+        [
+          1.1376805305480957,
+          1.2628834247589111
+        ]
+      ],
+      "self_intersections": 0,
+      "degenerate_uv_triangles": 0
+    },
+    "Bob-Catchlight-Right": {
+      "vertices": 49,
+      "faces": 48,
+      "triangles": 72,
+      "quads": 24,
+      "boundary_edges": 24,
+      "components": 1,
+      "bounds": [
+        [
+          0.19080352783203125,
+          0.2650463879108429
+        ],
+        [
+          -0.5995491147041321,
+          -0.49724990129470825
+        ],
+        [
+          1.1002912521362305,
+          1.2263466119766235
+        ]
+      ],
+      "self_intersections": 0,
+      "degenerate_uv_triangles": 0
+    }
+  },
+  "glb": {
+    "sha256": "3766746f131ca09f81d5a6a6e9d3bd28c287697f48f92fade2b1fcd721e1d1a0",
+    "bytes": 160500,
+    "deterministic_bytes": true,
+    "nodes": 6,
+    "meshes": 5,
+    "materials": 3,
+    "textures": 0,
+    "animations": 0,
+    "morph_targets": 0,
+    "triangles": 6708,
+    "vertices_after_uv_splits": 3635
+  },
+  "roundtrip": {
+    "Bob-Body": {
+      "max_position_drift": 0,
+      "min_normal_dot": 0.9999996721744537,
+      "uv_preserved": true,
+      "triangles": 5892,
+      "bounds": [
+        [
+          -1.2463475465774536,
+          1.138568639755249
+        ],
+        [
+          -0.9666173458099365,
+          0.7302347421646118
+        ],
+        [
+          0.15392042696475983,
+          2.0608370304107666
+        ]
+      ]
+    },
+    "Bob-Eye-Left": {
+      "max_position_drift": 0,
+      "min_normal_dot": 0.9999998360872269,
+      "uv_preserved": true,
+      "triangles": 336,
+      "bounds": [
+        [
+          -0.5565787553787231,
+          -0.22342126071453094
+        ],
+        [
+          -0.7864291667938232,
+          -0.4049534797668457
+        ],
+        [
+          0.8116392493247986,
+          1.3343607187271118
+        ]
+      ]
+    },
+    "Bob-Eye-Right": {
+      "max_position_drift": 0,
+      "min_normal_dot": 0.9999998509883881,
+      "uv_preserved": true,
+      "triangles": 336,
+      "bounds": [
+        [
+          0.09638416022062302,
+          0.42361584305763245
+        ],
+        [
+          -0.7836675643920898,
+          -0.4215223789215088
+        ],
+        [
+          0.787372350692749,
+          1.2906277179718018
+        ]
+      ]
+    },
+    "Bob-Catchlight-Left": {
+      "max_position_drift": 0,
+      "min_normal_dot": 0.9999999105930328,
+      "uv_preserved": true,
+      "triangles": 72,
+      "bounds": [
+        [
+          -0.4106261730194092,
+          -0.33571138978004456
+        ],
+        [
+          -0.5846579670906067,
+          -0.47486454248428345
+        ],
+        [
+          1.1376805305480957,
+          1.2628834247589111
+        ]
+      ]
+    },
+    "Bob-Catchlight-Right": {
+      "max_position_drift": 0,
+      "min_normal_dot": 0.9999998956918716,
+      "uv_preserved": true,
+      "triangles": 72,
+      "bounds": [
+        [
+          0.19080352783203125,
+          0.2650463879108429
+        ],
+        [
+          -0.5995491147041321,
+          -0.49724990129470825
+        ],
+        [
+          1.1002912521362305,
+          1.2263466119766235
+        ]
+      ]
+    }
+  }
+}
