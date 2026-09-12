@@ -276,6 +276,7 @@ implements BlackoutCheckpointParticipant {
           vertical,
           controls.aimHeld,
         );
+        this.enforceMountedRiderClearance();
       }
     } else if (this.model.state === 'parked-hover') {
       this.flight.park();
@@ -599,6 +600,7 @@ implements BlackoutCheckpointParticipant {
       y: desiredY - this.flight.position.y,
       z: 0,
     });
+    this.enforceMountedRiderClearance();
     this.model.startupProgress = progress;
 
     if (
@@ -617,6 +619,25 @@ implements BlackoutCheckpointParticipant {
       this.model.tutorialCompleted = true;
       this.events.emit('firstMountTutorialRequested', {});
     }
+  }
+
+  private enforceMountedRiderClearance(): void {
+    if (!this.voltMountedValue) return;
+    this.authoring.riderAnchor.getWorldPosition(this.anchorPosition);
+    if (
+      this.isVoltPlacementSafe(
+        this.anchorPosition,
+        this.voltRadiusMetres,
+      )
+    ) {
+      return;
+    }
+
+    // The authored drone body may fit below a ceiling while Volt's sphere
+    // protrudes above it. Revert the whole flight step rather than allowing the
+    // rider to be synchronized inside world geometry.
+    this.flight.teleport(this.flight.previousPosition);
+    this.flight.park();
   }
 
   private updateRecovery(deltaSeconds: number): void {
