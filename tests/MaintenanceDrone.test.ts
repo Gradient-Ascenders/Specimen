@@ -514,3 +514,69 @@ test('authored drone clearance cannot pass a vent gap that ordinary Volt can tra
     }
   }
 });
+
+
+test('partial constructor failure unregisters an already-added drone support collider', () => {
+  const world = new CollisionWorld();
+  const authoring = new MaintenanceDroneDevelopmentFixture();
+  const originalRegister = world.register.bind(world);
+  world.register = ((mesh, layerMask, transformMode) => {
+    originalRegister(mesh, layerMask, transformMode);
+    if ((layerMask & CollisionLayer.MaintenanceDroneSupport) !== 0) {
+      throw new Error('injected drone collider registration failure');
+    }
+  }) as typeof world.register;
+
+  try {
+    assert.throws(
+      () => new MaintenanceDroneController({
+        world,
+        authoring: authoring.authoring,
+        voltRadiusMetres: 0.45,
+        isVoltPlacementSafe: () => true,
+      }),
+      /injected drone collider registration failure/,
+    );
+    assert.equal(
+      world.colliderCount,
+      0,
+      'constructor rollback must not leave support collision registered',
+    );
+  } finally {
+    authoring.dispose();
+    world.clear();
+  }
+});
+
+test('checkpoint capture during a parked incomplete startup normalizes to an unmounted stable recovery state', () => {
+  const fixture = createControllerFixture();
+
+  try {
+    assert.equal(
+      fixture.controller.requestMount('volt', fixture.volt.position),
+      true,
+    );
+    fixture.controller.update(0.25, {
+      horizontalDirection: STILL,
+      ascendHeld: false,
+      descendHeld: false,
+      aimHeld: false,
+      controllingVolt: true,
+    });
+    assert.equal(fixture.controller.readModel.state, 'starting');
+
+    assert.equal(fixture.controller.parkForSwitch(), true);
+    assert.equal(fixture.controller.readModel.state, 'parked-hover');
+    assert.equal(fixture.controller.readModel.startupCompleted, false);
+
+    const snapshot = fixture.controller.capture();
+    fixture.controller.restore(snapshot);
+    fixture.controller.reconcileAfterBodyRecovery('bob', fixture.volt);
+
+    assert.equal(fixture.controller.voltMounted, false);
+    assert.equal(fixture.controller.readModel.state, 'damaged-idle');
+    assert.equal(fixture.controller.readModel.startupCompleted, false);
+  } finally {
+    fixture.dispose();
+  }
+});
