@@ -50,6 +50,7 @@ export class CultivationElevatorArt {
       if (object.name.endsWith('-shutter-panel')) overrides.set(object.name, lab.duct);
     });
     lab.dress(room.builder, [], overrides);
+    this.fitBoardingFrame(room);
     const tread = room.root.getObjectByName('room-4-lift-tread') as THREE.Mesh;
     mapCultivationPlatformWear(tread.geometry, tread.name, 12);
 
@@ -133,6 +134,40 @@ export class CultivationElevatorArt {
     attach(room.boardingGuard, merge(guard), 'room-4-art-guard');
     for (const material of [...this.materials, chamber.warning, chamber.cable, lab.metal, lab.wall]) {
       room.builder.borrowedMaterials.add(material);
+    }
+  }
+
+  /** Close the reveal around the four-metre shutter without narrowing its opening.
+   * Edit only the presentation copies owned/restored by lab.bind. The frame and
+   * boarding partitions already share the same scrolling entrance motion.
+   */
+  private fitBoardingFrame(room: LevelTwoRoomFourGreybox): void {
+    const bounds = (name: string) => {
+      const mesh = room.root.getObjectByName(name) as THREE.Mesh;
+      mesh.geometry.computeBoundingBox();
+      return mesh.geometry.boundingBox!.clone().translate(mesh.position);
+    };
+    const left = bounds('room-4-partition-0--3.7').max.x;
+    const right = bounds('room-4-partition-0-3.7').min.x;
+    const top = bounds('room-4-header-0').min.y;
+    for (const side of ['left', 'right', 'top']) {
+      const frame = room.entrance.root.getObjectByName(`room-4-boarding-frame-${side}`) as THREE.Mesh;
+      const geometry = frame.geometry, positions = geometry.getAttribute('position');
+      const normals = geometry.getAttribute('normal'), uv = geometry.getAttribute('uv');
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i), y = positions.getY(i);
+        let fittedX = x, fittedY = y;
+        if ((side === 'left' || side === 'top') && x < 0) fittedX = left - frame.position.x;
+        if ((side === 'right' || side === 'top') && x > 0) fittedX = right - frame.position.x;
+        if (side === 'top' && y > 0) fittedY = top - frame.position.y;
+        positions.setXY(i, fittedX, fittedY);
+        // Keep the shared metal finish at its existing two-metre UV scale.
+        const nx = normals.getX(i), ny = normals.getY(i), nz = normals.getZ(i);
+        uv.setXY(i, uv.getX(i) + (Math.abs(nx) > .5 ? 0 : Math.abs(ny) > .5 ? fittedX - x : nz * (fittedX - x)) / 2,
+          uv.getY(i) + (Math.abs(ny) > .5 ? 0 : fittedY - y) / 2);
+      }
+      positions.needsUpdate = uv.needsUpdate = true;
+      geometry.computeBoundingBox(); geometry.computeBoundingSphere();
     }
   }
 
