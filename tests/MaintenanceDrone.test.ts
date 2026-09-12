@@ -647,3 +647,108 @@ test('mounted rider clearance prevents the drone from moving Volt into low ceili
     for (const material of materials) material.dispose();
   }
 });
+
+
+test('unsafe dismount is rejected transactionally without moving or detaching Volt', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const floor = createFloor(world);
+  surfaces.register(floor);
+  const authoring = new MaintenanceDroneDevelopmentFixture();
+  const volt = createVolt(world, surfaces);
+  let safe = true;
+  const controller = new MaintenanceDroneController({
+    world,
+    authoring: authoring.authoring,
+    voltRadiusMetres: volt.radiusMetres,
+    isVoltPlacementSafe: () => safe,
+  });
+
+  try {
+    assert.equal(controller.requestMount('volt', volt.position), true);
+    for (let step = 0; step < 90; step += 1) {
+      controller.update(DT, {
+        horizontalDirection: STILL,
+        ascendHeld: false,
+        descendHeld: false,
+        aimHeld: false,
+        controllingVolt: true,
+      });
+      controller.syncMountedVolt(volt);
+    }
+
+    const beforeVolt = [
+      volt.position.x,
+      volt.position.y,
+      volt.position.z,
+    ] as const;
+    const beforeDrone = [
+      controller.readModel.position.x,
+      controller.readModel.position.y,
+      controller.readModel.position.z,
+    ] as const;
+    safe = false;
+
+    assert.equal(controller.requestDismount(volt), false);
+    assert.equal(controller.voltMounted, true);
+    assert.equal(controller.readModel.state, 'mounted');
+    assert.deepEqual(
+      [volt.position.x, volt.position.y, volt.position.z],
+      [...beforeVolt],
+    );
+    assert.deepEqual(
+      [
+        controller.readModel.position.x,
+        controller.readModel.position.y,
+        controller.readModel.position.z,
+      ],
+      [...beforeDrone],
+    );
+  } finally {
+    controller.dispose();
+    authoring.dispose();
+    world.unregister(floor);
+    surfaces.unregister(floor);
+    floor.geometry.dispose();
+    const materials = Array.isArray(floor.material)
+      ? floor.material
+      : [floor.material];
+    for (const material of materials) material.dispose();
+  }
+});
+
+test('repeated reset and disposal leave no maintenance-drone collider or mounted ownership behind', () => {
+  const fixture = createControllerFixture();
+
+  fixture.controller.requestMount('volt', fixture.volt.position);
+  fixture.controller.reset();
+  fixture.controller.reset();
+  fixture.controller.reset();
+
+  assert.equal(fixture.controller.readModel.state, 'damaged-idle');
+  assert.equal(fixture.controller.voltMounted, false);
+  assert.equal(fixture.controller.readModel.startupCompleted, false);
+  assert.equal(fixture.controller.readModel.tutorialCompleted, false);
+  assert.equal(
+    fixture.world.colliderCount,
+    2,
+    'floor plus one reusable drone support collider should remain before disposal',
+  );
+
+  fixture.controller.dispose();
+  fixture.controller.dispose();
+  assert.equal(
+    fixture.world.colliderCount,
+    1,
+    'disposing the drone must remove its support collider exactly once',
+  );
+
+  fixture.authoring.dispose();
+  fixture.world.unregister(fixture.floor);
+  fixture.surfaces.unregister(fixture.floor);
+  fixture.floor.geometry.dispose();
+  const materials = Array.isArray(fixture.floor.material)
+    ? fixture.floor.material
+    : [fixture.floor.material];
+  for (const material of materials) material.dispose();
+});
