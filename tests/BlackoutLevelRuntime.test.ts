@@ -208,6 +208,7 @@ class RuntimeFakeInput {
   endFixedUpdate(): void {
     this.pressed.clear();
     this.released.clear();
+    this.wasClearedSinceFixedUpdate = false;
     this.endPointerUpdate();
   }
 
@@ -860,6 +861,17 @@ test('Blackout maintenance drone mounts only Volt, parks exactly across slime sw
     assert.equal(runtime.maintenanceDroneReadModel?.startupCompleted, true);
     assert.equal(runtime.maintenanceDroneReadModel?.tutorialCompleted, true);
 
+    input.press('aimAbility');
+    input.press('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(
+      runtime.voltElectricalReadModel?.connectedTargetId,
+      'fixture-terminal',
+    );
+    input.release('aimAbility');
+    input.release('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+
     input.press('moveForward');
     for (let step = 0; step < 30; step += 1) {
       runtime.fixedUpdate(1 / 60);
@@ -874,6 +886,12 @@ test('Blackout maintenance drone mounts only Volt, parks exactly across slime sw
     assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'bob');
     assert.equal(runtime.maintenanceDroneReadModel?.state, 'parked-hover');
     assert.equal(runtime.maintenanceDroneReadModel?.lightEnabled, true);
+    assert.equal(runtime.maintenanceDroneReadModel?.mountAvailable, false);
+    assert.equal(
+      runtime.voltElectricalReadModel?.connectedTargetId,
+      'fixture-terminal',
+      'parked Volt must preserve the established electrical tether',
+    );
     const parked = [
       runtime.maintenanceDroneReadModel!.position.x,
       runtime.maintenanceDroneReadModel!.position.y,
@@ -977,6 +995,32 @@ test('mounted Volt ascends/descends, aim freezes the drone, and existing electri
     input.release('droneDescend');
     runtime.fixedUpdate(1 / 60);
     assert.ok(runtime.maintenanceDroneReadModel!.position.y < raisedY);
+
+    input.press('moveForward');
+    for (let step = 0; step < 10; step += 1) {
+      runtime.fixedUpdate(1 / 60);
+    }
+    assert.ok(runtime.maintenanceDroneReadModel!.horizontalSpeed > 0);
+
+    // Focus/menu input clearing is an immediate velocity-cancellation boundary.
+    input.resetState();
+    input.wasClearedSinceFixedUpdate = true;
+    const beforeClear = [
+      runtime.maintenanceDroneReadModel!.position.x,
+      runtime.maintenanceDroneReadModel!.position.y,
+      runtime.maintenanceDroneReadModel!.position.z,
+    ] as const;
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.maintenanceDroneReadModel?.horizontalSpeed, 0);
+    assert.equal(runtime.maintenanceDroneReadModel?.verticalSpeed, 0);
+    assert.deepEqual(
+      [
+        runtime.maintenanceDroneReadModel!.position.x,
+        runtime.maintenanceDroneReadModel!.position.y,
+        runtime.maintenanceDroneReadModel!.position.z,
+      ],
+      [...beforeClear],
+    );
 
     input.press('moveForward');
     for (let step = 0; step < 10; step += 1) {
