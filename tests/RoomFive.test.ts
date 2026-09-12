@@ -1,5 +1,6 @@
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
+import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../src/render/environment/cultivation/CultivationMaintenanceArt.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -245,7 +246,8 @@ test('sewer reboot, paired checkpoints and rescue retries preserve the right sta
 function setup() {
   const room = new LevelTwoRoomFiveGreybox(() => {});
   const lab = new CultivationLabMaterials();
-  const art = new CultivationMaintenanceArt(room, lab);
+  const contamination = new CultivationContaminationArt(lab);
+  const art = new CultivationMaintenanceArt(room, lab, contamination);
   room.root.position.set(64, 0, 249); room.root.updateMatrixWorld(true);
   const world = new CollisionWorld(); const surfaces = new SurfaceRegistry();
   world.registerAll(room.collisionMeshes, undefined, ColliderTransformMode.Static); surfaces.registerAll(room.collisionMeshes);
@@ -256,7 +258,7 @@ function setup() {
   const burns = new DissolveSystem(targets); room.bindDissolveTargets(targets); room.bindBurns(burns);
   const encounter = new RoomFiveDroneEncounter(room, world, surfaces, bob, goop, () => true);
   return { room, world, bob, goop, targets, burns, encounter,
-    dispose() { encounter.dispose(); burns.dispose(); for (const target of targets) target.dispose(); art.dispose(); lab.dispose(); room.dispose(); world.clear(); surfaces.clear(); } };
+    dispose() { encounter.dispose(); burns.dispose(); for (const target of targets) target.dispose(); art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); world.clear(); surfaces.clear(); } };
 }
 
 test('three acid hits wake, progressively damage, and destroy the sewer drone; retry restores it', () => {
@@ -270,8 +272,10 @@ test('three acid hits wake, progressively damage, and destroy the sewer drone; r
       return lights;
     };
     const initialLights = visibleLights();
+    assert.equal(s.encounter.brokenDrone.presentation.root.visible, false, 'no duplicate stock drone beneath the authored shell');
     assert.ok(parts.length > 0);
     for (let hit = 1; hit <= 3; hit++) {
+      if (hit === 3) s.room.brokenCore.position.y = -7;
       assert.equal(s.burns.startBurn(target), 'started');
       assert.equal(s.room.controller.brokenDroneHits, hit);
       assert.equal(s.room.controller.brokenDroneState, hit < 3 ? 'active' : 'destroyed');
@@ -282,11 +286,25 @@ test('three acid hits wake, progressively damage, and destroy the sewer drone; r
       assert.equal(s.room.brokenCore.visible, hit < 3);
       assert.deepEqual(visibleLights(), initialLights, 'acid hits must not invalidate room lighting shader variants');
     }
+    const debris = s.room.root.getObjectByName('room-5-sewer-drone-debris')!;
+    assert.equal(debris.visible, true, 'the final hit sheds independent fragments');
+    const fragments = debris.children.find(o => o instanceof THREE.InstancedMesh) as THREE.InstancedMesh;
+    assert.equal(fragments.count, 6);
+    const matrix = new THREE.Matrix4(); fragments.getMatrixAt(0, matrix);
+    const initialY = matrix.elements[13];
+    s.encounter.update(1);
+    fragments.getMatrixAt(0, matrix);
+    assert.ok(matrix.elements[13] < initialY - 2, 'airborne fragments fall toward the acid');
+    s.encounter.update(2);
+    assert.equal(debris.visible, false, 'wreckage clears instead of piling up');
+    s.room.restoreCheckpoint('controls'); s.encounter.reset();
+    assert.equal(debris.visible, false, 'a destroyed checkpoint does not replay the explosion');
     s.room.restoreCheckpoint('split');
     target.reset(); s.encounter.reset();
     assert.equal(s.room.controller.brokenDroneHits, 0);
     assert.ok(parts.every(p => p.visible));
     assert.equal(s.room.brokenCore.getObjectByName('room-5-damaged-drone-sparks')!.visible, false);
+    assert.equal(s.encounter.brokenDrone.presentation.root.visible, false, 'retry keeps the stock model hidden');
   } finally { s.dispose(); }
 });
 
@@ -619,6 +637,63 @@ test('covered switching stations allow charged launches onto each next route', (
         if (s.bob.supportColliderName === `room-5-route-${section}-jump-1` && s.bob.grounded) { landed = true; break; }
       }
       assert.ok(landed, `station ${section}: ${local.toArray()} support=${s.bob.supportColliderName}`);
+    }
+  } finally { s.dispose(); }
+});
+
+
+test('corridor waste has irregular flat shorelines and acid contact follows visible coverage', () => {
+  const room = new LevelTwoRoomFiveGreybox(() => {});
+  try {
+    const puddle = room.root.getObjectByName('room-5-vent-acid-0') as THREE.Mesh;
+    room.root.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster();
+    let wet = 0, dry = 0;
+    for (let x = 17.65; x < 18.35; x += .035) for (let z = 8.775; z < 9.125; z += .035) {
+      ray.set(new THREE.Vector3(x, 1, z), new THREE.Vector3(0, -1, 0));
+      const visible = ray.intersectObject(puddle).length > 0;
+      assert.equal(room.isAcidAt(new THREE.Vector3(x, .3, z)), visible);
+      if (visible) wet++; else dry++;
+    }
+    assert.ok(wet > 50 && dry > 30, 'rounded irregular patches leave visible dry corners');
+    const p = puddle.geometry.getAttribute('position');
+    for (let i = 0; i < p.count; i++) assert.ok(Math.abs(p.getY(i)) < 1e-7, 'no raised box sides');
+  } finally { room.dispose(); }
+});
+
+test('sewer control ramp top meets the channel and bank exactly', () => {
+  const room = new LevelTwoRoomFiveGreybox(() => {});
+  try {
+    const ramp = room.root.getObjectByName('room-5-sewer-bank-access-42-124') as THREE.Mesh<THREE.BoxGeometry>;
+    ramp.updateWorldMatrix(true, false);
+    const halfWidth = ramp.geometry.parameters.width / 2;
+    const low = new THREE.Vector3(-halfWidth, .02, 0).applyMatrix4(ramp.matrixWorld);
+    const high = new THREE.Vector3(halfWidth, .02, 0).applyMatrix4(ramp.matrixWorld);
+    assert.ok(low.distanceTo(new THREE.Vector3(40, -12, 124)) < 1e-6);
+    assert.ok(high.distanceTo(new THREE.Vector3(43, -11.2, 124)) < 1e-6);
+  } finally { room.dispose(); }
+});
+
+
+test('Goop crosses the sewer ramp in both directions without jumping, including after reset', () => {
+  const s = setup();
+  try {
+    const local = new THREE.Vector3();
+    for (const retry of [false, true]) {
+      if (retry) { s.room.restoreCheckpoint('split'); s.encounter.reset(); }
+      for (const z of [122.7, 124, 125.3]) {
+        s.goop.recoverAt(s.room.root.localToWorld(new THREE.Vector3(44.5, -10.54, z)));
+        for (const [goal, direction] of [[39.5, -1], [44.5, 1], [39.5, -1]]) {
+          for (let frame = 0; frame < 300; frame++) {
+            s.room.root.worldToLocal(local.copy(s.goop.position));
+            if ((local.x - goal) * direction >= 0) break;
+            s.goop.update(1 / 60, new THREE.Vector3(direction, 0, 0));
+          }
+          s.room.root.worldToLocal(local.copy(s.goop.position));
+          assert.ok((local.x - goal) * direction >= 0, `blocked toward ${goal}, z=${z}, retry=${retry}: ${local.toArray()}`);
+          assert.ok(Math.abs(local.z - z) < .1, 'no forced sideways movement around the seam');
+        }
+      }
     }
   } finally { s.dispose(); }
 });

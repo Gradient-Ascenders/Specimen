@@ -24,10 +24,16 @@ export class RoomFiveSewer {
     const box = (name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material = m.duct) =>
       b.addCollider({ name: `room-5-${name}`, size, position, material });
     const bank = new THREE.MeshStandardMaterial({ color: 0x242a28, roughness: .95 });
-    for (const x of [33.5, 46.5]) box(`sewer-bank-${x}`, [7, 1.3, 124], [x, -11.85, 78], bank);
+    for (const x of [33.5, 46.5]) {
+      const mesh = box(`sewer-bank-${x}`, [7, 1.3, 124], [x, -11.85, 78], bank);
+      if (x === 46.5) mesh.userData.preciseMovementCorners = true;
+    }
     // Short service ramps allow Goop to leave the lowered channel without an awkward jump.
-    this.controlRamp = box('sewer-bank-access-42-124', [Math.hypot(3, 1), .04, 4], [41.5, -11.541, 124], bank);
-    this.controlRamp.rotation.z = Math.atan2(1, 3);
+    const slope = Math.atan2(.8, 3);
+    this.controlRamp = box('sewer-bank-access-42-124', [Math.hypot(3, .8), .04, 4],
+      [41.5 + Math.sin(slope) * .02, -11.6 - Math.cos(slope) * .02, 124], bank);
+    this.controlRamp.rotation.z = slope;
+    this.controlRamp.userData.preciseMovementCorners = true;
     this.reunionBridge = box('sewer-reunion-bridge', [6, .2, 4], [40, -11.3, 124], bank);
     this.reunionBridge.visible = false;
     box('sewer-acid-channel', [6, .5, 124], [40, -12.25, 78], m.acid).userData.textureRole = 'acid-floor';

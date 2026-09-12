@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelTwoRoomFiveGreybox } from '../../../levels/LevelTwoRoomFiveGreybox.ts';
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
 import { CultivationAccessTunnelArt } from './CultivationAccessTunnelArt.ts';
+import { CultivationSewerArt } from './CultivationSewerArt.ts';
 import type { CultivationContaminationArt } from './CultivationContaminationArt.ts';
 import { CultivationVoltPodArt } from './CultivationVoltPodArt.ts';
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
@@ -17,12 +18,14 @@ export class CultivationMaintenanceArt {
   private readonly originals: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[] = [];
   private disposed = false;
   private readonly accessArt: CultivationAccessTunnelArt;
+  private readonly sewerArt: CultivationSewerArt;
   private readonly podArt: CultivationVoltPodArt;
   readonly diagnostics = { newTextures: 0, variants: 0, staticMeshesBatched: 0, batches: 0 };
 
   constructor(room: LevelTwoRoomFiveGreybox, lab: CultivationLabMaterials, contamination: CultivationContaminationArt) {
     const b = room.builder, m = b.materials;
     this.accessArt = new CultivationAccessTunnelArt(lab, contamination);
+    this.sewerArt = new CultivationSewerArt(lab, contamination);
     const variant = (source: THREE.MeshStandardMaterial, name: string, colour: number, roughness: number, lift = .045) => {
       const material = source.clone();
       material.name = `cultivation-maintenance-${name}`;
@@ -86,7 +89,7 @@ export class CultivationMaintenanceArt {
       else if (/sewer-pipe|control-.*-cabinet|pod-(base|cap)/.test(name)) finish = teal;
       else if (/safe-.*-deck|release-quiet-walk|rescue-shortcut|reunion-ramp$/.test(name)) finish = deck;
       else if (name === 'room-5-volt-conductive-terminal') finish = terminal;
-      finish = this.accessArt.finishFor(object) ?? finish;
+      finish = this.accessArt.finishFor(object) ?? this.sewerArt.finishFor(object) ?? finish;
       // Retain animated contacts, network signals, glass and the approved damaged drone.
       if (object === room.brokenCore || object.parent === room.brokenCore || object.userData.soluble) finish = undefined;
       if (!finish) return;
@@ -154,14 +157,12 @@ export class CultivationMaintenanceArt {
     };
     for (const z of [24, 40, 56, 72, 88, 104, 120, 136]) for (const x of [36.94, 43.06]) {
       box(lab.platformArt.warning, [x, -11.19, z], [.1, .012, 1.4]);
-      box(teal, [x < 40 ? 31.8 : 48.2, -8.15, z], [.12, .18, 1.8]);
     }
     for (const z of [26, 42, 58, 74]) for (const x of [-19.97, 19.97]) {
       box(teal, [x, 15, z], [.025, .4, 5]);
       box(metal, [x, 19, z], [.04, 36, .12]);
     }
-    // Quiet guide markings keep the fork and final terminal legible in the existing darkness.
-    for (const x of [-9, -5, 5, 13, 21]) box(teal, [x, .208, 8.1], [1.1, .01, .1]);
+    // Warning markings identify the final terminal approach.
     for (const x of [13.9, 18.1]) box(lab.platformArt.warning, [x, .01, 68], [.12, .02, 2.2]);
     for (const [material, transforms] of accents) {
       b.borrowedMaterials.add(material);
@@ -171,14 +172,15 @@ export class CultivationMaintenanceArt {
       room.root.add(mesh); this.batches.push(mesh);
     }
     this.accessArt.addDetails(room.root);
-    this.diagnostics.variants = this.materials.length + this.accessArt.materialCount;
+    this.sewerArt.addDetails(room, lab);
+    this.diagnostics.variants = this.materials.length + this.accessArt.materialCount + this.sewerArt.materialCount;
     this.diagnostics.staticMeshesBatched = candidates.length;
-    this.diagnostics.batches = this.batches.length + this.accessArt.batchCount;
+    this.diagnostics.batches = this.batches.length + this.accessArt.batchCount + this.sewerArt.batchCount;
   }
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
-    this.podArt.dispose(); this.accessArt.dispose();
+    this.podArt.dispose(); this.accessArt.dispose(); this.sewerArt.dispose();
     for (const { mesh, material } of this.originals) mesh.material = material;
     for (const mesh of this.batches) {
       mesh.removeFromParent(); mesh.geometry.dispose();

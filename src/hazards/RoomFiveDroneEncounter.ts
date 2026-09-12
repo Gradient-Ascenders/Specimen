@@ -140,8 +140,7 @@ export class RoomFiveDroneEncounter {
     this.brokenDrone = create('room-5-damaged-sewer-drone', SEWER_DRONE_POSITION.clone(), new THREE.Vector3(0, 0, -1), true);
     // The authored rusted shell is the visible, acid-targetable collider.
     this.brokenDrone.presentation.root.visible = false;
-    world.unregister(this.brokenDrone.collider);
-    surfaces.unregister(this.brokenDrone.collider);
+    this.brokenDrone.setCollisionEnabled(false);
     this.unsubscribe = this.damage.events.on('died', ({ slimeId }) => requestDeath(slimeId));
     room.root.traverse(object => {
       if (object instanceof THREE.Mesh) {
@@ -230,15 +229,20 @@ export class RoomFiveDroneEncounter {
     for (const search of this.searchLights) search.intensity = 0;
     for (let i = 0; i < this.drones.length; i++) {
       this.patrols[i].reset(); this.drones[i].reset();
+      this.drones[i].setPresentationVisible(false);
       this.drones[i].root.position.copy(this.patrols[i].position);
       this.drones[i].setPatrolDirection(this.patrols[i].direction);
     }
     this.brokenDrone.reset(); this.brokenDrone.setEnabled(false);
+    // SecurityDrone.reset restores its stock model and box. This adapter owns
+    // a separate authored shell/acid target, including its destruction lifetime.
+    this.brokenDrone.setPresentationVisible(false);
+    this.brokenDrone.setCollisionEnabled(false);
     this.sewerTime = 0;
     this.room.brokenCore.position.copy(SEWER_DRONE_POSITION);
     this.room.brokenCore.rotation.set(.2, 0, 1.1);
     this.updateSewerLightPosition();
-    this.sewerDamage.update(0, this.room.controller.brokenDroneHits);
+    this.sewerDamage.reset(this.room.controller.brokenDroneHits);
     this.sewerLight.intensity = this.room.controller.brokenDroneState === 'destroyed' ? 0 : 2;
   }
   dispose(): void {

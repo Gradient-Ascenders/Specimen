@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SphereBoxSweep } from './SphereBoxSweep.ts';
 
 const AXIS_EPSILON = 1e-9;
 const CONTACT_EPSILON = 1e-7;
@@ -129,6 +130,7 @@ export class CollisionWorld {
   private lastNarrowPhaseCheckCount = 0;
 
   private slabEnter = 0;
+  private readonly sphereBoxSweep = new SphereBoxSweep();
   private slabExit = 1;
   private slabUpdatedEnter = false;
   private slabNormalSign = 0;
@@ -338,7 +340,12 @@ export class CollisionWorld {
       // ellipsoid. Expanding by radius / minScale is conservative and avoids
       // missing collisions without requiring an ellipsoid solver.
       const localRadius = radius / minimumScale;
-      const fraction = this.sweepExpandedLocalBox(
+      // Opt-in rounded Minkowski corners avoid phantom ledges where a ramp
+      // meets a flat bank. Other colliders and camera/projectile sweeps retain
+      // the established conservative box expansion.
+      const preciseMovement = (queryMask & CollisionLayer.Movement) !== 0 && mesh.userData.preciseMovementCorners === true;
+      const fraction = preciseMovement ? this.sphereBoxSweep.sweep(collider.localBounds,
+        this.localStart, this.localDisplacement, localRadius, this.candidateNormalLocal) : this.sweepExpandedLocalBox(
         collider.localBounds,
         localRadius,
         this.localStart,
