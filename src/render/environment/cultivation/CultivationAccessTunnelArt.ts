@@ -118,16 +118,17 @@ export class CultivationAccessTunnelArt {
     const lamp = new THREE.MeshStandardMaterial({ name: 'cultivation-access-caged-lamp',
       color: 0xa08755, emissive: 0xd1a356, emissiveIntensity: .65, roughness: .85 });
     this.materials.push(lamp);
-    // Small pools of light leave the runs between fixtures dark. No shadows or animation.
-    for (const [x, y, z, colour, power] of [
-      [0, 2.2, 9.8, 0xd6bd87, 5], [-12.82, 2.15, 17.3, 0x9bbaa0, 5], [40, 2.2, 18.4, 0xb8bb79, 5],
+    // Broad, gently fading light approximates spill through the low corridor.
+    // The existing three lights overlap along the branches without extra shadow passes.
+    for (const [x, y, z, colour, intensity, reach] of [
+      [0, 2.2, 9.8, 0xd6bd87, 6.4, 32], [-12.82, 2.15, 17.3, 0x9bbaa0, 4.8, 28], [40, 2.2, 18.4, 0xb8bb79, 4.8, 28],
     ]) {
       if (x < 0) box(this.iron, [.2, .18, .24], [-13.08, y + .03, z]);
       else box(this.iron, [.08, .18, .08], [x, 2.35, z]);
       box(this.iron, [.55, .12, .24], [x, y + .03, z]);
       box(lamp, [.39, .05, .16], [x, y - .055, z]);
       for (const dx of [-.15, 0, .15]) box(this.iron, [.024, .025, .18], [x + dx, y - .0925, z]);
-      const light = new THREE.PointLight(colour, power, 7, 2);
+      const light = new THREE.PointLight(colour, intensity, reach, 1);
       light.position.set(x, y - .2, z); this.root.add(light);
     }
     // Map detail geometry in metres after placement so adjacent fittings differ.

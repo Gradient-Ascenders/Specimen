@@ -24,7 +24,7 @@ export class SlimeLightSampler {
       light.getWorldPosition(this.position); this.delta.copy(body).sub(this.position);
       const distance = this.delta.length();
       if (distance < .001 || (light.distance > 0 && distance >= light.distance)) continue;
-      let weight = light.intensity / Math.max(1, distance * distance);
+      let weight = light.intensity / Math.max(1, Math.pow(distance, light.decay));
       if (light.distance > 0) weight *= Math.pow(Math.max(0, 1 - Math.pow(distance / light.distance, 4)), 2);
       if (light instanceof THREE.SpotLight) {
         light.target.getWorldPosition(this.target); this.forward.copy(this.target).sub(this.position).normalize();
