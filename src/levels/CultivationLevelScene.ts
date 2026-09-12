@@ -163,7 +163,7 @@ export class CultivationLevelScene {
     this.root.add(lighting);
   }
 
-  setDarkRoomLighting(dark: boolean, deltaSeconds = 1): void {
+  setDarkRoomLighting(dark: boolean, deltaSeconds = 1, weatheredRooms = false): void {
     const previous = this.root.userData.darkRoomBlend as number | undefined;
     const target = dark ? 1 : 0;
     const blend = previous === undefined ? target : THREE.MathUtils.damp(previous, target, 5, deltaSeconds);
@@ -171,8 +171,13 @@ export class CultivationLevelScene {
     this.root.userData.darkRoomBlend = blend;
     const ambient = this.root.getObjectByName('cultivation-foundation-ambient-fill') as THREE.HemisphereLight;
     const key = this.root.getObjectByName('cultivation-foundation-key') as THREE.DirectionalLight;
-    ambient.intensity = THREE.MathUtils.lerp(.9, .008, blend);
-    key.intensity = THREE.MathUtils.lerp(1.35, 0, blend);
+    // The authored Cultivation rooms use a dimmer, neutral foundation. Later
+    // rooms retain their original lighting and dark-room transition contract.
+    ambient.color.setHex(weatheredRooms ? 0xc6ccca : 0xbdd8c8);
+    ambient.groundColor.setHex(weatheredRooms ? 0x1d201f : 0x18221d);
+    key.color.setHex(weatheredRooms ? 0xddd9d0 : 0xe4f2df);
+    ambient.intensity = THREE.MathUtils.lerp(weatheredRooms ? .62 : .9, .008, blend);
+    key.intensity = THREE.MathUtils.lerp(weatheredRooms ? .82 : 1.35, 0, blend);
   }
 }
 

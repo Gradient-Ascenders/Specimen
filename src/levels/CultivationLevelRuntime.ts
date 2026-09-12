@@ -580,7 +580,8 @@ export class CultivationLevelRuntime {
     const lightingRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position);
     const darkRoom = lightingRoom === 5 || (lightingRoom === 4
       && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
-    resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds);
+    resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
+      lightingRoom !== undefined && lightingRoom <= 3);
     this.renderLayer.renderer.shadowMap.enabled = darkRoom;
     this.renderLayer.renderer.shadowMap.type = THREE.PCFShadowMap;
     resources.bobVisual.mesh.castShadow = darkRoom;

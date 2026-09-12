@@ -30,6 +30,11 @@ Level 2 Rooms 1 and 2's shared laboratory finishes and instanced fixture/trim dr
 original project-authored procedural data and Three.js primitives. No downloaded
 textures or additional third-party assets are used in this pass.
 
+Cultivation issue #97 adds original procedural corrosion, condensation and wetness
+maps, a small gravity-runoff shader hook, and primitive-based broken service
+windows, tank cartridges, drainage pipes and plant silhouettes for Rooms 1–3.
+No downloaded textures, models or additional third-party resources are used.
+
 ## Audio / music
 
 No third-party audio or music has been introduced yet.
