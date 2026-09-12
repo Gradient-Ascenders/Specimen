@@ -620,7 +620,6 @@ test('mounted rider clearance prevents the drone from moving Volt into low ceili
       'mounted rider must remain outside the authored ceiling clearance',
     );
 
-    const before = controller.readModel.position.y;
     for (let step = 0; step < 30; step += 1) {
       controller.update(DT, {
         horizontalDirection: STILL,
@@ -632,8 +631,8 @@ test('mounted rider clearance prevents the drone from moving Volt into low ceili
       controller.syncMountedVolt(volt);
     }
     assert.ok(
-      controller.readModel.position.y <= before + 1e-9,
-      'blocked ascent must revert instead of clipping Volt upward',
+      volt.position.y + volt.radiusMetres <= 1.65 + 1e-9,
+      'repeated ascent must stop at safe rider clearance instead of clipping Volt upward',
     );
   } finally {
     controller.dispose();
