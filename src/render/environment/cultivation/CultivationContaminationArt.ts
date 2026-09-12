@@ -219,13 +219,14 @@ export class CultivationContaminationArt {
       const grain=((Math.imul(x+17,73856093)^Math.imul(y+3,19349663))>>>0)%997/997;
       const cloud=.5+.25*Math.sin(u*19+Math.sin(v*13))+.25*Math.cos(v*23+Math.sin(u*17));
       const seam=Math.exp(-edge*30);
-      const rust = seam * (.14 + cloud * .26) + grain * .018;
-      const damp=finish==='floor' ? THREE.MathUtils.smoothstep(cloud,.63,.88) * .65 : 0;
+      // Floor deposits are placed across the room below, rather than stamped
+      // into each two-metre panel. Retain only a faint joint residue here.
+      const rust = seam * (finish === 'floor' ? .045 : .14 + cloud * .26) + grain * .018;
       const i=(y*size+x)*4, j=(Math.floor(y*sourceSize/size)*sourceSize+Math.floor(x*sourceSize/size))*4;
       const tint=finish==='metal' ? [137,90,51] : [139,125,93];
       for(let c=0;c<3;c++) {
-        albedo[i+c]=data[j+c]*(1-rust)*(1-damp*.08)+tint[c]*rust+(grain-.5)*7;
-        rough[i+c]=Math.round(THREE.MathUtils.lerp(235,100,damp));
+        albedo[i+c]=data[j+c]*(1-rust)+tint[c]*rust+(grain-.5)*7;
+        rough[i+c]=235;
       }
       albedo[i+3]=rough[i+3]=255;
     }
@@ -236,8 +237,44 @@ export class CultivationContaminationArt {
     material.color.setHex(finish==='wall'?0xc0bfba:finish==='ceiling'?0xa4a8a5:finish==='floor'?0xaaafa9:0x727970);
     material.userData.tileSizeMetres=finish==='wall'?[4,3]:[2,2];
     if (finish === 'wall') this.addRunoff(material);
+    if (finish === 'floor') this.addFloorWear(material);
     optimizeFiniteLightEvaluation(material);
     return material;
+  }
+
+  /** Metre-scaled wear crosses panel boundaries and leaves broad clean areas. */
+  private addFloorWear(material: THREE.MeshStandardMaterial): void {
+    material.onBeforeCompile = shader => {
+      shader.vertexShader = 'varying vec3 vCultivationFloorPosition;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>',
+        '#include <project_vertex>\nvCultivationFloorPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      shader.fragmentShader = `varying vec3 vCultivationFloorPosition;
+        float floorWearHash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+        float floorWearNoise(vec2 p) {
+          vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+          return mix(mix(floorWearHash(i),floorWearHash(i+vec2(1,0)),f.x),
+            mix(floorWearHash(i+vec2(0,1)),floorWearHash(i+vec2(1,1)),f.x),f.y);
+        }
+      ` + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        vec2 floorP=vCultivationFloorPosition.xz+vCultivationFloorPosition.y*vec2(0.73,1.19);
+        float broad=floorWearNoise(floorP*0.19+vec2(8.3,2.7));
+        float broken=floorWearNoise(floorP*0.71+vec2(21.4,5.1));
+        float grain=floorWearNoise(floorP*3.1);
+        float deposits=smoothstep(0.48,0.73,broad*0.72+broken*0.28);
+        float dust=deposits*(0.65+grain*0.35);
+        // Irregular smaller wet cores sit within a few of the larger deposits.
+        float damp=deposits*smoothstep(0.58,0.82,broken*0.8+grain*0.2);
+        vec2 panel=fract(vMapUv);
+        float edge=min(min(panel.x,1.0-panel.x),min(panel.y,1.0-panel.y));
+        float joint=exp(-edge*38.0)*smoothstep(0.35,0.75,broad)*(0.35+broken*0.65);
+        diffuseColor.rgb*=mix(vec3(1.0),vec3(0.65,0.59,0.46),dust*0.58+joint*0.24);
+        diffuseColor.rgb*=1.0-damp*0.12;
+      `);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>',
+        '#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.48,damp*0.7);');
+    };
+    material.customProgramCacheKey = () => 'cultivation-irregular-floor-wear-v1';
   }
 
   /** Sparse, non-tile-repeating leaks with distinct sources and gravity tails. */
