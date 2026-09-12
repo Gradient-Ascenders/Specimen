@@ -6,6 +6,7 @@ import type { RenderLayer } from './RenderLayer.ts';
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
 interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
 interface Step { label?: string; run: () => void | Promise<unknown>; }
+class ShadowLayoutLight extends THREE.Light {}
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
 export class CultivationPreparationQueue {
@@ -124,14 +125,29 @@ export class CultivationPreparationQueue {
 
   async prepareInitial(): Promise<void> {
     const started = performance.now();
-    this.priority = this.configurations[0];
-    while (!this.disposed && !this.configurations[0].ready) {
+    await this.prepareConfiguration(this.configurations[0]);
+    this.diagnostics.initialMs = performance.now() - started;
+  }
+
+  /** Pay the expensive maintenance/shadow first draws during level startup,
+   * before a debug jump or lift arrival can expose the in-game loading overlay. */
+  async prepareStartup(): Promise<void> {
+    const started = performance.now();
+    await this.prepareInitial();
+    this.anticipateLiftExit();
+    if (this.upcoming) await this.prepareConfiguration(this.upcoming);
+    this.priority = undefined;
+    this.diagnostics.initialMs = performance.now() - started;
+  }
+
+  private async prepareConfiguration(config: Configuration): Promise<void> {
+    this.priority = config;
+    while (!this.disposed && !config.ready) {
       if (this.failure) throw this.failure;
       this.tick(0, true);
       // RAF yields to painting and the browser's asynchronous shader compiler.
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     }
-    this.diagnostics.initialMs = performance.now() - started;
   }
 
   tick(frameMs: number, foreground = false): void {
@@ -188,6 +204,15 @@ export class CultivationPreparationQueue {
 
   private *steps(config: Configuration): Generator<Step> {
     const scene = new THREE.Scene(); scene.fog = this.layer.scene.fog; scene.environment = this.layer.scene.environment;
+    // WebGLShadowMap renders depth/distance materials with no scene lighting.
+    // Compiling them against the colour-pass lights produces unused variants
+    // and leaves the actual first shadow draw to compile synchronously.
+    const shadowScene = new THREE.Scene();
+    // Shadow rendering keeps USE_SHADOWMAP enabled even though its light
+    // uniform arrays are empty. A zero-energy generic light supplies that flag
+    // without entering the directional/point/spot arrays used by colour shaders.
+    const shadowLayout = new ShadowLayoutLight(0, 0); shadowLayout.castShadow = true;
+    shadowScene.add(shadowLayout);
     const drawables: Drawable[] = [];
     const visit = (o: THREE.Object3D, foundation = false) => {
       foundation ||= o.name === 'cultivation-level-2-foundation';
@@ -273,26 +298,36 @@ export class CultivationPreparationQueue {
         }
       }
     }
-    for (const [objects, shadowTarget] of [[programs, false], [shadows, true]] as const) {
-      for (let i = 0; i < objects.length; i += 8) {
-        const group = new THREE.Group(); group.add(...objects.slice(i, i + 8));
+    // The first shadow frame has empty light arrays; later frames can retain
+    // the previous colour pass's layout. Warm both renderer states.
+    const passes = [[programs, false, scene], [shadows, true, shadowScene], [shadows, true, scene]] as const;
+    for (const [objects, shadowTarget, targetScene] of passes) {
+      for (let i = 0; i < objects.length;) {
+        // A requested room can submit a larger compiler batch while the loading
+        // screen is already up. Background work keeps its small gameplay slices.
+        const batch = objects.slice(i, i + (this.priority === config ? 32 : 8));
+        i += batch.length;
+        const group = new THREE.Group(); group.add(...batch);
         yield {label: shadowTarget ? 'shadow-compile' : 'compile', run: () => {
           const start = performance.now();
-          return this.withState(config.dark, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, scene)).then(() => {
+          return this.withState(config.dark, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, targetScene)).then(() => {
             this.diagnostics.compileWaitMs += performance.now()-start; group.clear();
           });
         }};
       }
     }
-    for (const [objects, shadowTarget] of [[primes, false], [shadows, true]] as const) for (const proxy of objects) {
-      yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + proxy.name, run: () => {
-        const start = performance.now(); scene.add(proxy);
-        try { this.withState(config.dark, shadowTarget, () => this.layer.renderer.render(scene, this.camera)); }
-        finally { proxy.removeFromParent(); }
+    for (const [objects, shadowTarget, targetScene] of [[primes, false, scene], [shadows, true, shadowScene], [shadows, true, scene]] as const) for (let i = 0; i < objects.length;) {
+      const batch = objects.slice(i, i + (this.priority === config ? 16 : 1));
+      i += batch.length;
+      yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + batch[0].name, run: () => {
+        const start = performance.now();
+        targetScene.add(...batch);
+        try { this.withState(config.dark, shadowTarget, () => this.layer.renderer.render(targetScene, this.camera)); }
+        finally { for (const proxy of batch) proxy.removeFromParent(); }
         this.diagnostics.primeMs += performance.now()-start;
       }};
     }
-    } finally { padding.dispose(); scene.clear(); }
+    } finally { padding.dispose(); scene.clear(); shadowScene.clear(); }
   }
 
   /** State is restored synchronously, before compileAsync yields to gameplay. */

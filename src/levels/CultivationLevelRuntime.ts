@@ -264,7 +264,7 @@ export class CultivationLevelRuntime {
     this.lightLayout ??= new CultivationLightLayout(this.renderLayer.scene);
     if (!this.preparationQueue) this.preparationQueue = new CultivationPreparationQueue(this.renderLayer, resources.authoredPreview, this.host);
     this.preparationQueue.diagnostics.constructionMs = this.constructionMs;
-    return this.presentationPreparation ??= this.preparationQueue.prepareInitial();
+    return this.presentationPreparation ??= this.preparationQueue.prepareStartup();
   }
   load(): void {
     if (this.lifecycle.state === 'unloaded') this.presentationPreparation = undefined;

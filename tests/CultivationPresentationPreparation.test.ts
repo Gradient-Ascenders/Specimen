@@ -6,7 +6,7 @@ import { CultivationPreparationQueue } from '../src/render/CultivationPreparatio
 import { CultivationLightLayout } from '../src/render/CultivationLightLayout.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
 
-for (const mode of ['jump', 'lift', 'failure']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
+for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
   const fail = mode === 'failure';
   const preview = new LevelTwoPreviewScene(() => {}), scene = new THREE.Scene(); scene.add(preview.root);
   const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
@@ -28,6 +28,7 @@ for (const mode of ['jump', 'lift', 'failure']) test(`loading preparation preser
   for (const geometry of geometries) geometry.addEventListener('dispose', () => destroyed++);
   let viewport = new THREE.Vector4(0, 0, 1280, 720), scissor = viewport.clone(), scissorTest = false;
   let compiles = 0;
+  const shadowLayouts = new Set<string>();
   let holdNextCompile = false;
   let releaseCompile: (() => void) | undefined;
   const priorRaf = globalThis.requestAnimationFrame;
@@ -40,7 +41,18 @@ for (const mode of ['jump', 'lift', 'failure']) test(`loading preparation preser
     setViewport: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
     setScissor: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
     setScissorTest: (value: boolean) => { scissorTest = value; }, initTexture() {}, compile() {}, render() {},
-    async compileAsync(group: THREE.Group) {
+    async compileAsync(group: THREE.Group, _camera: THREE.Camera, targetScene: THREE.Scene) {
+      if (group.children.some(o => o instanceof THREE.Mesh &&
+        (o.material instanceof THREE.MeshDepthMaterial || o.material instanceof THREE.MeshDistanceMaterial))) {
+        const lights: THREE.Light[] = [];
+        targetScene.traverseVisible(o => { if (o instanceof THREE.Light) lights.push(o); });
+        if (lights.length === 1 && lights[0].type === 'Light') {
+          shadowLayouts.add('first-frame');
+          assert.equal(lights[0].intensity, 0);
+          assert.equal(lights[0].castShadow, true, 'retain the shadow-pass shader define');
+          assert.equal(targetScene.fog, null); assert.equal(targetScene.environment, null);
+        } else shadowLayouts.add('following-frame');
+      }
       group.traverse(o => { if (o instanceof THREE.Mesh && !Array.isArray(o.material)) shadowVariants.add(o.material.customProgramCacheKey()); if (o instanceof THREE.Mesh && o.name === 'variant-regression') variants.add(o.material as THREE.Material); });
       compiles++;
       if (fail) throw new Error('driver rejected preparation');
@@ -53,10 +65,10 @@ for (const mode of ['jump', 'lift', 'failure']) test(`loading preparation preser
   const layer = { scene, renderer, cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
   const queue = new CultivationPreparationQueue(layer, preview);
   try {
-    const work = queue.prepareInitial();
+    const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
     assert.ok(compiles > 0);
-    if (!fail) { assert.equal(variants.size, 2, 'ordinary and instanced meshes must each await their shader variant'); assert.equal(queue.diagnostics.completed, 1); assert.ok(queue.diagnostics.total > 1);
+    if (!fail && mode !== 'startup') { assert.equal(variants.size, 2, 'ordinary and instanced meshes must each await their shader variant'); assert.equal(queue.diagnostics.completed, 1); assert.ok(queue.diagnostics.total > 1);
       const before = compiles; queue.tick(40); assert.equal(compiles, before, "an expensive gameplay frame defers background work");
       if (mode !== 'lift') {
         await new Promise(resolve => setTimeout(resolve, 260));
@@ -65,7 +77,7 @@ for (const mode of ['jump', 'lift', 'failure']) test(`loading preparation preser
         assert.ok(queue.diagnostics.workMs > beforeSlowFrame, 'sustained low frame rates must not starve background preparation');
       }
     }
-    if (!fail) {
+    if (!fail && mode !== 'startup') {
       // Jump into Room 5 while an earlier room is already compiling. Its
       // in-flight batch must settle, then Room 5 must finish before that room.
       holdNextCompile = true;
@@ -127,6 +139,18 @@ for (const mode of ['jump', 'lift', 'failure']) test(`loading preparation preser
         'suspended preparation resumes and completes exactly once');
       assert.ok(shadowVariants.has('custom-depth-regression'), 'custom dissolve depth shaders are prepared');
       assert.ok(shadowVariants.has('custom-distance-regression'), 'custom dissolve point-shadow shaders are prepared');
+    }
+    if (mode === 'startup') {
+      assert.deepEqual(shadowLayouts, new Set(['first-frame', 'following-frame']));
+      assert.equal(queue.diagnostics.completed, 2, 'startup prepares the initial view and lift/maintenance superset');
+      const preparedCompiles = compiles;
+      for (const z of [251, 270, 251, 270]) {
+        preview.updatePresentationVisibility({z}, {z}); lighting.sync(scene);
+        assert.equal(queue.requireCurrent(true), true, 'Room 5 jump and lift exit are ready before gameplay');
+        assert.equal(queue.diagnostics.pending, false);
+      }
+      assert.equal(compiles, preparedCompiles, 'jumps do not launch another compiler pass');
+      for (const old of snapshots) old.object.visible = old.visible;
     }
     assert.deepEqual(viewport.toArray(), [0, 0, 1280, 720]); assert.deepEqual(scissor.toArray(), viewport.toArray());
     assert.equal(scissorTest, false); assert.equal(renderer.shadowMap.enabled, false); assert.equal(renderer.shadowMap.type, THREE.BasicShadowMap);
