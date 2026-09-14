@@ -1,0 +1,438 @@
+{
+  "runtime": "v22.16.0",
+  "platform": "linux",
+  "generatedAt": "2026-09-13T15:21:45.422Z",
+  "scope": "Isolated original particle-cage/plane-contact solver; NOT the Specimen collision world or a Gish port.",
+  "tests": {
+    "traction": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          24.51212495730271,
+          0.40407549126666986,
+          0.013184078490616043
+        ],
+        "velocity": [
+          2.73456925955283,
+          -0.3422506201372016,
+          0.022508659276323378
+        ],
+        "volumeRatio": 0.9999495662443753,
+        "height": 0.8503681392341648,
+        "maxEdgeStrain": 0.0339359052131436,
+        "penetration": 0,
+        "contacts": 3,
+        "anchors": 0,
+        "acquired": 262,
+        "released": 259
+      },
+      "maxVolumeError": 0.0005190920144418909,
+      "maxPenetration": 0,
+      "minHeight": 0.7910547610675593,
+      "maxStrain": 0.0682503922375155
+    },
+    "zeroFriction": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          -6.647720568464521e-13,
+          0.384196201791529,
+          -1.3501593506409781e-12
+        ],
+        "velocity": [
+          -3.829922490261595e-14,
+          -0.0608510582189717,
+          -1.148753536956218e-13
+        ],
+        "volumeRatio": 0.999842842804955,
+        "height": 0.8277870855473467,
+        "maxEdgeStrain": 0.037103757268525994,
+        "penetration": 0,
+        "contacts": 4,
+        "anchors": 0,
+        "acquired": 276,
+        "released": 272
+      },
+      "maxVolumeError": 0.000630026629709457,
+      "maxPenetration": 0,
+      "minHeight": 0.7898818130448926,
+      "maxStrain": 0.06526017452963706
+    },
+    "drop": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          -0.003989359680098694,
+          0.3789604846744834,
+          0.010024378364844535
+        ],
+        "velocity": [
+          -0.00003248369940467734,
+          0.00012509463831237143,
+          -0.0000674733784944723
+        ],
+        "volumeRatio": 0.9997834894419506,
+        "height": 0.8291114465478184,
+        "maxEdgeStrain": 0.02716151343439477,
+        "penetration": 0,
+        "contacts": 5,
+        "anchors": 0,
+        "acquired": 38,
+        "released": 31
+      },
+      "maxVolumeError": 0.0027352835501847084,
+      "maxPenetration": 0,
+      "minHeight": 0.6735398981517068,
+      "maxStrain": 0.1643571334474736
+    },
+    "reversal": {
+      "startVelocity": 2.705407335000776,
+      "firstStepVelocity": 2.603039713229793,
+      "secondsToReverse": 0.25,
+      "overshootMetres": 0.2938346576154096,
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          3.6256221110591924,
+          0.385640996073248,
+          -0.017866381390228742
+        ],
+        "velocity": [
+          -2.7729650467734905,
+          -0.17677565348833577,
+          -0.017755208045482442
+        ],
+        "volumeRatio": 0.999874648672172,
+        "height": 0.8221501668196196,
+        "maxEdgeStrain": 0.04118575595492535,
+        "penetration": 0,
+        "contacts": 4,
+        "anchors": 0,
+        "acquired": 143,
+        "released": 139
+      }
+    },
+    "zeroNetForce": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          1.8282077240971972e-13,
+          9.999999999996927,
+          -1.3711995312073162e-13
+        ],
+        "velocity": [
+          1.5038664757938136e-13,
+          -1.918493142127886e-12,
+          1.0834316107315194e-14
+        ],
+        "volumeRatio": 1.000073271467886,
+        "height": 0.8969269405718169,
+        "maxEdgeStrain": 0.0034229697397649694,
+        "penetration": 0,
+        "contacts": 0,
+        "anchors": 0,
+        "acquired": 0,
+        "released": 0
+      },
+      "maxVolumeError": 0.00007327146788593808,
+      "maxPenetration": 0,
+      "minHeight": 0.8506277089390636,
+      "maxStrain": 0.003422970475037923
+    },
+    "movingPlane": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          4.892132341805641,
+          0.37883934361810284,
+          0.005745230668049667
+        ],
+        "velocity": [
+          0.9999987449062635,
+          -0.0000013372234469732904,
+          -0.0000027631504793015112
+        ],
+        "volumeRatio": 0.9997818100554002,
+        "height": 0.8290003936965805,
+        "maxEdgeStrain": 0.027237954571248002,
+        "penetration": 0,
+        "contacts": 5,
+        "anchors": 0,
+        "acquired": 14,
+        "released": 7
+      },
+      "maxVolumeError": 0.0005169662333029956,
+      "maxPenetration": 0,
+      "minHeight": 0.789977029636797,
+      "maxStrain": 0.07131477208387005
+    },
+    "slope15": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          6.911924693454741,
+          2.2906004497485544,
+          0.0003102152481932793
+        ],
+        "velocity": [
+          1.9787511799186877,
+          0.11015624804273784,
+          0.003145976336588971
+        ],
+        "volumeRatio": 1.0000136959994628,
+        "height": 0.8733272457311126,
+        "maxEdgeStrain": 0.018650608291559623,
+        "penetration": 0,
+        "contacts": 1,
+        "anchors": 0,
+        "acquired": 109,
+        "released": 108
+      },
+      "maxVolumeError": 0.0005771941248888801,
+      "maxPenetration": 4.440892098500626e-16,
+      "minHeight": 0.8287483081598039,
+      "maxStrain": 0.06592018441584813
+    },
+    "wallWithSurfaceGravity": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          0.3970937664909748,
+          13.551114920237593,
+          0.0068916834952209485
+        ],
+        "velocity": [
+          0.810022693557121,
+          2.4285348732653187,
+          0.0059864410861479285
+        ],
+        "volumeRatio": 0.9999332808018716,
+        "height": 0.8667196603816038,
+        "maxEdgeStrain": 0.06222390327127325,
+        "penetration": 0,
+        "contacts": 3,
+        "anchors": 5,
+        "acquired": 136,
+        "released": 131
+      },
+      "maxVolumeError": 0.0006994122167309769,
+      "maxPenetration": 0,
+      "minHeight": 0.8488295457155045,
+      "maxStrain": 0.09008604295762823,
+      "climbed": 11.551826254722076
+    },
+    "reset": {
+      "exactRepeat": true,
+      "stateSha256": "87fb7785a4c920cd1c1e588d6f9cccb79f624ef1cf1fe7aaf0f42b6e43eb0c0c"
+    },
+    "renderCadence": [
+      {
+        "fps": 30,
+        "ticks": 360,
+        "hash": "5a02c6e22f3ad475b2cc625672a7eb22baaa4ca8117828c0e0ad9639ceb543c5"
+      },
+      {
+        "fps": 60,
+        "ticks": 360,
+        "hash": "5a02c6e22f3ad475b2cc625672a7eb22baaa4ca8117828c0e0ad9639ceb543c5"
+      },
+      {
+        "fps": 144,
+        "ticks": 360,
+        "hash": "5a02c6e22f3ad475b2cc625672a7eb22baaa4ca8117828c0e0ad9639ceb543c5"
+      }
+    ]
+  },
+  "explorations": {
+    "noVolume": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          -0.0035987972931478176,
+          0.37568875094411003,
+          -0.0025951400745225918
+        ],
+        "velocity": [
+          0.000006368870484366811,
+          -0.00007463667025436086,
+          0.00001182427421569733
+        ],
+        "volumeRatio": 0.990318839524612,
+        "height": 0.8248363773047825,
+        "maxEdgeStrain": 0.029455695510911206,
+        "penetration": 0,
+        "contacts": 4,
+        "anchors": 0,
+        "acquired": 37,
+        "released": 30
+      },
+      "maxVolumeError": 0.15928776095217234,
+      "maxPenetration": 0,
+      "minHeight": 0.6254421798444769,
+      "maxStrain": 0.15013462842752512
+    },
+    "compressionRelease": {
+      "baselineCentreHeight": 0.3778766776074662,
+      "peakCentreHeight": 0.49098375350133605,
+      "peakRise": 0.11310707589386987,
+      "note": "Internal compression followed by cross-body stiffening; NOT a calibrated Specimen charged jump."
+    },
+    "unbreakableAnchors": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          0.35114556696790583,
+          2.089117529183781,
+          0.00047870136490966737
+        ],
+        "velocity": [
+          0.0001520356594259769,
+          -0.0005852356175710989,
+          0.000009474505901929961
+        ],
+        "volumeRatio": 0.9994619551315105,
+        "height": 0.8869621981448687,
+        "maxEdgeStrain": 0.09011801380616058,
+        "penetration": 0,
+        "contacts": 5,
+        "anchors": 8,
+        "acquired": 8,
+        "released": 0
+      },
+      "maxVolumeError": 0.0006935136056890334,
+      "maxPenetration": 0,
+      "minHeight": 0.8857174420799795,
+      "maxStrain": 0.11113500597441583,
+      "climbed": 0.08982886366826537
+    },
+    "worldGravityWall": {
+      "final": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          0.6013372245706357,
+          0.3870970169195667,
+          -0.002843654919802658
+        ],
+        "velocity": [
+          3.3447225148261084e-8,
+          -5.934998524383315e-10,
+          3.767410415132194e-9
+        ],
+        "volumeRatio": 0.99983982690819,
+        "height": 0.8374229031279861,
+        "maxEdgeStrain": 0.024102168529370638,
+        "penetration": 0,
+        "contacts": 6,
+        "anchors": 0,
+        "acquired": 38,
+        "released": 30
+      },
+      "maxVolumeError": 0.0013166981943207867,
+      "maxPenetration": 0,
+      "minHeight": 0.7281010310809218,
+      "maxStrain": 0.12080643938959246,
+      "note": "This tuning fails to sustain Gish-like wall climbing under world gravity. Successful wall run retains an explicit Specimen-like surface-gravity policy."
+    },
+    "budget1x8": {
+      "substeps": 1,
+      "iterations": 8,
+      "maxVolumeError": 0.008914143557203213,
+      "minHeight": 0.6785531500514594,
+      "maxStrain": 0.23786213618108243,
+      "penetration": 1.3877787807814457e-17
+    },
+    "budget2x8": {
+      "substeps": 2,
+      "iterations": 8,
+      "maxVolumeError": 0.004086966724039298,
+      "minHeight": 0.6823287268570635,
+      "maxStrain": 0.1630674364380047,
+      "penetration": 6.938893903907228e-18
+    },
+    "budget4x8": {
+      "substeps": 4,
+      "iterations": 8,
+      "maxVolumeError": 0.0027352835501847084,
+      "minHeight": 0.6735398981517068,
+      "maxStrain": 0.1643571334474736,
+      "penetration": 0
+    },
+    "budget8x4": {
+      "substeps": 8,
+      "iterations": 4,
+      "maxVolumeError": 0.0033786879675353765,
+      "minHeight": 0.6613330392508817,
+      "maxStrain": 0.15954052662141516,
+      "penetration": 0
+    }
+  },
+  "timings": [
+    {
+      "nodes": 12,
+      "constraints": 67,
+      "substeps": 4,
+      "iterations": 8,
+      "meanMs": 0.15293671111112922,
+      "p50Ms": 0.12979399999949237,
+      "p95Ms": 0.23847700000078476,
+      "p99Ms": 0.4914949999993041,
+      "note": "Node wall-clock, shared container, one body, plane-only collision; not a browser or full-game budget."
+    },
+    {
+      "nodes": 42,
+      "constraints": 262,
+      "substeps": 4,
+      "iterations": 8,
+      "meanMs": 0.5635128472222277,
+      "p50Ms": 0.527950000000601,
+      "p95Ms": 0.7645339999999123,
+      "p99Ms": 1.0952280000001338,
+      "note": "Node wall-clock, shared container, one body, plane-only collision; not a browser or full-game budget."
+    },
+    {
+      "nodes": 162,
+      "constraints": 1042,
+      "substeps": 4,
+      "iterations": 8,
+      "meanMs": 2.2480280972221887,
+      "p50Ms": 2.191407000000254,
+      "p95Ms": 2.6248450000002777,
+      "p99Ms": 3.2870349999993778,
+      "note": "Node wall-clock, shared container, one body, plane-only collision; not a browser or full-game budget."
+    }
+  ],
+  "assertionsPassed": true
+}

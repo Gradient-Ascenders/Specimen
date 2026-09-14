@@ -10,7 +10,19 @@ type BroadphaseZCells = Map<number, RegisteredCollider[]>;
 type BroadphaseYCells = Map<number, BroadphaseZCells>;
 type BroadphaseGrid = Map<number, BroadphaseYCells>;
 
-interface RegisteredCollider {
+/** Borrowed transform/bounds records for batched deformable-body queries.
+ * Treat these as read-only; valid until the next registry transform update. */
+export interface CollisionBoxCandidate {
+  readonly mesh: THREE.Mesh;
+  readonly localBounds: THREE.Box3;
+  readonly inverseWorld: THREE.Matrix4;
+  readonly cachedWorld: THREE.Matrix4;
+  readonly normalMatrix: THREE.Matrix3;
+  readonly worldBounds: THREE.Box3;
+  readonly minimumWorldScale: number;
+}
+
+interface RegisteredCollider extends CollisionBoxCandidate {
   readonly mesh: THREE.Mesh;
   layerMask: number;
   transformMode: ColliderTransformMode;
@@ -238,6 +250,26 @@ export class CollisionWorld {
 
   get colliderCount(): number {
     return this.colliders.length;
+  }
+
+  /** One candidate batch for an entire swept cage, in registration order.
+   * Does not change sphere-sweep diagnostics or turn a bounds query into a
+   * collision response. Refresh again when constraint corrections escape it. */
+  collectBoxCandidates(bounds: THREE.Box3, output: CollisionBoxCandidate[], queryMask = CollisionLayer.Movement): void {
+    this.validateLayerMask(queryMask);
+    output.length = 0;
+    if (bounds.isEmpty() || queryMask === CollisionLayer.None) return;
+    this.transformQueryStamp++;
+    this.advanceBroadphaseStamp();
+    this.ensureStaticBroadphase();
+    this.sweepBounds.copy(bounds);
+    if (this.broadphaseEnabled) this.markStaticBroadphaseCandidates(0);
+    for (const collider of this.colliders) {
+      if (!(collider.layerMask & queryMask) || !collider.mesh.visible) continue;
+      if (collider.transformMode === ColliderTransformMode.Dynamic || !collider.transformCacheValid) this.refreshTransformCache(collider);
+      if (this.broadphaseEnabled && collider.transformMode === ColliderTransformMode.Static && collider.broadphaseStamp !== this.broadphaseStamp) continue;
+      if (collider.minimumWorldScale > AXIS_EPSILON && bounds.intersectsBox(collider.worldBounds)) output.push(collider);
+    }
   }
 
   getLastSweepDiagnostics(): CollisionSweepDiagnostics {

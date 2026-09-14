@@ -1,0 +1,39 @@
+:root { font-family: ui-sans-serif, system-ui, sans-serif; color: #dce5ed; background: #10171e; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+#app { height: 100dvh; display: grid; grid-template-columns: minmax(0,1fr) 350px; }
+#room { position: relative; min-width: 0; min-height: 0; }
+canvas { display: block; outline-offset: -3px; }
+#room header { position: absolute; top: 20px; left: 24px; pointer-events: none; }
+h1 { font-size: 20px; margin: 0 0 8px; font-weight: 600; }
+p { margin: 8px 0; line-height: 1.5; font-size: 13px; }
+#room header p { color: #aabac9; }
+#room header a { pointer-events: auto; }
+a { color: #a9e5ce; }
+#legend { position: absolute; bottom: 20px; left: 24px; right: 20px; font-size: 12px; line-height: 1.8; pointer-events: none; }
+#legend span { margin-right: 12px; }
+aside { padding: 18px; overflow-y: auto; background: #17212b; border-left: 1px solid #34414f; }
+label { display: block; font-size: 12px; margin: 12px 0; color: #c8d5e0; }
+select, button, input[type=number] { font: inherit; background: #243341; border: 1px solid #566675; color: #eef5fa; border-radius: 4px; padding: 8px; }
+select { display: block; width: 100%; margin-top: 6px; }
+button { cursor: pointer; font-size: 12px; }
+button:hover { background: #34495c; }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #a9e5ce; outline-offset: 2px; }
+.buttons { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+input[type=range] { width: 100%; accent-color: #86d5b8; display: block; }
+input[type=number] { width: 64px; margin-left: 8px; }
+output { float: right; font-variant-numeric: tabular-nums; }
+.material-control output { float: none; display: block; margin-top: 4px; color: #a9e5ce; }
+pre { font-size: 11px; line-height: 1.65; white-space: pre-wrap; color: #bad0df; font-variant-numeric: tabular-nums; }
+#status { min-height: 40px; color: #b0ebd1; }
+details { border-top: 1px solid #34414f; padding-top: 12px; margin-top: 12px; }
+summary { cursor: pointer; font-size: 13px; }
+.hint { color: #a0b0bf; font-size: 12px; }
+#error { color: #ffb0a5; }
+@media (max-width: 760px) {
+  #app { height: auto; min-height: 100dvh; grid-template-columns: 1fr; grid-template-rows: 60dvh auto; }
+  aside { border-left: 0; border-top: 1px solid #34414f; }
+  #room header { top: 12px; left: 12px; }
+  #legend { left: 12px; bottom: 10px; }
+}

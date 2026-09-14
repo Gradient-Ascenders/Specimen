@@ -1,0 +1,128 @@
+{
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/144.0.0.0 Safari/537.36",
+  "scope": "Standalone HTML loaded with page.set_content because local file navigation is blocked in the research environment. Original shared solver; no Specimen integration.",
+  "checks": [
+    {
+      "name": "node-count controls",
+      "passed": true,
+      "counts": [
+        12,
+        162,
+        42
+      ]
+    },
+    {
+      "name": "browser floor propulsion",
+      "passed": true,
+      "travel": 10.57617859691399,
+      "metrics": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          10.576203555090304,
+          0.39522639892211336,
+          -0.0009056132849138986
+        ],
+        "velocity": [
+          2.869733615308557,
+          0.01670575527126056,
+          0.03187741710682206
+        ],
+        "volumeRatio": 0.9999161214058218,
+        "height": 0.8297717545609116,
+        "maxEdgeStrain": 0.03739144638207914,
+        "penetration": 0,
+        "contacts": 3,
+        "anchors": 0,
+        "acquired": 122,
+        "released": 118
+      }
+    },
+    {
+      "name": "browser zero-friction ablation",
+      "passed": true,
+      "metrics": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          -1.9088029767910797e-13,
+          0.392177004915599,
+          -6.463152766884167e-13
+        ],
+        "velocity": [
+          -3.90729115729016e-14,
+          0.26345768768166145,
+          -8.894111575702413e-14
+        ],
+        "volumeRatio": 0.9998630855454824,
+        "height": 0.8260965221648149,
+        "maxEdgeStrain": 0.0359061570616217,
+        "penetration": 0,
+        "contacts": 3,
+        "anchors": 0,
+        "acquired": 129,
+        "released": 126
+      }
+    },
+    {
+      "name": "browser scoped surface-gravity adhesion",
+      "passed": true,
+      "climbed": 11.551826254722076,
+      "surfaceGravity": true,
+      "metrics": {
+        "nodes": 42,
+        "constraints": 262,
+        "surfaceEdges": 120,
+        "faces": 80,
+        "centre": [
+          0.3970937664909748,
+          13.551114920237593,
+          0.0068916834952209485
+        ],
+        "velocity": [
+          0.810022693557121,
+          2.4285348732653187,
+          0.0059864410861479285
+        ],
+        "volumeRatio": 0.9999332808018716,
+        "height": 0.8667196603816038,
+        "maxEdgeStrain": 0.06222390327127325,
+        "penetration": 0,
+        "contacts": 3,
+        "anchors": 5,
+        "acquired": 136,
+        "released": 131
+      }
+    },
+    {
+      "name": "gravity-policy control",
+      "passed": true
+    },
+    {
+      "name": "WASD keyboard interaction",
+      "passed": true,
+      "centre": [
+        0.528592536652843,
+        0.3746790963659254,
+        -0.0002900056584872614
+      ]
+    },
+    {
+      "name": "trace download",
+      "passed": true,
+      "records": 1
+    },
+    {
+      "name": "narrow viewport layout",
+      "passed": true,
+      "width": 390,
+      "scrollWidth": 390
+    }
+  ],
+  "pageErrors": [],
+  "allPassed": true
+}

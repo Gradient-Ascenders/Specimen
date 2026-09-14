@@ -1,0 +1,204 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Specimen — Body Physics Lab</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#11151a;color:#e5eaf0}*{box-sizing:border-box}body{margin:0}header{padding:22px 28px 18px;border-bottom:1px solid #303940;display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:23px;margin:3px 0 0;letter-spacing:-.5px}.eyebrow{color:#9eb0bd;font-size:11px;letter-spacing:2px;text-transform:uppercase}.badge{border:1px solid #526570;padding:7px 10px;font-size:11px;border-radius:5px;color:#c9d6df}main{display:grid;grid-template-columns:minmax(0,1fr) 305px;min-height:calc(100vh - 100px)}.stage{position:relative;min-height:640px}canvas{width:100%;height:100%;display:block;touch-action:none;position:absolute;inset:0}.hint{position:absolute;left:24px;bottom:22px;right:24px;background:#11151ae8;border:1px solid #35404a;padding:13px 16px;pointer-events:none;border-radius:6px;font-size:12px;line-height:1.7;max-width:700px}.hint strong{font-size:13px}.hint kbd{border:1px solid #50606b;padding:1px 5px;border-radius:3px}.hud{position:absolute;left:24px;top:22px;font:12px/1.75 ui-monospace,monospace;pointer-events:none;color:#b4c3ce;white-space:pre}.hud b{color:#f2f5f7}aside{border-left:1px solid #303940;padding:22px 20px 28px;background:#171d24}h2{font-size:12px;text-transform:uppercase;letter-spacing:1.4px;color:#a6b7c4;margin:22px 0 12px}h2:first-child{margin-top:0}label{display:block;font-size:12px;color:#bccad4;margin:11px 0 6px}select,button{font:13px system-ui;color:#e5eaf0;background:#242d37;border:1px solid #46535f;border-radius:4px;padding:8px 9px}select{width:100%}button{cursor:pointer}button:hover{background:#33414e}button.primary{background:#cadbc8;color:#1b281d;border-color:#cadbc8;font-weight:650}.row{display:flex;gap:8px}.row>*{flex:1}.check{display:flex;align-items:center;gap:9px;margin:13px 0}.check input{accent-color:#c9dac7}.check label{margin:0;line-height:1.4}input[type=range]{width:100%;accent-color:#c9dac7}.small{font-size:11px;line-height:1.65;color:#91a2af}.notice{font-size:11px;line-height:1.7;color:#cebfa6;border-left:2px solid #9b8560;padding-left:11px;margin-top:20px}#bench{font:11px/1.7 ui-monospace,monospace;white-space:pre-wrap;color:#c3d6c0}#error{color:#ffb4a9;font-size:12px;line-height:1.5}#status{margin-top:10px;font-size:11px;color:#b7c9d4}@media(max-width:850px){main{grid-template-columns:1fr}.stage{height:65vh;min-height:480px}aside{border-left:0;border-top:1px solid #303940}.hint{bottom:12px;left:12px;right:12px}.hud{left:12px;top:12px}header{padding:16px}.badge{display:none}}
+</style></head><body><header><div><div class="eyebrow">Movement architecture research / isolated experiment</div><h1>Specimen — Body Physics Lab</h1></div><span class="badge">3D PARTICLES · NO AUTHORITATIVE RIGID COLLIDER</span></header>
+<main><section class="stage"><canvas id="canvas" aria-label="Interactive projection of a three-dimensional deformable particle cage"></canvas><div class="hud" id="hud"></div><div class="hint"><strong id="sceneNote">Floor traction experiment</strong><br><kbd>W A S D</kbd> move · <kbd>Space</kbd> compress / release stiffness · <kbd>R</kbd> reset · <kbd>P</kbd> pause<br>Drag to orbit. The outlined node keeps its material identity while the body rolls.</div></section>
+<aside><h2>Experiment</h2><label for="scene">Contact environment</label><select id="scene"><option value="floor">Flat floor</option><option value="slope">15° ramp plane</option><option value="moving">Moving plane · 1 m/s</option><option value="wall">Adhesive wall</option></select><label for="nodes">Surface nodes</label><select id="nodes"><option value="0">12 · coarse</option><option value="1" selected>42 · baseline</option><option value="2">162 · cost comparison</option></select><div class="row"><div><label for="subs">Substeps / 60 Hz</label><select id="subs"><option>2</option><option selected>4</option><option>8</option></select></div><div><label for="iters">Solver passes</label><select id="iters"><option>4</option><option selected>8</option><option>12</option></select></div></div><label for="mu">Static friction · <span id="muValue">0.90</span></label><input type="range" id="mu" min="0" max="1.4" step=".05" value=".9"><div class="check"><input type="checkbox" id="motor" checked><label for="motor">Particle torque actuator</label></div><div class="check"><input type="checkbox" id="volume" checked><label for="volume">Volume constraint</label></div><div class="check"><input type="checkbox" id="surfaceGravity" checked><label for="surfaceGravity">Wall surface gravity<br><span class="small">Explicit Specimen-style policy</span></label></div><label for="force">Adhesion release load / node</label><select id="force"><option value="6">6 N · weak grip / failure probe</option><option value="16" selected>16 N · baseline</option><option value="24">24 N · stronger</option><option value="1000000000">Unbreakable · locking probe</option></select>
+<h2>Playback</h2><div class="row"><button id="reset" class="primary">Reset</button><button id="pause">Pause</button><button id="step">Step</button></div><div class="row" style="margin-top:8px"><button id="drop">Drop from 2 m</button><button id="demo">Reversal tape</button></div><label for="view">Projection</label><select id="view"><option value="iso">Perspective-free 3D view</option><option value="side">Side / XY</option><option value="top">Top / XZ</option></select><div class="check"><input type="checkbox" id="cross"><label for="cross">Show interior cross-body links</label></div><div id="status">Live keyboard control</div><div id="error" role="alert"></div>
+<h2>Measurements</h2><button id="benchmark" style="width:100%">Benchmark this browser</button><div id="bench" style="margin-top:10px">One body · plane-only collision.<br>Not a full-game performance claim.</div><button id="trace" style="width:100%;margin-top:10px">Download recent trace</button><p class="notice">Research prototype, not a production controller. No box/triangle CCD, self-collision, ledge transitions, hazards, or calibrated Level 1 jumps. A successful wall run uses surface gravity; world-gravity climbing is not solved by this tuning.</p><p class="small">Open this file directly. No installation, libraries, server, network calls, or game assets required.</p></aside></main>
+<script>
+/* Original research sandbox, not a port of Gish and not production Specimen code.
+ * Physics: world-space particle cage, XPBD distance/volume constraints, plane
+ * contacts with persistent Coulomb friction anchors, optional breakable adhesion.
+ * No centre collider, centre-velocity setter, mesh pose target, or dependencies.
+ */
+(function(root) {
+'use strict';
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+function cageGeometry(level=1, radius=.4) {
+  const t=(1+Math.sqrt(5))/2;
+  let p=[[-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],[0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],[t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]];
+  const unit=v=>{const s=radius/Math.hypot(...v);return v.map(x=>x*s);}; p=p.map(unit);
+  let f=[[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+  for(let l=0;l<level;l++) {
+    const cache=new Map(), out=[];
+    const mid=(a,b)=>{const k=[Math.min(a,b),Math.max(a,b)].join(',');if(cache.has(k))return cache.get(k);const i=p.length;p.push(unit(p[a].map((x,c)=>(x+p[b][c])/2)));cache.set(k,i);return i;};
+    for(const [a,b,c] of f){const ab=mid(a,b),bc=mid(b,c),ca=mid(c,a);out.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]);} f=out;
+  }
+  const edgeMap=new Map();
+  for(const face of f) for(let k=0;k<3;k++) {const a=face[k],b=face[(k+1)%3],other=face[(k+2)%3],key=[Math.min(a,b),Math.max(a,b)].join(',');if(!edgeMap.has(key))edgeMap.set(key,{a:Math.min(a,b),b:Math.max(a,b),other:[]});edgeMap.get(key).other.push(other);}
+  const links=[], seen=new Set();
+  const add=(a,b,kind)=>{const key=[Math.min(a,b),Math.max(a,b)].join(',');if(a===b||seen.has(key))return;seen.add(key);links.push({a,b,kind,length:Math.hypot(...p[a].map((v,k)=>v-p[b][k]))});};
+  for(const e of edgeMap.values()) add(e.a,e.b,0);
+  const surfaceEdges=links.length;
+  for(const e of edgeMap.values()) if(e.other.length===2)add(e.other[0],e.other[1],1);
+  for(let a=0;a<p.length;a++){let best=-1,dist=Infinity;for(let b=0;b<p.length;b++){const d=p[a].reduce((s,x,k)=>s+(x+p[b][k])**2,0);if(d<dist){dist=d;best=b;}}add(a,best,2);}
+  return {rest:Float64Array.from(p.flat()),faces:f,links,surfaceEdges};
+}
+class Blob {
+  constructor(options={}) {
+    this.config={level:1,radius:.4,nodeRadius:.05,mass:1,substeps:4,iterations:8,gravity:18,edgeCompliance:1.5e-3,bendCompliance:1.5e-2,diameterCompliance:6e-2,volumeCompliance:2e-6,friction:.9,dynamicFriction:.65,motorMax:85,motorGain:14,targetSpeed:3.5,drag:.08,bondDamping:3,mode:'floor',slopeDegrees:15,adhesion:false,surfaceGravity:true,adhesionCompliance:3e-4,adhesionBreakDistance:.19,adhesionBreakForce:16,adhesionCooldown:.10,platformSpeed:0,...options};
+    for(const name of ['substeps','iterations']) if(!Number.isInteger(this.config[name])||this.config[name]<1||this.config[name]>64)throw new Error('Invalid '+name);
+    if(![0,1,2].includes(this.config.level))throw new Error('level must be 0, 1 or 2');
+    const g=cageGeometry(this.config.level,this.config.radius);Object.assign(this,g);
+    this.n=this.rest.length/3;this.w=this.n/this.config.mass;
+    this.p=new Float64Array(this.rest.length);this.old=new Float64Array(this.p.length);this.previous=new Float64Array(this.p.length);this.v=new Float64Array(this.p.length);this.grad=new Float64Array(this.p.length);this.lambda=new Float64Array(this.links.length);
+    // One contact record per node per plane. All storage is preallocated.
+    this.planes=this.config.mode==='wall'?[{n:[0,1,0],d:0,sticky:false},{n:[1,0,0],d:0,sticky:true}]:[{n:this.config.mode==='slope'?[-Math.sin(this.config.slopeDegrees*Math.PI/180),Math.cos(this.config.slopeDegrees*Math.PI/180),0]:[0,1,0],d:0,sticky:false}];
+    this.contacts=this.planes.map(()=>Array.from({length:this.n},()=>({active:false,sticky:false,a:new Float64Array(3),ln:0,lt:new Float64Array(3),la:new Float64Array(3),slip:false,age:0,cooldown:0})));
+    this.up=[0,1,0];this.centre=new Float64Array(3);this.meanV=new Float64Array(3);this.lastAxis=new Float64Array([0,0,-1]);
+    this.reset();
+  }
+  reset(position) {
+    const spawn=position||(this.config.mode==='wall'?[.44,2,0]:[0,.51,0]);
+    for(let i=0;i<this.n;i++)for(let k=0;k<3;k++)this.p[3*i+k]=this.rest[3*i+k]+spawn[k];
+    this.v.fill(0);this.old.set(this.p);this.previous.set(this.p);this.lambda.fill(0);
+    for(const cs of this.contacts)for(const c of cs){c.active=c.sticky=c.slip=false;c.ln=c.age=c.cooldown=0;c.lt.fill(0);c.la.fill(0);c.a.fill(0);}
+    this.time=0;this.stepNumber=0;this.releaseTime=0;this.charging=false;this.contactCount=0;this.anchorCount=0;this.up=[0,1,0];this.lastAxis.set([0,0,-1]);this.moments();this.restVolume=this.volume(false);this.volumeLambda=0;this.maxPenetration=0;this.acquireCount=0;this.releaseCount=0;
+  }
+  moments() {
+    this.centre.fill(0);this.meanV.fill(0);
+    for(let i=0;i<this.n;i++)for(let k=0;k<3;k++){this.centre[k]+=this.p[3*i+k]/this.n;this.meanV[k]+=this.v[3*i+k]/this.n;}
+  }
+  volume(withGradient) {
+    const p=this.p,c=this.centre,g=this.grad;if(withGradient)g.fill(0);let vol=0;
+    for(const [ia,ib,ic] of this.faces){const a=ia*3,b=ib*3,d=ic*3,ax=p[a]-c[0],ay=p[a+1]-c[1],az=p[a+2]-c[2],bx=p[b]-c[0],by=p[b+1]-c[1],bz=p[b+2]-c[2],cx=p[d]-c[0],cy=p[d+1]-c[1],cz=p[d+2]-c[2];
+      const gx=(by*cz-bz*cy)/6,gy=(bz*cx-bx*cz)/6,gz=(bx*cy-by*cx)/6;vol+=ax*gx+ay*gy+az*gz;
+      if(withGradient){g[a]+=gx;g[a+1]+=gy;g[a+2]+=gz;g[b]+=(cy*az-cz*ay)/6;g[b+1]+=(cz*ax-cx*az)/6;g[b+2]+=(cx*ay-cy*ax)/6;g[d]+=(ay*bz-az*by)/6;g[d+1]+=(az*bx-ax*bz)/6;g[d+2]+=(ax*by-ay*bx)/6;}
+    }return vol;
+  }
+  step(input={},dt=1/60) {
+    if(!Number.isFinite(dt)||dt<=0)throw new Error('Invalid dt');
+    this.previous.set(this.p);this.stepNumber++;
+    if(this.charging&&!input.charge)this.releaseTime=.16;
+    this.charging=!!input.charge;
+    for(let sub=0;sub<this.config.substeps;sub++)this.substep(input,dt/this.config.substeps);
+  }
+  substep(input,h) {
+    const cfg=this.config,p=this.p,v=this.v,w=this.w;
+    this.time+=h;this.releaseTime=Math.max(0,this.releaseTime-h);this.moments();
+    this.up=this.anchorCount>0&&cfg.mode==='wall'?[1,0,0]:this.planes[0].n;
+    const up=this.up;
+    const gravityUp=cfg.surfaceGravity&&this.anchorCount>0&&cfg.mode==='wall'?up:[0,1,0];
+    // Input direction projected into the current support tangent plane.
+    let dx=input.x||0,dy=input.y||0,dz=input.z||0,du=dx*up[0]+dy*up[1]+dz*up[2];dx-=du*up[0];dy-=du*up[1];dz-=du*up[2];const len=Math.hypot(dx,dy,dz),mag=Math.min(1,len);
+    let ax=this.lastAxis[0],ay=this.lastAxis[1],az=this.lastAxis[2];
+    if(len>1e-9){dx/=len;dy/=len;dz/=len;ax=up[1]*dz-up[2]*dy;ay=up[2]*dx-up[0]*dz;az=up[0]*dy-up[1]*dx;this.lastAxis.set([ax,ay,az]);}
+    let lx=0,ly=0,lz=0,ixx=0,iyy=0,izz=0,ixy=0,ixz=0,iyz=0;
+    for(let i=0;i<this.n;i++){
+      const j=3*i,rx=p[j]-this.centre[0],ry=p[j+1]-this.centre[1],rz=p[j+2]-this.centre[2],vx=v[j]-this.meanV[0],vy=v[j+1]-this.meanV[1],vz=v[j+2]-this.meanV[2];
+      lx+=ry*vz-rz*vy;ly+=rz*vx-rx*vz;lz+=rx*vy-ry*vx;
+      ixx+=ry*ry+rz*rz;iyy+=rx*rx+rz*rz;izz+=rx*rx+ry*ry;ixy-=rx*ry;ixz-=rx*rz;iyz-=ry*rz;
+    }
+    const aa=iyy*izz-iyz*iyz,bb=ixz*iyz-ixy*izz,cc=ixy*iyz-ixz*iyy,dd=ixx*izz-ixz*ixz,ee=ixy*ixz-ixx*iyz,ff=ixx*iyy-ixy*ixy;
+    const det=Math.max(1e-14,ixx*aa+ixy*bb+ixz*cc),ox=(aa*lx+bb*ly+cc*lz)/det,oy=(bb*lx+dd*ly+ee*lz)/det,oz=(cc*lx+ee*ly+ff*lz)/det;
+    this.omega=ox*ax+oy*ay+oz*az;
+    const motorEnabled=this.contactCount>0||this.anchorCount>0||input.forceAirMotor;
+    const target=cfg.targetSpeed/(cfg.radius+cfg.nodeRadius)*mag;
+    let alx=cfg.motorGain*(target*ax-ox),aly=cfg.motorGain*(target*ay-oy),alz=cfg.motorGain*(target*az-oz),alLength=Math.hypot(alx,aly,alz);
+    const motorScale=motorEnabled&&!input.motorOff?Math.min(1,cfg.motorMax/Math.max(1e-12,alLength)):0;alx*=motorScale;aly*=motorScale;alz*=motorScale;
+    for(let i=0;i<this.n;i++){
+      const j=3*i,rx=p[j]-this.centre[0],ry=p[j+1]-this.centre[1],rz=p[j+2]-this.centre[2],rUp=rx*up[0]+ry*up[1]+rz*up[2],squeeze=this.charging?-280*rUp:0;
+      v[j]+=(aly*rz-alz*ry+squeeze*up[0]-cfg.gravity*gravityUp[0])*h;
+      v[j+1]+=(alz*rx-alx*rz+squeeze*up[1]-cfg.gravity*gravityUp[1])*h;
+      v[j+2]+=(alx*ry-aly*rx+squeeze*up[2]-cfg.gravity*gravityUp[2])*h;
+    }
+    // Pairwise axial damping preserves linear momentum and rigid rotation.
+    const damping=1-Math.exp(-cfg.bondDamping*h);
+    for(const l of this.links){if(l.kind===1)continue;const a=3*l.a,b=3*l.b,rx=p[a]-p[b],ry=p[a+1]-p[b+1],rz=p[a+2]-p[b+2],rr=rx*rx+ry*ry+rz*rz;if(rr<1e-16)continue;const dv=((v[a]-v[b])*rx+(v[a+1]-v[b+1])*ry+(v[a+2]-v[b+2])*rz)/rr*damping*.5;
+      v[a]-=dv*rx;v[a+1]-=dv*ry;v[a+2]-=dv*rz;v[b]+=dv*rx;v[b+1]+=dv*ry;v[b+2]+=dv*rz;}
+    this.old.set(p);const drag=Math.exp(-cfg.drag*h);
+    for(let j=0;j<p.length;j++){v[j]*=drag;p[j]+=v[j]*h;}
+    this.lambda.fill(0);this.volumeLambda=0;
+    for(let pi=0;pi<this.planes.length;pi++){
+      const plane=this.planes[pi],n=plane.n;
+      for(let i=0;i<this.n;i++){
+        const c=this.contacts[pi][i],j=3*i,dist=p[j]*n[0]+p[j+1]*n[1]+p[j+2]*n[2]-plane.d-cfg.nodeRadius;const oldForce=Math.hypot(...c.la)/(h*h);c.cooldown=Math.max(0,c.cooldown-h);c.ln=0;c.lt.fill(0);c.la.fill(0);c.slip=false;
+        if(c.active&&cfg.platformSpeed&&pi===0)c.a[0]+=cfg.platformSpeed*h;
+        if(c.sticky){const stretch=Math.hypot(p[j]-c.a[0],p[j+1]-c.a[1],p[j+2]-c.a[2]);if(!cfg.adhesion||stretch>cfg.adhesionBreakDistance||(oldForce>cfg.adhesionBreakForce&&c.age>.04)){c.sticky=c.active=false;c.cooldown=cfg.adhesionCooldown;this.releaseCount++;}}
+        if(c.active&&!c.sticky&&dist>.018){c.active=false;this.releaseCount++;}
+        if(!c.active&&dist<.003){c.active=true;c.age=0;this.acquireCount++;for(let k=0;k<3;k++)c.a[k]=p[j+k]-dist*n[k];c.sticky=cfg.adhesion&&plane.sticky&&c.cooldown===0;}
+        if(c.active&&!c.sticky&&cfg.adhesion&&plane.sticky&&c.cooldown===0&&dist<.003){c.sticky=true;c.age=0;for(let k=0;k<3;k++)c.a[k]=p[j+k]-dist*n[k];this.acquireCount++;}
+        if(c.active)c.age+=h;
+      }
+    }
+    const h2=h*h;
+    for(let it=0;it<cfg.iterations;it++){
+      // Alternating deterministic traversal reduces a fixed-order directional bias.
+      for(let z=0;z<this.links.length;z++){
+        const index=it%2?this.links.length-1-z:z,l=this.links[index],a=3*l.a,b=3*l.b;
+        const x=p[a]-p[b],y=p[a+1]-p[b+1],zz=p[a+2]-p[b+2],length=Math.hypot(x,y,zz);if(length<1e-12)continue;
+        let compliance=l.kind===0?cfg.edgeCompliance:l.kind===1?cfg.bendCompliance:cfg.diameterCompliance;
+        if(l.kind===2&&this.releaseTime>0)compliance=Math.min(compliance,2e-5);
+        const al=compliance/h2,dl=(-(length-l.length)-al*this.lambda[index])/(2*w+al);this.lambda[index]+=dl;
+        const s=w*dl/length;p[a]+=x*s;p[a+1]+=y*s;p[a+2]+=zz*s;p[b]-=x*s;p[b+1]-=y*s;p[b+2]-=zz*s;
+      }
+      if(!input.volumeOff){const volume=this.volume(true);let denom=0;for(const q of this.grad)denom+=w*q*q;const al=cfg.volumeCompliance/h2,dl=(-(volume-this.restVolume)-al*this.volumeLambda)/(denom+al);this.volumeLambda+=dl;for(let j=0;j<p.length;j++)p[j]+=w*this.grad[j]*dl;}
+      for(let pi=0;pi<this.planes.length;pi++){
+        const plane=this.planes[pi],n=plane.n;
+        for(let i=0;i<this.n;i++){
+          const c=this.contacts[pi][i],j=3*i;let dist=p[j]*n[0]+p[j+1]*n[1]+p[j+2]*n[2]-plane.d-cfg.nodeRadius;
+          if(dist<0&&!c.active){c.active=true;c.age=0;this.acquireCount++;for(let k=0;k<3;k++)c.a[k]=p[j+k]-dist*n[k];c.sticky=cfg.adhesion&&plane.sticky&&c.cooldown===0;}
+          const next=Math.max(0,c.ln-dist/w),dl=next-c.ln;c.ln=next;for(let k=0;k<3;k++)p[j+k]+=w*dl*n[k];
+          if(!c.active)continue;
+          if(c.sticky){const al=cfg.adhesionCompliance/h2;for(let k=0;k<3;k++){const dl=(-(p[j+k]-c.a[k])-al*c.la[k])/(w+al);c.la[k]+=dl;p[j+k]+=w*dl;}continue;}
+          let ex=p[j]-c.a[0],ey=p[j+1]-c.a[1],ez=p[j+2]-c.a[2],en=ex*n[0]+ey*n[1]+ez*n[2];ex-=en*n[0];ey-=en*n[1];ez-=en*n[2];
+          let tx=c.lt[0]-ex/w,ty=c.lt[1]-ey/w,tz=c.lt[2]-ez/w,tl=Math.hypot(tx,ty,tz);
+          if(tl>cfg.friction*c.ln){const s=tl>0?Math.min(cfg.dynamicFriction,cfg.friction)*c.ln/tl:0;tx*=s;ty*=s;tz*=s;c.slip=true;}
+          p[j]+=w*(tx-c.lt[0]);p[j+1]+=w*(ty-c.lt[1]);p[j+2]+=w*(tz-c.lt[2]);c.lt[0]=tx;c.lt[1]=ty;c.lt[2]=tz;
+        }
+      }
+    }
+    this.contactCount=0;this.anchorCount=0;
+    for(let pi=0;pi<this.planes.length;pi++)for(let i=0;i<this.n;i++){
+      const c=this.contacts[pi][i],n=this.planes[pi].n,j=3*i;
+      if(c.ln>1e-9)this.contactCount++;
+      if(c.sticky)this.anchorCount++;
+      if(c.active&&c.slip&&!c.sticky){const d=p[j]*n[0]+p[j+1]*n[1]+p[j+2]*n[2]-this.planes[pi].d-cfg.nodeRadius;for(let k=0;k<3;k++)c.a[k]=p[j+k]-d*n[k];}
+    }
+    for(let j=0;j<p.length;j++){v[j]=(p[j]-this.old[j])/h;if(!Number.isFinite(p[j])||Math.abs(p[j])>1e6)throw new Error('Unstable simulation; reset required');}
+    this.moments();
+  }
+  metrics(){this.moments();let minY=Infinity,maxY=-Infinity,maxStrain=0;for(let i=0;i<this.n;i++){minY=Math.min(minY,this.p[3*i+1]);maxY=Math.max(maxY,this.p[3*i+1]);}for(const l of this.links){if(l.kind!==0)continue;const a=l.a*3,b=l.b*3,d=Math.hypot(this.p[a]-this.p[b],this.p[a+1]-this.p[b+1],this.p[a+2]-this.p[b+2]);maxStrain=Math.max(maxStrain,Math.abs(d/l.length-1));}
+    let penetration=0;for(const plane of this.planes)for(let i=0;i<this.n;i++)penetration=Math.max(penetration,this.config.nodeRadius+plane.d-this.p[3*i]*plane.n[0]-this.p[3*i+1]*plane.n[1]-this.p[3*i+2]*plane.n[2]);
+    return {nodes:this.n,constraints:this.links.length+1,surfaceEdges:this.surfaceEdges,faces:this.faces.length,centre:Array.from(this.centre),velocity:Array.from(this.meanV),volumeRatio:this.volume(false)/this.restVolume,height:maxY-minY+2*this.config.nodeRadius,maxEdgeStrain:maxStrain,penetration,contacts:this.contactCount,anchors:this.anchorCount,acquired:this.acquireCount,released:this.releaseCount};}
+}
+const api={Blob,cageGeometry};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.SoftBodyLab=api;
+})(typeof globalThis!=='undefined'?globalThis:this);
+
+</script><script>
+'use strict';
+const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d'),{Blob}=SoftBodyLab;
+let blob,paused=false,acc=0,last=0,keys=new Set(),demo=false,trace=[],lastMetrics=0,lastCost=0,yaw=.68,pitch=.4,viewCentre=[0,.4,0],drag=null;
+function options(){const scene=$('scene').value;return {level:+$('nodes').value,substeps:+$('subs').value,iterations:+$('iters').value,mode:scene==='moving'?'floor':scene,platformSpeed:scene==='moving'?1:0,friction:+$('mu').value,adhesion:scene==='wall',adhesionBreakForce:+$('force').value,surfaceGravity:$('surfaceGravity').checked};}
+function reset(){blob=new Blob(options());acc=0;demo=false;trace=[];viewCentre=Array.from(blob.centre);$('error').textContent='';$('status').textContent='Live keyboard control';const mode=$('scene').value;$('sceneNote').textContent=mode==='wall'?'Wall: W / S climb, A / D traverse. Surface gravity is a separate policy.':mode==='moving'?'Moving plane: release input and observe contact transport.':mode==='slope'?'Ramp: test ascent, braking, and passive sliding.':'Floor: set friction to zero and compare spin with travel.';window.labBlob=blob;}
+function input(){let i;if(demo){const t=blob.stepNumber%480;i={x:t<60?0:t<240?1:t<360?-1:0,z:0};}else if($('scene').value==='wall')i={y:(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0),z:(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0)};else i={x:(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0),z:(keys.has('KeyS')?1:0)-(keys.has('KeyW')?1:0)};return {...i,charge:keys.has('Space'),motorOff:!$('motor').checked,volumeOff:!$('volume').checked};}
+function tick(){const t=performance.now();try{blob.step(input());}catch(e){paused=true;$('pause').textContent='Resume';$('error').textContent=e.message;}lastCost=performance.now()-t;if(blob.stepNumber%6===0){trace.push({tick:blob.stepNumber,input:input(),...blob.metrics()});if(trace.length>600)trace.shift();}}
+function pause(){paused=!paused;$('pause').textContent=paused?'Resume':'Pause';acc=0;}
+$('reset').onclick=reset;$('pause').onclick=pause;$('step').onclick=()=>{if(!paused)pause();tick();};$('drop').onclick=()=>{reset();blob.reset(blob.config.mode==='wall'?[.44,3.5,0]:[0,2,0]);};$('demo').onclick=()=>{reset();demo=true;paused=false;$('pause').textContent='Pause';$('status').textContent='Repeating tape: settle → forward → reverse → coast';};
+for(const id of ['scene','nodes','subs','iters'])$(id).onchange=reset;
+$('mu').oninput=()=>{$('muValue').textContent=(+$('mu').value).toFixed(2);blob.config.friction=+$('mu').value;};$('force').onchange=()=>blob.config.adhesionBreakForce=+$('force').value;$('surfaceGravity').onchange=()=>blob.config.surfaceGravity=$('surfaceGravity').checked;
+$('view').onchange=()=>{const v=$('view').value;yaw=v==='iso'?.68:0;pitch=v==='top'?Math.PI/2:v==='side'?0:.4;};
+window.addEventListener('keydown',e=>{if(['INPUT','SELECT','BUTTON'].includes(document.activeElement.tagName))return;if(['Space','KeyW','KeyA','KeyS','KeyD'].includes(e.code)){e.preventDefault();demo=false;$('status').textContent='Live keyboard control';}keys.add(e.code);if(!e.repeat&&e.code==='KeyR')reset();if(!e.repeat&&e.code==='KeyP')pause();});window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>{keys.clear();acc=0;});document.addEventListener('visibilitychange',()=>{last=0;acc=0;keys.clear();});
+canvas.onpointerdown=e=>{canvas.setPointerCapture(e.pointerId);document.activeElement.blur();drag={x:e.clientX,y:e.clientY};};canvas.onpointermove=e=>{if(drag){yaw+=(e.clientX-drag.x)*.006;pitch=Math.max(-.1,Math.min(1.5,pitch+(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY};}};canvas.onpointerup=()=>drag=null;
+function draw(alpha,dt){const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio,2),w=rect.width,h=rect.height;if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#11171d';ctx.fillRect(0,0,w,h);
+ const target=[blob.centre[0],blob.config.mode==='wall'?blob.centre[1]:Math.max(.45,blob.centre[1]-.4),blob.centre[2]],follow=1-Math.exp(-8*dt);for(let k=0;k<3;k++)viewCentre[k]+=(target[k]-viewCentre[k])*follow;
+ const scale=Math.min(w/4,h/3),cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+ const project=(x,y,z)=>{x-=viewCentre[0];y-=viewCentre[1];z-=viewCentre[2];return [w*.5+scale*(x*cy-z*sy),h*.48-scale*(-x*sy*sp+y*cp-z*cy*sp),x*sy*cp+y*sp+z*cy*cp];};
+ const line=(a,b,c,width=1)=>{const pa=project(...a),pb=project(...b);ctx.strokeStyle=c;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.stroke();};
+ const gx=Math.floor(viewCentre[0]),gz=Math.floor(viewCentre[2]),offset=blob.config.platformSpeed?(blob.time*blob.config.platformSpeed)%1:0,slope=blob.config.mode==='slope'?Math.tan(blob.config.slopeDegrees*Math.PI/180):0;
+ for(let d=-8;d<=8;d++){const x=gx+d+offset,z=gz+d;line([x,slope*x,gz-8],[x,slope*x,gz+8],'#2c3944');line([gx-8,slope*(gx-8),z],[gx+8,slope*(gx+8),z],'#2c3944');}
+ if(blob.config.mode==='wall'){const gy=Math.floor(viewCentre[1]);for(let d=-8;d<=8;d++){line([0,Math.max(0,gy-8),gz+d],[0,gy+8,gz+d],'#3f4d45');line([0,Math.max(0,gy+d),gz-8],[0,Math.max(0,gy+d),gz+8],'#3f4d45');}}
+ const points=[];for(let i=0;i<blob.n;i++){const j=3*i,world=[0,1,2].map(k=>blob.previous[j+k]*(1-alpha)+blob.p[j+k]*alpha);points.push({world,s:project(...world),i});}
+ if($('cross').checked)for(let i=blob.surfaceEdges;i<blob.links.length;i++){const l=blob.links[i];if(l.kind===2)line(points[l.a].world,points[l.b].world,'#625563',.8);}
+ for(let i=0;i<blob.surfaceEdges;i++){const l=blob.links[i];line(points[l.a].world,points[l.b].world,'#93b2bc',1.15);}
+ for(const cs of blob.contacts)for(let i=0;i<blob.n;i++)if(cs[i].sticky)line(points[i].world,Array.from(cs[i].a),'#dfc887',2);
+ points.sort((a,b)=>a.s[2]-b.s[2]);for(const pt of points){const sticky=blob.contacts.some(cs=>cs[pt.i].sticky),contact=blob.contacts.some(cs=>cs[pt.i].ln>1e-9);ctx.fillStyle=sticky?'#e3c584':contact?'#c4db9c':'#d5e1e8';ctx.beginPath();ctx.arc(pt.s[0],pt.s[1],pt.i===0?5:3,0,Math.PI*2);ctx.fill();if(pt.i===0){ctx.strokeStyle='#f8fbfd';ctx.lineWidth=1;ctx.beginPath();ctx.arc(pt.s[0],pt.s[1],8,0,Math.PI*2);ctx.stroke();ctx.font='11px system-ui';ctx.fillText('0',pt.s[0]+12,pt.s[1]-7);}}
+ if(performance.now()-lastMetrics>100){lastMetrics=performance.now();const m=blob.metrics();$('hud').innerHTML=`<b>${m.nodes} surface nodes / ${m.constraints} constraints</b>\n60 Hz × ${blob.config.substeps} substeps × ${blob.config.iterations} passes\n\nCOM   ${m.centre.map(x=>x.toFixed(2).padStart(6)).join(' ')} m\nVEL   ${m.velocity.map(x=>x.toFixed(2).padStart(6)).join(' ')} m/s\nV/V₀  ${m.volumeRatio.toFixed(5)}   height ${m.height.toFixed(3)} m\ncontact ${m.contacts}   adhesive ${m.anchors}\nmax edge strain ${(m.maxEdgeStrain*100).toFixed(1)}%\nlast fixed step ${lastCost.toFixed(2)} ms\n${paused?'PAUSED':demo?'INPUT TAPE':'LIVE'} · tick ${blob.stepNumber}`;}
+}
+function frame(now){let dt=last?Math.min(.1,(now-last)/1000):0;last=now;if(!paused&&!document.hidden){acc+=dt;let count=0;while(acc+1e-10>=1/60&&count++<6){tick();acc-=1/60;}if(acc>=1/60)acc%=1/60;}draw(paused?1:Math.max(0,acc*60),dt||1/60);requestAnimationFrame(frame);}
+function download(name,data){const url=URL.createObjectURL(new window.Blob([data],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+$('trace').onclick=()=>download('specimen-blob-trace.json',JSON.stringify({config:blob.config,scope:'isolated plane-only research',trace},null,2));
+window.runBenchmark=async function(){const wasPaused=paused;paused=true;acc=0;const rows=[];$('benchmark').disabled=true;$('bench').textContent='Warming up…';try{for(const level of [0,1,2]){const b=new Blob({level});for(let i=0;i<120;i++)b.step({x:1});const samples=[];for(let block=0;block<8;block++){await new Promise(requestAnimationFrame);for(let i=0;i<45;i++){const t=performance.now();b.step({x:1});samples.push(performance.now()-t);}}samples.sort((a,b)=>a-b);rows.push({nodes:b.n,meanMs:samples.reduce((a,b)=>a+b,0)/samples.length,p95Ms:samples[Math.floor(samples.length*.95)],p99Ms:samples[Math.floor(samples.length*.99)],samples:samples.length,substeps:4,iterations:8});$('bench').textContent=rows.map(r=>`${r.nodes} nodes: ${r.meanMs.toFixed(2)} ms mean\n          ${r.p95Ms.toFixed(2)} ms p95`).join('\n')+'\nPlane-only, one body, this browser.';}window.lastBenchmark={userAgent:navigator.userAgent,rows};return window.lastBenchmark;}finally{paused=wasPaused;$('benchmark').disabled=false;last=0;acc=0;}};
+$('benchmark').onclick=()=>window.runBenchmark();reset();requestAnimationFrame(frame);
+</script></body></html>
