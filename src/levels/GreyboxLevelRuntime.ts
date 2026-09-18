@@ -428,7 +428,9 @@ export class GreyboxLevelRuntime {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
     const generation = ++this.lightingPrewarmGeneration;
-    const promise = this.runLightingPrewarm(resources, generation);
+    const promise = resources.testScene
+      .prepareBob()
+      .then(() => this.runLightingPrewarm(resources, generation));
     this.lightingPrewarmPromise = promise;
     return promise;
   }

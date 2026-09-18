@@ -3,11 +3,14 @@ import * as THREE from 'three';
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
 import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 import {
-  SlimeVisual,
-  type SlimeVisualDiagnostics,
-  type SlimeVisualLaunch,
-  type SlimeVisualState,
-  type Vector3State,
+  BobCharacterPresentation,
+  type BobGateOneLoader,
+} from '../render/bob/BobCharacterPresentation.ts';
+import type {
+  SlimeVisualDiagnostics,
+  SlimeVisualLaunch,
+  SlimeVisualState,
+  Vector3State,
 } from '../render/slime/SlimeVisual.ts';
 import {
   SlimeBurstPresentation,
@@ -63,7 +66,7 @@ export class ContainmentTeachingScene {
   private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
   private readonly ownedMaterials = new Set<THREE.Material>();
   private readonly artResources: ContainmentArtResources;
-  private readonly slimeVisual: SlimeVisual;
+  readonly bob: BobCharacterPresentation;
   private readonly slimeBurst = new SlimeBurstPresentation();
   private deathElapsedSeconds = 0;
   private disposed = false;
@@ -128,10 +131,10 @@ export class ContainmentTeachingScene {
     this.roomTwoArt = new RoomTwoArt(artResources);
     this.root.add(this.roomOneArt.root, this.roomTwoArt.root);
 
-    this.slimeVisual = new SlimeVisual({
-      radiusMetres: DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
-    });
-    this.root.add(this.slimeVisual.mesh, this.slimeBurst.root);
+    this.bob = new BobCharacterPresentation(
+      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
+    );
+    this.root.add(this.bob.mesh, this.slimeBurst.root);
     this.resetProbe();
   }
 
@@ -145,7 +148,11 @@ export class ContainmentTeachingScene {
   }
 
   get slimeDiagnostics(): SlimeVisualDiagnostics {
-    return this.slimeVisual.diagnostics;
+    return this.bob.diagnostics;
+  }
+
+  prepareBob(loader?: BobGateOneLoader): Promise<void> {
+    return this.bob.prepare(loader);
   }
 
   get deathBurstDiagnostics(): SlimeBurstDiagnostics {
@@ -171,15 +178,15 @@ export class ContainmentTeachingScene {
   }
 
   setProbePosition(position: Vector3State): void {
-    this.slimeVisual.setPosition(position);
+    this.bob.setPosition(position);
   }
 
   setProbeYaw(yawRadians: number): void {
-    this.slimeVisual.mesh.rotation.set(0, yawRadians, 0);
+    this.bob.setYaw(yawRadians);
   }
 
   setProbeOpacity(opacity: number): void {
-    this.slimeVisual.setOpacity(opacity);
+    this.bob.setOpacity(opacity);
   }
 
   isInsideCameraTightVent(position: Vector3State): boolean {
@@ -200,11 +207,11 @@ export class ContainmentTeachingScene {
   }
 
   presentProbe(): void {
-    this.slimeVisual.present();
+    this.bob.present();
   }
 
   update(deltaSeconds: number, visualState?: SlimeVisualState): void {
-    if (visualState) this.slimeVisual.update(deltaSeconds, visualState);
+    if (visualState) this.bob.update(deltaSeconds, visualState);
   }
 
   /** Begin the visual rupture at the authoritative death position. */
@@ -212,10 +219,10 @@ export class ContainmentTeachingScene {
     if (!this.slimeBurst.start(position)) return false;
 
     this.deathElapsedSeconds = 0;
-    this.slimeVisual.setPosition(position);
-    this.slimeVisual.setOpacity(1);
-    this.slimeVisual.mesh.scale.setScalar(1);
-    this.slimeVisual.mesh.visible = true;
+    this.bob.setPosition(position);
+    this.bob.setOpacity(1);
+    this.bob.mesh.scale.setScalar(1);
+    this.bob.mesh.visible = true;
     return true;
   }
 
@@ -230,23 +237,23 @@ export class ContainmentTeachingScene {
         0,
         DEATH_RUPTURE_SECONDS,
       );
-      this.slimeVisual.mesh.scale.setScalar(
+      this.bob.mesh.scale.setScalar(
         1 + Math.sin(anticipation * Math.PI) * 0.12,
       );
       return;
     }
 
-    this.slimeVisual.mesh.visible = false;
+    this.bob.mesh.visible = false;
   }
 
   /** Restore the live slime after checkpoint recovery succeeds. */
   finishDeath(position: Vector3State): void {
     this.deathElapsedSeconds = 0;
     this.slimeBurst.reset();
-    this.slimeVisual.setPosition(position);
-    this.slimeVisual.mesh.scale.setScalar(1);
-    this.slimeVisual.mesh.visible = true;
-    this.slimeVisual.reset();
+    this.bob.setPosition(position);
+    this.bob.mesh.scale.setScalar(1);
+    this.bob.mesh.visible = true;
+    this.bob.reset();
   }
 
   resetProbe(): void {
@@ -258,7 +265,7 @@ export class ContainmentTeachingScene {
     if (this.disposed) return;
     this.disposed = true;
     this.slimeBurst.dispose();
-    this.slimeVisual.dispose();
+    this.bob.dispose();
     this.roomOneArt.dispose();
     this.roomTwoArt.dispose();
     this.root.removeFromParent();
@@ -275,11 +282,11 @@ export class ContainmentTeachingScene {
     normalWorld: Vector3State,
     impactSpeedMetresPerSecond: number,
   ): void {
-    this.slimeVisual.onLanding(normalWorld, impactSpeedMetresPerSecond);
+    this.bob.onLanding(normalWorld, impactSpeedMetresPerSecond);
   }
 
   onSlimeLaunch(launch: SlimeVisualLaunch): void {
-    this.slimeVisual.onLaunch(launch);
+    this.bob.onLaunch(launch);
   }
 
   private addRoomOne(

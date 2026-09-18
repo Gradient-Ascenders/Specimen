@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import type { BobGateOneLoader } from '../render/bob/BobCharacterPresentation.ts';
 import type {
   SlimeVisualDiagnostics,
   SlimeVisualLaunch,
@@ -262,6 +263,10 @@ export class ContainmentLevelScene {
 
   get deathBurstDiagnostics(): SlimeBurstDiagnostics {
     return this.teaching.deathBurstDiagnostics;
+  }
+
+  prepareBob(loader?: BobGateOneLoader): Promise<void> {
+    return this.teaching.prepareBob(loader);
   }
 
   get measuredFirstUseGeometryPrimeDiagnostics(): MeasuredFirstUseGeometryPrimeDiagnostics {

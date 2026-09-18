@@ -1,0 +1,42 @@
+{
+  "gate": 1,
+  "root": "Bob-Gate-One",
+  "meshes": [
+    "Bob-Body",
+    "Bob-Eye-Left",
+    "Bob-Eye-Right"
+  ],
+  "body_dimensions_metres": [
+    1.0,
+    0.8,
+    0.9
+  ],
+  "body_bounds_metres": {
+    "minimum": [
+      -0.5,
+      -0.45,
+      -0.45
+    ],
+    "maximum": [
+      0.5,
+      0.35,
+      0.45
+    ]
+  },
+  "body_vertices": 1178,
+  "body_triangles": 2352,
+  "eye_triangles_combined": 504,
+  "total_triangles": 2856,
+  "body_connected_components": 1,
+  "body_non_manifold_edges": 0,
+  "armatures": 0,
+  "morph_targets": 0,
+  "animations": 0,
+  "materials": [
+    "Bob-Neutral-Body",
+    "Bob-Neutral-Eyes"
+  ],
+  "generator_sha256": "615e687d15a0c6f665c58ee7743202a5ab419e9dd43be89ae5187aa5021d4f2b",
+  "blend_sha256": "9c05cc5c25918b95e22ece841b55d2a35af87767358af7ee939c18d51f68ef4f",
+  "glb_sha256": "cf0a6f8babe0ae744e3d1d8f04bc5db0cae3fc8afae9801190025ca53efc0f5a"
+}
