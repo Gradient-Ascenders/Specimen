@@ -16,6 +16,7 @@ import math
 from pathlib import Path
 
 import bpy
+from mathutils import Vector
 
 
 SCRIPT_PATH = Path(__file__).resolve()
@@ -38,7 +39,18 @@ HEIGHT_METRES = 0.8
 DEPTH_METRES = 0.9
 BOTTOM_Y_METRES = -0.45
 TOP_Y_METRES = 0.35
-VERTICAL_PROFILE_EXPONENT = 1.2
+VERTICAL_PROFILE_EXPONENT = 1.15
+BODY_RADIAL_EXPONENT = 0.72
+BODY_LOWER_MASS_BIAS = 0.16
+BODY_ORGANIC_PRIMARY = 0.004
+BODY_ORGANIC_SECONDARY = 0.002
+
+EYE_CENTRE_X_METRES = 0.205
+EYE_CENTRE_Y_METRES = -0.065
+EYE_RADIUS_X_METRES = 0.080
+EYE_RADIUS_Y_METRES = 0.139
+EYE_SURFACE_GAP_METRES = 0.004
+EYE_LENS_DEPTH_METRES = 0.030
 
 
 def clear_scene() -> None:
@@ -50,14 +62,22 @@ def clear_scene() -> None:
             datablocks.remove(datablock)
 
 
-def create_material(name: str, colour: tuple[float, float, float, float]):
+def create_material(
+    name: str,
+    colour: tuple[float, float, float, float],
+    *,
+    roughness: float = 0.88,
+    coat_weight: float = 0.0,
+):
     material = bpy.data.materials.new(name)
     material.diffuse_color = colour
     material.use_nodes = True
     principled = material.node_tree.nodes.get("Principled BSDF")
     principled.inputs["Base Color"].default_value = colour
-    principled.inputs["Roughness"].default_value = 0.88
+    principled.inputs["Roughness"].default_value = roughness
     principled.inputs["Metallic"].default_value = 0.0
+    if coat := principled.inputs.get("Coat Weight"):
+        coat.default_value = coat_weight
     return material
 
 
@@ -93,11 +113,43 @@ def spherify_cube_point(point: tuple[int, int, int]) -> tuple[float, float, floa
 def map_body_direction(direction: tuple[float, float, float]):
     x, y, z = direction
     theta = math.acos(max(-1.0, min(1.0, y)))
+    vertical_unit = (y + 1.0) * 0.5
+    sphere_radius = math.sqrt(x * x + z * z)
+    if sphere_radius <= 1e-8:
+        return runtime_to_blender((0.0, body_y(theta), 0.0))
+    angle = math.atan2(z, x)
+    radial = sphere_radius ** BODY_RADIAL_EXPONENT
+    lower_mass = 1.0 + BODY_LOWER_MASS_BIAS * (0.5 - vertical_unit)
+    organic = 1.0 + (
+        BODY_ORGANIC_PRIMARY * math.sin(3.0 * angle + 0.55)
+        + BODY_ORGANIC_SECONDARY * math.sin(5.0 * angle - 0.2)
+    ) * math.sin(math.pi * vertical_unit) ** 2
     return runtime_to_blender((
-        WIDTH_METRES * 0.5 * x,
+        WIDTH_METRES * 0.5 * radial * lower_mass * organic * math.cos(angle),
         body_y(theta),
-        DEPTH_METRES * 0.5 * z,
+        DEPTH_METRES * 0.5 * radial * lower_mass * organic * math.sin(angle),
     ))
+
+
+def normalise_body_bounds(
+    vertices: list[tuple[float, float, float]],
+) -> list[tuple[float, float, float]]:
+    runtime_vertices = [
+        [blender_x, blender_z, -blender_y]
+        for blender_x, blender_y, blender_z in vertices
+    ]
+    minimum_x = min(vertex[0] for vertex in runtime_vertices)
+    maximum_x = max(vertex[0] for vertex in runtime_vertices)
+    minimum_z = min(vertex[2] for vertex in runtime_vertices)
+    maximum_z = max(vertex[2] for vertex in runtime_vertices)
+    for vertex in runtime_vertices:
+        vertex[0] = -WIDTH_METRES * 0.5 + (
+            (vertex[0] - minimum_x) * WIDTH_METRES / (maximum_x - minimum_x)
+        )
+        vertex[2] = -DEPTH_METRES * 0.5 + (
+            (vertex[2] - minimum_z) * DEPTH_METRES / (maximum_z - minimum_z)
+        )
+    return [runtime_to_blender(tuple(vertex)) for vertex in runtime_vertices]
 
 
 def create_body(material) -> bpy.types.Object:
@@ -145,6 +197,8 @@ def create_body(material) -> bpy.types.Object:
                     (u0, v1),
                 )))
 
+    vertices = normalise_body_bounds(vertices)
+
     mesh = bpy.data.meshes.new(f"{BODY_NAME}-Mesh")
     mesh.from_pydata(vertices, [], faces)
     mesh.materials.append(material)
@@ -157,32 +211,29 @@ def create_body(material) -> bpy.types.Object:
     return body
 
 
-def theta_for_y(y: float) -> float:
-    vertical_unit = ((y - BOTTOM_Y_METRES) / HEIGHT_METRES) ** (
-        1.0 / VERTICAL_PROFILE_EXPONENT
+def front_surface_z(body: bpy.types.Object, x: float, y: float) -> float:
+    hit, location, _normal, _face = body.ray_cast(
+        Vector((x, 1.0, y)),
+        Vector((0.0, -1.0, 0.0)),
+        distance=2.0,
     )
-    return math.acos(max(-1.0, min(1.0, vertical_unit * 2.0 - 1.0)))
+    if not hit:
+        raise RuntimeError(f"Eye sample did not hit Bob's front surface: {(x, y)}")
+    return -location.y
 
 
-def front_surface_z(x: float, y: float) -> float:
-    theta = theta_for_y(y)
-    radius_factor = math.sin(theta)
-    x_radius = WIDTH_METRES * 0.5 * radius_factor
-    z_radius = DEPTH_METRES * 0.5 * radius_factor
-    x_ratio = max(-1.0, min(1.0, x / x_radius))
-    return -z_radius * math.sqrt(max(0.0, 1.0 - x_ratio * x_ratio))
-
-
-def create_eye(name: str, centre_x: float, material) -> bpy.types.Object:
-    centre_y = 0.0
-    radius_x = 0.078
-    radius_y = 0.145
-    surface_gap = 0.002
-    lens_depth = 0.014
+def create_eye(
+    name: str,
+    centre_x: float,
+    material,
+    body: bpy.types.Object,
+) -> bpy.types.Object:
     vertices: list[tuple[float, float, float]] = [runtime_to_blender((
         centre_x,
-        centre_y,
-        front_surface_z(centre_x, centre_y) - lens_depth,
+        EYE_CENTRE_Y_METRES,
+        front_surface_z(body, centre_x, EYE_CENTRE_Y_METRES)
+        - EYE_SURFACE_GAP_METRES
+        - EYE_LENS_DEPTH_METRES,
     ))]
     faces: list[tuple[int, ...]] = []
 
@@ -190,11 +241,16 @@ def create_eye(name: str, centre_x: float, material) -> bpy.types.Object:
         radial = ring / EYE_RINGS
         for segment in range(EYE_SEGMENTS):
             angle = math.tau * segment / EYE_SEGMENTS
-            x = centre_x + radius_x * radial * math.cos(angle)
-            y = centre_y + radius_y * radial * math.sin(angle)
-            depth = surface_gap + lens_depth * (1.0 - radial * radial)
+            x = centre_x + EYE_RADIUS_X_METRES * radial * math.cos(angle)
+            y = (
+                EYE_CENTRE_Y_METRES
+                + EYE_RADIUS_Y_METRES * radial * math.sin(angle)
+            )
+            depth = EYE_SURFACE_GAP_METRES + EYE_LENS_DEPTH_METRES * (
+                1.0 - radial * radial
+            ) ** 1.35
             vertices.append(runtime_to_blender(
-                (x, y, front_surface_z(x, y) - depth)
+                (x, y, front_surface_z(body, x, y) - depth)
             ))
 
     first_ring = 1
@@ -308,17 +364,35 @@ def build() -> None:
     clear_scene()
     bpy.context.preferences.filepaths.save_version = 0
     body_material = create_material("Bob-Neutral-Body", (0.48, 0.51, 0.53, 1.0))
-    eye_material = create_material("Bob-Neutral-Eyes", (0.035, 0.045, 0.055, 1.0))
+    eye_material = create_material(
+        "Bob-Neutral-Eyes",
+        (0.025, 0.035, 0.045, 1.0),
+        roughness=0.20,
+        coat_weight=0.28,
+    )
 
     root = bpy.data.objects.new(ROOT_NAME, None)
     root.empty_display_type = "PLAIN_AXES"
+    root.empty_display_size = 0.001
     bpy.context.scene.collection.objects.link(root)
 
     body = create_body(body_material)
-    left_eye = create_eye(LEFT_EYE_NAME, -0.18, eye_material)
-    right_eye = create_eye(RIGHT_EYE_NAME, 0.18, eye_material)
+    bpy.context.scene.collection.objects.link(body)
+    body.parent = root
+    left_eye = create_eye(
+        LEFT_EYE_NAME,
+        -EYE_CENTRE_X_METRES,
+        eye_material,
+        body,
+    )
+    right_eye = create_eye(
+        RIGHT_EYE_NAME,
+        EYE_CENTRE_X_METRES,
+        eye_material,
+        body,
+    )
     eyes = [left_eye, right_eye]
-    for child in [body, *eyes]:
+    for child in eyes:
         bpy.context.scene.collection.objects.link(child)
         child.parent = root
 
