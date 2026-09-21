@@ -165,7 +165,8 @@ export class ContainmentTeachingScene {
 
   resetTeachingPresentation(): void {
     this.roomOneArt.reset();
-    this.bob.finishDeath(SPAWN_POSITION);
+    this.bob.setPosition(SPAWN_POSITION);
+    this.bob.reset();
   }
 
   dispose(): void {

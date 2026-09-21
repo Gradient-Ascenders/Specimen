@@ -74,6 +74,7 @@ export class BobCharacterPresentation {
   private preparation: Promise<void> | undefined;
   private opacity = 1;
   private deathElapsedSeconds = 0;
+  private deathActive = false;
   private disposed = false;
 
   constructor(radiusMetres: number) {
@@ -252,8 +253,10 @@ export class BobCharacterPresentation {
 
   /** Begin the visual rupture at the authoritative death position. */
   startDeath(position: Vector3State): boolean {
+    if (this.deathActive) return false;
     if (!this.deathBurst.start(position)) return false;
 
+    this.deathActive = true;
     this.deathElapsedSeconds = 0;
     this.setPosition(position);
     this.setOpacity(1);
@@ -264,6 +267,8 @@ export class BobCharacterPresentation {
 
   /** Continue visual-only death work while gameplay simulation is suspended. */
   updateDeath(deltaSeconds: number): void {
+    if (!this.deathActive) return;
+
     this.deathElapsedSeconds += deltaSeconds;
     this.deathBurst.update(deltaSeconds);
 
@@ -284,11 +289,13 @@ export class BobCharacterPresentation {
 
   /** Restore the live character after authoritative recovery succeeds. */
   finishDeath(position: Vector3State): void {
+    this.deathActive = false;
     this.setPosition(position);
     this.reset();
   }
 
   reset(): void {
+    this.deathActive = false;
     this.deathElapsedSeconds = 0;
     this.deathBurst.reset();
     this.setVisible(true);

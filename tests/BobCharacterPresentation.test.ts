@@ -11,6 +11,7 @@ import {
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import type { SlimeVisualState } from '../src/render/slime/SlimeVisual.ts';
 import { ContainmentTeachingScene } from '../src/levels/ContainmentTeachingScene.ts';
+import { DEFAULT_DEATH_BURST_DURATION_SECONDS } from '../src/systems/DeathSequence.ts';
 
 const ASSET_URL = new URL(
   '../assets/characters/bob/bob-gate-one.glb',
@@ -144,6 +145,50 @@ test('Bob presentation owns visibility, death hooks and combined diagnostics', a
     bob.root.getObjectByName('player-slime-bob-character')?.position.toArray(),
     [-1, 0.45, 6],
   );
+
+  bob.dispose();
+});
+
+test('finished death ignores a late presentation update', () => {
+  const bob = new BobCharacterPresentation(0.45);
+  const deathPosition = new THREE.Vector3(4, 2, -3);
+  const recoveryPosition = new THREE.Vector3(-1, 0.45, 6);
+
+  assert.equal(bob.startDeath(deathPosition), true);
+  bob.finishDeath(recoveryPosition);
+  bob.updateDeath(0.08);
+
+  assert.equal(bob.diagnostics.visible, true);
+  assert.equal(bob.diagnostics.deathBurst.active, false);
+  assert.deepEqual(getCharacter(bob.root).position.toArray(), [-1, 0.45, 6]);
+
+  bob.dispose();
+});
+
+test('neutral reset ignores a late death presentation update', () => {
+  const bob = new BobCharacterPresentation(0.45);
+
+  assert.equal(bob.startDeath(new THREE.Vector3(4, 2, -3)), true);
+  bob.reset();
+  bob.updateDeath(0.08);
+
+  assert.equal(bob.diagnostics.visible, true);
+  assert.equal(bob.diagnostics.deathBurst.active, false);
+
+  bob.dispose();
+});
+
+test('death cannot restart after the burst expires before recovery', () => {
+  const bob = new BobCharacterPresentation(0.45);
+  const deathPosition = new THREE.Vector3(4, 2, -3);
+
+  assert.equal(bob.startDeath(deathPosition), true);
+  bob.updateDeath(DEFAULT_DEATH_BURST_DURATION_SECONDS);
+  assert.equal(bob.diagnostics.deathBurst.active, false);
+
+  assert.equal(bob.startDeath(new THREE.Vector3(20, 10, 5)), false);
+  assert.deepEqual(bob.diagnostics.deathBurst.origin.toArray(), [4, 2, -3]);
+  assert.equal(bob.diagnostics.visible, false);
 
   bob.dispose();
 });
