@@ -84,12 +84,16 @@ The generator is the source of truth. `bob-gate-one.blend` is the editable
 inspection artifact and `bob-gate-one.glb` is the runtime artifact. The runtime
 validator rejects renamed meshes or materials, non-identity transforms,
 dimension/budget drift, exported axis/collider/contact metadata drift,
-eye-envelope drift, premature morphs, extra meshes and non-watertight body
-topology before attaching the model to
+approved eye-bounds drift, premature morphs, extra meshes, non-watertight body
+topology and multiple geometry-derived connected components before attaching the model to
 `BobCharacterPresentation`. The report records stable generator and runtime-GLB
 hashes, which the offline asset test verifies against the committed files; it
 omits a `.blend` hash because Blender embeds save-specific container metadata
 even when the generated scene and GLB are unchanged.
+
+The hash check detects committed-file drift but does not execute Blender in CI.
+A Blender-enabled clean regeneration comparison remains follow-up work before
+the generator can be enforced there as the sole artifact source.
 
 ## Gate boundary
 

@@ -252,7 +252,52 @@ test('Gate 1 validator rejects a body topology that is no longer watertight', as
 
   assert.throws(
     () => validateBobGateOneAsset(root),
-    /Bob Gate 1 asset contract: body topology is not one watertight component/,
+    /Bob Gate 1 asset contract: body topology is not watertight/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
+test('Gate 1 validator rejects a second disconnected closed body shell', async () => {
+  const root = await loadAsset();
+  const body = root.getObjectByName('Bob-Body');
+  assert.ok(body instanceof THREE.Mesh);
+  const positions = body.geometry.getAttribute('position');
+  const index = body.geometry.index;
+  assert.ok(index);
+
+  const combinedPositions = new Float32Array((positions.count + 4) * 3);
+  for (let vertex = 0; vertex < positions.count; vertex += 1) {
+    combinedPositions[vertex * 3] = positions.getX(vertex);
+    combinedPositions[vertex * 3 + 1] = positions.getY(vertex);
+    combinedPositions[vertex * 3 + 2] = positions.getZ(vertex);
+  }
+  combinedPositions.set([
+    0, 0, 0,
+    0.01, 0, 0,
+    0, 0.01, 0,
+    0, 0, 0.01,
+  ], positions.count * 3);
+
+  const firstShellVertex = positions.count;
+  const combinedIndices = Array.from(
+    { length: index.count },
+    (_, offset) => index.getX(offset),
+  );
+  combinedIndices.push(
+    firstShellVertex, firstShellVertex + 1, firstShellVertex + 2,
+    firstShellVertex, firstShellVertex + 3, firstShellVertex + 1,
+    firstShellVertex, firstShellVertex + 2, firstShellVertex + 3,
+    firstShellVertex + 1, firstShellVertex + 3, firstShellVertex + 2,
+  );
+  body.geometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(combinedPositions, 3),
+  );
+  body.geometry.setIndex(combinedIndices);
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: body topology has 2 connected components; expected exactly 1/,
   );
   disposeBobGateOneAsset(root);
 });
@@ -270,7 +315,7 @@ test('Gate 1 validator rejects meshes moved outside the stable Bob root', async 
   disposeBobGateOneAsset(root);
 });
 
-test('Gate 1 validator rejects eye geometry baked outside the approved lens envelope', async () => {
+test('Gate 1 validator rejects eye geometry outside the approved exported bounds', async () => {
   const root = await loadAsset();
   const eye = root.getObjectByName('Bob-Eye-Left');
   assert.ok(eye instanceof THREE.Mesh);
@@ -281,7 +326,7 @@ test('Gate 1 validator rejects eye geometry baked outside the approved lens enve
 
   assert.throws(
     () => validateBobGateOneAsset(root),
-    /Bob Gate 1 asset contract: "Bob-Eye-Left" bounds drifted/,
+    /Bob Gate 1 asset contract: "Bob-Eye-Left" bounds differ from the approved exported bounds/,
   );
   disposeBobGateOneAsset(root);
 });

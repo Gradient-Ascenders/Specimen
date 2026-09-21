@@ -12,7 +12,7 @@ const BOB_GATE_ONE_EYE_MATERIAL_NAME = 'Bob-Neutral-Eyes';
 const EXPECTED_BODY_SIZE = new THREE.Vector3(1, 0.8, 0.9);
 const EXPECTED_BODY_MINIMUM = new THREE.Vector3(-0.5, -0.45, -0.45);
 const EXPECTED_BODY_MAXIMUM = new THREE.Vector3(0.5, 0.35, 0.45);
-const EXPECTED_EYE_BOUNDS = {
+const APPROVED_EYE_BOUNDS = {
   'Bob-Eye-Left': new THREE.Box3(
     new THREE.Vector3(-0.285, -0.204, -0.447668),
     new THREE.Vector3(-0.125, 0.074, -0.356704),
@@ -88,7 +88,8 @@ function assertMaterialName(mesh: THREE.Mesh, expectedName: string): void {
   }
 }
 
-function assertEyeBounds(
+/** Lock each lens's approved dimensions and seated placement after export. */
+function assertApprovedEyeBounds(
   eye: THREE.Mesh,
   expected: THREE.Box3,
 ): void {
@@ -100,8 +101,8 @@ function assertEyeBounds(
     bounds.max.distanceTo(expected.max) > DIMENSION_TOLERANCE_METRES
   ) {
     throw new Error(
-      `Bob Gate 1 asset contract: "${eye.name}" bounds drifted outside the ` +
-        'approved shallow lens envelope.',
+      `Bob Gate 1 asset contract: "${eye.name}" bounds differ from the ` +
+        'approved exported bounds.',
     );
   }
 }
@@ -124,8 +125,6 @@ function assertExportMetadata(
 
   const bodyMetadata = body.userData;
   if (
-    bodyMetadata.watertight !== true ||
-    bodyMetadata.connected_components !== 1 ||
     bodyMetadata.resting_contact_y_metres !== EXPECTED_CONTACT_Y_METRES
   ) {
     throw new Error(
@@ -134,12 +133,35 @@ function assertExportMetadata(
   }
 }
 
-function assertWatertightBody(body: THREE.Mesh): void {
+function connectedComponentCount(
+  adjacency: readonly ReadonlySet<number>[],
+): number {
+  const unvisited = new Set(adjacency.keys());
+  let components = 0;
+  while (unvisited.size > 0) {
+    components += 1;
+    const first = unvisited.values().next().value;
+    if (first === undefined) break;
+    unvisited.delete(first);
+    const pending = [first];
+    while (pending.length > 0) {
+      const vertex = pending.pop();
+      if (vertex === undefined) continue;
+      for (const neighbour of adjacency[vertex] ?? []) {
+        if (!unvisited.delete(neighbour)) continue;
+        pending.push(neighbour);
+      }
+    }
+  }
+  return components;
+}
+
+function assertSingleWatertightBody(body: THREE.Mesh): void {
   const index = body.geometry.index;
   const positions = body.geometry.getAttribute('position');
   if (!index || index.count % 3 !== 0) {
     throw new Error(
-      'Bob Gate 1 asset contract: body topology is not one watertight component.',
+      'Bob Gate 1 asset contract: body topology is not watertight.',
     );
   }
 
@@ -163,7 +185,7 @@ function assertWatertightBody(body: THREE.Mesh): void {
     const c = index.getX(offset + 2);
     if (a === b || b === c || c === a) {
       throw new Error(
-        'Bob Gate 1 asset contract: body topology is not one watertight component.',
+        'Bob Gate 1 asset contract: body topology is not watertight.',
       );
     }
     addEdge(a, b);
@@ -173,23 +195,15 @@ function assertWatertightBody(body: THREE.Mesh): void {
 
   if ([...edgeUse.values()].some((useCount) => useCount !== 2)) {
     throw new Error(
-      'Bob Gate 1 asset contract: body topology is not one watertight component.',
+      'Bob Gate 1 asset contract: body topology is not watertight.',
     );
   }
 
-  const visited = new Set<number>();
-  const pending = [index.getX(0)];
-  while (pending.length > 0) {
-    const vertex = pending.pop();
-    if (vertex === undefined || visited.has(vertex)) continue;
-    visited.add(vertex);
-    for (const neighbour of adjacency[vertex] ?? []) {
-      if (!visited.has(neighbour)) pending.push(neighbour);
-    }
-  }
-  if (visited.size !== positions.count) {
+  const components = connectedComponentCount(adjacency);
+  if (components !== 1) {
     throw new Error(
-      'Bob Gate 1 asset contract: body topology is not one watertight component.',
+      `Bob Gate 1 asset contract: body topology has ${components} connected ` +
+        'components; expected exactly 1.',
     );
   }
 }
@@ -235,13 +249,13 @@ export function validateBobGateOneAsset(root: THREE.Group): BobGateOneAsset {
     );
   }
   assertExportMetadata(assetRoot, body);
-  assertWatertightBody(body);
+  assertSingleWatertightBody(body);
   assertMaterialName(body, BOB_GATE_ONE_BODY_MATERIAL_NAME);
   for (const eye of eyes) {
     assertMaterialName(eye, BOB_GATE_ONE_EYE_MATERIAL_NAME);
-    assertEyeBounds(
+    assertApprovedEyeBounds(
       eye,
-      EXPECTED_EYE_BOUNDS[eye.name as keyof typeof EXPECTED_EYE_BOUNDS],
+      APPROVED_EYE_BOUNDS[eye.name as keyof typeof APPROVED_EYE_BOUNDS],
     );
   }
   const meshes: THREE.Mesh[] = [];
