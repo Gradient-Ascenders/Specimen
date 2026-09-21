@@ -428,8 +428,8 @@ export class GreyboxLevelRuntime {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
     const generation = ++this.lightingPrewarmGeneration;
-    const promise = resources.testScene
-      .prepareBob()
+    const promise = resources.testScene.bob
+      .prepare()
       .then(() => this.runLightingPrewarm(resources, generation));
     this.lightingPrewarmPromise = promise;
     return promise;
@@ -512,7 +512,8 @@ export class GreyboxLevelRuntime {
         containmentLevel.state === 'complete'
           ? 'level-complete'
           : 'level-completing';
-      testScene.update(deltaSeconds, slimeVisualState);
+      testScene.bob.update(deltaSeconds, slimeVisualState);
+      testScene.update(deltaSeconds);
       this.input.endFixedUpdate();
       return;
     }
@@ -656,7 +657,8 @@ export class GreyboxLevelRuntime {
     slimeVisualState.contactName = body.lastContactName;
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
-    testScene.update(deltaSeconds, slimeVisualState);
+    testScene.bob.update(deltaSeconds, slimeVisualState);
+    testScene.update(deltaSeconds);
     this.input.endFixedUpdate();
   }
 
@@ -713,9 +715,9 @@ export class GreyboxLevelRuntime {
         ),
       );
 
-      testScene.setProbePosition(renderedProbePosition);
-      testScene.setProbeYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
-      testScene.presentProbe();
+      testScene.bob.setPosition(renderedProbePosition);
+      testScene.bob.setYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
+      testScene.bob.present();
       const activeRenderedPosition =
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
@@ -757,7 +759,7 @@ export class GreyboxLevelRuntime {
     }
     const cameraDistanceMetres =
       this.renderLayer.cameraRig.currentFollowDistanceMetres;
-    testScene.setProbeOpacity(
+    testScene.bob.setOpacity(
       deathSequence.isPlaying && slimePair.activeSlimeId === 'bob'
         ? resolveCameraTargetOpacity(
             cameraDistanceMetres,
@@ -1000,13 +1002,13 @@ export class GreyboxLevelRuntime {
       this.landingEventCount += 1;
       this.lastLandingImpactSpeedMetresPerSecond =
         event.impactSpeedMetresPerSecond;
-      testScene.onSlimeLanding(
+      testScene.bob.onLanding(
         body.groundNormal,
         event.impactSpeedMetresPerSecond,
       );
     });
     const unsubscribeJumped = movementEvents.on('jumped', (event) => {
-      testScene.onSlimeLaunch({
+      testScene.bob.onLaunch({
         directionWorld: event.directionWorld,
         speedMetresPerSecond: event.speedMetresPerSecond,
         chargeFraction: event.chargeFraction,
@@ -1031,7 +1033,7 @@ export class GreyboxLevelRuntime {
             containmentLevel.setActiveBody(slimePair.activeBody);
             containmentLevel.teleportToRoomForDebug(roomId);
             blobFacing.reset();
-            testScene.setProbePosition(body.position);
+            testScene.bob.setPosition(body.position);
             this.syncContextualCamera(this.requireResources());
           },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
@@ -1195,7 +1197,7 @@ export class GreyboxLevelRuntime {
     resources.slimePair.restoreInitialState();
     resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
     resources.pressurePlate.reset();
-    resources.testScene.resetProbe();
+    resources.testScene.resetTeachingPresentation();
     resources.blobFacing.reset();
     this.renderLayer.cameraRig.reset();
     this.retargetCameraToActiveSlime(resources);
@@ -1361,7 +1363,7 @@ export class GreyboxLevelRuntime {
     const dyingBody = resources.slimePair.activeBody;
 
     if (!resources.deathSequence.requestDeath(recovery)) return false;
-    if (!resources.testScene.startDeath(dyingBody.position)) {
+    if (!resources.testScene.bob.startDeath(dyingBody.position)) {
       resources.deathSequence.reset();
       return false;
     }
@@ -1389,9 +1391,9 @@ export class GreyboxLevelRuntime {
     resources.goopAcidPresentation.resume();
     this.notifySlimeHUD(undefined, true);
 
-    // The teaching scene owns Bob's legacy visual; the two-body presentation
-    // owns Goop. Restore that scene-owned visual to Bob's authoritative body.
-    resources.testScene.finishDeath(resources.body.position);
+    // Bob's shared presentation and Goop's pair presentation remain separate
+    // while Level 1 owns the two-body adapter. Restore Bob from body authority.
+    resources.testScene.bob.finishDeath(resources.body.position);
     resources.deathScreen.hide();
     const levelIsPlaying =
       !this.debugVisible && resources.containmentLevel.state === 'playing';
@@ -1407,6 +1409,7 @@ export class GreyboxLevelRuntime {
     deltaSeconds: number,
     resources: GreyboxRuntimeResources,
   ): void {
+    resources.testScene.bob.updateDeath(deltaSeconds);
     resources.testScene.updateDeath(deltaSeconds);
     if (resources.deathSequence.update(deltaSeconds)) {
       resources.deathScreen.show();
@@ -1543,10 +1546,10 @@ export class GreyboxLevelRuntime {
     const velocity = activeBody.velocity;
     const groundNormal = activeBody.groundNormal;
     const renderStats = this.renderLayer.getDiagnostics();
-    const slimeDiagnostics = testScene.slimeDiagnostics;
+    const slimeDiagnostics = testScene.bob.diagnostics;
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
     const deathStats = deathSequence.diagnostics;
-    const burstStats = testScene.deathBurstDiagnostics;
+    const burstStats = slimeDiagnostics.deathBurst;
     const measuredFirstUseGeometryPrimeStats =
       testScene.measuredFirstUseGeometryPrimeDiagnostics;
     const slimeManagerStats = slimeManager.getDiagnostics();
@@ -1841,14 +1844,17 @@ export class GreyboxLevelRuntime {
       const burstResourcePrimeProgramsBefore =
         renderer.info.programs?.length ?? 0;
       const burstResourcePrimeStarted = this.hostWindow.performance.now();
-      resources.testScene.primeDeathBurstResources((burstRoot) => {
-        renderIsolatedPrewarmResources(
-          renderer,
-          this.renderLayer.scene,
-          prewarmCamera,
-          [burstRoot],
-        );
-      });
+      resources.testScene.bob.primeDeathResources(
+        resources.spawnPosition,
+        (burstRoot) => {
+          renderIsolatedPrewarmResources(
+            renderer,
+            this.renderLayer.scene,
+            prewarmCamera,
+            [burstRoot],
+          );
+        },
+      );
       const burstResourcePrimeDurationMs =
         this.hostWindow.performance.now() - burstResourcePrimeStarted;
       this.lightingPrewarmProfile = {

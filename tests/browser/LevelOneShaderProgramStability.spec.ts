@@ -35,7 +35,9 @@ interface ProductionTraversalRuntime {
       teleportToRoomForDebug(roomId: number): void;
     };
     readonly blobFacing: { reset(): void };
-    readonly testScene: { setProbePosition(position: unknown): void };
+    readonly testScene: {
+      readonly bob: { setPosition(position: unknown): void };
+    };
     readonly acidProjectileSystem: {
       getDiagnostics(): {
         readonly solubleImpactCount: number;
@@ -167,7 +169,7 @@ const visitRoom = async (page: Page, room: number): Promise<void> => {
       resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
       resources.containmentLevel.teleportToRoomForDebug(roomId);
       resources.blobFacing.reset();
-      resources.testScene.setProbePosition(resources.body.position);
+      resources.testScene.bob.setPosition(resources.body.position);
       runtime.syncContextualCamera(resources);
     }, room);
   }

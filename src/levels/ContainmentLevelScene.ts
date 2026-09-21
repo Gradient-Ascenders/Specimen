@@ -1,13 +1,7 @@
 import * as THREE from 'three';
 
-import type { BobGateOneLoader } from '../render/bob/BobCharacterPresentation.ts';
-import type {
-  SlimeVisualDiagnostics,
-  SlimeVisualLaunch,
-  SlimeVisualState,
-  Vector3State,
-} from '../render/slime/SlimeVisual.ts';
-import type { SlimeBurstDiagnostics } from '../render/slime/SlimeBurstPresentation.ts';
+import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
+import type { Vector3State } from '../render/slime/SlimeVisual.ts';
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -162,6 +156,10 @@ export class ContainmentLevelScene {
   private measuredFirstUseGeometryResourcesPrimed = false;
   private measuredFirstUseGeometryResourcePrimeCount = 0;
 
+  get bob(): BobCharacterPresentation {
+    return this.teaching.bob;
+  }
+
   constructor(
     requestHazardFailure: (failure: ContainmentHazardFailure) => void,
     options: { readonly includeDevelopmentHelpers?: boolean } = {},
@@ -257,18 +255,6 @@ export class ContainmentLevelScene {
     ];
   }
 
-  get slimeDiagnostics(): SlimeVisualDiagnostics {
-    return this.teaching.slimeDiagnostics;
-  }
-
-  get deathBurstDiagnostics(): SlimeBurstDiagnostics {
-    return this.teaching.deathBurstDiagnostics;
-  }
-
-  prepareBob(loader?: BobGateOneLoader): Promise<void> {
-    return this.teaching.prepareBob(loader);
-  }
-
   get measuredFirstUseGeometryPrimeDiagnostics(): MeasuredFirstUseGeometryPrimeDiagnostics {
     return {
       ownerNames: MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST,
@@ -294,12 +280,6 @@ export class ContainmentLevelScene {
     return true;
   }
 
-  primeDeathBurstResources(
-    render: (root: THREE.Object3D) => void,
-  ): boolean {
-    return this.teaching.primeDeathBurstResources(render);
-  }
-
   copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
     return this.teaching.copySpawnPosition(target);
   }
@@ -312,18 +292,6 @@ export class ContainmentLevelScene {
     return this.teaching.copyRoomTwoSafeLandingPosition(target);
   }
 
-  setProbePosition(position: Vector3State): void {
-    this.teaching.setProbePosition(position);
-  }
-
-  setProbeYaw(yawRadians: number): void {
-    this.teaching.setProbeYaw(yawRadians);
-  }
-
-  setProbeOpacity(opacity: number): void {
-    this.teaching.setProbeOpacity(opacity);
-  }
-
   isInsideCameraTightVent(position: Vector3State): boolean {
     return (
       this.teaching.isInsideCameraTightVent(position) ||
@@ -331,12 +299,7 @@ export class ContainmentLevelScene {
     );
   }
 
-  presentProbe(): void {
-    this.teaching.presentProbe();
-  }
-
-  update(deltaSeconds: number, visualState?: SlimeVisualState): void {
-    this.teaching.update(deltaSeconds, visualState);
+  update(deltaSeconds: number): void {
     this.roomThree.updatePresentation(deltaSeconds);
     this.lighting.update(deltaSeconds);
   }
@@ -349,32 +312,12 @@ export class ContainmentLevelScene {
     this.lighting.reconcileAuthoritativeState(true);
   }
 
-  startDeath(position: Vector3State): boolean {
-    return this.teaching.startDeath(position);
-  }
-
   updateDeath(deltaSeconds: number): void {
-    this.teaching.updateDeath(deltaSeconds);
     this.roomThree.updatePresentation(deltaSeconds);
   }
 
-  finishDeath(position: Vector3State): void {
-    this.teaching.finishDeath(position);
-  }
-
-  resetProbe(): void {
-    this.teaching.resetProbe();
-  }
-
-  onSlimeLanding(
-    normalWorld: Vector3State,
-    impactSpeedMetresPerSecond: number,
-  ): void {
-    this.teaching.onSlimeLanding(normalWorld, impactSpeedMetresPerSecond);
-  }
-
-  onSlimeLaunch(launch: SlimeVisualLaunch): void {
-    this.teaching.onSlimeLaunch(launch);
+  resetTeachingPresentation(): void {
+    this.teaching.resetTeachingPresentation();
   }
 
   dispose(): void {

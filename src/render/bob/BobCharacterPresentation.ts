@@ -9,6 +9,10 @@ import type {
   Vector3State,
 } from '../slime/SlimeVisual.ts';
 import {
+  SlimeBurstPresentation,
+  type SlimeBurstDiagnostics,
+} from '../slime/SlimeBurstPresentation.ts';
+import {
   disposeBobGateOneAsset,
   validateBobGateOneAsset,
   type BobGateOneAsset,
@@ -18,8 +22,15 @@ const BOB_GATE_ONE_ASSET_URL = new URL(
   '../../../assets/characters/bob/bob-gate-one.glb',
   import.meta.url,
 ).href;
+const DEATH_RUPTURE_SECONDS = 0.075;
 
 export type BobGateOneLoader = () => Promise<THREE.Group>;
+
+export interface BobCharacterPresentationDiagnostics
+  extends SlimeVisualDiagnostics {
+  readonly visible: boolean;
+  readonly deathBurst: SlimeBurstDiagnostics;
+}
 
 async function loadDefaultBobGateOneAsset(): Promise<THREE.Group> {
   return (await new GLTFLoader().loadAsync(BOB_GATE_ONE_ASSET_URL)).scene;
@@ -34,9 +45,10 @@ async function loadDefaultBobGateOneAsset(): Promise<THREE.Group> {
  * behind their later visual approval gates.
  */
 export class BobCharacterPresentation {
-  readonly mesh = new THREE.Group();
+  readonly root = new THREE.Group();
   readonly radiusMetres: number;
 
+  private readonly mesh = new THREE.Group();
   private readonly inverseWorldQuaternion = new THREE.Quaternion();
   private readonly velocityWorld = new THREE.Vector3();
   private readonly surfaceNormalWorld = new THREE.Vector3(0, 1, 0);
@@ -57,9 +69,11 @@ export class BobCharacterPresentation {
   } satisfies SlimeVisualDiagnostics;
 
   private asset: BobGateOneAsset | undefined;
+  private readonly deathBurst = new SlimeBurstPresentation();
   private readonly materials = new Set<THREE.Material>();
   private preparation: Promise<void> | undefined;
   private opacity = 1;
+  private deathElapsedSeconds = 0;
   private disposed = false;
 
   constructor(radiusMetres: number) {
@@ -69,15 +83,21 @@ export class BobCharacterPresentation {
       );
     }
     this.radiusMetres = radiusMetres;
+    this.root.name = 'player-slime-bob-presentation';
     this.mesh.name = 'player-slime-bob-character';
+    this.root.add(this.mesh, this.deathBurst.root);
   }
 
   get ready(): boolean {
     return this.asset !== undefined && !this.disposed;
   }
 
-  get diagnostics(): SlimeVisualDiagnostics {
-    return this.diagnosticsState;
+  get diagnostics(): BobCharacterPresentationDiagnostics {
+    return {
+      ...this.diagnosticsState,
+      visible: this.mesh.visible,
+      deathBurst: this.deathBurst.diagnostics,
+    };
   }
 
   async prepare(
@@ -132,6 +152,10 @@ export class BobCharacterPresentation {
   setOpacity(opacity: number): void {
     this.opacity = THREE.MathUtils.clamp(opacity, 0, 1);
     this.applyOpacity();
+  }
+
+  setVisible(visible: boolean): void {
+    this.mesh.visible = visible;
   }
 
   update(deltaSeconds: number, state: SlimeVisualState): void {
@@ -219,8 +243,55 @@ export class BobCharacterPresentation {
     // Gate 1 holds the neutral silhouette; Launch belongs to Gate 3.
   }
 
+  primeDeathResources(
+    position: Vector3State,
+    render: (root: THREE.Object3D) => void,
+  ): boolean {
+    return this.deathBurst.primeResources(position, render);
+  }
+
+  /** Begin the visual rupture at the authoritative death position. */
+  startDeath(position: Vector3State): boolean {
+    if (!this.deathBurst.start(position)) return false;
+
+    this.deathElapsedSeconds = 0;
+    this.setPosition(position);
+    this.setOpacity(1);
+    this.mesh.scale.setScalar(1);
+    this.setVisible(true);
+    return true;
+  }
+
+  /** Continue visual-only death work while gameplay simulation is suspended. */
+  updateDeath(deltaSeconds: number): void {
+    this.deathElapsedSeconds += deltaSeconds;
+    this.deathBurst.update(deltaSeconds);
+
+    if (this.deathElapsedSeconds < DEATH_RUPTURE_SECONDS) {
+      const anticipation = THREE.MathUtils.smoothstep(
+        this.deathElapsedSeconds,
+        0,
+        DEATH_RUPTURE_SECONDS,
+      );
+      this.mesh.scale.setScalar(
+        1 + Math.sin(anticipation * Math.PI) * 0.12,
+      );
+      return;
+    }
+
+    this.setVisible(false);
+  }
+
+  /** Restore the live character after authoritative recovery succeeds. */
+  finishDeath(position: Vector3State): void {
+    this.setPosition(position);
+    this.reset();
+  }
+
   reset(): void {
-    this.mesh.visible = true;
+    this.deathElapsedSeconds = 0;
+    this.deathBurst.reset();
+    this.setVisible(true);
     this.mesh.scale.setScalar(1);
     this.setOpacity(1);
     this.velocityWorld.set(0, 0, 0);
@@ -244,11 +315,14 @@ export class BobCharacterPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.deathBurst.dispose();
     if (this.asset) disposeBobGateOneAsset(this.asset.root);
     this.asset = undefined;
     this.materials.clear();
     this.mesh.removeFromParent();
     this.mesh.clear();
+    this.root.removeFromParent();
+    this.root.clear();
   }
 
   private applyOpacity(): void {

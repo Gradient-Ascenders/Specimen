@@ -44,13 +44,19 @@ function state(): SlimeVisualState {
   };
 }
 
+function getCharacter(root: THREE.Object3D): THREE.Group {
+  const character = root.getObjectByName('player-slime-bob-character');
+  assert.ok(character instanceof THREE.Group);
+  return character;
+}
+
 test('neutral Bob presentation loads, follows authoritative transforms, fades, resets and disposes', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);
+  const character = getCharacter(bob.root);
 
   assert.equal(bob.ready, true);
-  assert.equal(bob.mesh.name, 'player-slime-bob-character');
-  assert.ok(bob.mesh.getObjectByName('Bob-Body'));
+  assert.ok(character.getObjectByName('Bob-Body'));
 
   const source = state();
   const sourceSnapshot = JSON.stringify(source);
@@ -60,10 +66,10 @@ test('neutral Bob presentation loads, follows authoritative transforms, fades, r
   bob.update(1 / 60, source);
   bob.present();
 
-  assert.deepEqual(bob.mesh.position.toArray(), [2, 3, 4]);
-  assert.equal(bob.mesh.rotation.y, Math.PI / 3);
+  assert.deepEqual(character.position.toArray(), [2, 3, 4]);
+  assert.equal(character.rotation.y, Math.PI / 3);
   assert.equal(JSON.stringify(source), sourceSnapshot);
-  bob.mesh.traverse((object) => {
+  character.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     const materials = Array.isArray(object.material)
       ? object.material
@@ -74,12 +80,12 @@ test('neutral Bob presentation loads, follows authoritative transforms, fades, r
     }
   });
 
-  bob.mesh.visible = false;
+  bob.setVisible(false);
   bob.reset();
-  assert.equal(bob.mesh.visible, true);
+  assert.equal(character.visible, true);
   assert.equal(bob.diagnostics.speed, 0);
   assert.equal(bob.diagnostics.jumpCharge, 0);
-  bob.mesh.traverse((object) => {
+  character.traverse((object) => {
     if (object instanceof THREE.Mesh) {
       assert.equal((object.material as THREE.Material).opacity, 1);
     }
@@ -90,7 +96,7 @@ test('neutral Bob presentation loads, follows authoritative transforms, fades, r
     THREE.BufferGeometry | THREE.Material,
     number
   >();
-  bob.mesh.traverse((object) => {
+  bob.root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     resources.add(object.geometry);
     const materials = Array.isArray(object.material)
@@ -108,20 +114,51 @@ test('neutral Bob presentation loads, follows authoritative transforms, fades, r
   bob.dispose();
   bob.dispose();
   assert.equal(bob.ready, false);
-  assert.equal(bob.mesh.children.length, 0);
+  assert.equal(bob.root.children.length, 0);
   assert.ok([...disposalCounts.values()].every((count) => count === 1));
+});
+
+test('Bob presentation owns visibility, death hooks and combined diagnostics', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+
+  bob.setVisible(false);
+  assert.equal(bob.diagnostics.visible, false);
+  bob.setVisible(true);
+
+  const deathPosition = new THREE.Vector3(4, 2, -3);
+  assert.equal(bob.startDeath(deathPosition), true);
+  assert.equal(bob.diagnostics.deathBurst.active, true);
+  assert.deepEqual(bob.diagnostics.deathBurst.origin.toArray(), [4, 2, -3]);
+  assert.equal(bob.diagnostics.visible, true);
+
+  bob.updateDeath(0.08);
+  assert.equal(bob.diagnostics.visible, false);
+
+  const recoveryPosition = new THREE.Vector3(-1, 0.45, 6);
+  bob.finishDeath(recoveryPosition);
+  assert.equal(bob.diagnostics.visible, true);
+  assert.equal(bob.diagnostics.deathBurst.active, false);
+  assert.deepEqual(bob.root.position.toArray(), [0, 0, 0]);
+  assert.deepEqual(
+    bob.root.getObjectByName('player-slime-bob-character')?.position.toArray(),
+    [-1, 0.45, 6],
+  );
+
+  bob.dispose();
 });
 
 test('Level 1 owns one shared Bob presentation without changing authoritative input', async () => {
   const art = new ContainmentArtResources();
   const scene = new ContainmentTeachingScene(art);
-  await scene.prepareBob(loadAsset);
+  await scene.bob.prepare(loadAsset);
 
   const bobOwners: THREE.Object3D[] = [];
   scene.root.traverse((object) => {
     if (object.name.startsWith('player-slime-')) bobOwners.push(object);
   });
   assert.equal(scene.bob.ready, true);
+  assert.equal(scene.bob.root.parent, scene.root);
   assert.equal(
     bobOwners.filter((object) => object.name === 'player-slime-bob-character')
       .length,
@@ -136,8 +173,8 @@ test('Level 1 owns one shared Bob presentation without changing authoritative in
 
   const authoritativeState = state();
   const snapshot = JSON.stringify(authoritativeState);
-  scene.update(1 / 60, authoritativeState);
-  scene.presentProbe();
+  scene.bob.update(1 / 60, authoritativeState);
+  scene.bob.present();
   assert.equal(JSON.stringify(authoritativeState), snapshot);
 
   scene.dispose();

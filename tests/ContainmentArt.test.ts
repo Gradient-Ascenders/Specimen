@@ -865,8 +865,8 @@ test('Containment scene resets and recreates without duplicating Room 1 or Room 
     initialObjects += 1;
   });
 
-  first.resetProbe();
-  first.resetProbe();
+  first.resetTeachingPresentation();
+  first.resetTeachingPresentation();
   let objectsAfterResets = 0;
   first.teaching.root.traverse(() => {
     objectsAfterResets += 1;
