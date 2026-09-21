@@ -1,11 +1,24 @@
 # Issue #150 — Bob Gate 1 geometry evidence
 
-Status: awaiting explicit Gate 1 visual approval. Gate 2 materials and Gate 3
-morph/motion work have not started.
+Status: revised after the first Gate 1 rejection and awaiting renewed visual
+approval. Gate 2 materials and Gate 3 morph/motion work have not started.
 
 The supplied cyan-slime concept sheet is the visual direction. These captures
-deliberately use neutral grey materials so lighting, gloss, transmission and
-wobble cannot disguise the geometry.
+deliberately keep the body neutral grey, with only a basic dark gloss on the
+projecting eye lenses. There is no gel, transmission, wobble or animation to
+disguise the geometry.
+
+## Blender MCP refinement and generator roundtrip
+
+- [Front viewport](gate-1/blender-viewport-front.png)
+- [Three-quarter viewport](gate-1/blender-viewport-three-quarter.png)
+- [Side viewport](gate-1/blender-viewport-side.png)
+- [Gameplay-distance viewport](gate-1/blender-viewport-gameplay-distance.png)
+
+The body and eyes were adjusted in the open `.blend` through Blender MCP, then
+the accepted profile was reconciled into the deterministic generator. These
+captures were taken after regenerating and reopening that generated `.blend`;
+they are not screenshots of an unsaved sculpt-only state.
 
 ## Primary gameplay views
 
@@ -70,13 +83,17 @@ npm run build
 The generator is the source of truth. `bob-gate-one.blend` is the editable
 inspection artifact and `bob-gate-one.glb` is the runtime artifact. The runtime
 validator rejects renamed meshes or materials, non-identity transforms,
-dimension/budget drift, premature morphs, extra meshes and non-watertight body
-topology before attaching the model to `BobCharacterPresentation`.
+dimension/budget drift, eye-envelope drift, premature morphs, extra meshes and
+non-watertight body topology before attaching the model to
+`BobCharacterPresentation`. The report records stable generator and runtime-GLB
+hashes; it omits a `.blend` hash because Blender embeds save-specific container
+metadata even when the generated scene and GLB are unchanged.
 
 ## Gate boundary
 
 This gate establishes only neutral geometry and the reusable Level 1 loading,
 lifecycle, visibility and disposal boundary. It intentionally does not claim
-approval for translucent gel, glossy eye response, catchlights, named body or
-eye morphs, expressions, support-frame transitions, locomotion, traversal
-reactions, shader-secondary motion, or representative-hardware performance.
+approval for translucent gel, final eye look-development, catchlights, named
+body or eye morphs, expressions, support-frame transitions, locomotion,
+traversal reactions, shader-secondary motion, or representative-hardware
+performance.

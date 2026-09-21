@@ -12,6 +12,16 @@ const BOB_GATE_ONE_EYE_MATERIAL_NAME = 'Bob-Neutral-Eyes';
 const EXPECTED_BODY_SIZE = new THREE.Vector3(1, 0.8, 0.9);
 const EXPECTED_BODY_MINIMUM = new THREE.Vector3(-0.5, -0.45, -0.45);
 const EXPECTED_BODY_MAXIMUM = new THREE.Vector3(0.5, 0.35, 0.45);
+const EXPECTED_EYE_BOUNDS = {
+  'Bob-Eye-Left': new THREE.Box3(
+    new THREE.Vector3(-0.285, -0.204, -0.447668),
+    new THREE.Vector3(-0.125, 0.074, -0.356704),
+  ),
+  'Bob-Eye-Right': new THREE.Box3(
+    new THREE.Vector3(0.125, -0.204, -0.445005),
+    new THREE.Vector3(0.285, 0.074, -0.353869),
+  ),
+} satisfies Record<(typeof BOB_GATE_ONE_EYE_NAMES)[number], THREE.Box3>;
 const DIMENSION_TOLERANCE_METRES = 1e-5;
 const IDENTITY_SCALE = new THREE.Vector3(1, 1, 1);
 const IDENTITY_QUATERNION = new THREE.Quaternion();
@@ -72,6 +82,24 @@ function assertMaterialName(mesh: THREE.Mesh, expectedName: string): void {
     throw new Error(
       `Bob Gate 1 asset contract: "${mesh.name}" uses material "${actual}", ` +
         `expected "${expectedName}".`,
+    );
+  }
+}
+
+function assertEyeBounds(
+  eye: THREE.Mesh,
+  expected: THREE.Box3,
+): void {
+  eye.geometry.computeBoundingBox();
+  const bounds = eye.geometry.boundingBox;
+  if (
+    !bounds ||
+    bounds.min.distanceTo(expected.min) > DIMENSION_TOLERANCE_METRES ||
+    bounds.max.distanceTo(expected.max) > DIMENSION_TOLERANCE_METRES
+  ) {
+    throw new Error(
+      `Bob Gate 1 asset contract: "${eye.name}" bounds drifted outside the ` +
+        'approved shallow lens envelope.',
     );
   }
 }
@@ -180,6 +208,10 @@ export function validateBobGateOneAsset(root: THREE.Group): BobGateOneAsset {
   assertMaterialName(body, BOB_GATE_ONE_BODY_MATERIAL_NAME);
   for (const eye of eyes) {
     assertMaterialName(eye, BOB_GATE_ONE_EYE_MATERIAL_NAME);
+    assertEyeBounds(
+      eye,
+      EXPECTED_EYE_BOUNDS[eye.name as keyof typeof EXPECTED_EYE_BOUNDS],
+    );
   }
   const meshes: THREE.Mesh[] = [];
   root.traverse((object) => {

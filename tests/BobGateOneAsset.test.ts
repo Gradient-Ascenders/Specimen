@@ -90,6 +90,35 @@ test('Gate 1 validator rejects an exported root transform that changes the agree
   disposeBobGateOneAsset(root);
 });
 
+test('Gate 1 validator rejects required mesh-name drift', async () => {
+  const root = await loadAsset();
+  const body = root.getObjectByName('Bob-Body');
+  assert.ok(body);
+  body.name = 'Renamed-Bob-Body';
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: missing static mesh "Bob-Body"/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
+test('Gate 1 validator rejects body geometry exported at the wrong dimensions', async () => {
+  const root = await loadAsset();
+  const body = root.getObjectByName('Bob-Body');
+  assert.ok(body instanceof THREE.Mesh);
+  const positions = body.geometry.getAttribute('position');
+  for (let index = 0; index < positions.count; index += 1) {
+    positions.setX(index, positions.getX(index) * 1.1);
+  }
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: size was/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
 test('Gate 1 validator rejects a transformed wrapper around the stable asset root', async () => {
   const root = await loadAsset();
   const assetRoot = root.getObjectByName('Bob-Gate-One');
@@ -132,6 +161,39 @@ test('Gate 1 validator rejects renamed neutral material slots', async () => {
   disposeBobGateOneAsset(root);
 });
 
+test('Gate 1 validator rejects post-export triangle-budget drift', async () => {
+  const root = await loadAsset();
+  const eye = root.getObjectByName('Bob-Eye-Left');
+  assert.ok(eye instanceof THREE.Mesh);
+  const index = eye.geometry.index;
+  assert.ok(index);
+  const expanded = Array.from(
+    { length: index.count },
+    (_, offset) => index.getX(offset),
+  );
+  for (let offset = 0; offset < 97 * 3; offset += 1) {
+    expanded.push(index.getX(offset % index.count));
+  }
+  eye.geometry.setIndex(expanded);
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: eye\/total triangle budget exceeded/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
+test('Gate 1 validator rejects neutral exports containing animation data', async () => {
+  const root = await loadAsset();
+  root.animations.push(new THREE.AnimationClip('unexpected', 1));
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: neutral asset has animations/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
 test('Gate 1 validator rejects a body topology that is no longer watertight', async () => {
   const root = await loadAsset();
   const body = root.getObjectByName('Bob-Body');
@@ -156,6 +218,22 @@ test('Gate 1 validator rejects meshes moved outside the stable Bob root', async 
   assert.throws(
     () => validateBobGateOneAsset(root),
     /Bob Gate 1 asset contract: "Bob-Eye-Right" must be a direct child of "Bob-Gate-One"/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
+test('Gate 1 validator rejects eye geometry baked outside the approved lens envelope', async () => {
+  const root = await loadAsset();
+  const eye = root.getObjectByName('Bob-Eye-Left');
+  assert.ok(eye instanceof THREE.Mesh);
+  const positions = eye.geometry.getAttribute('position');
+  for (let index = 0; index < positions.count; index += 1) {
+    positions.setZ(index, positions.getZ(index) + 0.9);
+  }
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: "Bob-Eye-Left" bounds drifted/,
   );
   disposeBobGateOneAsset(root);
 });

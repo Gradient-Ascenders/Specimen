@@ -424,7 +424,6 @@ def build() -> None:
         export_materials="EXPORT",
         export_attributes=False,
     )
-    report["blend_sha256"] = hashlib.sha256(BLEND_PATH.read_bytes()).hexdigest()
     report["glb_sha256"] = hashlib.sha256(GLB_PATH.read_bytes()).hexdigest()
     REPORT_PATH.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
