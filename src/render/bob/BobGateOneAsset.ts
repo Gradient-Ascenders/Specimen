@@ -25,6 +25,8 @@ const EXPECTED_EYE_BOUNDS = {
 const DIMENSION_TOLERANCE_METRES = 1e-5;
 const IDENTITY_SCALE = new THREE.Vector3(1, 1, 1);
 const IDENTITY_QUATERNION = new THREE.Quaternion();
+const EXPECTED_COLLIDER_RADIUS_METRES = 0.45;
+const EXPECTED_CONTACT_Y_METRES = -0.45;
 
 export interface BobGateOneAsset {
   readonly root: THREE.Group;
@@ -100,6 +102,34 @@ function assertEyeBounds(
     throw new Error(
       `Bob Gate 1 asset contract: "${eye.name}" bounds drifted outside the ` +
         'approved shallow lens envelope.',
+    );
+  }
+}
+
+function assertExportMetadata(
+  assetRoot: THREE.Object3D,
+  body: THREE.Mesh,
+): void {
+  const rootMetadata = assetRoot.userData;
+  if (
+    rootMetadata.contract !== 'bob-gate-one-neutral-v1' ||
+    rootMetadata.local_up !== '+Y' ||
+    rootMetadata.local_forward !== '-Z' ||
+    rootMetadata.collider_radius_metres !== EXPECTED_COLLIDER_RADIUS_METRES
+  ) {
+    throw new Error(
+      'Bob Gate 1 asset contract: exported axis and collider metadata drifted.',
+    );
+  }
+
+  const bodyMetadata = body.userData;
+  if (
+    bodyMetadata.watertight !== true ||
+    bodyMetadata.connected_components !== 1 ||
+    bodyMetadata.resting_contact_y_metres !== EXPECTED_CONTACT_Y_METRES
+  ) {
+    throw new Error(
+      'Bob Gate 1 asset contract: exported body metadata drifted.',
     );
   }
 }
@@ -204,6 +234,7 @@ export function validateBobGateOneAsset(root: THREE.Group): BobGateOneAsset {
         'only direct child of the loaded scene.',
     );
   }
+  assertExportMetadata(assetRoot, body);
   assertWatertightBody(body);
   assertMaterialName(body, BOB_GATE_ONE_BODY_MATERIAL_NAME);
   for (const eye of eyes) {

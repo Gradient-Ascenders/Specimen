@@ -423,6 +423,7 @@ def build() -> None:
         export_lights=False,
         export_materials="EXPORT",
         export_attributes=False,
+        export_extras=True,
     )
     report["glb_sha256"] = hashlib.sha256(GLB_PATH.read_bytes()).hexdigest()
     REPORT_PATH.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

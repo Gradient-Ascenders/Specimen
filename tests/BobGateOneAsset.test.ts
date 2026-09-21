@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -14,6 +15,14 @@ import {
 
 const ASSET_URL = new URL(
   '../assets/characters/bob/bob-gate-one.glb',
+  import.meta.url,
+);
+const GENERATOR_URL = new URL(
+  '../assets/characters/bob/generate-bob-gate-one.py',
+  import.meta.url,
+);
+const REPORT_URL = new URL(
+  '../assets/characters/bob/bob-gate-one.validation.json',
   import.meta.url,
 );
 
@@ -39,6 +48,19 @@ function assertVectorClose(actual: THREE.Vector3, expected: THREE.Vector3): void
     `${actual.toArray().join(', ')} != ${expected.toArray().join(', ')}`,
   );
 }
+
+async function sha256(url: URL): Promise<string> {
+  return createHash('sha256').update(await readFile(url)).digest('hex');
+}
+
+test('Gate 1 validation report identifies the committed generator and runtime GLB', async () => {
+  const report = JSON.parse(
+    await readFile(REPORT_URL, 'utf8'),
+  ) as Record<string, unknown>;
+
+  assert.equal(report.generator_sha256, await sha256(GENERATOR_URL));
+  assert.equal(report.glb_sha256, await sha256(ASSET_URL));
+});
 
 test('Gate 1 GLB exposes the approved neutral silhouette contract', async () => {
   const root = await loadAsset();
@@ -99,6 +121,32 @@ test('Gate 1 validator rejects required mesh-name drift', async () => {
   assert.throws(
     () => validateBobGateOneAsset(root),
     /Bob Gate 1 asset contract: missing static mesh "Bob-Body"/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
+test('Gate 1 validator rejects missing axis and collider export metadata', async () => {
+  const root = await loadAsset();
+  const assetRoot = root.getObjectByName('Bob-Gate-One');
+  assert.ok(assetRoot);
+  delete assetRoot.userData.local_forward;
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: exported axis and collider metadata drifted/,
+  );
+  disposeBobGateOneAsset(root);
+});
+
+test('Gate 1 validator rejects missing contact-point export metadata', async () => {
+  const root = await loadAsset();
+  const body = root.getObjectByName('Bob-Body');
+  assert.ok(body);
+  delete body.userData.resting_contact_y_metres;
+
+  assert.throws(
+    () => validateBobGateOneAsset(root),
+    /Bob Gate 1 asset contract: exported body metadata drifted/,
   );
   disposeBobGateOneAsset(root);
 });
