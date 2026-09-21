@@ -51,6 +51,98 @@ function getCharacter(root: THREE.Object3D): THREE.Group {
   return character;
 }
 
+test('Gate 2 materials present lit cyan gel and glossy eyes without self-light or catchlights', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const character = getCharacter(bob.root);
+  const body = character.getObjectByName('Bob-Body');
+  const leftEye = character.getObjectByName('Bob-Eye-Left');
+  const rightEye = character.getObjectByName('Bob-Eye-Right');
+
+  assert.ok(body instanceof THREE.Mesh);
+  assert.ok(leftEye instanceof THREE.Mesh);
+  assert.ok(rightEye instanceof THREE.Mesh);
+  assert.ok(body.material instanceof THREE.MeshPhysicalMaterial);
+  assert.ok(leftEye.material instanceof THREE.MeshPhysicalMaterial);
+  assert.equal(rightEye.material, leftEye.material);
+
+  assert.equal(body.material.name, 'Bob-Gel-Body');
+  assert.ok(body.material.color.g > body.material.color.r * 2);
+  assert.ok(body.material.color.b > body.material.color.r * 2);
+  assert.ok(body.material.transmission > 0);
+  assert.ok(body.material.transmission < 0.5);
+  assert.equal(body.material.emissive.getHex(), 0x000000);
+  assert.equal(body.material.emissiveIntensity, 0);
+
+  assert.equal(leftEye.material.name, 'Bob-Glossy-Eyes');
+  assert.ok(leftEye.material.color.getHSL({ h: 0, s: 0, l: 0 }).l < 0.04);
+  assert.ok(leftEye.material.roughness < 0.3);
+  assert.equal(leftEye.material.emissive.getHex(), 0x000000);
+  assert.equal(leftEye.material.emissiveIntensity, 0);
+
+  assert.equal(character.getObjectByName('Bob-Catchlight-Left'), undefined);
+  assert.equal(character.getObjectByName('Bob-Catchlight-Right'), undefined);
+  assert.ok(bob.diagnostics.materials);
+  assert.equal(bob.diagnostics.materials.selfLit, false);
+  assert.equal(bob.diagnostics.materials.catchlightCount, 0);
+  assert.ok(
+    bob.diagnostics.materials.maximumSecondaryDisplacementMetres <= 0.012,
+  );
+
+  bob.dispose();
+});
+
+test('Gate 2 secondary motion follows presentation time, ages impacts and resets cleanly', async () => {
+  const loadedRoot = await loadAsset();
+  const importedMaterials = new Set<THREE.Material>();
+  loadedRoot.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+    for (const material of materials) importedMaterials.add(material);
+  });
+  const importedDisposalCounts = new Map<THREE.Material, number>();
+  for (const material of importedMaterials) {
+    importedDisposalCounts.set(material, 0);
+    material.addEventListener('dispose', () => {
+      importedDisposalCounts.set(
+        material,
+        importedDisposalCounts.get(material)! + 1,
+      );
+    });
+  }
+
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(async () => loadedRoot);
+  assert.ok(
+    [...importedDisposalCounts.values()].every((count) => count === 1),
+  );
+
+  bob.update(0.25, state());
+  assert.equal(bob.diagnostics.materials?.elapsedTimeSeconds, 0.25);
+
+  bob.onImpact({
+    normalWorld: new THREE.Vector3(1, 0, 0),
+    strength: 0.8,
+    kind: 'wall',
+  });
+  bob.present();
+  assert.equal(bob.diagnostics.materials?.impactStrength, 0.8);
+  assert.equal(bob.diagnostics.materials?.impactAgeSeconds, 0);
+
+  bob.update(0.2, state());
+  bob.present();
+  assert.equal(bob.diagnostics.materials?.impactAgeSeconds, 0.2);
+
+  bob.reset();
+  assert.equal(bob.diagnostics.materials?.elapsedTimeSeconds, 0);
+  assert.equal(bob.diagnostics.materials?.impactStrength, 0);
+  assert.equal(bob.diagnostics.materials?.impactAgeSeconds, 1.2);
+
+  bob.dispose();
+});
+
 test('neutral Bob presentation loads, follows authoritative transforms, fades, resets and disposes', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);

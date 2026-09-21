@@ -17,6 +17,10 @@ import {
   validateBobGateOneAsset,
   type BobGateOneAsset,
 } from './BobGateOneAsset.ts';
+import {
+  BobGateTwoMaterialSet,
+  type BobGateTwoMaterialDiagnostics,
+} from './BobGateTwoMaterials.ts';
 
 const BOB_GATE_ONE_ASSET_URL = new URL(
   '../../../assets/characters/bob/bob-gate-one.glb',
@@ -30,6 +34,7 @@ export interface BobCharacterPresentationDiagnostics
   extends SlimeVisualDiagnostics {
   readonly visible: boolean;
   readonly deathBurst: SlimeBurstDiagnostics;
+  readonly materials: BobGateTwoMaterialDiagnostics | undefined;
 }
 
 async function loadDefaultBobGateOneAsset(): Promise<THREE.Group> {
@@ -39,10 +44,10 @@ async function loadDefaultBobGateOneAsset(): Promise<THREE.Group> {
 /**
  * Reusable visual-only boundary for Bob.
  *
- * Gate 1 deliberately presents only the approved neutral geometry. It accepts
- * the same authoritative read model as the provisional slime visual without
- * writing to gameplay state; morphs, expressions and frame transitions remain
- * behind their later visual approval gates.
+ * Gate 2 presents the approved neutral geometry with scene-lit gel and eye
+ * materials plus bounded surface motion. It accepts the same authoritative
+ * read model as the provisional slime visual without writing to gameplay
+ * state; morphs, expressions and frame transitions remain behind Gate 3.
  */
 export class BobCharacterPresentation {
   readonly root = new THREE.Group();
@@ -53,6 +58,8 @@ export class BobCharacterPresentation {
   private readonly velocityWorld = new THREE.Vector3();
   private readonly surfaceNormalWorld = new THREE.Vector3(0, 1, 0);
   private readonly moveDirectionWorld = new THREE.Vector3(0, 0, -1);
+  private readonly impactNormalWorld = new THREE.Vector3(0, 1, 0);
+  private readonly impactPointLocal = new THREE.Vector3(0, -0.45, 0);
   private readonly diagnosticsState = {
     speed: 0,
     locomotionPhase: 0,
@@ -69,12 +76,14 @@ export class BobCharacterPresentation {
   } satisfies SlimeVisualDiagnostics;
 
   private asset: BobGateOneAsset | undefined;
+  private materialSet: BobGateTwoMaterialSet | undefined;
   private readonly deathBurst = new SlimeBurstPresentation();
   private readonly materials = new Set<THREE.Material>();
   private preparation: Promise<void> | undefined;
   private opacity = 1;
   private deathElapsedSeconds = 0;
   private deathActive = false;
+  private impactPending = false;
   private disposed = false;
 
   constructor(radiusMetres: number) {
@@ -98,6 +107,7 @@ export class BobCharacterPresentation {
       ...this.diagnosticsState,
       visible: this.mesh.visible,
       deathBurst: this.deathBurst.diagnostics,
+      materials: this.materialSet?.diagnostics,
     };
   }
 
@@ -123,7 +133,20 @@ export class BobCharacterPresentation {
         disposeBobGateOneAsset(root);
         return;
       }
+      const importedMaterials = new Set<THREE.Material>();
+      for (const mesh of [asset.body, ...asset.eyes]) {
+        const materials = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
+        for (const material of materials) importedMaterials.add(material);
+      }
+      const materialSet = new BobGateTwoMaterialSet();
+      asset.body.material = materialSet.body;
+      for (const eye of asset.eyes) eye.material = materialSet.eyes;
+      for (const material of importedMaterials) material.dispose();
+
       this.asset = asset;
+      this.materialSet = materialSet;
       root.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         const materials = Array.isArray(object.material)
@@ -191,6 +214,7 @@ export class BobCharacterPresentation {
       1,
     );
     this.diagnosticsState.impactAge += deltaSeconds;
+    this.materialSet?.update(deltaSeconds);
   }
 
   present(): void {
@@ -209,6 +233,20 @@ export class BobCharacterPresentation {
     if (this.diagnosticsState.surfaceTangentLocal.lengthSq() > 1e-8) {
       this.diagnosticsState.surfaceTangentLocal.normalize();
     }
+    this.diagnosticsState.impactNormalLocal
+      .copy(this.impactNormalWorld)
+      .applyQuaternion(this.inverseWorldQuaternion)
+      .normalize();
+    this.impactPointLocal
+      .copy(this.diagnosticsState.impactNormalLocal)
+      .multiplyScalar(-this.radiusMetres);
+    if (this.impactPending && this.materialSet) {
+      this.materialSet.setImpact(
+        this.impactPointLocal,
+        this.diagnosticsState.impactStrength,
+      );
+      this.impactPending = false;
+    }
   }
 
   onImpact(impact: SlimeVisualImpact): void {
@@ -218,11 +256,12 @@ export class BobCharacterPresentation {
       1,
     );
     this.diagnosticsState.impactAge = 0;
-    this.diagnosticsState.impactNormalLocal.set(
+    this.impactPending = true;
+    this.impactNormalWorld.set(
       impact.normalWorld.x,
       impact.normalWorld.y,
       impact.normalWorld.z,
-    );
+    ).normalize();
   }
 
   onLanding(
@@ -241,7 +280,7 @@ export class BobCharacterPresentation {
   }
 
   onLaunch(_launch: SlimeVisualLaunch): void {
-    // Gate 1 holds the neutral silhouette; Launch belongs to Gate 3.
+    // Gate 2 holds the neutral silhouette; Launch belongs to Gate 3.
   }
 
   primeDeathResources(
@@ -304,6 +343,7 @@ export class BobCharacterPresentation {
     this.velocityWorld.set(0, 0, 0);
     this.surfaceNormalWorld.set(0, 1, 0);
     this.moveDirectionWorld.set(0, 0, -1);
+    this.impactNormalWorld.set(0, 1, 0);
     this.diagnosticsState.speed = 0;
     this.diagnosticsState.locomotionPhase = 0;
     this.diagnosticsState.grounded = 1;
@@ -312,10 +352,12 @@ export class BobCharacterPresentation {
     this.diagnosticsState.stretch = 0;
     this.diagnosticsState.impactStrength = 0;
     this.diagnosticsState.impactAge = 1.2;
+    this.impactPending = false;
     this.diagnosticsState.impactNormalLocal.set(0, 1, 0);
     this.diagnosticsState.surfaceNormalLocal.set(0, 1, 0);
     this.diagnosticsState.surfaceTangentLocal.set(0, 0, 1);
     this.diagnosticsState.moveDirectionLocal.set(0, 0, -1);
+    this.materialSet?.reset();
     this.present();
   }
 
@@ -325,6 +367,7 @@ export class BobCharacterPresentation {
     this.deathBurst.dispose();
     if (this.asset) disposeBobGateOneAsset(this.asset.root);
     this.asset = undefined;
+    this.materialSet = undefined;
     this.materials.clear();
     this.mesh.removeFromParent();
     this.mesh.clear();
@@ -333,7 +376,14 @@ export class BobCharacterPresentation {
   }
 
   private applyOpacity(): void {
+    this.materialSet?.setOpacity(this.opacity);
     for (const material of this.materials) {
+      if (
+        material === this.materialSet?.body ||
+        material === this.materialSet?.eyes
+      ) {
+        continue;
+      }
       material.transparent = this.opacity < 1;
       material.opacity = this.opacity;
       material.depthWrite = this.opacity >= 1;
