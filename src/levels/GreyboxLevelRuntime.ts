@@ -981,7 +981,7 @@ export class GreyboxLevelRuntime {
     });
 
     const slimeVisualState: BobCharacterPresentationState = {
-      positionWorld: body.position,
+      locomotionPositionWorld: body.locomotionPosition,
       velocityWorld: body.velocity,
       surfaceNormalWorld: body.groundNormal,
       gameplayUpWorld: body.gameplayUp,

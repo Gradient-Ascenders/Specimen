@@ -58,8 +58,8 @@ const LOCOMOTION_REVERSAL_NEUTRAL_STRENGTH = 0.025;
 export type BobCharacterLoader = () => Promise<THREE.Group>;
 
 export interface BobCharacterPresentationState extends SlimeVisualState {
-  /** Authoritative fixed-step position used only to measure travelled distance. */
-  readonly positionWorld: Vector3State;
+  /** Authoritative resolved travel coordinate excluding carrier transport. */
+  readonly locomotionPositionWorld: Vector3State;
 }
 
 export interface BobCharacterPresentationDiagnostics
@@ -94,7 +94,7 @@ export class BobCharacterPresentation {
   private readonly moveDirectionWorld = new THREE.Vector3(0, 0, -1);
   private readonly impactNormalWorld = new THREE.Vector3(0, 1, 0);
   private readonly impactPointLocal = new THREE.Vector3(0, -0.45, 0);
-  private readonly previousPositionWorld = new THREE.Vector3();
+  private readonly previousLocomotionPositionWorld = new THREE.Vector3();
   private readonly travelledWorld = new THREE.Vector3();
   private readonly diagnosticsState = {
     speed: 0,
@@ -127,7 +127,7 @@ export class BobCharacterPresentation {
   private landingCompression = 0;
   private damageRemaining = 0;
   private damageStrength = 0;
-  private hasPreviousPosition = false;
+  private hasPreviousLocomotionPosition = false;
   private locomotionStrength = 0;
   private previousTangentialSpeed = 0;
   private locomotionMoving = false;
@@ -557,8 +557,8 @@ export class BobCharacterPresentation {
     this.landingCompression = 0;
     this.damageRemaining = 0;
     this.damageStrength = 0;
-    this.hasPreviousPosition = false;
-    this.previousPositionWorld.set(0, 0, 0);
+    this.hasPreviousLocomotionPosition = false;
+    this.previousLocomotionPositionWorld.set(0, 0, 0);
     this.travelledWorld.set(0, 0, 0);
     this.locomotionStrength = 0;
     this.previousTangentialSpeed = 0;
@@ -620,26 +620,29 @@ export class BobCharacterPresentation {
     locomotionActive: boolean,
     deltaSeconds: number,
   ): void {
-    if (!this.hasPreviousPosition) {
-      this.previousPositionWorld.set(
-        state.positionWorld.x,
-        state.positionWorld.y,
-        state.positionWorld.z,
+    if (!this.hasPreviousLocomotionPosition) {
+      this.previousLocomotionPositionWorld.set(
+        state.locomotionPositionWorld.x,
+        state.locomotionPositionWorld.y,
+        state.locomotionPositionWorld.z,
       );
-      this.hasPreviousPosition = true;
+      this.hasPreviousLocomotionPosition = true;
       this.previousTangentialSpeed = tangentialSpeed;
       return;
     }
 
     this.travelledWorld.set(
-      state.positionWorld.x - this.previousPositionWorld.x,
-      state.positionWorld.y - this.previousPositionWorld.y,
-      state.positionWorld.z - this.previousPositionWorld.z,
+      state.locomotionPositionWorld.x -
+        this.previousLocomotionPositionWorld.x,
+      state.locomotionPositionWorld.y -
+        this.previousLocomotionPositionWorld.y,
+      state.locomotionPositionWorld.z -
+        this.previousLocomotionPositionWorld.z,
     );
-    this.previousPositionWorld.set(
-      state.positionWorld.x,
-      state.positionWorld.y,
-      state.positionWorld.z,
+    this.previousLocomotionPositionWorld.set(
+      state.locomotionPositionWorld.x,
+      state.locomotionPositionWorld.y,
+      state.locomotionPositionWorld.z,
     );
     this.travelledWorld.projectOnPlane(this.surfaceNormalWorld);
     const travelledMetres = this.travelledWorld.length();
@@ -660,8 +663,12 @@ export class BobCharacterPresentation {
       : 0;
     this.previousTangentialSpeed = tangentialSpeed;
     const targetStrength = locomotionActive
-      ? speedStrength * LOCOMOTION_CRUISE_STRENGTH +
-        accelerationStrength * LOCOMOTION_ACCELERATION_STRENGTH
+      ? THREE.MathUtils.clamp(
+          speedStrength * LOCOMOTION_CRUISE_STRENGTH +
+            accelerationStrength * LOCOMOTION_ACCELERATION_STRENGTH,
+          0,
+          1,
+        )
       : 0;
     if (targetStrength >= this.locomotionStrength) {
       this.locomotionStrength = targetStrength;

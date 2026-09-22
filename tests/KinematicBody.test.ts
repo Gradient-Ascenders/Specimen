@@ -108,6 +108,30 @@ test('charged jump endpoints produce approximately 25% higher apexes', () => {
   assert.ok(Math.abs(maximumHeightRatio - 1.25) < 0.01);
 });
 
+test('carrier transport never enters the authoritative locomotion position', () => {
+  const { body, floor } = createGroundBody();
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  const locomotionBeforeCarrier = new THREE.Vector3().copy(
+    body.locomotionPosition,
+  );
+  const positionBeforeCarrier = new THREE.Vector3().copy(body.position);
+
+  body.applyCarrierDisplacement(new THREE.Vector3(0.5, 0, 0), floor);
+
+  assert.ok(
+    Math.abs(body.position.x - positionBeforeCarrier.x - 0.5) < EPSILON,
+  );
+  assert.ok(
+    new THREE.Vector3().copy(body.locomotionPosition)
+      .distanceTo(locomotionBeforeCarrier) < EPSILON,
+  );
+
+  body.update(FIXED_DELTA_SECONDS, NO_MOVEMENT);
+  assert.ok(
+    Math.abs(body.locomotionPosition.x - locomotionBeforeCarrier.x) < EPSILON,
+  );
+});
+
 test('landing-reaction tuning cannot equal or exceed the normal jump impulse', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();

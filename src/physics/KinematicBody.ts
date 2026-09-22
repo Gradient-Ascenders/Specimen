@@ -156,6 +156,8 @@ export class KinematicBody {
 
   private readonly currentPosition = new THREE.Vector3();
   private readonly previousPositionValue = new THREE.Vector3();
+  private readonly locomotionPositionValue = new THREE.Vector3();
+  private readonly locomotionStepDisplacement = new THREE.Vector3();
   private readonly velocityValue = new THREE.Vector3();
   private readonly groundNormalValue = new THREE.Vector3(0, 1, 0);
   private readonly gameplayUpValue = new THREE.Vector3(0, 1, 0);
@@ -236,6 +238,11 @@ export class KinematicBody {
 
   get previousPosition(): ReadonlyVector3State {
     return this.previousPositionValue;
+  }
+
+  /** Cumulative resolved body travel excluding carrier transport and teleports. */
+  get locomotionPosition(): ReadonlyVector3State {
+    return this.locomotionPositionValue;
   }
 
   get velocity(): ReadonlyVector3State {
@@ -469,6 +476,11 @@ export class KinematicBody {
     this.refreshGroundState(deltaSeconds);
     this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
     this.consumeBufferedJumpAfterLanding(jumpInput);
+    this.locomotionStepDisplacement.subVectors(
+      this.currentPosition,
+      this.previousPositionValue,
+    );
+    this.locomotionPositionValue.add(this.locomotionStepDisplacement);
   }
 
 

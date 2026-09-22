@@ -28,11 +28,11 @@ async function loadAsset(): Promise<THREE.Group> {
 }
 
 function state(
-  positionWorld = new THREE.Vector3(),
+  locomotionPositionWorld = new THREE.Vector3(),
   velocityWorld = new THREE.Vector3(1, 0, -2),
 ): BobCharacterPresentationState {
   return {
-    positionWorld,
+    locomotionPositionWorld,
     velocityWorld,
     surfaceNormalWorld: new THREE.Vector3(0, 1, 0),
     gameplayUpWorld: new THREE.Vector3(0, 1, 0),
@@ -110,6 +110,27 @@ test('ground distance drives the Neutral-Reach-transfer-Gather-Neutral cycle', a
   bob.dispose();
 });
 
+test('support-relative travel drives Bob phase independently of carrier transport', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const velocity = new THREE.Vector3(0, 0, -1);
+
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(), velocity),
+    jumpCharge: 0,
+  });
+  bob.update(0.1, {
+    // Carrier displacement is intentionally absent from this coordinate.
+    ...state(new THREE.Vector3(0, 0, -0.1), velocity),
+    jumpCharge: 0,
+  });
+
+  assert.ok(
+    Math.abs(bob.diagnostics.locomotionPhase - 0.1 / 1.2) < 1e-9,
+  );
+  bob.dispose();
+});
+
 test('acceleration strengthens mass transfer while steady cruising stays subtle', async () => {
   const cruise = new BobCharacterPresentation(0.45);
   const accelerating = new BobCharacterPresentation(0.45);
@@ -145,6 +166,33 @@ test('acceleration strengthens mass transfer while steady cruising stays subtle'
 
   cruise.dispose();
   accelerating.dispose();
+});
+
+test('real full acceleration keeps every locomotion morph within its authored range', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const cruiseVelocity = new THREE.Vector3(0, 0, -2.3);
+  const fullSpeedVelocity = new THREE.Vector3(0, 0, -5.5);
+
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, 0), cruiseVelocity),
+    jumpCharge: 0,
+  });
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, -0.3), fullSpeedVelocity),
+    jumpCharge: 0,
+  });
+
+  assert.ok(bob.diagnostics.locomotionStrength <= 1);
+  for (const meshName of ['Bob-Body', 'Bob-Eye-Left', 'Bob-Eye-Right']) {
+    for (const pose of ['move-reach', 'move-gather']) {
+      assert.ok(
+        weight(bob, meshName, pose) <= 1,
+        `${meshName} ${pose} must remain within its authored range`,
+      );
+    }
+  }
+  bob.dispose();
 });
 
 test('the velocity dead zone rejects idle drift and retains the last heading', async () => {
