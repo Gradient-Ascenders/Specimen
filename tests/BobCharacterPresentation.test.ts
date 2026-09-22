@@ -135,10 +135,37 @@ test('Gate 2 secondary motion follows presentation time, ages impacts and resets
   bob.present();
   assert.equal(bob.diagnostics.materials?.impactAgeSeconds, 0.2);
 
+  bob.update(1.5, state());
+  bob.present();
+  assert.equal(bob.diagnostics.materials?.impactAgeSeconds, 1.2);
+  assert.equal(bob.diagnostics.materials?.impactStrength, 0);
+
   bob.reset();
   assert.equal(bob.diagnostics.materials?.elapsedTimeSeconds, 0);
   assert.equal(bob.diagnostics.materials?.impactStrength, 0);
   assert.equal(bob.diagnostics.materials?.impactAgeSeconds, 1.2);
+
+  bob.dispose();
+});
+
+test('Gate 2 eye fade invalidates the material program only when transparency changes', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const eye = getCharacter(bob.root).getObjectByName('Bob-Eye-Left');
+  assert.ok(eye instanceof THREE.Mesh);
+  assert.ok(eye.material instanceof THREE.MeshPhysicalMaterial);
+
+  const initialVersion = eye.material.version;
+  bob.setOpacity(0.35);
+  assert.equal(eye.material.transparent, true);
+  assert.equal(eye.material.version, initialVersion + 1);
+
+  bob.setOpacity(0.2);
+  assert.equal(eye.material.version, initialVersion + 1);
+
+  bob.setOpacity(1);
+  assert.equal(eye.material.transparent, false);
+  assert.equal(eye.material.version, initialVersion + 2);
 
   bob.dispose();
 });

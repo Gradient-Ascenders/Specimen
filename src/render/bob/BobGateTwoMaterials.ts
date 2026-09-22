@@ -103,10 +103,20 @@ transformed += objectNormal * bobSecondaryDisplacement;
   }
 
   update(deltaSeconds: number): void {
+    const elapsedSeconds = Math.max(deltaSeconds, 0);
     this.bobUniforms.time.value =
-      (this.bobUniforms.time.value + Math.max(deltaSeconds, 0)) %
+      (this.bobUniforms.time.value + elapsedSeconds) %
       BOB_SECONDARY_MOTION_PERIOD_SECONDS;
-    this.bobUniforms.impactAge.value += Math.max(deltaSeconds, 0);
+    this.bobUniforms.impactAge.value = Math.min(
+      this.bobUniforms.impactAge.value + elapsedSeconds,
+      BOB_IMPACT_RIPPLE_DURATION_SECONDS,
+    );
+    if (
+      this.bobUniforms.impactAge.value >=
+      BOB_IMPACT_RIPPLE_DURATION_SECONDS
+    ) {
+      this.bobUniforms.impactStrength.value = 0;
+    }
   }
 
   setImpact(pointLocal: THREE.Vector3, strength: number): void {
@@ -197,7 +207,11 @@ export class BobGateTwoMaterialSet {
     this.body.transparent = true;
     this.body.depthWrite = boundedOpacity >= 1;
     this.eyes.opacity = boundedOpacity;
-    this.eyes.transparent = boundedOpacity < 1;
+    const eyesTransparent = boundedOpacity < 1;
+    if (this.eyes.transparent !== eyesTransparent) {
+      this.eyes.transparent = eyesTransparent;
+      this.eyes.needsUpdate = true;
+    }
     this.eyes.depthWrite = boundedOpacity >= 1;
   }
 }
