@@ -14,21 +14,30 @@ import {
 } from '../slime/SlimeBurstPresentation.ts';
 import {
   disposeBobGateOneAsset,
-  validateBobGateOneAsset,
   type BobGateOneAsset,
 } from './BobGateOneAsset.ts';
+import {
+  BOB_BODY_POSES,
+  BOB_EXPRESSIONS,
+  validateBobMorphAsset,
+  type BobBodyPose,
+  type BobExpression,
+} from './BobMorphAsset.ts';
 import {
   BobGateTwoMaterialSet,
   type BobGateTwoMaterialDiagnostics,
 } from './BobGateTwoMaterials.ts';
 
-const BOB_GATE_ONE_ASSET_URL = new URL(
-  '../../../assets/characters/bob/bob-gate-one.glb',
+const BOB_AUTHORED_ASSET_URL = new URL(
+  '../../../assets/characters/bob/bob-authored.glb',
   import.meta.url,
 ).href;
 const DEATH_RUPTURE_SECONDS = 0.075;
+const LAUNCH_SECONDS = 0.18;
+const LANDING_SECONDS = 0.28;
+const DAMAGE_SECONDS = 0.22;
 
-export type BobGateOneLoader = () => Promise<THREE.Group>;
+export type BobCharacterLoader = () => Promise<THREE.Group>;
 
 export interface BobCharacterPresentationDiagnostics
   extends SlimeVisualDiagnostics {
@@ -37,17 +46,15 @@ export interface BobCharacterPresentationDiagnostics
   readonly materials: BobGateTwoMaterialDiagnostics | undefined;
 }
 
-async function loadDefaultBobGateOneAsset(): Promise<THREE.Group> {
-  return (await new GLTFLoader().loadAsync(BOB_GATE_ONE_ASSET_URL)).scene;
+async function loadDefaultBobAsset(): Promise<THREE.Group> {
+  return (await new GLTFLoader().loadAsync(BOB_AUTHORED_ASSET_URL)).scene;
 }
 
 /**
  * Reusable visual-only boundary for Bob.
  *
- * Gate 2 presents the approved neutral geometry with scene-lit gel and eye
- * materials plus bounded surface motion. It accepts the same authoritative
- * read model as the provisional slime visual without writing to gameplay
- * state; morphs, expressions and frame transitions remain behind Gate 3.
+ * Authored poses consume authoritative snapshots and events. The kinematic
+ * body and gameplay timing remain external; shaders add only surface detail.
  */
 export class BobCharacterPresentation {
   readonly root = new THREE.Group();
@@ -85,6 +92,22 @@ export class BobCharacterPresentation {
   private deathActive = false;
   private impactPending = false;
   private disposed = false;
+  private launchRemaining = 0;
+  private launchStrength = 0;
+  private landingRemaining = 0;
+  private landingCompression = 0;
+  private damageRemaining = 0;
+  private damageStrength = 0;
+  private readonly poseWeights: Record<BobBodyPose, number> = {
+    'move-reach': 0, 'move-gather': 0, squash: 0, flatten: 0,
+    launch: 0, airborne: 0, stress: 0,
+  };
+  private readonly expressionWeights: Record<BobExpression, number> = {
+    blink: 0, effort: 0, surprise: 0, 'stress-expression': 0,
+  };
+  private readonly requestedExpressions: Record<BobExpression, number> = {
+    blink: 0, effort: 0, surprise: 0, 'stress-expression': 0,
+  };
 
   constructor(radiusMetres: number) {
     if (Math.abs(radiusMetres - 0.45) > 1e-6) {
@@ -112,7 +135,7 @@ export class BobCharacterPresentation {
   }
 
   async prepare(
-    loader: BobGateOneLoader = loadDefaultBobGateOneAsset,
+    loader: BobCharacterLoader = loadDefaultBobAsset,
   ): Promise<void> {
     if (this.ready) return;
     if (this.disposed) {
@@ -123,7 +146,7 @@ export class BobCharacterPresentation {
     const preparation = loader().then((root) => {
       let asset: BobGateOneAsset;
       try {
-        asset = validateBobGateOneAsset(root);
+        asset = validateBobMorphAsset(root);
       } catch (error) {
         disposeBobGateOneAsset(root);
         throw error;
@@ -155,6 +178,7 @@ export class BobCharacterPresentation {
         for (const material of materials) this.materials.add(material);
       });
       this.mesh.add(root);
+      this.applyMorphs();
       this.applyOpacity();
     });
     this.preparation = preparation;
@@ -182,7 +206,16 @@ export class BobCharacterPresentation {
     this.mesh.visible = visible;
   }
 
+  setExpression(expression: BobExpression, weight: number): void {
+    if (this.disposed || this.deathActive) return;
+    this.requestedExpressions[expression] = Number.isFinite(weight)
+      ? THREE.MathUtils.clamp(weight, 0, 1)
+      : 0;
+    this.applyMorphs();
+  }
+
   update(deltaSeconds: number, state: SlimeVisualState): void {
+    if (this.disposed || this.deathActive) return;
     this.velocityWorld.set(
       state.velocityWorld.x,
       state.velocityWorld.y,
@@ -215,6 +248,35 @@ export class BobCharacterPresentation {
     );
     this.diagnosticsState.impactAge += deltaSeconds;
     this.materialSet?.update(deltaSeconds);
+    this.clearMorphWeights();
+    const elapsed = Math.max(0, deltaSeconds);
+    const supported = state.grounded || state.attached;
+    this.launchRemaining = Math.max(0, this.launchRemaining - elapsed);
+    this.landingRemaining = Math.max(0, this.landingRemaining - elapsed);
+    this.damageRemaining = Math.max(0, this.damageRemaining - elapsed);
+    if (supported) {
+      this.launchRemaining = 0;
+      const compression = Math.max(
+        this.diagnosticsState.jumpCharge,
+        this.landingCompression * this.landingRemaining / LANDING_SECONDS,
+      );
+      this.poseWeights.squash = Math.min(compression, 2 - compression);
+      this.poseWeights.flatten = Math.max(0, compression - 1);
+      this.expressionWeights.effort = Math.min(0.5, compression * 0.5);
+    } else {
+      this.landingRemaining = 0;
+      this.poseWeights.launch =
+        this.launchStrength * this.launchRemaining / LAUNCH_SECONDS;
+      this.poseWeights.airborne = 1 - this.poseWeights.launch;
+      this.expressionWeights.surprise = this.poseWeights.launch * 0.4;
+    }
+    if (this.damageRemaining > 0) {
+      this.clearMorphWeights();
+      this.poseWeights.stress =
+        this.damageStrength * this.damageRemaining / DAMAGE_SECONDS;
+      this.expressionWeights['stress-expression'] = this.poseWeights.stress * 0.6;
+    }
+    this.applyMorphs();
   }
 
   present(): void {
@@ -250,6 +312,7 @@ export class BobCharacterPresentation {
   }
 
   onImpact(impact: SlimeVisualImpact): void {
+    if (this.deathActive || this.disposed) return;
     this.diagnosticsState.impactStrength = THREE.MathUtils.clamp(
       impact.strength,
       0,
@@ -257,6 +320,11 @@ export class BobCharacterPresentation {
     );
     this.diagnosticsState.impactAge = 0;
     this.impactPending = true;
+    if (impact.kind === 'landing') {
+      this.launchRemaining = 0;
+      this.landingRemaining = LANDING_SECONDS;
+      this.landingCompression = this.diagnosticsState.impactStrength * 2;
+    }
     this.impactNormalWorld.set(
       impact.normalWorld.x,
       impact.normalWorld.y,
@@ -279,8 +347,19 @@ export class BobCharacterPresentation {
     });
   }
 
-  onLaunch(_launch: SlimeVisualLaunch): void {
-    // Gate 2 holds the neutral silhouette; Launch belongs to Gate 3.
+  onLaunch(launch: SlimeVisualLaunch): void {
+    if (this.deathActive || this.disposed) return;
+    this.launchRemaining = LAUNCH_SECONDS;
+    this.launchStrength =
+      0.65 + THREE.MathUtils.clamp(launch.chargeFraction, 0, 1) * 0.35;
+    this.landingRemaining = 0;
+  }
+
+  /** Visual reaction only; callers own damage eligibility and consequences. */
+  onDamage(strength: number): void {
+    if (this.deathActive || this.disposed) return;
+    this.damageRemaining = DAMAGE_SECONDS;
+    this.damageStrength = THREE.MathUtils.clamp(strength, 0, 1);
   }
 
   primeDeathResources(
@@ -292,11 +371,16 @@ export class BobCharacterPresentation {
 
   /** Begin the visual rupture at the authoritative death position. */
   startDeath(position: Vector3State): boolean {
-    if (this.deathActive) return false;
+    if (this.deathActive || this.disposed) return false;
     if (!this.deathBurst.start(position)) return false;
 
     this.deathActive = true;
     this.deathElapsedSeconds = 0;
+    this.clearMorphWeights();
+    this.poseWeights.stress = 0.35;
+    this.expressionWeights['stress-expression'] = 0.4;
+    this.applyMorphs();
+    this.deathBurst.root.visible = false;
     this.setPosition(position);
     this.setOpacity(1);
     this.mesh.scale.setScalar(1);
@@ -317,13 +401,18 @@ export class BobCharacterPresentation {
         0,
         DEATH_RUPTURE_SECONDS,
       );
-      this.mesh.scale.setScalar(
-        1 + Math.sin(anticipation * Math.PI) * 0.12,
-      );
+      this.clearMorphWeights();
+      this.poseWeights.stress = 0.35 + anticipation * 0.65;
+      this.expressionWeights['stress-expression'] = 0.6;
+      this.applyMorphs();
+      this.deathBurst.root.visible = false;
       return;
     }
 
     this.setVisible(false);
+    this.deathBurst.root.visible = this.deathBurst.diagnostics.active;
+    this.clearMorphWeights();
+    this.applyMorphs();
   }
 
   /** Restore the live character after authoritative recovery succeeds. */
@@ -353,16 +442,26 @@ export class BobCharacterPresentation {
     this.diagnosticsState.impactStrength = 0;
     this.diagnosticsState.impactAge = 1.2;
     this.impactPending = false;
+    this.launchRemaining = 0;
+    this.launchStrength = 0;
+    this.landingRemaining = 0;
+    this.landingCompression = 0;
+    this.damageRemaining = 0;
+    this.damageStrength = 0;
     this.diagnosticsState.impactNormalLocal.set(0, 1, 0);
     this.diagnosticsState.surfaceNormalLocal.set(0, 1, 0);
     this.diagnosticsState.surfaceTangentLocal.set(0, 0, 1);
     this.diagnosticsState.moveDirectionLocal.set(0, 0, -1);
     this.materialSet?.reset();
+    for (const name of BOB_EXPRESSIONS) this.requestedExpressions[name] = 0;
+    this.clearMorphWeights();
+    this.applyMorphs();
     this.present();
   }
 
   dispose(): void {
     if (this.disposed) return;
+    this.reset();
     this.disposed = true;
     this.deathBurst.dispose();
     if (this.asset) disposeBobGateOneAsset(this.asset.root);
@@ -387,6 +486,54 @@ export class BobCharacterPresentation {
       material.transparent = this.opacity < 1;
       material.opacity = this.opacity;
       material.depthWrite = this.opacity >= 1;
+    }
+  }
+
+  private clearMorphWeights(): void {
+    for (const name of BOB_BODY_POSES) this.poseWeights[name] = 0;
+    for (const name of BOB_EXPRESSIONS) this.expressionWeights[name] = 0;
+  }
+
+  private applyMorphs(): void {
+    this.diagnosticsState.squash =
+      this.poseWeights.squash + this.poseWeights.flatten;
+    this.diagnosticsState.stretch =
+      this.poseWeights.launch + this.poseWeights.airborne * 0.3;
+    if (!this.asset) return;
+    for (const name of BOB_BODY_POSES) {
+      const weight = this.poseWeights[name];
+      const bodyIndex = this.asset.body.morphTargetDictionary![name]!;
+      this.asset.body.morphTargetInfluences![bodyIndex] = weight;
+      for (const eye of this.asset.eyes) {
+        eye.morphTargetInfluences![eye.morphTargetDictionary![name]!] = weight;
+      }
+    }
+    // Additive expression deltas were authored on Neutral. Limit their shared
+    // budget as the skin compresses, so the lenses remain seated throughout
+    // intermediate blends, not just at the individual target endpoints.
+    const expressionBudget = 0.95 / (
+      1 + this.poseWeights.squash * 8 + this.poseWeights.flatten * 24 +
+      this.poseWeights.stress * 4 + this.poseWeights.airborne * 2 +
+      this.poseWeights['move-reach'] * 6
+    );
+    let expressionTotal = 0;
+    for (const name of BOB_EXPRESSIONS) {
+      expressionTotal += Math.max(
+        this.expressionWeights[name],
+        this.deathActive ? 0 : this.requestedExpressions[name],
+      );
+    }
+    const expressionScale = expressionTotal > expressionBudget
+      ? expressionBudget / expressionTotal
+      : 1;
+    for (const eye of this.asset.eyes) {
+      for (const name of BOB_EXPRESSIONS) {
+        eye.morphTargetInfluences![eye.morphTargetDictionary![name]!] =
+          Math.max(
+            this.expressionWeights[name],
+            this.deathActive ? 0 : this.requestedExpressions[name],
+          ) * expressionScale;
+      }
     }
   }
 }

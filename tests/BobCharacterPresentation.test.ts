@@ -14,7 +14,7 @@ import { ContainmentTeachingScene } from '../src/levels/ContainmentTeachingScene
 import { DEFAULT_DEATH_BURST_DURATION_SECONDS } from '../src/systems/DeathSequence.ts';
 
 const ASSET_URL = new URL(
-  '../assets/characters/bob/bob-gate-one.glb',
+  '../assets/characters/bob/bob-authored.glb',
   import.meta.url,
 );
 
@@ -50,6 +50,29 @@ function getCharacter(root: THREE.Object3D): THREE.Group {
   assert.ok(character instanceof THREE.Group);
   return character;
 }
+
+function weight(bob: BobCharacterPresentation, meshName: string, pose: string): number {
+  const mesh = bob.root.getObjectByName(meshName);
+  assert.ok(mesh instanceof THREE.Mesh);
+  assert.ok(mesh.morphTargetDictionary?.[pose] !== undefined, `missing ${pose}`);
+  return mesh.morphTargetInfluences![mesh.morphTargetDictionary[pose]!]!;
+}
+
+test('authoritative charge uses authored compression and copies seats to both lenses', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  bob.update(1 / 60, { ...state(), jumpCharge: 1 });
+  bob.present();
+  assert.equal(weight(bob, 'Bob-Body', 'squash'), 1);
+  assert.equal(weight(bob, 'Bob-Body', 'flatten'), 0);
+  for (const name of ['Bob-Eye-Left', 'Bob-Eye-Right']) {
+    assert.equal(weight(bob, name, 'squash'), 1);
+    assert.ok(weight(bob, name, 'effort') > 0);
+  }
+  bob.update(1 / 60, { ...state(), jumpCharge: 0 });
+  assert.equal(weight(bob, 'Bob-Body', 'squash'), 0);
+  bob.dispose();
+});
 
 test('Gate 2 materials present lit cyan gel and glossy eyes without self-light or catchlights', async () => {
   const bob = new BobCharacterPresentation(0.45);
@@ -89,6 +112,29 @@ test('Gate 2 materials present lit cyan gel and glossy eyes without self-light o
     bob.diagnostics.materials.maximumSecondaryDisplacementMetres <= 0.012,
   );
 
+  bob.dispose();
+});
+
+test('launch releases charge, hands off to airborne, and landing reconciles the visual envelope', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  bob.update(1 / 60, { ...state(), jumpCharge: 1 });
+  bob.onLaunch({ directionWorld: new THREE.Vector3(0, 1, 0), speedMetresPerSecond: 8, chargeFraction: 1 });
+  const flying = { ...state(), grounded: false, jumpCharge: 0 };
+  bob.update(1 / 60, flying);
+  assert.ok(weight(bob, 'Bob-Body', 'launch') > 0.8);
+  assert.equal(weight(bob, 'Bob-Body', 'squash'), 0);
+  bob.update(0.4, flying);
+  assert.equal(weight(bob, 'Bob-Body', 'launch'), 0);
+  assert.equal(weight(bob, 'Bob-Body', 'airborne'), 1);
+  bob.onLanding(new THREE.Vector3(0, 1, 0), 8.5);
+  bob.update(1 / 60, { ...state(), jumpCharge: 0 });
+  assert.equal(weight(bob, 'Bob-Body', 'airborne'), 0);
+  assert.ok(weight(bob, 'Bob-Body', 'flatten') > 0.5);
+  assert.ok(weight(bob, 'Bob-Body', 'squash') + weight(bob, 'Bob-Body', 'flatten') <= 1);
+  bob.update(1, { ...state(), jumpCharge: 0 });
+  assert.equal(weight(bob, 'Bob-Body', 'flatten'), 0);
+  assert.equal(weight(bob, 'Bob-Body', 'squash'), 0);
   bob.dispose();
 });
 
@@ -145,6 +191,101 @@ test('Gate 2 secondary motion follows presentation time, ages impacts and resets
   assert.equal(bob.diagnostics.materials?.impactStrength, 0);
   assert.equal(bob.diagnostics.materials?.impactAgeSeconds, 1.2);
 
+  bob.dispose();
+});
+
+test('damage and rupture own Stress exclusively, then clear on recovery and disposal', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  bob.onDamage(0.8);
+  bob.update(1 / 60, { ...state(), jumpCharge: 1 });
+  assert.ok(weight(bob, 'Bob-Body', 'stress') > 0.6);
+  assert.equal(weight(bob, 'Bob-Body', 'squash'), 0);
+  assert.ok(weight(bob, 'Bob-Eye-Left', 'stress-expression') > 0);
+  bob.startDeath(new THREE.Vector3());
+  bob.updateDeath(0.04);
+  assert.ok(weight(bob, 'Bob-Body', 'stress') > 0);
+  assert.deepEqual(getCharacter(bob.root).scale.toArray(), [1, 1, 1]);
+  assert.equal(bob.root.getObjectByName('player-slime-death-burst')!.visible, false);
+  bob.update(0.1, state());
+  bob.onLaunch({ directionWorld: new THREE.Vector3(0, 1, 0), speedMetresPerSecond: 8, chargeFraction: 1 });
+  assert.equal(weight(bob, 'Bob-Body', 'launch'), 0);
+  bob.updateDeath(0.04);
+  assert.equal(bob.diagnostics.visible, false);
+  assert.equal(bob.root.getObjectByName('player-slime-death-burst')!.visible, true);
+  bob.finishDeath(new THREE.Vector3());
+  for (const meshName of ['Bob-Body', 'Bob-Eye-Left', 'Bob-Eye-Right']) {
+    const mesh = bob.root.getObjectByName(meshName) as THREE.Mesh;
+    assert.ok(mesh.morphTargetInfluences!.every(value => value === 0));
+  }
+  bob.onDamage(1);
+  const mesh = bob.root.getObjectByName('Bob-Body') as THREE.Mesh;
+  bob.dispose();
+  assert.ok(mesh.morphTargetInfluences!.every(value => value === 0));
+  assert.equal(bob.startDeath(new THREE.Vector3()), false);
+});
+
+test('independent expressions are bounded during flattening and reset without changing eye seats', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  bob.setExpression('blink', 1);
+  bob.onLanding(new THREE.Vector3(0, 1, 0), 8.5);
+  bob.update(0, { ...state(), jumpCharge: 0 });
+  for (const eye of ['Bob-Eye-Left', 'Bob-Eye-Right']) {
+    assert.equal(weight(bob, eye, 'flatten'), 1);
+    assert.ok(weight(bob, eye, 'blink') > 0);
+    assert.ok(weight(bob, eye, 'blink') <= 0.45);
+  }
+  bob.reset();
+  bob.update(0, { ...state(), jumpCharge: 0 });
+  assert.equal(weight(bob, 'Bob-Eye-Left', 'blink'), 0);
+  bob.dispose();
+});
+
+test('supported reaction and expression blends keep both lenses on the body surface', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const body = bob.root.getObjectByName('Bob-Body') as THREE.Mesh;
+  const point = new THREE.Vector3();
+  const origin = new THREE.Vector3();
+  const ray = new THREE.Raycaster();
+  const direction = new THREE.Vector3(0, 0, 1);
+  for (const reaction of [0, 0.5, 1, 1.5, 2, 'launch', 'airborne', 'damage'] as const) {
+    for (const expression of ['blink', 'effort', 'surprise', 'stress-expression', 'all'] as const) {
+      for (const amount of [0.25, 0.5, 1]) {
+        bob.reset();
+        if (typeof reaction === 'number') {
+          bob.onLanding(new THREE.Vector3(0, 1, 0), 1.5 + reaction * 3.5);
+          bob.update(0, { ...state(), jumpCharge: 0 });
+        } else if (reaction === 'damage') {
+          bob.onDamage(1);
+          bob.update(0, { ...state(), jumpCharge: 0 });
+        } else {
+          if (reaction === 'launch') bob.onLaunch({ directionWorld: direction, speedMetresPerSecond: 8, chargeFraction: 1 });
+          bob.update(0, { ...state(), grounded: false, jumpCharge: 0 });
+        }
+        if (expression === 'all') {
+          for (const name of ['blink', 'effort', 'surprise', 'stress-expression'] as const) bob.setExpression(name, amount);
+        } else {
+          bob.setExpression(expression, amount);
+        }
+        bob.root.updateMatrixWorld(true);
+        for (const name of ['Bob-Eye-Left', 'Bob-Eye-Right']) {
+          const eye = bob.root.getObjectByName(name) as THREE.Mesh;
+          for (let vertex = 0; vertex < eye.geometry.getAttribute('position').count; vertex++) {
+            eye.getVertexPosition(vertex, point);
+            origin.set(point.x, point.y, -2);
+            ray.set(origin, direction);
+            const hit = ray.intersectObject(body, false)[0];
+            assert.ok(hit, `${name} detached at ${reaction}/${expression}/${amount}`);
+            const gap = hit.point.z - point.z;
+            assert.ok(gap >= -0.002 && gap <= 0.055,
+              `${name} seat gap ${gap} at ${reaction}/${expression}/${amount}`);
+          }
+        }
+      }
+    }
+  }
   bob.dispose();
 });
 

@@ -93,8 +93,9 @@ function assertApprovedEyeBounds(
   eye: THREE.Mesh,
   expected: THREE.Box3,
 ): void {
-  eye.geometry.computeBoundingBox();
-  const bounds = eye.geometry.boundingBox;
+  const bounds = new THREE.Box3().setFromBufferAttribute(
+    eye.geometry.getAttribute('position') as THREE.BufferAttribute,
+  );
   if (
     !bounds ||
     bounds.min.distanceTo(expected.min) > DIMENSION_TOLERANCE_METRES ||
@@ -209,7 +210,10 @@ function assertSingleWatertightBody(body: THREE.Mesh): void {
 }
 
 /** Validate the exported neutral asset through its runtime-visible hierarchy. */
-export function validateBobGateOneAsset(root: THREE.Group): BobGateOneAsset {
+export function validateBobGateOneAsset(
+  root: THREE.Group,
+  morphContract?: (mesh: THREE.Mesh) => void,
+): BobGateOneAsset {
   if (root.animations.length !== 0) {
     throw new Error('Bob Gate 1 asset contract: neutral asset has animations.');
   }
@@ -285,15 +289,18 @@ export function validateBobGateOneAsset(root: THREE.Group): BobGateOneAsset {
 
   for (const mesh of meshes) {
     assertIdentityTransform(mesh);
-    if (mesh.morphTargetInfluences !== undefined) {
+    if (morphContract) {
+      morphContract(mesh);
+    } else if (mesh.morphTargetInfluences !== undefined) {
       throw new Error(
         `Bob Gate 1 asset contract: "${mesh.name}" contains premature morphs.`,
       );
     }
   }
 
-  body.geometry.computeBoundingBox();
-  const localBounds = body.geometry.boundingBox;
+  const localBounds = new THREE.Box3().setFromBufferAttribute(
+    body.geometry.getAttribute('position') as THREE.BufferAttribute,
+  );
   if (!localBounds) {
     throw new Error('Bob Gate 1 asset contract: body has no bounds.');
   }
