@@ -43,15 +43,16 @@ const LANDING_SECONDS = 0.28;
 const DAMAGE_SECONDS = 0.22;
 const LOCOMOTION_CYCLE_DISTANCE_METRES = 1.2;
 const LOCOMOTION_DISTANCE_EPSILON_METRES = 1e-6;
-const LOCOMOTION_CRUISE_STRENGTH = 0.38;
-const LOCOMOTION_ACCELERATION_STRENGTH = 0.45;
+const LOCOMOTION_CRUISE_STRENGTH = 0.6;
+const LOCOMOTION_ACCELERATION_STRENGTH = 0.75;
 const LOCOMOTION_FULL_ACCELERATION_METRES_PER_SECOND_SQUARED = 32;
-const LOCOMOTION_STRENGTH_RELEASE_PER_SECOND = 5;
+const LOCOMOTION_STRENGTH_RELEASE_PER_SECOND = 7;
+const LOCOMOTION_REVERSAL_STRENGTH_RELEASE_PER_SECOND = 48;
 const LOCOMOTION_START_SPEED_METRES_PER_SECOND = 0.16;
 const LOCOMOTION_STOP_SPEED_METRES_PER_SECOND = 0.08;
 const LOCOMOTION_HEADING_HYSTERESIS_RADIANS = THREE.MathUtils.degToRad(5);
 const LOCOMOTION_REVERSAL_RADIANS = THREE.MathUtils.degToRad(120);
-const LOCOMOTION_TURN_SPEED_RADIANS_PER_SECOND = THREE.MathUtils.degToRad(360);
+const LOCOMOTION_TURN_SPEED_RADIANS_PER_SECOND = THREE.MathUtils.degToRad(540);
 const LOCOMOTION_REVERSAL_NEUTRAL_STRENGTH = 0.025;
 
 export type BobCharacterLoader = () => Promise<THREE.Group>;
@@ -665,9 +666,10 @@ export class BobCharacterPresentation {
     if (targetStrength >= this.locomotionStrength) {
       this.locomotionStrength = targetStrength;
     } else {
-      const releaseBlend = 1 - Math.exp(
-        -LOCOMOTION_STRENGTH_RELEASE_PER_SECOND * deltaSeconds,
-      );
+      const releasePerSecond = this.reversing
+        ? LOCOMOTION_REVERSAL_STRENGTH_RELEASE_PER_SECOND
+        : LOCOMOTION_STRENGTH_RELEASE_PER_SECOND;
+      const releaseBlend = 1 - Math.exp(-releasePerSecond * deltaSeconds);
       this.locomotionStrength = THREE.MathUtils.lerp(
         this.locomotionStrength,
         targetStrength,

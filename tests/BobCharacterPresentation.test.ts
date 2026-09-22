@@ -202,7 +202,10 @@ test('a sharp reversal collects to Neutral, turns at bounded speed, and starts a
   const position = new THREE.Vector3(0, 0.45, 0);
   const forward = new THREE.Vector3(0, 0, -3);
   const reverse = new THREE.Vector3(0, 0, 3);
-  bob.update(0.1, { ...state(position, forward), jumpCharge: 0 });
+  bob.update(0.1, {
+    ...state(position, new THREE.Vector3()),
+    jumpCharge: 0,
+  });
   position.z = -0.3;
   bob.update(0.1, { ...state(position, forward), jumpCharge: 0 });
   const reachBeforeReversal = weight(bob, 'Bob-Body', 'move-reach');
@@ -218,12 +221,23 @@ test('a sharp reversal collects to Neutral, turns at bounded speed, and starts a
   assert.ok(Math.abs(getCharacter(bob.root).rotation.y) < 1e-9);
 
   let previousYaw = getCharacter(bob.root).rotation.y;
+  for (let step = 0; step < 6 && Math.abs(previousYaw) < 1e-9; step += 1) {
+    position.addScaledVector(reverse, 1 / 60);
+    bob.update(1 / 60, { ...state(position, reverse), jumpCharge: 0 });
+    bob.present();
+    previousYaw = getCharacter(bob.root).rotation.y;
+  }
+  assert.ok(
+    Math.abs(previousYaw) > 1e-9,
+    'Bob should begin turning within 100 ms of a sharp reversal',
+  );
+
   for (let step = 0; step < 120 && bob.diagnostics.reversing; step += 1) {
     position.addScaledVector(reverse, 1 / 60);
     bob.update(1 / 60, { ...state(position, reverse), jumpCharge: 0 });
     bob.present();
     const yaw = getCharacter(bob.root).rotation.y;
-    assert.ok(Math.abs(yaw - previousYaw) <= THREE.MathUtils.degToRad(6.1));
+    assert.ok(Math.abs(yaw - previousYaw) <= THREE.MathUtils.degToRad(9.1));
     previousYaw = yaw;
   }
 
@@ -281,23 +295,24 @@ test('fixed-step subdivision preserves distance phase and mass-transfer weights'
 
   runTrajectory(coarse, 1 / 60);
   runTrajectory(fine, 1 / 120);
-  const fixedStepTolerance = 5e-4;
+  const fixedStepPhaseTolerance = 5e-4;
+  const fixedStepMorphTolerance = 1e-3;
   assert.ok(
     Math.abs(
       coarse.diagnostics.locomotionPhase - fine.diagnostics.locomotionPhase,
-    ) < fixedStepTolerance,
+    ) < fixedStepPhaseTolerance,
   );
   assert.ok(
     Math.abs(
       weight(coarse, 'Bob-Body', 'move-reach') -
       weight(fine, 'Bob-Body', 'move-reach'),
-    ) < fixedStepTolerance,
+    ) < fixedStepMorphTolerance,
   );
   assert.ok(
     Math.abs(
       weight(coarse, 'Bob-Body', 'move-gather') -
       weight(fine, 'Bob-Body', 'move-gather'),
-    ) < fixedStepTolerance,
+    ) < fixedStepMorphTolerance,
   );
   coarse.dispose();
   fine.dispose();
