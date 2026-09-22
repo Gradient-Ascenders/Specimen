@@ -33,6 +33,7 @@ const BOB_AUTHORED_ASSET_URL = new URL(
   import.meta.url,
 ).href;
 const DEATH_RUPTURE_SECONDS = 0.075;
+const DEATH_TIMING_EPSILON_SECONDS = 1e-9;
 const LAUNCH_SECONDS = 0.18;
 const LANDING_SECONDS = 0.28;
 const DAMAGE_SECONDS = 0.22;
@@ -391,9 +392,12 @@ export class BobCharacterPresentation {
   /** Continue visual-only death work while gameplay simulation is suspended. */
   updateDeath(deltaSeconds: number): void {
     if (!this.deathActive) return;
+    if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
+      throw new Error('Bob death deltaSeconds must be positive and finite.');
+    }
 
+    const previousElapsedSeconds = this.deathElapsedSeconds;
     this.deathElapsedSeconds += deltaSeconds;
-    this.deathBurst.update(deltaSeconds);
 
     if (this.deathElapsedSeconds < DEATH_RUPTURE_SECONDS) {
       const anticipation = THREE.MathUtils.smoothstep(
@@ -409,6 +413,12 @@ export class BobCharacterPresentation {
       return;
     }
 
+    const burstDeltaSeconds =
+      this.deathElapsedSeconds -
+      Math.max(previousElapsedSeconds, DEATH_RUPTURE_SECONDS);
+    if (burstDeltaSeconds > DEATH_TIMING_EPSILON_SECONDS) {
+      this.deathBurst.update(burstDeltaSeconds);
+    }
     this.setVisible(false);
     this.deathBurst.root.visible = this.deathBurst.diagnostics.active;
     this.clearMorphWeights();

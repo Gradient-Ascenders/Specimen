@@ -210,6 +210,7 @@ interface GreyboxRuntimeResources {
   readonly jumpInputState: JumpInputState;
   readonly unsubscribeLanding: () => void;
   readonly unsubscribeJumped: () => void;
+  readonly unsubscribeDamaged: () => void;
   unsubscribePressureOccupancy: () => void;
   unsubscribeSlimeRoster: readonly (() => void)[];
   readonly unsubscribeObjectiveChanged: () => void;
@@ -979,6 +980,11 @@ export class GreyboxLevelRuntime {
         );
       },
     });
+    const unsubscribeDamaged = containmentLevel.events.on('damaged', () => {
+      if (slimePair.activeSlimeId === 'bob') {
+        testScene.bob.onDamage(1);
+      }
+    });
 
     const slimeVisualState: SlimeVisualState = {
       velocityWorld: body.velocity,
@@ -1141,6 +1147,7 @@ export class GreyboxLevelRuntime {
       },
       unsubscribeLanding,
       unsubscribeJumped,
+      unsubscribeDamaged,
       unsubscribePressureOccupancy: () => {},
       unsubscribeSlimeRoster: [],
       unsubscribeObjectiveChanged,
@@ -1236,6 +1243,7 @@ export class GreyboxLevelRuntime {
     resources.testPanel?.element.remove();
     resources.unsubscribeLanding();
     resources.unsubscribeJumped();
+    resources.unsubscribeDamaged();
     resources.unsubscribePressureOccupancy();
     for (const unsubscribe of resources.unsubscribeSlimeRoster) unsubscribe();
     resources.unsubscribeObjectiveChanged();

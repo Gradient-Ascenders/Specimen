@@ -33,10 +33,23 @@ interface ProductionTraversalRuntime {
     readonly containmentLevel: {
       setActiveBody(body: unknown): void;
       teleportToRoomForDebug(roomId: number): void;
+      requestHazardFailure(failure: {
+        readonly roomId: 'room-3';
+        readonly hazardId: string;
+      }): boolean;
     };
     readonly blobFacing: { reset(): void };
     readonly testScene: {
-      readonly bob: { setPosition(position: unknown): void };
+      readonly bob: {
+        readonly diagnostics: {
+          readonly deathBurst: {
+            readonly elapsedSeconds: number;
+          };
+        };
+        setPosition(position: unknown): void;
+        onDamage(strength: number): void;
+        updateDeath(deltaSeconds: number): void;
+      };
     };
     readonly acidProjectileSystem: {
       getDiagnostics(): {
@@ -471,4 +484,67 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     consoleErrors.some((message) =>
       message.includes('Containment lighting prewarm failed')),
   ).toBe(false);
+});
+
+test('Level 1 damage holds the burst at frame zero through Stress anticipation', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const assertTraversalRuntimeExposed =
+    await exposeProductionTraversalRuntime(page);
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  assertTraversalRuntimeExposed();
+  await expect(page.locator('[data-action="start"]')).toBeVisible({
+    timeout: 120_000,
+  });
+  await page.locator('[data-action="start"]').click();
+
+  const observation = await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production traversal runtime');
+
+    const bob = resources.testScene.bob;
+    let damageCallCount = 0;
+    const onDamage = bob.onDamage.bind(bob);
+    bob.onDamage = (strength: number) => {
+      damageCallCount += 1;
+      onDamage(strength);
+    };
+
+    const accepted = resources.containmentLevel.requestHazardFailure({
+      roomId: 'room-3',
+      hazardId: 'browser-damage-regression',
+    });
+    const elapsedAtStart = bob.diagnostics.deathBurst.elapsedSeconds;
+    bob.updateDeath(0.05);
+    const elapsedDuringStress = bob.diagnostics.deathBurst.elapsedSeconds;
+    bob.updateDeath(0.025);
+    const elapsedAtHandoff = bob.diagnostics.deathBurst.elapsedSeconds;
+    bob.updateDeath(0.01);
+    const elapsedAfterHandoff = bob.diagnostics.deathBurst.elapsedSeconds;
+
+    return {
+      accepted,
+      damageCallCount,
+      elapsedAtStart,
+      elapsedDuringStress,
+      elapsedAtHandoff,
+      elapsedAfterHandoff,
+    };
+  });
+
+  expect(observation).toMatchObject({
+    accepted: true,
+    damageCallCount: 1,
+    elapsedAtStart: 0,
+    elapsedDuringStress: 0,
+    elapsedAtHandoff: 0,
+  });
+  expect(observation.elapsedAfterHandoff).toBeCloseTo(0.01, 12);
 });

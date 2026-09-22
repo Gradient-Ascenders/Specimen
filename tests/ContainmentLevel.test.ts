@@ -854,6 +854,37 @@ test('active checkpoint resets its room state before recovering the player', () 
   scene.dispose();
 });
 
+test('accepted hazard contact emits authoritative damage but out-of-bounds does not', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const collisionWorld = new CollisionWorld();
+  collisionWorld.registerAll(scene.collisionMeshes);
+  const fakeBody = createFakeBody();
+  const controller = new ContainmentLevelController({
+    scene,
+    body: fakeBody as unknown as KinematicBody,
+    collisionWorld,
+    requestDeath: () => true,
+  });
+  const damageEvents: ContainmentHazardFailure[] = [];
+  controller.events.on('damaged', (failure) => damageEvents.push(failure));
+
+  assert.equal(
+    controller.requestHazardFailure({
+      roomId: 'room-3',
+      hazardId: 'test-laser',
+    }),
+    true,
+  );
+  assert.equal(controller.requestOutOfBoundsFailure(), true);
+  assert.deepEqual(damageEvents, [
+    { roomId: 'room-3', hazardId: 'test-laser' },
+  ]);
+
+  controller.dispose();
+  collisionWorld.clear();
+  scene.dispose();
+});
+
 test('elevator stopping activates the Room 5 entry checkpoint before the player exits', () => {
   let controller: ContainmentLevelController;
   const scene = new ContainmentLevelScene(

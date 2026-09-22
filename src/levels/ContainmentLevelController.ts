@@ -55,6 +55,7 @@ export interface ContainmentObjectiveChangedEvent {
 }
 
 export interface ContainmentLevelEvents {
+  damaged: ContainmentHazardFailure;
   objectiveChanged: ContainmentObjectiveChangedEvent;
   completed: {
     readonly levelId: 'containment';
@@ -200,6 +201,8 @@ export class ContainmentLevelController {
   }
 
   requestHazardFailure(failure: ContainmentHazardFailure): boolean {
+    if (this.stateValue !== 'playing') return false;
+    this.events.emit('damaged', failure);
     return this.requestFailure(`${failure.roomId}:${failure.hazardId}`);
   }
 

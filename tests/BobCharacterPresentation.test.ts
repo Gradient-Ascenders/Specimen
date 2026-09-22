@@ -409,6 +409,30 @@ test('Bob presentation owns visibility, death hooks and combined diagnostics', a
   bob.dispose();
 });
 
+test('death burst waits at frame zero until Stress anticipation finishes', () => {
+  const bob = new BobCharacterPresentation(0.45);
+
+  assert.equal(bob.startDeath(new THREE.Vector3(4, 2, -3)), true);
+  assert.equal(bob.diagnostics.deathBurst.elapsedSeconds, 0);
+
+  bob.updateDeath(0.074);
+  assert.equal(bob.diagnostics.deathBurst.elapsedSeconds, 0);
+
+  bob.updateDeath(0.001);
+  assert.equal(bob.diagnostics.deathBurst.elapsedSeconds, 0);
+  assert.equal(
+    bob.root.getObjectByName('player-slime-death-burst')!.visible,
+    true,
+  );
+
+  bob.updateDeath(0.01);
+  assert.ok(
+    Math.abs(bob.diagnostics.deathBurst.elapsedSeconds - 0.01) < 1e-12,
+  );
+
+  bob.dispose();
+});
+
 test('finished death ignores a late presentation update', () => {
   const bob = new BobCharacterPresentation(0.45);
   const deathPosition = new THREE.Vector3(4, 2, -3);
@@ -443,7 +467,7 @@ test('death cannot restart after the burst expires before recovery', () => {
   const deathPosition = new THREE.Vector3(4, 2, -3);
 
   assert.equal(bob.startDeath(deathPosition), true);
-  bob.updateDeath(DEFAULT_DEATH_BURST_DURATION_SECONDS);
+  bob.updateDeath(0.075 + DEFAULT_DEATH_BURST_DURATION_SECONDS);
   assert.equal(bob.diagnostics.deathBurst.active, false);
 
   assert.equal(bob.startDeath(new THREE.Vector3(20, 10, 5)), false);
