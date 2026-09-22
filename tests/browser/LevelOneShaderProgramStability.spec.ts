@@ -28,7 +28,10 @@ interface LevelOnePrewarmVerification {
 
 interface ProductionTraversalRuntime {
   readonly resources?: {
-    readonly body: { readonly position: unknown };
+    readonly body: {
+      readonly grounded: boolean;
+      readonly position: unknown;
+    };
     readonly slimePair: { readonly activeBody: unknown };
     readonly containmentLevel: {
       setActiveBody(body: unknown): void;
@@ -38,14 +41,19 @@ interface ProductionTraversalRuntime {
         readonly hazardId: string;
       }): boolean;
     };
-    readonly blobFacing: { reset(): void };
     readonly testScene: {
       readonly bob: {
         readonly diagnostics: {
+          readonly facingYawRadians: number;
+          readonly locomotionPhase: number;
+          readonly locomotionStrength: number;
+          readonly reversing: boolean;
+          readonly speed: number;
           readonly deathBurst: {
             readonly elapsedSeconds: number;
           };
         };
+        reset(): void;
         setPosition(position: unknown): void;
         onDamage(strength: number): void;
         updateDeath(deltaSeconds: number): void;
@@ -181,7 +189,7 @@ const visitRoom = async (page: Page, room: number): Promise<void> => {
       }
       resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
       resources.containmentLevel.teleportToRoomForDebug(roomId);
-      resources.blobFacing.reset();
+      resources.testScene.bob.reset();
       resources.testScene.bob.setPosition(resources.body.position);
       runtime.syncContextualCamera(resources);
     }, room);
@@ -484,6 +492,113 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     consoleErrors.some((message) =>
       message.includes('Containment lighting prewarm failed')),
   ).toBe(false);
+});
+
+test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('requestfailed', (request) => {
+    failedRequests.push(`${request.method()} ${request.url()}`);
+  });
+  const assertTraversalRuntimeExposed =
+    await exposeProductionTraversalRuntime(page);
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  assertTraversalRuntimeExposed();
+  await expect(page.locator('[data-action="start"]')).toBeVisible({
+    timeout: 120_000,
+  });
+  await page.locator('[data-action="start"]').click();
+  await waitForRenderedFrames(page, 2);
+
+  const readBob = async () => page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob diagnostics');
+    const diagnostics = resources.testScene.bob.diagnostics;
+    const position = resources.body.position as {
+      readonly x: number;
+      readonly y: number;
+      readonly z: number;
+    };
+    return {
+      position: { x: position.x, y: position.y, z: position.z },
+      facingYawRadians: diagnostics.facingYawRadians,
+      grounded: resources.body.grounded,
+      locomotionPhase: diagnostics.locomotionPhase,
+      locomotionStrength: diagnostics.locomotionStrength,
+      reversing: diagnostics.reversing,
+      speed: diagnostics.speed,
+    };
+  });
+
+  const idle = await readBob();
+  await expect.poll(
+    async () => (await readBob()).grounded,
+    { timeout: 3_000, message: 'Waiting for Bob to settle on the floor' },
+  ).toBe(true);
+  await page.keyboard.down('a');
+  await expect.poll(
+    async () => (await readBob()).locomotionStrength > 0,
+    { timeout: 3_000, message: 'Waiting for Bob ground locomotion' },
+  ).toBe(true);
+  await page.waitForTimeout(400);
+  const moving = await readBob();
+  await page.keyboard.up('a');
+  await expect.poll(
+    async () => (await readBob()).speed,
+    { timeout: 3_000, message: 'Waiting for Bob to stop' },
+  ).toBe(0);
+  const stopped = await readBob();
+  await expect.poll(
+    async () => (await readBob()).locomotionStrength,
+    { timeout: 3_000, message: 'Waiting for Bob to settle toward Neutral' },
+  ).toBeLessThan(stopped.locomotionStrength);
+  const settled = await readBob();
+
+  expect(moving.position).not.toEqual(idle.position);
+  expect(moving.locomotionStrength).toBeGreaterThan(0);
+  expect(moving.locomotionPhase).not.toBe(idle.locomotionPhase);
+  expect(settled.locomotionPhase).toBeCloseTo(stopped.locomotionPhase, 10);
+  expect(settled.locomotionStrength).toBeLessThan(stopped.locomotionStrength);
+
+  await page.keyboard.down('d');
+  await expect.poll(
+    async () => (await readBob()).reversing,
+    { timeout: 3_000, message: 'Waiting for Bob reversal collection' },
+  ).toBe(true);
+  const collecting = await readBob();
+  expect(collecting.locomotionStrength).toBeLessThan(
+    moving.locomotionStrength,
+  );
+  await expect.poll(
+    async () => (await readBob()).reversing,
+    { timeout: 3_000, message: 'Waiting for Bob bounded reversal turn' },
+  ).toBe(false);
+  await expect.poll(
+    async () => (await readBob()).locomotionPhase,
+    { timeout: 3_000, message: 'Waiting for Bob fresh reverse cycle' },
+  ).toBeGreaterThan(0);
+  const reversed = await readBob();
+  await page.keyboard.up('d');
+  const reversalAngle = Math.abs(Math.atan2(
+    Math.sin(reversed.facingYawRadians - settled.facingYawRadians),
+    Math.cos(reversed.facingYawRadians - settled.facingYawRadians),
+  ));
+  expect(reversalAngle).toBeGreaterThan(170 * Math.PI / 180);
+  expect(reversed.locomotionPhase).toBeGreaterThan(0);
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
 });
 
 test('Level 1 damage holds the burst at frame zero through Stress anticipation', async ({

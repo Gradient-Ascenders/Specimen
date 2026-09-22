@@ -41,8 +41,8 @@ import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { BoxTriggerSensor } from '../puzzle/BoxTriggerSensor.ts';
 import { PressurePlate } from '../puzzle/PressurePlate.ts';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
-import { BlobFacing } from '../render/BlobFacing.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
+import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources } from '../render/IsolatedResourcePrewarm.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
@@ -51,7 +51,6 @@ import type {
   BobHatchLightingState,
   GoopReleaseLightingState,
 } from '../render/environment/containment/ContainmentLightingRig.ts';
-import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
 import { SlimePairPresentation } from '../slimes/SlimePairPresentation.ts';
@@ -178,7 +177,6 @@ interface GreyboxRuntimeResources {
   readonly renderedGoopPosition: THREE.Vector3;
   readonly cameraRelativeMovement: THREE.Vector3;
   readonly noMovement: THREE.Vector3;
-  readonly blobFacing: BlobFacing;
   readonly body: KinematicBody;
   readonly goopBody: KinematicBody;
   readonly slimeManager: SlimeManager<KinematicBody>;
@@ -206,7 +204,7 @@ interface GreyboxRuntimeResources {
   ];
   readonly deathSequence: DeathSequence;
   readonly deathScreen: DeathScreen;
-  readonly slimeVisualState: SlimeVisualState;
+  readonly slimeVisualState: BobCharacterPresentationState;
   readonly jumpInputState: JumpInputState;
   readonly unsubscribeLanding: () => void;
   readonly unsubscribeJumped: () => void;
@@ -648,7 +646,6 @@ export class GreyboxLevelRuntime {
       pointerLocked: this.input.pointerLocked,
     });
     resources.dissolveSystem.update(deltaSeconds);
-    resources.blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
     slimeVisualState.jumpCharge = body.chargeFraction;
@@ -679,7 +676,6 @@ export class GreyboxLevelRuntime {
     const {
       body,
       goopBody,
-      blobFacing,
       deathSequence,
       renderedProbePosition,
       renderedGoopPosition,
@@ -717,8 +713,7 @@ export class GreyboxLevelRuntime {
       );
 
       testScene.bob.setPosition(renderedProbePosition);
-      testScene.bob.setYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
-      testScene.bob.present();
+      testScene.bob.present(interpolationAlpha);
       const activeRenderedPosition =
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
@@ -883,7 +878,6 @@ export class GreyboxLevelRuntime {
     const outOfBoundsTestPosition = testScene.copyOutOfBoundsTestPosition(
       new THREE.Vector3(),
     );
-    const blobFacing = new BlobFacing();
     const slimeManager = new SlimeManager<KinematicBody>();
     const bobDefinition = slimeManager.getDefinition('bob');
     const goopDefinition = slimeManager.getDefinition('goop');
@@ -986,7 +980,8 @@ export class GreyboxLevelRuntime {
       }
     });
 
-    const slimeVisualState: SlimeVisualState = {
+    const slimeVisualState: BobCharacterPresentationState = {
+      positionWorld: body.position,
       velocityWorld: body.velocity,
       surfaceNormalWorld: body.groundNormal,
       gameplayUpWorld: body.gameplayUp,
@@ -1038,7 +1033,7 @@ export class GreyboxLevelRuntime {
           onTeleportRoom: (roomId) => {
             containmentLevel.setActiveBody(slimePair.activeBody);
             containmentLevel.teleportToRoomForDebug(roomId);
-            blobFacing.reset();
+            testScene.bob.reset();
             testScene.bob.setPosition(body.position);
             this.syncContextualCamera(this.requireResources());
           },
@@ -1121,7 +1116,6 @@ export class GreyboxLevelRuntime {
       renderedGoopPosition: new THREE.Vector3(),
       cameraRelativeMovement: new THREE.Vector3(),
       noMovement: new THREE.Vector3(),
-      blobFacing,
       body,
       goopBody,
       slimeManager,
@@ -1205,7 +1199,6 @@ export class GreyboxLevelRuntime {
     resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
     resources.pressurePlate.reset();
     resources.testScene.resetTeachingPresentation();
-    resources.blobFacing.reset();
     this.renderLayer.cameraRig.reset();
     this.retargetCameraToActiveSlime(resources);
     this.syncContextualCamera(resources);
@@ -1533,7 +1526,6 @@ export class GreyboxLevelRuntime {
     const {
       body,
       goopBody,
-      blobFacing,
       collisionWorld,
       containmentLevel,
       deathSequence,
@@ -1652,7 +1644,7 @@ export class GreyboxLevelRuntime {
         `camera preferred: ${cameraStats.preferredCameraPosition.x.toFixed(2)}, ${cameraStats.preferredCameraPosition.y.toFixed(2)}, ${cameraStats.preferredCameraPosition.z.toFixed(2)} m`,
         `camera resolved: ${cameraStats.resolvedCameraPosition.x.toFixed(2)}, ${cameraStats.resolvedCameraPosition.y.toFixed(2)}, ${cameraStats.resolvedCameraPosition.z.toFixed(2)} m`,
         `camera pitch manual / effective: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}° / ${THREE.MathUtils.radToDeg(cameraStats.effectivePitchRadians).toFixed(1)}°`,
-        `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
+        `Bob facing / reversing: ${THREE.MathUtils.radToDeg(slimeDiagnostics.facingYawRadians).toFixed(1)}° / ${slimeDiagnostics.reversing ? 'yes' : 'no'}`,
         `teaching-surface regression: ${this.slopeRegressionStatus}`,
         `two-body switching regression: ${this.twoBodySwitchingRegressionStatus}`,
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,

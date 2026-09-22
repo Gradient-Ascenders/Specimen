@@ -7,9 +7,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import {
   BobCharacterPresentation,
+  type BobCharacterPresentationState,
 } from '../src/render/bob/BobCharacterPresentation.ts';
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
-import type { SlimeVisualState } from '../src/render/slime/SlimeVisual.ts';
 import { ContainmentTeachingScene } from '../src/levels/ContainmentTeachingScene.ts';
 import { DEFAULT_DEATH_BURST_DURATION_SECONDS } from '../src/systems/DeathSequence.ts';
 
@@ -27,9 +27,13 @@ async function loadAsset(): Promise<THREE.Group> {
   return (await new GLTFLoader().parseAsync(buffer, '')).scene;
 }
 
-function state(): SlimeVisualState {
+function state(
+  positionWorld = new THREE.Vector3(),
+  velocityWorld = new THREE.Vector3(1, 0, -2),
+): BobCharacterPresentationState {
   return {
-    velocityWorld: new THREE.Vector3(1, 0, -2),
+    positionWorld,
+    velocityWorld,
     surfaceNormalWorld: new THREE.Vector3(0, 1, 0),
     gameplayUpWorld: new THREE.Vector3(0, 1, 0),
     grounded: true,
@@ -57,6 +61,305 @@ function weight(bob: BobCharacterPresentation, meshName: string, pose: string): 
   assert.ok(mesh.morphTargetDictionary?.[pose] !== undefined, `missing ${pose}`);
   return mesh.morphTargetInfluences![mesh.morphTargetDictionary[pose]!]!;
 }
+
+test('ground distance drives the Neutral-Reach-transfer-Gather-Neutral cycle', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const velocity = new THREE.Vector3(0, 0, -3);
+
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, 0), velocity),
+    jumpCharge: 0,
+  });
+  assert.equal(bob.diagnostics.locomotionPhase, 0);
+
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, -0.3), velocity),
+    jumpCharge: 0,
+  });
+  assert.ok(weight(bob, 'Bob-Body', 'move-reach') > 0);
+  assert.equal(weight(bob, 'Bob-Body', 'move-gather'), 0);
+
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, -0.6), velocity),
+    jumpCharge: 0,
+  });
+  assert.ok(weight(bob, 'Bob-Body', 'move-reach') > 0);
+  assert.ok(weight(bob, 'Bob-Body', 'move-gather') > 0);
+  assert.ok(
+    Math.abs(
+      weight(bob, 'Bob-Body', 'move-reach') -
+      weight(bob, 'Bob-Body', 'move-gather'),
+    ) < 1e-9,
+  );
+
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, -0.9), velocity),
+    jumpCharge: 0,
+  });
+  assert.equal(weight(bob, 'Bob-Body', 'move-reach'), 0);
+  assert.ok(weight(bob, 'Bob-Body', 'move-gather') > 0);
+
+  bob.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, -1.2), velocity),
+    jumpCharge: 0,
+  });
+  assert.ok(bob.diagnostics.locomotionPhase < 1e-9);
+  assert.equal(weight(bob, 'Bob-Body', 'move-reach'), 0);
+  assert.equal(weight(bob, 'Bob-Body', 'move-gather'), 0);
+  bob.dispose();
+});
+
+test('acceleration strengthens mass transfer while steady cruising stays subtle', async () => {
+  const cruise = new BobCharacterPresentation(0.45);
+  const accelerating = new BobCharacterPresentation(0.45);
+  await Promise.all([cruise.prepare(loadAsset), accelerating.prepare(loadAsset)]);
+  const stopped = new THREE.Vector3();
+  const moving = new THREE.Vector3(0, 0, -3);
+
+  cruise.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, 0), moving),
+    jumpCharge: 0,
+  });
+  accelerating.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, 0), stopped),
+    jumpCharge: 0,
+  });
+  cruise.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, -0.3), moving),
+    jumpCharge: 0,
+  });
+  accelerating.update(0.1, {
+    ...state(new THREE.Vector3(0, 0.45, -0.3), moving),
+    jumpCharge: 0,
+  });
+
+  const cruiseReach = weight(cruise, 'Bob-Body', 'move-reach');
+  const accelerationReach = weight(
+    accelerating,
+    'Bob-Body',
+    'move-reach',
+  );
+  assert.ok(cruiseReach > 0 && cruiseReach < 0.4);
+  assert.ok(accelerationReach > cruiseReach + 0.25);
+
+  cruise.dispose();
+  accelerating.dispose();
+});
+
+test('the velocity dead zone rejects idle drift and retains the last heading', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3(0, 0.45, 0);
+  const idleVelocity = new THREE.Vector3();
+  bob.update(1 / 60, { ...state(position, idleVelocity), jumpCharge: 0 });
+
+  for (let step = 0; step < 120; step += 1) {
+    const direction = step % 2 === 0 ? 1 : -1;
+    const jitterVelocity = new THREE.Vector3(direction * 0.05, 0, 0);
+    position.addScaledVector(jitterVelocity, 1 / 60);
+    bob.update(1 / 60, {
+      ...state(position, jitterVelocity),
+      jumpCharge: 0,
+    });
+  }
+  bob.present();
+
+  assert.equal(bob.diagnostics.locomotionPhase, 0);
+  assert.equal(weight(bob, 'Bob-Body', 'move-reach'), 0);
+  assert.equal(weight(bob, 'Bob-Body', 'move-gather'), 0);
+  assert.ok(
+    bob.diagnostics.moveDirectionLocal.distanceTo(
+      new THREE.Vector3(0, 0, -1),
+    ) < 1e-9,
+  );
+  bob.dispose();
+});
+
+test('first meaningful travel establishes heading without a false reversal', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3(0, 0.45, 0);
+  bob.update(1 / 60, {
+    ...state(position, new THREE.Vector3()),
+    jumpCharge: 0,
+  });
+  position.z = 0.1;
+  bob.update(1 / 60, {
+    ...state(position, new THREE.Vector3(0, 0, 3)),
+    jumpCharge: 0,
+  });
+
+  assert.equal(bob.diagnostics.reversing, false);
+  assert.ok(bob.diagnostics.locomotionStrength > 0);
+  assert.ok(bob.diagnostics.locomotionPhase > 0);
+  bob.dispose();
+});
+
+test('a sharp reversal collects to Neutral, turns at bounded speed, and starts a fresh cycle', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3(0, 0.45, 0);
+  const forward = new THREE.Vector3(0, 0, -3);
+  const reverse = new THREE.Vector3(0, 0, 3);
+  bob.update(0.1, { ...state(position, forward), jumpCharge: 0 });
+  position.z = -0.3;
+  bob.update(0.1, { ...state(position, forward), jumpCharge: 0 });
+  const reachBeforeReversal = weight(bob, 'Bob-Body', 'move-reach');
+  const phaseBeforeReversal = bob.diagnostics.locomotionPhase;
+  assert.ok(reachBeforeReversal > 0);
+
+  position.z = -0.25;
+  bob.update(1 / 60, { ...state(position, reverse), jumpCharge: 0 });
+  bob.present();
+  assert.equal(bob.diagnostics.reversing, true);
+  assert.equal(bob.diagnostics.locomotionPhase, phaseBeforeReversal);
+  assert.ok(weight(bob, 'Bob-Body', 'move-reach') < reachBeforeReversal);
+  assert.ok(Math.abs(getCharacter(bob.root).rotation.y) < 1e-9);
+
+  let previousYaw = getCharacter(bob.root).rotation.y;
+  for (let step = 0; step < 120 && bob.diagnostics.reversing; step += 1) {
+    position.addScaledVector(reverse, 1 / 60);
+    bob.update(1 / 60, { ...state(position, reverse), jumpCharge: 0 });
+    bob.present();
+    const yaw = getCharacter(bob.root).rotation.y;
+    assert.ok(Math.abs(yaw - previousYaw) <= THREE.MathUtils.degToRad(6.1));
+    previousYaw = yaw;
+  }
+
+  assert.equal(bob.diagnostics.reversing, false);
+  assert.equal(bob.diagnostics.locomotionPhase, 0);
+  assert.equal(weight(bob, 'Bob-Body', 'move-reach'), 0);
+  assert.equal(weight(bob, 'Bob-Body', 'move-gather'), 0);
+  assert.ok(
+    Math.abs(Math.abs(getCharacter(bob.root).rotation.y) - Math.PI) < 1e-6,
+  );
+
+  position.addScaledVector(reverse, 1 / 60);
+  bob.update(1 / 60, { ...state(position, reverse), jumpCharge: 0 });
+  assert.ok(bob.diagnostics.locomotionPhase > 0);
+  assert.ok(weight(bob, 'Bob-Body', 'move-reach') > 0);
+  bob.dispose();
+});
+
+test('fixed-step subdivision preserves distance phase and mass-transfer weights', async () => {
+  const coarse = new BobCharacterPresentation(0.45);
+  const fine = new BobCharacterPresentation(0.45);
+  await Promise.all([coarse.prepare(loadAsset), fine.prepare(loadAsset)]);
+
+  const runTrajectory = (
+    bob: BobCharacterPresentation,
+    fixedDeltaSeconds: number,
+  ): void => {
+    const acceleration = 12;
+    const accelerationSeconds = 0.25;
+    const durationSeconds = 0.5;
+    bob.update(0, {
+      ...state(new THREE.Vector3(0, 0.45, 0), new THREE.Vector3()),
+      jumpCharge: 0,
+    });
+    for (
+      let elapsed = fixedDeltaSeconds;
+      elapsed <= durationSeconds + 1e-9;
+      elapsed += fixedDeltaSeconds
+    ) {
+      const acceleratingSeconds = Math.min(elapsed, accelerationSeconds);
+      const cruiseSeconds = Math.max(0, elapsed - accelerationSeconds);
+      const speed = acceleration * acceleratingSeconds;
+      const distance =
+        0.5 * acceleration * acceleratingSeconds ** 2 +
+        acceleration * accelerationSeconds * cruiseSeconds;
+      bob.update(fixedDeltaSeconds, {
+        ...state(
+          new THREE.Vector3(0, 0.45, -distance),
+          new THREE.Vector3(0, 0, -speed),
+        ),
+        jumpCharge: 0,
+      });
+    }
+  };
+
+  runTrajectory(coarse, 1 / 60);
+  runTrajectory(fine, 1 / 120);
+  const fixedStepTolerance = 5e-4;
+  assert.ok(
+    Math.abs(
+      coarse.diagnostics.locomotionPhase - fine.diagnostics.locomotionPhase,
+    ) < fixedStepTolerance,
+  );
+  assert.ok(
+    Math.abs(
+      weight(coarse, 'Bob-Body', 'move-reach') -
+      weight(fine, 'Bob-Body', 'move-reach'),
+    ) < fixedStepTolerance,
+  );
+  assert.ok(
+    Math.abs(
+      weight(coarse, 'Bob-Body', 'move-gather') -
+      weight(fine, 'Bob-Body', 'move-gather'),
+    ) < fixedStepTolerance,
+  );
+  coarse.dispose();
+  fine.dispose();
+});
+
+test('stopping freezes distance phase and settles smoothly to Neutral', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3(0, 0.45, 0);
+  const moving = new THREE.Vector3(0, 0, -3);
+  bob.update(0.1, { ...state(position, moving), jumpCharge: 0 });
+  position.z = -0.3;
+  bob.update(0.1, { ...state(position, moving), jumpCharge: 0 });
+  const movingReach = weight(bob, 'Bob-Body', 'move-reach');
+  const stoppedPhase = bob.diagnostics.locomotionPhase;
+
+  bob.update(1 / 60, {
+    ...state(position, new THREE.Vector3()),
+    jumpCharge: 0,
+  });
+  const settlingReach = weight(bob, 'Bob-Body', 'move-reach');
+  assert.equal(bob.diagnostics.locomotionPhase, stoppedPhase);
+  assert.ok(settlingReach > 0 && settlingReach < movingReach);
+
+  for (let step = 0; step < 120; step += 1) {
+    bob.update(1 / 60, {
+      ...state(position, new THREE.Vector3()),
+      jumpCharge: 0,
+    });
+  }
+  assert.equal(bob.diagnostics.locomotionPhase, stoppedPhase);
+  assert.ok(weight(bob, 'Bob-Body', 'move-reach') < 1e-4);
+  assert.ok(weight(bob, 'Bob-Body', 'move-gather') < 1e-4);
+  bob.dispose();
+});
+
+test('heading hysteresis ignores small direction noise while Bob is moving', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3(0, 0.45, 0);
+  const forward = new THREE.Vector3(0, 0, -3);
+  bob.update(1 / 60, { ...state(position, forward), jumpCharge: 0 });
+
+  for (let step = 0; step < 60; step += 1) {
+    const angle = THREE.MathUtils.degToRad(step % 2 === 0 ? 4 : -4);
+    const noisyForward = new THREE.Vector3(
+      -Math.sin(angle) * 3,
+      0,
+      -Math.cos(angle) * 3,
+    );
+    position.addScaledVector(noisyForward, 1 / 60);
+    bob.update(1 / 60, {
+      ...state(position, noisyForward),
+      jumpCharge: 0,
+    });
+  }
+  bob.present();
+
+  assert.ok(Math.abs(getCharacter(bob.root).rotation.y) < 1e-9);
+  assert.ok(Math.abs(bob.diagnostics.facingYawRadians) < 1e-9);
+  bob.dispose();
+});
 
 test('authoritative charge uses authored compression and copies seats to both lenses', async () => {
   const bob = new BobCharacterPresentation(0.45);
@@ -322,9 +625,9 @@ test('neutral Bob presentation loads, follows authoritative transforms, fades, r
   const source = state();
   const sourceSnapshot = JSON.stringify(source);
   bob.setPosition(new THREE.Vector3(2, 3, 4));
-  bob.setYaw(Math.PI / 3);
   bob.setOpacity(0.35);
   bob.update(1 / 60, source);
+  bob.setYaw(Math.PI / 3);
   bob.present();
 
   assert.deepEqual(character.position.toArray(), [2, 3, 4]);
