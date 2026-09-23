@@ -1,0 +1,68 @@
+{
+  "candidateAssetRequests": 1,
+  "instrumentedBundles": 1,
+  "observations": {
+    "neutral": {
+      "position": {
+        "x": -9,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "lean": 0,
+      "speedRatio": 0,
+      "facingYawRadians": 0,
+      "reversing": false,
+      "grounded": true
+    },
+    "forward": {
+      "position": {
+        "x": -7.77777777777778,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "lean": 0.8867801140856714,
+      "speedRatio": 1,
+      "facingYawRadians": -1.5707963267948968,
+      "reversing": false,
+      "grounded": true
+    },
+    "reversal": {
+      "position": {
+        "x": -7.743333333333338,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "lean": -0.7683590517263461,
+      "speedRatio": 0.9510565162951536,
+      "facingYawRadians": -1.2566370614359175,
+      "reversing": true,
+      "grounded": true
+    },
+    "oppositeTravel": {
+      "position": {
+        "x": -9.393333333333338,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "lean": 0.6115000993628005,
+      "speedRatio": 1,
+      "facingYawRadians": 1.5707963267948966,
+      "reversing": false,
+      "grounded": true
+    },
+    "settled": {
+      "position": {
+        "x": -10.318333333333337,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "lean": 0.03722579039215949,
+      "speedRatio": 0,
+      "facingYawRadians": 1.5707963267948966,
+      "reversing": false,
+      "grounded": true
+    }
+  },
+  "pageErrors": [],
+  "failedRequests": []
+}
