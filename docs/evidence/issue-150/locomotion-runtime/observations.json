@@ -1,0 +1,307 @@
+{
+  "runtimeAsset": "bob-authored.glb",
+  "temporaryMotionDriver": false,
+  "exposedBundles": 1,
+  "observations": {
+    "neutral": {
+      "position": {
+        "x": -9,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": 0,
+      "reversing": false
+    },
+    "accelerating": {
+      "position": {
+        "x": -7.77777777777778,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": 5.5,
+        "y": 0,
+        "z": 6.735557395310443e-16
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0.8793119195949017,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": -1.5707963267948968,
+      "reversing": false
+    },
+    "cruising": {
+      "position": {
+        "x": -6.677777777777784,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": 5.5,
+        "y": 0,
+        "z": 6.735557395310443e-16
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0.9866273795144237,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": -1.5707963267948968,
+      "reversing": false
+    },
+    "stopping": {
+      "position": {
+        "x": -5.752777777777791,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0.16919609801100413,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": -1.5707963267948968,
+      "reversing": false
+    },
+    "settled": {
+      "position": {
+        "x": -5.752777777777791,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0.02071914983676901,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": -1.5707963267948968,
+      "reversing": false
+    },
+    "counterlean": {
+      "position": {
+        "x": -6.97500000000001,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": -5.5,
+        "y": 0,
+        "z": -6.735557395310443e-16
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0,
+      "reverse": 0.6052141658236249,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": -0.15707963267948988,
+      "reversing": true
+    },
+    "reversed": {
+      "position": {
+        "x": -8.625000000000007,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": -5.5,
+        "y": 0,
+        "z": -6.735557395310443e-16
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0.8716741844399944,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": 1.5707963267948966,
+      "reversing": false
+    },
+    "charge": {
+      "position": {
+        "x": -9.550000000000006,
+        "y": 0.46001000298023215,
+        "z": 31
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0,
+      "reverse": 0,
+      "squash": 0.4285714285714286,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": 1.5707963267948966,
+      "reversing": false
+    },
+    "takeoff": {
+      "position": {
+        "x": -9.550000000000006,
+        "y": 1.8459909458839368,
+        "z": 31
+      },
+      "velocity": {
+        "x": 0,
+        "y": 2.069936476345684,
+        "z": 0
+      },
+      "grounded": false,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 1,
+      "facingYawRadians": 1.5707963267948966,
+      "reversing": false
+    },
+    "landing": {
+      "position": {
+        "x": -9.550000000000006,
+        "y": 0.4600100029802322,
+        "z": 31
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "grounded": true,
+      "attached": false,
+      "supportNormal": {
+        "x": 0,
+        "y": 1,
+        "z": 0
+      },
+      "forward": 0,
+      "reverse": 0,
+      "squash": 0.9475393527981872,
+      "flatten": 0.05246064720181276,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": 1.5707963267948966,
+      "reversing": false
+    },
+    "wallAttach": {
+      "key": "w",
+      "position": {
+        "x": -5.166275098397524,
+        "y": 1.0795676125353362,
+        "z": 5.339989997019768
+      },
+      "velocity": {
+        "x": -6.938893903907228e-16,
+        "y": 5.5,
+        "z": 0
+      },
+      "grounded": true,
+      "attached": true,
+      "supportNormal": {
+        "x": 0,
+        "y": 0,
+        "z": -1
+      },
+      "forward": 0.21503970852535914,
+      "reverse": 0,
+      "squash": 0,
+      "flatten": 0,
+      "launch": 0,
+      "airborne": 0,
+      "facingYawRadians": 2.356194490192345,
+      "reversing": true
+    }
+  },
+  "pageErrors": [],
+  "failedRequests": []
+}

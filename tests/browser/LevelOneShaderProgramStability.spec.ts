@@ -45,7 +45,6 @@ interface ProductionTraversalRuntime {
       readonly bob: {
         readonly diagnostics: {
           readonly facingYawRadians: number;
-          readonly locomotionPhase: number;
           readonly locomotionStrength: number;
           readonly reversing: boolean;
           readonly speed: number;
@@ -535,7 +534,6 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
       position: { x: position.x, y: position.y, z: position.z },
       facingYawRadians: diagnostics.facingYawRadians,
       grounded: resources.body.grounded,
-      locomotionPhase: diagnostics.locomotionPhase,
       locomotionStrength: diagnostics.locomotionStrength,
       reversing: diagnostics.reversing,
       speed: diagnostics.speed,
@@ -568,8 +566,6 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
 
   expect(moving.position).not.toEqual(idle.position);
   expect(moving.locomotionStrength).toBeGreaterThan(0);
-  expect(moving.locomotionPhase).not.toBe(idle.locomotionPhase);
-  expect(settled.locomotionPhase).toBeCloseTo(stopped.locomotionPhase, 10);
   expect(settled.locomotionStrength).toBeLessThan(stopped.locomotionStrength);
 
   await page.keyboard.down('d');
@@ -586,9 +582,9 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
     { timeout: 3_000, message: 'Waiting for Bob bounded reversal turn' },
   ).toBe(false);
   await expect.poll(
-    async () => (await readBob()).locomotionPhase,
-    { timeout: 3_000, message: 'Waiting for Bob fresh reverse cycle' },
-  ).toBeGreaterThan(0);
+    async () => (await readBob()).locomotionStrength,
+    { timeout: 3_000, message: 'Waiting for Bob sustained lean after turning' },
+  ).toBeGreaterThan(0.05);
   const reversed = await readBob();
   await page.keyboard.up('d');
   const reversalAngle = Math.abs(Math.atan2(
@@ -596,7 +592,6 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
     Math.cos(reversed.facingYawRadians - settled.facingYawRadians),
   ));
   expect(reversalAngle).toBeGreaterThan(170 * Math.PI / 180);
-  expect(reversed.locomotionPhase).toBeGreaterThan(0);
   expect(consoleErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
 });

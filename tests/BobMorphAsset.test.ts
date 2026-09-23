@@ -11,7 +11,7 @@ test('authored Bob exports exactly seven body poses and matching seats plus four
   const bytes = await readFile(new URL('../assets/characters/bob/bob-authored.glb', import.meta.url));
   const root = (await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '')).scene;
   const asset = validateBobMorphAsset(root);
-  const bodyNames = ['move-reach', 'move-gather', 'squash', 'flatten', 'launch', 'airborne', 'stress'];
+  const bodyNames = ['move-forward', 'move-reverse', 'squash', 'flatten', 'launch', 'airborne', 'stress'];
   assert.deepEqual(Object.keys(asset.body.morphTargetDictionary!), bodyNames);
   for (const eye of asset.eyes) {
     assert.deepEqual(Object.keys(eye.morphTargetDictionary!), [...bodyNames, 'blink', 'effort', 'surprise', 'stress-expression']);
@@ -25,6 +25,7 @@ test('authored export report pins both generator sources and the runtime asset',
   const report = JSON.parse(await readFile(new URL('bob-authored.validation.json', base), 'utf8'));
   for (const [field, name] of [
     ['generator_sha256', 'generate-bob-authored.py'],
+    ['locomotion_generator_sha256', 'generate-bob-locomotion-candidate.py'],
     ['curl_generator_sha256', 'generate-bob-curl-candidate.py'],
     ['approved_neutral_glb_sha256', 'bob-curl-candidate.glb'],
     ['glb_sha256', 'bob-authored.glb'],
@@ -68,6 +69,36 @@ test('authored neutral preserves every approved curl vertex and triangle', async
     }
   });
   disposeBobGateOneAsset(authored);
+});
+
+test('production directional poses match the accepted locomotion candidate', async () => {
+  const base = new URL('../assets/characters/bob/', import.meta.url);
+  const loader = new GLTFLoader();
+  const load = async (name: string) => {
+    const bytes = await readFile(new URL(name, base));
+    return (await loader.parseAsync(bytes.buffer.slice(
+      bytes.byteOffset, bytes.byteOffset + bytes.byteLength,
+    ), '')).scene;
+  };
+  const candidate = await load('bob-locomotion-candidate.glb');
+  const production = await load('bob-authored.glb');
+  for (const meshName of ['Bob-Body', 'Bob-Eye-Left', 'Bob-Eye-Right']) {
+    const source = candidate.getObjectByName(meshName);
+    const result = production.getObjectByName(meshName);
+    assert.ok(source instanceof THREE.Mesh && result instanceof THREE.Mesh);
+    for (const pose of ['move-forward', 'move-reverse']) {
+      const sourceMorph = source.geometry.morphAttributes.position![
+        source.morphTargetDictionary![pose]!
+      ]!;
+      const resultMorph = result.geometry.morphAttributes.position![
+        result.morphTargetDictionary![pose]!
+      ]!;
+      assert.deepEqual(Array.from(resultMorph.array), Array.from(sourceMorph.array),
+        `${meshName} ${pose}`);
+    }
+  }
+  disposeBobGateOneAsset(candidate);
+  disposeBobGateOneAsset(production);
 });
 
 test('authored validator rejects missing seats, extra poses and corrupt morph geometry', async () => {

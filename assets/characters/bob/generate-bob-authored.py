@@ -16,13 +16,17 @@ DIRECTORY = Path(__file__).resolve().parent
 CURL_SOURCE = DIRECTORY / 'generate-bob-curl-candidate.py'
 curl = runpy.run_path(str(CURL_SOURCE))
 neutral = curl['neutral']
-BODY_POSES = ('move-reach', 'move-gather', 'squash', 'flatten', 'launch', 'airborne', 'stress')
+LOCOMOTION_SOURCE = DIRECTORY / 'generate-bob-locomotion-candidate.py'
+locomotion = runpy.run_path(str(LOCOMOTION_SOURCE))
+BODY_POSES = locomotion['BODY_POSES']
 EXPRESSIONS = ('blink', 'effort', 'surprise', 'stress-expression')
 
 
 def deform(name, point):
     x, y, z = point
     h = (y + 0.45) / 0.8
+    if name in ('move-forward', 'move-reverse'):
+        return locomotion['deform'](name, point)
     if name in ('squash', 'flatten'):
         scale = 0.76 if name == 'squash' else 0.48
         spread = 1 / math.sqrt(scale)
@@ -34,12 +38,7 @@ def deform(name, point):
     if name == 'stress':
         bulge = 1 + 0.07 * math.sin(math.pi * h)
         return x * bulge, -0.45 + (y + 0.45) * 0.95, z * bulge
-    # Reach places lower leading mass forward; Gather brings trailing mass in.
-    front = max(0, -z / 0.45)
-    back = max(0, z / 0.45)
-    if name == 'move-reach':
-        return x * (1 - 0.035 * front), y - 0.025 * h * front, z - 0.08 * front * (1 - h)
-    return x * (1 + 0.035 * back), y + 0.025 * h * back, z - 0.07 * back * (1 - h)
+    raise ValueError(name)
 
 
 def add_keys(body, eyes):
@@ -110,6 +109,7 @@ def build():
         export_materials='EXPORT', export_attributes=False, export_extras=True)
     report.update(gate=3, body_targets=BODY_POSES, eye_targets=(*BODY_POSES, *EXPRESSIONS),
         morph_targets=7, generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        locomotion_generator_sha256=hashlib.sha256(LOCOMOTION_SOURCE.read_bytes()).hexdigest(),
         curl_generator_sha256=hashlib.sha256(CURL_SOURCE.read_bytes()).hexdigest(),
         approved_neutral_glb_sha256=hashlib.sha256((DIRECTORY / 'bob-curl-candidate.glb').read_bytes()).hexdigest(),
         glb_sha256=hashlib.sha256(glb_path.read_bytes()).hexdigest())

@@ -1,8 +1,9 @@
 # Bob locomotion visual approval gate
 
-Status: **candidate for visual approval; not integrated into production.**
+Status: **integrated into production.** Runtime evidence is in
+[locomotion-runtime](../locomotion-runtime/review.md).
 
-The shipped `bob-authored.glb` and `BobCharacterPresentation.ts` are unchanged.
+The candidate was reviewed in isolation before production integration.
 The separate [candidate Blender source](../../../../assets/characters/bob/bob-locomotion-candidate.blend)
 exports `move-forward` and `move-reverse` shape keys. Its neutral mesh is the
 approved curl neutral. The body, eye seats and sprout deform together; no

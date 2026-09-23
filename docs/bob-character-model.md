@@ -54,7 +54,7 @@ While supported:
 - a dead zone, hysteresis, and bounded angular speed prevent idle jitter and snapping;
 - the last stable heading is retained at rest.
 
-On a sharp reversal, locomotion settles toward neutral, the frame turns, and a fresh locomotion cycle begins after the new heading stabilises.
+On a sharp reversal, the body counterleans briefly in the old frame, then the frame turns at a bounded speed and the lean follows the new heading.
 
 On takeoff, the current frame is retained long enough for Launch to read. Local `+Y` then relaxes toward authoritative `gameplayUp`. Instantaneous velocity may bias the body shape slightly but never owns the whole character orientation. Wall jumps read as wall-aligned charge, outward launch, gradual upright recovery, then airborne travel.
 
@@ -64,8 +64,8 @@ No camera billboarding or camera-tracking gaze is permitted.
 
 Neutral is the undeformed base. The initial asset contains exactly seven body targets:
 
-1. `move-reach`
-2. `move-gather`
+1. `move-forward`
+2. `move-reverse`
 3. `squash`
 4. `flatten`
 5. `launch`
@@ -76,15 +76,7 @@ Do not add another body target before Gate 3 demonstrates a specific failure tha
 
 ### Locomotion
 
-Locomotion is driven by actual tangential distance travelled in the current support plane. Speed controls deformation strength.
-
-The cycle is:
-
-`neutral -> move-reach -> reach/gather blend -> move-gather -> neutral`
-
-This must read as leading contact, central mass transfer, and trailing mass catch-up. It must not resemble hopping, bouncing, inchworming, rolling, floor thrusting, or pulse propulsion. The targets are authored around local forward; there are no left/right variants. When Bob stops, phase stops and the silhouette settles smoothly to neutral.
-
-Add `move-transfer` only if Gate 3 proves the interpolated middle does not read as mass passing over the contact patch.
+Resolved support-plane movement drives a sustained directional lean. The upper mass shifts over a planted sole while the crown lags. Signed resolved travel relative to Bob's visual forward axis chooses the forward or reverse target; its speed sets the weight. A reversal crosses neutral before the bounded visual turn. Stopping settles smoothly to neutral. The morphs are visual only and do not alter the collider or controls.
 
 ### Traversal and reactions
 
@@ -168,4 +160,4 @@ After Gate 1 approval, review the translucent cyan gel body and glossy eyes unde
 
 ### Gate 3 — deformation and runtime motion
 
-After Gate 2 approval, review all named morphs, eye seating and expressions, support-frame transitions, mass-transfer locomotion, traversal reactions, authoritative state mapping, reset behaviour, and real in-game motion.
+After Gate 2 approval, review all named morphs, eye seating and expressions, support-frame transitions, directional locomotion, traversal reactions, authoritative state mapping, reset behaviour, and real in-game motion.
