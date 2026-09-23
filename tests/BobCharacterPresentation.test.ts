@@ -110,6 +110,40 @@ test('ground distance drives the Neutral-Reach-transfer-Gather-Neutral cycle', a
   bob.dispose();
 });
 
+test('presentation aligns to wall support, holds launch frame and recovers upright', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const wall = {
+    ...state(new THREE.Vector3(), new THREE.Vector3(0, 2, 0)),
+    grounded: false,
+    attached: true,
+    surfaceNormalWorld: new THREE.Vector3(1, 0, 0),
+    jumpCharge: 0,
+  };
+  const up = new THREE.Vector3(0, 1, 0);
+  bob.update(0.3, wall);
+  bob.update(0.3, wall);
+  bob.present();
+  assert.ok(up.clone().applyQuaternion(getCharacter(bob.root).quaternion)
+    .distanceTo(wall.surfaceNormalWorld) < 1e-5);
+
+  bob.onLaunch({ directionWorld: new THREE.Vector3(1, 0, 0),
+    speedMetresPerSecond: 8, chargeFraction: 1 });
+  bob.update(0.05, { ...wall, attached: false });
+  bob.present();
+  assert.ok(up.clone().applyQuaternion(getCharacter(bob.root).quaternion)
+    .distanceTo(wall.surfaceNormalWorld) < 1e-5);
+
+  bob.update(0.3, { ...wall, attached: false });
+  bob.update(0.3, { ...wall, attached: false });
+  bob.present();
+  assert.ok(up.clone().applyQuaternion(getCharacter(bob.root).quaternion)
+    .distanceTo(up) < 1e-5);
+  bob.reset();
+  assert.ok(getCharacter(bob.root).quaternion.angleTo(new THREE.Quaternion()) < 1e-5);
+  bob.dispose();
+});
+
 test('support-relative travel drives Bob phase independently of carrier transport', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);

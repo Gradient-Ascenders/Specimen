@@ -9,10 +9,9 @@ export const BOB_GATE_ONE_EYE_NAMES = [
 const BOB_GATE_ONE_BODY_MATERIAL_NAME = 'Bob-Neutral-Body';
 const BOB_GATE_ONE_EYE_MATERIAL_NAME = 'Bob-Neutral-Eyes';
 
-const EXPECTED_BODY_SIZE = new THREE.Vector3(1, 0.8, 0.9);
-const EXPECTED_BODY_MINIMUM = new THREE.Vector3(-0.5, -0.45, -0.45);
-const EXPECTED_BODY_MAXIMUM = new THREE.Vector3(0.5, 0.35, 0.45);
-const APPROVED_EYE_BOUNDS = {
+const ORIGINAL_BODY_MINIMUM = new THREE.Vector3(-0.5, -0.45, -0.45);
+const ORIGINAL_BODY_MAXIMUM = new THREE.Vector3(0.5, 0.35, 0.45);
+const ORIGINAL_EYE_BOUNDS = {
   'Bob-Eye-Left': new THREE.Box3(
     new THREE.Vector3(-0.285, -0.204, -0.447668),
     new THREE.Vector3(-0.125, 0.074, -0.356704),
@@ -22,6 +21,30 @@ const APPROVED_EYE_BOUNDS = {
     new THREE.Vector3(0.285, 0.074, -0.353869),
   ),
 } satisfies Record<(typeof BOB_GATE_ONE_EYE_NAMES)[number], THREE.Box3>;
+const CURL_BODY_MINIMUM = new THREE.Vector3(-0.5, -0.45, -0.43);
+const CURL_BODY_MAXIMUM = new THREE.Vector3(0.5, 0.525885, 0.43);
+const CURL_EYE_BOUNDS = {
+  'Bob-Eye-Left': new THREE.Box3(
+    new THREE.Vector3(-0.234598, -0.25209, -0.387894),
+    new THREE.Vector3(-0.089102, 0.028391, -0.276146),
+  ),
+  'Bob-Eye-Right': new THREE.Box3(
+    new THREE.Vector3(0.061645, -0.25209, -0.396188),
+    new THREE.Vector3(0.207141, 0.028391, -0.29033),
+  ),
+} satisfies Record<(typeof BOB_GATE_ONE_EYE_NAMES)[number], THREE.Box3>;
+const APPROVED_PROFILES = {
+  'bob-gate-one-neutral-v1': {
+    minimum: ORIGINAL_BODY_MINIMUM,
+    maximum: ORIGINAL_BODY_MAXIMUM,
+    eyes: ORIGINAL_EYE_BOUNDS,
+  },
+  'bob-curl-neutral-v1': {
+    minimum: CURL_BODY_MINIMUM,
+    maximum: CURL_BODY_MAXIMUM,
+    eyes: CURL_EYE_BOUNDS,
+  },
+} as const;
 const DIMENSION_TOLERANCE_METRES = 1e-5;
 const IDENTITY_SCALE = new THREE.Vector3(1, 1, 1);
 const IDENTITY_QUATERNION = new THREE.Quaternion();
@@ -114,7 +137,7 @@ function assertExportMetadata(
 ): void {
   const rootMetadata = assetRoot.userData;
   if (
-    rootMetadata.contract !== 'bob-gate-one-neutral-v1' ||
+    !Object.hasOwn(APPROVED_PROFILES, rootMetadata.contract) ||
     rootMetadata.local_up !== '+Y' ||
     rootMetadata.local_forward !== '-Z' ||
     rootMetadata.collider_radius_metres !== EXPECTED_COLLIDER_RADIUS_METRES
@@ -253,13 +276,14 @@ export function validateBobGateOneAsset(
     );
   }
   assertExportMetadata(assetRoot, body);
+  const profile = APPROVED_PROFILES[assetRoot.userData.contract as keyof typeof APPROVED_PROFILES];
   assertSingleWatertightBody(body);
   assertMaterialName(body, BOB_GATE_ONE_BODY_MATERIAL_NAME);
   for (const eye of eyes) {
     assertMaterialName(eye, BOB_GATE_ONE_EYE_MATERIAL_NAME);
     assertApprovedEyeBounds(
       eye,
-      APPROVED_EYE_BOUNDS[eye.name as keyof typeof APPROVED_EYE_BOUNDS],
+      profile.eyes[eye.name as keyof typeof profile.eyes],
     );
   }
   const meshes: THREE.Mesh[] = [];
@@ -305,9 +329,9 @@ export function validateBobGateOneAsset(
     throw new Error('Bob Gate 1 asset contract: body has no bounds.');
   }
   const bounds = localBounds.clone();
-  assertVector(bounds.getSize(new THREE.Vector3()), EXPECTED_BODY_SIZE, 'size');
-  assertVector(bounds.min, EXPECTED_BODY_MINIMUM, 'minimum bounds');
-  assertVector(bounds.max, EXPECTED_BODY_MAXIMUM, 'maximum bounds');
+  assertVector(bounds.getSize(new THREE.Vector3()), profile.maximum.clone().sub(profile.minimum), 'size');
+  assertVector(bounds.min, profile.minimum, 'minimum bounds');
+  assertVector(bounds.max, profile.maximum, 'maximum bounds');
 
   const bodyTriangles = triangleCount(body);
   const eyeTriangles = eyes.reduce(

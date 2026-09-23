@@ -1,8 +1,8 @@
-"""Deterministic morph source. Run with Blender --background --python this-file.
+"""Deterministic morph source for the approved curl neutral.
 
-Reuses the approved neutral generator without rewriting its artifacts. Body and
-seat keys share a continuous deformation field; expression deltas are authored
-on the neutral front surface independently of that field.
+The approved Gate 1 candidate remains untouched. Body and eye-seat keys share
+a continuous deformation field; expressions use its neutral front surface.
+Run with Blender --background --factory-startup --python this-file.
 """
 import hashlib
 import json
@@ -13,8 +13,9 @@ import runpy
 import bpy
 
 DIRECTORY = Path(__file__).resolve().parent
-NEUTRAL_SOURCE = DIRECTORY / 'generate-bob-gate-one.py'
-neutral = runpy.run_path(str(NEUTRAL_SOURCE))
+CURL_SOURCE = DIRECTORY / 'generate-bob-curl-candidate.py'
+curl = runpy.run_path(str(CURL_SOURCE))
+neutral = curl['neutral']
 BODY_POSES = ('move-reach', 'move-gather', 'squash', 'flatten', 'launch', 'airborne', 'stress')
 EXPRESSIONS = ('blink', 'effort', 'surprise', 'stress-expression')
 
@@ -51,7 +52,7 @@ def add_keys(body, eyes):
                 target.co = neutral['runtime_to_blender'](deform(name, point))
         if obj == body:
             continue
-        centre_x = -0.205 if obj.name.endswith('Left') else 0.205
+        centre_x, centre_y, _ = neutral['blender_to_runtime'](basis.data[0].co)
         for name in EXPRESSIONS:
             key = obj.shape_key_add(name=name, from_mix=False)
             for source, target in zip(basis.data, key.data):
@@ -59,9 +60,10 @@ def add_keys(body, eyes):
                 sx, sy = {'blink': (1, 0.10), 'effort': (1.02, 0.75),
                           'surprise': (1.04, 1.07), 'stress-expression': (0.94, 0.68)}[name]
                 ex = centre_x + (x - centre_x) * sx
-                ey = -0.065 + (y + 0.065) * sy
+                ey = centre_y + (y - centre_y) * sy
                 # Preserve lens depth while moving its footprint over the skin.
-                ez = z + neutral['front_surface_z'](body, ex, ey) - neutral['front_surface_z'](body, x, y)
+                ez = (z + neutral['front_surface_z'](body, ex, ey)
+                      - neutral['front_surface_z'](body, x, y) - 0.012)
                 target.co = neutral['runtime_to_blender']((ex, ey, ez))
 
 
@@ -72,21 +74,29 @@ def build():
     bpy.context.scene.collection.objects.link(root)
     body_material = neutral['create_material']('Bob-Neutral-Body', (0.48, 0.51, 0.53, 1))
     eye_material = neutral['create_material']('Bob-Neutral-Eyes', (0.025, 0.035, 0.045, 1), roughness=0.2)
-    body = neutral['create_body'](body_material)
+    body = curl['create_candidate_body'](body_material)
     bpy.context.scene.collection.objects.link(body)
     body.parent = root
     eyes = []
-    for name, x in [('Bob-Eye-Left', -0.205), ('Bob-Eye-Right', 0.205)]:
-        eye = neutral['create_eye'](name, x, eye_material, body)
+    for name, pixel_x, tilt in (('Bob-Eye-Left', 729, -8), ('Bob-Eye-Right', 524, 8)):
+        eye = curl['create_candidate_eye'](name, pixel_x, tilt, eye_material, body)
         bpy.context.scene.collection.objects.link(eye)
         eye.parent = root
         eyes.append(eye)
-    root['contract'] = 'bob-gate-one-neutral-v1'
+    root['contract'] = 'bob-curl-neutral-v1'
     root['local_up'] = '+Y'
     root['local_forward'] = '-Z'
     root['collider_radius_metres'] = 0.45
     body['resting_contact_y_metres'] = -0.45
-    report = neutral['validate_source'](body, eyes)
+    report = {
+        'contract': 'bob-curl-neutral-v1',
+        'body_triangles': neutral['triangle_count'](body.data),
+        'eye_triangles_combined': sum(neutral['triangle_count'](eye.data) for eye in eyes),
+        'body_connected_components': neutral['connected_component_count'](body.data),
+        'body_non_manifold_edges': neutral['body_manifold_edge_count'](body.data),
+    }
+    assert report['body_connected_components'] == 1 and report['body_non_manifold_edges'] == 0
+    assert report['body_triangles'] == 3264 and report['eye_triangles_combined'] == 504
     add_keys(body, eyes)
     for obj in [body, *eyes]:
         expected = ('Basis', *BODY_POSES, *(EXPRESSIONS if obj != body else ()))
@@ -100,7 +110,8 @@ def build():
         export_materials='EXPORT', export_attributes=False, export_extras=True)
     report.update(gate=3, body_targets=BODY_POSES, eye_targets=(*BODY_POSES, *EXPRESSIONS),
         morph_targets=7, generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        neutral_generator_sha256=hashlib.sha256(NEUTRAL_SOURCE.read_bytes()).hexdigest(),
+        curl_generator_sha256=hashlib.sha256(CURL_SOURCE.read_bytes()).hexdigest(),
+        approved_neutral_glb_sha256=hashlib.sha256((DIRECTORY / 'bob-curl-candidate.glb').read_bytes()).hexdigest(),
         glb_sha256=hashlib.sha256(glb_path.read_bytes()).hexdigest())
     (DIRECTORY / 'bob-authored.validation.json').write_text(json.dumps(report, indent=2) + '\n')
 

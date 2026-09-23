@@ -1,7 +1,8 @@
 # Issue #153 — Bob Gate 2 material evidence
 
-Status: implemented and awaiting explicit visual approval. Gate 3 morph,
-expression, frame and locomotion work has not started.
+Historical Gate 2 evidence for the original neutral. The later approved curl
+adoption and its material review are recorded in
+[curl-production.md](../issue-150/curl-production.md).
 
 Bob uses the Gate 1-approved geometry unchanged. Runtime presentation replaces
 the neutral inspection materials with a scene-lit physical cyan gel body and

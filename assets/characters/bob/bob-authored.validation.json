@@ -1,42 +1,10 @@
 {
-  "gate": 3,
-  "root": "Bob-Gate-One",
-  "meshes": [
-    "Bob-Body",
-    "Bob-Eye-Left",
-    "Bob-Eye-Right"
-  ],
-  "body_dimensions_metres": [
-    1.0,
-    0.8,
-    0.9
-  ],
-  "body_bounds_metres": {
-    "minimum": [
-      -0.5,
-      -0.45,
-      -0.45
-    ],
-    "maximum": [
-      0.5,
-      0.35,
-      0.45
-    ]
-  },
-  "body_vertices": 1178,
-  "body_triangles": 2352,
+  "contract": "bob-curl-neutral-v1",
+  "body_triangles": 3264,
   "eye_triangles_combined": 504,
-  "total_triangles": 2856,
   "body_connected_components": 1,
   "body_non_manifold_edges": 0,
-  "armatures": 0,
-  "morph_targets": 7,
-  "animations": 0,
-  "materials": [
-    "Bob-Neutral-Body",
-    "Bob-Neutral-Eyes"
-  ],
-  "generator_sha256": "d49fab7d24560909f0e78ca92c0928fe9f93237482ef460ce19185821ea975b9",
+  "gate": 3,
   "body_targets": [
     "move-reach",
     "move-gather",
@@ -59,6 +27,9 @@
     "surprise",
     "stress-expression"
   ],
-  "neutral_generator_sha256": "e10f0d33620de201c271c8d94b35ac223e948cecb20a80860f7fb136324e4ad7",
-  "glb_sha256": "e35088b20c5669b8b429ae113f5e01a84b581f00bd3018390d76059d16bfca3a"
+  "morph_targets": 7,
+  "generator_sha256": "b80df8fa550ac701fb340fe3edfcea01cd7e92b327c433b30c0a06f330437c04",
+  "curl_generator_sha256": "7ba549b2b8ba1d941a6758329b4a6040cfb0a504f08496c08fe323ad00320bd5",
+  "approved_neutral_glb_sha256": "316656ae4d4a8fda4345ff09b04ab2017c802294c4f885b2670a27261c82282a",
+  "glb_sha256": "9c8fbd96bd0b5cc3551267e17c9810754eaafad514779b9c685a737fd02a422d"
 }

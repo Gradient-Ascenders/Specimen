@@ -76,7 +76,7 @@ ${shader.vertexShader}
 #include <begin_vertex>
 // Keep the projecting eye-seat region stable while the rest of the gel skin
 // receives millimetre-scale motion.
-float bobEyeSeatProtection = smoothstep(-0.36, -0.18, position.z);
+float bobEyeSeatProtection = smoothstep(-0.25, -0.12, position.z);
 float bobContactProtection = smoothstep(-0.45, -0.28, position.y);
 float bobWobble =
   sin(position.x * 8.3 + position.y * 6.1 + uBobSecondaryTime * 2.2) *
@@ -99,7 +99,7 @@ transformed += objectNormal * bobSecondaryDisplacement;
   }
 
   override customProgramCacheKey(): string {
-    return 'bob-gate-two-gel-v1';
+    return 'bob-gate-two-gel-curl-v1';
   }
 
   update(deltaSeconds: number): void {

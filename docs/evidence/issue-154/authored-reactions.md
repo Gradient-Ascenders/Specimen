@@ -1,5 +1,9 @@
 # Bob authored traversal and reactions — #154
 
+Historical evidence for the original neutral. The later approved curl export
+and its pose review are recorded in
+[curl-production.md](../issue-150/curl-production.md).
+
 The production Bob presentation now loads `bob-authored.glb`. Its neutral
 geometry is generated from the unchanged Gate 1 source. The new deterministic
 generator adds seven body targets, seven identically named seat targets on

@@ -54,6 +54,10 @@ const LOCOMOTION_HEADING_HYSTERESIS_RADIANS = THREE.MathUtils.degToRad(5);
 const LOCOMOTION_REVERSAL_RADIANS = THREE.MathUtils.degToRad(120);
 const LOCOMOTION_TURN_SPEED_RADIANS_PER_SECOND = THREE.MathUtils.degToRad(540);
 const LOCOMOTION_REVERSAL_NEUTRAL_STRENGTH = 0.025;
+const SUPPORT_FRAME_TURN_RADIANS_PER_SECOND = THREE.MathUtils.degToRad(360);
+const LOCAL_UP = new THREE.Vector3(0, 1, 0);
+const WORLD_FORWARD = new THREE.Vector3(0, 0, -1);
+const WORLD_RIGHT = new THREE.Vector3(1, 0, 0);
 
 export type BobCharacterLoader = () => Promise<THREE.Group>;
 
@@ -96,6 +100,14 @@ export class BobCharacterPresentation {
   private readonly impactPointLocal = new THREE.Vector3(0, -0.45, 0);
   private readonly previousLocomotionPositionWorld = new THREE.Vector3();
   private readonly travelledWorld = new THREE.Vector3();
+  private readonly previousFrame = new THREE.Quaternion();
+  private readonly currentFrame = new THREE.Quaternion();
+  private readonly targetFrame = new THREE.Quaternion();
+  private readonly frameUp = new THREE.Vector3();
+  private readonly frameForward = new THREE.Vector3();
+  private readonly frameRight = new THREE.Vector3();
+  private readonly frameBack = new THREE.Vector3();
+  private readonly frameBasis = new THREE.Matrix4();
   private readonly diagnosticsState = {
     speed: 0,
     locomotionPhase: 0,
@@ -240,7 +252,9 @@ export class BobCharacterPresentation {
     this.targetFacingYawRadians = yawRadians;
     this.hasTravelHeading = true;
     this.applyFacingDirection();
-    this.mesh.rotation.set(0, yawRadians, 0);
+    this.currentFrame.setFromAxisAngle(LOCAL_UP, yawRadians);
+    this.previousFrame.copy(this.currentFrame);
+    this.mesh.quaternion.copy(this.currentFrame);
   }
 
   setOpacity(opacity: number): void {
@@ -263,6 +277,7 @@ export class BobCharacterPresentation {
   update(deltaSeconds: number, state: BobCharacterPresentationState): void {
     if (this.disposed || this.deathActive) return;
     this.previousFacingYawRadians = this.currentFacingYawRadians;
+    this.previousFrame.copy(this.currentFrame);
     this.velocityWorld.set(
       state.velocityWorld.x,
       state.velocityWorld.y,
@@ -366,20 +381,23 @@ export class BobCharacterPresentation {
         this.damageStrength * this.damageRemaining / DAMAGE_SECONDS;
       this.expressionWeights['stress-expression'] = this.poseWeights.stress * 0.6;
     }
+    this.updateSupportFrame(elapsed, supported, state.attached);
     this.applyMorphs();
   }
 
   present(interpolationAlpha = 1): void {
     const alpha = THREE.MathUtils.clamp(interpolationAlpha, 0, 1);
-    this.mesh.rotation.set(
-      0,
-      this.previousFacingYawRadians +
-        shortestAngleDelta(
-          this.previousFacingYawRadians,
-          this.currentFacingYawRadians,
-        ) * alpha,
-      0,
-    );
+    const currentUpright = this.frameUp.copy(LOCAL_UP)
+      .applyQuaternion(this.currentFrame).dot(LOCAL_UP) > 0.9999;
+    const previousUpright = this.frameUp.copy(LOCAL_UP)
+      .applyQuaternion(this.previousFrame).dot(LOCAL_UP) > 0.9999;
+    if (currentUpright && previousUpright) {
+      this.mesh.rotation.set(0, this.previousFacingYawRadians +
+        shortestAngleDelta(this.previousFacingYawRadians,
+          this.currentFacingYawRadians) * alpha, 0);
+    } else {
+      this.mesh.quaternion.copy(this.previousFrame).slerp(this.currentFrame, alpha);
+    }
     this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
     this.diagnosticsState.surfaceNormalLocal
       .copy(this.surfaceNormalWorld)
@@ -568,6 +586,9 @@ export class BobCharacterPresentation {
     this.targetFacingYawRadians = 0;
     this.hasTravelHeading = false;
     this.reversing = false;
+    this.currentFrame.identity();
+    this.previousFrame.identity();
+    this.targetFrame.identity();
     this.diagnosticsState.impactNormalLocal.set(0, 1, 0);
     this.diagnosticsState.surfaceNormalLocal.set(0, 1, 0);
     this.diagnosticsState.surfaceTangentLocal.set(0, 0, 1);
@@ -756,6 +777,52 @@ export class BobCharacterPresentation {
       -Math.sin(this.currentFacingYawRadians),
       0,
       -Math.cos(this.currentFacingYawRadians),
+    );
+  }
+
+  private updateSupportFrame(
+    deltaSeconds: number,
+    supported: boolean,
+    attached: boolean,
+  ): void {
+    // Keep the contact frame through the brief launch stretch, then relax
+    // toward authoritative gameplay up in the air.
+    if (!supported && this.launchRemaining > 0) {
+      this.frameUp.copy(LOCAL_UP).applyQuaternion(this.currentFrame);
+    } else {
+      this.frameUp.copy(this.surfaceNormalWorld);
+    }
+    if (this.frameUp.lengthSq() < 1e-8) this.frameUp.copy(LOCAL_UP);
+    this.frameUp.normalize();
+    if (
+      this.frameUp.dot(LOCAL_UP) > 0.9999 &&
+      this.frameForward.copy(LOCAL_UP).applyQuaternion(this.currentFrame)
+        .dot(LOCAL_UP) > 0.9999
+    ) {
+      this.currentFrame.setFromAxisAngle(LOCAL_UP, this.currentFacingYawRadians);
+      return;
+    }
+
+    this.frameForward.copy(this.moveDirectionWorld);
+    if (attached && this.tangentialVelocityWorld.lengthSq() >
+      LOCOMOTION_START_SPEED_METRES_PER_SECOND ** 2) {
+      this.frameForward.copy(this.tangentialVelocityWorld);
+    }
+    this.frameForward.projectOnPlane(this.frameUp);
+    if (this.frameForward.lengthSq() < 1e-8) {
+      this.frameForward.copy(WORLD_FORWARD).projectOnPlane(this.frameUp);
+    }
+    if (this.frameForward.lengthSq() < 1e-8) {
+      this.frameForward.copy(WORLD_RIGHT).projectOnPlane(this.frameUp);
+    }
+    this.frameForward.normalize();
+    this.frameRight.crossVectors(this.frameForward, this.frameUp).normalize();
+    this.frameBack.copy(this.frameForward).negate();
+    this.frameBasis.makeBasis(this.frameRight, this.frameUp, this.frameBack);
+    this.targetFrame.setFromRotationMatrix(this.frameBasis);
+    this.currentFrame.rotateTowards(
+      this.targetFrame,
+      SUPPORT_FRAME_TURN_RADIANS_PER_SECOND * deltaSeconds,
     );
   }
 
