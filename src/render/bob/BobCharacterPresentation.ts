@@ -53,12 +53,18 @@ const SUPPORT_FRAME_TURN_RADIANS_PER_SECOND = THREE.MathUtils.degToRad(360);
 const LOCAL_UP = new THREE.Vector3(0, 1, 0);
 const WORLD_FORWARD = new THREE.Vector3(0, 0, -1);
 const WORLD_RIGHT = new THREE.Vector3(1, 0, 0);
+const SUPPORTED_BODY_POSES = [
+  'move-forward', 'move-reverse', 'squash', 'flatten', 'stress',
+] as const satisfies readonly BobBodyPose[];
+const WALL_CLEARANCE_METRES = 0.004;
 
 export type BobCharacterLoader = () => Promise<THREE.Group>;
 
 export interface BobCharacterPresentationState extends SlimeVisualState {
   /** Authoritative resolved travel coordinate excluding carrier transport. */
   readonly locomotionPositionWorld: Vector3State;
+  /** Camera-relative player movement intent, already resolved by the controller. */
+  movementIntentWorld: Vector3State;
 }
 
 export interface BobCharacterPresentationDiagnostics
@@ -86,11 +92,16 @@ export class BobCharacterPresentation {
   readonly radiusMetres: number;
 
   private readonly mesh = new THREE.Group();
+  private readonly gameplayPositionWorld = new THREE.Vector3();
+  private readonly wallContactBounds = new THREE.Box3();
+  private readonly wallContactVertex = new THREE.Vector3();
+  private readonly wallNormalLocal = new THREE.Vector3();
   private readonly inverseWorldQuaternion = new THREE.Quaternion();
   private readonly velocityWorld = new THREE.Vector3();
   private readonly tangentialVelocityWorld = new THREE.Vector3();
   private readonly surfaceNormalWorld = new THREE.Vector3(0, 1, 0);
   private readonly moveDirectionWorld = new THREE.Vector3(0, 0, -1);
+  private readonly wallHeadingWorld = new THREE.Vector3(0, 1, 0);
   private readonly impactNormalWorld = new THREE.Vector3(0, 1, 0);
   private readonly impactPointLocal = new THREE.Vector3(0, -0.45, 0);
   private readonly previousLocomotionPositionWorld = new THREE.Vector3();
@@ -139,6 +150,7 @@ export class BobCharacterPresentation {
   private signedLean = 0;
   private reversalHoldRemaining = 0;
   private locomotionMoving = false;
+  private attachedToWall = false;
   private currentFacingYawRadians = 0;
   private previousFacingYawRadians = 0;
   private targetFacingYawRadians = 0;
@@ -218,6 +230,7 @@ export class BobCharacterPresentation {
       for (const material of importedMaterials) material.dispose();
 
       this.asset = asset;
+      this.measureWallContactBounds(asset.body);
       this.materialSet = materialSet;
       root.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
@@ -239,7 +252,8 @@ export class BobCharacterPresentation {
   }
 
   setPosition(position: Vector3State): void {
-    this.mesh.position.set(position.x, position.y, position.z);
+    this.gameplayPositionWorld.set(position.x, position.y, position.z);
+    this.mesh.position.copy(this.gameplayPositionWorld);
   }
 
   setYaw(yawRadians: number): void {
@@ -285,6 +299,22 @@ export class BobCharacterPresentation {
     this.surfaceNormalWorld
       .set(sourceNormal.x, sourceNormal.y, sourceNormal.z)
       .normalize();
+    if (state.attached && !this.attachedToWall) {
+      // A passive fall into the wall has no chosen tangent; start facing up.
+      this.wallHeadingWorld.copy(LOCAL_UP)
+        .projectOnPlane(this.surfaceNormalWorld).normalize();
+    }
+    this.attachedToWall = state.attached;
+    if (this.attachedToWall) {
+      this.frameForward.set(
+        state.movementIntentWorld.x,
+        state.movementIntentWorld.y,
+        state.movementIntentWorld.z,
+      ).projectOnPlane(this.surfaceNormalWorld);
+      if (this.frameForward.lengthSq() > 1e-8) {
+        this.wallHeadingWorld.copy(this.frameForward).normalize();
+      }
+    }
     this.tangentialVelocityWorld
       .copy(this.velocityWorld)
       .projectOnPlane(this.surfaceNormalWorld);
@@ -384,6 +414,7 @@ export class BobCharacterPresentation {
 
   present(interpolationAlpha = 1): void {
     const alpha = THREE.MathUtils.clamp(interpolationAlpha, 0, 1);
+    this.mesh.position.copy(this.gameplayPositionWorld);
     const currentUpright = this.frameUp.copy(LOCAL_UP)
       .applyQuaternion(this.currentFrame).dot(LOCAL_UP) > 0.9999;
     const previousUpright = this.frameUp.copy(LOCAL_UP)
@@ -396,6 +427,20 @@ export class BobCharacterPresentation {
       this.mesh.quaternion.copy(this.previousFrame).slerp(this.currentFrame, alpha);
     }
     this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
+    if (this.attachedToWall && !this.deathActive && !this.wallContactBounds.isEmpty()) {
+      // The visual turns while the sphere collider stays put. Keep the
+      // supported body envelope outside the wall throughout that turn.
+      this.wallNormalLocal.copy(this.surfaceNormalWorld)
+        .applyQuaternion(this.inverseWorldQuaternion);
+      const bounds = this.wallContactBounds;
+      const minimumProjection =
+        this.wallNormalLocal.x * (this.wallNormalLocal.x >= 0 ? bounds.min.x : bounds.max.x) +
+        this.wallNormalLocal.y * (this.wallNormalLocal.y >= 0 ? bounds.min.y : bounds.max.y) +
+        this.wallNormalLocal.z * (this.wallNormalLocal.z >= 0 ? bounds.min.z : bounds.max.z);
+      const clearance = Math.max(0,
+        WALL_CLEARANCE_METRES - this.radiusMetres - minimumProjection);
+      this.mesh.position.addScaledVector(this.surfaceNormalWorld, clearance);
+    }
     this.diagnosticsState.surfaceNormalLocal
       .copy(this.surfaceNormalWorld)
       .applyQuaternion(this.inverseWorldQuaternion);
@@ -556,6 +601,7 @@ export class BobCharacterPresentation {
     this.velocityWorld.set(0, 0, 0);
     this.surfaceNormalWorld.set(0, 1, 0);
     this.moveDirectionWorld.set(0, 0, -1);
+    this.wallHeadingWorld.copy(LOCAL_UP);
     this.impactNormalWorld.set(0, 1, 0);
     this.diagnosticsState.speed = 0;
     this.diagnosticsState.locomotionPhase = 0;
@@ -579,6 +625,7 @@ export class BobCharacterPresentation {
     this.signedLean = 0;
     this.reversalHoldRemaining = 0;
     this.locomotionMoving = false;
+    this.attachedToWall = false;
     this.currentFacingYawRadians = 0;
     this.previousFacingYawRadians = 0;
     this.targetFacingYawRadians = 0;
@@ -741,14 +788,11 @@ export class BobCharacterPresentation {
       return;
     }
 
-    this.frameForward.copy(this.moveDirectionWorld);
-    if (attached && this.tangentialVelocityWorld.lengthSq() >
-      LOCOMOTION_START_SPEED_METRES_PER_SECOND ** 2) {
-      this.frameForward.copy(this.tangentialVelocityWorld);
-    }
+    this.frameForward.copy(attached ? this.wallHeadingWorld : this.moveDirectionWorld);
     this.frameForward.projectOnPlane(this.frameUp);
     if (this.frameForward.lengthSq() < 1e-8) {
-      this.frameForward.copy(WORLD_FORWARD).projectOnPlane(this.frameUp);
+      this.frameForward.copy(attached ? LOCAL_UP : WORLD_FORWARD)
+        .projectOnPlane(this.frameUp);
     }
     if (this.frameForward.lengthSq() < 1e-8) {
       this.frameForward.copy(WORLD_RIGHT).projectOnPlane(this.frameUp);
@@ -762,6 +806,26 @@ export class BobCharacterPresentation {
       this.targetFrame,
       SUPPORT_FRAME_TURN_RADIANS_PER_SECOND * deltaSeconds,
     );
+  }
+
+  private measureWallContactBounds(body: THREE.Mesh): void {
+    const positions = body.geometry.getAttribute('position');
+    const morphs = body.geometry.morphAttributes.position!;
+    this.wallContactBounds.makeEmpty();
+    for (let index = 0; index < positions.count; index += 1) {
+      const x = positions.getX(index);
+      const y = positions.getY(index);
+      const z = positions.getZ(index);
+      this.wallContactBounds.expandByPoint(this.wallContactVertex.set(x, y, z));
+      for (const pose of SUPPORTED_BODY_POSES) {
+        const morph = morphs[body.morphTargetDictionary![pose]!]!;
+        this.wallContactBounds.expandByPoint(this.wallContactVertex.set(
+          x + morph.getX(index),
+          y + morph.getY(index),
+          z + morph.getZ(index),
+        ));
+      }
+    }
   }
 
   private applyMorphs(): void {

@@ -152,6 +152,14 @@ test('Room 1 sticky wall uses Bob-related restrained membrane art', () => {
   const bobColour = new THREE.Color(DEFAULT_SLIME_BASE_COLOUR);
 
   assert.ok(membrane instanceof THREE.Mesh);
+  const collisionSurface = scene.collisionMeshes.find(
+    (mesh) => mesh.name === 'room-1-vent-sticky-entry-wall',
+  );
+  assert.ok(collisionSurface);
+  const membraneFront = new THREE.Box3().setFromObject(membrane).min.z;
+  const collisionFront = new THREE.Box3().setFromObject(collisionSurface).min.z;
+  assert.ok(membraneFront >= collisionFront,
+    `sticky membrane protrudes ${collisionFront - membraneFront} m into Bob's route`);
   assert.equal(membrane.material, scene.artResources.materials.stickyMembrane);
   const membraneColour = scene.artResources.materials.stickyMembrane.color;
   assert.equal(membraneColour.getHex(), bobColour.getHex());

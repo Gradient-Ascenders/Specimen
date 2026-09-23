@@ -606,19 +606,22 @@ export class RoomOneArt {
   private buildStickyRoute(): void {
     const { mechanicalBacking, graphite, serviceMetal, stickyMembrane } =
       this.resources.materials;
+    // Keep the visible membrane behind the sticky collider's room-facing
+    // surface at z = 5.8 so Bob's collider and silhouette meet the same wall.
+    const artDepthShift = 0.36;
     this.root.add(
       createChamferedBox(this.resources, {
         name: 'room-1-sticky-wall-recessed-backing',
         size: [2.24, 5.38, 0.14],
         radius: 0.055,
-        position: [-4.8, 2.61, 5.7],
+        position: [-4.8, 2.61, 5.7 + artDepthShift],
         material: mechanicalBacking,
       }),
     );
     this.addChamferedFrame(
       this.root,
       'room-1-sticky-wall-containment-frame',
-      [-4.8, 2.61, 5.58],
+      [-4.8, 2.61, 5.58 + artDepthShift],
       2.18,
       5.32,
       0.16,
@@ -628,7 +631,7 @@ export class RoomOneArt {
     const membraneGeometry = this.createOrganicMembraneGeometry(1.78, 4.92, 0.055, 13);
     const membrane = new THREE.Mesh(membraneGeometry, stickyMembrane);
     membrane.name = 'room-1-sticky-wall-inset-organic-membrane';
-    membrane.position.set(-4.8, 2.58, 5.49);
+    membrane.position.set(-4.8, 2.58, 5.49 + artDepthShift);
     markVisualOnly(membrane);
     this.root.add(membrane);
 
@@ -639,8 +642,10 @@ export class RoomOneArt {
         radius: 0.028,
         material: serviceMetal,
         transforms: [
-          [-5.83, 1.05, 5.45], [-5.83, 3.8, 5.45],
-          [-3.77, 1.4, 5.45], [-3.77, 4.15, 5.45],
+          [-5.83, 1.05, 5.45 + artDepthShift],
+          [-5.83, 3.8, 5.45 + artDepthShift],
+          [-3.77, 1.4, 5.45 + artDepthShift],
+          [-3.77, 4.15, 5.45 + artDepthShift],
         ].map((position) => ({ position: position as [number, number, number] })),
       }),
     );

@@ -511,6 +511,7 @@ export class GreyboxLevelRuntime {
         containmentLevel.state === 'complete'
           ? 'level-complete'
           : 'level-completing';
+      slimeVisualState.movementIntentWorld = resources.noMovement;
       testScene.bob.update(deltaSeconds, slimeVisualState);
       testScene.update(deltaSeconds);
       this.input.endFixedUpdate();
@@ -648,6 +649,9 @@ export class GreyboxLevelRuntime {
     resources.dissolveSystem.update(deltaSeconds);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
+    slimeVisualState.movementIntentWorld = activeBody === body && !switchedThisStep
+      ? cameraRelativeMovement
+      : resources.noMovement;
     slimeVisualState.jumpCharge = body.chargeFraction;
     slimeVisualState.contactCount = body.contactsThisStep;
     slimeVisualState.contactSpeedMetresPerSecond =
@@ -983,6 +987,7 @@ export class GreyboxLevelRuntime {
     const slimeVisualState: BobCharacterPresentationState = {
       locomotionPositionWorld: body.locomotionPosition,
       velocityWorld: body.velocity,
+      movementIntentWorld: new THREE.Vector3(),
       surfaceNormalWorld: body.groundNormal,
       gameplayUpWorld: body.gameplayUp,
       grounded: body.grounded,

@@ -34,6 +34,7 @@ function state(
   return {
     locomotionPositionWorld,
     velocityWorld,
+    movementIntentWorld: new THREE.Vector3(),
     surfaceNormalWorld: new THREE.Vector3(0, 1, 0),
     gameplayUpWorld: new THREE.Vector3(0, 1, 0),
     grounded: true,
@@ -61,6 +62,111 @@ function weight(bob: BobCharacterPresentation, meshName: string, pose: string): 
   assert.ok(mesh.morphTargetDictionary?.[pose] !== undefined, `missing ${pose}`);
   return mesh.morphTargetInfluences![mesh.morphTargetDictionary[pose]!]!;
 }
+
+function wallClearance(bob: BobCharacterPresentation, normal: THREE.Vector3): number {
+  bob.root.updateMatrixWorld(true);
+  const body = bob.root.getObjectByName('Bob-Body') as THREE.Mesh;
+  const positions = body.geometry.getAttribute('position');
+  const morphs = body.geometry.morphAttributes.position;
+  const point = new THREE.Vector3();
+  let minimum = Infinity;
+  for (let index = 0; index < positions.count; index += 1) {
+    point.fromBufferAttribute(positions, index);
+    for (let pose = 0; pose < morphs.length; pose += 1) {
+      point.addScaledVector(
+        new THREE.Vector3().fromBufferAttribute(morphs[pose]!, index),
+        body.morphTargetInfluences![pose]!,
+      );
+    }
+    point.applyMatrix4(body.matrixWorld);
+    minimum = Math.min(minimum, point.dot(normal));
+  }
+  return minimum;
+}
+
+test('wall transition keeps the authored body in front of the support plane', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const normal = new THREE.Vector3(1, 0, 0);
+  const wall = {
+    ...state(new THREE.Vector3(0.45, 0, 0), new THREE.Vector3(0, 2, 0)),
+    grounded: true,
+    attached: true,
+    surfaceNormalWorld: normal,
+    jumpCharge: 0,
+  };
+  bob.setPosition(new THREE.Vector3(0.45, 0, 0));
+  bob.update(0, { ...state(), jumpCharge: 0 });
+  let minimum = Infinity;
+  for (let step = 0; step < 40; step += 1) {
+    bob.update(1 / 60, wall);
+    bob.present();
+    minimum = Math.min(minimum, wallClearance(bob, normal));
+  }
+  assert.ok(minimum >= -0.01, `body entered wall by ${-minimum} m`);
+  bob.dispose();
+});
+
+test('stationary wall facing stays stable after upward motion', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const wall = {
+    ...state(new THREE.Vector3(0.45, 0, 0), new THREE.Vector3(0, 2, 0)),
+    grounded: true,
+    attached: true,
+    surfaceNormalWorld: new THREE.Vector3(1, 0, 0),
+    jumpCharge: 0,
+  };
+  for (let step = 0; step < 40; step += 1) bob.update(1 / 60, wall);
+  bob.present();
+  const character = getCharacter(bob.root);
+  const movingForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(character.quaternion);
+  assert.ok(movingForward.y > 0.9);
+  for (let step = 0; step < 40; step += 1) {
+    bob.update(1 / 60, { ...wall, velocityWorld: new THREE.Vector3() });
+  }
+  bob.present();
+  const idleForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(character.quaternion);
+  assert.ok(idleForward.dot(movingForward) > 0.95,
+    `idle wall heading changed to ${idleForward.toArray()}`);
+  bob.dispose();
+});
+
+test('wall facing follows player intent even without resolved movement, then holds', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const wall = {
+    ...state(new THREE.Vector3(0, 0, -0.45), new THREE.Vector3()),
+    grounded: true,
+    attached: true,
+    surfaceNormalWorld: new THREE.Vector3(0, 0, -1),
+    jumpCharge: 0,
+  };
+  for (let step = 0; step < 30; step += 1) bob.update(1 / 60, wall);
+  bob.present();
+  const character = getCharacter(bob.root);
+  const initialForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(character.quaternion);
+  assert.ok(initialForward.y > 0.95, 'uncommanded wall attachment faces up');
+
+  const intended = new THREE.Vector3(1, 0, 0);
+  for (let step = 0; step < 30; step += 1) {
+    bob.update(1 / 60, { ...wall, movementIntentWorld: intended });
+  }
+  bob.present();
+  const commandedForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(character.quaternion);
+  assert.ok(commandedForward.dot(intended) > 0.95);
+
+  for (let step = 0; step < 30; step += 1) bob.update(1 / 60, wall);
+  bob.present();
+  const idleForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(character.quaternion);
+  assert.ok(idleForward.dot(intended) > 0.95);
+  bob.dispose();
+});
 
 test('resolved supported travel holds a directional lean without a gait cycle', async () => {
   const bob = new BobCharacterPresentation(0.45);

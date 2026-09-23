@@ -50,7 +50,8 @@ While supported:
 
 - local `+Y` smoothly follows the outward support normal;
 - local forward remains tangent to the support surface;
-- meaningful tangential travel determines heading;
+- player movement intent determines wall heading, including when blocked;
+- meaningful tangential travel determines ground heading;
 - a dead zone, hysteresis, and bounded angular speed prevent idle jitter and snapping;
 - the last stable heading is retained at rest.
 
