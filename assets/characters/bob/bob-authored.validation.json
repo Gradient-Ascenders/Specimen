@@ -6,8 +6,8 @@
   "body_non_manifold_edges": 0,
   "gate": 3,
   "body_targets": [
-    "move-forward",
-    "move-reverse",
+    "move-reach",
+    "move-gather",
     "squash",
     "flatten",
     "launch",
@@ -15,8 +15,8 @@
     "stress"
   ],
   "eye_targets": [
-    "move-forward",
-    "move-reverse",
+    "move-reach",
+    "move-gather",
     "squash",
     "flatten",
     "launch",
@@ -28,9 +28,8 @@
     "stress-expression"
   ],
   "morph_targets": 7,
-  "generator_sha256": "430e57aef3fe336c211ddb11e28a4a9f22d02904c18b29c309dd1db1cb331eb4",
-  "locomotion_generator_sha256": "95c1618e75573f32eb26202442e23bb2e82137ae5ece3c2da6700474f98da34a",
+  "generator_sha256": "cac6fcbbce546cb51085fe5ee1332c9dde967f56b6104548321ad82f83643fea",
   "curl_generator_sha256": "7ba549b2b8ba1d941a6758329b4a6040cfb0a504f08496c08fe323ad00320bd5",
   "approved_neutral_glb_sha256": "316656ae4d4a8fda4345ff09b04ab2017c802294c4f885b2670a27261c82282a",
-  "glb_sha256": "e9dea2c9b576ac89e2900f265e87ee79568b68cf306449a1fe7ba43297fe0b01"
+  "glb_sha256": "b890d2c394cc16c12c33c7be2e23133dfd43b77a70ec467fb00e0a27dabea079"
 }

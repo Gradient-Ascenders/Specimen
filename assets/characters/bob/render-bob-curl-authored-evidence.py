@@ -4,12 +4,21 @@ Run after generate-bob-authored.py with Blender in background mode. The
 images come from the exported GLB, not the editable Blender source.
 """
 from pathlib import Path
+import sys
 
 import bpy
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[3]
 OUTPUT = ROOT / 'docs/evidence/issue-150/curl-production'
+locomotion_only = False
+if '--' in sys.argv:
+    arguments = sys.argv[sys.argv.index('--') + 1:]
+    locomotion_only = '--locomotion-only' in arguments
+    arguments = [argument for argument in arguments if argument != '--locomotion-only']
+    if len(arguments) != 2 or arguments[0] != '--output':
+        raise ValueError('Expected --output <repo-relative-directory> [--locomotion-only]')
+    OUTPUT = ROOT / arguments[1]
 OUTPUT.mkdir(parents=True, exist_ok=True)
 
 bpy.ops.object.select_all(action='SELECT')
@@ -65,5 +74,10 @@ render('neutral-side', (3, 0.12, 0))
 render('neutral-three-quarter', (2.1, 0.5, -2.1))
 for pose in ('move-reach', 'move-gather', 'squash', 'flatten',
              'launch', 'airborne', 'stress', 'blink'):
+    if locomotion_only and pose not in ('move-reach', 'move-gather'):
+        continue
     set_pose(pose)
     render(pose)
+    if pose in ('move-reach', 'move-gather'):
+        render(pose + '-side', (3, 0.12, 0))
+        render(pose + '-three-quarter', (2.1, 0.5, -2.1))

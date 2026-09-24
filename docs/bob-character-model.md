@@ -55,7 +55,7 @@ While supported:
 - a dead zone, hysteresis, and bounded angular speed prevent idle jitter and snapping;
 - the last stable heading is retained at rest.
 
-On a sharp reversal, the body counterleans briefly in the old frame, then the frame turns at a bounded speed and the lean follows the new heading.
+On a sharp reversal, the body collects toward Neutral in the old frame, then turns at a bounded speed and begins a fresh Reach/Gather cycle in the new heading.
 
 On takeoff, the current frame is retained long enough for Launch to read. Local `+Y` then relaxes toward authoritative `gameplayUp`. Instantaneous velocity may bias the body shape slightly but never owns the whole character orientation. Wall jumps read as wall-aligned charge, outward launch, gradual upright recovery, then airborne travel.
 
@@ -65,8 +65,8 @@ No camera billboarding or camera-tracking gaze is permitted.
 
 Neutral is the undeformed base. The initial asset contains exactly seven body targets:
 
-1. `move-forward`
-2. `move-reverse`
+1. `move-reach`
+2. `move-gather`
 3. `squash`
 4. `flatten`
 5. `launch`
@@ -77,7 +77,7 @@ Do not add another body target before Gate 3 demonstrates a specific failure tha
 
 ### Locomotion
 
-Resolved support-plane movement drives a sustained directional lean. The upper mass shifts over a planted sole while the crown lags. Signed resolved travel relative to Bob's visual forward axis chooses the forward or reverse target; its speed sets the weight. A reversal crosses neutral before the bounded visual turn. Stopping settles smoothly to neutral. The morphs are visual only and do not alter the collider or controls.
+Resolved support-plane distance advances Neutral to Reach, blended Reach/Gather transfer, Gather, then Neutral. Speed sets pose strength, with a brief stronger response during acceleration and a quieter steady cruise. The leading side seeks support, the central bulk crosses it, and the rear catches up while the sole stays planted. Stopping freezes phase and settles to Neutral. A sharp reversal collects toward Neutral before the bounded visual turn, then starts a new cycle. The morphs are visual only and do not alter the collider or controls.
 
 ### Traversal and reactions
 

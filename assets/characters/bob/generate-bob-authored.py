@@ -16,17 +16,37 @@ DIRECTORY = Path(__file__).resolve().parent
 CURL_SOURCE = DIRECTORY / 'generate-bob-curl-candidate.py'
 curl = runpy.run_path(str(CURL_SOURCE))
 neutral = curl['neutral']
-LOCOMOTION_SOURCE = DIRECTORY / 'generate-bob-locomotion-candidate.py'
-locomotion = runpy.run_path(str(LOCOMOTION_SOURCE))
-BODY_POSES = locomotion['BODY_POSES']
+BODY_POSES = ('move-reach', 'move-gather', 'squash', 'flatten', 'launch', 'airborne', 'stress')
 EXPRESSIONS = ('blink', 'effort', 'surprise', 'stress-expression')
+
+
+def smoothstep(start, end, value):
+    t = max(0.0, min(1.0, (value - start) / (end - start)))
+    return t * t * (3.0 - 2.0 * t)
 
 
 def deform(name, point):
     x, y, z = point
     h = (y + 0.45) / 0.8
-    if name in ('move-forward', 'move-reverse'):
-        return locomotion['deform'](name, point)
+    if name in ('move-reach', 'move-gather'):
+        contact = smoothstep(0.06, 0.38, h)
+        bulk = smoothstep(0.12, 0.78, h)
+        crown = smoothstep(0.82, 1.34, h)
+        leading = smoothstep(-0.12, 0.36, -z)
+        trailing = smoothstep(-0.12, 0.36, z)
+        if name == 'move-reach':
+            # Plant the sole, let the lower leading side seek new support,
+            # and leave the upper bulk behind it for the transfer blend.
+            z -= contact * (0.10 * leading * (1 - 0.28 * bulk) + 0.025 * bulk)
+            y -= 0.024 * leading * contact * (1 - 0.3 * crown)
+            x *= 1 - 0.025 * leading * contact
+        else:
+            # Bring the bulk over that contact while the rear catches up;
+            # the curl tip gives back some motion as inertial lag.
+            z -= 0.15 * bulk - 0.12 * crown + 0.045 * trailing * contact
+            y += 0.020 * trailing * contact * (1 - 0.3 * crown)
+            x *= 1 + 0.025 * trailing * contact
+        return x, y, z
     if name in ('squash', 'flatten'):
         scale = 0.76 if name == 'squash' else 0.48
         spread = 1 / math.sqrt(scale)
@@ -109,7 +129,6 @@ def build():
         export_materials='EXPORT', export_attributes=False, export_extras=True)
     report.update(gate=3, body_targets=BODY_POSES, eye_targets=(*BODY_POSES, *EXPRESSIONS),
         morph_targets=7, generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        locomotion_generator_sha256=hashlib.sha256(LOCOMOTION_SOURCE.read_bytes()).hexdigest(),
         curl_generator_sha256=hashlib.sha256(CURL_SOURCE.read_bytes()).hexdigest(),
         approved_neutral_glb_sha256=hashlib.sha256((DIRECTORY / 'bob-curl-candidate.glb').read_bytes()).hexdigest(),
         glb_sha256=hashlib.sha256(glb_path.read_bytes()).hexdigest())
