@@ -60,6 +60,37 @@ const createFakeBody = (): MutableFakeBody => ({
   },
 });
 
+test('recovering active Goop keeps Bob duct reflections tied to Bob position', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const collisionWorld = new CollisionWorld();
+  const bob = createFakeBody();
+  const goop = createFakeBody();
+  bob.position.set(-4.8, 6, 8);
+  goop.position.set(0, 0.46, -2.6);
+  const bobBody = bob as unknown as KinematicBody;
+  const goopBody = goop as unknown as KinematicBody;
+  const controller = new ContainmentLevelController({
+    scene,
+    body: bobBody,
+    bobBody,
+    persistentBodies: [bobBody, goopBody],
+    collisionWorld,
+    requestDeath: () => false,
+  });
+  scene.update(0, bob.position);
+  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'duct');
+
+  controller.setActiveBody(goopBody);
+  controller.recoverActiveCheckpoint();
+
+  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'duct');
+  assert.equal(scene.lightingDiagnostics.bobBodyReflectionTarget, 0.1);
+  assert.ok(bob.position.equals(new THREE.Vector3(-4.8, 6, 8)));
+  controller.dispose();
+  collisionWorld.clear();
+  scene.dispose();
+});
+
 test('complete Containment scene exposes unique, consistently tagged colliders', () => {
   const scene = new ContainmentLevelScene(() => {});
   const names = scene.collisionMeshes.map((mesh) => mesh.name);
@@ -348,6 +379,7 @@ test('inactive persistent slimes continue riding Room 4 and Room 5 carriers', ()
   const controller = new ContainmentLevelController({
     scene,
     body: bobBody,
+    bobBody,
     persistentBodies: [bobBody, goopBody],
     collisionWorld,
     requestDeath: () => false,

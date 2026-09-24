@@ -975,6 +975,7 @@ export class GreyboxLevelRuntime {
     containmentLevel = new ContainmentLevelController({
       scene: testScene,
       body,
+      bobBody: body,
       persistentBodies,
       collisionWorld,
       requestDeath: (recovery) => {

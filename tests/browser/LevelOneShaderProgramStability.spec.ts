@@ -43,10 +43,14 @@ interface ProductionTraversalRuntime {
         readonly disposed: boolean;
       };
     };
-    readonly slimePair: { readonly activeBody: unknown };
+    readonly slimePair: {
+      readonly activeBody: unknown;
+      switchActive(): boolean;
+    };
     readonly containmentLevel: {
       setActiveBody(body: unknown): void;
       teleportToRoomForDebug(roomId: number): void;
+      recoverActiveCheckpoint(): void;
       requestHazardFailure(failure: {
         readonly roomId: 'room-3';
         readonly hazardId: string;
@@ -595,6 +599,39 @@ test('Bob reflections snap across restart and recreate across level reload', asy
     async () => (await readReflectionState()).body,
     { timeout: 5_000, message: 'Waiting for the duct reflection fade' },
   ).toBeLessThan(0.15);
+
+  const recoveredGoop = await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob resources');
+    if (!resources.slimePair.switchActive()) {
+      throw new Error('Could not switch control from Bob to Goop');
+    }
+    resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
+    resources.containmentLevel.recoverActiveCheckpoint();
+    const materials = resources.testScene.bob.diagnostics.materials;
+    if (!materials) throw new Error('Bob reflection materials are not ready');
+    return {
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+      zone: resources.testScene.lightingDiagnostics.bobReflectionZone,
+      bodyTarget:
+        resources.testScene.lightingDiagnostics.bobBodyReflectionTarget,
+      eyeTarget:
+        resources.testScene.lightingDiagnostics.bobEyeReflectionTarget,
+    };
+  });
+  expect(recoveredGoop).toEqual({
+    body: 0.1,
+    eyes: 0.24,
+    zone: 'duct',
+    bodyTarget: 0.1,
+    eyeTarget: 0.24,
+  });
 
   const restarted = await page.evaluate(() => {
     const runtime = (
