@@ -32,6 +32,9 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
   assert.equal(initial.authoredLightCount, 20);
   assert.equal(initial.visibleAuthoredLightCount, 5);
   assert.equal(initial.shadowCastingLightCount, 0);
+  assert.equal(initial.bobReflectionZone, 'room');
+  assert.equal(initial.bobBodyReflectionTarget, 0.62);
+  assert.equal(initial.bobEyeReflectionTarget, 1.12);
   const roomOnePointLights: string[] = [];
   scene.root
     .getObjectByName('containment-room-1-lighting-rig')
@@ -55,6 +58,19 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
     scene.root.getObjectByName('containment-room-3-lighting-rig')?.visible,
     true,
   );
+  assert.equal(roomThree.bobBodyReflectionTarget, 0.38);
+  assert.equal(roomThree.bobEyeReflectionTarget, 0.74);
+
+  scene.update(1 / 60, new THREE.Vector3(-4.8, 6, 8));
+  const duct = scene.lightingDiagnostics;
+  assert.equal(duct.bobReflectionZone, 'duct');
+  assert.equal(duct.bobBodyReflectionTarget, 0.1);
+  assert.equal(duct.bobEyeReflectionTarget, 0.24);
+
+  scene.update(1 / 60, new THREE.Vector3(0, 0.45, 60));
+  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'room');
+  assert.equal(scene.lightingDiagnostics.bobBodyReflectionTarget, 0.38);
+  assert.equal(scene.lightingDiagnostics.bobEyeReflectionTarget, 0.74);
 
   scene.dispose();
 });

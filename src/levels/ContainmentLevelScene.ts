@@ -182,6 +182,7 @@ export class ContainmentLevelScene {
       roomOneArt: this.teaching.roomOneArt,
       roomFour: this.roomFour,
       roomFive: this.roomFive,
+      bob: this.teaching.bob,
     });
     this.root.add(this.lighting.root);
     this.staticBatches = [
@@ -299,7 +300,12 @@ export class ContainmentLevelScene {
     );
   }
 
-  update(deltaSeconds: number): void {
+  update(deltaSeconds: number, bobPosition?: Vector3State): void {
+    if (bobPosition) {
+      this.lighting.setBobInDarkDuct(
+        this.isInsideCameraTightVent(bobPosition),
+      );
+    }
     this.roomThree.updatePresentation(deltaSeconds);
     this.lighting.update(deltaSeconds);
   }

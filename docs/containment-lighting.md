@@ -1,5 +1,19 @@
 # Containment lighting and environmental effects
 
+## Bob reflection environment
+
+Bob's physical gel and eye materials use one Level-1-owned, PMREM-filtered
+laboratory reflection environment. It is assigned directly to Bob rather than
+to `scene.environment`, so existing level materials keep their authored
+response. The probe contains broad overhead fluorescent shapes, narrower front
+strips, dark negative space, and low cool fill.
+
+The active lighting room supplies separate body and eye intensity targets.
+Authored tight-vent volumes override those room values with a substantially
+darker profile, and the material eases between targets. The PMREM render target
+is created once per loaded Level 1 runtime and disposed after Bob's materials
+during unload.
+
 Issue #33 replaces the renderer's old inspection pair with a Level 1-owned
 lighting rig. `ContainmentLevelScene` owns one `ContainmentLightingRig` beneath
 its scene root and disposes it before the room art/resources it references.

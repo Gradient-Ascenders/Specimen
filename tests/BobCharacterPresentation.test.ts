@@ -911,6 +911,55 @@ test('Gate 2 materials present lit cyan gel and glossy eyes without self-light o
   bob.dispose();
 });
 
+test('Bob shares one external reflection map and eases room-authored intensity', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  const environment = new THREE.Texture();
+  environment.name = 'test-bob-laboratory-pmrem';
+  let environmentDisposeCount = 0;
+  environment.addEventListener('dispose', () => {
+    environmentDisposeCount += 1;
+  });
+  bob.setReflectionEnvironment(environment);
+  bob.setReflectionIntensity(0.62, 1.12);
+  await bob.prepare(loadAsset);
+
+  const character = getCharacter(bob.root);
+  const body = character.getObjectByName('Bob-Body');
+  const leftEye = character.getObjectByName('Bob-Eye-Left');
+  assert.ok(body instanceof THREE.Mesh);
+  assert.ok(leftEye instanceof THREE.Mesh);
+  assert.ok(body.material instanceof THREE.MeshPhysicalMaterial);
+  assert.ok(leftEye.material instanceof THREE.MeshPhysicalMaterial);
+  assert.equal(body.material.envMap, environment);
+  assert.equal(leftEye.material.envMap, environment);
+  assert.equal(body.material.envMapIntensity, 0.62);
+  assert.equal(leftEye.material.envMapIntensity, 1.12);
+
+  bob.setReflectionIntensity(0.1, 0.24);
+  bob.update(0.25, { ...state(), jumpCharge: 0 });
+  assert.ok(body.material.envMapIntensity < 0.62);
+  assert.ok(body.material.envMapIntensity > 0.1);
+  assert.ok(leftEye.material.envMapIntensity < 1.12);
+  assert.ok(leftEye.material.envMapIntensity > 0.24);
+  assert.equal(
+    bob.diagnostics.materials?.reflectionMapName,
+    environment.name,
+  );
+  assert.equal(
+    bob.diagnostics.materials?.targetBodyReflectionIntensity,
+    0.1,
+  );
+  assert.equal(
+    bob.diagnostics.materials?.targetEyeReflectionIntensity,
+    0.24,
+  );
+
+  bob.dispose();
+  assert.equal(environmentDisposeCount, 0);
+  environment.dispose();
+  assert.equal(environmentDisposeCount, 1);
+});
+
 test('launch releases charge, hands off to airborne, and landing reconciles the visual envelope', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);

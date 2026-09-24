@@ -145,6 +145,9 @@ export class BobCharacterPresentation {
 
   private asset: BobGateOneAsset | undefined;
   private materialSet: BobGateTwoMaterialSet | undefined;
+  private reflectionEnvironment: THREE.Texture | null = null;
+  private bodyReflectionIntensity = 0;
+  private eyeReflectionIntensity = 0;
   private readonly deathBurst = new SlimeBurstPresentation();
   private readonly materials = new Set<THREE.Material>();
   private preparation: Promise<void> | undefined;
@@ -243,6 +246,12 @@ export class BobCharacterPresentation {
         for (const material of materials) importedMaterials.add(material);
       }
       const materialSet = new BobGateTwoMaterialSet();
+      materialSet.setReflectionEnvironment(this.reflectionEnvironment);
+      materialSet.setReflectionIntensity(
+        this.bodyReflectionIntensity,
+        this.eyeReflectionIntensity,
+        true,
+      );
       asset.body.material = materialSet.body;
       for (const eye of asset.eyes) eye.material = materialSet.eyes;
       for (const material of importedMaterials) material.dispose();
@@ -291,6 +300,24 @@ export class BobCharacterPresentation {
 
   setVisible(visible: boolean): void {
     this.mesh.visible = visible;
+  }
+
+  /** Attach a renderer-owned PMREM without transferring texture ownership. */
+  setReflectionEnvironment(environmentMap: THREE.Texture | null): void {
+    if (this.disposed || this.reflectionEnvironment === environmentMap) return;
+    this.reflectionEnvironment = environmentMap;
+    this.materialSet?.setReflectionEnvironment(environmentMap);
+  }
+
+  /** Set room-authored targets; the material smooths changes during update. */
+  setReflectionIntensity(bodyIntensity: number, eyeIntensity: number): void {
+    if (this.disposed) return;
+    this.bodyReflectionIntensity = THREE.MathUtils.clamp(bodyIntensity, 0, 2);
+    this.eyeReflectionIntensity = THREE.MathUtils.clamp(eyeIntensity, 0, 2);
+    this.materialSet?.setReflectionIntensity(
+      this.bodyReflectionIntensity,
+      this.eyeReflectionIntensity,
+    );
   }
 
   setExpression(expression: BobExpression, weight: number): void {

@@ -6,6 +6,7 @@ import type {
   RoomFiveEndingState,
   RoomFiveGreybox,
 } from '../../../levels/RoomFiveGreybox.ts';
+import type { BobCharacterPresentation } from '../../bob/BobCharacterPresentation.ts';
 import type { RoomOneArt } from './RoomOneArt.ts';
 import { ContainmentPointEffect } from './ContainmentPointEffect.ts';
 
@@ -48,6 +49,9 @@ export interface ContainmentLightingDiagnostics {
   readonly goopStateApplicationCount: number;
   readonly elevatorStateApplicationCount: number;
   readonly disposed: boolean;
+  readonly bobReflectionZone: 'room' | 'duct';
+  readonly bobBodyReflectionTarget: number;
+  readonly bobEyeReflectionTarget: number;
 }
 
 export interface ContainmentLightingRigOptions {
@@ -55,6 +59,7 @@ export interface ContainmentLightingRigOptions {
   readonly roomOneArt: RoomOneArt;
   readonly roomFour: RoomFourGreybox;
   readonly roomFive: RoomFiveGreybox;
+  readonly bob: BobCharacterPresentation;
 }
 
 const ROOM_IDS: readonly ContainmentLightingRoomId[] = [1, 2, 3, 4, 5];
@@ -67,6 +72,17 @@ const ALARM_COLOUR = 0xff263f;
 const ACID_COLOUR = 0x87d62e;
 const RELEASE_GREEN_COLOUR = 0x7eff43;
 const ARRIVAL_GREEN_COLOUR = 0x49ef91;
+const BOB_ROOM_REFLECTIONS = {
+  1: { body: 0.62, eyes: 1.12 },
+  2: { body: 0.56, eyes: 1.02 },
+  3: { body: 0.38, eyes: 0.74 },
+  4: { body: 0.2, eyes: 0.46 },
+  5: { body: 0.34, eyes: 0.68 },
+} as const satisfies Record<
+  ContainmentLightingRoomId,
+  { readonly body: number; readonly eyes: number }
+>;
+const BOB_DUCT_REFLECTION = { body: 0.1, eyes: 0.24 } as const;
 
 /**
  * Authored Level 1 lighting and bounded environmental effects.
@@ -81,6 +97,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   private readonly levelRoot: THREE.Object3D;
   private readonly roomFour: RoomFourGreybox;
   private readonly roomFive: RoomFiveGreybox;
+  private readonly bob: BobCharacterPresentation;
   private readonly roomGroups = new Map<ContainmentLightingRoomId, THREE.Group>();
   private readonly geometries = new Set<THREE.BufferGeometry>();
   private readonly materials = new Set<THREE.Material>();
@@ -150,17 +167,20 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   private goopStateApplicationCount = 0;
   private elevatorStateApplicationCount = 0;
   private disposed = false;
+  private bobInDarkDuct = false;
 
   constructor(options: ContainmentLightingRigOptions) {
     this.levelRoot = options.levelRoot;
     this.roomFour = options.roomFour;
     this.roomFive = options.roomFive;
+    this.bob = options.bob;
     this.root.name = 'containment-authored-lighting-and-effects';
     this.root.userData.presentationOnly = true;
 
     const ambient = new THREE.HemisphereLight(0xcfe4f4, 0x19211f, 0.78);
     ambient.name = 'containment-cold-clinical-foundation';
     this.root.add(ambient);
+    this.applyBobReflectionTarget();
 
     for (const roomId of ROOM_IDS) {
       const group = new THREE.Group();
@@ -309,6 +329,9 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       goopStateApplicationCount: this.goopStateApplicationCount,
       elevatorStateApplicationCount: this.elevatorStateApplicationCount,
       disposed: this.disposed,
+      bobReflectionZone: this.bobInDarkDuct ? 'duct' : 'room',
+      bobBodyReflectionTarget: this.bobReflectionTarget.body,
+      bobEyeReflectionTarget: this.bobReflectionTarget.eyes,
     };
   }
 
@@ -316,6 +339,13 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     if (this.activeRoomIdValue === roomId) return;
     this.activeRoomIdValue = roomId;
     this.applyRoomVisibility();
+    this.applyBobReflectionTarget();
+  }
+
+  setBobInDarkDuct(inDarkDuct: boolean): void {
+    if (this.bobInDarkDuct === inDarkDuct) return;
+    this.bobInDarkDuct = inDarkDuct;
+    this.applyBobReflectionTarget();
   }
 
   /**
@@ -395,12 +425,14 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.goopReleaseManuallyDriven = false;
     this.goopReleaseStateValue = 'normal';
     this.goopStateElapsedSeconds = 0;
+    this.bobInDarkDuct = false;
     this.bobImpactEffect.reset();
     this.goopReleaseEffect.reset();
     this.applyRoomVisibility();
     this.applyBobHatchState();
     this.applyGoopReleaseState();
     this.syncElevatorLighting(true);
+    this.applyBobReflectionTarget();
   }
 
   update(deltaSeconds: number): void {
@@ -448,6 +480,20 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     for (const [roomId, group] of this.roomGroups) {
       group.visible = roomId === this.activeRoomIdValue;
     }
+  }
+
+  private get bobReflectionTarget(): {
+    readonly body: number;
+    readonly eyes: number;
+  } {
+    return this.bobInDarkDuct
+      ? BOB_DUCT_REFLECTION
+      : BOB_ROOM_REFLECTIONS[this.activeRoomIdValue];
+  }
+
+  private applyBobReflectionTarget(): void {
+    const target = this.bobReflectionTarget;
+    this.bob.setReflectionIntensity(target.body, target.eyes);
   }
 
   private applyBobHatchState(): void {

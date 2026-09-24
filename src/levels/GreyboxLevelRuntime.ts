@@ -43,6 +43,7 @@ import { PressurePlate } from '../puzzle/PressurePlate.ts';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
+import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources } from '../render/IsolatedResourcePrewarm.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
@@ -166,6 +167,7 @@ export interface GreyboxLevelRuntimeOptions {
 
 interface GreyboxRuntimeResources {
   readonly testScene: ContainmentLevelScene;
+  readonly bobReflectionEnvironment: BobReflectionEnvironment;
   readonly containmentLevel: ContainmentLevelController;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
@@ -513,7 +515,7 @@ export class GreyboxLevelRuntime {
           : 'level-completing';
       slimeVisualState.movementIntentWorld = resources.noMovement;
       testScene.bob.update(deltaSeconds, slimeVisualState);
-      testScene.update(deltaSeconds);
+      testScene.update(deltaSeconds, body.position);
       this.input.endFixedUpdate();
       return;
     }
@@ -661,7 +663,7 @@ export class GreyboxLevelRuntime {
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.bob.update(deltaSeconds, slimeVisualState);
-    testScene.update(deltaSeconds);
+    testScene.update(deltaSeconds, body.position);
     this.input.endFixedUpdate();
   }
 
@@ -823,12 +825,16 @@ export class GreyboxLevelRuntime {
 
   private readonly loadResources = (): void => {
     let containmentLevel: ContainmentLevelController;
+    const bobReflectionEnvironment = new BobReflectionEnvironment(
+      this.renderLayer.renderer,
+    );
     const testScene = new ContainmentLevelScene(
       (failure: ContainmentHazardFailure) => {
         containmentLevel.requestHazardFailure(failure);
       },
       { includeDevelopmentHelpers: this.debugAvailable },
     );
+    testScene.bob.setReflectionEnvironment(bobReflectionEnvironment.texture);
     this.renderLayer.scene.add(testScene.root);
 
     const collisionWorld = new CollisionWorld();
@@ -1112,6 +1118,7 @@ export class GreyboxLevelRuntime {
 
     this.resources = {
       testScene,
+      bobReflectionEnvironment,
       containmentLevel,
       collisionWorld,
       surfaceRegistry,
@@ -1261,6 +1268,7 @@ export class GreyboxLevelRuntime {
     resources.slimeManager.clearLevelRegistrations();
     resources.slimeManager.dispose();
     resources.testScene.dispose();
+    resources.bobReflectionEnvironment.dispose();
     resources.collisionWorld.clear();
     resources.surfaceRegistry.clear();
     this.renderLayer.cameraRig.clearFollowTarget();
@@ -1662,6 +1670,8 @@ export class GreyboxLevelRuntime {
         `lighting room / Bob hatch / Goop release: ${testScene.lightingDiagnostics.activeRoomId} / ${testScene.lightingDiagnostics.bobHatchState} / ${testScene.lightingDiagnostics.goopReleaseState}`,
         `lighting particles / manual release drive: ${testScene.lightingDiagnostics.activeParticleCount} / ${testScene.lightingDiagnostics.goopReleaseManuallyDriven ? 'yes' : 'no'}`,
         `lighting state applications Goop / elevator: ${testScene.lightingDiagnostics.goopStateApplicationCount} / ${testScene.lightingDiagnostics.elevatorStateApplicationCount}`,
+        `Bob reflection zone / body / eyes: ${testScene.lightingDiagnostics.bobReflectionZone} / ${slimeDiagnostics.materials?.bodyReflectionIntensity.toFixed(2) ?? 'unprepared'} / ${slimeDiagnostics.materials?.eyeReflectionIntensity.toFixed(2) ?? 'unprepared'}`,
+        `Bob reflection target body / eyes: ${testScene.lightingDiagnostics.bobBodyReflectionTarget.toFixed(2)} / ${testScene.lightingDiagnostics.bobEyeReflectionTarget.toFixed(2)}`,
         `lighting transition profiles: ${JSON.stringify(this.lightingTransitionProfiles)}`,
         `lighting prewarm profile: ${JSON.stringify(this.lightingPrewarmProfile ?? null)}`,
         `unique materials / instanced meshes: ${renderStats.uniqueMaterials} / ${renderStats.instancedMeshes}`,

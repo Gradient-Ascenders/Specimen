@@ -32,6 +32,11 @@ The production asset contains one watertight body mesh, including the curled cro
 
 It contains no armature, bones, interior liquid mesh, second body shell, contact mesh, hidden deformation geometry, soft-body simulation, or runtime subdivision.
 
+At runtime, the body and both lenses share one Bob-only PMREM reflection map.
+Its synthetic source resembles the containment laboratory: a dark enclosure,
+one broad overhead fluorescent bank, two narrower frontal strips, and restrained
+cool side fill. The environment is not assigned to the whole scene.
+
 ## Topology budget
 
 Post-export, triangulated budgets are:
@@ -97,6 +102,10 @@ A future constriction pose must be its own Squeeze family rather than reusing La
 
 Both lens meshes contain identically named seat-correction targets for every body target. A body weight is copied to the matching target on the left and right lenses.
 
+The eyes receive a stronger environment-map contribution than the body. This
+keeps their reflections smaller and clearer while the body's rougher response
+resolves as one broad highlight rather than a uniformly bright coating.
+
 Seat correction owns attachment only. Corrections remain modest; extreme correction indicates a body-shape or eye-placement defect.
 
 Each lens also provides four independent, bounded expression targets:
@@ -117,6 +126,11 @@ Authored morphs own major silhouette deformation. The existing shader architectu
 - slight transient inertia;
 - tiny contact compression or sticky peel;
 - other changes too small to materially alter the silhouette.
+
+Environment-map intensity is presentation state, not gameplay state. Level 1
+selects restrained body/eye targets per active room and fades to a much darker
+profile inside authored vent volumes. Transitions are smoothed so Bob does not
+pop between studio-bright and dark reflections at room or duct boundaries.
 
 When a morph owns a state or axis, suppress the equivalent shader contribution. Examples include suppressing shader charge squash during Squash, large shader stretch during Launch or Airborne, and shader impact squash during landing while retaining the local ripple.
 

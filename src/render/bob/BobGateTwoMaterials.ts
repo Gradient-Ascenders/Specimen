@@ -4,6 +4,7 @@ const BOB_WOBBLE_AMPLITUDE_METRES = 0.0035;
 const BOB_IMPACT_RIPPLE_AMPLITUDE_METRES = 0.006;
 const BOB_IMPACT_RIPPLE_DURATION_SECONDS = 1.2;
 const BOB_SECONDARY_MOTION_PERIOD_SECONDS = Math.PI * 200;
+const BOB_REFLECTION_RESPONSE_PER_SECOND = 4;
 
 interface BobGelUniforms {
   readonly time: THREE.IUniform<number>;
@@ -19,6 +20,11 @@ export interface BobGateTwoMaterialDiagnostics {
   readonly elapsedTimeSeconds: number;
   readonly impactStrength: number;
   readonly impactAgeSeconds: number;
+  readonly reflectionMapName: string | undefined;
+  readonly bodyReflectionIntensity: number;
+  readonly eyeReflectionIntensity: number;
+  readonly targetBodyReflectionIntensity: number;
+  readonly targetEyeReflectionIntensity: number;
 }
 
 /**
@@ -168,6 +174,8 @@ export class BobGateTwoMaterialSet {
     depthWrite: true,
     side: THREE.FrontSide,
   });
+  private targetBodyReflectionIntensity = 0;
+  private targetEyeReflectionIntensity = 0;
 
   get diagnostics(): BobGateTwoMaterialDiagnostics {
     const bodySelfLit =
@@ -183,11 +191,62 @@ export class BobGateTwoMaterialSet {
       elapsedTimeSeconds: this.body.elapsedTimeSeconds,
       impactStrength: this.body.impactStrength,
       impactAgeSeconds: this.body.impactAgeSeconds,
+      reflectionMapName: this.body.envMap?.name || undefined,
+      bodyReflectionIntensity: this.body.envMapIntensity,
+      eyeReflectionIntensity: this.eyes.envMapIntensity,
+      targetBodyReflectionIntensity: this.targetBodyReflectionIntensity,
+      targetEyeReflectionIntensity: this.targetEyeReflectionIntensity,
     };
   }
 
   update(deltaSeconds: number): void {
     this.body.update(deltaSeconds);
+    const blend = 1 - Math.exp(
+      -BOB_REFLECTION_RESPONSE_PER_SECOND * Math.max(0, deltaSeconds),
+    );
+    this.body.envMapIntensity = THREE.MathUtils.lerp(
+      this.body.envMapIntensity,
+      this.targetBodyReflectionIntensity,
+      blend,
+    );
+    this.eyes.envMapIntensity = THREE.MathUtils.lerp(
+      this.eyes.envMapIntensity,
+      this.targetEyeReflectionIntensity,
+      blend,
+    );
+  }
+
+  setReflectionEnvironment(environmentMap: THREE.Texture | null): void {
+    if (
+      this.body.envMap === environmentMap &&
+      this.eyes.envMap === environmentMap
+    ) {
+      return;
+    }
+    this.body.envMap = environmentMap;
+    this.eyes.envMap = environmentMap;
+    this.body.needsUpdate = true;
+    this.eyes.needsUpdate = true;
+  }
+
+  setReflectionIntensity(
+    bodyIntensity: number,
+    eyeIntensity: number,
+    snap = false,
+  ): void {
+    this.targetBodyReflectionIntensity = THREE.MathUtils.clamp(
+      bodyIntensity,
+      0,
+      2,
+    );
+    this.targetEyeReflectionIntensity = THREE.MathUtils.clamp(
+      eyeIntensity,
+      0,
+      2,
+    );
+    if (!snap) return;
+    this.body.envMapIntensity = this.targetBodyReflectionIntensity;
+    this.eyes.envMapIntensity = this.targetEyeReflectionIntensity;
   }
 
   setImpact(pointLocal: THREE.Vector3, strength: number): void {
