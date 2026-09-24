@@ -48,8 +48,10 @@ const LOCOMOTION_START_SPEED_METRES_PER_SECOND = 0.16;
 const LOCOMOTION_STOP_SPEED_METRES_PER_SECOND = 0.08;
 const LOCOMOTION_HEADING_HYSTERESIS_RADIANS = THREE.MathUtils.degToRad(5);
 const LOCOMOTION_REVERSAL_RADIANS = THREE.MathUtils.degToRad(120);
+const LOCOMOTION_REVERSAL_LEAN_THRESHOLD = 0.1;
 const LOCOMOTION_TURN_SPEED_RADIANS_PER_SECOND = THREE.MathUtils.degToRad(540);
 const SUPPORT_FRAME_TURN_RADIANS_PER_SECOND = THREE.MathUtils.degToRad(360);
+const WALL_HEADING_INPUT_DEAD_ZONE = 0.1;
 const LOCAL_UP = new THREE.Vector3(0, 1, 0);
 const WORLD_FORWARD = new THREE.Vector3(0, 0, -1);
 const WORLD_RIGHT = new THREE.Vector3(1, 0, 0);
@@ -107,6 +109,7 @@ export class BobCharacterPresentation {
   private readonly surfaceNormalWorld = new THREE.Vector3(0, 1, 0);
   private readonly moveDirectionWorld = new THREE.Vector3(0, 0, -1);
   private readonly wallHeadingWorld = new THREE.Vector3(0, 1, 0);
+  private readonly wallHeadingTargetWorld = new THREE.Vector3(0, 1, 0);
   private readonly impactNormalWorld = new THREE.Vector3(0, 1, 0);
   private readonly impactPointLocal = new THREE.Vector3(0, -0.45, 0);
   private readonly previousLocomotionPositionWorld = new THREE.Vector3();
@@ -114,6 +117,7 @@ export class BobCharacterPresentation {
   private readonly previousFrame = new THREE.Quaternion();
   private readonly currentFrame = new THREE.Quaternion();
   private readonly targetFrame = new THREE.Quaternion();
+  private readonly frameTransport = new THREE.Quaternion();
   private readonly frameUp = new THREE.Vector3();
   private readonly frameForward = new THREE.Vector3();
   private readonly frameRight = new THREE.Vector3();
@@ -157,8 +161,9 @@ export class BobCharacterPresentation {
   private locomotionMoving = false;
   private attachedToWall = false;
   private wallExitActive = false;
+  private wallReversing = false;
+  private wallReversalHoldRemaining = 0;
   private currentFacingYawRadians = 0;
-  private previousFacingYawRadians = 0;
   private targetFacingYawRadians = 0;
   private hasTravelHeading = false;
   private reversing = false;
@@ -197,7 +202,7 @@ export class BobCharacterPresentation {
       materials: this.materialSet?.diagnostics,
       locomotionStrength: this.locomotionStrength,
       facingYawRadians: this.currentFacingYawRadians,
-      reversing: this.reversing,
+      reversing: this.reversing || this.wallReversing,
     };
   }
 
@@ -264,7 +269,6 @@ export class BobCharacterPresentation {
 
   setYaw(yawRadians: number): void {
     this.currentFacingYawRadians = yawRadians;
-    this.previousFacingYawRadians = yawRadians;
     this.targetFacingYawRadians = yawRadians;
     this.hasTravelHeading = true;
     this.applyFacingDirection();
@@ -292,7 +296,6 @@ export class BobCharacterPresentation {
 
   update(deltaSeconds: number, state: BobCharacterPresentationState): void {
     if (this.disposed || this.deathActive) return;
-    this.previousFacingYawRadians = this.currentFacingYawRadians;
     this.previousFrame.copy(this.currentFrame);
     this.velocityWorld.set(
       state.velocityWorld.x,
@@ -309,8 +312,17 @@ export class BobCharacterPresentation {
       // A passive fall into the wall has no chosen tangent; start facing up.
       this.wallHeadingWorld.copy(LOCAL_UP)
         .projectOnPlane(this.surfaceNormalWorld).normalize();
+      this.wallHeadingTargetWorld.copy(this.wallHeadingWorld);
+      this.wallReversing = false;
+      this.wallReversalHoldRemaining = 0;
+      this.reversing = false;
+      this.reversalHoldRemaining = 0;
     }
-    if (this.attachedToWall && !state.attached) this.wallExitActive = true;
+    if (this.attachedToWall && !state.attached) {
+      this.wallExitActive = true;
+      this.wallReversing = false;
+      this.wallReversalHoldRemaining = 0;
+    }
     this.attachedToWall = state.attached;
     if (state.attached) this.wallExitActive = false;
     if (this.attachedToWall) {
@@ -319,8 +331,28 @@ export class BobCharacterPresentation {
         state.movementIntentWorld.y,
         state.movementIntentWorld.z,
       ).projectOnPlane(this.surfaceNormalWorld);
-      if (this.frameForward.lengthSq() > 1e-8) {
-        this.wallHeadingWorld.copy(this.frameForward).normalize();
+      if (this.frameForward.lengthSq() >=
+        WALL_HEADING_INPUT_DEAD_ZONE * WALL_HEADING_INPUT_DEAD_ZONE) {
+        this.frameForward.normalize();
+        const headingDelta = this.wallHeadingWorld.angleTo(this.frameForward);
+        if (this.wallReversing) {
+          this.wallHeadingTargetWorld.copy(this.frameForward);
+          if (headingDelta < LOCOMOTION_HEADING_HYSTERESIS_RADIANS) {
+            this.wallHeadingWorld.copy(this.frameForward);
+            this.wallReversing = false;
+            this.wallReversalHoldRemaining = 0;
+          }
+        } else if (
+          this.locomotionStrength >= LOCOMOTION_REVERSAL_LEAN_THRESHOLD &&
+          headingDelta >= LOCOMOTION_REVERSAL_RADIANS
+        ) {
+          this.wallHeadingTargetWorld.copy(this.frameForward);
+          this.wallReversing = true;
+          this.wallReversalHoldRemaining = LOCOMOTION_REVERSAL_HOLD_SECONDS;
+        } else if (headingDelta >= LOCOMOTION_HEADING_HYSTERESIS_RADIANS) {
+          this.wallHeadingWorld.copy(this.frameForward);
+          this.wallHeadingTargetWorld.copy(this.frameForward);
+        }
       }
     }
     this.tangentialVelocityWorld
@@ -394,6 +426,12 @@ export class BobCharacterPresentation {
         this.diagnosticsState.jumpCharge === 0,
       elapsed,
     );
+    if (this.wallReversing && this.wallReversalHoldRemaining > 0) {
+      this.wallReversalHoldRemaining = Math.max(0,
+        this.wallReversalHoldRemaining - elapsed);
+    } else if (this.wallReversing) {
+      this.wallHeadingWorld.copy(this.wallHeadingTargetWorld);
+    }
     this.updateFacing(elapsed);
     this.launchRemaining = Math.max(0, this.launchRemaining - elapsed);
     this.landingRemaining = Math.max(0, this.landingRemaining - elapsed);
@@ -433,17 +471,7 @@ export class BobCharacterPresentation {
   present(interpolationAlpha = 1): void {
     const alpha = THREE.MathUtils.clamp(interpolationAlpha, 0, 1);
     this.mesh.position.copy(this.gameplayPositionWorld);
-    const currentUpright = this.frameUp.copy(LOCAL_UP)
-      .applyQuaternion(this.currentFrame).dot(LOCAL_UP) > 0.9999;
-    const previousUpright = this.frameUp.copy(LOCAL_UP)
-      .applyQuaternion(this.previousFrame).dot(LOCAL_UP) > 0.9999;
-    if (currentUpright && previousUpright) {
-      this.mesh.rotation.set(0, this.previousFacingYawRadians +
-        shortestAngleDelta(this.previousFacingYawRadians,
-          this.currentFacingYawRadians) * alpha, 0);
-    } else {
-      this.mesh.quaternion.copy(this.previousFrame).slerp(this.currentFrame, alpha);
-    }
+    this.mesh.quaternion.copy(this.previousFrame).slerp(this.currentFrame, alpha);
     this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
     if ((this.attachedToWall || (this.wallExitActive &&
       this.diagnosticsState.grounded === 1)) &&
@@ -638,6 +666,7 @@ export class BobCharacterPresentation {
     this.surfaceNormalWorld.set(0, 1, 0);
     this.moveDirectionWorld.set(0, 0, -1);
     this.wallHeadingWorld.copy(LOCAL_UP);
+    this.wallHeadingTargetWorld.copy(LOCAL_UP);
     this.impactNormalWorld.set(0, 1, 0);
     this.diagnosticsState.speed = 0;
     this.diagnosticsState.locomotionPhase = 0;
@@ -663,10 +692,11 @@ export class BobCharacterPresentation {
     this.locomotionMoving = false;
     this.attachedToWall = false;
     this.wallExitActive = false;
+    this.wallReversing = false;
+    this.wallReversalHoldRemaining = 0;
     this.wallClearanceOffsetMetres = 0;
     this.wallClearanceNormal.set(0, 0, 0);
     this.currentFacingYawRadians = 0;
-    this.previousFacingYawRadians = 0;
     this.targetFacingYawRadians = 0;
     this.hasTravelHeading = false;
     this.reversing = false;
@@ -812,21 +842,24 @@ export class BobCharacterPresentation {
     // Keep the contact frame through the brief launch stretch, then relax
     // toward authoritative gameplay up in the air.
     if (!supported && this.launchRemaining > 0) {
-      this.frameUp.copy(LOCAL_UP).applyQuaternion(this.currentFrame);
-    } else {
-      this.frameUp.copy(this.surfaceNormalWorld);
-    }
-    if (this.frameUp.lengthSq() < 1e-8) this.frameUp.copy(LOCAL_UP);
-    this.frameUp.normalize();
-    if (
-      this.frameUp.dot(LOCAL_UP) > 0.9999 &&
-      this.frameForward.copy(LOCAL_UP).applyQuaternion(this.currentFrame)
-        .dot(LOCAL_UP) > 0.9999
-    ) {
-      this.currentFrame.setFromAxisAngle(LOCAL_UP, this.currentFacingYawRadians);
       return;
     }
-
+    if (!supported) {
+      this.frameUp.copy(LOCAL_UP).applyQuaternion(this.currentFrame).normalize();
+      this.frameForward.copy(this.surfaceNormalWorld);
+      if (this.frameForward.lengthSq() < 1e-8) this.frameForward.copy(LOCAL_UP);
+      this.frameForward.normalize();
+      this.frameTransport.setFromUnitVectors(this.frameUp, this.frameForward);
+      this.targetFrame.copy(this.currentFrame).premultiply(this.frameTransport);
+      this.currentFrame.rotateTowards(
+        this.targetFrame,
+        SUPPORT_FRAME_TURN_RADIANS_PER_SECOND * deltaSeconds,
+      );
+      return;
+    }
+    this.frameUp.copy(this.surfaceNormalWorld);
+    if (this.frameUp.lengthSq() < 1e-8) this.frameUp.copy(LOCAL_UP);
+    this.frameUp.normalize();
     this.frameForward.copy(attached ? this.wallHeadingWorld : this.moveDirectionWorld);
     this.frameForward.projectOnPlane(this.frameUp);
     if (this.frameForward.lengthSq() < 1e-8) {
@@ -845,6 +878,17 @@ export class BobCharacterPresentation {
       this.targetFrame,
       SUPPORT_FRAME_TURN_RADIANS_PER_SECOND * deltaSeconds,
     );
+    if (attached && this.wallReversing &&
+      this.wallReversalHoldRemaining === 0) {
+      this.frameForward.copy(WORLD_FORWARD)
+        .applyQuaternion(this.currentFrame)
+        .projectOnPlane(this.frameUp)
+        .normalize();
+      if (this.frameForward.angleTo(this.wallHeadingTargetWorld) <=
+        LOCOMOTION_HEADING_HYSTERESIS_RADIANS) {
+        this.wallReversing = false;
+      }
+    }
   }
 
   private measureWallContactBounds(body: THREE.Mesh): void {

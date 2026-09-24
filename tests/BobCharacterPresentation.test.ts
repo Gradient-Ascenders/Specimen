@@ -225,6 +225,69 @@ test('wall facing follows player intent even without resolved movement, then hol
   bob.dispose();
 });
 
+test('wall reversal counterleans through Neutral before the frame turns', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3();
+  const wallNormal = new THREE.Vector3(1, 0, 0);
+  const upward = new THREE.Vector3(0, 5.5, 0);
+  const downward = upward.clone().negate();
+  const wall = {
+    ...state(position, upward),
+    grounded: false,
+    attached: true,
+    surfaceNormalWorld: wallNormal,
+    gameplayUpWorld: wallNormal,
+    movementIntentWorld: upward.clone().normalize(),
+    jumpCharge: 0,
+  };
+  bob.update(0, wall);
+  for (let step = 0; step < 45; step += 1) {
+    position.addScaledVector(upward, 1 / 60);
+    bob.update(1 / 60, wall);
+  }
+  bob.present();
+  const character = getCharacter(bob.root);
+  const originalFrame = character.quaternion.clone();
+  assert.ok(weight(bob, 'Bob-Body', 'move-forward') > 0.9);
+
+  let crossedNeutral = false;
+  let greatestTurnStep = 0;
+  let previousFrame = originalFrame.clone();
+  for (let step = 0; step < 60; step += 1) {
+    position.addScaledVector(downward, 1 / 60);
+    bob.update(1 / 60, {
+      ...wall,
+      velocityWorld: downward,
+      movementIntentWorld: downward.clone().normalize(),
+    });
+    bob.present();
+    const signedLean = weight(bob, 'Bob-Body', 'move-forward') -
+      weight(bob, 'Bob-Body', 'move-reverse');
+    if (!crossedNeutral && signedLean <= 0) crossedNeutral = true;
+    if (!crossedNeutral) {
+      assert.ok(character.quaternion.angleTo(originalFrame) < 1e-6,
+        'wall frame turned before the directional lean crossed Neutral');
+    }
+    greatestTurnStep = Math.max(
+      greatestTurnStep,
+      character.quaternion.angleTo(previousFrame),
+    );
+    previousFrame = character.quaternion.clone();
+  }
+
+  const finalForward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(character.quaternion);
+  assert.ok(crossedNeutral, 'wall reversal never crossed Neutral');
+  assert.ok(finalForward.dot(downward.clone().normalize()) > 0.99,
+    'wall presentation did not finish facing reversed travel');
+  assert.ok(weight(bob, 'Bob-Body', 'move-forward') > 0.9,
+    'directional lean did not follow the reversed wall frame');
+  assert.ok(greatestTurnStep <= THREE.MathUtils.degToRad(6.01),
+    'wall reversal exceeded the support-frame turn bound');
+  bob.dispose();
+});
+
 test('resolved supported travel holds a directional lean without a gait cycle', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);
@@ -283,6 +346,98 @@ test('presentation aligns to wall support, holds launch frame and recovers uprig
   bob.reset();
   assert.ok(getCharacter(bob.root).quaternion.angleTo(new THREE.Quaternion()) < 1e-5);
   bob.dispose();
+});
+
+test('wall-jump recovery preserves heading without velocity-driven twist', async () => {
+  const bobs = [
+    new BobCharacterPresentation(0.45),
+    new BobCharacterPresentation(0.45),
+  ] as const;
+  await Promise.all(bobs.map((bob) => bob.prepare(loadAsset)));
+  const wallNormal = new THREE.Vector3(1, 0, 0);
+  const gameplayUp = new THREE.Vector3(0, 1, 0);
+  const wall = {
+    ...state(new THREE.Vector3(), new THREE.Vector3(0, 4, 0)),
+    grounded: false,
+    attached: true,
+    surfaceNormalWorld: wallNormal,
+    gameplayUpWorld: gameplayUp,
+    movementIntentWorld: new THREE.Vector3(0, 1, 0),
+    jumpCharge: 1,
+  };
+  for (const bob of bobs) {
+    for (let step = 0; step < 30; step += 1) bob.update(1 / 60, wall);
+    bob.present();
+    bob.onLaunch({
+      directionWorld: wallNormal,
+      speedMetresPerSecond: 8,
+      chargeFraction: 1,
+    });
+  }
+
+  const characters = bobs.map((bob) => getCharacter(bob.root));
+  assert.ok(characters[0].quaternion.angleTo(characters[1].quaternion) < 1e-6,
+    'wall-aligned setup produced different presentation frames');
+  const takeoffQuaternion = characters[0].quaternion.clone();
+  const previousUp = wallNormal.clone();
+  const previousForward = new THREE.Vector3(0, 1, 0);
+  const previousQuaternion = characters[0].quaternion.clone();
+  const swing = new THREE.Quaternion();
+  const currentUp = new THREE.Vector3();
+  const currentForward = new THREE.Vector3();
+  const transportedForward = new THREE.Vector3();
+  let recoveryStarted = false;
+
+  for (let step = 0; step < 60; step += 1) {
+    const velocities = [
+      new THREE.Vector3(8, 3, 5),
+      new THREE.Vector3(-4, -7, 2),
+    ] as const;
+    for (let index = 0; index < bobs.length; index += 1) {
+      bobs[index].update(1 / 60, {
+        ...wall,
+        attached: false,
+        jumpCharge: 0,
+        velocityWorld: velocities[index],
+      });
+      bobs[index].present();
+    }
+
+    const velocityFrameDifference = characters[0].quaternion
+      .angleTo(characters[1].quaternion);
+    assert.ok(velocityFrameDifference < 1e-6,
+      `airborne velocity changed Bob's orientation by ${velocityFrameDifference}`);
+    const recoveryStepRadians = previousQuaternion.angleTo(
+      characters[0].quaternion,
+    );
+    assert.ok(recoveryStepRadians <= THREE.MathUtils.degToRad(6.01),
+      `airborne recovery turned ${THREE.MathUtils.radToDeg(recoveryStepRadians)} degrees`);
+
+    currentUp.copy(THREE.Object3D.DEFAULT_UP)
+      .applyQuaternion(characters[0].quaternion);
+    currentForward.copy(new THREE.Vector3(0, 0, -1))
+      .applyQuaternion(characters[0].quaternion);
+    if (currentUp.distanceTo(previousUp) > 1e-6) {
+      recoveryStarted = true;
+      swing.setFromUnitVectors(previousUp, currentUp);
+      transportedForward.copy(previousForward).applyQuaternion(swing);
+      assert.ok(currentForward.dot(transportedForward) > 0.9999,
+        'upright recovery introduced twist around Bob\'s local up');
+    } else if (!recoveryStarted) {
+      assert.ok(currentUp.distanceTo(wallNormal) < 1e-6,
+        'launch did not retain the wall-aligned takeoff frame');
+      assert.ok(characters[0].quaternion.angleTo(takeoffQuaternion) < 1e-6,
+        'launch twisted away from the wall-aligned takeoff heading');
+    }
+    previousUp.copy(currentUp);
+    previousForward.copy(currentForward);
+    previousQuaternion.copy(characters[0].quaternion);
+  }
+
+  assert.ok(recoveryStarted, 'wall-jump frame never began upright recovery');
+  assert.ok(currentUp.distanceTo(gameplayUp) < 1e-5,
+    'wall-jump frame did not recover to authoritative gameplay up');
+  for (const bob of bobs) bob.dispose();
 });
 
 test('carrier transport and blocked movement cannot manufacture a lean', async () => {
