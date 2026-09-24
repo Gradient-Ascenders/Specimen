@@ -513,6 +513,192 @@ test('wall jump charge preserves the facing Bob had before charging', async () =
   bob.dispose();
 });
 
+test('instant wall jump preserves the last displayed side and backward headings', async () => {
+  const wallNormal = new THREE.Vector3(0, 0, -1);
+  const headings = [
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, -1, 0),
+  ];
+
+  for (const heading of headings) {
+    const bob = new BobCharacterPresentation(0.45);
+    await bob.prepare(loadAsset);
+    const wall = {
+      ...state(new THREE.Vector3(), heading.clone().multiplyScalar(5.5)),
+      grounded: false,
+      attached: true,
+      surfaceNormalWorld: wallNormal,
+      gameplayUpWorld: wallNormal,
+      movementIntentWorld: heading,
+      jumpCharge: 0,
+    };
+
+    for (let step = 0; step < 30; step += 1) bob.update(1 / 60, wall);
+    bob.present();
+    const character = getCharacter(bob.root);
+    const displayedBeforeJump = character.quaternion.clone();
+    assert.ok(new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(displayedBeforeJump).dot(heading) > 0.99);
+
+    // A press and release can arrive in one fixed step, so presentation never
+    // observes chargingJump. Any queued support-frame work must not replace the
+    // heading that was actually visible when the launch event arrived.
+    for (let step = 0; step < 4; step += 1) {
+      bob.update(1 / 60, {
+        ...wall,
+        movementIntentWorld: new THREE.Vector3(0, 1, 0),
+      });
+    }
+    bob.onLaunch({
+      directionWorld: wallNormal,
+      speedMetresPerSecond: 8,
+      chargeFraction: 0,
+    });
+    bob.update(1 / 60, {
+      ...wall,
+      grounded: false,
+      attached: false,
+      velocityWorld: wallNormal.clone().multiplyScalar(8),
+      movementIntentWorld: new THREE.Vector3(),
+    });
+    bob.present();
+
+    assert.ok(character.quaternion.angleTo(displayedBeforeJump) < 1e-6,
+      `instant wall takeoff replaced heading ${heading.toArray()}`);
+    bob.dispose();
+  }
+});
+
+test('landing after a wall jump preserves the recovered wall heading', async () => {
+  const wallNormal = new THREE.Vector3(0, 0, -1);
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const headings = [
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, -1, 0),
+  ];
+
+  for (const heading of headings) {
+    const bob = new BobCharacterPresentation(0.45);
+    await bob.prepare(loadAsset);
+    const wall = {
+      ...state(new THREE.Vector3(), heading.clone().multiplyScalar(5.5)),
+      grounded: false,
+      attached: true,
+      surfaceNormalWorld: wallNormal,
+      gameplayUpWorld: wallNormal,
+      movementIntentWorld: heading,
+      jumpCharge: 0,
+    };
+    for (let step = 0; step < 30; step += 1) bob.update(1 / 60, wall);
+    bob.present();
+    bob.onLaunch({
+      directionWorld: wallNormal,
+      speedMetresPerSecond: 8,
+      chargeFraction: 0,
+    });
+
+    for (let step = 0; step < 90; step += 1) {
+      bob.update(1 / 60, {
+        ...wall,
+        grounded: false,
+        attached: false,
+        movementIntentWorld: new THREE.Vector3(),
+        jumpCharge: 0,
+      });
+    }
+    for (let step = 0; step < 30; step += 1) {
+      bob.update(1 / 60, {
+        ...wall,
+        grounded: false,
+        attached: false,
+        gameplayUpWorld: worldUp,
+        movementIntentWorld: new THREE.Vector3(),
+        jumpCharge: 0,
+      });
+    }
+    bob.present();
+    const character = getCharacter(bob.root);
+    const recoveredHeading = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(character.quaternion);
+    assert.ok(Math.abs(recoveredHeading.dot(worldUp)) < 1e-6);
+
+    for (let step = 0; step < 30; step += 1) {
+      bob.update(1 / 60, {
+        ...wall,
+        grounded: true,
+        attached: false,
+        surfaceNormalWorld: worldUp,
+        gameplayUpWorld: worldUp,
+        velocityWorld: new THREE.Vector3(),
+        movementIntentWorld: new THREE.Vector3(),
+        jumpCharge: 0,
+      });
+    }
+    bob.present();
+    const landedHeading = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(character.quaternion);
+    assert.ok(landedHeading.dot(recoveredHeading) > 0.9999,
+      `landing changed ${recoveredHeading.toArray()} to ${landedHeading.toArray()}`);
+    bob.dispose();
+  }
+});
+
+test('reattaching after a wall jump preserves the last wall heading', async () => {
+  const wallNormal = new THREE.Vector3(0, 0, -1);
+  const headings = [
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, -1, 0),
+  ];
+
+  for (const heading of headings) {
+    const bob = new BobCharacterPresentation(0.45);
+    await bob.prepare(loadAsset);
+    const wall = {
+      ...state(new THREE.Vector3(), heading.clone().multiplyScalar(5.5)),
+      grounded: true,
+      attached: true,
+      surfaceNormalWorld: wallNormal,
+      gameplayUpWorld: wallNormal,
+      movementIntentWorld: heading,
+      jumpCharge: 0,
+    };
+    for (let step = 0; step < 30; step += 1) bob.update(1 / 60, wall);
+    bob.present();
+    const character = getCharacter(bob.root);
+    const displayedBeforeJump = character.quaternion.clone();
+    bob.onLaunch({
+      directionWorld: wallNormal,
+      speedMetresPerSecond: 8,
+      chargeFraction: 0,
+    });
+
+    for (let step = 0; step < 30; step += 1) {
+      bob.update(1 / 60, {
+        ...wall,
+        grounded: false,
+        attached: false,
+        velocityWorld: wallNormal.clone().multiplyScalar(2),
+        movementIntentWorld: new THREE.Vector3(),
+      });
+    }
+    for (let step = 0; step < 30; step += 1) {
+      bob.update(1 / 60, {
+        ...wall,
+        velocityWorld: new THREE.Vector3(),
+        movementIntentWorld: new THREE.Vector3(),
+      });
+    }
+    bob.present();
+
+    assert.ok(character.quaternion.angleTo(displayedBeforeJump) < 1e-6,
+      `wall reattachment replaced heading ${heading.toArray()}`);
+    bob.dispose();
+  }
+});
+
 test('carrier transport and blocked movement cannot manufacture a lean', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);

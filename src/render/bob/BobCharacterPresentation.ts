@@ -163,6 +163,7 @@ export class BobCharacterPresentation {
   private locomotionMoving = false;
   private attachedToWall = false;
   private wallExitActive = false;
+  private wallExitFacingPending = false;
   private wallReversing = false;
   private wallReversalHoldRemaining = 0;
   private wallChargeFacingLocked = false;
@@ -312,9 +313,26 @@ export class BobCharacterPresentation {
       .set(sourceNormal.x, sourceNormal.y, sourceNormal.z)
       .normalize();
     if (state.attached && !this.attachedToWall) {
-      // A passive fall into the wall has no chosen tangent; start facing up.
-      this.wallHeadingWorld.copy(LOCAL_UP)
-        .projectOnPlane(this.surfaceNormalWorld).normalize();
+      if (this.wallExitFacingPending) {
+        // Returning from a wall jump already has a chosen tangent. Carry it
+        // back onto the support instead of treating the contact as a passive
+        // fall that should face up.
+        this.wallHeadingWorld.projectOnPlane(this.surfaceNormalWorld);
+        if (this.wallHeadingWorld.lengthSq() < 1e-8) {
+          this.wallHeadingWorld.copy(WORLD_FORWARD)
+            .applyQuaternion(this.currentFrame)
+            .projectOnPlane(this.surfaceNormalWorld);
+        }
+        if (this.wallHeadingWorld.lengthSq() < 1e-8) {
+          this.wallHeadingWorld.copy(LOCAL_UP)
+            .projectOnPlane(this.surfaceNormalWorld);
+        }
+        this.wallHeadingWorld.normalize();
+      } else {
+        // A passive fall into the wall has no chosen tangent; start facing up.
+        this.wallHeadingWorld.copy(LOCAL_UP)
+          .projectOnPlane(this.surfaceNormalWorld).normalize();
+      }
       this.wallHeadingTargetWorld.copy(this.wallHeadingWorld);
       this.wallReversing = false;
       this.wallReversalHoldRemaining = 0;
@@ -323,30 +341,21 @@ export class BobCharacterPresentation {
     }
     if (this.attachedToWall && !state.attached) {
       this.wallExitActive = true;
+      this.wallExitFacingPending = true;
       this.wallReversing = false;
       this.wallReversalHoldRemaining = 0;
     }
     this.attachedToWall = state.attached;
-    if (state.attached) this.wallExitActive = false;
+    if (state.attached) {
+      this.wallExitActive = false;
+      this.wallExitFacingPending = false;
+    }
     const wallCharging = state.attached && state.chargingJump;
     if (!wallCharging) this.wallChargeFacingLocked = false;
     if (wallCharging && !this.wallChargeFacingLocked) {
       // Freeze the last frame the player actually saw. A charge may begin
       // between fixed updates while the support frame is still interpolating.
-      this.currentFrame.copy(this.mesh.quaternion);
-      this.previousFrame.copy(this.currentFrame);
-      this.frameForward.copy(WORLD_FORWARD)
-        .applyQuaternion(this.currentFrame)
-        .projectOnPlane(this.surfaceNormalWorld);
-      if (this.frameForward.lengthSq() < 1e-8) {
-        this.frameForward.copy(this.wallHeadingWorld);
-      } else {
-        this.frameForward.normalize();
-      }
-      this.wallHeadingWorld.copy(this.frameForward);
-      this.wallHeadingTargetWorld.copy(this.frameForward);
-      this.wallReversing = false;
-      this.wallReversalHoldRemaining = 0;
+      this.lockWallFacingToPresentedFrame();
       this.wallChargeFacingLocked = true;
     }
     if (this.attachedToWall && !this.wallChargeFacingLocked) {
@@ -384,6 +393,10 @@ export class BobCharacterPresentation {
       .projectOnPlane(this.surfaceNormalWorld);
     const tangentialSpeed = this.tangentialVelocityWorld.length();
     const groundLocomotion = state.grounded && !state.attached;
+    if (groundLocomotion && this.wallExitFacingPending) {
+      this.adoptRecoveredGroundFacing();
+      this.wallExitFacingPending = false;
+    }
     if (!groundLocomotion) {
       this.locomotionMoving = false;
     } else if (this.locomotionMoving) {
@@ -597,6 +610,7 @@ export class BobCharacterPresentation {
 
   onLaunch(launch: SlimeVisualLaunch): void {
     if (this.deathActive || this.disposed) return;
+    if (this.attachedToWall) this.lockWallFacingToPresentedFrame();
     this.launchRemaining = LAUNCH_SECONDS;
     this.launchStrength =
       0.65 + THREE.MathUtils.clamp(launch.chargeFraction, 0, 1) * 0.35;
@@ -716,6 +730,7 @@ export class BobCharacterPresentation {
     this.locomotionMoving = false;
     this.attachedToWall = false;
     this.wallExitActive = false;
+    this.wallExitFacingPending = false;
     this.wallReversing = false;
     this.wallReversalHoldRemaining = 0;
     this.wallChargeFacingLocked = false;
@@ -857,6 +872,46 @@ export class BobCharacterPresentation {
       0,
       -Math.cos(this.currentFacingYawRadians),
     );
+  }
+
+  private lockWallFacingToPresentedFrame(): void {
+    this.currentFrame.copy(this.mesh.quaternion);
+    this.previousFrame.copy(this.currentFrame);
+    this.frameForward.copy(WORLD_FORWARD)
+      .applyQuaternion(this.currentFrame)
+      .projectOnPlane(this.surfaceNormalWorld);
+    if (this.frameForward.lengthSq() < 1e-8) {
+      this.frameForward.copy(this.wallHeadingWorld);
+    } else {
+      this.frameForward.normalize();
+    }
+    this.wallHeadingWorld.copy(this.frameForward);
+    this.wallHeadingTargetWorld.copy(this.frameForward);
+    this.wallReversing = false;
+    this.wallReversalHoldRemaining = 0;
+  }
+
+  private adoptRecoveredGroundFacing(): void {
+    // Transport the displayed wall-exit frame upright without adding a turn,
+    // then seed ordinary ground facing from that recovered heading. This keeps
+    // the first grounded support update from targeting stale pre-wall input.
+    this.frameUp.copy(LOCAL_UP).applyQuaternion(this.currentFrame).normalize();
+    this.frameTransport.setFromUnitVectors(this.frameUp, LOCAL_UP);
+    this.frameForward.copy(WORLD_FORWARD)
+      .applyQuaternion(this.currentFrame)
+      .applyQuaternion(this.frameTransport)
+      .projectOnPlane(LOCAL_UP)
+      .normalize();
+    const recoveredYawRadians = Math.atan2(
+      -this.frameForward.x,
+      -this.frameForward.z,
+    );
+    this.currentFacingYawRadians = recoveredYawRadians;
+    this.targetFacingYawRadians = recoveredYawRadians;
+    this.hasTravelHeading = true;
+    this.reversing = false;
+    this.reversalHoldRemaining = 0;
+    this.applyFacingDirection();
   }
 
   private updateSupportFrame(
