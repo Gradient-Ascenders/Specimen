@@ -206,6 +206,7 @@ export class KinematicBody {
   private readonly launchDirection = new THREE.Vector3();
   private readonly edgeOldUp = new THREE.Vector3();
   private readonly edgeTravelDirection = new THREE.Vector3();
+  private readonly edgeProbeOrigin = new THREE.Vector3();
   private readonly edgeProbeDisplacement = new THREE.Vector3();
   private readonly edgeTransitionRotation = new THREE.Quaternion();
 
@@ -1148,6 +1149,22 @@ export class KinematicBody {
 
       if (
         allowSurfaceTransitions &&
+        this.tryTransitionAttachedContactToGround(
+          this.movementHit.normal,
+          this.movementHit.object,
+          surface.tag,
+          surface.tractionMultiplier,
+          velocityIntoSurface,
+        )
+      ) {
+        this.remainingDisplacement.multiplyScalar(1 - travelFraction)
+          .applyQuaternion(this.edgeTransitionRotation)
+          .projectOnPlane(this.groundNormalValue);
+        continue;
+      }
+
+      if (
+        allowSurfaceTransitions &&
         this.config.adhesionEnabled &&
         surface.adhesive
       ) {
@@ -1182,6 +1199,47 @@ export class KinematicBody {
         );
       }
     }
+  }
+
+  /** Carry wall-relative travel through a concave seam onto walkable ground. */
+  private tryTransitionAttachedContactToGround(
+    surfaceNormal: THREE.Vector3,
+    surfaceObject: THREE.Mesh | null,
+    surfaceTag: SurfaceTag,
+    tractionMultiplier: number,
+    velocityIntoSurface: number,
+  ): boolean {
+    if (!this.attachedValue || !surfaceObject) return false;
+    if (velocityIntoSurface >= 0) return false;
+    if (
+      surfaceNormal.dot(WORLD_UP) < this.config.minimumGroundNormalDot
+    ) {
+      return false;
+    }
+
+    this.edgeOldUp.copy(this.gameplayUpValue);
+    this.edgeTransitionRotation.setFromUnitVectors(
+      this.edgeOldUp,
+      surfaceNormal,
+    );
+    this.velocityValue
+      .applyQuaternion(this.edgeTransitionRotation)
+      .projectOnPlane(surfaceNormal);
+
+    this.attachedValue = false;
+    this.attachmentSurface = null;
+    this.supportColliderValue = surfaceObject;
+    this.stickyJumpGravityActiveValue = false;
+    this.stickyJumpGravityRemainingSecondsValue = 0;
+    this.gameplayUpValue.copy(WORLD_UP);
+    this.groundNormalValue.copy(surfaceNormal);
+    this.groundedValue = true;
+    this.supportSurfaceTagValue = surfaceTag;
+    this.supportTractionMultiplier = tractionMultiplier;
+    this.coyoteTimeRemainingSecondsValue = this.config.coyoteTimeSeconds;
+    this.groundReacquireDelaySeconds = 0;
+    this.airborneSeconds = 0;
+    return true;
   }
 
   private tryApplyBounce(
@@ -1463,36 +1521,58 @@ export class KinematicBody {
       )
       .addScaledVector(
         this.edgeOldUp,
-        -this.config.groundProbeDistanceMetres,
+        -(
+          this.config.radiusMetres +
+          this.config.skinWidthMetres +
+          this.config.groundProbeDistanceMetres
+        ),
       );
 
-    if (
-      !this.world.sweepSphere(
-        this.currentPosition,
+    const foundDirectEdge = this.world.sweepSphere(
+      this.currentPosition,
+      this.edgeProbeDisplacement,
+      this.config.radiusMetres + this.config.skinWidthMetres,
+      this.edgeHit,
+      this.config.movementCollisionMask,
+    );
+
+    if (!foundDirectEdge || !this.isValidAttachedEdgeHit()) {
+      // A separate ordinary floor can begin on the far side of a thin wall.
+      // Start beyond the old support plane and sweep back along travel so the
+      // floor's top normal wins over its box side expansion.
+      this.edgeProbeOrigin
+        .copy(this.currentPosition)
+        .addScaledVector(
+          this.edgeOldUp,
+          -(
+            this.config.radiusMetres * 2 +
+            this.config.skinWidthMetres +
+            this.config.groundProbeDistanceMetres
+          ),
+        );
+      this.edgeProbeDisplacement
+        .copy(this.edgeTravelDirection)
+        .multiplyScalar(
+          -(
+            this.config.groundProbeDistanceMetres +
+            tangentialSpeed * Math.max(0, deltaSeconds)
+          ),
+        );
+      if (!this.world.sweepSphere(
+        this.edgeProbeOrigin,
         this.edgeProbeDisplacement,
         this.config.radiusMetres + this.config.skinWidthMetres,
         this.edgeHit,
         this.config.movementCollisionMask,
-      )
-    ) {
-      return false;
+        this.attachmentSurface ?? undefined,
+      ) || !this.isValidAttachedEdgeHit()) {
+        return false;
+      }
     }
 
     const surface = this.surfaces.get(this.edgeHit.object);
-    if (!this.config.adhesionEnabled || !surface.adhesive) return false;
-
     const transitionNormal = this.edgeHit.normal;
-    if (
-      transitionNormal.dot(this.edgeTravelDirection) <
-      this.config.minimumGroundNormalDot
-    ) {
-      return false;
-    }
-
-    const walkableGround =
-      transitionNormal.dot(WORLD_UP) >= this.config.minimumGroundNormalDot;
     const attachableWall = this.isAuthoredWallNormal(transitionNormal);
-    if (!walkableGround && !attachableWall) return false;
 
     this.edgeTransitionRotation.setFromUnitVectors(
       this.edgeOldUp,
@@ -1508,6 +1588,7 @@ export class KinematicBody {
     this.groundedValue = true;
     this.attachedValue = attachableWall;
     this.attachmentSurface = attachableWall ? this.edgeHit.object : null;
+    this.supportColliderValue = this.edgeHit.object;
     this.stickyJumpGravityActiveValue = false;
     this.stickyJumpGravityRemainingSecondsValue = 0;
     this.gameplayUpValue.copy(
@@ -1520,6 +1601,24 @@ export class KinematicBody {
     this.groundReacquireDelaySeconds = 0;
     this.airborneSeconds = 0;
     return true;
+  }
+
+  private isValidAttachedEdgeHit(): boolean {
+    const transitionNormal = this.edgeHit.normal;
+    if (
+      transitionNormal.dot(this.edgeTravelDirection) <
+      this.config.minimumGroundNormalDot
+    ) {
+      return false;
+    }
+
+    const walkableGround =
+      transitionNormal.dot(WORLD_UP) >= this.config.minimumGroundNormalDot;
+    if (walkableGround) return true;
+    if (!this.isAuthoredWallNormal(transitionNormal)) return false;
+
+    const surface = this.surfaces.get(this.edgeHit.object);
+    return this.config.adhesionEnabled && surface.adhesive;
   }
 
   private removeVelocityIntoGround(): void {

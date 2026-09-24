@@ -1028,6 +1028,135 @@ test('authored sticky route carries movement around a vertical corner', () => {
   ledgeFascia.geometry.dispose();
 });
 
+test('Bob stays attached around every vertical face of a sticky wall', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4, 2.4));
+  wall.name = 'sticky-wall-full-wrap';
+  wall.position.y = 2;
+  wall.userData.surfaceTag = 'sticky';
+  wall.userData.movementFaceMode = 'vertical-sides';
+  world.register(wall);
+  surfaces.register(wall);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(-0.56, 2, 0),
+  });
+  body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(1, 0, 0));
+  assert.equal(body.attached, true);
+
+  const route = [
+    { movement: new THREE.Vector3(0, 0, 1), normal: new THREE.Vector3(0, 0, 1) },
+    { movement: new THREE.Vector3(1, 0, 0), normal: new THREE.Vector3(1, 0, 0) },
+    { movement: new THREE.Vector3(0, 0, -1), normal: new THREE.Vector3(0, 0, -1) },
+    { movement: new THREE.Vector3(-1, 0, 0), normal: new THREE.Vector3(-1, 0, 0) },
+  ] as const;
+
+  for (const turn of route) {
+    let reachedFace = false;
+    for (let step = 0; step < 120; step += 1) {
+      body.update(FIXED_DELTA_SECONDS, turn.movement);
+      assert.equal(body.attached, true,
+        `Bob detached before reaching ${turn.normal.toArray()}`);
+      if (new THREE.Vector3(
+        body.gameplayUp.x,
+        body.gameplayUp.y,
+        body.gameplayUp.z,
+      ).dot(turn.normal) > 0.99) {
+        reachedFace = true;
+        break;
+      }
+    }
+    assert.equal(reachedFace, true,
+      `Bob did not wrap onto ${turn.normal.toArray()}`);
+  }
+
+  assert.equal(body.supportSurfaceTag, 'sticky');
+  wall.geometry.dispose();
+});
+
+test('sticky wall top hands Bob directly onto an ordinary floor', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2, 4));
+  wall.name = 'sticky-wall-below-ordinary-floor';
+  wall.position.y = 1;
+  wall.userData.surfaceTag = 'sticky';
+  wall.userData.movementFaceMode = 'vertical-sides';
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4));
+  floor.name = 'ordinary-floor-above-sticky-wall';
+  floor.position.set(2.2, 1.9, 0);
+  world.registerAll([wall, floor]);
+  surfaces.registerAll([wall, floor]);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(-0.66, 1.2, 0),
+  });
+  body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(1, 0, 0));
+  assert.equal(body.attached, true);
+
+  let reachedFloor = false;
+  for (let step = 0; step < 120; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(0, 1, 0));
+    assert.equal(body.grounded, true,
+      'Bob became airborne during the top wall-to-floor handoff');
+    if (!body.attached && body.supportSurfaceTag === 'default') {
+      reachedFloor = true;
+      break;
+    }
+  }
+
+  assert.equal(reachedFloor, true);
+  assert.ok(body.groundNormal.y > 0.99);
+  assert.ok(body.velocity.x > 0);
+  wall.geometry.dispose();
+  floor.geometry.dispose();
+});
+
+test('sticky wall bottom carries downward travel onto an ordinary floor', () => {
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2, 4));
+  wall.name = 'sticky-wall-meeting-ordinary-floor';
+  wall.position.y = 1;
+  wall.userData.surfaceTag = 'sticky';
+  wall.userData.movementFaceMode = 'vertical-sides';
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(4, 0.2, 4));
+  floor.name = 'ordinary-floor-below-sticky-wall';
+  floor.position.set(-2.1, -0.1, 0);
+  world.registerAll([wall, floor]);
+  surfaces.registerAll([wall, floor]);
+
+  const body = new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: new THREE.Vector3(-0.56, 0.8, 0),
+  });
+  body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(1, 0, 0));
+  assert.equal(body.attached, true);
+
+  let reachedFloor = false;
+  for (let step = 0; step < 120; step += 1) {
+    body.update(FIXED_DELTA_SECONDS, new THREE.Vector3(0, -1, 0));
+    assert.equal(body.grounded, true,
+      'Bob became airborne during the bottom wall-to-floor handoff');
+    if (!body.attached && body.supportSurfaceTag === 'default') {
+      reachedFloor = true;
+      break;
+    }
+  }
+
+  assert.equal(reachedFloor, true);
+  assert.ok(body.groundNormal.y > 0.99);
+  assert.ok(body.velocity.x < 0);
+  wall.geometry.dispose();
+  floor.geometry.dispose();
+});
+
 
 test('maintenance drone support collision is opt-in and therefore cannot carry ordinary bodies', () => {
   const world = new CollisionWorld();

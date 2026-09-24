@@ -39,6 +39,7 @@ function state(
     gameplayUpWorld: new THREE.Vector3(0, 1, 0),
     grounded: true,
     attached: false,
+    chargingJump: false,
     jumpCharge: 0.4,
     maximumLocomotionSpeedMetresPerSecond: 5.5,
     contactCount: 1,
@@ -438,6 +439,78 @@ test('wall-jump recovery preserves heading without velocity-driven twist', async
   assert.ok(currentUp.distanceTo(gameplayUp) < 1e-5,
     'wall-jump frame did not recover to authoritative gameplay up');
   for (const bob of bobs) bob.dispose();
+});
+
+test('wall jump charge preserves the facing Bob had before charging', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3();
+  const wallNormal = new THREE.Vector3(1, 0, 0);
+  const chosenFacing = new THREE.Vector3(0, 0, 1);
+  const wall = {
+    ...state(position, chosenFacing.clone().multiplyScalar(5.5)),
+    grounded: false,
+    attached: true,
+    surfaceNormalWorld: wallNormal,
+    gameplayUpWorld: wallNormal,
+    movementIntentWorld: chosenFacing,
+    jumpCharge: 0,
+  };
+
+  for (let step = 0; step < 30; step += 1) {
+    position.addScaledVector(chosenFacing, 5.5 / 60);
+    bob.update(1 / 60, wall);
+  }
+  bob.present();
+  const character = getCharacter(bob.root);
+  const facingBeforeCharge = character.quaternion.clone();
+  const forwardBeforeCharge = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(facingBeforeCharge);
+  assert.ok(forwardBeforeCharge.dot(chosenFacing) > 0.99);
+
+  // Input can still be held while Space charges. That must not turn Bob away
+  // from the direction he had when the charge started.
+  bob.update(1 / 60, {
+    ...wall,
+    velocityWorld: new THREE.Vector3(),
+    movementIntentWorld: new THREE.Vector3(0, 1, 0),
+    chargingJump: true,
+    jumpCharge: 0,
+  });
+  bob.present();
+  assert.ok(character.quaternion.angleTo(facingBeforeCharge) < 1e-6,
+    'the zero-progress charge step changed Bob\'s wall facing');
+  for (let step = 0; step < 30; step += 1) {
+    bob.update(1 / 60, {
+      ...wall,
+      velocityWorld: new THREE.Vector3(),
+      movementIntentWorld: new THREE.Vector3(0, 1, 0),
+      chargingJump: true,
+      jumpCharge: (step + 1) / 30,
+    });
+  }
+  bob.present();
+  assert.ok(character.quaternion.angleTo(facingBeforeCharge) < 1e-6,
+    'charging turned Bob away from his pre-jump wall facing');
+
+  bob.onLaunch({
+    directionWorld: wallNormal,
+    speedMetresPerSecond: 8,
+    chargeFraction: 1,
+  });
+  bob.update(1 / 60, {
+    ...wall,
+    grounded: false,
+    attached: false,
+    chargingJump: false,
+    velocityWorld: wallNormal.clone().multiplyScalar(8),
+    movementIntentWorld: new THREE.Vector3(0, 1, 0),
+    jumpCharge: 0,
+  });
+  bob.present();
+  assert.ok(character.quaternion.angleTo(facingBeforeCharge) < 1e-6,
+    'takeoff did not retain the pre-charge wall facing');
+  bob.dispose();
 });
 
 test('carrier transport and blocked movement cannot manufacture a lean', async () => {

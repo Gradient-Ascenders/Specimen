@@ -363,14 +363,16 @@ export class CollisionWorld {
         .normalize();
 
       // Thin vertical panels still have mathematical caps and narrow edge
-      // strips. An authored side-only panel must expose only its two broad
-      // faces to movement, otherwise Bob can stand on a cap or attach to one
-      // of the almost invisible edges. Camera obstruction deliberately keeps
-      // the complete visual box.
+      // strips. Ordinary side-only panels expose just their broad faces.
+      // Sticky panels expose every vertical face so Bob can carry adhesion
+      // around an outside corner, while their horizontal caps stay disabled.
+      // Camera obstruction deliberately keeps the complete visual box.
       if (
         (queryMask & CollisionLayer.Movement) !== 0 &&
         mesh.userData.movementFaceMode === 'vertical-sides' &&
-        !this.isBroadVerticalPanelFace(collider)
+        (mesh.userData.surfaceTag === 'sticky'
+          ? Math.abs(this.candidateNormalWorld.y) > 0.5
+          : !this.isBroadVerticalPanelFace(collider))
       ) {
         continue;
       }

@@ -649,6 +649,7 @@ export class GreyboxLevelRuntime {
     resources.dissolveSystem.update(deltaSeconds);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
+    slimeVisualState.chargingJump = body.chargingJump;
     slimeVisualState.movementIntentWorld = activeBody === body && !switchedThisStep
       ? cameraRelativeMovement
       : resources.noMovement;
@@ -992,6 +993,7 @@ export class GreyboxLevelRuntime {
       gameplayUpWorld: body.gameplayUp,
       grounded: body.grounded,
       attached: body.attached,
+      chargingJump: body.chargingJump,
       jumpCharge: body.chargeFraction,
       maximumLocomotionSpeedMetresPerSecond:
         body.maximumLocomotionSpeedMetresPerSecond,

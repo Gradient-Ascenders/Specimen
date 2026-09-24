@@ -68,6 +68,8 @@ export interface BobCharacterPresentationState extends SlimeVisualState {
   readonly locomotionPositionWorld: Vector3State;
   /** Camera-relative player movement intent, already resolved by the controller. */
   movementIntentWorld: Vector3State;
+  /** True from the first authoritative charge step, including zero progress. */
+  chargingJump: boolean;
 }
 
 export interface BobCharacterPresentationDiagnostics
@@ -163,6 +165,7 @@ export class BobCharacterPresentation {
   private wallExitActive = false;
   private wallReversing = false;
   private wallReversalHoldRemaining = 0;
+  private wallChargeFacingLocked = false;
   private currentFacingYawRadians = 0;
   private targetFacingYawRadians = 0;
   private hasTravelHeading = false;
@@ -325,7 +328,28 @@ export class BobCharacterPresentation {
     }
     this.attachedToWall = state.attached;
     if (state.attached) this.wallExitActive = false;
-    if (this.attachedToWall) {
+    const wallCharging = state.attached && state.chargingJump;
+    if (!wallCharging) this.wallChargeFacingLocked = false;
+    if (wallCharging && !this.wallChargeFacingLocked) {
+      // Freeze the last frame the player actually saw. A charge may begin
+      // between fixed updates while the support frame is still interpolating.
+      this.currentFrame.copy(this.mesh.quaternion);
+      this.previousFrame.copy(this.currentFrame);
+      this.frameForward.copy(WORLD_FORWARD)
+        .applyQuaternion(this.currentFrame)
+        .projectOnPlane(this.surfaceNormalWorld);
+      if (this.frameForward.lengthSq() < 1e-8) {
+        this.frameForward.copy(this.wallHeadingWorld);
+      } else {
+        this.frameForward.normalize();
+      }
+      this.wallHeadingWorld.copy(this.frameForward);
+      this.wallHeadingTargetWorld.copy(this.frameForward);
+      this.wallReversing = false;
+      this.wallReversalHoldRemaining = 0;
+      this.wallChargeFacingLocked = true;
+    }
+    if (this.attachedToWall && !this.wallChargeFacingLocked) {
       this.frameForward.set(
         state.movementIntentWorld.x,
         state.movementIntentWorld.y,
@@ -694,6 +718,7 @@ export class BobCharacterPresentation {
     this.wallExitActive = false;
     this.wallReversing = false;
     this.wallReversalHoldRemaining = 0;
+    this.wallChargeFacingLocked = false;
     this.wallClearanceOffsetMetres = 0;
     this.wallClearanceNormal.set(0, 0, 0);
     this.currentFacingYawRadians = 0;
