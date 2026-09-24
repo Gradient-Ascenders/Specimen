@@ -212,16 +212,16 @@ export class ContainmentLevelController {
 
   recoverActiveCheckpoint(): void {
     this.checkpoints.recover(this.body);
-    this.scene.reconcilePresentationAfterRecovery();
+    this.scene.reconcilePresentationAfterRecovery(this.body.position);
   }
 
   /** Development-only shortcut that preserves normal checkpoint invariants. */
   teleportToRoomForDebug(roomId: ContainmentRoomId): void {
     this.checkpoints.activate(DEBUG_ROOM_ENTRY_CHECKPOINT_IDS[roomId]);
     this.checkpoints.recover(this.body);
-    this.scene.reconcilePresentationAfterRecovery();
     this.stateValue = 'playing';
     this.setActiveRoom(roomId);
+    this.scene.reconcilePresentationAfterRecovery(this.body.position);
     this.leverAdhesionSeconds = 0;
   }
 
@@ -399,7 +399,7 @@ export class ContainmentLevelController {
     if (this.stateValue !== 'playing') return false;
     const accepted = this.requestDeathAction(() => {
       this.checkpoints.recover(this.body);
-      this.scene.reconcilePresentationAfterRecovery();
+      this.scene.reconcilePresentationAfterRecovery(this.body.position);
     });
     if (accepted) this.lastFailureIdValue = failureId;
     return accepted;

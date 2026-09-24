@@ -314,7 +314,10 @@ export class ContainmentLevelScene {
     this.lighting.reset();
   }
 
-  reconcilePresentationAfterRecovery(): void {
+  reconcilePresentationAfterRecovery(bobPosition: Vector3State): void {
+    this.lighting.setBobInDarkDuct(
+      this.isInsideCameraTightVent(bobPosition),
+    );
     this.lighting.reconcileAuthoritativeState(true);
   }
 

@@ -309,14 +309,19 @@ export class BobCharacterPresentation {
     this.materialSet?.setReflectionEnvironment(environmentMap);
   }
 
-  /** Set room-authored targets; the material smooths changes during update. */
-  setReflectionIntensity(bodyIntensity: number, eyeIntensity: number): void {
+  /** Set room-authored targets, optionally snapping at lifecycle boundaries. */
+  setReflectionIntensity(
+    bodyIntensity: number,
+    eyeIntensity: number,
+    snap = false,
+  ): void {
     if (this.disposed) return;
     this.bodyReflectionIntensity = THREE.MathUtils.clamp(bodyIntensity, 0, 2);
     this.eyeReflectionIntensity = THREE.MathUtils.clamp(eyeIntensity, 0, 2);
     this.materialSet?.setReflectionIntensity(
       this.bodyReflectionIntensity,
       this.eyeReflectionIntensity,
+      snap,
     );
   }
 

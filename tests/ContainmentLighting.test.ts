@@ -1,9 +1,45 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
+import type { BobCharacterPresentationState } from '../src/render/bob/BobCharacterPresentation.ts';
+
+const BOB_ASSET_URL = new URL(
+  '../assets/characters/bob/bob-authored.glb',
+  import.meta.url,
+);
+
+async function loadBobAsset(): Promise<THREE.Group> {
+  const bytes = await readFile(BOB_ASSET_URL);
+  const buffer = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+  return (await new GLTFLoader().parseAsync(buffer, '')).scene;
+}
+
+const bobState = (): BobCharacterPresentationState => ({
+  locomotionPositionWorld: new THREE.Vector3(),
+  velocityWorld: new THREE.Vector3(),
+  movementIntentWorld: new THREE.Vector3(),
+  surfaceNormalWorld: new THREE.Vector3(0, 1, 0),
+  gameplayUpWorld: new THREE.Vector3(0, 1, 0),
+  grounded: true,
+  attached: false,
+  chargingJump: false,
+  jumpCharge: 0,
+  maximumLocomotionSpeedMetresPerSecond: 5.5,
+  contactCount: 1,
+  contactNormalWorld: new THREE.Vector3(0, 1, 0),
+  contactSpeedMetresPerSecond: 0,
+  contactName: 'room-1-floor',
+  contactSurfaceTag: 'default',
+  landedThisStep: false,
+});
 
 const createScene = (): ContainmentLevelScene =>
   new ContainmentLevelScene(() => undefined);
@@ -33,7 +69,7 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
   assert.equal(initial.visibleAuthoredLightCount, 5);
   assert.equal(initial.shadowCastingLightCount, 0);
   assert.equal(initial.bobReflectionZone, 'room');
-  assert.equal(initial.bobBodyReflectionTarget, 0.62);
+  assert.equal(initial.bobBodyReflectionTarget, 0.42);
   assert.equal(initial.bobEyeReflectionTarget, 1.12);
   const roomOnePointLights: string[] = [];
   scene.root
@@ -72,6 +108,59 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
   assert.equal(scene.lightingDiagnostics.bobBodyReflectionTarget, 0.38);
   assert.equal(scene.lightingDiagnostics.bobEyeReflectionTarget, 0.74);
 
+  scene.dispose();
+});
+
+test('restart restores fresh Room 1 reflection intensity before another frame', async () => {
+  const fresh = createScene();
+  await fresh.teaching.bob.prepare(loadBobAsset);
+  const freshMaterials = fresh.teaching.bob.diagnostics.materials;
+  assert.ok(freshMaterials);
+
+  const restarted = createScene();
+  await restarted.teaching.bob.prepare(loadBobAsset);
+  restarted.update(0, new THREE.Vector3(-4.8, 6, 8));
+  restarted.teaching.bob.update(2, bobState());
+  assert.ok(
+    restarted.teaching.bob.diagnostics.materials!.bodyReflectionIntensity <
+      freshMaterials.bodyReflectionIntensity,
+  );
+
+  restarted.resetPresentation();
+  restarted.resetTeachingPresentation();
+
+  assert.equal(
+    restarted.teaching.bob.diagnostics.materials?.bodyReflectionIntensity,
+    freshMaterials.bodyReflectionIntensity,
+  );
+  assert.equal(
+    restarted.teaching.bob.diagnostics.materials?.eyeReflectionIntensity,
+    freshMaterials.eyeReflectionIntensity,
+  );
+
+  fresh.dispose();
+  restarted.dispose();
+});
+
+test('checkpoint recovery recomputes the duct profile and snaps before another frame', async () => {
+  const scene = createScene();
+  await scene.teaching.bob.prepare(loadBobAsset);
+  scene.update(0, new THREE.Vector3(-4.8, 6, 8));
+  scene.teaching.bob.update(2, bobState());
+  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'duct');
+
+  const recoveredPosition = new THREE.Vector3(0, 0.45, -0.5);
+  scene.reconcilePresentationAfterRecovery(recoveredPosition);
+
+  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'room');
+  assert.equal(
+    scene.teaching.bob.diagnostics.materials?.bodyReflectionIntensity,
+    0.42,
+  );
+  assert.equal(
+    scene.teaching.bob.diagnostics.materials?.eyeReflectionIntensity,
+    1.12,
+  );
   scene.dispose();
 });
 
@@ -179,7 +268,7 @@ test('Room 4 lighting follows only authoritative elevator state and reset', () =
   assert.ok(upper.intensity > lower.intensity);
 
   scene.roomFour.reset();
-  scene.reconcilePresentationAfterRecovery();
+  scene.reconcilePresentationAfterRecovery(new THREE.Vector3(0, 0.45, -0.5));
   assert.equal(scene.lightingDiagnostics.roomFourElevatorState, 'waitingForRider');
   assert.equal(lower.intensity, waitingIntensity);
 
@@ -217,7 +306,7 @@ test('Room 5 maps authoritative ending progress through alarm, locks, opening an
   assert.equal(scene.lightingDiagnostics.activeParticleCount, 0);
 
   scene.roomFive.reset();
-  scene.reconcilePresentationAfterRecovery();
+  scene.reconcilePresentationAfterRecovery(new THREE.Vector3(0, 0.45, -0.5));
   assert.equal(scene.lightingDiagnostics.goopReleaseState, 'normal');
   assert.equal(scene.lightingDiagnostics.activeParticleCount, 0);
 
@@ -282,7 +371,7 @@ test('cutscene completion and skip converge on identical stable presentation', (
 
   scene.cutsceneLighting.setBobHatchLightingState('impact');
   scene.cutsceneLighting.setGoopReleaseLightingState('warning');
-  scene.reconcilePresentationAfterRecovery();
+  scene.reconcilePresentationAfterRecovery(new THREE.Vector3(0, 0.45, -0.5));
   assert.equal(scene.lightingDiagnostics.bobHatchState, 'gameplay');
   assert.equal(scene.lightingDiagnostics.goopReleaseState, 'normal');
   assert.equal(scene.lightingDiagnostics.goopReleaseManuallyDriven, false);

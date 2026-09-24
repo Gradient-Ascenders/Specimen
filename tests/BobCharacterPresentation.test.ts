@@ -890,6 +890,8 @@ test('Gate 2 materials present lit cyan gel and glossy eyes without self-light o
   assert.ok(body.material.color.b > body.material.color.r * 2);
   assert.ok(body.material.transmission > 0);
   assert.ok(body.material.transmission < 0.5);
+  assert.equal(body.material.roughness, 0.28);
+  assert.equal(body.material.clearcoat, 0.4);
   assert.equal(body.material.emissive.getHex(), 0x000000);
   assert.equal(body.material.emissiveIntensity, 0);
 

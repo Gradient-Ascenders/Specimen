@@ -46,9 +46,9 @@ export class BobGelBodyMaterial extends THREE.MeshPhysicalMaterial {
     super({
       name: 'Bob-Gel-Body',
       color: 0x18cddd,
-      roughness: 0.2,
+      roughness: 0.28,
       metalness: 0,
-      clearcoat: 0.62,
+      clearcoat: 0.4,
       clearcoatRoughness: 0.2,
       transmission: 0.28,
       thickness: 0.42,
@@ -256,6 +256,11 @@ export class BobGateTwoMaterialSet {
   reset(): void {
     this.body.resetSecondaryMotion();
     this.setOpacity(1);
+    this.setReflectionIntensity(
+      this.targetBodyReflectionIntensity,
+      this.targetEyeReflectionIntensity,
+      true,
+    );
   }
 
   setOpacity(opacity: number): void {

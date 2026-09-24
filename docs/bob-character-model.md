@@ -102,9 +102,9 @@ A future constriction pose must be its own Squeeze family rather than reusing La
 
 Both lens meshes contain identically named seat-correction targets for every body target. A body weight is copied to the matching target on the left and right lenses.
 
-The eyes receive a stronger environment-map contribution than the body. This
-keeps their reflections smaller and clearer while the body's rougher response
-resolves as one broad highlight rather than a uniformly bright coating.
+The eyes receive a stronger environment-map contribution for visibility. Their
+lower roughness and the narrow reflected light sources produce more
+concentrated highlights than the body.
 
 Seat correction owns attachment only. Corrections remain modest; extreme correction indicates a body-shape or eye-placement defect.
 

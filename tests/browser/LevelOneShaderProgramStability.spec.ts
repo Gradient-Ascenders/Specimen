@@ -31,6 +31,17 @@ interface ProductionTraversalRuntime {
     readonly body: {
       readonly grounded: boolean;
       readonly position: unknown;
+      teleport(position: {
+        readonly x: number;
+        readonly y: number;
+        readonly z: number;
+      }): void;
+    };
+    readonly bobReflectionEnvironment: {
+      readonly diagnostics: {
+        readonly textureName: string;
+        readonly disposed: boolean;
+      };
     };
     readonly slimePair: { readonly activeBody: unknown };
     readonly containmentLevel: {
@@ -42,6 +53,11 @@ interface ProductionTraversalRuntime {
       }): boolean;
     };
     readonly testScene: {
+      readonly lightingDiagnostics: {
+        readonly bobReflectionZone: 'room' | 'duct';
+        readonly bobBodyReflectionTarget: number;
+        readonly bobEyeReflectionTarget: number;
+      };
       readonly bob: {
         readonly diagnostics: {
           readonly facingYawRadians: number;
@@ -50,6 +66,11 @@ interface ProductionTraversalRuntime {
           readonly speed: number;
           readonly deathBurst: {
             readonly elapsedSeconds: number;
+          };
+          readonly materials?: {
+            readonly reflectionMapName?: string;
+            readonly bodyReflectionIntensity: number;
+            readonly eyeReflectionIntensity: number;
           };
         };
         reset(): void;
@@ -68,6 +89,12 @@ interface ProductionTraversalRuntime {
       getDiagnostics(): { readonly dropletMatrixUploadCount: number };
     };
   };
+  load(): void;
+  start(): void;
+  stop(): void;
+  restartLevel(): void;
+  unload(): void;
+  prepareLightingPrograms(): Promise<void>;
   syncContextualCamera(resources: unknown): void;
 }
 
@@ -491,6 +518,147 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     consoleErrors.some((message) =>
       message.includes('Containment lighting prewarm failed')),
   ).toBe(false);
+});
+
+test('Bob reflections snap across restart and recreate across level reload', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('requestfailed', (request) => {
+    failedRequests.push(`${request.method()} ${request.url()}`);
+  });
+  const assertTraversalRuntimeExposed =
+    await exposeProductionTraversalRuntime(page);
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  assertTraversalRuntimeExposed();
+  await expect(page.locator('[data-action="start"]')).toBeVisible({
+    timeout: 120_000,
+  });
+  await page.locator('[data-action="start"]').click();
+  await waitForRenderedFrames(page, 2);
+
+  const readReflectionState = async () => page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob resources');
+    const materials = resources.testScene.bob.diagnostics.materials;
+    if (!materials) throw new Error('Bob reflection materials are not ready');
+    return {
+      mapName: materials.reflectionMapName,
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+      zone: resources.testScene.lightingDiagnostics.bobReflectionZone,
+      bodyTarget:
+        resources.testScene.lightingDiagnostics.bobBodyReflectionTarget,
+      eyeTarget:
+        resources.testScene.lightingDiagnostics.bobEyeReflectionTarget,
+      environmentName:
+        resources.bobReflectionEnvironment.diagnostics.textureName,
+    };
+  });
+
+  expect(await readReflectionState()).toEqual({
+    mapName: 'bob-laboratory-pmrem',
+    body: 0.42,
+    eyes: 1.12,
+    zone: 'room',
+    bodyTarget: 0.42,
+    eyeTarget: 1.12,
+    environmentName: 'bob-laboratory-pmrem',
+  });
+
+  await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob resources');
+    resources.body.teleport({ x: -4.8, y: 6, z: 8 });
+  });
+  await expect.poll(
+    async () => (await readReflectionState()).zone,
+    { timeout: 5_000, message: 'Waiting for Bob to enter the dark duct profile' },
+  ).toBe('duct');
+  await expect.poll(
+    async () => (await readReflectionState()).body,
+    { timeout: 5_000, message: 'Waiting for the duct reflection fade' },
+  ).toBeLessThan(0.15);
+
+  const restarted = await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    if (!runtime) throw new Error('Missing plain-production traversal runtime');
+    runtime.restartLevel();
+    const resources = runtime.resources;
+    const materials = resources?.testScene.bob.diagnostics.materials;
+    if (!resources || !materials) {
+      throw new Error('Missing restarted Bob resources');
+    }
+    return {
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+      zone: resources.testScene.lightingDiagnostics.bobReflectionZone,
+    };
+  });
+  expect(restarted).toEqual({ body: 0.42, eyes: 1.12, zone: 'room' });
+
+  const reloaded = await page.evaluate(async () => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    if (!runtime?.resources) {
+      throw new Error('Missing plain-production traversal runtime');
+    }
+    const oldEnvironment = runtime.resources.bobReflectionEnvironment;
+    runtime.stop();
+    runtime.unload();
+    const oldEnvironmentDisposed = oldEnvironment.diagnostics.disposed;
+    runtime.load();
+    await runtime.prepareLightingPrograms();
+    runtime.start();
+    const resources = runtime.resources;
+    const materials = resources?.testScene.bob.diagnostics.materials;
+    if (!resources || !materials) {
+      throw new Error('Missing reloaded Bob resources');
+    }
+    return {
+      oldEnvironmentDisposed,
+      newEnvironmentDisposed:
+        resources.bobReflectionEnvironment.diagnostics.disposed,
+      mapName: materials.reflectionMapName,
+      environmentName:
+        resources.bobReflectionEnvironment.diagnostics.textureName,
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+    };
+  });
+  expect(reloaded).toEqual({
+    oldEnvironmentDisposed: true,
+    newEnvironmentDisposed: false,
+    mapName: 'bob-laboratory-pmrem',
+    environmentName: 'bob-laboratory-pmrem',
+    body: 0.42,
+    eyes: 1.12,
+  });
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
 });
 
 test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal', async ({

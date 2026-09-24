@@ -73,7 +73,7 @@ const ACID_COLOUR = 0x87d62e;
 const RELEASE_GREEN_COLOUR = 0x7eff43;
 const ARRIVAL_GREEN_COLOUR = 0x49ef91;
 const BOB_ROOM_REFLECTIONS = {
-  1: { body: 0.62, eyes: 1.12 },
+  1: { body: 0.42, eyes: 1.12 },
   2: { body: 0.56, eyes: 1.02 },
   3: { body: 0.38, eyes: 0.74 },
   4: { body: 0.2, eyes: 0.46 },
@@ -417,6 +417,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       );
     }
     this.syncElevatorLighting(true);
+    if (clearTransientEffects) this.applyBobReflectionTarget(true);
   }
 
   reset(): void {
@@ -432,7 +433,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.applyBobHatchState();
     this.applyGoopReleaseState();
     this.syncElevatorLighting(true);
-    this.applyBobReflectionTarget();
+    this.applyBobReflectionTarget(true);
   }
 
   update(deltaSeconds: number): void {
@@ -491,9 +492,9 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       : BOB_ROOM_REFLECTIONS[this.activeRoomIdValue];
   }
 
-  private applyBobReflectionTarget(): void {
+  private applyBobReflectionTarget(snap = false): void {
     const target = this.bobReflectionTarget;
-    this.bob.setReflectionIntensity(target.body, target.eyes);
+    this.bob.setReflectionIntensity(target.body, target.eyes, snap);
   }
 
   private applyBobHatchState(): void {
