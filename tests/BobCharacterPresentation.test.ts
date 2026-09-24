@@ -513,6 +513,39 @@ test('wall jump charge preserves the facing Bob had before charging', async () =
   bob.dispose();
 });
 
+test('stationary wall jump charge keeps Bob in contact with the wall', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3(0.45, 0, 0);
+  const wallNormal = new THREE.Vector3(1, 0, 0);
+  const wall = {
+    ...state(position, new THREE.Vector3()),
+    grounded: false,
+    attached: true,
+    surfaceNormalWorld: wallNormal,
+    gameplayUpWorld: wallNormal,
+    jumpCharge: 0,
+  };
+  bob.setPosition(position);
+  bob.update(0.3, wall);
+  bob.present();
+  for (let step = 0; step < 30; step += 1) {
+    bob.update(1 / 60, {
+      ...wall,
+      chargingJump: true,
+      jumpCharge: (step + 1) / 30,
+    });
+    bob.present();
+    const clearance = wallClearance(bob, wallNormal);
+    assert.ok(clearance >= -0.01,
+      `charging body entered wall by ${-clearance.toFixed(3)} m`);
+    assert.ok(clearance <= 0.015,
+      `charging body floated ${clearance.toFixed(3)} m above wall`);
+  }
+
+  bob.dispose();
+});
+
 test('instant wall jump preserves the last displayed side and backward headings', async () => {
   const wallNormal = new THREE.Vector3(0, 0, -1);
   const headings = [

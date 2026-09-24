@@ -98,10 +98,13 @@ export class BobCharacterPresentation {
 
   private readonly mesh = new THREE.Group();
   private readonly gameplayPositionWorld = new THREE.Vector3();
-  private readonly wallContactBounds = new THREE.Box3();
-  private readonly wallContactBaseBounds = new THREE.Box3();
-  private readonly wallContactMorphBounds = new Map<BobBodyPose, THREE.Box3>();
-  private readonly wallContactVertex = new THREE.Vector3();
+  private wallContactPositions:
+    THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined;
+  private readonly wallContactMorphs = new Map<
+    BobBodyPose,
+    THREE.BufferAttribute | THREE.InterleavedBufferAttribute
+  >();
+  private wallContactMorphsRelative = false;
   private readonly wallNormalLocal = new THREE.Vector3();
   private readonly wallClearanceNormal = new THREE.Vector3();
   private wallClearanceOffsetMetres = 0;
@@ -245,7 +248,7 @@ export class BobCharacterPresentation {
       for (const material of importedMaterials) material.dispose();
 
       this.asset = asset;
-      this.measureWallContactBounds(asset.body);
+      this.captureWallContactGeometry(asset.body);
       this.materialSet = materialSet;
       root.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
@@ -512,23 +515,10 @@ export class BobCharacterPresentation {
     this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
     if ((this.attachedToWall || (this.wallExitActive &&
       this.diagnosticsState.grounded === 1)) &&
-      !this.deathActive && !this.wallContactBounds.isEmpty()) {
-      // Use only the active body poses to keep the visible envelope outside
-      // the support during wall turns and their return to a floor.
-      this.wallContactBounds.copy(this.wallContactBaseBounds);
-      for (const [pose, bounds] of this.wallContactMorphBounds) {
-        const weight = this.poseWeights[pose];
-        if (weight <= 0) continue;
-        this.wallContactBounds.min.addScaledVector(bounds.min, weight);
-        this.wallContactBounds.max.addScaledVector(bounds.max, weight);
-      }
+      !this.deathActive && this.wallContactPositions) {
       this.wallNormalLocal.copy(this.surfaceNormalWorld)
         .applyQuaternion(this.inverseWorldQuaternion);
-      const bounds = this.wallContactBounds;
-      const minimumProjection =
-        this.wallNormalLocal.x * (this.wallNormalLocal.x >= 0 ? bounds.min.x : bounds.max.x) +
-        this.wallNormalLocal.y * (this.wallNormalLocal.y >= 0 ? bounds.min.y : bounds.max.y) +
-        this.wallNormalLocal.z * (this.wallNormalLocal.z >= 0 ? bounds.min.z : bounds.max.z);
+      const minimumProjection = this.findWallContactMinimumProjection();
       const clearance = Math.max(0,
         WALL_CLEARANCE_METRES - this.radiusMetres - minimumProjection);
       if (this.attachedToWall) {
@@ -971,29 +961,47 @@ export class BobCharacterPresentation {
     }
   }
 
-  private measureWallContactBounds(body: THREE.Mesh): void {
-    const positions = body.geometry.getAttribute('position');
-    const morphs = body.geometry.morphAttributes.position!;
-    this.wallContactBaseBounds.makeEmpty();
-    this.wallContactMorphBounds.clear();
+  private captureWallContactGeometry(body: THREE.Mesh): void {
+    this.wallContactPositions = body.geometry.getAttribute('position');
+    this.wallContactMorphsRelative = body.geometry.morphTargetsRelative;
+    this.wallContactMorphs.clear();
     for (const pose of SUPPORTED_BODY_POSES) {
-      this.wallContactMorphBounds.set(pose, new THREE.Box3().makeEmpty());
+      const index = body.morphTargetDictionary![pose]!;
+      this.wallContactMorphs.set(
+        pose,
+        body.geometry.morphAttributes.position![index]!,
+      );
     }
+  }
+
+  private findWallContactMinimumProjection(): number {
+    const positions = this.wallContactPositions;
+    if (!positions) return Infinity;
+    let minimumProjection = Infinity;
     for (let index = 0; index < positions.count; index += 1) {
-      const x = positions.getX(index);
-      const y = positions.getY(index);
-      const z = positions.getZ(index);
-      this.wallContactBaseBounds.expandByPoint(this.wallContactVertex.set(x, y, z));
+      const baseX = positions.getX(index);
+      const baseY = positions.getY(index);
+      const baseZ = positions.getZ(index);
+      let x = baseX;
+      let y = baseY;
+      let z = baseZ;
       for (const pose of SUPPORTED_BODY_POSES) {
-        const morph = morphs[body.morphTargetDictionary![pose]!]!;
-        this.wallContactMorphBounds.get(pose)!.expandByPoint(this.wallContactVertex.set(
-          morph.getX(index),
-          morph.getY(index),
-          morph.getZ(index),
-        ));
+        const weight = this.poseWeights[pose];
+        if (weight <= 0) continue;
+        const morph = this.wallContactMorphs.get(pose)!;
+        x += weight * (morph.getX(index) -
+          (this.wallContactMorphsRelative ? 0 : baseX));
+        y += weight * (morph.getY(index) -
+          (this.wallContactMorphsRelative ? 0 : baseY));
+        z += weight * (morph.getZ(index) -
+          (this.wallContactMorphsRelative ? 0 : baseZ));
       }
+      minimumProjection = Math.min(minimumProjection,
+        x * this.wallNormalLocal.x +
+        y * this.wallNormalLocal.y +
+        z * this.wallNormalLocal.z);
     }
-    this.wallContactBounds.copy(this.wallContactBaseBounds);
+    return minimumProjection;
   }
 
   private applyMorphs(): void {
