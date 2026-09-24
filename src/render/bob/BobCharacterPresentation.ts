@@ -57,6 +57,7 @@ const SUPPORTED_BODY_POSES = [
   'move-forward', 'move-reverse', 'squash', 'flatten', 'stress',
 ] as const satisfies readonly BobBodyPose[];
 const WALL_CLEARANCE_METRES = 0.004;
+const WALL_CLEARANCE_RELEASE_METRES_PER_SECOND = 1.5;
 
 export type BobCharacterLoader = () => Promise<THREE.Group>;
 
@@ -94,8 +95,12 @@ export class BobCharacterPresentation {
   private readonly mesh = new THREE.Group();
   private readonly gameplayPositionWorld = new THREE.Vector3();
   private readonly wallContactBounds = new THREE.Box3();
+  private readonly wallContactBaseBounds = new THREE.Box3();
+  private readonly wallContactMorphBounds = new Map<BobBodyPose, THREE.Box3>();
   private readonly wallContactVertex = new THREE.Vector3();
   private readonly wallNormalLocal = new THREE.Vector3();
+  private readonly wallClearanceNormal = new THREE.Vector3();
+  private wallClearanceOffsetMetres = 0;
   private readonly inverseWorldQuaternion = new THREE.Quaternion();
   private readonly velocityWorld = new THREE.Vector3();
   private readonly tangentialVelocityWorld = new THREE.Vector3();
@@ -151,6 +156,7 @@ export class BobCharacterPresentation {
   private reversalHoldRemaining = 0;
   private locomotionMoving = false;
   private attachedToWall = false;
+  private wallExitActive = false;
   private currentFacingYawRadians = 0;
   private previousFacingYawRadians = 0;
   private targetFacingYawRadians = 0;
@@ -304,7 +310,9 @@ export class BobCharacterPresentation {
       this.wallHeadingWorld.copy(LOCAL_UP)
         .projectOnPlane(this.surfaceNormalWorld).normalize();
     }
+    if (this.attachedToWall && !state.attached) this.wallExitActive = true;
     this.attachedToWall = state.attached;
+    if (state.attached) this.wallExitActive = false;
     if (this.attachedToWall) {
       this.frameForward.set(
         state.movementIntentWorld.x,
@@ -375,6 +383,11 @@ export class BobCharacterPresentation {
     this.clearMorphWeights();
     const elapsed = Math.max(0, deltaSeconds);
     const supported = state.grounded || state.attached;
+    if (!state.attached) {
+      this.wallClearanceOffsetMetres = Math.max(0,
+        this.wallClearanceOffsetMetres -
+          WALL_CLEARANCE_RELEASE_METRES_PER_SECOND * elapsed);
+    }
     this.updateLocomotion(
       state,
       supported && (state.attached || this.locomotionMoving) &&
@@ -409,6 +422,11 @@ export class BobCharacterPresentation {
       this.expressionWeights['stress-expression'] = this.poseWeights.stress * 0.6;
     }
     this.updateSupportFrame(elapsed, supported, state.attached);
+    if (!state.attached && this.wallClearanceOffsetMetres === 0 &&
+      this.frameUp.copy(LOCAL_UP).applyQuaternion(this.currentFrame)
+        .dot(LOCAL_UP) > 0.9999) {
+      this.wallExitActive = false;
+    }
     this.applyMorphs();
   }
 
@@ -427,9 +445,18 @@ export class BobCharacterPresentation {
       this.mesh.quaternion.copy(this.previousFrame).slerp(this.currentFrame, alpha);
     }
     this.mesh.getWorldQuaternion(this.inverseWorldQuaternion).invert();
-    if (this.attachedToWall && !this.deathActive && !this.wallContactBounds.isEmpty()) {
-      // The visual turns while the sphere collider stays put. Keep the
-      // supported body envelope outside the wall throughout that turn.
+    if ((this.attachedToWall || (this.wallExitActive &&
+      this.diagnosticsState.grounded === 1)) &&
+      !this.deathActive && !this.wallContactBounds.isEmpty()) {
+      // Use only the active body poses to keep the visible envelope outside
+      // the support during wall turns and their return to a floor.
+      this.wallContactBounds.copy(this.wallContactBaseBounds);
+      for (const [pose, bounds] of this.wallContactMorphBounds) {
+        const weight = this.poseWeights[pose];
+        if (weight <= 0) continue;
+        this.wallContactBounds.min.addScaledVector(bounds.min, weight);
+        this.wallContactBounds.max.addScaledVector(bounds.max, weight);
+      }
       this.wallNormalLocal.copy(this.surfaceNormalWorld)
         .applyQuaternion(this.inverseWorldQuaternion);
       const bounds = this.wallContactBounds;
@@ -439,8 +466,17 @@ export class BobCharacterPresentation {
         this.wallNormalLocal.z * (this.wallNormalLocal.z >= 0 ? bounds.min.z : bounds.max.z);
       const clearance = Math.max(0,
         WALL_CLEARANCE_METRES - this.radiusMetres - minimumProjection);
-      this.mesh.position.addScaledVector(this.surfaceNormalWorld, clearance);
+      if (this.attachedToWall) {
+        this.wallClearanceNormal.copy(this.surfaceNormalWorld);
+        this.wallClearanceOffsetMetres = clearance;
+      } else {
+        this.mesh.position.addScaledVector(this.surfaceNormalWorld, clearance);
+      }
     }
+    this.mesh.position.addScaledVector(
+      this.wallClearanceNormal,
+      this.wallClearanceOffsetMetres,
+    );
     this.diagnosticsState.surfaceNormalLocal
       .copy(this.surfaceNormalWorld)
       .applyQuaternion(this.inverseWorldQuaternion);
@@ -626,6 +662,9 @@ export class BobCharacterPresentation {
     this.reversalHoldRemaining = 0;
     this.locomotionMoving = false;
     this.attachedToWall = false;
+    this.wallExitActive = false;
+    this.wallClearanceOffsetMetres = 0;
+    this.wallClearanceNormal.set(0, 0, 0);
     this.currentFacingYawRadians = 0;
     this.previousFacingYawRadians = 0;
     this.targetFacingYawRadians = 0;
@@ -811,21 +850,26 @@ export class BobCharacterPresentation {
   private measureWallContactBounds(body: THREE.Mesh): void {
     const positions = body.geometry.getAttribute('position');
     const morphs = body.geometry.morphAttributes.position!;
-    this.wallContactBounds.makeEmpty();
+    this.wallContactBaseBounds.makeEmpty();
+    this.wallContactMorphBounds.clear();
+    for (const pose of SUPPORTED_BODY_POSES) {
+      this.wallContactMorphBounds.set(pose, new THREE.Box3().makeEmpty());
+    }
     for (let index = 0; index < positions.count; index += 1) {
       const x = positions.getX(index);
       const y = positions.getY(index);
       const z = positions.getZ(index);
-      this.wallContactBounds.expandByPoint(this.wallContactVertex.set(x, y, z));
+      this.wallContactBaseBounds.expandByPoint(this.wallContactVertex.set(x, y, z));
       for (const pose of SUPPORTED_BODY_POSES) {
         const morph = morphs[body.morphTargetDictionary![pose]!]!;
-        this.wallContactBounds.expandByPoint(this.wallContactVertex.set(
-          x + morph.getX(index),
-          y + morph.getY(index),
-          z + morph.getZ(index),
+        this.wallContactMorphBounds.get(pose)!.expandByPoint(this.wallContactVertex.set(
+          morph.getX(index),
+          morph.getY(index),
+          morph.getZ(index),
         ));
       }
     }
+    this.wallContactBounds.copy(this.wallContactBaseBounds);
   }
 
   private applyMorphs(): void {

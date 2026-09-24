@@ -89,6 +89,7 @@ Resolved support-plane movement drives a sustained directional lean. The upper m
 - `stress` supplies ordinary damage reaction and the short rupture anticipation before the existing droplet burst.
 - Landing timing determines whether the compression is a moderate Squash or transitions toward Flatten.
 - Ordinary floor or wall contact remains compatible with locomotion and adds only bounded secondary contact compression or peel.
+- During a floor/wall change, wall clearance follows the active authored poses; the visual offset eases away on release and stays clear of the returning floor.
 
 A future constriction pose must be its own Squeeze family rather than reusing Launch. It is deferred because current `main` has no active Bob constriction sequence; issue #38 still owns that cutscene choreography.
 

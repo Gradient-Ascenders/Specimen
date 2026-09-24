@@ -107,6 +107,63 @@ test('wall transition keeps the authored body in front of the support plane', as
   bob.dispose();
 });
 
+test('floor-to-wall attachment keeps Bob visually continuous while rotating', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const position = new THREE.Vector3(0.45, 0.45, 0);
+  bob.setPosition(position);
+  bob.setYaw(-Math.PI / 2);
+  const floor = {
+    ...state(position, new THREE.Vector3(1, 0, 0)),
+    movementIntentWorld: new THREE.Vector3(1, 0, 0),
+    jumpCharge: 0,
+  };
+  bob.update(1 / 60, floor);
+  bob.present();
+  const character = getCharacter(bob.root);
+  let priorPosition = character.position.clone();
+  let priorRotation = character.quaternion.clone();
+  let greatestPositionStep = 0;
+  let greatestRotationStep = 0;
+  let minimumFloorClearance = Infinity;
+  const wall = {
+    ...floor,
+    attached: true,
+    surfaceNormalWorld: new THREE.Vector3(1, 0, 0),
+    gameplayUpWorld: new THREE.Vector3(1, 0, 0),
+  };
+  for (let step = 0; step < 40; step += 1) {
+    bob.update(1 / 60, wall);
+    bob.present();
+    assert.ok(wallClearance(bob, wall.surfaceNormalWorld) >= -0.01);
+    greatestPositionStep = Math.max(greatestPositionStep,
+      character.position.distanceTo(priorPosition));
+    greatestRotationStep = Math.max(greatestRotationStep,
+      character.quaternion.angleTo(priorRotation));
+    priorPosition.copy(character.position);
+    priorRotation.copy(character.quaternion);
+  }
+  for (let step = 0; step < 40; step += 1) {
+    bob.update(1 / 60, floor);
+    bob.present();
+    minimumFloorClearance = Math.min(minimumFloorClearance,
+      wallClearance(bob, floor.surfaceNormalWorld));
+    greatestPositionStep = Math.max(greatestPositionStep,
+      character.position.distanceTo(priorPosition));
+    greatestRotationStep = Math.max(greatestRotationStep,
+      character.quaternion.angleTo(priorRotation));
+    priorPosition.copy(character.position);
+    priorRotation.copy(character.quaternion);
+  }
+  assert.ok(greatestPositionStep < 0.045,
+    `visible body moved ${greatestPositionStep.toFixed(3)} m in one frame`);
+  assert.ok(greatestRotationStep < THREE.MathUtils.degToRad(7),
+    `visible body turned ${THREE.MathUtils.radToDeg(greatestRotationStep).toFixed(1)} degrees in one frame`);
+  assert.ok(minimumFloorClearance >= -0.03,
+    `body penetrated the floor by ${-minimumFloorClearance.toFixed(3)} m`);
+  bob.dispose();
+});
+
 test('stationary wall facing stays stable after upward motion', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);
