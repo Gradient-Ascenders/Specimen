@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { validateBobGateOneAsset, type BobGateOneAsset } from './BobGateOneAsset.ts';
 
 export const BOB_BODY_POSES = [
-  'move-reach', 'move-gather', 'squash', 'flatten', 'launch', 'airborne', 'stress',
+  'move-forward', 'move-reverse', 'squash', 'flatten', 'launch', 'airborne', 'stress',
 ] as const;
 export const BOB_EXPRESSIONS = ['blink', 'effort', 'surprise', 'stress-expression'] as const;
 export type BobBodyPose = typeof BOB_BODY_POSES[number];

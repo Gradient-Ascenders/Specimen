@@ -5,7 +5,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const evidence = path.join(root, 'docs/evidence/issue-155/mass-transfer-runtime');
+const evidence = path.join(root, 'docs/evidence/issue-150/locomotion-runtime');
 const url = 'http://127.0.0.1:4175';
 const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4175', '--strictPort'], {
   cwd: root,
@@ -69,10 +69,8 @@ try {
         y: body.groundNormal.y,
         z: body.groundNormal.z,
       },
-      reach: weight('move-reach'),
-      gather: weight('move-gather'),
-      locomotionPhase: bob.diagnostics.locomotionPhase,
-      locomotionStrength: bob.diagnostics.locomotionStrength,
+      forward: weight('move-forward'),
+      reverse: weight('move-reverse'),
       squash: weight('squash'),
       flatten: weight('flatten'),
       launch: weight('launch'),
@@ -112,8 +110,8 @@ try {
   try {
     await page.waitForFunction(() => {
       const bob = window.__bobRuntime.resources.testScene.bob;
-      return bob.diagnostics.locomotionStrength > 0.3 &&
-        Math.abs(window.__bobRuntime.resources.body.position.x + 9) > 0.2;
+      const body = bob.root.getObjectByName('Bob-Body');
+      return body.morphTargetInfluences[body.morphTargetDictionary['move-forward']] > 0.65;
     }, null, { timeout: 10_000 });
   } catch (error) {
     console.error('Acceleration checkpoint:', await sample());
@@ -132,10 +130,11 @@ try {
   await page.keyboard.down('d');
   await page.waitForFunction(() => {
     const bob = window.__bobRuntime.resources.testScene.bob;
+    const body = bob.root.getObjectByName('Bob-Body');
     return bob.diagnostics.reversing &&
-      bob.diagnostics.locomotionStrength < 0.05;
+      body.morphTargetInfluences[body.morphTargetDictionary['move-reverse']] > 0.25;
   }, null, { timeout: 10_000 });
-  observations.collected = await sample();
+  observations.counterlean = await sample();
   await page.waitForFunction(() => !window.__bobRuntime.resources.testScene.bob.diagnostics.reversing,
     null, { timeout: 10_000 });
   observations.reversed = await sample();
@@ -168,9 +167,8 @@ try {
     try {
       await page.waitForFunction(() => {
         const body = window.__bobRuntime.resources.body;
-        const bob = window.__bobRuntime.resources.testScene.bob;
         return body.attached && Math.abs(body.groundNormal.y) < 0.5 &&
-          body.position.y > 1 && bob.diagnostics.locomotionStrength > 0.2;
+          body.position.y > 1;
       }, null, { timeout: 3000 });
       wallKey = key;
       break;
@@ -202,12 +200,9 @@ try {
   if (exposedBundles !== 1 || pageErrors.length || failedRequests.length) {
     throw new Error('Production capture had errors or failed requests');
   }
-  if (observations.accelerating.locomotionStrength <= 0.3 ||
-      Math.abs(observations.cruising.position.x - observations.neutral.position.x) <= 1 ||
-      observations.collected.locomotionStrength >= 0.05 ||
+  if (observations.cruising.forward <= 0.65 || observations.counterlean.reverse <= 0.25 ||
       !observations.takeoff.airborne && !observations.takeoff.launch ||
       !observations.landing.grounded || !observations.wallAttach.attached ||
-      observations.wallAttach.locomotionStrength <= 0.2 ||
       Math.abs(observations.wallAttach.supportNormal.y) >= 0.5) {
     throw new Error('Production movement did not reach the required checkpoints');
   }

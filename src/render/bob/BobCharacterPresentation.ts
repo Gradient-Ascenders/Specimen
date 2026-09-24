@@ -41,14 +41,9 @@ const DEATH_TIMING_EPSILON_SECONDS = 1e-9;
 const LAUNCH_SECONDS = 0.18;
 const LANDING_SECONDS = 0.28;
 const DAMAGE_SECONDS = 0.22;
-const LOCOMOTION_CYCLE_DISTANCE_METRES = 1.2;
-const LOCOMOTION_DISTANCE_EPSILON_METRES = 1e-6;
-const LOCOMOTION_CRUISE_STRENGTH = 0.6;
-const LOCOMOTION_ACCELERATION_STRENGTH = 0.75;
-const LOCOMOTION_FULL_ACCELERATION_METRES_PER_SECOND_SQUARED = 32;
-const LOCOMOTION_STRENGTH_RELEASE_PER_SECOND = 7;
-const LOCOMOTION_REVERSAL_STRENGTH_RELEASE_PER_SECOND = 48;
-const LOCOMOTION_REVERSAL_NEUTRAL_STRENGTH = 0.025;
+const LOCOMOTION_RESPONSE_PER_SECOND = 11;
+const LOCOMOTION_SETTLE_PER_SECOND = 7;
+const LOCOMOTION_REVERSAL_HOLD_SECONDS = 0.16;
 const LOCOMOTION_START_SPEED_METRES_PER_SECOND = 0.16;
 const LOCOMOTION_STOP_SPEED_METRES_PER_SECOND = 0.08;
 const LOCOMOTION_HEADING_HYSTERESIS_RADIANS = THREE.MathUtils.degToRad(5);
@@ -59,7 +54,7 @@ const LOCAL_UP = new THREE.Vector3(0, 1, 0);
 const WORLD_FORWARD = new THREE.Vector3(0, 0, -1);
 const WORLD_RIGHT = new THREE.Vector3(1, 0, 0);
 const SUPPORTED_BODY_POSES = [
-  'move-reach', 'move-gather', 'squash', 'flatten', 'stress',
+  'move-forward', 'move-reverse', 'squash', 'flatten', 'stress',
 ] as const satisfies readonly BobBodyPose[];
 const WALL_CLEARANCE_METRES = 0.004;
 const WALL_CLEARANCE_RELEASE_METRES_PER_SECOND = 1.5;
@@ -157,7 +152,8 @@ export class BobCharacterPresentation {
   private damageStrength = 0;
   private hasPreviousLocomotionPosition = false;
   private locomotionStrength = 0;
-  private previousTangentialSpeed = 0;
+  private signedLean = 0;
+  private reversalHoldRemaining = 0;
   private locomotionMoving = false;
   private attachedToWall = false;
   private wallExitActive = false;
@@ -167,7 +163,7 @@ export class BobCharacterPresentation {
   private hasTravelHeading = false;
   private reversing = false;
   private readonly poseWeights: Record<BobBodyPose, number> = {
-    'move-reach': 0, 'move-gather': 0, squash: 0, flatten: 0,
+    'move-forward': 0, 'move-reverse': 0, squash: 0, flatten: 0,
     launch: 0, airborne: 0, stress: 0,
   };
   private readonly expressionWeights: Record<BobExpression, number> = {
@@ -313,13 +309,6 @@ export class BobCharacterPresentation {
       // A passive fall into the wall has no chosen tangent; start facing up.
       this.wallHeadingWorld.copy(LOCAL_UP)
         .projectOnPlane(this.surfaceNormalWorld).normalize();
-      // Ground yaw and its pending reversal are irrelevant in the wall's
-      // support plane. Begin the same Reach/Gather sequence with a clean phase.
-      this.reversing = false;
-      this.targetFacingYawRadians = this.currentFacingYawRadians;
-      this.locomotionStrength = 0;
-      this.previousTangentialSpeed = 0;
-      this.diagnosticsState.locomotionPhase = 0;
     }
     if (this.attachedToWall && !state.attached) this.wallExitActive = true;
     this.attachedToWall = state.attached;
@@ -374,6 +363,7 @@ export class BobCharacterPresentation {
         )) >= LOCOMOTION_REVERSAL_RADIANS
       ) {
         this.reversing = true;
+        this.reversalHoldRemaining = LOCOMOTION_REVERSAL_HOLD_SECONDS;
       }
     }
     this.diagnosticsState.speed = THREE.MathUtils.clamp(
@@ -400,9 +390,8 @@ export class BobCharacterPresentation {
     }
     this.updateLocomotion(
       state,
-      tangentialSpeed,
       supported && (state.attached || this.locomotionMoving) &&
-        !this.reversing && this.diagnosticsState.jumpCharge === 0,
+        this.diagnosticsState.jumpCharge === 0,
       elapsed,
     );
     this.updateFacing(elapsed);
@@ -669,7 +658,8 @@ export class BobCharacterPresentation {
     this.previousLocomotionPositionWorld.set(0, 0, 0);
     this.travelledWorld.set(0, 0, 0);
     this.locomotionStrength = 0;
-    this.previousTangentialSpeed = 0;
+    this.signedLean = 0;
+    this.reversalHoldRemaining = 0;
     this.locomotionMoving = false;
     this.attachedToWall = false;
     this.wallExitActive = false;
@@ -731,20 +721,9 @@ export class BobCharacterPresentation {
 
   private updateLocomotion(
     state: BobCharacterPresentationState,
-    tangentialSpeed: number,
     locomotionActive: boolean,
     deltaSeconds: number,
   ): void {
-    if (!this.hasPreviousLocomotionPosition) {
-      this.previousLocomotionPositionWorld.set(
-        state.locomotionPositionWorld.x,
-        state.locomotionPositionWorld.y,
-        state.locomotionPositionWorld.z,
-      );
-      this.hasPreviousLocomotionPosition = true;
-      this.previousTangentialSpeed = tangentialSpeed;
-      return;
-    }
     this.travelledWorld.set(
       state.locomotionPositionWorld.x - this.previousLocomotionPositionWorld.x,
       state.locomotionPositionWorld.y - this.previousLocomotionPositionWorld.y,
@@ -755,84 +734,47 @@ export class BobCharacterPresentation {
       state.locomotionPositionWorld.y,
       state.locomotionPositionWorld.z,
     );
+    if (!this.hasPreviousLocomotionPosition) this.travelledWorld.set(0, 0, 0);
+    this.hasPreviousLocomotionPosition = true;
     this.travelledWorld.projectOnPlane(this.surfaceNormalWorld);
-    const travelledMetres = this.travelledWorld.length();
-    const speedStrength = THREE.MathUtils.clamp(
-      tangentialSpeed /
-        Math.max(state.maximumLocomotionSpeedMetresPerSecond, 1e-6),
-      0,
-      1,
-    );
-    const accelerationStrength = deltaSeconds > 0
-      ? THREE.MathUtils.clamp(
-          (tangentialSpeed - this.previousTangentialSpeed) /
-            deltaSeconds /
-            LOCOMOTION_FULL_ACCELERATION_METRES_PER_SECOND_SQUARED,
-          0,
-          1,
-        )
+    const forward = state.attached
+      ? this.frameForward.copy(WORLD_FORWARD)
+          .applyQuaternion(this.currentFrame)
+          .projectOnPlane(this.surfaceNormalWorld)
+          .normalize()
+      : this.moveDirectionWorld;
+    const resolvedSpeed = deltaSeconds > 0
+      ? this.travelledWorld.length() / deltaSeconds
       : 0;
-    this.previousTangentialSpeed = tangentialSpeed;
-    const targetStrength = locomotionActive &&
-      travelledMetres > LOCOMOTION_DISTANCE_EPSILON_METRES
-      ? THREE.MathUtils.clamp(
-          speedStrength * LOCOMOTION_CRUISE_STRENGTH +
-            accelerationStrength * LOCOMOTION_ACCELERATION_STRENGTH,
-          0,
-          1,
-        )
+    const signedSpeed = deltaSeconds > 0
+      ? this.travelledWorld.dot(forward) / deltaSeconds
       : 0;
-    if (targetStrength >= this.locomotionStrength) {
-      this.locomotionStrength = targetStrength;
-    } else {
-      const releasePerSecond = this.reversing
-        ? LOCOMOTION_REVERSAL_STRENGTH_RELEASE_PER_SECOND
-        : LOCOMOTION_STRENGTH_RELEASE_PER_SECOND;
-      this.locomotionStrength = THREE.MathUtils.lerp(
-        this.locomotionStrength,
-        targetStrength,
-        1 - Math.exp(-releasePerSecond * deltaSeconds),
-      );
-    }
-    if (!locomotionActive || travelledMetres <= LOCOMOTION_DISTANCE_EPSILON_METRES) {
-      return;
-    }
-    const nextPhase = (
-      this.diagnosticsState.locomotionPhase +
-      travelledMetres / LOCOMOTION_CYCLE_DISTANCE_METRES
-    ) % 1;
-    this.diagnosticsState.locomotionPhase =
-      nextPhase < LOCOMOTION_DISTANCE_EPSILON_METRES ||
-      1 - nextPhase < LOCOMOTION_DISTANCE_EPSILON_METRES
-        ? 0
-        : nextPhase;
+    const target = locomotionActive &&
+      resolvedSpeed >= LOCOMOTION_START_SPEED_METRES_PER_SECOND
+      ? THREE.MathUtils.clamp(signedSpeed /
+          Math.max(state.maximumLocomotionSpeedMetresPerSecond, 1e-6), -1, 1)
+      : 0;
+    const response = target === 0
+      ? LOCOMOTION_SETTLE_PER_SECOND
+      : LOCOMOTION_RESPONSE_PER_SECOND;
+    this.signedLean += (target - this.signedLean) *
+      (1 - Math.exp(-response * deltaSeconds));
+    if (Math.abs(this.signedLean) < 1e-5) this.signedLean = 0;
+    this.locomotionStrength = Math.abs(this.signedLean);
   }
 
   private applyLocomotionWeights(): void {
-    const phase = this.diagnosticsState.locomotionPhase;
-    const segment = Math.min(3, Math.floor(phase * 4));
-    const progress = THREE.MathUtils.smoothstep(phase * 4 - segment, 0, 1);
-    let reach = 0;
-    let gather = 0;
-    if (segment === 0) {
-      reach = progress;
-    } else if (segment === 1) {
-      reach = THREE.MathUtils.lerp(1, 0.5, progress);
-      gather = progress * 0.5;
-    } else if (segment === 2) {
-      reach = (1 - progress) * 0.5;
-      gather = THREE.MathUtils.lerp(0.5, 1, progress);
-    } else {
-      gather = 1 - progress;
-    }
-    this.poseWeights['move-reach'] = reach * this.locomotionStrength;
-    this.poseWeights['move-gather'] = gather * this.locomotionStrength;
+    this.poseWeights['move-forward'] = Math.max(0, this.signedLean);
+    this.poseWeights['move-reverse'] = Math.max(0, -this.signedLean);
   }
 
   private updateFacing(deltaSeconds: number): void {
     if (!this.locomotionMoving && !this.reversing) return;
-    if (this.reversing &&
-      this.locomotionStrength > LOCOMOTION_REVERSAL_NEUTRAL_STRENGTH) return;
+    if (this.reversing && this.reversalHoldRemaining > 0) {
+      this.reversalHoldRemaining = Math.max(0,
+        this.reversalHoldRemaining - deltaSeconds);
+      if (this.reversalHoldRemaining > 0) return;
+    }
 
     this.currentFacingYawRadians = moveAngleTowards(
       this.currentFacingYawRadians,
@@ -849,8 +791,7 @@ export class BobCharacterPresentation {
     ) {
       this.currentFacingYawRadians = this.targetFacingYawRadians;
       this.reversing = false;
-      this.locomotionStrength = 0;
-      this.diagnosticsState.locomotionPhase = 0;
+      this.reversalHoldRemaining = 0;
     }
     this.applyFacingDirection();
   }
@@ -951,7 +892,7 @@ export class BobCharacterPresentation {
     const expressionBudget = 0.95 / (
       1 + this.poseWeights.squash * 8 + this.poseWeights.flatten * 24 +
       this.poseWeights.stress * 4 + this.poseWeights.airborne * 2 +
-      (this.poseWeights['move-reach'] + this.poseWeights['move-gather']) * 6
+      (this.poseWeights['move-forward'] + this.poseWeights['move-reverse']) * 6
     );
     let expressionTotal = 0;
     for (const name of BOB_EXPRESSIONS) {

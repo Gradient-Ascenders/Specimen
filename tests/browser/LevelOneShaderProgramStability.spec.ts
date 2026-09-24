@@ -583,7 +583,7 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
   ).toBe(false);
   await expect.poll(
     async () => (await readBob()).locomotionStrength,
-    { timeout: 3_000, message: 'Waiting for Bob mass-transfer cycle after turning' },
+    { timeout: 3_000, message: 'Waiting for Bob sustained lean after turning' },
   ).toBeGreaterThan(0.05);
   const reversed = await readBob();
   await page.keyboard.up('d');

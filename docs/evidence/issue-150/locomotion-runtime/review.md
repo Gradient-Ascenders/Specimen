@@ -1,10 +1,6 @@
 # Bob directional locomotion in the built game
 
-Historical evidence for the directional-lean implementation before issue #155's
-Reach/Gather mass-transfer pass. The current production movement is documented
-under `docs/evidence/issue-155/mass-transfer-runtime/`.
-
-At the time of this capture, production `bob-authored.glb` contained the approved candidate's
+The production `bob-authored.glb` now contains the approved candidate's
 `move-forward` and `move-reverse` body and eye-seat morphs. The neutral curl,
 collider, gameplay physics, controls, and the other five reaction poses are
 unchanged. `BobCharacterPresentation` uses resolved movement to gate a signed,
@@ -27,8 +23,14 @@ Squash. The wall sample had `attached: true`, outward support normal `(0, 0,
 -1)`, and positive forward lean while ascending. The browser reported no page
 errors or failed requests.
 
-The current generator and capture script produce the issue #155 movement.
-Use commit `5fd2655` to reproduce this archived directional-lean capture.
+Reproduce from the repository root:
+
+```bash
+blender --background --factory-startup --python assets/characters/bob/generate-bob-authored.py
+node --test --test-isolation=none tests/BobGateOneAsset.test.ts tests/BobMorphAsset.test.ts tests/BobCharacterPresentation.test.ts
+npm run build
+node scripts/capture-bob-runtime.mjs
+```
 
 The plain-production browser control test is in
 `tests/browser/LevelOneShaderProgramStability.spec.ts`.
