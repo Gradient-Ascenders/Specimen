@@ -48,7 +48,7 @@ export class BobGelBodyMaterial extends THREE.MeshPhysicalMaterial {
       color: 0x18cddd,
       roughness: 0.28,
       metalness: 0,
-      clearcoat: 0.4,
+      clearcoat: 0.35,
       clearcoatRoughness: 0.2,
       transmission: 0.28,
       thickness: 0.42,
