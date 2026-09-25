@@ -64,6 +64,7 @@ import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment
 import type { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
+import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
   type SlimeHUDListener,
@@ -607,7 +608,10 @@ export class CultivationLevelRuntime {
       lightingRoom !== undefined && lightingRoom <= 3);
     this.renderLayer.renderer.shadowMap.enabled = darkRoom;
     this.renderLayer.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.updateBobLighting(resources, Boolean(darkRoom));
+    const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
+      resources.pair.bobBody.position,
+    );
+    this.updateBobLighting(resources, Boolean(darkRoom), bobLightingRoom);
     const aimPresentationAllowed =
       this.lifecycle.state === 'running' &&
       resources.deathSequence.isPlaying &&
@@ -1819,19 +1823,43 @@ export class CultivationLevelRuntime {
 
   private updateBobLighting(
     resources: CultivationRuntimeResources,
-    darkRoom: boolean,
+    shadowsEnabled: boolean,
+    bobLightingRoom: number | undefined,
   ): void {
-    if (this.bobCastsShadow === darkRoom) return;
-    this.bobCastsShadow = darkRoom;
-    resources.bobPresentation.root.traverse((object) => {
-      if (object instanceof THREE.Mesh) object.castShadow = darkRoom;
-    });
-    const reflection = darkRoom
-      ? CULTIVATION_BOB_REFLECTION.dark
-      : CULTIVATION_BOB_REFLECTION.normal;
+    if (this.bobCastsShadow !== shadowsEnabled) {
+      this.bobCastsShadow = shadowsEnabled;
+      resources.bobPresentation.root.traverse((object) => {
+        if (object instanceof THREE.Mesh) object.castShadow = shadowsEnabled;
+      });
+    }
+    let darkWeight = 0;
+    if (bobLightingRoom === 5 && resources.authoredPreview) {
+      resources.authoredPreview.roomFive.root.worldToLocal(
+        this.roomFiveLocal.copy(resources.renderedBobPosition),
+      );
+      darkWeight = ventEntranceLightingWeight(
+        this.roomFiveLocal.x,
+        this.roomFiveLocal.z,
+      );
+    } else if (
+      bobLightingRoom === 4 &&
+      resources.authoredPreview?.roomFour.controller.readModel.state === 'complete'
+    ) {
+      darkWeight = 1;
+    }
+    const bodyReflection = THREE.MathUtils.lerp(
+      CULTIVATION_BOB_REFLECTION.normal.body,
+      CULTIVATION_BOB_REFLECTION.dark.body,
+      darkWeight,
+    );
+    const eyeReflection = THREE.MathUtils.lerp(
+      CULTIVATION_BOB_REFLECTION.normal.eyes,
+      CULTIVATION_BOB_REFLECTION.dark.eyes,
+      darkWeight,
+    );
     resources.bobPresentation.setReflectionIntensity(
-      reflection.body,
-      reflection.eyes,
+      bodyReflection,
+      eyeReflection,
     );
   }
 

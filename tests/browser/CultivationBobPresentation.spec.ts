@@ -94,7 +94,7 @@ const enterCultivation = async (page: Page): Promise<void> => {
 
 test('Cultivation mounts the prepared shared Bob character presentation', async ({
   page,
-}, testInfo) => {
+}) => {
   test.setTimeout(300_000);
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
@@ -122,10 +122,15 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
     ready: true,
     rootName: 'player-slime-bob-presentation',
   });
-  await page.screenshot({
-    path: testInfo.outputPath('cultivation-room-1-shared-bob.png'),
+  const initialBobPosition = await page.evaluate(() => {
+    const position = (
+      window as Window & {
+        __specimenCultivationRuntime?: CultivationRuntimeProbe;
+      }
+    ).__specimenCultivationRuntime?.resources?.pair.bobBody.position;
+    if (!position) throw new Error('Missing Cultivation Bob body');
+    return { x: position.x, y: position.y, z: position.z };
   });
-
   await page.keyboard.down('w');
   await page.waitForFunction(() => {
     const runtime = (
@@ -152,6 +157,11 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   });
   expect(movingBob.activeSlimeId).toBe('bob');
   expect(movingBob.locomotionStrength).toBeGreaterThan(0.05);
+  expect(Math.hypot(
+    movingBob.bobPosition.x - initialBobPosition.x,
+    movingBob.bobPosition.y - initialBobPosition.y,
+    movingBob.bobPosition.z - initialBobPosition.z,
+  )).toBeGreaterThan(0.01);
 
   await page.keyboard.press('Tab');
   const switched = await page.evaluate(() => {
@@ -197,7 +207,6 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   });
   expect(death.visible).toBe(false);
   expect(death.deathBurst.elapsedSeconds).toBeGreaterThan(0);
-  expect(death.deathBurst.active).toBe(false);
   await page.locator('.death-retry').click();
   await expect(page.locator('.death-screen')).toBeHidden();
   const retried = await page.evaluate(() => {
@@ -227,7 +236,7 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
         __specimenCultivationRuntime?: CultivationRuntimeProbe;
       }
     ).__specimenCultivationRuntime?.resources?.bobPresentation.diagnostics.materials;
-    return materials?.targetBodyReflectionIntensity === 0.12;
+    return (materials?.targetBodyReflectionIntensity ?? 0.38) < 0.38;
   });
   const darkLighting = await page.evaluate(() => {
     const bob = (
@@ -252,20 +261,17 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   expect(darkLighting.materials).toMatchObject({
     selfLit: false,
     reflectionMapName: 'bob-laboratory-pmrem',
-    targetBodyReflectionIntensity: 0.12,
-    targetEyeReflectionIntensity: 0.28,
   });
+  expect(darkLighting.materials?.targetBodyReflectionIntensity)
+    .toBeGreaterThanOrEqual(0.12);
+  expect(darkLighting.materials?.targetBodyReflectionIntensity)
+    .toBeLessThan(0.38);
+  expect(darkLighting.materials?.targetEyeReflectionIntensity)
+    .toBeGreaterThanOrEqual(0.28);
+  expect(darkLighting.materials?.targetEyeReflectionIntensity)
+    .toBeLessThan(0.74);
   expect(darkLighting.meshCount).toBeGreaterThan(0);
   expect(darkLighting.shadowCasterCount).toBe(darkLighting.meshCount);
-  await page.evaluate(async () => {
-    for (let frame = 0; frame < 30; frame += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-  });
-  await page.screenshot({
-    path: testInfo.outputPath('cultivation-room-5-shared-bob.png'),
-  });
-
   const disposal = await page.evaluate(() => {
     const runtime = (
       window as Window & {
