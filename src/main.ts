@@ -60,6 +60,7 @@ const gameSession = new GameSessionCoordinator({
       input,
       renderLayer,
       progression,
+      authoredRoomOne: true,
     });
   },
   scheduleTransition: (transition) => {

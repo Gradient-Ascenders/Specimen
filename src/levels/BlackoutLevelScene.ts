@@ -1,14 +1,23 @@
 import * as THREE from 'three';
 
 import { BLACKOUT_FOUNDATION_LENGTH_METRES } from './BlackoutFoundationManifest.ts';
+import { BlackoutMaintenanceBay } from './BlackoutMaintenanceBay.ts';
 
 /** Minimal dark Level 3 shell; powered-device fixtures are composed at runtime. */
 export class BlackoutLevelScene {
   readonly root = new THREE.Group();
   readonly collisionMeshes: readonly THREE.Mesh[];
+  readonly maintenanceBay?: BlackoutMaintenanceBay;
 
-  constructor() {
+  constructor(authoredRoomOne = false) {
     this.root.name = 'blackout-level-3-foundation';
+    if (authoredRoomOne) {
+      this.maintenanceBay = new BlackoutMaintenanceBay();
+      this.root.add(this.maintenanceBay.root);
+      this.collisionMeshes = this.maintenanceBay.collisionMeshes;
+      this.root.add(new THREE.HemisphereLight(0x34404a, 0x080a0b, .025));
+      return;
+    }
 
     const collisionMeshes: THREE.Mesh[] = [];
     collisionMeshes.push(
@@ -56,6 +65,7 @@ export class BlackoutLevelScene {
   }
 
   dispose(): void {
+    this.maintenanceBay?.dispose();
     this.root.removeFromParent();
     this.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;

@@ -1,8 +1,12 @@
 import * as THREE from 'three';
+import { BlackoutMaintenanceBayController } from './BlackoutMaintenanceBayController.ts';
+import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
 
 import {
   SentinelBossDevelopmentRig,
 } from '../boss/SentinelBossDevelopmentRig.ts';
+import { AcidProjectileSystem, type AcidAimReadModel, type AcidProjectileReadState } from '../abilities/AcidProjectileSystem.ts';
+import { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import type {
   SentinelBossEvents,
   SentinelBossReadModel,
@@ -54,6 +58,7 @@ import {
 } from '../puzzle/PuzzleRegistry.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { VoltElectricalPresentation } from '../render/electrical/VoltElectricalPresentation.ts';
+import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import { SpecimenCombatPresentation } from '../render/specimen/SpecimenCombatPresentation.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
@@ -110,6 +115,7 @@ import {
 const OUT_OF_BOUNDS_Y = -5;
 
 export interface BlackoutLevelRuntimeOptions {
+  readonly authoredRoomOne?: boolean;
   readonly host: HTMLElement;
   readonly input: Input;
   readonly renderLayer: RenderLayer;
@@ -117,6 +123,11 @@ export interface BlackoutLevelRuntimeOptions {
 }
 
 interface BlackoutRuntimeResources {
+  readonly dissolveSystem: DissolveSystem;
+  readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
+  readonly goopAcidPresentation: GoopAcidPresentation;
+  readonly maintenanceBay?: BlackoutMaintenanceBayController;
+  readonly dronePresentation?: MaintenanceDronePresentation;
   readonly scene: BlackoutLevelScene;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
@@ -175,8 +186,12 @@ export class BlackoutLevelRuntime {
     local: {},
   };
   private completionEmitted = false;
+  private readonly authoredRoomOne: boolean;
+  private bayComplete = false;
+  private previousShadowEnabled: boolean | undefined;
 
   constructor(options: BlackoutLevelRuntimeOptions) {
+    this.authoredRoomOne = options.authoredRoomOne ?? false;
     validateLevelThreeProgressionSnapshot(options.progression);
     this.host = options.host;
     this.input = options.input;
@@ -208,6 +223,14 @@ export class BlackoutLevelRuntime {
 
   get voltElectricalReadModel(): VoltElectricalReadModel | undefined {
     return this.resources?.electricalSystem.readModel;
+  }
+
+  get goopAimReadModel(): AcidAimReadModel | undefined {
+    return this.resources?.acidProjectileSystem.aimReadModel;
+  }
+
+  get goopProjectileStates(): readonly AcidProjectileReadState[] {
+    return this.resources?.acidProjectileSystem.projectileStates ?? [];
   }
 
   getPoweredDeviceReadModel(
@@ -258,6 +281,17 @@ export class BlackoutLevelRuntime {
     return this.resources?.maintenanceDrone.readModel;
   }
 
+  /** Snapshot only; callers cannot mutate the persistent authoritative bodies. */
+  getSlimePositions(): Readonly<Record<'bob' | 'goop' | 'volt', THREE.Vector3>> | undefined {
+    const group = this.resources?.group;
+    if (!group) return undefined;
+    return {
+      bob: new THREE.Vector3(group.bobBody.position.x, group.bobBody.position.y, group.bobBody.position.z),
+      goop: new THREE.Vector3(group.goopBody.position.x, group.goopBody.position.y, group.goopBody.position.z),
+      volt: new THREE.Vector3(group.voltBody.position.x, group.voltBody.position.y, group.voltBody.position.z),
+    };
+  }
+
   get maintenanceDroneEvents(): Pick<
     EventBus<MaintenanceDroneEvents>,
     'on'
@@ -301,6 +335,7 @@ export class BlackoutLevelRuntime {
       if (!enabled) {
         this.input.resetState();
         this.resources.electricalSystem.cancelAim();
+        this.resources.acidProjectileSystem.cancelAim();
         this.resources.electricalPresentation.update(
           this.resources.electricalSystem.readModel,
         );
@@ -409,6 +444,8 @@ export class BlackoutLevelRuntime {
       return false;
     }
     resources.electricalSystem.reset('death');
+    resources.acidProjectileSystem.reset();
+    resources.goopAcidPresentation.reset();
     resources.specimenAttack.reset();
     resources.sentinelRig.controller.cancelTransient('death');
     resources.maintenanceDrone.cancelTransient('death');
@@ -445,6 +482,8 @@ export class BlackoutLevelRuntime {
     this.input.resetState();
     resources.electricalSystem.disconnect('merge');
     resources.electricalSystem.cancelAim();
+    resources.acidProjectileSystem.reset();
+    resources.goopAcidPresentation.reset();
     resources.specimenAttack.reset();
     resources.sentinelRig.controller.cancelTransient('phase-change');
     resources.maintenanceDrone.recoverImmediately('checkpoint');
@@ -553,6 +592,8 @@ export class BlackoutLevelRuntime {
         return false;
       }
       resources.specimenAttack.reset();
+      resources.acidProjectileSystem.reset();
+      resources.goopAcidPresentation.reset();
       this.renderLayer.cameraRig.setAimPresentationActive(false, true);
       this.currentRoom = {
         ...this.currentRoom,
@@ -571,6 +612,8 @@ export class BlackoutLevelRuntime {
 
     if (next === 'complete') {
       resources.electricalSystem.disconnect('completion');
+      resources.acidProjectileSystem.reset();
+      resources.goopAcidPresentation.reset();
       resources.electricalSystem.cancelAim();
       resources.specimenAttack.reset();
       resources.sentinelRig.controller.cancelTransient('phase-change');
@@ -850,9 +893,6 @@ export class BlackoutLevelRuntime {
         this.input.enabled && this.currentRoom.phase === 'three-slime',
       pointerLocked: this.input.pointerLocked,
     });
-    this.renderLayer.cameraRig.setAimPresentationActive(
-      resources.electricalSystem.readModel.aimActive,
-    );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
 
     resources.specimenAttack.update(deltaSeconds, {
@@ -865,9 +905,20 @@ export class BlackoutLevelRuntime {
       pointerLocked: this.input.pointerLocked,
       cancelled: this.input.wasClearedSinceFixedUpdate,
     });
+    resources.acidProjectileSystem.update(deltaSeconds, {
+      aimHeld: this.input.isDown('aimAbility'),
+      firePressed: this.input.wasPressed('fireAbility'),
+      gameplayInputEnabled:
+        this.input.enabled &&
+        resources.deathSequence.isPlaying &&
+        resources.phase.phase === 'three-slime',
+      pointerLocked: this.input.pointerLocked,
+    });
+    resources.dissolveSystem.update(deltaSeconds);
     this.renderLayer.cameraRig.setAimPresentationActive(
       resources.electricalSystem.readModel.aimActive ||
-      resources.specimenAttack.readModel.aimActive,
+      resources.specimenAttack.readModel.aimActive ||
+      resources.acidProjectileSystem.aimReadModel.active,
     );
     resources.specimenPresentation.update(specimenGameplay);
 
@@ -908,11 +959,33 @@ export class BlackoutLevelRuntime {
     );
     resources.electricalSystem.revalidateConnection();
     resources.poweredDeviceRig.recomputePower();
-    resources.poweredDeviceRig.updateHazards(
-      deltaSeconds,
-      participatingCarriers,
+    if (!this.authoredRoomOne) resources.poweredDeviceRig.updateHazards(
+      deltaSeconds, participatingCarriers,
     );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
+
+    if (resources.maintenanceBay) {
+      const bay = resources.maintenanceBay;
+      const bodies = {bob:resources.group.bobBody,goop:resources.group.goopBody,volt:resources.group.voltBody};
+      if (bay.powered && !bay.connectionClear(bodies.volt.position,resources.maintenanceDroneFixture.collider)) {
+        resources.electricalSystem.disconnect('target-invalid');
+      }
+      const dronePosition = resources.maintenanceDrone.readModel.position;
+      const lostDrone = bay.bay.acidAt(dronePosition);
+      const lostRider = lostDrone && resources.maintenanceDrone.voltMounted;
+      if (lostDrone) resources.maintenanceDrone.requestRecovery('acid');
+      const failed = lostRider ? 'volt' : bay.update(deltaSeconds,bodies);
+      resources.dronePresentation?.update(deltaSeconds,resources.maintenanceDrone.readModel, resources.group.activeSlimeId === 'volt');
+      if (failed) {
+        this.requestFailure();
+        this.input.endFixedUpdate(); return;
+      }
+      if (bay.complete && !this.bayComplete) {
+        this.bayComplete = true;
+        this.currentRoom = {roomId:'room-2',phase:'three-slime',local:{maintenanceBayComplete:true}};
+        this.events.emit('objectiveChanged',{roomId:'room-2',objective:'Maintenance bay complete — Room 2 staging area'});
+      }
+    }
 
     if (!resources.deathSequence.isPlaying) {
       this.syncVisuals(resources);
@@ -953,9 +1026,29 @@ export class BlackoutLevelRuntime {
       this.syncVisuals(resources);
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
+        this.lifecycle.state === 'running' && resources.deathSequence.isPlaying ? stats.frameDeltaSeconds : 0,
       );
       resources.specimenPresentation.update(
         resources.specimenForm.readModel.controlledForm === 'specimen',
+      );
+      const goopAimPresentationAllowed =
+        this.lifecycle.state === 'running' &&
+        resources.deathSequence.isPlaying &&
+        resources.phase.phase === 'three-slime' &&
+        this.input.enabled;
+      resources.goopAcidPresentation.update(
+        interpolationAlpha,
+        stats.frameDeltaSeconds,
+        goopAimPresentationAllowed,
+        goopAimPresentationAllowed,
+        false,
+      );
+      // GoopAcidPresentation owns its own aim overlay; reconcile the shared
+      // camera pose after all ability presentations have updated.
+      this.renderLayer.cameraRig.setAimPresentationActive(
+        resources.electricalSystem.readModel.aimActive ||
+        resources.specimenAttack.readModel.aimActive ||
+        resources.acidProjectileSystem.aimReadModel.active,
       );
 
       // Render frames can run without a fixed update when the display refresh
@@ -1014,7 +1107,7 @@ export class BlackoutLevelRuntime {
   }
 
   private readonly loadResources = (): void => {
-    const scene = new BlackoutLevelScene();
+    const scene = new BlackoutLevelScene(this.authoredRoomOne);
     const collisionWorld = new CollisionWorld();
     const surfaceRegistry = new SurfaceRegistry();
     const puzzleRegistry = new PuzzleRegistry();
@@ -1061,7 +1154,7 @@ export class BlackoutLevelRuntime {
         goop: makeBody('goop'),
         volt: makeBody('volt'),
       };
-      const initialActive =
+      const initialActive = this.authoredRoomOne ? 'volt' :
         this.initialProgression.activeSlimeId === 'bob' ||
         this.initialProgression.activeSlimeId === 'goop' ||
         this.initialProgression.activeSlimeId === 'volt'
@@ -1115,7 +1208,7 @@ export class BlackoutLevelRuntime {
         isSpawnSafe,
         initialActive,
       );
-      for (const checkpoint of BLACKOUT_CHECKPOINTS.slice(1)) {
+      for (const checkpoint of this.authoredRoomOne ? [] : BLACKOUT_CHECKPOINTS.slice(1)) {
         checkpoints.registerCheckpoint(checkpoint);
       }
       checkpoints.activate('cp1', initialActive);
@@ -1132,6 +1225,19 @@ export class BlackoutLevelRuntime {
         voltRadiusMetres: group.voltBody.radiusMetres,
       });
       rollback(() => maintenanceDrone.dispose());
+      const dronePresentation = this.authoredRoomOne
+        ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted()) : undefined;
+      if (dronePresentation) {
+        for(const mesh of scene.collisionMeshes) {mesh.castShadow=true;mesh.receiveShadow=true;}
+        if(this.renderLayer.renderer) {
+          this.previousShadowEnabled=this.renderLayer.renderer.shadowMap.enabled;
+          this.renderLayer.renderer.shadowMap.enabled=true;
+          rollback(()=>{this.renderLayer.renderer.shadowMap.enabled=this.previousShadowEnabled??false;this.previousShadowEnabled=undefined;});
+        }
+        const material = maintenanceDroneFixture.collider.material;
+        for (const item of Array.isArray(material) ? material : [material]) item.visible = false;
+        rollback(() => dronePresentation.dispose());
+      }
 
       const phase = new BlackoutPhaseController('three-slime');
       const deathSequence = new DeathSequence();
@@ -1154,6 +1260,11 @@ export class BlackoutLevelRuntime {
         this.renderLayer.scene.add(visual);
       }
       const voltLight = new THREE.PointLight(0xffdf75, 2.2, 8, 2);
+      if (this.authoredRoomOne) {
+        voltLight.intensity = 16;
+        (visuals.bob.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
+        (visuals.goop.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
+      }
       voltLight.name = 'blackout-volt-foundation-light';
       voltLight.castShadow = false;
       visuals.volt.add(voltLight);
@@ -1169,16 +1280,38 @@ export class BlackoutLevelRuntime {
       const electricalTargets = new ElectricalTargetRegistry(collisionWorld);
       rollback(() => electricalTargets.dispose());
 
-      const poweredDeviceRig = new BlackoutPoweredDeviceRig({
+      // Room 1 has no soluble geometry yet, but Goop still needs the same
+      // authoritative aim/projectile controls as Level 2.
+      const dissolveSystem = new DissolveSystem([]);
+      rollback(() => dissolveSystem.dispose());
+      const acidProjectileSystem = new AcidProjectileSystem({
+        slimeManager: manager,
         collisionWorld,
-        surfaceRegistry,
-        targetRegistry: electricalTargets,
+        dissolveSystem,
+        aimRayProvider: this.renderLayer.cameraRig,
+      });
+      rollback(() => acidProjectileSystem.dispose());
+
+      const maintenanceBay = scene.maintenanceBay
+        ? new BlackoutMaintenanceBayController(scene.maintenanceBay, collisionWorld, surfaceRegistry, electricalTargets) : undefined;
+      if (maintenanceBay) rollback(() => maintenanceBay.dispose());
+      // Backend device/combat fixtures stay available to their existing harness,
+      // but occupy a separate collision and targeting world in the authored bay.
+      const fixtureWorld = this.authoredRoomOne ? new CollisionWorld() : collisionWorld;
+      const fixtureSurfaces = this.authoredRoomOne ? new SurfaceRegistry() : surfaceRegistry;
+      const fixtureTargets = this.authoredRoomOne ? new ElectricalTargetRegistry(fixtureWorld) : electricalTargets;
+
+      const poweredDeviceRig = new BlackoutPoweredDeviceRig({
+        collisionWorld: fixtureWorld,
+        surfaceRegistry: fixtureSurfaces,
+        targetRegistry: fixtureTargets,
         requestFailure: () => {
           this.requestFailure();
         },
       });
       rollback(() => poweredDeviceRig.dispose());
       scene.root.add(poweredDeviceRig.root);
+      poweredDeviceRig.root.visible = !this.authoredRoomOne;
       puzzleRegistry.register(
         'blackout-powered-device-rig',
         poweredDeviceRig,
@@ -1192,26 +1325,28 @@ export class BlackoutLevelRuntime {
       const specimenCarrierBody =
         createPoweredCarrierBody('specimen', specimenBody);
 
-      const combatTargets = new CombatTargetRegistry(collisionWorld);
+      const combatTargets = new CombatTargetRegistry(fixtureWorld);
       rollback(() => combatTargets.dispose());
       const combatRig = new SpecimenCombatDevelopmentRig({
-        collisionWorld,
-        surfaceRegistry,
+        collisionWorld: fixtureWorld,
+        surfaceRegistry: fixtureSurfaces,
         targetRegistry: combatTargets,
       });
       rollback(() => combatRig.dispose());
       scene.root.add(combatRig.root);
+      combatRig.root.visible = !this.authoredRoomOne;
       puzzleRegistry.register(
         'specimen-combat-development-rig',
         combatRig,
       );
 
       const sentinelRig = new SentinelBossDevelopmentRig({
-        collisionWorld,
+        collisionWorld: fixtureWorld,
         targetRegistry: combatTargets,
       });
       rollback(() => sentinelRig.dispose());
       scene.root.add(sentinelRig.root);
+      sentinelRig.root.visible = !this.authoredRoomOne;
       puzzleRegistry.register(
         'sentinel-boss-development-rig',
         sentinelRig,
@@ -1237,6 +1372,7 @@ export class BlackoutLevelRuntime {
         collisionWorld,
         targetRegistry: electricalTargets,
         aimRayProvider: this.renderLayer.cameraRig,
+        ...(this.authoredRoomOne ? {config:{acquisitionRangeMetres:11,instabilityWarningRangeMetres:12,tetherBreakRangeMetres:13}} : {}),
       });
       rollback(() => electricalSystem.dispose());
 
@@ -1276,7 +1412,21 @@ export class BlackoutLevelRuntime {
       });
       rollback(() => electricalPresentation.dispose());
 
+      const goopAcidPresentation = new GoopAcidPresentation({
+        host: this.host,
+        scene: this.renderLayer.scene,
+        cameraRig: this.renderLayer.cameraRig,
+        source: acidProjectileSystem,
+        targets: [],
+      });
+      rollback(() => goopAcidPresentation.dispose());
+
       this.resources = {
+        dissolveSystem,
+        acidProjectileSystem,
+        goopAcidPresentation,
+        maintenanceBay,
+        dronePresentation,
         scene,
         collisionWorld,
         surfaceRegistry,
@@ -1318,6 +1468,7 @@ export class BlackoutLevelRuntime {
       };
 
       this.currentRoom = checkpoints.activeCheckpoint.room;
+      this.bayComplete = false;
       this.completionEmitted = false;
       this.syncVisuals(this.resources);
       this.resources.electricalPresentation.update(
@@ -1352,6 +1503,7 @@ export class BlackoutLevelRuntime {
 
   private readonly startResources = (): void => {
     const resources = this.requireResources();
+    resources.goopAcidPresentation.resume();
     this.input.resetState();
     this.input.setEnabled(
       this.debugInteractionEnabled &&
@@ -1363,6 +1515,8 @@ export class BlackoutLevelRuntime {
   private readonly stopResources = (): void => {
     const resources = this.requireResources();
     resources.electricalSystem.cancelAim();
+    resources.acidProjectileSystem.cancelAim();
+    resources.goopAcidPresentation.suspend();
     resources.specimenAttack.cancelInput();
     resources.maintenanceDrone.suspendInput();
     resources.specimenPresentation.suspend();
@@ -1378,7 +1532,13 @@ export class BlackoutLevelRuntime {
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
+    resources.maintenanceBay?.reset();
+    resources.dronePresentation?.resetTutorial();
+    this.bayComplete = false;
     resources.electricalSystem.reset('restart');
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
+    resources.goopAcidPresentation.reset();
     resources.specimenAttack.reset();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
@@ -1419,6 +1579,9 @@ export class BlackoutLevelRuntime {
     resources.deathSequence.reset();
     resources.deathScreen.dispose();
     resources.electricalPresentation.dispose();
+    resources.goopAcidPresentation.dispose();
+    resources.acidProjectileSystem.dispose();
+    resources.dissolveSystem.dispose();
     resources.specimenPresentation.dispose();
     resources.specimenAttack.dispose();
     resources.electricalSystem.dispose();
@@ -1427,6 +1590,12 @@ export class BlackoutLevelRuntime {
     resources.unregisterCombatCheckpointParticipant();
     resources.unregisterSentinelCheckpointParticipant();
     resources.unregisterMaintenanceDroneCheckpointParticipant();
+    resources.dronePresentation?.dispose();
+    if(this.previousShadowEnabled!==undefined) {
+      this.renderLayer.renderer.shadowMap.enabled=this.previousShadowEnabled;
+      this.previousShadowEnabled=undefined;
+    }
+    resources.maintenanceBay?.dispose();
     resources.maintenanceDrone.dispose();
     resources.maintenanceDroneFixture.dispose();
     resources.sentinelRig.dispose();
@@ -1459,7 +1628,13 @@ export class BlackoutLevelRuntime {
   ): void {
     this.input.setEnabled(false);
     this.input.resetState();
+    resources.maintenanceBay?.reset();
+    resources.dronePresentation?.resetTutorial();
+    this.bayComplete = false;
     resources.electricalSystem.reset('reset');
+    resources.acidProjectileSystem.reset();
+    resources.dissolveSystem.reset();
+    resources.goopAcidPresentation.reset();
     resources.specimenAttack.reset();
     resources.specimenPresentation.suspend();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
@@ -1569,6 +1744,17 @@ export class BlackoutLevelRuntime {
       : [resources.visuals.volt.material];
     for (const material of voltMaterials) {
       material.visible = !hideVoltBody;
+    }
+
+    const hideGoopBody =
+      !specimenControlled &&
+      resources.manager.activeSlimeId === 'goop' &&
+      resources.acidProjectileSystem.aimReadModel.active;
+    const goopMaterials = Array.isArray(resources.visuals.goop.material)
+      ? resources.visuals.goop.material
+      : [resources.visuals.goop.material];
+    for (const material of goopMaterials) {
+      material.visible = !hideGoopBody;
     }
 
     const specimenMaterials = Array.isArray(resources.specimenVisual.material)
@@ -1773,7 +1959,9 @@ function clearJump(state: JumpInputState, cancelled: boolean): void {
 function objectiveFor(room: BlackoutRoomState): string {
   switch (room.roomId) {
     case 'room-1': return 'Use Volt to bring the restricted sector back online';
-    case 'room-2': return 'Coordinate Bob, Goop, and Volt';
+    case 'room-2': return room.local.maintenanceBayComplete
+      ? 'Maintenance bay complete — Room 2 staging area'
+      : 'Coordinate Bob, Goop, and Volt';
     case 'room-3': return 'Reach the experimental core';
     case 'room-4a': return 'Enter the merge chamber';
     case 'room-4b': return 'Defeat the facility defence system';

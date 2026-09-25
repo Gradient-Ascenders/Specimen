@@ -890,6 +890,16 @@ test('Blackout maintenance drone mounts only Volt, parks exactly across slime sw
     runtime.fixedUpdate(1 / 60);
     const movingZ = runtime.maintenanceDroneReadModel!.position.z;
     assert.notEqual(movingZ, 2);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, undefined,
+      'flying while conducting must disconnect the tether');
+    // Reconnect once stationary: switching away must still preserve this
+    // newly established connection while the drone remains parked.
+    input.press('aimAbility');
+    input.press('fireAbility');
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.voltElectricalReadModel?.connectedTargetId, 'fixture-terminal');
+    input.release('aimAbility');
+    input.release('fireAbility');
 
     input.press('switchSlime');
     runtime.fixedUpdate(1 / 60);

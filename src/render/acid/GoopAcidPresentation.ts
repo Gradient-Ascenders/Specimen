@@ -304,6 +304,7 @@ export class GoopAcidPresentation {
     deltaSeconds: number,
     aimPresentationAllowed: boolean,
     advanceEffects = true,
+    manageCameraAim = true,
   ): void {
     this.assertNotDisposed('update');
     const safeAlpha = THREE.MathUtils.clamp(interpolationAlpha, 0, 1);
@@ -311,7 +312,9 @@ export class GoopAcidPresentation {
     const allowed = aimPresentationAllowed && !this.suspended;
     const aimActive = allowed && this.source.aimReadModel.active;
 
-    this.cameraRig.setAimPresentationActive(aimActive, !allowed);
+    if (manageCameraAim) {
+      this.cameraRig.setAimPresentationActive(aimActive, !allowed);
+    }
     this.syncCrosshair(resolveGoopCrosshairState(this.source.aimReadModel, allowed));
     if (!allowed) {
       this.suppressTransientPresentation();
