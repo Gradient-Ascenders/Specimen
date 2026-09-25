@@ -5,6 +5,34 @@ import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { MaintenanceDronePresentation } from '../src/render/environment/blackout/MaintenanceDronePresentation.ts';
 import type { MaintenanceDroneReadModel } from '../src/vehicles/MaintenanceDroneTypes.ts';
 
+test('tutorial waits for controller availability, acknowledges visible time, and resets', () => {
+  const element = () => ({style: {}, hidden: false, textContent: '', children: [] as any[], append(...children: any[]) {this.children.push(...children);}, remove() {}});
+  const host = {...element(), ownerDocument: {createElement: element}};
+  let completed = 0;
+  const presentation = new MaintenanceDronePresentation(new THREE.Group(), host as unknown as HTMLElement, undefined, undefined, () => completed++);
+  const tutorial = host.children[0].children[2];
+  const state = {state: 'starting', mounted: true, firstMountTutorialAvailable: false, tutorialCompleted: false} as MaintenanceDroneReadModel;
+  for (let i = 0; i < 50; i++) presentation.update(.1, state);
+  assert.equal(tutorial.hidden, true);
+  assert.equal(completed, 0);
+  const available = {...state, state: 'mounted' as const, firstMountTutorialAvailable: true};
+  for (let i = 0; i < 30; i++) presentation.update(.1, available);
+  assert.equal(tutorial.hidden, false);
+  presentation.resetTutorial();
+  for (let i = 0; i < 20; i++) presentation.update(.1, available);
+  assert.equal(completed, 0, 'checkpoint recovery clears partial display time');
+  for (let i = 0; i < 50; i++) presentation.update(.1, available, false);
+  assert.equal(completed, 0, 'hidden tutorial must not time out');
+  for (let i = 0; i < 21; i++) presentation.update(.1, available);
+  assert.equal(completed, 1);
+  presentation.update(.1, {...available, firstMountTutorialAvailable: false, tutorialCompleted: true});
+  assert.equal(tutorial.hidden, true);
+  presentation.resetTutorial();
+  presentation.update(.1, available);
+  assert.equal(tutorial.hidden, false, 'restored incomplete tutorial is shown again');
+  presentation.dispose();
+});
+
 test('maintenance beam reaches the floor and stops above intervening platforms',()=>{
   const element=()=>({style:{},append(){},remove(){}});
   const host={...element(),ownerDocument:{createElement:element}} as unknown as HTMLElement;

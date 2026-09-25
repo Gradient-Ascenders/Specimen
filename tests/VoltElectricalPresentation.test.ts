@@ -113,6 +113,8 @@ test('Volt presentation reuses one beam and one DOM overlay across updates', () 
 
   const firstArcPosition = beam.geometry.getAttribute('position').getY(1);
   presentation.update(model);
+  assert.equal(beam.geometry.getAttribute('position').getY(1), firstArcPosition);
+  presentation.update(model, 1 / 60);
   assert.notEqual(beam.geometry.getAttribute('position').getY(1), firstArcPosition);
 
   presentation.update({ ...model, beamMode: 'none' });
@@ -127,6 +129,27 @@ test('Volt presentation reuses one beam and one DOM overlay across updates', () 
   presentation.dispose();
   assert.equal(scene.children.length, 0);
   assert.equal(host.children[0]?.removed, true);
+});
+
+test('electrical animation is independent of refresh rate and extra state syncs', () => {
+  const sample = (hz: number, mode: 'search' | 'connected') => {
+    const scene = new THREE.Scene();
+    const presentation = new VoltElectricalPresentation({scene, host: new FakeHost() as unknown as HTMLElement, document: new FakeDocument() as unknown as Document});
+    const model = {...readModel(), beamMode: mode};
+    for (let i = 0; i < hz; i++) {
+      presentation.update(model);
+      presentation.update(model);
+      presentation.update(model, 1 / hz);
+    }
+    const result = ['volt-electrical-arc-core', 'volt-electrical-branch-arcs', 'volt-electrical-travelling-sparks'].flatMap(name =>
+      Array.from((scene.getObjectByName(name) as THREE.Line).geometry.getAttribute('position').array));
+    presentation.dispose();
+    return result;
+  };
+  for (const mode of ['search', 'connected'] as const) {
+    const expected = sample(60, mode);
+    for (const hz of [30, 144]) sample(hz, mode).forEach((value, i) => assert.ok(Math.abs(value - expected[i]!) < 1e-5));
+  }
 });
 
 test('Volt presentation removes an attached render root when scene.add throws after mutation', () => {

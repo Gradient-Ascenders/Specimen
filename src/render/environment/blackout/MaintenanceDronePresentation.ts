@@ -25,8 +25,8 @@ export class MaintenanceDronePresentation {
   private readonly spot: THREE.SpotLight;
   private readonly spotTarget = new THREE.Object3D();
   private elapsed = 0;
-  private tutorialShown = false;
   private tutorialElapsed = 0;
+  private readonly completeTutorial: () => void;
   private disposed = false;
   private readonly world?: CollisionWorld;
   private readonly ignored?: THREE.Mesh;
@@ -34,7 +34,8 @@ export class MaintenanceDronePresentation {
   private readonly beamOrigin = new THREE.Vector3();
   private readonly downward = new THREE.Vector3(0,-1,0);
 
-  constructor(authoringRoot: THREE.Group, host: HTMLElement, world?: CollisionWorld, ignored?: THREE.Mesh) {
+  constructor(authoringRoot: THREE.Group, host: HTMLElement, world?: CollisionWorld, ignored?: THREE.Mesh, completeTutorial: () => void = () => {}) {
+    this.completeTutorial = completeTutorial;
     this.world=world;this.ignored=ignored;
     this.root.name = 'maintenance-drone-presentation';
     this.root.userData.presentationOnly = true;
@@ -195,16 +196,27 @@ export class MaintenanceDronePresentation {
     const showMount = state.mountAvailable && !state.mounted;
     this.prompt.hidden = !activeVolt || (!showMount && !state.mounted);
     this.prompt.textContent = state.mounted ? '[M] DISMOUNT' : (showMount ? '[M] MOUNT' : '');
-    if (state.state === 'starting' && !this.tutorialShown) {
-      this.tutorialShown = true;
-      this.tutorialElapsed = 0;
+    if (!state.firstMountTutorialAvailable || state.tutorialCompleted) this.tutorialElapsed = 0;
+    this.tutorial.hidden = !activeVolt || !state.mounted || !state.firstMountTutorialAvailable || state.tutorialCompleted;
+    // Only count time actually visible after startup. The controller owns the
+    // one-shot completion flag and restores it with its checkpoint snapshot.
+    if (!this.tutorial.hidden) {
+      this.tutorialElapsed += step;
+      if (this.tutorialElapsed >= 4) {
+        this.completeTutorial();
+        this.tutorialElapsed = 0;
+        this.tutorial.hidden = true;
+      }
     }
-    if (this.tutorialShown && !state.tutorialCompleted) this.tutorialElapsed += step;
-    const playerMoving = state.horizontalSpeed > .35 || Math.abs(state.verticalSpeed) > .35;
-    this.tutorial.hidden = !activeVolt || !this.tutorialShown || state.tutorialCompleted || this.tutorialElapsed >= 4 || playerMoving;
     this.tutorial.textContent = this.tutorial.hidden ? '' : 'FLIGHT CONTROLS  ·  WASD MOVE  ·  SPACE RISE  ·  SHIFT DESCEND  ·  M DISMOUNT';
     this.status.textContent = !activeVolt ? '' : shorted ? 'ELECTRICAL FAULT' : started ? 'SYSTEM STARTING…' : '';
     this.status.hidden = !activeVolt || (!shorted && !started);
+  }
+
+  resetTutorial(): void {
+    this.tutorialElapsed = 0;
+    this.tutorial.hidden = true;
+    this.tutorial.textContent = '';
   }
 
   dispose(): void {

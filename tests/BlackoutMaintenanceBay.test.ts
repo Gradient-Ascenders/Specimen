@@ -39,11 +39,16 @@ test('door requires sustained power and safely holds when a slime occupies its c
     s.room.target.setConnectionState(true);
     for(let i=0;i<120;i++)s.room.update(1/60,s.bodies);
     assert.equal(s.room.door.state,'open');
+    s.bodies.volt.teleport(new THREE.Vector3(-6,.46,54));
+    s.room.update(1/60,s.bodies);
     s.bodies.bob.teleport(new THREE.Vector3(6,.46,54));
     s.room.target.setConnectionState(false);
     for(let i=0;i<120;i++)s.room.update(1/60,s.bodies);
     assert.ok(s.room.door.progress>0,'door must not crush Bob');
+    s.bodies.volt.teleport(new THREE.Vector3(6,.46,54));
+    s.room.update(1/60,s.bodies);
     s.bodies.bob.teleport(new THREE.Vector3(6,.46,57));
+    s.bodies.volt.teleport(new THREE.Vector3(6,.46,62));
     for(let i=0;i<120;i++)s.room.update(1/60,s.bodies);
     assert.equal(s.room.door.state,'closed');
     assert.equal(s.room.complete,false);
@@ -52,6 +57,9 @@ test('door requires sustained power and safely holds when a slime occupies its c
     s.bodies.volt.teleport(new THREE.Vector3(6,.46,62));s.room.update(1/60,s.bodies);
     assert.equal(s.room.complete,false,'Volt must take his vent route before regrouping');
     s.bodies.volt.teleport(new THREE.Vector3(-6,.46,54));s.room.update(1/60,s.bodies);
+    s.bodies.volt.teleport(new THREE.Vector3(6,.46,62));s.room.update(1/60,s.bodies);
+    assert.equal(s.room.complete,false,'touching the vent then taking the main door cannot complete');
+    s.bodies.volt.teleport(new THREE.Vector3(-6,.46,59.75));s.room.update(1/60,s.bodies);
     s.bodies.volt.teleport(new THREE.Vector3(6,.46,62));s.room.update(1/60,s.bodies);
     assert.equal(s.room.complete,true);
   }finally{s.dispose();}
@@ -132,10 +140,21 @@ test('floor-level vent is enclosed, traversable for Volt, and too narrow for the
       'the duct floor must seal the underside');
     // Walk from the basin through the flush wall opening, duct, and cross hall.
     s.bodies.volt.teleport(new THREE.Vector3(-6,.46,52));
-    for(let i=0;i<240 && s.bodies.volt.position.z<62;i++)s.bodies.volt.update(1/60,new THREE.Vector3(0,0,1));
+    s.bodies.bob.teleport(new THREE.Vector3(6,.46,57));
+    s.bodies.goop.teleport(new THREE.Vector3(7,.46,57));
+    for(let i=0;i<240 && s.bodies.volt.position.z<62;i++) {
+      s.bodies.volt.update(1/60,new THREE.Vector3(0,0,1));
+      s.room.update(1/60,s.bodies);
+    }
     assert.ok(s.bodies.volt.position.z>61.5,'Volt can walk from the bay into the cross hall without jumping');
-    for(let i=0;i<200 && s.bodies.volt.position.x<6;i++)s.bodies.volt.update(1/60,new THREE.Vector3(1,0,0));
+    for(let i=0;i<200 && s.bodies.volt.position.x<6;i++) {
+      s.bodies.volt.update(1/60,new THREE.Vector3(1,0,0));
+      s.room.update(1/60,s.bodies);
+    }
     assert.ok(s.bay.voltExitAt(s.bodies.volt.position));
+    assert.equal(s.room.complete,true,'walking the full duct and connector completes the route');
+    s.room.reset();s.room.update(1/60,s.bodies);
+    assert.equal(s.room.complete,false,'reset clears vent traversal evidence');
   }finally{s.dispose();}
 });
 

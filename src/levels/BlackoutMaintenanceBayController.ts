@@ -78,7 +78,8 @@ export class BlackoutMaintenanceBayController {
       const p=bodies[id].position;
       if(p.y < -5 || (id!=='goop' && this.bay.acidAt(p)) || (id!=='volt' && this.bay.ventAt(p))) return id;
     }
-    if(this.bay.ventAt(bodies.volt.position)) this.voltTraversedVent=true;
+    // Require reaching the far end of the duct, not merely touching its mouth.
+    if(this.bay.ventAt(bodies.volt.position) && bodies.volt.position.z >= BLACKOUT_BAY_LAYOUT.rearZ + 5.5) this.voltTraversedVent=true;
     this.complete=this.voltTraversedVent&&this.bay.vestibuleAt(bodies.bob.position)&&this.bay.vestibuleAt(bodies.goop.position)&&this.bay.voltExitAt(bodies.volt.position);
     return undefined;
   }

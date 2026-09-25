@@ -140,7 +140,7 @@ export class VoltElectricalPresentation {
     }
   }
 
-  update(readModel: VoltElectricalReadModel): void {
+  update(readModel: VoltElectricalReadModel, deltaSeconds = 0): void {
     if (this.disposed) return;
 
     this.crosshair.hidden = !readModel.aimActive;
@@ -170,7 +170,8 @@ export class VoltElectricalPresentation {
     this.beam.visible = true;
     this.branches.visible = true;
     this.sparks.visible = true;
-    this.phase += readModel.beamMode === 'search' ? 0.42 : 0.12;
+    // State reconciliation does not advance animation; only the render clock does.
+    this.phase += Math.max(0, deltaSeconds) * (readModel.beamMode === 'search' ? 25.2 : 7.2);
 
     const sx = readModel.beamStart.x;
     const sy = readModel.beamStart.y;

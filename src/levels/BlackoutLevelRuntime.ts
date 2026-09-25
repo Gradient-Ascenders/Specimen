@@ -1026,6 +1026,7 @@ export class BlackoutLevelRuntime {
       this.syncVisuals(resources);
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
+        this.lifecycle.state === 'running' && resources.deathSequence.isPlaying ? stats.frameDeltaSeconds : 0,
       );
       resources.specimenPresentation.update(
         resources.specimenForm.readModel.controlledForm === 'specimen',
@@ -1225,7 +1226,7 @@ export class BlackoutLevelRuntime {
       });
       rollback(() => maintenanceDrone.dispose());
       const dronePresentation = this.authoredRoomOne
-        ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider) : undefined;
+        ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted()) : undefined;
       if (dronePresentation) {
         for(const mesh of scene.collisionMeshes) {mesh.castShadow=true;mesh.receiveShadow=true;}
         if(this.renderLayer.renderer) {
@@ -1532,6 +1533,7 @@ export class BlackoutLevelRuntime {
     resources.deathSequence.reset();
     resources.deathScreen.hide();
     resources.maintenanceBay?.reset();
+    resources.dronePresentation?.resetTutorial();
     this.bayComplete = false;
     resources.electricalSystem.reset('restart');
     resources.acidProjectileSystem.reset();
@@ -1627,6 +1629,7 @@ export class BlackoutLevelRuntime {
     this.input.setEnabled(false);
     this.input.resetState();
     resources.maintenanceBay?.reset();
+    resources.dronePresentation?.resetTutorial();
     this.bayComplete = false;
     resources.electricalSystem.reset('reset');
     resources.acidProjectileSystem.reset();
