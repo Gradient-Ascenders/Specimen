@@ -47,12 +47,18 @@ import {
   CollisionWorld,
 } from '../physics/CollisionWorld.ts';
 import { KinematicBody, type JumpInputState } from '../physics/KinematicBody.ts';
+import type { MovementEvents } from '../physics/MovementEvents.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import {
   PuzzleRegistry,
   type ResettablePuzzleComponent,
 } from '../puzzle/PuzzleRegistry.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
+import {
+  BobCharacterPresentation,
+  type BobCharacterPresentationState,
+} from '../render/bob/BobCharacterPresentation.ts';
+import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { VoltElectricalPresentation } from '../render/electrical/VoltElectricalPresentation.ts';
 import { SpecimenCombatPresentation } from '../render/specimen/SpecimenCombatPresentation.ts';
 import {
@@ -108,6 +114,7 @@ import {
 } from './LevelProgression.ts';
 
 const OUT_OF_BOUNDS_Y = -5;
+const BLACKOUT_BOB_REFLECTION = { body: 0.12, eyes: 0.28 } as const;
 
 export interface BlackoutLevelRuntimeOptions {
   readonly host: HTMLElement;
@@ -149,7 +156,14 @@ interface BlackoutRuntimeResources {
   readonly phase: BlackoutPhaseController;
   readonly deathSequence: DeathSequence;
   readonly deathScreen: DeathScreen;
-  readonly visuals: Readonly<Record<'bob' | 'goop' | 'volt', THREE.Mesh>>;
+  readonly movementEvents: EventBus<MovementEvents>;
+  readonly bobPresentation: BobCharacterPresentation;
+  bobReflectionEnvironment: BobReflectionEnvironment | undefined;
+  readonly bobPresentationState: BobCharacterPresentationState;
+  readonly bobMovementIntent: THREE.Vector3;
+  readonly renderedBobPosition: THREE.Vector3;
+  bobDeathActive: boolean;
+  readonly visuals: Readonly<Record<'goop' | 'volt', THREE.Mesh>>;
   readonly voltLight: THREE.PointLight;
   readonly movement: THREE.Vector3;
   readonly jump: JumpInputState;
@@ -175,6 +189,7 @@ export class BlackoutLevelRuntime {
     local: {},
   };
   private completionEmitted = false;
+  private presentationPreparation: Promise<void> | undefined;
 
   constructor(options: BlackoutLevelRuntimeOptions) {
     validateLevelThreeProgressionSnapshot(options.progression);
@@ -278,7 +293,27 @@ export class BlackoutLevelRuntime {
     return this.requireResources().combatTargets.register(target, options);
   }
 
-  load(): void { this.lifecycle.load(); }
+  load(): void {
+    if (this.lifecycle.state === 'unloaded') {
+      this.presentationPreparation = undefined;
+    }
+    this.lifecycle.load();
+  }
+  preparePresentation(): Promise<void> {
+    const resources = this.requireResources();
+    resources.bobReflectionEnvironment ??= new BobReflectionEnvironment(
+      this.renderLayer.renderer,
+    );
+    resources.bobPresentation.setReflectionEnvironment(
+      resources.bobReflectionEnvironment.texture,
+    );
+    resources.bobPresentation.setReflectionIntensity(
+      BLACKOUT_BOB_REFLECTION.body,
+      BLACKOUT_BOB_REFLECTION.eyes,
+      true,
+    );
+    return this.presentationPreparation ??= resources.bobPresentation.prepare();
+  }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
   restartLevel(): void { this.lifecycle.restartLevel(); }
@@ -408,6 +443,17 @@ export class BlackoutLevelRuntime {
     )) {
       return false;
     }
+    resources.bobDeathActive =
+      resources.specimenForm.readModel.controlledForm === 'group' &&
+      resources.group.activeSlimeId === 'bob';
+    if (
+      resources.bobDeathActive &&
+      !resources.bobPresentation.startDeath(resources.group.bobBody.position)
+    ) {
+      resources.bobDeathActive = false;
+      resources.deathSequence.reset();
+      return false;
+    }
     resources.electricalSystem.reset('death');
     resources.specimenAttack.reset();
     resources.sentinelRig.controller.cancelTransient('death');
@@ -514,6 +560,9 @@ export class BlackoutLevelRuntime {
       phase: 'escape',
       local: { ...this.currentRoom.local, splitComplete: true },
     };
+    resources.bobMovementIntent.set(0, 0, 0);
+    resources.bobPresentation.setPosition(resources.group.bobBody.position);
+    resources.bobPresentation.reset();
     this.renderLayer.cameraRig.reset();
     this.retargetCamera(resources);
     this.syncVisuals(resources);
@@ -596,6 +645,9 @@ export class BlackoutLevelRuntime {
       return;
     }
     if (!resources.deathSequence.isPlaying) {
+      if (resources.bobDeathActive) {
+        resources.bobPresentation.updateDeath(deltaSeconds);
+      }
       if (resources.deathSequence.update(deltaSeconds)) {
         resources.deathScreen.show();
         this.host.dataset.gameState = resources.deathSequence.state;
@@ -746,6 +798,7 @@ export class BlackoutLevelRuntime {
     const body = specimenGameplay
       ? resources.specimenBody
       : resources.group.activeBody;
+    resources.bobMovementIntent.set(0, 0, 0);
 
     if (!switched) {
       this.renderLayer.cameraRig.queueLookInput(
@@ -803,6 +856,9 @@ export class BlackoutLevelRuntime {
         resources.jump.released = this.input.wasReleased('jump');
         resources.jump.cancelled =
           this.input.wasClearedSinceFixedUpdate;
+        if (!specimenGameplay && body === resources.group.bobBody) {
+          resources.bobMovementIntent.copy(resources.movement);
+        }
         body.update(deltaSeconds, resources.movement, resources.jump);
 
         resources.maintenanceDrone.update(deltaSeconds, {
@@ -835,6 +891,8 @@ export class BlackoutLevelRuntime {
         );
       }
     }
+
+    this.updateBobPresentation(deltaSeconds, resources);
 
     resources.maintenanceDrone.updateMountAvailability(
       resources.group.activeSlimeId,
@@ -951,6 +1009,13 @@ export class BlackoutLevelRuntime {
     const resources = this.resources;
     if (resources) {
       this.syncVisuals(resources);
+      interpolateBodyPosition(
+        resources.group.bobBody,
+        interpolationAlpha,
+        resources.renderedBobPosition,
+      );
+      resources.bobPresentation.setPosition(resources.renderedBobPosition);
+      resources.bobPresentation.present(interpolationAlpha);
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
       );
@@ -1037,6 +1102,8 @@ export class BlackoutLevelRuntime {
         this.initialProgression.activeSlimeId,
       );
       rollback(() => manager.dispose());
+      const movementEvents = new EventBus<MovementEvents>();
+      rollback(() => movementEvents.clear());
       const cp1 = BLACKOUT_CHECKPOINTS[0]!;
       const makeBody = (id: 'bob' | 'goop' | 'volt') => {
         const definition = manager.getDefinition(id);
@@ -1044,6 +1111,7 @@ export class BlackoutLevelRuntime {
           world: collisionWorld,
           surfaces: surfaceRegistry,
           initialPosition: cp1.bodyPositions[id],
+          events: id === 'bob' ? movementEvents : undefined,
           config: {
             movementCollisionMask:
               CollisionLayer.Movement |
@@ -1142,7 +1210,6 @@ export class BlackoutLevelRuntime {
       rollback(() => deathScreen.dispose());
       this.host.append(deathScreen.element);
       const visuals = {
-        bob: createSlimeVisual(0x44c7d8, 0x123941),
         goop: createSlimeVisual(0x7ad13d, 0x233d12),
         volt: createSlimeVisual(0xffdf45, 0x6d5600),
       } as const;
@@ -1153,6 +1220,26 @@ export class BlackoutLevelRuntime {
         rollback(() => disposeSlimeVisual(visual));
         this.renderLayer.scene.add(visual);
       }
+      const bobPresentation = new BobCharacterPresentation(
+        group.bobBody.radiusMetres,
+      );
+      bobPresentation.setPosition(group.bobBody.position);
+      rollback(() => bobPresentation.dispose());
+      this.renderLayer.scene.add(bobPresentation.root);
+      const bobPresentationState = createBobPresentationState(group.bobBody);
+      rollback(movementEvents.on('landed', (event) => {
+        bobPresentation.onLanding(
+          group.bobBody.groundNormal,
+          event.impactSpeedMetresPerSecond,
+        );
+      }));
+      rollback(movementEvents.on('jumped', (event) => {
+        bobPresentation.onLaunch({
+          directionWorld: event.directionWorld,
+          speedMetresPerSecond: event.speedMetresPerSecond,
+          chargeFraction: event.chargeFraction,
+        });
+      }));
       const voltLight = new THREE.PointLight(0xffdf75, 2.2, 8, 2);
       voltLight.name = 'blackout-volt-foundation-light';
       voltLight.castShadow = false;
@@ -1309,6 +1396,13 @@ export class BlackoutLevelRuntime {
         phase,
         deathSequence,
         deathScreen,
+        movementEvents,
+        bobPresentation,
+        bobReflectionEnvironment: undefined,
+        bobPresentationState,
+        bobMovementIntent: new THREE.Vector3(),
+        renderedBobPosition: new THREE.Vector3(),
+        bobDeathActive: false,
         visuals,
         voltLight,
         movement: new THREE.Vector3(),
@@ -1397,6 +1491,10 @@ export class BlackoutLevelRuntime {
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);
+    resources.bobMovementIntent.set(0, 0, 0);
+    resources.bobDeathActive = false;
+    resources.bobPresentation.setPosition(resources.group.bobBody.position);
+    resources.bobPresentation.reset();
     clearJump(resources.jump, false);
     this.completionEmitted = false;
     this.renderLayer.cameraRig.reset();
@@ -1436,6 +1534,9 @@ export class BlackoutLevelRuntime {
     resources.poweredDeviceRig.dispose();
     resources.electricalTargets.dispose();
 
+    resources.movementEvents.clear();
+    resources.bobPresentation.dispose();
+    resources.bobReflectionEnvironment?.dispose();
     for (const visual of Object.values(resources.visuals)) {
       disposeSlimeVisual(visual);
     }
@@ -1478,6 +1579,12 @@ export class BlackoutLevelRuntime {
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);
+    resources.bobMovementIntent.set(0, 0, 0);
+    if (resumeInput || !resources.bobDeathActive) {
+      resources.bobPresentation.setPosition(resources.group.bobBody.position);
+      resources.bobPresentation.reset();
+      resources.bobDeathActive = false;
+    }
     clearJump(resources.jump, true);
     this.renderLayer.cameraRig.reset();
     this.retargetCamera(resources);
@@ -1501,6 +1608,10 @@ export class BlackoutLevelRuntime {
   private readonly retryAfterDeath = (): void => {
     const resources = this.requireResources();
     if (!resources.deathSequence.completeRetry()) return;
+    if (resources.bobDeathActive) {
+      resources.bobPresentation.finishDeath(resources.group.bobBody.position);
+      resources.bobDeathActive = false;
+    }
     resources.deathScreen.hide();
     this.host.dataset.gameState = 'playing';
     if (
@@ -1532,6 +1643,26 @@ export class BlackoutLevelRuntime {
     }
   }
 
+  private updateBobPresentation(
+    deltaSeconds: number,
+    resources: BlackoutRuntimeResources,
+  ): void {
+    const bob = resources.group.bobBody;
+    const state = resources.bobPresentationState;
+    state.grounded = bob.grounded;
+    state.attached = bob.attached;
+    state.chargingJump = bob.chargingJump;
+    state.movementIntentWorld = resources.bobMovementIntent;
+    state.jumpCharge = bob.chargeFraction;
+    state.contactCount = bob.contactsThisStep;
+    state.contactSpeedMetresPerSecond =
+      bob.lastContactImpactSpeedMetresPerSecond;
+    state.contactName = bob.lastContactName;
+    state.contactSurfaceTag = bob.lastContactSurfaceTag;
+    state.landedThisStep = bob.landedThisStep;
+    resources.bobPresentation.update(deltaSeconds, state);
+  }
+
   private retargetCamera(resources: BlackoutRuntimeResources): void {
     const target =
       resources.specimenForm.readModel.controlledForm === 'specimen'
@@ -1544,7 +1675,7 @@ export class BlackoutLevelRuntime {
   }
 
   private syncVisuals(resources: BlackoutRuntimeResources): void {
-    resources.visuals.bob.position.copy(resources.group.bobBody.position);
+    resources.bobPresentation.setPosition(resources.group.bobBody.position);
     resources.visuals.goop.position.copy(resources.group.goopBody.position);
     resources.visuals.volt.position.copy(resources.group.voltBody.position);
     resources.specimenVisual.position.copy(resources.specimenBody.position);
@@ -1552,8 +1683,12 @@ export class BlackoutLevelRuntime {
     const specimenControlled =
       resources.specimenForm.readModel.controlledForm === 'specimen';
     const merging = resources.phase.phase === 'merging';
+    const groupVisible = !specimenControlled || merging;
+    if (!resources.bobDeathActive) {
+      resources.bobPresentation.setVisible(groupVisible);
+    }
     for (const visual of Object.values(resources.visuals)) {
-      visual.visible = !specimenControlled || merging;
+      visual.visible = groupVisible;
     }
     resources.specimenVisual.visible = specimenControlled;
     resources.voltLight.visible = !specimenControlled;
@@ -1768,6 +1903,42 @@ function clearJump(state: JumpInputState, cancelled: boolean): void {
   state.held = false;
   state.released = false;
   state.cancelled = cancelled;
+}
+
+function createBobPresentationState(
+  body: KinematicBody,
+): BobCharacterPresentationState {
+  return {
+    locomotionPositionWorld: body.locomotionPosition,
+    velocityWorld: body.velocity,
+    movementIntentWorld: new THREE.Vector3(),
+    surfaceNormalWorld: body.groundNormal,
+    gameplayUpWorld: body.gameplayUp,
+    grounded: body.grounded,
+    attached: body.attached,
+    chargingJump: body.chargingJump,
+    jumpCharge: body.chargeFraction,
+    maximumLocomotionSpeedMetresPerSecond:
+      body.maximumLocomotionSpeedMetresPerSecond,
+    contactCount: body.contactsThisStep,
+    contactNormalWorld: body.lastContactNormal,
+    contactSpeedMetresPerSecond: body.lastContactImpactSpeedMetresPerSecond,
+    contactName: body.lastContactName,
+    contactSurfaceTag: body.lastContactSurfaceTag,
+    landedThisStep: body.landedThisStep,
+  };
+}
+
+function interpolateBodyPosition(
+  body: KinematicBody,
+  alpha: number,
+  target: THREE.Vector3,
+): void {
+  target.set(
+    THREE.MathUtils.lerp(body.previousPosition.x, body.position.x, alpha),
+    THREE.MathUtils.lerp(body.previousPosition.y, body.position.y, alpha),
+    THREE.MathUtils.lerp(body.previousPosition.z, body.position.z, alpha),
+  );
 }
 
 function objectiveFor(room: BlackoutRoomState): string {
