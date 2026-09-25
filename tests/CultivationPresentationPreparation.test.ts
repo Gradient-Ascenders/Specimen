@@ -12,6 +12,13 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
   const ordinary = new THREE.Mesh(shape, shared), instanced = new THREE.InstancedMesh(shape, shared, 1);
   ordinary.name = instanced.name = 'variant-regression'; scene.add(ordinary, instanced);
+  const renderTarget = new THREE.WebGLRenderTarget(4, 4);
+  const reflectiveMaterial = new THREE.MeshStandardMaterial({
+    envMap: renderTarget.texture,
+  });
+  const reflective = new THREE.Mesh(shape, reflectiveMaterial);
+  reflective.name = 'render-target-texture-regression';
+  scene.add(reflective);
   const hidden = new THREE.Mesh(shape, new THREE.MeshBasicMaterial({visible:false}));
   hidden.name = 'hidden-collider-regression'; scene.add(hidden);
   const projectile = new THREE.InstancedMesh(shape, new THREE.MeshBasicMaterial(), 1);
@@ -39,6 +46,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   for (const geometry of geometries) geometry.addEventListener('dispose', () => destroyed++);
   let viewport = new THREE.Vector4(0, 0, 1280, 720), scissor = viewport.clone(), scissorTest = false;
   let compiles = 0;
+  const initializedTextures = new Set<THREE.Texture>();
   const shadowLayouts = new Set<string>();
   let holdNextCompile = false;
   let releaseCompile: (() => void) | undefined;
@@ -51,7 +59,9 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     getViewport: (out: THREE.Vector4) => out.copy(viewport), getScissor: (out: THREE.Vector4) => out.copy(scissor), getScissorTest: () => scissorTest,
     setViewport: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
     setScissor: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
-    setScissorTest: (value: boolean) => { scissorTest = value; }, initTexture() {}, compile() {}, render() {},
+    setScissorTest: (value: boolean) => { scissorTest = value; },
+    initTexture(texture: THREE.Texture) { initializedTextures.add(texture); },
+    compile() {}, render() {},
     async compileAsync(group: THREE.Group, _camera: THREE.Camera, targetScene: THREE.Scene) {
       group.traverse(o => {
         preparedOwners.add(o.name);
@@ -81,6 +91,11 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
     assert.ok(compiles > 0);
+    assert.equal(
+      initializedTextures.has(renderTarget.texture),
+      false,
+      'render-target textures stay owned by their render target',
+    );
     assert.equal(preparedOwners.has(hidden.name), false, 'hidden collider materials never enter the compiler');
     if (!fail) assert.equal(preparedOwners.has(projectile.name), mode === 'startup', 'projectile preparation follows its owning room');
     if (!fail && mode !== 'startup') { assert.equal(variants.size, 2, 'ordinary and instanced meshes must each await their shader variant'); assert.equal(queue.diagnostics.completed, 1); assert.ok(queue.diagnostics.total > 1);
@@ -176,6 +191,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
   } finally {
     queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
+    reflectiveMaterial.dispose(); renderTarget.dispose();
     hidden.material.dispose(); projectile.material.dispose(); mappedMaterial.map!.dispose(); mappedMaterial.dispose();
     mappedCaster.dispose(); plainCaster.dispose(); projectile.dispose();
     globalThis.requestAnimationFrame = priorRaf;

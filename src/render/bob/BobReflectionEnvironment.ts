@@ -125,7 +125,7 @@ function disposeReflectionSource(scene: THREE.Object3D): void {
   scene.clear();
 }
 
-/** Owns the one Bob-only PMREM target for a loaded Level 1 runtime. */
+/** Owns the one Bob-only PMREM target for a loaded level runtime. */
 export class BobReflectionEnvironment {
   readonly texture: THREE.Texture;
 

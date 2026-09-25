@@ -257,6 +257,10 @@ export class CultivationPreparationQueue {
       proxy.material = Array.isArray(source.material) ? copies : copies[0];
       for (const material of materials) for (const value of Object.values(material)) if (value instanceof THREE.Texture && !this.textures.has(value)) {
         this.textures.add(value);
+        // PMREM and other render-target textures are allocated and typed by
+        // their owning target. Treating them as ordinary source textures can
+        // rebind an incompatible format before the material samples them.
+        if (value.isRenderTargetTexture) continue;
         yield {run: () => { const start = performance.now(); this.layer.renderer.initTexture(value); this.diagnostics.textureMs += performance.now()-start; }};
       }
       if (needsProgram) {
