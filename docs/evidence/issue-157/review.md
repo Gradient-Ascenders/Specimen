@@ -1,7 +1,8 @@
 # Bob Gate 3 Level 1 review — #157
 
-Status: implementation and current runtime evidence are ready for explicit
-Gate 3 review. This document does not grant visual approval or close the gate.
+Status: **Gate 3 approved**. Kevin-Ebrahim explicitly approved the reviewed
+runtime evidence on 25 September 2026. This records visual acceptance but does
+not close the GitHub issue.
 
 ## Reviewed build and method
 
@@ -106,9 +107,10 @@ The recorder asserts eye-seat parity, bounded primary-family accumulation,
 clean retry/restart state, unload cleanup, no failed requests, and no
 unexplained browser errors before returning success.
 
-## Approval boundary
+## Approval result
 
-Review the recording with real player-control feel in mind, especially reversal,
-wall orientation, the close attached-charge view, eye-expression readability,
-and damage/death timing. Stop here for explicit Gate 3 approval before any Bob
-migration to later levels.
+Kevin-Ebrahim approved Gate 3 after reviewing this evidence package, including
+the documented close attached-charge framing, eye-expression readability, and
+damage/death evidence limitations. Bob's approved presentation may now proceed
+to separately scoped later-level migration work without reopening Gate 3 unless
+that integration demonstrates a regression.
