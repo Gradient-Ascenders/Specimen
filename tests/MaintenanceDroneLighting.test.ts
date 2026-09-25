@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import * as THREE from 'three';
+import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
+import { MaintenanceDronePresentation } from '../src/render/environment/blackout/MaintenanceDronePresentation.ts';
+import type { MaintenanceDroneReadModel } from '../src/vehicles/MaintenanceDroneTypes.ts';
+
+test('maintenance beam reaches the floor and stops above intervening platforms',()=>{
+  const element=()=>({style:{},append(){},remove(){}});
+  const host={...element(),ownerDocument:{createElement:element}} as unknown as HTMLElement;
+  const root=new THREE.Group();root.position.y=11;
+  const world=new CollisionWorld();
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(60,1,60));floor.position.y=-.5;world.register(floor);
+  const ignored=new THREE.Mesh();
+  const presentation=new MaintenanceDronePresentation(root,host,world,ignored);
+  const state={state:'parked-hover',lightEnabled:true,powered:true} as MaintenanceDroneReadModel;
+  const beam=root.getObjectByName('soft-maintenance-beam') as THREE.Mesh;
+  const bottom=()=>new THREE.Box3().setFromObject(beam).min.y;
+  presentation.update(1/60,state,false);
+  assert.ok(bottom()>=0 && bottom()<.15,`beam must reach ground, got ${bottom()}`);
+  const platform=new THREE.Mesh(new THREE.BoxGeometry(8,.4,8));platform.position.y=4.8;world.register(platform);
+  presentation.update(1/60,state,false);
+  assert.ok(bottom()>=5 && bottom()<5.15,`beam must stop at platform top, got ${bottom()}`);
+  let spot:THREE.SpotLight|undefined;
+  root.traverse(o=>{if(o instanceof THREE.SpotLight)spot=o;});
+  assert.equal(spot?.castShadow,true);
+  assert.equal(spot?.distance,32);
+  world.unregister(platform);presentation.update(1/60,state,false);
+  assert.ok(bottom()<.15,'beam grows back when no longer blocked');
+  presentation.dispose();world.clear();floor.geometry.dispose();platform.geometry.dispose();
+});

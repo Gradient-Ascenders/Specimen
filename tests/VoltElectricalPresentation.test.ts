@@ -89,6 +89,41 @@ test('Volt presentation reuses one beam and one DOM overlay across updates', () 
   assert.equal(diagnostics.beamVisible, true);
   assert.equal(diagnostics.crosshairCount, 1);
 
+  const beam = scene.getObjectByName('volt-electrical-arc-core') as THREE.Line;
+  const branches = scene.getObjectByName('volt-electrical-branch-arcs') as THREE.LineSegments;
+  const sparks = scene.getObjectByName('volt-electrical-travelling-sparks') as THREE.Points;
+  assert.ok(beam);
+  assert.ok(branches);
+  assert.ok(sparks);
+  assert.equal(beam.geometry.getAttribute('position').count, 14);
+  assert.equal(branches.geometry.getAttribute('position').count, 32);
+  assert.equal(sparks.geometry.getAttribute('position').count, 7);
+  const sparkMaterial = sparks.material as THREE.PointsMaterial;
+  assert.equal(sparkMaterial.size, 0.075);
+  const sparkShader = { fragmentShader: '#include <color_fragment>' };
+  sparkMaterial.onBeforeCompile(
+    sparkShader as THREE.WebGLProgramParametersWithUniforms,
+    {} as THREE.WebGLRenderer,
+  );
+  assert.match(sparkShader.fragmentShader, /gl_PointCoord/);
+  assert.match(sparkShader.fragmentShader, /smoothstep\(0\.18, 0\.5, sparkRadius\)/);
+  assert.equal(beam.visible, true);
+  assert.equal(branches.visible, true);
+  assert.equal(sparks.visible, true);
+
+  const firstArcPosition = beam.geometry.getAttribute('position').getY(1);
+  presentation.update(model);
+  assert.notEqual(beam.geometry.getAttribute('position').getY(1), firstArcPosition);
+
+  presentation.update({ ...model, beamMode: 'none' });
+  assert.equal(beam.visible, false);
+  assert.equal(branches.visible, false);
+  assert.equal(sparks.visible, false);
+  presentation.update({ ...model, beamMode: 'connected' });
+  assert.equal(beam.visible, true);
+  assert.equal(branches.visible, true);
+  assert.equal(sparks.visible, true);
+
   presentation.dispose();
   assert.equal(scene.children.length, 0);
   assert.equal(host.children[0]?.removed, true);

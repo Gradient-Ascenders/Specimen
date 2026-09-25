@@ -282,6 +282,7 @@ export class GreyboxLevelRuntime {
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private readonly hostWindow: Window;
+  private skipToLevelThreeTriggered = false;
   private readonly debugAvailable: boolean;
   private readonly lifecycle: LevelLifecycle;
 
@@ -342,6 +343,9 @@ export class GreyboxLevelRuntime {
   }
 
   captureProgressionSnapshot(): LevelProgressionSnapshot {
+    if (this.skipToLevelThreeTriggered) {
+      return {unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt'};
+    }
     const resources = this.requireResources();
     return {
       unlockedSlimeIds: resources.slimeManager.getRosterState()
@@ -1096,6 +1100,7 @@ export class GreyboxLevelRuntime {
       this.hostWindow.addEventListener('keydown', this.onDebugToggle);
     }
     this.host.append(deathScreen.element);
+    this.hostWindow.addEventListener('keydown', this.onSkipToLevelThree);
     this.host.dataset.gameState = deathSequence.state;
 
     this.resources = {
@@ -1181,6 +1186,7 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.skipToLevelThreeTriggered = false;
     const resources = this.requireResources();
     this.input.resetState();
     resources.deathSequence.reset();
@@ -1226,6 +1232,8 @@ export class GreyboxLevelRuntime {
     this.lightingPrewarmPromise = undefined;
     this.lightingPrewarmProfile = undefined;
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
+    this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree);
+    this.skipToLevelThreeTriggered = false;
     resources.deathSequence.reset();
     resources.deathScreen.dispose();
     resources.testPanel?.dispose();
@@ -1660,6 +1668,23 @@ export class GreyboxLevelRuntime {
       ].join('\n'),
     );
   }
+
+  private readonly onSkipToLevelThree = (event: KeyboardEvent): void => {
+    if (
+      (event.code !== 'Minus' && event.code !== 'NumpadSubtract') ||
+      event.repeat || this.skipToLevelThreeTriggered ||
+      this.lifecycle.state !== 'running' || !this.input.enabled ||
+      !this.debugInteractionEnabled || !this.resources?.deathSequence.isPlaying
+    ) return;
+    if (typeof Element !== 'undefined' && event.target instanceof Element &&
+      event.target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+    event.preventDefault();
+    this.skipToLevelThreeTriggered = true;
+    this.input.setEnabled(false);
+    this.input.releasePointerLock();
+    this.host.dataset.gameState = 'level-complete';
+    this.events.emit('completed', {levelId: LEVEL_ID, nextLevelId: 'level-3'});
+  };
 
   private readonly onDebugToggle = (event: KeyboardEvent): void => {
     const testPanel = this.resources?.testPanel;
