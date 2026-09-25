@@ -22,6 +22,15 @@ interface BlackoutRuntimeProbe {
       readonly diagnostics: {
         readonly visible: boolean;
         readonly locomotionStrength: number;
+        readonly asset?: {
+          readonly bodyTriangles: number;
+          readonly eyeTriangles: number;
+          readonly drawCalls: number;
+          readonly geometries: number;
+          readonly materials: number;
+          readonly bodyMorphTargets: number;
+          readonly eyeMorphTargets: number;
+        };
         readonly materials?: {
           readonly selfLit: boolean;
           readonly reflectionMapName?: string;
@@ -113,7 +122,9 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
 }) => {
   // This traverses two production transitions and compiles Bob's PMREM/GLB
   // under software Chromium before exercising Blackout.
-  test.setTimeout(360_000);
+  // This crosses both earlier levels, then performs two Blackout preparation
+  // cycles; software WebGL needs a wider budget for the lifecycle assertion.
+  test.setTimeout(720_000);
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   page.on('console', (message) => {
@@ -152,6 +163,7 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
       rootName: resources.bobPresentation.root.name,
       bobPosition: { ...resources.group.bobBody.position },
       activeSlimeId: resources.manager.activeSlimeId,
+      asset: resources.bobPresentation.diagnostics.asset,
       materials: resources.bobPresentation.diagnostics.materials,
       goopVisible: resources.visuals.goop.visible,
       voltVisible: resources.visuals.volt.visible,
@@ -161,6 +173,15 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
   expect(initial).toMatchObject({
     rootName: 'player-slime-bob-presentation',
     activeSlimeId: 'bob',
+    asset: {
+      bodyTriangles: 3_264,
+      eyeTriangles: 504,
+      drawCalls: 3,
+      geometries: 3,
+      materials: 2,
+      bodyMorphTargets: 7,
+      eyeMorphTargets: 11,
+    },
     materials: {
       selfLit: false,
       reflectionMapName: 'bob-laboratory-pmrem',

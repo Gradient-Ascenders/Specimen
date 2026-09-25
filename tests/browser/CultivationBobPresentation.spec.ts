@@ -12,6 +12,15 @@ interface CultivationRuntimeProbe {
       readonly diagnostics: {
         readonly visible: boolean;
         readonly locomotionStrength: number;
+        readonly asset?: {
+          readonly bodyTriangles: number;
+          readonly eyeTriangles: number;
+          readonly drawCalls: number;
+          readonly geometries: number;
+          readonly materials: number;
+          readonly bodyMorphTargets: number;
+          readonly eyeMorphTargets: number;
+        };
         readonly deathBurst: {
           readonly active: boolean;
           readonly elapsedSeconds: number;
@@ -95,7 +104,9 @@ const enterCultivation = async (page: Page): Promise<void> => {
 test('Cultivation mounts the prepared shared Bob character presentation', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
+  // Two full Cultivation constructions can exceed five minutes under the
+  // repository's software-WebGL browser while PMREM/program work is cold.
+  test.setTimeout(600_000);
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   page.on('console', (message) => {
@@ -114,13 +125,22 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
     ).__specimenCultivationRuntime;
     const bob = runtime?.resources?.bobPresentation;
     return bob
-      ? { ready: bob.ready, rootName: bob.root.name }
+      ? { ready: bob.ready, rootName: bob.root.name, asset: bob.diagnostics.asset }
       : undefined;
   });
 
   expect(presentation).toEqual({
     ready: true,
     rootName: 'player-slime-bob-presentation',
+    asset: {
+      bodyTriangles: 3_264,
+      eyeTriangles: 504,
+      drawCalls: 3,
+      geometries: 3,
+      materials: 2,
+      bodyMorphTargets: 7,
+      eyeMorphTargets: 11,
+    },
   });
   const initialBobPosition = await page.evaluate(() => {
     const position = (

@@ -71,14 +71,13 @@ Rendering interpolates the grey-box probe between `previousPosition` and `positi
 
 `CollisionWorld` is a query registry, not a rigid-body simulation.
 
-For the Sprint 1 test scene:
-
-- only the authored test-case meshes exposed through `GreyboxCollisionScene.collisionMeshes` are registered;
-- debug outlines, the scale reference, spawn/recovery markers and the visual probe are not colliders;
-- the registered geometry is authored as `BoxGeometry` and may be translated/rotated;
-- surface tags (`default`, `sticky`, `bouncy`) are metadata only in #11; sticky adhesion and bounce responses are deliberately deferred;
-- hidden collider meshes are ignored by queries;
-- collider transforms are refreshed during a query so later authored kinematic geometry can move without changing the query API.
+The original Sprint 1 standalone `GreyboxCollisionScene` was removed after the
+production level and shared Bob presentation superseded it. Collision
+regressions now use focused `CollisionWorld` / `KinematicBody` fixtures and the
+real Containment runtime. Only explicitly registered gameplay geometry is
+authoritative; debug art and deformable presentation meshes are never
+colliders. Collider transforms are refreshed during a query so authored
+kinematic geometry can move without changing the query API.
 
 ### Sphere sweep
 

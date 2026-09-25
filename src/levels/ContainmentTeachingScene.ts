@@ -5,7 +5,7 @@ import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 import {
   BobCharacterPresentation,
 } from '../render/bob/BobCharacterPresentation.ts';
-import type { Vector3State } from '../render/slime/SlimeVisual.ts';
+import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomOneArt } from '../render/environment/containment/RoomOneArt.ts';
 import { RoomTwoArt } from '../render/environment/containment/RoomTwoArt.ts';

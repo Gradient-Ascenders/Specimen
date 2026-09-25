@@ -1,6 +1,6 @@
 # Bob character model
 
-Status: the revised curled neutral is Gate 1 approved (2026-09-23).
+Status: Gates 1-3 approved; the shared presentation is integrated in Levels 1-3 (2026-09-25).
 
 This brief records the agreed production direction for Bob's asset and runtime presentation. The supplied cyan-slime concept sheet is the production art direction. Current approved decisions and this brief guide the visual design; earlier Bob experiments may inform technique but do not constrain it.
 
@@ -10,6 +10,36 @@ This brief records the agreed production direction for Bob's asset and runtime p
 - Integrate and approve it in Level 1 first.
 - Preserve the authoritative kinematic body, movement, collision, abilities, controls, and gameplay timing.
 - Do not redesign Goop or claim completion of all issue #42 scope.
+
+## Final runtime ownership
+
+`BobCharacterPresentation` is the only production owner of Bob's rendered
+character in Containment, Cultivation, and Blackout. Each level owns one
+presentation instance and one level-scoped `BobReflectionEnvironment`, mounts
+the presentation root below its scene, and disposes both when that runtime
+unloads. The old `GreyboxCollisionScene` / `SlimeVisual` / `SlimeMaterial`
+ownership path was removed after all three production runtimes migrated.
+
+```text
+KinematicBody snapshot + MovementEvents
+                 |
+                 v
+      BobCharacterPresentation
+       |       |       |       |
+       v       v       v       v
+   GLB morphs  eyes  materials  shared death burst
+```
+
+The arrow is one-way. `KinematicBody` owns position, collider, contacts,
+support frame, velocity, charge and movement eligibility. Level controllers
+own input, switching, hazards, checkpoints, merge/split and recovery.
+Presentation consumes those facts and events but never writes gameplay state.
+
+| Runtime | Bob owner | Other slime ownership preserved |
+| --- | --- | --- |
+| Level 1 — Containment | `ContainmentTeachingScene.bob` | Goop uses its existing Level 1 presentation. |
+| Level 2 — Cultivation | `CultivationLevelRuntime.bobPresentation` | `SlimePairPresentation` remains responsible for Goop. |
+| Level 3 — Blackout | `BlackoutLevelRuntime.bobPresentation` | Level-owned simple meshes remain for Goop and Volt; the merged specimen remains separate. |
 
 ## Character language
 
@@ -151,6 +181,57 @@ The generator explicitly defines coordinates, dimensions, origin, topology, eye 
 Accepted Blender MCP or manual changes must be reconciled into the generator before the asset is considered finished. Validation fails loudly on missing or extra morphs, renamed objects, wrong axes or dimensions, triangle-budget drift, missing eye meshes, unexpected non-zero transforms, or a GLB without morph targets.
 
 Complex UV work and complicated internal geometry are out of scope for the initial model.
+
+## Shader and material contract
+
+`BobGateTwoMaterialSet` owns exactly two runtime materials: one shared by the
+body and one shared by both eyes. The body is a scene-lit
+`MeshPhysicalMaterial` with a stable `onBeforeCompile` program key. Its custom
+vertex work is limited to at most `0.0095 m` of combined idle wobble and local
+impact ripple, with corrected normals. Authored morphs remain the only owner of
+large silhouette changes. The eyes use the physical material path without
+custom deformation and receive the same borrowed reflection map with a
+stronger room-authored intensity.
+
+The reflection PMREM is borrowed by Bob's materials and owned by the level's
+`BobReflectionEnvironment`; disposing the material must not dispose that map.
+Imported GLB materials are replaced and disposed during preparation.
+
+## Reset and disposal contract
+
+`reset()` is reusable and allocation-free. It clears death, burst, body poses,
+eye expressions, locomotion/frame history, charge, landing, damage, impact,
+opacity and visibility while retaining prepared GPU resources. Retry calls
+`finishDeath()` only after authoritative recovery has succeeded. Restart uses
+the same reset boundary after the gameplay snapshot is restored.
+
+`dispose()` is idempotent and terminal. It resets transient state, disposes the
+shared burst, every unique loaded GLB geometry, and the two replacement
+materials exactly once; then it detaches and clears the presentation root.
+Preparing a disposed presentation is an error. Level unload separately
+disposes the borrowed reflection environment after disposing Bob.
+
+## Approved asset cost
+
+The runtime diagnostic contract reports these exact values for the approved
+`bob-authored.glb` while prepared and reports no asset profile after disposal:
+
+| Cost | Value |
+| --- | ---: |
+| Body triangles | 3,264 |
+| Both eyes, combined | 504 |
+| Total character triangles | 3,768 |
+| Character draw submissions | 3 |
+| Character geometries | 3 |
+| Runtime materials | 2 |
+| Body morph targets | 7 |
+| Morph targets per eye | 11 (7 seat corrections + 4 expressions) |
+
+The shared death burst is a separate lifecycle-owned effect: one instanced
+droplet draw plus one core draw, both hidden outside the death sequence.
+
+Whole-game renderer measurements and lifecycle evidence are recorded in
+`docs/evidence/issue-160/review.md`.
 
 ## Approval gates
 

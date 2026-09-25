@@ -9,7 +9,7 @@ import { captureContainmentCollisionFingerprint } from '../src/levels/Containmen
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import { createSignagePanel } from '../src/render/environment/containment/ContainmentModularComponents.ts';
 import { getUnsupportedContainmentSignCharacters } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
-import { DEFAULT_SLIME_BASE_COLOUR } from '../src/render/slime/SlimeMaterial.ts';
+import { DEFAULT_SLIME_BASE_COLOUR } from '../src/render/slime/SlimePalette.ts';
 
 test('every authored Containment sign character has a visible vector glyph', () => {
   assert.deepEqual(getUnsupportedContainmentSignCharacters(), []);

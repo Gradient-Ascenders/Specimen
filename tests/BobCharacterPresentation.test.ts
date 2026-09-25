@@ -1226,6 +1226,25 @@ test('neutral Bob presentation loads, follows authoritative transforms, fades, r
   assert.ok([...disposalCounts.values()].every((count) => count === 1));
 });
 
+test('Bob presentation reports the approved asset cost until disposal', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+
+  assert.equal(bob.diagnostics.asset, undefined);
+  await bob.prepare(loadAsset);
+  assert.deepEqual(bob.diagnostics.asset, {
+    bodyTriangles: 3_264,
+    eyeTriangles: 504,
+    drawCalls: 3,
+    geometries: 3,
+    materials: 2,
+    bodyMorphTargets: 7,
+    eyeMorphTargets: 11,
+  });
+
+  bob.dispose();
+  assert.equal(bob.diagnostics.asset, undefined);
+});
+
 test('Bob presentation owns visibility, death hooks and combined diagnostics', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);

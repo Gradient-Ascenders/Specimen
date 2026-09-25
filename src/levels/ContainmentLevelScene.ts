@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
-import type { Vector3State } from '../render/slime/SlimeVisual.ts';
+import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import {
   consolidateContainmentRoomStaticVisuals,

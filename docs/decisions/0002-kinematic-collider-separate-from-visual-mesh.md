@@ -18,6 +18,8 @@ drives the visual representation one-way.
 ## Consequences
 
 Collision remains predictable while the slime wobbles, squashes, or stretches,
-and visual deformation can evolve independently of collision geometry. A
-`SlimeVisual`-style component consumes gameplay state rather than becoming
-authoritative. This separation keeps ownership and resource cleanup explicit.
+and visual deformation can evolve independently of collision geometry.
+`BobCharacterPresentation` consumes gameplay state rather than becoming
+authoritative. This separation keeps ownership and resource cleanup explicit;
+the earlier `SlimeVisual` prototype was removed after every production level
+adopted the shared character presentation.

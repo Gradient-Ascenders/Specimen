@@ -1,0 +1,268 @@
+{
+  "capturedAt": "2026-09-25T10:38:14.161Z",
+  "environment": {
+    "browser": "Playwright Chromium",
+    "viewportCssPixels": [
+      960,
+      600
+    ],
+    "renderer": "software WebGL in the Codex workspace",
+    "representativeHardwareProfiled": false
+  },
+  "levels": {
+    "levelOne": {
+      "asset": {
+        "bodyTriangles": 3264,
+        "eyeTriangles": 504,
+        "drawCalls": 3,
+        "geometries": 3,
+        "materials": 2,
+        "bodyMorphTargets": 7,
+        "eyeMorphTargets": 11
+      },
+      "render": {
+        "drawCalls": 382,
+        "triangles": 56494,
+        "programs": 99,
+        "geometries": 366,
+        "textures": 15
+      },
+      "frameTime": {
+        "samples": 12,
+        "p50Milliseconds": 616.6000000000022,
+        "p95Milliseconds": 800,
+        "maximumMilliseconds": 800
+      }
+    },
+    "cultivation": {
+      "asset": {
+        "bodyTriangles": 3264,
+        "eyeTriangles": 504,
+        "drawCalls": 3,
+        "geometries": 3,
+        "materials": 2,
+        "bodyMorphTargets": 7,
+        "eyeMorphTargets": 11
+      },
+      "render": {
+        "drawCalls": 36,
+        "triangles": 16814,
+        "programs": 115,
+        "geometries": 489,
+        "textures": 48
+      },
+      "frameTime": {
+        "samples": 12,
+        "p50Milliseconds": 316.6000000000058,
+        "p95Milliseconds": 583.3000000000029,
+        "maximumMilliseconds": 583.3000000000029
+      }
+    },
+    "blackout": {
+      "asset": {
+        "bodyTriangles": 3264,
+        "eyeTriangles": 504,
+        "drawCalls": 3,
+        "geometries": 3,
+        "materials": 2,
+        "bodyMorphTargets": 7,
+        "eyeMorphTargets": 11
+      },
+      "render": {
+        "drawCalls": 15,
+        "triangles": 6424,
+        "programs": 7,
+        "geometries": 10,
+        "textures": 8
+      },
+      "frameTime": {
+        "samples": 12,
+        "p50Milliseconds": 1433.300000000003,
+        "p95Milliseconds": 11249.600000000006,
+        "maximumMilliseconds": 11249.600000000006
+      }
+    }
+  },
+  "lifecycle": {
+    "transitions": {
+      "levelOneDisposed": true,
+      "cultivationDisposed": true
+    },
+    "restart": {
+      "reusedPresentation": true,
+      "assetStable": true
+    },
+    "unload": {
+      "bobReady": false,
+      "rootDetached": true,
+      "environmentDisposed": true,
+      "runtimeState": "unloaded"
+    },
+    "repeatedLevelOne": {
+      "initial": {
+        "operation": "initial",
+        "iteration": 0,
+        "restartCount": 0,
+        "asset": {
+          "bodyTriangles": 3264,
+          "eyeTriangles": 504,
+          "drawCalls": 3,
+          "geometries": 3,
+          "materials": 2,
+          "bodyMorphTargets": 7,
+          "eyeMorphTargets": 11
+        },
+        "rendererResources": {
+          "programs": 99,
+          "geometries": 366,
+          "textures": 15
+        }
+      },
+      "steadyState": {
+        "operation": "retry",
+        "iteration": 1,
+        "restartCount": 0,
+        "asset": {
+          "bodyTriangles": 3264,
+          "eyeTriangles": 504,
+          "drawCalls": 3,
+          "geometries": 3,
+          "materials": 2,
+          "bodyMorphTargets": 7,
+          "eyeMorphTargets": 11
+        },
+        "rendererResources": {
+          "programs": 99,
+          "geometries": 366,
+          "textures": 15
+        }
+      },
+      "retries": [
+        {
+          "operation": "retry",
+          "iteration": 1,
+          "restartCount": 0,
+          "asset": {
+            "bodyTriangles": 3264,
+            "eyeTriangles": 504,
+            "drawCalls": 3,
+            "geometries": 3,
+            "materials": 2,
+            "bodyMorphTargets": 7,
+            "eyeMorphTargets": 11
+          },
+          "rendererResources": {
+            "programs": 99,
+            "geometries": 366,
+            "textures": 15
+          }
+        },
+        {
+          "operation": "retry",
+          "iteration": 2,
+          "restartCount": 0,
+          "asset": {
+            "bodyTriangles": 3264,
+            "eyeTriangles": 504,
+            "drawCalls": 3,
+            "geometries": 3,
+            "materials": 2,
+            "bodyMorphTargets": 7,
+            "eyeMorphTargets": 11
+          },
+          "rendererResources": {
+            "programs": 99,
+            "geometries": 366,
+            "textures": 15
+          }
+        },
+        {
+          "operation": "retry",
+          "iteration": 3,
+          "restartCount": 0,
+          "asset": {
+            "bodyTriangles": 3264,
+            "eyeTriangles": 504,
+            "drawCalls": 3,
+            "geometries": 3,
+            "materials": 2,
+            "bodyMorphTargets": 7,
+            "eyeMorphTargets": 11
+          },
+          "rendererResources": {
+            "programs": 99,
+            "geometries": 366,
+            "textures": 15
+          }
+        }
+      ],
+      "restarts": [
+        {
+          "operation": "restart",
+          "iteration": 1,
+          "restartCount": 1,
+          "asset": {
+            "bodyTriangles": 3264,
+            "eyeTriangles": 504,
+            "drawCalls": 3,
+            "geometries": 3,
+            "materials": 2,
+            "bodyMorphTargets": 7,
+            "eyeMorphTargets": 11
+          },
+          "rendererResources": {
+            "programs": 99,
+            "geometries": 366,
+            "textures": 15
+          }
+        },
+        {
+          "operation": "restart",
+          "iteration": 2,
+          "restartCount": 2,
+          "asset": {
+            "bodyTriangles": 3264,
+            "eyeTriangles": 504,
+            "drawCalls": 3,
+            "geometries": 3,
+            "materials": 2,
+            "bodyMorphTargets": 7,
+            "eyeMorphTargets": 11
+          },
+          "rendererResources": {
+            "programs": 99,
+            "geometries": 366,
+            "textures": 15
+          }
+        },
+        {
+          "operation": "restart",
+          "iteration": 3,
+          "restartCount": 3,
+          "asset": {
+            "bodyTriangles": 3264,
+            "eyeTriangles": 504,
+            "drawCalls": 3,
+            "geometries": 3,
+            "materials": 2,
+            "bodyMorphTargets": 7,
+            "eyeMorphTargets": 11
+          },
+          "rendererResources": {
+            "programs": 99,
+            "geometries": 366,
+            "textures": 15
+          }
+        }
+      ],
+      "stable": true,
+      "unload": {
+        "bobReady": false,
+        "rootDetached": true,
+        "runtimeState": "unloaded"
+      }
+    }
+  },
+  "consoleErrors": [],
+  "failedRequests": []
+}

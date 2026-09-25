@@ -763,15 +763,20 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
     { timeout: 3_000, message: 'Waiting for Bob to stop' },
   ).toBe(0);
   const stopped = await readBob();
-  await expect.poll(
-    async () => (await readBob()).locomotionStrength,
-    { timeout: 3_000, message: 'Waiting for Bob to settle toward Neutral' },
-  ).toBeLessThan(stopped.locomotionStrength);
+  if (stopped.locomotionStrength > 0) {
+    await expect.poll(
+      async () => (await readBob()).locomotionStrength,
+      { timeout: 3_000, message: 'Waiting for Bob to settle toward Neutral' },
+    ).toBeLessThan(stopped.locomotionStrength);
+  }
   const settled = await readBob();
 
   expect(moving.position).not.toEqual(idle.position);
   expect(moving.locomotionStrength).toBeGreaterThan(0);
-  expect(settled.locomotionStrength).toBeLessThan(stopped.locomotionStrength);
+  expect(settled.locomotionStrength).toBeLessThan(moving.locomotionStrength);
+  expect(settled.locomotionStrength).toBeLessThanOrEqual(
+    stopped.locomotionStrength,
+  );
 
   await page.keyboard.down('d');
   await expect.poll(

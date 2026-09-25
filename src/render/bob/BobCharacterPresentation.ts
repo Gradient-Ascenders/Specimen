@@ -6,12 +6,12 @@ import {
   shortestAngleDelta,
 } from '../BlobFacing.ts';
 import type {
-  SlimeVisualDiagnostics,
-  SlimeVisualImpact,
-  SlimeVisualLaunch,
-  SlimeVisualState,
+  SlimePresentationDiagnostics,
+  SlimePresentationImpact,
+  SlimePresentationLaunch,
+  SlimePresentationState,
   Vector3State,
-} from '../slime/SlimeVisual.ts';
+} from '../slime/SlimePresentationContract.ts';
 import {
   SlimeBurstPresentation,
   type SlimeBurstDiagnostics,
@@ -63,7 +63,7 @@ const WALL_CLEARANCE_RELEASE_METRES_PER_SECOND = 1.5;
 
 export type BobCharacterLoader = () => Promise<THREE.Group>;
 
-export interface BobCharacterPresentationState extends SlimeVisualState {
+export interface BobCharacterPresentationState extends SlimePresentationState {
   /** Authoritative resolved travel coordinate excluding carrier transport. */
   readonly locomotionPositionWorld: Vector3State;
   /** Camera-relative player movement intent, already resolved by the controller. */
@@ -73,17 +73,59 @@ export interface BobCharacterPresentationState extends SlimeVisualState {
 }
 
 export interface BobCharacterPresentationDiagnostics
-  extends SlimeVisualDiagnostics {
+  extends SlimePresentationDiagnostics {
   readonly visible: boolean;
   readonly deathBurst: SlimeBurstDiagnostics;
   readonly materials: BobGateTwoMaterialDiagnostics | undefined;
   readonly locomotionStrength: number;
   readonly facingYawRadians: number;
   readonly reversing: boolean;
+  readonly asset: BobCharacterAssetDiagnostics | undefined;
+}
+
+export interface BobCharacterAssetDiagnostics {
+  readonly bodyTriangles: number;
+  readonly eyeTriangles: number;
+  readonly drawCalls: number;
+  readonly geometries: number;
+  readonly materials: number;
+  readonly bodyMorphTargets: number;
+  readonly eyeMorphTargets: number;
 }
 
 async function loadDefaultBobAsset(): Promise<THREE.Group> {
   return (await new GLTFLoader().loadAsync(BOB_AUTHORED_ASSET_URL)).scene;
+}
+
+function triangleCount(mesh: THREE.Mesh): number {
+  return (mesh.geometry.index?.count ??
+    mesh.geometry.getAttribute('position').count) / 3;
+}
+
+function measureCharacterAsset(
+  asset: BobGateOneAsset,
+): BobCharacterAssetDiagnostics {
+  const meshes = [asset.body, ...asset.eyes];
+  const geometries = new Set(meshes.map((mesh) => mesh.geometry));
+  const materials = new Set<THREE.Material>();
+  for (const mesh of meshes) {
+    const meshMaterials = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+    for (const material of meshMaterials) materials.add(material);
+  }
+  return {
+    bodyTriangles: triangleCount(asset.body),
+    eyeTriangles: asset.eyes.reduce(
+      (total, eye) => total + triangleCount(eye),
+      0,
+    ),
+    drawCalls: meshes.length,
+    geometries: geometries.size,
+    materials: materials.size,
+    bodyMorphTargets: asset.body.morphTargetInfluences?.length ?? 0,
+    eyeMorphTargets: asset.eyes[0]?.morphTargetInfluences?.length ?? 0,
+  };
 }
 
 /**
@@ -141,9 +183,10 @@ export class BobCharacterPresentation {
     surfaceNormalLocal: new THREE.Vector3(0, 1, 0),
     surfaceTangentLocal: new THREE.Vector3(0, 0, 1),
     moveDirectionLocal: new THREE.Vector3(0, 0, -1),
-  } satisfies SlimeVisualDiagnostics;
+  } satisfies SlimePresentationDiagnostics;
 
   private asset: BobGateOneAsset | undefined;
+  private assetDiagnostics: BobCharacterAssetDiagnostics | undefined;
   private materialSet: BobGateTwoMaterialSet | undefined;
   private reflectionEnvironment: THREE.Texture | null = null;
   private bodyReflectionIntensity = 0;
@@ -213,6 +256,7 @@ export class BobCharacterPresentation {
       locomotionStrength: this.locomotionStrength,
       facingYawRadians: this.currentFacingYawRadians,
       reversing: this.reversing || this.wallReversing,
+      asset: this.assetDiagnostics,
     };
   }
 
@@ -257,6 +301,7 @@ export class BobCharacterPresentation {
       for (const material of importedMaterials) material.dispose();
 
       this.asset = asset;
+      this.assetDiagnostics = measureCharacterAsset(asset);
       this.captureWallContactGeometry(asset.body);
       this.materialSet = materialSet;
       root.traverse((object) => {
@@ -594,7 +639,7 @@ export class BobCharacterPresentation {
     }
   }
 
-  onImpact(impact: SlimeVisualImpact): void {
+  onImpact(impact: SlimePresentationImpact): void {
     if (this.deathActive || this.disposed) return;
     this.diagnosticsState.impactStrength = THREE.MathUtils.clamp(
       impact.strength,
@@ -630,7 +675,7 @@ export class BobCharacterPresentation {
     });
   }
 
-  onLaunch(launch: SlimeVisualLaunch): void {
+  onLaunch(launch: SlimePresentationLaunch): void {
     if (this.deathActive || this.disposed) return;
     if (this.attachedToWall) this.lockWallFacingToPresentedFrame();
     this.launchRemaining = LAUNCH_SECONDS;
@@ -783,6 +828,7 @@ export class BobCharacterPresentation {
     this.deathBurst.dispose();
     if (this.asset) disposeBobGateOneAsset(this.asset.root);
     this.asset = undefined;
+    this.assetDiagnostics = undefined;
     this.materialSet = undefined;
     this.materials.clear();
     this.mesh.removeFromParent();
