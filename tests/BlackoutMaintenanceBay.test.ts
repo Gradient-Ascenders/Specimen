@@ -61,7 +61,44 @@ test('door requires sustained power and safely holds when a slime occupies its c
     assert.equal(s.room.complete,false,'touching the vent then taking the main door cannot complete');
     s.bodies.volt.teleport(new THREE.Vector3(-6,.46,59.75));s.room.update(1/60,s.bodies);
     s.bodies.volt.teleport(new THREE.Vector3(6,.46,62));s.room.update(1/60,s.bodies);
-    assert.equal(s.room.complete,true);
+    assert.equal(s.room.complete,false,'entering the far end from the hall cannot count as traversal');
+  }finally{s.dispose();}
+});
+
+test('vent traversal cancels on backing out and cannot be completed backwards or across reset',()=>{
+  const s=setup();try{
+    s.bodies.bob.teleport(new THREE.Vector3(6,.46,57));
+    s.bodies.goop.teleport(new THREE.Vector3(7,.46,57));
+    const moveVolt=(x:number,z:number)=>{
+      s.bodies.volt.teleport(new THREE.Vector3(x,.46,z));
+      s.room.update(1/60,s.bodies);
+    };
+    moveVolt(-6,53);
+    moveVolt(-6,54); // Start at the bay entrance.
+    moveVolt(-6,53); // Cancel by backing out.
+    moveVolt(6,57); // Main door bypass.
+    moveVolt(6,62);
+    moveVolt(-6,62); // Approach duct from connector.
+    moveVolt(-6,59.75);
+    moveVolt(-6,61); // Turning around at the outlet still does not count.
+    moveVolt(6,62);
+    assert.equal(s.room.complete,false);
+
+    moveVolt(-6,62);
+    for(let z=60;z>=53;z-=.5)moveVolt(-6,z);
+    moveVolt(6,62);
+    assert.equal(s.room.complete,false,'walking the duct backwards does not count');
+
+    moveVolt(-6,53);moveVolt(-6,54);
+    s.room.reset();
+    for(let z=54;z<=61;z+=.5)moveVolt(-6,z);
+    moveVolt(6,62);
+    assert.equal(s.room.complete,false,'reset clears an in-progress traversal');
+
+    moveVolt(-6,53);
+    for(let z=53.5;z<=61;z+=.5)moveVolt(-6,z);
+    moveVolt(6,62);
+    assert.equal(s.room.complete,true,'a fresh forward traversal succeeds after cancellation/reset');
   }finally{s.dispose();}
 });
 

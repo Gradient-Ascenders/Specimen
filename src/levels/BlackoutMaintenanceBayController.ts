@@ -3,7 +3,7 @@ import type { ElectricalTargetRegistry, ElectricalConnectionTarget } from '../ab
 import { CollisionHit, CollisionLayer, type CollisionWorld } from '../physics/CollisionWorld.ts';
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { VerticalBlastDoor } from '../puzzle/VerticalBlastDoor.ts';
-import type { KinematicBody } from '../physics/KinematicBody.ts';
+import type { KinematicBody, ReadonlyVector3State } from '../physics/KinematicBody.ts';
 import { BLACKOUT_BAY_LAYOUT, type BlackoutMaintenanceBay } from './BlackoutMaintenanceBay.ts';
 
 type SlimeId = 'bob' | 'goop' | 'volt';
@@ -19,6 +19,9 @@ export class BlackoutMaintenanceBayController {
   private readonly unregister: () => void;
   private charge = 0;
   private voltTraversedVent = false;
+  private enteredVentFromBay = false;
+  private hasPreviousVoltPosition = false;
+  private readonly previousVoltPosition = new THREE.Vector3();
   private readonly world: CollisionWorld;
   private readonly rayOrigin = new THREE.Vector3();
   private readonly rayDirection = new THREE.Vector3();
@@ -78,16 +81,39 @@ export class BlackoutMaintenanceBayController {
       const p=bodies[id].position;
       if(p.y < -5 || (id!=='goop' && this.bay.acidAt(p)) || (id!=='volt' && this.bay.ventAt(p))) return id;
     }
-    // Require reaching the far end of the duct, not merely touching its mouth.
-    if(this.bay.ventAt(bodies.volt.position) && bodies.volt.position.z >= BLACKOUT_BAY_LAYOUT.rearZ + 5.5) this.voltTraversedVent=true;
+    this.updateVentTraversal(bodies.volt.position);
     this.complete=this.voltTraversedVent&&this.bay.vestibuleAt(bodies.bob.position)&&this.bay.vestibuleAt(bodies.goop.position)&&this.bay.voltExitAt(bodies.volt.position);
     return undefined;
+  }
+
+  private updateVentTraversal(position: ReadonlyVector3State): void {
+    const previous = this.previousVoltPosition;
+    const entranceZ = BLACKOUT_BAY_LAYOUT.rearZ - 0.5;
+    const outletZ = BLACKOUT_BAY_LAYOUT.rearZ + 6;
+    const insideDuct = this.bay.ventAt(position);
+    const aligned = (p: ReadonlyVector3State) => Math.abs(p.x + 6) <= 0.75 && p.y >= 0 && p.y <= 2.2;
+
+    // Only a forward crossing from the bay starts a traversal. A hallway-side
+    // visit to the outlet cannot arm this state, even after an earlier visit.
+    if (this.hasPreviousVoltPosition && previous.z < entranceZ && insideDuct && aligned(previous)) {
+      this.enteredVentFromBay = true;
+    }
+    if (this.enteredVentFromBay && !insideDuct) {
+      if (this.hasPreviousVoltPosition && this.bay.ventAt(previous) &&
+          position.z > outletZ && aligned(position)) {
+        this.voltTraversedVent = true;
+      }
+      // Backing out or leaving the duct elsewhere cancels the active attempt.
+      this.enteredVentFromBay = false;
+    }
+    previous.copy(position);
+    this.hasPreviousVoltPosition = true;
   }
   private updateIndicator():void {
     const color=this.powered?0x36ff74:0xff2716;
     this.indicatorMaterial.color.setHex(color);this.indicatorMaterial.emissive.setHex(color);this.indicatorLight.color.setHex(color);
   }
-  reset():void {this.complete=false;this.powered=false;this.charge=0;this.voltTraversedVent=false;this.door.reset();this.updateIndicator();}
+  reset():void {this.complete=false;this.powered=false;this.charge=0;this.voltTraversedVent=false;this.enteredVentFromBay=false;this.hasPreviousVoltPosition=false;this.door.reset();this.updateIndicator();}
   dispose():void {
     this.unregister();this.door.dispose();this.receiver.removeFromParent();
     const materials=new Set<THREE.Material>();
