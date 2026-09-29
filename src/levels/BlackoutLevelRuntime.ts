@@ -443,6 +443,9 @@ export class BlackoutLevelRuntime {
       phase: room.phase,
       local: { ...room.local },
     };
+    this.roomTwoInitialized = room.roomId === 'room-2';
+    this.bayComplete =
+      this.roomTwoInitialized || room.local.maintenanceBayComplete === true;
   }
 
   recoverActiveCheckpoint(): void {
@@ -1591,6 +1594,10 @@ export class BlackoutLevelRuntime {
       resources.group.voltBody,
     );
     this.currentRoom = snapshot.room;
+    this.roomTwoInitialized = snapshot.room.roomId === 'room-2';
+    this.bayComplete =
+      this.roomTwoInitialized ||
+      snapshot.room.local.maintenanceBayComplete === true;
     resources.phase.restore(snapshot.room.phase);
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
