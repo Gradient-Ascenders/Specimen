@@ -174,6 +174,49 @@ test('checkpoint snapshots are independent, use authored safe anchors, and recov
   assert.equal(bodies.volt.recoveries, 2);
 });
 
+test('checkpoint activation can replace captured participant state without mutating the live participant', () => {
+  const { group, specimen } = makeGroup();
+  const manager = new BlackoutCheckpointManager<TestBody>(checkpoint(), () => true);
+  let participantState: SerializableValue = { mode: 'live-mounted' };
+  manager.registerParticipant({
+    id: 'drone',
+    capture: () => participantState,
+    restore: (state) => {
+      participantState = state;
+    },
+  });
+  manager.registerCheckpoint(checkpoint('cp2', 10));
+
+  manager.activate(
+    'cp2',
+    'volt',
+    undefined,
+    { drone: { mode: 'canonical-grounded' } },
+  );
+
+  assert.deepEqual(participantState, { mode: 'live-mounted' });
+  assert.deepEqual(
+    manager.activeCheckpoint.participantState.drone,
+    { mode: 'canonical-grounded' },
+  );
+
+  participantState = { mode: 'changed-after-activation' };
+  manager.recover(group, specimen);
+  assert.deepEqual(participantState, { mode: 'canonical-grounded' });
+});
+
+test('checkpoint activation rejects participant overrides for unknown IDs', () => {
+  const manager = new BlackoutCheckpointManager<TestBody>(checkpoint(), () => true);
+  manager.registerCheckpoint(checkpoint('cp2', 10));
+
+  assert.throws(
+    () => manager.activate('cp2', 'volt', undefined, {
+      missing: { state: true },
+    }),
+    /unregistered Blackout checkpoint participant/,
+  );
+});
+
 test('all CP1-CP9 identifiers are structurally registerable and unsafe restores are rejected before movement', () => {
   const { bodies, group, specimen } = makeGroup();
   let safe = true;
