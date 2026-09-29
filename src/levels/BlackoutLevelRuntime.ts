@@ -982,7 +982,10 @@ export class BlackoutLevelRuntime {
     );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
 
-    if (resources.maintenanceBay && !this.roomTwoInitialized) {
+    // Room 1 remains physically reachable from the Room 2 arrival staging
+    // corridor, so its hazards, powered door, hallway lighting and drone
+    // presentation must continue advancing after the one-shot handoff.
+    if (resources.maintenanceBay) {
       const bay = resources.maintenanceBay;
       const bodies = {
         bob: resources.group.bobBody,
