@@ -72,9 +72,9 @@ export const BLACKOUT_AUTHORED_ROOM_ONE_CP2: BlackoutCheckpointDefinition = {
 export const BLACKOUT_AUTHORED_ROOM_TWO_CP3: BlackoutCheckpointDefinition = {
   id: 'cp3',
   bodyPositions: {
-    bob: new THREE.Vector3(4.25, 0.46, 68),
-    goop: new THREE.Vector3(6, 0.46, 68),
-    volt: new THREE.Vector3(7.75, 0.46, 68),
+    bob: new THREE.Vector3(4.25, 0.46, 80),
+    goop: new THREE.Vector3(6, 0.46, 80),
+    volt: new THREE.Vector3(7.75, 0.46, 80),
   },
   activeSlimeId: 'bob',
   room: {
