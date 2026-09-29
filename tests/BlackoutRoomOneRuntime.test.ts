@@ -91,7 +91,7 @@ class TestCameraRig {
   update(): void {}
 }
 
-function mutableRoomOneBodies(runtime: BlackoutLevelRuntime): Readonly<Record<'bob' | 'goop' | 'volt', { readonly position: THREE.Vector3 }>> {
+function roomOneInternals(runtime: BlackoutLevelRuntime) {
   const internal = runtime as unknown as {
     resources?: {
       group: {
@@ -99,15 +99,28 @@ function mutableRoomOneBodies(runtime: BlackoutLevelRuntime): Readonly<Record<'b
         goopBody: { readonly position: THREE.Vector3 };
         voltBody: { readonly position: THREE.Vector3 };
       };
+      maintenanceBay?: {
+        readonly target: { setConnectionState(connected: boolean): void };
+        readonly door: { readonly progress: number; readonly state: string };
+      };
     };
   };
-  const group = internal.resources?.group;
-  if (!group) throw new Error('Room 1 runtime resources are not loaded.');
+  const resources = internal.resources;
+  if (!resources?.maintenanceBay) {
+    throw new Error('Room 1 runtime resources are not loaded.');
+  }
   return {
-    bob: group.bobBody,
-    goop: group.goopBody,
-    volt: group.voltBody,
+    bodies: {
+      bob: resources.group.bobBody,
+      goop: resources.group.goopBody,
+      volt: resources.group.voltBody,
+    },
+    bay: resources.maintenanceBay,
   };
+}
+
+function mutableRoomOneBodies(runtime: BlackoutLevelRuntime): Readonly<Record<'bob' | 'goop' | 'volt', { readonly position: THREE.Vector3 }>> {
+  return roomOneInternals(runtime).bodies;
 }
 
 function createFixture() {
@@ -293,15 +306,80 @@ test('Room 1 completion initializes Room 2 exactly once and CP3 owns later recov
 
     assert.equal(f.runtime.roomState.roomId, 'room-2');
     assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
-    assert.deepEqual(f.runtime.getSlimePositions()?.bob.toArray(), [4.25, 0.46, 68]);
-    assert.deepEqual(f.runtime.getSlimePositions()?.goop.toArray(), [6, 0.46, 68]);
-    assert.deepEqual(f.runtime.getSlimePositions()?.volt.toArray(), [7.75, 0.46, 68]);
+    assert.deepEqual(f.runtime.getSlimePositions()?.bob.toArray(), [4.25, 0.46, 80]);
+    assert.deepEqual(f.runtime.getSlimePositions()?.goop.toArray(), [6, 0.46, 80]);
+    assert.deepEqual(f.runtime.getSlimePositions()?.volt.toArray(), [7.75, 0.46, 80]);
 
     f.runtime.restartLevel();
     assert.equal(f.runtime.roomState.roomId, 'room-1');
     assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp1');
     assert.equal(f.runtime.maintenanceDroneReadModel?.tutorialCompleted, false);
     unsubscribe();
+  } finally {
+    f.cleanup();
+  }
+});
+
+
+test('Room 1 stays authoritative after the CP3 handoff while players can return from staging', () => {
+  const f = createFixture();
+  try {
+    const { bodies, bay } = roomOneInternals(f.runtime);
+
+    // Put the powered door well into its opening animation, then remove power
+    // before completing the room. The handoff must not freeze the still-reachable
+    // door at this partial pose.
+    bay.target.setConnectionState(true);
+    f.tick(82);
+    assert.ok(
+      bay.door.progress > 0.5 && bay.door.progress < 1,
+      `door should be partly open before completion, got ${bay.door.progress}`,
+    );
+    bay.target.setConnectionState(false);
+
+    bodies.bob.position.set(6, 0.46, 62);
+    bodies.goop.position.set(6.8, 0.46, 62);
+    bodies.volt.position.set(-6, 0.46, 53);
+    f.tick();
+    bodies.volt.position.set(-6, 0.46, 54);
+    f.tick();
+    bodies.volt.position.set(-6, 0.46, 59.8);
+    f.tick();
+    bodies.volt.position.set(-6, 0.46, 60.5);
+    f.tick();
+    bodies.volt.position.set(6, 0.46, 62);
+    f.tick();
+
+    assert.equal(f.runtime.roomState.roomId, 'room-2');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+    assert.ok(
+      bay.door.progress > 0,
+      'completion should occur before the already-open door finishes closing',
+    );
+
+    f.tick(30);
+    assert.equal(bay.door.state, 'closed');
+    assert.equal(bay.door.progress, 0);
+
+    // Room 1 remains physically reachable from the staging corridor. Returning
+    // Bob to the acid must still use the normal death path even after CP3.
+    bodies.bob.position.set(8, -0.49, 18);
+    f.tick();
+    f.tick(70);
+    const retryScreen = f.document.elements.find(
+      (element) => element.className === 'death-screen',
+    );
+    assert.ok(
+      retryScreen,
+      'post-handoff Room 1 acid must remain lethal instead of being disabled',
+    );
+    retryScreen!.retryButton.click();
+
+    assert.equal(f.runtime.roomState.roomId, 'room-2');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+    assert.deepEqual(f.runtime.getSlimePositions()?.bob.toArray(), [4.25, 0.46, 80]);
+    assert.deepEqual(f.runtime.getSlimePositions()?.goop.toArray(), [6, 0.46, 80]);
+    assert.deepEqual(f.runtime.getSlimePositions()?.volt.toArray(), [7.75, 0.46, 80]);
   } finally {
     f.cleanup();
   }
