@@ -91,6 +91,8 @@ import {
   type BlackoutCheckpointParticipant,
 } from './BlackoutCheckpointManager.ts';
 import {
+  BLACKOUT_AUTHORED_ROOM_ONE_CP2,
+  BLACKOUT_AUTHORED_ROOM_TWO_CP3,
   BLACKOUT_CHECKPOINTS,
   BLACKOUT_SPECIMEN_MERGE_ANCHOR,
   BLACKOUT_SPECIMEN_RADIUS_METRES,
@@ -188,6 +190,7 @@ export class BlackoutLevelRuntime {
   private completionEmitted = false;
   private readonly authoredRoomOne: boolean;
   private bayComplete = false;
+  private roomTwoInitialized = false;
   private previousShadowEnabled: boolean | undefined;
 
   constructor(options: BlackoutLevelRuntimeOptions) {
@@ -219,6 +222,14 @@ export class BlackoutLevelRuntime {
 
   get activeCheckpoint(): BlackoutRuntimeSnapshot | undefined {
     return this.resources?.checkpoints.activeCheckpoint;
+  }
+
+  get roomState(): BlackoutRoomState {
+    return {
+      roomId: this.currentRoom.roomId,
+      phase: this.currentRoom.phase,
+      local: { ...this.currentRoom.local },
+    };
   }
 
   get voltElectricalReadModel(): VoltElectricalReadModel | undefined {
