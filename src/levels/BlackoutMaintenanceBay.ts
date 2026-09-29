@@ -99,7 +99,43 @@ export class BlackoutMaintenanceBay {
     this.box('hallway-west-wall-after-connector', [0.35, hallwayHeight, hallwayLength - 10], [hallwayCenterX - hallwayWidth / 2, hallwayHeight / 2, rearZ + 15], darkSteel);
     this.box('hallway-east-wall', [0.35, hallwayHeight, hallwayLength], [hallwayCenterX + hallwayWidth / 2, hallwayHeight / 2, hallwayEndCenter], darkSteel);
     this.box('hallway-roof', [hallwayWidth, 0.35, hallwayLength], [hallwayCenterX, hallwayHeight + 0.15, hallwayEndCenter], darkSteel);
-    this.box('hallway-end-wall', [hallwayWidth, hallwayHeight, 0.45], [hallwayCenterX, hallwayHeight / 2, hallwayEndZ], darkSteel);
+
+    // Room 2 owns its puzzle chamber in #165, but Room 1 must hand off into a
+    // real traversable arrival volume rather than a sealed wall. Keep this
+    // short staging corridor deliberately puzzle-free so later Room 2 authoring
+    // can replace/extend it without changing Room 1 progression semantics.
+    const roomTwoStagingLength = 12;
+    const roomTwoStagingCenterZ = hallwayEndZ + roomTwoStagingLength / 2;
+    this.box(
+      'room-2-arrival-staging-floor',
+      [hallwayWidth, 0.4, roomTwoStagingLength],
+      [hallwayCenterX, -0.2, roomTwoStagingCenterZ],
+      platform,
+    );
+    this.box(
+      'room-2-arrival-staging-west-wall',
+      [0.35, hallwayHeight, roomTwoStagingLength],
+      [hallwayCenterX - hallwayWidth / 2, hallwayHeight / 2, roomTwoStagingCenterZ],
+      darkSteel,
+    );
+    this.box(
+      'room-2-arrival-staging-east-wall',
+      [0.35, hallwayHeight, roomTwoStagingLength],
+      [hallwayCenterX + hallwayWidth / 2, hallwayHeight / 2, roomTwoStagingCenterZ],
+      darkSteel,
+    );
+    this.box(
+      'room-2-arrival-staging-roof',
+      [hallwayWidth, 0.35, roomTwoStagingLength],
+      [hallwayCenterX, hallwayHeight + 0.15, roomTwoStagingCenterZ],
+      darkSteel,
+    );
+    this.box(
+      'room-2-arrival-staging-end-wall',
+      [hallwayWidth, hallwayHeight, 0.45],
+      [hallwayCenterX, hallwayHeight / 2, hallwayEndZ + roomTwoStagingLength],
+      darkSteel,
+    );
     // Level duct from the bay floor, through the rear wall, then into the
     // lateral connector. The matching opening in the connector's south wall
     // lines up with this 1.5 m bore; the adjoining floors meet at y=0.
