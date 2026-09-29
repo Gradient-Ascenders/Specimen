@@ -91,6 +91,8 @@ import {
   type BlackoutCheckpointParticipant,
 } from './BlackoutCheckpointManager.ts';
 import {
+  BLACKOUT_AUTHORED_ROOM_ONE_CP2,
+  BLACKOUT_AUTHORED_ROOM_TWO_CP3,
   BLACKOUT_CHECKPOINTS,
   BLACKOUT_SPECIMEN_MERGE_ANCHOR,
   BLACKOUT_SPECIMEN_RADIUS_METRES,
@@ -188,6 +190,7 @@ export class BlackoutLevelRuntime {
   private completionEmitted = false;
   private readonly authoredRoomOne: boolean;
   private bayComplete = false;
+  private roomTwoInitialized = false;
   private previousShadowEnabled: boolean | undefined;
 
   constructor(options: BlackoutLevelRuntimeOptions) {
@@ -219,6 +222,14 @@ export class BlackoutLevelRuntime {
 
   get activeCheckpoint(): BlackoutRuntimeSnapshot | undefined {
     return this.resources?.checkpoints.activeCheckpoint;
+  }
+
+  get roomState(): BlackoutRoomState {
+    return {
+      roomId: this.currentRoom.roomId,
+      phase: this.currentRoom.phase,
+      local: { ...this.currentRoom.local },
+    };
   }
 
   get voltElectricalReadModel(): VoltElectricalReadModel | undefined {
@@ -408,6 +419,10 @@ export class BlackoutLevelRuntime {
     resources.checkpoints.activate(checkpointId, resources.group.activeSlimeId);
     const snapshot = resources.checkpoints.activeCheckpoint;
     this.currentRoom = snapshot.room;
+    this.roomTwoInitialized = snapshot.room.roomId === 'room-2';
+    this.bayComplete =
+      this.roomTwoInitialized ||
+      snapshot.room.local.maintenanceBayComplete === true;
     resources.phase.restore(snapshot.room.phase);
     this.events.emit('objectiveChanged', {
       roomId: snapshot.room.roomId,
@@ -428,6 +443,9 @@ export class BlackoutLevelRuntime {
       phase: room.phase,
       local: { ...room.local },
     };
+    this.roomTwoInitialized = room.roomId === 'room-2';
+    this.bayComplete =
+      this.roomTwoInitialized || room.local.maintenanceBayComplete === true;
   }
 
   recoverActiveCheckpoint(): void {
@@ -964,26 +982,45 @@ export class BlackoutLevelRuntime {
     );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
 
+    // Room 1 remains physically reachable from the Room 2 arrival staging
+    // corridor, so its hazards, powered door, hallway lighting and drone
+    // presentation must continue advancing after the one-shot handoff.
     if (resources.maintenanceBay) {
       const bay = resources.maintenanceBay;
-      const bodies = {bob:resources.group.bobBody,goop:resources.group.goopBody,volt:resources.group.voltBody};
-      if (bay.powered && !bay.connectionClear(bodies.volt.position,resources.maintenanceDroneFixture.collider)) {
+      const bodies = {
+        bob: resources.group.bobBody,
+        goop: resources.group.goopBody,
+        volt: resources.group.voltBody,
+      };
+      if (
+        bay.powered &&
+        !bay.connectionClear(
+          bodies.volt.position,
+          resources.maintenanceDroneFixture.collider,
+        )
+      ) {
         resources.electricalSystem.disconnect('target-invalid');
       }
       const dronePosition = resources.maintenanceDrone.readModel.position;
       const lostDrone = bay.bay.acidAt(dronePosition);
       const lostRider = lostDrone && resources.maintenanceDrone.voltMounted;
       if (lostDrone) resources.maintenanceDrone.requestRecovery('acid');
-      const failed = lostRider ? 'volt' : bay.update(deltaSeconds,bodies);
-      resources.dronePresentation?.update(deltaSeconds,resources.maintenanceDrone.readModel, resources.group.activeSlimeId === 'volt');
+      const failed = lostRider ? 'volt' : bay.update(deltaSeconds, bodies);
+      resources.dronePresentation?.update(
+        deltaSeconds,
+        resources.maintenanceDrone.readModel,
+        resources.group.activeSlimeId === 'volt',
+      );
+      this.maybeActivateRoomOneTutorialCheckpoint(resources);
       if (failed) {
         this.requestFailure();
-        this.input.endFixedUpdate(); return;
+        this.input.endFixedUpdate();
+        return;
       }
       if (bay.complete && !this.bayComplete) {
-        this.bayComplete = true;
-        this.currentRoom = {roomId:'room-2',phase:'three-slime',local:{maintenanceBayComplete:true}};
-        this.events.emit('objectiveChanged',{roomId:'room-2',objective:'Maintenance bay complete — Room 2 staging area'});
+        this.commitRoomOneCompletion(resources);
+        this.input.endFixedUpdate();
+        return;
       }
     }
 
@@ -1208,8 +1245,13 @@ export class BlackoutLevelRuntime {
         isSpawnSafe,
         initialActive,
       );
-      for (const checkpoint of this.authoredRoomOne ? [] : BLACKOUT_CHECKPOINTS.slice(1)) {
-        checkpoints.registerCheckpoint(checkpoint);
+      if (this.authoredRoomOne) {
+        checkpoints.registerCheckpoint(BLACKOUT_AUTHORED_ROOM_ONE_CP2);
+        checkpoints.registerCheckpoint(BLACKOUT_AUTHORED_ROOM_TWO_CP3);
+      } else {
+        for (const checkpoint of BLACKOUT_CHECKPOINTS.slice(1)) {
+          checkpoints.registerCheckpoint(checkpoint);
+        }
       }
       checkpoints.activate('cp1', initialActive);
 
@@ -1469,6 +1511,7 @@ export class BlackoutLevelRuntime {
 
       this.currentRoom = checkpoints.activeCheckpoint.room;
       this.bayComplete = false;
+      this.roomTwoInitialized = false;
       this.completionEmitted = false;
       this.syncVisuals(this.resources);
       this.resources.electricalPresentation.update(
@@ -1535,6 +1578,7 @@ export class BlackoutLevelRuntime {
     resources.maintenanceBay?.reset();
     resources.dronePresentation?.resetTutorial();
     this.bayComplete = false;
+    this.roomTwoInitialized = false;
     resources.electricalSystem.reset('restart');
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
@@ -1553,6 +1597,10 @@ export class BlackoutLevelRuntime {
       resources.group.voltBody,
     );
     this.currentRoom = snapshot.room;
+    this.roomTwoInitialized = snapshot.room.roomId === 'room-2';
+    this.bayComplete =
+      this.roomTwoInitialized ||
+      snapshot.room.local.maintenanceBayComplete === true;
     resources.phase.restore(snapshot.room.phase);
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
@@ -1618,9 +1666,88 @@ export class BlackoutLevelRuntime {
     delete this.host.dataset.gameState;
     this.resources = undefined;
     this.currentRoom = { roomId: 'room-1', phase: 'three-slime', local: {} };
+    this.bayComplete = false;
+    this.roomTwoInitialized = false;
     this.completionEmitted = false;
     this.notifyHUD(undefined, true);
   };
+
+  private maybeActivateRoomOneTutorialCheckpoint(
+    resources: BlackoutRuntimeResources,
+  ): void {
+    if (
+      !this.authoredRoomOne ||
+      this.roomTwoInitialized ||
+      !resources.maintenanceDrone.readModel.tutorialCompleted ||
+      resources.checkpoints.activeCheckpoint.checkpointId !== 'cp1'
+    ) {
+      return;
+    }
+
+    const room: BlackoutRoomState = {
+      roomId: 'room-1',
+      phase: 'three-slime',
+      local: {
+        ...this.currentRoom.local,
+        tutorialComplete: true,
+      },
+    };
+    resources.checkpoints.activate('cp2', 'volt', room, {
+      'maintenance-drone':
+        resources.maintenanceDrone.captureTutorialCheckpointState(),
+    });
+    this.currentRoom = room;
+  }
+
+  private commitRoomOneCompletion(
+    resources: BlackoutRuntimeResources,
+  ): void {
+    if (
+      !this.authoredRoomOne ||
+      this.roomTwoInitialized ||
+      !resources.maintenanceBay?.complete
+    ) {
+      return;
+    }
+
+    this.bayComplete = true;
+    this.roomTwoInitialized = true;
+    resources.electricalSystem.disconnect('completion');
+    resources.electricalSystem.cancelAim();
+    resources.acidProjectileSystem.reset();
+    resources.goopAcidPresentation.reset();
+    resources.specimenAttack.reset();
+    resources.maintenanceDrone.suspendInput();
+    resources.electricalPresentation.update(
+      resources.electricalSystem.readModel,
+    );
+    this.renderLayer.cameraRig.setAimPresentationActive(false, true);
+    this.input.resetState();
+
+    const room: BlackoutRoomState = {
+      roomId: 'room-2',
+      phase: 'three-slime',
+      local: {
+        maintenanceBayComplete: true,
+      },
+    };
+    resources.checkpoints.activate(
+      'cp3',
+      resources.group.activeSlimeId,
+      room,
+      {
+        'maintenance-drone':
+          resources.maintenanceDrone.captureTutorialCheckpointState(),
+      },
+    );
+    this.currentRoom = room;
+    resources.phase.restore(room.phase);
+    this.notifyHUD(undefined, true);
+    this.events.emit('objectiveChanged', {
+      roomId: room.roomId,
+      objective: objectiveFor(room),
+    });
+  }
 
   private restoreActiveCheckpoint(
     resources: BlackoutRuntimeResources,

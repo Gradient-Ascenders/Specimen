@@ -219,6 +219,83 @@ test('hallway fixtures flicker independently and illuminate the enclosed corrido
     assert.ok(observed.size>30 && brightest>10);
     const hit=new CollisionHit();
     assert.equal(s.world.sweepSphere(new THREE.Vector3(-6,.5,62),new THREE.Vector3(-3,0,0),.45,hit),true,'connector west end is sealed');
-    assert.equal(s.world.sweepSphere(new THREE.Vector3(6,.5,72),new THREE.Vector3(0,0,4),.45,hit),true,'future Room 2 end is sealed');
+    assert.equal(
+      s.world.sweepSphere(
+        new THREE.Vector3(6,.5,72),
+        new THREE.Vector3(0,0,8),
+        .45,
+        hit,
+      ),
+      false,
+      'the old hallway end must open into traversable Room 2 arrival staging',
+    );
+    assert.equal(
+      s.world.sweepSphere(
+        new THREE.Vector3(6,.5,84),
+        new THREE.Vector3(0,0,4),
+        .45,
+        hit,
+      ),
+      true,
+      'the temporary Room 2 staging end remains safely sealed until #165 extends it',
+    );
   }finally{s.dispose();}
+});
+
+
+test('all Bob Goop Volt arrival orders gate completion until the third route condition',()=>{
+  const permutations: readonly (readonly ('bob'|'goop'|'volt')[])[] = [
+    ['bob','goop','volt'],
+    ['bob','volt','goop'],
+    ['goop','bob','volt'],
+    ['goop','volt','bob'],
+    ['volt','bob','goop'],
+    ['volt','goop','bob'],
+  ];
+
+  for(const order of permutations){
+    const s=setup();
+    try{
+      const resetBodies=()=>{
+        s.bodies.bob.teleport(new THREE.Vector3(-2,.46,2));
+        s.bodies.goop.teleport(new THREE.Vector3(0,.46,2));
+        s.bodies.volt.teleport(new THREE.Vector3(2,.46,2));
+        s.room.reset();
+        s.room.update(1/60,s.bodies);
+      };
+      const arrive=(id:'bob'|'goop'|'volt')=>{
+        if(id==='bob'){
+          s.bodies.bob.teleport(new THREE.Vector3(6,.46,62));
+          s.room.update(1/60,s.bodies);
+          return;
+        }
+        if(id==='goop'){
+          s.bodies.goop.teleport(new THREE.Vector3(7,.46,62));
+          s.room.update(1/60,s.bodies);
+          return;
+        }
+        // Volt's arrival must contain the full directional duct traversal.
+        s.bodies.volt.teleport(new THREE.Vector3(-6,.46,53));
+        s.room.update(1/60,s.bodies);
+        s.bodies.volt.teleport(new THREE.Vector3(-6,.46,54));
+        s.room.update(1/60,s.bodies);
+        s.bodies.volt.teleport(new THREE.Vector3(-6,.46,59.8));
+        s.room.update(1/60,s.bodies);
+        s.bodies.volt.teleport(new THREE.Vector3(-6,.46,60.5));
+        s.room.update(1/60,s.bodies);
+        s.bodies.volt.teleport(new THREE.Vector3(6,.46,62));
+        s.room.update(1/60,s.bodies);
+      };
+
+      resetBodies();
+      for(let index=0;index<order.length;index++){
+        arrive(order[index]!);
+        assert.equal(
+          s.room.complete,
+          index===order.length-1,
+          `completion mismatch for arrival order ${order.join(' -> ')} after ${index+1} arrivals`,
+        );
+      }
+    }finally{s.dispose();}
+  }
 });

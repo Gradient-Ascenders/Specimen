@@ -472,6 +472,18 @@ implements BlackoutCheckpointParticipant {
     this.syncModel();
   }
 
+  captureTutorialCheckpointState(): SerializableValue {
+    this.assertActive('capture tutorial checkpoint');
+    this.authoring.recoveryAnchor.getWorldPosition(this.recoveryPosition);
+    return {
+      position: toTuple(this.recoveryPosition),
+      stableState: 'grounded-idle',
+      startupCompleted: true,
+      tutorialCompleted: true,
+      voltMounted: false,
+    };
+  }
+
   capture(): SerializableValue {
     this.assertActive('capture');
     const transient =
