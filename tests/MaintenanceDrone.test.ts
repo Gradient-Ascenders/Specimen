@@ -41,6 +41,24 @@ function createVolt(
   });
 }
 
+function createOrdinarySlime(
+  world: CollisionWorld,
+  surfaces: SurfaceRegistry,
+  position: THREE.Vector3,
+): KinematicBody {
+  return new KinematicBody({
+    world,
+    surfaces,
+    initialPosition: position,
+    config: {
+      movementCollisionMask: CollisionLayer.Movement,
+      adhesionEnabled: false,
+      reboundEnabled: false,
+      chargedJumpEnabled: false,
+    },
+  });
+}
+
 function createControllerFixture() {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
@@ -815,4 +833,75 @@ test('repeated reset and disposal leave no maintenance-drone collider or mounted
     ? fixture.floor.material
     : [fixture.floor.material];
   for (const material of materials) material.dispose();
+});
+
+
+test('Bob and Goop cannot ride or be transported by the maintenance drone', () => {
+  const fixture = createControllerFixture();
+
+  try {
+    assert.equal(
+      fixture.controller.requestMount('volt', fixture.volt.position),
+      true,
+    );
+    for (let step = 0; step < 90; step += 1) {
+      fixture.controller.update(DT, {
+        horizontalDirection: STILL,
+        ascendHeld: false,
+        descendHeld: false,
+        aimHeld: false,
+        controllingVolt: true,
+      });
+      fixture.controller.syncMountedVolt(fixture.volt);
+    }
+
+    const droneStart = new THREE.Vector3(
+      fixture.controller.readModel.position.x,
+      fixture.controller.readModel.position.y,
+      fixture.controller.readModel.position.z,
+    );
+    const riderHeight = droneStart.y + 0.25 + 0.45 + 0.01;
+    const bob = createOrdinarySlime(
+      fixture.world,
+      fixture.surfaces,
+      new THREE.Vector3(droneStart.x - 0.25, riderHeight, droneStart.z),
+    );
+    const goop = createOrdinarySlime(
+      fixture.world,
+      fixture.surfaces,
+      new THREE.Vector3(droneStart.x + 0.25, riderHeight, droneStart.z),
+    );
+    const bobStartX = bob.position.x;
+    const goopStartX = goop.position.x;
+
+    for (let step = 0; step < 120; step += 1) {
+      bob.update(DT, STILL);
+      goop.update(DT, STILL);
+      fixture.controller.update(DT, {
+        horizontalDirection: new THREE.Vector3(1, 0, 0),
+        ascendHeld: false,
+        descendHeld: false,
+        aimHeld: false,
+        controllingVolt: true,
+      });
+      fixture.controller.syncMountedVolt(fixture.volt);
+    }
+
+    assert.ok(
+      fixture.controller.readModel.position.x > droneStart.x + 2,
+      'the drone should have moved far enough to expose accidental rider transport',
+    );
+    assert.ok(
+      Math.abs(bob.position.x - bobStartX) < 0.05,
+      `Bob must not inherit drone motion, moved to x=${bob.position.x}`,
+    );
+    assert.ok(
+      Math.abs(goop.position.x - goopStartX) < 0.05,
+      `Goop must not inherit drone motion, moved to x=${goop.position.x}`,
+    );
+    assert.ok(bob.position.y < riderHeight - 0.5);
+    assert.ok(goop.position.y < riderHeight - 0.5);
+  } finally {
+    fixture.dispose();
+  }
 });
