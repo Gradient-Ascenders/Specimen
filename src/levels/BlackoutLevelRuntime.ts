@@ -975,26 +975,42 @@ export class BlackoutLevelRuntime {
     );
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
 
-    if (resources.maintenanceBay) {
+    if (resources.maintenanceBay && !this.roomTwoInitialized) {
       const bay = resources.maintenanceBay;
-      const bodies = {bob:resources.group.bobBody,goop:resources.group.goopBody,volt:resources.group.voltBody};
-      if (bay.powered && !bay.connectionClear(bodies.volt.position,resources.maintenanceDroneFixture.collider)) {
+      const bodies = {
+        bob: resources.group.bobBody,
+        goop: resources.group.goopBody,
+        volt: resources.group.voltBody,
+      };
+      if (
+        bay.powered &&
+        !bay.connectionClear(
+          bodies.volt.position,
+          resources.maintenanceDroneFixture.collider,
+        )
+      ) {
         resources.electricalSystem.disconnect('target-invalid');
       }
       const dronePosition = resources.maintenanceDrone.readModel.position;
       const lostDrone = bay.bay.acidAt(dronePosition);
       const lostRider = lostDrone && resources.maintenanceDrone.voltMounted;
       if (lostDrone) resources.maintenanceDrone.requestRecovery('acid');
-      const failed = lostRider ? 'volt' : bay.update(deltaSeconds,bodies);
-      resources.dronePresentation?.update(deltaSeconds,resources.maintenanceDrone.readModel, resources.group.activeSlimeId === 'volt');
+      const failed = lostRider ? 'volt' : bay.update(deltaSeconds, bodies);
+      resources.dronePresentation?.update(
+        deltaSeconds,
+        resources.maintenanceDrone.readModel,
+        resources.group.activeSlimeId === 'volt',
+      );
+      this.maybeActivateRoomOneTutorialCheckpoint(resources);
       if (failed) {
         this.requestFailure();
-        this.input.endFixedUpdate(); return;
+        this.input.endFixedUpdate();
+        return;
       }
       if (bay.complete && !this.bayComplete) {
-        this.bayComplete = true;
-        this.currentRoom = {roomId:'room-2',phase:'three-slime',local:{maintenanceBayComplete:true}};
-        this.events.emit('objectiveChanged',{roomId:'room-2',objective:'Maintenance bay complete — Room 2 staging area'});
+        this.commitRoomOneCompletion(resources);
+        this.input.endFixedUpdate();
+        return;
       }
     }
 
