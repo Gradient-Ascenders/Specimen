@@ -1219,8 +1219,13 @@ export class BlackoutLevelRuntime {
         isSpawnSafe,
         initialActive,
       );
-      for (const checkpoint of this.authoredRoomOne ? [] : BLACKOUT_CHECKPOINTS.slice(1)) {
-        checkpoints.registerCheckpoint(checkpoint);
+      if (this.authoredRoomOne) {
+        checkpoints.registerCheckpoint(BLACKOUT_AUTHORED_ROOM_ONE_CP2);
+        checkpoints.registerCheckpoint(BLACKOUT_AUTHORED_ROOM_TWO_CP3);
+      } else {
+        for (const checkpoint of BLACKOUT_CHECKPOINTS.slice(1)) {
+          checkpoints.registerCheckpoint(checkpoint);
+        }
       }
       checkpoints.activate('cp1', initialActive);
 
@@ -1480,6 +1485,7 @@ export class BlackoutLevelRuntime {
 
       this.currentRoom = checkpoints.activeCheckpoint.room;
       this.bayComplete = false;
+      this.roomTwoInitialized = false;
       this.completionEmitted = false;
       this.syncVisuals(this.resources);
       this.resources.electricalPresentation.update(
@@ -1546,6 +1552,7 @@ export class BlackoutLevelRuntime {
     resources.maintenanceBay?.reset();
     resources.dronePresentation?.resetTutorial();
     this.bayComplete = false;
+    this.roomTwoInitialized = false;
     resources.electricalSystem.reset('restart');
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
@@ -1629,6 +1636,8 @@ export class BlackoutLevelRuntime {
     delete this.host.dataset.gameState;
     this.resources = undefined;
     this.currentRoom = { roomId: 'room-1', phase: 'three-slime', local: {} };
+    this.bayComplete = false;
+    this.roomTwoInitialized = false;
     this.completionEmitted = false;
     this.notifyHUD(undefined, true);
   };
