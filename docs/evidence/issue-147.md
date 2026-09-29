@@ -1,20 +1,38 @@
-# Issue #147 — Room 1 runtime completion evidence
+# Issue #147 — Room 1 runtime validation evidence
 
-This document records the implementation and validation matrix for the remaining
-Room 1 powered-door, hazard, checkpoint, and completion runtime work.
+This document records automated and manual validation for the remaining Room 1
+powered-door, hazard, checkpoint, drone, and completion runtime work.
 
-The issue references `docs/planning/Level 3/Rooms/Room 1 Detailed.md`, including
-a 20-case softlock list in section 52. That planning file is not present on
-`main` at the time of this implementation, so the matrix below does not pretend
-to reproduce missing section-52 wording. Instead it records twenty concrete
-softlock/bypass cases supported by the current issue requirements, merged PR
-#161 review findings, and executable Room 1 tests. If the planning document is
-restored, its exact case names should be cross-checked against this matrix before
-#147 is closed.
+## Section 52 source status
+
+Issue #147 requires the exact 20 softlock scenarios from section 52 of
+`docs/planning/Level 3/Rooms/Room 1 Detailed.md`. That detailed-plan file is
+not present on `main` or on this PR branch, so its exact 20-item wording cannot
+be verified from the tracked repository source.
+
+This PR therefore **does not claim that the section 52 acceptance item is
+complete** and no longer closes #147 automatically. The exact source list must
+be restored or linked and then cross-checked item-for-item before #147 is
+closed.
+
+The review of PR #166 explicitly identified several section-52 cases that were
+missing from the earlier substitute matrix. Those review-confirmed cases are now
+covered as follows:
+
+| Review-confirmed section-52 case | Coverage |
+|---|---|
+| Drone lost under inaccessible geometry | `MaintenanceDrone.test.ts` — acid/short/inaccessible/out-of-bounds recovery returns the authored usable drone |
+| Dismount Volt high in the air | `MaintenanceDrone.test.ts` — mid-air dismount, falling support, and landing |
+| Bob or Goop attempts to mount the drone | `MaintenanceDrone.test.ts` — only Volt can mount |
+| Bob or Goop attempts to ride/be transported by the drone | `MaintenanceDrone.test.ts` — ordinary slime collision masks do not inherit drone motion |
+| Switch away while the drone is moving | `MaintenanceDrone.test.ts` — moving drone parks at the exact pose and clears velocity |
+| Leave the drone parked while another slime is active | `MaintenanceDrone.test.ts` — parked hover remains fixed and lit across inactive updates |
+| Resume Volt after parking | `MaintenanceDrone.test.ts` — control resumes from zero velocity |
+| Different Bob/Goop/Volt arrival orders | `BlackoutMaintenanceBay.test.ts` — all six permutations gate completion until the third route condition |
 
 ## Recovery policy
 
-The accepted Room 1 policy is now:
+The accepted Room 1 policy is:
 
 - CP1 is the Room 1 entry state.
 - CP2 activates exactly once after the first Volt maintenance-drone tutorial has
@@ -25,43 +43,55 @@ The accepted Room 1 policy is now:
   serialized into CP2.
 - A live Volt electrical tether, acid projectile, aim state, moving door state,
   and in-progress vent traversal never survive death/retry.
-- Room 1 completion activates CP3 and hands authority to Room 2 staging exactly
-  once. Later failure recovers the whole group at the authored hallway anchors.
+- Room 1 completion activates CP3 once and opens into a real, collision-valid
+  Room 2 arrival staging corridor. Later failure recovers the whole group at
+  authored CP3 anchors inside that staging volume.
+- Room 1 remains physically reachable from that staging corridor, so its door,
+  hazards, hallway lighting, and drone presentation continue updating after the
+  handoff.
 - Full level restart returns to CP1 and resets the tutorial and Room 1 completion
   state.
 
-## Twenty-case Room 1 softlock / bypass matrix
+## Current Room 1 regression matrix
 
-| # | Scenario | Expected invariant | Coverage |
-|---:|---|---|---|
-| 1 | Goop enters the acid route | Goop survives | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
-| 2 | Bob enters acid | Existing death path is requested | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
-| 3 | Volt enters acid | Existing death path is requested | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
-| 4 | Volt enters the electrical duct | Volt survives | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
-| 5 | Goop enters the electrical duct | Existing death path is requested | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
-| 6 | Main door loses power with a slime in its closing path | Door holds/reopens instead of crushing | `BlackoutMaintenanceBay.test.ts` door obstruction |
-| 7 | Bob and Goop reach the hallway without Volt's route | Room does not complete | `BlackoutMaintenanceBay.test.ts` completion gating |
-| 8 | Volt reaches the hallway without traversing the duct | Room does not complete | `BlackoutMaintenanceBay.test.ts` completion gating |
-| 9 | Volt touches the bay-side vent mouth then uses the main door | Touching the entrance does not count | `BlackoutMaintenanceBay.test.ts` bypass regression |
-| 10 | Volt approaches the duct outlet from the hallway side | Reverse outlet entry does not count | `BlackoutMaintenanceBay.test.ts` directional traversal |
-| 11 | Volt starts a forward traversal then backs out | Active traversal is cancelled | `BlackoutMaintenanceBay.test.ts` backing-out regression |
-| 12 | Volt walks the duct fully backwards | Reverse traversal does not complete the route | `BlackoutMaintenanceBay.test.ts` reverse traversal |
-| 13 | Reset occurs while Volt is mid-duct | In-progress traversal evidence is cleared | `BlackoutMaintenanceBay.test.ts` reset-mid-route |
-| 14 | Volt performs a fresh forward traversal after cancellation/reset | Valid bay-to-outlet traversal can still succeed | `BlackoutMaintenanceBay.test.ts` successful forward traversal |
-| 15 | Maintenance drone attempts to enter Volt's duct | Physical collider excludes the drone | `BlackoutMaintenanceBay.test.ts` vent clearance |
-| 16 | Electrical aim is attempted through bay structure | Receiver LOS rejects the blocked connection | `BlackoutMaintenanceBay.test.ts` connection-clear contract |
-| 17 | Volt tries to carry the tether through the main exit | Range/route contract breaks the connection | `MaintenanceBayCircuit.test.ts` tether break |
-| 18 | Death/retry occurs during Room 1 | Bob, Goop, Volt, drone and transients recover together | `BlackoutRoomOneRuntime.test.ts` shared retry |
-| 19 | Death/retry occurs after the Volt tutorial | CP2 restores canonical grounded drone state and does not replay the tutorial | `BlackoutRoomOneRuntime.test.ts` CP2 recovery |
-| 20 | All three route conditions are met, then more fixed updates or a later death occur | Room 2 initializes once; CP3 owns later recovery | `BlackoutRoomOneRuntime.test.ts` one-shot handoff/CP3 recovery |
+This table is **additional coverage**, not a replacement for the missing exact
+section-52 checklist.
 
-Additional regression coverage verifies Bob's collision-valid stepping route,
+| Scenario | Expected invariant | Coverage |
+|---|---|---|
+| Goop enters the acid route | Goop survives | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
+| Bob enters acid | Existing death path is requested | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
+| Volt enters acid | Existing death path is requested | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
+| Volt enters the electrical duct | Volt survives | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
+| Goop enters the electrical duct | Existing death path is requested | `BlackoutMaintenanceBay.test.ts` hazard eligibility |
+| Main door loses power with a slime in its closing path | Door holds/reopens instead of crushing | `BlackoutMaintenanceBay.test.ts` door obstruction |
+| Bob and Goop reach the hallway without Volt's route | Room does not complete | `BlackoutMaintenanceBay.test.ts` completion gating |
+| Volt reaches the hallway without traversing the duct | Room does not complete | `BlackoutMaintenanceBay.test.ts` completion gating |
+| Volt touches the bay-side vent mouth then uses the main door | Touching the entrance does not count | `BlackoutMaintenanceBay.test.ts` bypass regression |
+| Volt approaches the duct outlet from the hallway side | Reverse outlet entry does not count | `BlackoutMaintenanceBay.test.ts` directional traversal |
+| Volt starts a forward traversal then backs out | Active traversal is cancelled | `BlackoutMaintenanceBay.test.ts` backing-out regression |
+| Volt walks the duct fully backwards | Reverse traversal does not complete the route | `BlackoutMaintenanceBay.test.ts` reverse traversal |
+| Reset occurs while Volt is mid-duct | In-progress traversal evidence is cleared | `BlackoutMaintenanceBay.test.ts` reset-mid-route |
+| Volt performs a fresh forward traversal after cancellation/reset | Valid bay-to-outlet traversal can still succeed | `BlackoutMaintenanceBay.test.ts` successful forward traversal |
+| Maintenance drone attempts to enter Volt's duct | Physical collider excludes the drone | `BlackoutMaintenanceBay.test.ts` vent clearance |
+| Electrical aim is attempted through bay structure | Receiver LOS rejects the blocked connection | `BlackoutMaintenanceBay.test.ts` connection-clear contract |
+| Volt tries to carry the tether through the main exit | Range/route contract breaks the connection | `MaintenanceBayCircuit.test.ts` tether break |
+| Death/retry occurs during Room 1 | Bob, Goop, Volt, drone and transients recover together | `BlackoutRoomOneRuntime.test.ts` shared retry |
+| Death/retry occurs after the Volt tutorial | CP2 restores canonical grounded drone state and does not replay the tutorial | `BlackoutRoomOneRuntime.test.ts` CP2 recovery |
+| All three route conditions are met | Room 2 staging initialises once and CP3 becomes authoritative | `BlackoutRoomOneRuntime.test.ts` one-shot handoff |
+| Door is partly open when handoff occurs | Door continues closing after power loss instead of freezing | `BlackoutRoomOneRuntime.test.ts` post-handoff authority regression |
+| Player returns from Room 2 staging into Room 1 acid | Room 1 hazard remains lethal and Retry returns to CP3 | `BlackoutRoomOneRuntime.test.ts` post-handoff return regression |
+| Old hallway end is crossed after handoff | Collision path continues into Room 2 staging | `BlackoutMaintenanceBay.test.ts` staging traversal |
+| Player reaches temporary end of Room 2 staging | Staging remains safely sealed until #165 extends it | `BlackoutMaintenanceBay.test.ts` staging boundary |
+
+Additional automated coverage verifies Bob's collision-valid stepping route,
 Goop's non-jump acid-exit ramp, the fully enclosed duct, full kinematic Volt
-walk-through, and checkpoint participant-state override semantics.
+walk-through, checkpoint participant-state override semantics, and repeated drone
+reset/disposal cleanup.
 
 ## Lifecycle acceptance
 
-Automated coverage now verifies:
+Automated coverage verifies:
 
 - CP2 activation is one-shot.
 - CP2 participant state is canonical and does not mutate live mounted gameplay.
@@ -69,21 +99,25 @@ Automated coverage now verifies:
   runtime reset order.
 - Room 1 completion is committed through one guarded runtime method.
 - CP3 is activated during the handoff rather than merely changing objective text.
-- Room 1 hazard/completion authority stops running once Room 2 staging owns the
-  runtime.
-- Retry after the handoff restores Room 2 staging rather than reopening Room 1.
+- CP3 anchors are physically inside a traversable Room 2 arrival staging volume.
+- Reachable Room 1 hazards, door mechanics, lights, and drone presentation remain
+  authoritative after CP3.
+- Re-entering Room 1 after CP3 can still fail through normal hazards, and Retry
+  returns to the CP3 Room 2 staging snapshot.
 - Full restart returns to CP1 and resets tutorial/completion state.
 
 ## Production / real-play sign-off
 
-Before marking #147 ready for merge:
+Before closing #147:
 
-- [ ] full automated test suite passes in CI;
-- [ ] TypeScript/production build passes in CI;
+- [ ] restore/link the exact detailed-plan section 52 list and cross-check all 20
+      cases item-for-item;
+- [ ] full automated test suite passes on the final review-fix head;
+- [ ] TypeScript/production build passes on the final review-fix head;
 - [ ] production build is served over HTTP and Room 1 is played from CP1 through
       the Volt tutorial, Bob/Goop routes, powered door, directional Volt duct,
-      and Room 2 handoff;
-- [ ] the high-risk bypass cases above are spot-checked in real play;
+      and Room 2 staging handoff;
+- [ ] the exact section-52 cases that require real play are recorded;
 - [ ] no console errors, duplicate completion event, stale tether, active
-      projectile, moving-door state, or retained listener is observed after
-      retry/restart/unload.
+      projectile, frozen moving-door state, stranded drone, or retained listener
+      is observed after retry/restart/unload.
