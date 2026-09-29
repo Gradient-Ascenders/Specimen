@@ -57,4 +57,31 @@ export const BLACKOUT_CHECKPOINTS: readonly BlackoutCheckpointDefinition[] = [
   },
 ] as const;
 
+
+export const BLACKOUT_AUTHORED_ROOM_ONE_CP2: BlackoutCheckpointDefinition = {
+  id: 'cp2',
+  bodyPositions: spawnSet(2),
+  activeSlimeId: 'volt',
+  room: {
+    roomId: 'room-1',
+    phase: 'three-slime',
+    local: { tutorialComplete: true },
+  },
+};
+
+export const BLACKOUT_AUTHORED_ROOM_TWO_CP3: BlackoutCheckpointDefinition = {
+  id: 'cp3',
+  bodyPositions: {
+    bob: new THREE.Vector3(4.25, 0.46, 68),
+    goop: new THREE.Vector3(6, 0.46, 68),
+    volt: new THREE.Vector3(7.75, 0.46, 68),
+  },
+  activeSlimeId: 'bob',
+  room: {
+    roomId: 'room-2',
+    phase: 'three-slime',
+    local: { maintenanceBayComplete: true },
+  },
+};
+
 export const BLACKOUT_FOUNDATION_LENGTH_METRES = 84;
