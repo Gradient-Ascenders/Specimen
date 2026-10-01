@@ -44,6 +44,57 @@ const bobState = (): BobCharacterPresentationState => ({
 const createScene = (): ContainmentLevelScene =>
   new ContainmentLevelScene(() => undefined);
 
+test('Room 1 proof retains its fixture and excludes glass and hidden colliders', () => {
+  const scene = createScene();
+  const key = scene.root.getObjectByName('room-1-pedestal-soft-key');
+  assert.ok(key instanceof THREE.SpotLight);
+  assert.equal(key.castShadow, true);
+  assert.deepEqual(key.position.toArray(), [0, 6.4, -0.5]);
+  assert.deepEqual(key.target.position.toArray(), [0, 1.65, -0.5]);
+  assert.equal(key.intensity, 62);
+  assert.equal(key.color.getHex(), 0xd9efff);
+  assert.equal(key.angle, 0.48);
+  assert.deepEqual(key.shadow.mapSize.toArray(), [1024, 1024]);
+  assert.equal(key.shadow.camera.near, 0.35);
+  assert.equal(key.shadow.camera.far, 10);
+  assert.equal(key.shadow.autoUpdate, true);
+  assert.equal(scene.root.getObjectByName('room-1-floor')?.receiveShadow, true);
+  assert.equal(scene.root.getObjectByName('room-1-pedestal-clean-shell')?.castShadow, true);
+  let wallReceivers = 0;
+  scene.root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    if (materials.some((material) => !material.visible || /collision-only/.test(material.name))) {
+      assert.equal(object.castShadow, false, object.name);
+      assert.equal(object.receiveShadow, false, object.name);
+    }
+    if (object.name.startsWith('room-1-') && materials.some((material) => material.transparent)) {
+      assert.equal(object.castShadow, false, object.name);
+    }
+    const names: string[] = object.userData.staticBatchSourceNames ?? [object.name];
+    if (names.some((name) => name.startsWith('room-1-panel-'))) {
+      assert.equal(object.receiveShadow, true, object.name);
+      wallReceivers++;
+    }
+  });
+  assert.ok(wallReceivers > 0);
+  const map = new THREE.WebGLRenderTarget(16, 16);
+  const pass = new THREE.WebGLRenderTarget(16, 16);
+  let disposals = 0;
+  map.addEventListener('dispose', () => disposals++);
+  pass.addEventListener('dispose', () => disposals++);
+  key.shadow.map = map;
+  key.shadow.mapPass = pass;
+  scene.resetPresentation();
+  scene.resetTeachingPresentation();
+  assert.equal(key.shadow.map, map, 'restart reuses the owned map');
+  scene.dispose();
+  scene.dispose();
+  assert.equal(disposals, 2);
+  assert.equal(key.shadow.map, null);
+  assert.equal(key.shadow.mapPass, null);
+});
+
 test('Containment replaces inspection lights with visible-source room rigs', () => {
   const scene = createScene();
 
@@ -67,7 +118,7 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
   assert.equal(initial.activeRoomId, 1);
   assert.equal(initial.authoredLightCount, 20);
   assert.equal(initial.visibleAuthoredLightCount, 5);
-  assert.equal(initial.shadowCastingLightCount, 0);
+  assert.equal(initial.shadowCastingLightCount, 1);
   assert.equal(initial.bobReflectionZone, 'room');
   assert.equal(initial.bobBodyReflectionTarget, 0.42);
   assert.equal(initial.bobEyeReflectionTarget, 1.12);

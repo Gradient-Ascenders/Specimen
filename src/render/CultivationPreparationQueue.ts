@@ -365,14 +365,11 @@ export class CultivationPreparationQueue {
   private withState<T>(dark: boolean, shadowTarget: boolean, action: () => T): T {
     const r = this.layer.renderer;
     const counters = r.info ? {calls:r.info.render.calls, triangles:r.info.render.triangles, points:r.info.render.points, lines:r.info.render.lines} : undefined;
-    const enabled = r.shadowMap.enabled, type = r.shadowMap.type, auto = r.shadowMap.autoUpdate;
     const viewport = r.getViewport(new THREE.Vector4()), scissor = r.getScissor(new THREE.Vector4()), test = r.getScissorTest(), target = r.getRenderTarget();
-    r.shadowMap.enabled = dark; r.shadowMap.type = THREE.PCFShadowMap; r.shadowMap.autoUpdate = false;
     if (shadowTarget) r.setRenderTarget(this.target);
     r.setViewport(-2, -2, 1, 1); r.setScissor(-2, -2, 1, 1); r.setScissorTest(true);
-    try { return action(); } finally {
+    try { return this.layer.withShadowPreparation(dark, action); } finally {
       r.setRenderTarget(target); r.setViewport(viewport); r.setScissor(scissor); r.setScissorTest(test);
-      r.shadowMap.enabled = enabled; r.shadowMap.type = type; r.shadowMap.autoUpdate = auto;
       if (counters) Object.assign(r.info.render, counters);
     }
   }

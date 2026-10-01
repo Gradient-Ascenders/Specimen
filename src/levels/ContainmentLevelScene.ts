@@ -208,6 +208,7 @@ export class ContainmentLevelScene {
     this.staticBatchDiagnostics = this.staticBatches.map(
       ({ diagnostics }) => diagnostics,
     );
+    this.lighting.configureRoomOneShadowReceivers(this.teaching.roomOneArt);
     this.measuredFirstUseGeometryResources =
       resolveMeasuredFirstUseGeometryResources(this.root);
   }

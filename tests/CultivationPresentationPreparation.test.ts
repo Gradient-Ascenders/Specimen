@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
 import { CultivationLightLayout } from '../src/render/CultivationLightLayout.ts';
-import type { RenderLayer } from '../src/render/RenderLayer.ts';
+import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
 
 for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
   const fail = mode === 'failure';
@@ -57,7 +57,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
   const renderer = {
     extensions: {has: () => mode !== 'lift'},
-    shadowMap: { enabled: false, autoUpdate: true, type: THREE.BasicShadowMap as THREE.ShadowMapType },
+    shadowMap: { enabled: false, autoUpdate: true, needsUpdate: false, type: THREE.BasicShadowMap as THREE.ShadowMapType },
     getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},
     getViewport: (out: THREE.Vector4) => out.copy(viewport), getScissor: (out: THREE.Vector4) => out.copy(scissor), getScissorTest: () => scissorTest,
     setViewport: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
@@ -105,7 +105,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       }
     },
   };
-  const layer = { scene, renderer, cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
+  const policy = new RenderShadowPolicy(renderer.shadowMap);
+  const layer = { scene, renderer, withShadowPreparation: policy.withPreparation.bind(policy), cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
   const queue = new CultivationPreparationQueue(layer, preview);
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
@@ -205,7 +206,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       for (const old of snapshots) old.object.visible = old.visible;
     }
     assert.deepEqual(viewport.toArray(), [0, 0, 1280, 720]); assert.deepEqual(scissor.toArray(), viewport.toArray());
-    assert.equal(scissorTest, false); assert.equal(renderer.shadowMap.enabled, false); assert.equal(renderer.shadowMap.type, THREE.BasicShadowMap);
+    assert.equal(scissorTest, false); assert.equal(renderer.shadowMap.enabled, false); assert.equal(renderer.shadowMap.type, THREE.PCFShadowMap);
     const after: THREE.Object3D[] = []; scene.traverse(o => after.push(o)); assert.deepEqual(after, objects);
     for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');

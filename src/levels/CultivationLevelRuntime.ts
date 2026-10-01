@@ -62,7 +62,7 @@ import {
 } from '../render/bob/BobCharacterPresentation.ts';
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import type { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
-import type { RenderLayer } from '../render/RenderLayer.ts';
+import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
 import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
 import {
@@ -188,6 +188,7 @@ export class CultivationLevelRuntime {
   private readonly host: HTMLElement;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
+  private shadowRequest: RenderShadowRequest | undefined;
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
   private readonly debugSupport: CultivationLevelDebugSupport | undefined;
@@ -292,6 +293,7 @@ export class CultivationLevelRuntime {
     if (this.lifecycle.state === 'unloaded') this.presentationPreparation = undefined;
     const started = performance.now();
     this.lifecycle.load();
+    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: false });
     this.constructionMs = performance.now() - started;
   }
   start(): void { this.lifecycle.start(); }
@@ -607,8 +609,7 @@ export class CultivationLevelRuntime {
       && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
-    this.renderLayer.renderer.shadowMap.enabled = darkRoom;
-    this.renderLayer.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.shadowRequest?.update({ enabled: Boolean(darkRoom) });
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
       resources.pair.bobBody.position,
     );
@@ -1355,7 +1356,8 @@ export class CultivationLevelRuntime {
     resources.roomFiveDamage?.dispose();
     resources.roomFiveView?.dispose();
     resources.roomFiveEncounter?.dispose();
-    this.renderLayer.renderer.shadowMap.enabled = false;
+    this.shadowRequest?.dispose();
+    this.shadowRequest = undefined;
     resources.voltVisual.removeFromParent(); resources.voltVisual.geometry.dispose(); resources.voltVisual.material.dispose();
     resources.damageVignette?.dispose();
     resources.droneProjectilePresentation?.dispose();

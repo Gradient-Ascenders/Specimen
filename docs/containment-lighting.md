@@ -30,9 +30,12 @@ ContainmentLevelScene
 
 Only the active room group is visible. This keeps the normal authored set to
 three to seven local lights plus the hemisphere foundation; Room 4 also has the
-two existing elevator-roof warning lights. Every real light in this pass has
-`castShadow = false`. Issue #42 owns enabling renderer shadow maps, selecting
-the final shadow lights and tuning map/depth parameters.
+two existing elevator-roof warning lights. Issue #169 enables the existing
+Room 1 pedestal key as the first real shadow
+source. Other Containment light shadows remain disabled. RenderLayer owns the
+shared PCF policy; levels own lights and maps. See
+[renderer shadow ownership](renderer-shadows.md) for configuration, lifecycle,
+coverage and the phased #168 follow-up work.
 
 ## Authored lights
 
@@ -144,14 +147,18 @@ animation, cameras, control lock, sequencing and skip input.
 - No `setTimeout`, event listener or callback is created by the rig.
 - Unload removes panel-mounted status fixtures, disposes the two point
   geometries/materials and every rig-owned material/geometry, then clears the
-  lighting root.
+  lighting root. The Room 1 spotlight map and its depth texture are disposed
+  once, and map references are cleared.
 
 ## Shadow and performance intent
 
 The pass records selected future shadow intent on pedestal/containment,
 elevator and Room 5 containment equipment, plus major floor/platform receivers.
-Transparent panes, debris and particles are excluded. Renderer shadow maps and
-all light shadows remain disabled for #42.
+Transparent panes, debris and particles are excluded. Issue #169 now enables
+one 1024-square Room 1 spotlight map and Bob/major solid caster roles. Wall art
+receivers are selected after static batching so measured owner names remain
+stable. The current character depth pass supports authored morphs; secondary
+shader deformation and fades remain #170. Rooms 2–5 remain for #171.
 
 All room rigs stay resident, but only one local room group is visible. No light
 or material is created per frame. Pulses update existing scalar/material state,
@@ -188,8 +195,11 @@ every distinct shader variant.
 
 A one-pixel scissored draw from each future room entry then performs bounded
 first-use geometry/material uploads without displaying another room. Room 1
-does not receive a duplicate priming draw: the normal boot flow already renders
-it twice behind the loading screen. The rig restores the room that was
+receives a hidden priming draw to allocate its shadow map and depth
+programs before the measured-resource guard. Isolated resource uploads suppress
+map updates through RenderLayer's synchronous preparation boundary. One
+preparation camera is reused across reloads to keep cached transmission targets
+bounded. The rig restores the room that was
 authoritative when prewarming began in a `finally` block.
 
 This intentionally trades a one-time loading cost and cached room-specific

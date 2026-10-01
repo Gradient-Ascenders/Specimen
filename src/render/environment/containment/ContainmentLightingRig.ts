@@ -208,6 +208,15 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       0.72,
       CLINICAL_COLOUR,
     );
+    this.roomOnePedestalKey.castShadow = true;
+    this.roomOnePedestalKey.shadow.mapSize.set(1024, 1024);
+    this.roomOnePedestalKey.shadow.camera.near = 0.35;
+    // SpotLightShadow derives far from the authored light distance (10 m).
+    this.roomOnePedestalKey.shadow.camera.far = this.roomOnePedestalKey.distance;
+    this.roomOnePedestalKey.shadow.bias = -0.0001;
+    this.roomOnePedestalKey.shadow.normalBias = 0.015;
+    this.roomOnePedestalKey.shadow.radius = 1.5;
+    this.roomOnePedestalKey.shadow.autoUpdate = true;
     roomOne.add(this.roomOnePedestalKey, this.roomOnePedestalKey.target);
 
     const ductLight = this.point(
@@ -459,6 +468,9 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.roomOnePedestalKey.shadow.dispose();
+    this.roomOnePedestalKey.shadow.map = null;
+    this.roomOnePedestalKey.shadow.mapPass = null;
     this.bobImpactEffect.dispose();
     this.goopReleaseEffect.dispose();
     for (const fixture of this.attachedPanelFixtures) fixture.removeFromParent();
@@ -679,8 +691,14 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     for (const root of castRoots) {
       root.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
-        if (/glass|pane|debris|sparkle|vapour/i.test(object.name)) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        if (materials.some((material) => material.transparent || !material.visible)) return;
+        if (/glass|debris|sparkle|vapour/i.test(object.name)) return;
+        if (root !== roomOneArt.pedestalDressing && root !== roomOneArt.containmentBoxRoot && /pane/i.test(object.name)) return;
         object.castShadow = true;
+        if (root === roomOneArt.pedestalDressing || root === roomOneArt.containmentBoxRoot) {
+          object.receiveShadow = true;
+        }
         object.userData.shadowIntent = 'selected-major-caster';
       });
     }
@@ -691,6 +709,16 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       if (/collision-only/i.test(object.material.name)) return;
       object.receiveShadow = true;
       object.userData.shadowIntent = 'selected-major-receiver';
+    });
+  }
+
+  /** Select opaque Room 1 wall batches after batching, preserving measured owner names. */
+  configureRoomOneShadowReceivers(roomOneArt: RoomOneArt): void {
+    roomOneArt.root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const names: string[] = object.userData.staticBatchSourceNames ?? [object.name];
+      if (!names.some((name) => name.startsWith('room-1-panel-'))) return;
+      object.receiveShadow = true;
     });
   }
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
-import { CameraRig } from './CameraRig';
+import { CameraRig } from './CameraRig.ts';
 import {
   DEFAULT_RENDER_PIXEL_RATIO_CAP,
   type RenderPixelRatioCap,
@@ -11,6 +11,89 @@ import {
 export const RENDER_EXPOSURE = 1;
 
 const BACKGROUND_COLOUR = 0x07110f;
+
+export interface RenderShadowConfiguration {
+  readonly enabled: boolean;
+}
+
+export interface RenderShadowRequest {
+  update(configuration: RenderShadowConfiguration): void;
+  dispose(): void;
+}
+
+/** Renderer policy only. Requesters retain ownership of lights and their maps. */
+export class RenderShadowPolicy {
+  private readonly shadowMap: THREE.WebGLRenderer['shadowMap'];
+  private disposed = false;
+  private readonly requests: {
+    owner: string;
+    enabled: boolean;
+  }[] = [];
+
+  constructor(shadowMap: THREE.WebGLRenderer['shadowMap']) {
+    this.shadowMap = shadowMap;
+    this.apply();
+  }
+
+  get activeOwner(): string | undefined {
+    return this.requests.at(-1)?.owner;
+  }
+
+  /** Compilation/draw setup is synchronous even when the action returns a promise. */
+  withPreparation<T>(enabled: boolean, action: () => T): T {
+    if (this.disposed) throw new Error('Cannot prepare a disposed shadow policy.');
+    const { enabled: previousEnabled, type, autoUpdate, needsUpdate } = this.shadowMap;
+    this.shadowMap.enabled = enabled;
+    this.shadowMap.type = THREE.PCFShadowMap;
+    this.shadowMap.autoUpdate = false;
+    this.shadowMap.needsUpdate = false;
+    try {
+      return action();
+    } finally {
+      Object.assign(this.shadowMap, { enabled: previousEnabled, type, autoUpdate, needsUpdate });
+    }
+  }
+
+  request(owner: string, configuration: RenderShadowConfiguration): RenderShadowRequest {
+    if (this.disposed) throw new Error('Cannot request a disposed shadow policy.');
+    const entry = { owner, enabled: configuration.enabled };
+    this.requests.push(entry);
+    this.apply();
+    let released = false;
+    return {
+      update: (next) => {
+        if (released || this.disposed || entry.enabled === next.enabled) return;
+        entry.enabled = next.enabled;
+        this.apply();
+      },
+      dispose: () => {
+        if (released) return;
+        released = true;
+        if (this.disposed) return;
+        this.requests.splice(this.requests.indexOf(entry), 1);
+        this.apply();
+      },
+    };
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.requests.length = 0;
+    this.apply();
+    this.disposed = true;
+  }
+
+  private apply(): void {
+    const enabled = this.requests.at(-1)?.enabled ?? false;
+    const changed = this.shadowMap.enabled !== enabled ||
+      this.shadowMap.type !== THREE.PCFShadowMap || !this.shadowMap.autoUpdate;
+    this.shadowMap.enabled = enabled;
+    this.shadowMap.type = THREE.PCFShadowMap;
+    // Characters and hatch geometry move: static caching is not safe here.
+    this.shadowMap.autoUpdate = true;
+    if (changed) this.shadowMap.needsUpdate = true;
+  }
+}
 
 export interface RenderDiagnostics {
   readonly viewportWidth: number;
@@ -46,6 +129,7 @@ export class RenderLayer {
   readonly scene = new THREE.Scene();
   readonly cameraRig = new CameraRig();
   readonly renderer: THREE.WebGLRenderer;
+  private readonly shadowPolicy: RenderShadowPolicy;
 
   private readonly host: HTMLElement;
   private readonly hostWindow: Window;
@@ -74,7 +158,7 @@ export class RenderLayer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = RENDER_EXPOSURE;
-    this.renderer.shadowMap.enabled = false;
+    this.shadowPolicy = new RenderShadowPolicy(this.renderer.shadowMap);
     this.renderer.setClearColor(BACKGROUND_COLOUR, 1);
     this.renderer.domElement.setAttribute('aria-hidden', 'true');
 
@@ -94,6 +178,22 @@ export class RenderLayer {
 
   render(): void {
     this.renderer.render(this.scene, this.cameraRig.camera);
+  }
+
+  requestShadowConfiguration(
+    owner: string,
+    configuration: RenderShadowConfiguration,
+  ): RenderShadowRequest {
+    if (this.disposed) throw new Error('Cannot configure a disposed RenderLayer.');
+    return this.shadowPolicy.request(owner, configuration);
+  }
+
+  get shadowConfigurationOwner(): string | undefined {
+    return this.shadowPolicy.activeOwner;
+  }
+
+  withShadowPreparation<T>(enabled: boolean, action: () => T): T {
+    return this.shadowPolicy.withPreparation(enabled, action);
   }
 
   setAnimationLoop(callback: XRFrameRequestCallback | null): void {
@@ -169,6 +269,7 @@ export class RenderLayer {
     this.renderer.setAnimationLoop(null);
     this.hostWindow.removeEventListener('resize', this.resize);
     this.resizeObserver?.disconnect();
+    this.shadowPolicy.dispose();
     this.renderer.dispose();
   }
 

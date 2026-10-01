@@ -46,7 +46,7 @@ import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPr
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources } from '../render/IsolatedResourcePrewarm.ts';
-import type { RenderLayer } from '../render/RenderLayer.ts';
+import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
 import type {
   BobHatchLightingState,
@@ -282,6 +282,7 @@ export class GreyboxLevelRuntime {
   private readonly host: HTMLElement;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
+  private shadowRequest: RenderShadowRequest | undefined;
   private readonly hostWindow: Window;
   private skipToLevelThreeTriggered = false;
   private readonly debugAvailable: boolean;
@@ -304,6 +305,9 @@ export class GreyboxLevelRuntime {
   private lastRenderedLightingRoomId: DebugRoomId | undefined;
   private pendingLightingTransitionProfile: LightingTransitionProfile | undefined;
   private lightingPrewarmPromise: Promise<void> | undefined;
+  // Three.js retains transmission targets per camera. Reuse this camera across
+  // unload/load so preparation does not allocate another cached target each time.
+  private readonly lightingPrewarmCamera = new THREE.PerspectiveCamera();
   private lightingPrewarmProfile: LightingPrewarmProfile | undefined;
   private lightingPrewarmGeneration = 0;
   private cancelLightingPrewarm: (() => void) | undefined;
@@ -422,6 +426,7 @@ export class GreyboxLevelRuntime {
 
   load(): void {
     this.lifecycle.load();
+    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('containment', { enabled: true });
   }
 
   start(): void {
@@ -435,7 +440,22 @@ export class GreyboxLevelRuntime {
     const generation = ++this.lightingPrewarmGeneration;
     const promise = resources.testScene.bob
       .prepare()
-      .then(() => this.runLightingPrewarm(resources, generation));
+      .then(() => {
+        if (this.resources !== resources || this.lightingPrewarmGeneration !== generation) return;
+        // Authored morphs participate in Three.js's default depth pass. Secondary
+        // shader deformation and fade handling remain tracked by issue #170.
+        resources.testScene.bob.root.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            object.castShadow = true;
+            object.receiveShadow = true;
+          }
+        });
+        return this.runLightingPrewarm(resources, generation);
+      })
+      .catch((error) => {
+        if (this.resources === resources) this.unload();
+        throw error;
+      });
     this.lightingPrewarmPromise = promise;
     return promise;
   }
@@ -479,10 +499,16 @@ export class GreyboxLevelRuntime {
   }
 
   unload(): void {
-    this.lifecycle.unload();
+    try {
+      this.lifecycle.unload();
+    } finally {
+      this.shadowRequest?.dispose();
+      this.shadowRequest = undefined;
+    }
   }
 
   dispose(): void {
+    if (this.lifecycle.state !== 'disposed') this.unload();
     this.lifecycle.dispose();
     this.slimeHUDListeners.clear();
     this.events.clear();
@@ -1753,7 +1779,7 @@ export class GreyboxLevelRuntime {
   ): Promise<void> {
     const renderer = this.renderLayer.renderer;
     const camera = this.renderLayer.cameraRig.camera;
-    const prewarmCamera = camera.clone();
+    const prewarmCamera = this.lightingPrewarmCamera.copy(camera);
     const transmissionPrewarmTarget = new THREE.WebGLRenderTarget(1, 1);
     const previousViewport = renderer.getViewport(new THREE.Vector4());
     const previousScissor = renderer.getScissor(new THREE.Vector4());
@@ -1853,11 +1879,9 @@ export class GreyboxLevelRuntime {
           prewarmCamera.lookAt(target[0], target[1] + 0.5, target[2] + 2);
           prewarmCamera.updateMatrixWorld();
           const primeStarted = this.hostWindow.performance.now();
-          // Boot already draws Room 1 twice behind the loading screen. Only
-          // future rooms need an additional hidden first-use geometry draw.
-          if (roomId !== 1) {
-            renderer.render(this.renderLayer.scene, prewarmCamera);
-          }
+          // Room 1 also needs a hidden draw now: compileAsync does not create
+          // the spotlight map or compile its caster depth programs.
+          renderer.render(this.renderLayer.scene, prewarmCamera);
           const primeDurationMs =
             this.hostWindow.performance.now() - primeStarted;
           renderer.setViewport(0, 0, 1, 1);
@@ -1898,11 +1922,13 @@ export class GreyboxLevelRuntime {
         this.hostWindow.performance.now();
       resources.testScene.primeMeasuredFirstUseGeometryResources(
         (measuredResources) => {
-          renderIsolatedPrewarmResources(
-            renderer,
-            this.renderLayer.scene,
-            prewarmCamera,
-            measuredResources,
+          this.renderLayer.withShadowPreparation(true, () =>
+            renderIsolatedPrewarmResources(
+              renderer,
+              this.renderLayer.scene,
+              prewarmCamera,
+              measuredResources,
+            ),
           );
         },
       );
@@ -2062,7 +2088,14 @@ function createRoomCompileSubset(
     }
   }
 
-  if (roomId === 1) sources.push(resources.pressurePlate.root);
+  if (roomId === 1) {
+    sources.push(resources.pressurePlate.root);
+    // The isolated measured uploads use the Room 1 shadow-light signature.
+    // Prepare those exact resource variants before enforcing the no-new-program guard.
+    for (const name of resources.testScene.measuredFirstUseGeometryPrimeDiagnostics.ownerNames) {
+      sources.push(requiredNamedObject(levelRoot, name));
+    }
+  }
 
   const subset = new THREE.Group();
   subset.name = `containment-room-${roomId}-shader-prewarm-subset`;

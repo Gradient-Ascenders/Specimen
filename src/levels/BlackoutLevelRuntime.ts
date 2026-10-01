@@ -57,7 +57,7 @@ import {
   PuzzleRegistry,
   type ResettablePuzzleComponent,
 } from '../puzzle/PuzzleRegistry.ts';
-import type { RenderLayer } from '../render/RenderLayer.ts';
+import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import {
   BobCharacterPresentation,
   type BobCharacterPresentationState,
@@ -190,6 +190,7 @@ export class BlackoutLevelRuntime {
   private readonly host: HTMLElement;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
+  private shadowRequest: RenderShadowRequest | undefined;
   private readonly initialProgression: LevelProgressionSnapshot;
   private readonly lifecycle: LevelLifecycle;
   private readonly hudListeners = new Set<SlimeHUDListener>();
@@ -206,7 +207,6 @@ export class BlackoutLevelRuntime {
   private readonly authoredRoomOne: boolean;
   private bayComplete = false;
   private roomTwoInitialized = false;
-  private previousShadowEnabled: boolean | undefined;
 
   constructor(options: BlackoutLevelRuntimeOptions) {
     this.authoredRoomOne = options.authoredRoomOne ?? false;
@@ -1340,9 +1340,8 @@ export class BlackoutLevelRuntime {
       if (dronePresentation) {
         for(const mesh of scene.collisionMeshes) {mesh.castShadow=true;mesh.receiveShadow=true;}
         if(this.renderLayer.renderer) {
-          this.previousShadowEnabled=this.renderLayer.renderer.shadowMap.enabled;
-          this.renderLayer.renderer.shadowMap.enabled=true;
-          rollback(()=>{this.renderLayer.renderer.shadowMap.enabled=this.previousShadowEnabled??false;this.previousShadowEnabled=undefined;});
+          this.shadowRequest = this.renderLayer.requestShadowConfiguration('blackout', { enabled: true });
+          rollback(() => { this.shadowRequest?.dispose(); this.shadowRequest = undefined; });
         }
         const material = maintenanceDroneFixture.collider.material;
         for (const item of Array.isArray(material) ? material : [material]) item.visible = false;
@@ -1736,10 +1735,8 @@ export class BlackoutLevelRuntime {
     resources.unregisterSentinelCheckpointParticipant();
     resources.unregisterMaintenanceDroneCheckpointParticipant();
     resources.dronePresentation?.dispose();
-    if(this.previousShadowEnabled!==undefined) {
-      this.renderLayer.renderer.shadowMap.enabled=this.previousShadowEnabled;
-      this.previousShadowEnabled=undefined;
-    }
+    this.shadowRequest?.dispose();
+    this.shadowRequest = undefined;
     resources.maintenanceBay?.dispose();
     resources.maintenanceDrone.dispose();
     resources.maintenanceDroneFixture.dispose();
