@@ -143,14 +143,30 @@ export class BlackoutCheckpointManager<Body extends PersistentSlimeBody> {
     checkpointId: BlackoutCheckpointId,
     activeSlimeId?: BlackoutSlimeId,
     roomState?: BlackoutRoomState,
+    participantStateOverrides: Readonly<Record<string, SerializableValue>> = {},
   ): void {
     const checkpoint = this.getCheckpoint(checkpointId);
     this.assertSafe(checkpoint);
-    this.activeSnapshot = this.createSnapshot(
+    const snapshot = this.createSnapshot(
       checkpoint,
       activeSlimeId,
       roomState,
     );
+    const participantState = {
+      ...snapshot.participantState,
+    } as Record<string, SerializableValue>;
+    for (const [id, state] of Object.entries(participantStateOverrides)) {
+      if (!this.participants.has(id)) {
+        throw new Error(
+          `Cannot override unregistered Blackout checkpoint participant "${id}".`,
+        );
+      }
+      participantState[id] = cloneSerializable(state);
+    }
+    this.activeSnapshot = {
+      ...snapshot,
+      participantState,
+    };
   }
 
   recover(

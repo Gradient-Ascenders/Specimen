@@ -12,6 +12,11 @@ import type {
 } from './ElectricalTargetRegistry.ts';
 
 const DISTANCE_EPSILON = 1e-6;
+// Slime physics can introduce sub-centimetre settling jitter after a tether is
+// latched. Treat displacement beyond this small dead zone as intentional
+// movement, measured from the original latch point so slow drift cannot evade
+// the rule by staying under a per-frame threshold.
+const TETHER_MOVEMENT_BREAK_METRES = 0.12;
 
 export interface VoltElectricalConfig {
   readonly acquisitionRangeMetres: number;
@@ -30,6 +35,7 @@ export type VoltDisconnectReason =
   | 'target-invalid'
   | 'target-removed'
   | 'range-exceeded'
+  | 'movement'
   | 'death'
   | 'reset'
   | 'restart'
@@ -145,8 +151,9 @@ export interface VoltElectricalSystemOptions<Body extends VoltElectricalBody> {
  *
  * Acquisition performs camera selection plus a separate Volt-body LOS check.
  * Once a target is latched, obstruction and camera motion are intentionally
- * ignored; only explicit disconnect, invalidation/removal, reset/death, or
- * range can break the tether.
+ * ignored; the tether breaks only on meaningful Volt-body movement from its
+ * latch position, explicit disconnect, invalidation/removal, reset/death, or
+ * range.
  */
 export class VoltElectricalSystem<Body extends VoltElectricalBody> {
   readonly events = new EventBus<VoltElectricalEvents>();
@@ -174,6 +181,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
 
   private connectedRegistration: ElectricalTargetRegistration | undefined;
   private selectedRegistration: ElectricalTargetRegistration | undefined;
+  private readonly connectionAnchor = new THREE.Vector3();
   private fireRequiresRelease = false;
   private disposed = false;
 
@@ -380,6 +388,13 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     }
 
     readVector(voltBody.position, this.voltPosition);
+    if (
+      this.voltPosition.distanceTo(this.connectionAnchor) >
+      TETHER_MOVEMENT_BREAK_METRES
+    ) {
+      this.disconnect('movement');
+      return;
+    }
     target.copySocketWorldPosition(this.socketPosition);
     const distance = this.voltPosition.distanceTo(this.socketPosition);
     if (distance > this.config.tetherBreakRangeMetres) {
@@ -544,6 +559,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     if (!voltBody) return;
 
     readVector(voltBody.position, this.voltPosition);
+    this.connectionAnchor.copy(this.voltPosition);
     target.copySocketWorldPosition(this.socketPosition);
     const distance = this.voltPosition.distanceTo(this.socketPosition);
     if (distance > this.config.acquisitionRangeMetres) return;

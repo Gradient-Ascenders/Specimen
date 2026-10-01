@@ -59,3 +59,55 @@ test('failed Cultivation construction rolls back attached resources', () => {
   assert.equal(runtime.state, 'disposed');
   assert.equal(scene.children.length, 0);
 });
+
+test('Level 2 zero shortcut works without debug preview and is one-shot', () => {
+  const inputStates: boolean[] = [];
+  const input = {
+    enabled: true,
+    setEnabled: (enabled: boolean) => inputStates.push(enabled),
+    releasePointerLock: () => undefined,
+  } as unknown as Input;
+  const runtime = new CultivationLevelRuntime({
+    host: { dataset: {} } as unknown as HTMLElement,
+    input,
+    renderLayer: { scene: new THREE.Scene() } as unknown as RenderLayer,
+    progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
+    window: new EventTarget() as unknown as Window,
+    debugAvailable: false,
+  });
+  let unlocked = false;
+  let emitted: unknown;
+  const internals = runtime as unknown as {
+    lifecycle: { state: string };
+    resources: Record<string, any>;
+    onSkipToLevelThree: (event: KeyboardEvent) => void;
+  };
+  internals.lifecycle = { state: 'running' };
+  internals.resources = {
+    deathSequence: { isPlaying: true },
+    controller: { readModel: { state: 'playing' } },
+    manager: {
+      isRegistered: () => false,
+      registerBody() {},
+      unlock(id: string) { unlocked = id === 'volt'; },
+      getRosterState: () => [],
+      activeSlimeId: 'bob',
+    },
+    pair: { bobBody: { position: new THREE.Vector3(1, 2, 3) } },
+    voltBody: { recoverAt(position: THREE.Vector3) { assert.deepEqual(position.toArray(), [1, 2, 3]); } },
+    voltVisual: { visible: false },
+  };
+  runtime.events.on('completed', (event) => { emitted = event; });
+  let prevented = false;
+  const keyEvent = {
+    code: 'Numpad0', repeat: false, target: null,
+    preventDefault: () => { prevented = true; },
+  } as unknown as KeyboardEvent;
+  internals.onSkipToLevelThree(keyEvent);
+  internals.onSkipToLevelThree(keyEvent);
+
+  assert.equal(prevented, true);
+  assert.equal(unlocked, true);
+  assert.deepEqual(inputStates, [false]);
+  assert.deepEqual(emitted, { levelId: 'level-2', nextLevelId: 'level-3' });
+});

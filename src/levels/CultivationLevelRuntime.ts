@@ -197,6 +197,7 @@ export class CultivationLevelRuntime {
   private resources: CultivationRuntimeResources | undefined;
   private debugVisible = false;
   private debugInteractionEnabled = true;
+  private skipToLevelThreeTriggered = false;
   private debugInspectionState: DebugPanelInspectionState | undefined;
   private debugElapsedSeconds = 0;
   private switchFeedbackSequence = 0;
@@ -834,10 +835,10 @@ export class CultivationLevelRuntime {
         },
       );
 
-      // Volt remains locked in Level 1/the foundation harness; this authored
-      // finale opts into his playable configuration without changing those scopes.
+      // Volt remains locked in the Level 1 harness; Level 2 can unlock him at
+      // its finale whether or not authored-preview content is enabled.
       const manager = new SlimeManager<KinematicBody>(SLIME_DEFINITIONS.map(definition =>
-        authoredPreview && definition.id === 'volt' ? { ...definition, betaAvailability: 'playable' as const } : definition));
+        definition.id === 'volt' ? { ...definition, betaAvailability: 'playable' as const } : definition));
       rollback(() => manager.dispose());
       if (!manager.isUnlocked('goop')) manager.unlock('goop');
       const entrance = CULTIVATION_FOUNDATION_MANIFEST.checkpoints[0];
@@ -1150,6 +1151,8 @@ export class CultivationLevelRuntime {
         rollback(() =>
           this.hostWindow.removeEventListener('keydown', this.onDebugToggle));
       }
+      this.hostWindow.addEventListener('keydown', this.onSkipToLevelThree);
+      rollback(() => this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree));
       const deathScreen = new DeathScreen({
         onRetry: this.retryAfterDeath,
         backgroundElements: [
@@ -1326,12 +1329,14 @@ export class CultivationLevelRuntime {
     this.resetRecoveryCamera(resources);
     this.retargetCamera(resources);
     this.lastDeathSlimeId = undefined;
+    this.skipToLevelThreeTriggered = false;
     this.notifyHUD(undefined, true);
   };
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
+    this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree);
     resources.unsubscribeControllerObjective();
     resources.unsubscribeControllerProgress();
     for (const unsubscribe of resources.unsubscribeBobPresentationEvents) {
@@ -1939,6 +1944,42 @@ export class CultivationLevelRuntime {
     this.debugVisible = true;
     this.applyDebugPresentation();
   };
+
+  private readonly onSkipToLevelThree = (event: KeyboardEvent): void => {
+    if (
+      (event.code !== 'Digit0' && event.code !== 'Numpad0') ||
+      event.repeat ||
+      this.skipToLevelThreeTriggered ||
+      this.lifecycle.state !== 'running' ||
+      !this.input.enabled ||
+      !this.debugInteractionEnabled ||
+      !this.isGameplayKeyboardTarget(event.target)
+    ) return;
+
+    const resources = this.requireResources();
+    if (!resources.deathSequence.isPlaying || resources.controller.readModel.state !== 'playing') return;
+
+    event.preventDefault();
+    this.skipToLevelThreeTriggered = true;
+    this.registerVoltForShortcut(resources);
+    this.input.setEnabled(false);
+    this.input.releasePointerLock();
+    this.host.dataset.gameState = 'complete';
+    this.events.emit('completed', { levelId: 'level-2', nextLevelId: 'level-3' });
+  };
+
+  private registerVoltForShortcut(resources: CultivationRuntimeResources): void {
+    if (!resources.manager.isRegistered('volt')) resources.manager.registerBody('volt', resources.voltBody);
+    resources.manager.unlock('volt');
+    resources.voltBody.recoverAt(this.roomFiveLocal.copy(resources.pair.bobBody.position));
+    resources.voltVisual.visible = true;
+    this.notifyHUD();
+  }
+
+  private isGameplayKeyboardTarget(target: EventTarget | null): boolean {
+    if (typeof Element === 'undefined' || !(target instanceof Element)) return true;
+    return !target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+  }
 
   private closeDebugInspection(restoreGameplayInput: boolean): void {
     const state = this.debugInspectionState;

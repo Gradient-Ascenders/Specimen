@@ -210,6 +210,49 @@ test('Bob and Goop cannot aim or operate Volt, while an established tether survi
   }
 });
 
+test('a tether tolerates parked-body jitter and switching, but breaks on cumulative Volt movement from the latch point', () => {
+  const fixture = makeFixture(10);
+  const disconnects: string[] = [];
+  fixture.system.events.on('disconnected', ({ reason }) => {
+    disconnects.push(reason);
+  });
+  try {
+    fixture.system.update(1 / 60, controls({
+      aimHeld: true,
+      fireHeld: true,
+      firePressed: true,
+    }));
+    assert.equal(fixture.system.connected, true);
+
+    // Switching away and looking around do not affect the latched tether.
+    fixture.manager.activeSlimeId = 'goop';
+    fixture.manager.volt.position.x = 0.04;
+    fixture.aimDirection.set(1, 0, 0);
+    fixture.system.update(1 / 60, controls());
+    fixture.manager.volt.position.x = -0.07;
+    fixture.system.update(1 / 60, controls({ pointerLocked: false }));
+    assert.equal(fixture.system.connected, true);
+    assert.deepEqual(disconnects, []);
+
+    // Slow per-step movement accumulates against the latch point instead of
+    // resetting the tolerance each frame.
+    fixture.manager.volt.position.x = 0.05;
+    fixture.system.update(1 / 60, controls());
+    assert.equal(fixture.system.connected, true);
+    fixture.manager.volt.position.x = 0.10;
+    fixture.system.update(1 / 60, controls());
+    assert.equal(fixture.system.connected, true);
+    fixture.manager.volt.position.x = 0.13;
+    fixture.system.update(1 / 60, controls());
+
+    assert.equal(fixture.system.connected, false);
+    assert.equal(fixture.target.connected, false);
+    assert.deepEqual(disconnects, ['movement']);
+  } finally {
+    fixture.dispose();
+  }
+});
+
 test('acquisition and tether boundaries are exact at 15, 16, and 20 metres', () => {
   const fixture = makeFixture(DEFAULT_VOLT_ELECTRICAL_CONFIG.acquisitionRangeMetres);
   try {
