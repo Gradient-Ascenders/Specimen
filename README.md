@@ -69,10 +69,20 @@ precedence over tentative planning information.
 
 ## Continuous integration
 
-The `PR validation` workflow checks pull requests targeting `main` before merge,
-and the `CI` workflow checks pushes to `main` after merge. Both select the Node.js
-version from `.nvmrc`, install the locked dependencies with `npm ci`, and run the
-same `npm run build` command used for local delivery.
+Two workflows separate merge checks from submission packaging:
 
-`PR validation / production-build` is the check intended to be required before
-merging into `main` when repository rules permit it.
+- **PR validation** runs on new and updated PRs targeting `main`. Unit tests and
+  production verification run in parallel. Production verification builds once,
+  validates static files, and smoke-tests the game from a nested HTTP path.
+  New commits cancel obsolete runs.
+- **Submission build** runs on pushes to `main` and can be started manually on
+  `main`. It builds the exact event revision, verifies the extracted archive,
+  and publishes `specimen-<12-character-commit>.zip` with a checksum and Tiny
+  File Manager handoff instructions. Manual runs can enable the full shader and
+  lifecycle browser suite.
+
+Require the **Unit tests** and **Production smoke** PR checks plus a teammate's
+approval before merging. See [`docs/continuous-integration.md`](docs/continuous-integration.md)
+for local commands, required-check activation, and the limits of automation.
+Upload the finished files through the Moodle-linked Tiny File Manager; a ZIP
+upload alone does not publish the game.

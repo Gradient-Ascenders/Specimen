@@ -1,0 +1,104 @@
+name: Submission build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      extended_checks:
+        description: Run the full shader and lifecycle browser suite before publishing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  submission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Require main for submission builds
+        env:
+          BUILD_REF: ${{ github.ref }}
+        run: test "$BUILD_REF" = refs/heads/main
+
+      # Default checkout uses the event revision, even if main advances later.
+      - name: Check out submission revision
+        uses: actions/checkout@v7
+
+      - name: Use pinned Node.js version and cache npm downloads
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      # archive builds once and validates the ZIP against dist/.
+      - name: Build and validate production archive
+        run: npm run archive
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke-test the extracted submission at a nested path
+        env:
+          SPECIMEN_SMOKE_ARCHIVE: artifacts/specimen-production.zip
+        run: npm run test:smoke
+
+      - name: Run extended shader and lifecycle checks
+        if: github.event_name == 'workflow_dispatch' && inputs.extended_checks
+        # Reuse the existing build rather than test:browser, which rebuilds it.
+        run: npx playwright test
+
+      - name: Name the verified submission
+        id: package
+        run: |
+          archive_path="artifacts/specimen-${GITHUB_SHA:0:12}.zip"
+          cp artifacts/specimen-production.zip "$archive_path"
+          echo "path=$archive_path" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the game ZIP without another archive wrapper
+        id: download
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.package.outputs.path }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Write submission handoff
+        env:
+          ARCHIVE_PATH: ${{ steps.package.outputs.path }}
+          DOWNLOAD_URL: ${{ steps.download.outputs.artifact-url }}
+          EXTENDED_CHECKS: ${{ github.event_name == 'workflow_dispatch' && inputs.extended_checks }}
+        run: |
+          archive_sha256="$(sha256sum "$ARCHIVE_PATH" | cut -d ' ' -f 1)"
+          {
+            printf 'Source revision: `%s`\n\n' "$GITHUB_SHA"
+            printf '[Download %s](%s)\n\n' "${ARCHIVE_PATH##*/}" "$DOWNLOAD_URL"
+            printf 'ZIP SHA-256: `%s`\n\n' "$archive_sha256"
+            printf '%s\n\n' 'Passed: unit tests, TypeScript, production build, archive validation, and smoke checks against the extracted ZIP at a nested path.'
+            printf 'Extended shader/lifecycle checks requested: `%s`\n\n' "$EXTENDED_CHECKS"
+            printf '%s\n' \
+              'Upload the ZIP to the Moodle-linked Tiny File Manager only if extraction is supported; otherwise extract locally and upload its contents.' \
+              'Verify index.html and assets/ are directly in the group directory, without an enclosing dist/ folder. Uploading a ZIP alone does not deploy the game.' \
+              'Open the confirmed public URL in Chrome and complete all three levels, transitions, restart, credits, console/network, performance, and memory checks.' \
+              'This artifact is verified locally in CI; publication and a full human playthrough remain required.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: submission-browser-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

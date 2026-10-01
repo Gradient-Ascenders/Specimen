@@ -24,7 +24,7 @@ screenshot, or written mentor confirmation is currently provided.
 | Is a devlog required at Beta? | Confirmed | No. The devlog is required only for Final. | Supplied CGV project brief, reviewed 19 August 2026 | Team: keep Final devlog work separate from the Beta gate. |
 | What is the trailer duration and public destination? | Confirmed | The trailer must be no longer than 2 minutes and must be uploaded to YouTube. | Supplied CGV project brief, reviewed 19 August 2026 | Issue #46 owner: verify the final duration and YouTube playback. The current-year link-submission workflow remains unresolved below. |
 | Where is the Final build deployed? | Confirmed | The Final build is deployed to the department LAMP server. | Supplied CGV project brief, reviewed 19 August 2026 | Release owner: use the Moodle-controlled process below; do not infer that SSH/SCP access is available. |
-| How is deployment submitted? | Confirmed | Deployment uses a Moodle archive upload, not SSH/SCP. Upload a production build rather than the source tree. | Supplied CGV project brief, reviewed 19 August 2026 | Release owner: obtain the current Moodle link and naming rules before upload. |
+| How is deployment submitted? | Confirmed UI; publication mapping unverified | The Moodle deployment link opens authenticated Tiny File Manager labelled `File Manager for sgroup3888`. Upload the production build contents, with `index.html` at the group root. If uploading a ZIP, explicitly extract it only after checking extraction support. No SSH/SCP. | Actual Moodle UI context supplied by the team, 1 October 2026; supersedes older archive-assignment assumptions | Release owner: follow `production-deployment.md`, verify the public URL and extraction behaviour, and retain the exact uploaded build. |
 | What is the Vite archive layout? | Confirmed | Build `dist/`, then archive the contents of `dist/` so `index.html` is at the archive root. Do not wrap the files in an extra `dist/` directory. | Supplied CGV project brief; repository `package.json`, `vite.config.ts`, archive script, and production deployment guide | Release owner: run `npm run archive` and inspect the ZIP before upload. |
 | How must the build be tested? | Confirmed | Serve the built files over local HTTP before upload. Open and play the published version in Chrome. | Supplied CGV project brief; `docs/production-deployment.md` | Release owner: retain local and published-host evidence. |
 | What hosting constraints apply? | Confirmed | Deployment must work from a subdirectory; root-absolute asset paths beginning with `/` are unsafe. Linux filenames are case-sensitive. | Supplied CGV project brief; repository `vite.config.ts` uses `base: './'` | Contributors: preserve relative paths and exact filename casing. |
@@ -53,10 +53,12 @@ Moodle; Moodle dates and current-year instructions override this plan.
 - Issue #6 records 31 August as tentative planning information. The project
   team's later direct confirmation sets the Beta due date to 1 September 2026,
   superseding that assumption.
-- The previous production guide said Issue #6 contained no confirmed publish
-  answers. The supplied brief does confirm Final LAMP deployment through a Moodle
-  archive upload, while the exact current-year Moodle link, deadline, filename,
-  and any Beta hosted-link requirement remain unresolved.
+- The 1 October 2026 UI context supersedes the earlier interpretation of a
+  normal Moodle archive upload. The Moodle deployment link opens Tiny File
+  Manager for `sgroup3888`. Publication requires actual extracted production
+  files, not simply a ZIP upload. The exact link/public URL mapping, extraction
+  behaviour, deadline, naming convention, and any Beta hosted-link requirement
+  remain unresolved. Earlier Issue #6 assessments below are historical records.
 - Issue #46 may rely on the confirmed 2-minute maximum, YouTube destination, and
   inclusion at Beta. It must not infer the current-year link-submission workflow.
 - Issue #47 may rely on the confirmed production-build and archive-layout rules.
