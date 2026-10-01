@@ -172,7 +172,7 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
   });
   expect(initial).toMatchObject({
     rootName: 'player-slime-bob-presentation',
-    activeSlimeId: 'bob',
+    activeSlimeId: 'volt',
     asset: {
       bodyTriangles: 3_264,
       eyeTriangles: 504,
@@ -192,6 +192,20 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
     voltVisible: true,
     voltLightVisible: true,
   });
+
+  const switchSlime = async (): Promise<string | undefined> => {
+    await page.keyboard.down('Tab');
+    const activeSlimeId = await page.evaluate(() => {
+      const runtime = window.__specimenBlackoutRuntime;
+      if (!runtime) throw new Error('Missing Blackout runtime');
+      runtime.fixedUpdate(1 / 60);
+      return runtime.resources?.manager.activeSlimeId;
+    });
+    await page.keyboard.up('Tab');
+    return activeSlimeId;
+  };
+  // Authored Room 1 starts with Volt; select Bob before testing his movement.
+  expect(await switchSlime()).toBe('bob');
 
   await page.keyboard.down('w');
   await page.evaluate(() => {
@@ -216,17 +230,6 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
     moved.bobPosition.z - initial.bobPosition.z,
   )).toBeGreaterThan(0.01);
 
-  const switchSlime = async (): Promise<string | undefined> => {
-    await page.keyboard.down('Tab');
-    const activeSlimeId = await page.evaluate(() => {
-      const runtime = window.__specimenBlackoutRuntime;
-      if (!runtime) throw new Error('Missing Blackout runtime');
-      runtime.fixedUpdate(1 / 60);
-      return runtime.resources?.manager.activeSlimeId;
-    });
-    await page.keyboard.up('Tab');
-    return activeSlimeId;
-  };
   expect(await switchSlime()).toBe('goop');
   expect(await switchSlime()).toBe('volt');
 
