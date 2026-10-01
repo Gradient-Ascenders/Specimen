@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { LaserHazard } from '../hazards/LaserHazard.ts';
 import { LaserHazardSystem } from '../hazards/LaserHazardSystem.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
-import { RoomThreeArt } from '../render/environment/containment/RoomThreeArt.ts';
+import { ROOM_THREE_ACID_SURFACE_Y_METRES, RoomThreeArt } from '../render/environment/containment/RoomThreeArt.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import {
@@ -39,8 +39,8 @@ export class RoomThreeGreybox {
   });
   readonly failureVolume = new LevelTriggerVolume({
     id: 'room-3-fall-failure',
-    centre: new THREE.Vector3(0, 3, 63),
-    size: new THREE.Vector3(38, 10, 32),
+    centre: new THREE.Vector3(0, (ROOM_THREE_ACID_SURFACE_Y_METRES - 2) / 2, 63),
+    size: new THREE.Vector3(38, ROOM_THREE_ACID_SURFACE_Y_METRES + 2, 32),
   });
   readonly lasers: LaserHazardSystem;
   readonly art: RoomThreeArt;
@@ -126,8 +126,8 @@ export class RoomThreeGreybox {
   private buildShell(): void {
     const { acid, wall } = this.builder.materials;
 
-    // The lower boundary is intentionally below the authored route. Crossing
-    // the failure volume starts recovery before the player can land in the acid.
+    // The trigger reaches the visible liquid surface, not the traversal space
+    // above it. Sphere contact starts recovery when the slime touches the acid.
     this.builder.addCollider({
       name: 'room-3-acid-floor',
       size: [34, 0.4, 28],

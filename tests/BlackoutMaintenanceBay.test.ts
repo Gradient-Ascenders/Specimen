@@ -18,6 +18,19 @@ function setup() {
   return {bay,world,surfaces,registry,room,bodies,dispose(){room.dispose();registry.dispose();bay.dispose();world.clear();surfaces.clear();}};
 }
 
+test('Room 1 stepping platforms have solid foundations sunk into the acid basin floor', () => {
+  const s = setup();
+  try {
+    s.bay.root.updateMatrixWorld(true);
+    for (const [z, top] of [[17,.15],[28.5,.45],[40,.15]]) {
+      const mesh = s.bay.root.getObjectByName(`bob-route-platform-${z}`)!;
+      const bounds = new THREE.Box3().setFromObject(mesh);
+      assert.ok(bounds.min.y <= -1, 'foundation must meet the bed beneath the acid, not float above it');
+      assert.ok(Math.abs(bounds.max.y - top) < 1e-6, 'preserve the tested charged-jump heights');
+    }
+  } finally { s.dispose(); }
+});
+
 test('maintenance bay acid is safe only for Goop, and electric vent is safe only for Volt',()=>{
   const s=setup();try {
     s.bodies.goop.teleport(new THREE.Vector3(8,-.49,18));
@@ -65,12 +78,36 @@ test('door requires sustained power and safely holds when a slime occupies its c
   }finally{s.dispose();}
 });
 
+test('Room 1 blast door fills the entire hallway opening, including both sides and the top', () => {
+  const s = setup();
+  try {
+    s.bay.root.updateMatrixWorld(true);
+    for (const x of [3.1, 4, 6, 8, 8.9]) for (const y of [.2, 2, 4.4]) {
+      const origin = new THREE.Vector3(x,y,52);
+      const hit = new CollisionHit();
+      assert.equal(s.world.raycast(origin, new THREE.Vector3(0,0,1), 3, hit), true);
+      assert.equal(hit.object, s.room.door.collisionMesh, 'closed panel must block the complete 6m by 4.5m aperture');
+      const visual = new THREE.Raycaster(origin,new THREE.Vector3(0,0,1),0,3);
+      assert.ok(visual.intersectObject(s.room.door.collisionMesh).length > 0, 'no visible gaps beside the closed door');
+    }
+    s.room.target.setConnectionState(true);
+    for (let i=0; i<120; i++) s.room.update(1/60,s.bodies);
+    assert.equal(s.room.door.state,'open');
+    // The hallway walls protrude 0.175m into the aperture; leave that plus
+    // the slime's 0.45m radius when probing the fully open walking lanes.
+    for (const x of [3.7, 6, 8.3]) {
+      const hit = new CollisionHit();
+      assert.equal(s.world.sweepSphere(new THREE.Vector3(x, .46, 52),new THREE.Vector3(0,0,4),.45,hit),false);
+    }
+  } finally { s.dispose(); }
+});
+
 test('vent traversal cancels on backing out and cannot be completed backwards or across reset',()=>{
   const s=setup();try{
     s.bodies.bob.teleport(new THREE.Vector3(6,.46,57));
     s.bodies.goop.teleport(new THREE.Vector3(7,.46,57));
-    const moveVolt=(x:number,z:number)=>{
-      s.bodies.volt.teleport(new THREE.Vector3(x,.46,z));
+    const moveVolt=(x:number,z:number,y=.46)=>{
+      s.bodies.volt.teleport(new THREE.Vector3(x,y,z));
       s.room.update(1/60,s.bodies);
     };
     moveVolt(-6,53);
@@ -98,6 +135,8 @@ test('vent traversal cancels on backing out and cannot be completed backwards or
     moveVolt(-6,53);
     for(let z=53.5;z<=61;z+=.5)moveVolt(-6,z);
     moveVolt(6,62);
+    assert.equal(s.room.complete,false,'the main hallway is not Volt’s separate exit');
+    moveVolt(-16,79.5,2.9);
     assert.equal(s.room.complete,true,'a fresh forward traversal succeeds after cancellation/reset');
   }finally{s.dispose();}
 });
@@ -161,8 +200,8 @@ test('Goop can walk out of the basin along the exit ramp without jumping',()=>{
 test('floor-level vent is enclosed, traversable for Volt, and too narrow for the maintenance drone',()=>{
   const s=setup();try{
     const hit=new CollisionHit();
-    assert.equal(s.world.sweepSphere(new THREE.Vector3(-6,3.3,62),new THREE.Vector3(0,0,-4),.25,hit),true,
-      'the taller connector must not expose the outside above the duct roof');
+    assert.equal(s.world.sweepSphere(new THREE.Vector3(-6,1.1,61.5),new THREE.Vector3(0,2,0),.25,hit),true,
+      'the turning duct must have a sealed roof');
     assert.equal(s.world.sweepSphere(new THREE.Vector3(-6,5.5,53),new THREE.Vector3(0,0,2),.25,hit),true,
       'the old elevated vent opening is closed');
     assert.equal(s.world.sweepSphere(new THREE.Vector3(-6,1.1,53),new THREE.Vector3(0,0,6),.45,hit),false,
@@ -184,12 +223,16 @@ test('floor-level vent is enclosed, traversable for Volt, and too narrow for the
       s.room.update(1/60,s.bodies);
     }
     assert.ok(s.bodies.volt.position.z>61.5,'Volt can walk from the bay into the cross hall without jumping');
-    for(let i=0;i<200 && s.bodies.volt.position.x<6;i++) {
-      s.bodies.volt.update(1/60,new THREE.Vector3(1,0,0));
+    for(let i=0;i<240 && s.bodies.volt.position.x>-15.95;i++) {
+      s.bodies.volt.update(1/60,new THREE.Vector3(-1,0,0));
+      s.room.update(1/60,s.bodies);
+    }
+    for(let i=0;i<300 && s.bodies.volt.position.z<79.5;i++) {
+      s.bodies.volt.update(1/60,new THREE.Vector3(0,0,1));
       s.room.update(1/60,s.bodies);
     }
     assert.ok(s.bay.voltExitAt(s.bodies.volt.position));
-    assert.equal(s.room.complete,true,'walking the full duct and connector completes the route');
+    assert.equal(s.room.complete,true,'walking the full separate side duct completes the route');
     s.room.reset();s.room.update(1/60,s.bodies);
     assert.equal(s.room.complete,false,'reset clears vent traversal evidence');
   }finally{s.dispose();}
@@ -218,27 +261,8 @@ test('hallway fixtures flicker independently and illuminate the enclosed corrido
     }
     assert.ok(observed.size>30 && brightest>10);
     const hit=new CollisionHit();
-    assert.equal(s.world.sweepSphere(new THREE.Vector3(-6,.5,62),new THREE.Vector3(-3,0,0),.45,hit),true,'connector west end is sealed');
-    assert.equal(
-      s.world.sweepSphere(
-        new THREE.Vector3(6,.5,72),
-        new THREE.Vector3(0,0,8),
-        .45,
-        hit,
-      ),
-      false,
-      'the old hallway end must open into traversable Room 2 arrival staging',
-    );
-    assert.equal(
-      s.world.sweepSphere(
-        new THREE.Vector3(6,.5,84),
-        new THREE.Vector3(0,0,4),
-        .45,
-        hit,
-      ),
-      true,
-      'the temporary Room 2 staging end remains safely sealed until #165 extends it',
-    );
+    assert.equal(s.world.sweepSphere(new THREE.Vector3(-16,.5,62),new THREE.Vector3(-3,0,0),.45,hit),true,'side duct west end is sealed');
+    assert.equal(s.world.sweepSphere(new THREE.Vector3(6,1.5,72),new THREE.Vector3(0,0,10),.25,hit),false,'the former dead end is open to Room 2');
   }finally{s.dispose();}
 });
 
@@ -283,7 +307,7 @@ test('all Bob Goop Volt arrival orders gate completion until the third route con
         s.room.update(1/60,s.bodies);
         s.bodies.volt.teleport(new THREE.Vector3(-6,.46,60.5));
         s.room.update(1/60,s.bodies);
-        s.bodies.volt.teleport(new THREE.Vector3(6,.46,62));
+        s.bodies.volt.teleport(new THREE.Vector3(-16,2.96,83));
         s.room.update(1/60,s.bodies);
       };
 

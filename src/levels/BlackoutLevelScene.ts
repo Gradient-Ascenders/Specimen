@@ -2,19 +2,25 @@ import * as THREE from 'three';
 
 import { BLACKOUT_FOUNDATION_LENGTH_METRES } from './BlackoutFoundationManifest.ts';
 import { BlackoutMaintenanceBay } from './BlackoutMaintenanceBay.ts';
+import { BlackoutTransitRoom } from './BlackoutTransitRoom.ts';
+import { BlackoutBossStaging } from './BlackoutBossStaging.ts';
 
 /** Minimal dark Level 3 shell; powered-device fixtures are composed at runtime. */
 export class BlackoutLevelScene {
   readonly root = new THREE.Group();
   readonly collisionMeshes: readonly THREE.Mesh[];
   readonly maintenanceBay?: BlackoutMaintenanceBay;
+  readonly transitRoom?: BlackoutTransitRoom;
+  readonly bossStaging?: BlackoutBossStaging;
 
   constructor(authoredRoomOne = false) {
     this.root.name = 'blackout-level-3-foundation';
     if (authoredRoomOne) {
       this.maintenanceBay = new BlackoutMaintenanceBay();
-      this.root.add(this.maintenanceBay.root);
-      this.collisionMeshes = this.maintenanceBay.collisionMeshes;
+      this.transitRoom = new BlackoutTransitRoom();
+      this.bossStaging = new BlackoutBossStaging();
+      this.root.add(this.maintenanceBay.root, this.transitRoom.root, this.bossStaging.root);
+      this.collisionMeshes = [...this.maintenanceBay.collisionMeshes, ...this.transitRoom.collisionMeshes, ...this.bossStaging.collisionMeshes];
       this.root.add(new THREE.HemisphereLight(0x34404a, 0x080a0b, .025));
       return;
     }
@@ -66,6 +72,8 @@ export class BlackoutLevelScene {
 
   dispose(): void {
     this.maintenanceBay?.dispose();
+    this.transitRoom?.dispose();
+    this.bossStaging?.dispose();
     this.root.removeFromParent();
     this.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;

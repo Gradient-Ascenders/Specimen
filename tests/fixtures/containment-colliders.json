@@ -341,37 +341,6 @@
     "developmentOnly": false
   },
   {
-    "name": "room-1-goop-soluble-test-barrier",
-    "worldPosition": [
-      4.8,
-      1.2,
-      -2.6
-    ],
-    "worldQuaternion": [
-      0,
-      0,
-      0,
-      1
-    ],
-    "worldScale": [
-      1,
-      1,
-      1
-    ],
-    "localDimensions": [
-      2.2,
-      2.4,
-      0.35
-    ],
-    "surfaceTag": "default",
-    "movementFaceMode": "all",
-    "interactionRole": null,
-    "textureRole": null,
-    "soluble": true,
-    "parentPath": "containment-level-greybox/containment-climb-and-bounce-greybox",
-    "developmentOnly": true
-  },
-  {
     "name": "duct-segment-a-sticky-vent-tile",
     "worldPosition": [
       -4.8,

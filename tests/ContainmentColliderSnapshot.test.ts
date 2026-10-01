@@ -4,7 +4,6 @@ import test from 'node:test';
 
 import {
   captureContainmentCollisionFingerprint,
-  ROOM_ONE_DEVELOPMENT_SOLUBLE_BARRIER_NAME,
   type ContainmentColliderFingerprint,
 } from '../src/levels/ContainmentCollisionFingerprint.ts';
 import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
@@ -27,26 +26,21 @@ test('Containment collision matches the frozen pre-art route', () => {
   scene.dispose();
 });
 
-test('production omits only the explicit development soluble barrier', () => {
+test('production and debug retain the same route without the retired Room 1 demo wall', () => {
   const scene = new ContainmentLevelScene(() => {});
   const production = captureContainmentCollisionFingerprint(
     scene.collisionMeshes,
   );
   assert.deepEqual(
     production,
-    fixture.filter((collider) => !collider.developmentOnly),
+    fixture,
   );
-  assert.equal(production.length, fixture.length - 1);
+  assert.equal(production.length, fixture.length);
+  assert.equal(scene.root.getObjectByName('room-1-goop-soluble-test-barrier'), undefined);
   scene.dispose();
 });
 
-test('the only frozen development collider is the explicit Room 1 barrier', () => {
-  const developmentColliders = fixture.filter(
-    (collider) => collider.developmentOnly,
-  );
-  assert.deepEqual(
-    developmentColliders.map((collider) => collider.name),
-    [ROOM_ONE_DEVELOPMENT_SOLUBLE_BARRIER_NAME],
-  );
-  assert.equal(developmentColliders[0]?.soluble, true);
+test('the collider fixture contains no retired development barriers', () => {
+  assert.equal(fixture.some(collider => collider.developmentOnly), false);
+  assert.equal(fixture.some(collider => collider.name === 'room-1-goop-soluble-test-barrier'), false);
 });

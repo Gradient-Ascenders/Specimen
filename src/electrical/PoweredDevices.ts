@@ -298,6 +298,8 @@ export interface PoweredPlatformOptions {
   readonly size?: THREE.Vector3;
   readonly travelDurationSeconds?: number;
   readonly routePolicy?: PoweredPlatformRoutePolicy;
+  /** Opt-in gravity return for thruster lifts; omitted preserves power-loss hold. */
+  readonly unpoweredReturnSpeedRatio?: number;
   readonly powerMode?: ElectricalPowerMode;
   readonly initialLatched?: boolean;
   readonly initialMechanicalPermission?: boolean;
@@ -314,6 +316,7 @@ export class PoweredPlatformDevice implements ElectricalDevice {
   private readonly collisionWorld: CollisionWorld;
   private readonly surfaceRegistry: SurfaceRegistry;
   private readonly routePolicy: PoweredPlatformRoutePolicy;
+  private readonly unpoweredReturnSpeedRatio: number;
   private readonly initialMechanicalPermission: boolean;
   private readonly proposedDisplacement = new THREE.Vector3();
   private readonly carrierOrigin = new THREE.Vector3();
@@ -332,6 +335,10 @@ export class PoweredPlatformDevice implements ElectricalDevice {
     this.collisionWorld = options.collisionWorld;
     this.surfaceRegistry = options.surfaceRegistry;
     this.routePolicy = options.routePolicy ?? 'one-way';
+    this.unpoweredReturnSpeedRatio = options.unpoweredReturnSpeedRatio ?? 0;
+    if (!Number.isFinite(this.unpoweredReturnSpeedRatio) || this.unpoweredReturnSpeedRatio < 0 || this.unpoweredReturnSpeedRatio > 1) {
+      throw new Error('Unpowered return speed ratio must be finite and between zero and one.');
+    }
     this.initialMechanicalPermission =
       options.initialMechanicalPermission ?? true;
     this.mechanicalPermission = this.initialMechanicalPermission;
@@ -419,8 +426,9 @@ export class PoweredPlatformDevice implements ElectricalDevice {
     bodies: readonly PoweredCarrierBody[],
   ): void {
     this.platform.hold();
+    const returning = !this.core.readModel.powered && this.unpoweredReturnSpeedRatio > 0;
     if (
-      !this.core.readModel.powered ||
+      (!this.core.readModel.powered && !returning) ||
       !this.mechanicalPermission ||
       deltaSeconds <= 0
     ) {
@@ -428,7 +436,10 @@ export class PoweredPlatformDevice implements ElectricalDevice {
       return;
     }
 
-    if (this.routePolicy === 'shuttle') {
+    const motionSeconds = deltaSeconds * (returning ? this.unpoweredReturnSpeedRatio : 1);
+    if (returning) {
+      this.platform.setActive(false);
+    } else if (this.routePolicy === 'shuttle') {
       if (this.platform.isAtEnd) this.shuttleTarget = 'start';
       if (this.platform.isAtStart) this.shuttleTarget = 'end';
       this.platform.setActive(this.shuttleTarget === 'end');
@@ -437,7 +448,7 @@ export class PoweredPlatformDevice implements ElectricalDevice {
     }
 
     this.platform.copyProposedDisplacement(
-      deltaSeconds,
+      motionSeconds,
       this.proposedDisplacement,
     );
     if (this.proposedDisplacement.lengthSq() <= MOTION_EPSILON_SQ) {
@@ -451,7 +462,7 @@ export class PoweredPlatformDevice implements ElectricalDevice {
     }
 
     this.core.setBlocked(false);
-    this.platform.update(deltaSeconds);
+    this.platform.update(motionSeconds);
     if (this.platform.displacement.lengthSq() <= MOTION_EPSILON_SQ) return;
 
     for (const body of this.supportedBodies) {

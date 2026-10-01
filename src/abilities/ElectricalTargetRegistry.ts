@@ -67,6 +67,10 @@ export class ElectricalTargetRegistry {
     return this.registrations.size;
   }
 
+  getRegistrations(): readonly ElectricalTargetRegistration[] {
+    return [...this.registrations];
+  }
+
   register(
     target: ElectricalConnectionTarget,
     options: ElectricalTargetRegistrationOptions = {},
