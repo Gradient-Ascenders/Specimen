@@ -2,8 +2,6 @@ import { batchMaintenanceScout } from '../render/hazards/BatchMaintenanceScout.t
 import { CultivationPlatformBoosters } from '../render/environment/cultivation/CultivationPlatformBoosters.ts';
 import * as THREE from 'three';
 import { BeamOcclusion } from '../render/hazards/BeamOcclusion.ts';
-import { SlimeLightSampler } from '../render/slime/SlimeLightSampler.ts';
-import type { SlimeMaterial } from '../render/slime/SlimeMaterial.ts';
 import { RoomFivePatrol } from './RoomFivePatrol.ts';
 import { ROOM_FIVE_JUMPS } from '../levels/RoomFiveParkour.ts';
 import { createRustedSewerDrone } from '../levels/RustedSewerDrone.ts';
@@ -42,7 +40,6 @@ export class RoomFiveDroneEncounter {
   private presentationStep = 0;
   private readonly beamLengths: number[] = [];
   private readonly world: CollisionWorld;
-  private readonly slimeLighting = new SlimeLightSampler();
   private readonly searchLights: THREE.SpotLight[] = [];
   private readonly sewerLight = new THREE.PointLight(0xff7935, 0, 8);
   private readonly sewerLighting: CultivationSewerLighting;
@@ -154,16 +151,9 @@ export class RoomFiveDroneEncounter {
         object.castShadow = !object.userData.shadowProxyReceiver && materials.some(material => material.visible && !material.transparent);
         object.receiveShadow = true;
       }
-      if (object instanceof THREE.PointLight || object instanceof THREE.SpotLight) {
-        const index = this.searchLights.indexOf(object as THREE.SpotLight);
-        this.slimeLighting.sources.push({ light: object, ignored: index >= 0 ? this.drones[index].collider : object === this.sewerLight ? room.brokenCore : undefined });
-      }
     });
     room.captiveVolt.castShadow = false;
     this.reset();
-  }
-  lightSlime(material: SlimeMaterial, position: THREE.Vector3): void {
-    this.slimeLighting.apply(material, position, this.world);
   }
   update(dt: number): void {
     if (this.disposed) return;

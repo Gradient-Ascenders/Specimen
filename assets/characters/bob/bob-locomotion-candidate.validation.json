@@ -1,0 +1,32 @@
+{
+  "contract": "bob-locomotion-approval-candidate-v1",
+  "body_triangles": 3264,
+  "eye_triangles_combined": 504,
+  "body_connected_components": 1,
+  "body_non_manifold_edges": 0,
+  "body_targets": [
+    "move-forward",
+    "move-reverse",
+    "squash",
+    "flatten",
+    "launch",
+    "airborne",
+    "stress"
+  ],
+  "eye_targets": [
+    "move-forward",
+    "move-reverse",
+    "squash",
+    "flatten",
+    "launch",
+    "airborne",
+    "stress",
+    "blink",
+    "effort",
+    "surprise",
+    "stress-expression"
+  ],
+  "generator_sha256": "95c1618e75573f32eb26202442e23bb2e82137ae5ece3c2da6700474f98da34a",
+  "approved_neutral_glb_sha256": "316656ae4d4a8fda4345ff09b04ab2017c802294c4f885b2670a27261c82282a",
+  "glb_sha256": "819a408a6eb259c0d717ce495a22ceef1bd086ea60853b6757618fda1a64194a"
+}

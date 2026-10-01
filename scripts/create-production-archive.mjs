@@ -1,69 +1,30 @@
 import { spawnSync } from 'node:child_process';
 import {
-  access,
   copyFile,
   mkdir,
   mkdtemp,
   readFile,
-  readdir,
   rename,
   rm,
   stat,
   utimes,
 } from 'node:fs/promises';
-import { constants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateProductionBuild } from './lib/production-build.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const buildDirectory = join(projectRoot, 'dist');
 const artifactDirectory = join(projectRoot, 'artifacts');
 const archivePath = join(artifactDirectory, 'specimen-production.zip');
 const archiveTimestamp = new Date('1980-01-01T00:00:00.000Z');
-const forbiddenRoots = new Set([
-  '.git',
-  'dist',
-  'node_modules',
-  'scripts',
-  'src',
-]);
-const forbiddenFiles = new Set([
-  'README.md',
-  'package.json',
-  'package-lock.json',
-  'start-production-server.ps1',
-  'start-production-server.sh',
-  'start-server.ps1',
-  'start-server.sh',
-  'tsconfig.json',
-  'vite.config.ts',
-]);
-
-const toArchivePath = (path) => path.split(sep).join('/');
-
-const collectFiles = async (root, current = root) => {
-  const entries = await readdir(current, { withFileTypes: true });
-  const files = [];
-
-  for (const entry of entries) {
-    const absolutePath = join(current, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(root, absolutePath)));
-    } else if (entry.isFile()) {
-      files.push(toArchivePath(relative(root, absolutePath)));
-    } else {
-      throw new Error(`Unsupported build entry: ${absolutePath}`);
-    }
-  }
-
-  return files.sort();
-};
 
 const run = (command, args, options = {}) => {
   const result = spawnSync(command, args, {
     encoding: 'utf8',
+    timeout: 60_000,
     ...options,
   });
 
@@ -77,54 +38,8 @@ const run = (command, args, options = {}) => {
   return result.stdout;
 };
 
-const validateBuild = async (files) => {
-  if (!files.includes('index.html')) {
-    throw new Error('dist/index.html is required at the build root.');
-  }
-
-  for (const file of files) {
-    const [root] = file.split('/');
-    if (forbiddenRoots.has(root) || forbiddenFiles.has(file)) {
-      throw new Error(`Development-only path found in production build: ${file}`);
-    }
-  }
-
-  const indexHtml = await readFile(join(buildDirectory, 'index.html'), 'utf8');
-  const references = Array.from(
-    indexHtml.matchAll(/(?:src|href)=["']([^"']+)["']/g),
-    (match) => match[1],
-  );
-  const rootRelativeReference = references.find((path) => path.startsWith('/'));
-  if (rootRelativeReference) {
-    throw new Error(
-      `Built index.html contains a root-relative reference: ${rootRelativeReference}`,
-    );
-  }
-
-  const localReferences = references
-    .filter((path) => path.startsWith('./'))
-    .map((path) => path.slice(2).split(/[?#]/, 1)[0]);
-
-  if (!localReferences.some((path) => path.endsWith('.js'))) {
-    throw new Error('Built index.html does not reference a production JavaScript file.');
-  }
-
-  if (!localReferences.some((path) => path.endsWith('.css'))) {
-    throw new Error('Built index.html does not reference a production stylesheet.');
-  }
-
-  for (const referencedPath of localReferences) {
-    if (!files.includes(referencedPath)) {
-      throw new Error(`Built index.html references a missing file: ${referencedPath}`);
-    }
-  }
-};
-
 const main = async () => {
-  await access(buildDirectory, constants.R_OK);
-
-  const buildFiles = await collectFiles(buildDirectory);
-  await validateBuild(buildFiles);
+  const buildFiles = await validateProductionBuild(buildDirectory);
 
   const temporaryRoot = await mkdtemp(join(tmpdir(), 'specimen-archive-'));
   const stagingDirectory = join(temporaryRoot, 'site');
@@ -143,11 +58,12 @@ const main = async () => {
       await utimes(destination, archiveTimestamp, archiveTimestamp);
     }
 
-    run('zip', ['-X', '-q', temporaryArchive, '-@'], {
+    // Use argv rather than stdin: a missing stdin EOF can stall zip -@.
+    run('zip', ['-X', '-q', '-nw', temporaryArchive, '--', ...buildFiles], {
       cwd: stagingDirectory,
       env: { ...process.env, TZ: 'UTC' },
-      input: `${buildFiles.join('\n')}\n`,
     });
+    run('unzip', ['-t', temporaryArchive]);
 
     const archivedFiles = run('unzip', ['-Z1', temporaryArchive])
       .trim()

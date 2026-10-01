@@ -3,16 +3,9 @@ import * as THREE from 'three';
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
 import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 import {
-  SlimeVisual,
-  type SlimeVisualDiagnostics,
-  type SlimeVisualLaunch,
-  type SlimeVisualState,
-  type Vector3State,
-} from '../render/slime/SlimeVisual.ts';
-import {
-  SlimeBurstPresentation,
-  type SlimeBurstDiagnostics,
-} from '../render/slime/SlimeBurstPresentation.ts';
+  BobCharacterPresentation,
+} from '../render/bob/BobCharacterPresentation.ts';
+import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomOneArt } from '../render/environment/containment/RoomOneArt.ts';
 import { RoomTwoArt } from '../render/environment/containment/RoomTwoArt.ts';
@@ -32,7 +25,6 @@ interface BoxOptions {
 const ROOM_2_CENTRE_Z = 38;
 const SPAWN_POSITION = new THREE.Vector3(-0.20995, 0.52507, -2.60112);
 const OUT_OF_BOUNDS_TEST_POSITION = new THREE.Vector3(0, -5, -1.8);
-const DEATH_RUPTURE_SECONDS = 0.075;
 const ROOM_2_FLOOR_TOP_Y = 0;
 const TIGHT_CAMERA_VENT_BOUNDS = [
   { min: [-6.1, 4.5, 5.2], max: [-3.5, 7.8, 13.2] },
@@ -63,9 +55,7 @@ export class ContainmentTeachingScene {
   private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
   private readonly ownedMaterials = new Set<THREE.Material>();
   private readonly artResources: ContainmentArtResources;
-  private readonly slimeVisual: SlimeVisual;
-  private readonly slimeBurst = new SlimeBurstPresentation();
-  private deathElapsedSeconds = 0;
+  readonly bob: BobCharacterPresentation;
   private disposed = false;
 
   constructor(
@@ -128,11 +118,11 @@ export class ContainmentTeachingScene {
     this.roomTwoArt = new RoomTwoArt(artResources);
     this.root.add(this.roomOneArt.root, this.roomTwoArt.root);
 
-    this.slimeVisual = new SlimeVisual({
-      radiusMetres: DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
-    });
-    this.root.add(this.slimeVisual.mesh, this.slimeBurst.root);
-    this.resetProbe();
+    this.bob = new BobCharacterPresentation(
+      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
+    );
+    this.root.add(this.bob.root);
+    this.resetTeachingPresentation();
   }
 
   get collisionMeshes(): readonly THREE.Mesh[] {
@@ -142,20 +132,6 @@ export class ContainmentTeachingScene {
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
   get solubleTargetMeshes(): readonly THREE.Mesh[] {
     return this.solubleTargetMeshList;
-  }
-
-  get slimeDiagnostics(): SlimeVisualDiagnostics {
-    return this.slimeVisual.diagnostics;
-  }
-
-  get deathBurstDiagnostics(): SlimeBurstDiagnostics {
-    return this.slimeBurst.diagnostics;
-  }
-
-  primeDeathBurstResources(
-    render: (root: THREE.Object3D) => void,
-  ): boolean {
-    return this.slimeBurst.primeResources(SPAWN_POSITION, render);
   }
 
   copySpawnPosition(target: THREE.Vector3): THREE.Vector3 {
@@ -168,18 +144,6 @@ export class ContainmentTeachingScene {
 
   copyRoomTwoSafeLandingPosition(target: THREE.Vector3): THREE.Vector3 {
     return target.copy(ROOM_2_SAFE_LANDING_POSITION);
-  }
-
-  setProbePosition(position: Vector3State): void {
-    this.slimeVisual.setPosition(position);
-  }
-
-  setProbeYaw(yawRadians: number): void {
-    this.slimeVisual.mesh.rotation.set(0, yawRadians, 0);
-  }
-
-  setProbeOpacity(opacity: number): void {
-    this.slimeVisual.setOpacity(opacity);
   }
 
   isInsideCameraTightVent(position: Vector3State): boolean {
@@ -199,66 +163,16 @@ export class ContainmentTeachingScene {
     return false;
   }
 
-  presentProbe(): void {
-    this.slimeVisual.present();
-  }
-
-  update(deltaSeconds: number, visualState?: SlimeVisualState): void {
-    if (visualState) this.slimeVisual.update(deltaSeconds, visualState);
-  }
-
-  /** Begin the visual rupture at the authoritative death position. */
-  startDeath(position: Vector3State): boolean {
-    if (!this.slimeBurst.start(position)) return false;
-
-    this.deathElapsedSeconds = 0;
-    this.slimeVisual.setPosition(position);
-    this.slimeVisual.setOpacity(1);
-    this.slimeVisual.mesh.scale.setScalar(1);
-    this.slimeVisual.mesh.visible = true;
-    return true;
-  }
-
-  /** Continue visual-only death work while gameplay simulation is suspended. */
-  updateDeath(deltaSeconds: number): void {
-    this.deathElapsedSeconds += deltaSeconds;
-    this.slimeBurst.update(deltaSeconds);
-
-    if (this.deathElapsedSeconds < DEATH_RUPTURE_SECONDS) {
-      const anticipation = THREE.MathUtils.smoothstep(
-        this.deathElapsedSeconds,
-        0,
-        DEATH_RUPTURE_SECONDS,
-      );
-      this.slimeVisual.mesh.scale.setScalar(
-        1 + Math.sin(anticipation * Math.PI) * 0.12,
-      );
-      return;
-    }
-
-    this.slimeVisual.mesh.visible = false;
-  }
-
-  /** Restore the live slime after checkpoint recovery succeeds. */
-  finishDeath(position: Vector3State): void {
-    this.deathElapsedSeconds = 0;
-    this.slimeBurst.reset();
-    this.slimeVisual.setPosition(position);
-    this.slimeVisual.mesh.scale.setScalar(1);
-    this.slimeVisual.mesh.visible = true;
-    this.slimeVisual.reset();
-  }
-
-  resetProbe(): void {
+  resetTeachingPresentation(): void {
     this.roomOneArt.reset();
-    this.finishDeath(SPAWN_POSITION);
+    this.bob.setPosition(SPAWN_POSITION);
+    this.bob.reset();
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.slimeBurst.dispose();
-    this.slimeVisual.dispose();
+    this.bob.dispose();
     this.roomOneArt.dispose();
     this.roomTwoArt.dispose();
     this.root.removeFromParent();
@@ -269,17 +183,6 @@ export class ContainmentTeachingScene {
     this.collisionMeshList.length = 0;
     this.solubleTargetMeshList.length = 0;
     this.root.clear();
-  }
-
-  onSlimeLanding(
-    normalWorld: Vector3State,
-    impactSpeedMetresPerSecond: number,
-  ): void {
-    this.slimeVisual.onLanding(normalWorld, impactSpeedMetresPerSecond);
-  }
-
-  onSlimeLaunch(launch: SlimeVisualLaunch): void {
-    this.slimeVisual.onLaunch(launch);
   }
 
   private addRoomOne(

@@ -122,6 +122,7 @@ export interface CameraRigDiagnostics {
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const CAMERA_BASIS_EPSILON_SQ = 1e-10;
+const WALL_TRANSITION_MIN_CAMERA_CLEARANCE_METRES = 1.35;
 
 interface SavedTargetView {
   readonly planarBack: THREE.Vector3;
@@ -177,6 +178,11 @@ export class CameraRig {
   private readonly partialUpRotation = new THREE.Quaternion();
   private readonly yawRotation = new THREE.Quaternion();
   private readonly obstructionHit = new CollisionHit();
+  private readonly orientationGuardHit = new CollisionHit();
+  private readonly previousSmoothedUp = new THREE.Vector3();
+  private readonly previousPlanarBack = new THREE.Vector3();
+  private readonly orientationGuardPivot = new THREE.Vector3();
+  private readonly orientationGuardBoom = new THREE.Vector3();
 
   private pitchRadians: number;
   private effectivePitchRadians: number;
@@ -478,7 +484,9 @@ export class CameraRig {
 
     this.groundBack.copy(this.planarBack).projectOnPlane(this.surfaceUp);
     if (this.groundBack.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
-      this.groundBack.set(0, 0, 1).projectOnPlane(this.surfaceUp);
+      // When the camera still faces an attached wall from the floor, its
+      // ground heading points into the wall. Keep forward input climbing.
+      this.groundBack.copy(WORLD_UP).negate().projectOnPlane(this.surfaceUp);
       if (this.groundBack.lengthSq() <= CAMERA_BASIS_EPSILON_SQ) {
         this.groundBack.set(1, 0, 0).projectOnPlane(this.surfaceUp);
       }
@@ -526,8 +534,14 @@ export class CameraRig {
     if (presentationDiscontinuity) {
       this.resetPresentationForDiscontinuity();
     } else {
+      this.previousSmoothedUp.copy(this.smoothedUp);
+      this.previousPlanarBack.copy(this.planarBack);
       this.updateOrientation(safeDeltaSeconds);
       this.updateFollowPosition(safeDeltaSeconds);
+      if (this.wallTurnWouldCollapseCamera()) {
+        this.smoothedUp.copy(this.previousSmoothedUp);
+        this.planarBack.copy(this.previousPlanarBack);
+      }
     }
     this.updateContextualTransition(safeDeltaSeconds);
     this.updateAimPresentationTransition(safeDeltaSeconds);
@@ -636,6 +650,30 @@ export class CameraRig {
       .applyQuaternion(this.partialUpRotation)
       .projectOnPlane(this.smoothedUp);
     this.ensurePlanarBack();
+  }
+
+  private wallTurnWouldCollapseCamera(): boolean {
+    if (!this.targetAttached || this.contextualCamera || !this.obstructionWorld) {
+      return false;
+    }
+    this.orientationGuardPivot.copy(this.smoothedTarget)
+      .addScaledVector(this.smoothedUp, this.config.targetHeightMetres);
+    this.orientationGuardBoom.copy(this.planarBack)
+      .multiplyScalar(Math.cos(this.pitchRadians))
+      .addScaledVector(this.smoothedUp, Math.sin(this.pitchRadians))
+      .normalize()
+      .multiplyScalar(this.getDesiredDistanceMetres());
+    return this.obstructionWorld.sweepSphere(
+      this.orientationGuardPivot,
+      this.orientationGuardBoom,
+      this.config.obstructionRadiusMetres,
+      this.orientationGuardHit,
+      CollisionLayer.CameraObstruction,
+    ) &&
+      this.orientationGuardHit.normal.dot(WORLD_UP) > 0.7 &&
+      this.orientationGuardHit.distance <
+        WALL_TRANSITION_MIN_CAMERA_CLEARANCE_METRES +
+          this.config.obstructionBufferMetres;
   }
 
   private isPresentationDiscontinuity(

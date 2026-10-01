@@ -1,0 +1,31 @@
+{
+  "status": "gate-1-candidate-awaiting-visual-approval",
+  "reference": "user-supplied front reference 2026-09-23",
+  "reference_projection": {
+    "pixels_per_metre": 692.0,
+    "centre_x": 617.0,
+    "contact_y": 955.0
+  },
+  "body_triangles": 3264,
+  "eye_triangles_combined": 504,
+  "body_connected_components": 1,
+  "body_non_manifold_edges": 0,
+  "body_bounds_metres": {
+    "minimum": [
+      -0.5,
+      -0.45,
+      -0.43
+    ],
+    "maximum": [
+      0.5,
+      0.525885,
+      0.43
+    ]
+  },
+  "morph_targets": 0,
+  "armatures": 0,
+  "animations": 0,
+  "generator_sha256": "7ba549b2b8ba1d941a6758329b4a6040cfb0a504f08496c08fe323ad00320bd5",
+  "neutral_generator_sha256": "e10f0d33620de201c271c8d94b35ac223e948cecb20a80860f7fb136324e4ad7",
+  "glb_sha256": "316656ae4d4a8fda4345ff09b04ab2017c802294c4f885b2670a27261c82282a"
+}

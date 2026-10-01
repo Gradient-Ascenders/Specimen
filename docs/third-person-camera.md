@@ -22,6 +22,9 @@ sticky traversal changes `gameplayUp`, the rig exponentially damps its private
 up and transports the existing orbit heading through that transition. Mouse
 yaw/pitch remain accumulated and direct: attachment, detachment, landing, and
 supported convex edges do not recenter the view.
+At the base of a sticky wall, the rig pauses that turn if the next camera pose
+would contract against the floor to an unusable distance. It resumes as Bob
+climbs and clearance opens; forward input still follows the wall climb.
 
 ## Camera tuning
 

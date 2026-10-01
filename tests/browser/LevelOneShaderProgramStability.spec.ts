@@ -28,14 +28,61 @@ interface LevelOnePrewarmVerification {
 
 interface ProductionTraversalRuntime {
   readonly resources?: {
-    readonly body: { readonly position: unknown };
-    readonly slimePair: { readonly activeBody: unknown };
+    readonly body: {
+      readonly grounded: boolean;
+      readonly position: unknown;
+      teleport(position: {
+        readonly x: number;
+        readonly y: number;
+        readonly z: number;
+      }): void;
+    };
+    readonly bobReflectionEnvironment: {
+      readonly diagnostics: {
+        readonly textureName: string;
+        readonly disposed: boolean;
+      };
+    };
+    readonly slimePair: {
+      readonly activeBody: unknown;
+      switchActive(): boolean;
+    };
     readonly containmentLevel: {
       setActiveBody(body: unknown): void;
       teleportToRoomForDebug(roomId: number): void;
+      recoverActiveCheckpoint(): void;
+      requestHazardFailure(failure: {
+        readonly roomId: 'room-3';
+        readonly hazardId: string;
+      }): boolean;
     };
-    readonly blobFacing: { reset(): void };
-    readonly testScene: { setProbePosition(position: unknown): void };
+    readonly testScene: {
+      readonly lightingDiagnostics: {
+        readonly bobReflectionZone: 'room' | 'duct';
+        readonly bobBodyReflectionTarget: number;
+        readonly bobEyeReflectionTarget: number;
+      };
+      readonly bob: {
+        readonly diagnostics: {
+          readonly facingYawRadians: number;
+          readonly locomotionStrength: number;
+          readonly reversing: boolean;
+          readonly speed: number;
+          readonly deathBurst: {
+            readonly elapsedSeconds: number;
+          };
+          readonly materials?: {
+            readonly reflectionMapName?: string;
+            readonly bodyReflectionIntensity: number;
+            readonly eyeReflectionIntensity: number;
+          };
+        };
+        reset(): void;
+        setPosition(position: unknown): void;
+        onDamage(strength: number): void;
+        updateDeath(deltaSeconds: number): void;
+      };
+    };
     readonly acidProjectileSystem: {
       getDiagnostics(): {
         readonly solubleImpactCount: number;
@@ -46,6 +93,12 @@ interface ProductionTraversalRuntime {
       getDiagnostics(): { readonly dropletMatrixUploadCount: number };
     };
   };
+  load(): void;
+  start(): void;
+  stop(): void;
+  restartLevel(): void;
+  unload(): void;
+  prepareLightingPrograms(): Promise<void>;
   syncContextualCamera(resources: unknown): void;
 }
 
@@ -166,8 +219,8 @@ const visitRoom = async (page: Page, room: number): Promise<void> => {
       }
       resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
       resources.containmentLevel.teleportToRoomForDebug(roomId);
-      resources.blobFacing.reset();
-      resources.testScene.setProbePosition(resources.body.position);
+      resources.testScene.bob.reset();
+      resources.testScene.bob.setPosition(resources.body.position);
       runtime.syncContextualCamera(resources);
     }, room);
   }
@@ -469,4 +522,349 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     consoleErrors.some((message) =>
       message.includes('Containment lighting prewarm failed')),
   ).toBe(false);
+});
+
+test('Bob reflections snap across restart and recreate across level reload', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('requestfailed', (request) => {
+    failedRequests.push(`${request.method()} ${request.url()}`);
+  });
+  const assertTraversalRuntimeExposed =
+    await exposeProductionTraversalRuntime(page);
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  assertTraversalRuntimeExposed();
+  await expect(page.locator('[data-action="start"]')).toBeVisible({
+    timeout: 120_000,
+  });
+  await page.locator('[data-action="start"]').click();
+  await waitForRenderedFrames(page, 2);
+
+  const readReflectionState = async () => page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob resources');
+    const materials = resources.testScene.bob.diagnostics.materials;
+    if (!materials) throw new Error('Bob reflection materials are not ready');
+    return {
+      mapName: materials.reflectionMapName,
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+      zone: resources.testScene.lightingDiagnostics.bobReflectionZone,
+      bodyTarget:
+        resources.testScene.lightingDiagnostics.bobBodyReflectionTarget,
+      eyeTarget:
+        resources.testScene.lightingDiagnostics.bobEyeReflectionTarget,
+      environmentName:
+        resources.bobReflectionEnvironment.diagnostics.textureName,
+    };
+  });
+
+  expect(await readReflectionState()).toEqual({
+    mapName: 'bob-laboratory-pmrem',
+    body: 0.42,
+    eyes: 1.12,
+    zone: 'room',
+    bodyTarget: 0.42,
+    eyeTarget: 1.12,
+    environmentName: 'bob-laboratory-pmrem',
+  });
+
+  await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob resources');
+    resources.body.teleport({ x: -4.8, y: 6, z: 8 });
+  });
+  await expect.poll(
+    async () => (await readReflectionState()).zone,
+    { timeout: 5_000, message: 'Waiting for Bob to enter the dark duct profile' },
+  ).toBe('duct');
+  await expect.poll(
+    async () => (await readReflectionState()).body,
+    { timeout: 5_000, message: 'Waiting for the duct reflection fade' },
+  ).toBeLessThan(0.15);
+
+  const recoveredGoop = await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob resources');
+    if (!resources.slimePair.switchActive()) {
+      throw new Error('Could not switch control from Bob to Goop');
+    }
+    resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
+    resources.containmentLevel.recoverActiveCheckpoint();
+    const materials = resources.testScene.bob.diagnostics.materials;
+    if (!materials) throw new Error('Bob reflection materials are not ready');
+    return {
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+      zone: resources.testScene.lightingDiagnostics.bobReflectionZone,
+      bodyTarget:
+        resources.testScene.lightingDiagnostics.bobBodyReflectionTarget,
+      eyeTarget:
+        resources.testScene.lightingDiagnostics.bobEyeReflectionTarget,
+    };
+  });
+  expect(recoveredGoop).toEqual({
+    body: 0.1,
+    eyes: 0.24,
+    zone: 'duct',
+    bodyTarget: 0.1,
+    eyeTarget: 0.24,
+  });
+
+  const restarted = await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    if (!runtime) throw new Error('Missing plain-production traversal runtime');
+    runtime.restartLevel();
+    const resources = runtime.resources;
+    const materials = resources?.testScene.bob.diagnostics.materials;
+    if (!resources || !materials) {
+      throw new Error('Missing restarted Bob resources');
+    }
+    return {
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+      zone: resources.testScene.lightingDiagnostics.bobReflectionZone,
+    };
+  });
+  expect(restarted).toEqual({ body: 0.42, eyes: 1.12, zone: 'room' });
+
+  const reloaded = await page.evaluate(async () => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    if (!runtime?.resources) {
+      throw new Error('Missing plain-production traversal runtime');
+    }
+    const oldEnvironment = runtime.resources.bobReflectionEnvironment;
+    runtime.stop();
+    runtime.unload();
+    const oldEnvironmentDisposed = oldEnvironment.diagnostics.disposed;
+    runtime.load();
+    await runtime.prepareLightingPrograms();
+    runtime.start();
+    const resources = runtime.resources;
+    const materials = resources?.testScene.bob.diagnostics.materials;
+    if (!resources || !materials) {
+      throw new Error('Missing reloaded Bob resources');
+    }
+    return {
+      oldEnvironmentDisposed,
+      newEnvironmentDisposed:
+        resources.bobReflectionEnvironment.diagnostics.disposed,
+      mapName: materials.reflectionMapName,
+      environmentName:
+        resources.bobReflectionEnvironment.diagnostics.textureName,
+      body: materials.bodyReflectionIntensity,
+      eyes: materials.eyeReflectionIntensity,
+    };
+  });
+  expect(reloaded).toEqual({
+    oldEnvironmentDisposed: true,
+    newEnvironmentDisposed: false,
+    mapName: 'bob-laboratory-pmrem',
+    environmentName: 'bob-laboratory-pmrem',
+    body: 0.42,
+    eyes: 1.12,
+  });
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
+});
+
+test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('requestfailed', (request) => {
+    failedRequests.push(`${request.method()} ${request.url()}`);
+  });
+  const assertTraversalRuntimeExposed =
+    await exposeProductionTraversalRuntime(page);
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  assertTraversalRuntimeExposed();
+  await expect(page.locator('[data-action="start"]')).toBeVisible({
+    timeout: 120_000,
+  });
+  await page.locator('[data-action="start"]').click();
+  await waitForRenderedFrames(page, 2);
+
+  const readBob = async () => page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production Bob diagnostics');
+    const diagnostics = resources.testScene.bob.diagnostics;
+    const position = resources.body.position as {
+      readonly x: number;
+      readonly y: number;
+      readonly z: number;
+    };
+    return {
+      position: { x: position.x, y: position.y, z: position.z },
+      facingYawRadians: diagnostics.facingYawRadians,
+      grounded: resources.body.grounded,
+      locomotionStrength: diagnostics.locomotionStrength,
+      reversing: diagnostics.reversing,
+      speed: diagnostics.speed,
+    };
+  });
+
+  const idle = await readBob();
+  await expect.poll(
+    async () => (await readBob()).grounded,
+    { timeout: 3_000, message: 'Waiting for Bob to settle on the floor' },
+  ).toBe(true);
+  await page.keyboard.down('a');
+  await expect.poll(
+    async () => (await readBob()).locomotionStrength > 0,
+    { timeout: 3_000, message: 'Waiting for Bob ground locomotion' },
+  ).toBe(true);
+  await page.waitForTimeout(400);
+  const moving = await readBob();
+  await page.keyboard.up('a');
+  await expect.poll(
+    async () => (await readBob()).speed,
+    { timeout: 3_000, message: 'Waiting for Bob to stop' },
+  ).toBe(0);
+  const stopped = await readBob();
+  if (stopped.locomotionStrength > 0) {
+    await expect.poll(
+      async () => (await readBob()).locomotionStrength,
+      { timeout: 3_000, message: 'Waiting for Bob to settle toward Neutral' },
+    ).toBeLessThan(stopped.locomotionStrength);
+  }
+  const settled = await readBob();
+
+  expect(moving.position).not.toEqual(idle.position);
+  expect(moving.locomotionStrength).toBeGreaterThan(0);
+  expect(settled.locomotionStrength).toBeLessThan(moving.locomotionStrength);
+  expect(settled.locomotionStrength).toBeLessThanOrEqual(
+    stopped.locomotionStrength,
+  );
+
+  await page.keyboard.down('d');
+  await expect.poll(
+    async () => (await readBob()).reversing,
+    { timeout: 3_000, message: 'Waiting for Bob reversal collection' },
+  ).toBe(true);
+  const collecting = await readBob();
+  expect(collecting.locomotionStrength).toBeLessThan(
+    moving.locomotionStrength,
+  );
+  await expect.poll(
+    async () => (await readBob()).reversing,
+    { timeout: 3_000, message: 'Waiting for Bob bounded reversal turn' },
+  ).toBe(false);
+  await expect.poll(
+    async () => (await readBob()).locomotionStrength,
+    { timeout: 3_000, message: 'Waiting for Bob sustained lean after turning' },
+  ).toBeGreaterThan(0.05);
+  const reversed = await readBob();
+  await page.keyboard.up('d');
+  const reversalAngle = Math.abs(Math.atan2(
+    Math.sin(reversed.facingYawRadians - settled.facingYawRadians),
+    Math.cos(reversed.facingYawRadians - settled.facingYawRadians),
+  ));
+  expect(reversalAngle).toBeGreaterThan(170 * Math.PI / 180);
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
+});
+
+test('Level 1 damage holds the burst at frame zero through Stress anticipation', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const assertTraversalRuntimeExposed =
+    await exposeProductionTraversalRuntime(page);
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  assertTraversalRuntimeExposed();
+  await expect(page.locator('[data-action="start"]')).toBeVisible({
+    timeout: 120_000,
+  });
+  await page.locator('[data-action="start"]').click();
+
+  const observation = await page.evaluate(() => {
+    const runtime = (
+      window as Window & {
+        __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
+      }
+    ).__specimenProductionTraversalRuntime;
+    const resources = runtime?.resources;
+    if (!resources) throw new Error('Missing plain-production traversal runtime');
+
+    const bob = resources.testScene.bob;
+    let damageCallCount = 0;
+    const onDamage = bob.onDamage.bind(bob);
+    bob.onDamage = (strength: number) => {
+      damageCallCount += 1;
+      onDamage(strength);
+    };
+
+    const accepted = resources.containmentLevel.requestHazardFailure({
+      roomId: 'room-3',
+      hazardId: 'browser-damage-regression',
+    });
+    const elapsedAtStart = bob.diagnostics.deathBurst.elapsedSeconds;
+    bob.updateDeath(0.05);
+    const elapsedDuringStress = bob.diagnostics.deathBurst.elapsedSeconds;
+    bob.updateDeath(0.025);
+    const elapsedAtHandoff = bob.diagnostics.deathBurst.elapsedSeconds;
+    bob.updateDeath(0.01);
+    const elapsedAfterHandoff = bob.diagnostics.deathBurst.elapsedSeconds;
+
+    return {
+      accepted,
+      damageCallCount,
+      elapsedAtStart,
+      elapsedDuringStress,
+      elapsedAtHandoff,
+      elapsedAfterHandoff,
+    };
+  });
+
+  expect(observation).toMatchObject({
+    accepted: true,
+    damageCallCount: 1,
+    elapsedAtStart: 0,
+    elapsedDuringStress: 0,
+    elapsedAtHandoff: 0,
+  });
+  expect(observation.elapsedAfterHandoff).toBeCloseTo(0.01, 12);
 });

@@ -60,6 +60,37 @@ const createFakeBody = (): MutableFakeBody => ({
   },
 });
 
+test('recovering active Goop keeps Bob duct reflections tied to Bob position', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const collisionWorld = new CollisionWorld();
+  const bob = createFakeBody();
+  const goop = createFakeBody();
+  bob.position.set(-4.8, 6, 8);
+  goop.position.set(0, 0.46, -2.6);
+  const bobBody = bob as unknown as KinematicBody;
+  const goopBody = goop as unknown as KinematicBody;
+  const controller = new ContainmentLevelController({
+    scene,
+    body: bobBody,
+    bobBody,
+    persistentBodies: [bobBody, goopBody],
+    collisionWorld,
+    requestDeath: () => false,
+  });
+  scene.update(0, bob.position);
+  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'duct');
+
+  controller.setActiveBody(goopBody);
+  controller.recoverActiveCheckpoint();
+
+  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'duct');
+  assert.equal(scene.lightingDiagnostics.bobBodyReflectionTarget, 0.1);
+  assert.ok(bob.position.equals(new THREE.Vector3(-4.8, 6, 8)));
+  controller.dispose();
+  collisionWorld.clear();
+  scene.dispose();
+});
+
 test('complete Containment scene exposes unique, consistently tagged colliders', () => {
   const scene = new ContainmentLevelScene(() => {});
   const names = scene.collisionMeshes.map((mesh) => mesh.name);
@@ -348,6 +379,7 @@ test('inactive persistent slimes continue riding Room 4 and Room 5 carriers', ()
   const controller = new ContainmentLevelController({
     scene,
     body: bobBody,
+    bobBody,
     persistentBodies: [bobBody, goopBody],
     collisionWorld,
     requestDeath: () => false,
@@ -848,6 +880,37 @@ test('active checkpoint resets its room state before recovering the player', () 
   assert.equal(scene.roomFour.elevator.state, 'waitingForRider');
   assert.equal(scene.roomFour.elevator.ascentProgress, 0);
   assert.ok(fakeBody.position.equals(new THREE.Vector3(9, 30.21, 85.5)));
+
+  controller.dispose();
+  collisionWorld.clear();
+  scene.dispose();
+});
+
+test('accepted hazard contact emits authoritative damage but out-of-bounds does not', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const collisionWorld = new CollisionWorld();
+  collisionWorld.registerAll(scene.collisionMeshes);
+  const fakeBody = createFakeBody();
+  const controller = new ContainmentLevelController({
+    scene,
+    body: fakeBody as unknown as KinematicBody,
+    collisionWorld,
+    requestDeath: () => true,
+  });
+  const damageEvents: ContainmentHazardFailure[] = [];
+  controller.events.on('damaged', (failure) => damageEvents.push(failure));
+
+  assert.equal(
+    controller.requestHazardFailure({
+      roomId: 'room-3',
+      hazardId: 'test-laser',
+    }),
+    true,
+  );
+  assert.equal(controller.requestOutOfBoundsFailure(), true);
+  assert.deepEqual(damageEvents, [
+    { roomId: 'room-3', hazardId: 'test-laser' },
+  ]);
 
   controller.dispose();
   collisionWorld.clear();

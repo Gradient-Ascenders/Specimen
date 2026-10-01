@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
 import { DEFAULT_DEATH_BURST_DURATION_SECONDS } from '../../systems/DeathSequence.ts';
-import { DEFAULT_SLIME_BASE_COLOUR } from './SlimeMaterial.ts';
-import type { Vector3State } from './SlimeVisual.ts';
+import { DEFAULT_SLIME_BASE_COLOUR } from './SlimePalette.ts';
+import type { Vector3State } from './SlimePresentationContract.ts';
 
 const FRAGMENT_COUNT = 30;
 const BURST_FADE_START_SECONDS = 0.56;
@@ -57,8 +57,7 @@ export class SlimeBurstPresentation {
     this.material = new THREE.MeshPhysicalMaterial({
       name: 'wet-slime-death-fragment-material',
       color: 0xffffff,
-      // The custom live-slime shader supplies its own clinical fill light.
-      // A modest identity-coloured emission keeps detached droplets equally
+      // A modest identity-coloured emission keeps detached droplets
       // readable when death happens below the authored lighting volume.
       emissive: new THREE.Color(baseColour).multiplyScalar(0.16),
       metalness: 0,

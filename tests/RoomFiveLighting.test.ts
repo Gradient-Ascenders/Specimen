@@ -2,34 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BeamOcclusion } from '../src/render/hazards/BeamOcclusion.ts';
-import { SlimeLightSampler } from '../src/render/slime/SlimeLightSampler.ts';
-import { SlimeMaterial } from '../src/render/slime/SlimeMaterial.ts';
 import { ventEntranceLightingWeight } from '../src/render/slime/VentEntranceLighting.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 
-test('Bob fades progressively into vent lighting and brightens smoothly when backing out', () => {
-  const material = new SlimeMaterial(), world = new CollisionWorld(), sampler = new SlimeLightSampler();
-  const body = new THREE.Vector3();
-  try {
-    let previous = Infinity;
-    for (const depth of [.8, 2, 3.2, 4.4, 5.6, 6.8, 8]) {
-      sampler.apply(material, body, world);
-      material.blendDefaultLighting(ventEntranceLightingWeight(depth, 9.1));
-      const brightness = material.uniforms.uKeyLightRadiance.value.r;
-      assert.ok(brightness < previous); previous = brightness;
-    }
-    assert.equal(previous, 0);
-    assert.equal(ventEntranceLightingWeight(0, 9.1), 0, 'straight entrance remains lit');
-    assert.equal(ventEntranceLightingWeight(-1.6, 9.1), ventEntranceLightingWeight(1.6, 9.1));
-    assert.ok(ventEntranceLightingWeight(-2.4, 9.1) < .2, 'entrance light lingers just past the corner');
-    assert.equal(ventEntranceLightingWeight(-8, 9.1), 1, 'left passage reaches full darkness farther in');
-    assert.equal(ventEntranceLightingWeight(8, 9.1), 1, 'right passage uses the same gradual fade');
-    assert.equal(ventEntranceLightingWeight(0, 30), 1, 'later rooms cannot regain entrance lighting');
-    sampler.apply(material, body, world); material.blendDefaultLighting(.5);
-    assert.ok(Math.abs(material.uniforms.uKeyLightRadiance.value.r - .575) < 1e-8);
-    sampler.apply(material, body, world); material.blendDefaultLighting(0);
-    assert.ok(Math.abs(material.uniforms.uKeyLightRadiance.value.r - 1.15) < 1e-8);
-  } finally { material.dispose(); world.clear(); }
+test('Bob reflection darkness increases progressively after the vent corner', () => {
+  let previous = -Infinity;
+  for (const depth of [.8, 2, 3.2, 4.4, 5.6, 6.8, 8]) {
+    const darkness = ventEntranceLightingWeight(depth, 9.1);
+    assert.ok(darkness > previous);
+    previous = darkness;
+  }
+  assert.equal(previous, 1);
+  assert.equal(ventEntranceLightingWeight(0, 9.1), 0, 'straight entrance remains lit');
+  assert.equal(ventEntranceLightingWeight(-1.6, 9.1), ventEntranceLightingWeight(1.6, 9.1));
+  assert.ok(ventEntranceLightingWeight(-2.4, 9.1) < .2, 'entrance light lingers just past the corner');
+  assert.equal(ventEntranceLightingWeight(-8, 9.1), 1, 'left passage reaches full darkness farther in');
+  assert.equal(ventEntranceLightingWeight(8, 9.1), 1, 'right passage uses the same gradual fade');
+  assert.equal(ventEntranceLightingWeight(0, 30), 1, 'later rooms cannot regain entrance lighting');
 });
 
 test('beam stops before a cover and recovers its length when the cover is removed', () => {
@@ -41,21 +30,6 @@ test('beam stops before a cover and recovers its length when the cover is remove
   world.unregister(wall);
   assert.equal(clip.length(world, origin, forward, 15, .4, source), 15);
   wall.geometry.dispose(); world.clear();
-});
-
-test('slime loses its fixed glow in darkness and receives only unblocked light', () => {
-  const material = new SlimeMaterial(), world = new CollisionWorld(), sampler = new SlimeLightSampler();
-  const body = new THREE.Vector3();
-  sampler.apply(material, body, world);
-  assert.equal(material.uniforms.uKeyLightRadiance.value.r, 0);
-  assert.ok(material.uniforms.uRimStrength.value < .01);
-  const light = new THREE.PointLight(0x79bdff, 30, 10); light.position.z = -4;
-  sampler.sources.push({ light }); sampler.apply(material, body, world);
-  assert.ok(material.uniforms.uKeyLightRadiance.value.b > .1);
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(5, 5, .3)); wall.position.z = -2; world.register(wall);
-  sampler.apply(material, body, world); assert.equal(material.uniforms.uKeyLightRadiance.value.b, 0);
-  material.restoreDefaultLighting(); assert.ok(material.uniforms.uKeyLightRadiance.value.r > 1);
-  material.dispose(); wall.geometry.dispose(); world.clear();
 });
 
 test('partial cover clips only blocked cone edges, not the entire visible ray', () => {

@@ -218,7 +218,7 @@ test('default authored solids block both movement and camera queries', () => {
   solid.geometry.dispose();
 });
 
-test('vertical-side panels block only broad faces without creating movement caps or thin edges', () => {
+test('vertical-side panels reject caps while sticky panels expose wrap faces', () => {
   const world = new CollisionWorld();
   const wall = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.022));
   wall.name = 'thin-sticky-wall';
@@ -257,6 +257,30 @@ test('vertical-side panels block only broad faces without creating movement caps
       CollisionLayer.Movement,
     ),
     false,
+  );
+
+  wall.userData.surfaceTag = 'sticky';
+  assert.equal(
+    world.sweepSphere(
+      new THREE.Vector3(0, 5, 0),
+      new THREE.Vector3(0, -5, 0),
+      0.45,
+      hit,
+      CollisionLayer.Movement,
+    ),
+    false,
+    'sticky panels must still reject their horizontal caps',
+  );
+  assert.equal(
+    world.sweepSphere(
+      new THREE.Vector3(3, 2, 0),
+      new THREE.Vector3(-4, 0, 0),
+      0.45,
+      hit,
+      CollisionLayer.Movement,
+    ),
+    true,
+    'sticky panels must expose narrow vertical faces for edge wrapping',
   );
 
   // Rendering still treats the complete visible panel as an obstruction.

@@ -41,8 +41,9 @@ import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { BoxTriggerSensor } from '../puzzle/BoxTriggerSensor.ts';
 import { PressurePlate } from '../puzzle/PressurePlate.ts';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
-import { BlobFacing } from '../render/BlobFacing.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
+import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
+import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources } from '../render/IsolatedResourcePrewarm.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
@@ -51,7 +52,6 @@ import type {
   BobHatchLightingState,
   GoopReleaseLightingState,
 } from '../render/environment/containment/ContainmentLightingRig.ts';
-import type { SlimeVisualState } from '../render/slime/SlimeVisual.ts';
 import { SlimeManager } from '../slimes/SlimeManager.ts';
 import { PersistentSlimePair } from '../slimes/PersistentSlimePair.ts';
 import { SlimePairPresentation } from '../slimes/SlimePairPresentation.ts';
@@ -167,6 +167,7 @@ export interface GreyboxLevelRuntimeOptions {
 
 interface GreyboxRuntimeResources {
   readonly testScene: ContainmentLevelScene;
+  readonly bobReflectionEnvironment: BobReflectionEnvironment;
   readonly containmentLevel: ContainmentLevelController;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
@@ -178,7 +179,6 @@ interface GreyboxRuntimeResources {
   readonly renderedGoopPosition: THREE.Vector3;
   readonly cameraRelativeMovement: THREE.Vector3;
   readonly noMovement: THREE.Vector3;
-  readonly blobFacing: BlobFacing;
   readonly body: KinematicBody;
   readonly goopBody: KinematicBody;
   readonly slimeManager: SlimeManager<KinematicBody>;
@@ -206,10 +206,11 @@ interface GreyboxRuntimeResources {
   ];
   readonly deathSequence: DeathSequence;
   readonly deathScreen: DeathScreen;
-  readonly slimeVisualState: SlimeVisualState;
+  readonly slimeVisualState: BobCharacterPresentationState;
   readonly jumpInputState: JumpInputState;
   readonly unsubscribeLanding: () => void;
   readonly unsubscribeJumped: () => void;
+  readonly unsubscribeDamaged: () => void;
   unsubscribePressureOccupancy: () => void;
   unsubscribeSlimeRoster: readonly (() => void)[];
   readonly unsubscribeObjectiveChanged: () => void;
@@ -432,7 +433,9 @@ export class GreyboxLevelRuntime {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
     const generation = ++this.lightingPrewarmGeneration;
-    const promise = this.runLightingPrewarm(resources, generation);
+    const promise = resources.testScene.bob
+      .prepare()
+      .then(() => this.runLightingPrewarm(resources, generation));
     this.lightingPrewarmPromise = promise;
     return promise;
   }
@@ -514,7 +517,9 @@ export class GreyboxLevelRuntime {
         containmentLevel.state === 'complete'
           ? 'level-complete'
           : 'level-completing';
-      testScene.update(deltaSeconds, slimeVisualState);
+      slimeVisualState.movementIntentWorld = resources.noMovement;
+      testScene.bob.update(deltaSeconds, slimeVisualState);
+      testScene.update(deltaSeconds, body.position);
       this.input.endFixedUpdate();
       return;
     }
@@ -648,9 +653,12 @@ export class GreyboxLevelRuntime {
       pointerLocked: this.input.pointerLocked,
     });
     resources.dissolveSystem.update(deltaSeconds);
-    resources.blobFacing.update(deltaSeconds, body.velocity, !body.attached);
     slimeVisualState.grounded = body.grounded;
     slimeVisualState.attached = body.attached;
+    slimeVisualState.chargingJump = body.chargingJump;
+    slimeVisualState.movementIntentWorld = activeBody === body && !switchedThisStep
+      ? cameraRelativeMovement
+      : resources.noMovement;
     slimeVisualState.jumpCharge = body.chargeFraction;
     slimeVisualState.contactCount = body.contactsThisStep;
     slimeVisualState.contactSpeedMetresPerSecond =
@@ -658,7 +666,8 @@ export class GreyboxLevelRuntime {
     slimeVisualState.contactName = body.lastContactName;
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
-    testScene.update(deltaSeconds, slimeVisualState);
+    testScene.bob.update(deltaSeconds, slimeVisualState);
+    testScene.update(deltaSeconds, body.position);
     this.input.endFixedUpdate();
   }
 
@@ -678,7 +687,6 @@ export class GreyboxLevelRuntime {
     const {
       body,
       goopBody,
-      blobFacing,
       deathSequence,
       renderedProbePosition,
       renderedGoopPosition,
@@ -715,9 +723,8 @@ export class GreyboxLevelRuntime {
         ),
       );
 
-      testScene.setProbePosition(renderedProbePosition);
-      testScene.setProbeYaw(blobFacing.getInterpolatedYaw(interpolationAlpha));
-      testScene.presentProbe();
+      testScene.bob.setPosition(renderedProbePosition);
+      testScene.bob.present(interpolationAlpha);
       const activeRenderedPosition =
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
@@ -759,7 +766,7 @@ export class GreyboxLevelRuntime {
     }
     const cameraDistanceMetres =
       this.renderLayer.cameraRig.currentFollowDistanceMetres;
-    testScene.setProbeOpacity(
+    testScene.bob.setOpacity(
       deathSequence.isPlaying && slimePair.activeSlimeId === 'bob'
         ? resolveCameraTargetOpacity(
             cameraDistanceMetres,
@@ -822,12 +829,16 @@ export class GreyboxLevelRuntime {
 
   private readonly loadResources = (): void => {
     let containmentLevel: ContainmentLevelController;
+    const bobReflectionEnvironment = new BobReflectionEnvironment(
+      this.renderLayer.renderer,
+    );
     const testScene = new ContainmentLevelScene(
       (failure: ContainmentHazardFailure) => {
         containmentLevel.requestHazardFailure(failure);
       },
       { includeDevelopmentHelpers: this.debugAvailable },
     );
+    testScene.bob.setReflectionEnvironment(bobReflectionEnvironment.texture);
     this.renderLayer.scene.add(testScene.root);
 
     const collisionWorld = new CollisionWorld();
@@ -882,7 +893,6 @@ export class GreyboxLevelRuntime {
     const outOfBoundsTestPosition = testScene.copyOutOfBoundsTestPosition(
       new THREE.Vector3(),
     );
-    const blobFacing = new BlobFacing();
     const slimeManager = new SlimeManager<KinematicBody>();
     const bobDefinition = slimeManager.getDefinition('bob');
     const goopDefinition = slimeManager.getDefinition('goop');
@@ -969,6 +979,7 @@ export class GreyboxLevelRuntime {
     containmentLevel = new ContainmentLevelController({
       scene: testScene,
       body,
+      bobBody: body,
       persistentBodies,
       collisionWorld,
       requestDeath: (recovery) => {
@@ -979,13 +990,21 @@ export class GreyboxLevelRuntime {
         );
       },
     });
+    const unsubscribeDamaged = containmentLevel.events.on('damaged', () => {
+      if (slimePair.activeSlimeId === 'bob') {
+        testScene.bob.onDamage(1);
+      }
+    });
 
-    const slimeVisualState: SlimeVisualState = {
+    const slimeVisualState: BobCharacterPresentationState = {
+      locomotionPositionWorld: body.locomotionPosition,
       velocityWorld: body.velocity,
+      movementIntentWorld: new THREE.Vector3(),
       surfaceNormalWorld: body.groundNormal,
       gameplayUpWorld: body.gameplayUp,
       grounded: body.grounded,
       attached: body.attached,
+      chargingJump: body.chargingJump,
       jumpCharge: body.chargeFraction,
       maximumLocomotionSpeedMetresPerSecond:
         body.maximumLocomotionSpeedMetresPerSecond,
@@ -1002,13 +1021,13 @@ export class GreyboxLevelRuntime {
       this.landingEventCount += 1;
       this.lastLandingImpactSpeedMetresPerSecond =
         event.impactSpeedMetresPerSecond;
-      testScene.onSlimeLanding(
+      testScene.bob.onLanding(
         body.groundNormal,
         event.impactSpeedMetresPerSecond,
       );
     });
     const unsubscribeJumped = movementEvents.on('jumped', (event) => {
-      testScene.onSlimeLaunch({
+      testScene.bob.onLaunch({
         directionWorld: event.directionWorld,
         speedMetresPerSecond: event.speedMetresPerSecond,
         chargeFraction: event.chargeFraction,
@@ -1032,8 +1051,8 @@ export class GreyboxLevelRuntime {
           onTeleportRoom: (roomId) => {
             containmentLevel.setActiveBody(slimePair.activeBody);
             containmentLevel.teleportToRoomForDebug(roomId);
-            blobFacing.reset();
-            testScene.setProbePosition(body.position);
+            testScene.bob.reset();
+            testScene.bob.setPosition(body.position);
             this.syncContextualCamera(this.requireResources());
           },
           onRunSlopeIdleRegression: this.runSlopeIdleRegression,
@@ -1105,6 +1124,7 @@ export class GreyboxLevelRuntime {
 
     this.resources = {
       testScene,
+      bobReflectionEnvironment,
       containmentLevel,
       collisionWorld,
       surfaceRegistry,
@@ -1116,7 +1136,6 @@ export class GreyboxLevelRuntime {
       renderedGoopPosition: new THREE.Vector3(),
       cameraRelativeMovement: new THREE.Vector3(),
       noMovement: new THREE.Vector3(),
-      blobFacing,
       body,
       goopBody,
       slimeManager,
@@ -1142,6 +1161,7 @@ export class GreyboxLevelRuntime {
       },
       unsubscribeLanding,
       unsubscribeJumped,
+      unsubscribeDamaged,
       unsubscribePressureOccupancy: () => {},
       unsubscribeSlimeRoster: [],
       unsubscribeObjectiveChanged,
@@ -1199,8 +1219,7 @@ export class GreyboxLevelRuntime {
     resources.slimePair.restoreInitialState();
     resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
     resources.pressurePlate.reset();
-    resources.testScene.resetProbe();
-    resources.blobFacing.reset();
+    resources.testScene.resetTeachingPresentation();
     this.renderLayer.cameraRig.reset();
     this.retargetCameraToActiveSlime(resources);
     this.syncContextualCamera(resources);
@@ -1240,6 +1259,7 @@ export class GreyboxLevelRuntime {
     resources.testPanel?.element.remove();
     resources.unsubscribeLanding();
     resources.unsubscribeJumped();
+    resources.unsubscribeDamaged();
     resources.unsubscribePressureOccupancy();
     for (const unsubscribe of resources.unsubscribeSlimeRoster) unsubscribe();
     resources.unsubscribeObjectiveChanged();
@@ -1257,6 +1277,7 @@ export class GreyboxLevelRuntime {
     resources.slimeManager.clearLevelRegistrations();
     resources.slimeManager.dispose();
     resources.testScene.dispose();
+    resources.bobReflectionEnvironment.dispose();
     resources.collisionWorld.clear();
     resources.surfaceRegistry.clear();
     this.renderLayer.cameraRig.clearFollowTarget();
@@ -1367,7 +1388,7 @@ export class GreyboxLevelRuntime {
     const dyingBody = resources.slimePair.activeBody;
 
     if (!resources.deathSequence.requestDeath(recovery)) return false;
-    if (!resources.testScene.startDeath(dyingBody.position)) {
+    if (!resources.testScene.bob.startDeath(dyingBody.position)) {
       resources.deathSequence.reset();
       return false;
     }
@@ -1395,9 +1416,9 @@ export class GreyboxLevelRuntime {
     resources.goopAcidPresentation.resume();
     this.notifySlimeHUD(undefined, true);
 
-    // The teaching scene owns Bob's legacy visual; the two-body presentation
-    // owns Goop. Restore that scene-owned visual to Bob's authoritative body.
-    resources.testScene.finishDeath(resources.body.position);
+    // Bob's shared presentation and Goop's pair presentation remain separate
+    // while Level 1 owns the two-body adapter. Restore Bob from body authority.
+    resources.testScene.bob.finishDeath(resources.body.position);
     resources.deathScreen.hide();
     const levelIsPlaying =
       !this.debugVisible && resources.containmentLevel.state === 'playing';
@@ -1413,6 +1434,7 @@ export class GreyboxLevelRuntime {
     deltaSeconds: number,
     resources: GreyboxRuntimeResources,
   ): void {
+    resources.testScene.bob.updateDeath(deltaSeconds);
     resources.testScene.updateDeath(deltaSeconds);
     if (resources.deathSequence.update(deltaSeconds)) {
       resources.deathScreen.show();
@@ -1528,7 +1550,6 @@ export class GreyboxLevelRuntime {
     const {
       body,
       goopBody,
-      blobFacing,
       collisionWorld,
       containmentLevel,
       deathSequence,
@@ -1549,10 +1570,10 @@ export class GreyboxLevelRuntime {
     const velocity = activeBody.velocity;
     const groundNormal = activeBody.groundNormal;
     const renderStats = this.renderLayer.getDiagnostics();
-    const slimeDiagnostics = testScene.slimeDiagnostics;
+    const slimeDiagnostics = testScene.bob.diagnostics;
     const cameraStats = this.renderLayer.cameraRig.getDiagnostics();
     const deathStats = deathSequence.diagnostics;
-    const burstStats = testScene.deathBurstDiagnostics;
+    const burstStats = slimeDiagnostics.deathBurst;
     const measuredFirstUseGeometryPrimeStats =
       testScene.measuredFirstUseGeometryPrimeDiagnostics;
     const slimeManagerStats = slimeManager.getDiagnostics();
@@ -1647,7 +1668,7 @@ export class GreyboxLevelRuntime {
         `camera preferred: ${cameraStats.preferredCameraPosition.x.toFixed(2)}, ${cameraStats.preferredCameraPosition.y.toFixed(2)}, ${cameraStats.preferredCameraPosition.z.toFixed(2)} m`,
         `camera resolved: ${cameraStats.resolvedCameraPosition.x.toFixed(2)}, ${cameraStats.resolvedCameraPosition.y.toFixed(2)}, ${cameraStats.resolvedCameraPosition.z.toFixed(2)} m`,
         `camera pitch manual / effective: ${THREE.MathUtils.radToDeg(cameraStats.pitchRadians).toFixed(1)}° / ${THREE.MathUtils.radToDeg(cameraStats.effectivePitchRadians).toFixed(1)}°`,
-        `blob facing: ${THREE.MathUtils.radToDeg(blobFacing.yawRadians).toFixed(1)}°`,
+        `Bob facing / reversing: ${THREE.MathUtils.radToDeg(slimeDiagnostics.facingYawRadians).toFixed(1)}° / ${slimeDiagnostics.reversing ? 'yes' : 'no'}`,
         `teaching-surface regression: ${this.slopeRegressionStatus}`,
         `two-body switching regression: ${this.twoBodySwitchingRegressionStatus}`,
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
@@ -1658,6 +1679,8 @@ export class GreyboxLevelRuntime {
         `lighting room / Bob hatch / Goop release: ${testScene.lightingDiagnostics.activeRoomId} / ${testScene.lightingDiagnostics.bobHatchState} / ${testScene.lightingDiagnostics.goopReleaseState}`,
         `lighting particles / manual release drive: ${testScene.lightingDiagnostics.activeParticleCount} / ${testScene.lightingDiagnostics.goopReleaseManuallyDriven ? 'yes' : 'no'}`,
         `lighting state applications Goop / elevator: ${testScene.lightingDiagnostics.goopStateApplicationCount} / ${testScene.lightingDiagnostics.elevatorStateApplicationCount}`,
+        `Bob reflection zone / body / eyes: ${testScene.lightingDiagnostics.bobReflectionZone} / ${slimeDiagnostics.materials?.bodyReflectionIntensity.toFixed(2) ?? 'unprepared'} / ${slimeDiagnostics.materials?.eyeReflectionIntensity.toFixed(2) ?? 'unprepared'}`,
+        `Bob reflection target body / eyes: ${testScene.lightingDiagnostics.bobBodyReflectionTarget.toFixed(2)} / ${testScene.lightingDiagnostics.bobEyeReflectionTarget.toFixed(2)}`,
         `lighting transition profiles: ${JSON.stringify(this.lightingTransitionProfiles)}`,
         `lighting prewarm profile: ${JSON.stringify(this.lightingPrewarmProfile ?? null)}`,
         `unique materials / instanced meshes: ${renderStats.uniqueMaterials} / ${renderStats.instancedMeshes}`,
@@ -1731,6 +1754,7 @@ export class GreyboxLevelRuntime {
     const renderer = this.renderLayer.renderer;
     const camera = this.renderLayer.cameraRig.camera;
     const prewarmCamera = camera.clone();
+    const transmissionPrewarmTarget = new THREE.WebGLRenderTarget(1, 1);
     const previousViewport = renderer.getViewport(new THREE.Vector4());
     const previousScissor = renderer.getScissor(new THREE.Vector4());
     const previousScissorTest = renderer.getScissorTest();
@@ -1780,6 +1804,42 @@ export class GreyboxLevelRuntime {
                 prewarmCamera,
                 this.renderLayer.scene,
               );
+            }
+            // Bob's transmission pass renders opaque surfaces into a linear
+            // target without canvas tone mapping. Warm that program variant
+            // too, even when a surface misses the hidden boot camera frustum.
+            const opaqueSubset = new THREE.Group();
+            for (const source of compileSubset.children) {
+              if (!isRenderableObject(source)) continue;
+              const materials = (
+                Array.isArray(source.material)
+                  ? source.material
+                  : [source.material]
+              ).filter(material => material.visible && !material.transparent);
+              if (materials.length === 0) continue;
+              const clone = source.clone(false) as typeof source;
+              clone.material = Array.isArray(source.material) ? materials : materials[0];
+              opaqueSubset.add(clone);
+            }
+            try {
+              const previousTarget = renderer.getRenderTarget();
+              let transmissionCompilation: Promise<unknown> | undefined;
+              try {
+                renderer.setRenderTarget(transmissionPrewarmTarget);
+                if (renderer.extensions.has('KHR_parallel_shader_compile')) {
+                  transmissionCompilation = renderer.compileAsync(
+                    opaqueSubset, prewarmCamera, this.renderLayer.scene,
+                  );
+                } else {
+                  renderer.compile(opaqueSubset, prewarmCamera, this.renderLayer.scene);
+                }
+              } finally {
+                // Restore before asynchronous compilation yields control.
+                renderer.setRenderTarget(previousTarget);
+              }
+              await transmissionCompilation;
+            } finally {
+              opaqueSubset.clear();
             }
           } finally {
             compileSubset.clear();
@@ -1864,14 +1924,17 @@ export class GreyboxLevelRuntime {
       const burstResourcePrimeProgramsBefore =
         renderer.info.programs?.length ?? 0;
       const burstResourcePrimeStarted = this.hostWindow.performance.now();
-      resources.testScene.primeDeathBurstResources((burstRoot) => {
-        renderIsolatedPrewarmResources(
-          renderer,
-          this.renderLayer.scene,
-          prewarmCamera,
-          [burstRoot],
-        );
-      });
+      resources.testScene.bob.primeDeathResources(
+        resources.spawnPosition,
+        (burstRoot) => {
+          renderIsolatedPrewarmResources(
+            renderer,
+            this.renderLayer.scene,
+            prewarmCamera,
+            [burstRoot],
+          );
+        },
+      );
       const burstResourcePrimeDurationMs =
         this.hostWindow.performance.now() - burstResourcePrimeStarted;
       this.lightingPrewarmProfile = {
@@ -1896,6 +1959,7 @@ export class GreyboxLevelRuntime {
         steps,
       };
     } finally {
+      transmissionPrewarmTarget.dispose();
       restoreRendererState();
       if (this.cancelLightingPrewarm === restoreRendererState) {
         this.cancelLightingPrewarm = undefined;

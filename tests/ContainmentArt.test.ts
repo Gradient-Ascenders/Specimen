@@ -9,7 +9,7 @@ import { captureContainmentCollisionFingerprint } from '../src/levels/Containmen
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import { createSignagePanel } from '../src/render/environment/containment/ContainmentModularComponents.ts';
 import { getUnsupportedContainmentSignCharacters } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
-import { DEFAULT_SLIME_BASE_COLOUR } from '../src/render/slime/SlimeMaterial.ts';
+import { DEFAULT_SLIME_BASE_COLOUR } from '../src/render/slime/SlimePalette.ts';
 
 test('every authored Containment sign character has a visible vector glyph', () => {
   assert.deepEqual(getUnsupportedContainmentSignCharacters(), []);
@@ -152,6 +152,14 @@ test('Room 1 sticky wall uses Bob-related restrained membrane art', () => {
   const bobColour = new THREE.Color(DEFAULT_SLIME_BASE_COLOUR);
 
   assert.ok(membrane instanceof THREE.Mesh);
+  const collisionSurface = scene.collisionMeshes.find(
+    (mesh) => mesh.name === 'room-1-vent-sticky-entry-wall',
+  );
+  assert.ok(collisionSurface);
+  const membraneFront = new THREE.Box3().setFromObject(membrane).min.z;
+  const collisionFront = new THREE.Box3().setFromObject(collisionSurface).min.z;
+  assert.ok(membraneFront >= collisionFront,
+    `sticky membrane protrudes ${collisionFront - membraneFront} m into Bob's route`);
   assert.equal(membrane.material, scene.artResources.materials.stickyMembrane);
   const membraneColour = scene.artResources.materials.stickyMembrane.color;
   assert.equal(membraneColour.getHex(), bobColour.getHex());
@@ -865,8 +873,8 @@ test('Containment scene resets and recreates without duplicating Room 1 or Room 
     initialObjects += 1;
   });
 
-  first.resetProbe();
-  first.resetProbe();
+  first.resetTeachingPresentation();
+  first.resetTeachingPresentation();
   let objectsAfterResets = 0;
   first.teaching.root.traverse(() => {
     objectsAfterResets += 1;

@@ -22,6 +22,10 @@ class FakeButton {
   }
 
   focus(): void {}
+
+  click(): void {
+    this.clickListener?.();
+  }
 }
 
 class FakeDialog {
@@ -230,9 +234,10 @@ class RuntimeFakeCameraRig {
   queuedLookY = 0;
   appliedLookX = 0;
   appliedLookY = 0;
+  followTarget: unknown;
 
-  setFollowTarget(): void {}
-  clearFollowTarget(): void {}
+  setFollowTarget(target: unknown): void { this.followTarget = target; }
+  clearFollowTarget(): void { this.followTarget = undefined; }
   reset(): void {}
   queueLookInput(deltaX: number, deltaY: number): void {
     this.queuedLookX += deltaX;
@@ -276,6 +281,99 @@ class RuntimeFakeCameraRig {
     this.applyQueuedLookInput();
   }
 }
+
+test('Blackout mounts shared Bob presentation and owns its lifecycle without replacing Goop or Volt', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement: () => new RuntimeFakeElement(),
+    },
+  });
+
+  try {
+    const scene = new THREE.Scene();
+    const renderLayer = {
+      scene,
+      canvas: new RuntimeFakeElement(),
+      cameraRig: new RuntimeFakeCameraRig(),
+      render: () => {},
+    } as unknown as RenderLayer;
+    const cameraRig = renderLayer.cameraRig as unknown as RuntimeFakeCameraRig;
+    const host = new RuntimeFakeElement();
+    const input = new RuntimeFakeInput();
+    const runtime = new BlackoutLevelRuntime({
+      host: host as unknown as HTMLElement,
+      input: input as unknown as Input,
+      renderLayer,
+      progression: {
+        unlockedSlimeIds: ['bob', 'goop', 'volt'],
+        activeSlimeId: 'volt',
+      },
+    });
+
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      runtime.load();
+      runtime.start();
+
+      const bobRoot = scene.getObjectByName('player-slime-bob-presentation');
+      const bobCharacter = scene.getObjectByName('player-slime-bob-character');
+      assert.ok(bobRoot, 'Blackout should mount the shared Bob presentation root');
+      assert.ok(bobCharacter, 'Blackout should use the shared Bob character hierarchy');
+      assert.equal(
+        scene.children.filter((child) => child.name === 'blackout-foundation-slime').length,
+        2,
+        'Goop and Volt should retain their existing plain presentations',
+      );
+      assert.deepEqual(bobCharacter.position.toArray(), [-2, 0.46, 2]);
+
+      runtime.activateCheckpoint('cp3');
+      runtime.recoverActiveCheckpoint();
+      assert.deepEqual(bobCharacter.position.toArray(), [-2, 0.46, 20]);
+      input.press('switchSlime');
+      runtime.fixedUpdate(1 / 60);
+      assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'bob');
+      assert.notEqual(cameraRig.followTarget, bobRoot);
+      assert.notEqual(cameraRig.followTarget, bobCharacter);
+      assert.deepEqual(
+        (cameraRig.followTarget as { position: THREE.Vector3 }).position.toArray(),
+        bobCharacter.position.toArray(),
+        'camera should follow Bob authoritative body at the presented position',
+      );
+
+      assert.equal(runtime.requestFailure(), true);
+      for (let step = 0; step < 70; step += 1) runtime.fixedUpdate(1 / 60);
+      assert.equal(bobCharacter.visible, false);
+      [...host.children].reverse().find(
+        (child) => child.className === 'death-screen' && !child.removed,
+      )?.retryButton.click();
+      assert.equal(bobCharacter.visible, true);
+      assert.deepEqual(bobCharacter.position.toArray(), [-2, 0.46, 20]);
+
+      runtime.restartLevel();
+      assert.equal(bobCharacter.visible, true);
+      assert.deepEqual(bobCharacter.position.toArray(), [-2, 0.46, 2]);
+      assert.notEqual(cameraRig.followTarget, bobCharacter);
+
+      assert.equal(runtime.beginMerge(), true);
+      for (let step = 0; step < 360; step += 1) runtime.fixedUpdate(1 / 60);
+      assert.equal(runtime.phase, 'specimen');
+      assert.equal(bobCharacter.visible, false);
+
+      runtime.unload();
+      assert.equal(scene.getObjectByName('player-slime-bob-presentation'), undefined);
+      assert.equal(scene.children.length, 0);
+    }
+
+    runtime.dispose();
+    assert.equal(runtime.state, 'disposed');
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+});
 
 test('Blackout runtime preserves live Volt tether across checkpoint/switch/pause and clears it on restart/death/dispose', () => {
   const originalDocument = globalThis.document;

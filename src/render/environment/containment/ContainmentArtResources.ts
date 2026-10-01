@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
-import { DEFAULT_SLIME_BASE_COLOUR } from '../../slime/SlimeMaterial.ts';
+import { DEFAULT_SLIME_BASE_COLOUR } from '../../slime/SlimePalette.ts';
 import {
   createContainmentProceduralTextures,
   type ContainmentProceduralTextures,

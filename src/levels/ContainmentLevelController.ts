@@ -55,6 +55,7 @@ export interface ContainmentObjectiveChangedEvent {
 }
 
 export interface ContainmentLevelEvents {
+  damaged: ContainmentHazardFailure;
   objectiveChanged: ContainmentObjectiveChangedEvent;
   completed: {
     readonly levelId: 'containment';
@@ -65,6 +66,7 @@ export interface ContainmentLevelEvents {
 export interface ContainmentLevelControllerOptions {
   readonly scene: ContainmentLevelScene;
   readonly body: KinematicBody;
+  readonly bobBody?: KinematicBody;
   readonly persistentBodies?: readonly KinematicBody[];
   readonly collisionWorld: CollisionWorld;
   readonly requestDeath: (recovery: DeathRecoveryAction) => boolean;
@@ -80,6 +82,7 @@ export class ContainmentLevelController {
 
   private readonly scene: ContainmentLevelScene;
   private body: KinematicBody;
+  private readonly bobBody: KinematicBody;
   private readonly persistentBodies: readonly KinematicBody[];
   private readonly collisionWorld: CollisionWorld;
   private readonly requestDeathAction: (recovery: DeathRecoveryAction) => boolean;
@@ -105,8 +108,15 @@ export class ContainmentLevelController {
     this.scene = options.scene;
     this.body = options.body;
     this.persistentBodies = [...(options.persistentBodies ?? [options.body])];
+    if (this.persistentBodies.length > 1 && !options.bobBody) {
+      throw new Error('Multi-body Containment requires an explicit Bob body.');
+    }
+    this.bobBody = options.bobBody ?? options.body;
     if (!this.persistentBodies.includes(this.body)) {
       throw new Error('The active body must belong to the persistent body set.');
+    }
+    if (!this.persistentBodies.includes(this.bobBody)) {
+      throw new Error('Bob must belong to the persistent body set.');
     }
     if (new Set(this.persistentBodies).size !== this.persistentBodies.length) {
       throw new Error('Persistent level bodies must be unique.');
@@ -200,6 +210,8 @@ export class ContainmentLevelController {
   }
 
   requestHazardFailure(failure: ContainmentHazardFailure): boolean {
+    if (this.stateValue !== 'playing') return false;
+    this.events.emit('damaged', failure);
     return this.requestFailure(`${failure.roomId}:${failure.hazardId}`);
   }
 
@@ -209,16 +221,16 @@ export class ContainmentLevelController {
 
   recoverActiveCheckpoint(): void {
     this.checkpoints.recover(this.body);
-    this.scene.reconcilePresentationAfterRecovery();
+    this.reconcileBobPresentationAfterRecovery();
   }
 
   /** Development-only shortcut that preserves normal checkpoint invariants. */
   teleportToRoomForDebug(roomId: ContainmentRoomId): void {
     this.checkpoints.activate(DEBUG_ROOM_ENTRY_CHECKPOINT_IDS[roomId]);
     this.checkpoints.recover(this.body);
-    this.scene.reconcilePresentationAfterRecovery();
     this.stateValue = 'playing';
     this.setActiveRoom(roomId);
+    this.reconcileBobPresentationAfterRecovery();
     this.leverAdhesionSeconds = 0;
   }
 
@@ -396,10 +408,14 @@ export class ContainmentLevelController {
     if (this.stateValue !== 'playing') return false;
     const accepted = this.requestDeathAction(() => {
       this.checkpoints.recover(this.body);
-      this.scene.reconcilePresentationAfterRecovery();
+      this.reconcileBobPresentationAfterRecovery();
     });
     if (accepted) this.lastFailureIdValue = failureId;
     return accepted;
+  }
+
+  private reconcileBobPresentationAfterRecovery(): void {
+    this.scene.reconcilePresentationAfterRecovery(this.bobBody.position);
   }
 
   private completeLevel(): void {

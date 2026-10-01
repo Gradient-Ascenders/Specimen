@@ -3,68 +3,73 @@ name: PR validation
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  production-build:
+  unit-tests:
+    name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Check out repository
+      - name: Check out proposed merge
         uses: actions/checkout@v7
 
-      - name: Use pinned Node.js version
+      - name: Use pinned Node.js version and cache npm downloads
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+          cache: npm
 
-      - name: Install dependencies
+      - name: Install locked dependencies
         run: npm ci
 
       - name: Run tests
         run: npm test
 
-      - name: Type-check
-        run: npm run type-check
-
-      - name: Build and validate production archive
-        run: npm run archive
-
-      - name: Upload validated production archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: specimen-production
-          path: artifacts/specimen-production.zip
-          if-no-files-found: error
-          retention-days: 14
-
-  level-one-shader-program-regression:
+  production-build:
+    name: Production smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Check out repository
+      - name: Check out proposed merge
         uses: actions/checkout@v7
 
-      - name: Use pinned Node.js version
+      - name: Use pinned Node.js version and cache npm downloads
         uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+          cache: npm
 
-      - name: Install dependencies
+      - name: Install locked dependencies
         run: npm ci
+
+      # build already runs tsc. Do not type-check or build a second time.
+      - name: Build for production
+        run: npm run build
+
+      - name: Validate production layout and references
+        run: npm run validate:production
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run Level 1 shader-program browser regression
-        run: npm run test:browser
+      - name: Smoke-test production at a nested path
+        run: npm run test:smoke
 
-      - name: Upload Playwright report on failure
+      - name: Upload browser diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: level-one-shader-program-playwright-report
-          path: playwright-report/
+          name: pr-${{ github.event.pull_request.number }}-browser-diagnostics
+          path: |
+            playwright-report/
+            test-results/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7

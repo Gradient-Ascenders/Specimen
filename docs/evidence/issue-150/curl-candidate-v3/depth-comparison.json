@@ -1,0 +1,9 @@
+{
+  "frontXY": "identical for every vertex",
+  "bodyBelowAntenna": "identical",
+  "eyes": "identical",
+  "indices": "identical",
+  "changedDepthVertices": 780,
+  "maximumDepthChange": 0.03864523861557245,
+  "lowestChangedY": 0.2173703908920288
+}

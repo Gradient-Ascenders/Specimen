@@ -640,6 +640,37 @@ test('attached movement follows the displayed camera during partial up damping',
   }
 });
 
+test('floor-to-wall camera keeps a usable view at the wall base', () => {
+  const target = createTarget();
+  target.position.set(0, 0.46, 5.34);
+  target.previousPosition.copy(target.position);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 12));
+  floor.position.set(0, -0.2, 0);
+  floor.name = 'room-floor';
+  const world = new CollisionWorld();
+  world.register(floor);
+  const rig = new CameraRig();
+  rig.setGroundOrbitYawRadians(Math.PI);
+  rig.setFollowTarget(target, world);
+  rig.update(1, 1 / 60);
+
+  target.gameplayUp.set(0, 0, -1);
+  target.attached = true;
+  for (let step = 0; step < 60; step += 1) {
+    rig.update(1, 1 / 60);
+    assert.ok(rig.getDiagnostics().currentDistanceMetres >= 1.3,
+      `camera collapsed to ${rig.getDiagnostics().currentDistanceMetres.toFixed(2)} m`);
+  }
+  const forward = rig.copySurfaceMovementDirection(0, -1,
+    target.gameplayUp, new THREE.Vector3());
+  assert.ok(forward.y > 0.8, `forward stopped climbing: ${forward.toArray()}`);
+  teleportTarget(target, new THREE.Vector3(0, 6, 5.34));
+  for (let step = 0; step < 90; step += 1) rig.update(1, 1 / 60);
+  assert.ok(rig.camera.up.dot(target.gameplayUp) > 0.95,
+    'camera did not finish its wall turn once the floor cleared');
+  floor.geometry.dispose();
+});
+
 test('gameplay-up damping is frame-subdivision invariant and never mutates movement state', () => {
   const oneStepTarget = createTarget();
   const splitStepTarget = createTarget();

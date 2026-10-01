@@ -1,0 +1,3217 @@
+{
+  "capturedAt": "2026-09-24T22:36:03.278Z",
+  "runtimeAsset": "bob-authored.glb",
+  "productionBuild": true,
+  "developmentHelpersEnabled": true,
+  "temporaryMotionDriver": false,
+  "exposedBundles": 1,
+  "wallTravelKey": "w",
+  "observations": {
+    "01-idle": {
+      "recordingElapsedMilliseconds": 367.69999999552965,
+      "bodyPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -9,
+        0.4600100029802322,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.5999999999999985,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.39999999999999997,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 0,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "02-cruise": {
+      "recordingElapsedMilliseconds": 1934.1999999955297,
+      "bodyPosition": [
+        -7.77777777777778,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -7.869444444444443,
+        0.4600100029802322,
+        31
+      ],
+      "velocity": [
+        5.5,
+        0,
+        6.735557395310443e-16
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0.8793119195949017,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0.8793119195949017,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0.8793119195949017,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0.8793119195949017,
+      "diagnostics": {
+        "speed": 1,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.9999999999999971,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.8000000000000008,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0.8793119195949017,
+        "facingYawRadians": -1.5707963267948968,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "03-stop": {
+      "recordingElapsedMilliseconds": 3152.7999999970198,
+      "bodyPosition": [
+        -6.852777777777787,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -6.852777777777787,
+        0.4600100029802322,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0.16662986418387996,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0.16662986418387996,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0.16662986418387996,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0.16662986418387996,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 2.399999999999996,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 1.2000000000000006,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0.16662986418387996,
+        "facingYawRadians": -1.5707963267948968,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "04-reversal": {
+      "recordingElapsedMilliseconds": 5496,
+      "bodyPosition": [
+        -9.175000000000008,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -9.083333333333346,
+        0.4600100029802322,
+        31
+      ],
+      "velocity": [
+        -5.5,
+        0,
+        -6.735557395310443e-16
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0.6147840605732783,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0.6147840605732783,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0.6147840605732783,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0.6147840605732783,
+      "diagnostics": {
+        "speed": 1,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 2.999999999999994,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          0.5000000000000063,
+          0,
+          -0.866025403784435
+        ],
+        "moveDirectionLocal": [
+          -0.866025403784435,
+          0,
+          -0.5000000000000063
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 1.7999999999999985,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0.6147840605732783,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "05-full-charge": {
+      "recordingElapsedMilliseconds": 9485.69999999553,
+      "bodyPosition": [
+        -11.200000000000008,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        0.4600100029802322,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": true,
+      "chargeFraction": 1,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 1,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 1,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 1,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0.10555555555555556,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0.10555555555555556,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 1,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 1,
+        "squash": 1,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 4.09999999999999,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 2.8999999999999946,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0.005230605052550327,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "06-launch": {
+      "recordingElapsedMilliseconds": 10973,
+      "bodyPosition": [
+        -11.200000000000008,
+        2.557010002980231,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        2.483010002980237,
+        31
+      ],
+      "velocity": [
+        0,
+        4.439999999999998,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": false,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "none",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 1,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 1,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 1,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 1,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 0,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0.3,
+        "impactStrength": 0,
+        "impactAge": 4.4999999999999885,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 3.299999999999993,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0.0003180734208133668,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "07-airborne": {
+      "recordingElapsedMilliseconds": 12030.29999999702,
+      "bodyPosition": [
+        -11.200000000000008,
+        3.0340100029802306,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        3.0500100029802293,
+        31
+      ],
+      "velocity": [
+        0,
+        -0.9600000000000011,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": false,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "none",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 1,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 1,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 1,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 1,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 0,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0.3,
+        "impactStrength": 0,
+        "impactAge": 4.799999999999987,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 3.599999999999992,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0.00003895013503501257,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "08-landing": {
+      "recordingElapsedMilliseconds": 14026.19999999553,
+      "bodyPosition": [
+        -11.200000000000008,
+        0.4600100029802322,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        0.4600100029802323,
+        31.000000000000004
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0.23809523809523792,
+        "flatten": 0.7619047619047621,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0.23809523809523792,
+          "flatten": 0.7619047619047621,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0.23809523809523792,
+          "flatten": 0.7619047619047621,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0.04483146067415729,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0.04483146067415729,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 1,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 1,
+        "stretch": 0,
+        "impactStrength": 1,
+        "impactAge": 0.03333333333333333,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 4.099999999999991,
+          "impactStrength": 1,
+          "impactAgeSeconds": 0,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "09-expression-blink": {
+      "recordingElapsedMilliseconds": 15587.19999999553,
+      "bodyPosition": [
+        -11.200000000000008,
+        0.4600100029802322,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        0.46001000298023215,
+        31.000000000000004
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0.95,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0.95,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 1,
+        "impactAge": 0.4333333333333333,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 4.499999999999989,
+          "impactStrength": 1,
+          "impactAgeSeconds": 0.39999999999999997,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "09-expression-effort": {
+      "recordingElapsedMilliseconds": 17457.60000000149,
+      "bodyPosition": [
+        -11.200000000000008,
+        0.4600100029802322,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        0.46001000298023215,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0.95,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0.95,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 1,
+        "impactAge": 0.733333333333334,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 4.799999999999988,
+          "impactStrength": 1,
+          "impactAgeSeconds": 0.7000000000000005,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "09-expression-surprise": {
+      "recordingElapsedMilliseconds": 18027,
+      "bodyPosition": [
+        -11.200000000000008,
+        0.4600100029802322,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        0.46001000298023215,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0.95,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0.95,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 1,
+        "impactAge": 0.9333333333333346,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 4.999999999999988,
+          "impactStrength": 1,
+          "impactAgeSeconds": 0.9000000000000011,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "09-expression-stress-expression": {
+      "recordingElapsedMilliseconds": 18930.29999999702,
+      "bodyPosition": [
+        -11.200000000000008,
+        0.4600100029802322,
+        31
+      ],
+      "visualPosition": [
+        -11.200000000000008,
+        0.46001000298023215,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0.95
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0.95
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 1,
+        "impactAge": 1.2333333333333338,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          -1.1102230246251568e-16
+        ],
+        "moveDirectionLocal": [
+          -1.1102230246251565e-16,
+          0,
+          -0.9999999999999999
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 5.2999999999999865,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 1.5707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "10-wall-travel": {
+      "recordingElapsedMilliseconds": 23351.39999999851,
+      "bodyPosition": [
+        -4.8,
+        1.0405655585357878,
+        5.339989997019768
+      ],
+      "visualPosition": [
+        -4.8,
+        0.9488988918691326,
+        5.2231598070838485
+      ],
+      "velocity": [
+        0,
+        5.5,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        0,
+        -1
+      ],
+      "grounded": true,
+      "attached": true,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        0,
+        -1
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-1-vent-sticky-entry-wall",
+      "lastContactName": "room-1-vent-sticky-entry-wall",
+      "bodyPoses": {
+        "move-forward": 0.1863623714685943,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0.1863623714685943,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0.1863623714685943,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0.1863623714685943,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.5999999999999985,
+        "impactNormalLocal": [
+          -0.62170287874953,
+          0.7024524956553296,
+          -0.3464765820400372
+        ],
+        "surfaceNormalLocal": [
+          0.7239364650293596,
+          0.3464765820400371,
+          -0.5965483825295718
+        ],
+        "surfaceTangentLocal": [
+          0.6217028787495296,
+          -0.7024524956553301,
+          0.34647658204003656
+        ],
+        "moveDirectionLocal": [
+          0.6682495634157438,
+          0.24495512311904521,
+          -0.70245249565533
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.39999999999999997,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.42,
+          "eyeReflectionIntensity": 1.12,
+          "targetBodyReflectionIntensity": 0.42,
+          "targetEyeReflectionIntensity": 1.12
+        },
+        "locomotionStrength": 0.1863623714685943,
+        "facingYawRadians": 0.15707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "11-wall-reversal": {
+      "recordingElapsedMilliseconds": 32105.69999999553,
+      "bodyPosition": [
+        -4.8,
+        1.0750100029802319,
+        5.339989997019768
+      ],
+      "visualPosition": [
+        -4.8,
+        1.1666766696468862,
+        5.335990008940698
+      ],
+      "velocity": [
+        6.73834593769571e-16,
+        -5.5,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        0,
+        -1
+      ],
+      "grounded": true,
+      "attached": true,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        0,
+        -1
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-1-vent-sticky-entry-wall",
+      "lastContactName": "room-1-vent-sticky-entry-wall",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0.6879531843521418,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0.6879531843521418,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0.6879531843521418,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0.6879531843521418,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 2.099999999999997,
+        "impactNormalLocal": [
+          0.6691306063588686,
+          -3.053113317719181e-16,
+          -0.743144825477385
+        ],
+        "surfaceNormalLocal": [
+          1.6653345369377348e-16,
+          1,
+          -3.3306690738754696e-16
+        ],
+        "surfaceTangentLocal": [
+          -0.6691306063588683,
+          3.589495796119622e-16,
+          0.743144825477385
+        ],
+        "moveDirectionLocal": [
+          0.11625346322097058,
+          0.9876883405951377,
+          0.1046750884477945
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.9000000000000011,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.42,
+          "eyeReflectionIntensity": 1.12,
+          "targetBodyReflectionIntensity": 0.42,
+          "targetEyeReflectionIntensity": 1.12
+        },
+        "locomotionStrength": 0.6879531843521418,
+        "facingYawRadians": 0.15707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "12-wall-charge": {
+      "recordingElapsedMilliseconds": 42149.29999999702,
+      "bodyPosition": [
+        -4.8,
+        1.4155655585357867,
+        5.339989997019768
+      ],
+      "visualPosition": [
+        -4.8,
+        1.4155655585357867,
+        5.335990008940697
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        0,
+        -1
+      ],
+      "grounded": true,
+      "attached": true,
+      "chargingJump": true,
+      "chargeFraction": 1,
+      "supportNormal": [
+        0,
+        0,
+        -1
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-1-vent-sticky-entry-wall",
+      "lastContactName": "room-1-vent-sticky-entry-wall",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 1,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 1,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 1,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0.10555555555555556,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0.10555555555555556,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 1,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 1,
+        "squash": 1,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 2.399999999999996,
+        "impactNormalLocal": [
+          -0.7279428369884975,
+          -2.220446049250313e-16,
+          -0.6856378242754244
+        ],
+        "surfaceNormalLocal": [
+          -1.1102230246251565e-16,
+          1,
+          -3.3306690738754696e-16
+        ],
+        "surfaceTangentLocal": [
+          0.7279428369884972,
+          3.091811595429008e-16,
+          0.6856378242754247
+        ],
+        "moveDirectionLocal": [
+          0.1072573862518737,
+          0.9876883405951377,
+          -0.11387534828416379
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 1.2000000000000006,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.42,
+          "eyeReflectionIntensity": 1.12,
+          "targetBodyReflectionIntensity": 0.42,
+          "targetEyeReflectionIntensity": 1.12
+        },
+        "locomotionStrength": 0.0020766326312992235,
+        "facingYawRadians": 0.15707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "13-wall-detach": {
+      "recordingElapsedMilliseconds": 44000.39999999851,
+      "bodyPosition": [
+        -4.8,
+        1.4155655585357867,
+        3.2429899970197695
+      ],
+      "visualPosition": [
+        -4.8,
+        1.4155655585357867,
+        3.3169899970197574
+      ],
+      "velocity": [
+        0,
+        0,
+        -4.439999999999998
+      ],
+      "gameplayUp": [
+        0,
+        0,
+        -1
+      ],
+      "grounded": false,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        0,
+        -1
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "none",
+      "lastContactName": "none",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 1,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 1,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 1,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 1,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 0,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0.3,
+        "impactStrength": 0,
+        "impactAge": 2.7999999999999945,
+        "impactNormalLocal": [
+          -0.7279428369884977,
+          -1.942890293094024e-16,
+          -0.6856378242754242
+        ],
+        "surfaceNormalLocal": [
+          -2.220446049250313e-16,
+          1,
+          -1.1102230246251565e-16
+        ],
+        "surfaceTangentLocal": [
+          0.7279428369884975,
+          2.377568695535647e-16,
+          0.6856378242754244
+        ],
+        "moveDirectionLocal": [
+          0.10725738625187359,
+          0.9876883405951378,
+          -0.11387534828416368
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 1.5999999999999992,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.42,
+          "eyeReflectionIntensity": 1.12,
+          "targetBodyReflectionIntensity": 0.42,
+          "targetEyeReflectionIntensity": 1.12
+        },
+        "locomotionStrength": 0.00012628016035887686,
+        "facingYawRadians": 0.15707963267948966,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "14-damage": {
+      "recordingElapsedMilliseconds": 45799.10000000149,
+      "bodyPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -9,
+        0.4600100029802322,
+        31.000000000000004
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0.7393939393939395
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0.7393939393939395
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0.7393939393939395
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0.2400459418070444
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0.2400459418070444
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0.7393939393939395,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.5166666666666655,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            0,
+            0,
+            0
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.31666666666666665,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 0,
+        "reversing": false
+      },
+      "lifecycleState": "stopped",
+      "restartCount": 0
+    },
+    "15-death-stress": {
+      "recordingElapsedMilliseconds": 46960,
+      "bodyPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0.35
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0.35
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0.35
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0.3958333333333333
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0.3958333333333333
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0.35,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.6166666666666651,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": true,
+          "elapsedSeconds": 0,
+          "origin": [
+            -9,
+            0.46001000298023215,
+            31
+          ],
+          "maximumFragmentDistanceMetres": 0.045000000000000005,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.41666666666666663,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 0,
+        "reversing": false
+      },
+      "lifecycleState": "stopped",
+      "restartCount": 0
+    },
+    "16-game-over": {
+      "recordingElapsedMilliseconds": 49003.89999999851,
+      "bodyPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.6166666666666651,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": false,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 1.15,
+          "origin": [
+            -9,
+            0.46001000298023215,
+            31
+          ],
+          "maximumFragmentDistanceMetres": 3.942988444695368,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.41666666666666663,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 0,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "17-retry": {
+      "recordingElapsedMilliseconds": 51531.79999999702,
+      "bodyPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "visualPosition": [
+        -9,
+        0.46001000298023215,
+        31
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-2-floor",
+      "lastContactName": "room-2-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.6999999999999982,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            -9,
+            0.46001000298023215,
+            31
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.49999999999999994,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.56,
+          "eyeReflectionIntensity": 1.02,
+          "targetBodyReflectionIntensity": 0.56,
+          "targetEyeReflectionIntensity": 1.02
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 0,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 0
+    },
+    "18-restart": {
+      "recordingElapsedMilliseconds": 54473.10000000149,
+      "bodyPosition": [
+        -0.20995,
+        0.4600100029802322,
+        -2.60112
+      ],
+      "visualPosition": [
+        -0.20995,
+        0.4600100029802322,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-1-floor",
+      "lastContactName": "room-1-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 1.583333333333332,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            -9,
+            0.46001000298023215,
+            31
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 0.3833333333333333,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.42,
+          "eyeReflectionIntensity": 1.12,
+          "targetBodyReflectionIntensity": 0.42,
+          "targetEyeReflectionIntensity": 1.12
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 0,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 1
+    }
+  },
+  "authority": {
+    "colliderRadiusMetres": 0.45,
+    "maximumSeatWeightDelta": 0,
+    "maximumPrimaryWeightTotal": 1,
+    "resetStates": [
+      {
+        "name": "17-retry",
+        "bodyPoses": {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        "eyeExpressions": [
+          {
+            "blink": 0,
+            "effort": 0,
+            "surprise": 0,
+            "stress-expression": 0
+          },
+          {
+            "blink": 0,
+            "effort": 0,
+            "surprise": 0,
+            "stress-expression": 0
+          }
+        ],
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            -9,
+            0.46001000298023215,
+            31
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        }
+      },
+      {
+        "name": "18-restart",
+        "bodyPoses": {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        "eyeExpressions": [
+          {
+            "blink": 0,
+            "effort": 0,
+            "surprise": 0,
+            "stress-expression": 0
+          },
+          {
+            "blink": 0,
+            "effort": 0,
+            "surprise": 0,
+            "stress-expression": 0
+          }
+        ],
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            -9,
+            0.46001000298023215,
+            31
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        }
+      }
+    ],
+    "beforeUnload": {
+      "recordingElapsedMilliseconds": 85226.69999999553,
+      "bodyPosition": [
+        -0.20995,
+        0.4600100029802322,
+        -2.60112
+      ],
+      "visualPosition": [
+        -0.20995,
+        0.4600100029802322,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "gameplayUp": [
+        0,
+        1,
+        0
+      ],
+      "grounded": true,
+      "attached": false,
+      "chargingJump": false,
+      "chargeFraction": 0,
+      "supportNormal": [
+        0,
+        1,
+        0
+      ],
+      "colliderRadiusMetres": 0.45,
+      "supportColliderName": "room-1-floor",
+      "lastContactName": "room-1-floor",
+      "bodyPoses": {
+        "move-forward": 0,
+        "move-reverse": 0,
+        "squash": 0,
+        "flatten": 0,
+        "launch": 0,
+        "airborne": 0,
+        "stress": 0
+      },
+      "eyePoses": [
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        },
+        {
+          "move-forward": 0,
+          "move-reverse": 0,
+          "squash": 0,
+          "flatten": 0,
+          "launch": 0,
+          "airborne": 0,
+          "stress": 0
+        }
+      ],
+      "eyeExpressions": [
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        },
+        {
+          "blink": 0,
+          "effort": 0,
+          "surprise": 0,
+          "stress-expression": 0
+        }
+      ],
+      "maximumSeatWeightDelta": 0,
+      "primaryWeightTotal": 0,
+      "diagnostics": {
+        "speed": 0,
+        "locomotionPhase": 0,
+        "grounded": 1,
+        "jumpCharge": 0,
+        "squash": 0,
+        "stretch": 0,
+        "impactStrength": 0,
+        "impactAge": 7.3833333333333115,
+        "impactNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceNormalLocal": [
+          0,
+          1,
+          0
+        ],
+        "surfaceTangentLocal": [
+          1,
+          0,
+          0
+        ],
+        "moveDirectionLocal": [
+          0,
+          0,
+          -1
+        ],
+        "visible": true,
+        "deathBurst": {
+          "active": false,
+          "elapsedSeconds": 0,
+          "origin": [
+            -9,
+            0.46001000298023215,
+            31
+          ],
+          "maximumFragmentDistanceMetres": 0,
+          "resourcesPrimed": true,
+          "resourcePrimeCount": 1
+        },
+        "materials": {
+          "selfLit": false,
+          "catchlightCount": 0,
+          "maximumSecondaryDisplacementMetres": 0.0095,
+          "elapsedTimeSeconds": 6.183333333333317,
+          "impactStrength": 0,
+          "impactAgeSeconds": 1.2,
+          "reflectionMapName": "bob-laboratory-pmrem",
+          "bodyReflectionIntensity": 0.42,
+          "eyeReflectionIntensity": 1.12,
+          "targetBodyReflectionIntensity": 0.42,
+          "targetEyeReflectionIntensity": 1.12
+        },
+        "locomotionStrength": 0,
+        "facingYawRadians": 0,
+        "reversing": false
+      },
+      "lifecycleState": "running",
+      "restartCount": 1
+    },
+    "unload": {
+      "bobReady": false,
+      "bobRootChildren": 0,
+      "bobRootAttached": false,
+      "runtimeState": "unloaded",
+      "canvasCount": 1
+    }
+  },
+  "consoleErrors": [
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 15322.60000000149, baselineProgramCount: 99, previousHighestProgramCount: 99, newProgramCount: 107, gameplay: Object}",
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 29546.5, baselineProgramCount: 99, previousHighestProgramCount: 107, newProgramCount: 108, gameplay: Object}",
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 42993.89999999851, baselineProgramCount: 99, previousHighestProgramCount: 108, newProgramCount: 110, gameplay: Object}",
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 50766.89999999851, baselineProgramCount: 99, previousHighestProgramCount: 110, newProgramCount: 111, gameplay: Object}"
+  ],
+  "knownConsoleDiagnostics": [
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 15322.60000000149, baselineProgramCount: 99, previousHighestProgramCount: 99, newProgramCount: 107, gameplay: Object}",
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 29546.5, baselineProgramCount: 99, previousHighestProgramCount: 107, newProgramCount: 108, gameplay: Object}",
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 42993.89999999851, baselineProgramCount: 99, previousHighestProgramCount: 108, newProgramCount: 110, gameplay: Object}",
+    "Cold shader program regression after Level 1 warm-up. {timestampMs: 50766.89999999851, baselineProgramCount: 99, previousHighestProgramCount: 110, newProgramCount: 111, gameplay: Object}"
+  ],
+  "unexplainedConsoleErrors": [],
+  "failedRequests": []
+}
