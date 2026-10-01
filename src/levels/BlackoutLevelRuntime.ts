@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { BlackoutMaintenanceBayController } from './BlackoutMaintenanceBayController.ts';
+import { BlackoutTransitController } from './BlackoutTransitController.ts';
+import { BLACKOUT_TRANSIT_CHECKPOINTS } from './BlackoutTransitRoom.ts';
+import { BLACKOUT_BOSS_STAGING_CHECKPOINT } from './BlackoutBossStaging.ts';
 import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
 
 import {
@@ -122,6 +125,16 @@ import {
 
 const OUT_OF_BOUNDS_Y = -5;
 const BLACKOUT_BOB_REFLECTION = { body: 0.12, eyes: 0.28 } as const;
+const BLACKOUT_MAINTENANCE_VOLT_RANGES = Object.freeze({
+  acquisitionRangeMetres: 11,
+  instabilityWarningRangeMetres: 12,
+  tetherBreakRangeMetres: 13,
+});
+const BLACKOUT_TRANSIT_VOLT_RANGES = Object.freeze({
+  acquisitionRangeMetres: 100,
+  instabilityWarningRangeMetres: 110,
+  tetherBreakRangeMetres: 120,
+});
 
 export interface BlackoutLevelRuntimeOptions {
   readonly authoredRoomOne?: boolean;
@@ -136,6 +149,8 @@ interface BlackoutRuntimeResources {
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly goopAcidPresentation: GoopAcidPresentation;
   readonly maintenanceBay?: BlackoutMaintenanceBayController;
+  readonly transit?: BlackoutTransitController;
+  readonly unregisterTransitCheckpointParticipant?: () => void;
   readonly dronePresentation?: MaintenanceDronePresentation;
   readonly scene: BlackoutLevelScene;
   readonly collisionWorld: CollisionWorld;
@@ -206,6 +221,8 @@ export class BlackoutLevelRuntime {
   private readonly authoredRoomOne: boolean;
   private bayComplete = false;
   private roomTwoInitialized = false;
+  private bayExitHintShown = false;
+  private transitObjective = '';
   private previousShadowEnabled: boolean | undefined;
 
   constructor(options: BlackoutLevelRuntimeOptions) {
@@ -492,7 +509,16 @@ export class BlackoutLevelRuntime {
     const resources = this.requireResources();
     if (this.lifecycle.state !== 'running' || resources.phase.terminal) return false;
     if (!resources.deathSequence.requestDeath(
-      () => this.restoreActiveCheckpoint(resources, false),
+      () => {
+        if (this.authoredRoomOne && this.currentRoom.roomId === 'room-2' && resources.transit) {
+          // Death retries restart the whole cooperation room, not a late
+          // snapshot with inactive slimes and solved devices left mid-route.
+          resources.transit.reset();
+          resources.transit.setActive(true);
+          this.activateCheckpoint('cp3');
+        }
+        this.restoreActiveCheckpoint(resources, false);
+      },
     )) {
       return false;
     }
@@ -701,6 +727,17 @@ export class BlackoutLevelRuntime {
   fixedUpdate(deltaSeconds: number): void {
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
+    resources.scene.transitRoom?.update(deltaSeconds);
+    if (this.authoredRoomOne && this.debugInteractionEnabled && this.input.enabled) {
+      const room = this.input.wasPressed('debugTeleportRoomOne') ? 1
+        : this.input.wasPressed('debugTeleportRoomTwo') ? 2
+          : this.input.wasPressed('debugTeleportRoomThree') ? 3 : undefined;
+      if (room) {
+        this.teleportToAuthoredRoom(room);
+        this.input.endFixedUpdate();
+        return;
+      }
+    }
     if (resources.phase.terminal) {
       this.input.endFixedUpdate();
       return;
@@ -1075,10 +1112,42 @@ export class BlackoutLevelRuntime {
         this.input.endFixedUpdate();
         return;
       }
-      if (bay.complete && !this.bayComplete) {
-        this.commitRoomOneCompletion(resources);
+      if (this.currentRoom.roomId === 'room-1' && !this.bayExitHintShown &&
+          (bay.complete || bay.bay.vestibuleAt(bodies.bob.position) || bay.bay.vestibuleAt(bodies.goop.position))) {
+        this.bayExitHintShown = true;
+        this.events.emit('objectiveChanged',{roomId:'room-1',objective:'Bob and Goop: follow the corridor into Room 2. Volt: follow the vent to the side catwalk.'});
+      }
+      if (this.currentRoom.roomId === 'room-1' && bay.complete && Object.values(bodies).every(body => bay.bay.transitAt(body.position))) {
+        this.enterTransitRoom(resources);
+      }
+    }
+
+    const enteringTransit = this.currentRoom.roomId === 'room-1' &&
+      resources.group.bodies.some(body => resources.maintenanceBay?.bay.transitAt(body.position));
+    if (resources.transit && (this.currentRoom.roomId === 'room-2' || enteringTransit)) {
+      const transit = resources.transit;
+      if (!transit.isActive) transit.setActive(true);
+      const failed = transit.update(deltaSeconds, {
+        bob: resources.group.bobBody, goop: resources.group.goopBody, volt: resources.group.voltBody,
+      });
+      if (failed) {
+        this.requestFailure();
         this.input.endFixedUpdate();
         return;
+      }
+      const checkpoint = BLACKOUT_TRANSIT_CHECKPOINTS[transit.checkpointStage];
+      if (this.currentRoom.roomId === 'room-2' && checkpoint && resources.checkpoints.activeCheckpoint.checkpointId !== checkpoint.id) {
+        this.activateCheckpoint(checkpoint.id);
+      }
+      if (this.currentRoom.roomId === 'room-2' && !this.currentRoom.local.transitComplete && transit.objective !== this.transitObjective) {
+        this.transitObjective = transit.objective;
+        this.events.emit('objectiveChanged',{roomId:'room-2',objective:transit.objective});
+      }
+      if (this.currentRoom.roomId === 'room-2' && transit.complete && !this.currentRoom.local.transitComplete) {
+        // Keep recovery/hazards in Room 2 until the revised boss arena exists.
+        this.currentRoom = {roomId:'room-2',phase:'three-slime',local:{transitComplete:true}};
+        resources.electricalSystem.disconnect('target-invalid');
+        this.events.emit('objectiveChanged',{roomId:'room-2',objective:'Transit restored — boss-sector entrance reached'});
       }
     }
 
@@ -1129,6 +1198,9 @@ export class BlackoutLevelRuntime {
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
         this.lifecycle.state === 'running' && resources.deathSequence.isPlaying ? stats.frameDeltaSeconds : 0,
+        this.lifecycle.state === 'running' && resources.deathSequence.isPlaying &&
+          resources.group.activeSlimeId === 'volt' && this.input.enabled &&
+          this.input.pointerLocked && this.input.isDown('aimAbility'),
       );
       resources.specimenPresentation.update(
         resources.specimenForm.readModel.controlledForm === 'specimen',
@@ -1145,6 +1217,7 @@ export class BlackoutLevelRuntime {
         goopAimPresentationAllowed,
         false,
       );
+      resources.transit?.projectilePresentation.update(interpolationAlpha);
       // GoopAcidPresentation owns its own aim overlay; reconcile the shared
       // camera pose after all ability presentations have updated.
       this.renderLayer.cameraRig.setAimPresentationActive(
@@ -1206,6 +1279,30 @@ export class BlackoutLevelRuntime {
     target.collisionEligible = resources.collisionWorld.lastSweepEligibleColliderCount;
     target.collisionCandidates = resources.collisionWorld.lastSweepBroadphaseCandidateCount;
     target.collisionNarrowChecks = resources.collisionWorld.lastSweepNarrowPhaseCheckCount;
+  }
+
+  private enterTransitRoom(resources: BlackoutRuntimeResources): void {
+    if (!resources.transit) return;
+    resources.maintenanceDrone.recoverImmediately('checkpoint');
+    resources.transit.setActive(true);
+    // Both entrances are now physical continuations. Save a safe recovery
+    // layout without snapping the bodies/camera away from their live positions.
+    this.commitRoomOneCompletion(resources);
+  }
+
+  private teleportToAuthoredRoom(room: 1 | 2 | 3): void {
+    // Start each shortcut from the same clean puzzle/checkpoint baseline;
+    // never carry a mounted rider, tether, burn, or extended bridge across it.
+    this.restartResources();
+    if (room === 1) return;
+    const resources = this.requireResources();
+    const checkpoint = room === 2 ? BLACKOUT_TRANSIT_CHECKPOINTS[0]! : BLACKOUT_BOSS_STAGING_CHECKPOINT;
+    resources.transit?.setActive(room === 2);
+    resources.group.setRecoveryState({positions:checkpoint.bodyPositions, activeSlimeId:checkpoint.activeSlimeId});
+    resources.group.restoreRecoveryState();
+    this.activateCheckpoint(checkpoint.id);
+    this.restoreActiveCheckpoint(resources, true);
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
   }
 
   private readonly loadResources = (): void => {
@@ -1315,12 +1412,18 @@ export class BlackoutLevelRuntime {
       );
       if (this.authoredRoomOne) {
         checkpoints.registerCheckpoint(BLACKOUT_AUTHORED_ROOM_ONE_CP2);
-        checkpoints.registerCheckpoint(BLACKOUT_AUTHORED_ROOM_TWO_CP3);
+        if (!scene.transitRoom) {
+          checkpoints.registerCheckpoint(BLACKOUT_AUTHORED_ROOM_TWO_CP3);
+        }
       } else {
         for (const checkpoint of BLACKOUT_CHECKPOINTS.slice(1)) {
           checkpoints.registerCheckpoint(checkpoint);
         }
       }
+      if (scene.transitRoom) for (const checkpoint of BLACKOUT_TRANSIT_CHECKPOINTS) {
+        checkpoints.registerCheckpoint(checkpoint);
+      }
+      if (scene.bossStaging) checkpoints.registerCheckpoint(BLACKOUT_BOSS_STAGING_CHECKPOINT);
       checkpoints.activate('cp1', initialActive);
 
       const maintenanceDroneFixture =
@@ -1408,9 +1511,16 @@ export class BlackoutLevelRuntime {
       const electricalTargets = new ElectricalTargetRegistry(collisionWorld);
       rollback(() => electricalTargets.dispose());
 
-      // Room 1 has no soluble geometry yet, but Goop still needs the same
-      // authoritative aim/projectile controls as Level 2.
-      const dissolveSystem = new DissolveSystem([]);
+      const transit = scene.transitRoom ? new BlackoutTransitController({
+        room: scene.transitRoom, world: collisionWorld, surfaces: surfaceRegistry, electricalTargets,
+      }) : undefined;
+      if (transit) {
+        scene.root.add(transit.root);
+        rollback(() => transit.dispose());
+      }
+      const unregisterTransitCheckpointParticipant = transit ? checkpoints.registerParticipant(transit) : undefined;
+      if (unregisterTransitCheckpointParticipant) rollback(unregisterTransitCheckpointParticipant);
+      const dissolveSystem = new DissolveSystem(transit?.dissolveTargets ?? []);
       rollback(() => dissolveSystem.dispose());
       const acidProjectileSystem = new AcidProjectileSystem({
         slimeManager: manager,
@@ -1500,7 +1610,14 @@ export class BlackoutLevelRuntime {
         collisionWorld,
         targetRegistry: electricalTargets,
         aimRayProvider: this.renderLayer.cameraRig,
-        ...(this.authoredRoomOne ? {config:{acquisitionRangeMetres:11,instabilityWarningRangeMetres:12,tetherBreakRangeMetres:13}} : {}),
+        ...(this.authoredRoomOne ? {
+          // Room 2 can be entered by Volt before the group handoff changes the
+          // room ID. Scope his longer reach to the physical transit chamber,
+          // never to Room 1's receiver or the connecting maintenance duct.
+          rangeConfigProvider: () => maintenanceBay?.bay.transitAt(group.voltBody.position)
+            ? BLACKOUT_TRANSIT_VOLT_RANGES
+            : BLACKOUT_MAINTENANCE_VOLT_RANGES,
+        } : {}),
       });
       rollback(() => electricalSystem.dispose());
 
@@ -1537,6 +1654,7 @@ export class BlackoutLevelRuntime {
       const electricalPresentation = new VoltElectricalPresentation({
         scene: this.renderLayer.scene,
         host: this.host,
+        targetRegistry: electricalTargets,
       });
       rollback(() => electricalPresentation.dispose());
 
@@ -1545,11 +1663,13 @@ export class BlackoutLevelRuntime {
         scene: this.renderLayer.scene,
         cameraRig: this.renderLayer.cameraRig,
         source: acidProjectileSystem,
-        targets: [],
+        targets: transit?.dissolveTargets ?? [],
       });
       rollback(() => goopAcidPresentation.dispose());
 
       this.resources = {
+        transit,
+        unregisterTransitCheckpointParticipant,
         dissolveSystem,
         acidProjectileSystem,
         goopAcidPresentation,
@@ -1605,6 +1725,8 @@ export class BlackoutLevelRuntime {
       this.currentRoom = checkpoints.activeCheckpoint.room;
       this.bayComplete = false;
       this.roomTwoInitialized = false;
+      this.bayExitHintShown = false;
+      this.transitObjective = '';
       this.completionEmitted = false;
       this.syncVisuals(this.resources);
       this.resources.electricalPresentation.update(
@@ -1672,6 +1794,8 @@ export class BlackoutLevelRuntime {
     resources.dronePresentation?.resetTutorial();
     this.bayComplete = false;
     this.roomTwoInitialized = false;
+    this.bayExitHintShown = false;
+    this.transitObjective = '';
     resources.electricalSystem.reset('restart');
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
@@ -1694,6 +1818,7 @@ export class BlackoutLevelRuntime {
     this.bayComplete =
       this.roomTwoInitialized ||
       snapshot.room.local.maintenanceBayComplete === true;
+    resources.transit?.setActive(snapshot.room.roomId === 'room-2');
     resources.phase.restore(snapshot.room.phase);
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
@@ -1735,6 +1860,8 @@ export class BlackoutLevelRuntime {
     resources.unregisterCombatCheckpointParticipant();
     resources.unregisterSentinelCheckpointParticipant();
     resources.unregisterMaintenanceDroneCheckpointParticipant();
+    resources.unregisterTransitCheckpointParticipant?.();
+    resources.transit?.dispose();
     resources.dronePresentation?.dispose();
     if(this.previousShadowEnabled!==undefined) {
       this.renderLayer.renderer.shadowMap.enabled=this.previousShadowEnabled;
@@ -1768,6 +1895,8 @@ export class BlackoutLevelRuntime {
     this.currentRoom = { roomId: 'room-1', phase: 'three-slime', local: {} };
     this.bayComplete = false;
     this.roomTwoInitialized = false;
+    this.bayExitHintShown = false;
+    this.transitObjective = '';
     this.completionEmitted = false;
     this.notifyHUD(undefined, true);
   };
@@ -1804,6 +1933,7 @@ export class BlackoutLevelRuntime {
   ): void {
     if (
       !this.authoredRoomOne ||
+      this.bayComplete ||
       this.roomTwoInitialized ||
       !resources.maintenanceBay?.complete
     ) {
@@ -1857,7 +1987,8 @@ export class BlackoutLevelRuntime {
     this.input.resetState();
     resources.maintenanceBay?.reset();
     resources.dronePresentation?.resetTutorial();
-    this.bayComplete = false;
+    this.bayExitHintShown = false;
+    this.transitObjective = '';
     resources.electricalSystem.reset('reset');
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
@@ -1876,6 +2007,11 @@ export class BlackoutLevelRuntime {
       resources.group.voltBody,
     );
     this.currentRoom = snapshot.room;
+    resources.transit?.setActive(snapshot.room.roomId === 'room-2');
+    this.roomTwoInitialized = snapshot.room.roomId === 'room-2';
+    this.bayComplete =
+      this.roomTwoInitialized ||
+      snapshot.room.local.maintenanceBayComplete === true;
     resources.phase.restore(snapshot.room.phase);
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
@@ -1888,6 +2024,9 @@ export class BlackoutLevelRuntime {
     }
     clearJump(resources.jump, true);
     this.renderLayer.cameraRig.reset();
+    if (snapshot.room.roomId === 'room-2' || snapshot.room.local.bossStaging) {
+      this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
+    }
     this.retargetCamera(resources);
     this.syncVisuals(resources);
     this.notifyHUD(undefined, true);
@@ -2256,10 +2395,12 @@ function interpolateBodyPosition(
 function objectiveFor(room: BlackoutRoomState): string {
   switch (room.roomId) {
     case 'room-1': return 'Use Volt to bring the restricted sector back online';
-    case 'room-2': return room.local.maintenanceBayComplete
-      ? 'Maintenance bay complete — Room 2 staging area'
-      : 'Coordinate Bob, Goop, and Volt';
-    case 'room-3': return 'Reach the experimental core';
+    case 'room-2': return room.local.transitComplete ? 'Transit restored — boss-sector entrance reached' : room.local.transitStage === 2
+      ? 'Bob holds the bridge. Goop clears its sightline. Volt crosses and locks it.'
+      : room.local.transitStage === 1
+        ? 'Use Volt to raise the cargo lifts and Goop to shield Bob’s route'
+        : 'Restore the transit lights and lower cover for Bob';
+    case 'room-3': return room.local.bossStaging ? 'Room 3 — boss arena not built yet. Press 1 or 2 to return.' : 'Reach the experimental core';
     case 'room-4a': return 'Enter the merge chamber';
     case 'room-4b': return 'Defeat the facility defence system';
     case 'ending': return room.phase === 'complete' ? 'Escape complete' : 'Escape the facility';

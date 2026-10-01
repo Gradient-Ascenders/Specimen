@@ -97,9 +97,9 @@ interface MutableVoltElectricalReadModel {
   connectedTargetName: string | undefined;
   connectionUnstable: boolean;
   tetherDistanceMetres: number;
-  readonly acquisitionRangeMetres: number;
-  readonly instabilityWarningRangeMetres: number;
-  readonly tetherBreakRangeMetres: number;
+  acquisitionRangeMetres: number;
+  instabilityWarningRangeMetres: number;
+  tetherBreakRangeMetres: number;
   beamMode: VoltBeamMode;
   readonly beamStart: MutableVectorState;
   readonly beamEnd: MutableVectorState;
@@ -144,6 +144,8 @@ export interface VoltElectricalSystemOptions<Body extends VoltElectricalBody> {
   readonly targetRegistry: ElectricalTargetRegistry;
   readonly aimRayProvider: VoltAimRayProvider;
   readonly config?: Partial<VoltElectricalConfig>;
+  /** Optional authored room profile, refreshed before acquisition and tether checks. */
+  readonly rangeConfigProvider?: () => Readonly<VoltElectricalConfig>;
 }
 
 /**
@@ -162,7 +164,8 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
   private readonly collisionWorld: CollisionWorld;
   private readonly targetRegistry: ElectricalTargetRegistry;
   private readonly aimRayProvider: VoltAimRayProvider;
-  private readonly config: VoltElectricalConfig;
+  private config: VoltElectricalConfig;
+  private readonly rangeConfigProvider: (() => Readonly<VoltElectricalConfig>) | undefined;
   private readonly readModelValue: MutableVoltElectricalReadModel;
   private readonly unsubscribeTargetRemoved: () => void;
 
@@ -190,9 +193,11 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     this.collisionWorld = options.collisionWorld;
     this.targetRegistry = options.targetRegistry;
     this.aimRayProvider = options.aimRayProvider;
+    this.rangeConfigProvider = options.rangeConfigProvider;
     this.config = {
       ...DEFAULT_VOLT_ELECTRICAL_CONFIG,
       ...options.config,
+      ...this.rangeConfigProvider?.(),
     };
     this.validateConfig();
 
@@ -251,6 +256,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
       this.fireRequiresRelease = false;
     }
 
+    this.refreshRangeConfig();
     this.maintainConnection();
 
     const activeVolt =
@@ -314,6 +320,7 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
    */
   revalidateConnection(): void {
     this.assertNotDisposed('revalidate Volt electrical connection');
+    this.refreshRangeConfig();
     this.maintainConnection();
   }
 
@@ -620,12 +627,29 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     writeVectorState(this.readModelValue.beamStart, this.voltPosition);
   }
 
-  private validateConfig(): void {
+  private refreshRangeConfig(): void {
+    const next = this.rangeConfigProvider?.();
+    if (!next || (
+      next.acquisitionRangeMetres === this.config.acquisitionRangeMetres &&
+      next.instabilityWarningRangeMetres === this.config.instabilityWarningRangeMetres &&
+      next.tetherBreakRangeMetres === this.config.tetherBreakRangeMetres
+    )) return;
+
+    // Validate before changing either authority or presentation. Keep a copy
+    // so callers cannot mutate the active profile between fixed updates.
+    this.validateConfig(next);
+    this.config = { ...next };
+    this.readModelValue.acquisitionRangeMetres = next.acquisitionRangeMetres;
+    this.readModelValue.instabilityWarningRangeMetres = next.instabilityWarningRangeMetres;
+    this.readModelValue.tetherBreakRangeMetres = next.tetherBreakRangeMetres;
+  }
+
+  private validateConfig(config: Readonly<VoltElectricalConfig> = this.config): void {
     const {
       acquisitionRangeMetres,
       instabilityWarningRangeMetres,
       tetherBreakRangeMetres,
-    } = this.config;
+    } = config;
     if (
       !Number.isFinite(acquisitionRangeMetres) ||
       acquisitionRangeMetres <= 0 ||

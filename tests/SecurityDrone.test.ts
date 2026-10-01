@@ -34,6 +34,25 @@ function config(): SecurityDroneConfig {
   };
 }
 
+test('stationary surveillance keeps its authored gaze and rejects negative scan settings', () => {
+  const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
+  const damage = new SlimeDamageSystem(), projectiles = new DroneProjectileSystem(world, damage);
+  const fixed = {...config(), scanSpeedRadiansPerSecond: 0, scanHalfAngleRadians: 0, trackTargets: false};
+  const drone = new SecurityDrone(fixed, world, surfaces, projectiles);
+  try {
+    for (let i = 0; i < 600; i++) drone.update(1 / 60, []);
+    assert.deepEqual(drone.readModel.scanDirection, {x:0,y:0,z:1});
+    const target = {slimeId:'bob' as const, position:new THREE.Vector3(.5,0,5)};
+    drone.update(.1, [target]);
+    assert.equal(drone.readModel.state, 'warning');
+    target.position.x = .8;
+    drone.update(.4, [target]);
+    assert.equal(drone.readModel.state, 'firing');
+    assert.deepEqual(drone.readModel.scanDirection, {x:0,y:0,z:1}, 'acquiring a target must not rotate a fixed surveillance cone');
+    assert.throws(() => new SecurityDrone({...fixed, scanSpeedRadiansPerSecond:-1}, world, surfaces, projectiles), /non-negative/);
+  } finally { drone.dispose(); projectiles.dispose(); damage.dispose(); world.clear(); surfaces.clear(); }
+});
+
 test('cover blocks detection and warning always precedes projectile fire', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();

@@ -6,6 +6,12 @@ import type { Input, InputAction } from '../src/core/Input.ts';
 import type { LoopStats } from '../src/core/Loop.ts';
 import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
+import { BLACKOUT_TRANSIT_CHECKPOINTS } from '../src/levels/BlackoutTransitRoom.ts';
+import type { KinematicBody } from '../src/physics/KinematicBody.ts';
+import type { BlackoutTransitController } from '../src/levels/BlackoutTransitController.ts';
+import type { BlackoutMaintenanceBayController } from '../src/levels/BlackoutMaintenanceBayController.ts';
+import type { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
+import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -71,10 +77,14 @@ class TestInput {
 
 class TestCameraRig {
   readonly camera = new THREE.PerspectiveCamera();
+  readonly aimOrigin = new THREE.Vector3(0, 0.46, 2);
+  readonly aimDirection = new THREE.Vector3(0, 0, 1);
   aimActive = false;
+  groundYaw = 0;
   setFollowTarget(): void {}
   clearFollowTarget(): void {}
-  reset(): void {}
+  reset(): void { this.groundYaw = 0; }
+  setGroundOrbitYawRadians(yaw: number): void { this.groundYaw = yaw; }
   queueLookInput(): void {}
   applyQueuedLookInput(): void {}
   copyGroundMovementDirection(x: number, z: number, target: THREE.Vector3): THREE.Vector3 {
@@ -84,8 +94,8 @@ class TestCameraRig {
     return target.set(x, 0, z).normalize();
   }
   copyAimRay(origin: THREE.Vector3, direction: THREE.Vector3): void {
-    origin.set(0, 0.46, 2);
-    direction.set(0, 0, 1);
+    origin.copy(this.aimOrigin);
+    direction.copy(this.aimDirection);
   }
   setAimPresentationActive(active: boolean): void { this.aimActive = active; }
   update(): void {}
@@ -151,6 +161,128 @@ function createFixture() {
     },
   };
 }
+
+function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
+  return (runtime as unknown as { resources: {
+    group: { bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody };
+    maintenanceBay: BlackoutMaintenanceBayController;
+    transit: BlackoutTransitController;
+    electricalSystem: VoltElectricalSystem<KinematicBody>;
+    electricalTargets: ElectricalTargetRegistry;
+  } }).resources;
+}
+
+test('Room 1 CP1 and CP2 cannot acquire the distant maintenance circuit, but approaching it still works', () => {
+  const f = createFixture();
+  try {
+    const resources = electricalRoomInternals(f.runtime);
+    const socket = new THREE.Vector3();
+    resources.maintenanceBay.target.copySocketWorldPosition(socket);
+    for (const checkpoint of ['cp1', 'cp2'] as const) {
+      f.runtime.activateCheckpoint(checkpoint);
+      f.runtime.recoverActiveCheckpoint();
+      f.tick();
+      const volt = resources.group.voltBody;
+      assert.ok(volt.position.distanceTo(socket) > 40, 'test uses the actual starting-side body position');
+      f.cameraRig.aimOrigin.copy(volt.position);
+      f.cameraRig.aimDirection.subVectors(socket, volt.position).normalize();
+      f.input.press('aimAbility');
+      f.input.press('fireAbility');
+      f.tick();
+      const readModel = resources.electricalSystem.readModel;
+      assert.equal(readModel.acquisitionRangeMetres, 11);
+      assert.equal(readModel.instabilityWarningRangeMetres, 12);
+      assert.equal(readModel.tetherBreakRangeMetres, 13);
+      assert.equal(readModel.connectedTargetId, undefined, `${checkpoint} must not bypass the drone/proximity tutorial`);
+      assert.equal(resources.maintenanceBay.powered, false);
+      f.input.release('fireAbility');
+      f.input.release('aimAbility');
+      f.tick();
+    }
+
+    const volt = resources.group.voltBody;
+    volt.teleport(socket.clone().add(new THREE.Vector3(0, 0, -5)));
+    f.cameraRig.aimOrigin.copy(volt.position);
+    f.cameraRig.aimDirection.subVectors(socket, volt.position).normalize();
+    f.input.press('aimAbility');
+    f.input.press('fireAbility');
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.connectedTargetId, 'maintenance-bay-circuit');
+    assert.equal(resources.maintenanceBay.powered, true, 'the original near-range circuit remains usable');
+  } finally { f.cleanup(); }
+});
+
+test('the complete runtime grants long range only inside Room 2, including early arrivals and recovery', () => {
+  const f = createFixture();
+  try {
+    const resources = electricalRoomInternals(f.runtime);
+    for (const drone of resources.transit.drones) drone.setEnabled(false);
+    const targets = [
+      ...resources.transit.lights.map(receiver => receiver.target),
+      ...resources.transit.lifts.map(lift => {
+        const contact = lift.root.getObjectByName(`${lift.id}-conducting-contact`) as THREE.Mesh;
+        assert.ok(contact);
+        return resources.electricalTargets.getRegistrationForMesh(contact)!.target;
+      }),
+    ];
+    const socket = new THREE.Vector3();
+    for (const target of targets) {
+      resources.electricalSystem.reset('reset');
+      target.copySocketWorldPosition(socket);
+      resources.group.voltBody.teleport(new THREE.Vector3(-16, 2.96, socket.z - 2));
+      f.tick();
+      assert.equal(f.runtime.roomState.roomId, 'room-1', 'the global group handoff has not occurred yet');
+      if (target.id !== 'transit-light-c') assert.ok(resources.group.voltBody.position.distanceTo(socket) > 20);
+      f.cameraRig.aimOrigin.copy(resources.group.voltBody.position);
+      f.cameraRig.aimDirection.subVectors(socket, resources.group.voltBody.position).normalize();
+      f.input.press('aimAbility');
+      f.input.press('fireAbility');
+      f.tick();
+      assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 100);
+      assert.equal(resources.electricalSystem.readModel.connectedTargetId, target.id, `actual runtime must reach ${target.id} across the chamber`);
+      f.input.release('fireAbility');
+      f.input.release('aimAbility');
+      f.tick();
+    }
+    f.runtime.activateCheckpoint('cp2');
+    f.runtime.recoverActiveCheckpoint();
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 11, 'Room 1 retry cannot retain Room 2 ranges');
+    f.input.press('debugTeleportRoomTwo');
+    f.tick();
+    f.input.release('debugTeleportRoomTwo');
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 100);
+    f.input.press('debugTeleportRoomOne');
+    f.tick();
+    f.input.release('debugTeleportRoomOne');
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 11, 'Room 1 shortcut restores near ranges');
+  } finally { f.cleanup(); }
+});
+
+test('conducting outlines appear only for actively aiming Volt, including render-only input release', () => {
+  const f = createFixture();
+  try {
+    const highlights = f.scene.getObjectByName('volt-conducting-target-highlights')!;
+    const assertHidden = () => {
+      assert.equal(highlights.visible, false);
+      assert.ok(highlights.children.every(child => !child.visible));
+    };
+    f.render(); assertHidden();
+    f.input.press('aimAbility'); f.tick(); f.render();
+    assert.equal(highlights.visible, true);
+    assert.ok(highlights.children.some(child => child.visible));
+    f.input.release('aimAbility'); f.render(); assertHidden();
+    f.input.press('aimAbility'); f.tick(); f.render();
+    assert.equal(highlights.visible, true);
+    f.switchSlime(); f.input.press('aimAbility'); f.tick(); f.render(); assertHidden(); // Bob
+    f.switchSlime(); f.input.press('aimAbility'); f.tick(); f.render(); assertHidden(); // Goop aiming acid
+    f.switchSlime(); f.input.press('aimAbility'); f.tick(); f.render();
+    assert.equal(highlights.visible, true);
+    f.input.pointerLocked = false; f.render(); assertHidden();
+  } finally { f.cleanup(); }
+});
 
 test('authored Room 1 lets Goop aim, fire, and render acid projectiles', () => {
   const f = createFixture();
@@ -262,16 +394,19 @@ test('Room 1 completion initializes Room 2 exactly once and CP3 owns later recov
   const f = createFixture();
   try {
     const bodies = mutableRoomOneBodies(f.runtime);
+    const entry = BLACKOUT_TRANSIT_CHECKPOINTS[0]!;
     let roomTwoObjectives = 0;
-    const unsubscribe = f.runtime.events.on('objectiveChanged', ({ roomId }) => {
-      if (roomId === 'room-2') roomTwoObjectives += 1;
+    const unsubscribe = f.runtime.events.on('objectiveChanged', ({ roomId, objective }) => {
+      // The authored Room 2 has its own progress objectives; count only the
+      // one-shot Room 1 handoff announcement.
+      if (roomId === 'room-2' && objective === 'Restore the transit lights and lower cover for Bob') roomTwoObjectives += 1;
     });
 
-    bodies.bob.position.set(6, 0.46, 62);
-    bodies.goop.position.set(6.8, 0.46, 62);
+    bodies.bob.position.set(6, 0.86, 83);
+    bodies.goop.position.set(8, 0.86, 83);
 
     // Establish a bay-side previous sample, cross the entrance, traverse the
-    // duct forward, then cross its outlet before entering the reunion hallway.
+    // duct forward, then cross its outlet before entering the side catwalk.
     bodies.volt.position.set(-6, 0.46, 53);
     f.tick();
     bodies.volt.position.set(-6, 0.46, 54);
@@ -280,7 +415,7 @@ test('Room 1 completion initializes Room 2 exactly once and CP3 owns later recov
     f.tick();
     bodies.volt.position.set(-6, 0.46, 60.5);
     f.tick();
-    bodies.volt.position.set(6, 0.46, 62);
+    bodies.volt.position.set(-16, 2.96, 83);
     f.tick();
 
     assert.equal(f.runtime.roomState.roomId, 'room-2');
@@ -306,9 +441,9 @@ test('Room 1 completion initializes Room 2 exactly once and CP3 owns later recov
 
     assert.equal(f.runtime.roomState.roomId, 'room-2');
     assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
-    assert.deepEqual(f.runtime.getSlimePositions()?.bob.toArray(), [4.25, 0.46, 80]);
-    assert.deepEqual(f.runtime.getSlimePositions()?.goop.toArray(), [6, 0.46, 80]);
-    assert.deepEqual(f.runtime.getSlimePositions()?.volt.toArray(), [7.75, 0.46, 80]);
+    assert.deepEqual(f.runtime.getSlimePositions()?.bob.toArray(), entry.bodyPositions.bob.toArray());
+    assert.deepEqual(f.runtime.getSlimePositions()?.goop.toArray(), entry.bodyPositions.goop.toArray());
+    assert.deepEqual(f.runtime.getSlimePositions()?.volt.toArray(), entry.bodyPositions.volt.toArray());
 
     f.runtime.restartLevel();
     assert.equal(f.runtime.roomState.roomId, 'room-1');
@@ -321,10 +456,11 @@ test('Room 1 completion initializes Room 2 exactly once and CP3 owns later recov
 });
 
 
-test('Room 1 stays authoritative after the CP3 handoff while players can return from staging', () => {
+test('Room 1 stays authoritative after the CP3 handoff while players can return from Room 2', () => {
   const f = createFixture();
   try {
     const { bodies, bay } = roomOneInternals(f.runtime);
+    const entry = BLACKOUT_TRANSIT_CHECKPOINTS[0]!;
 
     // Put the powered door well into its opening animation, then remove power
     // before completing the room. The handoff must not freeze the still-reachable
@@ -337,8 +473,8 @@ test('Room 1 stays authoritative after the CP3 handoff while players can return 
     );
     bay.target.setConnectionState(false);
 
-    bodies.bob.position.set(6, 0.46, 62);
-    bodies.goop.position.set(6.8, 0.46, 62);
+    bodies.bob.position.set(6, 0.86, 83);
+    bodies.goop.position.set(8, 0.86, 83);
     bodies.volt.position.set(-6, 0.46, 53);
     f.tick();
     bodies.volt.position.set(-6, 0.46, 54);
@@ -347,7 +483,7 @@ test('Room 1 stays authoritative after the CP3 handoff while players can return 
     f.tick();
     bodies.volt.position.set(-6, 0.46, 60.5);
     f.tick();
-    bodies.volt.position.set(6, 0.46, 62);
+    bodies.volt.position.set(-16, 2.96, 83);
     f.tick();
 
     assert.equal(f.runtime.roomState.roomId, 'room-2');
@@ -361,7 +497,7 @@ test('Room 1 stays authoritative after the CP3 handoff while players can return 
     assert.equal(bay.door.state, 'closed');
     assert.equal(bay.door.progress, 0);
 
-    // Room 1 remains physically reachable from the staging corridor. Returning
+    // Room 1 remains physically reachable from the authored Room 2. Returning
     // Bob to the acid must still use the normal death path even after CP3.
     bodies.bob.position.set(8, -0.49, 18);
     f.tick();
@@ -377,10 +513,161 @@ test('Room 1 stays authoritative after the CP3 handoff while players can return 
 
     assert.equal(f.runtime.roomState.roomId, 'room-2');
     assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
-    assert.deepEqual(f.runtime.getSlimePositions()?.bob.toArray(), [4.25, 0.46, 80]);
-    assert.deepEqual(f.runtime.getSlimePositions()?.goop.toArray(), [6, 0.46, 80]);
-    assert.deepEqual(f.runtime.getSlimePositions()?.volt.toArray(), [7.75, 0.46, 80]);
+    assert.deepEqual(f.runtime.getSlimePositions()?.bob.toArray(), entry.bodyPositions.bob.toArray());
+    assert.deepEqual(f.runtime.getSlimePositions()?.goop.toArray(), entry.bodyPositions.goop.toArray());
+    assert.deepEqual(f.runtime.getSlimePositions()?.volt.toArray(), entry.bodyPositions.volt.toArray());
   } finally {
     f.cleanup();
   }
+});
+
+test('authored Room 2 checkpoint uses split routes and recovers all three bodies in the transit room', () => {
+  const f = createFixture();
+  try {
+    f.runtime.activateCheckpoint('cp3');
+    f.runtime.recoverActiveCheckpoint();
+    const entry = BLACKOUT_TRANSIT_CHECKPOINTS[0]!;
+    const positions = f.runtime.getSlimePositions()!;
+    for (const id of ['bob', 'goop', 'volt'] as const) {
+      assert.ok(positions[id].distanceTo(entry.bodyPositions[id]) < 1e-6);
+    }
+    assert.ok(positions.bob.distanceTo(positions.volt) > 12, 'Volt starts on the separated service route');
+    assert.equal(f.cameraRig.groundYaw, Math.PI, 'Room 2 recovery should face into the route');
+    f.tick(3);
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+    assert.equal(f.runtime.requestFailure(), true);
+    f.tick(70);
+    f.document.elements.find(element => element.className === 'death-screen')!.retryButton.click();
+    const recovered = f.runtime.getSlimePositions()!;
+    assert.equal(f.cameraRig.groundYaw, Math.PI, 'death/retry must preserve the forward entry orientation');
+    for (const id of ['bob', 'goop', 'volt'] as const) {
+      assert.ok(recovered[id].distanceTo(entry.bodyPositions[id]) < 1e-6, `${id} recovers in Room 2, not Room 1`);
+    }
+  } finally { f.cleanup(); }
+});
+
+test('Room 1 separate entrances enter Room 2 without snapping bodies back to spawn', () => {
+  const f = createFixture();
+  try {
+    const {group} = (f.runtime as unknown as {resources: {group: {
+      bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody;
+    }}}).resources;
+    group.bobBody.teleport(new THREE.Vector3(5,.86,83));
+    group.goopBody.teleport(new THREE.Vector3(7,.86,83));
+    // Ordered fixed-step samples through the real Room 1 traversal controller.
+    for (let z = 53; z <= 61; z += .5) {
+      group.voltBody.teleport(new THREE.Vector3(-6,.46,z));
+      f.tick();
+    }
+    group.voltBody.teleport(new THREE.Vector3(-16,2.96,83));
+    f.tick();
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+    assert.equal(f.runtime.activeCheckpoint?.room.roomId, 'room-2');
+    assert.ok(f.runtime.getSlimePositions()!.volt.x < -14);
+    assert.equal(f.runtime.getSlimePositions()!.bob.x, 5, 'physical entry must not teleport Bob to the checkpoint marker');
+    f.tick(10);
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+  } finally { f.cleanup(); }
+});
+
+test('Level 3 number keys 1–3 teleport all bodies to clean room checkpoints', () => {
+  const f = createFixture();
+  try {
+    const pressRoom = (key:InputAction) => { f.input.press(key); f.tick(); f.input.release(key); f.tick(); };
+    pressRoom('debugTeleportRoomTwo');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+    assert.equal(f.runtime.activeCheckpoint?.room.roomId, 'room-2');
+    const positions = f.runtime.getSlimePositions()!;
+    assert.equal(positions.bob.x, 6);
+    assert.equal(positions.goop.x, 8);
+    assert.equal(positions.volt.x, -16);
+
+    pressRoom('debugTeleportRoomThree');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp6');
+    assert.equal(f.runtime.activeCheckpoint?.room.roomId, 'room-3');
+    assert.equal(f.runtime.activeCheckpoint?.room.local.bossStaging, true);
+    for (const body of Object.values(f.runtime.getSlimePositions()!)) assert.ok(body.z > 158 && body.y > .8);
+    assert.equal(f.runtime.requestFailure(), true);
+    f.tick(70);
+    f.document.elements.find(element => element.className === 'death-screen')!.retryButton.click();
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp6', 'Room 3 retry stays at its safe staging point');
+
+    pressRoom('debugTeleportRoomOne');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp1');
+    for (const body of Object.values(f.runtime.getSlimePositions()!)) assert.ok(body.z < 5);
+    pressRoom('debugTeleportRoomTwo');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3', 'room shortcuts remain repeatable after retry');
+  } finally { f.cleanup(); }
+});
+
+test('Room 2 hazards stay authoritative when one body arrives before the others', () => {
+  const f = createFixture();
+  try {
+    const {group} = (f.runtime as unknown as {resources:{group:{bobBody:KinematicBody}}}).resources;
+    group.bobBody.teleport(new THREE.Vector3(10,-.545,94));
+    f.tick();
+    assert.equal(f.input.enabled, false, 'Bob cannot bypass the acid while the other slimes remain in Room 1');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp1');
+  } finally { f.cleanup(); }
+});
+
+test('Bob can walk onto the final bridge button in the complete runtime', () => {
+  const f = createFixture();
+  try {
+    f.runtime.activateCheckpoint('cp5');
+    f.runtime.recoverActiveCheckpoint();
+    const { group, transit } = (f.runtime as unknown as { resources: {
+      group: { bobBody: KinematicBody; activeSlimeId: string };
+      transit: BlackoutTransitController;
+    } }).resources;
+    while (group.activeSlimeId !== 'bob') f.switchSlime();
+    f.input.press('moveLeft');
+    f.tick(90);
+    f.input.release('moveLeft');
+    f.tick(90);
+    assert.equal(group.bobBody.attached, true, `Bob stopped at ${group.bobBody.position.toArray()}`);
+    assert.equal(group.bobBody.attachmentSurfaceName, 'bob-bridge-switch-sticky-wall');
+    assert.equal(transit.bridgeDeployed, true);
+  } finally { f.cleanup(); }
+});
+
+test('dying late in Room 2 resets every body and all puzzle state to the room entrance', () => {
+  const f = createFixture();
+  try {
+    f.runtime.activateCheckpoint('cp3');
+    f.runtime.recoverActiveCheckpoint();
+    const { group, transit } = (f.runtime as unknown as { resources: {
+      group: { bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody };
+      transit: BlackoutTransitController;
+    } }).resources;
+    for (const stage of [1, 2]) {
+      const cover = transit.covers[stage - 1]!;
+      cover.support.advance(cover.support.dissolveDurationSeconds);
+      transit.lights[stage - 1]!.target.setConnectionState(true);
+      f.tick(120);
+      transit.lights[stage - 1]!.target.setConnectionState(false);
+      assert.equal(cover.deployed, true);
+      assert.equal(transit.lights[stage - 1]!.latched, true);
+      const checkpoint = BLACKOUT_TRANSIT_CHECKPOINTS[stage]!;
+      group.bobBody.teleport(checkpoint.bodyPositions.bob);
+      f.tick(3);
+      assert.equal(f.runtime.activeCheckpoint?.checkpointId, checkpoint.id);
+      group.goopBody.teleport(new THREE.Vector3(17,-.52,140));
+      group.voltBody.teleport(new THREE.Vector3(-16,2.96,132));
+      assert.equal(f.runtime.requestFailure(), true);
+      f.tick(70);
+      f.document.elements.find(element => element.className === 'death-screen')!.retryButton.click();
+      const restored = f.runtime.getSlimePositions()!;
+      for (const id of ['bob', 'goop', 'volt'] as const) {
+        assert.ok(restored[id].distanceTo(BLACKOUT_TRANSIT_CHECKPOINTS[0]!.bodyPositions[id]) < 1e-6,
+          `${id} should return to Room 2 entry even if parked far from the active slime`);
+      }
+      assert.ok(transit.covers.every(cover => !cover.deployed && cover.support.progress === 0));
+      assert.ok(transit.lights.every(light => !light.latched && light.charge === 0));
+      assert.equal(transit.bridgeLocked,false);
+      assert.equal(transit.bridgeDeployed,false);
+      f.tick(3);
+      assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3', 'death retry is a full room restart');
+    }
+  } finally { f.cleanup(); }
 });

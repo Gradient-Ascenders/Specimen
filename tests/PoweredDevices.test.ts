@@ -141,6 +141,27 @@ test('powered platform transports active and inactive riders, pauses on power lo
   }
 });
 
+test('opt-in thruster lift returns slowly with its inactive rider after power loss', () => {
+  const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
+  const lift = new PoweredLiftDevice({id:'return-lift',displayName:'Thruster lift',collisionWorld:world,surfaceRegistry:surfaces,
+    start:new THREE.Vector3(0,0,0),end:new THREE.Vector3(0,4,0),size:new THREE.Vector3(3,.5,3),travelDurationSeconds:2,unpoweredReturnSpeedRatio:.25});
+  const rider = new TestCarrier('inactive-bob',new THREE.Vector3(0,.71,0));
+  rider.supportCollider=lift.platform.collisionMesh;
+  try {
+    lift.core.setConnectionState(true);
+    lift.updateMechanics(2,[rider]);
+    assert.equal(lift.platform.progress,1);
+    const raisedY=rider.position.y;
+    lift.core.setConnectionState(false);
+    lift.updateMechanics(2,[rider]);
+    assert.equal(lift.platform.progress,.75);
+    assert.ok(Math.abs(rider.position.y-(raisedY-1))<1e-6);
+    lift.updateMechanics(10,[rider]);
+    assert.equal(lift.platform.progress,0);
+    assert.ok(Math.abs(rider.position.y-.71)<1e-6);
+  } finally {lift.dispose();world.clear();surfaces.clear();}
+});
+
 test('powered lift preflights supported-body ceiling motion and blocks without moving the carrier', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();

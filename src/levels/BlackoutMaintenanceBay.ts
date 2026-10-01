@@ -5,8 +5,8 @@ export const BLACKOUT_BAY_LAYOUT = Object.freeze({
   rearZ: 54,
   hallwayWidth: 6,
   hallwayHeight: 4.5,
-  hallwayLength: 20,
-  hallwayEndZ: 74,
+  hallwayLength: 26,
+  hallwayEndZ: 80,
   acidStartZ: 7,
   acidEndZ: 48,
 });
@@ -39,7 +39,7 @@ export class BlackoutMaintenanceBay {
       roughness: 0.52, metalness: 0.02,
     });
 
-    const { chamberWidth, rearZ, hallwayWidth, hallwayLength, hallwayEndZ, acidStartZ, acidEndZ } = BLACKOUT_BAY_LAYOUT;
+    const { chamberWidth, rearZ, hallwayWidth, hallwayLength, acidStartZ, acidEndZ } = BLACKOUT_BAY_LAYOUT;
     const halfWidth = chamberWidth / 2;
     const hallwayEndCenter = rearZ + hallwayLength / 2;
     const hallwayCenterX = 6;
@@ -64,7 +64,10 @@ export class BlackoutMaintenanceBay {
       [-2.5, 0.15, 40, 5, 7],
     ];
     for (const [x, y, z, width, depth] of steps) {
-      this.box(`bob-route-platform-${z}`, [width, 0.32, depth], [x, y - 0.16, z], submergedSteel);
+      // Keep the tested jump heights, but extend each solid foundation into
+      // the basin bed so there is no air gap beneath the stepping blocks.
+      const bottom = -1.05;
+      this.box(`bob-route-platform-${z}`, [width, y - bottom, depth], [x, (y + bottom) / 2, z], submergedSteel);
     }
 
     // The exit bank begins after the last long jump. A wide side ramp lets Goop
@@ -75,16 +78,16 @@ export class BlackoutMaintenanceBay {
     ramp.rotation.x = -Math.atan2(1, 5.5);
     ramp.userData.preciseMovementCorners = true;
 
-    // Main chamber walls and ceiling silhouette. The rear wall has a door gap at x=6
-    // and a floor-level service duct at x=-6; both are intentionally unobstructed.
+    // Main chamber walls and ceiling silhouette. Bob and Goop leave through
+    // the broad doorway at x=6; Volt uses the separate low side duct at x=-6.
     this.box('west-perimeter-wall', [0.4, 14, rearZ + 2], [-halfWidth + 0.2, 5, (rearZ - 2) / 2], darkSteel);
     this.box('east-perimeter-wall', [0.4, 14, rearZ + 2], [halfWidth - 0.2, 5, (rearZ - 2) / 2], darkSteel);
-    // Leave only the service vent at x=-6 and powered doorway at x=6 in the
-    // rear wall; these two continuations lead directly into one enclosed hall.
-    this.box('rear-wall-west', [9.85, 12, 0.45], [-11.875, 6, rearZ], darkSteel);
-    this.box('rear-wall-between-openings', [9.55, 12, 0.45], [-0.275, 6, rearZ], darkSteel);
-    this.box('rear-wall-east', [9.3, 12, 0.45], [12.15, 6, rearZ], darkSteel);
-    this.box('door-header', [3, 9, 0.45], [6, 7.5, rearZ], darkSteel);
+    // Deliberately separate the main doorway (x=3..9) from Volt's vent
+    // (x=-6.75..-5.25); no shared cross-hall connects the two routes.
+    this.box('rear-wall-west', [10.05, 12, 0.45], [-11.775, 6, rearZ], darkSteel);
+    this.box('rear-wall-between-openings', [8.25, 12, 0.45], [-1.125, 6, rearZ], darkSteel);
+    this.box('rear-wall-east', [7.8, 12, 0.45], [12.9, 6, rearZ], darkSteel);
+    this.box('door-header', [6, 7.5, 0.45], [6, 8.25, rearZ], darkSteel);
     // Taller service duct with a flush landing. Its 1.5 m clear width admits
     // Volt comfortably but still excludes the 1.65 m maintenance drone.
     this.box('vent-mouth-left-jamb', [0.2, 12, 0.45], [-6.85, 6, rearZ], steel);
@@ -92,70 +95,53 @@ export class BlackoutMaintenanceBay {
     this.box('vent-mouth-upper-wall', [1.5, 9.8, 0.45], [-6, 7.1, rearZ], darkSteel);
     this.box('main-ceiling', [chamberWidth, 0.35, rearZ + 2], [0, 12.15, (rearZ - 2) / 2], darkSteel);
 
-    // Enclosed continuation hall after Room 1, sealed at its far end until
-    // Room 2 is authored. Both the powered door and the vent drop reach it.
-    this.box('hallway-floor', [hallwayWidth, 0.4, hallwayLength], [hallwayCenterX, -0.2, hallwayEndCenter], platform);
-    this.box('hallway-west-wall-before-connector', [0.35, hallwayHeight, 6], [hallwayCenterX - hallwayWidth / 2, hallwayHeight / 2, rearZ + 3], darkSteel);
-    this.box('hallway-west-wall-after-connector', [0.35, hallwayHeight, hallwayLength - 10], [hallwayCenterX - hallwayWidth / 2, hallwayHeight / 2, rearZ + 15], darkSteel);
+    // Main route: keep the existing first 20 m of corridor, then add a broad
+    // shallow ramp to Room 2's raised entry deck. It stays centered on x=6.
+    this.box('hallway-floor', [hallwayWidth, 0.4, 20], [hallwayCenterX, -0.2, rearZ + 10], platform);
+    // Finish a few centimetres above the raised entry deck: the playable
+    // spheres otherwise catch on its vertical leading edge at the exact seam.
+    const hallwayRampRise = 0.45;
+    const hallwayRampAngle = Math.atan2(hallwayRampRise, 6);
+    const hallwayRamp = this.box('hallway-ramp', [hallwayWidth, 0.18, 6], [hallwayCenterX, hallwayRampRise / 2 - 0.09 / Math.cos(hallwayRampAngle), 77], platform);
+    hallwayRamp.rotation.x = -hallwayRampAngle;
+    hallwayRamp.userData.preciseMovementCorners = true;
+    this.box('hallway-west-wall', [0.35, hallwayHeight, hallwayLength], [hallwayCenterX - hallwayWidth / 2, hallwayHeight / 2, hallwayEndCenter], darkSteel);
     this.box('hallway-east-wall', [0.35, hallwayHeight, hallwayLength], [hallwayCenterX + hallwayWidth / 2, hallwayHeight / 2, hallwayEndCenter], darkSteel);
     this.box('hallway-roof', [hallwayWidth, 0.35, hallwayLength], [hallwayCenterX, hallwayHeight + 0.15, hallwayEndCenter], darkSteel);
 
-    // Room 2 owns its puzzle chamber in #165, but Room 1 must hand off into a
-    // real traversable arrival volume rather than a sealed wall. Keep this
-    // short staging corridor deliberately puzzle-free so later Room 2 authoring
-    // can replace/extend it without changing Room 1 progression semantics.
-    const roomTwoStagingLength = 12;
-    const roomTwoStagingCenterZ = hallwayEndZ + roomTwoStagingLength / 2;
-    this.box(
-      'room-2-arrival-staging-floor',
-      [hallwayWidth, 0.4, roomTwoStagingLength],
-      [hallwayCenterX, -0.2, roomTwoStagingCenterZ],
-      platform,
-    );
-    this.box(
-      'room-2-arrival-staging-west-wall',
-      [0.35, hallwayHeight, roomTwoStagingLength],
-      [hallwayCenterX - hallwayWidth / 2, hallwayHeight / 2, roomTwoStagingCenterZ],
-      darkSteel,
-    );
-    this.box(
-      'room-2-arrival-staging-east-wall',
-      [0.35, hallwayHeight, roomTwoStagingLength],
-      [hallwayCenterX + hallwayWidth / 2, hallwayHeight / 2, roomTwoStagingCenterZ],
-      darkSteel,
-    );
-    this.box(
-      'room-2-arrival-staging-roof',
-      [hallwayWidth, 0.35, roomTwoStagingLength],
-      [hallwayCenterX, hallwayHeight + 0.15, roomTwoStagingCenterZ],
-      darkSteel,
-    );
-    this.box(
-      'room-2-arrival-staging-end-wall',
-      [hallwayWidth, hallwayHeight, 0.45],
-      [hallwayCenterX, hallwayHeight / 2, hallwayEndZ + roomTwoStagingLength],
-      darkSteel,
-    );
-    // Level duct from the bay floor, through the rear wall, then into the
-    // lateral connector. The matching opening in the connector's south wall
-    // lines up with this 1.5 m bore; the adjoining floors meet at y=0.
-    this.box('vent-hall-connector-floor', [10, 0.2, 4], [-2, -0.1, rearZ + 8], platform);
-    this.box('vent-hall-connector-roof', [10, 0.35, 4], [-2, hallwayHeight + 0.15, rearZ + 8], darkSteel);
-    this.box('vent-hall-connector-south-wall-west', [0.35, hallwayHeight, 0.3], [-6.825, hallwayHeight / 2, rearZ + 6], darkSteel);
-    this.box('vent-hall-connector-south-wall-east', [8.35, hallwayHeight, 0.3], [-1.175, hallwayHeight / 2, rearZ + 6], darkSteel);
-    // The connector is taller than the duct; close the space above its outlet.
-    this.box('vent-outlet-header', [1.5, hallwayHeight-2.2, .3], [-6, (hallwayHeight+2.2)/2, rearZ+6], steel);
-    this.box('vent-hall-connector-north-wall', [10, hallwayHeight, 0.3], [-2, hallwayHeight / 2, rearZ + 10], darkSteel);
-    this.box('vent-hall-connector-west-wall', [0.3, hallwayHeight, 4], [-7, hallwayHeight / 2, rearZ + 8], darkSteel);
-
+    // Volt's route initially leaves the bay through the old straight vent,
+    // turns west in an enclosed service chamber, then climbs to the far-west
+    // side catwalk. The vent and main hallway remain physically separated.
     this.box('vent-interior-floor', [1.5, 0.2, 6], [-6, -0.1, rearZ + 3], steel).userData.preciseMovementCorners = true;
     this.box('vent-duct-west-wall', [0.2, 2.2, 6], [-6.85, 1.1, rearZ + 3], steel);
     this.box('vent-duct-east-wall', [0.2, 2.2, 6], [-5.15, 1.1, rearZ + 3], steel);
     this.box('vent-duct-ceiling', [1.5, 0.2, 6], [-6, 2.3, rearZ + 3], steel);
-    // A sealed outer jacket covers the duct joins and prevents sightlines out
-    // of the map at either corner, while preserving the continuous clear bore.
-    this.box('vent-duct-junction-west-seal', [0.45, 2.2, 0.35], [-7.175, 1.1, rearZ + 5.825], darkSteel);
-    this.box('vent-duct-junction-east-seal', [0.45, 2.2, 0.35], [-4.825, 1.1, rearZ + 5.825], darkSteel);
+    // Turn chamber bounds x[-16.75,-5.25], z[60,63]. Portal positions line
+    // up exactly with the northbound inlet and westbound ascending shaft.
+    this.box('vent-turn-floor', [11.5, 0.2, 3], [-11, -0.1, 61.5], steel);
+    this.box('vent-turn-ceiling', [11.5, 0.2, 3], [-11, 2.3, 61.5], darkSteel);
+    this.box('vent-turn-south-west', [10, 2.2, 0.3], [-11.75, 1.1, 60], darkSteel);
+    this.box('vent-turn-north-east', [10, 2.2, 0.3], [-10.25, 1.1, 63], darkSteel);
+    this.box('vent-turn-east-wall', [0.3, 2.2, 3], [-5.25, 1.1, 61.5], darkSteel);
+    this.box('vent-turn-west-wall', [0.3, 2.2, 3], [-16.75, 1.1, 61.5], darkSteel);
+    // The last few centimetres rise above the catwalk lip so Volt's sphere
+    // clears the deck's vertical edge instead of snagging on a coplanar seam.
+    const ductRise = 2.58;
+    const ductLength = Math.hypot(17, ductRise) + 0.2;
+    const ductAngle = Math.atan2(ductRise, 17);
+    const ductCenterZ = 71.5;
+    const ductFloor = this.box('volt-rising-duct-floor', [1.5, 0.2, ductLength], [-16, ductRise / 2 - 0.1 / Math.cos(ductAngle), ductCenterZ], steel);
+    ductFloor.rotation.x = -ductAngle;
+    ductFloor.userData.preciseMovementCorners = true;
+    const ductCeiling = this.box('volt-rising-duct-ceiling', [1.5, 0.2, ductLength], [-16, ductRise / 2 + 2.3, ductCenterZ], darkSteel);
+    ductCeiling.rotation.x = -ductAngle;
+    for (const sideX of [-16.85, -15.15]) {
+      const sideWall = this.box(`volt-rising-duct-side-${sideX}`, [0.2, 2.2, ductLength], [sideX, ductRise / 2 + 1.1, ductCenterZ], steel);
+      sideWall.rotation.x = -ductAngle;
+    }
+    // Short level outlet apron joins the rising shaft to Volt's separate
+    // service catwalk (top 2.5 m) at the west side of Room 2.
+    this.box('volt-catwalk-entry-extension', [2.8, 0.2, 6], [-16, 2.4, 83], steel);
     // Recessed industrial rim and repeated duct seams, outside the walking bore.
     for (const z of [rearZ - 0.25, rearZ + 1.5, rearZ + 3.5, rearZ + 5.5]) {
       for (const x of [-6.77, -5.23]) this.box(`vent-frame-side-${x}-${z}`, [0.08, 2.3, 0.08], [x, 1.1, z], trim);
@@ -176,7 +162,7 @@ export class BlackoutMaintenanceBay {
     const arcLight=new THREE.PointLight(0x76eaff,.5,3);
     arcLight.position.set(-6,1.1,rearZ-.4);this.root.add(arcLight);this.arcLights.push(arcLight);
 
-    for (const [index, z] of [rearZ + 2.5, rearZ + 7.5, rearZ + 12.5, rearZ + 17.5].entries()) {
+    for (const [index, z] of [rearZ + 2.5, rearZ + 8, rearZ + 14, rearZ + 20].entries()) {
       const bulbMaterial = new THREE.MeshStandardMaterial({ color: 0x886d38, emissive: 0xf2be58, emissiveIntensity: 0.22 });
       const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.1, 1.1), bulbMaterial);
       bulb.name = `hallway-flicker-bulb-${index + 1}`;
@@ -203,10 +189,15 @@ export class BlackoutMaintenanceBay {
     return position.x >= 3.4 && position.x <= 8.6 && position.z >= BLACKOUT_BAY_LAYOUT.rearZ + 1 && position.z <= BLACKOUT_BAY_LAYOUT.hallwayEndZ - 0.5 && position.y >= 0 && position.y <= BLACKOUT_BAY_LAYOUT.hallwayHeight;
   }
 
+  transitAt(position: Readonly<{ readonly x: number; readonly y: number; readonly z: number }>): boolean {
+    return position.x >= -22 && position.x <= 22 && position.z >= BLACKOUT_BAY_LAYOUT.hallwayEndZ && position.z <= 156 && position.y >= -1 && position.y <= 22;
+  }
+
   voltExitAt(position: Readonly<{ readonly x: number; readonly y: number; readonly z: number }>): boolean {
-    // Keep the exit trigger over the shared reunion hall, not only the narrow
-    // shaft mouth, so Volt retains completion after walking out of the vent.
-    return this.vestibuleAt(position) && position.y < 3;
+    // Volt exits through the far-west side duct onto his elevated catwalk.
+    // Once in Room 2, the broader room trigger keeps route completion latched;
+    // the main Bob/Goop corridor is never treated as Volt's vent exit.
+    return (position.x >= -17.4 && position.x <= -14.6 && position.z >= 79 && position.z <= 87 && position.y >= 2 && position.y <= 5) || this.transitAt(position);
   }
 
   update(dt: number, powered: boolean): void {

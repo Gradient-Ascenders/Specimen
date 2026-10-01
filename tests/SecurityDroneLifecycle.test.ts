@@ -210,8 +210,11 @@ test('only active Bob making sustained rear contact can tip a ground drone', () 
     bob.update(1 / 60, intent);
     lifecycle.update(1 / 60, [], bob, 'bob', intent);
   }
-  assert.equal(bob.lastContactCollider, lifecycle.drone.collider);
   assert.equal(lifecycle.readModel.state, 'tipping');
+  assert.ok(lifecycle.drone.root.position.z > 0.3);
+  assert.ok(lifecycle.drone.root.position.z < 0.4, 'the deliberate push should only nudge the drone before it slips');
+  assert.ok(lifecycle.drone.root.quaternion.angleTo(new THREE.Quaternion()) < 1e-9,
+    'the drone should remain upright until the tipping phase begins');
   assert.equal(
     radiation.intersectsWorldSphere(
       lifecycle.radiationTarget.position,
@@ -220,7 +223,12 @@ test('only active Bob making sustained rear contact can tip a ground drone', () 
     true,
   );
   lifecycle.signalRadiationContact();
-  lifecycle.update(0.75, [], bob, 'bob', intent);
+  const tippingStartZ = lifecycle.drone.root.position.z;
+  lifecycle.update(0.375, [], bob, 'bob', intent);
+  assert.ok(lifecycle.drone.root.position.z > tippingStartZ,
+    'the tipping phase should continue smoothly from the pushed pose');
+  assert.ok(lifecycle.drone.root.position.z < config.radioactiveFinalPosition.z);
+  lifecycle.update(0.375, [], bob, 'bob', intent);
   assert.equal(lifecycle.readModel.state, 'permanentlyDisabled');
 
   lifecycle.reset();

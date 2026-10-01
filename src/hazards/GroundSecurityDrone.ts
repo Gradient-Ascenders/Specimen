@@ -14,6 +14,7 @@ import {
 } from './SecurityDrone.ts';
 
 const EPSILON = 1e-9;
+const PRE_TIP_TRAVEL_FRACTION = 0.14;
 
 export type GroundSecurityDroneState =
   | 'active'
@@ -79,6 +80,8 @@ export class GroundSecurityDrone {
   private readonly finalPosition: THREE.Vector3;
   private readonly initialQuaternion = new THREE.Quaternion();
   private readonly finalQuaternion = new THREE.Quaternion();
+  private readonly tippingStartPosition = new THREE.Vector3();
+  private readonly tippingStartQuaternion = new THREE.Quaternion();
   private readonly authoredForward = new THREE.Vector3();
   private readonly localBob = new THREE.Vector3();
   private readonly movementDirection = new THREE.Vector3();
@@ -144,8 +147,9 @@ export class GroundSecurityDrone {
       this.updatePush(deltaSeconds, bobBody, activeSlimeId, bobMovementIntent);
     } else if (this.state === 'tipping') {
       const t = Math.min(1, this.stateElapsed / this.config.tippingDurationSeconds);
-      this.drone.root.position.lerpVectors(this.initialPosition, this.finalPosition, t);
-      this.drone.root.quaternion.slerpQuaternions(this.initialQuaternion, this.finalQuaternion, t);
+      const eased = smoothStep(t);
+      this.drone.root.position.lerpVectors(this.tippingStartPosition, this.finalPosition, eased);
+      this.drone.root.quaternion.slerpQuaternions(this.tippingStartQuaternion, this.finalQuaternion, eased);
       if (this.radiationContactPending && t >= 1 - EPSILON) this.disablePermanently();
     }
     this.syncRadiationPosition();
@@ -172,6 +176,8 @@ export class GroundSecurityDrone {
     this.stateElapsed = 0;
     this.radiationContactPending = false;
     this.drone.reset();
+    this.tippingStartPosition.copy(this.initialPosition);
+    this.tippingStartQuaternion.copy(this.initialQuaternion);
     this.syncRadiationPosition();
     this.syncReadModel();
     this.events.emit('reset', { droneId: this.drone.id });
@@ -190,7 +196,11 @@ export class GroundSecurityDrone {
     activeSlimeId: 'bob' | 'goop',
     movementIntent: { readonly x: number; readonly y: number; readonly z: number },
   ): void {
-    let deliberate = activeSlimeId === 'bob' && bobBody.lastContactCollider === this.drone.collider;
+    // Dynamic colliders can stop being the final reported contact for a frame
+    // while they move away from Bob. Once a push has begun, retain it while
+    // Bob remains inside the rear interaction volume and keeps pressing.
+    let deliberate = activeSlimeId === 'bob' &&
+      (bobBody.lastContactCollider === this.drone.collider || this.state === 'beingPushed');
     if (deliberate) {
       this.localBob.copy(bobBody.position);
       this.drone.root.worldToLocal(this.localBob);
@@ -216,7 +226,15 @@ export class GroundSecurityDrone {
     if (Math.abs(previous - this.pushProgress) > EPSILON) {
       this.events.emit('pushProgressChanged', { droneId: this.drone.id, progress: this.pushProgress });
     }
+    // Give the push visible feedback without letting the drone skate across the
+    // floor. Most of its travel and all of its rotation begin only once it
+    // loses its footing and enters the tipping phase.
+    const easedPush = smoothStep(this.pushProgress) * PRE_TIP_TRAVEL_FRACTION;
+    this.drone.root.position.lerpVectors(this.initialPosition, this.finalPosition, easedPush);
+    this.drone.root.quaternion.copy(this.initialQuaternion);
     if (this.pushProgress >= 1 - EPSILON) {
+      this.tippingStartPosition.copy(this.drone.root.position);
+      this.tippingStartQuaternion.copy(this.drone.root.quaternion);
       this.drone.setEnabled(false);
       this.transition('tipping');
       this.events.emit('tipping', { droneId: this.drone.id });
@@ -259,6 +277,10 @@ export class GroundSecurityDrone {
   private assertActive(): void {
     if (this.disposed) throw new Error('Cannot update a disposed ground drone.');
   }
+}
+
+function smoothStep(value: number): number {
+  return value * value * (3 - 2 * value);
 }
 
 function validateDelta(deltaSeconds: number): void {
