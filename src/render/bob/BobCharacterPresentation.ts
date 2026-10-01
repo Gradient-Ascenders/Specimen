@@ -199,6 +199,7 @@ export class BobCharacterPresentation {
   private deathActive = false;
   private impactPending = false;
   private disposed = false;
+  private shadowCasting = true;
   private launchRemaining = 0;
   private launchStrength = 0;
   private landingRemaining = 0;
@@ -297,7 +298,19 @@ export class BobCharacterPresentation {
         true,
       );
       asset.body.material = materialSet.body;
-      for (const eye of asset.eyes) eye.material = materialSet.eyes;
+      asset.body.customDepthMaterial = materialSet.bodyDepth;
+      asset.body.customDistanceMaterial = materialSet.bodyDistance;
+      for (const eye of asset.eyes) {
+        eye.material = materialSet.eyes;
+        eye.customDepthMaterial = materialSet.eyeDepth;
+        eye.customDistanceMaterial = materialSet.eyeDistance;
+      }
+      // Only the authored live meshes participate. Rupture core/droplets retain
+      // their existing bounded, non-casting particle presentation.
+      for (const mesh of [asset.body, ...asset.eyes]) {
+        mesh.castShadow = this.shadowCasting;
+        mesh.receiveShadow = true;
+      }
       for (const material of importedMaterials) material.dispose();
 
       this.asset = asset;
@@ -343,8 +356,29 @@ export class BobCharacterPresentation {
     this.applyOpacity();
   }
 
+  /** Loading only: retain the live eye material's transparent program as well
+   * as its opaque one. Borrowing a disposable material copy would release it. */
+  async prepareCameraFadePrograms(compile: () => unknown | Promise<unknown>): Promise<void> {
+    const previousOpacity = this.opacity;
+    this.setOpacity(0.5);
+    try {
+      await compile();
+    } finally {
+      this.setOpacity(previousOpacity);
+    }
+  }
+
   setVisible(visible: boolean): void {
     this.mesh.visible = visible;
+  }
+
+  /** Level shadow coverage may change; never enable casting on burst particles. */
+  setShadowCasting(enabled: boolean): void {
+    this.shadowCasting = enabled;
+    if (!this.asset) return;
+    for (const mesh of [this.asset.body, ...this.asset.eyes]) {
+      mesh.castShadow = enabled;
+    }
   }
 
   /** Attach a renderer-owned PMREM without transferring texture ownership. */

@@ -137,6 +137,9 @@ test('first-person Goop aim hides the body without creating a selection ring', (
   const bobPosition = { x: 2, y: 0.45, z: 0 };
   const goopPosition = { x: 0, y: 0.45, z: 0 };
   const goopMesh = presentation.root.getObjectByName('goop-development-body');
+  assert.ok(goopMesh instanceof THREE.Mesh);
+  assert.equal(goopMesh.castShadow, true);
+  assert.equal(goopMesh.receiveShadow, true);
   const activeRing = presentation.root.getObjectByName(
     'active-slime-control-indicator',
   );
@@ -161,6 +164,10 @@ test('first-person Goop aim hides the body without creating a selection ring', (
     false,
   );
   assert.equal(goopMesh?.visible, true);
+  presentation.setGoopVisible(false);
+  assert.equal(goopMesh.visible, false);
+  presentation.update(bobPosition, goopPosition, 'bob', camera, collisionWorld);
+  assert.equal(goopMesh.visible, true);
   assert.equal(presentation.root.getObjectByName('active-slime-control-indicator'), undefined);
 
   presentation.dispose();

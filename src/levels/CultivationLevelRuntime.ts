@@ -583,7 +583,7 @@ export class CultivationLevelRuntime {
     resources.bobPresentation.present(interpolationAlpha);
     if (resources.manager.isAvailable('volt')) {
       this.interpolate(resources.voltBody, interpolationAlpha, resources.voltVisual.position);
-      resources.voltVisual.visible = true;
+      resources.voltVisual.visible = resources.deathSequence.isPlaying || this.lastDeathSlimeId !== 'volt';
     }
     // A render frame can occur without a fixed update. Preserve the same
     // pointer-sampling behaviour as Level 1 so those frames apply mouse input
@@ -666,6 +666,9 @@ export class CultivationLevelRuntime {
       resources.collisionWorld,
       this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
     );
+    if (!resources.deathSequence.isPlaying && this.lastDeathSlimeId === 'goop') {
+      resources.pairPresentation.setGoopVisible(false);
+    }
     resources.droneProjectilePresentation?.update(interpolationAlpha);
     resources.roomFourProjectiles?.update(interpolationAlpha);
     resources.roomFiveEncounter?.presentation.update(interpolationAlpha);
@@ -881,7 +884,9 @@ export class CultivationLevelRuntime {
       const voltVisual = new THREE.Mesh(new THREE.SphereGeometry(voltBody.radiusMetres, 24, 18),
         new THREE.MeshStandardMaterial({ color: 0xffe85c, emissive: 0xffd21a, emissiveIntensity: .7, roughness: .3 }));
       rollback(() => { voltVisual.removeFromParent(); voltVisual.geometry.dispose(); voltVisual.material.dispose(); });
-      voltVisual.name = 'volt-runtime-body'; voltVisual.visible = false; this.renderLayer.scene.add(voltVisual);
+      voltVisual.name = 'volt-runtime-body'; voltVisual.visible = false;
+      voltVisual.castShadow = true; voltVisual.receiveShadow = true;
+      this.renderLayer.scene.add(voltVisual);
       const previewOccupants = [
         {
           id: 'bob' as const,
@@ -1835,9 +1840,7 @@ export class CultivationLevelRuntime {
   ): void {
     if (this.bobCastsShadow !== shadowsEnabled) {
       this.bobCastsShadow = shadowsEnabled;
-      resources.bobPresentation.root.traverse((object) => {
-        if (object instanceof THREE.Mesh) object.castShadow = shadowsEnabled;
-      });
+      resources.bobPresentation.setShadowCasting(shadowsEnabled);
     }
     let darkWeight = 0;
     if (bobLightingRoom === 5 && resources.authoredPreview) {

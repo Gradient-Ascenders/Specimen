@@ -2180,6 +2180,8 @@ function createSpecimenVisual(): THREE.Mesh<THREE.SphereGeometry, THREE.MeshStan
     }),
   );
   visual.name = 'blackout-specimen-body';
+  visual.castShadow = true;
+  visual.receiveShadow = true;
   visual.visible = false;
   return visual;
 }
@@ -2195,6 +2197,8 @@ function createSlimeVisual(colour: number, emissive: number): THREE.Mesh<THREE.S
     }),
   );
   visual.name = 'blackout-foundation-slime';
+  visual.castShadow = true;
+  visual.receiveShadow = true;
   return visual;
 }
 

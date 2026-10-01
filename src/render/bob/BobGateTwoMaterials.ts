@@ -1,19 +1,12 @@
 import * as THREE from 'three';
 
-const BOB_WOBBLE_AMPLITUDE_METRES = 0.0035;
-const BOB_IMPACT_RIPPLE_AMPLITUDE_METRES = 0.006;
-const BOB_IMPACT_RIPPLE_DURATION_SECONDS = 1.2;
-const BOB_IMPACT_RIPPLE_DISTANCE_DECAY = 3;
-const BOB_IMPACT_RIPPLE_TIME_DECAY = 4;
-const BOB_IMPACT_NORMAL_RESPONSE = 3;
-const BOB_IMPACT_NORMAL_SLOPE_LIMIT = 0.18;
-const BOB_IMPACT_NORMAL_CARRIER_FREQUENCY = 12;
-const BOB_IMPACT_NORMAL_CARRIER_TEMPORAL_FREQUENCY = 7.2;
-const BOB_IMPACT_NORMAL_CARRIER_TIME_DECAY = 2.2;
-const BOB_IMPACT_NORMAL_CARRIER_FADE_START_SECONDS = 0.65;
-const BOB_IMPACT_NORMAL_CARRIER_DISTANCE_DECAY = 0.6;
-const BOB_IMPACT_NORMAL_CARRIER_RESPONSE = 1.6;
-const BOB_IMPACT_NORMAL_CARRIER_SLOPE_LIMIT = 0.8;
+import {
+  BOB_WOBBLE_AMPLITUDE_METRES,
+  BOB_IMPACT_RIPPLE_AMPLITUDE_METRES,
+  BOB_IMPACT_RIPPLE_DURATION_SECONDS,
+  injectBobSecondaryMotionVertexShader,
+} from './BobSecondaryMotionShader.ts';
+
 const BOB_SECONDARY_MOTION_PERIOD_SECONDS = Math.PI * 200;
 const BOB_REFLECTION_RESPONSE_PER_SECOND = 4;
 
@@ -81,205 +74,29 @@ export class BobGelBodyMaterial extends THREE.MeshPhysicalMaterial {
         this.bobUniforms.impactPointLocal;
       shader.uniforms.uBobImpactStrength = this.bobUniforms.impactStrength;
       shader.uniforms.uBobImpactAge = this.bobUniforms.impactAge;
-      shader.vertexShader = /* glsl */ `
-uniform float uBobSecondaryTime;
-uniform vec3 uBobImpactPointLocal;
-uniform float uBobImpactStrength;
-uniform float uBobImpactAge;
-
-float bobSmoothstepDerivative(float edge0, float edge1, float value) {
-  float t = clamp((value - edge0) / (edge1 - edge0), 0.0, 1.0);
-  return t > 0.0 && t < 1.0
-    ? 6.0 * t * (1.0 - t) / (edge1 - edge0)
-    : 0.0;
-}
-
-// Evaluate scalar displacement and its object-space lighting slope together
-// so the physical material shades the same bounded waves that it renders.
-void bobEvaluateSecondaryMotion(
-  vec3 bobPosition,
-  vec3 bobCarrierNormal,
-  out float bobDisplacement,
-  out vec3 bobLightingGradient
-) {
-  // This shader evaluates source positions, where the neutral eye seats occupy
-  // x [-0.235, 0.207], y [-0.252, 0.028]. Protect those authored vertices,
-  // rather than suppressing the whole front.
-  float bobEyeSeatDepthMask =
-    1.0 - smoothstep(-0.25, -0.12, bobPosition.z);
-  float bobEyeSeatDepthDerivative =
-    -bobSmoothstepDerivative(-0.25, -0.12, bobPosition.z);
-  float bobEyeSeatCentredX = bobPosition.x + 0.014;
-  float bobEyeSeatAbsoluteX = abs(bobEyeSeatCentredX);
-  float bobEyeSeatHorizontalMask =
-    1.0 - smoothstep(0.25, 0.34, bobEyeSeatAbsoluteX);
-  float bobEyeSeatHorizontalDerivative =
-    -bobSmoothstepDerivative(0.25, 0.34, bobEyeSeatAbsoluteX) *
-    sign(bobEyeSeatCentredX);
-  float bobEyeSeatLowerMask = smoothstep(-0.36, -0.27, bobPosition.y);
-  float bobEyeSeatUpperMask =
-    1.0 - smoothstep(0.06, 0.16, bobPosition.y);
-  float bobEyeSeatVerticalMask = bobEyeSeatLowerMask * bobEyeSeatUpperMask;
-  float bobEyeSeatVerticalDerivative =
-    bobSmoothstepDerivative(-0.36, -0.27, bobPosition.y) *
-      bobEyeSeatUpperMask -
-    bobEyeSeatLowerMask *
-      bobSmoothstepDerivative(0.06, 0.16, bobPosition.y);
-  float bobEyeSeatMask = bobEyeSeatDepthMask *
-    bobEyeSeatHorizontalMask * bobEyeSeatVerticalMask;
-  float bobEyeSeatProtection = 1.0 - bobEyeSeatMask;
-  vec3 bobEyeSeatProtectionGradient = -vec3(
-    bobEyeSeatDepthMask * bobEyeSeatHorizontalDerivative *
-      bobEyeSeatVerticalMask,
-    bobEyeSeatDepthMask * bobEyeSeatHorizontalMask *
-      bobEyeSeatVerticalDerivative,
-    bobEyeSeatDepthDerivative * bobEyeSeatHorizontalMask *
-      bobEyeSeatVerticalMask
-  );
-  float bobContactProtection = smoothstep(-0.45, -0.28, bobPosition.y);
-  vec3 bobContactProtectionGradient = vec3(
-    0.0,
-    bobSmoothstepDerivative(-0.45, -0.28, bobPosition.y),
-    0.0
-  );
-
-  float bobWobblePhaseA =
-    bobPosition.x * 8.3 + bobPosition.y * 6.1 +
-    uBobSecondaryTime * 2.2;
-  float bobWobblePhaseB =
-    bobPosition.z * 7.2 - uBobSecondaryTime * 1.7;
-  float bobWobble =
-    sin(bobWobblePhaseA) * sin(bobWobblePhaseB) *
-    ${BOB_WOBBLE_AMPLITUDE_METRES.toFixed(4)};
-  vec3 bobWobbleGradient =
-    (cos(bobWobblePhaseA) * sin(bobWobblePhaseB) *
-      vec3(8.3, 6.1, 0.0) +
-    sin(bobWobblePhaseA) * cos(bobWobblePhaseB) *
-      vec3(0.0, 0.0, 7.2)) *
-    ${BOB_WOBBLE_AMPLITUDE_METRES.toFixed(4)};
-  float bobWobbleProtection = 0.45 + bobContactProtection * 0.55;
-  vec3 bobWobbleProtectionGradient =
-    bobContactProtectionGradient * 0.55;
-
-  vec3 bobFromImpact = bobPosition - uBobImpactPointLocal;
-  float bobImpactDistance = length(bobFromImpact);
-  vec3 bobImpactDirection = bobImpactDistance > 0.0001
-    ? bobFromImpact / bobImpactDistance
-    : vec3(0.0);
-  float bobImpactPhase =
-    bobImpactDistance * 30.0 - uBobImpactAge * 18.0;
-  float bobImpactEnvelope =
-    exp(-uBobImpactAge * ${BOB_IMPACT_RIPPLE_TIME_DECAY.toFixed(1)}) *
-    exp(-bobImpactDistance * ${BOB_IMPACT_RIPPLE_DISTANCE_DECAY.toFixed(1)});
-  float bobImpactAmplitude =
-    bobImpactEnvelope * uBobImpactStrength *
-    ${BOB_IMPACT_RIPPLE_AMPLITUDE_METRES.toFixed(4)};
-  float bobImpactRipple = sin(bobImpactPhase) * bobImpactAmplitude;
-  vec3 bobImpactGradient =
-    bobImpactDirection * bobImpactAmplitude *
-    (cos(bobImpactPhase) * 30.0 -
-      sin(bobImpactPhase) *
-        ${BOB_IMPACT_RIPPLE_DISTANCE_DECAY.toFixed(1)});
-
-  float bobProtectedWobble =
-    bobWobble * bobWobbleProtection * bobEyeSeatProtection;
-  vec3 bobProtectedWobbleGradient = (
-    bobWobbleGradient * bobWobbleProtection +
-    bobWobble * bobWobbleProtectionGradient
-  ) * bobEyeSeatProtection +
-    bobWobble * bobWobbleProtection * bobEyeSeatProtectionGradient;
-  float bobProtectedImpact = bobImpactRipple * bobEyeSeatProtection;
-  vec3 bobProtectedImpactGradient =
-    bobImpactGradient * bobEyeSeatProtection +
-    bobImpactRipple * bobEyeSeatProtectionGradient;
-
-  // Make the transient bend readable at gameplay distance without allowing a
-  // steeper lighting normal than the original six-millimetre wave can create.
-  vec3 bobImpactLightingGradient =
-    bobProtectedImpactGradient * ${BOB_IMPACT_NORMAL_RESPONSE.toFixed(1)};
-  bobImpactLightingGradient *= min(
-    1.0,
-    ${BOB_IMPACT_NORMAL_SLOPE_LIMIT.toFixed(3)} / max(length(bobImpactLightingGradient), 0.0001)
-  );
-
-  // The exact six-millimetre ripple above is too fine to move the main gel
-  // highlight at gameplay distance. This smooth normal-only carrier shares
-  // its impact centre and 0.6 m/s propagation speed, but spans roughly two
-  // broad bands across Bob. Normalising its authored-surface tangent prevents
-  // the main highlight from disappearing where the impact ray is nearly normal.
-  float bobImpactNormalCarrierPhase =
-    bobImpactDistance * ${BOB_IMPACT_NORMAL_CARRIER_FREQUENCY.toFixed(1)} -
-    uBobImpactAge * ${BOB_IMPACT_NORMAL_CARRIER_TEMPORAL_FREQUENCY.toFixed(1)};
-  float bobImpactNormalCarrierLifetime = 1.0 - smoothstep(
-    ${BOB_IMPACT_NORMAL_CARRIER_FADE_START_SECONDS.toFixed(2)},
-    ${BOB_IMPACT_RIPPLE_DURATION_SECONDS.toFixed(2)},
-    uBobImpactAge
-  );
-  float bobImpactNormalCarrierEnvelope =
-    exp(-uBobImpactAge * ${BOB_IMPACT_NORMAL_CARRIER_TIME_DECAY.toFixed(1)}) *
-    exp(-bobImpactDistance * ${BOB_IMPACT_NORMAL_CARRIER_DISTANCE_DECAY.toFixed(1)}) *
-    bobImpactNormalCarrierLifetime * uBobImpactStrength *
-    bobEyeSeatProtection;
-  vec3 bobImpactCarrierTangent = bobImpactDirection -
-    bobCarrierNormal * dot(bobImpactDirection, bobCarrierNormal);
-  float bobImpactCarrierTangentLength = length(bobImpactCarrierTangent);
-  bobImpactCarrierTangent = bobImpactCarrierTangentLength > 0.0001
-    ? bobImpactCarrierTangent / bobImpactCarrierTangentLength
-    : vec3(0.0);
-  vec3 bobImpactNormalCarrier = bobImpactCarrierTangent *
-    cos(bobImpactNormalCarrierPhase) *
-    bobImpactNormalCarrierEnvelope *
-    ${BOB_IMPACT_NORMAL_CARRIER_RESPONSE.toFixed(2)};
-  bobImpactNormalCarrier *= min(
-    1.0,
-    ${BOB_IMPACT_NORMAL_CARRIER_SLOPE_LIMIT.toFixed(3)} /
-      max(length(bobImpactNormalCarrier), 0.0001)
-  );
-
-  bobDisplacement = bobProtectedWobble + bobProtectedImpact;
-  bobLightingGradient = bobProtectedWobbleGradient +
-    bobImpactLightingGradient + bobImpactNormalCarrier;
-}
-${shader.vertexShader}
-`
-        .replace(
-          '#include <morphnormal_vertex>',
-          /* glsl */ `
-#include <morphnormal_vertex>
-// Start from Three.js's authored morph normal, then tilt it by the tangential
-// slope of the same object-space wave used for the vertex displacement.
-vec3 bobSecondaryBaseNormal = normalize(objectNormal);
-float bobSecondaryDisplacement;
-vec3 bobSecondaryLightingGradient;
-bobEvaluateSecondaryMotion(
-  position,
-  bobSecondaryBaseNormal,
-  bobSecondaryDisplacement,
-  bobSecondaryLightingGradient
-);
-vec3 bobSecondaryTangentialGradient =
-  bobSecondaryLightingGradient -
-  bobSecondaryBaseNormal * dot(
-    bobSecondaryLightingGradient,
-    bobSecondaryBaseNormal
-  );
-objectNormal = normalize(
-  bobSecondaryBaseNormal - bobSecondaryTangentialGradient
-);
-`,
-        )
-        .replace(
-          '#include <begin_vertex>',
-          /* glsl */ `
-#include <begin_vertex>
-transformed += bobSecondaryBaseNormal * bobSecondaryDisplacement;
-`,
-        );
+      shader.vertexShader = injectBobSecondaryMotionVertexShader(shader.vertexShader);
     };
   }
 
   override customProgramCacheKey(): string {
-    return 'bob-gate-two-gel-ripple-normals-v5';
+    return 'bob-gel-secondary-surface-v6';
+  }
+
+  /** Shadow passes borrow the live uniform objects; only update() advances them. */
+  configureShadowMaterial(
+    material: THREE.MeshDepthMaterial | THREE.MeshDistanceMaterial,
+    opacity: THREE.IUniform<number>,
+  ): void {
+    configureBobShadowFade(material, opacity, true);
+    const fade = material.onBeforeCompile;
+    material.onBeforeCompile = (shader, renderer) => {
+      shader.uniforms.uBobSecondaryTime = this.bobUniforms.time;
+      shader.uniforms.uBobImpactPointLocal = this.bobUniforms.impactPointLocal;
+      shader.uniforms.uBobImpactStrength = this.bobUniforms.impactStrength;
+      shader.uniforms.uBobImpactAge = this.bobUniforms.impactAge;
+      shader.vertexShader = injectBobSecondaryMotionVertexShader(shader.vertexShader, true);
+      fade(shader, renderer);
+    };
   }
 
   update(deltaSeconds: number): void {
@@ -329,7 +146,7 @@ transformed += bobSecondaryBaseNormal * bobSecondaryDisplacement;
   }
 }
 
-/** Owns the two shared Gate 2 materials and their presentation-only state. */
+/** Owns the shared visible/shadow materials and their presentation-only state. */
 export class BobGateTwoMaterialSet {
   readonly body = new BobGelBodyMaterial();
   readonly eyes = new THREE.MeshPhysicalMaterial({
@@ -348,8 +165,20 @@ export class BobGateTwoMaterialSet {
     depthWrite: true,
     side: THREE.FrontSide,
   });
+  readonly bodyDepth = new THREE.MeshDepthMaterial({ name: 'Bob-Gel-Depth' });
+  readonly bodyDistance = new THREE.MeshDistanceMaterial({ name: 'Bob-Gel-Distance' });
+  readonly eyeDepth = new THREE.MeshDepthMaterial({ name: 'Bob-Eye-Depth' });
+  readonly eyeDistance = new THREE.MeshDistanceMaterial({ name: 'Bob-Eye-Distance' });
+  private readonly shadowOpacity: THREE.IUniform<number> = { value: 1 };
   private targetBodyReflectionIntensity = 0;
   private targetEyeReflectionIntensity = 0;
+
+  constructor() {
+    this.body.configureShadowMaterial(this.bodyDepth, this.shadowOpacity);
+    this.body.configureShadowMaterial(this.bodyDistance, this.shadowOpacity);
+    configureBobShadowFade(this.eyeDepth, this.shadowOpacity, false);
+    configureBobShadowFade(this.eyeDistance, this.shadowOpacity, false);
+  }
 
   get diagnostics(): BobGateTwoMaterialDiagnostics {
     const bodySelfLit =
@@ -439,6 +268,7 @@ export class BobGateTwoMaterialSet {
 
   setOpacity(opacity: number): void {
     const boundedOpacity = THREE.MathUtils.clamp(opacity, 0, 1);
+    this.shadowOpacity.value = boundedOpacity;
     this.body.opacity = boundedOpacity;
     // Transmission requires a transparent program even at full presentation
     // opacity, so keep this flag stable across camera-proximity fades.
@@ -452,4 +282,33 @@ export class BobGateTwoMaterialSet {
     }
     this.eyes.depthWrite = boundedOpacity >= 1;
   }
+}
+
+function configureBobShadowFade(
+  material: THREE.MeshDepthMaterial | THREE.MeshDistanceMaterial,
+  opacity: THREE.IUniform<number>,
+  secondaryMotion: boolean,
+): void {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uBobShadowOpacity = opacity;
+    // Object-space coverage stays fixed while the light/camera moves. Both
+    // shadow types and the eye seats use one fade, with exact opaque/hidden ends.
+    shader.vertexShader = `varying vec3 vBobShadowPosition;\n${shader.vertexShader}`
+      .replace('#include <project_vertex>',
+        'vBobShadowPosition = position;\n#include <project_vertex>');
+    shader.fragmentShader = /* glsl */ `
+uniform float uBobShadowOpacity;
+varying vec3 vBobShadowPosition;
+${shader.fragmentShader}`.replace('#include <clipping_planes_fragment>', /* glsl */ `
+#include <clipping_planes_fragment>
+if (uBobShadowOpacity < 1.0) {
+  vec3 bobCell = floor(vBobShadowPosition * 256.0);
+  float bobCoverage = fract(sin(dot(bobCell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  if (uBobShadowOpacity <= 0.0 || bobCoverage >= uBobShadowOpacity) discard;
+}
+`);
+  };
+  material.customProgramCacheKey = () => secondaryMotion
+    ? 'bob-gel-secondary-shadow-fade-v1'
+    : 'bob-eye-shadow-fade-v1';
 }

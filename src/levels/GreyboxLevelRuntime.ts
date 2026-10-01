@@ -442,14 +442,6 @@ export class GreyboxLevelRuntime {
       .prepare()
       .then(() => {
         if (this.resources !== resources || this.lightingPrewarmGeneration !== generation) return;
-        // Authored morphs participate in Three.js's default depth pass. Secondary
-        // shader deformation and fade handling remain tracked by issue #170.
-        resources.testScene.bob.root.traverse((object) => {
-          if (object instanceof THREE.Mesh) {
-            object.castShadow = true;
-            object.receiveShadow = true;
-          }
-        });
         return this.runLightingPrewarm(resources, generation);
       })
       .catch((error) => {
@@ -1461,6 +1453,9 @@ export class GreyboxLevelRuntime {
     resources: GreyboxRuntimeResources,
   ): void {
     resources.testScene.bob.updateDeath(deltaSeconds);
+    if (this.lastDeathSlimeId === 'goop' && !resources.testScene.bob.diagnostics.visible) {
+      resources.slimePairPresentation.setGoopVisible(false);
+    }
     resources.testScene.updateDeath(deltaSeconds);
     if (resources.deathSequence.update(deltaSeconds)) {
       resources.deathScreen.show();
@@ -1867,6 +1862,14 @@ export class GreyboxLevelRuntime {
             } finally {
               opaqueSubset.clear();
             }
+            // Camera fades change the existing eyes' opaque/transparent shader
+            // variant. Retain both on their live material before gameplay starts.
+            await resources.testScene.bob.prepareCameraFadePrograms(() => {
+              if (renderer.extensions.has('KHR_parallel_shader_compile')) {
+                return renderer.compileAsync(compileSubset, prewarmCamera, this.renderLayer.scene);
+              }
+              renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene);
+            });
           } finally {
             compileSubset.clear();
           }

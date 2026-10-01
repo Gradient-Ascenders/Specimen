@@ -42,15 +42,60 @@ pedestal. This is a central Room 1 proof, not complete traversal coverage.
 Relevant wall art receives shadows where the cone reaches it; later room and
 adhesion coverage belongs to #171.
 
-Bob uses authored morphs in the default depth pass and casts/receives shadows.
+Bob's authored body and eye meshes cast and receive shadows.
 Major opaque pedestal and containment frame meshes cast/receive; the floor and
 selected wall art receive. Glass, particles, beams and hidden collision-only
 surfaces are excluded. Wall receivers are selected after static consolidation,
 using source names, preserving measured geometry owner/batch identities.
 
-Secondary shader displacement, camera fades, death and switching shadow
-correctness remain explicitly tracked by #170. No custom character shadow
-material or duplicate character animation authority is introduced here.
+## Character passes (#170)
+
+`BobGateTwoMaterialSet` provides one body depth/distance pair and one shared eye
+depth/distance pair. `BobSecondaryMotionShader` inserts the same bounded wobble
+and impact displacement into the visible body and both shadow passes. All three
+borrow the same uniform objects; only the existing body material update advances
+time or impact age. Three.js supplies each mesh's existing authored morph weights.
+Secondary motion evaluates neutral source positions along the authored morph
+normal before position morphs, preserving the established visible deformation
+order. The depth/distance shaders explicitly evaluate morph normals even without
+a displacement texture. The normal-only lighting carrier stays in the visible
+pass; it never changes a shadow silhouette.
+
+Camera-proximity opacity drives a shared object-space coverage mask in all four
+shadow materials. Full opacity casts the complete opaque silhouette; zero
+opacity discards every shadow fragment. Intermediate opacity reduces sampled
+coverage, filtered by the existing PCF map. The mask uses neutral source positions
+so its pattern does not advance with animation time. It adds no animation state
+or shader variants per fade value. The existing eye transparent/opaque material
+variants remain bounded and are compiled on the retained live material during
+Containment loading, with opacity restored even on compilation failure. This
+approximates fading shadow opacity; it does not
+simulate coloured transmission through gel.
+
+Bob visibility hides its entire live mesh hierarchy from both camera and shadow
+passes. The existing anticipation morphs cast until rupture; then the original
+body/eyes disappear. Rupture core and droplets remain non-casting effects. Level
+coverage uses `setShadowCasting` on only the authored meshes, including before
+asset preparation. Reset/recovery reuses all four materials and shared uniforms.
+Asset disposal collects unique custom depth/distance materials as well as visible
+materials, disposing each once without taking ownership of borrowed PMREM maps.
+
+Goop, unlocked Volt and the merged specimen use their existing standard materials
+and geometry with explicit cast/receive roles. Their existing mesh/material
+visibility governs first-person hiding and form switching in both passes;
+there is no shadow-only body. Cultivation hides the original Goop/Volt body during
+its existing rupture presentation and restores it on recovery. Containment hides
+Goop at its shared rupture boundary. Blackout's non-Bob death-screen presentation
+retains its existing visible bodies and matching shadows until recovery. The
+light-emitting captive Volt inside the Room 5 pod remains excluded as authored.
+
+`DissolveTarget` and its material bundle remain authoritative and unchanged.
+Their visible/depth/distance mask uniforms, collision/removal thresholds and
+reset behavior retain the existing implementation. No character shadow material
+is assigned to soluble geometry.
+
+See [character shadow evidence](evidence/issue-170/review.md) for verification,
+spot/point views and remaining visual acceptance limits.
 
 ## Preparation and lifecycle
 

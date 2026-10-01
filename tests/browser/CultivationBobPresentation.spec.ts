@@ -291,7 +291,8 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   expect(darkLighting.materials?.targetEyeReflectionIntensity)
     .toBeLessThan(0.74);
   expect(darkLighting.meshCount).toBeGreaterThan(0);
-  expect(darkLighting.shadowCasterCount).toBe(darkLighting.meshCount);
+  expect(darkLighting.shadowCasterCount).toBe(3); // Body and two authored eye lenses.
+  expect(darkLighting.shadowCasterCount).toBeLessThan(darkLighting.meshCount); // No rupture-particle shadows.
   const disposal = await page.evaluate(() => {
     const runtime = (
       window as Window & {

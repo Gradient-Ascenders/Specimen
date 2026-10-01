@@ -610,6 +610,13 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
     runtime.load();
     runtime.start();
 
+    const groupBodies = scene.getObjectsByProperty('name', 'blackout-foundation-slime') as THREE.Mesh[];
+    const specimen = scene.getObjectByName('blackout-specimen-body') as THREE.Mesh;
+    assert.equal(groupBodies.length, 2);
+    assert.ok(groupBodies.every(mesh => mesh.castShadow && mesh.receiveShadow && mesh.visible));
+    assert.ok(specimen.castShadow && specimen.receiveShadow);
+    assert.equal(specimen.visible, false);
+
     assert.equal(runtime.beginMerge(), true);
     assert.equal(runtime.beginMerge(), false);
     assert.equal(runtime.phase, 'merging');
@@ -637,6 +644,9 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
     assert.equal(runtime.phase, 'specimen');
     assert.equal(runtime.specimenFormReadModel?.controlledForm, 'specimen');
     assert.equal(runtime.specimenFormReadModel?.mergeProgress, 1);
+    runtime.render(0, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>);
+    assert.ok(groupBodies.every(mesh => !mesh.visible));
+    assert.equal(specimen.visible, true);
 
     const hud = runtime.getSlimeHUDSnapshot();
     assert.equal(hud.controlledForm, 'specimen');

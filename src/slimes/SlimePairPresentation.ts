@@ -69,6 +69,8 @@ export class SlimePairPresentation {
       }),
     );
     this.goopMesh.name = 'goop-development-body';
+    this.goopMesh.castShadow = true;
+    this.goopMesh.receiveShadow = true;
     this.root.add(this.goopMesh);
 
 
@@ -123,6 +125,11 @@ export class SlimePairPresentation {
     this.disposeLocator(this.goopLocator);
     this.root.removeFromParent();
     this.root.clear();
+  }
+
+  /** Hide the original body (and its shadow) while its rupture is presented. */
+  setGoopVisible(visible: boolean): void {
+    this.goopMesh.visible = visible;
   }
 
   private createLocator(
