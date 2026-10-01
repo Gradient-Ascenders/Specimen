@@ -135,6 +135,11 @@ export class CultivationPreparationQueue {
     await this.prepareInitial();
     this.anticipateLiftExit();
     if (this.upcoming) await this.prepareConfiguration(this.upcoming);
+    // The lit lift adds a real spotlight. Its handoff layout and the isolated
+    // dark room now have distinct shadow counts and must both be prepared.
+    const darkRoom = this.configurations.find(config => config.dark &&
+      config.visible.every((visible, i) => visible === (i === 7)));
+    if (darkRoom) await this.prepareConfiguration(darkRoom);
     this.priority = undefined;
     this.diagnostics.initialMs = performance.now() - started;
   }
@@ -215,7 +220,7 @@ export class CultivationPreparationQueue {
       if (o.name.startsWith('cultivation-room-3-drone-') && !config.visible[5]) return;
       if (o instanceof THREE.Light) {
         const clone = o.clone(false); o.updateWorldMatrix(true, false); clone.matrix.copy(o.matrixWorld); clone.matrixAutoUpdate = false;
-        if (config.dark && clone.castShadow && (clone instanceof THREE.SpotLight || clone instanceof THREE.PointLight || clone instanceof THREE.DirectionalLight)) {
+        if (clone.castShadow && (clone instanceof THREE.SpotLight || clone instanceof THREE.PointLight || clone instanceof THREE.DirectionalLight)) {
           // Preparation disables shadow updates, so cloned lights never acquire
           // real shadow maps. PCF receivers still require comparison-enabled
           // depth textures, including cube textures for point lights.
@@ -254,7 +259,7 @@ export class CultivationPreparationQueue {
       // the hidden originals only lengthens startup and background slices.
       if (!materials.some(material => material.visible)) continue;
       const geometry = source.geometry;
-      const feature = source.type + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
+      const feature = source.type + ':' + source.receiveShadow + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
         Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize).sort().join(',') + ':' + Object.keys(geometry.morphAttributes).join(',');
       const proxy = source.clone(false) as Drawable; proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;
       source.updateWorldMatrix(true, false); proxy.matrix.copy(source.matrixWorld); proxy.matrixAutoUpdate = false;
@@ -299,7 +304,8 @@ export class CultivationPreparationQueue {
       if (++collected % 8 === 0) yield {label:'collect', run: () => {}};
       // Shadow programs also encode light counts. Compile their real depth/distance
       // configurations asynchronously, without rendering nine whole-room shadow passes.
-      if (config.dark && source instanceof THREE.Mesh && source.castShadow) for (const material of materials) {
+      if (source instanceof THREE.Mesh && source.castShadow) for (const material of materials) {
+        if (!material.visible) continue;
         for (const distance of [false, true]) {
           const m = material as THREE.MeshStandardMaterial;
           const side = m.shadowSide ?? (m.side === THREE.FrontSide ? THREE.BackSide : m.side === THREE.BackSide ? THREE.FrontSide : THREE.DoubleSide);
@@ -336,7 +342,7 @@ export class CultivationPreparationQueue {
         const group = new THREE.Group(); group.add(...batch);
         yield {label: shadowTarget ? 'shadow-compile' : 'compile', run: () => {
           const start = performance.now();
-          return this.withState(config.dark, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, targetScene)).then(() => {
+          return this.withState(true, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, targetScene)).then(() => {
             this.diagnostics.compileWaitMs += performance.now()-start; group.clear();
           });
         }};
@@ -348,7 +354,7 @@ export class CultivationPreparationQueue {
       yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + batch[0].name, run: () => {
         const start = performance.now();
         targetScene.add(...batch);
-        try { this.withState(config.dark, shadowTarget, () => this.layer.renderer.render(targetScene, this.camera)); }
+        try { this.withState(true, shadowTarget, () => this.layer.renderer.render(targetScene, this.camera)); }
         finally { for (const proxy of batch) proxy.removeFromParent(); }
         this.diagnostics.primeMs += performance.now()-start;
       }};

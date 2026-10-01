@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeShadowLight } from '../../ShadowLightResources.ts';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 import type { MaintenanceDroneReadModel } from '../../../vehicles/MaintenanceDroneTypes.ts';
@@ -63,6 +64,8 @@ export class MaintenanceDronePresentation {
     hatch.position.set(0, .245, -.04); this.root.add(hatch);
     const window = new THREE.Mesh(this.own(new RoundedBoxGeometry(.37, .055, .2, 3, .025)), glass);
     window.position.set(0, .31, -.1); this.root.add(window);
+    shell.castShadow = hatch.castShadow = true;
+    shell.receiveShadow = hatch.receiveShadow = window.receiveShadow = true;
     for (const side of [-1, 1]) {
       const rail = new THREE.Mesh(this.own(new THREE.CylinderGeometry(.035, .035, 1.13, 8)), darkMetal);
       rail.rotation.z = Math.PI / 2; rail.position.set(0, -.07, side * .62); this.root.add(rail);
@@ -106,6 +109,7 @@ export class MaintenanceDronePresentation {
 
     // The visible cone and real spotlight share the same angle and useful range.
     this.spot = new THREE.SpotLight(0xffd34f, 0, 32, Math.atan(2/7), .5, 2);
+    this.spot.name = 'blackout-maintenance-searchlight';
     this.spot.castShadow=true;
     this.spot.shadow.mapSize.set(512,512);
     this.spot.shadow.camera.near=.05;
@@ -154,6 +158,9 @@ export class MaintenanceDronePresentation {
     const lit = state.lightEnabled || started;
     const ramp = started ? THREE.MathUtils.smoothstep(state.startupProgress, 0, 1) : (state.lightEnabled ? 1 : 0);
     this.spot.intensity = 100 * ramp;
+    // Keep the source registered for stable programs; unpowered maps do no work.
+    this.spot.shadow.autoUpdate = lit;
+    this.spot.shadow.needsUpdate = lit;
     let beamLength=32;
     if(lit && this.world && this.ignored) {
       this.root.updateWorldMatrix(true,false);
@@ -222,7 +229,7 @@ export class MaintenanceDronePresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.spot.dispose();
+    disposeShadowLight(this.spot);
     this.root.removeFromParent(); this.root.clear(); this.hud.remove();
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();

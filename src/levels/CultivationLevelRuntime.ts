@@ -216,7 +216,6 @@ export class CultivationLevelRuntime {
   private roomFiveCheckpoint: RoomFiveCheckpoint = 'split';
   private lastRoomFiveObjective = '';
   private readonly roomFiveLocal = new THREE.Vector3();
-  private bobCastsShadow = false;
   private readonly rescueCamera = {
     gameplayUpOverride: { x: 0, y: 1, z: 0 },
     profile: { id: 'volt-rescue', distanceMetres: 10, targetHeightMetres: 0,
@@ -266,7 +265,7 @@ export class CultivationLevelRuntime {
   private presentationPreparation: Promise<void> | undefined;
   private preparationQueue: CultivationPreparationQueue | undefined;
   private readonly preparationLightState = new THREE.Group();
-  private lastPreparedDark = false;
+  private lastShadowLayoutKey = '';
   private lightLayout: CultivationLightLayout | undefined;
   private lightLayoutKey = '';
   private constructionMs = 0;
@@ -287,19 +286,22 @@ export class CultivationLevelRuntime {
         }
         this.preparationQueue.diagnostics.constructionMs = this.constructionMs;
         return this.preparationQueue.prepareStartup();
+      }).catch(error => {
+        if (this.resources === resources) this.unload();
+        throw error;
       });
   }
   load(): void {
     if (this.lifecycle.state === 'unloaded') this.presentationPreparation = undefined;
     const started = performance.now();
     this.lifecycle.load();
-    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: false });
+    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: true });
     this.constructionMs = performance.now() - started;
   }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
   restartLevel(): void { this.lifecycle.restartLevel(); }
-  unload(): void { this.lightLayout?.dispose(); this.lightLayout = undefined; this.lightLayoutKey = ''; this.lastPreparedDark = false; this.bobCastsShadow = false; this.preparationQueue?.dispose(); this.preparationQueue = undefined; this.lifecycle.unload(); }
+  unload(): void { this.lifecycle.unload(); }
 
   dispose(): void {
     this.lightLayout?.dispose(); this.lightLayout = undefined;
@@ -609,11 +611,10 @@ export class CultivationLevelRuntime {
       && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
-    this.shadowRequest?.update({ enabled: Boolean(darkRoom) });
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
       resources.pair.bobBody.position,
     );
-    this.updateBobLighting(resources, Boolean(darkRoom), bobLightingRoom);
+    this.updateBobLighting(resources, bobLightingRoom);
     const aimPresentationAllowed =
       this.lifecycle.state === 'running' &&
       resources.deathSequence.isPlaying &&
@@ -687,10 +688,12 @@ export class CultivationLevelRuntime {
         resources.deathSequence.isPlaying &&
         this.roomThreeSlimeEligibility[damageSlimeId],
     );
-    if (darkRoom !== this.lastPreparedDark) {
-      // Shadow passes consume the scene's prior light state; refresh it before a lighting transition.
+    if (this.lightLayoutKey !== this.lastShadowLayoutKey ||
+        (this.preparationQueue && this.preparationQueue.diagnostics.completed < this.preparationQueue.diagnostics.total)) {
+      // Shadow materials consume prior light state. Restore the live layout
+      // after isolated preparation and at visibility handoffs before drawing.
       this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
-      this.lastPreparedDark = !!darkRoom;
+      this.lastShadowLayoutKey = this.lightLayoutKey;
     }
     this.renderLayer.render();
     this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
@@ -1341,6 +1344,9 @@ export class CultivationLevelRuntime {
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
+    this.preparationQueue?.dispose(); this.preparationQueue = undefined;
+    this.lightLayout?.dispose(); this.lightLayout = undefined;
+    this.lightLayoutKey = ''; this.lastShadowLayoutKey = '';
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
     this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree);
     resources.unsubscribeControllerObjective();
@@ -1835,13 +1841,8 @@ export class CultivationLevelRuntime {
 
   private updateBobLighting(
     resources: CultivationRuntimeResources,
-    shadowsEnabled: boolean,
     bobLightingRoom: number | undefined,
   ): void {
-    if (this.bobCastsShadow !== shadowsEnabled) {
-      this.bobCastsShadow = shadowsEnabled;
-      resources.bobPresentation.setShadowCasting(shadowsEnabled);
-    }
     let darkWeight = 0;
     if (bobLightingRoom === 5 && resources.authoredPreview) {
       resources.authoredPreview.roomFive.root.worldToLocal(

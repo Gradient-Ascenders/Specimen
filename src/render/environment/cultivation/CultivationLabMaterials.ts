@@ -1,4 +1,6 @@
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
+import { configureCultivationTraversalLight } from './CultivationShadowCoverage.ts';
+import { disposeShadowLight } from '../../ShadowLightResources.ts';
 import { AcidSurfaceMaterial } from '../containment/AcidSurfaceMaterial.ts';
 import { createCultivationStickyRouteGeometry } from './CultivationStickyRouteGeometry.ts';
 import { CultivationPlatformArt } from './CultivationPlatformArt.ts';
@@ -15,6 +17,7 @@ interface LabFixtureOptions {
   readonly wallSides?: readonly (-1 | 1)[];
   readonly fillHeightMetres?: number;
   readonly fillPositionsZ?: readonly number[];
+  readonly shadowTargets?: readonly (readonly [number, number, number])[];
 }
 
 /** Original, deterministic facility finishes shared by the dressed Cultivation rooms. */
@@ -218,12 +221,20 @@ export class CultivationLabMaterials {
     frames.computeBoundingSphere();
     group.add(frames);
     if (height > 10) {
-      // Broad local light pools neutralize the old green fill without changing the renderer.
-      for (const z of options.fillPositionsZ ?? [10, 38]) {
-        const light = new THREE.PointLight(0xf3f2e9, 480, 48, 2);
-        light.name = `${root.name}-neutral-fill`;
-        light.position.set(0, options.fillHeightMetres ?? 10, z);
-        group.add(light);
+      // Keep the original low point pools, including their upward illumination.
+      // Two fixed ceiling fixture keys cover traversal above those pools with
+      // one depth pass each. Nothing follows a character or changes a room clock.
+      for (const [index, z] of (options.fillPositionsZ ?? [10, 38]).entries()) {
+        const fill = new THREE.PointLight(0xf3f2e9, 480, 48, 2);
+        fill.name = `${root.name}-neutral-fill`;
+        fill.position.set(0, options.fillHeightMetres ?? 10, z);
+        const key = new THREE.SpotLight(0xf3f2e9, 120, 40, 1.2, .18, 2);
+        key.name = `${root.name}-fixture-shadow-${index + 1}`;
+        key.position.set((index === 0 ? -1 : 1) * width * .28, height - .45,
+          5 + 8 * Math.round((z - 5) / 8));
+        key.target.position.set(...(options.shadowTargets?.[index] ?? [0, 0, z]));
+        configureCultivationTraversalLight(key);
+        group.add(fill, key, key.target);
       }
     }
     root.add(group);
@@ -255,6 +266,7 @@ export class CultivationLabMaterials {
     for (const group of this.decorations) {
       group.removeFromParent();
       group.traverse((object) => {
+        if (object instanceof THREE.Light) disposeShadowLight(object);
         if (object instanceof THREE.Mesh) decorationGeometries.add(object.geometry);
         if (object instanceof THREE.InstancedMesh) object.dispose();
       });

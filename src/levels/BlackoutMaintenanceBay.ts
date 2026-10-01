@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeShadowLight } from '../render/ShadowLightResources.ts';
 
 export const BLACKOUT_BAY_LAYOUT = Object.freeze({
   chamberWidth: 34,
@@ -21,7 +22,7 @@ export class BlackoutMaintenanceBay {
   private readonly arcGeometry = new THREE.BufferGeometry();
   private readonly arcMaterial = new THREE.LineBasicMaterial({color:0xafffff,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false});
   private readonly arcLights: THREE.PointLight[] = [];
-  private readonly hallwayLights: THREE.PointLight[] = [];
+  private readonly hallwayLights: THREE.SpotLight[] = [];
   private readonly hallwayBulbs: THREE.Mesh[] = [];
   private readonly hallwayFlickerSeeds = [0.3, 1.8, 3.9, 5.2];
   private elapsed = 0;
@@ -183,12 +184,27 @@ export class BlackoutMaintenanceBay {
       bulb.position.set(hallwayCenterX, hallwayHeight - 0.3, z);
       this.root.add(bulb);
       this.hallwayBulbs.push(bulb);
-      const light = new THREE.PointLight(0xffcf70, 8, 10, 2);
+      const light = new THREE.SpotLight(0xffcf70, 8, 10, 1.1, .18, 2);
       light.name = `hallway-flicker-light-${index + 1}`;
       light.position.set(hallwayCenterX, hallwayHeight - 0.8, z);
-      this.root.add(light);
+      light.target.position.set(hallwayCenterX, 0, z);
+      light.castShadow = true;
+      light.shadow.mapSize.set(256, 256);
+      light.shadow.camera.near = .15;
+      light.shadow.bias = -.0001;
+      light.shadow.normalBias = .015;
+      light.shadow.radius = 1.5;
+      this.root.add(light, light.target);
       this.hallwayLights.push(light);
     }
+    this.root.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      const solid = materials.some(material => material instanceof THREE.MeshStandardMaterial &&
+        material.visible && !material.transparent && material !== this.acidMaterial);
+      object.castShadow = solid && !object.name.startsWith('hallway-flicker-bulb-');
+      object.receiveShadow = solid;
+    });
   }
 
   acidAt(position: Readonly<{ readonly x: number; readonly y: number; readonly z: number }>): boolean {
@@ -247,6 +263,7 @@ export class BlackoutMaintenanceBay {
     const geometries=new Set<THREE.BufferGeometry>();
     const materials=new Set<THREE.Material>();
     this.root.traverse((object) => {
+      if (object instanceof THREE.Light) disposeShadowLight(object);
       if (!(object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points)) return;
       geometries.add(object.geometry);
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);

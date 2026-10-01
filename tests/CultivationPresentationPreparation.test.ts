@@ -176,9 +176,13 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.equal(queue.requireCurrent(true), false, 'different lighting still requires preparation');
       extraLight.removeFromParent();
       const beforeReuse = compiles;
-      assert.equal(queue.requireCurrent(true), true, 'leaving the lift reuses the prepared Room 5 assets and lighting');
-      assert.equal(compiles, beforeReuse, 'a covered visibility change needs no compiler work');
-      assert.equal(queue.diagnostics.reused, 1);
+      assert.equal(queue.requireCurrent(true), false, 'the lift spotlight changes the isolated Room 5 layout');
+      const roomFiveDeadline = performance.now() + 10000;
+      while (!queue.requireCurrent(true) && performance.now() < roomFiveDeadline) {
+        queue.tick(0, true); await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      assert.equal(queue.requireCurrent(true), true, 'the isolated encounter layout is prepared');
+      assert.ok(compiles > beforeReuse);
       assert.equal(queue.diagnostics.pending, false, 'exploration does not show another loading screen');
       for (const old of snapshots) old.object.visible = old.visible;
       const deadline = performance.now() + 30000;
@@ -195,7 +199,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     if (mode === 'startup') {
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
-      assert.equal(queue.diagnostics.completed, 2, 'startup prepares the initial view and lift/maintenance superset');
+      assert.equal(queue.diagnostics.completed, 3, 'startup prepares initial, lift handoff and isolated encounter layouts');
       const preparedCompiles = compiles;
       for (const z of [251, 270, 251, 270]) {
         preview.updatePresentationVisibility({z}, {z}); lighting.sync(scene);

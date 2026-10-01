@@ -357,7 +357,10 @@ export class BlackoutLevelRuntime {
       BLACKOUT_BOB_REFLECTION.eyes,
       true,
     );
-    return this.presentationPreparation ??= resources.bobPresentation.prepare();
+    return this.presentationPreparation ??= resources.bobPresentation.prepare().catch(error => {
+      if (this.resources === resources) this.unload();
+      throw error;
+    });
   }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
@@ -551,6 +554,8 @@ export class BlackoutLevelRuntime {
     resources.specimenAttack.reset();
     resources.sentinelRig.controller.cancelTransient('phase-change');
     resources.maintenanceDrone.recoverImmediately('checkpoint');
+    resources.dronePresentation?.update(0, resources.maintenanceDrone.readModel,
+      resources.group.activeSlimeId === 'volt');
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(
       resources.electricalSystem.readModel,
@@ -1338,7 +1343,6 @@ export class BlackoutLevelRuntime {
       const dronePresentation = this.authoredRoomOne
         ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted()) : undefined;
       if (dronePresentation) {
-        for(const mesh of scene.collisionMeshes) {mesh.castShadow=true;mesh.receiveShadow=true;}
         if(this.renderLayer.renderer) {
           this.shadowRequest = this.renderLayer.requestShadowConfiguration('blackout', { enabled: true });
           rollback(() => { this.shadowRequest?.dispose(); this.shadowRequest = undefined; });
@@ -1688,6 +1692,8 @@ export class BlackoutLevelRuntime {
       resources.group.activeSlimeId,
       resources.group.voltBody,
     );
+    resources.dronePresentation?.update(0, resources.maintenanceDrone.readModel,
+      resources.group.activeSlimeId === 'volt');
     this.currentRoom = snapshot.room;
     this.roomTwoInitialized = snapshot.room.roomId === 'room-2';
     this.bayComplete =
@@ -1874,6 +1880,8 @@ export class BlackoutLevelRuntime {
     );
     this.currentRoom = snapshot.room;
     resources.phase.restore(snapshot.room.phase);
+    resources.dronePresentation?.update(0, resources.maintenanceDrone.readModel,
+      resources.group.activeSlimeId === 'volt');
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);

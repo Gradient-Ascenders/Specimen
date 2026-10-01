@@ -37,8 +37,16 @@ export class BlackoutMaintenanceBayController {
       travelAxis:new THREE.Vector3(0,1,0),travelDistance:3.3,openingDurationSeconds:1,closingDurationSeconds:.45,
       obstructionCentre:new THREE.Vector3(6,1.5,BLACKOUT_BAY_LAYOUT.rearZ),obstructionSize:new THREE.Vector3(3.8,3.4,1.6)});
     bay.root.add(this.door.root);
+    this.door.root.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      const solid = materials.some(material => material.visible && !material.transparent && material instanceof THREE.MeshStandardMaterial);
+      object.castShadow = solid;
+      object.receiveShadow = solid;
+    });
     this.receiver = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.65,.12),new THREE.MeshStandardMaterial({color:0x194d32,roughness:.72,metalness:.15}));
     this.receiver.name='maintenance-bay-door-receiver'; this.receiver.position.set(-9,3,BLACKOUT_BAY_LAYOUT.rearZ-.4); bay.root.add(this.receiver);
+    this.receiver.castShadow = this.receiver.receiveShadow = true;
     const backing = new THREE.Mesh(new THREE.BoxGeometry(1.55,1.9,.22),new THREE.MeshStandardMaterial({color:0x353d40,metalness:.65,roughness:.65}));
     backing.position.z=.07; this.receiver.add(backing);
     const copper = new THREE.MeshStandardMaterial({color:0xb39442,metalness:.75,roughness:.4});

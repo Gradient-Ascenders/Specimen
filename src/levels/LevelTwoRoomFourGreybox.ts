@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { configureCultivationTraversalLight } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import { CultivationRoomFourController, ROOM_FOUR_SPAWNS } from './CultivationRoomFourController.ts';
 import { ProximityShutterDoor } from '../puzzle/ProximityShutterDoor.ts';
@@ -94,7 +95,11 @@ export class LevelTwoRoomFourGreybox {
       group.add(body); this.root.add(group);
       this.droneRoots.push(group); this.solubleTargetMeshes.push(body);
     }
-    b.addLight('room-4-lift-light', [0, 5, 10], 0xc8eaff, 65, 18);
+    const liftLight = new THREE.SpotLight(0xc8eaff, 65, 18, 1.2, .18, 2);
+    liftLight.name = 'room-4-lift-light'; liftLight.position.set(0, 5, 10);
+    liftLight.target.position.set(0, 0, 2);
+    configureCultivationTraversalLight(liftLight);
+    b.root.add(liftLight, liftLight.target);
     b.addLight('room-4-boarding-light', [0, 4, 2], 0xc8eaff, 22, 10);
     this.reset();
   }

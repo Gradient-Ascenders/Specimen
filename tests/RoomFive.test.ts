@@ -261,6 +261,46 @@ function setup() {
     dispose() { encounter.dispose(); burns.dispose(); for (const target of targets) target.dispose(); art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); world.clear(); surfaces.clear(); } };
 }
 
+test('retained searchlights follow gaze and power without changing authoritative detection or hull roles', () => {
+  const s = setup();
+  try {
+    const lights = s.encounter.drones.map(drone => s.room.root.getObjectByName(`${drone.id}-search-light`) as THREE.SpotLight);
+    assert.equal(lights.length, 9);
+    for (const network of ['red', 'blue', 'green'] as const) {
+      s.room.controller.security.select(network); s.encounter.update(1 / 60);
+      s.encounter.drones.forEach((drone, i) => {
+        const light = lights[i], enabled = drone.readModel.enabled;
+        assert.deepEqual(light.shadow.mapSize.toArray(), [512, 512]);
+        assert.equal(light.distance, 15); assert.equal(light.angle, .4);
+        assert.equal(light.shadow.autoUpdate, enabled);
+        assert.equal(light.shadow.needsUpdate, enabled);
+        assert.equal(light.intensity, enabled ? drone.root.userData.network === 'blue' ? 65 : 45 : 0);
+        const direction = drone.readModel.scanDirection;
+        assert.ok(light.target.position.clone().sub(light.position).normalize().distanceTo(direction) < 1e-6);
+        assert.ok(light.position.distanceTo(drone.root.position.clone().addScaledVector(direction, 1.4)) < 1e-6);
+      });
+    }
+    s.room.controller.security.release(); s.encounter.update(1 / 60);
+    assert.ok(lights.every(light => light.intensity === 0 && !light.shadow.autoUpdate));
+    s.room.controller.security.reset(); s.encounter.reset(); s.encounter.update(1 / 60);
+    assert.ok(lights.every(light => light.intensity > 0 && light.shadow.autoUpdate));
+    assert.equal(s.room.captiveVolt.castShadow, false);
+    assert.ok(s.room.glassPanels.every(mesh => !mesh.castShadow));
+    s.room.root.traverse(o => {
+      if (!(o instanceof THREE.Mesh)) return;
+      if (o.name === 'room-5-platform-shadow-hulls') assert.equal(o.castShadow, true);
+      if (o.userData.shadowProxyReceiver) assert.equal(o.castShadow, false);
+    });
+    let freed = 0;
+    for (const light of lights) {
+      light.shadow.map = new THREE.WebGLRenderTarget(1, 1);
+      light.shadow.map.addEventListener('dispose', () => freed++);
+    }
+    s.encounter.dispose(); s.encounter.dispose();
+    assert.equal(freed, 9); assert.ok(lights.every(light => light.shadow.map === null));
+  } finally { s.dispose(); }
+});
+
 test('three acid hits wake, progressively damage, and destroy the sewer drone; retry restores it', () => {
   const s = setup();
   try {

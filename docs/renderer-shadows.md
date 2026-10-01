@@ -15,10 +15,11 @@ Lights, map sizes, shadow cameras and allocated render targets remain owned by
 level lighting/presentation. RenderLayer does not dispose level lights. Camera,
 exposure, tone mapping and gameplay are independent of this policy.
 
-Containment requests shadows after successful load. Cultivation requests its
-existing light/dark section behavior, and Blackout requests its existing
-maintenance-drone shadows. These are boundary migrations only: their encounter
-coverage, caster selection and light resources remain for #172.
+Containment requests shadows after successful load. Under #172, Cultivation
+retains shadows in ordinary and dark rooms, and Blackout retains its request
+through maintenance power changes. Each presentation owns source intensity and
+map updates without changing renderer policy per frame. See the
+[Cultivation/Blackout source inventory and lifecycle](cultivation-blackout-shadows.md).
 
 Preparation uses `withShadowPreparation(enabled, action)` for synchronous
 compile/draw setup. It selects PCF with automatic/forced map updates disabled,

@@ -53,6 +53,13 @@ test('maintenance beam reaches the floor and stops above intervening platforms',
   root.traverse(o=>{if(o instanceof THREE.SpotLight)spot=o;});
   assert.equal(spot?.castShadow,true);
   assert.equal(spot?.distance,32);
+  assert.equal(spot?.shadow.autoUpdate, true);
+  presentation.update(1/60, {...state, state:'grounded-idle', powered:false, lightEnabled:false}, false);
+  assert.equal(spot?.intensity, 0);
+  assert.equal(spot?.shadow.autoUpdate, false);
+  assert.equal(spot?.castShadow, true, 'power toggles retain the source layout');
+  presentation.update(1/60, state, false);
+  assert.equal(spot?.shadow.needsUpdate, true, 'repowering rebuilds any prior silhouette');
   world.unregister(platform);presentation.update(1/60,state,false);
   assert.ok(bottom()<.15,'beam grows back when no longer blocked');
   presentation.dispose();world.clear();floor.geometry.dispose();platform.geometry.dispose();
