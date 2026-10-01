@@ -1754,6 +1754,7 @@ export class GreyboxLevelRuntime {
     const renderer = this.renderLayer.renderer;
     const camera = this.renderLayer.cameraRig.camera;
     const prewarmCamera = camera.clone();
+    const transmissionPrewarmTarget = new THREE.WebGLRenderTarget(1, 1);
     const previousViewport = renderer.getViewport(new THREE.Vector4());
     const previousScissor = renderer.getScissor(new THREE.Vector4());
     const previousScissorTest = renderer.getScissorTest();
@@ -1803,6 +1804,42 @@ export class GreyboxLevelRuntime {
                 prewarmCamera,
                 this.renderLayer.scene,
               );
+            }
+            // Bob's transmission pass renders opaque surfaces into a linear
+            // target without canvas tone mapping. Warm that program variant
+            // too, even when a surface misses the hidden boot camera frustum.
+            const opaqueSubset = new THREE.Group();
+            for (const source of compileSubset.children) {
+              if (!isRenderableObject(source)) continue;
+              const materials = (
+                Array.isArray(source.material)
+                  ? source.material
+                  : [source.material]
+              ).filter(material => material.visible && !material.transparent);
+              if (materials.length === 0) continue;
+              const clone = source.clone(false) as typeof source;
+              clone.material = Array.isArray(source.material) ? materials : materials[0];
+              opaqueSubset.add(clone);
+            }
+            try {
+              const previousTarget = renderer.getRenderTarget();
+              let transmissionCompilation: Promise<unknown> | undefined;
+              try {
+                renderer.setRenderTarget(transmissionPrewarmTarget);
+                if (renderer.extensions.has('KHR_parallel_shader_compile')) {
+                  transmissionCompilation = renderer.compileAsync(
+                    opaqueSubset, prewarmCamera, this.renderLayer.scene,
+                  );
+                } else {
+                  renderer.compile(opaqueSubset, prewarmCamera, this.renderLayer.scene);
+                }
+              } finally {
+                // Restore before asynchronous compilation yields control.
+                renderer.setRenderTarget(previousTarget);
+              }
+              await transmissionCompilation;
+            } finally {
+              opaqueSubset.clear();
             }
           } finally {
             compileSubset.clear();
@@ -1922,6 +1959,7 @@ export class GreyboxLevelRuntime {
         steps,
       };
     } finally {
+      transmissionPrewarmTarget.dispose();
       restoreRendererState();
       if (this.cancelLightingPrewarm === restoreRendererState) {
         this.cancelLightingPrewarm = undefined;

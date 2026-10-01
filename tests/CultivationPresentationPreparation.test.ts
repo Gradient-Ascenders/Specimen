@@ -47,6 +47,9 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   let viewport = new THREE.Vector4(0, 0, 1280, 720), scissor = viewport.clone(), scissorTest = false;
   let compiles = 0;
   const initializedTextures = new Set<THREE.Texture>();
+  const initializedShadowTargets = new Set<THREE.WebGLRenderTarget>();
+  const disposedShadowTargets = new Set<THREE.WebGLRenderTarget>();
+  const disposedShadowTextures = new Set<THREE.Texture>();
   const shadowLayouts = new Set<string>();
   let holdNextCompile = false;
   let releaseCompile: (() => void) | undefined;
@@ -61,7 +64,24 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     setScissor: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
     setScissorTest: (value: boolean) => { scissorTest = value; },
     initTexture(texture: THREE.Texture) { initializedTextures.add(texture); },
-    compile() {}, render() {},
+    initRenderTarget(target: THREE.WebGLRenderTarget) {
+      initializedShadowTargets.add(target);
+      target.addEventListener('dispose', () => disposedShadowTargets.add(target));
+      const texture = target.depthTexture!;
+      texture.addEventListener('dispose', () => disposedShadowTextures.add(texture));
+    },
+    compile() {},
+    render(preparedScene: THREE.Scene) {
+      if (!renderer.shadowMap.enabled) return;
+      preparedScene.traverseVisible(object => {
+        if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight) || !object.castShadow) return;
+        const texture = object.shadow.map?.depthTexture;
+        assert.ok(texture, 'shadow-enabled preparation must provide depth textures for its samplers');
+        assert.ok(initializedShadowTargets.has(object.shadow.map!), 'depth attachments must be initialized before drawing receivers');
+        assert.equal(texture.compareFunction, THREE.LessEqualCompare, 'PCF samplers need comparison-enabled depth textures');
+        assert.equal(!!texture.isCubeTexture, object instanceof THREE.PointLight, 'point-light shadows need cube depth textures');
+      });
+    },
     async compileAsync(group: THREE.Group, _camera: THREE.Camera, targetScene: THREE.Scene) {
       group.traverse(o => {
         preparedOwners.add(o.name);
@@ -196,4 +216,6 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     mappedCaster.dispose(); plainCaster.dispose(); projectile.dispose();
     globalThis.requestAnimationFrame = priorRaf;
   }
+  assert.deepEqual(disposedShadowTargets, initializedShadowTargets, 'temporary shadow maps are released after completion or cancellation');
+  assert.equal(disposedShadowTextures.size, initializedShadowTargets.size, 'temporary depth attachments are released too');
 });

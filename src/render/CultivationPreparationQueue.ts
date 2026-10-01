@@ -204,6 +204,7 @@ export class CultivationPreparationQueue {
   private *steps(config: Configuration): Generator<Step> {
     const scene = new THREE.Scene(); scene.fog = this.layer.scene.fog; scene.environment = this.layer.scene.environment;
     const drawables: Drawable[] = [];
+    const shadowTargets: THREE.WebGLRenderTarget[] = [];
     const visit = (o: THREE.Object3D, foundation = false) => {
       foundation ||= o.name === 'cultivation-level-2-foundation';
       const index = this.roots.indexOf(o as THREE.Group);
@@ -214,6 +215,24 @@ export class CultivationPreparationQueue {
       if (o.name.startsWith('cultivation-room-3-drone-') && !config.visible[5]) return;
       if (o instanceof THREE.Light) {
         const clone = o.clone(false); o.updateWorldMatrix(true, false); clone.matrix.copy(o.matrixWorld); clone.matrixAutoUpdate = false;
+        if (config.dark && clone.castShadow && (clone instanceof THREE.SpotLight || clone instanceof THREE.PointLight || clone instanceof THREE.DirectionalLight)) {
+          // Preparation disables shadow updates, so cloned lights never acquire
+          // real shadow maps. PCF receivers still require comparison-enabled
+          // depth textures, including cube textures for point lights.
+          const depth = clone instanceof THREE.PointLight
+            ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
+            : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
+          depth.compareFunction = THREE.LessEqualCompare;
+          depth.minFilter = depth.magFilter = THREE.LinearFilter;
+          const target = clone instanceof THREE.PointLight
+            ? new THREE.WebGLCubeRenderTarget(1)
+            : new THREE.WebGLRenderTarget(1, 1);
+          // r185 supports cube depth attachments; its target option typings
+          // still restrict depthTexture to the two-dimensional texture class.
+          Object.assign(target, {depthTexture: depth});
+          clone.shadow.map = target;
+          shadowTargets.push(target);
+        }
         scene.add(clone);
       }
       if (!foundation && (o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Line || o instanceof THREE.Sprite)) drawables.push(o);
@@ -223,6 +242,7 @@ export class CultivationPreparationQueue {
     const padding = new CultivationLightLayout(scene);
     config.lightingKey = this.lightingKey(scene);
     try {
+    for (const target of shadowTargets) yield {run: () => this.layer.renderer.initRenderTarget(target)};
     const seen = new Set<string>();
     const materialCopies = new Map<string, THREE.Material>();
     const programs: Drawable[] = [], primes: Drawable[] = [], shadows: THREE.Mesh[] = [];
@@ -333,7 +353,12 @@ export class CultivationPreparationQueue {
         this.diagnostics.primeMs += performance.now()-start;
       }};
     }
-    } finally { padding.dispose(); scene.clear(); }
+    } finally {
+      for (const target of shadowTargets) {
+        target.depthTexture?.dispose(); target.depthTexture = null; target.dispose();
+      }
+      padding.dispose(); scene.clear();
+    }
   }
 
   /** State is restored synchronously, before compileAsync yields to gameplay. */

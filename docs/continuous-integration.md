@@ -119,8 +119,15 @@ its 27 files matched `dist/` byte-for-byte. Workflow syntax, unit tests, layout,
 archive integrity, and submission-summary checks passed. These are local
 results, not a successful GitHub Actions run or published-host verification.
 
-The failures occurred with unchanged game source. This CI change does not
-suppress them or repair unrelated shader/preparation paths. Resolve the
-rendering failures before treating either new gate as green. Default Chromium
-also produced long frame stalls; the explicit SwiftShader configuration reduced
-the complete local smoke run to about a minute while retaining the failures.
+The failures occurred with unchanged game source. The follow-up rendering fix
+warms opaque Containment materials for Bob's linear transmission render target,
+as well as the main canvas. Cultivation preparation now gives its cloned
+shadow-casting lights initialized comparison depth textures instead of drawing
+PCF receivers against missing shadow maps; these temporary resources are
+disposed after preparation or cancellation. The original two production smoke
+journeys then passed locally with their console/network assertions intact.
+
+Default Chromium also produced long frame stalls; the explicit SwiftShader
+configuration reduced the complete local smoke run to about a minute while
+retaining the original failures. A passing smoke check covers boot, credits,
+level loading and restarts; it does not replace the deployment playthrough.
