@@ -10,6 +10,7 @@ import {
 import {
   DEFAULT_VOLT_ELECTRICAL_CONFIG,
   VoltElectricalSystem,
+  type VoltElectricalConfig,
   type VoltElectricalControls,
 } from '../src/abilities/VoltElectricalSystem.ts';
 import {
@@ -83,7 +84,7 @@ const controls = (
   ...overrides,
 });
 
-function makeFixture(targetZ = 10) {
+function makeFixture(targetZ = 10, rangeConfigProvider?: () => Readonly<VoltElectricalConfig>) {
   const world = new CollisionWorld();
   const registry = new ElectricalTargetRegistry(world);
   const manager = new TestManager();
@@ -100,6 +101,7 @@ function makeFixture(targetZ = 10) {
     slimeManager: manager,
     collisionWorld: world,
     targetRegistry: registry,
+    rangeConfigProvider,
     aimRayProvider: {
       copyAimRay: (origin, direction) => {
         origin.copy(aimOrigin);
@@ -298,6 +300,58 @@ test('acquisition and tether boundaries are exact at 15, 16, and 20 metres', () 
   } finally {
     beyond.dispose();
   }
+});
+
+test('room range profiles update acquisition, warnings, and tether revalidation without leaking the longer range', () => {
+  const near = { acquisitionRangeMetres: 11, instabilityWarningRangeMetres: 12, tetherBreakRangeMetres: 13 };
+  const far = { acquisitionRangeMetres: 100, instabilityWarningRangeMetres: 110, tetherBreakRangeMetres: 120 };
+  let profile: VoltElectricalConfig = near;
+  const f = makeFixture(30, () => profile);
+  try {
+    const fire = controls({ aimHeld: true, fireHeld: true, firePressed: true });
+    assert.equal(f.system.readModel.acquisitionRangeMetres, 11);
+    f.system.update(1 / 60, fire);
+    assert.equal(f.system.connected, false);
+
+    profile = far;
+    f.system.update(1 / 60, fire);
+    assert.equal(f.system.connected, true);
+    assert.equal(f.system.readModel.acquisitionRangeMetres, 100);
+    assert.equal(f.system.readModel.instabilityWarningRangeMetres, 110);
+    assert.equal(f.system.readModel.tetherBreakRangeMetres, 120);
+    f.mesh.position.z = 110;
+    f.system.revalidateConnection();
+    assert.equal(f.system.readModel.connectionUnstable, true);
+
+    const reasons: string[] = [];
+    f.system.events.on('disconnected', ({ reason }) => reasons.push(reason));
+    profile = near;
+    f.system.revalidateConnection();
+    assert.equal(f.system.connected, false);
+    assert.deepEqual(reasons, ['range-exceeded']);
+    assert.equal(f.system.readModel.acquisitionRangeMetres, 11);
+    assert.equal(f.system.readModel.instabilityWarningRangeMetres, 12);
+    assert.equal(f.system.readModel.tetherBreakRangeMetres, 13);
+    f.system.reset('reset');
+    f.mesh.position.z = 30;
+    f.system.update(1 / 60, fire);
+    assert.equal(f.system.connected, false, 'the previous room profile cannot survive reset');
+  } finally { f.dispose(); }
+});
+
+test('an invalid replacement range profile leaves the last valid ranges intact', () => {
+  let profile: VoltElectricalConfig = { acquisitionRangeMetres: 11, instabilityWarningRangeMetres: 12, tetherBreakRangeMetres: 13 };
+  const f = makeFixture(10, () => profile);
+  try {
+    profile = { acquisitionRangeMetres: 17, instabilityWarningRangeMetres: 16, tetherBreakRangeMetres: 20 };
+    assert.throws(() => f.system.update(1 / 60, controls()), /ordered acquisition <= warning <= break/);
+    assert.equal(f.system.readModel.acquisitionRangeMetres, 11);
+    assert.equal(f.system.readModel.instabilityWarningRangeMetres, 12);
+    assert.equal(f.system.readModel.tetherBreakRangeMetres, 13);
+    profile = { acquisitionRangeMetres: 11, instabilityWarningRangeMetres: 12, tetherBreakRangeMetres: 13 };
+    f.system.update(1 / 60, controls({ aimHeld: true, fireHeld: true, firePressed: true }));
+    assert.equal(f.system.connected, true);
+  } finally { f.dispose(); }
 });
 
 test('camera selection and Volt-to-socket LOS are both required only at acquisition', () => {

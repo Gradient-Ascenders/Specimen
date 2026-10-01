@@ -86,6 +86,7 @@ test('drone head follows a moving visible target and rapid fire defeats exposure
   try {
     const drone = f.controller.drones[0]!;
     f.bodies.bob.position.set(10.5,1.66,102);
+    const hoverPosition = drone.root.position.clone();
     f.controller.update(DT,f.bodies);
     const head = drone.root.getObjectByName(`${drone.id}-tracking-head`)!;
     const before = head.quaternion.clone();
@@ -96,6 +97,7 @@ test('drone head follows a moving visible target and rapid fire defeats exposure
     let elapsed = 2*DT;
     while(!failed && elapsed < .5) { failed=f.controller.update(DT,f.bodies); elapsed+=DT; }
     assert.equal(failed,'bob','remaining exposed cannot outrun the slow old firing cadence');
+    assert.deepEqual(drone.root.position.toArray(), hoverPosition.toArray(), 'head tracking does not become a patrol or chase');
   } finally { f.dispose(); }
 });
 
@@ -132,9 +134,11 @@ test('drones visibly sweep and red beam volumes use their own shadow depth witho
   try {
     const drone = f.controller.drones[0]!;
     const start = new THREE.Vector3().copy(drone.readModel.scanDirection);
+    const hoverPosition = drone.root.position.clone();
     for (let i=0;i<60;i++) f.controller.update(DT,f.bodies);
     const direction = new THREE.Vector3().copy(drone.readModel.scanDirection);
-    assert.ok(start.angleTo(direction) > 0.1 && start.angleTo(direction) < 0.23, 'livelier bounded patrol sweep');
+    assert.ok(start.angleTo(direction) > 0.1 && start.angleTo(direction) < 0.23, 'livelier bounded idle sweep without moving the drone');
+    assert.deepEqual(drone.root.position.toArray(), hoverPosition.toArray(), 'the authored hover position remains fixed while sweeping');
     const beam = f.room.root.getObjectByName(`${drone.id}-searchlight`) as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>;
     const light = f.room.root.getObjectByName(`${drone.id}-search-light`) as THREE.SpotLight;
     assert.equal(light.color.getHex(), 0xff1830);

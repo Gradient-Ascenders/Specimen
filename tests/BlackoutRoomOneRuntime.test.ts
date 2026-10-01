@@ -9,6 +9,9 @@ import type { RenderLayer } from '../src/render/RenderLayer.ts';
 import { BLACKOUT_TRANSIT_CHECKPOINTS } from '../src/levels/BlackoutTransitRoom.ts';
 import type { KinematicBody } from '../src/physics/KinematicBody.ts';
 import type { BlackoutTransitController } from '../src/levels/BlackoutTransitController.ts';
+import type { BlackoutMaintenanceBayController } from '../src/levels/BlackoutMaintenanceBayController.ts';
+import type { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
+import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -74,6 +77,8 @@ class TestInput {
 
 class TestCameraRig {
   readonly camera = new THREE.PerspectiveCamera();
+  readonly aimOrigin = new THREE.Vector3(0, 0.46, 2);
+  readonly aimDirection = new THREE.Vector3(0, 0, 1);
   aimActive = false;
   groundYaw = 0;
   setFollowTarget(): void {}
@@ -89,8 +94,8 @@ class TestCameraRig {
     return target.set(x, 0, z).normalize();
   }
   copyAimRay(origin: THREE.Vector3, direction: THREE.Vector3): void {
-    origin.set(0, 0.46, 2);
-    direction.set(0, 0, 1);
+    origin.copy(this.aimOrigin);
+    direction.copy(this.aimDirection);
   }
   setAimPresentationActive(active: boolean): void { this.aimActive = active; }
   update(): void {}
@@ -156,6 +161,105 @@ function createFixture() {
     },
   };
 }
+
+function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
+  return (runtime as unknown as { resources: {
+    group: { bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody };
+    maintenanceBay: BlackoutMaintenanceBayController;
+    transit: BlackoutTransitController;
+    electricalSystem: VoltElectricalSystem<KinematicBody>;
+    electricalTargets: ElectricalTargetRegistry;
+  } }).resources;
+}
+
+test('Room 1 CP1 and CP2 cannot acquire the distant maintenance circuit, but approaching it still works', () => {
+  const f = createFixture();
+  try {
+    const resources = electricalRoomInternals(f.runtime);
+    const socket = new THREE.Vector3();
+    resources.maintenanceBay.target.copySocketWorldPosition(socket);
+    for (const checkpoint of ['cp1', 'cp2'] as const) {
+      f.runtime.activateCheckpoint(checkpoint);
+      f.runtime.recoverActiveCheckpoint();
+      f.tick();
+      const volt = resources.group.voltBody;
+      assert.ok(volt.position.distanceTo(socket) > 40, 'test uses the actual starting-side body position');
+      f.cameraRig.aimOrigin.copy(volt.position);
+      f.cameraRig.aimDirection.subVectors(socket, volt.position).normalize();
+      f.input.press('aimAbility');
+      f.input.press('fireAbility');
+      f.tick();
+      const readModel = resources.electricalSystem.readModel;
+      assert.equal(readModel.acquisitionRangeMetres, 11);
+      assert.equal(readModel.instabilityWarningRangeMetres, 12);
+      assert.equal(readModel.tetherBreakRangeMetres, 13);
+      assert.equal(readModel.connectedTargetId, undefined, `${checkpoint} must not bypass the drone/proximity tutorial`);
+      assert.equal(resources.maintenanceBay.powered, false);
+      f.input.release('fireAbility');
+      f.input.release('aimAbility');
+      f.tick();
+    }
+
+    const volt = resources.group.voltBody;
+    volt.teleport(socket.clone().add(new THREE.Vector3(0, 0, -5)));
+    f.cameraRig.aimOrigin.copy(volt.position);
+    f.cameraRig.aimDirection.subVectors(socket, volt.position).normalize();
+    f.input.press('aimAbility');
+    f.input.press('fireAbility');
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.connectedTargetId, 'maintenance-bay-circuit');
+    assert.equal(resources.maintenanceBay.powered, true, 'the original near-range circuit remains usable');
+  } finally { f.cleanup(); }
+});
+
+test('the complete runtime grants long range only inside Room 2, including early arrivals and recovery', () => {
+  const f = createFixture();
+  try {
+    const resources = electricalRoomInternals(f.runtime);
+    for (const drone of resources.transit.drones) drone.setEnabled(false);
+    const targets = [
+      ...resources.transit.lights.map(receiver => receiver.target),
+      ...resources.transit.lifts.map(lift => {
+        const contact = lift.root.getObjectByName(`${lift.id}-conducting-contact`) as THREE.Mesh;
+        assert.ok(contact);
+        return resources.electricalTargets.getRegistrationForMesh(contact)!.target;
+      }),
+    ];
+    const socket = new THREE.Vector3();
+    for (const target of targets) {
+      resources.electricalSystem.reset('reset');
+      target.copySocketWorldPosition(socket);
+      resources.group.voltBody.teleport(new THREE.Vector3(-16, 2.96, socket.z - 2));
+      f.tick();
+      assert.equal(f.runtime.roomState.roomId, 'room-1', 'the global group handoff has not occurred yet');
+      if (target.id !== 'transit-light-c') assert.ok(resources.group.voltBody.position.distanceTo(socket) > 20);
+      f.cameraRig.aimOrigin.copy(resources.group.voltBody.position);
+      f.cameraRig.aimDirection.subVectors(socket, resources.group.voltBody.position).normalize();
+      f.input.press('aimAbility');
+      f.input.press('fireAbility');
+      f.tick();
+      assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 100);
+      assert.equal(resources.electricalSystem.readModel.connectedTargetId, target.id, `actual runtime must reach ${target.id} across the chamber`);
+      f.input.release('fireAbility');
+      f.input.release('aimAbility');
+      f.tick();
+    }
+    f.runtime.activateCheckpoint('cp2');
+    f.runtime.recoverActiveCheckpoint();
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 11, 'Room 1 retry cannot retain Room 2 ranges');
+    f.input.press('debugTeleportRoomTwo');
+    f.tick();
+    f.input.release('debugTeleportRoomTwo');
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 100);
+    f.input.press('debugTeleportRoomOne');
+    f.tick();
+    f.input.release('debugTeleportRoomOne');
+    f.tick();
+    assert.equal(resources.electricalSystem.readModel.acquisitionRangeMetres, 11, 'Room 1 shortcut restores near ranges');
+  } finally { f.cleanup(); }
+});
 
 test('conducting outlines appear only for actively aiming Volt, including render-only input release', () => {
   const f = createFixture();

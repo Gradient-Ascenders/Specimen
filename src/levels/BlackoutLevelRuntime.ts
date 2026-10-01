@@ -125,6 +125,16 @@ import {
 
 const OUT_OF_BOUNDS_Y = -5;
 const BLACKOUT_BOB_REFLECTION = { body: 0.12, eyes: 0.28 } as const;
+const BLACKOUT_MAINTENANCE_VOLT_RANGES = Object.freeze({
+  acquisitionRangeMetres: 11,
+  instabilityWarningRangeMetres: 12,
+  tetherBreakRangeMetres: 13,
+});
+const BLACKOUT_TRANSIT_VOLT_RANGES = Object.freeze({
+  acquisitionRangeMetres: 100,
+  instabilityWarningRangeMetres: 110,
+  tetherBreakRangeMetres: 120,
+});
 
 export interface BlackoutLevelRuntimeOptions {
   readonly authoredRoomOne?: boolean;
@@ -1600,7 +1610,14 @@ export class BlackoutLevelRuntime {
         collisionWorld,
         targetRegistry: electricalTargets,
         aimRayProvider: this.renderLayer.cameraRig,
-        ...(this.authoredRoomOne ? {config:{acquisitionRangeMetres:100,instabilityWarningRangeMetres:110,tetherBreakRangeMetres:120}} : {}),
+        ...(this.authoredRoomOne ? {
+          // Room 2 can be entered by Volt before the group handoff changes the
+          // room ID. Scope his longer reach to the physical transit chamber,
+          // never to Room 1's receiver or the connecting maintenance duct.
+          rangeConfigProvider: () => maintenanceBay?.bay.transitAt(group.voltBody.position)
+            ? BLACKOUT_TRANSIT_VOLT_RANGES
+            : BLACKOUT_MAINTENANCE_VOLT_RANGES,
+        } : {}),
       });
       rollback(() => electricalSystem.dispose());
 
