@@ -442,8 +442,8 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   expect(
     prewarmProfile.measuredFirstUseResourcePrimeGeometriesAfter -
       prewarmProfile.measuredFirstUseResourcePrimeGeometriesBefore,
-    'The hidden prewarm did not make all 23 measured geometries resident',
-  ).toBe(23);
+    'The measured upload guard allocated geometry after room shadow preparation',
+  ).toBe(0);
   expect(prewarmProfile.measuredFirstUseResourcePrimeProgramsAfter).toBe(
     prewarmProfile.measuredFirstUseResourcePrimeProgramsBefore,
   );
@@ -496,9 +496,9 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     (await app.getAttribute('data-level-one-prewarm')) ?? '{}',
   ) as LevelOnePrewarmVerification;
   expect(verification).toEqual({
-    roomStepsCompleted: 5,
+    roomStepsCompleted: 9,
     measuredResourceCount: 23,
-    measuredGeometryDelta: 23,
+    measuredGeometryDelta: 0,
     measuredProgramDelta: 0,
     burstGeometryDelta: 2,
     burstProgramDelta: 0,

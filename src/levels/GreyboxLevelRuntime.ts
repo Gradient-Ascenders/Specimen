@@ -144,6 +144,7 @@ const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
     'room-3-first-static-laser-presentation-emitter-start-housing-collar',
     'room-3-first-static-laser-presentation-emitter-start-active-aperture',
   ],
+  2: ['room-3-acid-surface-material-integration-point'],
   3: ['room-2-observation-reinforced-glass'],
   5: ['room-3-acid-surface-material-integration-point'],
 };
@@ -685,7 +686,7 @@ export class GreyboxLevelRuntime {
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.bob.update(deltaSeconds, slimeVisualState);
-    testScene.update(deltaSeconds, body.position);
+    testScene.update(deltaSeconds, body.position, slimePair.activeBody.position);
     this.input.endFixedUpdate();
   }
 
@@ -806,6 +807,7 @@ export class GreyboxLevelRuntime {
       transitionRenderStarted = this.hostWindow.performance.now();
     }
 
+    testScene.lighting.prepareShadowFrame([body.position, goopBody.position]);
     this.renderLayer.render();
 
     if (profileLightingTransition) {
@@ -1699,6 +1701,7 @@ export class GreyboxLevelRuntime {
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
         `scene objects / lights: ${renderStats.sceneObjects} / ${renderStats.sceneLights}`,
         `authored lights active / total / shadow: ${testScene.lightingDiagnostics.visibleAuthoredLightCount} / ${testScene.lightingDiagnostics.authoredLightCount} / ${testScene.lightingDiagnostics.shadowCastingLightCount}`,
+        `shadow rooms / configured passes / update passes / texels: ${testScene.lightingDiagnostics.visibleRoomIds.join('+')} / ${testScene.lightingDiagnostics.shadowPassCount} / ${testScene.lightingDiagnostics.shadowUpdatePassCount} / ${testScene.lightingDiagnostics.shadowMapTexels}`,
         `lighting room / Bob hatch / Goop release: ${testScene.lightingDiagnostics.activeRoomId} / ${testScene.lightingDiagnostics.bobHatchState} / ${testScene.lightingDiagnostics.goopReleaseState}`,
         `lighting particles / manual release drive: ${testScene.lightingDiagnostics.activeParticleCount} / ${testScene.lightingDiagnostics.goopReleaseManuallyDriven ? 'yes' : 'no'}`,
         `lighting state applications Goop / elevator: ${testScene.lightingDiagnostics.goopStateApplicationCount} / ${testScene.lightingDiagnostics.elevatorStateApplicationCount}`,
@@ -1804,7 +1807,7 @@ export class GreyboxLevelRuntime {
       renderer.setScissor(0, 0, 1, 1);
       renderer.setScissorTest(true);
       await resources.testScene.lighting.prewarmShaderConfigurations(
-        async (roomId) => {
+        async (roomId, coverageRoomIds) => {
           if (!isCurrent()) return;
           const stepProgramsBefore = renderer.info.programs?.length ?? 0;
           const stepStarted = this.hostWindow.performance.now();
@@ -1812,7 +1815,14 @@ export class GreyboxLevelRuntime {
             this.renderLayer.scene,
             prewarmCamera,
           );
-          const compileSubset = createRoomCompileSubset(resources, roomId);
+          const compileSubset = new THREE.Group();
+          let compiledObjects = 0;
+          for (const coverageRoomId of coverageRoomIds) {
+            const roomSubset = createRoomCompileSubset(resources, coverageRoomId);
+            compiledObjects += roomSubset.userData.compiledObjects as number;
+            compileSubset.add(...roomSubset.children);
+          }
+          compileSubset.userData.compiledObjects = compiledObjects;
           const compileStarted = this.hostWindow.performance.now();
           try {
             if (renderer.extensions.has('KHR_parallel_shader_compile')) {
@@ -2186,6 +2196,8 @@ function compileObjectSignature(
     materials.map((material) => material.uuid).join(','),
     attributes,
     morphAttributes,
+    object.receiveShadow ? 'receiver' : 'non-receiver',
+    object.castShadow ? 'caster' : 'non-caster',
   ].join('|');
 }
 

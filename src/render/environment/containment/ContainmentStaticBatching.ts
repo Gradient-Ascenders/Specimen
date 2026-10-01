@@ -294,6 +294,7 @@ function batchKey(
     mesh.receiveShadow ? 1 : 0,
     mesh.renderOrder,
     mesh.layers.mask,
+    mesh.userData.staticBatchPartition ?? '',
     Math.round(centre.x / cellSize),
     Math.round(centre.y / cellSize),
     Math.round(centre.z / cellSize),

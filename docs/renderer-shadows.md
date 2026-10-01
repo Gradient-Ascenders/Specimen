@@ -28,8 +28,10 @@ live map with their temporary render layers. It does not cache live shadows.
 
 ## Room 1 proof
 
-The existing `room-1-pedestal-soft-key` is the only shadow source added in
-Containment. Position `(0, 6.4, -0.5)`, target `(0, 1.65, -0.5)`, color
+Issue #169 initially enabled only `room-1-pedestal-soft-key` in Containment.
+Issue #171 extends coverage to 21 fixed spot sources across Rooms 1–5 and ducts;
+see [the source, role and pass inventory](containment-lighting.md#shadow-sources-and-coverage-171).
+The original proof retains position `(0, 6.4, -0.5)`, target `(0, 1.65, -0.5)`, color
 `#d9efff`, intensity `62`, range `10 m`, angle `0.48`, penumbra `0.72` and renderer
 exposure `1` retain their authored values. Existing hatch-state intensity
 mappings continue to drive this light.
@@ -39,14 +41,14 @@ normal bias `0.015 m`, PCF radius `1.5`. Three.js derives the spotlight's far
 plane from its distance; reducing only `shadow.camera.far` would be overridden.
 At the floor, the cone covers approximately a `3.33 m` radius around the
 pedestal. This is a central Room 1 proof, not complete traversal coverage.
-Relevant wall art receives shadows where the cone reaches it; later room and
-adhesion coverage belongs to #171.
+Relevant wall art receives shadows where the cone reaches it; additional fixture
+cones supply traversal and adhesion coverage under #171.
 
 Bob's authored body and eye meshes cast and receive shadows.
 Major opaque pedestal and containment frame meshes cast/receive; the floor and
 selected wall art receive. Glass, particles, beams and hidden collision-only
-surfaces are excluded. Wall receivers are selected after static consolidation,
-using source names, preserving measured geometry owner/batch identities.
+surfaces are excluded. Under #171, roles are assigned before consolidation with
+the original batching partitions preserved, retaining measured owner identities.
 
 ## Character passes (#170)
 
@@ -101,23 +103,26 @@ spot/point views and remaining visual acceptance limits.
 
 ## Preparation and lifecycle
 
-Room 1 needs a hidden first draw as well as `compileAsync`: compilation alone
+Every room and doorway layout needs a hidden first draw as well as `compileAsync`: compilation alone
 does not allocate the light map or compile caster depth programs. The exact
 measured-resource shader variants are compiled with the Room 1 light layout
 before their isolated upload guard runs. Preparation reuses one camera across
 loads, because Three.js caches transmission render targets per camera.
 
-- Successful load retains one request and one lazily allocated spotlight map.
-- Restart and checkpoint retry reuse the map. Lighting, pose and cutscene state
-  reconcile through existing reset/recovery authority; automatic updates render
-  the current geometry on the next frame.
+- Successful load retains one request and 21 level-owned spotlight maps.
+- Restart and checkpoint retry reuse maps. Lighting, pose and cutscene state
+  reconcile through existing reset/recovery authority and invalidate cached depth.
+  Before each live draw the level updates maps containing characters and
+  invalidates old/new moving-assembly coverage; unaffected static zones cache depth.
 - Failed asynchronous preparation unloads its current resources, releases the
-  request, disposes the map and restores the prior renderer owner. Generation
+  request, disposes maps and restores the prior renderer owner. Generation
   checks prevent an obsolete preparation from changing a later load.
-- Unload/dispose cancels preparation, disposes the level lighting map once,
+- Unload/dispose cancels preparation, disposes each level lighting map once,
   clears map references, and releases the request. Repeated unload/dispose is
   safe. Three.js disposes the attached depth texture with its render target.
 
 See [Room 1 evidence and initial budget](evidence/issue-169/review.md) for the
 hardware baseline, matched captures, lifecycle counts and acceptance limits.
 Full production traversal/prewarm profiling remains #173.
+See [Containment rollout evidence](evidence/issue-171/review.md) for matched
+production captures, hardware timing, cache/disposal checks and remaining gates.

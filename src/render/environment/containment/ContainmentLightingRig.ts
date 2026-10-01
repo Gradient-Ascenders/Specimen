@@ -9,6 +9,15 @@ import type {
 import type { BobCharacterPresentation } from '../../bob/BobCharacterPresentation.ts';
 import type { RoomOneArt } from './RoomOneArt.ts';
 import { ContainmentPointEffect } from './ContainmentPointEffect.ts';
+import { DissolveMaterial } from '../../dissolve/DissolveMaterial.ts';
+import type { Vector3State } from '../../slime/SlimePresentationContract.ts';
+import {
+  authorContainmentShadowRoles,
+  configureContainmentShadow,
+  containmentRoomLightWeights,
+  CONTAINMENT_SHADOW_HANDOFFS,
+  CONTAINMENT_FIXTURE_AIMS,
+} from './ContainmentShadowCoverage.ts';
 
 export type ContainmentLightingRoomId = 1 | 2 | 3 | 4 | 5;
 
@@ -45,6 +54,11 @@ export interface ContainmentLightingDiagnostics {
   readonly authoredLightCount: number;
   readonly visibleAuthoredLightCount: number;
   readonly shadowCastingLightCount: number;
+  readonly visibleShadowSourceNames: readonly string[];
+  readonly shadowPassCount: number;
+  readonly shadowUpdatePassCount: number;
+  readonly shadowMapTexels: number;
+  readonly visibleRoomIds: readonly ContainmentLightingRoomId[];
   readonly activeParticleCount: number;
   readonly goopStateApplicationCount: number;
   readonly elevatorStateApplicationCount: number;
@@ -127,10 +141,10 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     0.65,
   );
 
-  private readonly roomOneFixtureLights: readonly THREE.PointLight[];
+  private readonly roomOneFixtureLights: readonly THREE.SpotLight[];
   private readonly roomOnePedestalKey: THREE.SpotLight;
-  private readonly roomFourZoneLights: readonly THREE.PointLight[];
-  private readonly roomFiveChamberLight: THREE.PointLight;
+  private readonly roomFourZoneLights: readonly THREE.SpotLight[];
+  private readonly roomFiveChamberLight: THREE.SpotLight;
   private readonly roomFiveRevealLight: THREE.SpotLight;
   private readonly roomFiveObservationLight: THREE.SpotLight;
   private readonly bobImpactEffect = new ContainmentPointEffect({
@@ -168,6 +182,20 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   private elevatorStateApplicationCount = 0;
   private disposed = false;
   private bobInDarkDuct = false;
+  private traversalPosition: Vector3State | undefined;
+  private readonly shadowLights: (THREE.PointLight | THREE.SpotLight)[] = [];
+  private readonly authoredIntensities = new Map<THREE.Light, number>();
+  private readonly previousShadowParticipants: THREE.Vector3[] = [];
+  private readonly shadowMovingOwners: {
+    readonly root: THREE.Object3D;
+    readonly radius: number;
+    readonly matrix: THREE.Matrix4;
+    readonly centre: THREE.Vector3;
+    visible: boolean;
+  }[] = [];
+  private readonly shadowSourcePosition = new THREE.Vector3();
+  private readonly shadowSphere = new THREE.Sphere();
+  private lastDoorDissolveAmount = 0;
 
   constructor(options: ContainmentLightingRigOptions) {
     this.levelRoot = options.levelRoot;
@@ -192,11 +220,10 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
 
     const roomOne = this.room(1);
     this.roomOneFixtureLights = [
-      this.point('room-1-fluorescent-a-received-light', [-3.8, 7.45, -1.5], CLINICAL_COLOUR, 58, 13),
-      this.point('room-1-fluorescent-b-received-light', [3.8, 7.45, -1.5], CLINICAL_COLOUR, 58, 13),
+      this.downlight('room-1-fluorescent-a-received-light', [-3.8, 7.45, -1.5], CLINICAL_COLOUR, 58, 13),
+      this.downlight('room-1-fluorescent-b-received-light', [3.8, 7.45, -1.5], CLINICAL_COLOUR, 58, 13),
     ];
-    // Physical Iris Xe profiling holds Room 1 to these fixture lights plus the
-    // duct-exit cue below. The emissive fixtures carry the removed local cues.
+    // Keep the existing fluorescent sources; duct keys are fitted separately.
     roomOne.add(...this.roomOneFixtureLights);
     this.roomOnePedestalKey = this.spot(
       'room-1-pedestal-soft-key',
@@ -219,9 +246,9 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.roomOnePedestalKey.shadow.autoUpdate = true;
     roomOne.add(this.roomOnePedestalKey, this.roomOnePedestalKey.target);
 
-    const ductLight = this.point(
+    const ductLight = this.downlight(
       'room-1-to-2-duct-reflected-cue',
-      [-6.6, 11.8, 25.6],
+      [-8.4, 12.25, 26.5],
       DUCT_COLOUR,
       24,
       11,
@@ -230,48 +257,65 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     roomOne.add(
       this.fixture(
         'room-1-to-2-duct-exit-fixture',
-        [-6.65, 12.38, 25.5],
+        [-8.4, 12.38, 26.5],
         [1.15, 0.06, 0.22],
         this.ductEmitterMaterial,
       ),
     );
     roomOne.add(this.bobImpactEffect.points);
+    // Dim service luminaires inside the enclosed low run and ramp. These use
+    // the existing duct cue palette, not a character-following light.
+    for (const [name, position, target, distance, angle] of [
+      ['low-run', [-4.8, 7.12, 10.5], [-4.8, 5.2, 10.5], 6.5, 1.25],
+      ['ramp', [-4.8, 11.7, 22], [-4.8, 6.2, 14], 12, 0.65],
+      ['turn', [-4.8, 12.4, 24], [-6.5, 10.5, 24], 6, 1.0],
+    ] as const) {
+      const key = this.spot(`room-1-to-2-duct-${name}-key`, position, target,
+        3, distance, angle, 0.3, DUCT_COLOUR);
+      roomOne.add(key, key.target,
+        this.fixture(`room-1-to-2-duct-${name}-fixture`, position,
+          [0.55, 0.04, 0.16], this.ductEmitterMaterial));
+    }
 
     const roomTwo = this.room(2);
     roomTwo.add(
-      this.point('room-2-drop-zone-light', [-8, 16.55, 35], CLINICAL_COLOUR, 280, 25),
-      this.point('room-2-lower-route-light', [0, 16.55, 39], 0xc9e9f5, 260, 25),
-      this.point('room-2-sticky-and-exit-route-light', [8, 16.55, 43], 0xc3e4ee, 280, 25),
+      this.downlight('room-2-drop-zone-light', [-8, 16.55, 35], CLINICAL_COLOUR, 280, 25),
+      this.downlight('room-2-lower-route-light', [0, 16.55, 39], 0xc9e9f5, 260, 25),
+      this.downlight('room-2-sticky-and-exit-route-light', [8, 16.55, 43], 0xc3e4ee, 280, 25),
     );
 
     const roomThree = this.room(3);
     roomThree.add(
-      this.point('room-3-clinical-entry-received-light', [-6.5, 30, 54], CLINICAL_COLOUR, 250, 30),
-      this.point('room-3-industrial-route-received-light', [8, 29, 64], 0xb2cad5, 210, 28),
+      this.downlight('room-3-clinical-entry-received-light', [-6.5, 30, 54], CLINICAL_COLOUR, 250, 30),
+      this.downlight('room-3-industrial-route-received-light', [8, 29, 64], 0xb2cad5, 210, 28),
       this.point('room-3-acid-reflected-light', [0, 7.2, 64], ACID_COLOUR, 75, 18),
-      this.point('room-3-high-exit-vent-cue', [9, 32.5, 74.3], 0xb6e4dd, 95, 16),
+      this.downlight('room-3-high-exit-vent-cue', [9, 32.5, 74.3], 0xb6e4dd, 95, 16),
     );
 
     const roomFour = this.room(4);
     this.roomFourZoneLights = [
-      this.point('room-4-lower-amber-received-light', [9, 33, 85.5], AMBER_COLOUR, 7, 16),
-      this.point('room-4-middle-escalation-received-light', [9, 53, 85.5], ORANGE_COLOUR, 4, 19),
-      this.point('room-4-upper-arrival-received-light', [9, 74, 88.5], 0x8aa7b2, 4, 17),
+      this.spot('room-4-lower-amber-received-light', [3.35, 41, 85.5], [9, 33, 85.5], 7, 16, 1, .18, AMBER_COLOUR),
+      this.spot('room-4-middle-escalation-received-light', [3.35, 65, 85.5], [9, 49, 85.5], 4, 28, 1, .18, ORANGE_COLOUR),
+      this.spot('room-4-upper-arrival-received-light', [3.35, 77, 85.5], [9, 70, 85.5], 4, 17, 1, .18, 0x8aa7b2),
     ];
     roomFour.add(...this.roomFourZoneLights);
+    roomFour.add(...this.roomFourZoneLights.map(light => light.target));
     this.buildShaftFixtures(roomFour);
 
     const roomFive = this.room(5);
     roomFive.add(
-      this.point('room-5-safe-entry-received-light', [9, 100, 96], CLINICAL_COLOUR, 320, 32),
-      this.point('room-5-upper-traversal-received-light', [10, 100, 116], 0xbadbe8, 240, 28),
+      this.downlight('room-5-safe-entry-received-light', [9, 100, 96], CLINICAL_COLOUR, 320, 32),
+      this.downlight('room-5-upper-traversal-received-light', [10, 100, 116], 0xbadbe8, 240, 32),
     );
-    this.roomFiveChamberLight = this.point(
+    this.roomFiveChamberLight = this.spot(
       'room-5-containment-state-light',
       [0, 79.8, 110],
-      ACID_COLOUR,
+      [0, 75, 114],
       62,
       14,
+      1.25,
+      .2,
+      ACID_COLOUR,
     );
     this.roomFiveRevealLight = this.spot(
       'room-5-goop-reveal-rim-light',
@@ -295,6 +339,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     );
     roomFive.add(
       this.roomFiveChamberLight,
+      this.roomFiveChamberLight.target,
       this.roomFiveRevealLight,
       this.roomFiveRevealLight.target,
       this.roomFiveObservationLight,
@@ -303,6 +348,30 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     );
     this.attachContainmentLockFixtures();
     this.authorShadowIntent(options.roomOneArt);
+    authorContainmentShadowRoles(this.levelRoot);
+    this.root.traverse(object => {
+      if (!(object instanceof THREE.PointLight || object instanceof THREE.SpotLight)) return;
+      this.authoredIntensities.set(object, object.intensity);
+      if (configureContainmentShadow(object)) this.shadowLights.push(object);
+    });
+    for (const [root, radius] of [
+      [this.roomFour.elevatorPlatform.root, 7],
+      [this.roomFive.movingPlatformOne.root, 4],
+      [this.roomFive.movingPlatformTwo.root, 4],
+      [options.roomOneArt.specimenAssembly, 4],
+      [options.roomOneArt.eggRoot, 2],
+      [options.roomOneArt.containmentBoxRoot, 3],
+      [options.roomOneArt.intactFrameAndPanes, 3],
+      [options.roomOneArt.shatteredFrameAndDebris, 3],
+      ...Object.values(options.roomOneArt.eggStates).map(root => [root, 2] as const),
+      [this.levelRoot.getObjectByName('room-1-locked-laboratory-door-assembly')!, 5],
+      [this.levelRoot.getObjectByName('room-4-cargo-elevator-room5-closed-shutter')!, 4],
+      ...Object.values(this.roomFive.art.panelPivots).map(root => [root, 5] as const),
+    ] as const) {
+      root.updateWorldMatrix(true, false);
+      this.shadowMovingOwners.push({ root, radius, matrix: root.matrixWorld.clone(),
+        centre: root.getWorldPosition(new THREE.Vector3()), visible: root.visible });
+    }
 
     this.applyRoomVisibility();
     this.applyBobHatchState();
@@ -323,6 +392,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       if (object.castShadow) shadowCastingLightCount += 1;
       if (isEffectivelyVisible(object)) visibleAuthoredLightCount += 1;
     });
+    const visibleShadowLights = this.shadowLights.filter(isEffectivelyVisible);
     return {
       activeRoomId: this.activeRoomIdValue,
       bobHatchState: this.bobHatchStateValue,
@@ -332,6 +402,12 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       authoredLightCount,
       visibleAuthoredLightCount,
       shadowCastingLightCount,
+      visibleShadowSourceNames: visibleShadowLights.map(light => light.name),
+      shadowPassCount: visibleShadowLights.reduce((count, light) => count + (light instanceof THREE.PointLight ? 6 : 1), 0),
+      shadowUpdatePassCount: visibleShadowLights.reduce((count, light) => count +
+        (light.shadow.autoUpdate || light.shadow.needsUpdate || !light.shadow.map ? (light instanceof THREE.PointLight ? 6 : 1) : 0), 0),
+      shadowMapTexels: visibleShadowLights.reduce((count, light) => count + light.shadow.mapSize.x * light.shadow.mapSize.y * (light instanceof THREE.PointLight ? 6 : 1), 0),
+      visibleRoomIds: ROOM_IDS.filter(roomId => this.room(roomId).visible),
       activeParticleCount:
         this.bobImpactEffect.activeParticleCount +
         this.goopReleaseEffect.activeParticleCount,
@@ -351,6 +427,70 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.applyBobReflectionTarget();
   }
 
+  setTraversalPosition(position: Vector3State): void {
+    // Borrow the existing body position: no duplicate movement or timer state.
+    this.traversalPosition = position;
+    this.applyRoomVisibility();
+  }
+
+  /** Call after presenting poses, immediately before the live draw.
+   * Static zones retain their maps. Current dynamic occupants stay live; a
+   * departed occupant or changed assembly invalidates both old/new coverage.
+   */
+  prepareShadowFrame(participants: readonly Vector3State[]): void {
+    if (this.disposed) return;
+    const changedOwners: { centre: THREE.Vector3; radius: number }[] = [];
+    for (const owner of this.shadowMovingOwners) {
+      owner.root.updateWorldMatrix(true, false);
+      if (owner.matrix.equals(owner.root.matrixWorld) && owner.visible === owner.root.visible) continue;
+      changedOwners.push({ centre: owner.centre.clone(), radius: owner.radius });
+      owner.root.getWorldPosition(owner.centre);
+      changedOwners.push({ centre: owner.centre, radius: owner.radius });
+      owner.matrix.copy(owner.root.matrixWorld);
+      owner.visible = owner.root.visible;
+    }
+    // Dissolve shaders change silhouettes without changing a transform.
+    const dissolvingDoor = this.roomFive.goopWoodenDoor;
+    const doorMaterials = [dissolvingDoor.material].flat();
+    const dissolveAmount = doorMaterials.find((material): material is DissolveMaterial =>
+      material instanceof DissolveMaterial)?.dissolveAmountUniform.value ?? 0;
+    const dissolveLive = dissolvingDoor.visible && dissolveAmount > 0 && dissolveAmount < 1;
+    const dissolveChanged = dissolveAmount !== this.lastDoorDissolveAmount;
+    for (const light of this.shadowLights) {
+      const shadow = light.shadow;
+      light.getWorldPosition(this.shadowSourcePosition);
+      if (light instanceof THREE.SpotLight) {
+        light.target.updateWorldMatrix(true, false);
+        light.shadow.updateMatrices(light);
+      }
+      const intersects = (position: Vector3State, radius: number): boolean => {
+        this.shadowSphere.center.set(position.x, position.y, position.z);
+        this.shadowSphere.radius = radius;
+        if (this.shadowSourcePosition.distanceTo(this.shadowSphere.center) > light.distance + radius) return false;
+        return !(light instanceof THREE.SpotLight) || light.shadow.getFrustum().intersectsSphere(this.shadowSphere);
+      };
+      const dynamic = participants.some(position => intersects(position, 1.5)) ||
+        (dissolveLive && intersects(dissolvingDoor.getWorldPosition(this.shadowSphere.center), 4));
+      shadow.autoUpdate = dynamic;
+      if (!shadow.map || (dissolveChanged && intersects(dissolvingDoor.getWorldPosition(this.shadowSphere.center), 4)) ||
+        changedOwners.some(owner => intersects(owner.centre, owner.radius)) ||
+        (!dynamic && this.previousShadowParticipants.some(position => intersects(position, 1.5)))) {
+        shadow.needsUpdate = true;
+      }
+    }
+    participants.forEach((position, index) => {
+      const previous = this.previousShadowParticipants[index] ??= new THREE.Vector3();
+      previous.set(position.x, position.y, position.z);
+    });
+    this.previousShadowParticipants.length = participants.length;
+    this.lastDoorDissolveAmount = dissolveAmount;
+  }
+
+  private invalidateShadowMaps(): void {
+    for (const light of this.shadowLights) light.shadow.needsUpdate = true;
+    this.previousShadowParticipants.length = 0;
+  }
+
   setBobInDarkDuct(inDarkDuct: boolean): void {
     if (this.bobInDarkDuct === inDarkDuct) return;
     this.bobInDarkDuct = inDarkDuct;
@@ -358,28 +498,43 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   }
 
   /**
-   * Visit each room presentation during the hidden loading prewarm.
-   * The caller may reuse Room 2's compiled signature for Room 4.
+   * Visit each room and doorway overlap during the hidden loading prewarm.
    */
   async prewarmShaderConfigurations(
     compileCurrentConfiguration: (
       roomId: ContainmentLightingRoomId,
+      coverageRoomIds: readonly ContainmentLightingRoomId[],
     ) => Promise<void>,
   ): Promise<void> {
     const initialRoomId = this.activeRoomIdValue;
+    const initialPosition = this.traversalPosition;
     try {
+      this.traversalPosition = undefined;
       for (const roomId of PREWARM_ROOM_IDS) {
         this.setActiveRoom(roomId);
-        await compileCurrentConfiguration(roomId);
+        this.applyRoomVisibility();
+        await compileCurrentConfiguration(roomId, [roomId]);
+      }
+      // Adjacent rigs coexist during spatial handoffs; prepare their combined
+      // light and receive-shadow signatures before gameplay crosses a doorway.
+      for (const handoff of CONTAINMENT_SHADOW_HANDOFFS) {
+        this.activeRoomIdValue = handoff.rooms[0];
+        this.traversalPosition = { x: 0, y: (handoff.minY + handoff.maxY) / 2, z: handoff.z };
+        this.applyRoomVisibility();
+        await compileCurrentConfiguration(handoff.rooms[0], handoff.rooms);
       }
     } finally {
+      this.traversalPosition = initialPosition;
       this.setActiveRoom(initialRoomId);
+      this.applyRoomVisibility();
+      this.applyBobReflectionTarget();
     }
   }
 
   setBobHatchLightingState(state: BobHatchLightingState): void {
     if (this.bobHatchStateValue === state) return;
     this.bobHatchStateValue = state;
+    this.invalidateShadowMaps();
     if (state === 'impact') {
       this.bobImpactEffect.start([0, 0.62, -0.5]);
     } else if (state === 'gameplay' || state === 'complete') {
@@ -389,6 +544,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   }
 
   finalizeBobHatch(_mode: CutsceneFinalizationMode): void {
+    this.invalidateShadowMaps();
     this.bobHatchStateValue = 'complete';
     this.bobImpactEffect.reset();
     this.applyBobHatchState();
@@ -400,6 +556,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   }
 
   finalizeGoopRelease(_mode: CutsceneFinalizationMode): void {
+    this.invalidateShadowMaps();
     this.goopReleaseManuallyDriven = true;
     this.setGoopReleaseState('released');
     this.goopReleaseEffect.reset();
@@ -411,6 +568,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
    */
   reconcileAuthoritativeState(clearTransientEffects = false): void {
     if (clearTransientEffects) {
+      this.invalidateShadowMaps();
       this.bobImpactEffect.reset();
       this.goopReleaseEffect.reset();
       this.bobHatchStateValue = 'gameplay';
@@ -430,12 +588,14 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   }
 
   reset(): void {
+    this.invalidateShadowMaps();
     this.activeRoomIdValue = 1;
     this.bobHatchStateValue = 'gameplay';
     this.goopReleaseManuallyDriven = false;
     this.goopReleaseStateValue = 'normal';
     this.goopStateElapsedSeconds = 0;
     this.bobInDarkDuct = false;
+    this.traversalPosition = undefined;
     this.bobImpactEffect.reset();
     this.goopReleaseEffect.reset();
     this.applyRoomVisibility();
@@ -468,9 +628,16 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.roomOnePedestalKey.shadow.dispose();
-    this.roomOnePedestalKey.shadow.map = null;
-    this.roomOnePedestalKey.shadow.mapPass = null;
+    for (const light of this.shadowLights) {
+      light.shadow.dispose();
+      light.shadow.map = null;
+      light.shadow.mapPass = null;
+    }
+    this.shadowLights.length = 0;
+    this.authoredIntensities.clear();
+    this.shadowMovingOwners.length = 0;
+    this.previousShadowParticipants.length = 0;
+    this.traversalPosition = undefined;
     this.bobImpactEffect.dispose();
     this.goopReleaseEffect.dispose();
     for (const fixture of this.attachedPanelFixtures) fixture.removeFromParent();
@@ -490,9 +657,20 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   }
 
   private applyRoomVisibility(): void {
+    const weights = containmentRoomLightWeights(this.activeRoomIdValue, this.traversalPosition);
     for (const [roomId, group] of this.roomGroups) {
-      group.visible = roomId === this.activeRoomIdValue;
+      const weight = weights.get(roomId) ?? 0;
+      group.visible = weight > 0;
+      group.traverse(object => {
+        if (!(object instanceof THREE.Light)) return;
+        object.intensity = (this.authoredIntensities.get(object) ?? object.intensity) * weight;
+      });
     }
+  }
+
+  private setAuthoredIntensity(light: THREE.Light, intensity: number): void {
+    this.authoredIntensities.set(light, intensity);
+    light.intensity = intensity;
   }
 
   private get bobReflectionTarget(): {
@@ -512,22 +690,24 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   private applyBobHatchState(): void {
     const state = this.bobHatchStateValue;
     const fixtureIntensity = state === 'establishing' ? 52 : 58;
-    for (const light of this.roomOneFixtureLights) light.intensity = fixtureIntensity;
+    for (const light of this.roomOneFixtureLights) this.setAuthoredIntensity(light, fixtureIntensity);
 
     if (state === 'establishing') {
-      this.roomOnePedestalKey.intensity = 78;
+      this.setAuthoredIntensity(this.roomOnePedestalKey, 78);
     } else if (state === 'emergence') {
-      this.roomOnePedestalKey.intensity = 92;
+      this.setAuthoredIntensity(this.roomOnePedestalKey, 92);
     } else if (state === 'impact') {
-      this.roomOnePedestalKey.intensity = 110;
+      this.setAuthoredIntensity(this.roomOnePedestalKey, 110);
     } else {
-      this.roomOnePedestalKey.intensity = 62;
+      this.setAuthoredIntensity(this.roomOnePedestalKey, 62);
     }
+    this.applyRoomVisibility();
   }
 
   private setGoopReleaseState(state: GoopReleaseLightingState): boolean {
     if (this.goopReleaseStateValue === state) return false;
     this.goopReleaseStateValue = state;
+    this.invalidateShadowMaps();
     this.goopStateElapsedSeconds = 0;
     if (state === 'opening') {
       this.goopReleaseEffect.start([0, 75.75, 110]);
@@ -580,12 +760,13 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     }
 
     this.roomFiveChamberLight.color.setHex(chamberColour);
-    this.roomFiveChamberLight.intensity = chamberIntensity;
+    this.setAuthoredIntensity(this.roomFiveChamberLight, chamberIntensity);
     this.roomFiveRevealLight.color.setHex(RELEASE_GREEN_COLOUR);
-    this.roomFiveRevealLight.intensity = revealIntensity;
+    this.setAuthoredIntensity(this.roomFiveRevealLight, revealIntensity);
     this.lockEmitterMaterial.color.setHex(lockColour);
     this.lockEmitterMaterial.emissive.setHex(lockColour);
     this.lockEmitterMaterial.emissiveIntensity = lockIntensity;
+    this.applyRoomVisibility();
   }
 
   private syncElevatorLighting(force = false): void {
@@ -639,12 +820,13 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     for (let index = 0; index < this.roomFourZoneLights.length; index += 1) {
       const light = this.roomFourZoneLights[index];
       light.color.setHex(colours[index]);
-      light.intensity = intensities[index];
+      this.setAuthoredIntensity(light, intensities[index]);
       const material = this.shaftEmitterMaterials[index];
       material.color.setHex(colours[index]);
       material.emissive.setHex(colours[index]);
       material.emissiveIntensity = Math.max(0.25, intensities[index] * 0.09);
     }
+    this.applyRoomVisibility();
   }
 
   private buildShaftFixtures(parent: THREE.Group): void {
@@ -763,6 +945,24 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     light.castShadow = false;
     light.userData.presentationOnly = true;
     light.userData.authoredFixtureSource = true;
+    return light;
+  }
+
+  /** Broad downward fixture cone retains existing colour, distance and intensity.
+   * One depth pass replaces the six cubemap faces a ceiling point would need.
+   */
+  private downlight(
+    name: string,
+    position: readonly [number, number, number],
+    colour: number,
+    intensity: number,
+    distance: number,
+  ): THREE.SpotLight {
+    const light = this.spot(name, position,
+      CONTAINMENT_FIXTURE_AIMS[name] ?? [position[0], position[1] - 1, position[2]],
+      intensity, distance, 1.0, 0.18, colour);
+    // Targets remain owned by the rig, independent of moving assemblies.
+    this.root.add(light.target);
     return light;
   }
 
