@@ -62,10 +62,21 @@ merged-specimen meshes cast/receive with their current geometry and standard
 materials. Mesh/material visibility continues to control both render and shadow
 passes through first-person aim and merge/split. No shadow-only proxy is added.
 
+The Level 1 review follow-up hides Goop immediately after the shared Bob death
+presentation accepts its position. This removes the duplicate caster throughout
+the 75 ms anticipation, rather than waiting for rupture. A runtime regression
+checks the accepted handoff before any frame update, anticipation, rupture,
+rejected starts, Bob-only death and authoritative retry followed by pair updates.
+It uses the authored Bob asset and actual visible character meshes. The physical
+captures above predate this follow-up; Goop death was not recaptured in a browser.
+
 ## Verification
 
-- `npm test`: all 106 unit-test files pass, including shadow-uniform/order, fade,
-  disposal, form-visibility and existing dissolve progress/reset checks.
+- `npm test`: all 107 unit-test files pass, including the Level 1 death handoff,
+  shadow-uniform/order, fade, disposal, form-visibility and existing dissolve
+  progress/reset checks.
+- `node --test --test-isolation=none tests/GreyboxDeathPresentation.test.ts`:
+  all three focused runtime regression cases pass.
 - `npm run type-check`: passes.
 - `npm run build`: passes, with the existing large-chunk advisory.
 - `git diff --check`: passes.

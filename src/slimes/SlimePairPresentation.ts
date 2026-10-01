@@ -127,7 +127,7 @@ export class SlimePairPresentation {
     this.root.clear();
   }
 
-  /** Hide the original body (and its shadow) while its rupture is presented. */
+  /** Hide the original body and its shadow while another presentation owns death. */
   setGoopVisible(visible: boolean): void {
     this.goopMesh.visible = visible;
   }

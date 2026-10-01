@@ -85,7 +85,9 @@ and geometry with explicit cast/receive roles. Their existing mesh/material
 visibility governs first-person hiding and form switching in both passes;
 there is no shadow-only body. Cultivation hides the original Goop/Volt body during
 its existing rupture presentation and restores it on recovery. Containment hides
-Goop at its shared rupture boundary. Blackout's non-Bob death-screen presentation
+Goop when its shared death presentation starts, before anticipation can render a
+duplicate body or shadow. Rejected starts leave Goop visible; normal pair updates
+restore it after successful recovery. Blackout's non-Bob death-screen presentation
 retains its existing visible bodies and matching shadows until recovery. The
 light-emitting captive Volt inside the Room 5 pod remains excluded as authored.
 

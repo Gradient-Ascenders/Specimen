@@ -36,8 +36,10 @@ export class GreyboxTestPanel {
   private readonly goopLightingButton: HTMLButtonElement;
   private readonly finalizeLightingButton: HTMLButtonElement;
   private readonly resetLightingButton: HTMLButtonElement;
+  private readonly options: GreyboxTestPanelOptions;
 
-  constructor(private readonly options: GreyboxTestPanelOptions) {
+  constructor(options: GreyboxTestPanelOptions) {
+    this.options = options;
     this.element = document.createElement('section');
     this.element.className = 'test-panel';
     this.element.innerHTML = `

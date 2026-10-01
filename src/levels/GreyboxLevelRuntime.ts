@@ -1412,6 +1412,11 @@ export class GreyboxLevelRuntime {
     }
 
     this.lastDeathSlimeId = dyingSlimeId;
+    if (dyingSlimeId === 'goop') {
+      // The shared death mesh now owns anticipation at Goop's authoritative
+      // position. Retire the cached Goop mesh before the next render/shadow pass.
+      resources.slimePairPresentation.setGoopVisible(false);
+    }
 
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
@@ -1453,9 +1458,6 @@ export class GreyboxLevelRuntime {
     resources: GreyboxRuntimeResources,
   ): void {
     resources.testScene.bob.updateDeath(deltaSeconds);
-    if (this.lastDeathSlimeId === 'goop' && !resources.testScene.bob.diagnostics.visible) {
-      resources.slimePairPresentation.setGoopVisible(false);
-    }
     resources.testScene.updateDeath(deltaSeconds);
     if (resources.deathSequence.update(deltaSeconds)) {
       resources.deathScreen.show();
