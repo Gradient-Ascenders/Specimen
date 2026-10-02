@@ -2,6 +2,35 @@ import * as THREE from 'three';
 
 const ISOLATED_RESOURCE_PREWARM_LAYER = 31;
 
+/** Restore synchronously, even when action returns a pending compilation. */
+export function withIsolatedPrewarmState<T>(
+  renderer: THREE.WebGLRenderer,
+  action: () => T,
+  target?: THREE.WebGLRenderTarget,
+): T {
+  const viewport = renderer.getViewport(new THREE.Vector4());
+  const scissor = renderer.getScissor(new THREE.Vector4());
+  const scissorTest = renderer.getScissorTest();
+  const previousTarget = renderer.getRenderTarget();
+  const face = renderer.getActiveCubeFace();
+  const mip = renderer.getActiveMipmapLevel();
+  // frame is an internal upload-generation key; it must remain monotonic.
+  const { calls, triangles, points, lines } = renderer.info.render;
+  try {
+    if (target) renderer.setRenderTarget(target);
+    renderer.setViewport(target ? 0 : -2, target ? 0 : -2, 1, 1);
+    renderer.setScissor(target ? 0 : -2, target ? 0 : -2, 1, 1);
+    renderer.setScissorTest(true);
+    return action();
+  } finally {
+    renderer.setRenderTarget(previousTarget, face, mip);
+    renderer.setViewport(viewport);
+    renderer.setScissor(scissor);
+    renderer.setScissorTest(scissorTest);
+    Object.assign(renderer.info.render, { calls, triangles, points, lines });
+  }
+}
+
 /** Render only explicit resources with the camera's current visible lights. */
 export function renderIsolatedPrewarmResources(
   renderer: THREE.WebGLRenderer,

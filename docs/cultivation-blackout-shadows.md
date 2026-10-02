@@ -91,4 +91,7 @@ cannot unload a newer resource generation.
 Detection, LOS, beam collision, damage, movement, puzzle progression and all
 authoritative timers remain unchanged. See the [production evidence and recorded
 limitations](evidence/issue-172/review.md) for hardware measurements and visual
-review. Full traversal/performance acceptance remains part of #173.
+review. See [integrated preparation and profiling](shadow-validation.md) and
+the [#173 integration evidence](evidence/issue-173/review.md) for the current
+preparation, reload-resource and hardware checks. Full native traversal and
+visual acceptance remain separate from those measurements.

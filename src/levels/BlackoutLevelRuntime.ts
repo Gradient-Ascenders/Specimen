@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BlackoutPresentationPreparation } from '../render/BlackoutPresentationPreparation.ts';
 import { BlackoutMaintenanceBayController } from './BlackoutMaintenanceBayController.ts';
 import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
 
@@ -204,6 +205,8 @@ export class BlackoutLevelRuntime {
   };
   private completionEmitted = false;
   private presentationPreparation: Promise<void> | undefined;
+  private programPreparation: BlackoutPresentationPreparation | undefined;
+  private readonly preparationCamera = new THREE.PerspectiveCamera();
   private readonly authoredRoomOne: boolean;
   private bayComplete = false;
   private roomTwoInitialized = false;
@@ -357,7 +360,12 @@ export class BlackoutLevelRuntime {
       BLACKOUT_BOB_REFLECTION.eyes,
       true,
     );
-    return this.presentationPreparation ??= resources.bobPresentation.prepare().catch(error => {
+    return this.presentationPreparation ??= resources.bobPresentation.prepare().then(async () => {
+      if (this.resources !== resources) return;
+      const preparation = new BlackoutPresentationPreparation();
+      this.programPreparation = preparation;
+      await preparation.prepare(this.renderLayer, this.preparationCamera.copy(this.renderLayer.cameraRig.camera));
+    }).catch(error => {
       if (this.resources === resources) this.unload();
       throw error;
     });
@@ -1722,6 +1730,7 @@ export class BlackoutLevelRuntime {
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
+    this.programPreparation?.dispose(); this.programPreparation = undefined;
     this.input.setEnabled(false);
     this.input.resetState();
     this.input.releasePointerLock();

@@ -124,6 +124,10 @@ loads, because Three.js caches transmission render targets per camera.
 
 See [Room 1 evidence and initial budget](evidence/issue-169/review.md) for the
 hardware baseline, matched captures, lifecycle counts and acceptance limits.
-Full production traversal/prewarm profiling remains #173.
+Issue #173 adds explicit depth compilation beyond the hidden camera frustum,
+synchronous preparation state restoration, Blackout program preparation and
+Cultivation transmission-target cleanup. See [integrated preparation and
+validation](shadow-validation.md) and [final integration evidence](evidence/issue-173/review.md).
+Complete native traversal and teammate visual acceptance remain separate gates.
 See [Containment rollout evidence](evidence/issue-171/review.md) for matched
 production captures, hardware timing, cache/disposal checks and remaining gates.

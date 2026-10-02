@@ -1,0 +1,5 @@
+
+Running 1 test using 1 worker
+
+[1/1] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:418:1 › Level 1 traversal creates no programs after hidden-boot warm-up
+  1 passed (13.5s)

@@ -45,7 +45,8 @@ import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
-import { renderIsolatedPrewarmResources } from '../render/IsolatedResourcePrewarm.ts';
+import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
+import { createDepthPrewarmGroup } from '../render/ShadowPrewarmMaterial.ts';
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
 import type {
@@ -311,7 +312,8 @@ export class GreyboxLevelRuntime {
   private readonly lightingPrewarmCamera = new THREE.PerspectiveCamera();
   private lightingPrewarmProfile: LightingPrewarmProfile | undefined;
   private lightingPrewarmGeneration = 0;
-  private cancelLightingPrewarm: (() => void) | undefined;
+  private readonly depthPrewarmGroups: ReturnType<typeof createDepthPrewarmGroup>[] = [];
+  private readonly compilingDepthGroups = new Set<ReturnType<typeof createDepthPrewarmGroup>>();
   private readonly twoBodySwitchingRegressionStatus =
     runTwoBodySwitchingRegression();
 
@@ -1266,8 +1268,8 @@ export class GreyboxLevelRuntime {
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
     this.lightingPrewarmGeneration += 1;
-    this.cancelLightingPrewarm?.();
-    this.cancelLightingPrewarm = undefined;
+    for (const batch of this.depthPrewarmGroups) if (!this.compilingDepthGroups.has(batch)) batch.dispose();
+    this.depthPrewarmGroups.length = 0;
     this.lightingPrewarmPromise = undefined;
     this.lightingPrewarmProfile = undefined;
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
@@ -1781,31 +1783,16 @@ export class GreyboxLevelRuntime {
     const camera = this.renderLayer.cameraRig.camera;
     const prewarmCamera = this.lightingPrewarmCamera.copy(camera);
     const transmissionPrewarmTarget = new THREE.WebGLRenderTarget(1, 1);
-    const previousViewport = renderer.getViewport(new THREE.Vector4());
-    const previousScissor = renderer.getScissor(new THREE.Vector4());
-    const previousScissorTest = renderer.getScissorTest();
     const programsBefore = renderer.info.programs?.length ?? 0;
     const started = this.hostWindow.performance.now();
     const steps: LightingPrewarmStepProfile[] = [];
-    let rendererStateRestored = false;
-    const restoreRendererState = (): void => {
-      if (rendererStateRestored) return;
-      rendererStateRestored = true;
-      renderer.setViewport(previousViewport);
-      renderer.setScissor(previousScissor);
-      renderer.setScissorTest(previousScissorTest);
-    };
     const isCurrent = (): boolean =>
       this.resources === resources &&
       this.lightingPrewarmGeneration === generation;
-    this.cancelLightingPrewarm = restoreRendererState;
 
     try {
       // This draw remains behind the loading screen. The one-pixel
       // viewport initializes first-use fixture buffers without flashing a room.
-      renderer.setViewport(0, 0, 1, 1);
-      renderer.setScissor(0, 0, 1, 1);
-      renderer.setScissorTest(true);
       await resources.testScene.lighting.prewarmShaderConfigurations(
         async (roomId, coverageRoomIds) => {
           if (!isCurrent()) return;
@@ -1826,18 +1813,37 @@ export class GreyboxLevelRuntime {
           const compileStarted = this.hostWindow.performance.now();
           try {
             if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-              await renderer.compileAsync(
-                compileSubset,
-                prewarmCamera,
-                this.renderLayer.scene,
-              );
+              await withIsolatedPrewarmState(renderer, () => renderer.compileAsync(
+                compileSubset, prewarmCamera, this.renderLayer.scene,
+              ));
             } else {
-              renderer.compile(
-                compileSubset,
-                prewarmCamera,
-                this.renderLayer.scene,
-              );
+              withIsolatedPrewarmState(renderer, () => renderer.compile(
+                compileSubset, prewarmCamera, this.renderLayer.scene,
+              ));
             }
+            if (!isCurrent()) return;
+            // Hidden camera draws cannot see every morph/instanced/dissolve
+            // caster. Compile their actual PCF depth materials independently.
+            const depthBatch = createDepthPrewarmGroup(compileSubset);
+            this.depthPrewarmGroups.push(depthBatch);
+            this.compilingDepthGroups.add(depthBatch);
+            const shadowScene = new THREE.Scene();
+            this.renderLayer.scene.traverseVisible(object => {
+              if (object instanceof THREE.Light && object.layers.test(prewarmCamera.layers)) shadowScene.add(object.clone(false));
+            });
+            try {
+              await withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () => {
+                if (renderer.extensions.has('KHR_parallel_shader_compile')) {
+                  return renderer.compileAsync(depthBatch.group, prewarmCamera, shadowScene);
+                }
+                renderer.compile(depthBatch.group, prewarmCamera, shadowScene);
+              }), transmissionPrewarmTarget);
+            } finally {
+              shadowScene.clear();
+              this.compilingDepthGroups.delete(depthBatch);
+              if (!isCurrent()) depthBatch.dispose();
+            }
+            if (!isCurrent()) return;
             // Bob's transmission pass renders opaque surfaces into a linear
             // target without canvas tone mapping. Warm that program variant
             // too, even when a surface misses the hidden boot camera frustum.
@@ -1855,34 +1861,27 @@ export class GreyboxLevelRuntime {
               opaqueSubset.add(clone);
             }
             try {
-              const previousTarget = renderer.getRenderTarget();
-              let transmissionCompilation: Promise<unknown> | undefined;
-              try {
-                renderer.setRenderTarget(transmissionPrewarmTarget);
+              await withIsolatedPrewarmState(renderer, () => {
                 if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-                  transmissionCompilation = renderer.compileAsync(
-                    opaqueSubset, prewarmCamera, this.renderLayer.scene,
-                  );
-                } else {
-                  renderer.compile(opaqueSubset, prewarmCamera, this.renderLayer.scene);
+                  return renderer.compileAsync(opaqueSubset, prewarmCamera, this.renderLayer.scene);
                 }
-              } finally {
-                // Restore before asynchronous compilation yields control.
-                renderer.setRenderTarget(previousTarget);
-              }
-              await transmissionCompilation;
+                renderer.compile(opaqueSubset, prewarmCamera, this.renderLayer.scene);
+              }, transmissionPrewarmTarget);
             } finally {
+              disposeCompileInstances(opaqueSubset);
               opaqueSubset.clear();
             }
+            if (!isCurrent()) return;
             // Camera fades change the existing eyes' opaque/transparent shader
             // variant. Retain both on their live material before gameplay starts.
             await resources.testScene.bob.prepareCameraFadePrograms(() => {
               if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-                return renderer.compileAsync(compileSubset, prewarmCamera, this.renderLayer.scene);
+                return withIsolatedPrewarmState(renderer, () => renderer.compileAsync(compileSubset, prewarmCamera, this.renderLayer.scene));
               }
-              renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene);
+              withIsolatedPrewarmState(renderer, () => renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene));
             });
           } finally {
+            disposeCompileInstances(compileSubset);
             compileSubset.clear();
           }
           const compileDurationMs =
@@ -1896,12 +1895,9 @@ export class GreyboxLevelRuntime {
           const primeStarted = this.hostWindow.performance.now();
           // Room 1 also needs a hidden draw now: compileAsync does not create
           // the spotlight map or compile its caster depth programs.
-          renderer.render(this.renderLayer.scene, prewarmCamera);
+          withIsolatedPrewarmState(renderer, () => renderer.render(this.renderLayer.scene, prewarmCamera));
           const primeDurationMs =
             this.hostWindow.performance.now() - primeStarted;
-          renderer.setViewport(0, 0, 1, 1);
-          renderer.setScissor(0, 0, 1, 1);
-          renderer.setScissorTest(true);
           steps.push({
             roomId,
             compiledObjects: compileSubset.userData.compiledObjects as number,
@@ -1937,14 +1933,14 @@ export class GreyboxLevelRuntime {
         this.hostWindow.performance.now();
       resources.testScene.primeMeasuredFirstUseGeometryResources(
         (measuredResources) => {
-          this.renderLayer.withShadowPreparation(true, () =>
+          withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
             renderIsolatedPrewarmResources(
               renderer,
               this.renderLayer.scene,
               prewarmCamera,
               measuredResources,
             ),
-          );
+          ));
         },
       );
       const measuredFirstUseResourcePrimeDurationMs =
@@ -1968,12 +1964,9 @@ export class GreyboxLevelRuntime {
       resources.testScene.bob.primeDeathResources(
         resources.spawnPosition,
         (burstRoot) => {
-          renderIsolatedPrewarmResources(
-            renderer,
-            this.renderLayer.scene,
-            prewarmCamera,
-            [burstRoot],
-          );
+          withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+            renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, prewarmCamera, [burstRoot]),
+          ));
         },
       );
       const burstResourcePrimeDurationMs =
@@ -2001,10 +1994,6 @@ export class GreyboxLevelRuntime {
       };
     } finally {
       transmissionPrewarmTarget.dispose();
-      restoreRendererState();
-      if (this.cancelLightingPrewarm === restoreRendererState) {
-        this.cancelLightingPrewarm = undefined;
-      }
     }
   }
 
@@ -2222,6 +2211,12 @@ function cloneCompileObject(
     return clone;
   }
   return object.clone(false);
+}
+
+function disposeCompileInstances(root: THREE.Object3D): void {
+  root.traverse(object => {
+    if (object instanceof THREE.InstancedMesh) object.dispose();
+  });
 }
 
 function nextPreviewState<T>(states: readonly T[], current: T): T {

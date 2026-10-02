@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 
 interface CultivationRuntimeProbe {
   readonly resources?: {
@@ -184,6 +185,9 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   )).toBeGreaterThan(0.01);
 
   await page.keyboard.press('Tab');
+  await page.waitForFunction(() => (
+    window as Window & { __specimenCultivationRuntime?: CultivationRuntimeProbe }
+  ).__specimenCultivationRuntime?.resources?.manager.activeSlimeId === 'goop');
   const switched = await page.evaluate(() => {
     const resources = (
       window as Window & {
@@ -205,6 +209,9 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
     goopVisible: true,
   });
   await page.keyboard.press('Tab');
+  await page.waitForFunction(() => (
+    window as Window & { __specimenCultivationRuntime?: CultivationRuntimeProbe }
+  ).__specimenCultivationRuntime?.resources?.manager.activeSlimeId === 'bob');
 
   await page.evaluate(() => {
     const body = (
@@ -340,4 +347,42 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   });
   expect(consoleErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
+});
+
+test('Cultivation draws prepared room and fade shadow variants without creating programs', async ({page}) => {
+  test.setTimeout(600_000);
+  const assertExposed = await exposeCultivationRuntime(page);
+  await enterCultivation(page); assertExposed();
+  await page.evaluate(() => {
+    const r = (window as any).__specimenCultivationRuntime;
+    r.stop();
+    r.__coldDraws = [];
+    const layer = r.renderLayer, draw = layer.render.bind(layer);
+    layer.render = () => {
+      const before = layer.renderer.info.programs.length;
+      draw();
+      const after = layer.renderer.info.programs.length;
+      if (after > before) r.__coldDraws.push({
+        before, after, room: r.__probeRoom, opacity: r.__probeOpacity,
+        programs: layer.renderer.info.programs.slice(before).map((p: any) => ({name: p.name, key: p.cacheKey})),
+      });
+      r.__lastDraw = performance.now();
+    };
+  });
+  for (const room of [1,2,3,4,5,1]) {
+    const before = await page.evaluate(roomId => {
+      const r = (window as any).__specimenCultivationRuntime;
+      r.__lastDraw = 0; r.__probeRoom = roomId; r.__probeOpacity = 1; r.teleportToAuthoredPreviewRoom(roomId); return performance.now();
+    }, room);
+    await page.waitForFunction(start => (window as any).__specimenCultivationRuntime.__lastDraw > start, before, {timeout:120_000});
+    await page.evaluate(() => {
+      const r = (window as any).__specimenCultivationRuntime, bob = r.resources.bobPresentation;
+      for (const opacity of [0.5,0,1]) {
+        r.__probeOpacity = opacity;bob.setOpacity(opacity);
+        r.renderLayer.renderer.compile(r.preparationLightState,r.renderLayer.cameraRig.camera,r.renderLayer.scene);
+        r.renderLayer.render();
+      }
+    });
+  }
+  expect(await page.evaluate(() => (window as any).__specimenCultivationRuntime.__coldDraws)).toEqual([]);
 });

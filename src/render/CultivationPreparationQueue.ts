@@ -2,6 +2,8 @@ import { CultivationLightLayout } from './CultivationLightLayout.ts';
 import * as THREE from 'three';
 import type { LevelTwoPreviewScene } from '../levels/LevelTwoPreviewScene.ts';
 import type { RenderLayer } from './RenderLayer.ts';
+import { copyPrewarmMaterial, createShadowPrewarmMaterial } from './ShadowPrewarmMaterial.ts';
+import { withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
 interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
@@ -25,6 +27,7 @@ export class CultivationPreparationQueue {
   private readonly suspended = new Map<Configuration, {iterator: Generator<Step>; elapsedMs: number}>();
   private busy = false;
   private disposed = false;
+  private released = false;
   private failure: unknown;
   private priority: Configuration | undefined;
   private upcoming: Configuration | undefined;
@@ -210,8 +213,7 @@ export class CultivationPreparationQueue {
     const scene = new THREE.Scene(); scene.fog = this.layer.scene.fog; scene.environment = this.layer.scene.environment;
     const drawables: Drawable[] = [];
     const shadowTargets: THREE.WebGLRenderTarget[] = [];
-    const visit = (o: THREE.Object3D, foundation = false) => {
-      foundation ||= o.name === 'cultivation-level-2-foundation';
+    const visit = (o: THREE.Object3D) => {
       const index = this.roots.indexOf(o as THREE.Group);
       if (index !== -1 && !config.visible[index]) return;
       const room = o.userData.presentationRoom as number | undefined;
@@ -240,11 +242,22 @@ export class CultivationPreparationQueue {
         }
         scene.add(clone);
       }
-      if (!foundation && (o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Line || o instanceof THREE.Sprite)) drawables.push(o);
-      for (const child of o.children) visit(child, foundation);
+      // Foundation presentation remains in the live scene beside authored
+      // rooms. Its dissolve/hazard variants also need the current light layout.
+      if (o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Line || o instanceof THREE.Sprite) drawables.push(o);
+      for (const child of o.children) visit(child);
     };
     visit(this.layer.scene);
     const padding = new CultivationLightLayout(scene);
+    const shadowScene = new THREE.Scene();
+    for (const object of scene.children) if (object instanceof THREE.Light) {
+      const light = object.clone(false);
+      if ((light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) &&
+        (object instanceof THREE.SpotLight || object instanceof THREE.PointLight || object instanceof THREE.DirectionalLight)) light.shadow.map = object.shadow.map;
+      shadowScene.add(light);
+    }
+    // Padding's point slots also enter the real renderer's previous light state.
+    shadowScene.add(padding.root.clone(true));
     config.lightingKey = this.lightingKey(scene);
     try {
     for (const target of shadowTargets) yield {run: () => this.layer.renderer.initRenderTarget(target)};
@@ -260,7 +273,8 @@ export class CultivationPreparationQueue {
       if (!materials.some(material => material.visible)) continue;
       const geometry = source.geometry;
       const feature = source.type + ':' + source.receiveShadow + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
-        Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize).sort().join(',') + ':' + Object.keys(geometry.morphAttributes).join(',');
+        Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize + ':' + a.normalized).sort().join(',') + ':' +
+        Object.entries(geometry.morphAttributes).map(([name, entries]) => name + ':' + entries.length).sort().join(',');
       const proxy = source.clone(false) as Drawable; proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;
       source.updateWorldMatrix(true, false); proxy.matrix.copy(source.matrixWorld); proxy.matrixAutoUpdate = false;
       if (proxy instanceof THREE.InstancedMesh) this.temporaryInstances.push(proxy);
@@ -271,12 +285,8 @@ export class CultivationPreparationQueue {
         if (material.visible && !seen.has(key)) { seen.add(key); needsProgram = true; }
         // compileAsync reads currentProgram later. Isolate it from live rendering.
         const existing = materialCopies.get(key); if (existing) return existing;
-        const copy = material instanceof THREE.MeshPhysicalMaterial ? new THREE.MeshPhysicalMaterial().copy(material) :
-          material instanceof THREE.MeshStandardMaterial ? new THREE.MeshStandardMaterial().copy(material) :
-          material instanceof THREE.ShaderMaterial ? new THREE.ShaderMaterial().copy(material) : material.clone();
-        if (copy instanceof THREE.ShaderMaterial && material instanceof THREE.ShaderMaterial) copy.uniforms = material.uniforms;
-        materialCopies.set(key, copy); copy.onBeforeCompile = material.onBeforeCompile;
-        const cacheKey = material.customProgramCacheKey(); copy.customProgramCacheKey = () => cacheKey;
+        const copy = copyPrewarmMaterial(material);
+        materialCopies.set(key, copy);
         this.retained.push(copy); return copy;
       });
       proxy.material = Array.isArray(source.material) ? copies : copies[0];
@@ -290,6 +300,11 @@ export class CultivationPreparationQueue {
       }
       if (needsProgram) {
         programs.push(proxy);
+        for (const copy of copies) if (source.name.startsWith('Bob-Eye') && !copy.transparent) {
+          const faded = copyPrewarmMaterial(copy); faded.transparent = true; this.retained.push(faded);
+          const fadeProxy = proxy.clone(false) as Drawable; fadeProxy.material = faded;
+          programs.push(fadeProxy); primes.push(fadeProxy);
+        }
         // Three's two-pass transparent preparation waits on the last side only.
         // Give the back-face program its own material so both sides are awaited.
         for (const copy of copies) if (copy.transparent && copy.side === THREE.DoubleSide && !copy.forceSinglePass) {
@@ -300,31 +315,35 @@ export class CultivationPreparationQueue {
           programs.push(backProxy);
         }
       }
-      if (needsProgram || needsBuffer) { primes.push(proxy); this.uploaded.add(geometry); }
+      // Bob is the only transmissive material and already has depth primers
+      // for the same morph geometry. Drawing him in a temporary scene creates
+      // a renderer-owned transmission target per scene/camera on every reload.
+      // Compile his visible pass, upload through his depth pass, and let the
+      // retained live camera own the single gameplay transmission target.
+      const transmissive = copies.some(m => m instanceof THREE.MeshPhysicalMaterial && m.transmission > 0);
+      if ((needsProgram || needsBuffer) && !transmissive) { primes.push(proxy); this.uploaded.add(geometry); }
       if (++collected % 8 === 0) yield {label:'collect', run: () => {}};
       // Shadow programs also encode light counts. Compile their real depth/distance
       // configurations asynchronously, without rendering nine whole-room shadow passes.
       if (source instanceof THREE.Mesh && source.castShadow) for (const material of materials) {
         if (!material.visible) continue;
         for (const distance of [false, true]) {
+          // Ordinary rooms have no shadowed point source and never use distance programs.
+          if (!scene.children.some(o => o instanceof THREE.Light && o.castShadow &&
+            (distance ? o instanceof THREE.PointLight : !(o instanceof THREE.PointLight)))) continue;
           const m = material as THREE.MeshStandardMaterial;
           const side = m.shadowSide ?? (m.side === THREE.FrontSide ? THREE.BackSide : m.side === THREE.BackSide ? THREE.FrontSide : THREE.DoubleSide);
           const custom = distance ? source.customDistanceMaterial : source.customDepthMaterial;
           const alphaTest = m.alphaToCoverage ? .5 : m.alphaTest;
-          const key = (custom?.customProgramCacheKey() ?? '') + 'shadow:' + distance + ':' + side + ':' + feature + ':' +
+          const key = (custom?.uuid ?? '') + 'shadow:' + distance + ':' + side + ':' + feature + ':' +
             alphaTest + ':' + (m.map?.channel ?? 'none') + ':' + (m.alphaMap?.channel ?? 'none') + ':' +
             m.wireframe + ':' + (m.displacementMap?.uuid ?? '');
           if (seen.has(key)) continue; seen.add(key);
-          const shadow = (custom ? custom.clone() : distance ? new THREE.MeshDistanceMaterial() : new THREE.MeshDepthMaterial()) as THREE.MeshDepthMaterial | THREE.MeshDistanceMaterial;
-          if (custom) { shadow.onBeforeCompile = custom.onBeforeCompile; const key = custom.customProgramCacheKey(); shadow.customProgramCacheKey = () => key; }
-          shadow.side = side; shadow.map = m.map; shadow.alphaMap = m.alphaMap; shadow.alphaTest = alphaTest;
-          // Three also assigns this dynamically on distance materials.
-          Object.assign(shadow, {wireframe: m.wireframe});
-          shadow.displacementMap = m.displacementMap; shadow.displacementScale = m.displacementScale; shadow.displacementBias = m.displacementBias;
+          const shadow = createShadowPrewarmMaterial(source, material, distance);
           this.retained.push(shadow);
           const shadowProxy = source.clone(false) as THREE.Mesh; shadowProxy.material = shadow; shadowProxy.castShadow = false; shadowProxy.frustumCulled = false; shadowProxy.visible = true;
           if (shadowProxy instanceof THREE.InstancedMesh) this.temporaryInstances.push(shadowProxy);
-          if (distance) (this.layer.renderer.properties.get(shadow) as {light?: THREE.Object3D}).light = scene.children.find(o => o instanceof THREE.PointLight);
+          if (distance) (this.layer.renderer.properties.get(shadow) as {light?: THREE.Object3D}).light = scene.children.find(o => o instanceof THREE.PointLight && o.castShadow);
           shadows.push(shadowProxy);
         }
       }
@@ -332,7 +351,8 @@ export class CultivationPreparationQueue {
     // CultivationLevelRuntime refreshes the live light state before enabling
     // shadows. Only that layout is used by gameplay; an extra empty-light pass
     // would compile and draw an entire unused set of depth/distance programs.
-    const passes = [[programs, false, scene], [shadows, true, scene]] as const;
+    const transmissionPrograms = programs.filter(object => (Array.isArray(object.material) ? object.material : [object.material]).some(m => !m.transparent));
+    const passes = [[programs, false, scene], [transmissionPrograms, true, scene], [shadows, true, shadowScene]] as const;
     for (const [objects, shadowTarget, targetScene] of passes) {
       for (let i = 0; i < objects.length;) {
         // A requested room can submit a larger compiler batch while the loading
@@ -340,7 +360,7 @@ export class CultivationPreparationQueue {
         const batch = objects.slice(i, i + (this.priority === config ? 32 : 8));
         i += batch.length;
         const group = new THREE.Group(); group.add(...batch);
-        yield {label: shadowTarget ? 'shadow-compile' : 'compile', run: () => {
+        yield {label: targetScene === shadowScene ? 'shadow-compile' : shadowTarget ? 'transmission-compile' : 'compile', run: () => {
           const start = performance.now();
           return this.withState(true, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, targetScene)).then(() => {
             this.diagnostics.compileWaitMs += performance.now()-start; group.clear();
@@ -348,7 +368,7 @@ export class CultivationPreparationQueue {
         }};
       }
     }
-    for (const [objects, shadowTarget, targetScene] of [[primes, false, scene], [shadows, true, scene]] as const) for (let i = 0; i < objects.length;) {
+    for (const [objects, shadowTarget, targetScene] of [[primes, false, scene], [shadows, true, shadowScene]] as const) for (let i = 0; i < objects.length;) {
       const batch = objects.slice(i, i + (this.priority === config ? 16 : 1));
       i += batch.length;
       yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + batch[0].name, run: () => {
@@ -363,23 +383,17 @@ export class CultivationPreparationQueue {
       for (const target of shadowTargets) {
         target.depthTexture?.dispose(); target.depthTexture = null; target.dispose();
       }
-      padding.dispose(); scene.clear();
+      padding.dispose(); scene.clear(); shadowScene.clear();
     }
   }
 
   /** State is restored synchronously, before compileAsync yields to gameplay. */
   private withState<T>(dark: boolean, shadowTarget: boolean, action: () => T): T {
-    const r = this.layer.renderer;
-    const counters = r.info ? {calls:r.info.render.calls, triangles:r.info.render.triangles, points:r.info.render.points, lines:r.info.render.lines} : undefined;
-    const viewport = r.getViewport(new THREE.Vector4()), scissor = r.getScissor(new THREE.Vector4()), test = r.getScissorTest(), target = r.getRenderTarget();
-    if (shadowTarget) r.setRenderTarget(this.target);
-    r.setViewport(-2, -2, 1, 1); r.setScissor(-2, -2, 1, 1); r.setScissorTest(true);
-    try { return this.layer.withShadowPreparation(dark, action); } finally {
-      r.setRenderTarget(target); r.setViewport(viewport); r.setScissor(scissor); r.setScissorTest(test);
-      if (counters) Object.assign(r.info.render, counters);
-    }
+    return withIsolatedPrewarmState(this.layer.renderer,
+      () => this.layer.withShadowPreparation(dark, action), shadowTarget ? this.target : undefined);
   }
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true; this.iterator?.return(undefined); this.iterator = undefined;
     for (const work of this.suspended.values()) work.iterator.return(undefined);
     this.suspended.clear();
@@ -387,6 +401,8 @@ export class CultivationPreparationQueue {
     if (!this.busy) this.releaseResources();
   }
   private releaseResources(): void {
+    if (this.released) return;
+    this.released = true;
     for (const m of this.retained) m.dispose();
     for (const mesh of this.temporaryInstances) mesh.dispose();
     this.retained.length = 0; this.temporaryInstances.length = 0;

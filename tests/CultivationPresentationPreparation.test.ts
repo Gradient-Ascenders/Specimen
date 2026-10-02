@@ -12,6 +12,12 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
   const ordinary = new THREE.Mesh(shape, shared), instanced = new THREE.InstancedMesh(shape, shared, 1);
   ordinary.name = instanced.name = 'variant-regression'; scene.add(ordinary, instanced);
+  const foundation = new THREE.Group(); foundation.name = 'cultivation-level-2-foundation';
+  const foundationMaterial = new THREE.MeshBasicMaterial({transparent:true, opacity:.32});
+  const foundationMesh = new THREE.Mesh(shape, foundationMaterial); foundationMesh.name = 'visible-foundation-regression';
+  foundation.add(foundationMesh); scene.add(foundation);
+  const gel = new THREE.MeshPhysicalMaterial({transmission: .28, transparent:true});
+  const body = new THREE.Mesh(shape, gel); body.name = 'Bob-Body'; body.castShadow = true; scene.add(body);
   const renderTarget = new THREE.WebGLRenderTarget(4, 4);
   const reflectiveMaterial = new THREE.MeshStandardMaterial({
     envMap: renderTarget.texture,
@@ -70,8 +76,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       const texture = target.depthTexture!;
       texture.addEventListener('dispose', () => disposedShadowTextures.add(texture));
     },
+    getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
+    info: {render: {calls: 0, triangles: 0, points: 0, lines: 0, frame: 0}},
     compile() {},
     render(preparedScene: THREE.Scene) {
+      preparedScene.traverseVisible(object => {
+        if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
+          assert.equal(object.material.transmission, 0, 'temporary scenes must not allocate Bob transmission targets');
+        }
+      });
       if (!renderer.shadowMap.enabled) return;
       preparedScene.traverseVisible(object => {
         if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight) || !object.castShadow) return;
@@ -90,6 +103,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       });
       if (group.children.some(o => o instanceof THREE.Mesh &&
         (o.material instanceof THREE.MeshDepthMaterial || o.material instanceof THREE.MeshDistanceMaterial))) {
+        assert.equal(targetScene.fog, null, 'real shadow draws use the empty scene, without visible-pass fog');
+        assert.equal(targetScene.environment, null, 'custom depth/distance programs do not borrow visible-pass environment');
         const lights: THREE.Light[] = [];
         targetScene.traverseVisible(o => { if (o instanceof THREE.Light) lights.push(o); });
         assert.ok(lights.some(light => light.castShadow), 'retain the live shadow-light layout');
@@ -112,6 +127,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
     assert.ok(compiles > 0);
+    if (!fail) assert.ok(preparedOwners.has('Bob-Body'), 'transmissive body still enters shader preparation');
+    if (!fail) assert.ok(preparedOwners.has(foundationMesh.name), 'visible foundation meshes need every authored room signature');
     assert.equal(
       initializedTextures.has(renderTarget.texture),
       false,
@@ -217,6 +234,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   } finally {
     queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
     reflectiveMaterial.dispose(); renderTarget.dispose();
+    gel.dispose();
+    foundationMaterial.dispose();
     hidden.material.dispose(); projectile.material.dispose(); mappedMaterial.map!.dispose(); mappedMaterial.dispose();
     mappedCaster.dispose(); plainCaster.dispose(); projectile.dispose();
     globalThis.requestAnimationFrame = priorRaf;

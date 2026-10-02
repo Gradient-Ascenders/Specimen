@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 
 interface CultivationRuntimeProbe {
   readonly events: {
@@ -15,6 +16,7 @@ interface CultivationRuntimeProbe {
 interface BlackoutRuntimeProbe {
   readonly state: string;
   readonly phase: string;
+  readonly renderLayer: {readonly renderer: {readonly info: {readonly programs?: readonly unknown[]}}};
   readonly resources?: {
     readonly bobPresentation: {
       readonly ready: boolean;
@@ -149,12 +151,16 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
   await enterLevel.click();
   await page.waitForFunction(
     () =>
-      window.__specimenBlackoutRuntime?.resources?.bobPresentation.ready ===
-      true,
+      window.__specimenBlackoutRuntime?.state === 'running',
     undefined,
     { timeout: 120_000 },
   );
   assertRuntimesExposed();
+  const preparedPrograms = await page.evaluate(() => window.__specimenBlackoutRuntime!.renderLayer.renderer.info.programs!.length);
+  const assertProgramsPrepared = async () => {
+    await page.evaluate(async () => { for (let i = 0; i < 3; i++) await new Promise(requestAnimationFrame); });
+    expect(await page.evaluate(() => window.__specimenBlackoutRuntime!.renderLayer.renderer.info.programs!.length)).toBeLessThanOrEqual(preparedPrograms);
+  };
 
   const initial = await page.evaluate(() => {
     const resources = window.__specimenBlackoutRuntime?.resources;
@@ -232,6 +238,7 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
 
   expect(await switchSlime()).toBe('goop');
   expect(await switchSlime()).toBe('volt');
+  await assertProgramsPrepared();
 
   expect(await page.evaluate(() => {
     const runtime = window.__specimenBlackoutRuntime;
@@ -251,6 +258,7 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
     };
   });
   expect(merged).toEqual({ bobVisible: false, voltLightVisible: false });
+  await assertProgramsPrepared();
 
   const split = await page.evaluate(() => {
     const runtime = window.__specimenBlackoutRuntime;

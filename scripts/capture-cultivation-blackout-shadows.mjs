@@ -73,6 +73,19 @@ try {
   const draw = () => page.evaluate(() => { const r = globalThis.__active; r.__draws = {}; r.__count = true; r.renderLayer.render(); r.__count = false; });
   const capture = async name => {
     const modes = [];
+    // Three derives a shadow camera's far plane from light.distance on its
+    // first shadow update. Normalize it before the off snapshot as well.
+    await page.evaluate(() => {
+      const r = globalThis.__active; r.renderLayer.scene.updateMatrixWorld(true);
+      for (const light of r.__lights) {
+        if (light.isPointLight) {
+          // r185 updates point projections inside WebGLShadowMap, not through
+          // LightShadow.updateMatrices (point lights have no target object).
+          light.shadow.camera.far = light.distance || light.shadow.camera.far;
+          light.shadow.camera.updateProjectionMatrix();
+        } else light.shadow.updateMatrices(light);
+      }
+    });
     for (const enabled of [false, true]) {
       console.log(`${name}: shadow ${enabled ? 'on' : 'off'}`);
       await page.evaluate(value => {
@@ -96,6 +109,7 @@ try {
     }
     assert.deepEqual(modes[0].camera, modes[1].camera);
     assert.deepEqual(modes[0].morphs, modes[1].morphs);
+    assert.deepEqual(modes[0].sources, modes[1].sources);
     const submission = await page.evaluate(async () => {
       const r = globalThis.__active, times = [];
       for (let i = 0; i < 5; i++) { await new Promise(requestAnimationFrame); r.renderLayer.render(); }
