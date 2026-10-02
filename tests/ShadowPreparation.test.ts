@@ -3,6 +3,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { withIsolatedPrewarmState } from '../src/render/IsolatedResourcePrewarm.ts';
 import { copyPrewarmMaterial, createShadowPrewarmMaterial, createDepthPrewarmGroup } from '../src/render/ShadowPrewarmMaterial.ts';
+import { ShadowedDroneBeam } from '../src/render/hazards/ShadowedDroneBeam.ts';
 import { BlackoutPresentationPreparation } from '../src/render/BlackoutPresentationPreparation.ts';
 import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
@@ -147,4 +148,62 @@ for (const mode of ['complete', 'reject', 'cancel']) test(`Blackout prepares hid
   assert.equal(ownedDisposals, observed.size);
   assert.equal(borrowedDisposals, 0);
   geometry.dispose(); material.dispose(); mesh.customDepthMaterial.dispose(); borrowedTarget.dispose();
+});
+
+
+test('Blackout allocates PCF maps before isolated receiver draws', async () => {
+  const { renderer, borrowedTarget } = fixture();
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+  mesh.castShadow = mesh.receiveShadow = true;
+  const light = new THREE.SpotLight(); light.castShadow = true;
+  scene.add(mesh, light);
+  let isolatedDraws = 0;
+  renderer.render = (drawScene) => {
+    if (drawScene === scene && scene.children.some(o => o instanceof THREE.Group)) {
+      isolatedDraws++;
+      assert.equal(light.shadow.map?.depthTexture?.compareFunction, THREE.LessEqualCompare,
+        'PCF receiver proxies require an allocated comparison texture');
+    } else if (drawScene === scene) {
+      const map = new THREE.WebGLRenderTarget(1, 1);
+      map.depthTexture = new THREE.DepthTexture(1, 1);
+      map.depthTexture.compareFunction = THREE.LessEqualCompare;
+      light.shadow.map = map;
+    }
+  };
+  const policy = new RenderShadowPolicy(renderer.shadowMap);
+  const layer = { renderer, scene, withShadowPreparation: policy.withPreparation.bind(policy) } as unknown as RenderLayer;
+  const preparation = new BlackoutPresentationPreparation();
+  try {
+    await preparation.prepare(layer, camera);
+    assert.ok(isolatedDraws > 0);
+    assert.equal(light.shadow.needsUpdate, true);
+  } finally {
+    preparation.dispose(); light.shadow.map?.depthTexture?.dispose(); light.shadow.map?.dispose();
+    mesh.geometry.dispose(); mesh.material.dispose(); borrowedTarget.dispose();
+  }
+});
+
+
+test('unallocated drone beam shadows bind a matching fallback without becoming visible', () => {
+  const light = new THREE.SpotLight();
+  const { mesh } = new ShadowedDroneBeam(light, 10, .34);
+  const material = mesh.material;
+  const fallback = material.uniforms.beamShadow.value as THREE.DepthTexture;
+  assert.ok(fallback.version > 0, 'fallback must upload before its first draw');
+  let disposals = 0; fallback.addEventListener('dispose', () => disposals++);
+  const renderer = { shadowMap: { type: THREE.PCFShadowMap } } as THREE.WebGLRenderer;
+  const draw = () => mesh.onBeforeRender(renderer, new THREE.Scene(), new THREE.PerspectiveCamera(), mesh.geometry, material, null);
+  draw();
+  assert.equal(fallback.compareFunction, THREE.LessEqualCompare);
+  assert.equal(material.uniforms.beamShadowReady.value, false);
+  renderer.shadowMap.type = THREE.BasicShadowMap; draw();
+  assert.equal(fallback.compareFunction, null);
+  assert.equal(material.defines.SHADOW_COMPARE, undefined);
+  const map = new THREE.WebGLRenderTarget(1, 1);
+  map.depthTexture = new THREE.DepthTexture(1, 1); light.shadow.map = map; draw();
+  assert.equal(material.uniforms.beamShadow.value, map.depthTexture);
+  assert.equal(material.uniforms.beamShadowReady.value, true);
+  material.dispose(); assert.equal(disposals, 1);
+  mesh.geometry.dispose(); map.depthTexture.dispose(); map.dispose();
 });

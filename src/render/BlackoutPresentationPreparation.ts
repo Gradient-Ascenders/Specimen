@@ -75,15 +75,20 @@ export class BlackoutPresentationPreparation {
             () => layer.renderer.compileAsync(group, camera, scene)), this.target);
           if (this.disposed) return;
         }
+        if (group === visible) {
+          // PCF receivers use comparison samplers in r185. Preparation suppresses
+          // shadow updates, so allocate the level-owned maps with a live draw
+          // before submitting receiver proxies; null fallback textures cannot
+          // satisfy those samplers on SwiftShader.
+          withIsolatedPrewarmState(layer.renderer, () => layer.renderer.render(layer.scene, camera));
+        }
         scene.add(group);
         try {
           withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
             () => renderIsolatedPrewarmResources(layer.renderer, scene, camera, [group])), target);
         } finally { group.removeFromParent(); }
       }
-      // Allocate the live maps while loading. They remain level-owned. Force
-      // invalidation afterwards so a later powered/moving state cannot reuse it.
-      if (!this.disposed) withIsolatedPrewarmState(layer.renderer, () => layer.renderer.render(layer.scene, camera));
+      // Invalidate the loading maps so later powered/moving state cannot reuse them.
       layer.scene.traverse(object => {
         if ((object instanceof THREE.SpotLight || object instanceof THREE.PointLight) && object.castShadow) object.shadow.needsUpdate = true;
       });

@@ -15,13 +15,19 @@ export class ShadowedDroneBeam {
     });
     const geometry = mergeGeometries(shells)!;
     shells.forEach(shell => shell.dispose());
+    // The GPU validates active samplers even when beamShadowReady discards
+    // fragments. Hidden transit beams also participate in loading preparation.
+    const fallbackDepth = new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
+    fallbackDepth.compareFunction = THREE.LessEqualCompare;
+    fallbackDepth.minFilter = fallbackDepth.magFilter = THREE.LinearFilter;
+    fallbackDepth.needsUpdate = true;
     const material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
       toneMapped: false,
       defines: { SHADOW_COMPARE: 1 },
       uniforms: {
-        beamShadow: { value: null }, beamShadowMatrix: { value: light.shadow.matrix },
+        beamShadow: { value: fallbackDepth }, beamShadowMatrix: { value: light.shadow.matrix },
         beamShadowReady: { value: false }, beamRange: { value: range },
         beamColor: { value: new THREE.Color(0xff1830) },
       },
@@ -63,6 +69,7 @@ export class ShadowedDroneBeam {
           beamOutput = vec4(beamColor, alpha);
         }`,
     });
+    material.addEventListener('dispose', () => fallbackDepth.dispose());
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.renderOrder = 2;
     this.mesh.castShadow = false;
@@ -72,7 +79,12 @@ export class ShadowedDroneBeam {
         material.defines = compare ? {SHADOW_COMPARE:1} : {};
         material.needsUpdate = true;
       }
-      material.uniforms.beamShadow.value = light.shadow.map?.depthTexture ?? null;
+      const comparison = compare ? THREE.LessEqualCompare : null;
+      if (fallbackDepth.compareFunction !== comparison) {
+        fallbackDepth.compareFunction = comparison;
+        fallbackDepth.needsUpdate = true;
+      }
+      material.uniforms.beamShadow.value = light.shadow.map?.depthTexture ?? fallbackDepth;
       material.uniforms.beamShadowReady.value = Boolean(light.shadow.map?.depthTexture);
     };
   }
