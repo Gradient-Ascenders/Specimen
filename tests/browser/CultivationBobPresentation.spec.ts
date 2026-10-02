@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 
 interface CultivationRuntimeProbe {
   readonly resources?: {
@@ -184,6 +185,9 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   )).toBeGreaterThan(0.01);
 
   await page.keyboard.press('Tab');
+  await page.waitForFunction(() => (
+    window as Window & { __specimenCultivationRuntime?: CultivationRuntimeProbe }
+  ).__specimenCultivationRuntime?.resources?.manager.activeSlimeId === 'goop');
   const switched = await page.evaluate(() => {
     const resources = (
       window as Window & {
@@ -205,6 +209,9 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
     goopVisible: true,
   });
   await page.keyboard.press('Tab');
+  await page.waitForFunction(() => (
+    window as Window & { __specimenCultivationRuntime?: CultivationRuntimeProbe }
+  ).__specimenCultivationRuntime?.resources?.manager.activeSlimeId === 'bob');
 
   await page.evaluate(() => {
     const body = (
@@ -291,7 +298,8 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   expect(darkLighting.materials?.targetEyeReflectionIntensity)
     .toBeLessThan(0.74);
   expect(darkLighting.meshCount).toBeGreaterThan(0);
-  expect(darkLighting.shadowCasterCount).toBe(darkLighting.meshCount);
+  expect(darkLighting.shadowCasterCount).toBe(3); // Body and two authored eye lenses.
+  expect(darkLighting.shadowCasterCount).toBeLessThan(darkLighting.meshCount); // No rupture-particle shadows.
   const disposal = await page.evaluate(() => {
     const runtime = (
       window as Window & {
@@ -339,4 +347,102 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   });
   expect(consoleErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
+});
+
+test('Cultivation draws Room 5 immediately after load and teleport with valid live PCF maps', async ({ page }) => {
+  test.setTimeout(600_000);
+  const assertExposed = await exposeCultivationRuntime(page);
+  await enterCultivation(page); assertExposed();
+  await page.waitForFunction(() => (window as any).__specimenCultivationRuntime?.state === 'running', undefined, { timeout: 240_000 });
+  const consoleErrors: string[] = [];
+  const samplerWarnings: string[] = [];
+  page.on('console', message => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (/GL_INVALID_OPERATION|sampler.*(?:mismatch|texture)|texture.*(?:mismatch|sampler)/i.test(message.text())) {
+      samplerWarnings.push(message.text());
+    }
+  });
+  const draws = await page.evaluate(() => {
+    const r = (window as any).__specimenCultivationRuntime;
+    const renderer = r.renderLayer.renderer, gl = renderer.getContext();
+    r.stop(); r.unload();
+    const stats = {
+      fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 0, frameDeltaSeconds: 0,
+      stepsThisFrame: 0, interpolationAlpha: 0, droppedSimulationTimeSeconds: 0, renderFps: 60,
+    };
+    const draws = [];
+    // Repeat on a fresh resource generation, with no preparation or encounter
+    // update between load, the debug teleport and the first actual WebGL draw.
+    for (let generation = 0; generation < 2; generation++) {
+      r.load();
+      if (!r.teleportToAuthoredPreviewRoom(5)) throw new Error('Room 5 teleport failed');
+      const room = r.resources.authoredPreview.roomFive;
+      const lights: any[] = [];
+      room.root.traverse((o: any) => {
+        if (o.isSpotLight && o.name.endsWith('-search-light')) lights.push(o);
+      });
+      const before = lights.map(light => ({ map: light.shadow.map === null, intensity: light.intensity }));
+      // Clear prior-context errors so the assertions measure this first draw.
+      for (let i = 0; i < 100 && gl.getError() !== gl.NO_ERROR; i++) { /* drain */ }
+      r.render(0, stats);
+      const firstDraw = {
+        visible: room.root.visible, before, error: gl.getError(),
+        allocated: lights.filter(light => light.shadow.map?.depthTexture?.isDepthTexture).length,
+        pending: lights.filter(light => light.shadow.needsUpdate).length,
+      };
+      r.resources.roomFiveEncounter.reset();
+      const resetMaps = lights.map(light => light.shadow.map);
+      const resetPending = lights.filter(light => light.shadow.needsUpdate || light.shadow.autoUpdate).length;
+      r.render(0, stats);
+      draws.push({ ...firstDraw, resetPending, resetError: gl.getError(),
+        reused: lights.every((light, i) => light.shadow.map === resetMaps[i]) });
+      r.unload();
+    }
+    return draws;
+  });
+  expect(draws).toEqual(Array.from({ length: 2 }, () => ({
+    visible: true,
+    before: Array.from({ length: 9 }, () => ({ map: true, intensity: 0 })),
+    error: 0, allocated: 9, pending: 0, resetPending: 0, resetError: 0, reused: true,
+  })));
+  expect(consoleErrors).toEqual([]);
+  expect(samplerWarnings).toEqual([]);
+});
+
+test('Cultivation draws prepared room and fade shadow variants without creating programs', async ({page}) => {
+  test.setTimeout(600_000);
+  const assertExposed = await exposeCultivationRuntime(page);
+  await enterCultivation(page); assertExposed();
+  await page.evaluate(() => {
+    const r = (window as any).__specimenCultivationRuntime;
+    r.stop();
+    r.__coldDraws = [];
+    const layer = r.renderLayer, draw = layer.render.bind(layer);
+    layer.render = () => {
+      const before = layer.renderer.info.programs.length;
+      draw();
+      const after = layer.renderer.info.programs.length;
+      if (after > before) r.__coldDraws.push({
+        before, after, room: r.__probeRoom, opacity: r.__probeOpacity,
+        programs: layer.renderer.info.programs.slice(before).map((p: any) => ({name: p.name, key: p.cacheKey})),
+      });
+      r.__lastDraw = performance.now();
+    };
+  });
+  for (const room of [1,2,3,4,5,1]) {
+    const before = await page.evaluate(roomId => {
+      const r = (window as any).__specimenCultivationRuntime;
+      r.__lastDraw = 0; r.__probeRoom = roomId; r.__probeOpacity = 1; r.teleportToAuthoredPreviewRoom(roomId); return performance.now();
+    }, room);
+    await page.waitForFunction(start => (window as any).__specimenCultivationRuntime.__lastDraw > start, before, {timeout:120_000});
+    await page.evaluate(() => {
+      const r = (window as any).__specimenCultivationRuntime, bob = r.resources.bobPresentation;
+      for (const opacity of [0.5,0,1]) {
+        r.__probeOpacity = opacity;bob.setOpacity(opacity);
+        r.renderLayer.renderer.compile(r.preparationLightState,r.renderLayer.cameraRig.camera,r.renderLayer.scene);
+        r.renderLayer.render();
+      }
+    });
+  }
+  expect(await page.evaluate(() => (window as any).__specimenCultivationRuntime.__coldDraws)).toEqual([]);
 });

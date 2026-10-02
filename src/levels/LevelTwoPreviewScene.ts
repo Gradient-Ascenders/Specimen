@@ -1,4 +1,5 @@
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
+import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../render/environment/cultivation/CultivationMaintenanceArt.ts';
 import { CultivationElevatorArt } from '../render/environment/cultivation/CultivationElevatorArt.ts';
@@ -169,6 +170,7 @@ export class LevelTwoPreviewScene {
     });
     this.labArt.addFixtures(this.roomThree.root, 48, 30, 72, {
       fillHeightMetres: 16, fillPositionsZ: [18, 54],
+      shadowTargets: [[-4, 23, 25.5], [0, 23, 53]],
     });
     this.chamberArt.addBoundary(this.roomThree.root);
     this.labArt.dress(this.roomOne.builder, [], this.contaminationArt.overrides(this.roomOne.builder));
@@ -186,6 +188,7 @@ export class LevelTwoPreviewScene {
       wallSides: [1],
       fillHeightMetres: 14,
       fillPositionsZ: [12, 34],
+      shadowTargets: [[-17, 17, 27], [0, 0, 34]],
     });
     this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28);
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
@@ -218,6 +221,7 @@ export class LevelTwoPreviewScene {
       this.roomFive.root,
     );
     this.surfaceCleanup = new CultivationSurfaceCleanup(this);
+    applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),

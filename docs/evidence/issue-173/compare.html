@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issue 173 shadow comparisons</title>
+<style>
+  :root{color-scheme:dark;font:16px system-ui;background:#101417;color:#edf2f4}
+  body{max-width:1100px;margin:auto;padding:24px}p{max-width:80ch;line-height:1.5}
+  label{display:block;margin:16px 0 8px}select{font:inherit;max-width:100%;padding:8px}
+  #view{position:relative;aspect-ratio:8/5;margin-top:20px;background:#000}
+  img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  #on{clip-path:inset(0 50% 0 0)}input{width:100%;margin:12px 0}
+  a{color:#b2e5ff}.modes{display:flex;justify-content:space-between}
+</style>
+<h1>Issue 173 shadow comparisons</h1>
+<p>Matched Intel Iris Xe captures at 960×600 / DPR 1. These views stage camera,
+character and encounter presentation through existing APIs. They do not replay
+native sequences or establish teammate visual approval.</p>
+<label for="scene">Captured scene</label>
+<select id="scene">
+  <option value="cultivation-searchlights">Cultivation searchlights</option>
+  <option value="cultivation-room-1">Cultivation Room 1</option>
+  <option value="cultivation-room-2">Cultivation Room 2</option>
+  <option value="cultivation-room-3">Cultivation Room 3</option>
+  <option value="cultivation-room-4">Cultivation Room 4</option>
+  <option value="cultivation-red-network-off">Cultivation red network disabled</option>
+  <option value="cultivation-rescued-point">Cultivation rescue point light</option>
+  <option value="cultivation-lift-dark-handoff">Cultivation lift / dark-room handoff</option>
+  <option value="blackout-drone-unpowered">Blackout unpowered drone</option>
+  <option value="blackout-hallway-unpowered">Blackout unpowered hallway</option>
+  <option value="blackout-drone-powered">Blackout powered drone</option>
+  <option value="blackout-hallway-powered">Blackout powered hallway</option>
+</select>
+<div id="view"><img id="off" alt=""><img id="on" alt=""></div>
+<div class="modes"><span>Shadows on</span><span>Shadows off</span></div>
+<label for="split">Comparison divider</label>
+<input id="split" type="range" min="0" max="100" value="50">
+<p><a href="review.md">Evidence and acceptance limits</a> ·
+<a href="encounters/measurements.json">Camera, light, lifecycle and timing data</a></p>
+<script>
+  const scene = document.querySelector('#scene'), split = document.querySelector('#split');
+  const off = document.querySelector('#off'), on = document.querySelector('#on');
+  function selectScene(){
+    const label = scene.selectedOptions[0].textContent;
+    for(const [image, mode] of [[off,'off'],[on,'on']]){
+      image.src = `encounters/${scene.value}-${mode}.png`;
+      image.alt = `${label}, shadows ${mode}`;
+    }
+  }
+  scene.addEventListener('change',selectScene);
+  split.addEventListener('input',()=>on.style.clipPath=`inset(0 ${100-split.value}% 0 0)`);
+  selectScene();
+</script>
+</html>

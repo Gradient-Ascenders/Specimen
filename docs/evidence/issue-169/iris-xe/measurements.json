@@ -1,0 +1,2053 @@
+{
+  "capturedAtUtc": "2026-10-01T13:55:41.238Z",
+  "browserVersion": "154.0.8037.58",
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+    "platform": "Win32",
+    "hardwareConcurrency": 20,
+    "gpuVendor": "Google Inc. (Intel)",
+    "gpuRenderer": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x000046A6) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "gpuTimerAvailable": true,
+    "browserDpr": 1
+  },
+  "cdp": true,
+  "physicalGpuDetected": true,
+  "representativeHardwareVerified": true,
+  "limitations": [
+    "Human visual acceptance is separate.",
+    "Bob secondary deformation and fade shadow correctness remain #170.",
+    "Hatch evidence stages the existing lighting/art API; no native hatch cutscene exists in this checkout.",
+    "Timings measure warmed Room 1 at a fixed standing pose; traversal profiling remains #173."
+  ],
+  "baseline": {
+    "bodyPosition": [
+      -0.20995,
+      0.49507,
+      -2.60112
+    ],
+    "velocity": [
+      0,
+      0,
+      0
+    ],
+    "grounded": true,
+    "charging": false,
+    "charge": 0,
+    "morphs": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "camera": {
+      "position": [
+        -0.20994999999999964,
+        1.8197873718848314,
+        -5.551468301530914
+      ],
+      "quaternion": [
+        -9.565831951739505e-18,
+        0.9876883405951377,
+        0.15643446504023084,
+        6.039628597442224e-17
+      ],
+      "fov": 48
+    },
+    "light": {
+      "position": [
+        0,
+        6.4,
+        -0.5
+      ],
+      "target": [
+        0,
+        1.65,
+        -0.5
+      ],
+      "intensity": 62,
+      "colour": "d9efff",
+      "distance": 10,
+      "angle": 0.48,
+      "penumbra": 0.72,
+      "mapSize": [
+        1024,
+        1024
+      ],
+      "near": 0.35,
+      "far": 10,
+      "bias": -0.0001,
+      "normalBias": 0.015,
+      "radius": 1.5
+    },
+    "exposure": 1,
+    "render": {
+      "viewportWidth": 960,
+      "viewportHeight": 600,
+      "drawingBufferWidth": 960,
+      "drawingBufferHeight": 600,
+      "pixelRatio": 1,
+      "pixelRatioCap": 2,
+      "drawCalls": 405,
+      "triangles": 60170,
+      "sceneObjects": 1392,
+      "sceneLights": 22,
+      "uniqueMaterials": 127,
+      "instancedMeshes": 160,
+      "geometries": 450,
+      "textures": 18,
+      "programs": 133
+    },
+    "owner": "containment",
+    "shadowMapAllocated": true
+  },
+  "poses": [
+    {
+      "name": "standing",
+      "bodyPosition": [
+        -0.20995,
+        0.4600100029802322,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.465500764763914,
+          1.8472533233302335,
+          -5.267576851992832
+        ],
+        "quaternion": [
+          -0.04385348241447377,
+          0.9487841167220565,
+          0.15221843020541273,
+          0.27334066920579253
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 315,
+        "triangles": 44486,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 19,
+        "programs": 150
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "movement",
+      "bodyPosition": [
+        -0.30926286162888744,
+        0.46001000298023215,
+        -2.443064946428385
+      ],
+      "velocity": [
+        -1.7025061993523551,
+        0,
+        2.7095152040848194
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0.19664343634406525,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.5120529387158876,
+          1.901878338892188,
+          -5.341663996670517
+        ],
+        "quaternion": [
+          -0.04385348241447376,
+          0.9487841167220564,
+          0.1522184302054127,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 315,
+        "triangles": 44486,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 19,
+        "programs": 150
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "charging",
+      "bodyPosition": [
+        -0.37133340014694205,
+        0.4600100029802322,
+        -2.3442805379461262
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": true,
+      "charge": 0.35714285714285715,
+      "morphs": [
+        0,
+        0,
+        0.35714285714285715,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.5849861703844659,
+          2.0207061388715686,
+          -5.457736231922423
+        ],
+        "quaternion": [
+          -0.04385348241447375,
+          0.9487841167220565,
+          0.15221843020541273,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 321,
+        "triangles": 44966,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 19,
+        "programs": 150
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "jumping",
+      "bodyPosition": [
+        -0.37133340014694205,
+        0.7184063496530396,
+        -2.3442805379461262
+      ],
+      "velocity": [
+        0,
+        4.867926933456147,
+        0
+      ],
+      "grounded": false,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0.5115740740740741,
+        0.48842592592592593,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.6221195862282975,
+          2.113449403219046,
+          -5.516833552593995
+        ],
+        "quaternion": [
+          -0.04385348241447375,
+          0.9487841167220565,
+          0.1522184302054127,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 325,
+        "triangles": 45454,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 19,
+        "programs": 150
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "landing",
+      "bodyPosition": [
+        -0.37133340014694205,
+        0.5018982786115237,
+        -2.3442805379461262
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0.9702932916429792,
+        0.029706708357020828,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.6452526912307697,
+          2.3348427206887212,
+          -5.553649571088219
+        ],
+        "quaternion": [
+          -0.04385348241447376,
+          0.9487841167220564,
+          0.1522184302054127,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 343,
+        "triangles": 47030,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 19,
+        "programs": 150
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "hatch-api-establishing",
+      "bodyPosition": [
+        -0.37133340014694205,
+        0.5018982786115237,
+        -2.3442805379461262
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0.9702932916429792,
+        0.029706708357020828,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.6452526912307697,
+          2.3348427206887212,
+          -5.553649571088219
+        ],
+        "quaternion": [
+          -0.04385348241447376,
+          0.9487841167220564,
+          0.1522184302054127,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 78,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 343,
+        "triangles": 47030,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 19,
+        "programs": 150
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "hatch-api-emergence",
+      "bodyPosition": [
+        -0.37133340014694205,
+        0.5018982786115237,
+        -2.3442805379461262
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0.9702932916429792,
+        0.029706708357020828,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.6452526912307697,
+          2.3348427206887212,
+          -5.553649571088219
+        ],
+        "quaternion": [
+          -0.04385348241447376,
+          0.9487841167220564,
+          0.1522184302054127,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 92,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 347,
+        "triangles": 48150,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 452,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "hatch-api-impact",
+      "bodyPosition": [
+        -0.37133340014694205,
+        0.5018982786115237,
+        -2.3442805379461262
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0.9702932916429792,
+        0.029706708357020828,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.6452526912307697,
+          2.3348427206887212,
+          -5.553649571088219
+        ],
+        "quaternion": [
+          -0.04385348241447376,
+          0.9487841167220564,
+          0.1522184302054127,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 110,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 348,
+        "triangles": 48150,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "name": "hatch-api-complete",
+      "bodyPosition": [
+        -0.37133340014694205,
+        0.5018982786115237,
+        -2.3442805379461262
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0.9702932916429792,
+        0.029706708357020828,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          1.6452526912307697,
+          2.3348427206887212,
+          -5.553649571088219
+        ],
+        "quaternion": [
+          -0.04385348241447376,
+          0.9487841167220564,
+          0.1522184302054127,
+          0.2733406692057924
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 347,
+        "triangles": 48150,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    }
+  ],
+  "timings": [
+    {
+      "enabled": false,
+      "renderSubmissionMs": {
+        "samples": 60,
+        "p50": 9,
+        "p95": 10.899999991059303,
+        "maximum": 11.399999991059303
+      },
+      "frameIntervalMs": {
+        "samples": 60,
+        "p50": 13.300000000001091,
+        "p95": 13.5,
+        "maximum": 13.699999999998909
+      },
+      "gpuMs": {
+        "samples": 60,
+        "p50": 3.929218,
+        "p95": 5.269739,
+        "maximum": 5.34177
+      },
+      "gpuDisjoint": false,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 380,
+        "triangles": 54158,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      }
+    },
+    {
+      "enabled": true,
+      "renderSubmissionMs": {
+        "samples": 60,
+        "p50": 10.299999997019768,
+        "p95": 11.900000005960464,
+        "maximum": 12.100000008940697
+      },
+      "frameIntervalMs": {
+        "samples": 60,
+        "p50": 13.30000000000291,
+        "p95": 13.5,
+        "maximum": 13.599999999998545
+      },
+      "gpuMs": {
+        "samples": 60,
+        "p50": 6.041093,
+        "p95": 7.900208,
+        "maximum": 9.152864
+      },
+      "gpuDisjoint": false,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 405,
+        "triangles": 60170,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      }
+    },
+    {
+      "enabled": true,
+      "renderSubmissionMs": {
+        "samples": 60,
+        "p50": 10.800000011920929,
+        "p95": 12.900000005960464,
+        "maximum": 13.099999994039536
+      },
+      "frameIntervalMs": {
+        "samples": 60,
+        "p50": 13.30000000000291,
+        "p95": 13.5,
+        "maximum": 13.5
+      },
+      "gpuMs": {
+        "samples": 60,
+        "p50": 5.309895,
+        "p95": 7.343333,
+        "maximum": 7.692135
+      },
+      "gpuDisjoint": false,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 405,
+        "triangles": 60170,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      }
+    },
+    {
+      "enabled": false,
+      "renderSubmissionMs": {
+        "samples": 60,
+        "p50": 8.299999997019768,
+        "p95": 10.699999988079071,
+        "maximum": 11.400000005960464
+      },
+      "frameIntervalMs": {
+        "samples": 60,
+        "p50": 13.299999999999272,
+        "p95": 13.5,
+        "maximum": 13.599999999998545
+      },
+      "gpuMs": {
+        "samples": 60,
+        "p50": 5.577187,
+        "p95": 6.777135,
+        "maximum": 9.375364
+      },
+      "gpuDisjoint": false,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 380,
+        "triangles": 54158,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      }
+    }
+  ],
+  "lifecycle": [
+    {
+      "operation": "initial",
+      "bodyPosition": [
+        -0.20995,
+        0.46507,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.7909084643502369,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 403,
+        "triangles": 59306,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "restart-1",
+      "bodyPosition": [
+        -0.20995,
+        0.51007,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.8292149615109818,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739507e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 409,
+        "triangles": 60434,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "retry-1",
+      "bodyPosition": [
+        -0.20995,
+        0.52507,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999966,
+          1.8336962739146956,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 409,
+        "triangles": 60434,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "restart-2",
+      "bodyPosition": [
+        -0.20995,
+        0.52507,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.2099499999999996,
+          1.8336962739146956,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 409,
+        "triangles": 60434,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "retry-2",
+      "bodyPosition": [
+        -0.20995,
+        0.52507,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.8336962739146956,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 409,
+        "triangles": 60434,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "restart-3",
+      "bodyPosition": [
+        -0.20995,
+        0.52507,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999966,
+          1.8336962739146956,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 409,
+        "triangles": 60434,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "retry-3",
+      "bodyPosition": [
+        -0.20995,
+        0.52507,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.8336962739146956,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 409,
+        "triangles": 60434,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 453,
+        "textures": 19,
+        "programs": 152
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "reload-1",
+      "bodyPosition": [
+        -0.20995,
+        0.50007,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.8215896568945293,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 405,
+        "triangles": 60170,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 18,
+        "programs": 133
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "reload-2",
+      "bodyPosition": [
+        -0.20995,
+        0.49507,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.818487904333133,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739507e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 405,
+        "triangles": 60170,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 18,
+        "programs": 133
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "reload-3",
+      "bodyPosition": [
+        -0.20995,
+        0.50007,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.8221271181918839,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 407,
+        "triangles": 60386,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 18,
+        "programs": 133
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    },
+    {
+      "operation": "reload-after-failure",
+      "bodyPosition": [
+        -0.20995,
+        0.50007,
+        -2.60112
+      ],
+      "velocity": [
+        0,
+        0,
+        0
+      ],
+      "grounded": true,
+      "charging": false,
+      "charge": 0,
+      "morphs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "camera": {
+        "position": [
+          -0.20994999999999964,
+          1.8228427577118915,
+          -5.551468301530914
+        ],
+        "quaternion": [
+          -9.565831951739505e-18,
+          0.9876883405951377,
+          0.15643446504023084,
+          6.039628597442224e-17
+        ],
+        "fov": 48
+      },
+      "light": {
+        "position": [
+          0,
+          6.4,
+          -0.5
+        ],
+        "target": [
+          0,
+          1.65,
+          -0.5
+        ],
+        "intensity": 62,
+        "colour": "d9efff",
+        "distance": 10,
+        "angle": 0.48,
+        "penumbra": 0.72,
+        "mapSize": [
+          1024,
+          1024
+        ],
+        "near": 0.35,
+        "far": 10,
+        "bias": -0.0001,
+        "normalBias": 0.015,
+        "radius": 1.5
+      },
+      "exposure": 1,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 407,
+        "triangles": 60386,
+        "sceneObjects": 1392,
+        "sceneLights": 22,
+        "uniqueMaterials": 127,
+        "instancedMeshes": 160,
+        "geometries": 450,
+        "textures": 18,
+        "programs": 133
+      },
+      "owner": "containment",
+      "shadowMapAllocated": true
+    }
+  ],
+  "unloads": [
+    {
+      "enabled": false,
+      "owner": null,
+      "disposals": 1,
+      "depthDisposals": 1,
+      "mapCleared": true,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 409,
+        "triangles": 60434,
+        "sceneObjects": 1,
+        "sceneLights": 0,
+        "uniqueMaterials": 0,
+        "instancedMeshes": 0,
+        "geometries": 1,
+        "textures": 3,
+        "programs": 5
+      }
+    },
+    {
+      "enabled": false,
+      "owner": null,
+      "disposals": 1,
+      "depthDisposals": 1,
+      "mapCleared": true,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 405,
+        "triangles": 60170,
+        "sceneObjects": 1,
+        "sceneLights": 0,
+        "uniqueMaterials": 0,
+        "instancedMeshes": 0,
+        "geometries": 1,
+        "textures": 3,
+        "programs": 7
+      }
+    },
+    {
+      "enabled": false,
+      "owner": null,
+      "disposals": 1,
+      "depthDisposals": 1,
+      "mapCleared": true,
+      "render": {
+        "viewportWidth": 960,
+        "viewportHeight": 600,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 600,
+        "pixelRatio": 1,
+        "pixelRatioCap": 2,
+        "drawCalls": 405,
+        "triangles": 60170,
+        "sceneObjects": 1,
+        "sceneLights": 0,
+        "uniqueMaterials": 0,
+        "instancedMeshes": 0,
+        "geometries": 1,
+        "textures": 3,
+        "programs": 7
+      }
+    }
+  ],
+  "failedLoad": {
+    "error": "Error: injected shadow preparation failure",
+    "state": "unloaded",
+    "enabled": false,
+    "owner": null,
+    "allocatedBeforeFailure": true,
+    "disposals": 1,
+    "mapCleared": true
+  },
+  "errors": [],
+  "failures": []
+}

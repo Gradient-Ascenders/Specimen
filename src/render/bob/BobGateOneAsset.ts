@@ -364,6 +364,8 @@ export function disposeBobGateOneAsset(root: THREE.Object3D): void {
       ? object.material
       : [object.material];
     for (const material of meshMaterials) materials.add(material);
+    if (object.customDepthMaterial) materials.add(object.customDepthMaterial);
+    if (object.customDistanceMaterial) materials.add(object.customDistanceMaterial);
   });
   for (const geometry of geometries) geometry.dispose();
   for (const material of materials) material.dispose();

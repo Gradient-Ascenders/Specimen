@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 
 const GUARD_SELECTOR = '[data-shader-program-guard]';
 const RUNTIME_DIAGNOSTICS_SELECTOR = '[data-runtime-status]';
@@ -111,7 +112,17 @@ const parseLightingPrewarmProfile = (text: string): LightingPrewarmProfile => {
 };
 
 const toggleDebugPanel = async (page: Page): Promise<void> => {
+  const diagnostics = page.locator(RUNTIME_DIAGNOSTICS_SELECTOR);
+  const wasVisible = await diagnostics.isVisible();
   await page.keyboard.press('F2');
+  if (wasVisible) await expect(diagnostics).toBeHidden();
+  else {
+    await expect(diagnostics).toBeVisible();
+    await page.waitForFunction(() => document.pointerLockElement === null);
+  }
+  // Native pointer-lock change is asynchronous. Let release settle before
+  // closing diagnostics can restore gameplay input and reacquire the pointer.
+  await waitForRenderedFrames(page, 2);
 };
 
 const parseAcidPresentationSample = (text: string): AcidPresentationSample => {
@@ -237,6 +248,7 @@ const sweepCamera = async (page: Page): Promise<void> => {
   );
   if (!pointerLocked) {
     await canvas.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
+    await page.waitForFunction(() => document.pointerLockElement?.tagName === 'CANVAS');
   }
   await page.evaluate(() => {
     for (const [movementX, movementY] of [[180, -80], [-360, 160], [180, -80]]) {
@@ -359,9 +371,11 @@ const traverseRepresentativeLevelOnePaths = async (
   const acidBefore = await readAcidPresentationSample(page);
   await sweepCamera(page);
   await page.mouse.down({ button: 'right' });
-  await waitForRenderedFrames(page);
+  await waitForRenderedFrames(page, 3);
   await assertProgramsStable('Room 2 acid aim');
-  await page.mouse.click(400, 300, { button: 'left' });
+  await page.mouse.down({ button: 'left' });
+  await waitForRenderedFrames(page, 3);
+  await page.mouse.up({ button: 'left' });
   await page.mouse.up({ button: 'right' });
   await waitForRenderedFrames(page);
   const acidAfter = await waitForAcidImpactPresentation(page, acidBefore);
@@ -442,8 +456,8 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   expect(
     prewarmProfile.measuredFirstUseResourcePrimeGeometriesAfter -
       prewarmProfile.measuredFirstUseResourcePrimeGeometriesBefore,
-    'The hidden prewarm did not make all 23 measured geometries resident',
-  ).toBe(23);
+    'The measured upload guard allocated geometry after room shadow preparation',
+  ).toBe(0);
   expect(prewarmProfile.measuredFirstUseResourcePrimeProgramsAfter).toBe(
     prewarmProfile.measuredFirstUseResourcePrimeProgramsBefore,
   );
@@ -496,9 +510,9 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     (await app.getAttribute('data-level-one-prewarm')) ?? '{}',
   ) as LevelOnePrewarmVerification;
   expect(verification).toEqual({
-    roomStepsCompleted: 5,
+    roomStepsCompleted: 9,
     measuredResourceCount: 23,
-    measuredGeometryDelta: 23,
+    measuredGeometryDelta: 0,
     measuredProgramDelta: 0,
     burstGeometryDelta: 2,
     burstProgramDelta: 0,

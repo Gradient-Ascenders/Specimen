@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BlackoutPresentationPreparation } from '../render/BlackoutPresentationPreparation.ts';
 import { BlackoutMaintenanceBayController } from './BlackoutMaintenanceBayController.ts';
 import { BlackoutTransitController } from './BlackoutTransitController.ts';
 import { BLACKOUT_TRANSIT_CHECKPOINTS } from './BlackoutTransitRoom.ts';
@@ -60,7 +61,7 @@ import {
   PuzzleRegistry,
   type ResettablePuzzleComponent,
 } from '../puzzle/PuzzleRegistry.ts';
-import type { RenderLayer } from '../render/RenderLayer.ts';
+import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import {
   BobCharacterPresentation,
   type BobCharacterPresentationState,
@@ -205,6 +206,7 @@ export class BlackoutLevelRuntime {
   private readonly host: HTMLElement;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
+  private shadowRequest: RenderShadowRequest | undefined;
   private readonly initialProgression: LevelProgressionSnapshot;
   private readonly lifecycle: LevelLifecycle;
   private readonly hudListeners = new Set<SlimeHUDListener>();
@@ -218,12 +220,13 @@ export class BlackoutLevelRuntime {
   };
   private completionEmitted = false;
   private presentationPreparation: Promise<void> | undefined;
+  private programPreparation: BlackoutPresentationPreparation | undefined;
+  private readonly preparationCamera = new THREE.PerspectiveCamera();
   private readonly authoredRoomOne: boolean;
   private bayComplete = false;
   private roomTwoInitialized = false;
   private bayExitHintShown = false;
   private transitObjective = '';
-  private previousShadowEnabled: boolean | undefined;
 
   constructor(options: BlackoutLevelRuntimeOptions) {
     this.authoredRoomOne = options.authoredRoomOne ?? false;
@@ -374,7 +377,15 @@ export class BlackoutLevelRuntime {
       BLACKOUT_BOB_REFLECTION.eyes,
       true,
     );
-    return this.presentationPreparation ??= resources.bobPresentation.prepare();
+    return this.presentationPreparation ??= resources.bobPresentation.prepare().then(async () => {
+      if (this.resources !== resources) return;
+      const preparation = new BlackoutPresentationPreparation();
+      this.programPreparation = preparation;
+      await preparation.prepare(this.renderLayer, this.preparationCamera.copy(this.renderLayer.cameraRig.camera));
+    }).catch(error => {
+      if (this.resources === resources) this.unload();
+      throw error;
+    });
   }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
@@ -577,6 +588,8 @@ export class BlackoutLevelRuntime {
     resources.specimenAttack.reset();
     resources.sentinelRig.controller.cancelTransient('phase-change');
     resources.maintenanceDrone.recoverImmediately('checkpoint');
+    resources.dronePresentation?.update(0, resources.maintenanceDrone.readModel,
+      resources.group.activeSlimeId === 'volt');
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(
       resources.electricalSystem.readModel,
@@ -1441,11 +1454,9 @@ export class BlackoutLevelRuntime {
       const dronePresentation = this.authoredRoomOne
         ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted()) : undefined;
       if (dronePresentation) {
-        for(const mesh of scene.collisionMeshes) {mesh.castShadow=true;mesh.receiveShadow=true;}
         if(this.renderLayer.renderer) {
-          this.previousShadowEnabled=this.renderLayer.renderer.shadowMap.enabled;
-          this.renderLayer.renderer.shadowMap.enabled=true;
-          rollback(()=>{this.renderLayer.renderer.shadowMap.enabled=this.previousShadowEnabled??false;this.previousShadowEnabled=undefined;});
+          this.shadowRequest = this.renderLayer.requestShadowConfiguration('blackout', { enabled: true });
+          rollback(() => { this.shadowRequest?.dispose(); this.shadowRequest = undefined; });
         }
         const material = maintenanceDroneFixture.collider.material;
         for (const item of Array.isArray(material) ? material : [material]) item.visible = false;
@@ -1813,6 +1824,8 @@ export class BlackoutLevelRuntime {
       resources.group.activeSlimeId,
       resources.group.voltBody,
     );
+    resources.dronePresentation?.update(0, resources.maintenanceDrone.readModel,
+      resources.group.activeSlimeId === 'volt');
     this.currentRoom = snapshot.room;
     this.roomTwoInitialized = snapshot.room.roomId === 'room-2';
     this.bayComplete =
@@ -1842,6 +1855,7 @@ export class BlackoutLevelRuntime {
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
+    this.programPreparation?.dispose(); this.programPreparation = undefined;
     this.input.setEnabled(false);
     this.input.resetState();
     this.input.releasePointerLock();
@@ -1863,10 +1877,8 @@ export class BlackoutLevelRuntime {
     resources.unregisterTransitCheckpointParticipant?.();
     resources.transit?.dispose();
     resources.dronePresentation?.dispose();
-    if(this.previousShadowEnabled!==undefined) {
-      this.renderLayer.renderer.shadowMap.enabled=this.previousShadowEnabled;
-      this.previousShadowEnabled=undefined;
-    }
+    this.shadowRequest?.dispose();
+    this.shadowRequest = undefined;
     resources.maintenanceBay?.dispose();
     resources.maintenanceDrone.dispose();
     resources.maintenanceDroneFixture.dispose();
@@ -2013,6 +2025,8 @@ export class BlackoutLevelRuntime {
       this.roomTwoInitialized ||
       snapshot.room.local.maintenanceBayComplete === true;
     resources.phase.restore(snapshot.room.phase);
+    resources.dronePresentation?.update(0, resources.maintenanceDrone.readModel,
+      resources.group.activeSlimeId === 'volt');
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);
@@ -2322,6 +2336,8 @@ function createSpecimenVisual(): THREE.Mesh<THREE.SphereGeometry, THREE.MeshStan
     }),
   );
   visual.name = 'blackout-specimen-body';
+  visual.castShadow = true;
+  visual.receiveShadow = true;
   visual.visible = false;
   return visual;
 }
@@ -2337,6 +2353,8 @@ function createSlimeVisual(colour: number, emissive: number): THREE.Mesh<THREE.S
     }),
   );
   visual.name = 'blackout-foundation-slime';
+  visual.castShadow = true;
+  visual.receiveShadow = true;
   return visual;
 }
 

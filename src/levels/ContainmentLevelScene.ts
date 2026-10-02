@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import { fitContainmentShadowCullingBounds } from '../render/environment/containment/ContainmentShadowCoverage.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
   type ContainmentStaticBatchDiagnostics,
@@ -208,6 +209,8 @@ export class ContainmentLevelScene {
     this.staticBatchDiagnostics = this.staticBatches.map(
       ({ diagnostics }) => diagnostics,
     );
+    this.lighting.configureRoomOneShadowReceivers(this.teaching.roomOneArt);
+    fitContainmentShadowCullingBounds(this.root);
     this.measuredFirstUseGeometryResources =
       resolveMeasuredFirstUseGeometryResources(this.root);
   }
@@ -297,7 +300,8 @@ export class ContainmentLevelScene {
     );
   }
 
-  update(deltaSeconds: number, bobPosition?: Vector3State): void {
+  update(deltaSeconds: number, bobPosition?: Vector3State, activePosition = bobPosition): void {
+    if (activePosition) this.lighting.setTraversalPosition(activePosition);
     if (bobPosition) {
       this.lighting.setBobInDarkDuct(
         this.isInsideCameraTightVent(bobPosition),
@@ -312,6 +316,7 @@ export class ContainmentLevelScene {
   }
 
   reconcilePresentationAfterRecovery(bobPosition: Vector3State): void {
+    this.lighting.setTraversalPosition(bobPosition);
     this.lighting.setBobInDarkDuct(
       this.isInsideCameraTightVent(bobPosition),
     );

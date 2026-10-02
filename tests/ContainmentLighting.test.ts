@@ -44,6 +44,57 @@ const bobState = (): BobCharacterPresentationState => ({
 const createScene = (): ContainmentLevelScene =>
   new ContainmentLevelScene(() => undefined);
 
+test('Room 1 proof retains its fixture and excludes glass and hidden colliders', () => {
+  const scene = createScene();
+  const key = scene.root.getObjectByName('room-1-pedestal-soft-key');
+  assert.ok(key instanceof THREE.SpotLight);
+  assert.equal(key.castShadow, true);
+  assert.deepEqual(key.position.toArray(), [0, 6.4, -0.5]);
+  assert.deepEqual(key.target.position.toArray(), [0, 1.65, -0.5]);
+  assert.equal(key.intensity, 62);
+  assert.equal(key.color.getHex(), 0xd9efff);
+  assert.equal(key.angle, 0.48);
+  assert.deepEqual(key.shadow.mapSize.toArray(), [1024, 1024]);
+  assert.equal(key.shadow.camera.near, 0.35);
+  assert.equal(key.shadow.camera.far, 10);
+  assert.equal(key.shadow.autoUpdate, true);
+  assert.equal(scene.root.getObjectByName('room-1-floor')?.receiveShadow, true);
+  assert.equal(scene.root.getObjectByName('room-1-pedestal-clean-shell')?.castShadow, true);
+  let wallReceivers = 0;
+  scene.root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    if (materials.some((material) => !material.visible || /collision-only/.test(material.name))) {
+      assert.equal(object.castShadow, false, object.name);
+      assert.equal(object.receiveShadow, false, object.name);
+    }
+    if (object.name.startsWith('room-1-') && materials.some((material) => material.transparent)) {
+      assert.equal(object.castShadow, false, object.name);
+    }
+    const names: string[] = object.userData.staticBatchSourceNames ?? [object.name];
+    if (names.some((name) => name.startsWith('room-1-panel-'))) {
+      assert.equal(object.receiveShadow, true, object.name);
+      wallReceivers++;
+    }
+  });
+  assert.ok(wallReceivers > 0);
+  const map = new THREE.WebGLRenderTarget(16, 16);
+  const pass = new THREE.WebGLRenderTarget(16, 16);
+  let disposals = 0;
+  map.addEventListener('dispose', () => disposals++);
+  pass.addEventListener('dispose', () => disposals++);
+  key.shadow.map = map;
+  key.shadow.mapPass = pass;
+  scene.resetPresentation();
+  scene.resetTeachingPresentation();
+  assert.equal(key.shadow.map, map, 'restart reuses the owned map');
+  scene.dispose();
+  scene.dispose();
+  assert.equal(disposals, 2);
+  assert.equal(key.shadow.map, null);
+  assert.equal(key.shadow.mapPass, null);
+});
+
 test('Containment replaces inspection lights with visible-source room rigs', () => {
   const scene = createScene();
 
@@ -65,9 +116,9 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
 
   const initial = scene.lightingDiagnostics;
   assert.equal(initial.activeRoomId, 1);
-  assert.equal(initial.authoredLightCount, 20);
-  assert.equal(initial.visibleAuthoredLightCount, 5);
-  assert.equal(initial.shadowCastingLightCount, 0);
+  assert.equal(initial.authoredLightCount, 23);
+  assert.equal(initial.visibleAuthoredLightCount, 8);
+  assert.equal(initial.shadowCastingLightCount, 21);
   assert.equal(initial.bobReflectionZone, 'room');
   assert.equal(initial.bobBodyReflectionTarget, 0.42);
   assert.equal(initial.bobEyeReflectionTarget, 1.12);
@@ -77,11 +128,7 @@ test('Containment replaces inspection lights with visible-source room rigs', () 
     ?.traverse((object) => {
       if (object instanceof THREE.PointLight) roomOnePointLights.push(object.name);
     });
-  assert.deepEqual(roomOnePointLights.sort(), [
-    'room-1-fluorescent-a-received-light',
-    'room-1-fluorescent-b-received-light',
-    'room-1-to-2-duct-reflected-cue',
-  ]);
+  assert.deepEqual(roomOnePointLights, [], 'ceiling/duct sources use one-pass spots');
 
   scene.lighting.setActiveRoom(3);
   const roomThree = scene.lightingDiagnostics;
@@ -168,14 +215,17 @@ test('lighting prewarm visits every room and restores the authoritative room', a
   const scene = createScene();
   const visitedRooms: number[] = [];
 
-  await scene.lighting.prewarmShaderConfigurations(async (roomId) => {
+  const coverage: number[][] = [];
+  await scene.lighting.prewarmShaderConfigurations(async (roomId, roomIds) => {
     visitedRooms.push(roomId);
+    coverage.push([...roomIds]);
     assert.equal(scene.lightingDiagnostics.activeRoomId, roomId);
   });
 
-  assert.deepEqual(visitedRooms, [1, 2, 3, 4, 5]);
+  assert.deepEqual(visitedRooms, [1, 2, 3, 4, 5, 1, 2, 3, 4]);
+  assert.deepEqual(coverage, [[1], [2], [3], [4], [5], [1, 2], [2, 3], [3, 4], [4, 5]]);
   assert.equal(scene.lightingDiagnostics.activeRoomId, 1);
-  assert.equal(scene.lightingDiagnostics.visibleAuthoredLightCount, 5);
+  assert.equal(scene.lightingDiagnostics.visibleAuthoredLightCount, 8);
 
   scene.lighting.setActiveRoom(3);
   await assert.rejects(
@@ -248,8 +298,8 @@ test('Room 4 lighting follows only authoritative elevator state and reset', () =
   const upper = scene.root.getObjectByName(
     'room-4-upper-arrival-received-light',
   );
-  assert.ok(lower instanceof THREE.PointLight);
-  assert.ok(upper instanceof THREE.PointLight);
+  assert.ok(lower instanceof THREE.SpotLight);
+  assert.ok(upper instanceof THREE.SpotLight);
 
   const waitingIntensity = lower.intensity;
   scene.roomFour.elevator.begin();
@@ -268,7 +318,7 @@ test('Room 4 lighting follows only authoritative elevator state and reset', () =
   assert.ok(upper.intensity > lower.intensity);
 
   scene.roomFour.reset();
-  scene.reconcilePresentationAfterRecovery(new THREE.Vector3(0, 0.45, -0.5));
+  scene.reconcilePresentationAfterRecovery(new THREE.Vector3(9, 29, 85.5));
   assert.equal(scene.lightingDiagnostics.roomFourElevatorState, 'waitingForRider');
   assert.equal(lower.intensity, waitingIntensity);
 
@@ -321,7 +371,7 @@ test('cutscene completion and skip converge on identical stable presentation', (
   const lockLens = scene.root.getObjectByName(
     'room-5-containment-front-lock-status-emissive-lens',
   );
-  assert.ok(chamberLight instanceof THREE.PointLight);
+  assert.ok(chamberLight instanceof THREE.SpotLight);
   assert.ok(lockLens instanceof THREE.Mesh);
   assert.ok(lockLens.material instanceof THREE.MeshStandardMaterial);
 
@@ -427,7 +477,7 @@ test('lighting effects and attached fixtures dispose once and recreate cleanly',
   assert.equal(goopMaterialDisposals, 1);
 
   const recreated = createScene();
-  assert.equal(recreated.lightingDiagnostics.authoredLightCount, 20);
+  assert.equal(recreated.lightingDiagnostics.authoredLightCount, 23);
   assert.equal(recreated.lightingDiagnostics.activeParticleCount, 0);
   assert.equal(recreated.lightingDiagnostics.disposed, false);
   recreated.dispose();

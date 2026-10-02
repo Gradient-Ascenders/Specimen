@@ -14,7 +14,7 @@ export class CultivationLightLayout {
     let points = 0, searchlights = false;
     scene.traverseVisible(o => {
       if (o instanceof THREE.PointLight && !o.castShadow) points++;
-      if (o instanceof THREE.SpotLight && o.castShadow) searchlights = true;
+      if (o instanceof THREE.SpotLight && o.castShadow && !o.userData.cultivationTraversalShadowLight) searchlights = true;
     });
     // Keep compatible small layouts without inflating the elevator's two lights
     // to the seventeen needed by Room 3. Zero-radiance slots still cost GPU work.

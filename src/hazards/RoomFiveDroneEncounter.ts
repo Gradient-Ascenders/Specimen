@@ -1,4 +1,6 @@
 import { batchMaintenanceScout } from '../render/hazards/BatchMaintenanceScout.ts';
+import { disposeShadowLight } from '../render/ShadowLightResources.ts';
+import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationPlatformBoosters } from '../render/environment/cultivation/CultivationPlatformBoosters.ts';
 import * as THREE from 'three';
 import { BeamOcclusion } from '../render/hazards/BeamOcclusion.ts';
@@ -145,14 +147,15 @@ export class RoomFiveDroneEncounter {
     this.brokenDrone.presentation.root.visible = false;
     this.brokenDrone.setCollisionEnabled(false);
     this.unsubscribe = this.damage.events.on('died', ({ slimeId }) => requestDeath(slimeId));
+    // Encounter geometry is attached after room dressing. Preserve its explicit
+    // exclusions and the platform hull/receiver split on this final assignment.
+    const acidMaterials = new Set<THREE.Material>();
     room.root.traverse(object => {
-      if (object instanceof THREE.Mesh) {
-        const materials = Array.isArray(object.material) ? object.material : [object.material];
-        object.castShadow = !object.userData.shadowProxyReceiver && materials.some(material => material.visible && !material.transparent);
-        object.receiveShadow = true;
+      if (object instanceof THREE.Mesh && object.userData.textureRole === 'acid-floor') {
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) acidMaterials.add(material);
       }
     });
-    room.captiveVolt.castShadow = false;
+    applyCultivationShadowRoles(room.root, acidMaterials);
     this.reset();
   }
   update(dt: number): void {
@@ -186,6 +189,8 @@ export class RoomFiveDroneEncounter {
       this.flyers[i].body.quaternion.setFromUnitVectors(this.sewerForward, this.direction);
       this.flyers[i].eye.material.color.copy(drone.frontIndicator.material.color);
       const search = this.searchLights[i]; search.intensity = enabled ? (network === 'blue' ? 65 : 45) : 0;
+      search.shadow.autoUpdate = enabled;
+      search.shadow.needsUpdate = enabled || search.shadow.map === null;
       // Shadow maps now handle partial occlusion without cutting all illumination short.
       search.distance = ROOM_FIVE_DRONE_VIEW_RANGE;
       search.position.copy(drone.root.position).addScaledVector(this.direction, 1.4);
@@ -226,7 +231,12 @@ export class RoomFiveDroneEncounter {
     this.damage.reset(); this.projectiles.reset(); this.presentation.reset();
     this.beamLengths.fill(-1); this.presentationStep = 0;
     for (const beam of this.beams) beam.visible = false;
-    for (const search of this.searchLights) search.intensity = 0;
+    for (const search of this.searchLights) {
+      search.intensity = 0; search.shadow.autoUpdate = false;
+      // Zero-intensity lights retain live PCF sampler slots. Allocate their
+      // first map even if a teleport draws the room before its next fixed step.
+      search.shadow.needsUpdate = search.shadow.map === null;
+    }
     for (let i = 0; i < this.drones.length; i++) {
       this.patrols[i].reset(); this.drones[i].reset();
       this.drones[i].setPresentationVisible(false);
@@ -256,8 +266,8 @@ export class RoomFiveDroneEncounter {
     this.sewerDamage.dispose();
     this.sewerLighting.dispose();
     this.platformBoosters.dispose();
-    this.sewerLight.removeFromParent(); this.sewerLight.dispose();
-    for (const light of this.searchLights) { light.target.removeFromParent(); light.removeFromParent(); light.dispose(); }
+    this.sewerLight.removeFromParent(); disposeShadowLight(this.sewerLight);
+    for (const light of this.searchLights) { light.target.removeFromParent(); light.removeFromParent(); disposeShadowLight(light); }
     for (const flyer of this.flyers) {
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       flyer.body.traverse(object => { if (object instanceof THREE.Mesh) {

@@ -249,8 +249,8 @@ test('the powered circuit has clear access from the bay but cannot pass through 
 
 test('hallway fixtures flicker independently and illuminate the enclosed corridor',()=>{
   const s=setup();try{
-    const lamps:THREE.PointLight[]=[];
-    s.bay.root.traverse(object=>{if(object instanceof THREE.PointLight && object.name.startsWith('hallway-flicker-light')) lamps.push(object);});
+    const lamps:THREE.SpotLight[]=[];
+    s.bay.root.traverse(object=>{if(object instanceof THREE.SpotLight && object.name.startsWith('hallway-flicker-light')) lamps.push(object);});
     assert.equal(lamps.length,4);
     const observed=new Set<string>();
     let brightest=0;

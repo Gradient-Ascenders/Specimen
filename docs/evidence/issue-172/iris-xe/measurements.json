@@ -1,0 +1,6610 @@
+{
+  "recordedAt": "2026-10-01T23:20:53.789Z",
+  "baseline": false,
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+    "dpr": 1,
+    "exposure": 1,
+    "gpu": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x000046A6) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "timerAvailable": true
+  },
+  "captures": [
+    {
+      "name": "cultivation-searchlights",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              53.5,
+              13.9,
+              276.2
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                25,
+                291
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                57.74578491152123,
+                15.089101596903996,
+                271.1139854000324
+              ],
+              "target": [
+                44.29639254269908,
+                8.543843157166439,
+                272.2424519996768
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                57.71394325097113,
+                18.648505366602,
+                283.9662697419987
+              ],
+              "target": [
+                43.934274236486786,
+                12.739715887914485,
+                283.5113755259309
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                61.0912253751736,
+                20.34102715698781,
+                294.27625539513934
+              ],
+              "target": [
+                48.56488860420584,
+                18.63782828957683,
+                302.3502878893984
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                67.15717682314086,
+                24.86201467050051,
+                302.18187281929784
+              ],
+              "target": [
+                68.64125544678129,
+                15.883682019297058,
+                314.1060941122455
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                69.03311445632976,
+                28.26679546118414,
+                299.6608320275491
+              ],
+              "target": [
+                80.16341769793871,
+                23.625399853019573,
+                290.74041743189605
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                69.93802657940466,
+                29.341425946506764,
+                288.6106965448703
+              ],
+              "target": [
+                69.367251751337,
+                27.64249982394173,
+                273.71815256723806
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                58.54640876414387,
+                15.558269495430741,
+                264.6672562805658
+              ],
+              "target": [
+                69.83908883378297,
+                7.611075353040478,
+                270.5253687844303
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                69.59966523097694,
+                19.9758983017704,
+                301.49237601233517
+              ],
+              "target": [
+                71.76759495574086,
+                18.64615565587645,
+                316.2751993287445
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                72.20989231796291,
+                32.67653595377664,
+                294.3032759477642
+              ],
+              "target": [
+                59.612091160992364,
+                25.99648243652102,
+                298.958626741854
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 86,
+            "triangles": 55656,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 615,
+            "textures": 62,
+            "programs": 271
+          },
+          "geometries": 615
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              53.5,
+              13.9,
+              276.2
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                25,
+                291
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 12,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                57.74578491152123,
+                15.089101596903996,
+                271.1139854000324
+              ],
+              "target": [
+                44.29639254269908,
+                8.543843157166439,
+                272.2424519996768
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                57.71394325097113,
+                18.648505366602,
+                283.9662697419987
+              ],
+              "target": [
+                43.934274236486786,
+                12.739715887914485,
+                283.5113755259309
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                61.0912253751736,
+                20.34102715698781,
+                294.27625539513934
+              ],
+              "target": [
+                48.56488860420584,
+                18.63782828957683,
+                302.3502878893984
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                67.15717682314086,
+                24.86201467050051,
+                302.18187281929784
+              ],
+              "target": [
+                68.64125544678129,
+                15.883682019297058,
+                314.1060941122455
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                69.03311445632976,
+                28.26679546118414,
+                299.6608320275491
+              ],
+              "target": [
+                80.16341769793871,
+                23.625399853019573,
+                290.74041743189605
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                69.93802657940466,
+                29.341425946506764,
+                288.6106965448703
+              ],
+              "target": [
+                69.367251751337,
+                27.64249982394173,
+                273.71815256723806
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                58.54640876414387,
+                15.558269495430741,
+                264.6672562805658
+              ],
+              "target": [
+                69.83908883378297,
+                7.611075353040478,
+                270.5253687844303
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                69.59966523097694,
+                19.9758983017704,
+                301.49237601233517
+              ],
+              "target": [
+                71.76759495574086,
+                18.64615565587645,
+                316.2751993287445
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                72.20989231796291,
+                32.67653595377664,
+                294.3032759477642
+              ],
+              "target": [
+                59.612091160992364,
+                25.99648243652102,
+                298.958626741854
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "room-5-volt-glow": {
+              "calls": 254,
+              "triangles": 57933
+            },
+            "room-5-red-security-0-search-light": {
+              "calls": 24,
+              "triangles": 8181
+            },
+            "room-5-blue-security-1-search-light": {
+              "calls": 16,
+              "triangles": 3860
+            },
+            "room-5-green-security-2-search-light": {
+              "calls": 18,
+              "triangles": 4243
+            },
+            "room-5-red-security-3-search-light": {
+              "calls": 17,
+              "triangles": 4213
+            },
+            "room-5-blue-security-4-search-light": {
+              "calls": 24,
+              "triangles": 4701
+            },
+            "room-5-green-security-5-search-light": {
+              "calls": 24,
+              "triangles": 5099
+            },
+            "room-5-blue-security-0-partner-search-light": {
+              "calls": 20,
+              "triangles": 4776
+            },
+            "room-5-red-security-2-partner-search-light": {
+              "calls": 17,
+              "triangles": 3960
+            },
+            "room-5-red-security-5-partner-search-light": {
+              "calls": 40,
+              "triangles": 12986
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 540,
+            "triangles": 165608,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 615,
+            "textures": 81,
+            "programs": 289
+          },
+          "geometries": 615
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 20.400000005960464,
+        "p95": 22.799999997019768
+      }
+    },
+    {
+      "name": "cultivation-room-1",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              57,
+              3.66,
+              11.5
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "cultivation-room-1-greybox-fixture-shadow-1",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                53.92,
+                19.55,
+                13
+              ],
+              "target": [
+                64,
+                0,
+                10
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "cultivation-room-1-greybox-fixture-shadow-2",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                74.08,
+                19.55,
+                37
+              ],
+              "target": [
+                64,
+                0,
+                38
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 40,
+            "triangles": 16912,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 491,
+            "textures": 62,
+            "programs": 249
+          },
+          "geometries": 491
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              57,
+              3.66,
+              11.5
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "cultivation-room-1-greybox-fixture-shadow-1",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                53.92,
+                19.55,
+                13
+              ],
+              "target": [
+                64,
+                0,
+                10
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "cultivation-room-1-greybox-fixture-shadow-2",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                74.08,
+                19.55,
+                37
+              ],
+              "target": [
+                64,
+                0,
+                38
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "cultivation-room-1-greybox-fixture-shadow-1": {
+              "calls": 40,
+              "triangles": 23056
+            },
+            "cultivation-room-1-greybox-fixture-shadow-2": {
+              "calls": 40,
+              "triangles": 23055
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 120,
+            "triangles": 63023,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 491,
+            "textures": 62,
+            "programs": 249
+          },
+          "geometries": 491
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 4.5999999940395355,
+        "p95": 8.400000005960464
+      }
+    },
+    {
+      "name": "cultivation-room-2",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              65,
+              3.66,
+              88
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "cultivation-room-2-greybox-fixture-shadow-1",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                53.36,
+                23.55,
+                91
+              ],
+              "target": [
+                47,
+                17,
+                105
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "cultivation-room-2-greybox-fixture-shadow-2",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                74.64,
+                23.55,
+                115
+              ],
+              "target": [
+                64,
+                0,
+                112
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 97,
+            "triangles": 21990,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 538,
+            "textures": 62,
+            "programs": 252
+          },
+          "geometries": 538
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              65,
+              3.66,
+              88
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "cultivation-room-2-greybox-fixture-shadow-1",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                53.36,
+                23.55,
+                91
+              ],
+              "target": [
+                47,
+                17,
+                105
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "cultivation-room-2-greybox-fixture-shadow-2",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                74.64,
+                23.55,
+                115
+              ],
+              "target": [
+                64,
+                0,
+                112
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "cultivation-room-2-greybox-fixture-shadow-1": {
+              "calls": 87,
+              "triangles": 27954
+            },
+            "cultivation-room-2-greybox-fixture-shadow-2": {
+              "calls": 96,
+              "triangles": 31794
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 280,
+            "triangles": 81738,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 599,
+            "textures": 66,
+            "programs": 254
+          },
+          "geometries": 599
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 11,
+        "p95": 13
+      }
+    },
+    {
+      "name": "cultivation-room-3",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              71.5,
+              23.61,
+              159
+            ],
+            "quaternion": [
+              -0.05675366455694005,
+              0.9385572232730651,
+              0.18744462065067538,
+              0.2841722618244724
+            ]
+          },
+          "sources": [
+            {
+              "name": "cultivation-room-3-greybox-fixture-shadow-1",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                50.56,
+                29.55,
+                172
+              ],
+              "target": [
+                60,
+                23,
+                176.5
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "cultivation-room-3-greybox-fixture-shadow-2",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                77.44,
+                29.55,
+                204
+              ],
+              "target": [
+                64,
+                23,
+                204
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 57,
+            "triangles": 168463,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 774,
+            "textures": 87,
+            "programs": 331
+          },
+          "geometries": 774
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              71.5,
+              23.61,
+              159
+            ],
+            "quaternion": [
+              -0.05675366455694005,
+              0.9385572232730651,
+              0.18744462065067538,
+              0.2841722618244724
+            ]
+          },
+          "sources": [
+            {
+              "name": "cultivation-room-3-greybox-fixture-shadow-1",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                50.56,
+                29.55,
+                172
+              ],
+              "target": [
+                60,
+                23,
+                176.5
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "cultivation-room-3-greybox-fixture-shadow-2",
+              "type": "SpotLight",
+              "intensity": 120,
+              "position": [
+                77.44,
+                29.55,
+                204
+              ],
+              "target": [
+                64,
+                23,
+                204
+              ],
+              "angle": 1.2,
+              "distance": 40,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 40,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "cultivation-room-3-greybox-fixture-shadow-1": {
+              "calls": 56,
+              "triangles": 86196
+            },
+            "cultivation-room-3-greybox-fixture-shadow-2": {
+              "calls": 50,
+              "triangles": 82396
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 163,
+            "triangles": 337055,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 804,
+            "textures": 91,
+            "programs": 337
+          },
+          "geometries": 804
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 7,
+        "p95": 9
+      }
+    },
+    {
+      "name": "cultivation-room-4",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              68,
+              4,
+              223
+            ],
+            "quaternion": [
+              -0.05675366455694005,
+              0.9385572232730651,
+              0.18744462065067538,
+              0.2841722618244724
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-4-lift-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                64,
+                5,
+                237
+              ],
+              "target": [
+                64,
+                0,
+                229
+              ],
+              "angle": 1.2,
+              "distance": 18,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 500,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 115,
+            "triangles": 12650,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 812,
+            "textures": 91,
+            "programs": 359
+          },
+          "geometries": 812
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              68,
+              4,
+              223
+            ],
+            "quaternion": [
+              -0.05675366455694005,
+              0.9385572232730651,
+              0.18744462065067538,
+              0.2841722618244724
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-4-lift-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                64,
+                5,
+                237
+              ],
+              "target": [
+                64,
+                0,
+                229
+              ],
+              "angle": 1.2,
+              "distance": 18,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 18,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.38,
+              "eyeReflectionIntensity": 0.74,
+              "targetBodyReflectionIntensity": 0.38,
+              "targetEyeReflectionIntensity": 0.74
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "room-4-lift-light": {
+              "calls": 55,
+              "triangles": 8551
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 170,
+            "triangles": 21201,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 812,
+            "textures": 93,
+            "programs": 380
+          },
+          "geometries": 812
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 2.7999999970197678,
+        "p95": 4.5999999940395355
+      }
+    },
+    {
+      "name": "cultivation-red-network-off",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              53.5,
+              13.9,
+              276.2
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                25,
+                291
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 12,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.74994339394206,
+                15.089101596903996,
+                271.15534466699
+              ],
+              "target": [
+                44.345106193914575,
+                8.543843157166439,
+                272.72694626975186
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                57.71399798313409,
+                18.648482521020444,
+                283.9775679010191
+              ],
+              "target": [
+                43.93344674015299,
+                12.739693042332927,
+                283.55023391439545
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                61.097814418714876,
+                20.341004311406255,
+                294.28568845531214
+              ],
+              "target": [
+                48.58765075463545,
+                18.637805443995276,
+                302.38475745835177
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                67.19382134517645,
+                24.86201467050051,
+                302.1766967527868
+              ],
+              "target": [
+                69.07051984776953,
+                15.88368201929706,
+                314.04546019026
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                69.02566444024137,
+                28.266772615602587,
+                299.6522200685952
+              ],
+              "target": [
+                80.13810460395385,
+                23.62537700743802,
+                290.70956272212266
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                69.9265528164602,
+                29.34140310092521,
+                288.6115642870819
+              ],
+              "target": [
+                69.32599406184326,
+                27.642476978360175,
+                273.72019164342277
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                58.540600780201316,
+                15.558292341012296,
+                264.6598032495621
+              ],
+              "target": [
+                69.8449744816847,
+                7.611098198622033,
+                270.49531869212313
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.64507789915687,
+                19.9758983017704,
+                301.4849488057267
+              ],
+              "target": [
+                72.29957192584872,
+                18.64615565587645,
+                316.1881949084738
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                72.22486835827311,
+                32.67653595377664,
+                294.34183356983027
+              ],
+              "target": [
+                59.78752477605486,
+                25.99648243652102,
+                299.4103017431993
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 85,
+            "triangles": 55632,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 812,
+            "textures": 93,
+            "programs": 380
+          },
+          "geometries": 812
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              53.5,
+              13.9,
+              276.2
+            ],
+            "quaternion": [
+              -0.1874446206506754,
+              0.2841722618244724,
+              0.05675366455694006,
+              0.938557223273065
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                25,
+                291
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 12,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.74994339394206,
+                15.089101596903996,
+                271.15534466699
+              ],
+              "target": [
+                44.345106193914575,
+                8.543843157166439,
+                272.72694626975186
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                57.71399798313409,
+                18.648482521020444,
+                283.9775679010191
+              ],
+              "target": [
+                43.93344674015299,
+                12.739693042332927,
+                283.55023391439545
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                61.097814418714876,
+                20.341004311406255,
+                294.28568845531214
+              ],
+              "target": [
+                48.58765075463545,
+                18.637805443995276,
+                302.38475745835177
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                67.19382134517645,
+                24.86201467050051,
+                302.1766967527868
+              ],
+              "target": [
+                69.07051984776953,
+                15.88368201929706,
+                314.04546019026
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                69.02566444024137,
+                28.266772615602587,
+                299.6522200685952
+              ],
+              "target": [
+                80.13810460395385,
+                23.62537700743802,
+                290.70956272212266
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 45,
+              "position": [
+                69.9265528164602,
+                29.34140310092521,
+                288.6115642870819
+              ],
+              "target": [
+                69.32599406184326,
+                27.642476978360175,
+                273.72019164342277
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                58.540600780201316,
+                15.558292341012296,
+                264.6598032495621
+              ],
+              "target": [
+                69.8449744816847,
+                7.611098198622033,
+                270.49531869212313
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.64507789915687,
+                19.9758983017704,
+                301.4849488057267
+              ],
+              "target": [
+                72.29957192584872,
+                18.64615565587645,
+                316.1881949084738
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                72.22486835827311,
+                32.67653595377664,
+                294.34183356983027
+              ],
+              "target": [
+                59.78752477605486,
+                25.99648243652102,
+                299.4103017431993
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "room-5-volt-glow": {
+              "calls": 254,
+              "triangles": 57933
+            },
+            "room-5-blue-security-1-search-light": {
+              "calls": 16,
+              "triangles": 3860
+            },
+            "room-5-green-security-2-search-light": {
+              "calls": 18,
+              "triangles": 4243
+            },
+            "room-5-blue-security-4-search-light": {
+              "calls": 24,
+              "triangles": 4701
+            },
+            "room-5-green-security-5-search-light": {
+              "calls": 24,
+              "triangles": 5099
+            },
+            "room-5-blue-security-0-partner-search-light": {
+              "calls": 20,
+              "triangles": 4776
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 441,
+            "triangles": 136244,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 812,
+            "textures": 93,
+            "programs": 380
+          },
+          "geometries": 812
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 15.400000005960464,
+        "p95": 17.30000001192093
+      }
+    },
+    {
+      "name": "cultivation-rescued-point",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              70.5,
+              3.2999999999999985,
+              310.5
+            ],
+            "quaternion": [
+              -0.11754852873982716,
+              0.33775455529641146,
+              0.042558437210915234,
+              0.9328949475636525
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                2.6499999999999986,
+                306
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 12,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.74994339394206,
+                15.089101596903996,
+                271.15534466699
+              ],
+              "target": [
+                44.345106193914575,
+                8.543843157166439,
+                272.72694626975186
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.71337972378705,
+                18.648482521020444,
+                284.0174524064373
+              ],
+              "target": [
+                43.92620427351618,
+                12.739693042332927,
+                284.0174524064373
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                61.121804966187455,
+                20.341004311406255,
+                294.32151554455976
+              ],
+              "target": [
+                48.868682882171406,
+                18.637805443995276,
+                302.8044462181093
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                67.19382134517645,
+                24.86201467050051,
+                302.1766967527868
+              ],
+              "target": [
+                69.07051984776953,
+                15.88368201929706,
+                314.04546019026
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                68.99929617962849,
+                28.266772615602587,
+                299.62047424074194
+              ],
+              "target": [
+                79.82921926534581,
+                23.62537700743802,
+                290.33768302441285
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.88350094307482,
+                29.34140310092521,
+                288.61396940039526
+              ],
+              "target": [
+                68.82167211647167,
+                27.642476978360175,
+                273.74836582795126
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                58.55697524452852,
+                15.558292341012296,
+                264.6268394842316
+              ],
+              "target": [
+                70.03678963523201,
+                7.611098198622033,
+                270.10917172682275
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.64507789915687,
+                19.9758983017704,
+                301.4849488057267
+              ],
+              "target": [
+                72.29957192584872,
+                18.64615565587645,
+                316.1881949084738
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                72.22486835827311,
+                32.67653595377664,
+                294.34183356983027
+              ],
+              "target": [
+                59.78752477605486,
+                25.99648243652102,
+                299.4103017431993
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 147,
+            "triangles": 67900,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 849,
+            "textures": 93,
+            "programs": 393
+          },
+          "geometries": 849
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              70.5,
+              3.2999999999999985,
+              310.5
+            ],
+            "quaternion": [
+              -0.11754852873982716,
+              0.33775455529641146,
+              0.042558437210915234,
+              0.9328949475636525
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                2.6499999999999986,
+                306
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 12,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.74994339394206,
+                15.089101596903996,
+                271.15534466699
+              ],
+              "target": [
+                44.345106193914575,
+                8.543843157166439,
+                272.72694626975186
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.71337972378705,
+                18.648482521020444,
+                284.0174524064373
+              ],
+              "target": [
+                43.92620427351618,
+                12.739693042332927,
+                284.0174524064373
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                61.121804966187455,
+                20.341004311406255,
+                294.32151554455976
+              ],
+              "target": [
+                48.868682882171406,
+                18.637805443995276,
+                302.8044462181093
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                67.19382134517645,
+                24.86201467050051,
+                302.1766967527868
+              ],
+              "target": [
+                69.07051984776953,
+                15.88368201929706,
+                314.04546019026
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                68.99929617962849,
+                28.266772615602587,
+                299.62047424074194
+              ],
+              "target": [
+                79.82921926534581,
+                23.62537700743802,
+                290.33768302441285
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.88350094307482,
+                29.34140310092521,
+                288.61396940039526
+              ],
+              "target": [
+                68.82167211647167,
+                27.642476978360175,
+                273.74836582795126
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                58.55697524452852,
+                15.558292341012296,
+                264.6268394842316
+              ],
+              "target": [
+                70.03678963523201,
+                7.611098198622033,
+                270.10917172682275
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.64507789915687,
+                19.9758983017704,
+                301.4849488057267
+              ],
+              "target": [
+                72.29957192584872,
+                18.64615565587645,
+                316.1881949084738
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                72.22486835827311,
+                32.67653595377664,
+                294.34183356983027
+              ],
+              "target": [
+                59.78752477605486,
+                25.99648243652102,
+                299.4103017431993
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "room-5-volt-glow": {
+              "calls": 158,
+              "triangles": 31044
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 305,
+            "triangles": 98944,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 849,
+            "textures": 93,
+            "programs": 398
+          },
+          "geometries": 849
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 16.200000002980232,
+        "p95": 21
+      }
+    },
+    {
+      "name": "cultivation-lift-dark-handoff",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              70.5,
+              3.2999999999999985,
+              310.5
+            ],
+            "quaternion": [
+              -0.11754852873982716,
+              0.33775455529641146,
+              0.042558437210915234,
+              0.9328949475636525
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-4-lift-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                64,
+                5,
+                237
+              ],
+              "target": [
+                64,
+                0,
+                229
+              ],
+              "angle": 1.2,
+              "distance": 18,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 18,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                2.6499999999999986,
+                306
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 12,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.74994339394206,
+                15.089101596903996,
+                271.15534466699
+              ],
+              "target": [
+                44.345106193914575,
+                8.543843157166439,
+                272.72694626975186
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.71337972378705,
+                18.648482521020444,
+                284.0174524064373
+              ],
+              "target": [
+                43.92620427351618,
+                12.739693042332927,
+                284.0174524064373
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                61.121804966187455,
+                20.341004311406255,
+                294.32151554455976
+              ],
+              "target": [
+                48.868682882171406,
+                18.637805443995276,
+                302.8044462181093
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                67.19382134517645,
+                24.86201467050051,
+                302.1766967527868
+              ],
+              "target": [
+                69.07051984776953,
+                15.88368201929706,
+                314.04546019026
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                68.99929617962849,
+                28.266772615602587,
+                299.62047424074194
+              ],
+              "target": [
+                79.82921926534581,
+                23.62537700743802,
+                290.33768302441285
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.88350094307482,
+                29.34140310092521,
+                288.61396940039526
+              ],
+              "target": [
+                68.82167211647167,
+                27.642476978360175,
+                273.74836582795126
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                58.55697524452852,
+                15.558292341012296,
+                264.6268394842316
+              ],
+              "target": [
+                70.03678963523201,
+                7.611098198622033,
+                270.10917172682275
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.64507789915687,
+                19.9758983017704,
+                301.4849488057267
+              ],
+              "target": [
+                72.29957192584872,
+                18.64615565587645,
+                316.1881949084738
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                72.22486835827311,
+                32.67653595377664,
+                294.34183356983027
+              ],
+              "target": [
+                59.78752477605486,
+                25.99648243652102,
+                299.4103017431993
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 261,
+            "triangles": 78870,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 849,
+            "textures": 93,
+            "programs": 468
+          },
+          "geometries": 849
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              70.5,
+              3.2999999999999985,
+              310.5
+            ],
+            "quaternion": [
+              -0.11754852873982716,
+              0.33775455529641146,
+              0.042558437210915234,
+              0.9328949475636525
+            ]
+          },
+          "sources": [
+            {
+              "name": "room-4-lift-light",
+              "type": "SpotLight",
+              "intensity": 65,
+              "position": [
+                64,
+                5,
+                237
+              ],
+              "target": [
+                64,
+                0,
+                229
+              ],
+              "angle": 1.2,
+              "distance": 18,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 18,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "room-5-volt-glow",
+              "type": "PointLight",
+              "intensity": 50,
+              "position": [
+                64,
+                2.6499999999999986,
+                306
+              ],
+              "distance": 12,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 12,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-0-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.74994339394206,
+                15.089101596903996,
+                271.15534466699
+              ],
+              "target": [
+                44.345106193914575,
+                8.543843157166439,
+                272.72694626975186
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-1-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                57.71337972378705,
+                18.648482521020444,
+                284.0174524064373
+              ],
+              "target": [
+                43.92620427351618,
+                12.739693042332927,
+                284.0174524064373
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-2-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                61.121804966187455,
+                20.341004311406255,
+                294.32151554455976
+              ],
+              "target": [
+                48.868682882171406,
+                18.637805443995276,
+                302.8044462181093
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-3-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                67.19382134517645,
+                24.86201467050051,
+                302.1766967527868
+              ],
+              "target": [
+                69.07051984776953,
+                15.88368201929706,
+                314.04546019026
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-4-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                68.99929617962849,
+                28.266772615602587,
+                299.62047424074194
+              ],
+              "target": [
+                79.82921926534581,
+                23.62537700743802,
+                290.33768302441285
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-green-security-5-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.88350094307482,
+                29.34140310092521,
+                288.61396940039526
+              ],
+              "target": [
+                68.82167211647167,
+                27.642476978360175,
+                273.74836582795126
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-blue-security-0-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                58.55697524452852,
+                15.558292341012296,
+                264.6268394842316
+              ],
+              "target": [
+                70.03678963523201,
+                7.611098198622033,
+                270.10917172682275
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-2-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                69.64507789915687,
+                19.9758983017704,
+                301.4849488057267
+              ],
+              "target": [
+                72.29957192584872,
+                18.64615565587645,
+                316.1881949084738
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            },
+            {
+              "name": "room-5-red-security-5-partner-search-light",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                72.22486835827311,
+                32.67653595377664,
+                294.34183356983027
+              ],
+              "target": [
+                59.78752477605486,
+                25.99648243652102,
+                299.4103017431993
+              ],
+              "angle": 0.4,
+              "distance": 15,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.2,
+              "far": 15,
+              "bias": -0.0002,
+              "normalBias": 0.025
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "room-4-lift-light": {
+              "calls": 60,
+              "triangles": 5868
+            },
+            "room-5-volt-glow": {
+              "calls": 162,
+              "triangles": 31092
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 483,
+            "triangles": 115830,
+            "sceneObjects": 2219,
+            "sceneLights": 75,
+            "uniqueMaterials": 388,
+            "instancedMeshes": 21,
+            "geometries": 849,
+            "textures": 93,
+            "programs": 498
+          },
+          "geometries": 849
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 25.099999994039536,
+        "p95": 27.30000001192093
+      }
+    },
+    {
+      "name": "blackout-drone-unpowered",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              1,
+              3.01,
+              12
+            ],
+            "quaternion": [
+              -0.059033724433353515,
+              0.9284999365850026,
+              0.1682922234779763,
+              0.32570019136932005
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 0.4765866878076004,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 16.37901516455325,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 9.718467789827098,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 19.699084367502394,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                -3,
+                6.48,
+                17
+              ],
+              "target": [
+                -3,
+                4.11,
+                17
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 147,
+            "triangles": 6320,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 53
+          },
+          "geometries": 131
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              1,
+              3.01,
+              12
+            ],
+            "quaternion": [
+              -0.059033724433353515,
+              0.9284999365850026,
+              0.1682922234779763,
+              0.32570019136932005
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 0.4765866878076004,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 16.37901516455325,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 9.718467789827098,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 19.699084367502394,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                -3,
+                6.48,
+                17
+              ],
+              "target": [
+                -3,
+                4.11,
+                17
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "hallway-flicker-light-1": {
+              "calls": 27,
+              "triangles": 324
+            },
+            "hallway-flicker-light-2": {
+              "calls": 25,
+              "triangles": 300
+            },
+            "hallway-flicker-light-3": {
+              "calls": 21,
+              "triangles": 252
+            },
+            "hallway-flicker-light-4": {
+              "calls": 19,
+              "triangles": 228
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 239,
+            "triangles": 7424,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 53
+          },
+          "geometries": 131
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 4.100000008940697,
+        "p95": 6.299999997019768
+      }
+    },
+    {
+      "name": "blackout-hallway-unpowered",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              7.8,
+              2.86,
+              65
+            ],
+            "quaternion": [
+              -0.2853791422837628,
+              0.25496147661187973,
+              0.07904544634333976,
+              0.9204918294073315
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 10.276241391893723,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 14.123488001061148,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 21.692194656471948,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 0.60914680612567,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                6,
+                6.33,
+                62
+              ],
+              "target": [
+                6,
+                3.96,
+                62
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 95,
+            "triangles": 5400,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 53
+          },
+          "geometries": 131
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              7.8,
+              2.86,
+              65
+            ],
+            "quaternion": [
+              -0.2853791422837628,
+              0.25496147661187973,
+              0.07904544634333976,
+              0.9204918294073315
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 10.276241391893723,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 14.123488001061148,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 21.692194656471948,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 0.60914680612567,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 0,
+              "position": [
+                6,
+                6.33,
+                62
+              ],
+              "target": [
+                6,
+                3.96,
+                62
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "hallway-flicker-light-1": {
+              "calls": 30,
+              "triangles": 4092
+            },
+            "hallway-flicker-light-2": {
+              "calls": 28,
+              "triangles": 4068
+            },
+            "hallway-flicker-light-3": {
+              "calls": 24,
+              "triangles": 4020
+            },
+            "hallway-flicker-light-4": {
+              "calls": 19,
+              "triangles": 228
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 196,
+            "triangles": 17808,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 55
+          },
+          "geometries": 131
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 3.800000011920929,
+        "p95": 6.4000000059604645
+      }
+    },
+    {
+      "name": "blackout-drone-powered",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              1,
+              3.01,
+              12
+            ],
+            "quaternion": [
+              -0.059033724433353515,
+              0.9284999365850026,
+              0.1682922234779763,
+              0.32570019136932005
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 2.851911140088046,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 5.77884624824721,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 0.4757043103125737,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 10.280051919765725,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 100,
+              "position": [
+                -3,
+                6.48,
+                17
+              ],
+              "target": [
+                -3,
+                4.11,
+                17
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 147,
+            "triangles": 6320,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 55
+          },
+          "geometries": 131
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              1,
+              3.01,
+              12
+            ],
+            "quaternion": [
+              -0.059033724433353515,
+              0.9284999365850026,
+              0.1682922234779763,
+              0.32570019136932005
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 2.851911140088046,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 5.77884624824721,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 0.4757043103125737,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 10.280051919765725,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 100,
+              "position": [
+                -3,
+                6.48,
+                17
+              ],
+              "target": [
+                -3,
+                4.11,
+                17
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "hallway-flicker-light-1": {
+              "calls": 27,
+              "triangles": 324
+            },
+            "hallway-flicker-light-2": {
+              "calls": 24,
+              "triangles": 288
+            },
+            "hallway-flicker-light-3": {
+              "calls": 21,
+              "triangles": 252
+            },
+            "hallway-flicker-light-4": {
+              "calls": 19,
+              "triangles": 228
+            },
+            "blackout-maintenance-searchlight": {
+              "calls": 13,
+              "triangles": 5424
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 251,
+            "triangles": 12836,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 55
+          },
+          "geometries": 131
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 4.100000008940697,
+        "p95": 5.5999999940395355
+      }
+    },
+    {
+      "name": "blackout-hallway-powered",
+      "kind": "API-staged frozen production view",
+      "modes": [
+        {
+          "enabled": false,
+          "camera": {
+            "position": [
+              7.8,
+              2.86,
+              65
+            ],
+            "quaternion": [
+              -0.2853791422837628,
+              0.25496147661187973,
+              0.07904544634333976,
+              0.9204918294073315
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 14.544862984596605,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 10.84720004641279,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 7.774286717346724,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 14.378344570434344,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 100,
+              "position": [
+                6,
+                6.33,
+                62
+              ],
+              "target": [
+                6,
+                3.96,
+                62
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {},
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 87,
+            "triangles": 5232,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 55
+          },
+          "geometries": 131
+        },
+        {
+          "enabled": true,
+          "camera": {
+            "position": [
+              7.8,
+              2.86,
+              65
+            ],
+            "quaternion": [
+              -0.2853791422837628,
+              0.25496147661187973,
+              0.07904544634333976,
+              0.9204918294073315
+            ]
+          },
+          "sources": [
+            {
+              "name": "hallway-flicker-light-1",
+              "type": "SpotLight",
+              "intensity": 14.544862984596605,
+              "position": [
+                6,
+                3.7,
+                56.5
+              ],
+              "target": [
+                6,
+                0,
+                56.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-2",
+              "type": "SpotLight",
+              "intensity": 10.84720004641279,
+              "position": [
+                6,
+                3.7,
+                61.5
+              ],
+              "target": [
+                6,
+                0,
+                61.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-3",
+              "type": "SpotLight",
+              "intensity": 7.774286717346724,
+              "position": [
+                6,
+                3.7,
+                66.5
+              ],
+              "target": [
+                6,
+                0,
+                66.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "hallway-flicker-light-4",
+              "type": "SpotLight",
+              "intensity": 14.378344570434344,
+              "position": [
+                6,
+                3.7,
+                71.5
+              ],
+              "target": [
+                6,
+                0,
+                71.5
+              ],
+              "angle": 1.1,
+              "distance": 10,
+              "mapSize": [
+                256,
+                256
+              ],
+              "near": 0.15,
+              "far": 10,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            },
+            {
+              "name": "blackout-maintenance-searchlight",
+              "type": "SpotLight",
+              "intensity": 100,
+              "position": [
+                6,
+                6.33,
+                62
+              ],
+              "target": [
+                6,
+                3.96,
+                62
+              ],
+              "angle": 0.27829965900511133,
+              "distance": 32,
+              "mapSize": [
+                512,
+                512
+              ],
+              "near": 0.05,
+              "far": 32,
+              "bias": -0.0001,
+              "normalBias": 0.015
+            }
+          ],
+          "bob": {
+            "speed": 0,
+            "locomotionPhase": 0,
+            "grounded": 1,
+            "jumpCharge": 0,
+            "squash": 0,
+            "stretch": 0,
+            "impactStrength": 0,
+            "impactAge": 1.2,
+            "impactNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceNormalLocal": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "surfaceTangentLocal": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "moveDirectionLocal": {
+              "x": 0,
+              "y": 0,
+              "z": -1
+            },
+            "visible": true,
+            "deathBurst": {
+              "active": false,
+              "elapsedSeconds": 0,
+              "origin": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "maximumFragmentDistanceMetres": 0,
+              "resourcesPrimed": false,
+              "resourcePrimeCount": 0
+            },
+            "materials": {
+              "selfLit": false,
+              "catchlightCount": 0,
+              "maximumSecondaryDisplacementMetres": 0.0095,
+              "elapsedTimeSeconds": 0,
+              "impactStrength": 0,
+              "impactAgeSeconds": 1.2,
+              "reflectionMapName": "bob-laboratory-pmrem",
+              "bodyReflectionIntensity": 0.12,
+              "eyeReflectionIntensity": 0.28,
+              "targetBodyReflectionIntensity": 0.12,
+              "targetEyeReflectionIntensity": 0.28
+            },
+            "locomotionStrength": 0,
+            "facingYawRadians": 0,
+            "reversing": false,
+            "asset": {
+              "bodyTriangles": 3264,
+              "eyeTriangles": 504,
+              "drawCalls": 3,
+              "geometries": 3,
+              "materials": 2,
+              "bodyMorphTargets": 7,
+              "eyeMorphTargets": 11
+            }
+          },
+          "morphs": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "shadowDraws": {
+            "hallway-flicker-light-1": {
+              "calls": 30,
+              "triangles": 4092
+            },
+            "hallway-flicker-light-2": {
+              "calls": 27,
+              "triangles": 4056
+            },
+            "hallway-flicker-light-3": {
+              "calls": 24,
+              "triangles": 4020
+            },
+            "hallway-flicker-light-4": {
+              "calls": 19,
+              "triangles": 228
+            },
+            "blackout-maintenance-searchlight": {
+              "calls": 13,
+              "triangles": 5424
+            }
+          },
+          "render": {
+            "viewportWidth": 960,
+            "viewportHeight": 600,
+            "drawingBufferWidth": 960,
+            "drawingBufferHeight": 600,
+            "pixelRatio": 1,
+            "pixelRatioCap": 2,
+            "drawCalls": 200,
+            "triangles": 23052,
+            "sceneObjects": 314,
+            "sceneLights": 11,
+            "uniqueMaterials": 90,
+            "instancedMeshes": 3,
+            "geometries": 131,
+            "textures": 20,
+            "programs": 55
+          },
+          "geometries": 131
+        }
+      ],
+      "submissionMs": {
+        "samples": 20,
+        "p50": 2.6000000089406967,
+        "p95": 5.4000000059604645
+      }
+    }
+  ],
+  "timings": [
+    {
+      "name": "cultivation-searchlights",
+      "enabled": false,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 6.349166,
+        "p95": 6.996562
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 7.299999997019768,
+        "p95": 8.699999988079071
+      }
+    },
+    {
+      "name": "cultivation-searchlights",
+      "enabled": true,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 8.423802,
+        "p95": 9.292187
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 18.899999991059303,
+        "p95": 20.900000005960464
+      }
+    },
+    {
+      "name": "cultivation-searchlights",
+      "enabled": true,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 9.225052,
+        "p95": 9.881197
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 19.400000005960464,
+        "p95": 21.5
+      }
+    },
+    {
+      "name": "cultivation-searchlights",
+      "enabled": false,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 6.401302,
+        "p95": 7.395937
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 7.100000008940697,
+        "p95": 8.299999997019768
+      }
+    },
+    {
+      "name": "blackout-hallway-powered",
+      "enabled": false,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 4.173489,
+        "p95": 4.3425
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 2.2000000029802322,
+        "p95": 3.0999999940395355
+      }
+    },
+    {
+      "name": "blackout-hallway-powered",
+      "enabled": true,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 4.972239,
+        "p95": 5.175989
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 3.5,
+        "p95": 5.200000002980232
+      }
+    },
+    {
+      "name": "blackout-hallway-powered",
+      "enabled": true,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 4.667864,
+        "p95": 8.8025
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 3.1000000089406967,
+        "p95": 5.5999999940395355
+      }
+    },
+    {
+      "name": "blackout-hallway-powered",
+      "enabled": false,
+      "disjoint": false,
+      "gpuMs": {
+        "samples": 20,
+        "p50": 2.637291,
+        "p95": 2.862916
+      },
+      "submissionMs": {
+        "samples": 20,
+        "p50": 1.7000000029802322,
+        "p95": 3.800000011920929
+      }
+    }
+  ],
+  "lifecycle": [
+    {
+      "level": "cultivation",
+      "restartCount": 3,
+      "retained": true,
+      "enabled": true,
+      "before": {
+        "programs": 498,
+        "geometries": 849,
+        "textures": 93
+      },
+      "after": {
+        "programs": 498,
+        "geometries": 849,
+        "textures": 93
+      }
+    },
+    {
+      "level": "cultivation",
+      "handoffState": "disposed",
+      "allocated": 17,
+      "freed": 17,
+      "cleared": true,
+      "owner": "blackout"
+    },
+    {
+      "level": "blackout",
+      "retained": true,
+      "powerRestored": true,
+      "allocated": 5,
+      "freed": 5,
+      "cleared": true,
+      "unloadedState": "unloaded",
+      "owner": null,
+      "enabled": false
+    }
+  ],
+  "errors": [],
+  "failures": [
+    {
+      "url": "http://127.0.0.1:4173/group-folder/assets/bob-authored-B1_iF836.glb",
+      "reason": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:4173/group-folder/assets/bob-authored-B1_iF836.glb",
+      "reason": "net::ERR_ABORTED"
+    }
+  ],
+  "recapturedViews": {
+    "recordedAt": "2026-10-01T23:26:20.700Z",
+    "names": [
+      "cultivation-room-1",
+      "cultivation-room-2"
+    ],
+    "reason": "Camera placed inside the front wall for an unobstructed floor view",
+    "errors": [],
+    "failures": [
+      {
+        "url": "http://127.0.0.1:4173/group-folder/assets/bob-authored-B1_iF836.glb",
+        "reason": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:4173/group-folder/assets/bob-authored-B1_iF836.glb",
+        "reason": "net::ERR_ABORTED"
+      }
+    ]
+  }
+}

@@ -62,7 +62,7 @@ import {
 } from '../render/bob/BobCharacterPresentation.ts';
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import type { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
-import type { RenderLayer } from '../render/RenderLayer.ts';
+import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
 import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
 import {
@@ -188,6 +188,7 @@ export class CultivationLevelRuntime {
   private readonly host: HTMLElement;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
+  private shadowRequest: RenderShadowRequest | undefined;
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
   private readonly debugSupport: CultivationLevelDebugSupport | undefined;
@@ -215,7 +216,6 @@ export class CultivationLevelRuntime {
   private roomFiveCheckpoint: RoomFiveCheckpoint = 'split';
   private lastRoomFiveObjective = '';
   private readonly roomFiveLocal = new THREE.Vector3();
-  private bobCastsShadow = false;
   private readonly rescueCamera = {
     gameplayUpOverride: { x: 0, y: 1, z: 0 },
     profile: { id: 'volt-rescue', distanceMetres: 10, targetHeightMetres: 0,
@@ -265,7 +265,7 @@ export class CultivationLevelRuntime {
   private presentationPreparation: Promise<void> | undefined;
   private preparationQueue: CultivationPreparationQueue | undefined;
   private readonly preparationLightState = new THREE.Group();
-  private lastPreparedDark = false;
+  private lastShadowLayoutKey = '';
   private lightLayout: CultivationLightLayout | undefined;
   private lightLayoutKey = '';
   private constructionMs = 0;
@@ -286,18 +286,22 @@ export class CultivationLevelRuntime {
         }
         this.preparationQueue.diagnostics.constructionMs = this.constructionMs;
         return this.preparationQueue.prepareStartup();
+      }).catch(error => {
+        if (this.resources === resources) this.unload();
+        throw error;
       });
   }
   load(): void {
     if (this.lifecycle.state === 'unloaded') this.presentationPreparation = undefined;
     const started = performance.now();
     this.lifecycle.load();
+    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: true });
     this.constructionMs = performance.now() - started;
   }
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
   restartLevel(): void { this.lifecycle.restartLevel(); }
-  unload(): void { this.lightLayout?.dispose(); this.lightLayout = undefined; this.lightLayoutKey = ''; this.lastPreparedDark = false; this.bobCastsShadow = false; this.preparationQueue?.dispose(); this.preparationQueue = undefined; this.lifecycle.unload(); }
+  unload(): void { this.lifecycle.unload(); }
 
   dispose(): void {
     this.lightLayout?.dispose(); this.lightLayout = undefined;
@@ -581,7 +585,7 @@ export class CultivationLevelRuntime {
     resources.bobPresentation.present(interpolationAlpha);
     if (resources.manager.isAvailable('volt')) {
       this.interpolate(resources.voltBody, interpolationAlpha, resources.voltVisual.position);
-      resources.voltVisual.visible = true;
+      resources.voltVisual.visible = resources.deathSequence.isPlaying || this.lastDeathSlimeId !== 'volt';
     }
     // A render frame can occur without a fixed update. Preserve the same
     // pointer-sampling behaviour as Level 1 so those frames apply mouse input
@@ -607,12 +611,10 @@ export class CultivationLevelRuntime {
       && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
-    this.renderLayer.renderer.shadowMap.enabled = darkRoom;
-    this.renderLayer.renderer.shadowMap.type = THREE.PCFShadowMap;
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
       resources.pair.bobBody.position,
     );
-    this.updateBobLighting(resources, Boolean(darkRoom), bobLightingRoom);
+    this.updateBobLighting(resources, bobLightingRoom);
     const aimPresentationAllowed =
       this.lifecycle.state === 'running' &&
       resources.deathSequence.isPlaying &&
@@ -665,6 +667,9 @@ export class CultivationLevelRuntime {
       resources.collisionWorld,
       this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
     );
+    if (!resources.deathSequence.isPlaying && this.lastDeathSlimeId === 'goop') {
+      resources.pairPresentation.setGoopVisible(false);
+    }
     resources.droneProjectilePresentation?.update(interpolationAlpha);
     resources.roomFourProjectiles?.update(interpolationAlpha);
     resources.roomFiveEncounter?.presentation.update(interpolationAlpha);
@@ -683,10 +688,12 @@ export class CultivationLevelRuntime {
         resources.deathSequence.isPlaying &&
         this.roomThreeSlimeEligibility[damageSlimeId],
     );
-    if (darkRoom !== this.lastPreparedDark) {
-      // Shadow passes consume the scene's prior light state; refresh it before a lighting transition.
+    if (this.lightLayoutKey !== this.lastShadowLayoutKey ||
+        (this.preparationQueue && this.preparationQueue.diagnostics.completed < this.preparationQueue.diagnostics.total)) {
+      // Shadow materials consume prior light state. Restore the live layout
+      // after isolated preparation and at visibility handoffs before drawing.
       this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
-      this.lastPreparedDark = !!darkRoom;
+      this.lastShadowLayoutKey = this.lightLayoutKey;
     }
     this.renderLayer.render();
     this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
@@ -880,7 +887,9 @@ export class CultivationLevelRuntime {
       const voltVisual = new THREE.Mesh(new THREE.SphereGeometry(voltBody.radiusMetres, 24, 18),
         new THREE.MeshStandardMaterial({ color: 0xffe85c, emissive: 0xffd21a, emissiveIntensity: .7, roughness: .3 }));
       rollback(() => { voltVisual.removeFromParent(); voltVisual.geometry.dispose(); voltVisual.material.dispose(); });
-      voltVisual.name = 'volt-runtime-body'; voltVisual.visible = false; this.renderLayer.scene.add(voltVisual);
+      voltVisual.name = 'volt-runtime-body'; voltVisual.visible = false;
+      voltVisual.castShadow = true; voltVisual.receiveShadow = true;
+      this.renderLayer.scene.add(voltVisual);
       const previewOccupants = [
         {
           id: 'bob' as const,
@@ -1335,6 +1344,9 @@ export class CultivationLevelRuntime {
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
+    this.preparationQueue?.dispose(); this.preparationQueue = undefined;
+    this.lightLayout?.dispose(); this.lightLayout = undefined;
+    this.lightLayoutKey = ''; this.lastShadowLayoutKey = '';
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
     this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree);
     resources.unsubscribeControllerObjective();
@@ -1355,7 +1367,8 @@ export class CultivationLevelRuntime {
     resources.roomFiveDamage?.dispose();
     resources.roomFiveView?.dispose();
     resources.roomFiveEncounter?.dispose();
-    this.renderLayer.renderer.shadowMap.enabled = false;
+    this.shadowRequest?.dispose();
+    this.shadowRequest = undefined;
     resources.voltVisual.removeFromParent(); resources.voltVisual.geometry.dispose(); resources.voltVisual.material.dispose();
     resources.damageVignette?.dispose();
     resources.droneProjectilePresentation?.dispose();
@@ -1828,15 +1841,8 @@ export class CultivationLevelRuntime {
 
   private updateBobLighting(
     resources: CultivationRuntimeResources,
-    shadowsEnabled: boolean,
     bobLightingRoom: number | undefined,
   ): void {
-    if (this.bobCastsShadow !== shadowsEnabled) {
-      this.bobCastsShadow = shadowsEnabled;
-      resources.bobPresentation.root.traverse((object) => {
-        if (object instanceof THREE.Mesh) object.castShadow = shadowsEnabled;
-      });
-    }
     let darkWeight = 0;
     if (bobLightingRoom === 5 && resources.authoredPreview) {
       resources.authoredPreview.roomFive.root.worldToLocal(

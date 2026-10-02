@@ -28,11 +28,13 @@ ContainmentLevelScene
    └─ Room 5 release-vapour point pool (18 points)
 ```
 
-Only the active room group is visible. This keeps the normal authored set to
-three to seven local lights plus the hemisphere foundation; Room 4 also has the
-two existing elevator-roof warning lights. Every real light in this pass has
-`castShadow = false`. Issue #42 owns enabling renderer shadow maps, selecting
-the final shadow lights and tuning map/depth parameters.
+Issue #171 extends real PCF shadows across all five rooms and their ducts.
+The physical traversal position selects one room rig, or two rigs during a
+smooth doorway handoff. Authoritative room progression still controls objectives,
+checkpoints and Bob's reflection targets. Room 4 also retains its two existing
+non-shadowing elevator-roof warning lights. RenderLayer owns the shared renderer
+policy; the level owns and disposes all source maps. See
+[renderer shadow ownership](renderer-shadows.md).
 
 ## Authored lights
 
@@ -45,10 +47,10 @@ exposure `1.0`; point/spot decay remains the physically-correct default `2`.
 | `room-1-fluorescent-a-received-light` | `(-3.8, 7.45, -1.5)` | `#d9efff` | `58 / 13 m` | Existing west fluorescent diffuser. |
 | `room-1-fluorescent-b-received-light` | `(3.8, 7.45, -1.5)` | `#d9efff` | `58 / 13 m` | Existing east fluorescent diffuser. |
 | `room-1-pedestal-soft-key` | `(0, 6.4, -0.5)` | `#d9efff` | `62 / 10 m` | Soft egg/pedestal key; raised only by hatch presentation states. |
-| `room-1-egg-glass-catchlight` | `(0, 2.7, 0.95)` | `#9bd7ff` | `18 / 5.5 m` | Egg rim and containment-glass catchlight. |
-| `room-1-to-2-duct-entrance-spill` | `(-4.8, 6.45, 9.2)` | `#b9d9e7` | `9 / 8 m` | Room 1 spill carried into the tight first run. |
-| `room-1-to-2-duct-ramp-reflected-light` | `(-4.8, 7.0, 14.5)` | `#86aabd` | `6 / 11 m` | Restrained reflected bridge at the first bend and rising run. |
-| `room-1-to-2-duct-reflected-cue` | `(-6.6, 11.8, 25.6)` | `#86aabd` | `24 / 11 m` | Dim exit fixture/reflected cue in the final duct turn. |
+| `room-1-to-2-duct-reflected-cue` | `(-8.4, 12.25, 26.5)` | `#86aabd` | `24 / 11 m` | Final-run ceiling fixture, moved inside the enclosed duct so its walls do not block the source. |
+| `room-1-to-2-duct-low-run-key` | `(-4.8, 7.12, 10.5)` | `#86aabd` | `3 / 6.5 m` | Dim ceiling fixture inside the first enclosed run. |
+| `room-1-to-2-duct-ramp-key` | `(-4.8, 11.7, 22)` | `#86aabd` | `3 / 12 m` | Upper-ramp fixture aimed down the incline. |
+| `room-1-to-2-duct-turn-key` | `(-4.8, 12.4, 24)` | `#86aabd` | `3 / 6 m` | Turning-bay ceiling fixture aimed toward the final run. |
 | `room-2-drop-zone-light` | `(-8, 16.55, 35)` | `#d9efff` | `280 / 25 m` | Drop, landing and first lower route. |
 | `room-2-lower-route-light` | `(0, 16.55, 39)` | `#c9e9f5` | `260 / 25 m` | Lower platform sequence. |
 | `room-2-sticky-and-exit-route-light` | `(8, 16.55, 43)` | `#c3e4ee` | `280 / 25 m` | Sticky catch, upper route and Room 3 exit. |
@@ -56,11 +58,11 @@ exposure `1.0`; point/spot decay remains the physically-correct default `2`.
 | `room-3-industrial-route-received-light` | `(8, 29, 64)` | `#b2cad5` | `210 / 28 m` | Cooler central route contrast. |
 | `room-3-acid-reflected-light` | `(0, 7.2, 64)` | `#87d62e` | `75 / 18 m` | Acid-surface reflected response; laser emitters remain red emissive sources. |
 | `room-3-high-exit-vent-cue` | `(9, 32.5, 74.3)` | `#b6e4dd` | `95 / 16 m` | Final sticky strip and exit vent. |
-| `room-4-lower-amber-received-light` | `(9, 33, 85.5)` | amber | state-driven / `16 m` | Starting elevator zone. |
-| `room-4-middle-escalation-received-light` | `(9, 53, 85.5)` | red-orange | state-driven / `19 m` | Shaft escalation and laser route. |
-| `room-4-upper-arrival-received-light` | `(9, 74, 88.5)` | cool/green | state-driven / `17 m` | Top platform and arrival portal. |
+| `room-4-lower-amber-received-light` | `(3.35, 41, 85.5)` | amber | state-driven / `16 m` | Starting elevator zone. |
+| `room-4-middle-escalation-received-light` | `(3.35, 65, 85.5)` | red-orange | state-driven / `28 m` | Shaft escalation and laser route. |
+| `room-4-upper-arrival-received-light` | `(3.35, 77, 85.5)` | cool/green | state-driven / `17 m` | Top platform and arrival portal. |
 | `room-5-safe-entry-received-light` | `(9, 100, 96)` | `#d9efff` | `320 / 32 m` | Safe entry and lower route. |
-| `room-5-upper-traversal-received-light` | `(10, 100, 116)` | `#badbe8` | `240 / 28 m` | Moving platforms, east ascent and final transfers. |
+| `room-5-upper-traversal-received-light` | `(10, 100, 116)` | `#badbe8` | `240 / 32 m` | Moving platforms, east ascent, final transfers and the lower Goop door. |
 | `room-5-observation-lever-key` | `(-10, 103.5, 128)` | `#d7efff` | `78 / 14 m` | Focused observation console/lever key. |
 | `room-5-containment-state-light` | `(0, 79.8, 110)` | green/red/orange | state-driven / `14 m` | Containment glass, locks and environmental response. |
 | `room-5-goop-reveal-rim-light` | `(0, 82.5, 106)` | `#7eff43` | state-driven / `15 m` | Goop reveal key/rim; off during normal containment. |
@@ -71,6 +73,109 @@ sources. Room 4 adds seven low-cost emissive wall fixtures split across lower,
 middle and upper shaft zones while using only three received-light sources.
 Room 5 adds one status lens to each panel pivot, so the lock cues follow the
 four panels when #38 animates them.
+
+## Shadow sources and coverage (#171)
+
+`ContainmentShadowCoverage.ts` is the source/map and material-role inventory.
+Existing ceiling point sources become broad spotlights: one depth pass per
+source rather than six cube faces. Their colour, intensity, decay and renderer
+exposure remain unchanged. Room 5's upper source range extends from 28 to 32 m
+to reach the lower Goop door; the shaft middle range extends from 19 to 28 m
+for continuous lift coverage. The cone is `1 rad` half-angle
+with `0.18` penumbra; fixtures aimed toward sticky walls or upper exits are
+listed below. This preserves light within the useful fixture cone, but removes
+omnidirectional spill; the matched captures must be reviewed for palette and
+readability. The pedestal, observation and reveal spotlight parameters remain
+unchanged. Three dim duct keys have visible owned fixture meshes.
+
+Shaft sources move from the empty shaft centre to just inside existing west
+wall fixtures at y=41/65/77 and aim across/down the shaft. Their alarm/arrival
+colours and intensity mappings remain intact. The chamber uses a broad downward
+cone, half-angle `1.25`, aimed at `(0,75,114)`. Initial profiling found cube-map
+submission costs exceeded the budget; all 21 shadow sources now use one pass
+each. No source follows Bob or the lift, and no camera spans the entire shaft.
+
+| Zone | Sources / aims | Maps and depth | Coverage / solid roles |
+| --- | --- | --- | --- |
+| Room 1 | Pedestal key unchanged; west fluorescent aims at `(-4.8,3,3)`, east aims down | Pedestal `1024²`, near `.35`, far `10`; fluorescent pair `512²`, near `.25`, far `13` | Floor, egg/pedestal/frame, door and major wall panels cast/receive; sticky membrane receives floor-to-wall traversal. Both egg variants retain their own visibility/ownership. |
+| Room 1–2 duct | Low run aims down; ramp aims at `(-4.8,6.2,14)`; turn aims at `(-6.5,10.5,24)`; final cue aims down | Four `256²` maps, near `.12`, far `6.5/12/6/11`; low/ramp/turn half-angles `1.25/.65/1` | Existing opaque floors, slope, walls, roofs and seals cast/receive. Sources sit inside the actual enclosure. Small service fixtures and emissive lenses are excluded. |
+| Room 2 | Drop aims down; central aims at `(0,7,43)`; east aims at `(14,7,43)` | Three `1024²`, near `.35`, far `25` | Quiet floor/panel skins, platforms/treads, structural members, sticky catch and upper balcony cast/receive. Glass and signs are excluded. |
+| Room 3 | Entry aims down; industrial aims at `(16,18,63)`; vent aims at `(9,31.2,79)` | Entry/industrial `1024²`, near `.35`, far `30/28`; vent `512²`, near `.2`, far `16` | Major walls, platforms, actuator supports and both adhesion membranes cast/receive. The vent source covers the connecting floor/side/ceiling liners into Room 4. Acid surface and reflected acid fill, beams and particles do not cast/receive shadows. |
+| Room 4 | Three fixed west wall spots aim at `(9,33,85.5)`, `(9,49,85.5)`, `(9,70,85.5)` | Three `512²` maps, near `.3`, far `16/28/17` | Wall substrates, ribs/rails, roof/deck, major underframe and exit shutter cast/receive. The roof/shutter remain owned by `ElevatorPresentation`; warning lenses, seams, rollers and hidden collision roof are excluded. Source frustums cover centre x=9,z=85.5 continuously from y=29 through y=75, sampled every `.25 m` in tests. |
+| Room 5 | Entry aims down; traversal aims at `(18,82,116)`; existing observation and reveal spots; chamber aims at `(0,75,114)` | Entry/traversal `1024²`, near `.35`, far `32/32`; observation/reveal/chamber `512²`, near `.2`, far `14/15/14` | Floor/wall skins, static/moving treads, east/rear membranes, chamber base/clamps/panels, console and soluble door cast/receive. Moving treads stay under their platform roots; panels stay under their pivots. Existing dissolve depth/distance masks remain owned by `DissolveTarget`. Glass, captive placeholders and status/effect details are excluded. |
+
+All maps use bias `-.0001`, PCF radius `1.5` and normal bias `.015 m`.
+Maps containing Bob/Goop keep updating, including stationary secondary motion
+and camera fade. Static zones cache their maps. Leaving a zone clears the old
+silhouette once; moving platform/lift/egg/containment/panel transforms and art
+variant/shutter visibility changes invalidate
+both old and new coverage. The existing soluble-door mask is sampled for live
+dissolve and completion; its clock/removal authority stays unchanged. Hatch and
+release transitions, restart and recovery explicitly invalidate retained maps.
+Intensity/colour pulses alone reuse depth. Restart and
+retry reuse maps; unload and failed preparation dispose each allocated map and
+clear its references exactly once. No shadow hulls or duplicate character meshes
+are introduced. Character/deformation ownership remains the #170 presentation.
+
+Caster/receiver roles are assigned **before** room-local consolidation. Opaque
+structural, floor/platform and membrane materials are explicitly selected;
+transparent/invisible/collision-only materials, liquid/effects, signs, gaskets,
+crack marks and status inlays are excluded. Existing compatible detail sharing a
+selected solid material stays in its bounded batch; no additional small-detail
+shadow geometry is generated. The original role partition is retained in the
+batch key, preventing newly equal roles from merging or renumbering measured
+GPU-resource owners. Unbatched Room 1 instrument/track details are receiver-only.
+Every original batch retains its source membership and 8 m cells (4 m in Room 3),
+and the existing 23-owner upload list is unchanged. Per-object bounds are fitted
+to immutable box dimensions, and instance bounds to their existing boxes, without
+changing GPU geometry. Shadow frustums additionally test conservative world
+boxes for authored boxes, batches and static instances, caching bounds until
+the world matrix changes. Character morph culling keeps Three.js's existing
+path. This rejects distant rooms even when a tall shaft's fitted sphere overlaps
+a local source. No renderer-global method or geometry buffer is changed.
+
+### Spatial handoffs and preparation
+
+Doorway overlap centres are z=27/49/79.5/91.5 with half-widths 2/2/1.5/2 m,
+limited to the corresponding doorway height intervals. Both rigs stay visible
+within an overlap; their source intensities use complementary smoothstep weights.
+A checkpoint trigger changing the authoritative room does not change those
+weights. Beyond a doorway, the physical side selects the rig even when the Room 2
+landing checkpoint has not fired yet. Returning across a doorway reverses the
+same blend. The active body selects coverage; Bob still supplies his own duct
+reflection position. Other light state comes from the existing hatch/release and
+`ElevatorSequence` mappings, multiplied by the spatial weight without modifying
+any authoritative state/timer.
+
+Loading visits five individual rigs and four adjacent pairs, compiles caster and
+receiver variants separately, and primes their owned maps. Failed preparation
+restores the original room, traversal position, intensity weights and Bob target
+in `finally`. The compile subsets borrow the two rooms' existing materials;
+none become gameplay objects.
+
+### Map/pass inventory and budget
+
+| Visible rig(s) | Maps | Shadow passes | Depth texels |
+| --- | ---: | ---: | ---: |
+| Room 1 including duct | 7 | 7 | 1,835,008 |
+| Room 2 | 3 | 3 | 3,145,728 |
+| Room 3 including duct | 3 | 3 | 2,359,296 |
+| Room 4 | 3 | 3 | 786,432 |
+| Room 5 | 5 | 5 | 2,883,584 |
+| Handoff 1–2 | 10 | 10 | 4,980,736 |
+| Handoff 2–3 | 6 | 6 | 5,505,024 |
+| Handoff 3–4 | 6 | 6 | 3,145,728 |
+| Handoff 4–5 | 8 | 8 | 3,670,016 |
+
+These are configured live-pass maxima (including the zero-intensity reveal key),
+not a frame-time guarantee. Diagnostics expose visible source names, room IDs,
+configured/updated pass counts and depth texels. All owned maps total
+11,010,048 depth texels. See [production captures and measurements](evidence/issue-171/review.md)
+for submitted caster calls, raw fixed-pose GPU samples and outstanding acceptance.
+The #169 Iris Xe budget remains the comparison: per-source paired overhead
+p50 ≤2.5 ms / p95 ≤3 ms, Room 1 total GPU p95 ≤10 ms and submission p95 ≤14 ms
+at 960×600/DPR1. Additional sources cannot multiply that allowance to justify
+worst-case simultaneous cost; full gameplay/higher-DPR acceptance remains #173.
 
 ## State mappings
 
@@ -144,16 +249,12 @@ animation, cameras, control lock, sequencing and skip input.
 - No `setTimeout`, event listener or callback is created by the rig.
 - Unload removes panel-mounted status fixtures, disposes the two point
   geometries/materials and every rig-owned material/geometry, then clears the
-  lighting root.
+  lighting root. All 21 spotlight maps and their depth textures are disposed
+  once, and map references are cleared.
 
-## Shadow and performance intent
+## Performance and diagnostics
 
-The pass records selected future shadow intent on pedestal/containment,
-elevator and Room 5 containment equipment, plus major floor/platform receivers.
-Transparent panes, debris and particles are excluded. Renderer shadow maps and
-all light shadows remain disabled for #42.
-
-All room rigs stay resident, but only one local room group is visible. No light
+All room rigs stay resident, with one rig or an adjacent pair visible. No light
 or material is created per frame. Pulses update existing scalar/material state,
 and both effects use fixed dynamic position buffers. The diagnostics panel
 reports authored active/total/shadow lights, presentation states and live point
@@ -163,19 +264,23 @@ count.
 
 Three.js `0.185.1` excludes invisible subtrees while collecting lights, and its
 program cache key includes each active light-type count. The room visibility
-gating therefore produces four distinct signatures:
+gating therefore prepares five room layouts and four doorway layouts:
 
 ```text
-Room 1   8 point / 1 spot / 0 directional / 1 hemisphere
-Room 2   5 point / 0 spot / 0 directional / 1 hemisphere
-Room 3   6 point / 0 spot / 0 directional / 1 hemisphere
-Room 4   5 point / 0 spot / 0 directional / 1 hemisphere (reuses Room 2)
-Room 5   5 point / 2 spot / 0 directional / 1 hemisphere
+Room 1   2 point / 7 spot / 0 directional / 1 hemisphere
+Room 2   2 point / 3 spot / 0 directional / 1 hemisphere
+Room 3   3 point / 3 spot / 0 directional / 1 hemisphere
+Room 4   2 point / 3 spot / 0 directional / 1 hemisphere
+Room 5   2 point / 5 spot / 0 directional / 1 hemisphere
+1–2      2 point / 10 spot / 0 directional / 1 hemisphere
+2–3      3 point / 6 spot / 0 directional / 1 hemisphere
+3–4      3 point / 6 spot / 0 directional / 1 hemisphere
+4–5      2 point / 8 spot / 0 directional / 1 hemisphere
 ```
 
 `GreyboxLevelRuntime.prepareLightingPrograms()` visits these presentations
 behind the loading screen. Each call to `WebGLRenderer.compileAsync()` receives
-a room-owned renderable subset and the authoritative full scene as Three.js's
+a room-owned renderable subset (the union during overlaps) and the full scene as Three.js's
 `targetScene`, so the subset compiles against the correct active lights and
 environment without multiplying every Level 1 material across every signature.
 The subsets include the room, shared slime presentation, the corresponding
@@ -183,17 +288,20 @@ Bob/Goop transient material, and #92's bounded acid presentation root. The acid
 root contributes representatives for its core, halo, trail, droplets, and
 impact flash while all live slots remain hidden and gameplay state remains
 untouched. Exact shared material/object-feature signatures use one lightweight
-representative, avoiding repeated `InstancedMesh` buffer clones while retaining
+representative including caster/receiver flags, avoiding repeated `InstancedMesh` buffer clones while retaining
 every distinct shader variant.
 
 A one-pixel scissored draw from each future room entry then performs bounded
-first-use geometry/material uploads without displaying another room. Room 1
-does not receive a duplicate priming draw: the normal boot flow already renders
-it twice behind the loading screen. The rig restores the room that was
+first-use geometry/material uploads without displaying another room. Every room
+and overlap receives a hidden priming draw to allocate its shadow maps and
+depth programs before the measured-resource guard. Isolated resource uploads suppress
+map updates through RenderLayer's synchronous preparation boundary. One
+preparation camera is reused across reloads to keep cached transmission targets
+bounded. The rig restores the room that was
 authoritative when prewarming began in a `finally` block.
 
 This intentionally trades a one-time loading cost and cached room-specific
-programs for stable room boundaries; it does not add lights, duplicate owned
+programs for stable room boundaries; preparation does not add lights, duplicate owned
 materials, alter gameplay state or perform recurring work. Temporary subset
 objects share existing resources, are detached immediately after compilation,
 and are never added to the gameplay scene. The development diagnostics record

@@ -64,6 +64,66 @@ function weight(bob: BobCharacterPresentation, meshName: string, pose: string): 
   return mesh.morphTargetInfluences![mesh.morphTargetDictionary[pose]!]!;
 }
 
+test('character shadow resources survive fade, hide, rupture and reset, then dispose once', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  bob.setShadowCasting(false);
+  await bob.prepare(loadAsset);
+  const meshes: THREE.Mesh[] = [];
+  bob.root.traverse(object => { if (object instanceof THREE.Mesh) meshes.push(object); });
+  const live = meshes.filter(mesh => mesh.name === 'Bob-Body' || mesh.name.startsWith('Bob-Eye'));
+  assert.equal(live.length, 3);
+  const shadows = new Set(live.flatMap(mesh => [mesh.customDepthMaterial!, mesh.customDistanceMaterial!]));
+  assert.equal(shadows.size, 4); // Both lenses share their pair of materials.
+  assert.ok(live.every(mesh => !mesh.castShadow && mesh.receiveShadow));
+  const disposeCounts = new Map<THREE.Material, number>();
+  for (const material of shadows) {
+    disposeCounts.set(material, 0);
+    material.addEventListener('dispose', () => disposeCounts.set(material, disposeCounts.get(material)! + 1));
+  }
+  for (let cycle = 0; cycle < 3; cycle++) {
+    bob.setShadowCasting(true);
+    bob.setOpacity(0.2);
+    bob.setVisible(false);
+    assert.equal(bob.diagnostics.visible, false);
+    bob.reset();
+    assert.equal(bob.diagnostics.visible, true);
+    assert.ok(live.every(mesh => mesh.castShadow && mesh.receiveShadow));
+    assert.ok(meshes.filter(mesh => !live.includes(mesh)).every(mesh => !mesh.castShadow));
+    bob.startDeath(new THREE.Vector3(0, 0.45, 0));
+    bob.updateDeath(0.03);
+    assert.equal(bob.diagnostics.visible, true);
+    bob.updateDeath(0.5);
+    assert.equal(bob.diagnostics.visible, false);
+    bob.finishDeath(new THREE.Vector3(0, 0.45, 0));
+    assert.equal(bob.diagnostics.visible, true);
+    assert.equal(bob.diagnostics.materials?.impactStrength, 0);
+    assert.deepEqual(new Set(live.flatMap(mesh => [mesh.customDepthMaterial!, mesh.customDistanceMaterial!])), shadows);
+  }
+  bob.dispose();
+  bob.dispose();
+  for (const count of disposeCounts.values()) assert.equal(count, 1);
+});
+
+test('camera fade preparation restores visible and shadow opacity after a failed compile', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const body = bob.root.getObjectByName('Bob-Body') as THREE.Mesh;
+  const shadow = { uniforms: {} as Record<string, THREE.IUniform>,
+    vertexShader: THREE.ShaderLib.depth.vertexShader, fragmentShader: THREE.ShaderLib.depth.fragmentShader };
+  body.customDepthMaterial!.onBeforeCompile(shadow as THREE.WebGLProgramParametersWithUniforms, null as never);
+  bob.setOpacity(0.8);
+  await assert.rejects(bob.prepareCameraFadePrograms(async () => {
+    assert.equal((body.material as THREE.Material).opacity, 0.5);
+    assert.equal(shadow.uniforms.uBobShadowOpacity.value, 0.5);
+    throw new Error('injected fade compilation failure');
+  }), /injected fade compilation failure/);
+  assert.equal((body.material as THREE.Material).opacity, 0.8);
+  assert.equal(shadow.uniforms.uBobShadowOpacity.value, 0.8);
+  bob.reset();
+  assert.equal(shadow.uniforms.uBobShadowOpacity.value, 1);
+  bob.dispose();
+});
+
 function wallClearance(bob: BobCharacterPresentation, normal: THREE.Vector3): number {
   bob.root.updateMatrixWorld(true);
   const body = bob.root.getObjectByName('Bob-Body') as THREE.Mesh;

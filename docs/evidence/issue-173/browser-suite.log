@@ -1,0 +1,36 @@
+
+Running 8 tests using 1 worker
+
+[1/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\BlackoutBobPresentation.spec.ts:122:1 › Blackout uses prepared shared Bob through movement, switching, merge, split, lighting, and unload
+[2/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\CultivationBobPresentation.spec.ts:105:1 › Cultivation mounts the prepared shared Bob character presentation
+[3/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\CultivationBobPresentation.spec.ts:352:1 › Cultivation draws prepared room and fade shadow variants without creating programs
+[4/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:405:1 › Level 1 traversal creates no programs after hidden-boot warm-up
+  1) [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:405:1 › Level 1 traversal creates no programs after hidden-boot warm-up
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator:  locator('[data-runtime-status]')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for locator('[data-runtime-status]')
+        14 × locator resolved to <pre class="runtime-status" data-runtime-status="">active level: containment-teaching-level-1↵lifecy…</pre>
+           - unexpected value "hidden"
+
+        at waitForAcidImpactPresentation (wsl.localhost\\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:313:29)
+        at traverseRepresentativeLevelOnePaths (wsl.localhost\\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:368:21)
+        at wsl.localhost\\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:460:3
+
+    Error Context: test-results\LevelOneShaderProgramStabi-a7e63-s-after-hidden-boot-warm-up-chromium\error-context.md
+
+
+[5/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:469:1 › plain production completes prewarm before Level 1 traversal
+[6/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:528:1 › Bob reflections snap across restart and recreate across level reload
+[7/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:702:1 › real Level 1 controls drive Bob ground locomotion, stopping, and reversal
+[8/8] [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:810:1 › Level 1 damage holds the burst at frame zero through Stress anticipation
+  1 failed
+    [chromium] › ..\..\..\..\..\..\..\wsl.localhost\Ubuntu-24.04\Ubuntu-24.04\home\kevin\dev\worktrees\specimen\feat-lighting-shadows\tests\browser\LevelOneShaderProgramStability.spec.ts:405:1 › Level 1 traversal creates no programs after hidden-boot warm-up
+  7 passed (6.5m)

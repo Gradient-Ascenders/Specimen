@@ -185,9 +185,12 @@ Patrol cones have matching shadow-casting spotlights driven by their gaze and po
 state. Platform bulbs and their lights are removed for the darker playtest.
 Patrol spotlights and Volt's point light use 512-pixel shadow maps. Opaque room
 geometry casts and receives shadows; transparent glass and captive Volt do not
-block the pod's internal glow. Shadows are enabled only while viewing Room 5,
-and their resources are disposed on unload. Small sewer panel lights retain
+block the pod's internal glow. The loaded level retains its shared PCF request
+in ordinary and dark rooms; Room 5 keeps its original source budget. Owned maps
+are disposed and references cleared on unload. Small sewer panel lights retain
 their inexpensive unshadowed fill.
+
+See [the #172 coverage and lifecycle inventory](cultivation-blackout-shadows.md).
 
 Upper drone view cones use a .4-radian half angle (about 46 degrees total),
 with detection, ray length and spotlights all using a 15-metre range and a

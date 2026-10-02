@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
 import { CultivationLightLayout } from '../src/render/CultivationLightLayout.ts';
-import type { RenderLayer } from '../src/render/RenderLayer.ts';
+import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
 
 for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
   const fail = mode === 'failure';
@@ -12,6 +12,12 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
   const ordinary = new THREE.Mesh(shape, shared), instanced = new THREE.InstancedMesh(shape, shared, 1);
   ordinary.name = instanced.name = 'variant-regression'; scene.add(ordinary, instanced);
+  const foundation = new THREE.Group(); foundation.name = 'cultivation-level-2-foundation';
+  const foundationMaterial = new THREE.MeshBasicMaterial({transparent:true, opacity:.32});
+  const foundationMesh = new THREE.Mesh(shape, foundationMaterial); foundationMesh.name = 'visible-foundation-regression';
+  foundation.add(foundationMesh); scene.add(foundation);
+  const gel = new THREE.MeshPhysicalMaterial({transmission: .28, transparent:true});
+  const body = new THREE.Mesh(shape, gel); body.name = 'Bob-Body'; body.castShadow = true; scene.add(body);
   const renderTarget = new THREE.WebGLRenderTarget(4, 4);
   const reflectiveMaterial = new THREE.MeshStandardMaterial({
     envMap: renderTarget.texture,
@@ -57,7 +63,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
   const renderer = {
     extensions: {has: () => mode !== 'lift'},
-    shadowMap: { enabled: false, autoUpdate: true, type: THREE.BasicShadowMap as THREE.ShadowMapType },
+    shadowMap: { enabled: false, autoUpdate: true, needsUpdate: false, type: THREE.BasicShadowMap as THREE.ShadowMapType },
     getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},
     getViewport: (out: THREE.Vector4) => out.copy(viewport), getScissor: (out: THREE.Vector4) => out.copy(scissor), getScissorTest: () => scissorTest,
     setViewport: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
@@ -70,8 +76,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       const texture = target.depthTexture!;
       texture.addEventListener('dispose', () => disposedShadowTextures.add(texture));
     },
+    getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
+    info: {render: {calls: 0, triangles: 0, points: 0, lines: 0, frame: 0}},
     compile() {},
     render(preparedScene: THREE.Scene) {
+      preparedScene.traverseVisible(object => {
+        if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
+          assert.equal(object.material.transmission, 0, 'temporary scenes must not allocate Bob transmission targets');
+        }
+      });
       if (!renderer.shadowMap.enabled) return;
       preparedScene.traverseVisible(object => {
         if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight) || !object.castShadow) return;
@@ -90,6 +103,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       });
       if (group.children.some(o => o instanceof THREE.Mesh &&
         (o.material instanceof THREE.MeshDepthMaterial || o.material instanceof THREE.MeshDistanceMaterial))) {
+        assert.equal(targetScene.fog, null, 'real shadow draws use the empty scene, without visible-pass fog');
+        assert.equal(targetScene.environment, null, 'custom depth/distance programs do not borrow visible-pass environment');
         const lights: THREE.Light[] = [];
         targetScene.traverseVisible(o => { if (o instanceof THREE.Light) lights.push(o); });
         assert.ok(lights.some(light => light.castShadow), 'retain the live shadow-light layout');
@@ -105,12 +120,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       }
     },
   };
-  const layer = { scene, renderer, cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
+  const policy = new RenderShadowPolicy(renderer.shadowMap);
+  const layer = { scene, renderer, withShadowPreparation: policy.withPreparation.bind(policy), cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
   const queue = new CultivationPreparationQueue(layer, preview);
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
     assert.ok(compiles > 0);
+    if (!fail) assert.ok(preparedOwners.has('Bob-Body'), 'transmissive body still enters shader preparation');
+    if (!fail) assert.ok(preparedOwners.has(foundationMesh.name), 'visible foundation meshes need every authored room signature');
     assert.equal(
       initializedTextures.has(renderTarget.texture),
       false,
@@ -175,9 +193,13 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.equal(queue.requireCurrent(true), false, 'different lighting still requires preparation');
       extraLight.removeFromParent();
       const beforeReuse = compiles;
-      assert.equal(queue.requireCurrent(true), true, 'leaving the lift reuses the prepared Room 5 assets and lighting');
-      assert.equal(compiles, beforeReuse, 'a covered visibility change needs no compiler work');
-      assert.equal(queue.diagnostics.reused, 1);
+      assert.equal(queue.requireCurrent(true), false, 'the lift spotlight changes the isolated Room 5 layout');
+      const roomFiveDeadline = performance.now() + 10000;
+      while (!queue.requireCurrent(true) && performance.now() < roomFiveDeadline) {
+        queue.tick(0, true); await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      assert.equal(queue.requireCurrent(true), true, 'the isolated encounter layout is prepared');
+      assert.ok(compiles > beforeReuse);
       assert.equal(queue.diagnostics.pending, false, 'exploration does not show another loading screen');
       for (const old of snapshots) old.object.visible = old.visible;
       const deadline = performance.now() + 30000;
@@ -194,7 +216,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     if (mode === 'startup') {
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
-      assert.equal(queue.diagnostics.completed, 2, 'startup prepares the initial view and lift/maintenance superset');
+      assert.equal(queue.diagnostics.completed, 3, 'startup prepares initial, lift handoff and isolated encounter layouts');
       const preparedCompiles = compiles;
       for (const z of [251, 270, 251, 270]) {
         preview.updatePresentationVisibility({z}, {z}); lighting.sync(scene);
@@ -205,13 +227,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       for (const old of snapshots) old.object.visible = old.visible;
     }
     assert.deepEqual(viewport.toArray(), [0, 0, 1280, 720]); assert.deepEqual(scissor.toArray(), viewport.toArray());
-    assert.equal(scissorTest, false); assert.equal(renderer.shadowMap.enabled, false); assert.equal(renderer.shadowMap.type, THREE.BasicShadowMap);
+    assert.equal(scissorTest, false); assert.equal(renderer.shadowMap.enabled, false); assert.equal(renderer.shadowMap.type, THREE.PCFShadowMap);
     const after: THREE.Object3D[] = []; scene.traverse(o => after.push(o)); assert.deepEqual(after, objects);
     for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
   } finally {
     queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
     reflectiveMaterial.dispose(); renderTarget.dispose();
+    gel.dispose();
+    foundationMaterial.dispose();
     hidden.material.dispose(); projectile.material.dispose(); mappedMaterial.map!.dispose(); mappedMaterial.dispose();
     mappedCaster.dispose(); plainCaster.dispose(); projectile.dispose();
     globalThis.requestAnimationFrame = priorRaf;

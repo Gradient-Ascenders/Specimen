@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeShadowLight } from '../render/ShadowLightResources.ts';
 
 import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 
@@ -158,7 +159,7 @@ export class GreyboxRoomBuilder {
     ownedMaterials.add(this.cameraObstructionMaterial);
     this.root.removeFromParent();
     this.root.traverse((object) => {
-      if (object instanceof THREE.Light) object.dispose();
+      if (object instanceof THREE.Light) disposeShadowLight(object);
       if (!(object instanceof THREE.Mesh || object instanceof THREE.LineSegments)) {
         return;
       }
