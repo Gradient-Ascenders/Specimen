@@ -261,11 +261,38 @@ function setup() {
     dispose() { encounter.dispose(); burns.dispose(); for (const target of targets) target.dispose(); art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); world.clear(); surfaces.clear(); } };
 }
 
+test('inactive searchlights retain their first map update until a live draw allocates them', () => {
+  const s = setup();
+  try {
+    const lights = s.encounter.drones.map(drone => s.room.root.getObjectByName(`${drone.id}-search-light`) as THREE.SpotLight);
+    const assertPending = () => {
+      assert.equal(lights.length, 9);
+      for (const light of lights) {
+        assert.equal(light.castShadow, true);
+        assert.equal(light.intensity, 0);
+        assert.equal(light.shadow.map, null);
+        assert.equal(light.shadow.autoUpdate, false);
+        assert.equal(light.shadow.needsUpdate, true);
+      }
+    };
+    assertPending();
+    s.encounter.reset(); assertPending();
+    s.room.controller.security.release();
+    s.encounter.update(1 / 60); assertPending();
+    s.encounter.update(1 / 60); assertPending();
+  } finally { s.dispose(); }
+});
+
 test('retained searchlights follow gaze and power without changing authoritative detection or hull roles', () => {
   const s = setup();
   try {
     const lights = s.encounter.drones.map(drone => s.room.root.getObjectByName(`${drone.id}-search-light`) as THREE.SpotLight);
     assert.equal(lights.length, 9);
+    let freed = 0;
+    for (const light of lights) {
+      light.shadow.map = new THREE.WebGLRenderTarget(1, 1);
+      light.shadow.map.addEventListener('dispose', () => freed++);
+    }
     for (const network of ['red', 'blue', 'green'] as const) {
       s.room.controller.security.select(network); s.encounter.update(1 / 60);
       s.encounter.drones.forEach((drone, i) => {
@@ -281,7 +308,9 @@ test('retained searchlights follow gaze and power without changing authoritative
       });
     }
     s.room.controller.security.release(); s.encounter.update(1 / 60);
-    assert.ok(lights.every(light => light.intensity === 0 && !light.shadow.autoUpdate));
+    assert.ok(lights.every(light => light.intensity === 0 && !light.shadow.autoUpdate && !light.shadow.needsUpdate));
+    s.encounter.reset();
+    assert.ok(lights.every(light => light.shadow.map !== null && !light.shadow.autoUpdate && !light.shadow.needsUpdate));
     s.room.controller.security.reset(); s.encounter.reset(); s.encounter.update(1 / 60);
     assert.ok(lights.every(light => light.intensity > 0 && light.shadow.autoUpdate));
     assert.equal(s.room.captiveVolt.castShadow, false);
@@ -291,11 +320,6 @@ test('retained searchlights follow gaze and power without changing authoritative
       if (o.name === 'room-5-platform-shadow-hulls') assert.equal(o.castShadow, true);
       if (o.userData.shadowProxyReceiver) assert.equal(o.castShadow, false);
     });
-    let freed = 0;
-    for (const light of lights) {
-      light.shadow.map = new THREE.WebGLRenderTarget(1, 1);
-      light.shadow.map.addEventListener('dispose', () => freed++);
-    }
     s.encounter.dispose(); s.encounter.dispose();
     assert.equal(freed, 9); assert.ok(lights.every(light => light.shadow.map === null));
   } finally { s.dispose(); }

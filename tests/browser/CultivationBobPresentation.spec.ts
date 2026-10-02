@@ -349,6 +349,66 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   expect(failedRequests).toEqual([]);
 });
 
+test('Cultivation draws Room 5 immediately after load and teleport with valid live PCF maps', async ({ page }) => {
+  test.setTimeout(600_000);
+  const assertExposed = await exposeCultivationRuntime(page);
+  await enterCultivation(page); assertExposed();
+  await page.waitForFunction(() => (window as any).__specimenCultivationRuntime?.state === 'running', undefined, { timeout: 240_000 });
+  const consoleErrors: string[] = [];
+  const samplerWarnings: string[] = [];
+  page.on('console', message => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (/GL_INVALID_OPERATION|sampler.*(?:mismatch|texture)|texture.*(?:mismatch|sampler)/i.test(message.text())) {
+      samplerWarnings.push(message.text());
+    }
+  });
+  const draws = await page.evaluate(() => {
+    const r = (window as any).__specimenCultivationRuntime;
+    const renderer = r.renderLayer.renderer, gl = renderer.getContext();
+    r.stop(); r.unload();
+    const stats = {
+      fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 0, frameDeltaSeconds: 0,
+      stepsThisFrame: 0, interpolationAlpha: 0, droppedSimulationTimeSeconds: 0, renderFps: 60,
+    };
+    const draws = [];
+    // Repeat on a fresh resource generation, with no preparation or encounter
+    // update between load, the debug teleport and the first actual WebGL draw.
+    for (let generation = 0; generation < 2; generation++) {
+      r.load();
+      if (!r.teleportToAuthoredPreviewRoom(5)) throw new Error('Room 5 teleport failed');
+      const room = r.resources.authoredPreview.roomFive;
+      const lights: any[] = [];
+      room.root.traverse((o: any) => {
+        if (o.isSpotLight && o.name.endsWith('-search-light')) lights.push(o);
+      });
+      const before = lights.map(light => ({ map: light.shadow.map === null, intensity: light.intensity }));
+      // Clear prior-context errors so the assertions measure this first draw.
+      for (let i = 0; i < 100 && gl.getError() !== gl.NO_ERROR; i++) { /* drain */ }
+      r.render(0, stats);
+      const firstDraw = {
+        visible: room.root.visible, before, error: gl.getError(),
+        allocated: lights.filter(light => light.shadow.map?.depthTexture?.isDepthTexture).length,
+        pending: lights.filter(light => light.shadow.needsUpdate).length,
+      };
+      r.resources.roomFiveEncounter.reset();
+      const resetMaps = lights.map(light => light.shadow.map);
+      const resetPending = lights.filter(light => light.shadow.needsUpdate || light.shadow.autoUpdate).length;
+      r.render(0, stats);
+      draws.push({ ...firstDraw, resetPending, resetError: gl.getError(),
+        reused: lights.every((light, i) => light.shadow.map === resetMaps[i]) });
+      r.unload();
+    }
+    return draws;
+  });
+  expect(draws).toEqual(Array.from({ length: 2 }, () => ({
+    visible: true,
+    before: Array.from({ length: 9 }, () => ({ map: true, intensity: 0 })),
+    error: 0, allocated: 9, pending: 0, resetPending: 0, resetError: 0, reused: true,
+  })));
+  expect(consoleErrors).toEqual([]);
+  expect(samplerWarnings).toEqual([]);
+});
+
 test('Cultivation draws prepared room and fade shadow variants without creating programs', async ({page}) => {
   test.setTimeout(600_000);
   const assertExposed = await exposeCultivationRuntime(page);

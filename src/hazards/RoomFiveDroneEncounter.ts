@@ -190,7 +190,7 @@ export class RoomFiveDroneEncounter {
       this.flyers[i].eye.material.color.copy(drone.frontIndicator.material.color);
       const search = this.searchLights[i]; search.intensity = enabled ? (network === 'blue' ? 65 : 45) : 0;
       search.shadow.autoUpdate = enabled;
-      search.shadow.needsUpdate = enabled;
+      search.shadow.needsUpdate = enabled || search.shadow.map === null;
       // Shadow maps now handle partial occlusion without cutting all illumination short.
       search.distance = ROOM_FIVE_DRONE_VIEW_RANGE;
       search.position.copy(drone.root.position).addScaledVector(this.direction, 1.4);
@@ -232,7 +232,10 @@ export class RoomFiveDroneEncounter {
     this.beamLengths.fill(-1); this.presentationStep = 0;
     for (const beam of this.beams) beam.visible = false;
     for (const search of this.searchLights) {
-      search.intensity = 0; search.shadow.autoUpdate = false; search.shadow.needsUpdate = false;
+      search.intensity = 0; search.shadow.autoUpdate = false;
+      // Zero-intensity lights retain live PCF sampler slots. Allocate their
+      // first map even if a teleport draws the room before its next fixed step.
+      search.shadow.needsUpdate = search.shadow.map === null;
     }
     for (let i = 0; i < this.drones.length; i++) {
       this.patrols[i].reset(); this.drones[i].reset();
