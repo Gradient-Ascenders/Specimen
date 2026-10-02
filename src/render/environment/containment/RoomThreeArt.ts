@@ -35,6 +35,10 @@ const PLATFORM_DRESSINGS: readonly PlatformDressing[] = [
 ];
 
 const UP = new THREE.Vector3(0, 1, 0);
+const ACID_SURFACE_CENTRE_Y_METRES = 5.025;
+const ACID_SURFACE_THICKNESS_METRES = 0.05;
+export const ROOM_THREE_ACID_SURFACE_Y_METRES =
+  ACID_SURFACE_CENTRE_Y_METRES + ACID_SURFACE_THICKNESS_METRES / 2;
 
 /** Room 3-only visual layer around the frozen acid, laser and traversal route. */
 export class RoomThreeArt {
@@ -61,8 +65,8 @@ export class RoomThreeArt {
     });
     this.acidSurface = createBorrowedBox(resources, {
       name: 'room-3-acid-surface-material-integration-point',
-      size: [32.7, 0.05, 26.7],
-      position: [0, 5.025, 63],
+      size: [32.7, ACID_SURFACE_THICKNESS_METRES, 26.7],
+      position: [0, ACID_SURFACE_CENTRE_Y_METRES, 63],
       material: this.acidSurfaceMaterial,
     });
     this.acidSurface.userData.materialRole = 'replaceable-acid-surface';

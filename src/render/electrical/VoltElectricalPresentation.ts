@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 
 import type { VoltElectricalReadModel } from '../../abilities/VoltElectricalSystem.ts';
+import type { ElectricalTargetRegistry } from '../../abilities/ElectricalTargetRegistry.ts';
+import { ElectricalTargetHighlights } from './ElectricalTargetHighlights.ts';
 
 export interface VoltElectricalPresentationOptions {
   readonly scene: THREE.Scene;
   readonly host: HTMLElement;
   readonly document?: Document;
+  readonly targetRegistry?: ElectricalTargetRegistry;
 }
 
 /** Visual-only electrical arcs and aim UI. Gameplay authority stays in the
@@ -30,6 +33,7 @@ export class VoltElectricalPresentation {
   private readonly crosshair: HTMLElement;
   private readonly status: HTMLElement;
   private disposed = false;
+  private readonly highlights?: ElectricalTargetHighlights;
 
   constructor(options: VoltElectricalPresentationOptions) {
     const hostDocument = options.document ?? document;
@@ -123,11 +127,16 @@ export class VoltElectricalPresentation {
     this.status = status;
 
     try {
+      if (options.targetRegistry) {
+        this.highlights = new ElectricalTargetHighlights(options.targetRegistry);
+        this.root.add(this.highlights.root);
+      }
       // Arm cleanup before each attachment: observers/test doubles may mutate
       // ownership and then throw from add/append.
       options.scene.add(this.root);
       options.host.append(this.element);
     } catch (error) {
+      this.highlights?.dispose();
       this.root.removeFromParent();
       this.element.remove();
       this.beamGeometry.dispose();
@@ -140,10 +149,11 @@ export class VoltElectricalPresentation {
     }
   }
 
-  update(readModel: VoltElectricalReadModel, deltaSeconds = 0): void {
+  update(readModel: VoltElectricalReadModel, deltaSeconds = 0, aimAllowed = true): void {
     if (this.disposed) return;
+    this.highlights?.update(readModel, aimAllowed);
 
-    this.crosshair.hidden = !readModel.aimActive;
+    this.crosshair.hidden = !(aimAllowed && readModel.aimActive);
     this.crosshair.dataset.state =
       readModel.selectedTargetValid ? 'valid' : 'neutral';
 
@@ -253,11 +263,13 @@ export class VoltElectricalPresentation {
   suspendAim(): void {
     if (this.disposed) return;
     this.crosshair.hidden = true;
+    if (this.highlights) this.highlights.root.visible = false;
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.highlights?.dispose();
     this.root.removeFromParent();
     this.element.remove();
     this.beamGeometry.dispose();

@@ -42,6 +42,8 @@ export interface SecurityDroneConfig {
   readonly scanAxis: THREE.Vector3;
   readonly scanHalfAngleRadians: number;
   readonly scanSpeedRadiansPerSecond: number;
+  /** False for fixed surveillance cones; default preserves target tracking. */
+  readonly trackTargets?: boolean;
   readonly detectionHalfAngleRadians: number;
   readonly detectionRangeMetres: number;
   /** Minimum target height in the drone parent's authoring coordinates. */
@@ -350,6 +352,10 @@ export class SecurityDrone {
 
   private advanceScan(deltaSeconds: number): void {
     const cycleRadians = this.config.scanHalfAngleRadians * 4;
+    if (cycleRadians === 0 || this.config.scanSpeedRadiansPerSecond === 0) {
+      this.updateScanningDirection();
+      return;
+    }
     this.scanPhase = normalizePhase(
       this.scanPhase + this.config.scanSpeedRadiansPerSecond * deltaSeconds / cycleRadians,
     );
@@ -357,6 +363,10 @@ export class SecurityDrone {
   }
 
   private updateScanningDirection(): void {
+    if (this.config.scanSpeedRadiansPerSecond === 0) {
+      this.scanDirection.copy(this.baseForward);
+      return;
+    }
     const triangle = 1 - 4 * Math.abs(this.scanPhase - 0.5);
     this.scanDirection.copy(this.baseForward).applyAxisAngle(
       this.scanAxis,
@@ -440,6 +450,7 @@ export class SecurityDrone {
 
   private trackTarget(): void {
     if (!this.target) return;
+    if (this.config.trackTargets === false) return;
     this.copyAnchor(this.config.detectionAnchor, this.detectionOrigin);
     this.scanDirection.set(
       this.target.position.x - this.detectionOrigin.x,
@@ -551,6 +562,12 @@ function validateConfig(config: SecurityDroneConfig): void {
   for (const [label, value] of [
     ['scanHalfAngleRadians', config.scanHalfAngleRadians],
     ['scanSpeedRadiansPerSecond', config.scanSpeedRadiansPerSecond],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`Security drone ${label} must be non-negative and finite.`);
+    }
+  }
+  for (const [label, value] of [
     ['detectionHalfAngleRadians', config.detectionHalfAngleRadians],
     ['detectionRangeMetres', config.detectionRangeMetres],
     ['warningSeconds', config.warningSeconds],

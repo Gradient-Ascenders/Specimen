@@ -33,9 +33,9 @@ export class BlackoutMaintenanceBayController {
     this.bay=bay;
     this.world=world;
     this.door = new VerticalBlastDoor({id:'maintenance-bay-exit', collisionWorld:world, surfaceRegistry:surfaces,
-      closedPosition:new THREE.Vector3(6,1.5,BLACKOUT_BAY_LAYOUT.rearZ),panelSize:new THREE.Vector3(3,3,.4),
-      travelAxis:new THREE.Vector3(0,1,0),travelDistance:3.3,openingDurationSeconds:1,closingDurationSeconds:.45,
-      obstructionCentre:new THREE.Vector3(6,1.5,BLACKOUT_BAY_LAYOUT.rearZ),obstructionSize:new THREE.Vector3(3.8,3.4,1.6)});
+      closedPosition:new THREE.Vector3(6,2.25,BLACKOUT_BAY_LAYOUT.rearZ),panelSize:new THREE.Vector3(6,4.5,.4),
+      travelAxis:new THREE.Vector3(0,1,0),travelDistance:4.8,openingDurationSeconds:1,closingDurationSeconds:.45,
+      obstructionCentre:new THREE.Vector3(6,2.25,BLACKOUT_BAY_LAYOUT.rearZ),obstructionSize:new THREE.Vector3(6.4,4.8,1.6)});
     bay.root.add(this.door.root);
     this.door.root.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
@@ -90,7 +90,8 @@ export class BlackoutMaintenanceBayController {
       if(p.y < -5 || (id!=='goop' && this.bay.acidAt(p)) || (id!=='volt' && this.bay.ventAt(p))) return id;
     }
     this.updateVentTraversal(bodies.volt.position);
-    this.complete=this.voltTraversedVent&&this.bay.vestibuleAt(bodies.bob.position)&&this.bay.vestibuleAt(bodies.goop.position)&&this.bay.voltExitAt(bodies.volt.position);
+    const mainRouteReady = (body:KinematicBody) => this.bay.vestibuleAt(body.position) || this.bay.transitAt(body.position);
+    this.complete=this.voltTraversedVent&&mainRouteReady(bodies.bob)&&mainRouteReady(bodies.goop)&&this.bay.voltExitAt(bodies.volt.position);
     return undefined;
   }
 

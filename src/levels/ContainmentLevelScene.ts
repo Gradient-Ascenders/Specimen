@@ -253,10 +253,7 @@ export class ContainmentLevelScene {
 
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
   get solubleTargetMeshes(): readonly THREE.Mesh[] {
-    return [
-      ...this.teaching.solubleTargetMeshes,
-      this.roomFive.goopWoodenDoor,
-    ];
+    return [this.roomFive.goopWoodenDoor];
   }
 
   get measuredFirstUseGeometryPrimeDiagnostics(): MeasuredFirstUseGeometryPrimeDiagnostics {

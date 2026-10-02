@@ -79,9 +79,9 @@ function ground(
     rearPushCentreLocal: new THREE.Vector3(0, 0, 1.35),
     rearPushSize: new THREE.Vector3(4, 2.4, 1.8),
     pushIntentDotThreshold: 0.25,
-    pushProgressPerSecond: 2.5,
-    pushDecayPerSecond: 1,
-    tippingDurationSeconds: 0.75,
+    pushProgressPerSecond: 0.8,
+    pushDecayPerSecond: 0.7,
+    tippingDurationSeconds: 0.9,
     radioactiveFinalPosition: new THREE.Vector3(position.x, 0.55, position.z - 2.5),
     radioactiveFinalRotation: new THREE.Euler(Math.PI * 0.5, 0, 0),
   };

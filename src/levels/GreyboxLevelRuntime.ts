@@ -38,8 +38,6 @@ import {
 } from '../physics/KinematicBody.ts';
 import type { MovementEvents } from '../physics/MovementEvents.ts';
 import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
-import { BoxTriggerSensor } from '../puzzle/BoxTriggerSensor.ts';
-import { PressurePlate } from '../puzzle/PressurePlate.ts';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
@@ -60,7 +58,6 @@ import {
   EMPTY_SLIME_HUD_SNAPSHOT,
   type SlimeHUDListener,
   type SlimeHUDSnapshot,
-  type SlimePassiveInteraction,
   type SlimePlayerSwitchFeedback,
 } from '../slimes/SlimeHUDState.ts';
 import {
@@ -106,10 +103,6 @@ const DEBUG_ROOM_TELEPORT_ACTIONS: ReadonlyArray<
   ['debugTeleportRoomFive', 5],
 ];
 const GOOP_SPAWN_OFFSET_X_METRES = 2;
-const TWO_BODY_PLATE_POSITION = new THREE.Vector3(3.1, 0, -2.6);
-const TWO_BODY_PLATE_SIZE = new THREE.Vector3(1.8, 0.18, 1.8);
-const TWO_BODY_SENSOR_CENTRE = new THREE.Vector3(3.1, 0.45, -2.6);
-const TWO_BODY_SENSOR_SIZE = new THREE.Vector3(2, 1, 2);
 const DISSOLVE_PUZZLE_GROUP_ID = 'containment-goop-dissolve-demo';
 const BOB_HATCH_LIGHTING_PREVIEW_STATES: readonly BobHatchLightingState[] = [
   'gameplay',
@@ -149,16 +142,6 @@ const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
   3: ['room-2-observation-reinforced-glass'],
   5: ['room-3-acid-surface-material-integration-point'],
 };
-// This test barrier is intentionally absent from normal production. Compile
-// it under the relevant future-room light signatures only when debug helpers
-// created it; every real production source above remains mandatory.
-const LIGHTING_PREWARM_OPTIONAL_DEVELOPMENT_RENDERABLE_NAMES: Readonly<
-  Partial<Record<DebugRoomId, readonly string[]>>
-> = {
-  2: ['room-1-goop-soluble-test-barrier'],
-  3: ['room-1-goop-soluble-test-barrier'],
-};
-
 export interface GreyboxLevelRuntimeOptions {
   host: HTMLElement;
   input: Input;
@@ -186,26 +169,12 @@ interface GreyboxRuntimeResources {
   readonly slimeManager: SlimeManager<KinematicBody>;
   readonly slimePair: PersistentSlimePair<KinematicBody>;
   readonly slimePairPresentation: SlimePairPresentation;
-  readonly pressurePlate: PressurePlate;
-  readonly pressurePlateSensor: BoxTriggerSensor;
   readonly puzzleRegistry: PuzzleRegistry;
   readonly dissolveTargets: readonly DissolveTarget[];
   readonly dissolveSystem: DissolveSystem;
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly collisionOverlay: ContainmentCollisionOverlay | undefined;
   readonly goopAcidPresentation: GoopAcidPresentation;
-  readonly pressurePlateOccupants: readonly [
-    {
-      readonly id: 'bob';
-      readonly position: KinematicBody['position'];
-      readonly radiusMetres: number;
-    },
-    {
-      readonly id: 'goop';
-      readonly position: KinematicBody['position'];
-      readonly radiusMetres: number;
-    },
-  ];
   readonly deathSequence: DeathSequence;
   readonly deathScreen: DeathScreen;
   readonly slimeVisualState: BobCharacterPresentationState;
@@ -213,7 +182,6 @@ interface GreyboxRuntimeResources {
   readonly unsubscribeLanding: () => void;
   readonly unsubscribeJumped: () => void;
   readonly unsubscribeDamaged: () => void;
-  unsubscribePressureOccupancy: () => void;
   unsubscribeSlimeRoster: readonly (() => void)[];
   readonly unsubscribeObjectiveChanged: () => void;
   readonly unsubscribeLevelCompleted: () => void;
@@ -409,19 +377,10 @@ export class GreyboxLevelRuntime {
     const resources = this.resources;
     if (!resources) return EMPTY_SLIME_HUD_SNAPSHOT;
 
-    const passiveInteractions: SlimePassiveInteraction[] = [];
-    for (const occupantId of resources.pressurePlate.trigger.occupants) {
-      if (occupantId !== 'bob' && occupantId !== 'goop') continue;
-      passiveInteractions.push({
-        slimeId: occupantId,
-        label: 'pressure plate',
-      });
-    }
-
     return {
       roster: resources.slimeManager.getRosterState(),
       activeSlimeId: resources.slimeManager.activeSlimeId,
-      passiveInteractions,
+      passiveInteractions: [],
       playerSwitchFeedback,
       resetSwitchFeedback,
     };
@@ -640,11 +599,6 @@ export class GreyboxLevelRuntime {
       body.update(deltaSeconds, resources.noMovement);
       goopBody.update(deltaSeconds, resources.noMovement);
     }
-
-    resources.pressurePlateSensor.update(
-      resources.pressurePlate.trigger,
-      resources.pressurePlateOccupants,
-    );
 
     if (slimePair.activeBody.position.y < PLAYER_OUT_OF_BOUNDS_Y_METRES) {
       containmentLevel.requestOutOfBoundsFailure();
@@ -966,29 +920,6 @@ export class GreyboxLevelRuntime {
     const slimePairPresentation = new SlimePairPresentation(body.radiusMetres);
     this.renderLayer.scene.add(slimePairPresentation.root);
 
-    const pressurePlate = new PressurePlate({
-      id: 'two-body-persistence-demo',
-      position: TWO_BODY_PLATE_POSITION,
-      size: TWO_BODY_PLATE_SIZE,
-    });
-    this.renderLayer.scene.add(pressurePlate.root);
-    const pressurePlateSensor = new BoxTriggerSensor(
-      TWO_BODY_SENSOR_CENTRE,
-      TWO_BODY_SENSOR_SIZE,
-    );
-    const pressurePlateOccupants = [
-      {
-        id: 'bob' as const,
-        position: body.position,
-        radiusMetres: body.radiusMetres,
-      },
-      {
-        id: 'goop' as const,
-        position: goopBody.position,
-        radiusMetres: goopBody.radiusMetres,
-      },
-    ] as const;
-
     this.renderLayer.cameraRig.setFollowTarget(
       slimePair.activeBody,
       collisionWorld,
@@ -1163,15 +1094,12 @@ export class GreyboxLevelRuntime {
       slimeManager,
       slimePair,
       slimePairPresentation,
-      pressurePlate,
-      pressurePlateSensor,
       puzzleRegistry,
       dissolveTargets,
       dissolveSystem,
       collisionOverlay,
       acidProjectileSystem,
       goopAcidPresentation,
-      pressurePlateOccupants,
       deathSequence,
       deathScreen,
       slimeVisualState,
@@ -1184,7 +1112,6 @@ export class GreyboxLevelRuntime {
       unsubscribeLanding,
       unsubscribeJumped,
       unsubscribeDamaged,
-      unsubscribePressureOccupancy: () => {},
       unsubscribeSlimeRoster: [],
       unsubscribeObjectiveChanged,
       unsubscribeLevelCompleted,
@@ -1198,10 +1125,6 @@ export class GreyboxLevelRuntime {
       slimeManager.events.on('unregistered', this.onSlimeRosterChanged),
       slimeManager.events.on('activeChanged', this.onSlimeRosterChanged),
     ];
-    resources.unsubscribePressureOccupancy = pressurePlate.trigger.events.on(
-      'occupancyChanged',
-      this.onSlimeRosterChanged,
-    );
     this.notifySlimeHUD();
     this.events.emit('objectiveChanged', {
       roomId: containmentLevel.activeRoomId,
@@ -1240,7 +1163,6 @@ export class GreyboxLevelRuntime {
     resources.puzzleRegistry.reset();
     resources.slimePair.restoreInitialState();
     resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
-    resources.pressurePlate.reset();
     resources.testScene.resetTeachingPresentation();
     this.renderLayer.cameraRig.reset();
     this.retargetCameraToActiveSlime(resources);
@@ -1282,13 +1204,11 @@ export class GreyboxLevelRuntime {
     resources.unsubscribeLanding();
     resources.unsubscribeJumped();
     resources.unsubscribeDamaged();
-    resources.unsubscribePressureOccupancy();
     for (const unsubscribe of resources.unsubscribeSlimeRoster) unsubscribe();
     resources.unsubscribeObjectiveChanged();
     resources.unsubscribeLevelCompleted();
     resources.movementEvents.clear();
     resources.containmentLevel.dispose();
-    resources.pressurePlate.dispose();
     resources.goopAcidPresentation.dispose();
     resources.acidProjectileSystem.dispose();
     resources.dissolveSystem.dispose();
@@ -1584,7 +1504,6 @@ export class GreyboxLevelRuntime {
       testScene,
       slimeManager,
       slimePair,
-      pressurePlate,
       dissolveSystem,
       acidProjectileSystem,
       goopAcidPresentation,
@@ -1638,7 +1557,6 @@ export class GreyboxLevelRuntime {
         `Bob position: ${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)}, ${body.position.z.toFixed(2)} m`,
         `Goop position: ${goopBody.position.x.toFixed(2)}, ${goopBody.position.y.toFixed(2)}, ${goopBody.position.z.toFixed(2)} m`,
         `persistent bodies / active controllers: ${slimeManager.registeredCount} / ${slimeManager.getRosterState().filter((entry) => entry.active).length}`,
-        `two-body plate pressed / occupants: ${pressurePlate.isPressed ? 'yes' : 'no'} / ${Array.from(pressurePlate.trigger.occupants).join(', ') || 'none'}`,
         `slime roster: ${slimeRoster.map((entry) => `${entry.displayName}:${entry.betaPlayable ? 'beta' : 'locked'}/${entry.unlocked ? 'unlocked' : 'locked'}/${entry.registered ? 'registered' : 'unregistered'}/${entry.active ? 'active' : 'inactive'}`).join(' | ')}`,
         `slime counts available / unlocked / registered: ${slimeManagerStats.availableCount} / ${slimeManagerStats.unlockedCount} / ${slimeManagerStats.registeredCount}`,
         `Bob abilities adhesion / rebound / dissolve / electrical: ${bobDefinition.abilities.adhesion ? 'yes' : 'no'} / ${bobDefinition.abilities.rebound ? 'yes' : 'no'} / ${bobDefinition.abilities.dissolve ? 'yes' : 'no'} / ${bobDefinition.abilities.electrical ? 'yes' : 'no'}`,
@@ -2093,7 +2011,6 @@ function createRoomCompileSubset(
   }
 
   if (roomId === 1) {
-    sources.push(resources.pressurePlate.root);
     // The isolated measured uploads use the Room 1 shadow-light signature.
     // Prepare those exact resource variants before enforcing the no-new-program guard.
     for (const name of resources.testScene.measuredFirstUseGeometryPrimeDiagnostics.ownerNames) {
@@ -2122,13 +2039,6 @@ function createRoomCompileSubset(
     const name of LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES[roomId] ?? []
   ) {
     addCompileObject(requiredNamedObject(levelRoot, name));
-  }
-  for (
-    const name of
-      LIGHTING_PREWARM_OPTIONAL_DEVELOPMENT_RENDERABLE_NAMES[roomId] ?? []
-  ) {
-    const optionalDevelopmentObject = levelRoot.getObjectByName(name);
-    if (optionalDevelopmentObject) addCompileObject(optionalDevelopmentObject);
   }
   subset.userData.compiledObjects = compiledObjects;
   return subset;

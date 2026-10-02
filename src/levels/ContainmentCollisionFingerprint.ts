@@ -2,9 +2,6 @@ import * as THREE from 'three';
 
 import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
 
-export const ROOM_ONE_DEVELOPMENT_SOLUBLE_BARRIER_NAME =
-  'room-1-goop-soluble-test-barrier';
-
 export interface ContainmentColliderFingerprint {
   readonly name: string;
   readonly worldPosition: readonly [number, number, number];
@@ -62,8 +59,7 @@ export function captureContainmentCollisionFingerprint(
       textureRole: mesh.userData.textureRole ?? null,
       soluble: mesh.userData.soluble === true,
       parentPath: getParentPath(mesh),
-      developmentOnly:
-        mesh.name === ROOM_ONE_DEVELOPMENT_SOLUBLE_BARRIER_NAME,
+      developmentOnly: mesh.userData.developmentOnly === true,
     };
   });
 }

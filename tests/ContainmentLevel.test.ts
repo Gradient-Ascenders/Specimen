@@ -17,7 +17,8 @@ import {
   CollisionLayer,
   CollisionWorld,
 } from '../src/physics/CollisionWorld.ts';
-import type { KinematicBody } from '../src/physics/KinematicBody.ts';
+import { KinematicBody } from '../src/physics/KinematicBody.ts';
+import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { CameraRig } from '../src/render/CameraRig.ts';
 import { DeathSequence } from '../src/systems/DeathSequence.ts';
 
@@ -58,6 +59,56 @@ const createFakeBody = (): MutableFakeBody => ({
     this.attached = false;
     this.attachmentSurfaceName = 'none';
   },
+});
+
+test('Room 1 omits the demo wooden wall even with development helpers enabled', () => {
+  for (const includeDevelopmentHelpers of [false, true]) {
+    const scene = new ContainmentLevelScene(() => {}, { includeDevelopmentHelpers });
+    try {
+      assert.equal(scene.root.getObjectByName('room-1-goop-soluble-test-barrier'), undefined);
+      assert.deepEqual(scene.solubleTargetMeshes, [scene.roomFive.goopWoodenDoor],
+        'the actual Room 5 dissolvable door must remain playable');
+    } finally { scene.dispose(); }
+  }
+});
+
+test('Room 3 acid failure starts at liquid contact, not metres above the surface', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  try {
+    const surfaceY = new THREE.Box3().setFromObject(scene.roomThree.art.acidSurface).max.y;
+    const body = createFakeBody();
+    for (const height of [8.1, surfaceY + body.radiusMetres + 0.01]) {
+      body.position.set(-12, height, 63);
+      scene.roomThree.updateFailureTrigger(body);
+      assert.equal(scene.roomThree.failureVolume.occupied, false, 'a slime still above the acid must survive');
+    }
+    body.position.y = surfaceY + body.radiusMetres - 0.001;
+    scene.roomThree.updateFailureTrigger(body);
+    assert.equal(scene.roomThree.failureVolume.occupied, true, 'the bottom of the body touching acid is lethal');
+  } finally { scene.dispose(); }
+});
+
+test('a physical fall reaches the visible Room 3 acid before its failure trigger activates', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const world = new CollisionWorld();
+  const surfaces = new SurfaceRegistry();
+  try {
+    world.registerAll(scene.collisionMeshes);
+    surfaces.registerAll(scene.collisionMeshes);
+    const body = new KinematicBody({ world, surfaces, initialPosition: new THREE.Vector3(-12, 10, 63) });
+    const surfaceY = new THREE.Box3().setFromObject(scene.roomThree.art.acidSurface).max.y;
+    const noMovement = new THREE.Vector3();
+    for (let step = 0; step < 120 && !scene.roomThree.failureVolume.occupied; step += 1) {
+      body.update(1 / 60, noMovement);
+      scene.roomThree.updateFailureTrigger(body);
+      if (body.position.y - body.radiusMetres > surfaceY + 1e-6) {
+        assert.equal(scene.roomThree.failureVolume.occupied, false);
+      }
+    }
+    assert.equal(scene.roomThree.failureVolume.occupied, true);
+    assert.ok(body.position.y - body.radiusMetres <= surfaceY + 1e-6,
+      'collision resolution must not leave the body hovering over the new lethal threshold');
+  } finally { scene.dispose(); world.clear(); surfaces.clear(); }
 });
 
 test('recovering active Goop keeps Bob duct reflections tied to Bob position', () => {
