@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
+import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
 
 import type { BlackoutCheckpointDefinition } from './BlackoutCheckpointManager.ts';
 
@@ -132,6 +134,7 @@ export class BlackoutTransitRoom {
   private readonly hallwayLights: THREE.PointLight[] = [];
   private readonly hallwayBulbs: THREE.MeshStandardMaterial[] = [];
   private hallwayElapsed = 0;
+  private readonly staticVisuals: ContainmentStaticBatchResult;
 
   constructor() {
     this.root.name = 'level-3-room-2-powered-transit-gauntlet';
@@ -159,6 +162,12 @@ export class BlackoutTransitRoom {
     this.bridgeLockContact = this.buildExitHallway(darkSteel, steel, platformSteel, trim, warning);
     this.buildIndustrialDressing(steel, darkSteel, trim, glass);
     this.update(0);
+    const immutable: THREE.Mesh[] = [];
+    this.root.traverse(object => {
+      if (object instanceof THREE.Mesh && object !== this.switchButton && object !== this.bridgeLockContact &&
+          object.userData.textureRole !== 'acid-floor' && !object.name.includes('hallway-bulb')) immutable.push(object);
+    });
+    this.staticVisuals = consolidateStaticRoomVisuals(this.root, immutable);
   }
 
   acidAt(position: TransitPosition): boolean {
@@ -191,6 +200,7 @@ export class BlackoutTransitRoom {
   }
 
   dispose(): void {
+    this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries = new Set<THREE.BufferGeometry>();
     this.root.traverse((object) => {

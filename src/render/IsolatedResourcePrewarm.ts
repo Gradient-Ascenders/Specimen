@@ -37,27 +37,45 @@ export function renderIsolatedPrewarmResources(
   scene: THREE.Scene,
   camera: THREE.Camera,
   resourceRoots: readonly THREE.Object3D[],
+  options: { readonly includeHidden?: boolean } = {},
 ): void {
   const previousCameraLayers = camera.layers.mask;
   const previousResourceLayers = new Map<THREE.Object3D, number>();
   const previousResourceFrustumCulling = new Map<THREE.Object3D, boolean>();
   const previousLightLayers = new Map<THREE.Light, number>();
+  const previousVisibility = new Map<THREE.Object3D, boolean>();
+  const visibleLights = new Set<THREE.Light>();
+
+  // Snapshot the layout before exposing dormant resources. Revealing a room
+  // ancestor must not accidentally enable another room's lighting signature.
+  scene.traverseVisible(object => {
+    if (object instanceof THREE.Light && object.layers.test(camera.layers)) visibleLights.add(object);
+  });
+  scene.traverse(object => {
+    if (!(object instanceof THREE.Light)) return;
+    previousLightLayers.set(object, object.layers.mask);
+    object.layers.disable(ISOLATED_RESOURCE_PREWARM_LAYER);
+    if (visibleLights.has(object)) object.layers.enable(ISOLATED_RESOURCE_PREWARM_LAYER);
+  });
+
+  const expose = (object: THREE.Object3D): void => {
+    if (!previousVisibility.has(object)) previousVisibility.set(object, object.visible);
+    object.visible = true;
+  };
 
   for (const resourceRoot of resourceRoots) {
     resourceRoot.traverse((object) => {
+      if (object instanceof THREE.Light || previousResourceLayers.has(object)) return;
       previousResourceLayers.set(object, object.layers.mask);
       previousResourceFrustumCulling.set(object, object.frustumCulled);
       object.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
       object.frustumCulled = false;
+      if (options.includeHidden) expose(object);
     });
-  }
-  scene.traverseVisible((object) => {
-    if (!(object instanceof THREE.Light) || !object.layers.test(camera.layers)) {
-      return;
+    if (options.includeHidden) {
+      for (let ancestor = resourceRoot.parent; ancestor && ancestor !== scene; ancestor = ancestor.parent) expose(ancestor);
     }
-    previousLightLayers.set(object, object.layers.mask);
-    object.layers.enable(ISOLATED_RESOURCE_PREWARM_LAYER);
-  });
+  }
   camera.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
 
   try {
@@ -73,5 +91,6 @@ export function renderIsolatedPrewarmResources(
     for (const [light, layers] of previousLightLayers) {
       light.layers.mask = layers;
     }
+    for (const [object, visible] of previousVisibility) object.visible = visible;
   }
 }

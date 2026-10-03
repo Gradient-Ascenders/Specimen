@@ -7,6 +7,7 @@ import type { Input, InputAction } from '../src/core/Input.ts';
 import type { LoopStats } from '../src/core/Loop.ts';
 import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
+import type { KinematicBody } from '../src/physics/KinematicBody.ts';
 
 class FakeButton {
   private clickListener: (() => void) | null = null;
@@ -281,6 +282,47 @@ class RuntimeFakeCameraRig {
     this.applyQueuedLookInput();
   }
 }
+
+test('switching away mid-jump lets inactive Bob finish falling and land', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', { configurable: true,
+    value: { createElement: () => new RuntimeFakeElement() } });
+  const input = new RuntimeFakeInput();
+  const runtime = new BlackoutLevelRuntime({
+    host: new RuntimeFakeElement() as unknown as HTMLElement,
+    input: input as unknown as Input,
+    renderLayer: { scene: new THREE.Scene(), canvas: new RuntimeFakeElement(),
+      cameraRig: new RuntimeFakeCameraRig(), render: () => {} } as unknown as RenderLayer,
+    progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'bob' },
+  });
+  try {
+    runtime.load(); runtime.start();
+    const group = (runtime as unknown as { resources: { group: {
+      bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody;
+    } } }).resources.group;
+    runtime.fixedUpdate(1 / 60);
+    const floorY = group.bobBody.position.y;
+    input.press('jump');
+    for (let step = 0; step < 30; step++) runtime.fixedUpdate(1 / 60);
+    input.release('jump'); runtime.fixedUpdate(1 / 60);
+    assert.ok(group.bobBody.velocity.y > 0, 'Bob has actually launched');
+    input.press('switchSlime'); runtime.fixedUpdate(1 / 60);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'goop');
+    const switchedY = group.bobBody.position.y;
+    for (let step = 0; step < 120; step++) runtime.fixedUpdate(1 / 60);
+    assert.ok(Math.abs(group.bobBody.position.y - switchedY) > .01, 'inactive body keeps simulating');
+    assert.equal(group.bobBody.grounded, true);
+    assert.ok(Math.abs(group.bobBody.position.y - floorY) < .02);
+    assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, 'goop', 'landing does not change control');
+    // The formerly active Goop and Volt must also fall, without player intent.
+    group.voltBody.recoverAt(new THREE.Vector3(2, 3, 2));
+    for (let step = 0; step < 120; step++) runtime.fixedUpdate(1 / 60);
+    assert.equal(group.voltBody.grounded, true);
+  } finally {
+    runtime.dispose();
+    Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument });
+  }
+});
 
 test('Blackout mounts shared Bob presentation and owns its lifecycle without replacing Goop or Volt', () => {
   const originalDocument = globalThis.document;

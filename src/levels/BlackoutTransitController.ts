@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { setShadowMapUpdatesActive } from '../render/ShadowLightResources.ts';
 
 import type { ElectricalConnectionTarget, ElectricalTargetRegistry } from '../abilities/ElectricalTargetRegistry.ts';
 import { DissolveTarget } from '../abilities/DissolveTarget.ts';
@@ -328,7 +329,10 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     for (let i = 0; i < this.lifts.length; i++) this.updateLiftVisual(i);
     for (const drone of this.drones) drone.setEnabled(active);
     for (let i = 0; i < this.drones.length; i++) this.updateBeam(this.drones[i]!, i);
-    for (const light of this.searchLights) light.intensity = active ? 26 : 0;
+    for (const light of this.searchLights) {
+      light.intensity = active ? 26 : 0;
+      setShadowMapUpdatesActive(light, active);
+    }
     for (const laser of this.lasers) laser.root.visible = active;
     if (this.laserPresentation) this.laserPresentation.root.visible = active;
     this.updateLampBanks();
@@ -432,6 +436,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       this.drones[i]!.setEnabled(this.active);
       this.beamMeshes[i]!.visible = this.active;
       this.searchLights[i]!.intensity = this.active ? 26 : 0;
+      setShadowMapUpdatesActive(this.searchLights[i]!, this.active);
     }
     this.updateLampBanks();
     this.updateSwitchButton();

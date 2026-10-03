@@ -273,6 +273,8 @@ export class GreyboxLevelRuntime {
   private readonly lightingRoomVisits = new Map<DebugRoomId, number>();
   private readonly lightingTransitionProfiles: LightingTransitionProfile[] = [];
   private lastRenderedLightingRoomId: DebugRoomId | undefined;
+  private readonly preparationLightState = new THREE.Group();
+  private lastShadowLayoutKey: string | undefined;
   private pendingLightingTransitionProfile: LightingTransitionProfile | undefined;
   private lightingPrewarmPromise: Promise<void> | undefined;
   // Three.js retains transmission targets per camera. Reuse this camera across
@@ -763,6 +765,15 @@ export class GreyboxLevelRuntime {
       transitionRenderStarted = this.hostWindow.performance.now();
     }
 
+    const shadowLayoutKey = testScene.lightingDiagnostics.visibleRoomIds.join(',');
+    if (shadowLayoutKey !== this.lastShadowLayoutKey) {
+      // Three draws shadows before refreshing the visible pass's light state.
+      // An empty compile updates that state without compiling any materials,
+      // avoiding a cold previous-room shader binding on the first handoff frame.
+      this.renderLayer.renderer.compile(this.preparationLightState,
+        this.renderLayer.cameraRig.camera, this.renderLayer.scene);
+      this.lastShadowLayoutKey = shadowLayoutKey;
+    }
     testScene.lighting.prepareShadowFrame([body.position, goopBody.position]);
     this.renderLayer.render();
 
@@ -1237,6 +1248,7 @@ export class GreyboxLevelRuntime {
     this.lightingRoomVisits.clear();
     this.lightingTransitionProfiles.length = 0;
     this.lastRenderedLightingRoomId = undefined;
+    this.lastShadowLayoutKey = undefined;
     this.pendingLightingTransitionProfile = undefined;
     this.notifySlimeHUD();
   };
@@ -1721,8 +1733,10 @@ export class GreyboxLevelRuntime {
             prewarmCamera,
           );
           const compileSubset = new THREE.Group();
+          const roomResources: THREE.Object3D[] = [];
           let compiledObjects = 0;
           for (const coverageRoomId of coverageRoomIds) {
+            roomResources.push(...createRoomPrewarmSources(resources, coverageRoomId));
             const roomSubset = createRoomCompileSubset(resources, coverageRoomId);
             compiledObjects += roomSubset.userData.compiledObjects as number;
             compileSubset.add(...roomSubset.children);
@@ -1814,6 +1828,38 @@ export class GreyboxLevelRuntime {
           // Room 1 also needs a hidden draw now: compileAsync does not create
           // the spotlight map or compile its caster depth programs.
           withIsolatedPrewarmState(renderer, () => renderer.render(this.renderLayer.scene, prewarmCamera));
+          // Compilation only prepares one representative of each material.
+          // Upload every live geometry/instance buffer and bind its actual VAO
+          // now, including resources hidden until an interaction occurs.
+          withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+            renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, prewarmCamera,
+              roomResources, { includeHidden: true }),
+          ));
+          // The sticky-wall turn and lift's wide view expose geometry from
+          // neighbouring rooms. Bind those real draw VAOs during loading too;
+          // entry-facing compilation alone does not initialize those bindings.
+          if (roomId === 3 || roomId === 4) {
+            const views = roomId === 3
+              ? [[16, 16, 63], [9, 28, 76.5]]
+              : [[9, 31, 85.5], [9, 40, 85.5]];
+            withIsolatedPrewarmState(renderer, () => {
+              renderer.compile(this.preparationLightState, prewarmCamera, this.renderLayer.scene);
+              for (const [x, y, z] of views) {
+                for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                  prewarmCamera.position.set(x + dx * 5, y + 1.6, z + dz * 5);
+                  prewarmCamera.lookAt(x, y, z);
+                  prewarmCamera.updateMatrixWorld();
+                  renderer.render(this.renderLayer.scene, prewarmCamera);
+                }
+              }
+            });
+          }
+          await resources.testScene.bob.prepareCameraFadePrograms(() => {
+            withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+              renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, prewarmCamera,
+                [resources.testScene.bob.root]),
+            ));
+          });
           const primeDurationMs =
             this.hostWindow.performance.now() - primeStarted;
           steps.push({
@@ -1889,6 +1935,20 @@ export class GreyboxLevelRuntime {
       );
       const burstResourcePrimeDurationMs =
         this.hostWindow.performance.now() - burstResourcePrimeStarted;
+      // Three owns transmission targets per camera ID. Prime the live camera's
+      // full-size target too; preparing only the clone still leaves gameplay
+      // with a first-frame allocation. Copy/restore its pose synchronously.
+      const gameplayViewport = renderer.getViewport(new THREE.Vector4());
+      const savedCamera = camera.clone();
+      try {
+        camera.copy(prewarmCamera);
+        withIsolatedPrewarmState(renderer, () => {
+          renderer.setViewport(gameplayViewport);
+          this.renderLayer.withShadowPreparation(true, () =>
+            renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, camera,
+              createRoomPrewarmSources(resources, 1), { includeHidden: true }));
+        });
+      } finally { camera.copy(savedCamera); }
       this.lightingPrewarmProfile = {
         durationMs: this.hostWindow.performance.now() - started,
         programsBefore,
@@ -1971,10 +2031,10 @@ function countVisibleLights(
   };
 }
 
-function createRoomCompileSubset(
+function createRoomPrewarmSources(
   resources: GreyboxRuntimeResources,
   roomId: DebugRoomId,
-): THREE.Group {
+): THREE.Object3D[] {
   const levelRoot = resources.testScene.root;
   const teachingRoot = requiredNamedObject(
     levelRoot,
@@ -2018,6 +2078,19 @@ function createRoomCompileSubset(
     }
   }
 
+  // Development spawn markers can also be seen from the far rooms.
+  const spawnMarker = levelRoot.getObjectByName('room-1-safe-spawn-marker');
+  if (spawnMarker) sources.push(spawnMarker);
+  for (const name of LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES[roomId] ?? []) {
+    sources.push(requiredNamedObject(levelRoot, name));
+  }
+  return sources;
+}
+
+function createRoomCompileSubset(
+  resources: GreyboxRuntimeResources,
+  roomId: DebugRoomId,
+): THREE.Group {
   const subset = new THREE.Group();
   subset.name = `containment-room-${roomId}-shader-prewarm-subset`;
   const compiledSignatures = new Set<string>();
@@ -2032,13 +2105,8 @@ function createRoomCompileSubset(
     subset.add(clone);
     compiledObjects += 1;
   };
-  for (const source of sources) {
+  for (const source of createRoomPrewarmSources(resources, roomId)) {
     source.traverse(addCompileObject);
-  }
-  for (
-    const name of LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES[roomId] ?? []
-  ) {
-    addCompileObject(requiredNamedObject(levelRoot, name));
   }
   subset.userData.compiledObjects = compiledObjects;
   return subset;

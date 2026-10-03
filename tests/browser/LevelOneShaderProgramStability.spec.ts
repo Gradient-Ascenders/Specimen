@@ -514,7 +514,8 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     measuredResourceCount: 23,
     measuredGeometryDelta: 0,
     measuredProgramDelta: 0,
-    burstGeometryDelta: 2,
+    // Whole-room upload priming now reaches the burst buffers earlier too.
+    burstGeometryDelta: 0,
     burstProgramDelta: 0,
   });
   await expect(page.locator('[data-action="start"]')).toBeVisible();

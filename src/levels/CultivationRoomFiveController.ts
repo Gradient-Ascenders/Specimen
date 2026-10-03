@@ -17,8 +17,7 @@ export class CultivationRoomFiveController {
   get rescued(): boolean { return this.security.shutdown && this.releaseElapsed >= 4; }
   get objective(): string {
     if (this.complete) return 'Cultivation complete — Volt is free!';
-    if (this.exitPowered) return 'Bring all three slimes through the exit';
-    if (this.rescued) return 'Reunite, then use Volt to power the exit';
+    if (this.rescued) return 'Volt is free — entering Blackout';
     if (this.releasing) return 'Volt containment releasing';
     if (this.checkpoint === 'controls') return 'Use the security networks to reach Volt';
     return 'Find Volt and the sewer security controls';
@@ -51,7 +50,7 @@ export class CultivationRoomFiveController {
   }
   destroyBrokenDrone(): void { this.brokenDroneState = 'destroyed'; this.brokenDroneHits = 3; }
   powerExit(): void { if (this.rescued) this.exitPowered = true; }
-  finish(): void { if (this.exitPowered) this.complete = true; }
+  finish(): void { if (this.rescued) this.complete = true; }
   reset(checkpoint: RoomFiveCheckpoint = 'split'): void {
     this.checkpoint = checkpoint;
     this.security.reset();

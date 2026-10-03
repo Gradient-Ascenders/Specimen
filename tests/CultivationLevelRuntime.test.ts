@@ -5,6 +5,7 @@ import * as THREE from 'three';
 
 import type { Input } from '../src/core/Input.ts';
 import { CultivationLevelRuntime } from '../src/levels/CultivationLevelRuntime.ts';
+import { CultivationRoomFiveController } from '../src/levels/CultivationRoomFiveController.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
 
 test('failed Cultivation construction rolls back attached resources', () => {
@@ -110,4 +111,58 @@ test('Level 2 zero shortcut works without debug preview and is one-shot', () => 
   assert.equal(unlocked, true);
   assert.deepEqual(inputStates, [false]);
   assert.deepEqual(emitted, { levelId: 'level-2', nextLevelId: 'level-3' });
+});
+
+test('final lever hands off to Level 3 once Volt is released and unlocked, without an exit reunion', () => {
+  let enabled = true, unlocked = false, registered = false, transitions = 0;
+  const input = { setEnabled(value: boolean) { enabled = value; }, releasePointerLock() {} } as unknown as Input;
+  const runtime = new CultivationLevelRuntime({
+    host: { dataset: {} } as unknown as HTMLElement, input,
+    renderLayer: { scene: new THREE.Scene() } as unknown as RenderLayer,
+    progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
+    window: new EventTarget() as unknown as Window, debugAvailable: false,
+  });
+  const controller = new CultivationRoomFiveController();
+  controller.reset('controls');
+  controller.update(1.5, false, false, false, true);
+  const pod = new THREE.Group(); pod.position.set(0, 2.65, 64);
+  const resources = {
+    authoredPreview: { roomFive: { controller, pod }, roomFour: { controller: { readModel: { state: 'complete' } } } },
+    deathSequence: { isPlaying: true },
+    manager: {
+      isAvailable: () => unlocked,
+      isRegistered: () => registered,
+      registerBody() { registered = true; },
+      unlock() { unlocked = true; },
+      getRosterState: () => [], activeSlimeId: 'bob',
+    },
+    voltBody: { recoverAt(position: THREE.Vector3) { assert.deepEqual(position.toArray(), [0, 2.65, 64]); } },
+    voltVisual: { visible: false },
+  };
+  const internals = runtime as unknown as {
+    resources: typeof resources; authoredPreviewProgression: { roomId: number };
+    roomFiveCheckpoint: string; captureAuthoredPreviewCheckpoint(): void;
+    updateRoomFive(dt: number, resources: typeof resources): void;
+  };
+  internals.resources = resources;
+  internals.authoredPreviewProgression = { roomId: 5 };
+  internals.roomFiveCheckpoint = 'controls';
+  internals.captureAuthoredPreviewCheckpoint = () => {};
+  runtime.events.on('completed', event => {
+    assert.equal(unlocked, true, 'session progression already includes Volt');
+    assert.equal(registered, true);
+    assert.deepEqual(event, { levelId: 'level-2', nextLevelId: 'level-3' });
+    transitions++;
+  });
+  internals.updateRoomFive(1 / 60, resources);
+  assert.equal(transitions, 0, 'let the rescue animation finish');
+  assert.equal(enabled, true);
+  controller.update(4, false, false, false, false);
+  internals.updateRoomFive(1 / 60, resources);
+  assert.equal(controller.complete, true);
+  assert.equal(enabled, false);
+  assert.equal(transitions, 1);
+  assert.equal(controller.exitPowered, false, 'no obsolete terminal or reunion requirement');
+  internals.updateRoomFive(1 / 60, resources);
+  assert.equal(transitions, 1, 'handoff is one-shot');
 });

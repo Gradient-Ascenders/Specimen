@@ -45,6 +45,7 @@ export class CultivationPreparationQueue {
       preview.roomThree.root, preview.roomFour.root, preview.roomFive.root];
     this.camera = layer.cameraRig.camera.clone();
     const saved = this.roots.map(root => root.visible);
+    const savedLiftGeometry = preview.roomFourGeometry.visible;
     const add = (z: number, dark: boolean) => {
       const visible = this.roots.map(root => root.visible), key = this.key(visible, dark);
       if (!this.configurations.some(c => c.key === key)) this.configurations.push({key, visible, dark, z, ready: false});
@@ -59,6 +60,7 @@ export class CultivationPreparationQueue {
       }
     }
     this.roots.forEach((root, i) => root.visible = saved[i]);
+    preview.roomFourGeometry.visible = savedLiftGeometry;
     this.diagnostics.total = this.configurations.length;
     preview.root.userData.preparation = this.diagnostics;
     if (host && typeof document !== 'undefined') {
@@ -138,11 +140,8 @@ export class CultivationPreparationQueue {
     await this.prepareInitial();
     this.anticipateLiftExit();
     if (this.upcoming) await this.prepareConfiguration(this.upcoming);
-    // The lit lift adds a real spotlight. Its handoff layout and the isolated
-    // dark room now have distinct shadow counts and must both be prepared.
-    const darkRoom = this.configurations.find(config => config.dark &&
-      config.visible.every((visible, i) => visible === (i === 7)));
-    if (darkRoom) await this.prepareConfiguration(darkRoom);
+    // Room 5 retains the lift's finite lights even once its geometry is culled.
+    // The arrival preparation therefore also covers the entire maintenance room.
     this.priority = undefined;
     this.diagnostics.initialMs = performance.now() - started;
   }

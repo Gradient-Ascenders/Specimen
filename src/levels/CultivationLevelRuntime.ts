@@ -65,6 +65,8 @@ import type { DroneProjectilePresentation } from '../render/hazards/DroneProject
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
 import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
+import { CameraShadowCulling } from '../render/CameraShadowCulling.ts';
+import { optimizeFiniteLightEvaluation } from '../render/environment/cultivation/FiniteLightEvaluation.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
   type SlimeHUDListener,
@@ -269,6 +271,7 @@ export class CultivationLevelRuntime {
   private lightLayout: CultivationLightLayout | undefined;
   private lightLayoutKey = '';
   private constructionMs = 0;
+  private cameraShadowCulling: CameraShadowCulling | undefined;
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
     return this.presentationPreparation ??= resources.bobPresentation
@@ -276,6 +279,12 @@ export class CultivationLevelRuntime {
       .then(() => {
         if (this.resources !== resources) return;
         if (!resources.authoredPreview) return;
+        this.renderLayer.scene.traverse(object => {
+          if (!(object instanceof THREE.Mesh)) return;
+          for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+            if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material);
+          }
+        });
         this.lightLayout ??= new CultivationLightLayout(this.renderLayer.scene);
         if (!this.preparationQueue) {
           this.preparationQueue = new CultivationPreparationQueue(
@@ -643,7 +652,7 @@ export class CultivationLevelRuntime {
     if (resources.authoredPreview) {
       const p = resources.authoredPreview;
       if (resources.droneProjectilePresentation) resources.droneProjectilePresentation.mesh.visible = p.roomThree.root.visible;
-      if (resources.roomFourProjectiles) resources.roomFourProjectiles.mesh.visible = p.roomFour.root.visible;
+      if (resources.roomFourProjectiles) resources.roomFourProjectiles.mesh.visible = p.roomFour.root.visible && p.roomFourGeometry.visible;
       if (resources.roomFiveEncounter) resources.roomFiveEncounter.presentation.mesh.visible = p.roomFive.root.visible;
     }
     if (resources.authoredPreview && this.lightLayout) {
@@ -695,7 +704,12 @@ export class CultivationLevelRuntime {
       this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
       this.lastShadowLayoutKey = this.lightLayoutKey;
     }
-    this.renderLayer.render();
+    this.cameraShadowCulling?.prepare(this.renderLayer.cameraRig.camera);
+    try {
+      this.renderLayer.render();
+    } finally {
+      this.cameraShadowCulling?.restore();
+    }
     this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
 
     this.debugElapsedSeconds += stats.rawFrameDeltaSeconds;
@@ -1160,6 +1174,12 @@ export class CultivationLevelRuntime {
         rollback(() =>
           this.hostWindow.removeEventListener('keydown', this.onDebugToggle));
       }
+      const shadowLights: (THREE.PointLight | THREE.SpotLight)[] = [];
+      this.renderLayer.scene.traverse(object => {
+        if ((object instanceof THREE.PointLight || object instanceof THREE.SpotLight) && object.castShadow) shadowLights.push(object);
+      });
+      this.cameraShadowCulling = new CameraShadowCulling(shadowLights);
+      rollback(() => { this.cameraShadowCulling = undefined; });
       this.hostWindow.addEventListener('keydown', this.onSkipToLevelThree);
       rollback(() => this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree));
       const deathScreen = new DeathScreen({
@@ -1344,6 +1364,7 @@ export class CultivationLevelRuntime {
 
   private readonly unloadResources = (): void => {
     const resources = this.requireResources();
+    this.cameraShadowCulling = undefined;
     this.preparationQueue?.dispose(); this.preparationQueue = undefined;
     this.lightLayout?.dispose(); this.lightLayout = undefined;
     this.lightLayoutKey = ''; this.lastShadowLayoutKey = '';
@@ -1548,6 +1569,7 @@ export class CultivationLevelRuntime {
     const preview = resources.authoredPreview;
     if (!preview || !resources.deathSequence.isPlaying) return;
     const room = preview.roomFive, c = room.controller;
+    if (c.complete) return;
     // Elevator completion establishes recovery even before either slime exits.
     if (this.authoredPreviewRoomId === 4 && preview.roomFour.controller.readModel.state === 'complete') {
       this.authoredPreviewProgression = this.debugSupport!.createPreviewProgression(5);
@@ -1562,20 +1584,13 @@ export class CultivationLevelRuntime {
       this.captureAuthoredPreviewCheckpoint(resources);
     }
     if (c.rescued && !resources.manager.isAvailable('volt')) this.registerRescuedVolt(resources);
-    if (c.rescued && resources.manager.activeSlimeId === 'volt') {
-      if (room.isAtVoltTerminal(resources.voltBody.position)) c.powerExit();
-    }
-    if (c.exitPowered && !c.complete) {
-      let allAtExit = true;
-      for (let i = 0; i < 3; i++) {
-        const body = i === 0 ? resources.pair.bobBody : i === 1 ? resources.pair.goopBody : resources.voltBody;
-        allAtExit &&= room.isAtFinalExit(body.position);
-      }
-      if (allAtExit) {
-        c.finish(); this.input.setEnabled(false); this.input.releasePointerLock();
-        this.host.dataset.gameState = 'complete';
-        this.events.emit('completed', { levelId: 'level-2', nextLevelId: 'level-3' });
-      }
+    if (c.rescued && !c.complete) {
+      // The lever ends Cultivation after its release sequence. Register Volt
+      // before emitting so the session carries all three slimes into Blackout.
+      c.finish(); this.input.setEnabled(false); this.input.releasePointerLock();
+      this.host.dataset.gameState = 'complete';
+      this.events.emit('completed', { levelId: 'level-2', nextLevelId: 'level-3' });
+      return;
     }
     if (resources.manager.isAvailable('volt') &&
       (resources.voltBody.position.y < -18 || room.isAcidAt(resources.voltBody.position))) {
