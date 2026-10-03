@@ -156,6 +156,7 @@ export class ContainmentLevelScene {
   private readonly measuredFirstUseGeometryResources: readonly THREE.Mesh[];
   private measuredFirstUseGeometryResourcesPrimed = false;
   private measuredFirstUseGeometryResourcePrimeCount = 0;
+  private readonly roomOneOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
 
   get bob(): BobCharacterPresentation {
     return this.teaching.bob;
@@ -213,6 +214,25 @@ export class ContainmentLevelScene {
     fitContainmentShadowCullingBounds(this.root);
     this.measuredFirstUseGeometryResources =
       resolveMeasuredFirstUseGeometryResources(this.root);
+    // Preserve light-bearing ancestry (including the elevator warning lamps):
+    // hiding those lights changes the shader layout of the local room.
+    const branches: { root: THREE.Object3D; visible: boolean }[] = [];
+    for (const root of [this.roomThree.root, this.roomFour.root, this.roomFive.root]) {
+      const lightAncestors = new Set<THREE.Object3D>();
+      root.traverse(object => {
+        if (!(object instanceof THREE.Light)) return;
+        for (let parent: THREE.Object3D | null = object; parent; parent = parent.parent) {
+          lightAncestors.add(parent);
+          if (parent === root) break;
+        }
+      });
+      const collect = (object: THREE.Object3D): void => {
+        if (lightAncestors.has(object)) object.children.forEach(collect);
+        else branches.push({ root: object, visible: object.visible });
+      };
+      collect(root);
+    }
+    this.roomOneOccludedBranches = branches;
   }
 
   /** Small #38-facing API; callers never need individual fixture objects. */
@@ -298,6 +318,33 @@ export class ContainmentLevelScene {
       this.teaching.isInsideCameraTightVent(position) ||
       this.roomThree.isInsideCameraTightVent(position)
     );
+  }
+
+  /**
+   * Room 1 and its enclosed entry duct cannot see Rooms 3–5. The climbing
+   * camera can nevertheless include them in its frustum, forcing cold GPU
+   * bindings even though the local walls cover every pixel. Cull only for
+   * the draw: preparation, physics, and authored visibility retain ownership.
+   * Stop before the duct's final turn so subsequent room views are unchanged.
+   */
+  withRoomOneOcclusion<T>(
+    activePosition: Vector3State,
+    cameraPosition: Vector3State,
+    draw: () => T,
+  ): T {
+    if (this.lighting.activeRoomId !== 1 ||
+      activePosition.z >= 24 || cameraPosition.z >= 24 ||
+      activePosition.y >= 14 || cameraPosition.y >= 14) return draw();
+
+    for (const branch of this.roomOneOccludedBranches) {
+      branch.visible = branch.root.visible;
+      branch.root.visible = false;
+    }
+    try {
+      return draw();
+    } finally {
+      for (const branch of this.roomOneOccludedBranches) branch.root.visible = branch.visible;
+    }
   }
 
   update(deltaSeconds: number, bobPosition?: Vector3State, activePosition = bobPosition): void {

@@ -775,7 +775,11 @@ export class GreyboxLevelRuntime {
       this.lastShadowLayoutKey = shadowLayoutKey;
     }
     testScene.lighting.prepareShadowFrame([body.position, goopBody.position]);
-    this.renderLayer.render();
+    testScene.withRoomOneOcclusion(
+      slimePair.activeBody.position,
+      this.renderLayer.cameraRig.camera.position,
+      () => this.renderLayer.render(),
+    );
 
     if (profileLightingTransition) {
       const visit = (this.lightingRoomVisits.get(lightingRoomId) ?? 0) + 1;

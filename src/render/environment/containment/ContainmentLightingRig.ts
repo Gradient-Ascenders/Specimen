@@ -382,6 +382,10 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     return this;
   }
 
+  get activeRoomId(): ContainmentLightingRoomId {
+    return this.activeRoomIdValue;
+  }
+
   get diagnostics(): ContainmentLightingDiagnostics {
     let authoredLightCount = 0;
     let visibleAuthoredLightCount = 0;
