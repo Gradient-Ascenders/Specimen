@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { disposeShadowLight } from '../render/ShadowLightResources.ts';
+import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
+import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
 
 export const BLACKOUT_BAY_LAYOUT = Object.freeze({
   chamberWidth: 34,
@@ -26,6 +28,11 @@ export class BlackoutMaintenanceBay {
   private readonly hallwayBulbs: THREE.Mesh[] = [];
   private readonly hallwayFlickerSeeds = [0.3, 1.8, 3.9, 5.2];
   private elapsed = 0;
+  private readonly staticVisuals: ContainmentStaticBatchResult;
+
+  get hallwayShadowLights(): readonly THREE.SpotLight[] {
+    return this.hallwayLights;
+  }
 
   constructor() {
     this.root.name = 'level-3-room-1-blackout-maintenance-bay';
@@ -191,6 +198,7 @@ export class BlackoutMaintenanceBay {
       object.castShadow = solid && !object.name.startsWith('hallway-flicker-bulb-');
       object.receiveShadow = solid;
     });
+    this.staticVisuals = consolidateStaticRoomVisuals(this.root, this.collisionMeshes.filter(mesh => mesh.material !== this.acidMaterial));
   }
 
   acidAt(position: Readonly<{ readonly x: number; readonly y: number; readonly z: number }>): boolean {
@@ -250,6 +258,7 @@ export class BlackoutMaintenanceBay {
   }
 
   dispose(): void {
+    this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries=new Set<THREE.BufferGeometry>();
     const materials=new Set<THREE.Material>();

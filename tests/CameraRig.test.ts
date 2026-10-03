@@ -39,6 +39,21 @@ const TEST_CONTEXTUAL_PROFILE: ContextualCameraProfile = {
   framingDampingPerSecond: 8,
 };
 
+test('vent ceiling cannot push the follow focus outside the map during a jump', () => {
+  const world = new CollisionWorld();
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(20, .3, 20)); roof.position.y = 2.55;
+  world.register(roof, CollisionLayer.CameraObstruction);
+  const target = createTarget();
+  target.position.y = 1.94; target.previousPosition.copy(target.position);
+  const rig = new CameraRig({ initialPitchRadians: THREE.MathUtils.degToRad(65) });
+  try {
+    rig.setFollowTarget(target, world); rig.update(1, 1 / 60);
+    assert.ok(rig.camera.position.y < 2.4, 'camera stays beneath the vent roof');
+    assert.ok(rig.getDiagnostics().focusPosition.y < 2.4 - .22, 'focus stays on the safe side as well');
+    assert.deepEqual(target.position.toArray(), [0, 1.94, 0], 'only presentation is constrained');
+  } finally { world.clear(); roof.geometry.dispose(); }
+});
+
 test('cinematic up override leaves wall gravity untouched and restores it on handoff', () => {
   const rig = new CameraRig();
   const target = createTarget();

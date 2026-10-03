@@ -17,14 +17,19 @@ export class BeamOcclusion {
       original = new Float32Array(positions.array); this.originals.set(geometry, original);
       positions.setUsage(THREE.DynamicDrawUsage);
     }
-    for (let i = 0; i < positions.count; i++) {
-      const offset = i * 3;
-      this.ray.fromArray(original, offset).applyQuaternion(rotation);
-      let fraction = 1;
-      if (this.ray.lengthSq() > .0001 && world.sweepSphere(origin, this.ray, .01, this.hit, CollisionLayer.LineOfSight, ignored))
-        fraction = Math.max(0, this.hit.fraction - .015 / this.ray.length());
-      positions.setXYZ(i, original[offset] * fraction, original[offset + 1] * fraction, original[offset + 2] * fraction);
-    }
+    // Every edge samples the same immutable pose. Refresh moving collider and
+    // parent matrices once for this cone, rather than again for every vertex.
+    const sourcePositions = original;
+    world.withStableQueryTransforms(() => {
+      for (let i = 0; i < positions.count; i++) {
+        const offset = i * 3;
+        this.ray.fromArray(sourcePositions, offset).applyQuaternion(rotation);
+        let fraction = 1;
+        if (this.ray.lengthSq() > .0001 && world.sweepSphere(origin, this.ray, .01, this.hit, CollisionLayer.LineOfSight, ignored))
+          fraction = Math.max(0, this.hit.fraction - .015 / this.ray.length());
+        positions.setXYZ(i, sourcePositions[offset] * fraction, sourcePositions[offset + 1] * fraction, sourcePositions[offset + 2] * fraction);
+      }
+    });
     positions.needsUpdate = true;
     geometry.computeBoundingSphere();
   }

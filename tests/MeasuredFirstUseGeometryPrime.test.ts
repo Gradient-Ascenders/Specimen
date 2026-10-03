@@ -179,3 +179,29 @@ test('isolated resource prewarm restores camera, light and renderable state', ()
   (unrelated.material as THREE.Material).dispose();
   light.dispose();
 });
+
+test('whole-room warm-up restores overlapping hidden owners and preserves the live light layout on failure', () => {
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const room = new THREE.Group(); room.visible = false;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+  mesh.visible = false; mesh.layers.set(4);
+  const dormantLight = new THREE.PointLight();
+  const liveLight = new THREE.SpotLight();
+  room.add(mesh, dormantLight); scene.add(room, liveLight);
+  const cameraLayers = camera.layers.mask, meshLayers = mesh.layers.mask;
+  const renderer = { render() {
+    assert.equal(room.visible, true); assert.equal(mesh.visible, true);
+    assert.equal(mesh.frustumCulled, false);
+    assert.ok(liveLight.layers.test(camera.layers));
+    assert.equal(dormantLight.layers.test(camera.layers), false, 'hidden ancestor must not add lights');
+    throw new Error('warm draw failed');
+  } } as unknown as THREE.WebGLRenderer;
+  try {
+    assert.throws(() => renderIsolatedPrewarmResources(renderer, scene, camera, [room, mesh],
+      { includeHidden: true }), /warm draw failed/);
+    assert.equal(room.visible, false); assert.equal(mesh.visible, false);
+    assert.equal(mesh.layers.mask, meshLayers, 'overlapping roots retain the original mask');
+    assert.equal(mesh.frustumCulled, true); assert.equal(camera.layers.mask, cameraLayers);
+    assert.equal(dormantLight.layers.mask, 1); assert.equal(liveLight.layers.mask, 1);
+  } finally { mesh.geometry.dispose(); mesh.material.dispose(); }
+});

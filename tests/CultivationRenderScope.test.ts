@@ -40,6 +40,22 @@ test('render scope hides distant rooms while keeping authored collision and spli
     scene.roomFour.controller.restoreArrival();
     scene.updatePresentationVisibility({ z: LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 7 }, { z: LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 5 });
     assert.equal(scene.roomFive.root.visible, true);
+    scene.updatePresentationVisibility({ z: LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 5 }, { z: LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 1 });
+    assert.equal(scene.roomThree.root.visible, false, 'upper Room 3 stays hidden while the camera crosses the lower vent entrance');
+    assert.equal(scene.roomFourGeometry.visible, true);
+    assert.equal(scene.roomFive.root.visible, true);
+    const arrivalLights: THREE.Light[] = [];
+    scene.root.traverseVisible(object => { if (object instanceof THREE.Light) arrivalLights.push(object); });
+    const liftFloor = scene.roomFour.collisionMeshes.find(mesh => mesh.name === 'room-4-lift-floor')!;
+    const floorBefore = liftFloor.getWorldPosition(new THREE.Vector3());
+    scene.updatePresentationVisibility({ z: 275 }, { z: 280 });
+    assert.equal(scene.roomFourGeometry.visible, false, 'distant lift geometry is still culled');
+    assert.equal(scene.roomFour.root.visible, true, 'the finite lift lights retain their shader slots');
+    assert.equal(liftFloor.visible, true, 'render culling cannot disable collision');
+    assert.deepEqual(liftFloor.getWorldPosition(new THREE.Vector3()), floorBefore);
+    const distantLights: THREE.Light[] = [];
+    scene.root.traverseVisible(object => { if (object instanceof THREE.Light) distantLights.push(object); });
+    assert.deepEqual(distantLights, arrivalLights);
     scene.reset(); scene.updatePresentationVisibility({ z: 4 }, { z: 8 });
     assert.equal(scene.roomOne.root.visible, true); assert.equal(scene.roomFive.root.visible, false);
   } finally { world.clear(); scene.dispose(); }

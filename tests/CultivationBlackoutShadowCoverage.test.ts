@@ -36,7 +36,7 @@ test('ordinary Cultivation coverage uses seven bounded sources and preserves Roo
     assert.ok(hulls.length > 0); assert.ok(receivers.length > 0);
     assert.ok(hulls.every(o => o.castShadow && !o.receiveShadow));
     assert.ok(receivers.every(o => !o.castShadow));
-    assert.ok(scene.labArt.floor.customProgramCacheKey().includes('finite-light-branch-v1'));
+    assert.ok(scene.labArt.floor.customProgramCacheKey().includes('finite-light-branch-v3'));
     // Moving decks stay attached to their collider; the normal material receives.
     let decks = 0;
     scene.roomOne.root.traverse(o => { if (o instanceof THREE.Mesh && o.material === scene.labArt.platform) { decks++; assert.equal(o.receiveShadow, true); assert.equal(o.castShadow, true); } });

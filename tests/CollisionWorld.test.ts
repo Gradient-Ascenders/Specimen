@@ -11,6 +11,38 @@ import {
   DEFAULT_SOLID_COLLISION_LAYERS,
 } from '../src/physics/CollisionWorld.ts';
 
+test('stable beam query batches reuse live transforms but never stale ordinary queries', () => {
+  const world = new CollisionWorld();
+  const parent = new THREE.Group();
+  const collider = new THREE.Mesh(new THREE.BoxGeometry()); collider.position.z = 2;
+  parent.add(collider); world.register(collider, CollisionLayer.LineOfSight);
+  let refreshes = 0;
+  const update = collider.updateWorldMatrix.bind(collider);
+  collider.updateWorldMatrix = (...args) => { refreshes++; update(...args); };
+  const hit = new CollisionHit(), origin = new THREE.Vector3(), displacement = new THREE.Vector3(0, 0, 8);
+  try {
+    let firstDistance = 0;
+    world.withStableQueryTransforms(() => {
+      for (let i = 0; i < 25; i++) {
+        assert.equal(world.sweepSphere(origin, displacement, .01, hit, CollisionLayer.LineOfSight), true);
+        if (i === 0) firstDistance = hit.distance;
+        assert.equal(hit.distance, firstDistance);
+      }
+      world.withStableQueryTransforms(() => world.raycast(origin, displacement.clone().normalize(), 8, hit, CollisionLayer.LineOfSight));
+    });
+    assert.equal(refreshes, 1);
+    parent.position.z = 2;
+    assert.equal(world.sweepSphere(origin, displacement, .01, hit, CollisionLayer.LineOfSight), true);
+    assert.ok(hit.distance > firstDistance);
+    assert.equal(refreshes, 2);
+    assert.throws(() => world.withStableQueryTransforms(() => { throw new Error('interrupted beam'); }), /interrupted beam/);
+    parent.position.z = 3;
+    const previousDistance = hit.distance;
+    world.sweepSphere(origin, displacement, .01, hit, CollisionLayer.LineOfSight);
+    assert.ok(hit.distance > previousDistance, 'throwing releases the snapshot');
+  } finally { world.clear(); collider.geometry.dispose(); }
+});
+
 test('static colliders reuse transform data until explicitly invalidated', () => {
   const world = new CollisionWorld();
   const collider = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));

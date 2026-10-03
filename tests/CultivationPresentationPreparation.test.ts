@@ -189,17 +189,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.equal(queue.diagnostics.configurations[1].z, 230);
       preview.updatePresentationVisibility({z:270}, {z:270});
       lighting.sync(scene);
+      // An explicitly different, unprepared light layout must not reuse arrival.
+      preview.roomFour.root.visible = false;
       const extraLight = new THREE.SpotLight(); scene.add(extraLight);
       assert.equal(queue.requireCurrent(true), false, 'different lighting still requires preparation');
       extraLight.removeFromParent();
+      preview.updatePresentationVisibility({z:270}, {z:270}); lighting.sync(scene);
       const beforeReuse = compiles;
-      assert.equal(queue.requireCurrent(true), false, 'the lift spotlight changes the isolated Room 5 layout');
-      const roomFiveDeadline = performance.now() + 10000;
-      while (!queue.requireCurrent(true) && performance.now() < roomFiveDeadline) {
-        queue.tick(0, true); await new Promise(resolve => setTimeout(resolve, 0));
-      }
-      assert.equal(queue.requireCurrent(true), true, 'the isolated encounter layout is prepared');
-      assert.ok(compiles > beforeReuse);
+      assert.equal(queue.requireCurrent(true), true, 'culling the lift geometry preserves the prepared light layout');
+      assert.equal(compiles, beforeReuse, 'Room 5 reuses the arrival shaders');
       assert.equal(queue.diagnostics.pending, false, 'exploration does not show another loading screen');
       for (const old of snapshots) old.object.visible = old.visible;
       const deadline = performance.now() + 30000;
@@ -216,8 +214,13 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     if (mode === 'startup') {
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
-      assert.equal(queue.diagnostics.completed, 3, 'startup prepares initial, lift handoff and isolated encounter layouts');
+      assert.equal(queue.diagnostics.completed, 2, 'startup prepares initial and the shared lift/encounter layout');
       const preparedCompiles = compiles;
+      preview.roomFour.controller.restoreArrival();
+      for (let z = 241; z <= 249; z += .1) {
+        preview.updatePresentationVisibility({z: z - 5.2}, {z}); lighting.sync(scene);
+        assert.equal(queue.requireCurrent(true), true, `vent entrance is ready with the camera trailing at ${z}`);
+      }
       for (const z of [251, 270, 251, 270]) {
         preview.updatePresentationVisibility({z}, {z}); lighting.sync(scene);
         assert.equal(queue.requireCurrent(true), true, 'Room 5 jump and lift exit are ready before gameplay');

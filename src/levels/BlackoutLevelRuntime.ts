@@ -62,6 +62,7 @@ import {
   type ResettablePuzzleComponent,
 } from '../puzzle/PuzzleRegistry.ts';
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
+import { SpatialShadowCache, type ShadowParticipantPosition } from '../render/SpatialShadowCache.ts';
 import {
   BobCharacterPresentation,
   type BobCharacterPresentationState,
@@ -153,6 +154,8 @@ interface BlackoutRuntimeResources {
   readonly transit?: BlackoutTransitController;
   readonly unregisterTransitCheckpointParticipant?: () => void;
   readonly dronePresentation?: MaintenanceDronePresentation;
+  readonly hallwayShadows?: SpatialShadowCache;
+  readonly hallwayShadowParticipants: readonly ShadowParticipantPosition[];
   readonly scene: BlackoutLevelScene;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
@@ -911,6 +914,16 @@ export class BlackoutLevelRuntime {
       : resources.group.activeBody;
     resources.bobMovementIntent.set(0, 0, 0);
 
+    // Switching changes input ownership, not gravity. Keep the other bodies
+    // falling and landing; mounted Volt is carried by the drone instead.
+    if (!specimenGameplay) {
+      resources.movement.set(0, 0, 0);
+      for (const passiveBody of resources.group.bodies) {
+        if (passiveBody === resources.group.voltBody && resources.maintenanceDrone.voltMounted) continue;
+        if (passiveBody !== body || switched) passiveBody.update(deltaSeconds, resources.movement);
+      }
+    }
+
     if (!switched) {
       this.renderLayer.cameraRig.queueLookInput(
         this.input.pointerDeltaX,
@@ -1263,6 +1276,7 @@ export class BlackoutLevelRuntime {
     }
     this.input.endPointerUpdate();
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    resources?.hallwayShadows?.prepareFrame(resources.hallwayShadowParticipants);
     this.renderLayer.render();
   }
 
@@ -1686,6 +1700,12 @@ export class BlackoutLevelRuntime {
         goopAcidPresentation,
         maintenanceBay,
         dronePresentation,
+        hallwayShadows: scene.maintenanceBay && maintenanceBay
+          ? new SpatialShadowCache(scene.maintenanceBay.hallwayShadowLights, [
+              { root: maintenanceBay.door.collisionMesh, radiusMetres: 4 },
+              { root: maintenanceDroneFixture.droneRoot, radiusMetres: 2, animated: true },
+            ]) : undefined,
+        hallwayShadowParticipants: [group.bobBody.position, group.goopBody.position, group.voltBody.position, specimenBody.position],
         scene,
         collisionWorld,
         surfaceRegistry,
@@ -1803,6 +1823,7 @@ export class BlackoutLevelRuntime {
     resources.deathScreen.hide();
     resources.maintenanceBay?.reset();
     resources.dronePresentation?.resetTutorial();
+    resources.hallwayShadows?.invalidate();
     this.bayComplete = false;
     this.roomTwoInitialized = false;
     this.bayExitHintShown = false;
@@ -1999,6 +2020,7 @@ export class BlackoutLevelRuntime {
     this.input.resetState();
     resources.maintenanceBay?.reset();
     resources.dronePresentation?.resetTutorial();
+    resources.hallwayShadows?.invalidate();
     this.bayExitHintShown = false;
     this.transitObjective = '';
     resources.electricalSystem.reset('reset');

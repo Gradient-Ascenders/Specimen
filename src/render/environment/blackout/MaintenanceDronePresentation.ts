@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { disposeShadowLight } from '../../ShadowLightResources.ts';
+import { disposeShadowLight, setShadowMapUpdatesActive } from '../../ShadowLightResources.ts';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 import type { MaintenanceDroneReadModel } from '../../../vehicles/MaintenanceDroneTypes.ts';
@@ -159,8 +159,7 @@ export class MaintenanceDronePresentation {
     const ramp = started ? THREE.MathUtils.smoothstep(state.startupProgress, 0, 1) : (state.lightEnabled ? 1 : 0);
     this.spot.intensity = 100 * ramp;
     // Keep the source registered for stable programs; unpowered maps do no work.
-    this.spot.shadow.autoUpdate = lit;
-    this.spot.shadow.needsUpdate = lit;
+    setShadowMapUpdatesActive(this.spot, lit);
     let beamLength=32;
     if(lit && this.world && this.ignored) {
       this.root.updateWorldMatrix(true,false);

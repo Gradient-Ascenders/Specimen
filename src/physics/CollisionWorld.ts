@@ -141,6 +141,16 @@ export class CollisionWorld {
     this.broadphaseEnabled = options.broadphaseEnabled ?? true;
   }
 
+  /** Synchronous read-only queries against one unchanged geometry pose.
+   * Only use around a batch that never moves colliders or their ancestors.
+   * Ordinary movement/camera queries still refresh transforms independently. */
+  withStableQueryTransforms<T>(query: () => T): T {
+    if (this.stableQueryDepth === 0) this.transformQueryStamp += 1;
+    this.stableQueryDepth++;
+    try { return query(); }
+    finally { this.stableQueryDepth--; }
+  }
+
   register(
     mesh: THREE.Mesh,
     layerMask = DEFAULT_SOLID_COLLISION_LAYERS,
@@ -286,7 +296,7 @@ export class CollisionWorld {
     this.validateLayerMask(queryMask);
     outHit.reset();
     this.resetSweepDiagnostics();
-    this.transformQueryStamp += 1;
+    if (this.stableQueryDepth === 0) this.transformQueryStamp += 1;
 
     if (queryMask === CollisionLayer.None) return false;
 
@@ -420,7 +430,7 @@ export class CollisionWorld {
 
     this.validateLayerMask(queryMask);
     outHit.reset();
-    this.transformQueryStamp += 1;
+    if (this.stableQueryDepth === 0) this.transformQueryStamp += 1;
     if (queryMask === CollisionLayer.None) return false;
 
     this.worldEnd
@@ -695,6 +705,7 @@ export class CollisionWorld {
   }
 
   private transformQueryStamp = 0;
+  private stableQueryDepth = 0;
   private readonly updatedNodes = new WeakMap<THREE.Object3D, number>();
 
   /** Ancestors are shared by many moving colliders; update each once per synchronous query. */

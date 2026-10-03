@@ -153,6 +153,8 @@ export class CameraRig {
   private readonly smoothedTarget = new THREE.Vector3();
   private readonly followError = new THREE.Vector3();
   private readonly framingPivot = new THREE.Vector3();
+  private readonly framingDisplacement = new THREE.Vector3();
+  private readonly framingHit = new CollisionHit();
   private readonly cameraLookPivot = new THREE.Vector3();
   private readonly normalFramingPivot = new THREE.Vector3();
   private readonly contextualAnchorPosition = new THREE.Vector3();
@@ -936,6 +938,19 @@ export class CameraRig {
       );
     } else {
       this.framingPivot.copy(this.normalFramingPivot);
+    }
+    // A smoothed/head-height focus can itself enter a low ceiling or a wall
+    // at a vent corner. Sweeping only the boom from that point can then let
+    // the camera escape on the collider's far side. Keep a player-follow
+    // focus reachable from the actual body before resolving the orbit.
+    if (!profile || profile.playerControlledPitch) {
+      this.framingDisplacement.subVectors(this.framingPivot, this.interpolatedTarget);
+      if (this.obstructionWorld?.sweepSphere(this.interpolatedTarget, this.framingDisplacement,
+        this.config.obstructionRadiusMetres, this.framingHit, CollisionLayer.CameraObstruction)) {
+        const length = this.framingDisplacement.length();
+        this.framingPivot.copy(this.interpolatedTarget).addScaledVector(this.framingDisplacement,
+          Math.max(0, this.framingHit.distance - this.config.obstructionBufferMetres) / length);
+      }
     }
     const cosPitch = Math.cos(this.effectivePitchRadians);
     this.boomDirection

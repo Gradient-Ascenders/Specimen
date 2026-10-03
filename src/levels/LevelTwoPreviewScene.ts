@@ -110,6 +110,7 @@ export class LevelTwoPreviewScene {
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
   readonly roomFour = new LevelTwoRoomFourGreybox();
+  readonly roomFourGeometry = new THREE.Group();
   readonly roomFive: LevelTwoRoomFiveGreybox;
   readonly maintenanceArt: CultivationMaintenanceArt;
   readonly elevatorArt: CultivationElevatorArt;
@@ -222,6 +223,19 @@ export class LevelTwoPreviewScene {
     );
     this.surfaceCleanup = new CultivationSurfaceCleanup(this);
     applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
+    // Keep the finite lift lights registered through Room 5 so entering the
+    // vent and leaving the lift's render range use the same shader layout.
+    // Geometry still has its own culling root; collider visibility is untouched.
+    this.roomFourGeometry.name = 'cultivation-room-4-render-geometry';
+    const lightNodes = new Set<THREE.Object3D>();
+    for (const child of this.roomFour.root.children) {
+      if (child instanceof THREE.Light) lightNodes.add(child);
+      if (child instanceof THREE.SpotLight || child instanceof THREE.DirectionalLight) lightNodes.add(child.target);
+    }
+    for (const child of [...this.roomFour.root.children]) {
+      if (!lightNodes.has(child)) this.roomFourGeometry.add(child);
+    }
+    this.roomFour.root.add(this.roomFourGeometry);
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),
@@ -354,8 +368,10 @@ export class LevelTwoPreviewScene {
     const nearZ = Math.min(cameraZ, bodyZ), farZ = Math.max(cameraZ, bodyZ);
     // Keep both ends of each 28m passage loaded throughout its approach/traversal.
     // The 12m overlap exceeds the normal camera orbit and prevents doorway popping.
-    const onLift = bodyZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z && bodyZ < LEVEL_TWO_ROOM_FIVE_OFFSET_Z;
-    const departed = onLift && this.roomFour.controller.boardingConfirmed;
+    // The shaft has descended by the time its vent opens. Crossing into Room 5
+    // must not re-expose the upper Room 3 while the follow camera is still on
+    // the lift; that room is no longer physically connected to this landing.
+    const departed = bodyZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z && this.roomFour.controller.boardingConfirmed;
     this.roomOne.root.visible = nearZ <= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z + 12;
     this.roomOneToTwoPassage.root.visible = nearZ <= LEVEL_TWO_ROOM_TWO_OFFSET_Z + 12;
     this.roomTwo.root.visible = farZ >= LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_THREE_OFFSET_Z + 12;
@@ -363,10 +379,11 @@ export class LevelTwoPreviewScene {
     this.roomTwoToThreeGoopPassage.root.visible = secondPassage;
     this.roomTwoToThreeBobAirDuct.root.visible = secondPassage;
     this.roomThree.root.visible = !departed && farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FOUR_OFFSET_Z + 12;
-    this.roomFour.root.visible = farZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 12;
+    this.roomFourGeometry.visible = farZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 12;
     // The closed lift vent occludes the entire lower sector during descent.
     this.roomFive.root.visible = bodyZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z || cameraZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z ||
       (this.roomFour.controller.readModel.state === 'complete' && farZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 12);
+    this.roomFour.root.visible = this.roomFourGeometry.visible || this.roomFive.root.visible;
   }
 
   updateAcidInteractions(deltaSeconds: number, bodies: readonly AcidContactBody[]): void {
