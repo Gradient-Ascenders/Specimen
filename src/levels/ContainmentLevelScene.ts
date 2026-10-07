@@ -157,6 +157,7 @@ export class ContainmentLevelScene {
   private measuredFirstUseGeometryResourcesPrimed = false;
   private measuredFirstUseGeometryResourcePrimeCount = 0;
   private readonly roomOneOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly roomThreeOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
 
   get bob(): BobCharacterPresentation {
     return this.teaching.bob;
@@ -216,23 +217,10 @@ export class ContainmentLevelScene {
       resolveMeasuredFirstUseGeometryResources(this.root);
     // Preserve light-bearing ancestry (including the elevator warning lamps):
     // hiding those lights changes the shader layout of the local room.
-    const branches: { root: THREE.Object3D; visible: boolean }[] = [];
-    for (const root of [this.roomThree.root, this.roomFour.root, this.roomFive.root]) {
-      const lightAncestors = new Set<THREE.Object3D>();
-      root.traverse(object => {
-        if (!(object instanceof THREE.Light)) return;
-        for (let parent: THREE.Object3D | null = object; parent; parent = parent.parent) {
-          lightAncestors.add(parent);
-          if (parent === root) break;
-        }
-      });
-      const collect = (object: THREE.Object3D): void => {
-        if (lightAncestors.has(object)) object.children.forEach(collect);
-        else branches.push({ root: object, visible: object.visible });
-      };
-      collect(root);
-    }
-    this.roomOneOccludedBranches = branches;
+    this.roomOneOccludedBranches = collectLightlessBranches([
+      this.roomThree.root, this.roomFour.root, this.roomFive.root,
+    ]);
+    this.roomThreeOccludedBranches = collectLightlessBranches([this.roomFive.root]);
   }
 
   /** Small #38-facing API; callers never need individual fixture objects. */
@@ -321,29 +309,37 @@ export class ContainmentLevelScene {
   }
 
   /**
-   * Room 1 and its enclosed entry duct cannot see Rooms 3–5. The climbing
-   * camera can nevertheless include them in its frustum, forcing cold GPU
-   * bindings even though the local walls cover every pixel. Cull only for
-   * the draw: preparation, physics, and authored visibility retain ownership.
-   * Stop before the duct's final turn so subsequent room views are unchanged.
+   * Enclosed Room 1 cannot see Rooms 3–5, and Room 3 cannot see the Room 5
+   * laboratory above the elevator shaft. Climbing cameras still submit that
+   * hidden geometry (and cold material variants) when they tilt upward.
+   * Cull only for the draw, preserving light ancestry and authored visibility.
+   * Stop before each exit so doorway views and subsequent rooms are unchanged.
    */
-  withRoomOneOcclusion<T>(
+  withEnclosedRoomOcclusion<T>(
     activePosition: Vector3State,
     cameraPosition: Vector3State,
     draw: () => T,
   ): T {
-    if (this.lighting.activeRoomId !== 1 ||
-      activePosition.z >= 24 || cameraPosition.z >= 24 ||
-      activePosition.y >= 14 || cameraPosition.y >= 14) return draw();
+    const roomId = this.lighting.activeRoomId;
+    const branches = roomId === 1 &&
+      activePosition.z < 24 && cameraPosition.z < 24 &&
+      activePosition.y < 14 && cameraPosition.y < 14
+      ? this.roomOneOccludedBranches
+      : roomId === 3 &&
+        activePosition.z < 78 && cameraPosition.z < 78 &&
+        activePosition.y < 34 && cameraPosition.y < 34
+        ? this.roomThreeOccludedBranches
+        : undefined;
+    if (!branches) return draw();
 
-    for (const branch of this.roomOneOccludedBranches) {
+    for (const branch of branches) {
       branch.visible = branch.root.visible;
       branch.root.visible = false;
     }
     try {
       return draw();
     } finally {
-      for (const branch of this.roomOneOccludedBranches) branch.root.visible = branch.visible;
+      for (const branch of branches) branch.root.visible = branch.visible;
     }
   }
 
@@ -389,6 +385,27 @@ export class ContainmentLevelScene {
     this.root.removeFromParent();
     this.root.clear();
   }
+}
+
+function collectLightlessBranches(roots: readonly THREE.Object3D[]):
+  { root: THREE.Object3D; visible: boolean }[] {
+  const branches: { root: THREE.Object3D; visible: boolean }[] = [];
+  for (const root of roots) {
+    const lightAncestors = new Set<THREE.Object3D>();
+    root.traverse(object => {
+      if (!(object instanceof THREE.Light)) return;
+      for (let parent: THREE.Object3D | null = object; parent; parent = parent.parent) {
+        lightAncestors.add(parent);
+        if (parent === root) break;
+      }
+    });
+    const collect = (object: THREE.Object3D): void => {
+      if (lightAncestors.has(object)) object.children.forEach(collect);
+      else branches.push({ root: object, visible: object.visible });
+    };
+    collect(root);
+  }
+  return branches;
 }
 
 function resolveMeasuredFirstUseGeometryResources(

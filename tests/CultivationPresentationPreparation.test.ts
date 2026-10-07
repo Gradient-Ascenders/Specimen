@@ -170,8 +170,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
         let now = performance.now();
         const clock = context.mock.method(performance, 'now', () => now += .001);
         try {
-          for (let i = 0; i < 1000 && queue.diagnostics.completed < 2; i++) {
-            now += 51; queue.tick(40);
+          for (let i = 0; i < 1000 && queue.diagnostics.completed < 3; i++) {
+            now += 51; queue.anticipateLiftExit(); queue.tick(40);
             assert.equal(queue.diagnostics.pending, false, 'preparing the destination must not block the lift');
             await new Promise(resolve => setTimeout(resolve, 0));
           }
@@ -185,8 +185,16 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
         }
       }
       assert.equal(queue.requireCurrent(true), true, 'the requested room finishes');
-      assert.equal(queue.diagnostics.completed, 2, 'earlier background work remains suspended until Room 5 is ready');
-      assert.equal(queue.diagnostics.configurations[1].z, 230);
+      assert.equal(queue.diagnostics.completed, mode === 'lift' ? 3 : 2, 'earlier background work remains suspended until the lift and Room 5 are ready');
+      assert.equal(queue.diagnostics.configurations[mode === 'lift' ? 2 : 1].z, 230);
+      if (mode === 'lift') {
+        assert.equal(queue.diagnostics.configurations[1].dark, false, 'prepare the ordinary lift layout before its exit');
+        assert.equal(queue.diagnostics.configurations[2].dark, true, 'then prepare the maintenance room');
+        preview.roomFour.controller.update(1.5, true, true);
+        preview.updatePresentationVisibility({z:237}, {z:237}); lighting.sync(scene);
+        assert.equal(queue.requireCurrent(false), true, 'the camera can return to the lift without loading at braking');
+        preview.updatePresentationVisibility({z:251}, {z:251}); lighting.sync(scene);
+      }
       preview.updatePresentationVisibility({z:270}, {z:270});
       lighting.sync(scene);
       // An explicitly different, unprepared light layout must not reuse arrival.
@@ -215,8 +223,33 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
       assert.equal(queue.diagnostics.completed, 2, 'startup prepares initial and the shared lift/encounter layout');
+      // Startup already prepared Room 5. Prioritize the smaller, bright lift
+      // layout during approach/ride instead of waiting for unrelated rooms.
+      let now = performance.now();
+      const clock = context.mock.method(performance, 'now', () => now += .001);
+      try {
+        for (let i = 0; i < 1000 && queue.diagnostics.completed < 3; i++) {
+          now += 51; queue.anticipateLiftExit(); queue.tick(40);
+          assert.equal(queue.diagnostics.pending, false, 'anticipated work stays in background');
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      } finally { clock.mock.restore(); }
+      assert.equal(queue.diagnostics.completed, 3, 'the lift is ready before braking');
+      assert.equal(queue.diagnostics.configurations[2].dark, false);
       const preparedCompiles = compiles;
-      preview.roomFour.controller.restoreArrival();
+      // The orbiting lift camera can expose Room 5 before its dark-room
+      // lighting starts. Exercise the real arrival states, not only a debug
+      // restore directly into the completed (dark) elevator.
+      preview.roomFour.controller.update(1.5, true, true);
+      for (const dt of [59, 1, 1.5]) {
+        preview.roomFour.controller.update(dt, true, true);
+        for (const cameraZ of [237, 251]) {
+          preview.updatePresentationVisibility({z:cameraZ}, {z:237}); lighting.sync(scene);
+          const dark = preview.roomFour.controller.readModel.state === 'complete';
+          assert.equal(queue.requireCurrent(dark), true, `lift exit is ready during ${preview.roomFour.controller.readModel.state} with camera at ${cameraZ}`);
+          assert.equal(queue.diagnostics.pending, false, 'brightness changes do not repeat GPU preparation');
+        }
+      }
       for (let z = 241; z <= 249; z += .1) {
         preview.updatePresentationVisibility({z: z - 5.2}, {z}); lighting.sync(scene);
         assert.equal(queue.requireCurrent(true), true, `vent entrance is ready with the camera trailing at ${z}`);

@@ -601,7 +601,7 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
         resources: {
           body: { attached: boolean; position: { x: number; y: number; z: number } };
           testScene: {
-            withRoomOneOcclusion<T>(body: THREE.Vector3Like, camera: THREE.Vector3Like, draw: () => T): T;
+            withEnclosedRoomOcclusion<T>(body: THREE.Vector3Like, camera: THREE.Vector3Like, draw: () => T): T;
           };
         };
         renderLayer: {
@@ -658,7 +658,7 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
       gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       return pixels;
     };
-    runtime.resources!.testScene.withRoomOneOcclusion(runtime.resources!.body.position,
+    runtime.resources!.testScene.withEnclosedRoomOcclusion(runtime.resources!.body.position,
       layer.cameraRig.camera.position, () => layer.render());
     const culledPixels = readPixels();
     const culledImage = layer.renderer.domElement.toDataURL();
@@ -698,6 +698,91 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
   expect(samples.visual.changedChannels / samples.visual.channelCount).toBeLessThan(0.001);
   expect(samples.visual.maxDelta).toBeLessThanOrEqual(20);
   expect(samples.visual.culledCalls).toBeLessThan(samples.visual.unculledCalls);
+});
+
+test('Room 3 final sticky-wall climb reuses GPU programs and bindings without changing the view', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 320, height: 180 });
+  const assertExposed = await exposeProductionTraversalRuntime(page);
+  await page.addInitScript(() => {
+    const counts = { programs: 0, bindings: 0, uploads: 0 };
+    const prototype = WebGL2RenderingContext.prototype;
+    const program = prototype.createProgram, binding = prototype.createVertexArray, upload = prototype.bufferData;
+    prototype.createProgram = function () { counts.programs++; return program.call(this); };
+    prototype.createVertexArray = function () { counts.bindings++; return binding.call(this); };
+    prototype.bufferData = function (...args: Parameters<typeof upload>) { counts.uploads++; return upload.apply(this, args); };
+    Object.assign(window, { __finalWallGpuCounts: counts });
+  });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
+  assertExposed();
+  await page.locator('[data-action="start"]').click();
+  await waitForRenderedFrames(page, 2);
+  const result = await page.evaluate(() => {
+    const host = window as Window & {
+      __finalWallGpuCounts: { programs: number; bindings: number; uploads: number };
+      __specimenProductionTraversalRuntime: ProductionTraversalRuntime & {
+        input: { isDown(action: string): boolean };
+        fixedUpdate(deltaSeconds: number): void;
+        resources: {
+          body: { attached: boolean; position: THREE.Vector3 };
+          testScene: { withEnclosedRoomOcclusion<T>(body: THREE.Vector3Like, camera: THREE.Vector3Like, draw: () => T): T };
+        };
+        renderLayer: { renderer: THREE.WebGLRenderer; cameraRig: {
+          camera: THREE.Camera; reset(): void; setGroundOrbitYawRadians(yaw: number): void;
+        }; render(): void };
+        render(alpha: number, stats: {
+          fixedDeltaSeconds: number; rawFrameDeltaSeconds: number; frameDeltaSeconds: number;
+          stepsThisFrame: number; interpolationAlpha: number; droppedSimulationTimeSeconds: number; renderFps: number;
+        }): void;
+      };
+    };
+    const runtime = host.__specimenProductionTraversalRuntime, r = runtime.resources!, layer = runtime.renderLayer;
+    const stats = { fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 1 / 60, frameDeltaSeconds: 1 / 60,
+      stepsThisFrame: 1, interpolationAlpha: 1, droppedSimulationTimeSeconds: 0, renderFps: 60 };
+    r.containmentLevel.teleportToRoomForDebug(3);
+    runtime.syncContextualCamera(r);
+    runtime.render(1, stats);
+    const prepared = { ...host.__finalWallGpuCounts }, gl = layer.renderer.getContext();
+    r.body.teleport({ x: 7.4, y: 25.9753, z: 75.3 });
+    layer.cameraRig.reset(); layer.cameraRig.setGroundOrbitYawRadians(Math.PI);
+    const isDown = runtime.input.isDown, samples = [];
+    try {
+      runtime.input.isDown = action => action === 'moveForward';
+      // Walk off the last platform, attach, and climb through the reported
+      // mid-wall camera turn. Teleporting up misses the cold first-use frame.
+      for (let step = 0; step <= 36; step++) {
+        runtime.fixedUpdate(1 / 60);
+        if (step % 6) continue;
+        runtime.render(1, stats); gl.finish();
+        samples.push({ step, attached: r.body.attached, y: r.body.position.y, counts: { ...host.__finalWallGpuCounts } });
+      }
+    } finally { runtime.input.isDown = isDown; }
+    const readPixels = () => {
+      const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+      gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      return pixels;
+    };
+    r.testScene.withEnclosedRoomOcclusion(r.body.position, layer.cameraRig.camera.position, () => layer.render());
+    const culled = readPixels(), culledCalls = layer.renderer.info.render.calls;
+    layer.render();
+    const unculled = readPixels(), unculledCalls = layer.renderer.info.render.calls;
+    let changedChannels = 0, maxDelta = 0;
+    for (let i = 0; i < culled.length; i++) if (culled[i] !== unculled[i]) {
+      changedChannels++; maxDelta = Math.max(maxDelta, Math.abs(culled[i] - unculled[i]));
+    }
+    return { prepared, samples, visual: { changedChannels, channelCount: culled.length, maxDelta, culledCalls, unculledCalls }, error: gl.getError() };
+  });
+  await test.info().attach('final-wall-gpu-and-visual-regression', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
+  expect(result.samples.some(sample => sample.attached && sample.y > 26.5), 'Bob reaches the middle of the last wall').toBe(true);
+  for (const sample of result.samples) expect(sample.counts, `final-wall camera turn at step ${sample.step}`).toEqual(result.prepared);
+  expect(result.error).toBe(0);
+  // Removing hidden draws changes a few MSAA/transmission edge samples on
+  // the bottom of Bob's silhouette (measured: eight pixels, max 39/255).
+  // Missing scenery or a lighting change must still fail this comparison.
+  expect(result.visual.changedChannels / result.visual.channelCount).toBeLessThan(0.0002);
+  expect(result.visual.maxDelta).toBeLessThanOrEqual(48);
+  expect(result.visual.culledCalls).toBeLessThan(result.visual.unculledCalls);
 });
 
 test('Bob reflections snap across restart and recreate across level reload', async ({

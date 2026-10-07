@@ -775,7 +775,7 @@ export class GreyboxLevelRuntime {
       this.lastShadowLayoutKey = shadowLayoutKey;
     }
     testScene.lighting.prepareShadowFrame([body.position, goopBody.position]);
-    testScene.withRoomOneOcclusion(
+    testScene.withEnclosedRoomOcclusion(
       slimePair.activeBody.position,
       this.renderLayer.cameraRig.camera.position,
       () => this.renderLayer.render(),
@@ -1854,6 +1854,30 @@ export class GreyboxLevelRuntime {
                   prewarmCamera.lookAt(x, y, z);
                   prewarmCamera.updateMatrixWorld();
                   renderer.render(this.renderLayer.scene, prewarmCamera);
+                }
+              }
+              if (roomId === 3) {
+                // The final wall's surface camera drops below Bob and tilts
+                // upward during attachment. Ground-orbit views miss the lift
+                // geometry exposed by that turn. Bind its real VAOs now while
+                // keeping the fully occluded upper laboratory out of the draw.
+                for (const [eye, target] of [
+                  [[7.4, 27.93, 70.35], [7.4, 26.3, 75.3]],
+                  [[7.4, 25.72, 73.81], [7.4, 26.75, 76.17]],
+                ]) {
+                  prewarmCamera.position.set(eye[0], eye[1], eye[2]);
+                  prewarmCamera.lookAt(target[0], target[1], target[2]);
+                  prewarmCamera.updateMatrixWorld();
+                  resources.testScene.withEnclosedRoomOcclusion(
+                    {x: target[0], y: target[1], z: target[2]}, prewarmCamera.position,
+                    () => renderer.render(this.renderLayer.scene, prewarmCamera),
+                  );
+                  withIsolatedPrewarmState(renderer, () =>
+                    resources.testScene.withEnclosedRoomOcclusion(
+                      {x: target[0], y: target[1], z: target[2]}, prewarmCamera.position,
+                      () => renderer.render(this.renderLayer.scene, prewarmCamera),
+                    ), transmissionPrewarmTarget,
+                  );
                 }
               }
             });
