@@ -18,8 +18,8 @@ git switch main
 git pull --ff-only
 ```
 
-Use Node.js 24.x and npm 11.x. The repository pins the verified versions in
-`.nvmrc` and the `packageManager` field in `package.json`. Use `npm ci` for
+Use the Node.js version in `.nvmrc` and the npm version in the `packageManager`
+field of `package.json`. CI installs both versions explicitly. Use `npm ci` for
 reproducible installs, keep the manifest and lockfile synchronized, and do not
 replace the package manager or lockfile without an approved project decision.
 
@@ -52,12 +52,9 @@ request.
 - Add proportionate automated tests for meaningful behaviour changes once the
   relevant test infrastructure exists.
 
-Before committing, run every relevant check exposed by the repository. The
-expected verification set, once corresponding scripts are available, is:
+Before committing, run every relevant check exposed by the repository:
 
 ```bash
-npm run format:check
-npm run lint
 npm run type-check
 npm test
 npm run build

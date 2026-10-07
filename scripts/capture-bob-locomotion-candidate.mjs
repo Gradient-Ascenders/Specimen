@@ -10,7 +10,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const evidence = path.join(root, 'docs/evidence/issue-150/locomotion-candidate');
+const evidence = path.join(root, 'artifacts/evidence/bob/locomotion-candidate');
 const source = path.join(root, 'assets/characters/bob/bob-locomotion-candidate.glb');
 const url = 'http://127.0.0.1:4175';
 const clipOnly = process.env.BOB_CAPTURE_CLIP_ONLY === '1';

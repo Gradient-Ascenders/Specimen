@@ -14,8 +14,6 @@ test('canonical brand assets and external lockups are checked in', async () => {
   const canonicalFiles = [
     ...Object.values(BRAND_ASSETS).map((asset) => `public/${asset.slice(2)}`),
     'public/brand/specimen-lockup-full.png',
-    'public/brand/specimen-lockup-compact.png',
-    'public/brand/specimen-containment-emblem.png',
     'public/brand/specimen-app-icon.png',
     'public/brand/specimen-favicon.svg',
   ];

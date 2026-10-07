@@ -56,16 +56,9 @@ npm run archive
 
 The generated `artifacts/specimen-production.zip` contains the contents of
 `dist/` at its root and is intentionally ignored by Git. See
-[`docs/production-deployment.md`](docs/production-deployment.md) for archive
+[`docs/operations/deployment.md`](docs/operations/deployment.md) for archive
 inspection, external nested-path testing, publication, verification, and retry
 steps.
-
-Assessment planning must distinguish the supplied CGV brief from current-year
-Moodle and mentor instructions. See
-[`docs/beta-requirements.md`](docs/beta-requirements.md) for confirmed
-Beta/trailer/deployment requirements, unresolved questions, owners, and the
-Issue #6 acceptance assessment. Moodle dates and current-year instructions take
-precedence over tentative planning information.
 
 ## Continuous integration
 
@@ -82,7 +75,15 @@ Two workflows separate merge checks from submission packaging:
   lifecycle browser suite.
 
 Require the **Unit tests** and **Production smoke** PR checks plus a teammate's
-approval before merging. See [`docs/continuous-integration.md`](docs/continuous-integration.md)
+approval before merging. See
+[`docs/operations/continuous-integration.md`](docs/operations/continuous-integration.md)
 for local commands, required-check activation, and the limits of automation.
 Upload the finished files through the Moodle-linked Tiny File Manager; a ZIP
 upload alone does not publish the game.
+
+## Documentation
+
+[`docs/README.md`](docs/README.md) indexes the current architecture, gameplay,
+level, operations, and decision records. Historical screenshots, videos, logs,
+and issue-closure reports are kept with their issue, pull request, or CI run
+rather than in the source tree.

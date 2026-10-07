@@ -33,6 +33,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      - name: Use pinned npm version
+        run: npm install --global npm@11.18.0
+
       - name: Install locked dependencies
         run: npm ci
 

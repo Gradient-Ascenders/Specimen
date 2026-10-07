@@ -5,7 +5,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const evidence = path.join(root, 'docs/evidence/issue-157');
+const evidence = path.join(root, 'artifacts/evidence/bob/gate-three');
 const url = 'http://127.0.0.1:4176/?debug=1';
 const poses = [
   'move-forward', 'move-reverse', 'squash', 'flatten',

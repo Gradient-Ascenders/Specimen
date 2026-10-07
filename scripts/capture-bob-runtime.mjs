@@ -5,7 +5,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const evidence = path.join(root, 'docs/evidence/issue-150/locomotion-runtime');
+const evidence = path.join(root, 'artifacts/evidence/bob/runtime');
 const url = 'http://127.0.0.1:4175';
 const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4175', '--strictPort'], {
   cwd: root,

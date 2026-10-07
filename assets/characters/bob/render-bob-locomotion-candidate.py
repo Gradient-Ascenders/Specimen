@@ -5,7 +5,7 @@ import bpy
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'docs/evidence/issue-150/locomotion-candidate'
+OUTPUT = ROOT / 'artifacts/evidence/bob/locomotion-candidate'
 OUTPUT.mkdir(parents=True, exist_ok=True)
 
 bpy.ops.object.select_all(action='SELECT')

@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 
-const output = path.resolve(process.env.LEVEL_SHADOW_OUTPUT ?? 'docs/evidence/issue-172/local');
+const output = path.resolve(process.env.LEVEL_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/cultivation-blackout');
 const baseline = process.env.LEVEL_SHADOW_BASELINE === '1';
 const url = process.env.LEVEL_SHADOW_URL ?? 'http://127.0.0.1:4182/';
 const server = process.env.LEVEL_SHADOW_URL ? undefined : spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4182', '--strictPort'], { stdio: 'ignore' });
