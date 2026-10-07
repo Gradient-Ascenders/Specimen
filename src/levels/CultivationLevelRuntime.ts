@@ -615,7 +615,9 @@ export class CultivationLevelRuntime {
     }
     this.input.endPointerUpdate();
     const lightingRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position);
-    if (lightingRoom === 4) this.preparationQueue?.anticipateLiftExit();
+    if (lightingRoom === 4 || (lightingRoom === 3 && resources.authoredPreview?.roomFourGeometry.visible)) {
+      this.preparationQueue?.anticipateLiftExit();
+    }
     const darkRoom = lightingRoom === 5 || (lightingRoom === 4
       && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,

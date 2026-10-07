@@ -89,7 +89,15 @@ export class CultivationPreparationQueue {
 
   /** Prepare the destination during the lift ride, while its shutter is closed. */
   anticipateLiftExit(): void {
-    this.upcoming = this.configurations.find(config => config.dark &&
+    // The camera returns to the ordinary lift layout while braking, before
+    // Room 5's searchlights enter its render scope. Prepare that smaller layout
+    // first rather than leaving it behind unrelated earlier-room work.
+    this.upcoming = this.configurations.find(config => !config.ready && !config.dark &&
+      config.visible.every((visible, i) => visible === (i === 6))) ?? this.liftExitConfiguration();
+  }
+
+  private liftExitConfiguration(): Configuration | undefined {
+    return this.configurations.find(config => config.dark &&
       config.visible.every((visible, i) => visible === (i === 6 || i === 7)));
   }
 
@@ -103,10 +111,13 @@ export class CultivationPreparationQueue {
     }
     // Culling an already prepared neighboring room does not introduce assets.
     // If the padded light layout also matches, every remaining program and
-    // buffer is ready. Do not put up another loading screen just to prime it again.
+    // buffer is ready. Bright/dark transitions change only light uniforms;
+    // all configurations prepare the same shadow-enabled variants. In particular,
+    // the lift camera can see Room 5 before its dark lighting starts at arrival.
+    // Do not put up another loading screen just to prime that layout again.
     if (!config.ready) {
       const lightingKey = this.lightingKey(this.layer.scene);
-      const covered = this.configurations.some(prepared => prepared.ready && prepared.dark === dark &&
+      const covered = this.configurations.some(prepared => prepared.ready &&
         prepared.lightingKey === lightingKey && config!.visible.every((visible, i) => !visible || prepared.visible[i]));
       if (covered) {
         // A speculative pass may already be queued. Its materials stay retained
@@ -138,7 +149,9 @@ export class CultivationPreparationQueue {
   async prepareStartup(): Promise<void> {
     const started = performance.now();
     await this.prepareInitial();
-    this.anticipateLiftExit();
+    // Keep startup's cost unchanged. The ordinary lift layout is prepared in
+    // background on approach; the expensive Room 5 layout still loads here.
+    this.upcoming = this.liftExitConfiguration();
     if (this.upcoming) await this.prepareConfiguration(this.upcoming);
     // Room 5 retains the lift's finite lights even once its geometry is culled.
     // The arrival preparation therefore also covers the entire maintenance room.
