@@ -1,8 +1,27 @@
 node_modules/
 dist/
 artifacts/
+coverage/
+.nyc_output/
+.vite/
+*.tsbuildinfo
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Browser-test output
 .playwright-mcp/
 playwright-report/
 test-results/
-*.local
+
+# Editor and operating-system files
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
+Thumbs.db

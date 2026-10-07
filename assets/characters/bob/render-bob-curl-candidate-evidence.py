@@ -5,8 +5,8 @@ Run after generate-bob-curl-candidate.py:
     --python assets/characters/bob/render-bob-curl-candidate-evidence.py
 
 Default output is the current front/side pass. Append `-- --overlay` to include
-the reference overlay; `--output docs/evidence/issue-150/<folder>` selects its
-destination. The overlay uses exported geometry without warping the reference.
+the reference overlay. `--output` and `--reference` select paths relative to the
+repository root. The overlay uses exported geometry without warping the reference.
 """
 from pathlib import Path
 import argparse
@@ -18,11 +18,12 @@ from mathutils import Vector
 
 ROOT=Path(__file__).resolve().parents[3]
 parser=argparse.ArgumentParser()
-parser.add_argument('--output',default='docs/evidence/issue-150/curl-candidate-v3')
+parser.add_argument('--output', default='artifacts/evidence/bob/curl-candidate')
+parser.add_argument('--reference', default='artifacts/evidence/bob/reference-front.png')
 parser.add_argument('--overlay',action='store_true')
 args=parser.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])
 OUTPUT=ROOT/args.output
-REFERENCE=ROOT/'docs/evidence/issue-150/curl-candidate-v2/reference-front.png'
+REFERENCE=ROOT/args.reference
 scene=bpy.context.scene
 
 

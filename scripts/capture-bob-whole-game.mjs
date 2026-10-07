@@ -5,7 +5,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const evidenceDirectory = path.join(root, 'docs/evidence/issue-160');
+const evidenceDirectory = path.join(root, 'artifacts/evidence/bob/whole-game');
 const evidencePath = path.join(evidenceDirectory, 'measurements.json');
 const url = 'http://127.0.0.1:4177/?debug=1';
 const approvedAsset = {

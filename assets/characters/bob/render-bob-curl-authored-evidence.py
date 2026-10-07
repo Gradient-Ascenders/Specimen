@@ -9,7 +9,7 @@ import bpy
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[3]
-OUTPUT = ROOT / 'docs/evidence/issue-150/curl-production'
+OUTPUT = ROOT / 'artifacts/evidence/bob/curl-production'
 OUTPUT.mkdir(parents=True, exist_ok=True)
 
 bpy.ops.object.select_all(action='SELECT')

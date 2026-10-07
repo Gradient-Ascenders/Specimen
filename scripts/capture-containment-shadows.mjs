@@ -6,7 +6,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const output = path.resolve(process.env.CONTAINMENT_SHADOW_OUTPUT ?? path.join(root, 'docs/evidence/issue-171/local'));
+const output = path.resolve(process.env.CONTAINMENT_SHADOW_OUTPUT ?? path.join(root, 'artifacts/evidence/shadows/containment'));
 const url = process.env.CONTAINMENT_SHADOW_URL ?? 'http://127.0.0.1:4181/';
 const cdp = process.env.CONTAINMENT_SHADOW_CDP_URL;
 const server = process.env.CONTAINMENT_SHADOW_URL ? undefined : spawn('npm',

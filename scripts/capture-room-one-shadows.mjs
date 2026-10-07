@@ -5,7 +5,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const evidence = path.resolve(process.env.SHADOW_PROOF_OUTPUT ?? path.join(root, 'docs/evidence/issue-169'));
+const evidence = path.resolve(process.env.SHADOW_PROOF_OUTPUT ?? path.join(root, 'artifacts/evidence/shadows/room-one'));
 const url = process.env.SHADOW_PROOF_URL ?? 'http://127.0.0.1:4179/';
 // A CDP connection allows the same capture on representative physical hardware.
 const cdp = process.env.SHADOW_PROOF_CDP_URL;

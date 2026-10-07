@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {chromium} from '@playwright/test';
 
-const output = path.resolve(process.env.GAME_SHADOW_OUTPUT ?? 'docs/evidence/issue-173/local');
+const output = path.resolve(process.env.GAME_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/full-game');
 const url = process.env.GAME_SHADOW_URL ?? 'http://127.0.0.1:4183/';
 const dpr = Number(process.env.GAME_SHADOW_DPR ?? 1);
 const server = process.env.GAME_SHADOW_URL ? undefined : spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4183', '--strictPort'], {stdio: 'ignore'});

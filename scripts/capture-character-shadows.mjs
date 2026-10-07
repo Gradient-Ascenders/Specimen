@@ -6,7 +6,7 @@ import path from 'node:path';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '..');
-const output = path.resolve(process.env.CHARACTER_SHADOW_OUTPUT ?? 'docs/evidence/issue-170');
+const output = path.resolve(process.env.CHARACTER_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/characters');
 const url = process.env.CHARACTER_SHADOW_URL ?? 'http://127.0.0.1:4180/';
 const server = process.env.CHARACTER_SHADOW_URL ? undefined : spawn('npm',
   ['run', 'preview', '--', '--host', '0.0.0.0', '--port', '4180', '--strictPort'],

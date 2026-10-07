@@ -15,7 +15,7 @@ from mathutils import Vector
 
 
 ROOT_DIRECTORY = Path(__file__).resolve().parents[3]
-OUTPUT_DIRECTORY = ROOT_DIRECTORY / "docs" / "evidence" / "issue-150" / "gate-1"
+OUTPUT_DIRECTORY = ROOT_DIRECTORY / "artifacts" / "evidence" / "bob" / "gate-one"
 OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
 ROOT_NAME = "Bob-Gate-One"
