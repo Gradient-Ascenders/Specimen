@@ -19,7 +19,7 @@ export class BlackoutLevelScene {
     if (authoredRoomOne) {
       if (!mapData) throw new Error('Room 1 texture maps must be prepared before scene construction.');
       this.maintenanceBay = new BlackoutMaintenanceBay(mapData);
-      this.transitRoom = new BlackoutTransitRoom();
+      this.transitRoom = new BlackoutTransitRoom(this.maintenanceBay.surfaceMaterials);
       this.bossStaging = new BlackoutBossStaging();
       this.root.add(this.maintenanceBay.root, this.transitRoom.root, this.bossStaging.root);
       this.collisionMeshes = [...this.maintenanceBay.collisionMeshes, ...this.transitRoom.collisionMeshes, ...this.bossStaging.collisionMeshes];
@@ -73,8 +73,9 @@ export class BlackoutLevelScene {
   }
 
   dispose(): void {
-    this.maintenanceBay?.dispose();
+    // Static Room 2 borrowers must release their batches before the kit owner.
     this.transitRoom?.dispose();
+    this.maintenanceBay?.dispose();
     this.bossStaging?.dispose();
     this.root.removeFromParent();
     this.root.traverse((object) => {

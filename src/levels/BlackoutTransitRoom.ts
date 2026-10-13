@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import type { BlackoutMaintenanceMaterials } from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
+import { mapBlackoutBoxUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
+import { borrowBlackoutMaps } from '../render/environment/blackout/BlackoutTransitMaterials.ts';
 import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
 import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
 
@@ -136,7 +139,13 @@ export class BlackoutTransitRoom {
   private hallwayElapsed = 0;
   private readonly staticVisuals: ContainmentStaticBatchResult;
 
-  constructor() {
+  private disposed = false;
+
+  /** Borrowed from the maintenance bay; controller and room dispose first. */
+  readonly surfaceMaterials?: BlackoutMaintenanceMaterials;
+
+  constructor(surfaceMaterials?: BlackoutMaintenanceMaterials) {
+    this.surfaceMaterials = surfaceMaterials;
     this.root.name = 'level-3-room-2-powered-transit-gauntlet';
     this.root.userData.levelId = 'blackout';
     this.root.userData.roomId = 'room-2';
@@ -161,6 +170,32 @@ export class BlackoutTransitRoom {
     this.buildExit(platformSteel, liftSteel, warning);
     this.bridgeLockContact = this.buildExitHallway(darkSteel, steel, platformSteel, trim, warning);
     this.buildIndustrialDressing(steel, darkSteel, trim, glass);
+    if (surfaceMaterials) {
+      // Bind authored material references before batching; these choices never
+      // supply gameplay meaning. Mutable contacts retain their private materials.
+      const bindings = new Map<THREE.Material, THREE.MeshStandardMaterial>([
+        [darkSteel, surfaceMaterials.get('wallPanel')],
+        [steel, surfaceMaterials.get('machineryMetal')],
+        [platformSteel, surfaceMaterials.get('floorDeck')],
+        [liftSteel, surfaceMaterials.get('ductSteel')],
+        [trim, surfaceMaterials.detail('steel')],
+        [warning, surfaceMaterials.get('warningPaint')],
+      ]);
+      borrowBlackoutMaps(sticky, surfaceMaterials.get('wallPanel'));
+      borrowBlackoutMaps(glass, surfaceMaterials.get('machineryMetal'));
+      this.root.traverse(object => {
+        if (!(object instanceof THREE.Mesh) || object.material === acid || object.name.includes('hallway-bulb') || object.name.includes('threshold-light') || object.name === 'transit-main-entry-frame-top') return;
+        const original = object.material as THREE.MeshStandardMaterial;
+        object.material = bindings.get(original) ?? original;
+        if (object.name === 'transit-ceiling' || object.name === 'transit-exit-hallway-ceiling') object.material = surfaceMaterials.get('ceilingPanel');
+        if (object.name.startsWith('transit-basin-') && original === darkSteel) object.material = surfaceMaterials.get('basinMetal');
+        if (object.name === 'transit-main-power-trunk') object.material = surfaceMaterials.get('ductSteel');
+        const material = object.material as THREE.MeshStandardMaterial;
+        if (!material.normalMap) borrowBlackoutMaps(material, surfaceMaterials.get(object.name === 'transit-exit-door-prop-crate' ? 'acidPlatform' : 'machineryMetal'));
+        object.updateMatrix();
+        mapBlackoutBoxUVs(object.geometry, object.matrix, material.userData.tileSizeMetres);
+      });
+    }
     this.update(0);
     const immutable: THREE.Mesh[] = [];
     this.root.traverse(object => {
@@ -200,6 +235,8 @@ export class BlackoutTransitRoom {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries = new Set<THREE.BufferGeometry>();
