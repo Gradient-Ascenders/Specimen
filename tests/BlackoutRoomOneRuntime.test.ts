@@ -1,3 +1,4 @@
+import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -147,6 +148,7 @@ function createFixture() {
     renderLayer: { scene, canvas: document.createElement(), cameraRig, render: () => {} } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt' },
     authoredRoomOne: true,
+    maintenanceMaps,
   });
   runtime.load();
   runtime.start();
@@ -670,4 +672,19 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
       assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3', 'death retry is a full room restart');
     }
   } finally { f.cleanup(); }
+});
+
+ test('preloaded CPU maps survive reload while each bay owns fresh textures and dispose releases runtime data', () => {
+  const f=createFixture();
+  const resources=()=> (f.runtime as unknown as {resources:{scene:{maintenanceBay:{surfaceMaterials:{get(family:string):THREE.MeshStandardMaterial}}}}}).resources;
+  const first=resources().scene.maintenanceBay.surfaceMaterials.get('wallPanel').map as THREE.DataTexture;
+  let disposed=0;first.addEventListener('dispose',()=>disposed++);
+  try {
+    f.runtime.unload();f.runtime.unload();assert.equal(disposed,1);
+    f.runtime.load();
+    const second=resources().scene.maintenanceBay.surfaceMaterials.get('wallPanel').map as THREE.DataTexture;
+    assert.notEqual(second,first);assert.equal(second.image.data,first.image.data);
+    f.runtime.start();f.runtime.restartLevel();assert.equal(resources().scene.maintenanceBay.surfaceMaterials.get('wallPanel').map,second);
+    f.runtime.dispose();assert.equal((f.runtime as unknown as {maintenanceMaps:unknown}).maintenanceMaps,undefined);
+  } finally {f.cleanup();}
 });

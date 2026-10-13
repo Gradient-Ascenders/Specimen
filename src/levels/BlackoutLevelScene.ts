@@ -1,3 +1,4 @@
+import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
 
 import { BLACKOUT_FOUNDATION_LENGTH_METRES } from './BlackoutFoundationManifest.ts';
@@ -13,10 +14,11 @@ export class BlackoutLevelScene {
   readonly transitRoom?: BlackoutTransitRoom;
   readonly bossStaging?: BlackoutBossStaging;
 
-  constructor(authoredRoomOne = false) {
+  constructor(authoredRoomOne = false, mapData?: BlackoutMaintenanceMapData) {
     this.root.name = 'blackout-level-3-foundation';
     if (authoredRoomOne) {
-      this.maintenanceBay = new BlackoutMaintenanceBay();
+      if (!mapData) throw new Error('Room 1 texture maps must be prepared before scene construction.');
+      this.maintenanceBay = new BlackoutMaintenanceBay(mapData);
       this.transitRoom = new BlackoutTransitRoom();
       this.bossStaging = new BlackoutBossStaging();
       this.root.add(this.maintenanceBay.root, this.transitRoom.root, this.bossStaging.root);

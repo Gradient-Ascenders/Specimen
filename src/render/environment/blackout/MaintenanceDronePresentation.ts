@@ -5,6 +5,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import type { MaintenanceDroneReadModel } from '../../../vehicles/MaintenanceDroneTypes.ts';
 import type { CollisionWorld } from '../../../physics/CollisionWorld.ts';
 import { BeamOcclusion } from '../../hazards/BeamOcclusion.ts';
+import type { BlackoutMaintenanceMaterials } from './BlackoutMaintenanceMaterials.ts';
+import { mapBlackoutPropUVs } from './BlackoutMaintenanceUVs.ts';
 
 /** Worn, purely visual maintenance craft; gameplay/collision remain runtime-owned. */
 export class MaintenanceDronePresentation {
@@ -35,7 +37,7 @@ export class MaintenanceDronePresentation {
   private readonly beamOrigin = new THREE.Vector3();
   private readonly downward = new THREE.Vector3(0,-1,0);
 
-  constructor(authoringRoot: THREE.Group, host: HTMLElement, world?: CollisionWorld, ignored?: THREE.Mesh, completeTutorial: () => void = () => {}) {
+  constructor(authoringRoot: THREE.Group, host: HTMLElement, world?: CollisionWorld, ignored?: THREE.Mesh, completeTutorial: () => void = () => {}, kit?: BlackoutMaintenanceMaterials) {
     this.completeTutorial = completeTutorial;
     this.world=world;this.ignored=ignored;
     this.root.name = 'maintenance-drone-presentation';
@@ -47,11 +49,11 @@ export class MaintenanceDronePresentation {
       this.materials.add(m);
       return m;
     };
-    const yellow = mat(0xc79b27, .78, .35);
-    const edgeYellow = mat(0x84651c, .88, .28);
-    const darkMetal = mat(0x252a27, .52, .78);
-    const steel = mat(0x66706b, .44, .82);
-    const rubber = mat(0x171a18, .96, .05);
+    const yellow = kit?.get('dronePaint') ?? mat(0xc79b27, .78, .35);
+    const edgeYellow = kit?.detail('droneTrim') ?? mat(0x84651c, .88, .28);
+    const darkMetal = kit?.get('machineryMetal') ?? mat(0x252a27, .52, .78);
+    const steel = kit?.detail('steel') ?? mat(0x66706b, .44, .82);
+    const rubber = kit?.detail('rubber') ?? mat(0x171a18, .96, .05);
     const glass = mat(0x182522, .24, .35);
     const shellGeo = this.own(new RoundedBoxGeometry(1.45, .38, 1.34, 4, .13));
     const shell = new THREE.Mesh(shellGeo, yellow);
@@ -87,7 +89,7 @@ export class MaintenanceDronePresentation {
       this.fans.push(fan);
     }
     // Functional-looking service fittings and bundled exposed cable, no weaponry.
-    const hoseMat = mat(0x332b1b, .92, .08);
+    const hoseMat = kit?.detail('rubber') ?? mat(0x332b1b, .92, .08);
     for (let i = 0; i < 3; i++) {
       const cable = new THREE.Mesh(this.own(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
         new THREE.Vector3(-.37 + i * .16, .02, .66), new THREE.Vector3(-.3 + i * .16, -.1, .72),
@@ -100,6 +102,13 @@ export class MaintenanceDronePresentation {
       foot.position.set(x, -.19, .43); this.root.add(foot);
     }
 
+    // Bake once in object coordinates. Fan motion and flight never rewrite UVs.
+    if (kit) this.root.traverse(object => {
+      if (object instanceof THREE.Mesh && kit.owns(object.material as THREE.Material)) {
+        mapBlackoutPropUVs(object.geometry, (object.material as THREE.Material).userData.tileSizeMetres);
+      }
+    });
+
     for (const [x, z] of [[-.47, -.684], [.47, -.684], [-.47, .684], [.47, .684]]) {
       const lampMat = mat(0x44351a, .35, .18); lampMat.emissive.setHex(0xffc42e); lampMat.emissiveIntensity = .3;
       this.lamps.push(lampMat);
@@ -107,8 +116,9 @@ export class MaintenanceDronePresentation {
       lamp.position.set(x, .03, z); this.root.add(lamp);
     }
 
-    // The visible cone and real spotlight share the same angle and useful range.
-    this.spot = new THREE.SpotLight(0xffd34f, 0, 32, Math.atan(2/7), .5, 2);
+    // At normal hover height, cover a 5 x 7 m landing deck with a soft local pool.
+    // Keep one shadowed source; the beam geometry and occlusion use its angle.
+    this.spot = new THREE.SpotLight(0xffd34f, 0, 32, Math.atan(6/7), .25, 2);
     this.spot.name = 'blackout-maintenance-searchlight';
     this.spot.castShadow=true;
     this.spot.shadow.mapSize.set(512,512);
@@ -124,7 +134,7 @@ export class MaintenanceDronePresentation {
         opacity: 0, depthWrite: false, side: THREE.DoubleSide });
       this.materials.add(coneMat);
       // ConeGeometry's apex is +Y: leave it unrotated so the beam widens down.
-      const cone = new THREE.Mesh(this.own(new THREE.ConeGeometry([1.48, 1.72, 2][i]!, 7, 24, 1, true)), coneMat);
+      const cone = new THREE.Mesh(this.own(new THREE.ConeGeometry([.74, .86, 1][i]! * Math.tan(this.spot.angle) * 7, 7, 24, 1, true)), coneMat);
       cone.name = 'soft-maintenance-beam'; cone.position.y = -3.63; this.root.add(cone);
       this.cones.push({ mesh: cone, baseOpacity });
     }
@@ -164,7 +174,7 @@ export class MaintenanceDronePresentation {
     if(lit && this.world && this.ignored) {
       this.root.updateWorldMatrix(true,false);
       this.beamOrigin.set(0,-.13,0);this.root.localToWorld(this.beamOrigin);
-      beamLength=this.occlusion.length(this.world,this.beamOrigin,this.downward,32,Math.atan(2/7),this.ignored);
+      beamLength=this.occlusion.length(this.world,this.beamOrigin,this.downward,this.spot.distance,this.spot.angle,this.ignored);
     }
     for(const cone of this.cones) {
       cone.mesh.scale.setScalar(beamLength/7);

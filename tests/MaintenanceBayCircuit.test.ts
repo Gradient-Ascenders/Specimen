@@ -1,3 +1,4 @@
+import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -9,7 +10,7 @@ import { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegis
 import { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
 
 test('vent discharges animate without blue rings or allocating new geometry',()=>{
-  const bay=new BlackoutMaintenanceBay();
+  const bay=new BlackoutMaintenanceBay(maintenanceMaps);
   const arcs=bay.root.getObjectByName('vent-live-electrical-arcs') as THREE.LineSegments;
   assert.ok(arcs);
   assert.equal(bay.root.getObjectByName('electrical-arc-1'),undefined);
@@ -24,7 +25,7 @@ test('vent discharges animate without blue rings or allocating new geometry',()=
 });
 
 test('Volt acquires the actual bay receiver without its conduit blocking the socket', () => {
-  const bay = new BlackoutMaintenanceBay();
+  const bay = new BlackoutMaintenanceBay(maintenanceMaps);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(bay.collisionMeshes);

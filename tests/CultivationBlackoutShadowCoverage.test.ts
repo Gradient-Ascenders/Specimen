@@ -1,3 +1,4 @@
+import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -73,7 +74,7 @@ test('role assignment leaves dissolve materials and hidden/transparent/effect ex
 });
 
 test('four Blackout hallway maps cover the retained floor and exclude acid/light emitters', () => {
-  const bay = new BlackoutMaintenanceBay();
+  const bay = new BlackoutMaintenanceBay(maintenanceMaps);
   try {
     const spots: THREE.SpotLight[] = [];
     bay.root.traverse(o => { if (o instanceof THREE.SpotLight) spots.push(o); });

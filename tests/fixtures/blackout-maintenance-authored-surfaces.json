@@ -1,0 +1,1813 @@
+{
+  "surfaces": [
+    {
+      "name": "entry-safe-platform",
+      "collider": true,
+      "position": [
+        0,
+        -0.525,
+        3.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "154a5d474f4aac5ec07c317885351fbb3f82c629193b52e6008f52ad5f047d34",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "front-perimeter-wall",
+      "collider": true,
+      "position": [
+        0,
+        6,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "8e34084f75dff305268592f011248c66c149557bf752d2c05a0edf65d5cffece",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "acid-basin-bed",
+      "collider": true,
+      "position": [
+        0,
+        -1.25,
+        27.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "b9681ede6b64a2de48d4e4391ea3f4d4f59cbaee1d7c47388e898a98c1046ed5",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "animated-acid-surface",
+      "collider": true,
+      "position": [
+        0,
+        -0.99,
+        27.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "6928326486c417d119002c7b252977d0582e0ce38b0fc8d621dcedafd5800681",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision",
+        "textureRole": "acid-floor"
+      },
+      "castShadow": false,
+      "receiveShadow": false
+    },
+    {
+      "name": "entry-apron-riser-west",
+      "collider": true,
+      "position": [
+        -12.6,
+        -0.475,
+        7
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "1a21be87648347cacb6307215bb2eaf79f29e013ff31d788aee758f7d6bcdb70",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "entry-apron-riser-east",
+      "collider": true,
+      "position": [
+        5.5,
+        -0.475,
+        7
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "40cb9cf413a72b6f9f41c25d78b9fb79e9d654dd7010441c3db6926b2569a2b0",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "bob-route-platform-17",
+      "collider": true,
+      "position": [
+        -3,
+        -0.45,
+        17
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "1fb696b828a469e7baa969f731e785fd4291254398fce11a2024a32ce696274a",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "bob-route-platform-28.5",
+      "collider": true,
+      "position": [
+        1.5,
+        -0.30000000000000004,
+        28.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "a0ef4420284af60e46763dd837c5fc8cd4b21354d216612d5f7797016922ba59",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "bob-route-platform-40",
+      "collider": true,
+      "position": [
+        -2.5,
+        -0.45,
+        40
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "1fb696b828a469e7baa969f731e785fd4291254398fce11a2024a32ce696274a",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "exit-safe-platform",
+      "collider": true,
+      "position": [
+        0,
+        -0.525,
+        51
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "74065563951d72b69ff6a8e3f406be24e34e55c79f01f7c0ce1d0057ff8b0b1d",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision",
+        "preciseMovementCorners": true
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "acid-exit-ramp",
+      "collider": true,
+      "position": [
+        12.4,
+        -0.59,
+        45.25
+      ],
+      "rotation": [
+        -0.17985349979247828,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "b68f287abf89439795e394e9da8be8ea09e8b9538945fbf78451526d3002333f",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision",
+        "preciseMovementCorners": true
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "west-perimeter-wall",
+      "collider": true,
+      "position": [
+        -16.8,
+        5,
+        26
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "9d5057e61b6802a7c4159d0cb29da75b49e56c66a8668fcdda25da1348add950",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "east-perimeter-wall",
+      "collider": true,
+      "position": [
+        16.8,
+        5,
+        26
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "9d5057e61b6802a7c4159d0cb29da75b49e56c66a8668fcdda25da1348add950",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "rear-wall-west",
+      "collider": true,
+      "position": [
+        -11.775,
+        6,
+        54
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "09a7b013342a795421f4198fe2ad7514d2d4d94a5cde4929f795836d55ffc879",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "rear-wall-between-openings",
+      "collider": true,
+      "position": [
+        -1.125,
+        6,
+        54
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "dda7d87155364f7ef4df33e66aae50ced0916b77a2441f6cc9fe5aa1dc5f7f2d",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "rear-wall-east",
+      "collider": true,
+      "position": [
+        12.9,
+        6,
+        54
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "6f137905f3085e3c1eb3662f2b34fc4171e37f1e3af55bdda138089ddf14fa1f",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "door-header",
+      "collider": true,
+      "position": [
+        6,
+        8.25,
+        54
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "8e6510dc393b27905f43076bd068bb9067eefb2b2b42a7ffcf65df2f524246d2",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-mouth-left-jamb",
+      "collider": true,
+      "position": [
+        -6.85,
+        6,
+        54
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "c16c70ad40260e35f8679f3c6dd074fa6d096f78ed015a1dfcc858d0969a1552",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-mouth-right-jamb",
+      "collider": true,
+      "position": [
+        -5.15,
+        6,
+        54
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "c16c70ad40260e35f8679f3c6dd074fa6d096f78ed015a1dfcc858d0969a1552",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-mouth-upper-wall",
+      "collider": true,
+      "position": [
+        -6,
+        7.1,
+        54
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "a6e74b0ee07b7e56e253af5886b8d65e5254f6e5d33bedf07588d945f78d7868",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "main-ceiling",
+      "collider": true,
+      "position": [
+        0,
+        12.15,
+        26
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "35070d264a4bf45966f1dad6b6db9480d9f4a2659420b67bc0a563117d8d3eb1",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-floor",
+      "collider": true,
+      "position": [
+        6,
+        -0.2,
+        64
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "84eeef00842de26cebb0b55235f4dbd71ea440e45dc78cab33aa977605b13612",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-ramp",
+      "collider": true,
+      "position": [
+        6,
+        0.1347472299594079,
+        77
+      ],
+      "rotation": [
+        -0.07485984771076686,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "5b7dc7b79b97eddf9317316d288017cec6c13909b62bf880fca4195a5ae62ff2",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision",
+        "preciseMovementCorners": true
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-west-wall",
+      "collider": true,
+      "position": [
+        3,
+        2.25,
+        67
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "6c9b066d6ace0009cff7b8577db96ad6ce562da7d05f71db8184e62dc615b1b3",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-east-wall",
+      "collider": true,
+      "position": [
+        9,
+        2.25,
+        67
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "6c9b066d6ace0009cff7b8577db96ad6ce562da7d05f71db8184e62dc615b1b3",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-roof",
+      "collider": true,
+      "position": [
+        6,
+        4.65,
+        67
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "e8dbf633c6c183439d8cffe94fdd6712dddc3df0374d15e3407fc27313132f4b",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-interior-floor",
+      "collider": true,
+      "position": [
+        -6,
+        -0.1,
+        57
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "740ec2cc2526f6c77379b255ee222a2006d77613b1c4de97b5dc087a04541720",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision",
+        "preciseMovementCorners": true
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-duct-west-wall",
+      "collider": true,
+      "position": [
+        -6.85,
+        1.1,
+        57
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "5bb88ce59a93ebfc43d865ffd7a79bf6a129cc133b090697fdd86f87b6870811",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-duct-east-wall",
+      "collider": true,
+      "position": [
+        -5.15,
+        1.1,
+        57
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "5bb88ce59a93ebfc43d865ffd7a79bf6a129cc133b090697fdd86f87b6870811",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-duct-ceiling",
+      "collider": true,
+      "position": [
+        -6,
+        2.3,
+        57
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "740ec2cc2526f6c77379b255ee222a2006d77613b1c4de97b5dc087a04541720",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-turn-floor",
+      "collider": true,
+      "position": [
+        -11,
+        -0.1,
+        61.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "f66d606fbd77a7fe3d05a4f3fc78a7dfe87a661a7a672ea5efc4f8a0cde65fd3",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-turn-ceiling",
+      "collider": true,
+      "position": [
+        -11,
+        2.3,
+        61.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "f66d606fbd77a7fe3d05a4f3fc78a7dfe87a661a7a672ea5efc4f8a0cde65fd3",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-turn-south-west",
+      "collider": true,
+      "position": [
+        -11.75,
+        1.1,
+        60
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "ecdf6ef2dcec50c0080be9e0b4edeae7f8b98fb94abba0ce847e6e25f3b7d549",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-turn-north-east",
+      "collider": true,
+      "position": [
+        -10.25,
+        1.1,
+        63
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "ecdf6ef2dcec50c0080be9e0b4edeae7f8b98fb94abba0ce847e6e25f3b7d549",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-turn-east-wall",
+      "collider": true,
+      "position": [
+        -5.25,
+        1.1,
+        61.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "9c7b3134bbecac8d4d48c6159127cf93f4a01ac999cbeab48877947ee64b9982",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-turn-west-wall",
+      "collider": true,
+      "position": [
+        -16.75,
+        1.1,
+        61.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "9c7b3134bbecac8d4d48c6159127cf93f4a01ac999cbeab48877947ee64b9982",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "volt-rising-duct-floor",
+      "collider": true,
+      "position": [
+        -16,
+        1.1888549296331474,
+        71.5
+      ],
+      "rotation": [
+        -0.15061537294043809,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "0337678980eeeab61cae06e41f318e5632a766b64831f3115526fef61aba139d",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision",
+        "preciseMovementCorners": true
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "volt-rising-duct-ceiling",
+      "collider": true,
+      "position": [
+        -16,
+        3.59,
+        71.5
+      ],
+      "rotation": [
+        -0.15061537294043809,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "0337678980eeeab61cae06e41f318e5632a766b64831f3115526fef61aba139d",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "volt-rising-duct-side--16.85",
+      "collider": true,
+      "position": [
+        -16.85,
+        2.39,
+        71.5
+      ],
+      "rotation": [
+        -0.15061537294043809,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "46a04ba4e478da1c6fa8b84dae7d55641ef17d7f666281d4dd0cf34fb3c75f66",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "volt-rising-duct-side--15.15",
+      "collider": true,
+      "position": [
+        -15.15,
+        2.39,
+        71.5
+      ],
+      "rotation": [
+        -0.15061537294043809,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "46a04ba4e478da1c6fa8b84dae7d55641ef17d7f666281d4dd0cf34fb3c75f66",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "volt-catwalk-entry-extension",
+      "collider": true,
+      "position": [
+        -16,
+        2.4,
+        83
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "21a2b2f4606677242c25c1df18fb20d5040e0eaa39c8033dce35cb50fbab033a",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--6.77-53.75",
+      "collider": true,
+      "position": [
+        -6.77,
+        1.1,
+        53.75
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--5.23-53.75",
+      "collider": true,
+      "position": [
+        -5.23,
+        1.1,
+        53.75
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-header-53.75",
+      "collider": true,
+      "position": [
+        -6,
+        2.28,
+        53.75
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "dc519235faa25c4b0600a5a5dcb07eb903f38b89c2d0c55a153086a082e06769",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--6.77-55.5",
+      "collider": true,
+      "position": [
+        -6.77,
+        1.1,
+        55.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--5.23-55.5",
+      "collider": true,
+      "position": [
+        -5.23,
+        1.1,
+        55.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-header-55.5",
+      "collider": true,
+      "position": [
+        -6,
+        2.28,
+        55.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "dc519235faa25c4b0600a5a5dcb07eb903f38b89c2d0c55a153086a082e06769",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--6.77-57.5",
+      "collider": true,
+      "position": [
+        -6.77,
+        1.1,
+        57.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--5.23-57.5",
+      "collider": true,
+      "position": [
+        -5.23,
+        1.1,
+        57.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-header-57.5",
+      "collider": true,
+      "position": [
+        -6,
+        2.28,
+        57.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "dc519235faa25c4b0600a5a5dcb07eb903f38b89c2d0c55a153086a082e06769",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--6.77-59.5",
+      "collider": true,
+      "position": [
+        -6.77,
+        1.1,
+        59.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-side--5.23-59.5",
+      "collider": true,
+      "position": [
+        -5.23,
+        1.1,
+        59.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "vent-frame-header-59.5",
+      "collider": true,
+      "position": [
+        -6,
+        2.28,
+        59.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "dc519235faa25c4b0600a5a5dcb07eb903f38b89c2d0c55a153086a082e06769",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "entry-warning--1.5",
+      "collider": false,
+      "position": [
+        0,
+        0.012,
+        -1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "ff930ef64e08d76aa8910b0671126a8e115e23323a5590c76baa3947049a98a7",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "entry-warning-6.3",
+      "collider": false,
+      "position": [
+        0,
+        0.012,
+        6.3
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "ff930ef64e08d76aa8910b0671126a8e115e23323a5590c76baa3947049a98a7",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "exit-warning-48.4",
+      "collider": false,
+      "position": [
+        0,
+        0.012,
+        48.4
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "ff930ef64e08d76aa8910b0671126a8e115e23323a5590c76baa3947049a98a7",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "exit-warning-52.8",
+      "collider": false,
+      "position": [
+        0,
+        0.012,
+        52.8
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "ff930ef64e08d76aa8910b0671126a8e115e23323a5590c76baa3947049a98a7",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "ceiling-entry-vent-frame",
+      "collider": true,
+      "position": [
+        -2,
+        11.9,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "ad9b5a9910e926708671aaa57d42aeff5c2b3989b9cb47d1f21d8a39e0a4ff74",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "ceiling-entry-vent-grille",
+      "collider": true,
+      "position": [
+        -2,
+        11.78,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "9b971d7b284a7f9cafc61cf26617dfaa5f0de951dde2e7b9d201c4dcf74c2f7b",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {
+        "surfaceTag": "default",
+        "authoringRole": "blackout-maintenance-bay-collision"
+      },
+      "castShadow": true,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-flicker-bulb-1",
+      "collider": false,
+      "position": [
+        6,
+        4.2,
+        56.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "fac5020e288fdce429a26f923a2f519f1df8ef52ac15d63b0b8008e22fb0302f",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": false,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-flicker-bulb-2",
+      "collider": false,
+      "position": [
+        6,
+        4.2,
+        62
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "fac5020e288fdce429a26f923a2f519f1df8ef52ac15d63b0b8008e22fb0302f",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": false,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-flicker-bulb-3",
+      "collider": false,
+      "position": [
+        6,
+        4.2,
+        68
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "fac5020e288fdce429a26f923a2f519f1df8ef52ac15d63b0b8008e22fb0302f",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": false,
+      "receiveShadow": true
+    },
+    {
+      "name": "hallway-flicker-bulb-4",
+      "collider": false,
+      "position": [
+        6,
+        4.2,
+        74
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        "XYZ"
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "positionHash": "fac5020e288fdce429a26f923a2f519f1df8ef52ac15d63b0b8008e22fb0302f",
+      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
+      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "userData": {},
+      "castShadow": false,
+      "receiveShadow": true
+    }
+  ]
+}

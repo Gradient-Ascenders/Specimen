@@ -44,6 +44,8 @@ export interface VerticalBlastDoorSnapshot {
 }
 
 export interface VerticalBlastDoorOptions {
+  /** Optional borrowed finishes. Their owner must outlive this door. */
+  readonly materials?: { readonly panel: THREE.MeshStandardMaterial; readonly frame: THREE.MeshStandardMaterial };
   readonly id: string;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
@@ -88,9 +90,14 @@ export class VerticalBlastDoor {
   private transitionCountValue = 0;
   private collisionEnabledValue = false;
   private disposed = false;
+  private readonly borrowedMaterials = new Set<THREE.Material>();
 
   constructor(options: VerticalBlastDoorOptions) {
     validateOptions(options);
+    if (options.materials) {
+      this.borrowedMaterials.add(options.materials.panel);
+      this.borrowedMaterials.add(options.materials.frame);
+    }
     this.id = options.id;
     this.collisionWorld = options.collisionWorld;
     this.surfaceRegistry = options.surfaceRegistry;
@@ -109,7 +116,7 @@ export class VerticalBlastDoor {
 
     this.collisionMesh = new THREE.Mesh(
       new THREE.BoxGeometry(options.panelSize.x, options.panelSize.y, options.panelSize.z),
-      new THREE.MeshStandardMaterial({
+      options.materials?.panel ?? new THREE.MeshStandardMaterial({
         color: 0x66777e,
         emissive: 0x182126,
         emissiveIntensity: 0.16,
@@ -124,7 +131,7 @@ export class VerticalBlastDoor {
     this.collisionMesh.userData.movementFaceMode = 'vertical-sides';
     this.root.add(this.collisionMesh);
 
-    this.addFrame(options.panelSize);
+    this.addFrame(options.panelSize, options.materials?.frame);
     this.applyProgress();
     this.collisionWorld.register(
       this.collisionMesh,
@@ -284,7 +291,7 @@ export class VerticalBlastDoor {
       }
     });
     for (const geometry of geometries) geometry.dispose();
-    for (const material of materials) material.dispose();
+    for (const material of materials) if (!this.borrowedMaterials.has(material)) material.dispose();
     this.root.clear();
   }
 
@@ -400,8 +407,8 @@ export class VerticalBlastDoor {
     }
   }
 
-  private addFrame(panelSize: THREE.Vector3): void {
-    const material = new THREE.MeshStandardMaterial({
+  private addFrame(panelSize: THREE.Vector3, borrowed?: THREE.MeshStandardMaterial): void {
+    const material = borrowed ?? new THREE.MeshStandardMaterial({
       color: 0x344047,
       roughness: 0.62,
       metalness: 0.55,

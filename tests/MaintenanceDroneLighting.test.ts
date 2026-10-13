@@ -64,3 +64,45 @@ test('maintenance beam reaches the floor and stops above intervening platforms',
   assert.ok(bottom()<.15,'beam grows back when no longer blocked');
   presentation.dispose();world.clear();floor.geometry.dispose();platform.geometry.dispose();
 });
+
+test('local maintenance spotlight covers landing corners on all three decks without revealing the next step', () => {
+  const element = () => ({style: {}, append() {}, remove() {}});
+  const host = {...element(), ownerDocument: {createElement: element}} as unknown as HTMLElement;
+  const root = new THREE.Group();
+  const presentation = new MaintenanceDronePresentation(root, host);
+  const spot = root.getObjectByName('blackout-maintenance-searchlight') as THREE.SpotLight;
+  const beams: THREE.Mesh[] = [];
+  root.traverse(object => { if (object instanceof THREE.Mesh && object.name === 'soft-maintenance-beam') beams.push(object); });
+  const state = {state: 'parked-hover', lightEnabled: true, powered: true} as MaintenanceDroneReadModel;
+  presentation.update(1 / 60, state, false);
+  assert.equal(spot.intensity, 100);
+  assert.equal(spot.decay, 2);
+  assert.equal(spot.distance, 32);
+  assert.equal(spot.penumbra, .25);
+  assert.deepEqual(spot.shadow.mapSize.toArray(), [512, 512]);
+  const decks = [[-3, .15, 17], [1.5, .45, 28.5], [-2.5, .15, 40]];
+  for (const [x, top, z] of decks) {
+    root.position.set(x!, 6.61, z!);
+    root.updateWorldMatrix(true, true);
+    spot.shadow.updateMatrices(spot);
+    const height = 6.61 - .13 - top!;
+    const cornerCosine = height / Math.hypot(height, 2.5, 3.5);
+    const outerCosine = Math.cos(spot.angle);
+    const innerCosine = Math.cos(spot.angle * (1 - spot.penumbra));
+    const t = THREE.MathUtils.clamp((cornerCosine - outerCosine) / (innerCosine - outerCosine), 0, 1);
+    assert.ok(t * t * (3 - 2 * t) >= .5, 'landing corners receive at least half the angular light strength');
+    for (const dx of [-2.5, 2.5]) for (const dz of [-3.5, 3.5]) {
+      const corner = new THREE.Vector3(x! + dx, top!, z! + dz).project(spot.shadow.camera);
+      assert.ok(Math.abs(corner.x) < 1 && Math.abs(corner.y) < 1 && Math.abs(corner.z) < 1, 'shadow frustum covers illuminated corners');
+    }
+    assert.ok(Math.tan(spot.angle) * (height + 1.1) < 8, 'pool stops short of the next deck, including basin height');
+  }
+  const outerBeam = beams.at(-1)!;
+  const radius = (outerBeam.geometry as THREE.ConeGeometry).parameters.radius;
+  assert.ok(Math.abs(radius / 7 - Math.tan(spot.angle)) < 1e-12, 'visible outer beam shares the light angle');
+  presentation.update(1 / 60, {...state, lightEnabled: false, powered: false, state: 'grounded-idle'}, false);
+  assert.equal(spot.intensity, 0);
+  assert.equal(spot.shadow.autoUpdate, false);
+  assert.ok(beams.every(beam => (beam.material as THREE.MeshBasicMaterial).opacity === 0));
+  presentation.dispose();
+});
