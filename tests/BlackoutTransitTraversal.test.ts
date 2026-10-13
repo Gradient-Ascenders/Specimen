@@ -1,3 +1,5 @@
+import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
+import { BlackoutMaintenanceMaterials } from '../src/render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -17,7 +19,8 @@ function directionTo(body: KinematicBody, target: THREE.Vector3): THREE.Vector3 
 }
 
 function createTransitFixture() {
-  const room = new BlackoutTransitRoom();
+  const kit = new BlackoutMaintenanceMaterials(maintenanceMaps);
+  const room = new BlackoutTransitRoom(kit);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(room.collisionMeshes, undefined, ColliderTransformMode.Static);
@@ -110,6 +113,7 @@ function createTransitFixture() {
     dispose() {
       for (const lift of [...lifts].reverse()) lift.dispose();
       room.dispose();
+      kit.dispose();
       world.clear();
       surfaces.clear();
     },
