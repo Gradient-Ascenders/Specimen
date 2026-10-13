@@ -651,6 +651,8 @@ export class GreyboxLevelRuntime {
     testScene.bob.update(deltaSeconds, slimeVisualState);
     testScene.goop.update(deltaSeconds, {
       locomotionPositionWorld: goopBody.locomotionPosition,
+      velocityWorld: goopBody.velocity,
+      maximumLocomotionSpeedMetresPerSecond: goopBody.maximumLocomotionSpeedMetresPerSecond,
       movementIntentWorld: activeBody === goopBody && !switchedThisStep ? cameraRelativeMovement : resources.noMovement,
       grounded: goopBody.grounded,
     });
@@ -985,6 +987,8 @@ export class GreyboxLevelRuntime {
     const unsubscribeDamaged = containmentLevel.events.on('damaged', () => {
       if (slimePair.activeSlimeId === 'bob') {
         testScene.bob.onDamage(1);
+      } else if (slimePair.activeSlimeId === 'goop') {
+        testScene.goop.onDamage(1);
       }
     });
 

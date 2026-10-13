@@ -126,8 +126,11 @@ export class RoomFiveGreybox {
   private readonly containedGoopPosition = new THREE.Vector3(0, 76.546, 110);
   private readonly goopPresentationState = {
     locomotionPositionWorld: new THREE.Vector3(),
+    velocityWorld: new THREE.Vector3(),
+    maximumLocomotionSpeedMetresPerSecond: 5.5,
     movementIntentWorld: new THREE.Vector3(),
-    grounded: false,
+    // The capsule supports the resting pose; release motion is scripted.
+    grounded: true,
   };
   private endingStateValue: RoomFiveEndingState = 'traversal';
   private endingElapsedSeconds = 0;

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import * as THREE from 'three';
 import { loadGoop } from './fixtures/GoopAssetFixture.ts';
-import { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
+import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../src/render/goop/GoopCharacterPresentation.ts';
 import { disposeGoopAsset, GOOP_EYE_BOUNDS, validateGoopAsset } from '../src/render/goop/GoopAsset.ts';
 import { GOOP_BASE_COLOR, GoopMaterialSet, goopMotionProtection } from '../src/render/goop/GoopMaterials.ts';
 import { prepareCharacterCameraFades } from '../src/render/slime/PrepareCharacterCameraFades.ts';
@@ -13,6 +13,15 @@ function compile(material: THREE.Material, library: keyof typeof THREE.ShaderLib
   const shader = { uniforms: {}, vertexShader: THREE.ShaderLib[library].vertexShader, fragmentShader: THREE.ShaderLib[library].fragmentShader };
   material.onBeforeCompile(shader as THREE.WebGLProgramParametersWithUniforms, null as never);
   return shader as typeof shader & { uniforms: Record<string, THREE.IUniform> };
+}
+
+function motionState(): GoopCharacterPresentationState & {
+  locomotionPositionWorld: THREE.Vector3;
+  velocityWorld: THREE.Vector3;
+  movementIntentWorld: THREE.Vector3;
+} {
+  return { locomotionPositionWorld: new THREE.Vector3(), velocityWorld: new THREE.Vector3(),
+    maximumLocomotionSpeedMetresPerSecond: 5.5, movementIntentWorld: new THREE.Vector3(), grounded: true };
 }
 
 test('real Goop export validates geometry, its own axis/contact metadata, and static hierarchy', async () => {
@@ -90,12 +99,14 @@ test('failure permits retry and resolution after disposal releases every importe
 test('normal jumps and landings deform the whole seated group about the sole then settle exactly', async () => {
   const p = new GoopCharacterPresentation(); await p.prepare(loadGoop);
   const position = new THREE.Vector3(0, 0.46, 0), intent = new THREE.Vector3();
-  const state = { locomotionPositionWorld: position, movementIntentWorld: intent, grounded: true };
+  const state = { locomotionPositionWorld: position, movementIntentWorld: intent,
+    velocityWorld: new THREE.Vector3(0, 6, 0), maximumLocomotionSpeedMetresPerSecond: 5.5, grounded: false };
   p.setPosition(position); p.onLaunch({ directionWorld: { x: 0, y: 1, z: 0 }, speedMetresPerSecond: 6, chargeFraction: 1 });
   p.update(0.09, state); p.present(); assert.ok(p.diagnostics.stretch > 0);
   const body = p.root.getObjectByName('Goop-Body')!;
   const sole = body.localToWorld(new THREE.Vector3(0, -0.45, 0));
   assert.ok(Math.abs(sole.y - 0.01) < 1e-8);
+  state.grounded = true; state.velocityWorld.set(0, 0, 0);
   p.onLanding({ x: 0, y: 1, z: 0 }, 9); p.update(0.14, state); p.present(); assert.ok(p.diagnostics.squash > 0);
   p.update(2, state); p.present(); assert.equal(p.diagnostics.squash, 0); assert.equal(p.diagnostics.stretch, 0);
   // Carrier movement and a teleport with no player intent cannot steer facing.
@@ -103,6 +114,151 @@ test('normal jumps and landings deform the whole seated group about the sole the
   intent.x = 1; position.x += 0.05; p.update(1 / 60, state); assert.ok(p.diagnostics.facingYawRadians < 0);
   p.reset(); assert.equal(p.diagnostics.facingYawRadians, 0); assert.equal(p.diagnostics.materials!.impactStrength, 0);
   p.dispose();
+});
+
+test('ground locomotion leans over a planted sole, interpolates, counterleans on reversal and settles', async () => {
+  const p = new GoopCharacterPresentation(); await p.prepare(loadGoop);
+  const state = motionState(), dt = 1 / 60;
+  p.setPosition(new THREE.Vector3(0, 0.46, 0)); p.update(dt, state);
+  state.movementIntentWorld.z = -1;
+  for (let frame = 0; frame < 45; frame++) {
+    state.locomotionPositionWorld.z -= 5.5 * dt; p.update(dt, state);
+  }
+  assert.ok(p.diagnostics.locomotionStrength > 0.95);
+  const body = p.root.getObjectByName('Goop-Body') as THREE.Mesh;
+  const eyes = ['Goop-Eye-Left', 'Goop-Eye-Right'].map(name => p.root.getObjectByName(name) as THREE.Mesh);
+  p.present();
+  const sole = body.localToWorld(new THREE.Vector3(0, -0.45, 0));
+  const upper = body.localToWorld(new THREE.Vector3(0, 0.2, 0));
+  assert.ok(Math.abs(sole.y - 0.01) < 1e-8); assert.equal(sole.z, 0);
+  assert.ok(upper.z < -0.17, 'upper body travels forward over the contact');
+  assert.ok(Math.abs(body.matrixWorld.determinant() - 1) < 1e-8, 'gel volume is preserved');
+  for (const eye of eyes) { eye.updateWorldMatrix(true, false); assert.ok(eye.matrixWorld.equals(body.matrixWorld)); }
+  // Only the presentation transform changes; approved vertex data stays intact.
+  assert.equal(body.geometry.morphAttributes.position, undefined);
+  const beforeReverse = p.diagnostics.facingYawRadians;
+  state.movementIntentWorld.z = 1;
+  for (let frame = 0; frame < 7; frame++) {
+    state.locomotionPositionWorld.z += 5.5 * dt; p.update(dt, state);
+  }
+  assert.equal(p.diagnostics.reversing, true); assert.equal(p.diagnostics.facingYawRadians, beforeReverse);
+  assert.ok(p.diagnostics.signedLean < -0.25, 'gel counterleans before the face turns');
+  p.present(0); const previous = body.localToWorld(new THREE.Vector3(0, 0.2, 0));
+  p.present(1); const current = body.localToWorld(new THREE.Vector3(0, 0.2, 0));
+  p.present(0.5); const middle = body.localToWorld(new THREE.Vector3(0, 0.2, 0));
+  assert.ok(middle.z > previous.z && middle.z < current.z);
+  for (let frame = 0; frame < 40; frame++) {
+    state.locomotionPositionWorld.z += 5.5 * dt; p.update(dt, state);
+  }
+  assert.equal(p.diagnostics.reversing, false); assert.ok(p.diagnostics.signedLean > 0.9);
+  state.movementIntentWorld.set(0, 0, 0);
+  for (let frame = 0; frame < 120; frame++) p.update(dt, state);
+  p.present(); assert.equal(p.diagnostics.locomotionStrength, 0);
+  assert.equal(body.localToWorld(new THREE.Vector3(0, 0.2, 0)).z, 0);
+  p.dispose();
+});
+
+test('gradual steering advances every step and remains smooth between fixed updates', () => {
+  const p = new GoopCharacterPresentation(), state = motionState(), dt = 1 / 60;
+  p.update(dt, state); state.movementIntentWorld.z = -1;
+  for (let frame = 0; frame < 60; frame++) {
+    state.locomotionPositionWorld.z -= 5.5 * dt; p.update(dt, state);
+  }
+  const character = p.root.getObjectByName('player-slime-goop-character')!;
+  let lastPresented = character.rotation.y;
+  for (let frame = 1; frame <= 30; frame++) {
+    const heading = THREE.MathUtils.degToRad(frame);
+    state.movementIntentWorld.set(-Math.sin(heading), 0, -Math.cos(heading));
+    state.locomotionPositionWorld.addScaledVector(state.movementIntentWorld, 5.5 * dt);
+    const before = p.diagnostics.facingYawRadians; p.update(dt, state);
+    const change = p.diagnostics.facingYawRadians - before;
+    assert.ok(change > 0, 'gentle steering must not pause between heading thresholds');
+    assert.ok(change < THREE.MathUtils.degToRad(1.1), 'one degree of steering must not create a five-degree turn');
+    for (const alpha of [0, 0.25, 0.5, 0.75, 1]) {
+      p.present(alpha);
+      const yaw = character.rotation.y;
+      assert.ok(yaw >= lastPresented - 1e-10, 'render samples must not jump backwards at a fixed-step boundary');
+      assert.ok(yaw - lastPresented < THREE.MathUtils.degToRad(0.3));
+      lastPresented = yaw;
+    }
+  }
+  assert.ok(p.diagnostics.signedLean > 0.99, 'smooth steering keeps the stronger forward lean');
+  // No new travel: stop at the last heading, rather than following camera/input.
+  state.movementIntentWorld.set(0, 0, 0);
+  p.update(2, state); p.present();
+  const settled = character.rotation.y;
+  for (let frame = 0; frame < 30; frame++) { p.update(dt, state); p.present(); assert.equal(character.rotation.y, settled); }
+  p.dispose();
+});
+
+test('small alternating travel-heading noise is damped without losing smooth facing', () => {
+  const p = new GoopCharacterPresentation(), state = motionState(), dt = 1 / 60;
+  p.update(dt, state);
+  for (let frame = 0; frame < 120; frame++) {
+    const heading = THREE.MathUtils.degToRad(frame % 2 === 0 ? 0.6 : -0.6);
+    state.movementIntentWorld.set(-Math.sin(heading), 0, -Math.cos(heading));
+    state.locomotionPositionWorld.addScaledVector(state.movementIntentWorld, 5.5 * dt);
+    p.update(dt, state);
+    if (frame > 30) assert.ok(Math.abs(p.diagnostics.facingYawRadians) < THREE.MathUtils.degToRad(0.1));
+  }
+  assert.ok(p.diagnostics.signedLean > 0.99);
+  p.dispose();
+});
+
+test('airborne motion persists beyond takeoff and landing strength controls compression, spread and recovery', async () => {
+  const p = new GoopCharacterPresentation(); await p.prepare(loadGoop);
+  const state = motionState(), dt = 1 / 60;
+  state.grounded = false; state.velocityWorld.y = 6;
+  p.onLaunch({ directionWorld: { x: 0, y: 1, z: 0 }, speedMetresPerSecond: 6, chargeFraction: 0 });
+  for (let frame = 0; frame < 5; frame++) p.update(dt, state);
+  assert.ok(p.diagnostics.stretch > 0.15, 'normal launch visibly stretches the gel');
+  state.velocityWorld.y = -5;
+  for (let frame = 0; frame < 20; frame++) p.update(dt, state);
+  assert.ok(p.diagnostics.stretch > 0.09, 'falling gel retains an airborne pose');
+  state.grounded = true;
+  const landing = (speed: number) => {
+    p.onLanding({ x: 0, y: 1, z: 0 }, speed); p.update(dt, state); p.present();
+    return p.diagnostics.squash;
+  };
+  const soft = landing(3), hard = landing(8.5);
+  assert.ok(hard > 0.3 && hard > soft * 3);
+  const body = p.root.getObjectByName('Goop-Body')!;
+  const sole = body.localToWorld(new THREE.Vector3(0, -0.45, 0));
+  const edge = body.localToWorld(new THREE.Vector3(0.5, -0.3, 0));
+  assert.ok(Math.abs(sole.y + 0.45) < 1e-8); assert.ok(edge.x > 0.59);
+  for (let frame = 0; frame < 17; frame++) p.update(dt, state);
+  assert.ok(p.diagnostics.stretch > 0, 'the body has a small elastic recovery overshoot');
+  for (let frame = 0; frame < 10; frame++) p.update(dt, state);
+  p.present(); assert.equal(p.diagnostics.squash, 0); assert.equal(p.diagnostics.stretch, 0);
+  p.reset(); assert.equal(p.diagnostics.locomotionStrength, 0); assert.equal(p.diagnostics.reversing, false);
+  p.dispose();
+});
+
+test('passive travel, carrier transport and discontinuities do not drive lean or heading', () => {
+  const p = new GoopCharacterPresentation(), state = motionState(), dt = 1 / 60;
+  p.update(dt, state);
+  state.locomotionPositionWorld.x += 0.06; p.update(dt, state);
+  assert.equal(p.diagnostics.locomotionStrength, 0); assert.equal(p.diagnostics.facingYawRadians, 0);
+  // Carrier transport changes the rendered position, not the travel coordinate.
+  state.movementIntentWorld.x = 1; p.setPosition(new THREE.Vector3(12, 3, 9)); p.update(dt, state);
+  assert.equal(p.diagnostics.locomotionStrength, 0); assert.equal(p.diagnostics.facingYawRadians, 0);
+  state.locomotionPositionWorld.x += 15; p.update(dt, state);
+  assert.equal(p.diagnostics.locomotionStrength, 0); assert.equal(p.diagnostics.facingYawRadians, 0);
+  p.dispose();
+});
+
+test('damage reaction, directional impact and reset retain the existing material lifecycle', async () => {
+  const p = new GoopCharacterPresentation(); await p.prepare(loadGoop);
+  const state = motionState(); p.setPosition(new THREE.Vector3(1, 0.46, 3)); p.setYaw(Math.PI / 2);
+  const body = p.root.getObjectByName('Goop-Body') as THREE.Mesh;
+  const shader = compile(body.material as THREE.Material, 'physical');
+  p.onLanding({ x: 0.6, y: 0.8, z: 0 }, 8.5); p.update(1 / 60, state); p.present();
+  const point = body.localToWorld(shader.uniforms.uBobImpactPointLocal.value.clone());
+  assert.ok(point.distanceTo(new THREE.Vector3(1 - 0.6 * 0.45, 0.46 - 0.8 * 0.45, 3)) < 1e-8);
+  p.reset(); p.onDamage(1); p.update(1 / 60, state); p.present(); assert.ok(p.diagnostics.squash > 0.06);
+  p.update(2, state); p.present(); assert.equal(p.diagnostics.squash, 0);
+  p.onDamage(1); p.reset(); p.update(1 / 60, state); assert.equal(p.diagnostics.squash, 0);
+  assert.equal(p.diagnostics.materials!.impactStrength, 0); p.dispose();
 });
 
 test('maximum combined shader motion protects complete eye bounds, sole, forelock and tips', () => {

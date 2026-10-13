@@ -130,7 +130,6 @@ import {
 } from './LevelProgression.ts';
 
 const OUT_OF_BOUNDS_Y = -5;
-const ZERO_MOVEMENT = new THREE.Vector3();
 const BLACKOUT_BOB_REFLECTION = { body: 0.12, eyes: 0.28 } as const;
 const BLACKOUT_MAINTENANCE_VOLT_RANGES = Object.freeze({
   acquisitionRangeMetres: 11,
@@ -204,6 +203,7 @@ interface BlackoutRuntimeResources {
   bobReflectionEnvironment: BobReflectionEnvironment | undefined;
   readonly bobPresentationState: BobCharacterPresentationState;
   readonly bobMovementIntent: THREE.Vector3;
+  readonly goopMovementIntent: THREE.Vector3;
   readonly renderedBobPosition: THREE.Vector3;
   bobDeathActive: boolean;
   readonly visuals: Readonly<Record<'volt', THREE.Mesh>>;
@@ -684,6 +684,7 @@ export class BlackoutLevelRuntime {
       local: { ...this.currentRoom.local, splitComplete: true },
     };
     resources.bobMovementIntent.set(0, 0, 0);
+    resources.goopMovementIntent.set(0, 0, 0);
     resources.bobPresentation.setPosition(resources.group.bobBody.position);
     resources.bobPresentation.reset();
     resources.goopPresentation.setPosition(resources.group.goopBody.position);
@@ -941,6 +942,7 @@ export class BlackoutLevelRuntime {
       ? resources.specimenBody
       : resources.group.activeBody;
     resources.bobMovementIntent.set(0, 0, 0);
+    resources.goopMovementIntent.set(0, 0, 0);
 
     // Switching changes input ownership, not gravity. Keep the other bodies
     // falling and landing; mounted Volt is carried by the drone instead.
@@ -1010,6 +1012,10 @@ export class BlackoutLevelRuntime {
           this.input.wasClearedSinceFixedUpdate;
         if (!specimenGameplay && body === resources.group.bobBody) {
           resources.bobMovementIntent.copy(resources.movement);
+        } else if (!specimenGameplay && body === resources.group.goopBody) {
+          // The maintenance drone reuses and clears movement below. Preserve
+          // Goop's actual intent for presentation just as Bob already does.
+          resources.goopMovementIntent.copy(resources.movement);
         }
         body.update(deltaSeconds, resources.movement, resources.jump);
 
@@ -1791,6 +1797,7 @@ export class BlackoutLevelRuntime {
         bobReflectionEnvironment: undefined,
         bobPresentationState,
         bobMovementIntent: new THREE.Vector3(),
+        goopMovementIntent: new THREE.Vector3(),
         renderedBobPosition: new THREE.Vector3(),
         bobDeathActive: false,
         visuals,
@@ -1906,6 +1913,7 @@ export class BlackoutLevelRuntime {
     resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);
     resources.bobMovementIntent.set(0, 0, 0);
+    resources.goopMovementIntent.set(0, 0, 0);
     resources.bobDeathActive = false;
     resources.bobPresentation.setPosition(resources.group.bobBody.position);
     resources.bobPresentation.reset();
@@ -2106,6 +2114,7 @@ export class BlackoutLevelRuntime {
     resources.sentinelRig.syncPresentation();
     resources.movement.set(0, 0, 0);
     resources.bobMovementIntent.set(0, 0, 0);
+    resources.goopMovementIntent.set(0, 0, 0);
     if (resumeInput || !resources.bobDeathActive) {
       resources.bobPresentation.setPosition(resources.group.bobBody.position);
       resources.bobPresentation.reset();
@@ -2198,7 +2207,7 @@ export class BlackoutLevelRuntime {
     state.landedThisStep = bob.landedThisStep;
     resources.bobPresentation.update(deltaSeconds, state);
     resources.goopPresentationState.grounded = resources.group.goopBody.grounded;
-    resources.goopPresentationState.movementIntentWorld = resources.group.activeSlimeId === 'goop' && resources.specimenForm.readModel.controlledForm === 'group' ? resources.movement : ZERO_MOVEMENT;
+    resources.goopPresentationState.movementIntentWorld = resources.goopMovementIntent;
     resources.goopPresentation.update(deltaSeconds, resources.goopPresentationState);
   }
 
