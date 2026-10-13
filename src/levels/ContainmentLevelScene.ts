@@ -159,6 +159,8 @@ export class ContainmentLevelScene {
   private readonly roomOneOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly roomThreeOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
 
+  get goop() { return this.teaching.goop; }
+
   get bob(): BobCharacterPresentation {
     return this.teaching.bob;
   }
@@ -351,6 +353,7 @@ export class ContainmentLevelScene {
       );
     }
     this.roomThree.updatePresentation(deltaSeconds);
+    this.roomFive.updatePresentation(deltaSeconds);
     this.lighting.update(deltaSeconds);
   }
 

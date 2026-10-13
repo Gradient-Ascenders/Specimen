@@ -312,7 +312,7 @@ export class CultivationPreparationQueue {
       }
       if (needsProgram) {
         programs.push(proxy);
-        for (const copy of copies) if (source.name.startsWith('Bob-Eye') && !copy.transparent) {
+        for (const copy of copies) if ((source.userData.cameraFadeEye || source.name.startsWith('Bob-Eye')) && !copy.transparent) {
           const faded = copyPrewarmMaterial(copy); faded.transparent = true; this.retained.push(faded);
           const fadeProxy = proxy.clone(false) as Drawable; fadeProxy.material = faded;
           programs.push(fadeProxy); primes.push(fadeProxy);
@@ -327,10 +327,10 @@ export class CultivationPreparationQueue {
           programs.push(backProxy);
         }
       }
-      // Bob is the only transmissive material and already has depth primers
-      // for the same morph geometry. Drawing him in a temporary scene creates
+      // Character gel already has depth primers for its geometry. Drawing
+      // transmission in a temporary scene creates
       // a renderer-owned transmission target per scene/camera on every reload.
-      // Compile his visible pass, upload through his depth pass, and let the
+      // Compile the visible pass, upload through the depth pass, and let the
       // retained live camera own the single gameplay transmission target.
       const transmissive = copies.some(m => m instanceof THREE.MeshPhysicalMaterial && m.transmission > 0);
       if ((needsProgram || needsBuffer) && !transmissive) { primes.push(proxy); this.uploaded.add(geometry); }

@@ -1,3 +1,4 @@
+import { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import * as THREE from 'three';
 
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
@@ -54,6 +55,7 @@ export class ContainmentTeachingScene {
   private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
   private readonly ownedMaterials = new Set<THREE.Material>();
   readonly bob: BobCharacterPresentation;
+  readonly goop = new GoopCharacterPresentation();
   private disposed = false;
 
   constructor(
@@ -115,7 +117,7 @@ export class ContainmentTeachingScene {
     this.bob = new BobCharacterPresentation(
       DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
     );
-    this.root.add(this.bob.root);
+    this.root.add(this.bob.root, this.goop.root);
     this.resetTeachingPresentation();
   }
 
@@ -156,12 +158,14 @@ export class ContainmentTeachingScene {
     this.roomOneArt.reset();
     this.bob.setPosition(SPAWN_POSITION);
     this.bob.reset();
+    this.goop.reset();
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.bob.dispose();
+    this.goop.dispose();
     this.roomOneArt.dispose();
     this.roomTwoArt.dispose();
     this.root.removeFromParent();

@@ -324,7 +324,7 @@ test('switching away mid-jump lets inactive Bob finish falling and land', () => 
   }
 });
 
-test('Blackout mounts shared Bob presentation and owns its lifecycle without replacing Goop or Volt', () => {
+test('Blackout mounts shared Bob presentation and owns its lifecycle alongside authored Goop and Volt', () => {
   const originalDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -364,8 +364,8 @@ test('Blackout mounts shared Bob presentation and owns its lifecycle without rep
       assert.ok(bobCharacter, 'Blackout should use the shared Bob character hierarchy');
       assert.equal(
         scene.children.filter((child) => child.name === 'blackout-foundation-slime').length,
-        2,
-        'Goop and Volt should retain their existing plain presentations',
+        1,
+        'Volt retains its existing plain presentation',
       );
       assert.deepEqual(bobCharacter.position.toArray(), [-2, 0.46, 2]);
 
@@ -654,7 +654,8 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
 
     const groupBodies = scene.getObjectsByProperty('name', 'blackout-foundation-slime') as THREE.Mesh[];
     const specimen = scene.getObjectByName('blackout-specimen-body') as THREE.Mesh;
-    assert.equal(groupBodies.length, 2);
+    assert.equal(groupBodies.length, 1);
+    assert.ok(scene.getObjectByName("player-slime-goop-presentation"));
     assert.ok(groupBodies.every(mesh => mesh.castShadow && mesh.receiveShadow && mesh.visible));
     assert.ok(specimen.castShadow && specimen.receiveShadow);
     assert.equal(specimen.visible, false);

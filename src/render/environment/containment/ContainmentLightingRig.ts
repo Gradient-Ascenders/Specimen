@@ -358,6 +358,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       [this.roomFour.elevatorPlatform.root, 7],
       [this.roomFive.movingPlatformOne.root, 4],
       [this.roomFive.movingPlatformTwo.root, 4],
+      [this.roomFive.goopPresentation.root.getObjectByName('player-slime-goop-character')!, 1.3],
       [options.roomOneArt.specimenAssembly, 4],
       [options.roomOneArt.eggRoot, 2],
       [options.roomOneArt.containmentBoxRoot, 3],
@@ -675,6 +676,11 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   private setAuthoredIntensity(light: THREE.Light, intensity: number): void {
     this.authoredIntensities.set(light, intensity);
     light.intensity = intensity;
+  }
+
+  reflectionTargetForPosition(position: Vector3State, inDuct: boolean) {
+    const roomId = position.z >= 91.5 ? 5 : position.z >= 79.5 ? 4 : position.z >= 49 ? 3 : position.z >= 27 ? 2 : 1;
+    return inDuct ? BOB_DUCT_REFLECTION : BOB_ROOM_REFLECTIONS[roomId];
   }
 
   private get bobReflectionTarget(): {

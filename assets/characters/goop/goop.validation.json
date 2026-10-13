@@ -1,0 +1,81 @@
+{
+  "asset": "goop-concept-sculpt-v1",
+  "runtime_up": "+Y",
+  "runtime_forward": "-Z",
+  "resting_contact_y_metres": -0.45,
+  "meshes": {
+    "Goop-Body": {
+      "vertices": 13404,
+      "triangles": 26804,
+      "connected_components": 1,
+      "non_manifold_edges": 0,
+      "runtime_bounds_metres": {
+        "minimum": [
+          -0.704583,
+          -0.45,
+          -0.576371
+        ],
+        "maximum": [
+          0.75407,
+          0.849047,
+          0.700931
+        ]
+      },
+      "geometry_sha256": "41b05190815d2b64dd09a49cac5ffffb8aa8c27bc53c8c8cadf10dc23ccd67b0"
+    },
+    "Goop-Eye-Left": {
+      "vertices": 1730,
+      "triangles": 3456,
+      "connected_components": 1,
+      "non_manifold_edges": 0,
+      "runtime_bounds_metres": {
+        "minimum": [
+          -0.375799,
+          -0.303495,
+          -0.441802
+        ],
+        "maximum": [
+          -0.075,
+          0.045,
+          -0.147804
+        ]
+      },
+      "geometry_sha256": "2c02e9380eac5ddab56b3cb807363ea1cc92d66fafb4f03bdb265b3f902ec628"
+    },
+    "Goop-Eye-Right": {
+      "vertices": 1730,
+      "triangles": 3456,
+      "connected_components": 1,
+      "non_manifold_edges": 0,
+      "runtime_bounds_metres": {
+        "minimum": [
+          0.075,
+          -0.303495,
+          -0.464465
+        ],
+        "maximum": [
+          0.375799,
+          0.045,
+          -0.147014
+        ]
+      },
+      "geometry_sha256": "6f976ff053d415c1a5715b3e2db0b091a3b22e07c623f3e851e66667429e804d"
+    }
+  },
+  "materials": [
+    "Goop-Acid-Gel",
+    "Goop-Obsidian-Eyes"
+  ],
+  "armatures": 0,
+  "morph_targets": 0,
+  "animations": 0,
+  "export_excludes": [
+    "studio"
+  ],
+  "total_triangles": 33716,
+  "glb_sha256": "35d1fcf37a972264991a9b4a5b12b9e25a127a6a291499db68638f6193ca7862",
+  "sources": {
+    "generate-goop.py": "75cd7f7188c20ce77d82e4b6ba90b9414b7f926e7d8ab43cc125894dec6b5967",
+    "goop_model.py": "f17c6ff0828fd88fe22b369991b91aa206887f7b4260b6c84f1ba9a3036f04ee"
+  }
+}

@@ -25,3 +25,6 @@ test-results/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Character generator caches
+assets/characters/**/__pycache__/

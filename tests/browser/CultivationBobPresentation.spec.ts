@@ -47,6 +47,7 @@ interface CultivationRuntimeProbe {
         readonly position: { readonly x: number; readonly y: number; readonly z: number };
       };
     };
+    readonly goopPresentation: { readonly diagnostics: { readonly visible: boolean } };
     readonly pairPresentation: {
       readonly root: {
         getObjectByName(name: string): { readonly visible: boolean } | undefined;
@@ -199,8 +200,7 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
       activeSlimeId: resources.manager.activeSlimeId,
       bobVisible: resources.bobPresentation.diagnostics.visible,
       goopVisible:
-        resources.pairPresentation.root.getObjectByName('goop-development-body')
-          ?.visible,
+        resources.goopPresentation.diagnostics.visible,
     };
   });
   expect(switched).toEqual({
