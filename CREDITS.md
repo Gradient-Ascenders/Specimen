@@ -35,6 +35,18 @@ maps, a small gravity-runoff shader hook, and primitive-based broken service
 windows, tank cartridges, drainage pipes and plant silhouettes for Rooms 1–3.
 No downloaded textures, models or additional third-party resources are used.
 
+Level 3 Room 1 issue #162 Checkpoint 1 adds original deterministic painted-steel,
+corrosion, traction-deck and warning-paint albedo, roughness and tangent-space
+normal maps. Its periodic wear generation follows Specimen's existing procedural
+material approach. No downloaded textures, external art, or new third-party
+techniques are introduced.
+
+Checkpoint 2 extends that project-authored kit with corroded duct steel,
+machinery wear and chipped maintenance-yellow paint; small circuit and rubber
+fittings share the kit's roughness/normal maps. Object-local metric UVs retain
+Three.js's existing curved primitive charts. No external texture assets,
+adapted code or additional dependencies were introduced.
+
 ## Audio / music
 
 No third-party audio or music has been introduced yet.

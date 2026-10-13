@@ -1,3 +1,4 @@
+import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -12,7 +13,7 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 const DT = 1 / 60;
 
 function makeFixture() {
-  const bay = new BlackoutMaintenanceBay();
+  const bay = new BlackoutMaintenanceBay(maintenanceMaps);
   const transit = new BlackoutTransitRoom();
   const staging = new BlackoutBossStaging();
   const world = new CollisionWorld();

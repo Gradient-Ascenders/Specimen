@@ -341,3 +341,23 @@ test('Level 2 completion replaces it with exactly one Level 3 runtime and preser
   assert.equal(session.state, 'stopped');
   session.dispose();
 });
+
+for (const cancellation of ['unload','dispose'] as const) test(`Level 3 late texture preparation cannot construct scene resources after session ${cancellation}`, async () => {
+  const {BlackoutLevelRuntime}=await import('../src/levels/BlackoutLevelRuntime.ts');
+  const {maintenanceMaps}=await import('./helpers/BlackoutMaintenanceMapData.ts');
+  const unlocked={unlockedSlimeIds:['bob','goop','volt'],activeSlimeId:'volt'} as const;
+  const two=new MockRuntime('level-2',unlocked);
+  let finish!:()=>void;
+  const pending=new Promise<void>(resolve=>{finish=resolve;});
+  let late: InstanceType<typeof BlackoutLevelRuntime> | undefined;
+  const session=new GameSessionCoordinator({initialRuntime:two,createLevelTwo:()=>two,createLevelThree:async()=>{
+    await pending;
+    late=new BlackoutLevelRuntime({authoredRoomOne:true,maintenanceMaps,progression:unlocked,host:{} as HTMLElement,input:{} as any,renderLayer:{} as any});
+    return late;
+  },scheduleTransition:transition=>transition()});
+  let completed=0;session.events.on('transitionCompleted',()=>completed++);
+  session.load();session.start();two.events.emit('completed',{levelId:'level-2',nextLevelId:'level-3'});
+  session[cancellation]();finish();await pending;await Promise.resolve();await Promise.resolve();
+  assert.equal(late?.state,'disposed');assert.equal((late as unknown as {maintenanceMaps:unknown}).maintenanceMaps,undefined);
+  assert.equal(completed,0);session.dispose();
+});

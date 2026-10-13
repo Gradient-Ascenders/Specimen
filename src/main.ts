@@ -1,3 +1,4 @@
+import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
@@ -54,13 +55,17 @@ const gameSession = new GameSessionCoordinator({
     });
   },
   createLevelThree: async (progression) => {
-    const runtimeModule = await import('./levels/BlackoutLevelRuntime.ts');
+    const [runtimeModule, maintenanceMaps] = await Promise.all([
+      import('./levels/BlackoutLevelRuntime.ts'),
+      loadBlackoutMaintenanceMapData(new URL('./assets/blackout/maintenance-maps.bin', import.meta.url)),
+    ]);
     return new runtimeModule.BlackoutLevelRuntime({
       host: app,
       input,
       renderLayer,
       progression,
       authoredRoomOne: true,
+      maintenanceMaps,
     });
   },
   scheduleTransition: (transition) => {

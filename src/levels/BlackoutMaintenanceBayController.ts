@@ -5,6 +5,7 @@ import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { VerticalBlastDoor } from '../puzzle/VerticalBlastDoor.ts';
 import type { KinematicBody, ReadonlyVector3State } from '../physics/KinematicBody.ts';
 import { BLACKOUT_BAY_LAYOUT, type BlackoutMaintenanceBay } from './BlackoutMaintenanceBay.ts';
+import { mapBlackoutPropUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
 
 type SlimeId = 'bob' | 'goop' | 'volt';
 
@@ -18,6 +19,7 @@ export class BlackoutMaintenanceBayController {
   complete = false;
   private readonly unregister: () => void;
   private charge = 0;
+  private disposed = false;
   private voltTraversedVent = false;
   private enteredVentFromBay = false;
   private hasPreviousVoltPosition = false;
@@ -32,7 +34,9 @@ export class BlackoutMaintenanceBayController {
   constructor(bay: BlackoutMaintenanceBay, world: CollisionWorld, surfaces: SurfaceRegistry, registry: ElectricalTargetRegistry) {
     this.bay=bay;
     this.world=world;
+    const kit = bay.surfaceMaterials;
     this.door = new VerticalBlastDoor({id:'maintenance-bay-exit', collisionWorld:world, surfaceRegistry:surfaces,
+      materials: { panel: kit.get('ductSteel'), frame: kit.get('machineryMetal') },
       closedPosition:new THREE.Vector3(6,2.25,BLACKOUT_BAY_LAYOUT.rearZ),panelSize:new THREE.Vector3(6,4.5,.4),
       travelAxis:new THREE.Vector3(0,1,0),travelDistance:4.8,openingDurationSeconds:1,closingDurationSeconds:.45,
       obstructionCentre:new THREE.Vector3(6,2.25,BLACKOUT_BAY_LAYOUT.rearZ),obstructionSize:new THREE.Vector3(6.4,4.8,1.6)});
@@ -44,13 +48,13 @@ export class BlackoutMaintenanceBayController {
       object.castShadow = solid;
       object.receiveShadow = solid;
     });
-    this.receiver = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.65,.12),new THREE.MeshStandardMaterial({color:0x194d32,roughness:.72,metalness:.15}));
+    this.receiver = new THREE.Mesh(new THREE.BoxGeometry(1.3,1.65,.12),kit.detail('circuitBoard'));
     this.receiver.name='maintenance-bay-door-receiver'; this.receiver.position.set(-9,3,BLACKOUT_BAY_LAYOUT.rearZ-.4); bay.root.add(this.receiver);
     this.receiver.castShadow = this.receiver.receiveShadow = true;
-    const backing = new THREE.Mesh(new THREE.BoxGeometry(1.55,1.9,.22),new THREE.MeshStandardMaterial({color:0x353d40,metalness:.65,roughness:.65}));
+    const backing = new THREE.Mesh(new THREE.BoxGeometry(1.55,1.9,.22),kit.get('machineryMetal'));
     backing.position.z=.07; this.receiver.add(backing);
-    const copper = new THREE.MeshStandardMaterial({color:0xb39442,metalness:.75,roughness:.4});
-    const chipMaterial = new THREE.MeshStandardMaterial({color:0x080d0c,roughness:.8});
+    const copper = kit.detail('copper');
+    const chipMaterial = kit.detail('rubber');
     for(let i=0;i<4;i++) {
       const trace=new THREE.Mesh(new THREE.BoxGeometry(.65,.025,.015),copper);
       trace.position.set(-.05,-.55+i*.25,-.07);this.receiver.add(trace);
@@ -63,6 +67,14 @@ export class BlackoutMaintenanceBayController {
       const screw=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.03,8),copper);
       screw.rotation.x=Math.PI/2;screw.position.set(x,y,-.055);this.receiver.add(screw);
     }
+    const mapped = new Set<THREE.BufferGeometry>();
+    for (const root of [this.door.root, this.receiver]) root.traverse(object => {
+      if (!(object instanceof THREE.Mesh) || mapped.has(object.geometry)) return;
+      const material = object.material as THREE.MeshStandardMaterial;
+      mapBlackoutPropUVs(object.geometry, material.userData.tileSizeMetres);
+      if (material === kit.get('ductSteel')) object.renderOrder = -1;
+      mapped.add(object.geometry);
+    });
     const indicator=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.07,20),this.indicatorMaterial);
     indicator.name='circuit-connection-indicator';indicator.rotation.x=Math.PI/2;indicator.position.set(0,.55,-.12);this.receiver.add(indicator);
     this.indicatorLight.position.set(0,.55,-.35);this.receiver.add(this.indicatorLight);
@@ -124,9 +136,10 @@ export class BlackoutMaintenanceBayController {
   }
   reset():void {this.complete=false;this.powered=false;this.charge=0;this.voltTraversedVent=false;this.enteredVentFromBay=false;this.hasPreviousVoltPosition=false;this.door.reset();this.updateIndicator();}
   dispose():void {
+    if(this.disposed)return;this.disposed=true;
     this.unregister();this.door.dispose();this.receiver.removeFromParent();
     const materials=new Set<THREE.Material>();
     this.receiver.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();for(const material of Array.isArray(object.material)?object.material:[object.material])materials.add(material);}});
-    for(const material of materials)material.dispose();this.receiver.clear();
+    for(const material of materials)if(!this.bay.surfaceMaterials.owns(material))material.dispose();this.receiver.clear();
   }
 }

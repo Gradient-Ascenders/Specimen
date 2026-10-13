@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "generate:blackout-maps": "node scripts/generate-blackout-maintenance-maps.ts",
     "test": "node --test tests/*.test.ts",
     "test:browser": "npm run build && playwright test",
     "test:smoke": "playwright test --config playwright.smoke.config.ts",

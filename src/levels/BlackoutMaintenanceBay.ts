@@ -1,7 +1,10 @@
+import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
 import { disposeShadowLight } from '../render/ShadowLightResources.ts';
 import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
 import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
+import { BlackoutMaintenanceMaterials, type BlackoutMaterialFamily } from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
+import { mapBlackoutBoxUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
 
 export const BLACKOUT_BAY_LAYOUT = Object.freeze({
   chamberWidth: 34,
@@ -29,12 +32,17 @@ export class BlackoutMaintenanceBay {
   private readonly hallwayFlickerSeeds = [0.3, 1.8, 3.9, 5.2];
   private elapsed = 0;
   private readonly staticVisuals: ContainmentStaticBatchResult;
+  /** Runtime disposes borrowing door/controller/drone before this owning bay. */
+  readonly surfaceMaterials: BlackoutMaintenanceMaterials;
+  private readonly replacedMaterials = new Set<THREE.Material>();
+  private disposed = false;
 
   get hallwayShadowLights(): readonly THREE.SpotLight[] {
     return this.hallwayLights;
   }
 
-  constructor() {
+  constructor(mapData: BlackoutMaintenanceMapData) {
+    this.surfaceMaterials = new BlackoutMaintenanceMaterials(mapData);
     this.root.name = 'level-3-room-1-blackout-maintenance-bay';
     const steel = new THREE.MeshStandardMaterial({ color: 0x20272b, roughness: 0.93, metalness: 0.48 });
     const darkSteel = new THREE.MeshStandardMaterial({ color: 0x11171b, roughness: 0.96, metalness: 0.3 });
@@ -190,6 +198,7 @@ export class BlackoutMaintenanceBay {
       this.root.add(light, light.target);
       this.hallwayLights.push(light);
     }
+    this.applySurfaceMaterials();
     this.root.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -258,10 +267,12 @@ export class BlackoutMaintenanceBay {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries=new Set<THREE.BufferGeometry>();
-    const materials=new Set<THREE.Material>();
+    const materials=new Set<THREE.Material>(this.replacedMaterials);
     this.root.traverse((object) => {
       if (object instanceof THREE.Light) disposeShadowLight(object);
       if (!(object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points)) return;
@@ -269,8 +280,78 @@ export class BlackoutMaintenanceBay {
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
     });
     for(const geometry of geometries)geometry.dispose();
-    for(const material of materials)material.dispose();
+    for(const material of materials)if(!this.surfaceMaterials.owns(material))material.dispose();
     this.root.clear();
+    this.surfaceMaterials.dispose();
+    this.replacedMaterials.clear();
+  }
+
+  /** Explicit presentation bindings; material/name never supplies gameplay meaning. */
+  private applySurfaceMaterials(): void {
+    const surfaces: Record<string, BlackoutMaterialFamily> = {
+      'front-perimeter-wall': 'wallPanel',
+      'west-perimeter-wall': 'wallPanel',
+      'east-perimeter-wall': 'wallPanel',
+      'rear-wall-west': 'wallPanel',
+      'rear-wall-between-openings': 'wallPanel',
+      'rear-wall-east': 'wallPanel',
+      'door-header': 'wallPanel',
+      'vent-mouth-upper-wall': 'wallPanel',
+      'main-ceiling': 'ceilingPanel',
+      'ceiling-entry-vent-frame': 'ceilingPanel',
+      'ceiling-entry-vent-grille': 'ceilingPanel',
+      'entry-safe-platform': 'floorDeck',
+      'exit-safe-platform': 'floorDeck',
+      'acid-exit-ramp': 'floorDeck',
+      'bob-route-platform-17': 'acidPlatform',
+      'bob-route-platform-28.5': 'acidPlatform',
+      'bob-route-platform-40': 'acidPlatform',
+      'acid-basin-bed': 'basinMetal',
+      'entry-apron-riser-west': 'basinMetal',
+      'entry-apron-riser-east': 'basinMetal',
+      'entry-warning--1.5': 'warningPaint',
+      'entry-warning-6.3': 'warningPaint',
+      'exit-warning-48.4': 'warningPaint',
+      'exit-warning-52.8': 'warningPaint',
+      'hallway-floor': 'floorDeck',
+      'hallway-ramp': 'floorDeck',
+      'hallway-west-wall': 'wallPanel',
+      'hallway-east-wall': 'wallPanel',
+      'hallway-roof': 'ceilingPanel',
+      'vent-mouth-left-jamb': 'machineryMetal',
+      'vent-mouth-right-jamb': 'machineryMetal',
+      'vent-interior-floor': 'ductSteel',
+      'vent-duct-west-wall': 'ductSteel',
+      'vent-duct-east-wall': 'ductSteel',
+      'vent-duct-ceiling': 'ductSteel',
+      'vent-turn-floor': 'ductSteel',
+      'vent-turn-ceiling': 'ductSteel',
+      'vent-turn-south-west': 'ductSteel',
+      'vent-turn-north-east': 'ductSteel',
+      'vent-turn-east-wall': 'ductSteel',
+      'vent-turn-west-wall': 'ductSteel',
+      'volt-rising-duct-floor': 'ductSteel',
+      'volt-rising-duct-ceiling': 'ductSteel',
+      'volt-rising-duct-side--16.85': 'ductSteel',
+      'volt-rising-duct-side--15.15': 'ductSteel',
+      'volt-catwalk-entry-extension': 'floorDeck',
+    };
+    for (const z of [BLACKOUT_BAY_LAYOUT.rearZ - .25, 55.5, 57.5, 59.5]) {
+      for (const x of [-6.77, -5.23]) surfaces[`vent-frame-side-${x}-${z}`] = 'machineryMetal';
+      surfaces[`vent-frame-header-${z}`] = 'machineryMetal';
+    }
+    for (const [name, family] of Object.entries(surfaces)) {
+      const mesh = this.root.getObjectByName(name) as THREE.Mesh;
+      for (const original of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) this.replacedMaterials.add(original);
+      const material = this.surfaceMaterials.get(family);
+      mesh.updateMatrix();
+      // Each box already owns unique geometry; replace only its UV attribute.
+      mapBlackoutBoxUVs(mesh.geometry, mesh.matrix, material.userData.tileSizeMetres);
+      mesh.material = material;
+      // Enclosing opaque ducts reject hidden fragment work before later materials.
+      // Batching preserves renderOrder; depth/shadows and collider data are unchanged.
+      if (family === 'ductSteel') mesh.renderOrder = -1;
+    }
   }
 
   private box(name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material): THREE.Mesh {
