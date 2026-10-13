@@ -12,6 +12,8 @@ for (const [index, family] of BLACKOUT_MATERIAL_FAMILIES.entries()) {
   chunks.push(...generateBlackoutMaintenanceMaps(family));
 }
 const bundle = gzipSync(Buffer.concat(chunks), { level: 9 });
+// Portable gzip OS marker: Node otherwise writes different bytes on Windows/Linux.
+bundle[9] = 255;
 const output = new URL('../src/assets/blackout/maintenance-maps.bin', import.meta.url);
 if (process.argv.includes('--check')) {
   if (!bundle.equals(await readFile(output))) throw new Error('Blackout map bundle is stale. Run npm run generate:blackout-maps.');

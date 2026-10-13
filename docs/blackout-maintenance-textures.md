@@ -9,6 +9,9 @@ node scripts/generate-blackout-maintenance-maps.ts --check
 ```
 
 The generator retains the original seeded wear, corrosion, relief and normals.
+Gzip header byte 9 (OS) is normalized to 255 (unknown) before writing or checking,
+so Windows and Linux produce the same bundle. The Linux PR unit-test job runs
+the exact regeneration check shown above.
 The gzip payload starts with `SPCBM001`, nine little-endian uint32 dimensions in
 `BLACKOUT_MATERIAL_FAMILIES` order, then RGBA8 albedo, roughness and normal bytes
 for each family. Changing the format/order requires a new version. The `.bin`
