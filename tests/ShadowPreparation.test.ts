@@ -8,6 +8,8 @@ import { BlackoutPresentationPreparation } from '../src/render/BlackoutPresentat
 import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
+import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
 function fixture() {
   let viewport = new THREE.Vector4(4, 5, 960, 600), scissor = viewport.clone(), test = false;
@@ -206,4 +208,35 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   assert.equal(material.uniforms.beamShadowReady.value, true);
   material.dispose(); assert.equal(disposals, 1);
   mesh.geometry.dispose(); map.depthTexture.dispose(); map.dispose();
+});
+
+test('hidden Volt prewarms morph, transmission, faded-eye and actual caster variants without changing live state', async () => {
+  const { renderer, borrowedTarget } = fixture();
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), volt = new VoltCharacterPresentation();
+  await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
+  const light = new THREE.SpotLight(); light.castShadow = true; scene.add(light);
+  const variants = new Set<string>();
+  renderer.compileAsync = async group => {
+    group.traverse(object => {
+      if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
+      assert.equal(object.geometry.morphTargetsRelative, true);
+      assert.equal(object.geometry.morphAttributes.position!.length, 5);
+      assert.equal(object.geometry.morphAttributes.normal!.length, 5);
+      assert.equal(Object.keys(object.morphTargetDictionary!).length, 5);
+      assert.deepEqual(object.morphTargetInfluences, [0, 0, 0, 0, 0]);
+      const material = object.material as THREE.Material;
+      variants.add(`${object.name}:${material.type}:${material.transparent}`);
+    });
+  };
+  const policy = new RenderShadowPolicy(renderer.shadowMap), preparation = new BlackoutPresentationPreparation();
+  const before = volt.diagnostics;
+  try {
+    await preparation.prepare({ renderer, scene, withShadowPreparation: policy.withPreparation.bind(policy) } as unknown as RenderLayer, camera);
+    for (const name of ['Volt-Body', 'Volt-Eye-Left', 'Volt-Eye-Right']) {
+      assert.ok(variants.has(`${name}:MeshPhysicalMaterial:true`));
+      assert.ok(variants.has(`${name}:MeshDepthMaterial:false`));
+      if (name !== 'Volt-Body') assert.ok(variants.has(`${name}:MeshPhysicalMaterial:false`));
+    }
+    assert.deepEqual(volt.diagnostics, before);
+  } finally { preparation.dispose(); volt.dispose(); borrowedTarget.dispose(); }
 });

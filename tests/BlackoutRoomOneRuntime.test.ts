@@ -13,6 +13,8 @@ import type { BlackoutTransitController } from '../src/levels/BlackoutTransitCon
 import type { BlackoutMaintenanceBayController } from '../src/levels/BlackoutMaintenanceBayController.ts';
 import type { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
 import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -173,6 +175,42 @@ function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
     electricalTargets: ElectricalTargetRegistry;
   } }).resources;
 }
+
+test('authored Room 1 Volt keeps identity events, light, interpolated placement and death/recovery ownership', async () => {
+  const f = createFixture();
+  try {
+    const r = (f.runtime as unknown as { resources: {
+      group: { voltBody: KinematicBody };
+      voltPresentation: VoltCharacterPresentation;
+      voltLight: THREE.PointLight;
+      voltMovementEvents: { emit(name: string, event: unknown): void };
+      bobPresentation: { diagnostics: { stretch: number; squash: number } };
+      goopPresentation: { diagnostics: { stretch: number; squash: number } };
+    } }).resources;
+    await r.voltPresentation.prepare(loadVolt);
+    assert.deepEqual(r.voltPresentation.diagnostics.asset, { triangles: 38208, drawCalls: 3, geometries: 3, materials: 2 });
+    assert.equal(r.voltLight.parent, r.voltPresentation.placement);
+    assert.equal(r.voltLight.intensity, 16); assert.equal(r.voltLight.distance, 8); assert.equal(r.voltLight.decay, 2);
+    assert.equal(r.voltLight.color.getHex(), 0xffdf75); assert.equal(r.voltLight.castShadow, false);
+    const body = r.group.voltBody;
+    body.teleport(new THREE.Vector3(0, 3, 3));
+    r.voltMovementEvents.emit('jumped', { directionWorld: new THREE.Vector3(0, 1, 0), speedMetresPerSecond: 6, chargeFraction: 0 });
+    f.tick(); assert.ok(r.voltPresentation.diagnostics.weights.Stretch > 0);
+    assert.equal(r.bobPresentation.diagnostics.stretch, 0); assert.equal(r.goopPresentation.diagnostics.stretch, 0);
+    f.runtime.render(0.5, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>);
+    const expected = new THREE.Vector3().lerpVectors(body.previousPosition, body.position, 0.5);
+    assert.ok(r.voltPresentation.placement.position.distanceTo(expected) < 1e-8);
+    assert.ok(r.voltLight.getWorldPosition(new THREE.Vector3()).distanceTo(expected) < 1e-8);
+    r.voltPresentation.setOpacity(0); assert.equal(r.voltLight.visible, true);
+    r.voltPresentation.setOpacity(1);
+    assert.equal(f.runtime.requestFailure(), true); assert.equal(f.runtime.requestFailure(), false);
+    f.tick(8); f.render(); assert.equal(r.voltPresentation.diagnostics.visible, false); assert.equal(r.voltLight.visible, false);
+    assert.equal(r.voltPresentation.diagnostics.deathActive, true);
+    f.runtime.restartLevel(); f.render(); assert.equal(r.voltPresentation.diagnostics.deathActive, false);
+    assert.equal(r.voltPresentation.diagnostics.opacity, 1); assert.equal(r.voltLight.visible, true);
+    assert.ok(Object.values(r.voltPresentation.diagnostics.weights).every(weight => weight === 0));
+  } finally { f.cleanup(); }
+});
 
 test('Room 1 CP1 and CP2 cannot acquire the distant maintenance circuit, but approaching it still works', () => {
   const f = createFixture();

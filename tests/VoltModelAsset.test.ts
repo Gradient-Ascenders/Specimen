@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 
 const bytes = readFileSync(new URL('../assets/characters/volt/volt.glb',import.meta.url));
 const document = JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
@@ -80,4 +81,22 @@ test('Volt retains the approved neutral body, eyes, axes and contact plane',() =
   for (const mesh of Object.values(report.meshes) as {non_manifold_edges: number; connected_components: number}[]) {
     assert.equal(mesh.non_manifold_edges,0); assert.equal(mesh.connected_components,1);
   }
+});
+
+test('approved GLB and generator sources retain their hashes independently of editable Blender bytes', () => {
+  const hash = (value: Buffer) => createHash('sha256').update(value).digest('hex');
+  assert.equal(hash(bytes), '4e1d5d7d6ea3f368e96cbc0d13ff6b1a232a7d9154e73602ee54f809ec6d2807');
+  for (const [name, digest] of Object.entries(report.sources)) {
+    assert.equal(hash(readFileSync(new URL(`../assets/characters/volt/${name}`, import.meta.url))), digest);
+  }
+  const body = document.meshes.find((mesh: { name: string }) => mesh.name === 'Volt-Body');
+  const positions = vectorAccessor(body.primitives[0].attributes.POSITION);
+  let preserved = 0;
+  for (let vertex = 0; vertex < positions.length / 3; vertex++) if (positions[vertex * 3 + 1]! <= 0.340001) preserved++;
+  assert.equal(preserved, 6817);
+  // The whole-file GLB identity covers the exact neutral lower-body/eye data;
+  // source geometry signatures are checked by the committed Blender verifier.
+  const roundtrip = JSON.parse(readFileSync(new URL('../assets/characters/volt/volt.roundtrip.json', import.meta.url), 'utf8'));
+  assert.equal(roundtrip.preserved_body_geometry_sha256, report.preserved_geometry.lower_body_geometry_sha256);
+  assert.deepEqual(roundtrip.preserved_eyes_geometry_sha256, report.preserved_geometry.eyes_geometry_sha256);
 });
