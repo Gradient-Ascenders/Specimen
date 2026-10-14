@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { mapBlackoutBoxUVs, mapBlackoutPropUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
+import { borrowBlackoutMaps, updateBlackoutStretchUVs } from '../render/environment/blackout/BlackoutTransitMaterials.ts';
 import { setShadowMapUpdatesActive } from '../render/ShadowLightResources.ts';
 
 import type { ElectricalConnectionTarget, ElectricalTargetRegistry } from '../abilities/ElectricalTargetRegistry.ts';
@@ -139,6 +141,9 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private readonly coverRegistered = new Set<THREE.Mesh>();
   private readonly bridge: THREE.Mesh;
   private bridgeRegistered = false;
+  private bridgeFullUVs?: Float32Array;
+  private bridgeUVStretch = -1;
+  private readonly texturedDressing = new Set<THREE.BufferGeometry>();
   private disposed = false;
 
   constructor(options: { room: BlackoutTransitRoom; world: CollisionWorld; surfaces: SurfaceRegistry; electricalTargets: ElectricalTargetRegistry }) {
@@ -146,6 +151,18 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.world = options.world;
     this.surfaces = options.surfaces;
     this.root.name = 'level-3-room-2-powered-transit-controller';
+    const kit = this.room.surfaceMaterials;
+    if (kit) {
+      borrowBlackoutMaps(this.steel, kit.get('machineryMetal'));
+      borrowBlackoutMaps(this.wood, kit.get('ductSteel'));
+      this.wood.color.setHex(0xffffff); this.wood.metalness = .52;
+      borrowBlackoutMaps(this.solubleWood, kit.get('acidPlatform'));
+      this.solubleWood.color.setHex(0xb59970);
+      for (const [geometry, material] of [[this.coverGeometry, this.wood], [this.supportGeometry, this.solubleWood], [this.liftSocketGeometry, this.steel], [this.lampTargetGeometry, this.steel], [this.lightTargetGeometry, this.steel]] as const) {
+        mapBlackoutPropUVs(geometry, material.userData.tileSizeMetres);
+      }
+      mapBlackoutPropUVs(this.thrusterGeometry, this.steel.userData.tileSizeMetres);
+    }
     this.room.root.add(this.root);
 
     const unregisterTargets = this.targetUnregisters;
@@ -189,12 +206,19 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
         device.platform.collisionMesh.material.metalness = .5;
         device.platform.collisionMesh.castShadow = true;
         device.platform.collisionMesh.receiveShadow = true;
+        if (kit) {
+          const deck = device.platform.collisionMesh;
+          borrowBlackoutMaps(deck.material, kit.get('floorDeck'));
+          deck.material.color.setHex(0xffffff);
+          mapBlackoutPropUVs(deck.geometry, deck.material.userData.tileSizeMetres);
+        }
         // Attach the conducting contact to the actual moving lift, rather than
         // a floating remote proxy on Volt's catwalk.
         const liftTarget = device.root.getObjectByName(`${slot.id}-target`);
         if (liftTarget) liftTarget.visible = false;
         this.root.add(device.root);
         const socketMaterial = new THREE.MeshStandardMaterial({ color: 0x39413d, emissive: 0x48bc84, emissiveIntensity: 0, metalness: 0.42, roughness: 0.52 });
+        if (kit) borrowBlackoutMaps(socketMaterial, kit.detail('copper'));
         this.indicatorMaterials.push(socketMaterial);
         const socket = new THREE.Mesh(this.liftSocketGeometry, socketMaterial);
         socket.name = `${slot.id}-conducting-contact`;
@@ -204,6 +228,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
         contactStem.name = `${slot.id}-contact-mount`;
         contactStem.scale.set(0.12, 2.1, 0.12);
         contactStem.position.set(socket.position.x, 1.05, 0);
+        this.mapScaledDressing(contactStem);
         device.root.add(contactStem);
         const hardware = new THREE.Group();
         hardware.name = `${slot.id}-thruster-hardware`;
@@ -304,6 +329,13 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       this.bridgeStartPosition.copy(bridgeStart);
       this.bridgeEndPosition.copy(bridgeEnd);
 
+      if (kit) {
+        const material = this.bridge.material as THREE.MeshStandardMaterial;
+        borrowBlackoutMaps(material, kit.get('floorDeck'));
+        material.color.setHex(0xffffff);
+        mapBlackoutPropUVs(this.bridge.geometry, material.userData.tileSizeMetres);
+        this.bridgeFullUVs = new Float32Array(this.bridge.geometry.getAttribute('uv').array);
+      }
       this.drones = ownedDrones;
       this.root.updateMatrixWorld(true);
       this.setActive(false);
@@ -479,7 +511,12 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.disposed = true;
     for (const unregister of [...this.targetUnregisters].reverse()) unregister();
     this.targetUnregisters.length = 0;
-    for (const lift of [...this.lifts].reverse()) lift.dispose();
+    for (const lift of [...this.lifts].reverse()) {
+      // These fittings belong to this controller, not MovingPlatform's traversal.
+      lift.root.getObjectByName(lift.id + '-conducting-contact')?.removeFromParent();
+      lift.root.getObjectByName(lift.id + '-contact-mount')?.removeFromParent();
+      lift.dispose();
+    }
     for (const target of [...this.dissolveTargets].reverse()) target.dispose();
     for (const cover of this.covers) {
       if (this.coverRegistered.delete(cover.panel)) this.world.unregister(cover.panel);
@@ -497,6 +534,8 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.root.removeFromParent(); this.root.clear();
     this.lightGeometry.dispose(); this.lightTargetGeometry.dispose(); this.coverGeometry.dispose(); this.supportGeometry.dispose(); this.liftSocketGeometry.dispose();
     this.dressingGeometry.dispose();
+    for (const geometry of this.texturedDressing) geometry.dispose();
+    this.texturedDressing.clear();
     this.thrusterGeometry.dispose(); this.plumeGeometry.dispose(); this.plumeMaterial.dispose();
     this.lampTargetGeometry.dispose();
     this.bridge.geometry.dispose(); (this.bridge.material as THREE.Material).dispose();
@@ -513,10 +552,12 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     if (!existingTargetMesh) {
       const backing = new THREE.Mesh(this.lightGeometry, this.steel); backing.position.y = isLamp ? 0.25 : 0.55;
       if (isLamp) backing.scale.set(2.1, 1, 3);
+      this.mapScaledDressing(backing);
       root.add(backing);
     }
     const targetMaterial = existingTargetMesh?.material ?? new THREE.MeshStandardMaterial({ color: 0x39413d, roughness: 0.45, emissive: 0xffcc7a, emissiveIntensity: 0 });
     if (!(targetMaterial instanceof THREE.MeshStandardMaterial)) throw new Error(`Electrical contact ${id} requires a standard material.`);
+    if (!existingTargetMesh && this.room.surfaceMaterials) borrowBlackoutMaps(targetMaterial, this.room.surfaceMaterials.detail('copper'));
     const targetMesh = existingTargetMesh ?? new THREE.Mesh(isLamp ? this.lampTargetGeometry : this.lightTargetGeometry, targetMaterial);
     if (!existingTargetMesh) {
       targetMesh.name = isLamp ? `${id}-conducting-lamp` : `${id}-electrical-socket`; targetMesh.position.y = isLamp ? 0 : 0.55; root.add(targetMesh);
@@ -541,10 +582,21 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     mesh.name = name;
     mesh.scale.copy(size);
     mesh.position.copy(position);
+    this.mapScaledDressing(mesh);
     mesh.userData.presentationOnly = true;
     mesh.receiveShadow = true;
     this.root.add(mesh);
     return mesh;
+  }
+
+  private mapScaledDressing(mesh: THREE.Mesh): void {
+    if (!this.room.surfaceMaterials) return;
+    // Shared unit boxes have different authored scales: each chart needs its
+    // physical span. Preserve positions, normals and transforms verbatim.
+    mesh.geometry = mesh.geometry.clone();
+    this.texturedDressing.add(mesh.geometry);
+    mesh.updateMatrix();
+    mapBlackoutBoxUVs(mesh.geometry, mesh.matrix, (mesh.material as THREE.MeshStandardMaterial).userData.tileSizeMetres, 'object');
   }
 
   private updateLampBanks(): void {
@@ -617,6 +669,10 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
 
   private updateBridgeMeshes(): void {
     this.bridge.scale.x = Math.max(0.001, this.bridgeProgress);
+    if (this.bridgeFullUVs && this.bridgeUVStretch !== this.bridge.scale.x) {
+      updateBlackoutStretchUVs(this.bridge.geometry, this.bridgeFullUVs, this.bridge.scale.x);
+      this.bridgeUVStretch = this.bridge.scale.x;
+    }
     this.bridge.position.copy(this.bridgeStartPosition).lerp(this.bridgeEndPosition, this.bridgeProgress * 0.5);
     this.bridge.visible = this.bridgeProgress > 0.001;
     if (this.bridgeProgress >= 0.92 && !this.bridgeRegistered) {

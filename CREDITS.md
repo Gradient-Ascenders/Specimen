@@ -47,6 +47,12 @@ fittings share the kit's roughness/normal maps. Object-local metric UVs retain
 Three.js's existing curved primitive charts. No external texture assets,
 adapted code or additional dependencies were introduced.
 
+Level 3 Room 2 issue #163 reuses Room 1's project-authored prebaked facility maps
+for the chamber, transit decks, machinery and retained covers. Sticky walls and
+soluble latches use distinct tinted finishes; conducting contacts borrow the
+existing data maps while retaining private powered-state materials. No new
+texture assets, external code or third-party dependencies were introduced.
+
 ## Audio / music
 
 No third-party audio or music has been introduced yet.
