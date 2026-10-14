@@ -5,6 +5,8 @@ import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
 import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresentationContract.ts';
 import { disposeVoltAsset, disposeVoltMaterials, validateVoltAsset, VOLT_MORPHS, type VoltAsset, type VoltWeights } from './VoltAsset.ts';
 import { VOLT_BASE_COLOR, VoltMaterialSet } from './VoltMaterials.ts';
+import type { CollisionWorld } from '../../physics/CollisionWorld.ts';
+import { VoltHeadroom } from './VoltHeadroom.ts';
 import { GEL_LAUNCH_SECONDS, GEL_LANDING_SECONDS, GEL_MAXIMUM_BASE_OFFSET_METRES,
   GEL_MAXIMUM_JUMP_BASE_OFFSET_METRES, GEL_CREST_LAG_METRES, GEL_LANDING_RIPPLE_SECONDS,
   gelLandingSquash, gelAirborneStretch } from '../slime/GelElasticMotion.ts';
@@ -27,6 +29,7 @@ export class VoltCharacterPresentation {
   readonly placement = new THREE.Group();
   private readonly character = new THREE.Group();
   private readonly shape = new THREE.Group();
+  private readonly headroom = new VoltHeadroom();
   private readonly burst = new SlimeBurstPresentation(VOLT_BASE_COLOR);
   private readonly previousTravel = new THREE.Vector3();
   private readonly travel = new THREE.Vector3();
@@ -112,6 +115,7 @@ export class VoltCharacterPresentation {
       baseOffsetWorld: { x: this.baseOffsetWorld.x, y: this.baseOffsetWorld.y, z: this.baseOffsetWorld.z },
       polish: { crestLagMetres: Math.abs(this.crestLag), landingRippleStrength: this.rippleStrength,
         landingRippleAgeSeconds: this.rippleAge },
+      headroom: this.headroom.diagnostics,
       meshes: this.asset ? [this.asset.body, ...this.asset.eyes].map(mesh => ({ name: mesh.name,
         vertices: mesh.geometry.getAttribute('position').count, triangles: mesh.geometry.index!.count / 3,
         weights: Object.fromEntries(VOLT_MORPHS.map(name => [name, mesh.morphTargetInfluences![mesh.morphTargetDictionary![name]]])),
@@ -132,6 +136,7 @@ export class VoltCharacterPresentation {
       try {
         if (this.disposed) { disposeVoltAsset(root); return; }
         const asset = validateVoltAsset(root);
+        this.headroom.prepare(asset.body);
         const imported = new Set<THREE.Material>([asset.body.material, ...asset.eyes.map(eye => eye.material)].flat());
         materials = new VoltMaterialSet(...asset.maps);
         materials.setOpacity(this.opacity); materials.setReflectionEnvironment(this.environment);
@@ -154,6 +159,7 @@ export class VoltCharacterPresentation {
         this.shape.add(root); this.asset = asset; this.materials = materials;
         this.applyVisibility(); this.present();
       } catch (error) {
+        this.headroom.releaseAsset();
         if (materials) {
           // Replacement can fail before every shadow variant has attached.
           const owned = new Set<THREE.Material>([materials.body, materials.eyes, materials.bodyDepth,
@@ -173,6 +179,7 @@ export class VoltCharacterPresentation {
     return pending;
   }
   setPosition(position: Vector3State): void { this.placement.position.set(position.x, position.y, position.z); }
+  setCollisionWorld(world: CollisionWorld): void { this.headroom.setCollisionWorld(world); }
   setYaw(yaw: number): void {
     this.yaw = this.previousYaw = this.targetYaw = yaw;
     this.reversing = this.hasTravelHeading = false; this.reversalRemaining = 0; this.present();
@@ -199,6 +206,7 @@ export class VoltCharacterPresentation {
   update(deltaSeconds: number, state: VoltCharacterPresentationState): void {
     if (this.disposed || this.deathActive || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
     const dt = deltaSeconds;
+    this.headroom.update(dt);
     this.previousYaw = this.yaw; this.previousBodyWeight = this.bodyWeight; this.previousFlex = this.flex; this.previousBlink = this.blink;
     this.previousLean = this.lean; this.previousCrestLag = this.crestLag;
     this.previousBaseOffsetWorld.copy(this.baseOffsetWorld); this.previousRippleAge = this.rippleAge;
@@ -305,6 +313,7 @@ export class VoltCharacterPresentation {
       0, -shear, spread, -shear * this.radiusMetres,
       0, 0, 0, 1);
     this.shape.matrixWorldNeedsUpdate = true;
+    this.headroom.present(this.placement.position, this.shape.matrix, this.weights);
     this.presentedBaseOffsetWorld.lerpVectors(this.previousBaseOffsetWorld, this.baseOffsetWorld, blend);
     this.materials?.setMotion(this.presentedBaseOffsetWorld, this.character.rotation.y,
       THREE.MathUtils.lerp(this.previousCrestLag, this.crestLag, blend), this.rippleStrength,
@@ -350,6 +359,7 @@ export class VoltCharacterPresentation {
   }
   finishDeath(position: Vector3State): void { this.setPosition(position); this.reset(); }
   reset(): void {
+    this.headroom.reset();
     this.deathActive = false; this.deathElapsed = 0; this.burst.reset();
     this.yaw = this.previousYaw = this.targetYaw = this.bodyWeight = this.previousBodyWeight = this.flex = this.previousFlex = 0;
     this.blink = this.previousBlink = this.blinkClock = this.blinkCount = this.speed = this.previousLateralSpeed = 0;
@@ -366,6 +376,7 @@ export class VoltCharacterPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.headroom.dispose();
     if (this.asset) disposeVoltAsset(this.asset.root, this.environment);
     this.asset = undefined; this.materials = undefined;
     this.burst.dispose(); this.root.removeFromParent(); this.root.clear(); this.applyVisibility();

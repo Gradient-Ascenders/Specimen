@@ -967,6 +967,7 @@ export class CultivationLevelRuntime {
         initialPosition: new THREE.Vector3(), events: voltMovementEvents, config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false } });
       const voltPresentation = new VoltCharacterPresentation(voltBody.radiusMetres);
       rollback(() => voltPresentation.dispose());
+      voltPresentation.setCollisionWorld(collisionWorld);
       voltPresentation.setVisible(false);
       this.renderLayer.scene.add(voltPresentation.root);
       const previewOccupants = [
@@ -1941,6 +1942,7 @@ export class CultivationLevelRuntime {
     resources.goopPresentation.update(deltaSeconds, goopState);
     resources.voltPresentationState.grounded = resources.voltBody.grounded;
     resources.voltPresentationState.movementIntentWorld = resources.pair.activeBody === resources.voltBody ? resources.movement : resources.noMovement;
+    resources.voltPresentation.setPosition(resources.voltBody.position);
     resources.voltPresentation.update(deltaSeconds, resources.voltPresentationState);
   }
 

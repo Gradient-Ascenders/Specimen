@@ -15,6 +15,7 @@ import type { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem
 import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -169,12 +170,100 @@ function createFixture() {
 function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
   return (runtime as unknown as { resources: {
     group: { bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody };
+    voltPresentation: VoltCharacterPresentation;
     maintenanceBay: BlackoutMaintenanceBayController;
     transit: BlackoutTransitController;
     electricalSystem: VoltElectricalSystem<KinematicBody>;
     electricalTargets: ElectricalTargetRegistry;
   } }).resources;
 }
+
+function assertVoltBelowCeiling(body: THREE.Mesh, ceiling: THREE.Mesh): number {
+  body.updateWorldMatrix(true, false); ceiling.updateWorldMatrix(true, false);
+  const inverseCeiling = new THREE.Matrix4().copy(ceiling.matrixWorld).invert();
+  const bounds = ceiling.geometry.boundingBox!, point = new THREE.Vector3(), local = new THREE.Vector3();
+  let top = -Infinity;
+  for (let i = 0; i < body.geometry.getAttribute('position').count; i++) {
+    body.getVertexPosition(i, point); point.applyMatrix4(body.matrixWorld); top = Math.max(top, point.y);
+    local.copy(point).applyMatrix4(inverseCeiling);
+    if (local.x >= bounds.min.x && local.x <= bounds.max.x && local.z >= bounds.min.z && local.z <= bounds.max.z) {
+      assert.ok(local.y <= bounds.min.y + 1e-5, `Volt vertex ${i} penetrates ${ceiling.name} by ${local.y - bounds.min.y} m`);
+    }
+  }
+  return top;
+}
+
+test('real Volt GLB normal jump clears the actual maintenance-vent ceiling at every render alpha', async () => {
+  const f = createFixture();
+  try {
+    const r = electricalRoomInternals(f.runtime), volt = r.group.voltBody;
+    await r.voltPresentation.prepare(loadVolt);
+    const mesh = r.voltPresentation.root.getObjectByName('Volt-Body') as THREE.Mesh;
+    const ceiling = r.maintenanceBay.bay.collisionMeshes.find(m => m.name === 'vent-duct-ceiling')!;
+    const ceilingBottom = new THREE.Box3().setFromObject(ceiling).min.y;
+    assert.ok(Math.abs(ceilingBottom - 2.2) < 1e-6);
+    volt.teleport(new THREE.Vector3(-6, 0.46, 57)); f.tick(10);
+    assert.equal(volt.grounded, true); assert.equal(volt.radiusMetres, 0.45);
+    assert.equal(r.voltPresentation.diagnostics.headroom.compression, 0, 'preserve the neutral crest with ample grounded headroom');
+    f.input.press('jump');
+    let peakColliderTop = 0, peakVisualTop = 0, uncompressedTop = 0, maximumCompression = 0;
+    const point = new THREE.Vector3();
+    for (let frame = 0; frame < 60; frame++) {
+      f.tick(); if (frame === 0) f.input.release('jump');
+      peakColliderTop = Math.max(peakColliderTop, volt.position.y + volt.radiusMetres);
+      for (const alpha of [0, 0.5, 1]) {
+        f.runtime.render(alpha, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>);
+        peakVisualTop = Math.max(peakVisualTop, assertVoltBelowCeiling(mesh, ceiling));
+      }
+      maximumCompression = Math.max(maximumCompression, r.voltPresentation.diagnostics.headroom.compression);
+      if (frame === 14) {
+        const target = mesh.morphTargetDictionary!.Headroom, weight = mesh.morphTargetInfluences![target]!;
+        mesh.morphTargetInfluences![target] = 0;
+        for (let i = 0; i < mesh.geometry.getAttribute('position').count; i++) {
+          mesh.getVertexPosition(i, point); point.applyMatrix4(mesh.matrixWorld); uncompressedTop = Math.max(uncompressedTop, point.y);
+        }
+        mesh.morphTargetInfluences![target] = weight;
+      }
+    }
+    assert.equal(volt.lastJumpSpeedMetresPerSecond, DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond);
+    assert.ok(peakColliderTop > 1.65 && peakColliderTop < 1.8, 'ordinary jump tuning and unobstructed collider apex');
+    assert.ok(uncompressedTop > 2.65, 'reproduce the reviewer\'s approximately half-metre crest penetration');
+    assert.ok(peakVisualTop <= ceilingBottom - 0.02); assert.ok(maximumCompression > 0 && maximumCompression < 1);
+    volt.teleport(new THREE.Vector3(-6, 0.46, 49)); f.tick(90); f.render();
+    assert.equal(r.voltPresentation.diagnostics.headroom.compression, 0, 'restore authored height after exiting the passage');
+    f.runtime.restartLevel(); f.render(); assert.equal(r.voltPresentation.diagnostics.headroom.compression, 0);
+  } finally { f.cleanup(); }
+});
+
+test('real Volt GLB traverses and jumps through flat and rising ducts without ceiling clipping', async () => {
+  const f = createFixture();
+  try {
+    const r = electricalRoomInternals(f.runtime), volt = r.group.voltBody;
+    await r.voltPresentation.prepare(loadVolt);
+    const mesh = r.voltPresentation.root.getObjectByName('Volt-Body') as THREE.Mesh;
+    const flat = r.maintenanceBay.bay.collisionMeshes.find(m => m.name === 'vent-duct-ceiling')!;
+    const rising = r.maintenanceBay.bay.collisionMeshes.find(m => m.name === 'volt-rising-duct-ceiling')!;
+    volt.teleport(new THREE.Vector3(-6, 0.46, 53)); f.tick(10); f.input.press('moveBackward');
+    for (let frame = 0; frame < 100; frame++) {
+      if (frame === 30) f.input.press('jump');
+      f.tick(); if (frame === 30) f.input.release('jump');
+      if (frame % 5 === 0) for (const alpha of [0, 0.5, 1]) {
+        f.runtime.render(alpha, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>); assertVoltBelowCeiling(mesh, flat);
+      }
+    }
+    f.input.release('moveBackward'); assert.ok(volt.position.z > 60, 'ordinary input traverses the straight duct');
+    volt.teleport(new THREE.Vector3(-16, 1.6, 69)); f.tick(30); assert.equal(volt.grounded, true);
+    const startZ = volt.position.z; f.input.press('moveBackward'); f.input.press('jump');
+    for (let frame = 0; frame < 60; frame++) {
+      f.tick(); if (frame === 0) f.input.release('jump');
+      if (frame % 5 === 0) for (const alpha of [0, 0.5, 1]) {
+        f.runtime.render(alpha, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>); assertVoltBelowCeiling(mesh, rising);
+      }
+    }
+    f.input.release('moveBackward'); assert.ok(volt.position.z > startZ + 3, 'ordinary input climbs the authored sloping duct');
+    assert.equal(volt.radiusMetres, 0.45);
+  } finally { f.cleanup(); }
+});
 
 test('authored Room 1 Volt keeps identity events, light, interpolated placement and death/recovery ownership', async () => {
   const f = createFixture();

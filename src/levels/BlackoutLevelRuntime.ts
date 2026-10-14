@@ -1592,6 +1592,7 @@ export class BlackoutLevelRuntime {
       this.host.append(deathScreen.element);
       const voltPresentation = new VoltCharacterPresentation(group.voltBody.radiusMetres);
       rollback(() => voltPresentation.dispose());
+      voltPresentation.setCollisionWorld(collisionWorld);
       voltPresentation.setPosition(group.voltBody.position);
       this.renderLayer.scene.add(voltPresentation.root);
       rollback(voltMovementEvents.on('landed', event => voltPresentation.onLanding(group.voltBody.groundNormal, event.impactSpeedMetresPerSecond)));
@@ -2298,6 +2299,7 @@ export class BlackoutLevelRuntime {
     resources.voltPresentationState.movementIntentWorld = resources.voltMovementIntent;
     resources.voltPresentation.setAimDirection(resources.electricalSystem.readModel.aimActive
       ? this.renderLayer.cameraRig.camera.getWorldDirection(this.voltAimDirection) : undefined);
+    resources.voltPresentation.setPosition(resources.group.voltBody.position);
     resources.voltPresentation.update(deltaSeconds, resources.voltPresentationState);
   }
 
