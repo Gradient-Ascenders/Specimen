@@ -1834,7 +1834,9 @@ export class BlackoutLevelRuntime {
         safetyDisplacement,
       };
       if (this.audio) {
-        const gameplayAudio = new GameplayAudio(this.audio, manager, acidProjectileSystem);
+        const gameplayAudio = new GameplayAudio(this.audio, manager, acidProjectileSystem, () =>
+          specimenForm.readModel.controlledForm === 'specimen' ? specimenBody :
+            phase.phase === 'merging' ? undefined : manager.activeBody);
         this.gameplayAudio = gameplayAudio;
         rollback(() => {
           gameplayAudio.dispose();
@@ -2391,6 +2393,8 @@ export class BlackoutLevelRuntime {
     const resources = this.requireResources();
     if (this.completionEmitted || !resources.phase.terminal) return;
     this.completionEmitted = true;
+    this.gameplayAudio?.reset();
+    this.gameplayAudio?.setEnabled(false);
     resources.electricalSystem.disconnect('completion');
     resources.electricalSystem.cancelAim();
     resources.specimenAttack.reset();

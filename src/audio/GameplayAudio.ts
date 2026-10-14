@@ -17,15 +17,18 @@ export class GameplayAudio {
   private readonly audio: AudioPlayback;
   private readonly manager: SlimeManager<KinematicBody>;
   private readonly acid: AcidProjectileSystem<KinematicBody>;
+  private readonly controlledBody: () => KinematicBody | undefined;
 
   constructor(
     audio: AudioPlayback,
     manager: SlimeManager<KinematicBody>,
     acid: AcidProjectileSystem<KinematicBody>,
+    controlledBody: () => KinematicBody | undefined = () => manager.activeBody,
   ) {
     this.audio = audio;
     this.manager = manager;
     this.acid = acid;
+    this.controlledBody = controlledBody;
     this.unsubscribers.push(
       gameplayAudioEvents.on('cue', ({ sound, position }) => {
         if (this.enabled && !this.dead && !this.resetting) audio.play(sound, position);
@@ -82,8 +85,10 @@ export class GameplayAudio {
     this.resetting = false;
     const id = this.manager.activeSlimeId;
     const body = this.manager.activeBody;
+    const controlled = this.controlledBody();
+    if (controlled) this.audio.setListener(controlled.position);
+    if (controlled !== body) { this.clearCharacter(); this.updateProjectiles(); return; }
     if (!body || (id !== 'bob' && id !== 'goop' && id !== 'volt')) { this.clearCharacter(); return; }
-    this.audio.setListener(body.position);
     const v = body.velocity, n = body.groundNormal;
     const normalSpeed = v.x * n.x + v.y * n.y + v.z * n.z;
     const tangentSpeedSquared = Math.max(0, v.x*v.x + v.y*v.y + v.z*v.z - normalSpeed*normalSpeed);
@@ -101,6 +106,10 @@ export class GameplayAudio {
     if (!moving && body.grounded && (id === 'goop' || id === 'volt'))
       this.audio.startLoop('character:idle', id === 'goop' ? 'goop-idle-bubbles-loop-01' : 'volt-idle-sparks-loop-01', body.position);
     else this.audio.stopLoop('character:idle');
+    this.updateProjectiles();
+  }
+
+  private updateProjectiles(): void {
     for (const projectile of this.acid.projectileStates) {
       const key = `acid:${projectile.id}`;
       if (projectile.active) this.audio.startLoop(key, 'goop-projectile-flight-loop-01', projectile.position);

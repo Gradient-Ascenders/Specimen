@@ -30,7 +30,7 @@ Voices are bounded at 24 globally and three per one-shot effect. Each standard l
 - Pause/menus suspend the context and clear transient character loops. World loops preserve their offsets and resume once. Browser blur/visibility adds an independent suspension gate. Fixed-step state recreates character movement/charge loops only if still valid.
 - Death stops existing voices, plays Bob's accepted-failure cue when applicable, and rejects further world sounds until successful recovery. Retry sounds the restored active identity.
 - Restart/checkpoint/puzzle reset clears voices and suppresses restoration notifications until the next gameplay update. Projectile impact, expiry, reset and disposal immediately stop flight ownership; burn completion/reset/disposal stop corrosion ownership.
-- Unload/transition removes level subscriptions and all sources. Shutdown removes browser handlers, disconnects audio graph resources and closes the context. Completion stops through the existing runtime/session lifecycle.
+- Unload/transition removes level subscriptions and all sources. Shutdown removes browser handlers, disconnects audio graph resources and closes the context. Blackout's terminal completion explicitly clears and suspends audio; its session retains the completed scene. Merging clears original-character loops and the merged Specimen owns listener position without borrowing a slime's movement sounds.
 
 ## Complete mapping
 

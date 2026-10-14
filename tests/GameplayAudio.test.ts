@@ -23,6 +23,7 @@ import { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 import { BlackoutTransitController } from '../src/levels/BlackoutTransitController.ts';
 import { BlackoutTransitRoom } from '../src/levels/BlackoutTransitRoom.ts';
+import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 
 class Parameter {
   value = 0;
@@ -131,7 +132,8 @@ class Playback implements AudioPlayback {
   stopLoop(key: string) { this.loops.delete(key); }
   stopAll() { this.loops.clear(); }
   setPaused(paused: boolean) { this.paused = paused; }
-  setListener() {}
+  listener = {x:0,y:0,z:0};
+  setListener(position: {x:number;y:number;z:number}) { this.listener={...position}; }
 }
 function directorFixture(initialIds = ['bob', 'goop', 'volt']) {
   const audio = new Playback();
@@ -209,6 +211,40 @@ test('pause, world loops, projectile destruction, reset, respawn and unload clea
   const before=audio.cues.length;
   gameplayAudioEvents.emit('cue',{sound:'specimen-turret-shot'});
   assert.equal(audio.cues.length,before);
+});
+
+test('merged control clears original-character loops and follows the actual controlled body', () => {
+  const {audio,director}=directorFixture();
+  try {
+    director.setEnabled(true); director.update();
+    assert.ok(audio.loops.has('character:movement'));
+    (director as any).controlledBody=()=>({position:{x:50,y:2,z:20}});
+    director.update();
+    assert.equal(audio.loops.size,0);
+    assert.deepEqual(audio.listener,{x:50,y:2,z:20});
+  } finally {director.dispose();}
+});
+
+test('terminal Blackout completion stops all voices once even though the scene remains loaded', () => {
+  const {audio,director}=directorFixture();
+  const noop=()=>{};
+  const runtime:any={
+    completionEmitted:false,gameplayAudio:director,
+    requireResources:()=>({phase:{terminal:true},electricalSystem:{disconnect:noop,cancelAim:noop,readModel:{}},specimenAttack:{reset:noop},poweredDeviceRig:{recomputePower:noop},electricalPresentation:{update:noop}}),
+    renderLayer:{cameraRig:{setAimPresentationActive:noop}},input:{setEnabled:noop,releasePointerLock:noop},host:{dataset:{}},events:new EventBus<any>(),
+  };
+  let completions=0; runtime.events.on('completed',()=>completions++);
+  try {
+    director.setEnabled(true); director.update();
+    assert.ok(audio.loops.size>0);
+    (BlackoutLevelRuntime.prototype as any).commitCompletion.call(runtime);
+    (BlackoutLevelRuntime.prototype as any).commitCompletion.call(runtime);
+    director.update();
+    assert.equal(completions,1); assert.equal(audio.loops.size,0); assert.equal(audio.paused,true);
+    const before=audio.cues.length;
+    gameplayAudioEvents.emit('cue',{sound:'specimen-turret-shot'});
+    assert.equal(audio.cues.length,before);
+  } finally {director.dispose();}
 });
 
 test('real accepted turret spawns produce exactly one cue; rejected spawns stay silent', () => {
