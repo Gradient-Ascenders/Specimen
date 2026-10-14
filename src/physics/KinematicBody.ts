@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import type { EventBus } from '../core/EventBus.ts';
+import { EventBus } from '../core/EventBus.ts';
 import {
   CollisionHit,
   CollisionLayer,
@@ -152,7 +152,8 @@ export class KinematicBody {
   private readonly world: CollisionWorld;
   private readonly surfaces: SurfaceRegistry;
   private readonly config: KinematicBodyConfig;
-  private readonly events: EventBus<MovementEvents> | undefined;
+  readonly events: EventBus<MovementEvents>;
+  private bouncedThisStep = false;
 
   private readonly currentPosition = new THREE.Vector3();
   private readonly previousPositionValue = new THREE.Vector3();
@@ -222,7 +223,7 @@ export class KinematicBody {
   constructor(options: KinematicBodyOptions) {
     this.world = options.world;
     this.surfaces = options.surfaces;
-    this.events = options.events;
+    this.events = options.events ?? new EventBus<MovementEvents>();
     this.config = {
       ...DEFAULT_KINEMATIC_BODY_CONFIG,
       ...options.config,
@@ -413,6 +414,7 @@ export class KinematicBody {
 
     this.previousPositionValue.copy(this.currentPosition);
     this.contactsThisStep = 0;
+    this.bouncedThisStep = false;
     this.lastCollisionName = 'none';
     this.lastContactImpactSpeedValue = 0;
     this.lastContactNameValue = 'none';
@@ -477,6 +479,11 @@ export class KinematicBody {
     this.refreshGroundState(deltaSeconds);
     this.handleLanding(groundedAtStepStart, downwardSpeedBeforeCollision);
     this.consumeBufferedJumpAfterLanding(jumpInput);
+    if (!this.landedThisStepValue && !this.bouncedThisStep &&
+      this.lastContactImpactSpeedValue >= 4 &&
+      Math.abs(this.lastContactNormalValue.dot(this.gameplayUpValue)) < this.config.minimumGroundNormalDot) {
+      this.events.emit('obstacleImpact', { speedMetresPerSecond: this.lastContactImpactSpeedValue });
+    }
     this.locomotionStepDisplacement.subVectors(
       this.currentPosition,
       this.previousPositionValue,
@@ -656,6 +663,7 @@ export class KinematicBody {
     if (!preserveVelocity) this.velocityValue.set(0, 0, 0);
 
     this.contactsThisStep = 0;
+    this.bouncedThisStep = false;
     this.lastCollisionName = 'none';
     this.attachedValue = false;
     this.attachmentSurface = null;
@@ -1330,6 +1338,8 @@ export class KinematicBody {
     );
     this.airborneSeconds = 0;
     this.bounceCooldownSecondsValue = this.config.bounceCooldownSeconds;
+    this.bouncedThisStep = true;
+    this.events.emit('bounced', {});
     this.lastBounceSpeedValue = bounceSpeedMetresPerSecond;
     this.lastBounceSurfaceNameValue =
       surfaceObject?.name || '<unnamed>';
@@ -1348,6 +1358,7 @@ export class KinematicBody {
       return false;
     }
 
+    if (!this.attachedValue) this.events.emit('attached', {});
     this.attachedValue = true;
     this.attachmentSurface = surfaceObject;
     this.supportColliderValue = surfaceObject;
@@ -1376,6 +1387,7 @@ export class KinematicBody {
     cooldownSeconds: number,
     preserveStickyJumpGravity = false,
   ): void {
+    if (this.attachedValue) this.events.emit('detached', { lostSupport: false });
     this.attachedValue = false;
     this.attachmentSurface = null;
     this.groundedValue = false;
@@ -1394,6 +1406,7 @@ export class KinematicBody {
   }
 
   private detachAfterLosingSurfaceSupport(): void {
+    if (this.attachedValue) this.events.emit('detached', { lostSupport: true });
     this.attachedValue = false;
     this.attachmentSurface = null;
     this.supportColliderValue = null;
@@ -1586,6 +1599,7 @@ export class KinematicBody {
       .addScaledVector(transitionNormal, CONTACT_PUSH_METRES);
 
     this.groundedValue = true;
+    this.events.emit(attachableWall ? 'regripped' : 'detached', { lostSupport: false });
     this.attachedValue = attachableWall;
     this.attachmentSurface = attachableWall ? this.edgeHit.object : null;
     this.supportColliderValue = this.edgeHit.object;

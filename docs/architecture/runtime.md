@@ -3,9 +3,10 @@
 ## Ownership
 
 `src/main.ts` owns browser-session resources: `RenderLayer`, `Input`, the
-single `Loop`, UI, and `GameSessionCoordinator`. A concrete level runtime owns
+single `Loop`, `AudioManager`, UI, and `GameSessionCoordinator`. A concrete level runtime owns
 only its scene, collision and surface registries, playable bodies, level UI,
-hazards, puzzles, checkpoints, and subscriptions.
+hazards, puzzles, checkpoints, and subscriptions, including its `GameplayAudio`
+director. See [Gameplay audio](gameplay-audio.md) for sound ownership and mappings.
 
 The coordinator runs the authored progression
 `Containment -> Cultivation -> Blackout`. It stops and disposes the current
