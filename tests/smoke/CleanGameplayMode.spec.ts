@@ -116,8 +116,8 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       await page.evaluate(() => {
         const resources = (window as any).__cleanSession.runtime.resources;
         return {
-          bob: resources.bobPresentation.ready,
-          goop: resources.goopPresentation.ready,
+          bob: (resources.bobPresentation ?? resources.testScene.bob).ready,
+          goop: (resources.goopPresentation ?? resources.testScene.goop).ready,
         };
       }),
     ).toEqual({ bob: true, goop: true });
