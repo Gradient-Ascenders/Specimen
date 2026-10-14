@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../src/render/goop/GoopCharacterPresentation.ts';
-import { GOOP_MAXIMUM_BASE_OFFSET_METRES } from '../src/render/goop/GoopBaseMotion.ts';
+import { GOOP_MAXIMUM_BASE_OFFSET_METRES, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES } from '../src/render/goop/GoopBaseMotion.ts';
 import { GoopMaterialSet } from '../src/render/goop/GoopMaterials.ts';
 import { loadGoop } from './fixtures/GoopAssetFixture.ts';
 
@@ -29,7 +29,7 @@ test('bottom slime trails forward and backward travel steadily, including before
   }
   p.present();
   assert.ok(p.diagnostics.baseOffsetWorld.z > 0.079, 'forward travel shifts the bottom backwards');
-  assert.ok(shader.uniforms.uGoopBaseOffset.value.y > 0.079);
+  assert.ok(shader.uniforms.uGoopBaseOffset.value.z > 0.079);
   assert.equal(p.diagnostics.baseOffsetWorld.x, 0);
   const steadyOffset = p.diagnostics.baseOffsetWorld.z;
   for (let frame = 0; frame < 30; frame++) {
@@ -42,16 +42,16 @@ test('bottom slime trails forward and backward travel steadily, including before
   }
   assert.equal(p.diagnostics.reversing, true);
   assert.ok(p.diagnostics.baseOffsetWorld.z < 0, 'backward travel shifts the bottom forwards before the face turns');
-  p.present(0); const previous = shader.uniforms.uGoopBaseOffset.value.y;
-  p.present(1); const current = shader.uniforms.uGoopBaseOffset.value.y;
-  p.present(0.5); const middle = shader.uniforms.uGoopBaseOffset.value.y;
+  p.present(0); const previous = shader.uniforms.uGoopBaseOffset.value.z;
+  p.present(1); const current = shader.uniforms.uGoopBaseOffset.value.z;
+  p.present(0.5); const middle = shader.uniforms.uGoopBaseOffset.value.z;
   assert.ok(middle < previous && middle > current, 'the offset interpolates smoothly');
   for (let frame = 0; frame < 40; frame++) {
     state.locomotionPositionWorld.z += 5.5 * dt; p.update(dt, state);
   }
   p.present();
-  const localOffset = shader.uniforms.uGoopBaseOffset.value as THREE.Vector2;
-  const worldOffset = new THREE.Vector3(localOffset.x, 0, localOffset.y)
+  const localOffset = shader.uniforms.uGoopBaseOffset.value as THREE.Vector3;
+  const worldOffset = localOffset.clone()
     .applyAxisAngle(new THREE.Vector3(0, 1, 0), p.diagnostics.facingYawRadians);
   assert.ok(worldOffset.z < -0.079);
   const expected = p.diagnostics.baseOffsetWorld;
@@ -60,7 +60,7 @@ test('bottom slime trails forward and backward travel steadily, including before
   p.reset(); assert.equal(shader.uniforms.uGoopBaseOffset.value.length(), 0); p.dispose();
 });
 
-test('the base lag scales with speed and settles on stopping, blocked travel, or takeoff', () => {
+test('the base lag scales with speed, settles when blocked, and carries through takeoff', () => {
   const p = new GoopCharacterPresentation(), state = motionState(); p.update(dt, state);
   for (let frame = 0; frame < 30; frame++) {
     state.locomotionPositionWorld.z -= 2.75 * dt; p.update(dt, state);
@@ -72,7 +72,9 @@ test('the base lag scales with speed and settles on stopping, blocked travel, or
   state.locomotionPositionWorld.z -= 5.5 * dt; p.update(dt, state);
   assert.ok(p.diagnostics.baseMotionStrength > 0);
   state.grounded = false; state.locomotionPositionWorld.z -= 5.5 * dt; p.update(dt, state);
-  assert.equal(p.diagnostics.baseMotionStrength, 0);
+  assert.ok(p.diagnostics.baseMotionStrength > 0);
+  assert.ok(p.diagnostics.baseOffsetWorld.z > 0, 'ground drag carries into a moving jump');
+  p.reset();
   state.grounded = true; state.movementIntentWorld.set(0, 0, 0);
   state.locomotionPositionWorld.x += 0.06; p.update(dt, state);
   assert.equal(p.diagnostics.baseMotionStrength, 0, 'passive travel does not shift the base');
@@ -83,17 +85,55 @@ test('the base lag scales with speed and settles on stopping, blocked travel, or
   p.dispose();
 });
 
+test('lower gel trails jump velocity, relaxes at the apex, and plants on landing at every render alpha', async () => {
+  const p = new GoopCharacterPresentation(); await p.prepare(loadGoop);
+  const state = motionState(); state.movementIntentWorld.set(0, 0, 0);
+  p.update(dt, state);
+  const body = p.root.getObjectByName('Goop-Body') as THREE.Mesh;
+  const shader = compile(body.material as THREE.Material, 'physical');
+  state.grounded = false; state.velocityWorld.y = 6;
+  for (let frame = 0; frame < 5; frame++) {
+    state.locomotionPositionWorld.y += state.velocityWorld.y * dt;
+    p.setPosition(state.locomotionPositionWorld); p.update(dt, state);
+  }
+  p.present();
+  assert.ok(p.diagnostics.jumpBaseOffsetMetres < -0.02, 'the lower slime lags downward while rising');
+  assert.ok(p.diagnostics.jumpBaseOffsetMetres >= -GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES);
+  assert.equal(shader.uniforms.uGoopBaseOffset.value.y, p.diagnostics.jumpBaseOffsetMetres);
+  assert.equal(p.diagnostics.baseMotionStrength, 0, 'a stationary jump adds only vertical lag');
+  state.velocityWorld.y = 0;
+  for (let frame = 0; frame < 20; frame++) p.update(dt, state);
+  assert.ok(Math.abs(p.diagnostics.jumpBaseOffsetMetres) < 0.001, 'the skirt relaxes near the apex');
+  state.velocityWorld.y = -6;
+  for (let frame = 0; frame < 10; frame++) p.update(dt, state);
+  assert.ok(p.diagnostics.jumpBaseOffsetMetres > 0.03, 'the lower slime lags upward while falling');
+  assert.ok(p.diagnostics.jumpBaseOffsetMetres <= GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES);
+  p.present(0); const previous = shader.uniforms.uGoopBaseOffset.value.y;
+  p.present(1); const current = shader.uniforms.uGoopBaseOffset.value.y;
+  p.present(0.5); assert.ok(shader.uniforms.uGoopBaseOffset.value.y > previous && shader.uniforms.uGoopBaseOffset.value.y < current);
+  state.grounded = true; state.velocityWorld.y = 0;
+  p.onLanding({ x: 0, y: 1, z: 0 }, 8.5); p.update(dt, state);
+  assert.ok(p.diagnostics.squash > 0);
+  for (const alpha of [0, 0.25, 0.5, 0.75, 1]) {
+    p.present(alpha);
+    assert.equal(shader.uniforms.uGoopBaseOffset.value.y, 0, 'landing cannot render a floating or sunken sole');
+  }
+  p.reset(); assert.equal(p.diagnostics.jumpBaseOffsetMetres, 0);
+  assert.equal(shader.uniforms.uGoopBaseOffset.value.length(), 0); p.dispose();
+});
+
 test('visible and shadow materials share the base offset without recompiling', () => {
   const materials = new GoopMaterialSet();
   const surface = compile(materials.body, 'physical');
   const depth = compile(materials.bodyDepth, 'depth');
   const distance = compile(materials.bodyDistance, 'distance');
   const version = materials.body.version, key = materials.body.customProgramCacheKey();
-  materials.setBaseOffset(new THREE.Vector3(0, 0, GOOP_MAXIMUM_BASE_OFFSET_METRES), Math.PI / 2);
+  materials.setBaseOffset(new THREE.Vector3(0, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES, GOOP_MAXIMUM_BASE_OFFSET_METRES), Math.PI / 2);
   for (const shader of [surface, depth, distance]) {
     assert.equal(shader.uniforms.uGoopBaseOffset, surface.uniforms.uGoopBaseOffset);
-    assert.match(shader.vertexShader, /transformed.xz \+= goopBaseMask\(transformed.y\) \* uGoopBaseOffset/);
+    assert.match(shader.vertexShader, /transformed \+= goopBaseMask\(transformed.y\) \* uGoopBaseOffset/);
     assert.ok(shader.uniforms.uGoopBaseOffset.value.x < -0.079);
+    assert.equal(shader.uniforms.uGoopBaseOffset.value.y, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES);
   }
   assert.match(surface.vertexShader, /objectNormal.y -= goopBaseSlope/);
   assert.equal(materials.body.version, version); assert.equal(materials.body.customProgramCacheKey(), key);

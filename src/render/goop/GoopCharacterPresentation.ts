@@ -5,7 +5,7 @@ import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
 import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresentationContract.ts';
 import { disposeGoopAsset, disposeGoopMaterials, validateGoopAsset, type GoopAsset } from './GoopAsset.ts';
 import { GOOP_BASE_COLOR, GoopMaterialSet } from './GoopMaterials.ts';
-import { GOOP_MAXIMUM_BASE_OFFSET_METRES } from './GoopBaseMotion.ts';
+import { GOOP_MAXIMUM_BASE_OFFSET_METRES, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES, GOOP_MAXIMUM_BASE_DISPLACEMENT_METRES } from './GoopBaseMotion.ts';
 
 const ASSET_URL = new URL('../../../assets/characters/goop/goop.glb', import.meta.url).href;
 const LAUNCH_SECONDS = 0.18;
@@ -104,8 +104,9 @@ export class GoopCharacterPresentation {
     return { ready: this.ready, visible: this.character.visible, opacity: this.opacity,
       facingYawRadians: this.yaw, speed: this.speed, grounded: this.grounded,
       locomotionStrength: Math.abs(this.lean), signedLean: this.lean, reversing: this.reversing,
-      baseMotionStrength: this.baseOffsetWorld.length() / GOOP_MAXIMUM_BASE_OFFSET_METRES,
-      baseOffsetWorld: { x: this.baseOffsetWorld.x, y: 0, z: this.baseOffsetWorld.z },
+      baseMotionStrength: Math.hypot(this.baseOffsetWorld.x, this.baseOffsetWorld.z) / GOOP_MAXIMUM_BASE_OFFSET_METRES,
+      jumpBaseOffsetMetres: this.baseOffsetWorld.y,
+      baseOffsetWorld: { x: this.baseOffsetWorld.x, y: this.baseOffsetWorld.y, z: this.baseOffsetWorld.z },
       squash: Math.max(0, this.squash), stretch: Math.max(0, -this.squash),
       shadowCasting: this.shadows && this.character.visible,
       deathActive: this.deathActive, deathBurst: this.burst.diagnostics,
@@ -146,7 +147,7 @@ export class GoopCharacterPresentation {
         for (const mesh of [asset.body, ...asset.eyes]) {
           mesh.receiveShadow = true;
           mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere();
-          const displacement = 0.0045 + (mesh === asset.body ? GOOP_MAXIMUM_BASE_OFFSET_METRES : 0);
+          const displacement = 0.0045 + (mesh === asset.body ? GOOP_MAXIMUM_BASE_DISPLACEMENT_METRES : 0);
           mesh.geometry.boundingBox!.expandByScalar(displacement);
           // Matrix4's scale estimate omits shear. Pad the sphere for the
           // maximum lean as well as the protected surface waves.
@@ -206,9 +207,9 @@ export class GoopCharacterPresentation {
     const maximumSpeed = Math.max(state.maximumLocomotionSpeedMetresPerSecond, 1e-6);
     // Travel excludes carrier transport. Intent and the speed bound also keep
     // passive motion and discontinuities from becoming a locomotion pose.
-    const activeTravel = state.grounded && this.speed <= maximumSpeed * 1.5 &&
+    const activeTravel = this.speed <= maximumSpeed * 1.5 &&
       intent.x * intent.x + intent.z * intent.z > 0.01;
-    if (!activeTravel || this.speed <= STOP_SPEED) this.moving = false;
+    if (!state.grounded || !activeTravel || this.speed <= STOP_SPEED) this.moving = false;
     else if (this.speed >= START_SPEED) this.moving = true;
     if (this.moving) {
       const desiredYaw = Math.atan2(-this.travel.x, -this.travel.z);
@@ -235,16 +236,24 @@ export class GoopCharacterPresentation {
     this.lean += (targetLean - this.lean) * (1 - Math.exp(-(targetLean === 0 ? LOCOMOTION_SETTLE : LOCOMOTION_RESPONSE) * dt));
     if (Math.abs(this.lean) < 1e-5) this.lean = 0;
     this.targetBaseOffsetWorld.set(0, 0, 0);
-    if (this.moving && dt > 0) {
+    const trailingTravel = this.moving || (!state.grounded && activeTravel && this.speed > STOP_SPEED);
+    if (trailingTravel && dt > 0) {
       this.targetBaseOffsetWorld.copy(this.travel).setY(0)
         .multiplyScalar(-GOOP_MAXIMUM_BASE_OFFSET_METRES / (maximumSpeed * dt))
         .clampLength(0, GOOP_MAXIMUM_BASE_OFFSET_METRES);
     }
-    this.baseOffsetWorld.lerp(this.targetBaseOffsetWorld, 1 - Math.exp(-BASE_RESPONSE * dt));
-    if (!state.grounded || this.baseOffsetWorld.lengthSq() < 1e-12) {
-      this.baseOffsetWorld.set(0, 0, 0);
-      if (!state.grounded) this.previousBaseOffsetWorld.set(0, 0, 0);
+    if (!state.grounded) {
+      // As with ground travel, the lower gel trails the body's motion. Relax
+      // through the apex, then let it lag upward during the descent.
+      this.targetBaseOffsetWorld.y = -GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES *
+        THREE.MathUtils.clamp(state.velocityWorld.y / 6, -1, 1);
     }
+    this.baseOffsetWorld.lerp(this.targetBaseOffsetWorld, 1 - Math.exp(-BASE_RESPONSE * dt));
+    if (state.grounded) {
+      // Every render sample plants the sole as soon as the body lands.
+      this.baseOffsetWorld.y = this.previousBaseOffsetWorld.y = 0;
+    }
+    for (const axis of ['x', 'y', 'z'] as const) if (Math.abs(this.baseOffsetWorld[axis]) < 1e-6) this.baseOffsetWorld[axis] = 0;
     this.grounded = state.grounded;
     const wasLanding = this.landingRemaining > 0;
     this.launchRemaining = Math.max(0, this.launchRemaining - dt);

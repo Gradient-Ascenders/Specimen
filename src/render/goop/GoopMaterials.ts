@@ -55,7 +55,7 @@ const profile: GelMaterialProfile = {
 };
 
 export class GoopMaterialSet extends GelMaterialSet {
-  private readonly baseOffset: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2() };
+  private readonly baseOffset: THREE.IUniform<THREE.Vector3> = { value: new THREE.Vector3() };
 
   constructor() {
     super(profile);
@@ -63,7 +63,7 @@ export class GoopMaterialSet extends GelMaterialSet {
     for (const material of [this.body, this.bodyDepth, this.bodyDistance]) {
       const hook = material.onBeforeCompile;
       const cacheKey = material.customProgramCacheKey.bind(material);
-      material.customProgramCacheKey = () => `${cacheKey()}-base-lag-v1`;
+      material.customProgramCacheKey = () => `${cacheKey()}-base-lag-v2`;
       material.onBeforeCompile = (shader, renderer) => {
         hook(shader, renderer);
         shader.uniforms.uGoopBaseOffset = this.baseOffset;
@@ -73,14 +73,15 @@ export class GoopMaterialSet extends GelMaterialSet {
   }
 
   setBaseOffset(offsetWorld: THREE.Vector3, facingYaw: number): void {
-    if (offsetWorld.lengthSq() === 0) { this.baseOffset.value.set(0, 0); return; }
+    if (offsetWorld.lengthSq() === 0) { this.baseOffset.value.set(0, 0, 0); return; }
     const sine = Math.sin(facingYaw), cosine = Math.cos(facingYaw);
     this.baseOffset.value.set(cosine * offsetWorld.x - sine * offsetWorld.z,
+      offsetWorld.y,
       sine * offsetWorld.x + cosine * offsetWorld.z);
   }
 
   override reset(): void {
     super.reset();
-    this.baseOffset.value.set(0, 0);
+    this.baseOffset.value.set(0, 0, 0);
   }
 }
