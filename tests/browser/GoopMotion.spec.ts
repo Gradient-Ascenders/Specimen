@@ -25,12 +25,15 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-action="start"]').click();
   await page.waitForFunction(() => (window as any).__goopMotionRuntime?.state === 'running');
+  await page.locator('canvas').click();
+  await page.waitForFunction(() => (window as any).__goopMotionRuntime.input.pointerLocked);
   await page.addStyleTag({ content: '.game-hud, .performance-recorder { visibility: hidden !important; }' });
   await page.evaluate(() => {
     const rt = (window as any).__goopMotionRuntime, r = rt.resources;
     // Advance the real controller in deterministic fixed steps so software
     // rendering cannot skip over a short landing or reversal pose.
     rt.renderLayer.setAnimationLoop(null);
+    rt.input.endPointerUpdate();
     rt.switchActiveSlime(r);
     r.goopBody.teleport({ x: 3, y: 0.46, z: 0 });
     r.testScene.goop.reset();
@@ -39,6 +42,9 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   const observations: Record<string, any> = {};
   const step = async (count: number, stopOnLanding = false) => page.evaluate(({ count, stopOnLanding }) => {
     const rt = (window as any).__goopMotionRuntime, r = rt.resources;
+    // A scripted heading owns this batch. Preserve held controls, but discard
+    // mouse-look retained between screenshots before fixedUpdate consumes it.
+    rt.input.endPointerUpdate();
     rt.renderLayer.cameraRig.setGroundOrbitYawRadians(0);
     for (let frame = 0; frame < count; frame++) {
       rt.fixedUpdate(1 / 60);
@@ -67,6 +73,15 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   const neutral = await capture('neutral', 30);
   expect(neutral.locomotionStrength).toBe(0);
   expect(neutral.baseMotionStrength).toBe(0);
+  // Exercise the review regression deliberately: resetting camera yaw alone
+  // cannot neutralize mouse displacement still waiting in the input boundary.
+  const retainedLook = await page.evaluate(() => {
+    const input = (window as any).__goopMotionRuntime.input;
+    input.endPointerUpdate();
+    window.dispatchEvent(new MouseEvent('mousemove', { movementX: 120, movementY: -40 }));
+    return { x: input.pointerDeltaX, y: input.pointerDeltaY };
+  });
+  expect(retainedLook).toEqual({ x: 120, y: -40 });
   await page.keyboard.down('w');
   const forward = await capture('forward', 40);
   expect(forward.signedLean).toBeGreaterThan(0.9);
@@ -77,6 +92,7 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   // Braking precedes reverse travel. Find the counterlean during the hold.
   const reverse = await page.evaluate(() => {
     const rt = (window as any).__goopMotionRuntime, r = rt.resources;
+    rt.input.endPointerUpdate();
     rt.renderLayer.cameraRig.setGroundOrbitYawRadians(0);
     for (let frame = 0; frame < 40; frame++) {
       rt.fixedUpdate(1 / 60);
@@ -122,11 +138,14 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   await page.evaluate(() => {
     const rt = (window as any).__goopMotionRuntime, r = rt.resources;
     r.goopBody.teleport({ x: 3, y: 0.46, z: 0 }); r.testScene.goop.reset();
+    rt.input.endPointerUpdate();
     rt.renderLayer.cameraRig.setGroundOrbitYawRadians(0);
   });
   await page.keyboard.down('w');
   observations.steering = await page.evaluate(() => {
     const rt = (window as any).__goopMotionRuntime, r = rt.resources, goop = r.testScene.goop;
+    rt.input.endPointerUpdate();
+    rt.renderLayer.cameraRig.setGroundOrbitYawRadians(0);
     for (let frame = 0; frame < 24; frame++) rt.fixedUpdate(1 / 60);
     const character = goop.root.getObjectByName('player-slime-goop-character');
     goop.present(); let previousYaw = character.rotation.y;
@@ -135,6 +154,7 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
       frameDeltaSeconds: 1 / 180, stepsThisFrame: 0, interpolationAlpha: 1,
       droppedSimulationTimeSeconds: 0, renderFps: 180 };
     for (let frame = 1; frame <= 30; frame++) {
+      rt.input.endPointerUpdate();
       rt.renderLayer.cameraRig.setGroundOrbitYawRadians(frame * Math.PI / 180);
       const before = goop.diagnostics.facingYawRadians;
       rt.fixedUpdate(1 / 60);
@@ -183,6 +203,7 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   expect(open.polish.eyeClosure).toBe(0);
   await page.evaluate(() => {
     const rt = (window as any).__goopMotionRuntime;
+    rt.input.endPointerUpdate();
     for (let frame = 0; frame < 360; frame++) {
       rt.fixedUpdate(1 / 60);
       if (rt.resources.testScene.goop.diagnostics.polish.eyeClosure > 0.9) return;
