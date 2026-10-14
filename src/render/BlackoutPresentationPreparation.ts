@@ -42,7 +42,7 @@ export class BlackoutPresentationPreparation {
         visible.add(clone(object, copy));
         // Camera fade changes Bob's eyes from opaque to transparent. Shader
         // hooks/uniforms remain borrowed, and no fade value is changed on Bob.
-        if (object.name.startsWith('Bob-Eye') && !copy.transparent) {
+        if ((object.userData.cameraFadeEye || object.name.startsWith('Bob-Eye')) && !copy.transparent) {
           const faded = copyPrewarmMaterial(copy); faded.transparent = true;
           this.materials.push(faded); visible.add(clone(object, faded));
         }

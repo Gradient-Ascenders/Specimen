@@ -1,3 +1,4 @@
+import { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import * as THREE from 'three';
 
 import { LaserHazard } from '../hazards/LaserHazard.ts';
@@ -121,7 +122,16 @@ export class RoomFiveGreybox {
   private readonly laserMotions: readonly RoomFiveLaserMotion[];
   private readonly laserTranslationOffset = new THREE.Vector3();
   private readonly leverHandle: THREE.Mesh;
-  private readonly etchPlaceholder: THREE.Mesh;
+  readonly goopPresentation = new GoopCharacterPresentation();
+  private readonly containedGoopPosition = new THREE.Vector3(0, 76.546, 110);
+  private readonly goopPresentationState = {
+    locomotionPositionWorld: new THREE.Vector3(),
+    velocityWorld: new THREE.Vector3(),
+    maximumLocomotionSpeedMetresPerSecond: 5.5,
+    movementIntentWorld: new THREE.Vector3(),
+    // The capsule supports the resting pose; release motion is scripted.
+    grounded: true,
+  };
   private endingStateValue: RoomFiveEndingState = 'traversal';
   private endingElapsedSeconds = 0;
   private traversalElapsedSeconds = 0;
@@ -142,19 +152,10 @@ export class RoomFiveGreybox {
     this.buildTraversal();
     const endingObjects = this.buildContainmentAndObservationRoom();
     this.leverHandle = endingObjects.leverHandle;
-    this.etchPlaceholder = endingObjects.etch;
+    this.root.add(this.goopPresentation.root);
     const leverMaterial = artResources.materials.stickyMembrane.clone();
     leverMaterial.name = 'room-5-authoritative-sticky-lever-handle';
     this.leverHandle.material = leverMaterial;
-    const containedGoopMaterial = this.etchPlaceholder
-      .material as THREE.MeshStandardMaterial;
-    containedGoopMaterial.name = 'room-5-contained-goop-biological-material';
-    containedGoopMaterial.color.setHex(0x7cae2d);
-    containedGoopMaterial.emissive.setHex(0x213b08);
-    containedGoopMaterial.emissiveIntensity = 0.22;
-    containedGoopMaterial.roughness = 0.2;
-    containedGoopMaterial.metalness = 0;
-
     const hazards = this.createHazards();
     this.laserMotions = ROOM_FIVE_LASER_MOTIONS.map((definition) => {
       const hazard = hazards.find((candidate) => candidate.id === definition.id);
@@ -186,6 +187,12 @@ export class RoomFiveGreybox {
 
   get releaseComplete(): boolean {
     return this.endingStateValue === 'released';
+  }
+
+  updatePresentation(deltaSeconds: number): void {
+    // Release translation belongs to the ending sequence, not locomotion.
+    this.goopPresentation.update(deltaSeconds, this.goopPresentationState);
+    this.goopPresentation.present();
   }
 
   /** Normalized progress inside the current authoritative ending phase. */
@@ -261,11 +268,13 @@ export class RoomFiveGreybox {
       1,
     );
     const eased = THREE.MathUtils.smoothstep(progress, 0, 1);
-    this.etchPlaceholder.position.y = 76.546 - eased * 8.8;
-    this.etchPlaceholder.position.z = 110 + eased * 2;
+    this.containedGoopPosition.y = 76.546 - eased * 8.8;
+    this.containedGoopPosition.z = 110 + eased * 2;
 
+    this.goopPresentation.setPosition(this.containedGoopPosition);
     if (progress < 1) return false;
     this.endingStateValue = 'released';
+    this.goopPresentation.setVisible(false);
     this.endingElapsedSeconds = 0;
     return true;
   }
@@ -291,6 +300,7 @@ export class RoomFiveGreybox {
     this.laserPresentation.dispose();
     this.lasers.dispose();
     for (const platform of this.movingPlatforms) platform.dispose();
+    this.goopPresentation.dispose();
     this.builder.dispose();
   }
 
@@ -446,24 +456,14 @@ export class RoomFiveGreybox {
 
   private buildContainmentAndObservationRoom(): {
     readonly leverHandle: THREE.Mesh;
-    readonly etch: THREE.Mesh;
   } {
-    const { containment, glass, etch: etchMaterial, floor, wall, sticky } = this.builder.materials;
+    const { containment, glass, floor, wall, sticky } = this.builder.materials;
 
     // Latest Blender scene keeps the containment glass and Etch but removes
     // the old frame and sliding-door meshes.
     // The transparent enclosure is also a solid traversal object: Bob can
     // land and jump on its roof, while its sides remain ordinary blockers.
     this.builder.addCollider({ name: 'room-5-containment-glass', size: [5.1, 3.2, 4.5], position: [0, 77.075, 110], material: glass });
-
-    const etch = new THREE.Mesh(
-      new THREE.SphereGeometry(0.65, 22, 15),
-      etchMaterial,
-    );
-    etch.name = 'room-5-contained-etch-placeholder';
-    etch.position.set(0, 76.546, 110);
-    etch.scale.set(1.05, 0.85, 1.05);
-    this.root.add(etch);
 
     // Observation room remains unchanged in the Blender-authored scene.
     this.builder.addCollider({ name: 'room-5-observation-floor', size: [8, 0.4, 7], position: [-10, 97.3, 129], material: floor });
@@ -484,13 +484,13 @@ export class RoomFiveGreybox {
       textureRole: 'sticky-wall-tile',
     });
 
-    return { leverHandle, etch };
+    return { leverHandle };
   }
 
   private hideGameplayColliders(): void {
     for (const [role, material] of Object.entries(this.builder.materials)) {
       material.name = `containment-room-5-${role}-collision-only`;
-      material.visible = role === 'etch';
+      material.visible = false;
     }
     (this.goopWoodenDoor.material as THREE.Material).visible = true;
     (this.leverHandle.material as THREE.Material).visible = true;
@@ -506,7 +506,9 @@ export class RoomFiveGreybox {
     this.endingStateValue = 'traversal';
     this.endingElapsedSeconds = 0;
     this.leverHandle.rotation.set(0, 0, 0);
-    this.etchPlaceholder.position.set(0, 76.546, 110);
+    this.containedGoopPosition.set(0, 76.546, 110);
+    this.goopPresentation.reset();
+    this.goopPresentation.setPosition(this.containedGoopPosition);
   }
 
   private createHazards(): readonly LaserHazard[] {

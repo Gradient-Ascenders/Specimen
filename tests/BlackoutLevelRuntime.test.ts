@@ -8,6 +8,7 @@ import type { LoopStats } from '../src/core/Loop.ts';
 import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
 import type { KinematicBody } from '../src/physics/KinematicBody.ts';
+import type { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
 
 class FakeButton {
   private clickListener: (() => void) | null = null;
@@ -283,6 +284,41 @@ class RuntimeFakeCameraRig {
   }
 }
 
+test('Goop retains real movement intent after drone updates and settles when control switches', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', { configurable: true,
+    value: { createElement: () => new RuntimeFakeElement() } });
+  const input = new RuntimeFakeInput(), cameraRig = new RuntimeFakeCameraRig();
+  cameraRig.copyGroundMovementDirection = (x, z, target) => target.set(x, 0, z).normalize();
+  const runtime = new BlackoutLevelRuntime({
+    host: new RuntimeFakeElement() as unknown as HTMLElement,
+    input: input as unknown as Input,
+    renderLayer: { scene: new THREE.Scene(), canvas: new RuntimeFakeElement(),
+      cameraRig, render: () => {} } as unknown as RenderLayer,
+    progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'goop' },
+  });
+  try {
+    runtime.load(); runtime.start();
+    const r = (runtime as unknown as { resources: {
+      group: { goopBody: KinematicBody }; goopPresentation: GoopCharacterPresentation;
+      movement: THREE.Vector3;
+    } }).resources;
+    r.group.goopBody.teleport(new THREE.Vector3(4, 0.46, 6));
+    input.press('moveForward');
+    for (let step = 0; step < 24; step++) runtime.fixedUpdate(1 / 60);
+    assert.ok(r.group.goopBody.position.z < 5, 'the real body moves through the controller');
+    assert.equal(r.movement.lengthSq(), 0, 'drone update has cleared the shared movement vector');
+    assert.ok(r.goopPresentation.diagnostics.signedLean > 0.65, 'Goop still receives the actual player intent');
+    input.press('switchSlime'); runtime.fixedUpdate(1 / 60);
+    input.release('moveForward'); input.release('switchSlime');
+    for (let step = 0; step < 120; step++) runtime.fixedUpdate(1 / 60);
+    assert.equal(r.goopPresentation.diagnostics.locomotionStrength, 0);
+  } finally {
+    runtime.dispose();
+    Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument });
+  }
+});
+
 test('switching away mid-jump lets inactive Bob finish falling and land', () => {
   const originalDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', { configurable: true,
@@ -324,7 +360,7 @@ test('switching away mid-jump lets inactive Bob finish falling and land', () => 
   }
 });
 
-test('Blackout mounts shared Bob presentation and owns its lifecycle without replacing Goop or Volt', () => {
+test('Blackout mounts shared Bob presentation and owns its lifecycle alongside authored Goop and Volt', () => {
   const originalDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -364,8 +400,8 @@ test('Blackout mounts shared Bob presentation and owns its lifecycle without rep
       assert.ok(bobCharacter, 'Blackout should use the shared Bob character hierarchy');
       assert.equal(
         scene.children.filter((child) => child.name === 'blackout-foundation-slime').length,
-        2,
-        'Goop and Volt should retain their existing plain presentations',
+        1,
+        'Volt retains its existing plain presentation',
       );
       assert.deepEqual(bobCharacter.position.toArray(), [-2, 0.46, 2]);
 
@@ -654,7 +690,8 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
 
     const groupBodies = scene.getObjectsByProperty('name', 'blackout-foundation-slime') as THREE.Mesh[];
     const specimen = scene.getObjectByName('blackout-specimen-body') as THREE.Mesh;
-    assert.equal(groupBodies.length, 2);
+    assert.equal(groupBodies.length, 1);
+    assert.ok(scene.getObjectByName("player-slime-goop-presentation"));
     assert.ok(groupBodies.every(mesh => mesh.castShadow && mesh.receiveShadow && mesh.visible));
     assert.ok(specimen.castShadow && specimen.receiveShadow);
     assert.equal(specimen.visible, false);

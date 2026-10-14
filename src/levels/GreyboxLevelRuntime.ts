@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-
 import {
+
   createAuthoredDissolveTarget,
   type DissolveTarget,
 } from '../abilities/DissolveTarget.ts';
@@ -42,6 +42,7 @@ import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
+import { prepareCharacterCameraFades } from '../render/slime/PrepareCharacterCameraFades.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
 import { createDepthPrewarmGroup } from '../render/ShadowPrewarmMaterial.ts';
@@ -157,6 +158,7 @@ interface GreyboxRuntimeResources {
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
   readonly movementEvents: EventBus<MovementEvents>;
+  readonly goopMovementEvents: EventBus<MovementEvents>;
   readonly spawnPosition: THREE.Vector3;
   readonly goopSpawnPosition: THREE.Vector3;
   readonly outOfBoundsTestPosition: THREE.Vector3;
@@ -402,8 +404,11 @@ export class GreyboxLevelRuntime {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
     const generation = ++this.lightingPrewarmGeneration;
-    const promise = resources.testScene.bob
-      .prepare()
+    const promise = Promise.all([
+      resources.testScene.bob.prepare(),
+      resources.testScene.goop.prepare(),
+      resources.testScene.roomFive.goopPresentation.prepare(),
+    ])
       .then(() => {
         if (this.resources !== resources || this.lightingPrewarmGeneration !== generation) return;
         return this.runLightingPrewarm(resources, generation);
@@ -644,6 +649,13 @@ export class GreyboxLevelRuntime {
     slimeVisualState.contactSurfaceTag = body.lastContactSurfaceTag;
     slimeVisualState.landedThisStep = body.landedThisStep;
     testScene.bob.update(deltaSeconds, slimeVisualState);
+    testScene.goop.update(deltaSeconds, {
+      locomotionPositionWorld: goopBody.locomotionPosition,
+      velocityWorld: goopBody.velocity,
+      maximumLocomotionSpeedMetresPerSecond: goopBody.maximumLocomotionSpeedMetresPerSecond,
+      movementIntentWorld: activeBody === goopBody && !switchedThisStep ? cameraRelativeMovement : resources.noMovement,
+      grounded: goopBody.grounded,
+    });
     testScene.update(deltaSeconds, body.position, slimePair.activeBody.position);
     this.input.endFixedUpdate();
   }
@@ -702,6 +714,8 @@ export class GreyboxLevelRuntime {
 
       testScene.bob.setPosition(renderedProbePosition);
       testScene.bob.present(interpolationAlpha);
+      testScene.goop.setPosition(renderedGoopPosition);
+      testScene.goop.present(interpolationAlpha);
       const activeRenderedPosition =
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
@@ -753,6 +767,16 @@ export class GreyboxLevelRuntime {
           )
         : 1,
     );
+    const reveal = testScene.roomFive.goopPresentation;
+    const showReveal = testScene.lightingDiagnostics.visibleRoomIds.includes(5) &&
+      !testScene.roomFive.releaseComplete && slimePair.activeSlimeId !== 'goop';
+    reveal.setVisible(showReveal);
+    testScene.goop.setVisible(!showReveal);
+    testScene.goop.setOpacity(slimePair.activeSlimeId === 'goop'
+      ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
+        cameraDistanceMetres, CAMERA_FADE_START_DISTANCE_METRES, CAMERA_FADE_END_DISTANCE_METRES, CAMERA_MINIMUM_TARGET_OPACITY)) : 1);
+    const reflection = testScene.lighting.reflectionTargetForPosition(goopBody.position, testScene.isInsideCameraTightVent(goopBody.position));
+    testScene.goop.setReflectionIntensity(reflection.body, reflection.eyes);
     const lightingRoomId = testScene.lightingDiagnostics.activeRoomId;
     const profileLightingTransition =
       this.debugAvailable &&
@@ -852,6 +876,7 @@ export class GreyboxLevelRuntime {
       ? new ContainmentCollisionOverlay(testScene.collisionMeshes)
       : undefined;
     const movementEvents = new EventBus<MovementEvents>();
+    const goopMovementEvents = new EventBus<MovementEvents>();
     const puzzleRegistry = new PuzzleRegistry();
     const dissolveTargets = testScene.solubleTargetMeshes
       .map((mesh) =>
@@ -903,6 +928,7 @@ export class GreyboxLevelRuntime {
       world: collisionWorld,
       surfaces: surfaceRegistry,
       initialPosition: goopSpawnPosition,
+      events: goopMovementEvents,
       config: {
         adhesionEnabled: goopDefinition.abilities.adhesion,
         reboundEnabled: goopDefinition.abilities.rebound,
@@ -930,6 +956,7 @@ export class GreyboxLevelRuntime {
       cameraRig: this.renderLayer.cameraRig,
       source: acidProjectileSystem,
       targets: dissolveTargets,
+      onProjectileFired: direction => testScene.goop.onAcidFired(direction),
     });
 
     const slimePairPresentation = new SlimePairPresentation(body.radiusMetres);
@@ -961,6 +988,8 @@ export class GreyboxLevelRuntime {
     const unsubscribeDamaged = containmentLevel.events.on('damaged', () => {
       if (slimePair.activeSlimeId === 'bob') {
         testScene.bob.onDamage(1);
+      } else if (slimePair.activeSlimeId === 'goop') {
+        testScene.goop.onDamage(1);
       }
     });
 
@@ -985,6 +1014,12 @@ export class GreyboxLevelRuntime {
       landedThisStep: body.landedThisStep,
     };
 
+    goopMovementEvents.on('landed', event => testScene.goop.onLanding(goopBody.groundNormal, event.impactSpeedMetresPerSecond));
+    goopMovementEvents.on('jumped', event => testScene.goop.onLaunch(event));
+    testScene.goop.setPosition(goopBody.position);
+    testScene.goop.setReflectionEnvironment(bobReflectionEnvironment.texture);
+    testScene.roomFive.goopPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
+    testScene.roomFive.goopPresentation.setReflectionIntensity(0.34, 0.68, true);
     const unsubscribeLanding = movementEvents.on('landed', (event) => {
       this.landingEventCount += 1;
       this.lastLandingImpactSpeedMetresPerSecond =
@@ -1020,6 +1055,7 @@ export class GreyboxLevelRuntime {
             containmentLevel.setActiveBody(slimePair.activeBody);
             containmentLevel.teleportToRoomForDebug(roomId);
             testScene.bob.reset();
+            testScene.goop.reset();
             testScene.bob.setPosition(body.position);
             this.syncContextualCamera(this.requireResources());
           },
@@ -1097,6 +1133,7 @@ export class GreyboxLevelRuntime {
       collisionWorld,
       surfaceRegistry,
       movementEvents,
+      goopMovementEvents,
       spawnPosition,
       goopSpawnPosition,
       outOfBoundsTestPosition,
@@ -1177,6 +1214,7 @@ export class GreyboxLevelRuntime {
     resources.containmentLevel.reset();
     resources.puzzleRegistry.reset();
     resources.slimePair.restoreInitialState();
+    this.lastDeathSlimeId = undefined;
     resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
     resources.testScene.resetTeachingPresentation();
     this.renderLayer.cameraRig.reset();
@@ -1223,6 +1261,7 @@ export class GreyboxLevelRuntime {
     resources.unsubscribeObjectiveChanged();
     resources.unsubscribeLevelCompleted();
     resources.movementEvents.clear();
+    resources.goopMovementEvents.clear();
     resources.containmentLevel.dispose();
     resources.goopAcidPresentation.dispose();
     resources.acidProjectileSystem.dispose();
@@ -1275,6 +1314,7 @@ export class GreyboxLevelRuntime {
     recoverLevelCheckpoint();
     resources.slimePair.captureCurrentRecoveryState();
     resources.slimePair.restoreRecoveryState();
+    if (this.lastDeathSlimeId !== 'goop') resources.testScene.goop.reset();
   }
 
   /**
@@ -1346,18 +1386,13 @@ export class GreyboxLevelRuntime {
     const dyingBody = resources.slimePair.activeBody;
 
     if (!resources.deathSequence.requestDeath(recovery)) return false;
-    if (!resources.testScene.bob.startDeath(dyingBody.position)) {
+    const presentation = dyingSlimeId === 'goop' ? resources.testScene.goop : resources.testScene.bob;
+    if (!presentation.startDeath(dyingBody.position)) {
       resources.deathSequence.reset();
       return false;
     }
 
     this.lastDeathSlimeId = dyingSlimeId;
-    if (dyingSlimeId === 'goop') {
-      // The shared death mesh now owns anticipation at Goop's authoritative
-      // position. Retire the cached Goop mesh before the next render/shadow pass.
-      resources.slimePairPresentation.setGoopVisible(false);
-    }
-
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
     this.input.setEnabled(false);
@@ -1379,9 +1414,10 @@ export class GreyboxLevelRuntime {
     resources.goopAcidPresentation.resume();
     this.notifySlimeHUD(undefined, true);
 
-    // Bob's shared presentation and Goop's pair presentation remain separate
-    // while Level 1 owns the two-body adapter. Restore Bob from body authority.
+    // Restore both characters from authority after the retained recovery action.
     resources.testScene.bob.finishDeath(resources.body.position);
+    resources.testScene.goop.finishDeath(resources.goopBody.position);
+    this.lastDeathSlimeId = undefined;
     resources.deathScreen.hide();
     const levelIsPlaying =
       !this.debugVisible && resources.containmentLevel.state === 'playing';
@@ -1397,7 +1433,7 @@ export class GreyboxLevelRuntime {
     deltaSeconds: number,
     resources: GreyboxRuntimeResources,
   ): void {
-    resources.testScene.bob.updateDeath(deltaSeconds);
+    (this.lastDeathSlimeId === 'goop' ? resources.testScene.goop : resources.testScene.bob).updateDeath(deltaSeconds);
     resources.testScene.updateDeath(deltaSeconds);
     if (resources.deathSequence.update(deltaSeconds)) {
       resources.deathScreen.show();
@@ -1810,7 +1846,9 @@ export class GreyboxLevelRuntime {
             if (!isCurrent()) return;
             // Camera fades change the existing eyes' opaque/transparent shader
             // variant. Retain both on their live material before gameplay starts.
-            await resources.testScene.bob.prepareCameraFadePrograms(() => {
+            await prepareCharacterCameraFades(
+              [resources.testScene.bob, resources.testScene.goop, resources.testScene.roomFive.goopPresentation],
+              () => {
               if (renderer.extensions.has('KHR_parallel_shader_compile')) {
                 return withIsolatedPrewarmState(renderer, () => renderer.compileAsync(compileSubset, prewarmCamera, this.renderLayer.scene));
               }
@@ -1882,10 +1920,12 @@ export class GreyboxLevelRuntime {
               }
             });
           }
-          await resources.testScene.bob.prepareCameraFadePrograms(() => {
+          await prepareCharacterCameraFades(
+              [resources.testScene.bob, resources.testScene.goop, resources.testScene.roomFive.goopPresentation],
+              () => {
             withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
               renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, prewarmCamera,
-                [resources.testScene.bob.root]),
+                [resources.testScene.bob.root, resources.testScene.goop.root, resources.testScene.roomFive.goopPresentation.root]),
             ));
           });
           const primeDurationMs =
@@ -1961,6 +2001,10 @@ export class GreyboxLevelRuntime {
           ));
         },
       );
+      resources.testScene.goop.primeDeathResources(resources.goopSpawnPosition, burstRoot => {
+        withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+          renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, prewarmCamera, [burstRoot])));
+      });
       const burstResourcePrimeDurationMs =
         this.hostWindow.performance.now() - burstResourcePrimeStarted;
       // Three owns transmission targets per camera ID. Prime the live camera's
@@ -2074,6 +2118,7 @@ function createRoomPrewarmSources(
   );
   const sources: THREE.Object3D[] = [
     lightingRoot,
+    resources.testScene.roomFive.goopPresentation.root,
     resources.slimePairPresentation.root,
     resources.goopAcidPresentation.root,
   ];

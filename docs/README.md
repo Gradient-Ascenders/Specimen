@@ -10,6 +10,8 @@ for implementation details and historical evidence.
   fixed-step updates, input, transitions, restart, and disposal.
 - [Rendering and assets](architecture/rendering.md) — renderer ownership,
   lighting, shadows, preparation, and asset boundaries.
+- [Goop model integration](architecture/goop-model-integration.md) — implementation
+  specification for the authored Goop model and shared gel presentation.
 - [Architecture decisions](decisions/README.md) — concise accepted decisions.
 
 ## Gameplay

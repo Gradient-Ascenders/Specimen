@@ -34,14 +34,10 @@ const LOCATOR_MIN_SIZE_METRES = 0.45;
 const LOCATOR_MAX_SIZE_METRES = 1.2;
 const LOCATOR_HEIGHT_MULTIPLIER = 1.7;
 
-/** Development-readable Goop proxy and active-control indication for #28. */
+/** Inactive-body locators only; level character presentations own visibility. */
 export class SlimePairPresentation {
   readonly root = new THREE.Group();
 
-  private readonly goopMesh: THREE.Mesh<
-    THREE.SphereGeometry,
-    THREE.MeshStandardMaterial
-  >;
   private readonly bobLocator: SlimeLocator;
   private readonly goopLocator: SlimeLocator;
   private readonly locatorHit = new CollisionHit();
@@ -59,21 +55,6 @@ export class SlimePairPresentation {
     this.root.name = 'persistent-two-body-presentation';
     this.locatorHeightMetres = radiusMetres * LOCATOR_HEIGHT_MULTIPLIER;
 
-    this.goopMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(radiusMetres, 24, 18),
-      new THREE.MeshStandardMaterial({
-        color: 0x91cf4b,
-        emissive: 0x18380a,
-        emissiveIntensity: 0.28,
-        roughness: 0.42,
-      }),
-    );
-    this.goopMesh.name = 'goop-development-body';
-    this.goopMesh.castShadow = true;
-    this.goopMesh.receiveShadow = true;
-    this.root.add(this.goopMesh);
-
-
     this.bobLocator = this.createLocator('bob', 'B', 'diamond', 0x9be7ff);
     this.goopLocator = this.createLocator('goop', 'G', 'circle', 0xc9ff8a);
   }
@@ -88,18 +69,8 @@ export class SlimePairPresentation {
     activeSlimeId: SlimeId,
     camera: THREE.Camera,
     collisionWorld: CollisionWorld,
-    firstPersonAimActive = false,
+    _firstPersonAimActive = false,
   ): void {
-    this.goopMesh.position.set(
-      goopPosition.x,
-      goopPosition.y,
-      goopPosition.z,
-    );
-
-    this.goopMesh.visible = !(
-      firstPersonAimActive && activeSlimeId === 'goop'
-    );
-
     this.updateLocator(
       this.bobLocator,
       bobPosition,
@@ -119,17 +90,10 @@ export class SlimePairPresentation {
   }
 
   dispose(): void {
-    this.goopMesh.geometry.dispose();
-    this.goopMesh.material.dispose();
     this.disposeLocator(this.bobLocator);
     this.disposeLocator(this.goopLocator);
     this.root.removeFromParent();
     this.root.clear();
-  }
-
-  /** Hide the original body and its shadow while another presentation owns death. */
-  setGoopVisible(visible: boolean): void {
-    this.goopMesh.visible = visible;
   }
 
   private createLocator(

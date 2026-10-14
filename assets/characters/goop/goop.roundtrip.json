@@ -1,0 +1,40 @@
+{
+  "glb_sha256": "35d1fcf37a972264991a9b4a5b12b9e25a127a6a291499db68638f6193ca7862",
+  "meshes": {
+    "Goop-Body": {
+      "triangles": 26804,
+      "max_position_error_metres": 0.0
+    },
+    "Goop-Eye-Left": {
+      "triangles": 3456,
+      "max_position_error_metres": 0.0
+    },
+    "Goop-Eye-Right": {
+      "triangles": 3456,
+      "max_position_error_metres": 0.0
+    }
+  },
+  "eye_seating": {
+    "Goop-Eye-Left": {
+      "front_depth_range": [
+        -0.0015000104904174805,
+        0.016499996185302734
+      ],
+      "rear_max_depth": -0.014999985694885254
+    },
+    "Goop-Eye-Right": {
+      "front_depth_range": [
+        -0.0015000104904174805,
+        0.016499996185302734
+      ],
+      "rear_max_depth": -0.014999985694885254
+    }
+  },
+  "materials": {
+    "Goop-Acid-Gel": "base color, roughness, coat, transmission and IOR match",
+    "Goop-Obsidian-Eyes": "base color, roughness, coat, transmission and IOR match"
+  },
+  "outward_normals_and_manifoldness": "passed",
+  "loose_puddles": 0,
+  "scope": "Static asset roundtrip; not in-game acceptance"
+}

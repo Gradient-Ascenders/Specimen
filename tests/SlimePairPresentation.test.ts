@@ -129,46 +129,15 @@ test('inactive-body locator responds immediately when occluding geometry moves',
   wall.geometry.dispose();
 });
 
-test('first-person Goop aim hides the body without creating a selection ring', () => {
+test('locator updates own no character model and cannot resurrect a hidden presentation', () => {
   const presentation = new SlimePairPresentation(0.45);
-  const camera = new THREE.PerspectiveCamera();
-  camera.position.set(0, 1, 5);
+  const camera = new THREE.PerspectiveCamera(); camera.position.set(0, 1, 5);
   const collisionWorld = new CollisionWorld();
-  const bobPosition = { x: 2, y: 0.45, z: 0 };
-  const goopPosition = { x: 0, y: 0.45, z: 0 };
-  const goopMesh = presentation.root.getObjectByName('goop-development-body');
-  assert.ok(goopMesh instanceof THREE.Mesh);
-  assert.equal(goopMesh.castShadow, true);
-  assert.equal(goopMesh.receiveShadow, true);
-  const activeRing = presentation.root.getObjectByName(
-    'active-slime-control-indicator',
-  );
-
-  presentation.update(
-    bobPosition,
-    goopPosition,
-    'goop',
-    camera,
-    collisionWorld,
-    true,
-  );
-  assert.equal(goopMesh?.visible, false);
-  assert.equal(activeRing, undefined);
-
-  presentation.update(
-    bobPosition,
-    goopPosition,
-    'goop',
-    camera,
-    collisionWorld,
-    false,
-  );
-  assert.equal(goopMesh?.visible, true);
-  presentation.setGoopVisible(false);
-  assert.equal(goopMesh.visible, false);
-  presentation.update(bobPosition, goopPosition, 'bob', camera, collisionWorld);
-  assert.equal(goopMesh.visible, true);
-  assert.equal(presentation.root.getObjectByName('active-slime-control-indicator'), undefined);
-
+  for (const aiming of [true, false]) {
+    presentation.update({ x: 2, y: 0.45, z: 0 }, { x: 0, y: 0.45, z: 0 }, 'goop', camera, collisionWorld, aiming);
+    assert.equal(presentation.root.getObjectByName('goop-development-body'), undefined);
+    assert.equal(presentation.locatorDiagnostics.goopVisible, false);
+    assert.equal(presentation.root.getObjectByName('active-slime-control-indicator'), undefined);
+  }
   presentation.dispose();
 });
