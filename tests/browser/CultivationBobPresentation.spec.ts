@@ -119,6 +119,14 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
   await enterCultivation(page);
   assertRuntimeExposed();
 
+  const entryLayoutPrepared = await page.evaluate(() => {
+    const runtime = (window as any).__specimenCultivationRuntime;
+    const queue = runtime.preparationQueue;
+    const entry = queue.configurations.find((configuration: any) => configuration.z === 0);
+    return entry.ready && entry.lightingKey === queue.lightingKey(runtime.renderLayer.scene);
+  });
+  expect(entryLayoutPrepared, 'live startup priming must use the prepared entry light signature').toBe(true);
+
   const presentation = await page.evaluate(() => {
     const runtime = (
       window as Window & {
@@ -444,5 +452,26 @@ test('Cultivation draws prepared room and fade shadow variants without creating 
       }
     });
   }
+  // Return to the already prepared maintenance sector. With no isolated work,
+  // steady frames must not repeatedly traverse the scene to rebuild light state.
+  await page.evaluate(() => {
+    const r = (window as any).__specimenCultivationRuntime;
+    r.teleportToAuthoredPreviewRoom(5);
+    r.__restoreLightStateCalls = 0;
+    r.__compileBeforeProbe = r.renderLayer.renderer.compile;
+    r.renderLayer.renderer.compile = function(...args: any[]) {
+      if (args[0] === r.preparationLightState) r.__restoreLightStateCalls++;
+      return r.__compileBeforeProbe.apply(this, args);
+    };
+    r.__drawBeforeProbe = r.__lastDraw;
+  });
+  await page.waitForTimeout(500);
+  const maintenance = await page.evaluate(() => {
+    const r = (window as any).__specimenCultivationRuntime;
+    r.renderLayer.renderer.compile = r.__compileBeforeProbe;
+    return {calls:r.__restoreLightStateCalls, drawn:r.__lastDraw > r.__drawBeforeProbe};
+  });
+  expect(maintenance.drawn).toBe(true);
+  expect(maintenance.calls).toBeLessThanOrEqual(1);
   expect(await page.evaluate(() => (window as any).__specimenCultivationRuntime.__coldDraws)).toEqual([]);
 });

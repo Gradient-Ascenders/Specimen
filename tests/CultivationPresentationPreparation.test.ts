@@ -220,6 +220,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.deepEqual(mapsInShadow, new Set([true, false]), 'mapped and unmapped shadows are both prepared');
     }
     if (mode === 'startup') {
+      assert.ok(queue.diagnostics.startupMs >= queue.diagnostics.initialMs, 'report entry and full startup separately');
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
       assert.equal(queue.diagnostics.completed, 2, 'startup prepares initial and the shared lift/encounter layout');

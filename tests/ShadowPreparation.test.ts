@@ -207,3 +207,67 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   material.dispose(); assert.equal(disposals, 1);
   mesh.geometry.dispose(); map.depthTexture.dispose(); map.dispose();
 });
+
+test('instance primers upload both live buffers sharing a geometry and never dispose borrowed storage', async () => {
+  const { renderer, borrowedTarget } = fixture();
+  const scene = new THREE.Scene(), preview = new LevelTwoPreviewScene(() => {});
+  scene.add(preview.root);
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshStandardMaterial();
+  geometry.morphAttributes.position = [geometry.getAttribute('position').clone()];
+  const morph = new THREE.Mesh(geometry, material);
+  morph.morphTargetInfluences![0] = .4;
+  const originals = [new THREE.InstancedMesh(geometry, material, 2), new THREE.InstancedMesh(geometry, material, 2)];
+  for (const [index, mesh] of originals.entries()) {
+    mesh.name = `shared-geometry-live-instance-${index}`;
+    mesh.setColorAt(0, new THREE.Color('red'));
+    mesh.setMorphAt(0, morph);
+    scene.add(mesh);
+  }
+  const buffers = new Set<THREE.InstancedBufferAttribute>();
+  let textureDisposals = 0;
+  for (const mesh of originals) mesh.morphTexture!.addEventListener('dispose', () => textureDisposals++);
+  const maps = originals.map(mesh => ({matrix:mesh.instanceMatrix, color:mesh.instanceColor, morph:mesh.morphTexture}));
+  renderer.render = prepared => {
+    prepared.traverseVisible(object => {
+      if (!(object instanceof THREE.InstancedMesh)) return;
+      buffers.add(object.instanceMatrix);
+      if (object.instanceColor) buffers.add(object.instanceColor);
+      // Model Three's disposal listener: releasing a proxy must not release
+      // attributes that are still owned by a live mesh.
+      if (!object.hasEventListener('dispose', release)) object.addEventListener('dispose', release);
+    });
+  };
+  function release(event: THREE.Event<'dispose', THREE.InstancedMesh>): void {
+    buffers.delete(event.target.instanceMatrix);
+    if (event.target.instanceColor) buffers.delete(event.target.instanceColor);
+  }
+  const policy = new RenderShadowPolicy(renderer.shadowMap);
+  const layer = {renderer, scene, cameraRig:{camera:new THREE.PerspectiveCamera()}, withShadowPreparation:policy.withPreparation.bind(policy)} as unknown as RenderLayer;
+  const queue = new CultivationPreparationQueue(layer, preview);
+  const raf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = callback => Number(setTimeout(() => callback(performance.now()), 0));
+  try {
+    await queue.prepareInitial();
+    for (const {matrix, color} of maps) {
+      assert.ok(buffers.has(matrix), 'warm the actual source matrix buffer');
+      assert.ok(buffers.has(color!), 'same-geometry instances need their own color buffers');
+    }
+    preview.updatePresentationVisibility({z:0}, {z:0});
+    const before = buffers.size;
+    renderer.render(scene);
+    assert.equal(buffers.size, before, 'the first live draw creates no instance buffers');
+    queue.dispose();
+    for (const {matrix, color} of maps) { assert.ok(buffers.has(matrix)); assert.ok(buffers.has(color!)); }
+    assert.equal(textureDisposals, 0, 'proxy cleanup preserves live morph textures');
+    originals.forEach((mesh, i) => {
+      assert.equal(mesh.instanceMatrix, maps[i].matrix);
+      assert.equal(mesh.instanceColor, maps[i].color);
+      assert.equal(mesh.morphTexture, maps[i].morph);
+    });
+  } finally {
+    queue.dispose(); globalThis.requestAnimationFrame = raf;
+    for (const mesh of originals) mesh.dispose();
+    preview.dispose(); geometry.dispose(); material.dispose(); borrowedTarget.dispose();
+  }
+  assert.equal(textureDisposals, 2);
+});
