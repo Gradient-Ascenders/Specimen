@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
+import { copyPrewarmMaterial } from '../src/render/ShadowPrewarmMaterial.ts';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
 import { optimizeFiniteLightEvaluation } from '../src/render/environment/cultivation/FiniteLightEvaluation.ts';
 
 test('finite lighting retains the acid hook and guards only direct contributions Three marks invisible', () => {
   const material = new AcidSurfaceMaterial();
-  optimizeFiniteLightEvaluation(material);
+  optimizeFiniteLightEvaluation(material, true);
   const hook = material.onBeforeCompile, key = material.customProgramCacheKey();
   optimizeFiniteLightEvaluation(material);
   assert.equal(material.onBeforeCompile, hook);
@@ -31,7 +32,14 @@ test('finite lighting retains the acid hook and guards only direct contributions
     THREE.ShaderChunk.lights_fragment_begin.indexOf('\t#pragma unroll_loop_start', THREE.ShaderChunk.lights_fragment_begin.indexOf('SpotLight spotLight;')),
     THREE.ShaderChunk.lights_fragment_begin.indexOf('\t#pragma unroll_loop_end', THREE.ShaderChunk.lights_fragment_begin.indexOf('SpotLight spotLight;')),
   );
-  assert.ok(shader.fragmentShader.includes(originalSpotLoop.replace(
+  const guardedSpotLoop = originalSpotLoop.replace('getSpotLightInfo( spotLight, geometryPosition, directLight );', `if ( any( notEqual( spotLight.color, vec3( 0.0 ) ) ) ) {
+      getSpotLightInfo( spotLight, geometryPosition, directLight );
+    } else {
+      directLight.color = vec3( 0.0 );
+      directLight.direction = vec3( 0.0 );
+      directLight.visible = false;
+    }`);
+  assert.ok(shader.fragmentShader.includes(guardedSpotLoop.replace(
     'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );',
     'spotContributions[ i ] = directLight;',
   )));
@@ -48,4 +56,27 @@ test('physical transmission keeps the original spot loop while retaining compact
   assert.ok(shader.fragmentShader.includes('pointIndex = NUM_POINT_LIGHT_SHADOWS; pointIndex < NUM_POINT_LIGHTS'));
   assert.ok(shader.fragmentShader.includes('if ( directLight.visible ) { RE_Direct('));
   material.dispose();
+});
+
+test('inherited finite-light hooks share the original program key and preserve later custom shading', () => {
+  const source = new AcidSurfaceMaterial();
+  optimizeFiniteLightEvaluation(source);
+  const originalHook = source.onBeforeCompile;
+  const originalKey = source.customProgramCacheKey();
+  source.onBeforeCompile = function(shader, renderer) {
+    originalHook.call(this, shader, renderer);
+    shader.fragmentShader += '\n// retained late material hook';
+  };
+  source.customProgramCacheKey = () => `${originalKey}:late-hook`;
+  const clone = copyPrewarmMaterial(source);
+  optimizeFiniteLightEvaluation(clone);
+  assert.equal(clone.customProgramCacheKey(), source.customProgramCacheKey());
+  const shader = () => ({ uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader });
+  const a = shader(), b = shader();
+  source.onBeforeCompile(a as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+  clone.onBeforeCompile(b as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+  assert.equal(b.vertexShader, a.vertexShader);
+  assert.equal(b.fragmentShader, a.fragmentShader);
+  assert.deepEqual(Object.keys(b.uniforms), Object.keys(a.uniforms));
+  source.dispose(); clone.dispose();
 });
