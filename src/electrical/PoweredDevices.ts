@@ -117,6 +117,7 @@ export class PoweredLightDevice implements ElectricalDevice {
     this.root.add(this.pointLight);
 
     this.core = new PoweredDeviceCore({
+      audioKind: 'light',
       id: options.id,
       displayName: options.displayName,
       hitMeshes: [targetMesh],
@@ -215,6 +216,7 @@ export class PoweredDoorDevice implements ElectricalDevice {
     this.root.add(targetMesh);
 
     this.core = new PoweredDeviceCore({
+      audioKind: 'platform',
       id: options.id,
       displayName: options.displayName,
       hitMeshes: [targetMesh],
@@ -370,6 +372,7 @@ export class PoweredPlatformDevice implements ElectricalDevice {
     targetMesh.position.set(0, 0.65, 0);
     this.root.add(targetMesh);
     this.core = new PoweredDeviceCore({
+      audioKind: 'platform',
       id: options.id,
       displayName: options.displayName,
       hitMeshes: [targetMesh],
@@ -654,6 +657,7 @@ export class RotatingBridgeDevice implements ElectricalDevice {
     }
 
     this.core = new PoweredDeviceCore({
+      audioKind: 'platform',
       id: options.id,
       displayName: options.displayName,
       hitMeshes: [targetMesh],
@@ -818,6 +822,7 @@ export class LaserJunctionDevice implements ElectricalDevice {
     const targetMesh = createTargetMesh(`${options.id}-target`);
     this.root.add(targetMesh);
     this.core = new PoweredDeviceCore({
+      audioKind: 'terminal',
       id: options.id,
       displayName: options.displayName,
       hitMeshes: [targetMesh],
@@ -886,6 +891,7 @@ class RelayDeviceBase implements ElectricalDevice {
     const targetMesh = createTargetMesh(`${options.id}-target`);
     this.root.add(targetMesh);
     this.core = new PoweredDeviceCore({
+      audioKind: 'terminal',
       id: options.id,
       displayName: options.displayName,
       hitMeshes: [targetMesh],

@@ -1,4 +1,6 @@
 import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
+import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import type { AudioPlayback } from '../audio/AudioManager.ts';
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
@@ -145,6 +147,7 @@ const BLACKOUT_TRANSIT_VOLT_RANGES = Object.freeze({
 });
 
 export interface BlackoutLevelRuntimeOptions {
+  readonly audio?: AudioPlayback;
   readonly authoredRoomOne?: boolean;
   readonly maintenanceMaps?: BlackoutMaintenanceMapData;
   readonly host: HTMLElement;
@@ -226,6 +229,8 @@ export class BlackoutLevelRuntime {
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
+  private readonly audio: AudioPlayback | undefined;
+  private gameplayAudio: GameplayAudio | undefined;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
@@ -256,6 +261,7 @@ export class BlackoutLevelRuntime {
     if (this.authoredRoomOne && !options.maintenanceMaps) throw new Error('Room 1 texture maps must be prepared before runtime construction.');
     this.maintenanceMaps = options.maintenanceMaps;
     validateLevelThreeProgressionSnapshot(options.progression);
+    this.audio = options.audio;
     this.host = options.host;
     this.input = options.input;
     this.renderLayer = options.renderLayer;
@@ -593,6 +599,7 @@ export class BlackoutLevelRuntime {
       resources.deathSequence.reset();
       return false;
     }
+    this.gameplayAudio?.died(resources.specimenForm.readModel.controlledForm === 'group' ? resources.manager.activeSlimeId : undefined);
     resources.electricalSystem.reset('death');
     resources.acidProjectileSystem.reset();
     resources.goopAcidPresentation.reset();
@@ -803,11 +810,13 @@ export class BlackoutLevelRuntime {
           : this.input.wasPressed('debugTeleportRoomThree') ? 3 : undefined;
       if (room) {
         this.teleportToAuthoredRoom(room);
+        this.gameplayAudio?.update();
         this.input.endFixedUpdate();
         return;
       }
     }
     if (resources.phase.terminal) {
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -821,6 +830,7 @@ export class BlackoutLevelRuntime {
         resources.deathScreen.show();
         this.host.dataset.gameState = resources.deathSequence.state;
       }
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -873,6 +883,7 @@ export class BlackoutLevelRuntime {
       resources.poweredDeviceRig.updateMechanics(deltaSeconds, []);
       resources.poweredDeviceRig.updateHazards(deltaSeconds, []);
       this.syncVisuals(resources);
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -885,6 +896,7 @@ export class BlackoutLevelRuntime {
       resources.poweredDeviceRig.updateMechanics(deltaSeconds, []);
       resources.poweredDeviceRig.updateHazards(deltaSeconds, []);
       this.syncVisuals(resources);
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -1133,6 +1145,7 @@ export class BlackoutLevelRuntime {
 
       if (!resources.deathSequence.isPlaying) {
         this.syncVisuals(resources);
+        this.gameplayAudio?.update();
         this.input.endFixedUpdate();
         return;
       }
@@ -1142,6 +1155,7 @@ export class BlackoutLevelRuntime {
       if (resources.sentinelRig.controller.consumeDefeatRequest()) {
         this.commitBossDefeat(resources);
         this.syncVisuals(resources);
+        this.gameplayAudio?.update();
         this.input.endFixedUpdate();
         return;
       }
@@ -1198,6 +1212,7 @@ export class BlackoutLevelRuntime {
       this.maybeActivateRoomOneTutorialCheckpoint(resources);
       if (failed) {
         this.requestFailure();
+        this.gameplayAudio?.update();
         this.input.endFixedUpdate();
         return;
       }
@@ -1221,6 +1236,7 @@ export class BlackoutLevelRuntime {
       });
       if (failed) {
         this.requestFailure();
+        this.gameplayAudio?.update();
         this.input.endFixedUpdate();
         return;
       }
@@ -1242,6 +1258,7 @@ export class BlackoutLevelRuntime {
 
     if (!resources.deathSequence.isPlaying) {
       this.syncVisuals(resources);
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -1264,12 +1281,14 @@ export class BlackoutLevelRuntime {
     for (const participatingBody of participatingBodies) {
       if (participatingBody.position.y < OUT_OF_BOUNDS_Y) {
         this.requestFailure();
+        this.gameplayAudio?.update();
         this.input.endFixedUpdate();
         return;
       }
     }
 
     this.syncVisuals(resources);
+    this.gameplayAudio?.update();
     this.input.endFixedUpdate();
   }
 
@@ -1845,6 +1864,16 @@ export class BlackoutLevelRuntime {
         safetyHit,
         safetyDisplacement,
       };
+      if (this.audio) {
+        const gameplayAudio = new GameplayAudio(this.audio, manager, acidProjectileSystem, () =>
+          specimenForm.readModel.controlledForm === 'specimen' ? specimenBody :
+            phase.phase === 'merging' ? undefined : manager.activeBody);
+        this.gameplayAudio = gameplayAudio;
+        rollback(() => {
+          gameplayAudio.dispose();
+          if (this.gameplayAudio === gameplayAudio) this.gameplayAudio = undefined;
+        });
+      }
 
       this.currentRoom = checkpoints.activeCheckpoint.room;
       this.bayComplete = false;
@@ -1884,6 +1913,7 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly startResources = (): void => {
+    this.gameplayAudio?.setEnabled(true);
     const resources = this.requireResources();
     resources.goopAcidPresentation.resume();
     this.input.resetState();
@@ -1895,6 +1925,7 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    this.gameplayAudio?.setEnabled(false);
     const resources = this.requireResources();
     resources.electricalSystem.cancelAim();
     resources.acidProjectileSystem.cancelAim();
@@ -1910,6 +1941,7 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.gameplayAudio?.reset();
     const resources = this.requireResources();
     this.input.resetState();
     resources.deathSequence.reset();
@@ -1929,6 +1961,7 @@ export class BlackoutLevelRuntime {
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     resources.checkpoints.resetToInitial();
+    this.gameplayAudio?.reset();
     resources.puzzleRegistry.reset();
     const snapshot = resources.checkpoints.recover(
       resources.group,
@@ -1975,6 +2008,8 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.gameplayAudio?.dispose();
+    this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.programPreparation?.dispose(); this.programPreparation = undefined;
     this.input.setEnabled(false);
@@ -2132,6 +2167,7 @@ export class BlackoutLevelRuntime {
     resources.specimenPresentation.suspend();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
+    this.gameplayAudio?.reset();
     resources.puzzleRegistry.reset();
     const snapshot = resources.checkpoints.recover(
       resources.group,
@@ -2195,6 +2231,7 @@ export class BlackoutLevelRuntime {
   private readonly retryAfterDeath = (): void => {
     const resources = this.requireResources();
     if (!resources.deathSequence.completeRetry()) return;
+    this.gameplayAudio?.respawn();
     resources.goopPresentation.finishDeath(resources.group.goopBody.position);
     resources.voltPresentation.finishDeath(resources.group.voltBody.position);
     resources.voltDeathActive = false;
@@ -2395,6 +2432,8 @@ export class BlackoutLevelRuntime {
     const resources = this.requireResources();
     if (this.completionEmitted || !resources.phase.terminal) return;
     this.completionEmitted = true;
+    this.gameplayAudio?.reset();
+    this.gameplayAudio?.setEnabled(false);
     resources.electricalSystem.disconnect('completion');
     resources.electricalSystem.cancelAim();
     resources.specimenAttack.reset();

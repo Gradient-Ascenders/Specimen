@@ -177,6 +177,7 @@ test('settings retain session values across flow transitions', () => {
     mouseSensitivity: 1.7,
     invertVerticalLook: true,
     masterVolume: 0.35,
+    soundEffectsVolume: 0.8,
     cameraDistanceMetres: 6.4,
     renderPixelRatioCap: 1.5,
   });
