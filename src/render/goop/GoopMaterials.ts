@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GelMaterialSet, type GelMaterialProfile } from '../slime/GelMaterials.ts';
 import { GOOP_EYE_BOUNDS } from './GoopAsset.ts';
+import { injectGoopBaseVertexShader } from './GoopBaseMotion.ts';
 
 export const GOOP_BASE_COLOR = new THREE.Color().setRGB(0.045, 0.60, 0.001, THREE.LinearSRGBColorSpace);
 const smoothstep = THREE.MathUtils.smoothstep;
@@ -54,15 +55,32 @@ const profile: GelMaterialProfile = {
 };
 
 export class GoopMaterialSet extends GelMaterialSet {
+  private readonly baseOffset: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2() };
+
   constructor() {
     super(profile);
     // The shared wave evaluation accepts identity-specific protection functions.
     for (const material of [this.body, this.bodyDepth, this.bodyDistance]) {
       const hook = material.onBeforeCompile;
+      const cacheKey = material.customProgramCacheKey.bind(material);
+      material.customProgramCacheKey = () => `${cacheKey()}-base-lag-v1`;
       material.onBeforeCompile = (shader, renderer) => {
         hook(shader, renderer);
-        shader.vertexShader = protectionFunction + shader.vertexShader;
+        shader.uniforms.uGoopBaseOffset = this.baseOffset;
+        shader.vertexShader = injectGoopBaseVertexShader(protectionFunction + shader.vertexShader, material !== this.body);
       };
     }
+  }
+
+  setBaseOffset(offsetWorld: THREE.Vector3, facingYaw: number): void {
+    if (offsetWorld.lengthSq() === 0) { this.baseOffset.value.set(0, 0); return; }
+    const sine = Math.sin(facingYaw), cosine = Math.cos(facingYaw);
+    this.baseOffset.value.set(cosine * offsetWorld.x - sine * offsetWorld.z,
+      sine * offsetWorld.x + cosine * offsetWorld.z);
+  }
+
+  override reset(): void {
+    super.reset();
+    this.baseOffset.value.set(0, 0);
   }
 }

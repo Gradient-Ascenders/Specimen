@@ -55,6 +55,7 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
     return { ...goop.diagnostics, soleY: sole.y, bodyY: r.goopBody.position.y,
       velocityY: r.goopBody.velocity.y, landed: r.goopBody.landedThisStep,
       programs: rt.renderLayer.renderer.info.programs.length,
+      baseOffsetLocal: goop.materials.baseOffset.value.toArray(),
       bodyPosition: r.goopBody.position.toArray() };
   }, { count, stopOnLanding });
   const capture = async (name: string, count: number, stopOnLanding = false) => {
@@ -65,9 +66,12 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   };
   const neutral = await capture('neutral', 30);
   expect(neutral.locomotionStrength).toBe(0);
+  expect(neutral.baseMotionStrength).toBe(0);
   await page.keyboard.down('w');
   const forward = await capture('forward', 40);
   expect(forward.signedLean).toBeGreaterThan(0.9);
+  expect(forward.baseOffsetWorld.z).toBeGreaterThan(0.07);
+  expect(forward.baseOffsetWorld.x).toBe(0);
   expect(forward.soleY).toBeCloseTo(forward.bodyY - 0.45, 8);
   await page.keyboard.up('w'); await page.keyboard.down('s');
   // Braking precedes reverse travel. Find the counterlean during the hold.
@@ -83,15 +87,19 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   expect(reverse).toBe(true);
   const counterlean = await capture('counterlean', 0);
   expect(counterlean.reversing).toBe(true); expect(counterlean.signedLean).toBeLessThan(0);
+  expect(counterlean.baseOffsetWorld.z).toBeLessThan(0);
   const reversed = await capture('reversed', 40);
   expect(reversed.reversing).toBe(false); expect(reversed.signedLean).toBeGreaterThan(0.9);
   await page.keyboard.up('s');
   const settled = await capture('stopped', 120);
   expect(settled.locomotionStrength).toBe(0);
+  expect(settled.baseMotionStrength).toBe(0);
+  expect(settled.baseOffsetLocal).toEqual([0, 0]);
   await page.keyboard.down('Space');
   const takeoff = await capture('takeoff', 5);
   await page.keyboard.up('Space');
   expect(takeoff.grounded).toBe(false); expect(takeoff.stretch).toBeGreaterThan(0.15);
+  expect(takeoff.baseMotionStrength).toBe(0);
   const falling = await capture('falling', 20);
   expect(falling.grounded).toBe(false); expect(falling.velocityY).toBeLessThan(0);
   expect(falling.stretch).toBeGreaterThan(0.07);
