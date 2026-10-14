@@ -172,7 +172,7 @@ test('legal combined morphs preserve sole, volume, finite normals and outward no
   disposeVoltAsset(root);
 });
 
-test('authored blink/body motion keeps the complete eye outline seated without secondary shader displacement', async () => {
+test('authored blink/body motion keeps the complete eye outline seated', async () => {
   const root = await loadVolt(), asset = validateVoltAsset(root), ray = new THREE.Raycaster();
   const point = new THREE.Vector3();
   const poses = [[0, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 0.5, 0]];
@@ -217,9 +217,13 @@ test('visible and shadow passes share time/fade uniforms and use authored morph 
     assert.match(shadow.vertexShader, /#include <morphtarget_vertex>/);
     assert.equal(shadow.uniforms.uBobSecondaryTime, surface.uniforms.uBobSecondaryTime);
     assert.equal(shadow.uniforms.uBobImpactStrength, surface.uniforms.uBobImpactStrength);
+    for (const name of ['uVoltBaseOffset', 'uVoltCrestLag', 'uVoltLandingRipple']) {
+      assert.equal(shadow.uniforms[name], surface.uniforms[name]);
+    }
+    assert.match(shadow.vertexShader, /transformed \+= voltElasticPosition\(position\) - position/);
     assert.ok(shadow.uniforms.uBobShadowOpacity);
   }
-  assert.equal(p.diagnostics.materials!.maximumSecondaryDisplacementMetres, 0);
+  assert.ok(Math.abs(p.diagnostics.materials!.maximumSecondaryDisplacementMetres - 0.0045) < 1e-12);
   p.update(1 / 60, state()); assert.equal(surface.uniforms.uBobSecondaryTime.value, 1 / 60);
   const eye = p.root.getObjectByName('Volt-Eye-Left') as THREE.Mesh;
   assert.equal(eye.userData.cameraFadeEye, true);

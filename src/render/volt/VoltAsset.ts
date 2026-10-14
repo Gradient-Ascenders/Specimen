@@ -4,6 +4,8 @@ import report from '../../../assets/characters/volt/volt.validation.json' with {
 export const VOLT_MORPHS = ['Squash', 'Stretch', 'Blink', 'CrestFlexLeft', 'CrestFlexRight'] as const;
 export type VoltMorph = typeof VOLT_MORPHS[number];
 export type VoltWeights = Record<VoltMorph, number>;
+export const VOLT_EYE_BOUNDS = [report.meshes['Volt-Eye-Left'], report.meshes['Volt-Eye-Right']].map(eye =>
+  new THREE.Box3(new THREE.Vector3(...eye.runtime_bounds_metres.minimum), new THREE.Vector3(...eye.runtime_bounds_metres.maximum)));
 export interface VoltAsset {
   readonly root: THREE.Group;
   readonly body: THREE.Mesh;
