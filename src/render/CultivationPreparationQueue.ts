@@ -65,6 +65,7 @@ export class CultivationPreparationQueue {
     preview.root.userData.preparation = this.diagnostics;
     if (host && typeof document !== 'undefined') {
       this.overlay = document.createElement('div'); this.overlay.setAttribute('role', 'status'); this.overlay.hidden = true;
+      this.overlay.setAttribute('data-clean-gameplay-essential', '');
       Object.assign(this.overlay.style, {position:'absolute', inset:'0', background:'#07110f', color:'#dbe9e4',
         zIndex:'80', display:'none', placeItems:'center', fontFamily:'sans-serif'});
       host.append(this.overlay);

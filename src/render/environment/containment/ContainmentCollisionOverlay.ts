@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GAMEPLAY_UI_LAYER } from '../../GameplayUiLayer.ts';
 
 /** Debug-only visual proof layered directly onto authoritative colliders. */
 export class ContainmentCollisionOverlay {
@@ -31,6 +32,7 @@ export class ContainmentCollisionOverlay {
           : this.defaultMaterial;
       const line = new THREE.LineSegments(this.edgeGeometry, material);
       line.name = `${collider.name}-debug-collision-overlay`;
+      line.layers.set(GAMEPLAY_UI_LAYER);
       line.position.copy(centre);
       line.scale.copy(size);
       line.visible = false;

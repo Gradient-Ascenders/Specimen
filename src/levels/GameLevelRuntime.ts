@@ -25,6 +25,7 @@ export interface GameLevelRuntime {
   fixedUpdate(deltaSeconds: number): void;
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void;
   setDebugInteractionEnabled(enabled: boolean): void;
+  prepareCleanGameplay?(): void;
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void;
   getSlimeHUDSnapshot(): SlimeHUDSnapshot;
   captureProgressionSnapshot(): LevelProgressionSnapshot;

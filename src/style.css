@@ -39,6 +39,14 @@ canvas {
   display: none !important;
 }
 
+/* One boundary covers present and future DOM overlays, including inline styles.
+ * Full-screen menus/recovery/loading remain functional; only the real canvas
+ * is exempted, not arbitrary canvases belonging to diagnostic widgets. */
+#app[data-clean-gameplay="true"] > :not([data-gameplay-canvas]):not(.game-flow):not([data-clean-gameplay-essential]),
+#app[data-clean-gameplay="true"] > .game-flow[data-state="playing"] {
+  display: none !important;
+}
+
 /* Development diagnostics remain deliberately utilitarian. */
 .test-panel {
   z-index: 5;

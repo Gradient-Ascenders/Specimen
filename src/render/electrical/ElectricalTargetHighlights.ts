@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GAMEPLAY_UI_LAYER } from '../GameplayUiLayer.ts';
 import type { ElectricalTargetRegistration, ElectricalTargetRegistry } from '../../abilities/ElectricalTargetRegistry.ts';
 import type { VoltElectricalReadModel } from '../../abilities/VoltElectricalSystem.ts';
 
@@ -47,6 +48,7 @@ export class ElectricalTargetHighlights {
     const helpers = registration.target.hitMeshes.map(mesh => {
       const helper = new THREE.BoxHelper(mesh, 0xffd45c);
       helper.name = `${registration.target.id}-conducting-outline`;
+      helper.layers.set(GAMEPLAY_UI_LAYER);
       helper.material.transparent = true;
       helper.material.depthTest = true;
       helper.material.depthWrite = false;
