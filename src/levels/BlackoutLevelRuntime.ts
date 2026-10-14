@@ -1,3 +1,4 @@
+import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
 import { GelReflectionLighting } from '../render/slime/GelReflectionLighting.ts';
@@ -144,6 +145,7 @@ const BLACKOUT_TRANSIT_VOLT_RANGES = Object.freeze({
 
 export interface BlackoutLevelRuntimeOptions {
   readonly authoredRoomOne?: boolean;
+  readonly maintenanceMaps?: BlackoutMaintenanceMapData;
   readonly host: HTMLElement;
   readonly input: Input;
   readonly renderLayer: RenderLayer;
@@ -237,6 +239,7 @@ export class BlackoutLevelRuntime {
   private programPreparation: BlackoutPresentationPreparation | undefined;
   private readonly preparationCamera = new THREE.PerspectiveCamera();
   private readonly authoredRoomOne: boolean;
+  private maintenanceMaps: BlackoutMaintenanceMapData | undefined;
   private bayComplete = false;
   private roomTwoInitialized = false;
   private bayExitHintShown = false;
@@ -244,6 +247,8 @@ export class BlackoutLevelRuntime {
 
   constructor(options: BlackoutLevelRuntimeOptions) {
     this.authoredRoomOne = options.authoredRoomOne ?? false;
+    if (this.authoredRoomOne && !options.maintenanceMaps) throw new Error('Room 1 texture maps must be prepared before runtime construction.');
+    this.maintenanceMaps = options.maintenanceMaps;
     validateLevelThreeProgressionSnapshot(options.progression);
     this.host = options.host;
     this.input = options.input;
@@ -417,6 +422,7 @@ export class BlackoutLevelRuntime {
 
   dispose(): void {
     this.lifecycle.dispose();
+    this.maintenanceMaps = undefined;
     this.hudListeners.clear();
     this.events.clear();
   }
@@ -1378,7 +1384,7 @@ export class BlackoutLevelRuntime {
   }
 
   private readonly loadResources = (): void => {
-    const scene = new BlackoutLevelScene(this.authoredRoomOne);
+    const scene = new BlackoutLevelScene(this.authoredRoomOne, this.maintenanceMaps);
     const collisionWorld = new CollisionWorld();
     const surfaceRegistry = new SurfaceRegistry();
     const puzzleRegistry = new PuzzleRegistry();
@@ -1513,7 +1519,7 @@ export class BlackoutLevelRuntime {
       });
       rollback(() => maintenanceDrone.dispose());
       const dronePresentation = this.authoredRoomOne
-        ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted()) : undefined;
+        ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted(), scene.maintenanceBay?.surfaceMaterials) : undefined;
       if (dronePresentation) {
         if(this.renderLayer.renderer) {
           this.shadowRequest = this.renderLayer.requestShadowConfiguration('blackout', { enabled: true });

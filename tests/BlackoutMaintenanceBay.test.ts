@@ -1,3 +1,4 @@
+import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -9,7 +10,7 @@ import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
 
 function setup() {
-  const bay=new BlackoutMaintenanceBay(),world=new CollisionWorld(),surfaces=new SurfaceRegistry();
+  const bay=new BlackoutMaintenanceBay(maintenanceMaps),world=new CollisionWorld(),surfaces=new SurfaceRegistry();
   world.registerAll(bay.collisionMeshes);surfaces.registerAll(bay.collisionMeshes);
   const registry=new ElectricalTargetRegistry(world);
   const room=new BlackoutMaintenanceBayController(bay,world,surfaces,registry);
