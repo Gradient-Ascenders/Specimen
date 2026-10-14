@@ -99,7 +99,7 @@ interface Fixture {
   readonly presentation: GoopAcidPresentation;
 }
 
-function createFixture(): Fixture {
+function createFixture(onProjectileFired?: (direction: AcidProjectileReadState['direction']) => void): Fixture {
   const geometry = new THREE.BoxGeometry(2, 2, 0.4);
   const material = new THREE.MeshStandardMaterial({
     color: 0x684526,
@@ -156,6 +156,7 @@ function createFixture(): Fixture {
     },
     targets: [target],
     document: document as unknown as Document,
+    onProjectileFired,
   });
   return {
     target,
@@ -182,6 +183,20 @@ function disposeFixture(fixture: Fixture): void {
   fixture.world.clear();
   fixture.surfaces.clear();
 }
+
+test('character recoil receives only actual projectile events and unsubscribes with presentation disposal', () => {
+  const shots: AcidProjectileReadState['direction'][] = [];
+  const fixture = createFixture(direction => shots.push(direction));
+  try {
+    fixture.aim.active = true; fixture.presentation.update(1, 1 / 60, true);
+    assert.equal(shots.length, 0, 'aiming alone must not recoil');
+    const event = { projectileId: 1, position: fixture.projectile.position, direction: fixture.projectile.direction };
+    fixture.events.emit('projectileFired', event);
+    assert.equal(shots.length, 1); assert.equal(shots[0], event.direction);
+    fixture.presentation.dispose(); fixture.events.emit('projectileFired', event);
+    assert.equal(shots.length, 1);
+  } finally { disposeFixture(fixture); }
+});
 
 test('crosshair mapping follows only the authoritative aim target and readiness', () => {
   const fixture = createFixture();

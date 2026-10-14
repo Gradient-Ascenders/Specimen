@@ -956,6 +956,7 @@ export class GreyboxLevelRuntime {
       cameraRig: this.renderLayer.cameraRig,
       source: acidProjectileSystem,
       targets: dissolveTargets,
+      onProjectileFired: direction => testScene.goop.onAcidFired(direction),
     });
 
     const slimePairPresentation = new SlimePairPresentation(body.radiusMetres);

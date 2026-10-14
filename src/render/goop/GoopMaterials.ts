@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GelMaterialSet, type GelMaterialProfile } from '../slime/GelMaterials.ts';
 import { GOOP_EYE_BOUNDS } from './GoopAsset.ts';
 import { injectGoopBaseVertexShader } from './GoopBaseMotion.ts';
+import { injectGoopEyeBlinkShader, injectGoopPolishVertexShader } from './GoopPolishShader.ts';
 
 export const GOOP_BASE_COLOR = new THREE.Color().setRGB(0.045, 0.60, 0.001, THREE.LinearSRGBColorSpace);
 const smoothstep = THREE.MathUtils.smoothstep;
@@ -56,6 +57,9 @@ const profile: GelMaterialProfile = {
 
 export class GoopMaterialSet extends GelMaterialSet {
   private readonly baseOffset: THREE.IUniform<THREE.Vector3> = { value: new THREE.Vector3() };
+  private readonly crestLag: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2() };
+  private readonly landingRipple: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2(0, 0.65) };
+  private readonly eyeClosure: THREE.IUniform<number> = { value: 0 };
 
   constructor() {
     super(profile);
@@ -63,13 +67,31 @@ export class GoopMaterialSet extends GelMaterialSet {
     for (const material of [this.body, this.bodyDepth, this.bodyDistance]) {
       const hook = material.onBeforeCompile;
       const cacheKey = material.customProgramCacheKey.bind(material);
-      material.customProgramCacheKey = () => `${cacheKey()}-base-lag-v2`;
+      material.customProgramCacheKey = () => `${cacheKey()}-polish-v1`;
       material.onBeforeCompile = (shader, renderer) => {
         hook(shader, renderer);
         shader.uniforms.uGoopBaseOffset = this.baseOffset;
-        shader.vertexShader = injectGoopBaseVertexShader(protectionFunction + shader.vertexShader, material !== this.body);
+        shader.uniforms.uGoopCrestLag = this.crestLag;
+        shader.uniforms.uGoopLandingRipple = this.landingRipple;
+        shader.vertexShader = injectGoopPolishVertexShader(
+          injectGoopBaseVertexShader(protectionFunction + shader.vertexShader, material !== this.body), material !== this.body);
       };
     }
+    for (const [index, material] of [this.eyes, this.eyeDepth, this.eyeDistance].entries()) {
+      const hook = material.onBeforeCompile;
+      material.customProgramCacheKey = () => `goop-eye-blink-${index}-v1`;
+      material.onBeforeCompile = (shader, renderer) => {
+        hook(shader, renderer);
+        shader.uniforms.uGoopEyeClosure = this.eyeClosure;
+        injectGoopEyeBlinkShader(shader);
+      };
+    }
+  }
+
+  setPolish(crestLag: THREE.Vector2, eyeClosure: number, rippleStrength: number, rippleAge: number): void {
+    this.crestLag.value.copy(crestLag);
+    this.eyeClosure.value = eyeClosure;
+    this.landingRipple.value.set(rippleStrength, rippleAge);
   }
 
   setBaseOffset(offsetWorld: THREE.Vector3, facingYaw: number): void {
@@ -83,5 +105,6 @@ export class GoopMaterialSet extends GelMaterialSet {
   override reset(): void {
     super.reset();
     this.baseOffset.value.set(0, 0, 0);
+    this.crestLag.value.set(0, 0); this.eyeClosure.value = 0; this.landingRipple.value.set(0, 0.65);
   }
 }

@@ -1741,6 +1741,7 @@ export class BlackoutLevelRuntime {
         cameraRig: this.renderLayer.cameraRig,
         source: acidProjectileSystem,
         targets: transit?.dissolveTargets ?? [],
+        onProjectileFired: direction => goopPresentation.onAcidFired(direction),
       });
       rollback(() => goopAcidPresentation.dispose());
 

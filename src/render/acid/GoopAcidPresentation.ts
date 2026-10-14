@@ -46,6 +46,7 @@ export interface GoopAcidPresentationOptions {
   readonly cameraRig: CameraRig;
   readonly source: GoopAcidPresentationSource;
   readonly targets: readonly DissolveTarget[];
+  readonly onProjectileFired?: (direction: ReadonlyVector3State) => void;
   readonly document?: Document;
 }
 
@@ -254,7 +255,8 @@ export class GoopAcidPresentation {
     options.host.append(this.crosshairElement);
 
     this.unsubscribeEvents = [
-      this.source.events.on('projectileFired', ({ projectileId }) => {
+      this.source.events.on('projectileFired', ({ projectileId, direction }) => {
+        options.onProjectileFired?.(direction);
         this.trackProjectile(projectileId);
         if (this.crosshairState !== 'hidden') {
           this.crosshairElement.classList.remove('is-firing');

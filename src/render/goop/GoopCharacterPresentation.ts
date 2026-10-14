@@ -6,6 +6,7 @@ import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresen
 import { disposeGoopAsset, disposeGoopMaterials, validateGoopAsset, type GoopAsset } from './GoopAsset.ts';
 import { GOOP_BASE_COLOR, GoopMaterialSet } from './GoopMaterials.ts';
 import { GOOP_MAXIMUM_BASE_OFFSET_METRES, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES, GOOP_MAXIMUM_BASE_DISPLACEMENT_METRES } from './GoopBaseMotion.ts';
+import { GoopPolishMotion, GOOP_CREST_LAG_METRES, GOOP_LANDING_RIPPLE_METRES } from './GoopPolishMotion.ts';
 
 const ASSET_URL = new URL('../../../assets/characters/goop/goop.glb', import.meta.url).href;
 const LAUNCH_SECONDS = 0.18;
@@ -41,6 +42,8 @@ export class GoopCharacterPresentation {
   private readonly character = new THREE.Group();
   private readonly shape = new THREE.Group();
   private readonly burst = new SlimeBurstPresentation(GOOP_BASE_COLOR);
+  private readonly polish = new GoopPolishMotion();
+  private readonly recoil = new THREE.Vector3();
   private readonly position = new THREE.Vector3();
   private readonly previousTravel = new THREE.Vector3();
   private readonly travel = new THREE.Vector3();
@@ -107,6 +110,7 @@ export class GoopCharacterPresentation {
       baseMotionStrength: Math.hypot(this.baseOffsetWorld.x, this.baseOffsetWorld.z) / GOOP_MAXIMUM_BASE_OFFSET_METRES,
       jumpBaseOffsetMetres: this.baseOffsetWorld.y,
       baseOffsetWorld: { x: this.baseOffsetWorld.x, y: this.baseOffsetWorld.y, z: this.baseOffsetWorld.z },
+      polish: this.polish.diagnostics,
       squash: Math.max(0, this.squash), stretch: Math.max(0, -this.squash),
       shadowCasting: this.shadows && this.character.visible,
       deathActive: this.deathActive, deathBurst: this.burst.diagnostics,
@@ -147,7 +151,8 @@ export class GoopCharacterPresentation {
         for (const mesh of [asset.body, ...asset.eyes]) {
           mesh.receiveShadow = true;
           mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere();
-          const displacement = 0.0045 + (mesh === asset.body ? GOOP_MAXIMUM_BASE_DISPLACEMENT_METRES : 0);
+          const displacement = 0.0045 + (mesh === asset.body
+            ? GOOP_MAXIMUM_BASE_DISPLACEMENT_METRES + GOOP_CREST_LAG_METRES + GOOP_LANDING_RIPPLE_METRES : 0);
           mesh.geometry.boundingBox!.expandByScalar(displacement);
           // Matrix4's scale estimate omits shear. Pad the sphere for the
           // maximum lean as well as the protected surface waves.
@@ -281,6 +286,7 @@ export class GoopCharacterPresentation {
     if (this.damageRemaining > 0) {
       this.squash = Math.max(this.squash, 0.08 * this.damageStrength * this.damageRemaining / DAMAGE_SECONDS);
     }
+    this.polish.update(dt, shortestAngleDelta(this.previousYaw, this.yaw), this.grounded, this.character.visible);
     this.materials?.update(dt);
   }
 
@@ -292,17 +298,20 @@ export class GoopCharacterPresentation {
     const lean = THREE.MathUtils.lerp(this.previousLean, this.lean, blend);
     this.presentedBaseOffsetWorld.lerpVectors(this.previousBaseOffsetWorld, this.baseOffsetWorld, blend);
     this.materials?.setBaseOffset(this.presentedBaseOffsetWorld, this.character.rotation.y);
+    if (this.materials) this.polish.present(this.materials, blend);
+    this.polish.copyRecoil(blend, this.recoil);
+    this.recoil.applyAxisAngle(THREE.Object3D.DEFAULT_UP, -this.character.rotation.y);
     const leanShear = (lean >= 0 ? 0.28 : 0.22) * lean;
-    const height = 1 - squash - Math.abs(lean) * 0.025;
+    const height = 1 - squash - Math.abs(lean) * 0.025 - this.polish.recoilCompression(blend);
     const spread = 1 / Math.sqrt(height);
     this.shape.scale.set(spread, height, spread);
     // Shear toward local -Z rather than rotating the skirt into the floor.
     // One volume-preserving transform keeps eyes seated and spikes cohesive;
     // its inverse-transpose also supplies correct surface and shadow normals.
     this.shape.matrix.set(
-      spread, 0, 0, 0,
+      spread, this.recoil.x, 0, 0,
       0, height, 0, -this.radiusMetres,
-      0, -leanShear, spread, 0,
+      0, -leanShear + this.recoil.z, spread, 0,
       0, 0, 0, 1,
     );
     this.shape.matrixWorldNeedsUpdate = true;
@@ -315,6 +324,7 @@ export class GoopCharacterPresentation {
   }
   onLanding(normal: Vector3State, impactSpeed: number): void {
     if (this.deathActive || this.disposed) return;
+    this.polish.onLanding(impactSpeed);
     this.landingStrength = THREE.MathUtils.clamp((impactSpeed - 1.5) / 7, 0, 1);
     this.landingRemaining = LANDING_SECONDS; this.launchRemaining = 0;
     this.impactNormal.set(normal.x, normal.y, normal.z).normalize();
@@ -327,8 +337,13 @@ export class GoopCharacterPresentation {
   }
   onDamage(strength: number): void {
     if (this.deathActive || this.disposed) return;
+    this.polish.onDamage(strength);
     this.damageRemaining = DAMAGE_SECONDS;
     this.damageStrength = THREE.MathUtils.clamp(strength, 0, 1);
+  }
+  onAcidFired(direction: Vector3State): void {
+    if (this.deathActive || this.disposed) return;
+    this.polish.onAcidFired(direction);
   }
   primeDeathResources(position: Vector3State, render: (root: THREE.Object3D) => void): boolean { return this.burst.primeResources(position, render); }
   startDeath(position: Vector3State): boolean {
@@ -350,6 +365,7 @@ export class GoopCharacterPresentation {
   }
   finishDeath(position: Vector3State): void { this.setPosition(position); this.reset(); }
   reset(): void {
+    this.polish.reset();
     this.deathActive = false; this.deathElapsed = 0; this.burst.reset();
     this.launchRemaining = this.landingRemaining = this.squash = this.previousSquash = this.speed = 0;
     this.launchStrength = this.landingStrength = this.damageRemaining = this.damageStrength = 0;

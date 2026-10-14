@@ -156,7 +156,74 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
     expect(sample).toBeGreaterThan(0); expect(sample).toBeLessThan(0.4 * Math.PI / 180);
   }
   expect(observations.steering.programs).toBe(neutral.programs);
+  expect(await page.evaluate(() => (window as any).__goopMotionRuntime.resources.testScene.goop.diagnostics.polish.crestLagMetres)).toBeGreaterThan(0);
   await page.screenshot({ path: resolve(directory, 'steering.png'), timeout: 120_000 });
+
+  // Front-view review of the same production model, with deterministic idle
+  // timing and deliberately hard landing events for the faint surface ripple.
+  await page.evaluate(() => {
+    const rt = (window as any).__goopMotionRuntime, r = rt.resources;
+    r.goopBody.teleport({ x: 3, y: 0.46, z: -0.8 }); r.testScene.goop.reset();
+  });
+  const captureFront = async (name: string, count = 0) => {
+    const state = await step(count);
+    await page.evaluate(() => {
+      const rt = (window as any).__goopMotionRuntime;
+      rt.renderLayer.cameraRig.reset(); rt.retargetCameraToActiveSlime(rt.resources);
+      rt.renderLayer.cameraRig.setGroundOrbitYawRadians(Math.PI);
+      rt.render(1, { fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 1 / 60,
+        frameDeltaSeconds: 1 / 60, stepsThisFrame: 0, interpolationAlpha: 1,
+        droppedSimulationTimeSeconds: 0, renderFps: 60 });
+    });
+    observations[name] = state;
+    await page.screenshot({ path: resolve(directory, `${name}.png`), timeout: 120_000 });
+    return state;
+  };
+  const open = await captureFront('eyes-open', 20);
+  expect(open.polish.eyeClosure).toBe(0);
+  await page.evaluate(() => {
+    const rt = (window as any).__goopMotionRuntime;
+    for (let frame = 0; frame < 360; frame++) {
+      rt.fixedUpdate(1 / 60);
+      if (rt.resources.testScene.goop.diagnostics.polish.eyeClosure > 0.9) return;
+    }
+    throw new Error('Goop never blinked');
+  });
+  expect((await captureFront('blink')).polish.eyeClosure).toBeGreaterThan(0.9);
+  expect((await captureFront('eyes-reopened', 15)).polish.eyeClosure).toBe(0);
+
+  // A real shot must reach the model through the acid event adapter. Preserve
+  // the existing first-person body hiding while checking the recoil state.
+  await page.locator('canvas').click();
+  await page.waitForFunction(() => (window as any).__goopMotionRuntime.input.pointerLocked);
+  await step(1);
+  const shotsBefore = await page.evaluate(() => (window as any).__goopMotionRuntime.resources.acidProjectileSystem.getDiagnostics().firedCount);
+  await page.mouse.down({ button: 'right' }); await step(1);
+  await page.mouse.down({ button: 'left' }); const shot = await step(3);
+  expect(await page.evaluate(() => (window as any).__goopMotionRuntime.resources.acidProjectileSystem.getDiagnostics().firedCount)).toBe(shotsBefore + 1);
+  expect(shot.polish.acidRecoil).toBeGreaterThan(0.9);
+  expect(shot.visible).toBe(false);
+  await page.mouse.up({ button: 'left' }); await page.mouse.up({ button: 'right' });
+  await step(60);
+  // Re-show that visual reaction from outside the first-person camera so its
+  // silhouette and squint can be inspected in a screenshot.
+  await page.evaluate(() => {
+    const goop = (window as any).__goopMotionRuntime.resources.testScene.goop;
+    goop.setYaw(0); goop.onAcidFired({ x: 0, y: 0, z: -1 });
+  });
+  const recoil = await captureFront('acid-recoil', 3);
+  expect(recoil.polish.acidRecoil).toBeGreaterThan(0.9);
+  expect(recoil.polish.eyeClosure).toBeGreaterThan(0.1);
+  await step(30);
+  await page.evaluate(() => (window as any).__goopMotionRuntime.resources.testScene.goop.onLanding({ x: 0, y: 1, z: 0 }, 8.5));
+  const ripple = await captureFront('hard-landing-ripple', 23);
+  expect(ripple.polish.landingRippleStrength).toBe(1);
+  expect(ripple.polish.crestLagMetres).toBeGreaterThan(0);
+  const polishSettled = await captureFront('polish-settled', 120);
+  expect(polishSettled.polish.acidRecoil).toBe(0);
+  expect(polishSettled.polish.landingRippleStrength).toBe(0);
+  expect(polishSettled.polish.crestLagMetres).toBe(0);
+  expect(polishSettled.programs).toBe(neutral.programs);
   await writeFile(resolve(directory, 'observations.json'), JSON.stringify({ observations, errors, failedRequests }, null, 2));
   expect(errors).toEqual([]); expect(failedRequests).toEqual([]);
 });

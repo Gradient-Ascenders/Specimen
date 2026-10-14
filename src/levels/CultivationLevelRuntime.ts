@@ -1175,6 +1175,7 @@ export class CultivationLevelRuntime {
         cameraRig: this.renderLayer.cameraRig,
         source: acidProjectileSystem,
         targets: dissolveTargets,
+        onProjectileFired: direction => goopPresentation.onAcidFired(direction),
       });
       rollback(() => goopAcidPresentation.dispose());
       const droneProjectilePresentation = roomThreeEncounter
