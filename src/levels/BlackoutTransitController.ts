@@ -1,3 +1,4 @@
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 import { mapBlackoutBoxUVs, mapBlackoutPropUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
 import { borrowBlackoutMaps, updateBlackoutStretchUVs } from '../render/environment/blackout/BlackoutTransitMaterials.ts';
@@ -374,7 +375,10 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     }
     this.updateSwitchButton();
     if (!active) {
-      for (const receiver of [...this.lights, this.lockReceiver]) receiver.connected = false;
+      for (const receiver of [...this.lights, this.lockReceiver]) {
+        receiver.connected = false;
+        gameplayAudioEvents.emit('stop', { key: `charge:${receiver.target.id}` });
+      }
       this.projectiles.reset();
     }
   }
@@ -543,6 +547,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       if (receiver.ownsTargetMaterial) receiver.targetMaterial.dispose();
       else receiver.targetMaterial.emissiveIntensity = 0;
     }
+    for (const receiver of [...this.lights, this.lockReceiver]) gameplayAudioEvents.emit('stop', { key: `charge:${receiver.target.id}` });
     this.steel.dispose(); this.wood.dispose(); this.solubleWood.dispose();
     for (const material of this.indicatorMaterials) material.dispose();
   }
@@ -570,7 +575,11 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       id, displayName, hitMeshes: [targetMesh],
       copySocketWorldPosition: (out) => targetMesh.localToWorld(out.set(0, 0, 0)),
       isAvailable: () => this.active && (id !== 'transit-bridge-lock' || (this.bridgeDeployed && this.currentVoltPosition.distanceToSquared(LOCK_RECEIVER_APPROACH) <= LOCK_RECEIVER_RANGE_SQ)),
-      setConnectionState: (connected) => { receiver.connected = connected; },
+      setConnectionState: (connected) => {
+        receiver.connected = connected;
+        if (connected && !receiver.latched) gameplayAudioEvents.emit('loop', { key: `charge:${id}`, sound: 'volt-charge-loop-01', position });
+        else gameplayAudioEvents.emit('stop', { key: `charge:${id}` });
+      },
     };
     Object.assign(receiver, { target, root, light, targetMaterial, ownsTargetMaterial: !existingTargetMesh, connected: false, charge: 0, latched: false, unregister: registry.register(target) });
     registrations.push(receiver.unregister);
@@ -611,7 +620,16 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private updateReceiver(receiver: MutableTimedReceiver, dt: number): void {
     if (receiver.connected && !receiver.latched) receiver.charge = Math.min(1, receiver.charge + dt / LIGHT_CHARGE_SECONDS);
     else if (!receiver.latched) receiver.charge = Math.max(0, receiver.charge - dt * 0.5);
-    if (receiver.charge >= 1 - 1e-9) { receiver.charge = 1; receiver.latched = true; }
+    if (receiver.charge >= 1 - 1e-9) {
+      if (!receiver.latched) {
+        gameplayAudioEvents.emit('stop', { key: `charge:${receiver.target.id}` });
+        const position = receiver.root.getWorldPosition(new THREE.Vector3());
+        gameplayAudioEvents.emit('cue', { sound: 'volt-charge-ready-01', position });
+        gameplayAudioEvents.emit('cue', { sound: this.lights.includes(receiver) ? 'volt-light-activate-01' : 'volt-terminal-activate-01', position });
+        if (!this.lights.includes(receiver)) gameplayAudioEvents.emit('cue', { sound: 'volt-platform-power-on-01', position });
+      }
+      receiver.charge = 1; receiver.latched = true;
+    }
     const powered = receiver.latched || receiver.connected;
     receiver.targetMaterial.emissiveIntensity = powered ? 1.2 : 0;
     receiver.light.color.setHex(receiver.latched ? 0xffd991 : 0xffc45c);
@@ -619,6 +637,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   }
 
   private restoreReceiver(receiver: MutableTimedReceiver, state: ReceiverSnapshot): void {
+    gameplayAudioEvents.emit('stop', { key: `charge:${receiver.target.id}` });
     receiver.connected = false; receiver.charge = Math.max(0, Math.min(1, state.charge)); receiver.latched = state.latched;
     this.updateReceiver(receiver, 0.000001);
   }

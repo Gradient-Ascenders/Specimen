@@ -17,6 +17,11 @@ export interface JumpedEvent {
 }
 
 export interface MovementEvents {
+  attached: Record<string, never>;
+  detached: { readonly lostSupport: boolean };
+  bounced: Record<string, never>;
+  regripped: Record<string, never>;
+  obstacleImpact: { readonly speedMetresPerSecond: number };
   /** Fired once for a stable airborne -> grounded transition. */
   landed: LandedEvent;
   /** Fired once when stored jump charge becomes a launch impulse. */

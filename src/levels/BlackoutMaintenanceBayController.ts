@@ -1,3 +1,4 @@
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 import type { ElectricalTargetRegistry, ElectricalConnectionTarget } from '../abilities/ElectricalTargetRegistry.ts';
 import { CollisionHit, CollisionLayer, type CollisionWorld } from '../physics/CollisionWorld.ts';
@@ -81,7 +82,11 @@ export class BlackoutMaintenanceBayController {
     this.target={id:'maintenance-bay-circuit',displayName:'Exit door circuit',hitMeshes:[this.receiver],
       // The socket sits on the exposed face, not inside the conduit collider.
       copySocketWorldPosition:p=>this.receiver.localToWorld(p.set(0,.55,-.2)),isAvailable:()=>true,
-      setConnectionState:connected=>{this.powered=connected; if(!connected)this.charge=0;this.updateIndicator();}};
+      setConnectionState:connected=>{if (this.powered !== connected) {
+        if (connected) gameplayAudioEvents.emit('loop', { key: 'charge:maintenance-bay', sound: 'volt-charge-loop-01', position: this.receiver.getWorldPosition(new THREE.Vector3()) });
+        else gameplayAudioEvents.emit('stop', { key: 'charge:maintenance-bay' });
+      }
+      this.powered=connected; if(!connected)this.charge=0;this.updateIndicator();}};
     this.unregister=registry.register(this.target);
   }
 
@@ -93,7 +98,15 @@ export class BlackoutMaintenanceBayController {
   }
 
   update(dt:number,bodies:Record<SlimeId,KinematicBody>):SlimeId|undefined {
+    const previousCharge = this.charge;
     this.charge=this.powered?Math.min(1,this.charge+dt*1.5):0;
+    if (previousCharge < 1 && this.charge >= 1) {
+      gameplayAudioEvents.emit('stop', { key: 'charge:maintenance-bay' });
+      const position = this.receiver.getWorldPosition(new THREE.Vector3());
+      gameplayAudioEvents.emit('cue', { sound: 'volt-charge-ready-01', position });
+      gameplayAudioEvents.emit('cue', { sound: 'volt-terminal-activate-01', position });
+      gameplayAudioEvents.emit('cue', { sound: 'volt-platform-power-on-01', position });
+    }
     this.door.setOpen(this.charge>=1);
     this.door.update(dt,Object.entries(bodies).map(([id,body])=>({id,position:body.position,radiusMetres:body.radiusMetres})));
     this.bay.update(dt,this.charge>=1);
@@ -134,9 +147,10 @@ export class BlackoutMaintenanceBayController {
     const color=this.powered?0x36ff74:0xff2716;
     this.indicatorMaterial.color.setHex(color);this.indicatorMaterial.emissive.setHex(color);this.indicatorLight.color.setHex(color);
   }
-  reset():void {this.complete=false;this.powered=false;this.charge=0;this.voltTraversedVent=false;this.enteredVentFromBay=false;this.hasPreviousVoltPosition=false;this.door.reset();this.updateIndicator();}
+  reset():void {gameplayAudioEvents.emit('stop', { key: 'charge:maintenance-bay' });this.complete=false;this.powered=false;this.charge=0;this.voltTraversedVent=false;this.enteredVentFromBay=false;this.hasPreviousVoltPosition=false;this.door.reset();this.updateIndicator();}
   dispose():void {
     if(this.disposed)return;this.disposed=true;
+    gameplayAudioEvents.emit('stop', { key: 'charge:maintenance-bay' });
     this.unregister();this.door.dispose();this.receiver.removeFromParent();
     const materials=new Set<THREE.Material>();
     this.receiver.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();for(const material of Array.isArray(object.material)?object.material:[object.material])materials.add(material);}});

@@ -55,7 +55,13 @@ texture assets, external code or third-party dependencies were introduced.
 
 ## Audio / music
 
-No third-party audio or music has been introduced yet.
+| Resource | Author / creator | Source | Licence | Use in Specimen |
+| --- | --- | --- | --- | --- |
+| Bob, Goop and Volt sound packs (53 effects) | Original procedural synthesis with ChatGPT assistance, as described in the supplied manifests | Requester-supplied Specimen character SFX ZIP packs | Created for this project; no separate licence declaration supplied | Gameplay movement, abilities, collisions, power and recovery. Oscillators, filtered noise and envelopes; no imported audio samples. |
+| Specimen turret shot | Requester-supplied audio; original creator and generation tool not specified | Supplied `specimen-turret-shot.wav`, converted to OGG Vorbis | No separate licence declaration supplied | Accepted turret projectile spawns across the shared drone firing system. |
+
+The complete asset inventory and gameplay mappings are documented in
+`docs/architecture/gameplay-audio.md`. No music has been introduced.
 
 ## Fonts
 
