@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -13,7 +14,7 @@ test('observation recess preserves solid walls, floor, doors and collider author
     id: 'cultivation-room-1-to-2-lab-passage', fromRoomId: 1, toRoomId: 2,
     widthMetres: 8, heightMetres: 6.5, lengthMetres: 28, doorwayWidthMetres: 4, doorwayHeightMetres: 4.6,
   });
-  const lab = new CultivationLabMaterials(), contamination = new CultivationContaminationArt(lab);
+  const lab = new CultivationLabMaterials(cultivationAssets), contamination = new CultivationContaminationArt(lab);
   lab.dress(passage.builder, [], contamination.overrides(passage.builder));
   const snapshots = passage.collisionMeshes.map(mesh => ({ mesh, geometry: mesh.geometry,
     positions: Array.from(mesh.geometry.getAttribute('position').array), position: mesh.position.toArray(),
@@ -44,7 +45,7 @@ test('observation recess preserves solid walls, floor, doors and collider author
 });
 
 test('passage art survives retry, releases allocations once and leaves shared maps with their owners', () => {
-  const scene = new LevelTwoPreviewScene(() => {}), art = scene.passageArt;
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets), art = scene.passageArt;
   const meshes: THREE.Mesh[] = [];
   art.root.traverse(object => { if (object instanceof THREE.Mesh) meshes.push(object); });
   const originalChildren = [...art.root.children];

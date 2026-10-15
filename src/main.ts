@@ -1,5 +1,6 @@
 import { AudioManager } from './audio/AudioManager.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
+import { loadCultivationBakedAssets } from './render/environment/cultivation/CultivationBakedAssets.ts';
 import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
@@ -50,10 +51,13 @@ const levelOneRuntime = new GreyboxLevelRuntime({
 const gameSession = new GameSessionCoordinator({
   initialRuntime: levelOneRuntime,
   createLevelTwo: async (progression) => {
-    const [runtimeModule, debugModule] = await Promise.all([
+    const [runtimeModule, debugModule, authoredAssets] = await Promise.all([
       import('./levels/CultivationLevelRuntime.ts'),
       debugAvailable
         ? import('./debug/CultivationLevelDebug.ts')
+        : Promise.resolve(undefined),
+      debugAvailable
+        ? loadCultivationBakedAssets(new URL('./assets/cultivation/authored-assets.bin', import.meta.url))
         : Promise.resolve(undefined),
     ]);
     return new runtimeModule.CultivationLevelRuntime({
@@ -64,6 +68,7 @@ const gameSession = new GameSessionCoordinator({
       progression,
       debugAvailable,
       debugSupport: debugModule?.CULTIVATION_LEVEL_DEBUG_SUPPORT,
+      authoredAssets,
     });
   },
   createLevelThree: async (progression) => {

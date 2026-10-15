@@ -1,0 +1,50 @@
+name: Cultivation bake diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: Baseline revision for matched construction and visual checks
+        required: true
+        default: b00978e58eeea4f782c03c57d890ad02b5620b3a
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.baseline }}
+          path: artifacts/baseline
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm install --global npm@11.18.0
+      - run: npm ci
+      - run: npm run check:generated-assets
+      - name: Capture matched cold CPU profiles sequentially
+        run: |
+          node --expose-gc scripts/profile-cultivation-construction.ts --baseline-root artifacts/baseline --output artifacts/perf-192/baseline.json
+          node --expose-gc scripts/profile-cultivation-construction.ts --output artifacts/perf-192/baked.json
+      - name: Compare all authored gameplay poses
+        run: node scripts/compare-cultivation-bake.ts artifacts/baseline > artifacts/perf-192/parity.log
+      - run: npx playwright install --with-deps chromium
+      - name: Capture matched room and animation views
+        run: |
+          node scripts/capture-cultivation-bake.mjs --baseline-root artifacts/baseline
+          node scripts/capture-cultivation-bake.mjs
+          node scripts/compare-cultivation-captures.mjs
+      - name: Retain raw evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cultivation-bake-diagnostics-${{ github.sha }}
+          path: artifacts/perf-192/
+          if-no-files-found: warn
+          retention-days: 30

@@ -33,8 +33,8 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Verify prebaked texture reproducibility
-        run: node scripts/generate-blackout-maintenance-maps.ts --check
+      - name: Verify baked asset reproducibility
+        run: npm run check:generated-assets
 
       - name: Run tests
         run: npm test

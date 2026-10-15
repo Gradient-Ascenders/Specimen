@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -7,8 +8,8 @@ import { CultivationChamberMaterials } from '../src/render/environment/cultivati
 
 test('Room 3 art preserves authored collision and interactions through batching and reset', () => {
   const baseline = new LevelTwoRoomThreeGreybox(() => {});
-  const lab = new CultivationLabMaterials();
-  const chamber = new CultivationChamberMaterials();
+  const lab = new CultivationLabMaterials(cultivationAssets);
+  const chamber = new CultivationChamberMaterials(cultivationAssets);
   const room = new LevelTwoRoomThreeGreybox(() => {}, builder => lab.dress(builder, [], chamber.overrides(builder, lab)));
   assert.equal(room.collisionMeshes.length, baseline.collisionMeshes.length);
   room.collisionMeshes.forEach((mesh, index) => {

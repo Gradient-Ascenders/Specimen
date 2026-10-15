@@ -1,4 +1,5 @@
 import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
+import type { CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
@@ -119,6 +120,7 @@ export interface CultivationLevelRuntimeOptions {
   readonly window?: Window;
   readonly debugAvailable?: boolean;
   readonly debugSupport?: CultivationLevelDebugSupport;
+  readonly authoredAssets?: CultivationAssetSource;
 }
 
 interface CultivationRuntimeResources {
@@ -207,6 +209,7 @@ export class CultivationLevelRuntime {
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
   private readonly debugSupport: CultivationLevelDebugSupport | undefined;
+  private readonly authoredAssets: CultivationAssetSource | undefined;
   private readonly initialProgression: LevelProgressionSnapshot;
   private readonly lifecycle: LevelLifecycle;
   private readonly hudListeners = new Set<SlimeHUDListener>();
@@ -254,8 +257,12 @@ export class CultivationLevelRuntime {
     this.hostWindow = options.window ?? window;
     this.debugAvailable = options.debugAvailable ?? import.meta.env.DEV;
     this.debugSupport = options.debugSupport;
+    this.authoredAssets = options.authoredAssets;
     if (this.debugAvailable && !this.debugSupport) {
       throw new Error('Cultivation debug support must be loaded when debugging is enabled.');
+    }
+    if (this.debugAvailable && !this.authoredAssets) {
+      throw new Error('Cultivation authored assets must be loaded before scene construction.');
     }
     this.initialProgression = {
       unlockedSlimeIds: [...options.progression.unlockedSlimeIds],
@@ -837,8 +844,9 @@ export class CultivationLevelRuntime {
       rollback(() => scene.dispose());
       this.renderLayer.scene.add(scene.root);
       const authoredPreview = this.debugAvailable
-        ? new this.debugSupport!.PreviewScene((failure) =>
-            this.handleAuthoredPreviewFailure(failure),
+        ? new this.debugSupport!.PreviewScene(
+            (failure) => this.handleAuthoredPreviewFailure(failure),
+            this.authoredAssets!,
           )
         : undefined;
       if (authoredPreview) {

@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
@@ -266,7 +267,7 @@ test('sewer reboot, paired checkpoints and rescue retries preserve the right sta
 
 function setup() {
   const room = new LevelTwoRoomFiveGreybox(() => {});
-  const lab = new CultivationLabMaterials();
+  const lab = new CultivationLabMaterials(cultivationAssets);
   const contamination = new CultivationContaminationArt(lab);
   const art = new CultivationMaintenanceArt(room, lab, contamination);
   room.root.position.set(64, 0, 249); room.root.updateMatrixWorld(true);
