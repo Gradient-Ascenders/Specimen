@@ -838,7 +838,7 @@ export class CultivationLevelRuntime {
       this.renderLayer.scene.add(scene.root);
       const authoredPreview = this.debugAvailable
         ? new this.debugSupport!.PreviewScene((failure) =>
-            this.handleAuthoredPreviewFailure(failure),
+            this.handleAuthoredPreviewFailure(failure), this.renderLayer.gelRendering,
           )
         : undefined;
       if (authoredPreview) {
@@ -979,7 +979,7 @@ export class CultivationLevelRuntime {
       });
       const voltBody = new KinematicBody({ world: collisionWorld, surfaces: surfaceRegistry,
         initialPosition: new THREE.Vector3(), events: voltMovementEvents, config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false } });
-      const voltPresentation = new VoltCharacterPresentation(voltBody.radiusMetres);
+      const voltPresentation = new VoltCharacterPresentation(voltBody.radiusMetres, this.renderLayer.gelRendering);
       rollback(() => voltPresentation.dispose());
       voltPresentation.setCollisionWorld(collisionWorld);
       voltPresentation.setVisible(false);
@@ -1185,13 +1185,13 @@ export class CultivationLevelRuntime {
       rollback(() => bobReflectionEnvironment.dispose());
       voltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       authoredPreview?.roomFive.captiveVoltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
-      const goopPresentation = new GoopCharacterPresentation(goopBody.radiusMetres);
+      const goopPresentation = new GoopCharacterPresentation(goopBody.radiusMetres, this.renderLayer.gelRendering);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(goopBody.position);
       goopPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       goopPresentation.setReflectionIntensity(CULTIVATION_BOB_REFLECTION.normal.body, CULTIVATION_BOB_REFLECTION.normal.eyes, true);
       this.renderLayer.scene.add(goopPresentation.root);
-      const bobPresentation = new BobCharacterPresentation(bobBody.radiusMetres);
+      const bobPresentation = new BobCharacterPresentation(bobBody.radiusMetres, this.renderLayer.gelRendering);
       bobPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       bobPresentation.setReflectionIntensity(
         CULTIVATION_BOB_REFLECTION.normal.body,

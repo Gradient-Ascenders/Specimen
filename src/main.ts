@@ -86,6 +86,13 @@ const gameSession = new GameSessionCoordinator({
   },
 });
 const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
+let warmedLevelOneProgramBaseline: number | undefined;
+let levelOneShaderProgramGuardActive = true;
+let levelOneShaderProgramGuardInvalidation: string | undefined;
+let sampleLevelOneShaderPrograms: (() => void) | undefined;
+let performanceRecorder:
+  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
+  | undefined;
 const gameFlow = new GameFlowUI({
   settings,
   creditsMarkdown,
@@ -116,15 +123,16 @@ const gameFlow = new GameFlowUI({
         nextSettings.cameraDistanceMetres,
       );
       renderLayer.setPixelRatioCap(nextSettings.renderPixelRatioCap);
+      if (renderLayer.gelRendering.value !== nextSettings.gelRenderingMode) {
+        levelOneShaderProgramGuardActive = false;
+        sampleLevelOneShaderPrograms = undefined;
+        levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
+        performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
+      }
+      renderLayer.gelRendering.setMode(nextSettings.gelRenderingMode);
     },
   },
 });
-let warmedLevelOneProgramBaseline: number | undefined;
-let levelOneShaderProgramGuardActive = true;
-let sampleLevelOneShaderPrograms: (() => void) | undefined;
-let performanceRecorder:
-  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
-  | undefined;
 const unsubscribeObjectiveChanged = gameSession.events.on(
   'objectiveChanged',
   ({ objective }) => gameFlow.setObjective(objective),
@@ -174,6 +182,9 @@ if (debugAvailable) {
       });
       performanceRecorder = recorder;
       loop.setProfiler(recorder);
+      if (levelOneShaderProgramGuardInvalidation) {
+        recorder.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
+      }
       if (
         levelOneShaderProgramGuardActive &&
         warmedLevelOneProgramBaseline !== undefined

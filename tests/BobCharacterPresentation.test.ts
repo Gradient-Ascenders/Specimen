@@ -145,6 +145,47 @@ function wallClearance(bob: BobCharacterPresentation, normal: THREE.Vector3): nu
   return minimum;
 }
 
+test('wall clearance matches evaluated mesh vertices as poses, normals and interpolation change', async () => {
+  const bob = new BobCharacterPresentation(0.45);
+  await bob.prepare(loadAsset);
+  const character = getCharacter(bob.root);
+  const body = character.getObjectByName('Bob-Body') as THREE.Mesh;
+  const point = new THREE.Vector3();
+  const normals = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1),
+    new THREE.Vector3(-1, 0.2, 0.5).normalize()];
+  try {
+    for (const normal of normals) {
+      bob.reset();
+      const position = normal.clone().multiplyScalar(0.45);
+      bob.setPosition(position);
+      const wall = { ...state(position), attached: true, jumpCharge: 0,
+        surfaceNormalWorld: normal, gameplayUpWorld: normal };
+      // Exercise shrinking/changing active sets, including return to Neutral.
+      for (const reaction of ['neutral', 'charge', 'flatten', 'damage', 'neutral'] as const) {
+        if (reaction === 'flatten') bob.onLanding(normal, 8.5);
+        if (reaction === 'damage') bob.onDamage(0.8);
+        bob.update(reaction === 'neutral' ? 2 : 1 / 60,
+          { ...wall, jumpCharge: reaction === 'charge' ? 0.7 : 0 });
+        for (const alpha of [0, 0.35, 1]) {
+          bob.present(alpha);
+          const actualPosition = character.position.clone();
+          character.position.copy(position); // Independently evaluate the uncorrected surface.
+          bob.root.updateMatrixWorld(true);
+          let minimum = Infinity;
+          for (let index = 0; index < body.geometry.getAttribute('position').count; index++) {
+            body.getVertexPosition(index, point).applyMatrix4(body.matrixWorld);
+            minimum = Math.min(minimum, point.dot(normal));
+          }
+          const expectedPosition = position.clone().addScaledVector(normal, Math.max(0, 0.004 - minimum));
+          assert.ok(actualPosition.distanceTo(expectedPosition) < 1e-12,
+            `${reaction}, normal=${normal.toArray()}, alpha=${alpha}`);
+          character.position.copy(actualPosition);
+        }
+      }
+    }
+  } finally { bob.dispose(); }
+});
+
 test('wall transition keeps the authored body in front of the support plane', async () => {
   const bob = new BobCharacterPresentation(0.45);
   await bob.prepare(loadAsset);

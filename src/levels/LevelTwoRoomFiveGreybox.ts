@@ -1,3 +1,4 @@
+import type { GelRendering } from '../render/slime/GelRendering.ts';
 import * as THREE from 'three';
 import { VoltCharacterPresentation } from '../render/volt/VoltCharacterPresentation.ts';
 import { RoomFiveVentWaste } from './RoomFiveVentWaste.ts';
@@ -40,7 +41,7 @@ export class LevelTwoRoomFiveGreybox {
   private readonly shortcutEntry: THREE.Mesh;
   readonly pod = new THREE.Group();
   readonly captiveVolt = new THREE.Group();
-  readonly captiveVoltPresentation = new VoltCharacterPresentation();
+  readonly captiveVoltPresentation: VoltCharacterPresentation;
   readonly brokenCore: THREE.Mesh;
   private readonly glassPanels: THREE.Mesh[] = [];
   private readonly captiveState = { locomotionPositionWorld: new THREE.Vector3(), velocityWorld: new THREE.Vector3(),
@@ -56,7 +57,8 @@ export class LevelTwoRoomFiveGreybox {
   private appliedContactOrder = 0;
   readonly sewer: RoomFiveSewer;
   private readonly requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void;
-  constructor(requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void) {
+  constructor(requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void, gelRendering?: GelRendering) {
+    this.captiveVoltPresentation = new VoltCharacterPresentation(undefined, gelRendering);
     this.requestFailure = requestFailure;
     const b = this.builder, m = b.materials;
     const box = (name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material = m.wall, sticky = false) => {

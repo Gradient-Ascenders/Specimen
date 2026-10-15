@@ -1,3 +1,4 @@
+import type { GelRendering } from '../render/slime/GelRendering.ts';
 import { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import * as THREE from 'three';
 
@@ -55,13 +56,14 @@ export class ContainmentTeachingScene {
   private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
   private readonly ownedMaterials = new Set<THREE.Material>();
   readonly bob: BobCharacterPresentation;
-  readonly goop = new GoopCharacterPresentation();
+  readonly goop: GoopCharacterPresentation;
   private disposed = false;
 
   constructor(
     artResources: ContainmentArtResources,
-    options: { readonly includeDevelopmentHelpers?: boolean } = {},
+    options: { readonly includeDevelopmentHelpers?: boolean; readonly gelRendering?: GelRendering } = {},
   ) {
+    this.goop = new GoopCharacterPresentation(undefined, options.gelRendering);
     // Retain the validated hierarchy name for collision fingerprint stability.
     this.root.name = 'containment-climb-and-bounce-greybox';
 
@@ -115,7 +117,7 @@ export class ContainmentTeachingScene {
     this.root.add(this.roomOneArt.root, this.roomTwoArt.root);
 
     this.bob = new BobCharacterPresentation(
-      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
+      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres, options.gelRendering,
     );
     this.root.add(this.bob.root, this.goop.root);
     this.resetTeachingPresentation();

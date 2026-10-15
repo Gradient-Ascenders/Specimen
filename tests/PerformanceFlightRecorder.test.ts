@@ -6,6 +6,7 @@ import {
   HitchDetector,
   PerformanceFlightRecorder,
   type ShaderProgramGrowthEvent,
+  type ShaderProgramGuardSnapshot,
 } from '../src/debug/PerformanceFlightRecorder.ts';
 import type { LoopStats } from '../src/core/Loop.ts';
 
@@ -297,6 +298,16 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
       element.shaderProgramGuardStatus.textContent,
       /Level 1 shader guard complete/,
     );
+    recorder.invalidateLevelOneShaderProgramGuard('Character gel quality changed');
+    programs.push({});
+    recorder.armLevelOneShaderProgramGuard(programs.length);
+    recorder.sampleLevelOneShaderPrograms();
+    assert.equal(recorder.getShaderProgramGuardSnapshot().armed, false);
+    assert.equal(recorder.getShaderProgramGuardSnapshot().invalidatedBy, 'Character gel quality changed');
+    assert.match(element.shaderProgramGuardStatus.textContent, /guard invalidated/);
+    assert.equal(errors.length, 2);
+    assert.equal((recorder.buildExport() as { shaderProgramGuard: ShaderProgramGuardSnapshot })
+      .shaderProgramGuard.invalidatedBy, 'Character gel quality changed');
     recorder.dispose();
   } finally {
     restoreGlobal('PerformanceObserver', originalObserver);
