@@ -45,13 +45,14 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
   });
   await page.keyboard.press('F1');
   await expect(app).not.toHaveAttribute('data-clean-gameplay');
-  await page.locator('[data-action="start"]').click();
-  await page.locator('canvas').click();
-  await page.waitForFunction(
-    () => (window as any).__cleanSession.runtime.input.pointerLocked,
-  );
+  // Start supplies the trusted pointer-lock gesture. Freeze the loop before
+  // it so a software-rendered frame cannot stall a redundant canvas click.
   await page.evaluate(() =>
     (window as any).__cleanSession.runtime.renderLayer.setAnimationLoop(null),
+  );
+  await page.locator('[data-action="start"]').click();
+  await page.waitForFunction(
+    () => (window as any).__cleanSession.runtime.input.pointerLocked,
   );
   const draw = () =>
     page.evaluate(() => {
@@ -87,6 +88,7 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
     await expect(page.locator('[data-current-objective]')).toBeHidden();
     await expect(page.locator('[data-slime-roster]')).toBeHidden();
     await expect(page.locator('.hud-hint')).toBeHidden();
+    await expect(page.locator('.specimen-combat-label')).toBeHidden();
     await expect(page.locator('[data-gameplay-canvas]')).toBeVisible();
     const visible = await page.evaluate(() =>
       [...document.querySelector('#app')!.children]
@@ -240,7 +242,9 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
     });
     expect(editing).toBe(false);
     await expect(app).not.toHaveAttribute('data-clean-gameplay');
-    await page.locator('canvas').click();
+    await page.waitForFunction(
+      () => (window as any).__cleanSession.runtime.input.pointerLocked,
+    );
     await page.keyboard.press('F1');
     const start = await step(0);
     await page.keyboard.down('KeyW');
@@ -368,6 +372,19 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
               .controlledForm,
         ),
       ).toBe('specimen');
+      await draw();
+      await expect(page.locator('.specimen-combat-crosshair')).toBeHidden();
+      await expect(page.locator('.specimen-combat-charge')).toBeHidden();
+      await assertCleanHud();
+      await page.keyboard.press('F1');
+      await expect(hud).toBeVisible();
+      await expect(page.locator('.specimen-combat-label')).toBeVisible();
+      await expect(page.locator('.specimen-combat-crosshair')).toBeHidden();
+      await expect(page.locator('.specimen-combat-charge')).toBeHidden();
+      await capture(level, 'specimen-no-aim-normal');
+      await page.keyboard.press('F1');
+      await assertCleanHud();
+      await capture(level, 'specimen-no-aim-clean');
       await page.mouse.down({ button: 'right' });
       await page.mouse.down({ button: 'left' });
       await step(1);
@@ -377,6 +394,7 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       await assertCleanHud();
       await page.keyboard.press('F1');
       await expect(hud).toBeVisible();
+      await expect(page.locator('.specimen-combat-label')).toBeVisible();
       await expect(page.locator('.specimen-combat-crosshair')).toBeVisible();
       await page.keyboard.press('F1');
       await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
@@ -390,6 +408,13 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       await draw();
       await expect(page.locator('.specimen-combat-crosshair')).toBeHidden();
       await expect(page.locator('.specimen-combat-charge')).toBeHidden();
+      await assertCleanHud();
+      await page.keyboard.press('F1');
+      await expect(page.locator('.specimen-combat-label')).toBeVisible();
+      await expect(page.locator('.specimen-combat-crosshair')).toBeHidden();
+      await expect(page.locator('.specimen-combat-charge')).toBeHidden();
+      await page.keyboard.press('F1');
+      await assertCleanHud();
     }
 
     // Dynamic overlays, inline damage effects and objective changes stay hidden.
@@ -441,7 +466,9 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       await expect(enter).toBeVisible({ timeout: 180_000 });
       await expect(enter).toContainText(`Enter Level ${level + 1}`);
       await enter.click();
-      await page.locator('canvas').click();
+      await page.waitForFunction(
+        () => (window as any).__cleanSession.runtime.input.pointerLocked,
+      );
     }
   }
   expect(errors).toEqual([]);

@@ -29,7 +29,8 @@ after F1 remain hidden without per-frame scans or a mutation observer. New
 screen-space UI should remain under this host boundary. Essential full-screen
 blocking surfaces must opt in with `data-clean-gameplay-essential`. Aiming overlays
 use the separate `data-clean-gameplay-aiming` exception, which leaves F1 toggling
-available and preserves their normal aim/charge/visibility lifecycle.
+available and preserves their normal aim/charge/visibility lifecycle. The
+non-aiming Specimen name badge inside its mixed overlay is hidden separately.
 
 HUDs continue receiving their normal live state updates while hidden. Restoring
 normal presentation changes only this boundary, without replaying cached text,
@@ -39,6 +40,7 @@ changing individual `hidden` flags or resurrecting expired elements.
 | --- | --- |
 | Objectives, guidance, control hints, roster, switch/passive status | Entire game HUD hidden |
 | Goop acid crosshair; Volt electrical crosshair/status; merged attack charge/crosshair | Kept visible according to normal aiming state |
+| Merged Specimen name badge | Hidden during clean mode, including when not aiming; restored normally with F1 |
 | Maintenance drone mount instructions, status and tutorial | DOM overlay hidden |
 | Elevator and security-network prompts | DOM overlays hidden |
 | Damage vignette and screen-edge flashes | DOM feedback hidden; damage simulation continues |
@@ -67,8 +69,13 @@ browser test in `tests/smoke/CleanGameplayMode.spec.ts` exercises all three leve
 all playable identities, dynamic overlays, movement, switching, diagnostics,
 pause/restart/transition behavior, unchanged audio state, and canvas visibility.
 Goop, Volt and merged Specimen aiming UI stays visible while objectives, roster and
-control hints stay hidden. Releasing aim hides crosshairs and charge normally.
-It observes real runtime seams without replacing game or rendering logic.
+control hints and the non-aiming Specimen badge stay hidden. Releasing aim hides
+crosshairs and charge normally. Merged-form coverage also checks the idle badge
+and its restoration when F1 is toggled off.
+It observes real runtime seams without replacing game or rendering logic. Start
+and Enter Level provide the trusted pointer-lock gestures; the test waits for
+that lock rather than clicking an already locked canvas. Rendering is stepped
+explicitly for stable captures.
 
 Browser captures are written to ignored `artifacts/evidence/f1-clean-gameplay/`.
 Reviewed examples are retained under `docs/evidence/f1-clean-gameplay/`:
@@ -83,3 +90,6 @@ Aiming with F1 enabled: [Goop crosshair](../evidence/f1-clean-gameplay/level-1-g
 [Volt crosshair](../evidence/f1-clean-gameplay/level-3-volt-aim-clean.png), and
 [merged Specimen crosshair and charge](../evidence/f1-clean-gameplay/level-3-specimen-aim-clean.png).
 The remaining HUD is hidden in each capture.
+
+Merged form without aiming: [normal HUD and badge](../evidence/f1-clean-gameplay/level-3-specimen-no-aim-normal.png)
+and [clean view without the badge](../evidence/f1-clean-gameplay/level-3-specimen-no-aim-clean.png).

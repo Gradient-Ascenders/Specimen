@@ -43,6 +43,7 @@ canvas {
  * keeps its own visibility rules; menus/recovery/loading remain functional.
  * Only the real gameplay canvas is exempted among canvases. */
 #app[data-clean-gameplay="true"] > :not([data-gameplay-canvas]):not(.game-flow):not([data-clean-gameplay-essential]):not([data-clean-gameplay-aiming]),
+#app[data-clean-gameplay="true"] .specimen-combat-label,
 #app[data-clean-gameplay="true"] > .game-flow[data-state="playing"] {
   display: none !important;
 }
