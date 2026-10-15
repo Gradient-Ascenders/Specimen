@@ -78,6 +78,8 @@ for (const label of labels) {
                 pacingTrusted: x.frames.every(f => f.visibility === "visible" && f.focused),
                 hitches: Object.fromEntries([50,100,150].map(ms => [ms,x.frames.filter(f => f.drawn !== false && f.cadence > ms).length])),
 				diagnostics: x.diagnostics,
+				transmissionResolutionScale: x.transmissionResolutionScale,
+				glError: x.glError,
 				preparation: x.preparation && {
 					...x.preparation,
 					slowSteps: undefined

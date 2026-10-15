@@ -16,6 +16,14 @@ const deviceScaleFactor = Number(process.env.PROFILE_DPR ?? 1);
 const flightRecorder = process.env.PROFILE_RECORDER === "1";
 const runs = Number(process.env.PROFILE_RUNS ?? 2);
 const keyMs = Number(process.env.PROFILE_KEY_MS ?? 900);
+const betaScope = process.env.PROFILE_SCOPE === "beta";
+const preset = process.env.PROFILE_PRESET;
+const resolutionCap = process.env.PROFILE_RESOLUTION_CAP;
+const transmissionScale = process.env.PROFILE_TRANSMISSION_SCALE;
+if (preset && !["normal", "performance"].includes(preset)) throw new Error("Unknown PROFILE_PRESET");
+if (resolutionCap && !["0.75", "1", "1.5", "2"].includes(resolutionCap)) throw new Error("Unknown PROFILE_RESOLUTION_CAP");
+if (preset === "performance" && Number(resolutionCap) > 1) throw new Error("Performance preset supports resolution caps up to 1");
+if (transmissionScale && !["1", "0.75", "0.5"].includes(transmissionScale)) throw new Error("Unknown diagnostic PROFILE_TRANSMISSION_SCALE");
 if (!Number.isInteger(runs) || runs < 1 || !Number.isFinite(keyMs) || keyMs <= 0) throw new Error("PROFILE_RUNS must be a positive integer and PROFILE_KEY_MS must be positive");
 if (![width,height].every(v => Number.isInteger(v) && v > 0) || !Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0) throw new Error("PROFILE_WIDTH/HEIGHT must be positive integers and PROFILE_DPR must be positive");
 const out = path.resolve(root, "artifacts/performance-overhaul", label);
@@ -45,6 +53,7 @@ const server = spawn(process.execPath, [
 const report = {
 	label,
 	protocol: {width,height,deviceScaleFactor,flightRecorder,headless:process.env.PROFILE_HEADLESS !== "0",keyMs},
+	requestedGraphics: {preset, resolutionCap, transmissionScale},
 	recordedAt: new Date().toISOString(),
 	assetHashes,
 	runs: [],
@@ -296,6 +305,12 @@ try {
 		}));
 		await page.locator("[data-action=\"start\"]").waitFor({ state: "visible" });
 		data.readyMs = performance.now() - t;
+		if (preset || resolutionCap) {
+			await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+			if (preset) await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
+			if (resolutionCap) await page.locator('[data-setting="render-resolution"]').selectOption(resolutionCap);
+			await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+		}
 		const clicked = performance.now();
 		await page.locator("[data-action=\"start\"]").click();
 		await page.waitForFunction(() => globalThis.__one?.state === "running");
@@ -357,6 +372,13 @@ try {
                     await page.waitForFunction(previous => __three.resources.manager.activeSlimeId !== previous, active, {timeout:10000});
                 }
                 if (await page.evaluate(() => __three.resources.manager.activeSlimeId) !== target) throw new Error("Could not select the recorded Level 3 body");
+            }
+            if (transmissionScale) {
+                // Diagnostic public API override only; allow target allocation before capture.
+                await page.evaluate(({name, scale}) => {
+                    globalThis[name].renderLayer.renderer.transmissionResolutionScale = Number(scale);
+                }, {name, scale:transmissionScale});
+                await page.waitForTimeout(1000);
             }
             const staged = await page.evaluate((name) => {
 				const r = globalThis[name], b = r.resources.body ?? r.resources.pair?.activeBody ?? r.resources.group?.activeBody;
@@ -464,6 +486,8 @@ try {
 				return {
 					frames: r.__profile.frames.slice(start),
 					diagnostics: r.renderLayer.getDiagnostics(),
+					transmissionResolutionScale: r.renderLayer.renderer.transmissionResolutionScale,
+					glError: r.renderLayer.renderer.getContext().getError(),
 					preparation: r.preparationQueue?.diagnostics
 				};
 			}, {
@@ -473,6 +497,7 @@ try {
             if (flightRecorder && result.frames.some(frame => !frame.drawn)) {
                 throw new Error("Loading/non-rendered frames entered the capture");
             }
+            if (result.glError) throw new Error(`WebGL error ${result.glError} in ${captureId}`);
 			data.rooms.push({
 				name,
 				room,
@@ -483,7 +508,7 @@ try {
 			await page.locator("canvas").screenshot({ path: path.join(out, `${captureId}.png`) });
 			await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
 		};
-		if (process.env.PROFILE_MODE !== "startup") for (const room of [
+		if (process.env.PROFILE_MODE !== "startup") for (const room of betaScope ? [1] : [
 			1,
 			3,
 			5
@@ -516,13 +541,21 @@ try {
 		console.log("two transition", data.twoTransitionMs);
 		data.twoConfigurations = await page.evaluate(() => __two.preparationQueue?.configurations);
 		await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
-		if (process.env.PROFILE_MODE !== "startup") for (const room of [
+		if (process.env.PROFILE_MODE !== "startup") for (const room of betaScope ? [5] : [
 			1,
 			2,
 			3,
 			4,
 			5
 		]) await sample("__two", room);
+		if (betaScope && process.env.PROFILE_MODE !== "startup") {
+			await page.keyboard.press("Tab", {delay:150});
+			await page.waitForFunction(() => __two.resources.manager.activeSlimeId === "goop");
+			await sample("__two", 5, "goop");
+		}
+		if (betaScope && process.env.PROFILE_EXTRA_ROOM_ONE === "1" && process.env.PROFILE_MODE !== "startup") {
+			await sample("__two", 1, "background-preparation");
+		}
 		await page.evaluate(() => {
 			__two.resources.manager.unlock("volt");
 			__two.events.emit("completed", {
@@ -534,7 +567,7 @@ try {
 		await page.locator("[data-action=\"enter-level\"]").click();
 		await page.waitForFunction(() => globalThis.__three?.state === "running");
 		data.threeTransitionMs = performance.now() - three;
-		if (process.env.PROFILE_MODE !== "startup") for (const room of [1, 2]) await sample("__three", room);
+		if (process.env.PROFILE_MODE !== "startup") for (const room of betaScope ? [1] : [1, 2]) await sample("__three", room);
 		data.profiles = await page.evaluate(() => __profiles);
 		await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
 		await context.close();

@@ -8,6 +8,7 @@ import {
   DEFAULT_RENDER_PIXEL_RATIO_CAP,
   type RenderPixelRatioCap,
 } from '../render/RenderResolution.ts';
+import type { GraphicsPreset } from '../render/GraphicsQuality.ts';
 
 export interface GameSettingsSnapshot {
   readonly gelRenderingMode: GelRenderingMode;
@@ -17,6 +18,7 @@ export interface GameSettingsSnapshot {
   readonly soundEffectsVolume: number;
   readonly cameraDistanceMetres: number;
   readonly renderPixelRatioCap: RenderPixelRatioCap;
+  readonly graphicsPreset: GraphicsPreset;
 }
 
 export type GameSettingsListener = (
@@ -31,6 +33,7 @@ export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
   soundEffectsVolume: 0.8,
   cameraDistanceMetres: DEFAULT_CAMERA_RIG_CONFIG.followDistanceMetres,
   renderPixelRatioCap: DEFAULT_RENDER_PIXEL_RATIO_CAP,
+  graphicsPreset: 'normal',
 };
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
@@ -79,6 +82,10 @@ export class GameSettings {
     this.update({ renderPixelRatioCap: value });
   }
 
+  setGraphicsPreset(value: GraphicsPreset): void {
+    this.update({ graphicsPreset: value });
+  }
+
   subscribe(listener: GameSettingsListener): () => void {
     this.listeners.add(listener);
     listener(this.current);
@@ -94,7 +101,8 @@ export class GameSettings {
       next.masterVolume === this.current.masterVolume &&
       next.soundEffectsVolume === this.current.soundEffectsVolume &&
       next.cameraDistanceMetres === this.current.cameraDistanceMetres &&
-      next.renderPixelRatioCap === this.current.renderPixelRatioCap
+      next.renderPixelRatioCap === this.current.renderPixelRatioCap &&
+      next.graphicsPreset === this.current.graphicsPreset
     ) {
       return;
     }

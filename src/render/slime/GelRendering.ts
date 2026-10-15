@@ -10,6 +10,7 @@ export const isGelRenderingMode = (value: string): value is GelRenderingMode =>
 export class GelRendering {
   private readonly bodies = new Map<THREE.MeshPhysicalMaterial, number>();
   private mode: GelRenderingMode = DEFAULT_GEL_RENDERING_MODE;
+  private transmissionResolutionScaleCap = 1;
 
   private readonly renderer: Pick<THREE.WebGLRenderer, 'transmissionResolutionScale'>;
 
@@ -34,9 +35,22 @@ export class GelRendering {
   setMode(mode: GelRenderingMode): void {
     if (this.mode === mode) return;
     this.mode = mode;
-    // Half width and height: one quarter of the transmission target's pixels.
-    this.renderer.transmissionResolutionScale = mode === 'reduced-transmission' ? 0.5 : 1;
+    this.applyTransmissionResolutionScale();
     for (const [body, transmission] of this.bodies) this.apply(body, transmission);
+  }
+
+  /** Compose the graphics preset with gel quality, regardless of setting order. */
+  setTransmissionResolutionScaleCap(cap: number): void {
+    this.transmissionResolutionScaleCap = cap;
+    this.applyTransmissionResolutionScale();
+  }
+
+  private applyTransmissionResolutionScale(): void {
+    // Half width and height: one quarter of the transmission target's pixels.
+    this.renderer.transmissionResolutionScale = Math.min(
+      this.transmissionResolutionScaleCap,
+      this.mode === 'reduced-transmission' ? 0.5 : 1,
+    );
   }
 
   private apply(body: THREE.MeshPhysicalMaterial, authoredTransmission: number): void {
