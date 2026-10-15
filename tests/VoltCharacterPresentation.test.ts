@@ -5,9 +5,37 @@ import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 import { disposeVoltAsset, validateVoltAsset, VOLT_MORPHS } from '../src/render/volt/VoltAsset.ts';
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { prepareCharacterCameraFades } from '../src/render/slime/PrepareCharacterCameraFades.ts';
+import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 
 const state = () => ({ locomotionPositionWorld: new THREE.Vector3(), velocityWorld: new THREE.Vector3(),
   movementIntentWorld: new THREE.Vector3(), maximumLocomotionSpeedMetresPerSecond: 5.5, grounded: true });
+
+test('hidden Volt avoids ceiling queries and resolves the current ceiling before revealing', async () => {
+  const p = new VoltCharacterPresentation(), world = new CollisionWorld();
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(4, 0.1, 4), new THREE.MeshBasicMaterial());
+  roof.position.y = 1.25; roof.updateMatrixWorld(true); world.register(roof);
+  p.setCollisionWorld(world); p.setVisible(false); await p.prepare(loadVolt);
+  let queries = 0;
+  const raycast = world.raycast.bind(world);
+  world.raycast = (...args) => { queries++; return raycast(...args); };
+  const motion = state();
+  motion.grounded = false; motion.velocityWorld.y = 2;
+  p.setPosition(new THREE.Vector3(0, 0.46, 0));
+  p.onLaunch({ speedMetresPerSecond: 6, directionWorld: new THREE.Vector3(0, 1, 0), chargeFraction: 0 });
+  for (let i = 0; i < 6; i++) { p.update(1 / 60, motion); p.present(0.5); }
+  assert.equal(queries, 0);
+  assert.equal(p.diagnostics.visible, false);
+  const weights = { ...p.diagnostics.weights };
+  assert.ok(weights.Stretch > 0, 'hidden animation still advances');
+  p.setVisible(true); p.present(0.5);
+  assert.equal(queries, 9);
+  assert.equal(p.diagnostics.visible, true);
+  const body = p.root.getObjectByName('Volt-Body') as THREE.Mesh;
+  assert.ok(body.morphTargetInfluences![body.morphTargetDictionary!.Headroom] > 0,
+    'the first revealed frame must fit below the ceiling');
+  assert.deepEqual(p.diagnostics.weights, weights, 'revealing does not restart animation');
+  p.dispose(); world.clear(); roof.geometry.dispose(); (roof.material as THREE.Material).dispose();
+});
 
 test('real GLB validates sparse morphs, connected manifold geometry and exact Volt metadata', async () => {
   const root = await loadVolt(), asset = validateVoltAsset(root);

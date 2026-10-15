@@ -293,10 +293,13 @@ test('authored Room 1 Volt keeps identity events, light, interpolated placement 
     r.voltPresentation.setOpacity(0); assert.equal(r.voltLight.visible, true);
     r.voltPresentation.setOpacity(1);
     assert.equal(f.runtime.requestFailure(), true); assert.equal(f.runtime.requestFailure(), false);
-    f.tick(8); f.render(); assert.equal(r.voltPresentation.diagnostics.visible, false); assert.equal(r.voltLight.visible, false);
+    f.tick(8); f.render(); assert.equal(r.voltPresentation.diagnostics.visible, false);
+    // Keep the warmed point-light slot to avoid compiling a new shader when Volt dies.
+    assert.equal(r.voltLight.visible, true); assert.equal(r.voltLight.intensity, 0);
     assert.equal(r.voltPresentation.diagnostics.deathActive, true);
     f.runtime.restartLevel(); f.render(); assert.equal(r.voltPresentation.diagnostics.deathActive, false);
     assert.equal(r.voltPresentation.diagnostics.opacity, 1); assert.equal(r.voltLight.visible, true);
+    assert.equal(r.voltLight.intensity, 16);
     assert.ok(Object.values(r.voltPresentation.diagnostics.weights).every(weight => weight === 0));
   } finally { f.cleanup(); }
 });

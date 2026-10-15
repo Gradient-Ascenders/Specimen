@@ -17,6 +17,8 @@ function fixture() {
   const borrowedTarget = new THREE.WebGLCubeRenderTarget(8);
   let target: THREE.WebGLRenderTarget | null = borrowedTarget, face = 3, mip = 2;
   const renderer = {
+    transmissionResolutionScale: 0.5,
+    getPixelRatio: () => 0.75,
     info: {render: {calls: 7, triangles: 42, points:0, lines:0, frame: 12}, programs: []},
     shadowMap: {enabled: true, autoUpdate: true, needsUpdate: true, type: THREE.PCFShadowMap as THREE.ShadowMapType},
     getViewport: (out: THREE.Vector4) => out.copy(viewport), setViewport: (v: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = v instanceof THREE.Vector4 ? v.clone() : new THREE.Vector4(v, y, w, h); },
@@ -29,7 +31,7 @@ function fixture() {
     compileAsync: async (_group: THREE.Object3D, _camera: THREE.Camera, _scene: THREE.Scene) => {},
     render: (_scene: THREE.Scene, _camera: THREE.Camera) => { renderer.info.render.calls++; },
   };
-  const snapshot = () => ({viewport: viewport.toArray(), scissor: scissor.toArray(), test, target, face, mip, counters: {...renderer.info.render}, shadows: {...renderer.shadowMap}});
+  const snapshot = () => ({viewport: viewport.toArray(), scissor: scissor.toArray(), test, target, face, mip, transmissionScale: renderer.transmissionResolutionScale, counters: {...renderer.info.render}, shadows: {...renderer.shadowMap}});
   return {renderer, snapshot, borrowedTarget};
 }
 
@@ -39,6 +41,8 @@ test('preparation restores render target face, viewport, counters and shadow sta
   const policy = new RenderShadowPolicy(renderer.shadowMap);
   const before = snapshot();
   const pending = withIsolatedPrewarmState(renderer as unknown as THREE.WebGLRenderer, () => policy.withPreparation(false, async () => {
+    assert.equal(renderer.transmissionResolutionScale, 1, 'one-pixel primers keep a nonzero transmission target');
+    assert.deepEqual(renderer.getViewport(new THREE.Vector4()).toArray(), [0, 0, 2, 2]);
     renderer.info.render.calls = 100;
     await Promise.resolve();
     assert.deepEqual(snapshot(), before);
@@ -46,6 +50,7 @@ test('preparation restores render target face, viewport, counters and shadow sta
   assert.deepEqual(snapshot(), before);
   await pending;
   assert.throws(() => withIsolatedPrewarmState(renderer as unknown as THREE.WebGLRenderer, () => {
+    assert.equal(renderer.transmissionResolutionScale, 1);
     renderer.info.render.calls = 99; throw new Error('driver');
   }, target), /driver/);
   assert.deepEqual(snapshot(), before);

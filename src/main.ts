@@ -134,7 +134,7 @@ const gameFlow = new GameFlowUI({
       renderLayer.cameraRig.setFollowDistanceMetres(
         nextSettings.cameraDistanceMetres,
       );
-      renderLayer.setPixelRatioCap(nextSettings.renderPixelRatioCap);
+      renderLayer.setGraphicsSettings(nextSettings.graphicsPreset, nextSettings.renderPixelRatioCap);
       if (renderLayer.gelRendering.value !== nextSettings.gelRenderingMode) {
         levelOneShaderProgramGuardActive = false;
         sampleLevelOneShaderPrograms = undefined;

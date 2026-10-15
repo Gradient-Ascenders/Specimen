@@ -419,10 +419,14 @@ test('Cultivation draws Room 5 immediately after load and teleport with valid li
   expect(samplerWarnings).toEqual([]);
 });
 
-test('Cultivation draws prepared room and fade shadow variants without creating programs', async ({page}) => {
+for (const preset of ['normal', 'performance'] as const) {
+test(`Cultivation draws prepared room and fade shadow variants without creating programs (${preset})`, async ({page}) => {
   test.setTimeout(600_000);
   const assertExposed = await exposeCultivationRuntime(page);
   await enterCultivation(page); assertExposed();
+  await page.evaluate(preset => {
+    (window as any).__specimenCultivationRuntime.renderLayer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
+  }, preset);
   await page.evaluate(() => {
     const r = (window as any).__specimenCultivationRuntime;
     r.stop();
@@ -481,6 +485,7 @@ test('Cultivation draws prepared room and fade shadow variants without creating 
   expect(maintenance.calls).toBeLessThanOrEqual(1);
   expect(await page.evaluate(() => (window as any).__specimenCultivationRuntime.__coldDraws)).toEqual([]);
 });
+}
 
 test('Cultivation bounds actual render lights across rooms, characters, power cycles and teardown', async ({page}) => {
   test.setTimeout(600_000);
@@ -561,16 +566,18 @@ test('Cultivation bounds actual render lights across rooms, characters, power cy
   expect(errors).toEqual([]);
 });
 
-test('Cultivation background compilation and primers preserve active lighting and shadows', async ({page}) => {
+for (const preset of ['normal', 'performance'] as const) {
+test(`Cultivation background compilation and primers preserve active lighting and shadows (${preset})`, async ({page}) => {
   test.setTimeout(600_000);
   const errors: string[] = [];
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', error => errors.push(error.message));
   const assertExposed = await exposeCultivationRuntime(page);
   await enterCultivation(page); assertExposed();
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async preset => {
     const r = (window as any).__specimenCultivationRuntime;
     r.stop();
+    r.renderLayer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
     const renderer = r.renderLayer.renderer;
     renderer.setAnimationLoop(null);
     const queue = r.preparationQueue;
@@ -613,7 +620,7 @@ test('Cultivation background compilation and primers preserve active lighting an
     const difference = (a: Uint8Array,b: Uint8Array) => {
       let maximum=0; for(let i=0;i<a.length;i++) maximum=Math.max(maximum,Math.abs(a[i]!-b[i]!)); return maximum;
     };
-    const shadowState = () => [renderer.shadowMap.enabled,renderer.shadowMap.type,
+    const shadowState = () => [renderer.transmissionResolutionScale, renderer.shadowMap.enabled,renderer.shadowMap.type,
       renderer.shadowMap.autoUpdate,renderer.shadowMap.needsUpdate];
     const beforeState = JSON.stringify(shadowState());
     const lights = () => {
@@ -655,7 +662,7 @@ test('Cultivation background compilation and primers preserve active lighting an
       } finally { queue.tick=tick; r.renderLayer.render=liveDraw; }
     }
     return {compiles,primers,maxPixelDifference,livePrograms,stateChanges,glErrors};
-  });
+  }, preset);
   console.log("preparation isolation", result);
   expect(result.compiles).toBeGreaterThan(0);
   expect(result.primers).toBe(2);
@@ -665,6 +672,7 @@ test('Cultivation background compilation and primers preserve active lighting an
   expect(result.maxPixelDifference).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
+}
 
 
 test('Cultivation retained shaders match early-zero controls for Bob and Goop room pixels', async ({page}) => {

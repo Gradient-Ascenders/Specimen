@@ -59,6 +59,33 @@ const progression: LevelProgressionSnapshot = {
   activeSlimeId: 'goop',
 };
 
+test('paused rendering holds the last presentation fraction and resumes live interpolation', () => {
+  const runtime = new MockRuntime('level-1', progression);
+  const next = new MockRuntime('level-2', progression);
+  const received: number[] = [];
+  const nextReceived: number[] = [];
+  (runtime as GameLevelRuntime).render = alpha => { received.push(alpha); };
+  (next as GameLevelRuntime).render = alpha => { nextReceived.push(alpha); };
+  const session = new GameSessionCoordinator({
+    initialRuntime: runtime, createLevelTwo: () => next,
+    scheduleTransition: transition => transition(),
+  });
+  const stats = {} as Parameters<GameSessionCoordinator['render']>[1];
+  session.load(); session.start();
+  session.render(0.25, stats); session.render(0.6, stats);
+  session.stop();
+  session.render(0.1, stats); session.render(0.9, stats);
+  assert.deepEqual(received, [0.25, 0.6, 0.6, 0.6]);
+  session.start(); session.render(0.8, stats);
+  assert.equal(received.at(-1), 0.8);
+  runtime.events.emit('completed', { levelId: 'level-1', nextLevelId: 'level-2' });
+  session.render(0.9, stats);
+  assert.deepEqual(nextReceived, [0], 'a new stopped runtime starts with its own presentation fraction');
+  session.start(); session.render(0.4, stats);
+  assert.equal(nextReceived.at(-1), 0.4);
+  session.dispose();
+});
+
 test('Level 1 completion replaces it with exactly one Level 2 runtime', () => {
   const levelOne = new MockRuntime('level-1', progression);
   let created = 0;

@@ -5,10 +5,11 @@ import { expect, test } from './fixtures.ts';
 // Match the existing production-bundle exposure convention. No game globals
 // or alternative gameplay controllers are shipped for this fixture.
 test.use({ video: 'on', actionTimeout: 60_000 });
-test('authored Volt travels from captive release to Blackout and survives the warmed lifecycle', async ({ page }) => {
+for (const preset of ['normal', 'performance'] as const) {
+test(`${preset} graphics retains Volt release, controls and warmed lifecycle through Blackout`, async ({ page }) => {
   test.setTimeout(1_800_000);
   const gelMode = process.env.SPECIMEN_GEL_RENDERING_MODE;
-  const directory = resolve(gelMode ? `artifacts/evidence/issue-188/${gelMode}-journey` : 'artifacts/evidence/volt');
+  const directory = resolve(gelMode ? `artifacts/evidence/issue-188/${gelMode}-journey/${preset}` : `artifacts/evidence/volt/${preset}`);
   await mkdir(directory, { recursive: true });
   const errors: string[] = [], failedRequests: string[] = [], samples: unknown[] = [];
   page.on('pageerror', e => { errors.push(e.message); console.error(e.message); });
@@ -41,23 +42,26 @@ test('authored Volt travels from captive release to Blackout and survives the wa
         captive: r.authoredPreview?.roomFive.captiveVoltPresentation.diagnostics,
         light: r.voltLight ? { visible: r.voltLight.visible, intensity: r.voltLight.intensity, distance: r.voltLight.distance, decay: r.voltLight.decay } : undefined,
         active: r.manager.activeSlimeId, names, programs: info.programs.length, geometries: info.memory.geometries, textures: info.memory.textures,
-        renderer: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) };
+        renderer: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), glError: gl.getError() };
     }, { runtime, phase });
     if (gelMode) {
       expect(value.gelMode).toBe(gelMode);
       if (gelMode === 'minimum') expect(value.bodyTransmission.every(body => !body.ready || body.transmission === 0)).toBe(true);
     }
-    samples.push(value); await writeFile(resolve(directory, 'samples.json'), JSON.stringify(samples, null, 2)); console.info(`${phase}: ${value.programs} programs, ${value.geometries} geometries, ${value.textures} textures`); return value;
+    samples.push(value); await writeFile(resolve(directory, 'samples.json'), JSON.stringify(samples, null, 2)); console.info(`${phase}: ${value.programs} programs, ${value.geometries} geometries, ${value.textures} textures`);
+    expect(value.glError, `GL state at ${phase}`).toBe(0); return value;
   };
   const capture = async (name: string) => page.screenshot({ path: resolve(directory, `${name}.png`), timeout: 120_000 });
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: '.game-hud, .performance-recorder, .security-network-status { visibility: hidden !important; }' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
+  if (preset === 'performance') await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   if (gelMode) {
-    await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
     await page.locator('[data-setting="gel-rendering"]').selectOption(gelMode);
-    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   }
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-action="start"]').click();
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 180_000 });
   // The containment roster remains locked and does not load Volt.
@@ -199,16 +203,17 @@ test('authored Volt travels from captive release to Blackout and survives the wa
   const carrier = await sample('__voltBlackout', 'drone-flight');
   expect(await page.evaluate(() => (window as any).__voltBlackout.voltElectricalReadModel.connectedTargetId)).toBeUndefined();
   expect(carrier.volt.weights.Squash + carrier.volt.weights.Stretch).toBe(0); await capture('drone-flight');
-  await page.keyboard.press('Tab'); await frames();
+  await page.keyboard.press('Tab', { delay: 150 });
+  await page.waitForFunction(() => (window as any).__voltBlackout.resources.manager.activeSlimeId === 'bob');
   expect(await page.evaluate(() => (window as any).__voltBlackout.maintenanceDroneReadModel.state)).toBe('parked-hover');
-  // Each key press must reach a fixed update before the next edge; otherwise
-  // two Tab presses can collapse into one on slow renderers.
+  // Input latches each action until a fixed update; two taps in one step coalesce.
   for (const id of ['goop', 'volt']) {
-    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab', { delay: 150 });
     await page.waitForFunction(id => (window as any).__voltBlackout.resources.manager.activeSlimeId === id, id);
   }
-  await page.keyboard.press('KeyM'); await frames();
+  await page.keyboard.press('KeyM', { delay: 150 });
   await page.waitForFunction(() => !(window as any).__voltBlackout.maintenanceDroneReadModel.mounted);
+  expect(await page.evaluate(() => (window as any).__voltBlackout.maintenanceDroneReadModel.mounted)).toBe(false);
   // Stage the existing low vent, with its collision geometry and authority intact.
   await page.evaluate(() => {
     const rt = (window as any).__voltBlackout, r = rt.resources;
@@ -221,7 +226,14 @@ test('authored Volt travels from captive release to Blackout and survives the wa
   let retryProgramCount = warm.programs;
   let firstDeathProgramGrowth = 0;
   for (const pass of [1, 2]) {
+    await page.keyboard.press('F1');
+    if (pass === 1) await expect(page.locator('#app')).toHaveAttribute('data-clean-gameplay', 'true');
+    else await expect(page.locator('#app')).not.toHaveAttribute('data-clean-gameplay');
     await page.evaluate(() => (window as any).__voltBlackout.requestFailure());
+    await frames(2);
+    const dying = await sample('__voltBlackout', `dying-${pass}`);
+    expect(dying.light.intensity).toBe(0);
+    expect(dying.programs).toBe(warm.programs);
     await expect(page.locator('.death-retry')).toBeVisible({ timeout: 120_000 });
     await page.locator('.death-retry').click(); await frames();
     const retry = await sample('__voltBlackout', `death-retry-${pass}`);
@@ -252,6 +264,65 @@ test('authored Volt travels from captive release to Blackout and survives the wa
   expect(split.volt.visible).toBe(true); expect(split.light.visible).toBe(true); expect(split.volt.opacity).toBe(1);
   await page.evaluate(() => (window as any).__voltBlackout.restartLevel()); await frames();
   expect((await sample('__voltBlackout', 'restart')).active).toBe('volt');
+  // Diagnostic original-light-removal controls run only after gameplay/cache
+  // assertions. They intentionally compile the old smaller light signature.
+  const lightEquivalence = await page.evaluate(async () => {
+    const rt = (window as any).__voltBlackout, layer = rt.renderLayer, renderer = layer.renderer;
+    rt.stop(); renderer.setAnimationLoop(null);
+    const light = rt.resources.voltLight, gl = renderer.getContext();
+    const saved = { preset: layer.graphicsPreset, cap: layer.pixelRatioCap, visible: light.visible, intensity: light.intensity };
+    const check = (stage: string) => {
+      const error = gl.getError();
+      if (error) throw new Error(`GL error ${error} at ${stage}`);
+    };
+    check('control entry');
+    const stats = { fixedDeltaSeconds:1/60, frameDeltaSeconds:0, rawFrameDeltaSeconds:0,
+      stepsThisFrame:0, interpolationAlpha:1, droppedSimulationTimeSeconds:0, renderFps:0 };
+    const draw = () => {
+      rt.render(1, stats);
+      check('control render');
+      const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+      gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+      check('control readback');
+      return pixels;
+    };
+    const difference = (a: Uint8Array, b: Uint8Array) => {
+      let maximum = 0, changed = 0, lit = 0, low = 255, high = 0;
+      for (let i=0;i<a.length;i+=4) {
+        let d = 0;
+        for(let c=0;c<3;c++) { d=Math.max(d,Math.abs(a[i+c]-b[i+c]));low=Math.min(low,a[i+c]);high=Math.max(high,a[i+c]); }
+        if(d)changed++;maximum=Math.max(maximum,d);if(Math.max(a[i],a[i+1],a[i+2])>32)lit++;
+      }
+      return {maximum,changed,lit,range:high-low,pixels:a.length/4};
+    };
+    const result = [];
+    try {
+      for (const preset of ['normal','performance']) {
+        layer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
+        // Match menu application: resize first, then render on the next browser frame.
+        await new Promise(requestAnimationFrame);
+        check(`${preset} resize`);
+        light.intensity = 0; light.visible = true;
+        draw(); const reference = draw();
+        light.visible = false;
+        await renderer.compileAsync(layer.scene, layer.cameraRig.camera);
+        const original = draw();
+        light.visible = true;
+        const restored = draw();
+        result.push({preset,buffer:[gl.drawingBufferWidth,gl.drawingBufferHeight],
+          original:difference(reference,original),restored:difference(reference,restored),error:gl.getError()});
+      }
+    } finally {light.visible=saved.visible;light.intensity=saved.intensity;layer.setGraphicsSettings(saved.preset,saved.cap);}
+    return result;
+  });
+  console.info('zero-radiance light equivalence', lightEquivalence);
+  for (const control of lightEquivalence) {
+    expect(control.original.lit).toBeGreaterThan(control.original.pixels * 0.01);
+    expect(control.original.range).toBeGreaterThan(32);
+    expect(control.original.maximum).toBe(0);
+    expect(control.restored.maximum).toBe(0);
+    expect(control.error).toBe(0);
+  }
   const lifecycle = await page.evaluate(async () => {
     const rt = (window as any).__voltBlackout;
     rt.stop(); rt.unload(); rt.load();
@@ -268,7 +339,8 @@ test('authored Volt travels from captive release to Blackout and survives the wa
   });
   expect(lifecycle).toEqual({ failure: { rejected: true, state: 'unloaded', detached: true }, retry: true,
     late: { ready: false, detached: true, state: 'unloaded' }, gelMaterials: 0 });
-  await writeFile(resolve(directory, 'journeys.json'), JSON.stringify({ samples, firstDeathProgramGrowth, lifecycle, errors, failedRequests }, null, 2));
+  await writeFile(resolve(directory, 'journeys.json'), JSON.stringify({ samples, firstDeathProgramGrowth, lightEquivalence, lifecycle, errors, failedRequests }, null, 2));
   expect(errors).toEqual([]); expect(failedRequests).toEqual([]);
   const video = page.video(); await page.close(); await video?.saveAs(resolve(directory, 'journey.webm'));
 });
+}

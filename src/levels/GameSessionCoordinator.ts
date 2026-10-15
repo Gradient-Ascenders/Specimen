@@ -46,6 +46,7 @@ export class GameSessionCoordinator {
   private transitionFailed = false;
   private debugInteractionEnabled = true;
   private disposed = false;
+  private renderedInterpolationAlpha = 0;
 
   constructor(options: GameSessionCoordinatorOptions) {
     this.runtime = options.initialRuntime;
@@ -84,7 +85,11 @@ export class GameSessionCoordinator {
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
-    if (!this.transitionPending && !this.transitionFailed) this.runtime.render(interpolationAlpha, stats);
+    if (this.transitionPending || this.transitionFailed) return;
+    // The browser loop keeps ticking behind menus. Reusing its changing alpha
+    // against frozen physics snapshots makes paused bodies and morphs oscillate.
+    if (this.runtime.state === 'running') this.renderedInterpolationAlpha = interpolationAlpha;
+    this.runtime.render(this.renderedInterpolationAlpha, stats);
   }
 
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void {
@@ -112,6 +117,7 @@ export class GameSessionCoordinator {
   }
 
   private bindRuntime(runtime: GameLevelRuntime): void {
+    this.renderedInterpolationAlpha = 0;
     this.unsubscribeRuntimeEvents = [
       runtime.events.on('objectiveChanged', (event) => this.events.emit('objectiveChanged', event)),
       runtime.events.on('completed', (event) => this.onLevelCompleted(event.nextLevelId)),

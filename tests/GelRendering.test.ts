@@ -7,6 +7,24 @@ import { GoopMaterialSet } from '../src/render/goop/GoopMaterials.ts';
 import { VoltMaterialSet } from '../src/render/volt/VoltMaterials.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 
+test('preset transmission cap composes with gel mode in either setting order', () => {
+  const renderer = { transmissionResolutionScale: 1 };
+  const rendering = new GelRendering(renderer);
+  rendering.setTransmissionResolutionScaleCap(0.5);
+  for (const mode of ['reduced-transmission', 'minimum', 'physical'] as const) {
+    rendering.setMode(mode);
+    assert.equal(renderer.transmissionResolutionScale, 0.5);
+  }
+  rendering.setTransmissionResolutionScaleCap(1);
+  assert.equal(renderer.transmissionResolutionScale, 1);
+  rendering.setMode('reduced-transmission');
+  rendering.setTransmissionResolutionScaleCap(0.5);
+  rendering.setTransmissionResolutionScaleCap(1);
+  assert.equal(renderer.transmissionResolutionScale, 0.5, 'Normal retains explicit soft refraction');
+  rendering.setMode('physical');
+  assert.equal(renderer.transmissionResolutionScale, 1);
+});
+
 test('minimum gel removes transmission from every identity while preserving surface and fade state', () => {
   const renderer = { transmissionResolutionScale: 1 };
   const rendering = new GelRendering(renderer);
