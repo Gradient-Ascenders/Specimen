@@ -30,7 +30,7 @@ and level start is the only operation that re-enables it.
 The normal controls are WASD movement, Space jump, Tab slime switch, right mouse
 aim, left mouse fire while aiming, M maintenance-drone mount/dismount, and Shift
 drone descent. F2 toggles diagnostics when debug tools are enabled.
-F1 toggles [clean gameplay mode](clean-gameplay-mode.md), hiding gameplay UI
+F1 toggles [clean gameplay mode](clean-gameplay-mode.md), hiding non-aiming gameplay UI
 without pausing simulation, controls or audio.
 
 ## Lifecycle and reset

@@ -39,10 +39,10 @@ canvas {
   display: none !important;
 }
 
-/* One boundary covers present and future DOM overlays, including inline styles.
- * Full-screen menus/recovery/loading remain functional; only the real canvas
- * is exempted, not arbitrary canvases belonging to diagnostic widgets. */
-#app[data-clean-gameplay="true"] > :not([data-gameplay-canvas]):not(.game-flow):not([data-clean-gameplay-essential]),
+/* Hide current and future HUD overlays, including inline styles. Aiming UI
+ * keeps its own visibility rules; menus/recovery/loading remain functional.
+ * Only the real gameplay canvas is exempted among canvases. */
+#app[data-clean-gameplay="true"] > :not([data-gameplay-canvas]):not(.game-flow):not([data-clean-gameplay-essential]):not([data-clean-gameplay-aiming]),
 #app[data-clean-gameplay="true"] > .game-flow[data-state="playing"] {
   display: none !important;
 }

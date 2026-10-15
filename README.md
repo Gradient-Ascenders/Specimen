@@ -90,6 +90,6 @@ rather than in the source tree.
 
 Gameplay sound-effects architecture, asset provenance and the complete event mapping: [Gameplay audio](docs/architecture/gameplay-audio.md).
 
-Press **F1** during gameplay for a clean view without HUDs or indicators; press
-it again to restore the current UI. See [Clean gameplay mode](docs/architecture/clean-gameplay-mode.md)
+Press **F1** during gameplay to hide the HUD while keeping aiming overlays
+visible; press it again to restore the current UI. See [Clean gameplay mode](docs/architecture/clean-gameplay-mode.md)
 for menu behavior, lifecycle policy and screenshots.

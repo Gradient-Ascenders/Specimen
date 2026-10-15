@@ -82,14 +82,18 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
         camera: rt.renderLayer.cameraRig.camera.position.toArray(),
       };
     }, count);
-  const assertOnlyWorld = async () => {
+  const assertCleanHud = async () => {
     await expect(hud).toBeHidden();
+    await expect(page.locator('[data-current-objective]')).toBeHidden();
+    await expect(page.locator('[data-slime-roster]')).toBeHidden();
+    await expect(page.locator('.hud-hint')).toBeHidden();
     await expect(page.locator('[data-gameplay-canvas]')).toBeVisible();
     const visible = await page.evaluate(() =>
       [...document.querySelector('#app')!.children]
         .filter((element) => {
           const style = getComputedStyle(element);
           return (
+            !element.hasAttribute('data-clean-gameplay-aiming') &&
             style.display !== 'none' &&
             style.visibility !== 'hidden' &&
             Number(style.opacity) !== 0 &&
@@ -100,6 +104,9 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
     );
     expect(visible).toEqual(['CANVAS']);
   };
+  await expect(
+    page.locator('[data-clean-gameplay-aiming][data-clean-gameplay-essential]'),
+  ).toHaveCount(0);
   const capture = async (level: number, name: string) => {
     await draw();
     await page.screenshot({
@@ -123,7 +130,7 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
     ).toEqual({ bob: true, goop: true });
     if (level > 1) {
       await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
-      await assertOnlyWorld();
+      await assertCleanHud();
       await page.keyboard.press('F1');
     }
     await expect(hud).toBeVisible();
@@ -132,21 +139,23 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
     const before = await step(0);
     await page.keyboard.press('F1');
     await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
-    await assertOnlyWorld();
+    await assertCleanHud();
     await capture(level, 'clean');
     // Check actual WebGL UI filtering in levels that own locator sprites.
     const renderState = await page.evaluate(() => {
       const rt = (window as any).__cleanSession.runtime,
         layer = rt.renderLayer,
-        seen: any[] = [];
+        seen: { locator: boolean[]; aiming: boolean[] } = {
+          locator: [],
+          aiming: [],
+        };
       const render = layer.renderer.render.bind(layer.renderer);
       layer.renderer.render = (scene: any, camera: any) => {
         scene.traverse((object: any) => {
-          if (
-            object.name.endsWith('-inactive-body-locator') ||
-            object.name.endsWith('-conducting-outline')
-          )
-            seen.push(camera.layers.test(object.layers));
+          if (object.name.endsWith('-inactive-body-locator'))
+            seen.locator.push(camera.layers.test(object.layers));
+          if (object.name.endsWith('-conducting-outline'))
+            seen.aiming.push(camera.layers.test(object.layers));
         });
         return render(scene, camera);
       };
@@ -157,8 +166,14 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       }
       return seen;
     });
-    if (level < 3) expect(renderState.length).toBeGreaterThan(0);
-    expect(renderState.every((value: boolean) => value === false)).toBe(true);
+    if (level < 3) expect(renderState.locator.length).toBeGreaterThan(0);
+    expect(renderState.locator.every((value: boolean) => value === false)).toBe(
+      true,
+    );
+    if (level === 3) expect(renderState.aiming.length).toBeGreaterThan(0);
+    expect(renderState.aiming.every((value: boolean) => value === true)).toBe(
+      true,
+    );
 
     const after = await step(0);
     expect(after.position).toEqual(before.position);
@@ -185,7 +200,7 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       await expect(page.locator('.test-panel')).toBeVisible();
       expect((await step(0)).input).toBe(false);
       await page.keyboard.press('F1');
-      await assertOnlyWorld();
+      await assertCleanHud();
       await page.waitForFunction(
         () => (window as any).__cleanSession.runtime.input.pointerLocked,
       );
@@ -239,12 +254,12 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
     const switched = await step(1);
     expect(switched.active).not.toBe(active);
     await draw();
-    await assertOnlyWorld();
+    await assertCleanHud();
     await page.keyboard.press('F2');
     await step(1);
     expect((await step(0)).input).toBe(true);
 
-    // Real aim/fire state updates cannot resurrect crosshairs or cooldown UI.
+    // Aiming remains visible while the rest of the HUD stays hidden.
     for (let i = 0; i < 3 && (await step(0)).active !== 'goop'; i++) {
       await page.keyboard.press('Tab');
       await step(1);
@@ -273,13 +288,20 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
             .firedCount,
       ),
     ).toBe(shots + 1);
-    await assertOnlyWorld();
+    await assertCleanHud();
     await page.keyboard.press('F1');
+    await expect(hud).toBeVisible();
+    await expect(app).not.toHaveAttribute('data-clean-gameplay');
     await expect(page.locator('.goop-aim-crosshair')).toBeVisible();
     await page.keyboard.press('F1');
-    await expect(page.locator('.goop-aim-crosshair')).toBeHidden();
+    await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
+    await expect(page.locator('.goop-aim-crosshair')).toBeVisible();
+    await assertCleanHud();
+    if (level === 1) await capture(level, 'goop-aim-clean');
     await page.mouse.up({ button: 'right' });
     await step(1);
+    await draw();
+    await expect(page.locator('.goop-aim-crosshair')).toBeHidden();
 
     if (level === 3) {
       for (let i = 0; i < 3 && (await step(0)).active !== 'volt'; i++) {
@@ -297,13 +319,77 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
               .aimActive,
         ),
       ).toBe(true);
-      await assertOnlyWorld();
+      expect(
+        await page.evaluate(
+          () =>
+            (
+              window as any
+            ).__cleanSession.runtime.renderLayer.scene.getObjectByName(
+              'volt-conducting-target-highlights',
+            ).visible,
+        ),
+      ).toBe(true);
+      await assertCleanHud();
       await page.keyboard.press('F1');
+      await expect(hud).toBeVisible();
+      await expect(app).not.toHaveAttribute('data-clean-gameplay');
       await expect(page.locator('.volt-electrical-crosshair')).toBeVisible();
       await page.keyboard.press('F1');
-      await expect(page.locator('.volt-electrical-crosshair')).toBeHidden();
+      await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
+      await expect(page.locator('.volt-electrical-crosshair')).toBeVisible();
+      await assertCleanHud();
+      await capture(level, 'volt-aim-clean');
       await page.mouse.up({ button: 'right' });
       await step(1);
+      await draw();
+      await expect(page.locator('.volt-electrical-crosshair')).toBeHidden();
+      expect(
+        await page.evaluate(
+          () =>
+            (
+              window as any
+            ).__cleanSession.runtime.renderLayer.scene.getObjectByName(
+              'volt-conducting-target-highlights',
+            ).visible,
+        ),
+      ).toBe(false);
+
+      // Exercise the real merged-form controller and charge overlay as well.
+      expect(
+        await page.evaluate(() =>
+          (window as any).__cleanSession.runtime.beginMerge(),
+        ),
+      ).toBe(true);
+      await step(360);
+      expect(
+        await page.evaluate(
+          () =>
+            (window as any).__cleanSession.runtime.specimenFormReadModel
+              .controlledForm,
+        ),
+      ).toBe('specimen');
+      await page.mouse.down({ button: 'right' });
+      await page.mouse.down({ button: 'left' });
+      await step(1);
+      await draw();
+      await expect(page.locator('.specimen-combat-crosshair')).toBeVisible();
+      await expect(page.locator('.specimen-combat-charge')).toBeVisible();
+      await assertCleanHud();
+      await page.keyboard.press('F1');
+      await expect(hud).toBeVisible();
+      await expect(page.locator('.specimen-combat-crosshair')).toBeVisible();
+      await page.keyboard.press('F1');
+      await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
+      await expect(page.locator('.specimen-combat-crosshair')).toBeVisible();
+      await expect(page.locator('.specimen-combat-charge')).toBeVisible();
+      await assertCleanHud();
+      await capture(level, 'specimen-aim-clean');
+      await page.mouse.up({ button: 'left' });
+      await page.mouse.up({ button: 'right' });
+      await step(1);
+      await draw();
+      await expect(page.locator('.specimen-combat-crosshair')).toBeHidden();
+      await expect(page.locator('.specimen-combat-charge')).toBeHidden();
     }
 
     // Dynamic overlays, inline damage effects and objective changes stay hidden.
@@ -319,7 +405,7 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
         objective: 'Current objective changed while clean',
       });
     });
-    await assertOnlyWorld();
+    await assertCleanHud();
     await page.evaluate(() =>
       document.querySelector('#clean-dynamic-probe')!.remove(),
     );
@@ -336,7 +422,7 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       .click();
     await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
     await draw();
-    await assertOnlyWorld();
+    await assertCleanHud();
     await page.keyboard.press('KeyP');
     await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
     await page
@@ -344,7 +430,7 @@ test('F1 preserves gameplay across three levels and captures normal, clean and r
       .click();
     await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
     await draw();
-    await assertOnlyWorld();
+    await assertCleanHud();
     await page.keyboard.press('F1');
     await expect(hud).toBeVisible();
     await page.keyboard.press('F1');

@@ -60,6 +60,7 @@ export class SpecimenCombatPresentation {
     const hostDocument = options.document ?? document;
     const element = hostDocument.createElement('div');
     element.className = 'specimen-combat-overlay';
+    element.setAttribute('data-clean-gameplay-aiming', '');
     element.setAttribute('aria-live', 'polite');
 
     this.crosshair = hostDocument.createElement('span');
