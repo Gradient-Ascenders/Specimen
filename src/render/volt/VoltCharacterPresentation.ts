@@ -1,3 +1,4 @@
+import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
 import { moveAngleTowards, shortestAngleDelta } from '../BlobFacing.ts';
@@ -26,6 +27,7 @@ export interface VoltCharacterPresentationState {
 export class VoltCharacterPresentation {
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
+  private readonly gelRendering: GelRendering | undefined;
   readonly placement = new THREE.Group();
   private readonly character = new THREE.Group();
   private readonly shape = new THREE.Group();
@@ -91,9 +93,10 @@ export class VoltCharacterPresentation {
   private deathElapsed = 0;
   private readonly weights: VoltWeights = { Squash: 0, Stretch: 0, Blink: 0, CrestFlexLeft: 0, CrestFlexRight: 0 };
 
-  constructor(radiusMetres = 0.45) {
+  constructor(radiusMetres = 0.45, gelRendering?: GelRendering) {
     if (Math.abs(radiusMetres - 0.45) > 1e-6) throw new Error('Volt requires the approved 0.45 m radius');
     this.radiusMetres = radiusMetres;
+    this.gelRendering = gelRendering;
     this.root.name = 'player-slime-volt-presentation';
     this.placement.name = 'player-slime-volt-placement';
     this.character.name = 'player-slime-volt-character';
@@ -135,7 +138,7 @@ export class VoltCharacterPresentation {
         const asset = validateVoltAsset(root);
         this.headroom.prepare(asset.body);
         const imported = new Set<THREE.Material>([asset.body.material, ...asset.eyes.map(eye => eye.material)].flat());
-        materials = new VoltMaterialSet(...asset.maps);
+        materials = new VoltMaterialSet(...asset.maps, this.gelRendering);
         materials.setOpacity(this.opacity); materials.setReflectionEnvironment(this.environment);
         materials.setReflectionIntensity(this.bodyReflection, this.eyeReflection, true);
         asset.body.material = materials.body;

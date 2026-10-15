@@ -1601,7 +1601,7 @@ export class BlackoutLevelRuntime {
       });
       rollback(() => deathScreen.dispose());
       this.host.append(deathScreen.element);
-      const voltPresentation = new VoltCharacterPresentation(group.voltBody.radiusMetres);
+      const voltPresentation = new VoltCharacterPresentation(group.voltBody.radiusMetres, this.renderLayer.gelRendering);
       rollback(() => voltPresentation.dispose());
       voltPresentation.setCollisionWorld(collisionWorld);
       voltPresentation.setPosition(group.voltBody.position);
@@ -1609,7 +1609,7 @@ export class BlackoutLevelRuntime {
       rollback(voltMovementEvents.on('landed', event => voltPresentation.onLanding(group.voltBody.groundNormal, event.impactSpeedMetresPerSecond)));
       rollback(voltMovementEvents.on('jumped', event => voltPresentation.onLaunch(event)));
       const voltPresentationState = createBobPresentationState(group.voltBody);
-      const goopPresentation = new GoopCharacterPresentation(group.goopBody.radiusMetres);
+      const goopPresentation = new GoopCharacterPresentation(group.goopBody.radiusMetres, this.renderLayer.gelRendering);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(group.goopBody.position);
       this.renderLayer.scene.add(goopPresentation.root);
@@ -1617,8 +1617,7 @@ export class BlackoutLevelRuntime {
       rollback(goopMovementEvents.on('jumped', event => goopPresentation.onLaunch(event)));
       const goopPresentationState = createBobPresentationState(group.goopBody);
       const bobPresentation = new BobCharacterPresentation(
-        group.bobBody.radiusMetres,
-      );
+        group.bobBody.radiusMetres, this.renderLayer.gelRendering);
       bobPresentation.setPosition(group.bobBody.position);
       rollback(() => bobPresentation.dispose());
       this.renderLayer.scene.add(bobPresentation.root);

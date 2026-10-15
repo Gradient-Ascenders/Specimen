@@ -181,6 +181,7 @@ test('settings retain session values across flow transitions', () => {
     cameraDistanceMetres: 6.4,
     renderPixelRatioCap: 1.5,
     graphicsPreset: 'normal',
+    gelRenderingMode: 'physical',
   });
   assert.deepEqual(snapshots.slice(0, 2), [1, 1.7]);
 

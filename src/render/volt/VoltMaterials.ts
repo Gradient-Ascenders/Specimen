@@ -1,3 +1,4 @@
+import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { GelMaterialSet } from '../slime/GelMaterials.ts';
 import { GEL_LANDING_RIPPLE_SECONDS } from '../slime/GelElasticMotion.ts';
@@ -11,7 +12,7 @@ export class VoltMaterialSet extends GelMaterialSet {
   private readonly crestLag: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2() };
   private readonly landingRipple: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2(0, GEL_LANDING_RIPPLE_SECONDS) };
 
-  constructor(emission: THREE.Texture, roughness: THREE.Texture) {
+  constructor(emission: THREE.Texture, roughness: THREE.Texture, rendering?: GelRendering) {
     super({
       name: 'Volt',
       body: { name: 'Volt-Golden-Gel', color: VOLT_BASE_COLOR, attenuationColor: VOLT_BASE_COLOR,
@@ -24,7 +25,7 @@ export class VoltMaterialSet extends GelMaterialSet {
         wobbleAmplitudeMetres: 0.0015, impactAmplitudeMetres: 0.003,
         protectionShader: VOLT_SECONDARY_PROTECTION_SHADER,
       },
-    });
+    }, rendering);
     emission.colorSpace = THREE.SRGBColorSpace;
     roughness.colorSpace = THREE.NoColorSpace;
     for (const material of [this.body, this.bodyDepth, this.bodyDistance]) {

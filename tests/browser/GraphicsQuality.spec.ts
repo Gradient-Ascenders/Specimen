@@ -26,7 +26,9 @@ for (const query of ['', '?debug=1']) {
     await title.locator('[data-action="settings"]').click();
     const preset = page.locator('[data-setting="graphics-preset"]');
     const resolution = page.locator('[data-setting="render-resolution"]');
+    const gel = page.locator('[data-setting="gel-rendering"]');
     await expect(preset).toHaveValue('normal');
+    await expect(gel).toHaveValue('physical');
     await resolution.selectOption('1.5');
     const sample = () => page.evaluate(() => {
       const r = (window as any).__graphicsRuntime, layer = r.renderLayer, renderer = layer.renderer;
@@ -57,6 +59,10 @@ for (const query of ['', '?debug=1']) {
     expect(normal.lit).toBeGreaterThan(1200 * 750 * 0.01);
     expect(normal.range).toBeGreaterThan(32);
     await preset.selectOption('performance');
+    await gel.selectOption('reduced-transmission');
+    expect((await sample()).scale).toBe(0.5);
+    await gel.selectOption('physical');
+    expect((await sample()).scale).toBe(0.5);
     await expect(resolution).toBeEnabled();
     await expect(resolution.locator('option[value="1.5"]')).toBeDisabled();
     await expect(resolution).toHaveValue('1');
@@ -79,7 +85,21 @@ for (const query of ['', '?debug=1']) {
     await page.locator('canvas').click();
     await page.keyboard.press('KeyW', { delay: 250 });
     await page.keyboard.press('Space', { delay: 150 });
+    await page.keyboard.press('F1');
+    await expect(page.locator('#app')).toHaveAttribute('data-clean-gameplay', 'true');
+    await expect(page.locator('.game-hud')).toBeHidden();
+    const position = () => page.evaluate(() => ({ ...(window as any).__graphicsRuntime.resources.slimeManager.activeBody.position }));
+    const beforeMovement = await position();
+    await page.keyboard.down('KeyW');
+    await page.keyboard.press('F1');
+    await expect(page.locator('.game-hud')).toBeVisible();
+    await page.keyboard.press('F1');
+    await page.waitForTimeout(250);
+    await page.keyboard.up('KeyW');
+    expect(await position()).not.toEqual(beforeMovement);
+    await expect(page.locator('.game-hud')).toBeHidden();
     await page.keyboard.press('KeyP');
+    await expect(page.locator('#app')).not.toHaveAttribute('data-clean-gameplay');
     await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
     await expect(preset).toHaveValue('performance');
     await resolution.selectOption('0.75');
@@ -93,6 +113,16 @@ for (const query of ['', '?debug=1']) {
     await expect(resolution).toHaveValue('0.75');
     await resolution.selectOption('1.5');
     expect((await sample()).buffer).toEqual([1100, 687]);
+    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+    await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
+    await expect(page.locator('#app')).toHaveAttribute('data-clean-gameplay', 'true');
+    await expect(page.locator('.game-hud')).toBeHidden();
+    const cleanNormal = await sample();
+    expect(cleanNormal.scale).toBe(1);
+    expect(cleanNormal.programs).toBe(normal.programs);
+    expect(cleanNormal.error).toBe(0);
+    await page.keyboard.press('F1');
+    await expect(page.locator('.game-hud')).toBeVisible();
     expect(errors).toEqual([]);
   });
 }

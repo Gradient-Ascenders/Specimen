@@ -5,9 +5,12 @@ import { expect, test } from './fixtures.ts';
 // Match the existing production-bundle exposure convention. No game globals
 // or alternative gameplay controllers are shipped for this fixture.
 test.use({ video: 'on', actionTimeout: 60_000 });
-test('Performance preset retains Volt release, controls and warmed lifecycle through Blackout', async ({ page }) => {
+for (const preset of ['normal', 'performance'] as const) {
+test(`${preset} graphics retains Volt release, controls and warmed lifecycle through Blackout`, async ({ page }) => {
   test.setTimeout(1_800_000);
-  const directory = resolve('artifacts/evidence/volt'); await mkdir(directory, { recursive: true });
+  const gelMode = process.env.SPECIMEN_GEL_RENDERING_MODE;
+  const directory = resolve(gelMode ? `artifacts/evidence/issue-188/${gelMode}-journey/${preset}` : `artifacts/evidence/volt/${preset}`);
+  await mkdir(directory, { recursive: true });
   const errors: string[] = [], failedRequests: string[] = [], samples: unknown[] = [];
   page.on('pageerror', e => { errors.push(e.message); console.error(e.message); });
   page.on('console', e => { if (e.type() === 'error' || /GL_INVALID_|CONTEXT_LOST_WEBGL|sampler.*mismatch/i.test(e.text())) errors.push(e.text()); });
@@ -31,12 +34,20 @@ test('Performance preset retains Volt release, controls and warmed lifecycle thr
       const names: string[] = [];
       rt.renderLayer.scene.traverseVisible((o: any) => { if (o.isMesh && o.name.startsWith('Volt-')) names.push(o.name); });
       const gl = rt.renderLayer.renderer.getContext(), debug = gl.getExtension('WEBGL_debug_renderer_info');
-      return { phase, volt: r.voltPresentation.diagnostics,
+      return { phase, gelMode: rt.renderLayer.gelRendering.value, gelMaterials: rt.renderLayer.gelRendering.materialCount,
+        bodyTransmission: [r.bobPresentation, r.goopPresentation, r.voltPresentation,
+          r.authoredPreview?.roomFive.captiveVoltPresentation].filter(Boolean)
+          .map(p => ({ ready: p.ready, transmission: p.diagnostics.materials?.transmission })),
+        volt: r.voltPresentation.diagnostics,
         captive: r.authoredPreview?.roomFive.captiveVoltPresentation.diagnostics,
         light: r.voltLight ? { visible: r.voltLight.visible, intensity: r.voltLight.intensity, distance: r.voltLight.distance, decay: r.voltLight.decay } : undefined,
         active: r.manager.activeSlimeId, names, programs: info.programs.length, geometries: info.memory.geometries, textures: info.memory.textures,
         renderer: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), glError: gl.getError() };
     }, { runtime, phase });
+    if (gelMode) {
+      expect(value.gelMode).toBe(gelMode);
+      if (gelMode === 'minimum') expect(value.bodyTransmission.every(body => !body.ready || body.transmission === 0)).toBe(true);
+    }
     samples.push(value); await writeFile(resolve(directory, 'samples.json'), JSON.stringify(samples, null, 2)); console.info(`${phase}: ${value.programs} programs, ${value.geometries} geometries, ${value.textures} textures`);
     expect(value.glError, `GL state at ${phase}`).toBe(0); return value;
   };
@@ -45,8 +56,11 @@ test('Performance preset retains Volt release, controls and warmed lifecycle thr
   await page.addStyleTag({ content: '.game-hud, .performance-recorder, .security-network-status { visibility: hidden !important; }' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
-  await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
-  await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
+  await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
+  if (preset === 'performance') await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
+  if (gelMode) {
+    await page.locator('[data-setting="gel-rendering"]').selectOption(gelMode);
+  }
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-action="start"]').click();
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 180_000 });
@@ -209,7 +223,12 @@ test('Performance preset retains Volt release, controls and warmed lifecycle thr
   await page.keyboard.down('w'); await frames(35); await page.keyboard.up('w'); await sample('__voltBlackout', 'low-vent'); await capture('low-vent');
   await page.evaluate(() => (window as any).__voltBlackout.recoverActiveCheckpoint()); await frames();
   const warm = await sample('__voltBlackout', 'before-death');
+  let retryProgramCount = warm.programs;
+  let firstDeathProgramGrowth = 0;
   for (const pass of [1, 2]) {
+    await page.keyboard.press('F1');
+    if (pass === 1) await expect(page.locator('#app')).toHaveAttribute('data-clean-gameplay', 'true');
+    else await expect(page.locator('#app')).not.toHaveAttribute('data-clean-gameplay');
     await page.evaluate(() => (window as any).__voltBlackout.requestFailure());
     await frames(2);
     const dying = await sample('__voltBlackout', `dying-${pass}`);
@@ -219,7 +238,15 @@ test('Performance preset retains Volt release, controls and warmed lifecycle thr
     await page.locator('.death-retry').click(); await frames();
     const retry = await sample('__voltBlackout', `death-retry-${pass}`);
     expect(retry.volt.visible).toBe(true); expect(retry.volt.deathActive).toBe(false); expect(retry.volt.opacity).toBe(1);
-    expect([retry.programs, retry.geometries, retry.textures]).toEqual([warm.programs, warm.geometries, warm.textures]);
+    // Minimum mode has a distinct first-use death/light configuration. Record
+    // its compilation cost, then require an exactly stable repeated cycle.
+    // Keep the existing physical-path zero-growth assertion intact.
+    if (gelMode === 'minimum' && pass === 1) {
+      firstDeathProgramGrowth = retry.programs - warm.programs;
+      retryProgramCount = retry.programs;
+      console.info(`Minimum first-death program growth: ${firstDeathProgramGrowth}`);
+    }
+    expect([retry.programs, retry.geometries, retry.textures]).toEqual([retryProgramCount, warm.geometries, warm.textures]);
   }
   await page.evaluate(() => {
     const rt = (window as any).__voltBlackout;
@@ -307,11 +334,13 @@ test('Performance preset retains Volt release, controls and warmed lifecycle thr
     rt.load(); await rt.preparePresentation(); const retry = rt.resources.voltPresentation.ready;
     rt.unload(); rt.load(); const late = rt.resources.voltPresentation, pending = rt.preparePresentation();
     rt.unload(); await pending;
-    return { failure, retry, late: { ready: late.ready, detached: late.root.parent === null, state: rt.state } };
+    return { failure, retry, late: { ready: late.ready, detached: late.root.parent === null, state: rt.state },
+      gelMaterials: rt.renderLayer.gelRendering.materialCount };
   });
   expect(lifecycle).toEqual({ failure: { rejected: true, state: 'unloaded', detached: true }, retry: true,
-    late: { ready: false, detached: true, state: 'unloaded' } });
-  await writeFile(resolve(directory, 'journeys.json'), JSON.stringify({ samples, lightEquivalence, lifecycle, errors, failedRequests }, null, 2));
+    late: { ready: false, detached: true, state: 'unloaded' }, gelMaterials: 0 });
+  await writeFile(resolve(directory, 'journeys.json'), JSON.stringify({ samples, firstDeathProgramGrowth, lightEquivalence, lifecycle, errors, failedRequests }, null, 2));
   expect(errors).toEqual([]); expect(failedRequests).toEqual([]);
   const video = page.video(); await page.close(); await video?.saveAs(resolve(directory, 'journey.webm'));
 });
+}

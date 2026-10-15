@@ -1,3 +1,4 @@
+import { isGelRenderingMode } from '../render/slime/GelRendering.ts';
 import type {
   GameSettings,
   GameSettingsSnapshot,
@@ -372,6 +373,7 @@ export class GameFlowUI {
   private readonly cameraDistanceOutput: HTMLOutputElement;
   private readonly renderResolutionInput: HTMLSelectElement;
   private readonly graphicsPresetInput: HTMLSelectElement;
+  private readonly gelRenderingInput: HTMLSelectElement;
   private readonly slimeRoster: HTMLElement;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
@@ -422,6 +424,7 @@ export class GameFlowUI {
     this.cameraDistanceOutput = this.requireElement<HTMLOutputElement>(
       '[data-setting-output="camera-distance"]',
     );
+    this.gelRenderingInput = this.requireElement<HTMLSelectElement>('[data-setting="gel-rendering"]');
     this.renderResolutionInput = this.requireElement<HTMLSelectElement>(
       '[data-setting="render-resolution"]',
     );
@@ -698,6 +701,15 @@ export class GameFlowUI {
             </select>
             <p class="setting-note">Limits 3D rendering detail. Interface resolution is unchanged.</p>
           </div>
+          <div class="setting-row">
+            <div class="setting-heading"><label for="gel-rendering">Character gel</label></div>
+            <select id="gel-rendering" data-setting="gel-rendering">
+              <option value="minimum">Minimum hardware — glossy gel</option>
+              <option value="reduced-transmission">Balanced — soft refraction</option>
+              <option value="physical">High — full refraction</option>
+            </select>
+            <p class="setting-note">Glossy gel keeps reflections and character glow. Refraction adds background distortion at a higher graphics cost.</p>
+          </div>
           <button class="system-action system-back" data-action="back" data-autofocus>
             <span aria-hidden="true">←</span><span>Back</span>
           </button>
@@ -784,6 +796,10 @@ export class GameFlowUI {
       this.onCameraDistanceInput,
       { signal },
     );
+    this.gelRenderingInput.addEventListener('change', () => {
+      const mode = this.gelRenderingInput.value;
+      if (isGelRenderingMode(mode)) this.settings.setGelRenderingMode(mode);
+    }, { signal });
     this.renderResolutionInput.addEventListener(
       'change',
       this.onRenderResolutionChange,
@@ -1034,6 +1050,7 @@ export class GameFlowUI {
     for (const option of this.renderResolutionInput.options) {
       option.disabled = performance && Number(option.value) > 1;
     }
+    this.gelRenderingInput.value = settings.gelRenderingMode;
     this.actions.applySettings(settings);
   };
 
