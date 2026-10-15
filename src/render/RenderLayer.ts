@@ -3,6 +3,7 @@ import { GelRendering, type GelRenderingMode } from './slime/GelRendering.ts';
 
 import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
 import { CameraRig } from './CameraRig.ts';
+import { GAMEPLAY_UI_LAYER, withGameplayUiVisibility } from './GameplayUiLayer.ts';
 import {
   DEFAULT_RENDER_PIXEL_RATIO_CAP,
   type RenderPixelRatioCap,
@@ -144,6 +145,7 @@ export class RenderLayer {
   private viewportWidth = 0;
   private viewportHeight = 0;
   private disposed = false;
+  private cleanGameplay = false;
 
   constructor(options: RenderLayerOptions) {
     this.host = options.host;
@@ -152,6 +154,7 @@ export class RenderLayer {
       options.pixelRatioCap ?? DEFAULT_RENDER_PIXEL_RATIO_CAP;
 
     this.scene.name = 'game-scene';
+    this.cameraRig.camera.layers.enable(GAMEPLAY_UI_LAYER);
     this.scene.background = new THREE.Color(BACKGROUND_COLOUR);
 
     this.renderer = new THREE.WebGLRenderer({
@@ -182,7 +185,13 @@ export class RenderLayer {
   }
 
   render(): void {
-    this.renderer.render(this.scene, this.cameraRig.camera);
+    withGameplayUiVisibility(this.cameraRig.camera, !this.cleanGameplay, () => {
+      this.renderer.render(this.scene, this.cameraRig.camera);
+    });
+  }
+
+  setCleanGameplayMode(clean: boolean): void {
+    this.cleanGameplay = clean;
   }
 
   requestShadowConfiguration(

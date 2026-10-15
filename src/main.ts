@@ -11,6 +11,7 @@ import { RenderLayer } from './render/RenderLayer.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
+import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -37,6 +38,7 @@ const renderLayer = new RenderLayer({
   pixelRatioCap: settings.value.renderPixelRatioCap,
 });
 const input = new Input({ pointerLockElement: renderLayer.canvas });
+renderLayer.canvas.dataset.gameplayCanvas = 'true';
 const debugAvailable =
   import.meta.env.DEV ||
   new URLSearchParams(window.location.search).get('debug') === '1';
@@ -132,6 +134,12 @@ const gameFlow = new GameFlowUI({
       renderLayer.gelRendering.setMode(nextSettings.gelRenderingMode);
     },
   },
+});
+const cleanGameplayMode = new CleanGameplayMode({
+  host: app,
+  flow: gameFlow,
+  prepareGameplay: () => gameSession.prepareCleanGameplay(),
+  present: (clean) => renderLayer.setCleanGameplayMode(clean),
 });
 const unsubscribeObjectiveChanged = gameSession.events.on(
   'objectiveChanged',
@@ -256,6 +264,7 @@ const shutdown = (): void => {
   unsubscribeTransitionCompleted();
   unsubscribeTransitionFailed();
   performanceRecorder?.dispose();
+  cleanGameplayMode.dispose();
   gameFlow.dispose();
   gameSession.dispose();
   audio.dispose();
