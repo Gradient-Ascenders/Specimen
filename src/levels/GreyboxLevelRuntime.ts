@@ -47,6 +47,8 @@ import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment
 import { prepareCharacterCameraFades } from '../render/slime/PrepareCharacterCameraFades.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
+import { ContainmentLightLayout } from '../render/ContainmentLightLayout.ts';
+import { optimizeFiniteLightEvaluation } from '../render/environment/cultivation/FiniteLightEvaluation.ts';
 import { createDepthPrewarmGroup } from '../render/ShadowPrewarmMaterial.ts';
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { ContainmentCollisionOverlay } from '../render/environment/containment/ContainmentCollisionOverlay.ts';
@@ -282,6 +284,7 @@ export class GreyboxLevelRuntime {
   private lastRenderedLightingRoomId: DebugRoomId | undefined;
   private readonly preparationLightState = new THREE.Group();
   private lastShadowLayoutKey: string | undefined;
+  private lightLayout: ContainmentLightLayout | undefined;
   private pendingLightingTransitionProfile: LightingTransitionProfile | undefined;
   private lightingPrewarmPromise: Promise<void> | undefined;
   // Three.js retains transmission targets per camera. Reuse this camera across
@@ -417,6 +420,13 @@ export class GreyboxLevelRuntime {
     ])
       .then(() => {
         if (this.resources !== resources || this.lightingPrewarmGeneration !== generation) return;
+        resources.testScene.root.traverse(object => {
+          if (!(object instanceof THREE.Mesh)) return;
+          for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+            if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material, true);
+          }
+        });
+        this.lightLayout ??= new ContainmentLightLayout(this.renderLayer.scene);
         return this.runLightingPrewarm(resources, generation);
       })
       .catch((error) => {
@@ -801,6 +811,7 @@ export class GreyboxLevelRuntime {
 
     const shadowLayoutKey = testScene.lightingDiagnostics.visibleRoomIds.join(',');
     if (shadowLayoutKey !== this.lastShadowLayoutKey) {
+      this.lightLayout?.sync();
       // Three draws shadows before refreshing the visible pass's light state.
       // An empty compile updates that state without compiling any materials,
       // avoiding a cold previous-room shader binding on the first handoff frame.
@@ -1260,6 +1271,7 @@ export class GreyboxLevelRuntime {
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.lightingPrewarmGeneration += 1;
+    this.lightLayout?.dispose(); this.lightLayout = undefined;
     for (const batch of this.depthPrewarmGroups) if (!this.compilingDepthGroups.has(batch)) batch.dispose();
     this.depthPrewarmGroups.length = 0;
     this.lightingPrewarmPromise = undefined;
@@ -1787,6 +1799,7 @@ export class GreyboxLevelRuntime {
       await resources.testScene.lighting.prewarmShaderConfigurations(
         async (roomId, coverageRoomIds) => {
           if (!isCurrent()) return;
+          this.lightLayout?.sync();
           const stepProgramsBefore = renderer.info.programs?.length ?? 0;
           const stepStarted = this.hostWindow.performance.now();
           const signature = countVisibleLights(
@@ -1966,6 +1979,7 @@ export class GreyboxLevelRuntime {
       );
 
       if (!isCurrent()) return;
+      this.lightLayout?.sync();
       const roomOneTarget = LIGHTING_PREWARM_CAMERA_TARGETS[1];
       prewarmCamera.position.set(
         roomOneTarget[0],

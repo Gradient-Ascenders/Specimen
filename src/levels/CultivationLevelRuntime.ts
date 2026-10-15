@@ -282,6 +282,7 @@ export class CultivationLevelRuntime {
   private preparationQueue: CultivationPreparationQueue | undefined;
   private readonly preparationLightState = new THREE.Group();
   private lastShadowLayoutKey = '';
+  private lastPreparationRenderStateRevision = -1;
   private lightLayout: CultivationLightLayout | undefined;
   private lightLayoutKey = '';
   private constructionMs = 0;
@@ -297,12 +298,20 @@ export class CultivationLevelRuntime {
       .then(() => {
         if (this.resources !== resources) return;
         if (!resources.authoredPreview) return;
+        // Keep compact light loops and contribution guards. Early-zero guards
+        // regress mandatory compilation on UHD 620.
         this.renderLayer.scene.traverse(object => {
           if (!(object instanceof THREE.Mesh)) return;
           for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
             if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material);
           }
         });
+        // Match the first gameplay draw before cloning preparation layouts or
+        // priming live PCF receivers. Newly built room roots are all visible.
+        this.renderLayer.cameraRig.update(1, 0);
+        resources.authoredPreview.updatePresentationVisibility(
+          this.renderLayer.cameraRig.camera.position, resources.pair.activeBody.position,
+        );
         this.lightLayout ??= new CultivationLightLayout(this.renderLayer.scene);
         if (!this.preparationQueue) {
           this.preparationQueue = new CultivationPreparationQueue(
@@ -760,11 +769,12 @@ export class CultivationLevelRuntime {
         this.roomThreeSlimeEligibility[damageSlimeId],
     );
     if (this.lightLayoutKey !== this.lastShadowLayoutKey ||
-        (this.preparationQueue && this.preparationQueue.diagnostics.completed < this.preparationQueue.diagnostics.total)) {
+        (this.preparationQueue && this.preparationQueue.renderStateRevision !== this.lastPreparationRenderStateRevision)) {
       // Shadow materials consume prior light state. Restore the live layout
       // after isolated preparation and at visibility handoffs before drawing.
       this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
       this.lastShadowLayoutKey = this.lightLayoutKey;
+      this.lastPreparationRenderStateRevision = this.preparationQueue?.renderStateRevision ?? -1;
     }
     this.cameraShadowCulling?.prepare(this.renderLayer.cameraRig.camera);
     try {
@@ -772,7 +782,11 @@ export class CultivationLevelRuntime {
     } finally {
       this.cameraShadowCulling?.restore();
     }
-    this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
+    // Maintenance was prepared at startup. Once the pair has reached the
+    // lower sector, speculative upper-room work is not needed for this view
+    // and competes with its searchlights. Demand preparation above still
+    // guards every draw, and background work resumes if ownership returns.
+    if (lightingRoom !== 5) this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
 
     this.debugElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (this.debugVisible && resources.debugPanel && this.debugElapsedSeconds >= 0.25) {
@@ -1463,6 +1477,7 @@ export class CultivationLevelRuntime {
     this.preparationQueue?.dispose(); this.preparationQueue = undefined;
     this.lightLayout?.dispose(); this.lightLayout = undefined;
     this.lightLayoutKey = ''; this.lastShadowLayoutKey = '';
+    this.lastPreparationRenderStateRevision = -1;
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
     this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree);
     resources.unsubscribeControllerObjective();
