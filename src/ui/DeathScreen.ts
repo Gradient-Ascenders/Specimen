@@ -24,6 +24,7 @@ export class DeathScreen {
     this.options = options;
     this.element = document.createElement('section');
     this.element.className = 'death-screen';
+    this.element.setAttribute('data-clean-gameplay-essential', '');
     this.element.hidden = true;
     this.element.setAttribute('aria-hidden', 'true');
     this.element.setAttribute('aria-labelledby', 'death-screen-title');

@@ -249,6 +249,7 @@ export class GoopAcidPresentation {
       options.document ?? options.host.ownerDocument ?? document;
     this.crosshairElement = hostDocument.createElement('div');
     this.crosshairElement.className = 'goop-aim-crosshair';
+    this.crosshairElement.setAttribute('data-clean-gameplay-aiming', '');
     this.crosshairElement.dataset.state = 'neutral';
     this.crosshairElement.hidden = true;
     this.crosshairElement.setAttribute('aria-hidden', 'true');
