@@ -313,6 +313,7 @@ export class CultivationLevelRuntime {
           this.renderLayer.cameraRig.camera.position, resources.pair.activeBody.position,
         );
         this.lightLayout ??= new CultivationLightLayout(this.renderLayer.scene);
+        this.lightLayout.restore();
         if (!this.preparationQueue) {
           this.preparationQueue = new CultivationPreparationQueue(
             this.renderLayer,
@@ -323,25 +324,28 @@ export class CultivationLevelRuntime {
         this.preparationQueue.diagnostics.constructionMs = this.constructionMs;
         return this.preparationQueue.prepareStartup().then(() => {
           if (this.resources !== resources) return;
-          // The queue primes against cloned comparison maps. Live PCF samplers
-          // also need real maps before drawing Goop's physical burst materials,
-          // even though the particles do not receive or cast shadows.
-          // An empty isolated layer allocates the light-owned maps without
-          // uploading other rooms or drawing their visible/shadow variants.
-          withIsolatedPrewarmState(this.renderLayer.renderer, () =>
-            renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene,
-              this.renderLayer.cameraRig.camera, []));
-          resources.goopPresentation.primeDeathResources(resources.pair.goopBody.position, root => {
-            withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
-              renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
-          });
-          resources.voltPresentation.primeDeathResources(resources.voltBody.position, root => {
-            withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
-              renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
-          });
-          this.renderLayer.scene.traverse(object => {
-            if ((object instanceof THREE.SpotLight || object instanceof THREE.PointLight ||
-              object instanceof THREE.DirectionalLight) && object.castShadow) object.shadow.needsUpdate = true;
+          this.lightLayout!.withLayout(this.renderLayer.scene, this.renderLayer.cameraRig.camera,
+            resources.pair.activeBody.position, () => {
+            // The queue primes against cloned comparison maps. Live PCF samplers
+            // also need real maps before drawing Goop's physical burst materials,
+            // even though the particles do not receive or cast shadows.
+            // An empty isolated layer allocates the light-owned maps without
+            // uploading other rooms or drawing their visible/shadow variants.
+            withIsolatedPrewarmState(this.renderLayer.renderer, () =>
+              renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene,
+                this.renderLayer.cameraRig.camera, []));
+            resources.goopPresentation.primeDeathResources(resources.pair.goopBody.position, root => {
+              withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+                renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
+            });
+            resources.voltPresentation.primeDeathResources(resources.voltBody.position, root => {
+              withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+                renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
+            });
+            this.renderLayer.scene.traverse(object => {
+              if ((object instanceof THREE.SpotLight || object instanceof THREE.PointLight ||
+                object instanceof THREE.DirectionalLight) && object.castShadow) object.shadow.needsUpdate = true;
+            });
           });
         });
       }).catch(error => {
@@ -736,58 +740,66 @@ export class CultivationLevelRuntime {
       const key = [p.roomOne.root.visible, p.roomOneToTwoPassage.root.visible, p.roomTwo.root.visible,
         p.roomTwoToThreeGoopPassage.root.visible, p.roomTwoToThreeBobAirDuct.root.visible,
         p.roomThree.root.visible, p.roomFour.root.visible, p.roomFive.root.visible].join(',');
-      if (key !== this.lightLayoutKey) { this.lightLayout.sync(this.renderLayer.scene); this.lightLayoutKey = key; }
+      this.lightLayout.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
+      this.lightLayoutKey = `${key}:${this.lightLayout.signature}`;
     }
-    if (this.preparationQueue && !this.preparationQueue.requireCurrent(!!darkRoom)) {
-      this.preparationQueue.tick(0, true); return;
-    }
-    if (resources.roomThreeEncounter && resources.authoredPreview) {
-      resources.roomThreeEncounter.root.visible = resources.authoredPreview.roomThree.root.visible;
-    }
-    resources.pairPresentation.update(
-      resources.renderedBobPosition,
-      resources.renderedGoopPosition,
-      resources.manager.activeSlimeId!,
-      this.renderLayer.cameraRig.camera,
-      resources.collisionWorld,
-      this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
-    );
-    resources.goopPresentation.setOpacity(resources.manager.activeSlimeId === 'goop'
-      ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
-        this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
-    resources.voltPresentation.setOpacity(resources.manager.activeSlimeId === 'volt'
-      ? resolveCameraTargetOpacity(this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25) : 1);
-    resources.droneProjectilePresentation?.update(interpolationAlpha);
-    resources.roomFourProjectiles?.update(interpolationAlpha);
-    resources.roomFiveEncounter?.presentation.update(interpolationAlpha);
-    if (resources.authoredPreview) resources.roomFiveView?.update(resources.authoredPreview.roomFive.controller, this.authoredPreviewRoomId === 5);
-    const inRoomFour = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position) === 4;
-    if (resources.authoredPreview) resources.roomFourView?.update(resources.authoredPreview.roomFour.controller, inRoomFour);
-    const damageSlimeId = resources.manager.activeSlimeId === 'goop' ? 'goop' : 'bob';
-    resources.roomFiveDamage?.update(stats.frameDeltaSeconds, damageSlimeId,
-      this.authoredPreviewRoomId === 5 && !resources.authoredPreview!.roomFive.controller.rescued && resources.deathSequence.isPlaying);
-    resources.roomFourDamage?.update(stats.frameDeltaSeconds, damageSlimeId,
-      inRoomFour && resources.deathSequence.isPlaying);
-    resources.damageVignette?.update(
-      stats.frameDeltaSeconds,
-      damageSlimeId,
-      this.lifecycle.state === 'running' &&
-        resources.deathSequence.isPlaying &&
-        this.roomThreeSlimeEligibility[damageSlimeId],
-    );
-    if (this.lightLayoutKey !== this.lastShadowLayoutKey ||
-        (this.preparationQueue && this.preparationQueue.renderStateRevision !== this.lastPreparationRenderStateRevision)) {
-      // Shadow materials consume prior light state. Restore the live layout
-      // after isolated preparation and at visibility handoffs before drawing.
-      this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
-      this.lastShadowLayoutKey = this.lightLayoutKey;
-      this.lastPreparationRenderStateRevision = this.preparationQueue?.renderStateRevision ?? -1;
-    }
-    this.cameraShadowCulling?.prepare(this.renderLayer.cameraRig.camera);
     try {
-      this.renderLayer.render();
+      if (this.preparationQueue && !this.preparationQueue.requireCurrent(!!darkRoom)) {
+        // Isolated preparation clones the authored source graph, not this frame's
+        // camera-dependent selection. Never carry a render-only mask across RAF.
+        this.lightLayout?.restore();
+        this.preparationQueue.tick(0, true); return;
+      }
+      if (resources.roomThreeEncounter && resources.authoredPreview) {
+        resources.roomThreeEncounter.root.visible = resources.authoredPreview.roomThree.root.visible;
+      }
+      resources.pairPresentation.update(
+        resources.renderedBobPosition,
+        resources.renderedGoopPosition,
+        resources.manager.activeSlimeId!,
+        this.renderLayer.cameraRig.camera,
+        resources.collisionWorld,
+        this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
+      );
+      resources.goopPresentation.setOpacity(resources.manager.activeSlimeId === 'goop'
+        ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
+          this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
+      resources.voltPresentation.setOpacity(resources.manager.activeSlimeId === 'volt'
+        ? resolveCameraTargetOpacity(this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25) : 1);
+      resources.droneProjectilePresentation?.update(interpolationAlpha);
+      resources.roomFourProjectiles?.update(interpolationAlpha);
+      resources.roomFiveEncounter?.presentation.update(interpolationAlpha);
+      if (resources.authoredPreview) resources.roomFiveView?.update(resources.authoredPreview.roomFive.controller, this.authoredPreviewRoomId === 5);
+      const inRoomFour = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position) === 4;
+      if (resources.authoredPreview) resources.roomFourView?.update(resources.authoredPreview.roomFour.controller, inRoomFour);
+      const damageSlimeId = resources.manager.activeSlimeId === 'goop' ? 'goop' : 'bob';
+      resources.roomFiveDamage?.update(stats.frameDeltaSeconds, damageSlimeId,
+        this.authoredPreviewRoomId === 5 && !resources.authoredPreview!.roomFive.controller.rescued && resources.deathSequence.isPlaying);
+      resources.roomFourDamage?.update(stats.frameDeltaSeconds, damageSlimeId,
+        inRoomFour && resources.deathSequence.isPlaying);
+      resources.damageVignette?.update(
+        stats.frameDeltaSeconds,
+        damageSlimeId,
+        this.lifecycle.state === 'running' &&
+          resources.deathSequence.isPlaying &&
+          this.roomThreeSlimeEligibility[damageSlimeId],
+      );
+      if (this.lightLayoutKey !== this.lastShadowLayoutKey ||
+          (this.preparationQueue && this.preparationQueue.renderStateRevision !== this.lastPreparationRenderStateRevision)) {
+        // Shadow materials consume prior light state. Restore the live layout
+        // after isolated preparation and at visibility handoffs before drawing.
+        this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
+        this.lastShadowLayoutKey = this.lightLayoutKey;
+        this.lastPreparationRenderStateRevision = this.preparationQueue?.renderStateRevision ?? -1;
+      }
+      this.cameraShadowCulling?.prepare(this.renderLayer.cameraRig.camera);
+      try {
+        this.renderLayer.render();
+      } finally {
+        this.cameraShadowCulling?.restore();
+      }
     } finally {
-      this.cameraShadowCulling?.restore();
+      this.lightLayout?.restore();
     }
     // Maintenance was prepared at startup. Once the pair has reached the
     // lower sector, speculative upper-room work is not needed for this view
