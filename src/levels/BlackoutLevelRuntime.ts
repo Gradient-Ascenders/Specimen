@@ -136,6 +136,7 @@ import {
 
 const OUT_OF_BOUNDS_Y = -5;
 const BLACKOUT_BOB_REFLECTION = { body: 0.12, eyes: 0.28 } as const;
+const BLACKOUT_VOLT_LIGHT_INTENSITY = { authored: 16, foundation: 2.2 } as const;
 const BLACKOUT_MAINTENANCE_VOLT_RANGES = Object.freeze({
   acquisitionRangeMetres: 11,
   instabilityWarningRangeMetres: 12,
@@ -1635,10 +1636,8 @@ export class BlackoutLevelRuntime {
           chargeFraction: event.chargeFraction,
         });
       }));
-      const voltLight = new THREE.PointLight(0xffdf75, 2.2, 8, 2);
-      if (this.authoredRoomOne) {
-        voltLight.intensity = 16;
-      }
+      const voltLight = new THREE.PointLight(0xffdf75,
+        this.authoredRoomOne ? BLACKOUT_VOLT_LIGHT_INTENSITY.authored : BLACKOUT_VOLT_LIGHT_INTENSITY.foundation, 8, 2);
       voltLight.name = 'blackout-volt-foundation-light';
       voltLight.castShadow = false;
       voltPresentation.placement.add(voltLight);
@@ -2339,7 +2338,12 @@ export class BlackoutLevelRuntime {
     }
     resources.voltPresentation.setVisible(groupVisible);
     resources.specimenVisual.visible = specimenControlled;
-    resources.voltLight.visible = !specimenControlled && !resources.voltDeathActive;
+    // Removing the light on death changes NUM_POINT_LIGHTS and cold-compiles
+    // receivers. Keep its warmed slot with zero radiance; specimen mode still
+    // replaces that slot with specimenLight as before.
+    resources.voltLight.visible = !specimenControlled;
+    resources.voltLight.intensity = resources.voltDeathActive ? 0 :
+      (this.authoredRoomOne ? BLACKOUT_VOLT_LIGHT_INTENSITY.authored : BLACKOUT_VOLT_LIGHT_INTENSITY.foundation);
     resources.specimenLight.visible = specimenControlled;
 
     // Aim presentation hides only the currently controlled body material.
