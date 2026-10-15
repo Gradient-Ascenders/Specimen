@@ -467,7 +467,14 @@ export class GreyboxLevelRuntime {
     this.lifecycle.restartLevel();
   }
 
-  /** Allow the application flow to suppress level-owned diagnostics behind menus. */
+  /** Close only diagnostics-owned input capture before hiding its UI. */
+  prepareCleanGameplay(): void {
+    if (!this.debugVisible) return;
+    const resources = this.requireResources();
+    this.closeDebugInspection(this.lifecycle.state === 'running' &&
+      resources.deathSequence.isPlaying && resources.containmentLevel.state === 'playing');
+  }
+
   setDebugInteractionEnabled(enabled: boolean): void {
     this.debugInteractionEnabled = enabled;
     if (!enabled && this.debugVisible) this.closeDebugInspection(false);
@@ -874,7 +881,7 @@ export class GreyboxLevelRuntime {
       (failure: ContainmentHazardFailure) => {
         containmentLevel.requestHazardFailure(failure);
       },
-      { includeDevelopmentHelpers: this.debugAvailable },
+      { includeDevelopmentHelpers: this.debugAvailable, gelRendering: this.renderLayer.gelRendering },
     );
     testScene.bob.setReflectionEnvironment(bobReflectionEnvironment.texture);
     this.renderLayer.scene.add(testScene.root);
@@ -1752,6 +1759,10 @@ export class GreyboxLevelRuntime {
       return;
     }
     if (event.code !== DEBUG_TOGGLE_CODE || event.repeat) return;
+    if (this.host.dataset.cleanGameplay === 'true') {
+      event.preventDefault();
+      return;
+    }
     if (!this.debugInteractionEnabled) return;
     event.preventDefault();
     if (!testPanel) return;

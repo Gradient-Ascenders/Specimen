@@ -1,5 +1,7 @@
+import type { GelRendering } from '../render/slime/GelRendering.ts';
 import { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import * as THREE from 'three';
+import { GAMEPLAY_UI_LAYER } from '../render/GameplayUiLayer.ts';
 
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
 import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
@@ -55,13 +57,14 @@ export class ContainmentTeachingScene {
   private readonly ownedGeometries = new Set<THREE.BufferGeometry>();
   private readonly ownedMaterials = new Set<THREE.Material>();
   readonly bob: BobCharacterPresentation;
-  readonly goop = new GoopCharacterPresentation();
+  readonly goop: GoopCharacterPresentation;
   private disposed = false;
 
   constructor(
     artResources: ContainmentArtResources,
-    options: { readonly includeDevelopmentHelpers?: boolean } = {},
+    options: { readonly includeDevelopmentHelpers?: boolean; readonly gelRendering?: GelRendering } = {},
   ) {
+    this.goop = new GoopCharacterPresentation(undefined, options.gelRendering);
     // Retain the validated hierarchy name for collision fingerprint stability.
     this.root.name = 'containment-climb-and-bounce-greybox';
 
@@ -115,7 +118,7 @@ export class ContainmentTeachingScene {
     this.root.add(this.roomOneArt.root, this.roomTwoArt.root);
 
     this.bob = new BobCharacterPresentation(
-      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres,
+      DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres, options.gelRendering,
     );
     this.root.add(this.bob.root, this.goop.root);
     this.resetTeachingPresentation();
@@ -327,6 +330,7 @@ export class ContainmentTeachingScene {
       roomOneMarkerMaterial,
     );
     roomOneMarker.name = 'room-1-safe-spawn-marker';
+    roomOneMarker.layers.set(GAMEPLAY_UI_LAYER);
     roomOneMarker.position.set(SPAWN_POSITION.x, SPAWN_POSITION.y - 0.46, SPAWN_POSITION.z);
     roomOneMarker.rotation.x = Math.PI / 2;
     this.root.add(roomOneMarker);
@@ -335,6 +339,7 @@ export class ContainmentTeachingScene {
     this.ownedGeometries.add(roomTwoMarkerGeometry);
     const roomTwoMarker = new THREE.Mesh(roomTwoMarkerGeometry, exitMaterial);
     roomTwoMarker.name = 'room-2-safe-recovery-marker';
+    roomTwoMarker.layers.set(GAMEPLAY_UI_LAYER);
     roomTwoMarker.position.set(
       ROOM_2_SAFE_LANDING_POSITION.x,
       ROOM_2_FLOOR_TOP_Y + 0.01,

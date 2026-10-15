@@ -96,7 +96,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
     info: {render: {calls: 0, triangles: 0, points: 0, lines: 0, frame: 0}},
     compile() {},
-    render(preparedScene: THREE.Scene) {
+    render(preparedScene: THREE.Scene, camera: THREE.Camera) {
       preparedScene.traverseVisible(object => {
         if (object instanceof THREE.Mesh && object.geometry === captiveBody.geometry && object.material instanceof THREE.MeshDepthMaterial) {
           captiveUploaded = true;
@@ -109,7 +109,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       });
       if (!renderer.shadowMap.enabled) return;
       preparedScene.traverseVisible(object => {
-        if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight) || !object.castShadow) return;
+        if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight) || !object.castShadow || !object.layers.test(camera.layers)) return;
         const texture = object.shadow.map?.depthTexture;
         assert.ok(texture, 'shadow-enabled preparation must provide depth textures for its samplers');
         assert.ok(initializedShadowTargets.has(object.shadow.map!), 'depth attachments must be initialized before drawing receivers');
@@ -137,7 +137,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
         assert.equal(targetScene.fog, null, 'real shadow draws use the empty scene, without visible-pass fog');
         assert.equal(targetScene.environment, null, 'custom depth/distance programs do not borrow visible-pass environment');
         const lights: THREE.Light[] = [];
-        targetScene.traverseVisible(o => { if (o instanceof THREE.Light) lights.push(o); });
+        targetScene.traverseVisible(o => { if (o instanceof THREE.Light && o.layers.test(_camera.layers)) lights.push(o); });
         assert.ok(lights.some(light => light.castShadow), 'retain the live shadow-light layout');
         assert.equal(lights.some(light => light.type === 'Light'), false, 'do not warm an unused empty-light shadow layout');
         shadowLayouts.add('live-layout');
@@ -222,6 +222,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
           queue.tick(0, true); await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
+      assert.ifError((queue as unknown as { failure?: unknown }).failure);
       assert.equal(queue.requireCurrent(true), true, 'the requested room finishes');
       assert.equal(queue.diagnostics.completed, mode === 'lift' ? 3 : 2, 'earlier background work remains suspended until the lift and Room 5 are ready');
       assert.equal(queue.diagnostics.configurations[mode === 'lift' ? 2 : 1].z, 230);
@@ -273,6 +274,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
           await new Promise(resolve => setTimeout(resolve, 0));
         }
       } finally { clock.mock.restore(); }
+      assert.ifError((queue as unknown as { failure?: unknown }).failure);
       assert.equal(queue.diagnostics.completed, 3, 'the lift is ready before braking');
       assert.equal(queue.diagnostics.configurations[2].dark, false);
       const preparedCompiles = compiles;

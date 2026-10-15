@@ -75,6 +75,10 @@ export class GameSessionCoordinator {
     this.runtime.setDebugInteractionEnabled(enabled && !this.transitionPending);
   }
 
+  prepareCleanGameplay(): void {
+    this.runtime.prepareCleanGameplay?.();
+  }
+
   fixedUpdate(deltaSeconds: number): void {
     if (!this.transitionPending && !this.transitionFailed) this.runtime.fixedUpdate(deltaSeconds);
   }

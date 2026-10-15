@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CharacterDetail, readCharacterDetail } from '../src/render/slime/CharacterDetail.ts';
 import { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import { GelRendering } from '../src/render/slime/GelRendering.ts';
 import { loadGoop } from './fixtures/GoopAssetFixture.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
@@ -14,7 +15,8 @@ async function bank(character: string) {
 }
 
 for (const character of ['goop', 'volt'] as const) test(`${character} distant detail preserves owned streams, materials, morphs and full-detail recovery`, async () => {
-  const p = character === 'goop' ? new GoopCharacterPresentation() : new VoltCharacterPresentation();
+  const rendering = new GelRendering({ transmissionResolutionScale: 1 });
+  const p = character === 'goop' ? new GoopCharacterPresentation(undefined, rendering) : new VoltCharacterPresentation(undefined, rendering);
   const root = await (character === 'goop' ? loadGoop() : loadVolt());
   const sourceIndices = new Map<string, number[]>();
   root.traverse(o => { if (o instanceof THREE.Mesh) sourceIndices.set(o.name, Array.from(o.geometry.index!.array)); });
@@ -32,6 +34,15 @@ for (const character of ['goop', 'volt'] as const) test(`${character} distant de
   camera.position.z = 50; p.updateDetail(camera);
   assert.equal(p.detailDiagnostics!.level, 'distant');
   assert.ok(p.detailDiagnostics!.triangles < fullTriangles * 0.251);
+  assert.equal(rendering.materialCount, 1);
+  const body = meshes.find(mesh => mesh.name.endsWith('-Body'))!;
+  const material = body.material as THREE.MeshPhysicalMaterial;
+  const distantTriangles = p.detailDiagnostics!.triangles;
+  for (const mode of ['minimum', 'reduced-transmission', 'physical'] as const) {
+    rendering.setMode(mode);
+    assert.equal(material.transmission, mode === 'minimum' ? 0 : character === 'goop' ? 0.28 : 0.55);
+    assert.equal(p.detailDiagnostics!.triangles, distantTriangles, 'gel quality does not reset the selected LOD');
+  }
   for (let i = 0; i < meshes.length; i++) {
     const mesh = meshes[i]!, full = original[i]!;
     assert.equal(mesh.geometry, full.geometry, 'LOD must not allocate duplicate GPU morph textures');
@@ -63,6 +74,7 @@ for (const character of ['goop', 'volt'] as const) test(`${character} distant de
   let released = 0;
   for (const geometry of original.map(entry => entry.geometry)) geometry.addEventListener('dispose', () => released++);
   p.dispose(); p.dispose();
+  assert.equal(rendering.materialCount, 0);
   assert.equal(released, 3, 'each shared geometry and its index bank are disposed exactly once');
 });
 

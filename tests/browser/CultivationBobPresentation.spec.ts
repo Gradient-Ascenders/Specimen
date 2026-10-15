@@ -123,7 +123,9 @@ test('Cultivation mounts the prepared shared Bob character presentation', async 
     const runtime = (window as any).__specimenCultivationRuntime;
     const queue = runtime.preparationQueue;
     const entry = queue.configurations.find((configuration: any) => configuration.z === 0);
-    return entry.ready && entry.lightingKey === queue.lightingKey(runtime.renderLayer.scene);
+    return runtime.lightLayout.withLayout(runtime.renderLayer.scene, runtime.renderLayer.cameraRig.camera,
+      runtime.resources.pair.activeBody.position,
+      () => entry.ready && entry.lightingKey === queue.lightingKey(runtime.renderLayer.scene));
   });
   expect(entryLayoutPrepared, 'live startup priming must use the prepared entry light signature').toBe(true);
 
@@ -447,8 +449,12 @@ test('Cultivation draws prepared room and fade shadow variants without creating 
       const r = (window as any).__specimenCultivationRuntime, bob = r.resources.bobPresentation;
       for (const opacity of [0.5,0,1]) {
         r.__probeOpacity = opacity;bob.setOpacity(opacity);
-        r.renderLayer.renderer.compile(r.preparationLightState,r.renderLayer.cameraRig.camera,r.renderLayer.scene);
-        r.renderLayer.render();
+        // Manual fade draws must use the same bounded layout as runtime.render;
+        // authored layer masks are deliberately restored between real frames.
+        r.lightLayout.withLayout(r.renderLayer.scene,r.renderLayer.cameraRig.camera,r.resources.pair.activeBody.position,()=>{
+          r.renderLayer.renderer.compile(r.preparationLightState,r.renderLayer.cameraRig.camera,r.renderLayer.scene);
+          r.renderLayer.render();
+        });
       }
     });
   }
@@ -474,6 +480,85 @@ test('Cultivation draws prepared room and fade shadow variants without creating 
   expect(maintenance.drawn).toBe(true);
   expect(maintenance.calls).toBeLessThanOrEqual(1);
   expect(await page.evaluate(() => (window as any).__specimenCultivationRuntime.__coldDraws)).toEqual([]);
+});
+
+test('Cultivation bounds actual render lights across rooms, characters, power cycles and teardown', async ({page}) => {
+  test.setTimeout(600_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  const assertExposed = await exposeCultivationRuntime(page);
+  await enterCultivation(page); assertExposed();
+  const result = await page.evaluate(async () => {
+    const r = (window as any).__specimenCultivationRuntime, resources = r.resources;
+    const layer = r.renderLayer, renderer = layer.renderer, scene = layer.scene, camera = layer.cameraRig.camera;
+    renderer.setAnimationLoop(null); r.stop();
+    const stats = {fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,
+      stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60};
+    const rows: {points:number;spots:number;pointShadows:number;spotShadows:number;zeroAuthored:number}[] = [];
+    const original = layer.render;
+    layer.render = function() {
+      const row = {points:0,spots:0,pointShadows:0,spotShadows:0,zeroAuthored:0};
+      scene.traverseVisible((light:any) => {
+        if (!light.isLight || !light.layers.test(camera.layers)) return;
+        if (light.isPointLight) {row.points++; if(light.castShadow) row.pointShadows++;}
+        if (light.isSpotLight) {row.spots++; if(light.castShadow) row.spotShadows++;}
+        if ((light.isPointLight || light.isSpotLight) && light.intensity === 0 &&
+            light.parent !== r.lightLayout.root) row.zeroAuthored++;
+      });
+      rows.push(row); return original.call(this);
+    };
+    const drawReady = async () => {
+      r.render(1,stats);
+      const requested = r.preparationQueue.priority;
+      if (requested && !requested.ready) {await r.preparationQueue.prepareConfiguration(requested);r.render(1,stats);}
+    };
+    try {
+      for (const room of [1,2,3,4,5]) {
+        r.teleportToAuthoredPreviewRoom(room);
+        for (const character of room === 5 ? ['bob','goop','volt'] : ['bob','goop']) {
+          if (character === 'volt') r.registerRescuedVolt(resources);
+          if (!resources.manager.activate(character) || resources.manager.activeSlimeId !== character) throw new Error('Requested actor was not activated');
+          r.retargetCamera(resources);
+          resources.roomFiveEncounter.update(1/60);
+          await drawReady();
+        }
+      }
+      r.teleportToAuthoredPreviewRoom(5);
+      const masks: {light:any;mask:number}[] = [];
+      scene.traverse((light:any) => {if(light.isLight)masks.push({light,mask:light.layers.mask});});
+      const programs = [];
+      for (let round=0;round<3;round++) {
+        for (const state of ['red','blue','green','released','reset']) {
+          const security = resources.authoredPreview.roomFive.controller.security;
+          if (state === 'released') security.release(); else if (state === 'reset') security.reset(); else security.select(state);
+          resources.roomFiveEncounter.update(1/60); await drawReady();
+        }
+        programs.push(renderer.info.programs.length);
+      }
+      const masksRestored = masks.every(({light,mask})=>light.layers.mask===mask);
+      const restarts = [];
+      for(let i=0;i<3;i++){r.restartLevel();await drawReady();restarts.push(renderer.info.programs.length);}
+      const maps: {light:any;map:any;freed:number}[] = [];
+      scene.traverse((light:any)=>{if(light.isLight&&light.shadow?.map)maps.push({light,map:light.shadow.map,freed:0});});
+      for(const entry of maps) entry.map.addEventListener('dispose',()=>entry.freed++);
+      const glError = renderer.getContext().getError();
+      r.unload();
+      return {rows,programs,restarts,masksRestored,glError,maps:maps.length,
+        mapsReleased:maps.every(entry=>entry.freed===1&&entry.light.shadow.map===null)};
+    } finally {layer.render=original;}
+  });
+  expect(result.rows.length).toBeGreaterThan(20);
+  for (const row of result.rows) {
+    expect(row.points).toBeLessThanOrEqual(4); expect(row.spots).toBeLessThanOrEqual(3);
+    expect(row.pointShadows).toBeLessThanOrEqual(1); expect(row.spotShadows).toBeLessThanOrEqual(3);
+    expect(row.zeroAuthored).toBe(0);
+  }
+  expect(result.programs[2]).toBe(result.programs[1]);
+  expect(result.restarts[2]).toBe(result.restarts[1]);
+  expect(result.masksRestored).toBe(true); expect(result.maps).toBeGreaterThan(0);
+  expect(result.mapsReleased).toBe(true); expect(result.glError).toBe(0);
+  expect(errors).toEqual([]);
 });
 
 test('Cultivation background compilation and primers preserve active lighting and shadows', async ({page}) => {

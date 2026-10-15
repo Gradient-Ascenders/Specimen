@@ -39,6 +39,15 @@ canvas {
   display: none !important;
 }
 
+/* Hide current and future HUD overlays, including inline styles. Aiming UI
+ * keeps its own visibility rules; menus/recovery/loading remain functional.
+ * Only the real gameplay canvas is exempted among canvases. */
+#app[data-clean-gameplay="true"] > :not([data-gameplay-canvas]):not(.game-flow):not([data-clean-gameplay-essential]):not([data-clean-gameplay-aiming]),
+#app[data-clean-gameplay="true"] .specimen-combat-label,
+#app[data-clean-gameplay="true"] > .game-flow[data-state="playing"] {
+  display: none !important;
+}
+
 /* Development diagnostics remain deliberately utilitarian. */
 .test-panel {
   z-index: 5;

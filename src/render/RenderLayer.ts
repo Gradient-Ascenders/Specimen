@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { GelRendering, type GelRenderingMode } from './slime/GelRendering.ts';
 
 import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
 import { CameraRig } from './CameraRig.ts';
+import { GAMEPLAY_UI_LAYER, withGameplayUiVisibility } from './GameplayUiLayer.ts';
 import {
   DEFAULT_RENDER_PIXEL_RATIO_CAP,
   type RenderPixelRatioCap,
@@ -102,6 +104,8 @@ export interface RenderDiagnostics {
   readonly drawingBufferHeight: number;
   readonly pixelRatio: number;
   readonly pixelRatioCap: RenderPixelRatioCap;
+  readonly gelRenderingMode: GelRenderingMode;
+  readonly transmissionResolutionScale: number;
   readonly drawCalls: number;
   readonly triangles: number;
   readonly sceneObjects: number;
@@ -129,6 +133,7 @@ export class RenderLayer {
   readonly scene = new THREE.Scene();
   readonly cameraRig = new CameraRig();
   readonly renderer: THREE.WebGLRenderer;
+  readonly gelRendering: GelRendering;
   private readonly shadowPolicy: RenderShadowPolicy;
 
   private readonly host: HTMLElement;
@@ -140,6 +145,7 @@ export class RenderLayer {
   private viewportWidth = 0;
   private viewportHeight = 0;
   private disposed = false;
+  private cleanGameplay = false;
 
   constructor(options: RenderLayerOptions) {
     this.host = options.host;
@@ -148,6 +154,7 @@ export class RenderLayer {
       options.pixelRatioCap ?? DEFAULT_RENDER_PIXEL_RATIO_CAP;
 
     this.scene.name = 'game-scene';
+    this.cameraRig.camera.layers.enable(GAMEPLAY_UI_LAYER);
     this.scene.background = new THREE.Color(BACKGROUND_COLOUR);
 
     this.renderer = new THREE.WebGLRenderer({
@@ -155,6 +162,7 @@ export class RenderLayer {
       antialias: true,
       powerPreference: 'high-performance',
     });
+    this.gelRendering = new GelRendering(this.renderer);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = RENDER_EXPOSURE;
@@ -177,7 +185,13 @@ export class RenderLayer {
   }
 
   render(): void {
-    this.renderer.render(this.scene, this.cameraRig.camera);
+    withGameplayUiVisibility(this.cameraRig.camera, !this.cleanGameplay, () => {
+      this.renderer.render(this.scene, this.cameraRig.camera);
+    });
+  }
+
+  setCleanGameplayMode(clean: boolean): void {
+    this.cleanGameplay = clean;
   }
 
   requestShadowConfiguration(
@@ -231,6 +245,8 @@ export class RenderLayer {
       drawingBufferHeight: this.drawingBufferSize.y,
       pixelRatio: this.renderer.getPixelRatio(),
       pixelRatioCap: this.pixelRatioCap,
+      gelRenderingMode: this.gelRendering.value,
+      transmissionResolutionScale: this.renderer.transmissionResolutionScale,
       drawCalls: this.renderer.info.render.calls,
       triangles: this.renderer.info.render.triangles,
       sceneObjects,

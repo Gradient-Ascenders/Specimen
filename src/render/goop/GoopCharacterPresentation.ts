@@ -1,3 +1,4 @@
+import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
 import { CharacterDetail, loadCharacterDetail, type CharacterDetailIndices } from '../slime/CharacterDetail.ts';
@@ -42,6 +43,7 @@ export class GoopCharacterPresentation {
   private detail: CharacterDetail | undefined;
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
+  private readonly gelRendering: GelRendering | undefined;
   private readonly character = new THREE.Group();
   private readonly shape = new THREE.Group();
   private readonly burst = new SlimeBurstPresentation(GOOP_BASE_COLOR);
@@ -92,9 +94,10 @@ export class GoopCharacterPresentation {
   private deathActive = false;
   private deathElapsed = 0;
 
-  constructor(radiusMetres = 0.45) {
+  constructor(radiusMetres = 0.45, gelRendering?: GelRendering) {
     if (Math.abs(radiusMetres - 0.45) > 1e-6) throw new Error('Goop requires the approved 0.45 m radius');
     this.radiusMetres = radiusMetres;
+    this.gelRendering = gelRendering;
     this.root.name = 'player-slime-goop-presentation';
     this.character.name = 'player-slime-goop-character';
     this.shape.name = 'goop-sole-pivot';
@@ -136,7 +139,7 @@ export class GoopCharacterPresentation {
         for (const mesh of [asset.body, ...asset.eyes]) {
           for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) imported.add(material);
         }
-        const materials = new GoopMaterialSet();
+        const materials = new GoopMaterialSet(this.gelRendering);
         materials.setOpacity(this.opacity);
         materials.setReflectionEnvironment(this.environment);
         materials.setReflectionIntensity(this.bodyReflection, this.eyeReflection, true);

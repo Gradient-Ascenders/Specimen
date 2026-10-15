@@ -1,3 +1,4 @@
+import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
 
@@ -137,6 +138,7 @@ function measureCharacterAsset(
 export class BobCharacterPresentation {
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
+  private readonly gelRendering: GelRendering | undefined;
 
   private readonly mesh = new THREE.Group();
   private readonly gameplayPositionWorld = new THREE.Vector3();
@@ -146,6 +148,10 @@ export class BobCharacterPresentation {
     BobBodyPose,
     THREE.BufferAttribute | THREE.InterleavedBufferAttribute
   >();
+  private readonly activeWallContactWeights = new Float64Array(SUPPORTED_BODY_POSES.length);
+  private readonly activeWallContactMorphs = new Array<
+    THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined
+  >(SUPPORTED_BODY_POSES.length);
   private wallContactMorphsRelative = false;
   private readonly wallNormalLocal = new THREE.Vector3();
   private readonly wallClearanceNormal = new THREE.Vector3();
@@ -232,13 +238,14 @@ export class BobCharacterPresentation {
     blink: 0, effort: 0, surprise: 0, 'stress-expression': 0,
   };
 
-  constructor(radiusMetres: number) {
+  constructor(radiusMetres: number, gelRendering?: GelRendering) {
     if (Math.abs(radiusMetres - 0.45) > 1e-6) {
       throw new Error(
         `Bob Gate 1 presentation requires the 0.45 m gameplay radius; received ${radiusMetres}.`,
       );
     }
     this.radiusMetres = radiusMetres;
+    this.gelRendering = gelRendering;
     this.root.name = 'player-slime-bob-presentation';
     this.mesh.name = 'player-slime-bob-character';
     this.root.add(this.mesh, this.deathBurst.root);
@@ -290,7 +297,7 @@ export class BobCharacterPresentation {
           : [mesh.material];
         for (const material of materials) importedMaterials.add(material);
       }
-      const materialSet = new BobGateTwoMaterialSet();
+      const materialSet = new BobGateTwoMaterialSet(undefined, this.gelRendering);
       materialSet.setReflectionEnvironment(this.reflectionEnvironment);
       materialSet.setReflectionIntensity(
         this.bodyReflectionIntensity,
@@ -865,6 +872,7 @@ export class BobCharacterPresentation {
     this.assetDiagnostics = undefined;
     this.materialSet = undefined;
     this.materials.clear();
+    this.activeWallContactMorphs.fill(undefined);
     this.mesh.removeFromParent();
     this.mesh.clear();
     this.root.removeFromParent();
@@ -1089,6 +1097,20 @@ export class BobCharacterPresentation {
   private findWallContactMinimumProjection(): number {
     const positions = this.wallContactPositions;
     if (!positions) return Infinity;
+    // Resolve pose weights and attributes once per projection, in their authored
+    // order. Scratch slots are reused as poses change between presentation calls.
+    const weights = this.activeWallContactWeights;
+    const morphs = this.activeWallContactMorphs;
+    let activeCount = 0;
+    for (const pose of SUPPORTED_BODY_POSES) {
+      const weight = this.poseWeights[pose];
+      if (weight <= 0) continue;
+      weights[activeCount] = weight;
+      morphs[activeCount] = this.wallContactMorphs.get(pose)!;
+      activeCount += 1;
+    }
+    const relative = this.wallContactMorphsRelative;
+    const normal = this.wallNormalLocal;
     let minimumProjection = Infinity;
     for (let index = 0; index < positions.count; index += 1) {
       const baseX = positions.getX(index);
@@ -1097,21 +1119,18 @@ export class BobCharacterPresentation {
       let x = baseX;
       let y = baseY;
       let z = baseZ;
-      for (const pose of SUPPORTED_BODY_POSES) {
-        const weight = this.poseWeights[pose];
-        if (weight <= 0) continue;
-        const morph = this.wallContactMorphs.get(pose)!;
+      for (let pose = 0; pose < activeCount; pose += 1) {
+        const weight = weights[pose];
+        const morph = morphs[pose]!;
         x += weight * (morph.getX(index) -
-          (this.wallContactMorphsRelative ? 0 : baseX));
+          (relative ? 0 : baseX));
         y += weight * (morph.getY(index) -
-          (this.wallContactMorphsRelative ? 0 : baseY));
+          (relative ? 0 : baseY));
         z += weight * (morph.getZ(index) -
-          (this.wallContactMorphsRelative ? 0 : baseZ));
+          (relative ? 0 : baseZ));
       }
       minimumProjection = Math.min(minimumProjection,
-        x * this.wallNormalLocal.x +
-        y * this.wallNormalLocal.y +
-        z * this.wallNormalLocal.z);
+        x * normal.x + y * normal.y + z * normal.z);
     }
     return minimumProjection;
   }

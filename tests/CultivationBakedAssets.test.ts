@@ -6,6 +6,25 @@ import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import { CultivationBakedAssets, readCultivationBakedAssets, loadCultivationBakedAssets, type CultivationAssetSource } from '../src/render/environment/cultivation/CultivationBakedAssets.ts';
 import { CultivationAssetGenerator } from '../scripts/lib/cultivation-asset-generator.ts';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
+import { GelRendering } from '../src/render/slime/GelRendering.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+
+test('baked scene forwards the session gel policy to captive Volt and releases its registration', async () => {
+  const rendering = new GelRendering({ transmissionResolutionScale: 1 });
+  rendering.setMode('minimum');
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets, rendering);
+  try {
+    await scene.roomFive.captiveVoltPresentation.prepare(loadVolt);
+    const body = scene.roomFive.captiveVoltPresentation.root.getObjectByName('Volt-Body') as import('three').Mesh;
+    const material = body.material as import('three').MeshPhysicalMaterial;
+    assert.equal(rendering.materialCount, 1);
+    assert.equal(material.transmission, 0, 'late captive preparation inherits the active session mode');
+    rendering.setMode('physical');
+    assert.equal(material.transmission, 0.55);
+    assert.equal(scene.surfaceCleanup.repairedMeshes, cultivationAssets.manifest.repairs.length);
+  } finally { scene.dispose(); }
+  assert.equal(rendering.materialCount, 0);
+});
 
 test('every baked texture byte and sampler matches the retained offline generator', () => {
   const generator = new CultivationAssetGenerator();

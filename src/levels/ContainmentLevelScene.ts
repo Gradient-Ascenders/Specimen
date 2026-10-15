@@ -1,3 +1,4 @@
+import type { GelRendering } from '../render/slime/GelRendering.ts';
 import * as THREE from 'three';
 
 import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
@@ -167,7 +168,7 @@ export class ContainmentLevelScene {
 
   constructor(
     requestHazardFailure: (failure: ContainmentHazardFailure) => void,
-    options: { readonly includeDevelopmentHelpers?: boolean } = {},
+    options: { readonly includeDevelopmentHelpers?: boolean; readonly gelRendering?: GelRendering } = {},
   ) {
     // Retain the validated hierarchy name because it is part of the frozen
     // collision parent path; production art is layered beneath it.
@@ -175,7 +176,7 @@ export class ContainmentLevelScene {
     this.teaching = new ContainmentTeachingScene(this.artResources, options);
     this.roomThree = new RoomThreeGreybox(requestHazardFailure, this.artResources);
     this.roomFour = new RoomFourGreybox(requestHazardFailure, this.artResources);
-    this.roomFive = new RoomFiveGreybox(requestHazardFailure, this.artResources);
+    this.roomFive = new RoomFiveGreybox(requestHazardFailure, this.artResources, options.gelRendering);
     this.root.add(
       this.teaching.root,
       this.roomThree.root,

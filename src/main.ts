@@ -13,6 +13,7 @@ import { RenderLayer } from './render/RenderLayer.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
+import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -39,6 +40,7 @@ const renderLayer = new RenderLayer({
   pixelRatioCap: settings.value.renderPixelRatioCap,
 });
 const input = new Input({ pointerLockElement: renderLayer.canvas });
+renderLayer.canvas.dataset.gameplayCanvas = 'true';
 const debugAvailable =
   import.meta.env.DEV ||
   new URLSearchParams(window.location.search).get('debug') === '1';
@@ -96,6 +98,13 @@ const gameSession = new GameSessionCoordinator({
   },
 });
 const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
+let warmedLevelOneProgramBaseline: number | undefined;
+let levelOneShaderProgramGuardActive = true;
+let levelOneShaderProgramGuardInvalidation: string | undefined;
+let sampleLevelOneShaderPrograms: (() => void) | undefined;
+let performanceRecorder:
+  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
+  | undefined;
 const gameFlow = new GameFlowUI({
   settings,
   creditsMarkdown,
@@ -126,15 +135,22 @@ const gameFlow = new GameFlowUI({
         nextSettings.cameraDistanceMetres,
       );
       renderLayer.setPixelRatioCap(nextSettings.renderPixelRatioCap);
+      if (renderLayer.gelRendering.value !== nextSettings.gelRenderingMode) {
+        levelOneShaderProgramGuardActive = false;
+        sampleLevelOneShaderPrograms = undefined;
+        levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
+        performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
+      }
+      renderLayer.gelRendering.setMode(nextSettings.gelRenderingMode);
     },
   },
 });
-let warmedLevelOneProgramBaseline: number | undefined;
-let levelOneShaderProgramGuardActive = true;
-let sampleLevelOneShaderPrograms: (() => void) | undefined;
-let performanceRecorder:
-  | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
-  | undefined;
+const cleanGameplayMode = new CleanGameplayMode({
+  host: app,
+  flow: gameFlow,
+  prepareGameplay: () => gameSession.prepareCleanGameplay(),
+  present: (clean) => renderLayer.setCleanGameplayMode(clean),
+});
 const unsubscribeObjectiveChanged = gameSession.events.on(
   'objectiveChanged',
   ({ objective }) => gameFlow.setObjective(objective),
@@ -184,6 +200,9 @@ if (debugAvailable) {
       });
       performanceRecorder = recorder;
       loop.setProfiler(recorder);
+      if (levelOneShaderProgramGuardInvalidation) {
+        recorder.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
+      }
       if (
         levelOneShaderProgramGuardActive &&
         warmedLevelOneProgramBaseline !== undefined
@@ -255,6 +274,7 @@ const shutdown = (): void => {
   unsubscribeTransitionCompleted();
   unsubscribeTransitionFailed();
   performanceRecorder?.dispose();
+  cleanGameplayMode.dispose();
   gameFlow.dispose();
   gameSession.dispose();
   audio.dispose();

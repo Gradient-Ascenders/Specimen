@@ -109,6 +109,7 @@ export class VoltElectricalPresentation {
 
     const element = hostDocument.createElement('div');
     element.className = 'volt-electrical-overlay';
+    element.setAttribute('data-clean-gameplay-aiming', '');
     element.setAttribute('aria-live', 'polite');
 
     const crosshair = hostDocument.createElement('span');
