@@ -24,7 +24,7 @@ test('ordinary Cultivation coverage uses seven bounded sources and preserves Roo
     assert.ok(volt instanceof THREE.PointLight);
     assert.deepEqual(volt.shadow.mapSize.toArray(), [512, 512]);
     assert.equal(volt.intensity, 50); assert.equal(volt.distance, 12);
-    assert.equal(scene.roomFive.captiveVolt.castShadow, false);
+    assert.equal(scene.roomFive.captiveVoltPresentation.diagnostics.shadowCasting, false);
     for (const glass of scene.roomFive.glassPanels) assert.equal(glass.castShadow, false);
     const hulls: THREE.Mesh[] = [], receivers: THREE.Mesh[] = [];
     scene.roomFive.root.traverse(o => {

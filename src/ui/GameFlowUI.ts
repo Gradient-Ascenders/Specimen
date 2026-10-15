@@ -366,6 +366,8 @@ export class GameFlowUI {
   private readonly invertVerticalOutput: HTMLOutputElement;
   private readonly volumeInput: HTMLInputElement;
   private readonly volumeOutput: HTMLOutputElement;
+  private readonly effectsInput: HTMLInputElement;
+  private readonly effectsOutput: HTMLOutputElement;
   private readonly cameraDistanceInput: HTMLInputElement;
   private readonly cameraDistanceOutput: HTMLOutputElement;
   private readonly renderResolutionInput: HTMLSelectElement;
@@ -411,6 +413,8 @@ export class GameFlowUI {
     this.volumeOutput = this.requireElement<HTMLOutputElement>(
       '[data-setting-output="volume"]',
     );
+    this.effectsInput = this.requireElement<HTMLInputElement>('[data-setting="effects-volume"]');
+    this.effectsOutput = this.requireElement<HTMLOutputElement>('[data-setting-output="effects-volume"]');
     this.cameraDistanceInput = this.requireElement<HTMLInputElement>(
       '[data-setting="camera-distance"]',
     );
@@ -659,7 +663,14 @@ export class GameFlowUI {
               <output for="master-volume" data-setting-output="volume"></output>
             </div>
             <input id="master-volume" data-setting="volume" type="range" min="0" max="100" step="5">
-            <p class="setting-note">Stored for this session. Audio output is not yet connected.</p>
+            <p class="setting-note">Stored for this session. Controls all game audio.</p>
+          </div>
+          <div class="setting-row">
+            <div class="setting-heading">
+              <label for="effects-volume">Sound effects volume</label>
+              <output for="effects-volume" data-setting-output="effects-volume"></output>
+            </div>
+            <input id="effects-volume" data-setting="effects-volume" type="range" min="0" max="100" step="5">
           </div>
           <div class="setting-row">
             <div class="setting-heading">
@@ -752,6 +763,7 @@ export class GameFlowUI {
       { signal },
     );
     this.volumeInput.addEventListener('input', this.onVolumeInput, { signal });
+    this.effectsInput.addEventListener('input', this.onEffectsInput, { signal });
     this.cameraDistanceInput.addEventListener(
       'input',
       this.onCameraDistanceInput,
@@ -943,6 +955,10 @@ export class GameFlowUI {
     this.settings.setInvertVerticalLook(this.invertVerticalInput.checked);
   };
 
+  private readonly onEffectsInput = (): void => {
+    this.settings.setSoundEffectsVolume(this.effectsInput.valueAsNumber / 100);
+  };
+
   private readonly onVolumeInput = (): void => {
     this.settings.setMasterVolume(this.volumeInput.valueAsNumber / 100);
   };
@@ -977,6 +993,9 @@ export class GameFlowUI {
       `${settings.masterVolume * 100}%`,
     );
     this.volumeOutput.value = `${Math.round(settings.masterVolume * 100)}%`;
+    this.effectsInput.value = String(Math.round(settings.soundEffectsVolume * 100));
+    this.effectsInput.style.setProperty('--range-progress', `${settings.soundEffectsVolume * 100}%`);
+    this.effectsOutput.value = `${Math.round(settings.soundEffectsVolume * 100)}%`;
     this.cameraDistanceInput.value = settings.cameraDistanceMetres.toFixed(1);
     this.cameraDistanceInput.style.setProperty(
       '--range-progress',

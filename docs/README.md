@@ -12,6 +12,8 @@ for implementation details and historical evidence.
   lighting, shadows, preparation, and asset boundaries.
 - [Goop model integration](architecture/goop-model-integration.md) — implementation
   specification for the authored Goop model and shared gel presentation.
+- [Volt model integration](architecture/volt-model-integration.md) — implementation
+  specification for Volt's authored model, morphs, rescue and electrical lifecycle.
 - [Architecture decisions](decisions/README.md) — concise accepted decisions.
 
 ## Gameplay

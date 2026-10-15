@@ -1,3 +1,6 @@
+import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
+import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
@@ -66,7 +69,6 @@ import {
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import type { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
-import { SlimeBurstPresentation } from '../render/slime/SlimeBurstPresentation.ts';
 import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
 import { CameraShadowCulling } from '../render/CameraShadowCulling.ts';
 import { optimizeFiniteLightEvaluation } from '../render/environment/cultivation/FiniteLightEvaluation.ts';
@@ -109,6 +111,7 @@ const CULTIVATION_BOB_REFLECTION = {
 } as const;
 
 export interface CultivationLevelRuntimeOptions {
+  readonly audio?: AudioPlayback;
   readonly host: HTMLElement;
   readonly input: Input;
   readonly renderLayer: RenderLayer;
@@ -123,7 +126,10 @@ interface CultivationRuntimeResources {
   readonly roomFiveDamage: SlimeDamageVignette | undefined;
   readonly roomFiveView: SecurityNetworkView | undefined;
   readonly voltBody: KinematicBody;
-  readonly voltVisual: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
+  readonly voltPresentation: VoltCharacterPresentation;
+  readonly voltPresentationState: VoltCharacterPresentationState;
+  readonly voltMovementEvents: EventBus<MovementEvents>;
+  readonly renderedVoltPosition: THREE.Vector3;
   readonly scene: CultivationLevelScene;
   readonly authoredPreview: LevelTwoPreviewScene | undefined;
   readonly collisionWorld: CollisionWorld;
@@ -174,7 +180,6 @@ interface CultivationRuntimeResources {
   readonly bobReflectionEnvironment: BobReflectionEnvironment;
   readonly bobPresentation: BobCharacterPresentation;
   readonly pairPresentation: SlimePairPresentation;
-  readonly nonBobBurst: SlimeBurstPresentation;
   readonly deathSequence: DeathSequence;
   readonly deathScreen: DeathScreen;
   readonly bobPresentationState: BobCharacterPresentationState;
@@ -194,6 +199,8 @@ export class CultivationLevelRuntime {
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
+  private readonly audio: AudioPlayback | undefined;
+  private gameplayAudio: GameplayAudio | undefined;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
@@ -240,6 +247,7 @@ export class CultivationLevelRuntime {
 
   constructor(options: CultivationLevelRuntimeOptions) {
     validateLevelProgressionSnapshot(options.progression);
+    this.audio = options.audio;
     this.host = options.host;
     this.input = options.input;
     this.renderLayer = options.renderLayer;
@@ -283,6 +291,8 @@ export class CultivationLevelRuntime {
     return this.presentationPreparation ??= Promise.all([
       resources.bobPresentation.prepare(),
       resources.goopPresentation.prepare(),
+      resources.voltPresentation.prepare(),
+      ...(resources.authoredPreview ? [resources.authoredPreview.roomFive.captiveVoltPresentation.prepare()] : []),
     ])
       .then(() => {
         if (this.resources !== resources) return;
@@ -313,6 +323,10 @@ export class CultivationLevelRuntime {
             renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene,
               this.renderLayer.cameraRig.camera, []));
           resources.goopPresentation.primeDeathResources(resources.pair.goopBody.position, root => {
+            withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+              renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
+          });
+          resources.voltPresentation.primeDeathResources(resources.voltBody.position, root => {
             withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
               renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
           });
@@ -425,9 +439,10 @@ export class CultivationLevelRuntime {
   }
 
   fixedUpdate(deltaSeconds: number): void {
-    if (this.preparationQueue?.diagnostics.pending) { this.input.endFixedUpdate(); return; }
+    if (this.preparationQueue?.diagnostics.pending) { this.gameplayAudio?.setEnabled(false); this.input.endFixedUpdate(); return; }
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
+    if (resources.deathSequence.isPlaying) this.gameplayAudio?.setEnabled(true);
     if (!resources.deathSequence.isPlaying) {
       resources.authoredPreview?.labArt.acid.update(deltaSeconds);
       if (this.lastDeathSlimeId === 'bob') {
@@ -435,9 +450,10 @@ export class CultivationLevelRuntime {
       } else if (this.lastDeathSlimeId === 'goop') {
         resources.goopPresentation.updateDeath(deltaSeconds);
       } else {
-        resources.nonBobBurst.update(deltaSeconds);
+        resources.voltPresentation.updateDeath(deltaSeconds);
       }
       if (resources.deathSequence.update(deltaSeconds)) resources.deathScreen.show();
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -446,6 +462,7 @@ export class CultivationLevelRuntime {
     ) {
       this.input.setEnabled(false);
       this.input.releasePointerLock();
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -456,10 +473,12 @@ export class CultivationLevelRuntime {
     const debugRoomId = this.consumeAuthoredPreviewTeleport();
     if (debugRoomId !== undefined) {
       this.teleportToAuthoredPreviewRoom(debugRoomId);
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
     if (resources.authoredPreview?.roomFive.controller.complete) {
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate(); return;
     }
 
@@ -607,6 +626,7 @@ export class CultivationLevelRuntime {
           : resources.noMovement,
       );
     }
+    this.gameplayAudio?.update();
     this.input.endFixedUpdate();
   }
 
@@ -622,10 +642,11 @@ export class CultivationLevelRuntime {
     resources.bobPresentation.present(interpolationAlpha);
     resources.goopPresentation.setPosition(resources.renderedGoopPosition);
     resources.goopPresentation.present(interpolationAlpha);
-    if (resources.manager.isAvailable('volt')) {
-      this.interpolate(resources.voltBody, interpolationAlpha, resources.voltVisual.position);
-      resources.voltVisual.visible = resources.deathSequence.isPlaying || this.lastDeathSlimeId !== 'volt';
-    }
+    this.interpolate(resources.voltBody, interpolationAlpha, resources.renderedVoltPosition);
+    resources.voltPresentation.setPosition(resources.renderedVoltPosition);
+    resources.voltPresentation.setVisible(resources.manager.isAvailable('volt'));
+    resources.voltPresentation.present(interpolationAlpha);
+    resources.authoredPreview?.roomFive.captiveVoltPresentation.present(interpolationAlpha);
     // A render frame can occur without a fixed update. Preserve the same
     // pointer-sampling behaviour as Level 1 so those frames apply mouse input
     // instead of discarding it and making Level 2 sensitivity frame-rate
@@ -657,6 +678,12 @@ export class CultivationLevelRuntime {
     );
     this.updateBobLighting(resources, bobLightingRoom);
     this.updateBobLighting(resources, resources.authoredPreview?.resolveRoomId(resources.pair.goopBody.position), resources.goopPresentation, resources.renderedGoopPosition);
+    this.updateBobLighting(resources, resources.authoredPreview?.resolveRoomId(resources.voltBody.position), resources.voltPresentation, resources.renderedVoltPosition);
+    const captive = resources.authoredPreview?.roomFive.captiveVoltPresentation;
+    if (captive) {
+      const position = resources.authoredPreview!.roomFive.pod.getWorldPosition(this.roomFiveLocal);
+      this.updateBobLighting(resources, 5, captive, position);
+    }
     const aimPresentationAllowed =
       this.lifecycle.state === 'running' &&
       resources.deathSequence.isPlaying &&
@@ -712,6 +739,8 @@ export class CultivationLevelRuntime {
     resources.goopPresentation.setOpacity(resources.manager.activeSlimeId === 'goop'
       ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
         this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
+    resources.voltPresentation.setOpacity(resources.manager.activeSlimeId === 'volt'
+      ? resolveCameraTargetOpacity(this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25) : 1);
     resources.droneProjectilePresentation?.update(interpolationAlpha);
     resources.roomFourProjectiles?.update(interpolationAlpha);
     resources.roomFiveEncounter?.presentation.update(interpolationAlpha);
@@ -900,6 +929,8 @@ export class CultivationLevelRuntime {
       const goopDefinition = manager.getDefinition('goop');
       const movementEvents = new EventBus<MovementEvents>();
       const goopMovementEvents = new EventBus<MovementEvents>();
+      const voltMovementEvents = new EventBus<MovementEvents>();
+      rollback(() => voltMovementEvents.clear());
       rollback(() => goopMovementEvents.clear());
       rollback(() => movementEvents.clear());
       const bobBody = new KinematicBody({
@@ -933,13 +964,12 @@ export class CultivationLevelRuntime {
         initialActiveSlimeId: this.initialProgression.activeSlimeId === 'volt' ? 'bob' : this.initialProgression.activeSlimeId,
       });
       const voltBody = new KinematicBody({ world: collisionWorld, surfaces: surfaceRegistry,
-        initialPosition: new THREE.Vector3(), config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false } });
-      const voltVisual = new THREE.Mesh(new THREE.SphereGeometry(voltBody.radiusMetres, 24, 18),
-        new THREE.MeshStandardMaterial({ color: 0xffe85c, emissive: 0xffd21a, emissiveIntensity: .7, roughness: .3 }));
-      rollback(() => { voltVisual.removeFromParent(); voltVisual.geometry.dispose(); voltVisual.material.dispose(); });
-      voltVisual.name = 'volt-runtime-body'; voltVisual.visible = false;
-      voltVisual.castShadow = true; voltVisual.receiveShadow = true;
-      this.renderLayer.scene.add(voltVisual);
+        initialPosition: new THREE.Vector3(), events: voltMovementEvents, config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false } });
+      const voltPresentation = new VoltCharacterPresentation(voltBody.radiusMetres);
+      rollback(() => voltPresentation.dispose());
+      voltPresentation.setCollisionWorld(collisionWorld);
+      voltPresentation.setVisible(false);
+      this.renderLayer.scene.add(voltPresentation.root);
       const previewOccupants = [
         {
           id: 'bob' as const,
@@ -1139,6 +1169,8 @@ export class CultivationLevelRuntime {
         this.renderLayer.renderer,
       );
       rollback(() => bobReflectionEnvironment.dispose());
+      voltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
+      authoredPreview?.roomFive.captiveVoltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       const goopPresentation = new GoopCharacterPresentation(goopBody.radiusMetres);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(goopBody.position);
@@ -1200,9 +1232,6 @@ export class CultivationLevelRuntime {
       const pairPresentation = new SlimePairPresentation(bobBody.radiusMetres);
       rollback(() => pairPresentation.dispose());
       this.renderLayer.scene.add(pairPresentation.root);
-      const nonBobBurst = new SlimeBurstPresentation();
-      rollback(() => nonBobBurst.dispose());
-      this.renderLayer.scene.add(nonBobBurst.root);
       const debugPanel = this.debugAvailable
         ? new this.debugSupport!.TestPanel(
             () => this.restartLevel(),
@@ -1236,8 +1265,11 @@ export class CultivationLevelRuntime {
       this.host.append(deathScreen.element);
 
       const goopPresentationState = this.createBobPresentationState(goopBody);
+      const voltPresentationState = this.createBobPresentationState(voltBody);
       const bobPresentationState = this.createBobPresentationState(bobBody);
       const unsubscribeBobPresentationEvents = [
+        voltMovementEvents.on('landed', event => voltPresentation.onLanding(voltBody.groundNormal, event.impactSpeedMetresPerSecond)),
+        voltMovementEvents.on('jumped', event => voltPresentation.onLaunch(event)),
         goopMovementEvents.on('landed', event => goopPresentation.onLanding(goopBody.groundNormal, event.impactSpeedMetresPerSecond)),
         goopMovementEvents.on('jumped', event => goopPresentation.onLaunch(event)),
         movementEvents.on('landed', (event) => {
@@ -1299,7 +1331,7 @@ export class CultivationLevelRuntime {
       });
 
       this.resources = {
-        roomFiveEncounter, roomFiveDamage, roomFiveView, voltBody, voltVisual,
+        roomFiveEncounter, roomFiveDamage, roomFiveView, voltBody, voltPresentation, voltPresentationState, voltMovementEvents, renderedVoltPosition: new THREE.Vector3(),
         scene, authoredPreview, collisionWorld, surfaceRegistry,
         dissolveTargets, previewDissolveTargets,
         dissolveSystem, acidProjectileSystem, goopAcidPresentation,
@@ -1311,7 +1343,7 @@ export class CultivationLevelRuntime {
         radiation, radiationTargets, previewOccupants,
         acidContactBodies: [bobBody, goopBody],
         movementEvents, goopMovementEvents, goopPresentation, goopPresentationState, bobReflectionEnvironment, bobPresentation,
-        pairPresentation, nonBobBurst,
+        pairPresentation,
         deathSequence, deathScreen, bobPresentationState,
         jumpInputState: {
           pressed: false,
@@ -1329,6 +1361,14 @@ export class CultivationLevelRuntime {
         unsubscribeBobPresentationEvents,
         unsubscribeManager,
       };
+      if (this.audio) {
+        const gameplayAudio = new GameplayAudio(this.audio, manager, acidProjectileSystem);
+        this.gameplayAudio = gameplayAudio;
+        rollback(() => {
+          gameplayAudio.dispose();
+          if (this.gameplayAudio === gameplayAudio) this.gameplayAudio = undefined;
+        });
+      }
       if (authoredPreview) {
         // Level 1's Digit0 shortcut now enters the authored three-room route
         // immediately. The separate backend-foundation composition remains a
@@ -1357,6 +1397,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly startResources = (): void => {
+    this.gameplayAudio?.setEnabled(true);
     const resources = this.requireResources();
     resources.goopAcidPresentation.resume();
     this.input.resetState();
@@ -1368,6 +1409,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    this.gameplayAudio?.setEnabled(false);
     const resources = this.requireResources();
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
@@ -1375,11 +1417,13 @@ export class CultivationLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.gameplayAudio?.reset();
     const resources = this.requireResources();
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
-    resources.nonBobBurst.reset();
+    resources.voltPresentation.reset();
+    resources.voltPresentation.setVisible(resources.manager.isAvailable('volt'));
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
     resources.authoredPreview?.reset();
@@ -1412,6 +1456,8 @@ export class CultivationLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.gameplayAudio?.dispose();
+    this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.cameraShadowCulling = undefined;
     this.preparationQueue?.dispose(); this.preparationQueue = undefined;
@@ -1439,7 +1485,7 @@ export class CultivationLevelRuntime {
     resources.roomFiveEncounter?.dispose();
     this.shadowRequest?.dispose();
     this.shadowRequest = undefined;
-    resources.voltVisual.removeFromParent(); resources.voltVisual.geometry.dispose(); resources.voltVisual.material.dispose();
+    resources.voltPresentation.dispose();
     resources.damageVignette?.dispose();
     resources.droneProjectilePresentation?.dispose();
     resources.roomThreeEncounter?.dispose();
@@ -1451,7 +1497,6 @@ export class CultivationLevelRuntime {
     resources.acidProjectileSystem.dispose();
     resources.dissolveSystem.dispose();
     for (const target of resources.dissolveTargets) target.dispose();
-    resources.nonBobBurst.dispose();
     resources.bobPresentation.dispose();
     resources.goopPresentation.dispose();
     resources.bobReflectionEnvironment.dispose();
@@ -1462,6 +1507,7 @@ export class CultivationLevelRuntime {
     resources.scene.dispose();
     resources.movementEvents.clear();
     resources.goopMovementEvents.clear();
+    resources.voltMovementEvents.clear();
     resources.collisionWorld.clear();
     resources.surfaceRegistry.clear();
     this.renderLayer.cameraRig.clearFollowTarget();
@@ -1545,7 +1591,8 @@ export class CultivationLevelRuntime {
     resources.droneProjectilePresentation?.reset();
     resources.damageVignette?.reset();
     resources.buttonDoorCoordinator.setEnabled(false);
-    resources.nonBobBurst.reset();
+    resources.voltPresentation.reset();
+    resources.voltPresentation.setVisible(resources.manager.isAvailable('volt'));
     this.resetRoomFour(resources);
     this.resetRoomFive(resources);
     resources.deathSequence.reset();
@@ -1659,7 +1706,8 @@ export class CultivationLevelRuntime {
     room.pod.getWorldPosition(this.roomFiveLocal);
     resources.voltBody.recoverAt(this.roomFiveLocal);
     if (!resources.manager.isRegistered('volt')) resources.manager.registerBody('volt', resources.voltBody);
-    resources.manager.unlock('volt'); resources.voltVisual.visible = true;
+    resources.manager.unlock('volt'); resources.voltPresentation.reset();
+    resources.voltPresentation.setPosition(resources.voltBody.position); resources.voltPresentation.setVisible(true);
     this.notifyHUD();
   }
 
@@ -1674,7 +1722,7 @@ export class CultivationLevelRuntime {
       this.registerRescuedVolt(resources);
       if (this.authoredPreviewRecoveryActiveSlimeId === 'volt') resources.manager.activate('volt');
     } else {
-      resources.manager.lock('volt'); resources.voltVisual.visible = false;
+      resources.manager.lock('volt'); resources.voltPresentation.reset(); resources.voltPresentation.setVisible(false);
     }
   }
 
@@ -1824,11 +1872,12 @@ export class CultivationLevelRuntime {
     const presentationStarted = dyingSlimeId === 'bob'
       ? resources.bobPresentation.startDeath(dyingBody.position)
       : dyingSlimeId === 'goop' ? resources.goopPresentation.startDeath(dyingBody.position)
-      : resources.nonBobBurst.start(dyingBody.position);
+      : resources.voltPresentation.startDeath(dyingBody.position);
     if (!presentationStarted) {
       resources.deathSequence.reset();
       return false;
     }
+    this.gameplayAudio?.died(dyingSlimeId);
     this.lastDeathSlimeId = dyingSlimeId;
     this.input.setEnabled(false);
     this.input.releasePointerLock();
@@ -1838,9 +1887,11 @@ export class CultivationLevelRuntime {
   private readonly retryAfterDeath = (): void => {
     const resources = this.requireResources();
     if (!resources.deathSequence.completeRetry()) return;
-    resources.nonBobBurst.reset();
+    this.gameplayAudio?.respawn();
     resources.bobPresentation.finishDeath(resources.pair.bobBody.position);
     resources.goopPresentation.finishDeath(resources.pair.goopBody.position);
+    resources.voltPresentation.finishDeath(resources.voltBody.position);
+    resources.voltPresentation.setVisible(resources.manager.isAvailable('volt'));
     this.lastDeathSlimeId = undefined;
     resources.goopAcidPresentation.reset();
     resources.deathScreen.hide();
@@ -1889,6 +1940,10 @@ export class CultivationLevelRuntime {
     goopState.grounded = resources.pair.goopBody.grounded;
     goopState.movementIntentWorld = resources.pair.activeBody === resources.pair.goopBody ? resources.movement : resources.noMovement;
     resources.goopPresentation.update(deltaSeconds, goopState);
+    resources.voltPresentationState.grounded = resources.voltBody.grounded;
+    resources.voltPresentationState.movementIntentWorld = resources.pair.activeBody === resources.voltBody ? resources.movement : resources.noMovement;
+    resources.voltPresentation.setPosition(resources.voltBody.position);
+    resources.voltPresentation.update(deltaSeconds, resources.voltPresentationState);
   }
 
   private createBobPresentationState(
@@ -1917,7 +1972,7 @@ export class CultivationLevelRuntime {
   private updateBobLighting(
     resources: CultivationRuntimeResources,
     bobLightingRoom: number | undefined,
-    presentation: BobCharacterPresentation | GoopCharacterPresentation = resources.bobPresentation,
+    presentation: BobCharacterPresentation | GoopCharacterPresentation | VoltCharacterPresentation = resources.bobPresentation,
     position = resources.renderedBobPosition,
   ): void {
     let darkWeight = 0;
@@ -2055,7 +2110,9 @@ export class CultivationLevelRuntime {
     if (!resources.manager.isRegistered('volt')) resources.manager.registerBody('volt', resources.voltBody);
     resources.manager.unlock('volt');
     resources.voltBody.recoverAt(this.roomFiveLocal.copy(resources.pair.bobBody.position));
-    resources.voltVisual.visible = true;
+    resources.voltPresentation.reset();
+    resources.voltPresentation.setPosition(resources.voltBody.position); resources.voltPresentation.setVisible(true);
+    resources.authoredPreview?.roomFive.captiveVoltPresentation.setVisible(false);
     this.notifyHUD();
   }
 

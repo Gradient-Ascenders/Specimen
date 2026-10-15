@@ -1,3 +1,4 @@
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -538,6 +539,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
     );
     this.cooldownRemainingSecondsValue = this.config.fireCooldownSeconds;
     this.firedCount += 1;
+    gameplayAudioEvents.emit('cue', { sound: 'goop-shoot-01', position: projectile.position });
     this.events.emit('projectileFired', {
       projectileId: projectile.state.id,
       position: pointPayload(projectile.position),
@@ -638,6 +640,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
         point: pointPayload(hit.point),
       });
     }
+    gameplayAudioEvents.emit('cue', { sound: 'goop-projectile-impact-01', position: hit.point });
     this.deactivateProjectile(projectile);
   }
 
@@ -658,6 +661,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   }
 
   private deactivateProjectile(projectile: AcidProjectileSlot): void {
+    gameplayAudioEvents.emit('stop', { key: `acid:${projectile.state.id}` });
     projectile.state.active = false;
     projectile.ageSeconds = 0;
     projectile.distanceTravelledMetres = 0;
@@ -675,6 +679,7 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   private setAimActive(active: boolean): void {
     if (this.aimReadModelValue.active === active) return;
     this.aimReadModelValue.active = active;
+    gameplayAudioEvents.emit('cue', { sound: active ? 'goop-aim-enter-01' : 'goop-aim-exit-01' });
     this.events.emit(active ? 'aimEntered' : 'aimExited', {});
   }
 

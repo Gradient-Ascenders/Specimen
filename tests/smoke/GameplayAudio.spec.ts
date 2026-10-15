@@ -1,0 +1,74 @@
+import { expect, test } from '@playwright/test';
+
+test('54 OGGs decode beneath nested base and gameplay owns charge, movement, pause and reset audio', async ({ page }) => {
+  const errors: string[] = [], audioRequests: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('request', request => { if (request.url().endsWith('.ogg')) audioRequests.push(request.url()); });
+  // Expose the existing runtime to observe actual Web Audio resources, without
+  // replacing gameplay or audio code. Plain production smoke remains separate.
+  await page.route('**/assets/index-*.js', async route => {
+    const response = await route.fetch(), source = await response.text();
+    const pattern = /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
+    expect(source).toMatch(pattern);
+    await route.fulfill({ response, body: source.replace(pattern,
+      '(globalThis.__audioRuntime=$1,$1.prepareLightingPrograms()).then(') });
+  });
+  await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
+  await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.loaded === 54);
+  expect(new Set(audioRequests).size).toBe(54);
+  expect(audioRequests.every(url => new URL(url).pathname.startsWith('/group-folder/assets/audio/'))).toBe(true);
+  // This test advances gameplay manually. Stop rendering before Start so a
+  // software-rendered gameplay frame cannot block the audio/input checks.
+  await page.evaluate(() => (window as any).__audioRuntime.renderLayer.setAnimationLoop(null));
+  // Start is the trusted gesture that unlocks audio and requests pointer lock.
+  await page.locator('[data-action="start"]').click();
+  await page.waitForFunction(() => document.pointerLockElement === document.querySelector('canvas'));
+  await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
+  await page.evaluate(() => {
+    const runtime=(window as any).__audioRuntime;
+    runtime.resources.body.teleport({x:3,y:0.46,z:0});
+  });
+  const step=async(count:number)=>page.evaluate(count=>{
+    const runtime=(window as any).__audioRuntime;
+    for(let i=0;i<count;i++) runtime.fixedUpdate(1/60);
+    return { ...runtime.audio.diagnostics, keys:[...runtime.audio.loops.keys()] };
+  },count);
+  await page.keyboard.down('KeyW');
+  const moving=await step(8);
+  expect(moving.keys).toContain('character:movement');
+  await page.keyboard.up('KeyW'); await step(40);
+  await page.keyboard.down('Space');
+  const charging=await step(12);
+  expect(charging.keys).toContain('character:charge');
+  await page.keyboard.up('Space');
+  const jumped=await step(1);
+  expect(jumped.keys).not.toContain('character:charge');
+  expect(jumped.played).toBeGreaterThan(charging.played);
+  await step(150);
+  await page.keyboard.down('Space'); await step(8);
+  await page.keyboard.press('Tab');
+  const switched=await step(1);
+  expect(switched.keys).not.toContain('character:charge');
+  await page.keyboard.up('Space');
+  await page.keyboard.press('KeyP');
+  await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
+  await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'suspended');
+  await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  await page.locator('[data-setting="volume"]').press('Home');
+  await page.locator('[data-setting="effects-volume"]').press('Home');
+  for (let i=0;i<7;i++) await page.locator('[data-setting="effects-volume"]').press('ArrowRight');
+  const volume=await page.evaluate(()=>(window as any).__audioRuntime.audio.diagnostics);
+  expect(volume.masterVolume).toBe(0); expect(volume.effectsVolume).toBe(0.35);
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
+  await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
+  const reset=await step(1);
+  expect(reset.keys).not.toContain('character:charge');
+  expect(reset.keys.some(key=>key.startsWith('acid:') || key.startsWith('dissolve:'))).toBe(false);
+  await page.evaluate(() => (window as any).__audioRuntime.unload());
+  const unloaded=await page.evaluate(()=>(window as any).__audioRuntime.audio.diagnostics);
+  expect(unloaded.loops).toBe(0); expect(unloaded.voices).toBe(0);
+  expect(unloaded.failed).toEqual([]); expect(errors).toEqual([]);
+});

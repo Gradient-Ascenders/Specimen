@@ -215,7 +215,7 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
   await page.mouse.down({ button: 'right' });
   await page.waitForFunction(() => (window as any).__goopBlackout.resources.acidProjectileSystem.aimReadModel.active);
   expect((await sample('__goopBlackout', 'blackout-acid-aim')).goop.visible).toBe(false);
-  expect(await page.evaluate(() => (window as any).__goopBlackout.resources.visuals.volt.visible)).toBe(true);
+  expect(await page.evaluate(() => (window as any).__goopBlackout.resources.voltPresentation.diagnostics.visible)).toBe(true);
   await screenshot('blackout-acid-aim'); await page.mouse.up({ button: 'right' }); await frames();
   await page.evaluate(() => {
     const rt = (window as any).__goopBlackout;

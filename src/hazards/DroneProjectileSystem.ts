@@ -1,3 +1,4 @@
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -149,6 +150,7 @@ export class DroneProjectileSystem {
     slot.read.ownerDroneId = ownerDroneId;
     slot.read.active = true;
     syncSlot(slot);
+    gameplayAudioEvents.emit('cue', { sound: 'specimen-turret-shot', position: slot.position });
     this.events.emit('spawned', {
       projectileId: slot.read.id,
       ownerDroneId,

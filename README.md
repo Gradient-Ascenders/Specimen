@@ -87,3 +87,5 @@ upload alone does not publish the game.
 level, operations, and decision records. Historical screenshots, videos, logs,
 and issue-closure reports are kept with their issue, pull request, or CI run
 rather than in the source tree.
+
+Gameplay sound-effects architecture, asset provenance and the complete event mapping: [Gameplay audio](docs/architecture/gameplay-audio.md).
