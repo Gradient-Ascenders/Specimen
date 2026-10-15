@@ -46,6 +46,68 @@ mesh structure is important.
 
 ## Verification
 
+### Distant character detail
+
+`generate:character-lods` bakes attribute-aware meshoptimizer index banks from
+the approved Goop/Volt GLBs without modifying those sources. The generator
+includes normals, UVs and every authored position morph in its error metric
+(maximum relative error 0.004). The distant Goop/Volt totals are 8,428/9,552
+triangles versus 33,716/38,208 at full detail. Bob stays unchanged.
+
+Preparation loads each bank through a Vite-managed URL, validates it against the
+source vertex counts, and appends the indices to one per-instance index buffer.
+`CharacterDetail` changes only the geometry's draw range: no extra geometry,
+vertex/morph texture, material, shader variant or first-transition upload is
+needed. Visible, depth, distance and transmission passes use the same range;
+Volt's generated headroom morph remains shared. Existing asset owners dispose
+the single geometry and its index bank. Full source topology remains the asset
+validation contract; rendered topology is available through `detailDiagnostics`.
+
+Runtimes update detail after the camera, including the captive/reveal instances.
+Full detail switches to distant below 10% projected view height and returns
+above 12.5%; zoom is respected. Collider, locomotion, animation and ability
+state are independent of that selection. Injected test loaders can supply a
+detail-bank loader explicitly; they do not implicitly fetch production assets.
+
+### Acid flow lookup
+
+`generate:acid-noise` bakes the existing three-octave FBM (float32 lattice hash,
+cubic value noise, rotated octaves and authored weights) into a 256×256
+single-channel byte table. Each of the three animated flow fields takes one
+lookup instead of three value-noise evaluations. Four counter-moving domain
+warp evaluations remain analytic: the shader does four rather than thirteen
+value-noise evaluations, plus three lookups. Bubbles, derivative normals and
+the twelve live ripple slots remain animated.
+
+The table repeats over 16 noise cells, with an outer two-cell blend to match
+opposite edges and their first derivatives. It samples 16 texels per base noise
+cell. The flow pattern is now resampled, quantized and periodic, so this is a
+quality-preserving visual change, not pixel-identical parity with the unbounded
+arithmetic field. Replacing each lattice hash with a lookup was rejected after
+software-renderer measurements; baking complete FBM fields needs fewer fetches.
+
+Immutable CPU bytes are decoded once. Each acid material owns/disposes its own
+linear, repeating, non-colour, mipmap-free texture; foundation/normal maps remain
+borrowed. Regenerate with `npm run generate:acid-noise`. Both new generators
+participate in `check:generated-assets`.
+
+`scripts/capture-extra-optimisations.mjs` captures matched acid times/ripples and
+full/distant moving-character views. `--root <checkout> --output <directory>`
+selects another revision. It records draw counts, warmed programs, resource
+cleanup and isolated render/readback wall times under `artifacts/`. These are
+software-renderer diagnostics, not target-GPU performance evidence.
+`--acid-only --reference-root <checkout>` additionally alternates the current
+and reference shaders within the same browser/context to reduce run-to-run noise.
+
+### Electrical presentation clock
+
+Blackout electrical acquisition, power, device motion, tether revalidation and
+hazards remain fixed-step mechanics. Beam/branch/spark buffers, outlines and DOM
+feedback reconcile once per rendered frame, after the latest simulation state.
+Explicit lifecycle resets may still reconcile immediately. Hidden outlines skip
+target/bounds work until aiming resumes; unchanged overlay state does not write
+the DOM again. Render-only pointer releases still hide the aiming feedback.
+
 ### Cultivation generated assets
 
 The authored Level 2 factory loads `src/assets/cultivation/authored-assets.bin`
@@ -80,8 +142,8 @@ npm run generate:cultivation-assets
 npm run check:generated-assets
 ```
 
-PR validation regenerates both asset bundles and compares every compressed
-byte. Generation omits timestamps and random object identifiers and normalizes
+PR validation regenerates the asset bundles and compares their bytes.
+Generation omits timestamps and random object identifiers and normalizes
 the gzip platform marker. Use the pinned Node/npm toolchain for reproduction.
 Do not edit the binary by hand.
 

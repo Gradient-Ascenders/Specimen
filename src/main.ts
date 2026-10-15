@@ -1,4 +1,5 @@
 import { AudioManager } from './audio/AudioManager.ts';
+import { SOUND_BANKS } from './audio/SoundCatalog.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import { loadCultivationBakedAssets } from './render/environment/cultivation/CultivationBakedAssets.ts';
 import creditsMarkdown from '../CREDITS.md?raw';
@@ -25,7 +26,7 @@ if (!app) {
 
 const settings = new GameSettings();
 const audio = new AudioManager(import.meta.env.BASE_URL);
-void audio.preload();
+void audio.preload(SOUND_BANKS.containment);
 const unlockAudio = (): void => audio.unlock();
 const focusAudio = (): void => audio.setFocused(!document.hidden && document.hasFocus());
 window.addEventListener('pointerdown', unlockAudio);
@@ -51,6 +52,9 @@ const levelOneRuntime = new GreyboxLevelRuntime({
 const gameSession = new GameSessionCoordinator({
   initialRuntime: levelOneRuntime,
   createLevelTwo: async (progression) => {
+    // Start the next bank before module/visual preparation, without allowing
+    // optional audio or a stalled device decoder to hold up the transition.
+    void audio.preload(SOUND_BANKS.cultivation);
     const [runtimeModule, debugModule, authoredAssets] = await Promise.all([
       import('./levels/CultivationLevelRuntime.ts'),
       debugAvailable
@@ -72,6 +76,7 @@ const gameSession = new GameSessionCoordinator({
     });
   },
   createLevelThree: async (progression) => {
+    void audio.preload(SOUND_BANKS.blackout);
     const [runtimeModule, maintenanceMaps] = await Promise.all([
       import('./levels/BlackoutLevelRuntime.ts'),
       loadBlackoutMaintenanceMapData(new URL('./assets/blackout/maintenance-maps.bin', import.meta.url)),

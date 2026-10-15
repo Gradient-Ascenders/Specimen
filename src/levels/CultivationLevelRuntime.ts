@@ -722,6 +722,9 @@ export class CultivationLevelRuntime {
       this.renderLayer.cameraRig.setContextualCamera(this.roomFourCamera);
     } else this.renderLayer.cameraRig.setContextualCamera(undefined);
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
+    resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
+    captive?.updateDetail(this.renderLayer.cameraRig.camera);
     resources.authoredPreview?.updatePresentationVisibility(
       this.renderLayer.cameraRig.camera.position, resources.pair.activeBody.position,
     );

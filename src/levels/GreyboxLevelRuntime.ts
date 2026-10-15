@@ -788,6 +788,8 @@ export class GreyboxLevelRuntime {
         : 1,
     );
     const reveal = testScene.roomFive.goopPresentation;
+    testScene.goop.updateDetail(this.renderLayer.cameraRig.camera);
+    reveal.updateDetail(this.renderLayer.cameraRig.camera);
     const showReveal = testScene.lightingDiagnostics.visibleRoomIds.includes(5) &&
       !testScene.roomFive.releaseComplete && slimePair.activeSlimeId !== 'goop';
     reveal.setVisible(showReveal);

@@ -1117,8 +1117,6 @@ export class BlackoutLevelRuntime {
         this.input.enabled && this.currentRoom.phase === 'three-slime',
       pointerLocked: this.input.pointerLocked,
     });
-    resources.electricalPresentation.update(resources.electricalSystem.readModel);
-
     resources.specimenAttack.update(deltaSeconds, {
       active: specimenGameplay,
       aimHeld: this.input.isDown('aimAbility'),
@@ -1188,8 +1186,6 @@ export class BlackoutLevelRuntime {
     if (!this.authoredRoomOne) resources.poweredDeviceRig.updateHazards(
       deltaSeconds, participatingCarriers,
     );
-    resources.electricalPresentation.update(resources.electricalSystem.readModel);
-
     // Room 1 remains physically reachable from the Room 2 arrival staging
     // corridor, so its hazards, powered door, hallway lighting and drone
     // presentation must continue advancing after the one-shot handoff.
@@ -1375,6 +1371,8 @@ export class BlackoutLevelRuntime {
     this.input.endPointerUpdate();
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     if (resources) {
+      resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
+      resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.goopPresentation.setOpacity(resources.group.activeSlimeId === 'goop'
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);

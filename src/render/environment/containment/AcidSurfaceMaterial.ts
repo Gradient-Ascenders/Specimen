@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createAcidNoiseTexture } from './AcidNoiseTexture.ts';
 
 import {
   acidSurfaceFragmentColour,
@@ -20,11 +21,12 @@ export const DEFAULT_ACID_BUBBLE_SCALE = 5.2;
 export const DEFAULT_ACID_BUBBLE_STRENGTH = 0.64;
 export const DEFAULT_ACID_EMISSION_STRENGTH = 0.025;
 
-const ACID_PROGRAM_CACHE_KEY = 'specimen-acid-liquid-interactions-v3';
+const ACID_PROGRAM_CACHE_KEY = 'specimen-acid-baked-fbm-v4';
 
 interface AcidSurfaceUniforms {
   [name: string]: THREE.IUniform;
   uTime: THREE.IUniform<number>;
+  uAcidNoise: THREE.IUniform<THREE.DataTexture>;
   uRipples: THREE.IUniform<THREE.Vector4[]>;
   uRippleSurfaceY: THREE.IUniform<Float32Array>;
   uDeepColour: THREE.IUniform<THREE.Color>;
@@ -66,6 +68,7 @@ export class AcidSurfaceMaterial extends THREE.MeshStandardMaterial {
   private readonly rippleHeights = new Float32Array(12);
   private nextRipple = 0;
   private emittedRipples = 0;
+  private released = false;
 
   constructor(options: AcidSurfaceMaterialOptions = {}) {
     const parameters: THREE.MeshStandardMaterialParameters = {
@@ -83,6 +86,7 @@ export class AcidSurfaceMaterial extends THREE.MeshStandardMaterial {
 
     this.acidUniforms = {
       uTime: { value: 0 },
+      uAcidNoise: { value: createAcidNoiseTexture() },
       uRipples: { value: this.rippleSlots },
       uRippleSurfaceY: { value: this.rippleHeights },
       uDeepColour: { value: new THREE.Color(DEFAULT_ACID_DEEP_COLOUR) },
@@ -130,6 +134,13 @@ export class AcidSurfaceMaterial extends THREE.MeshStandardMaterial {
         );
     };
     this.customProgramCacheKey = () => ACID_PROGRAM_CACHE_KEY;
+  }
+
+  override dispose(): void {
+    if (this.released) return;
+    this.released = true;
+    this.acidUniforms.uAcidNoise.value.dispose();
+    super.dispose();
   }
 
   get diagnostics(): AcidSurfaceMaterialDiagnostics {
