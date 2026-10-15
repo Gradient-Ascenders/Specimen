@@ -8,6 +8,8 @@ import { BlackoutPresentationPreparation } from '../src/render/BlackoutPresentat
 import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
+import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
 function fixture() {
   let viewport = new THREE.Vector4(4, 5, 960, 600), scissor = viewport.clone(), test = false;
@@ -206,6 +208,48 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   assert.equal(material.uniforms.beamShadowReady.value, true);
   material.dispose(); assert.equal(disposals, 1);
   mesh.geometry.dispose(); map.depthTexture.dispose(); map.dispose();
+});
+
+test('hidden Volt prewarms morph, transmission, faded-eye and actual caster variants without changing live state', async () => {
+  const { renderer, borrowedTarget } = fixture();
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), volt = new VoltCharacterPresentation();
+  await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
+  const expectedMorphs = new Map<THREE.BufferGeometry, { mesh: THREE.Mesh; dictionary: Record<string, number>; influences: number[] }>();
+  volt.root.traverse(object => {
+    if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
+    if (object.name === 'Volt-Body') {
+      assert.equal(object.geometry.morphAttributes.position!.length, 6);
+      object.morphTargetInfluences![object.morphTargetDictionary!.Headroom] = 0.35;
+    } else assert.equal(object.geometry.morphAttributes.position!.length, 5);
+    expectedMorphs.set(object.geometry, { mesh: object, dictionary: { ...object.morphTargetDictionary }, influences: [...object.morphTargetInfluences!] });
+  });
+  const light = new THREE.SpotLight(); light.castShadow = true; scene.add(light);
+  const variants = new Set<string>();
+  renderer.compileAsync = async group => {
+    group.traverse(object => {
+      if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
+      assert.equal(object.geometry.morphTargetsRelative, true);
+      const expected = expectedMorphs.get(object.geometry)!; assert.ok(expected, 'proxy retains its live geometry');
+      assert.equal(object.geometry.morphAttributes.position!.length, expected.influences.length);
+      assert.equal(object.geometry.morphAttributes.normal!.length, expected.influences.length);
+      assert.deepEqual(object.morphTargetDictionary, expected.dictionary);
+      assert.deepEqual(object.morphTargetInfluences, expected.influences, 'retain the live headroom pose while prewarming');
+      const material = object.material as THREE.Material;
+      variants.add(`${object.name}:${material.type}:${material.transparent}`);
+    });
+  };
+  const policy = new RenderShadowPolicy(renderer.shadowMap), preparation = new BlackoutPresentationPreparation();
+  const before = volt.diagnostics;
+  try {
+    await preparation.prepare({ renderer, scene, withShadowPreparation: policy.withPreparation.bind(policy) } as unknown as RenderLayer, camera);
+    for (const name of ['Volt-Body', 'Volt-Eye-Left', 'Volt-Eye-Right']) {
+      assert.ok(variants.has(`${name}:MeshPhysicalMaterial:true`));
+      assert.ok(variants.has(`${name}:MeshDepthMaterial:false`));
+      if (name !== 'Volt-Body') assert.ok(variants.has(`${name}:MeshPhysicalMaterial:false`));
+    }
+    assert.deepEqual(volt.diagnostics, before);
+    for (const expected of expectedMorphs.values()) assert.deepEqual(expected.mesh.morphTargetInfluences, expected.influences);
+  } finally { preparation.dispose(); volt.dispose(); borrowedTarget.dispose(); }
 });
 
 test('instance primers upload both live buffers sharing a geometry and never dispose borrowed storage', async () => {

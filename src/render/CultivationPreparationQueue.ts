@@ -349,10 +349,22 @@ export class CultivationPreparationQueue {
           if (source.instanceColor) scheduledInstances.add(source.instanceColor);
         }
       }
+      // The captive gel does not cast shadows. Upload its authored geometry
+      // and morph textures through its depth material without allocating a
+      // temporary transmission target or changing the live caster policy.
+      if (transmissive && needsBuffer && source instanceof THREE.Mesh && source.customDepthMaterial &&
+          !source.castShadow && !source.userData.characterShadowCaster) {
+        const depth = createShadowPrewarmMaterial(source, materials[0]!, false);
+        this.retained.push(depth);
+        const primer = source.clone(false); primer.material = depth;
+        primer.visible = true; primer.frustumCulled = false; primer.castShadow = false;
+        source.updateWorldMatrix(true, false); primer.matrix.copy(source.matrixWorld); primer.matrixAutoUpdate = false;
+        shadows.push(primer);
+      }
       if (++collected % 8 === 0) yield {label:'collect', run: () => {}};
       // Shadow programs also encode light counts. Compile their real depth/distance
       // configurations asynchronously, without rendering nine whole-room shadow passes.
-      if (source instanceof THREE.Mesh && source.castShadow) for (const material of materials) {
+      if (source instanceof THREE.Mesh && (source.castShadow || source.userData.characterShadowCaster)) for (const material of materials) {
         if (!material.visible) continue;
         for (const distance of [false, true]) {
           // Ordinary rooms have no shadowed point source and never use distance programs.
@@ -405,8 +417,7 @@ export class CultivationPreparationQueue {
           this.withState(true, shadowTarget, () => this.layer.renderer.render(targetScene, this.camera));
           for (const proxy of batch) {
             const source = this.proxySources.get(proxy);
-            if (!source) continue;
-            this.uploaded.add(source.geometry);
+            this.uploaded.add(source?.geometry ?? proxy.geometry);
             if (source instanceof THREE.InstancedMesh) {
               this.uploadedInstanceAttributes.add(source.instanceMatrix);
               if (source.instanceColor) this.uploadedInstanceAttributes.add(source.instanceColor);

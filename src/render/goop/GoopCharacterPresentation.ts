@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
 import { moveAngleTowards, shortestAngleDelta } from '../BlobFacing.ts';
 import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
 import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresentationContract.ts';
@@ -7,12 +7,11 @@ import { disposeGoopAsset, disposeGoopMaterials, validateGoopAsset, type GoopAss
 import { GOOP_BASE_COLOR, GoopMaterialSet } from './GoopMaterials.ts';
 import { GOOP_MAXIMUM_BASE_OFFSET_METRES, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES, GOOP_MAXIMUM_BASE_DISPLACEMENT_METRES } from './GoopBaseMotion.ts';
 import { GoopPolishMotion, GOOP_CREST_LAG_METRES, GOOP_LANDING_RIPPLE_METRES } from './GoopPolishMotion.ts';
+import { GEL_LAUNCH_SECONDS, GEL_LANDING_SECONDS, gelLandingSquash, gelAirborneStretch } from '../slime/GelElasticMotion.ts';
 
 const ASSET_URL = new URL('../../../assets/characters/goop/goop.glb', import.meta.url).href;
-const LAUNCH_SECONDS = 0.18;
-const LANDING_COMPRESSION_SECONDS = 0.24;
-const LANDING_SETTLE_SECONDS = 0.18;
-const LANDING_SECONDS = LANDING_COMPRESSION_SECONDS + LANDING_SETTLE_SECONDS;
+const LAUNCH_SECONDS = GEL_LAUNCH_SECONDS;
+const LANDING_SECONDS = GEL_LANDING_SECONDS;
 const DAMAGE_SECONDS = 0.22;
 // Bob's ground response and brief reversal counterlean, with continuous facing.
 const LOCOMOTION_RESPONSE = 11;
@@ -118,12 +117,7 @@ export class GoopCharacterPresentation {
       asset: this.asset ? { bodyTriangles: 26804, eyeTriangles: 6912, drawCalls: 3, geometries: 3, materials: 2 } : undefined };
   }
 
-  prepare(loader: GoopCharacterLoader = async () => {
-    const gltf = await new GLTFLoader().loadAsync(ASSET_URL);
-    // GLTF animations are separate from scene.animations.
-    gltf.scene.animations = gltf.animations;
-    return gltf.scene;
-  }): Promise<void> {
+  prepare(loader: GoopCharacterLoader = () => loadCharacterAsset(ASSET_URL)): Promise<void> {
     if (this.disposed) return Promise.reject(new Error('Cannot prepare disposed Goop'));
     if (this.ready) return Promise.resolve();
     if (this.preparation) return this.preparation;
@@ -270,17 +264,14 @@ export class GoopCharacterPresentation {
         const age = LANDING_SECONDS - this.landingRemaining;
         // Compress at contact, release, then give the gel one small overshoot.
         // This is a visual recovery; the kinematic body stays on its support.
-        this.squash = age < LANDING_COMPRESSION_SECONDS
-          ? 0.34 * this.landingStrength * (1 - THREE.MathUtils.smoothstep(age, 0, LANDING_COMPRESSION_SECONDS))
-          : -0.06 * this.landingStrength * Math.sin(Math.PI * (age - LANDING_COMPRESSION_SECONDS) / LANDING_SETTLE_SECONDS);
+        this.squash = gelLandingSquash(age, this.landingStrength);
       } else {
         this.squash = wasLanding ? 0 : this.squash * Math.exp(-LOCOMOTION_RESPONSE * dt);
         if (Math.abs(this.squash) < 1e-5) this.squash = 0;
       }
     } else {
       this.landingRemaining = 0;
-      const airborneStretch = 0.07 + 0.05 * THREE.MathUtils.clamp(Math.abs(state.velocityWorld.y) / 8.5, 0, 1);
-      const stretch = airborneStretch + 0.18 * this.launchStrength * this.launchRemaining / LAUNCH_SECONDS;
+      const stretch = gelAirborneStretch(state.velocityWorld.y, this.launchStrength, this.launchRemaining);
       this.squash += (-stretch - this.squash) * (1 - Math.exp(-18 * dt));
     }
     if (this.damageRemaining > 0) {

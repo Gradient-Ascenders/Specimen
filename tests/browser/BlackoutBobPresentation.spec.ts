@@ -53,7 +53,7 @@ interface BlackoutRuntimeProbe {
     readonly phase: { restore(phase: 'boss-defeated'): void };
     readonly specimenForm: { restore(form: 'specimen'): void };
     readonly goopPresentation: { readonly diagnostics: { readonly visible: boolean } };
-    readonly visuals: Readonly<Record<'volt', { readonly visible: boolean }>>;
+    readonly voltPresentation: { readonly diagnostics: { readonly visible: boolean } };
     readonly voltLight: { readonly visible: boolean };
   };
   fixedUpdate(deltaSeconds: number): void;
@@ -173,7 +173,7 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
       asset: resources.bobPresentation.diagnostics.asset,
       materials: resources.bobPresentation.diagnostics.materials,
       goopVisible: resources.goopPresentation.diagnostics.visible,
-      voltVisible: resources.visuals.volt.visible,
+      voltVisible: resources.voltPresentation.diagnostics.visible,
       voltLightVisible: resources.voltLight.visible,
     };
   });
