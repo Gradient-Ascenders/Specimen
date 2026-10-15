@@ -346,6 +346,18 @@ try {
 			await page.waitForTimeout(1e3);
 			await page.locator("canvas").click();
             await page.waitForFunction(name => globalThis[name].input.enabled && globalThis[name].input.pointerLocked, name, {timeout:10000});
+            if (name === "__three") {
+                // Room 1 starts with Volt, whose position is not exported by the recorder.
+                // Select a recorded body through normal input before measuring movement.
+                const target = room === 2 ? "goop" : "bob";
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    const active = await page.evaluate(() => __three.resources.manager.activeSlimeId);
+                    if (active === target) break;
+                    await page.keyboard.press("Tab", {delay:150});
+                    await page.waitForFunction(previous => __three.resources.manager.activeSlimeId !== previous, active, {timeout:10000});
+                }
+                if (await page.evaluate(() => __three.resources.manager.activeSlimeId) !== target) throw new Error("Could not select the recorded Level 3 body");
+            }
             const staged = await page.evaluate((name) => {
 				const r = globalThis[name], b = r.resources.body ?? r.resources.pair?.activeBody ?? r.resources.group?.activeBody;
 				return {
@@ -441,7 +453,8 @@ try {
                 const body = active[0] === "goop" ? "goop" : "bob";
                 captureValidation = {active,states,cutscenes,rawFrames:frames.length,totalFrames:recording.summary.totalFrames,
                     bodyRange:["X","Y","Z"].map(axis=>range(body+axis)),cameraRange:["X","Y","Z"].map(axis=>range("camera"+axis))};
-                if (active.length!==1 || states.some(state=>state!=="playing") || cutscenes.some(state=>state!=="none") ||
+                const expectedState = name === "__three" ? "three-slime" : "playing";
+                if (active.length!==1 || !["bob","goop"].includes(active[0]) || states.some(state=>state!==expectedState) || cutscenes.some(state=>state!=="none") ||
                     frames.length!==recording.summary.totalFrames || Math.max(...captureValidation.bodyRange)<.05 || Math.max(...captureValidation.cameraRange)<.05) {
                     throw new Error("Invalid interactive capture: "+JSON.stringify(captureValidation));
                 }
