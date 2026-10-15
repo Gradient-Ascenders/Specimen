@@ -580,3 +580,95 @@ test('Cultivation background compilation and primers preserve active lighting an
   expect(result.maxPixelDifference).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
+
+
+test('Cultivation zero-radiance guards preserve Bob and Goop room pixels', async ({page}) => {
+  test.setTimeout(600_000);
+  const assertExposed = await exposeCultivationRuntime(page);
+  await enterCultivation(page); assertExposed();
+  await page.waitForFunction(() => (window as any).__specimenCultivationRuntime?.state === 'running', undefined, {timeout:240_000});
+  const errors: string[] = [];
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  const results = await page.evaluate(async () => {
+    const r = (window as any).__specimenCultivationRuntime, layer = r.renderLayer;
+    const renderer = layer.renderer, camera = layer.cameraRig.camera, gl = renderer.getContext();
+    layer.setAnimationLoop(null);
+    const queue = r.preparationQueue, tick = queue.tick; queue.tick = () => {};
+    while (queue.busy) await new Promise(resolve => setTimeout(resolve, 16));
+    const stats = {fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,
+      stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60};
+    const draw = () => {
+      r.cameraShadowCulling.prepare(camera);
+      try { renderer.render(layer.scene,camera); } finally { r.cameraShadowCulling.restore(); }
+    };
+    const read = () => {
+      const pixels = new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);
+      gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+      return pixels;
+    };
+    const results = [];
+    try {
+      for (const [room,slime] of [[1,'bob'],[5,'goop']] as const) {
+        r.resources.manager.activate(slime); r.teleportToAuthoredPreviewRoom(room); r.render(1,stats);
+        if (queue.diagnostics.pending) {
+          queue.tick=tick;
+          const deadline=performance.now()+240_000;
+          try {
+            while (queue.diagnostics.pending) {
+              if (performance.now()>deadline) throw new Error('Pixel control preparation timed out');
+              await new Promise(resolve=>setTimeout(resolve,16)); r.render(1,stats);
+            }
+          } finally {queue.tick=()=>{};}
+          while (queue.busy) await new Promise(resolve=>setTimeout(resolve,16));
+          r.render(1,stats);
+        }
+        draw(); const baseline = read();
+        let lit = 0, min = 255, max = 0;
+        for (let i=0;i<baseline.length;i+=4) {
+          const value = Math.max(baseline[i],baseline[i+1],baseline[i+2]);
+          if (value>8) lit++; min=Math.min(min,value); max=Math.max(max,value);
+        }
+        if (lit<baseline.length/4*.01 || max-min<16) throw new Error('Blank lighting control baseline');
+        const materials = new Set<any>(), group = layer.scene.clone(false);
+        layer.scene.traverseVisible((o: any) => {
+          if (!o.isMesh) return; group.add(o.clone(false));
+          for (const m of Array.isArray(o.material)?o.material:[o.material])
+            if (m.customProgramCacheKey().includes(':finite-light-branch-v4')) materials.add(m);
+        });
+        let removed = 0;
+        const saved = [...materials].map(m => [m,m.onBeforeCompile,m.customProgramCacheKey]);
+        try {
+          for (const [m,hook,key] of saved) {
+            m.onBeforeCompile = function(shader: any, renderer: any) {
+              hook.call(this,shader,renderer);
+              for (const [kind,v] of [['Point','pointLight'],['Spot','spotLight']]) {
+                const call = 'get'+kind+'LightInfo( '+v+', geometryPosition, directLight );';
+                const block = 'if ( any( notEqual( '+v+'.color, vec3( 0.0 ) ) ) ) {\n      '+call+'\n    } else {\n      directLight.color = vec3( 0.0 );\n      directLight.direction = vec3( 0.0 );\n      directLight.visible = false;\n    }';
+                removed += shader.fragmentShader.split(block).length-1;
+                shader.fragmentShader = shader.fragmentShader.replaceAll(block,call);
+              }
+            };
+            const controlKey = key.call(m)+':unguarded-pixel-control';
+            m.customProgramCacheKey=()=>controlKey; m.needsUpdate=true;
+          }
+          await renderer.compileAsync(group,camera,layer.scene); draw();
+          const control = read(); let difference = 0;
+          for (let i=0;i<baseline.length;i++) difference=Math.max(difference,Math.abs(baseline[i]-control[i]));
+          results.push({room,slime,lit,removed,difference,error:gl.getError()});
+        } finally {
+          for (const [m,hook,key] of saved) {m.onBeforeCompile=hook;m.customProgramCacheKey=key;m.needsUpdate=true;}
+          group.clear();
+        }
+      }
+    } finally {queue.tick=tick;}
+    return results;
+  });
+  console.log('zero-radiance pixel controls',results);
+  expect(results).toHaveLength(2);
+  for (const result of results) {
+    expect(result.removed).toBeGreaterThan(0);
+    expect(result.difference).toBeLessThanOrEqual(1);
+    expect(result.error).toBe(0);
+  }
+  expect(errors).toEqual([]);
+});

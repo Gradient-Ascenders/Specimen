@@ -134,6 +134,6 @@ export function batchMaintenanceScout(body: THREE.Mesh, eye: THREE.Mesh,
       object.material.bumpScale = .004;
     }
     weatherScout(object.material);
-    optimizeFiniteLightEvaluation(object.material);
+    optimizeFiniteLightEvaluation(object.material, true);
   });
 }

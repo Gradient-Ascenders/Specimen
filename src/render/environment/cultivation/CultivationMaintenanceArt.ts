@@ -37,7 +37,7 @@ export class CultivationMaintenanceArt {
       material.emissiveMap = material.map;
       material.userData.tileSizeMetres = source === lab.wall ? [4, 3] : source === lab.sticky ? [6.08, 6.55] : [2, 2];
       if (source === lab.sticky) configureCultivationMembraneMaterial(material);
-      optimizeFiniteLightEvaluation(material);
+      optimizeFiniteLightEvaluation(material, true);
       this.materials.push(material); b.borrowedMaterials.add(material);
       return material;
     };

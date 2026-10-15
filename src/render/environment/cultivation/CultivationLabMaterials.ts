@@ -66,7 +66,7 @@ export class CultivationLabMaterials {
     this.pole.customProgramCacheKey = () => 'cultivation-anchored-pole-oxidation-v1';
     this.textures.push(...Object.values(this.deckWear), ...Object.values(this.poleWear));
     for (const material of [this.wall, this.floor, this.ceiling, this.metal, this.duct, this.platform, this.pole, this.acid, this.sticky]) {
-      optimizeFiniteLightEvaluation(material);
+      optimizeFiniteLightEvaluation(material, true);
     }
     this.acidFoundation.repeat.set(4, 3);
     this.acid.userData.tileSizeMetres = [32.7, 26.7];
