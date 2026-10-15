@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import type { Vector3State } from '../slime/SlimePresentationContract.ts';
 import type { GoopMaterialSet } from './GoopMaterials.ts';
+import { GEL_CREST_LAG_METRES, GEL_LANDING_RIPPLE_METRES, GEL_LANDING_RIPPLE_SECONDS } from '../slime/GelElasticMotion.ts';
 
-export const GOOP_CREST_LAG_METRES = 0.02;
-export const GOOP_LANDING_RIPPLE_METRES = 0.003;
-export const GOOP_LANDING_RIPPLE_SECONDS = 0.65;
+export const GOOP_CREST_LAG_METRES = GEL_CREST_LAG_METRES;
+export const GOOP_LANDING_RIPPLE_METRES = GEL_LANDING_RIPPLE_METRES;
+export const GOOP_LANDING_RIPPLE_SECONDS = GEL_LANDING_RIPPLE_SECONDS;
 const RECOIL_SECONDS = 0.22;
 const BLINK_SECONDS = 0.18;
 const CREST_LANDING_SECONDS = 0.3;

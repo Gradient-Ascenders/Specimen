@@ -42,6 +42,23 @@ const compactSpots = spotStart >= 0 && spotEndMarker > spotStart && spotLoop.inc
     }
     ` + compactLightingChunk.slice(spotEnd)
   : compactLightingChunk;
+// Zero-radiance padding and powered-down lamps need no direction, distance
+// or cone evaluation. Keep IncidentLight fully initialized for the shadow
+// and shared BRDF loops that follow, retaining all nonzero light math.
+function skipZeroRadiance(chunk: string): string {
+  if (chunk.includes('// specimen-zero-radiance-v1')) return chunk;
+  for (const [kind, variable] of [['Point', 'pointLight'], ['Spot', 'spotLight']]) {
+    const call = `get${kind}LightInfo( ${variable}, geometryPosition, directLight );`;
+    chunk = chunk.replaceAll(call, `if ( any( notEqual( ${variable}.color, vec3( 0.0 ) ) ) ) {
+      ${call}
+    } else {
+      directLight.color = vec3( 0.0 );
+      directLight.direction = vec3( 0.0 );
+      directLight.visible = false;
+    }`);
+  }
+  return '// specimen-zero-radiance-v1\n' + chunk;
+}
 const finiteLightingChunk = compactSpots.replaceAll(
   DIRECT_LIGHT_CALL, `if ( directLight.visible ) { ${DIRECT_LIGHT_CALL} }`,
 );
@@ -54,16 +71,25 @@ const physicalLightingChunk = compactLightingChunk.replaceAll(
 const optimized = new WeakSet<THREE.Material>();
 
 /** Skip BRDF work only when Three's own attenuation/cone test says contribution is zero. */
-export function optimizeFiniteLightEvaluation(material: THREE.Material): void {
+export function optimizeFiniteLightEvaluation(material: THREE.Material, skipPaddingMath = false): void {
   if (optimized.has(material)) return;
   optimized.add(material);
   const priorCompile = material.onBeforeCompile;
   const priorKey = material.customProgramCacheKey();
+  // Preserve an inherited padding hook when preparing a material clone.
+  const earlyZero = skipPaddingMath || priorKey.includes(':finite-light-branch-v4');
+  const suffix = earlyZero ? ':finite-light-branch-v4' : ':finite-light-branch-v3';
+  const first = priorKey.indexOf(suffix);
+  // Clones may borrow an already composed hook. Keep its original key order
+  // and remove only redundant markers, including around later custom hooks.
+  const cacheKey = first < 0 ? priorKey + suffix
+    : priorKey.slice(0, first + suffix.length) + priorKey.slice(first + suffix.length).replaceAll(suffix, '');
   const lightingChunk = material instanceof THREE.MeshPhysicalMaterial ? physicalLightingChunk : finiteLightingChunk;
   material.onBeforeCompile = function(shader, renderer) {
     priorCompile.call(this, shader, renderer);
     shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_begin>', lightingChunk);
+    if (earlyZero) shader.fragmentShader = skipZeroRadiance(shader.fragmentShader);
   };
-  material.customProgramCacheKey = () => `${priorKey}:finite-light-branch-v3`;
+  material.customProgramCacheKey = () => cacheKey;
   material.needsUpdate = true;
 }

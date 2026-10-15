@@ -19,12 +19,15 @@ test('54 OGGs decode beneath nested base and gameplay owns charge, movement, pau
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.loaded === 54);
   expect(new Set(audioRequests).size).toBe(54);
   expect(audioRequests.every(url => new URL(url).pathname.startsWith('/group-folder/assets/audio/'))).toBe(true);
+  // This test advances gameplay manually. Stop rendering before Start so a
+  // software-rendered gameplay frame cannot block the audio/input checks.
+  await page.evaluate(() => (window as any).__audioRuntime.renderLayer.setAnimationLoop(null));
+  // Start is the trusted gesture that unlocks audio and requests pointer lock.
   await page.locator('[data-action="start"]').click();
-  await page.locator('canvas').click();
+  await page.waitForFunction(() => document.pointerLockElement === document.querySelector('canvas'));
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
-    runtime.renderLayer.setAnimationLoop(null);
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
   });
   const step=async(count:number)=>page.evaluate(count=>{

@@ -68,3 +68,43 @@ export function createDepthPrewarmGroup(root: THREE.Object3D): {
     for (const instance of instances) instance.dispose();
   } };
 }
+
+/** Upload the live instance attributes rather than allocating cloned GPU buffers.
+ * Restore private storage before disposal: InstancedMesh.dispose otherwise
+ * deletes the borrowed attributes and morph texture through renderer listeners. */
+export function clonePrewarmDrawable<Drawable extends THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite>(
+  source: Drawable,
+  instanceDisposers: (() => void)[],
+): Drawable {
+  if (!(source instanceof THREE.InstancedMesh)) return source.clone(false) as Drawable;
+  const proxy = new THREE.InstancedMesh(source.geometry, source.material, 1);
+  const ownedMatrix = proxy.instanceMatrix;
+  proxy.instanceMatrix = source.instanceMatrix;
+  proxy.instanceColor = source.instanceColor;
+  proxy.morphTexture = source.morphTexture;
+  proxy.count = source.count;
+  proxy.name = source.name;
+  proxy.renderOrder = source.renderOrder;
+  proxy.layers.mask = source.layers.mask;
+  proxy.position.copy(source.position);
+  proxy.quaternion.copy(source.quaternion);
+  proxy.scale.copy(source.scale);
+  proxy.matrix.copy(source.matrix);
+  proxy.matrixWorld.copy(source.matrixWorld);
+  proxy.matrixAutoUpdate = source.matrixAutoUpdate;
+  proxy.matrixWorldAutoUpdate = source.matrixWorldAutoUpdate;
+  proxy.castShadow = source.castShadow;
+  proxy.receiveShadow = source.receiveShadow;
+  proxy.morphTargetInfluences = source.morphTargetInfluences;
+  proxy.morphTargetDictionary = source.morphTargetDictionary;
+  let disposed = false;
+  instanceDisposers.push(() => {
+    if (disposed) return;
+    disposed = true;
+    proxy.instanceMatrix = ownedMatrix;
+    proxy.instanceColor = null;
+    proxy.morphTexture = null;
+    proxy.dispose();
+  });
+  return proxy as unknown as Drawable;
+}

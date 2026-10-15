@@ -1,0 +1,71 @@
+{
+  "glb_sha256": "4e1d5d7d6ea3f368e96cbc0d13ff6b1a232a7d9154e73602ee54f809ec6d2807",
+  "meshes": {
+    "Volt-Body": {
+      "triangles": 32064,
+      "max_position_error_metres": 0.0
+    },
+    "Volt-Eye-Left": {
+      "triangles": 3072,
+      "max_position_error_metres": 0.0
+    },
+    "Volt-Eye-Right": {
+      "triangles": 3072,
+      "max_position_error_metres": 0.0
+    }
+  },
+  "eye_seating": {
+    "Volt-Eye-Left": {
+      "front_depth_range": [
+        -0.0020000040531158447,
+        0.03799998760223389
+      ],
+      "rear_max_depth": -0.018000006675720215
+    },
+    "Volt-Eye-Right": {
+      "front_depth_range": [
+        -0.0020000040531158447,
+        0.03799998760223389
+      ],
+      "rear_max_depth": -0.018000006675720215
+    }
+  },
+  "materials": {
+    "Volt-Golden-Gel": "base color, metallic, roughness, coat, transmission, IOR and emission match",
+    "Volt-Obsidian-Eyes": "base color, metallic, roughness, coat, transmission, IOR and emission match"
+  },
+  "outward_normals_and_manifoldness": "passed",
+  "floating_electrical_effects": 0,
+  "preserved_body_geometry_sha256": "f2b6621829b0a2117b5d46feb04c842e6edbb368b559a9f7935f28bd760fbd0f",
+  "preserved_eyes_geometry_sha256": {
+    "Volt-Eye-Left": "cdb019211f0d6d45de030360ae817c7ac17bd9a2b18ff423dc922e3a8e9eb9c6",
+    "Volt-Eye-Right": "d92fc20506cb14964dae9f0b5c06b26078bd7df9d4ae3b67d23cbfad51168720"
+  },
+  "subtle_compositor_bloom_strength": 0.08,
+  "morph_position_errors_metres": {
+    "Volt-Body": {
+      "Squash": 3.725290298461914e-09,
+      "Stretch": 4.656612873077393e-10,
+      "Blink": 0.0,
+      "CrestFlexLeft": 3.725290298461914e-09,
+      "CrestFlexRight": 3.725290298461914e-09
+    },
+    "Volt-Eye-Left": {
+      "Squash": 3.725290298461914e-09,
+      "Stretch": 3.725290298461914e-09,
+      "Blink": 7.450580596923828e-09,
+      "CrestFlexLeft": 0.0,
+      "CrestFlexRight": 0.0
+    },
+    "Volt-Eye-Right": {
+      "Squash": 3.725290298461914e-09,
+      "Stretch": 3.725290298461914e-09,
+      "Blink": 7.450580596923828e-09,
+      "CrestFlexLeft": 0.0,
+      "CrestFlexRight": 0.0
+    }
+  },
+  "continuous_textures": "embedded PNG, gradient endpoints, monotonicity and UV roundtrip passed",
+  "visible_mesh_primitives": 3,
+  "scope": "Neutral and morph asset roundtrip; runtime lifecycle acceptance remains separate"
+}
