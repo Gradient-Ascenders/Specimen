@@ -26,7 +26,7 @@ for (const label of labels) {
     for (const run of r.runs) for (const room of run.rooms.filter(x => x.frames)) {
         let flight;
         try {
-            flight = JSON.parse(await readFile(path.join(root, label, `run${run.run}-${room.name}-${room.room}-flight.json`), "utf8"));
+            flight = JSON.parse(await readFile(path.join(root, label, `run${run.run}-${room.name}-${room.room}${room.variant ? "-"+room.variant : ""}-flight.json`), "utf8"));
         } catch (error) {
             if (error.code === "ENOENT") continue;
             throw error;
@@ -36,7 +36,7 @@ for (const label of labels) {
         for (const window of flight.hitchWindows) for (const frame of window.frames) {
             if (!rows.has(frame[columns.sequence]) || frame[columns.gpuStatus] === "valid") rows.set(frame[columns.sequence], frame);
         }
-        flightRecordings.set(`${run.run}:${room.name}:${room.room}`, {
+        flightRecordings.set(`${run.run}:${room.name}:${room.room}:${room.variant ?? ""}`, {
             summary: flight.summary,
             viewport: flight.viewport,
             webgl: flight.webgl,
@@ -66,12 +66,14 @@ for (const label of labels) {
 			rooms: d.rooms.filter((x) => x.frames).map((x) => ({
 				level: x.name,
 				room: x.room,
+                variant: x.variant,
+                captureValidation: x.captureValidation,
 				staged: x.staged,
 				cadence: stats(x.frames.filter((f) => f.drawn !== false).map((f) => f.cadence)),
 				fixed: stats(x.frames.map((f) => f.fixed)),
 				render: stats(x.frames.map((f) => f.render)),
 				gpu: stats(x.frames.map((f) => f.gpu)),
-                flightRecorder: flightRecordings.get(`${d.run}:${x.name}:${x.room}`),
+                flightRecorder: flightRecordings.get(`${d.run}:${x.name}:${x.room}:${x.variant ?? ""}`),
                 shadowCpu: stats(x.frames.map(f => f.shadowCpu)),
                 pacingTrusted: x.frames.every(f => f.visibility === "visible" && f.focused),
                 hitches: Object.fromEntries([50,100,150].map(ms => [ms,x.frames.filter(f => f.drawn !== false && f.cadence > ms).length])),

@@ -315,13 +315,20 @@ try {
 			};
 		});
 		console.log(data.environment, "boot", data.bootMs);
-		const sample = async (name, room) => {
+		const sample = async (name, room, variant = "") => {
+            if (!/^[a-z0-9_-]*$/.test(variant)) throw new Error("Invalid capture variant");
+            const captureId = `run${run}-${name}-${room}${variant ? "-"+variant : ""}`;
 			await page.bringToFront();
 			const entered = performance.now();
 			const requested = await page.evaluate(({ name, room }) => {
 				const r = globalThis[name], t = performance.now();
 				if (name === "__one") r.resources.containmentLevel.teleportToRoomForDebug(room);
-				else if (name === "__two") r.teleportToAuthoredPreviewRoom(room);
+				else if (name === "__two") {
+                    r.teleportToAuthoredPreviewRoom(room);
+                    // Debug staging resets death state but does not resume disabled input.
+                    // Use the normal lifecycle before the measured sequence.
+                    r.stop(); r.start();
+                }
 				else if (room === 2) r.input;
 				return t;
 			}, {
@@ -337,7 +344,9 @@ try {
 				entryMs: performance.now() - entered
 			});
 			await page.waitForTimeout(1e3);
-			const staged = await page.evaluate((name) => {
+			await page.locator("canvas").click();
+            await page.waitForFunction(name => globalThis[name].input.enabled && globalThis[name].input.pointerLocked, name, {timeout:10000});
+            const staged = await page.evaluate((name) => {
 				const r = globalThis[name], b = r.resources.body ?? r.resources.pair?.activeBody ?? r.resources.group?.activeBody;
 				return {
 					body: b ? {
@@ -349,7 +358,13 @@ try {
 					quaternion: r.renderLayer.cameraRig.camera.quaternion.toArray()
 				};
 			}, name);
-			if (flightRecorder) { await page.keyboard.press("Shift+KeyP"); console.log(name,room,"recorder started"); }
+			if (flightRecorder) {
+                await page.keyboard.press("Shift+KeyP");
+                // Coverage markers retain normal frames between automatic hitch windows.
+                // They are instrumentation markers, not subjective reports of a hitch.
+                await page.keyboard.press("Shift+KeyH");
+                console.log(name,room,"recorder started");
+            }
 			const start = await page.evaluate((name) => {
 				const r = globalThis[name], renderer = r.renderLayer.renderer, gl = renderer.getContext(), ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
 				r.renderLayer.scene.traverse(object => {
@@ -395,25 +410,43 @@ try {
 				}
 				return r.__profile.frames.length;
 			}, name);
-			for (const key of [
-				"w",
-				"d",
-				"s",
-				"a"
-			]) {
-				await page.mouse.move(700 + (key === "d" ? 50 : 0), 350 + (key === "s" ? 20 : 0), {steps:8});
-				if (key === "w") await page.keyboard.press("Space");
-				await page.keyboard.down(key);
-				await page.waitForTimeout(keyMs);
-				await page.keyboard.up(key);
-			}
+			// Short opposing moves keep a normal room capture close to its safe spawn.
+            for (let elapsed = 0; elapsed < keyMs; elapsed += 500) {
+                const stepMs = Math.min(500, keyMs-elapsed);
+                if (flightRecorder) await page.keyboard.press("Shift+KeyH");
+                await page.mouse.move(width/2 + (elapsed % 1000 ? 5 : -5), height/2, {steps:4});
+                if (elapsed === 0) await page.keyboard.press("Space", {delay:150});
+                for (const key of ["w", "s", "d", "a"]) {
+                    await page.keyboard.down(key);
+                    await page.waitForTimeout(stepMs);
+                    await page.keyboard.up(key);
+                }
+            }
 			if (flightRecorder) {
+                await page.keyboard.press("Shift+KeyH");
 				await page.keyboard.press("Shift+KeyP");
 				const downloaded = page.waitForEvent("download");
 				await page.keyboard.press("Shift+KeyE");
-				await (await downloaded).saveAs(path.join(out, `run${run}-${name}-${room}-flight.json`));
+				await (await downloaded).saveAs(path.join(out, `${captureId}-flight.json`));
 			}
-			const result = await page.evaluate(({ name, start }) => {
+			let captureValidation;
+            if (flightRecorder) {
+                const recording = JSON.parse(await readFile(path.join(out, captureId+"-flight.json"),"utf8"));
+                const columns = Object.fromEntries(recording.frameColumns.map((key,index)=>[key,index]));
+                const frames = [...new Map(recording.hitchWindows.flatMap(window=>window.frames).map(row=>[row[columns.sequence],row])).values()];
+                const range = key => {const values=frames.map(row=>row[columns[key]]);return Math.max(...values)-Math.min(...values);};
+                const active = [...new Set(frames.map(row=>row[columns.activeSlime]))];
+                const states = [...new Set(frames.map(row=>row[columns.gameplayState]))];
+                const cutscenes = [...new Set(frames.map(row=>row[columns.cutsceneState]))];
+                const body = active[0] === "goop" ? "goop" : "bob";
+                captureValidation = {active,states,cutscenes,rawFrames:frames.length,totalFrames:recording.summary.totalFrames,
+                    bodyRange:["X","Y","Z"].map(axis=>range(body+axis)),cameraRange:["X","Y","Z"].map(axis=>range("camera"+axis))};
+                if (active.length!==1 || states.some(state=>state!=="playing") || cutscenes.some(state=>state!=="none") ||
+                    frames.length!==recording.summary.totalFrames || Math.max(...captureValidation.bodyRange)<.05 || Math.max(...captureValidation.cameraRange)<.05) {
+                    throw new Error("Invalid interactive capture: "+JSON.stringify(captureValidation));
+                }
+            }
+            const result = await page.evaluate(({ name, start }) => {
 				const r = globalThis[name];
 				return {
 					frames: r.__profile.frames.slice(start),
@@ -424,14 +457,17 @@ try {
 				name,
 				start
 			});
+            if (flightRecorder && result.frames.some(frame => !frame.drawn)) {
+                throw new Error("Loading/non-rendered frames entered the capture");
+            }
 			data.rooms.push({
 				name,
 				room,
 				staged,
-				...result
+				variant, captureValidation, ...result
 			});
 			console.log(name, room, "frames", result.frames.length, "programs", result.diagnostics.programs);
-			await page.locator("canvas").screenshot({ path: path.join(out, `run${run}-${name}-${room}.png`) });
+			await page.locator("canvas").screenshot({ path: path.join(out, `${captureId}.png`) });
 			await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
 		};
 		if (process.env.PROFILE_MODE !== "startup") for (const room of [
