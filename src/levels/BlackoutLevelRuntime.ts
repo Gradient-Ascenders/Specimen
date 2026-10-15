@@ -69,6 +69,7 @@ import {
   type ResettablePuzzleComponent,
 } from '../puzzle/PuzzleRegistry.ts';
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
+import { optimizeFiniteLightEvaluation } from '../render/environment/cultivation/FiniteLightEvaluation.ts';
 import { SpatialShadowCache, type ShadowParticipantPosition } from '../render/SpatialShadowCache.ts';
 import {
   BobCharacterPresentation,
@@ -408,6 +409,15 @@ export class BlackoutLevelRuntime {
       resources.goopPresentation.prepare(),
     ]).then(async () => {
       if (this.resources !== resources) return;
+      // The retained light layout includes distant and unpowered fixtures.
+      // Reuse the tested finite-light guard before warming all material forms;
+      // zero-contribution sources need no BRDF evaluation, including transmission.
+      this.renderLayer.scene.traverse(object => {
+        if (!(object instanceof THREE.Mesh)) return;
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material, true);
+        }
+      });
       const preparation = new BlackoutPresentationPreparation();
       this.programPreparation = preparation;
       await preparation.prepare(this.renderLayer, this.preparationCamera.copy(this.renderLayer.cameraRig.camera));
