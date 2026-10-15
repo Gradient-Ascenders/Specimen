@@ -180,6 +180,7 @@ test('settings retain session values across flow transitions', () => {
     soundEffectsVolume: 0.8,
     cameraDistanceMetres: 6.4,
     renderPixelRatioCap: 1.5,
+    graphicsPreset: 'normal',
   });
   assert.deepEqual(snapshots.slice(0, 2), [1, 1.7]);
 

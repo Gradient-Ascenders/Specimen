@@ -66,7 +66,7 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   expect([...failures], 'Production console/network errors').toEqual([]);
 });
 
-test('production loads Cultivation and Blackout and restarts each at a nested path', async ({
+test('Performance production loads Cultivation and Blackout and restarts each at a nested path', async ({
   page, baseURL,
 }) => {
   const failures = watchProductionRequests(page, baseURL!);
@@ -77,6 +77,10 @@ test('production loads Cultivation and Blackout and restarts each at a nested pa
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
   const start = page.locator('[data-flow-panel="title"] [data-action="start"]');
   await expect(start).toBeVisible({ timeout: 120_000 });
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
+  await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await start.click();
   await assertPlaying(page);
   expect([...voltAssets], 'Containment must not load Volt').toEqual([]);

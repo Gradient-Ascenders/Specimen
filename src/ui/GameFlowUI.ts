@@ -371,6 +371,7 @@ export class GameFlowUI {
   private readonly cameraDistanceInput: HTMLInputElement;
   private readonly cameraDistanceOutput: HTMLOutputElement;
   private readonly renderResolutionInput: HTMLSelectElement;
+  private readonly graphicsPresetInput: HTMLSelectElement;
   private readonly slimeRoster: HTMLElement;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
@@ -423,6 +424,9 @@ export class GameFlowUI {
     );
     this.renderResolutionInput = this.requireElement<HTMLSelectElement>(
       '[data-setting="render-resolution"]',
+    );
+    this.graphicsPresetInput = this.requireElement<HTMLSelectElement>(
+      '[data-setting="graphics-preset"]',
     );
     this.slimeRoster = this.requireElement('[data-slime-roster]');
     this.passiveStatus = this.requireElement('[data-passive-status]');
@@ -674,12 +678,23 @@ export class GameFlowUI {
           </div>
           <div class="setting-row">
             <div class="setting-heading">
+              <label for="graphics-preset">Graphics preset</label>
+            </div>
+            <select id="graphics-preset" data-setting="graphics-preset">
+              <option value="normal">Normal</option>
+              <option value="performance">Performance</option>
+            </select>
+            <p class="setting-note">Performance caps render resolution at 1× and softens refraction detail for smoother play. Lighting and shadows stay enabled.</p>
+          </div>
+          <div class="setting-row">
+            <div class="setting-heading">
               <label for="render-resolution">Render resolution</label>
             </div>
             <select id="render-resolution" data-setting="render-resolution">
-              <option value="1">Performance — 1.0× cap</option>
-              <option value="1.5">Balanced — 1.5× cap</option>
-              <option value="2">High — 2.0× cap</option>
+              <option value="0.75">0.75× cap — lowest detail</option>
+              <option value="1">1.0× cap</option>
+              <option value="1.5">1.5× cap</option>
+              <option value="2">2.0× cap</option>
             </select>
             <p class="setting-note">Limits 3D rendering detail. Interface resolution is unchanged.</p>
           </div>
@@ -774,6 +789,7 @@ export class GameFlowUI {
       this.onRenderResolutionChange,
       { signal },
     );
+    this.graphicsPresetInput.addEventListener('change', this.onGraphicsPresetChange, { signal });
     this.hostWindow.addEventListener('keydown', this.onKeyDown, { signal });
     this.hostWindow.addEventListener('blur', this.onWindowBlur, { signal });
     this.hostDocument.addEventListener(
@@ -976,6 +992,11 @@ export class GameFlowUI {
     }
   };
 
+  private readonly onGraphicsPresetChange = (): void => {
+    const value = this.graphicsPresetInput.value;
+    if (value === 'normal' || value === 'performance') this.settings.setGraphicsPreset(value);
+  };
+
   private readonly onSettingsChanged = (
     settings: Readonly<GameSettingsSnapshot>,
   ): void => {
@@ -1007,7 +1028,12 @@ export class GameFlowUI {
     );
     this.cameraDistanceOutput.value =
       `${settings.cameraDistanceMetres.toFixed(1)} m`;
-    this.renderResolutionInput.value = String(settings.renderPixelRatioCap);
+    const performance = settings.graphicsPreset === 'performance';
+    this.graphicsPresetInput.value = settings.graphicsPreset;
+    this.renderResolutionInput.value = String(performance ? Math.min(1, settings.renderPixelRatioCap) : settings.renderPixelRatioCap);
+    for (const option of this.renderResolutionInput.options) {
+      option.disabled = performance && Number(option.value) > 1;
+    }
     this.actions.applySettings(settings);
   };
 
