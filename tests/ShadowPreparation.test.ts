@@ -214,16 +214,26 @@ test('hidden Volt prewarms morph, transmission, faded-eye and actual caster vari
   const { renderer, borrowedTarget } = fixture();
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), volt = new VoltCharacterPresentation();
   await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
+  const expectedMorphs = new Map<THREE.BufferGeometry, { mesh: THREE.Mesh; dictionary: Record<string, number>; influences: number[] }>();
+  volt.root.traverse(object => {
+    if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
+    if (object.name === 'Volt-Body') {
+      assert.equal(object.geometry.morphAttributes.position!.length, 6);
+      object.morphTargetInfluences![object.morphTargetDictionary!.Headroom] = 0.35;
+    } else assert.equal(object.geometry.morphAttributes.position!.length, 5);
+    expectedMorphs.set(object.geometry, { mesh: object, dictionary: { ...object.morphTargetDictionary }, influences: [...object.morphTargetInfluences!] });
+  });
   const light = new THREE.SpotLight(); light.castShadow = true; scene.add(light);
   const variants = new Set<string>();
   renderer.compileAsync = async group => {
     group.traverse(object => {
       if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
       assert.equal(object.geometry.morphTargetsRelative, true);
-      assert.equal(object.geometry.morphAttributes.position!.length, 5);
-      assert.equal(object.geometry.morphAttributes.normal!.length, 5);
-      assert.equal(Object.keys(object.morphTargetDictionary!).length, 5);
-      assert.deepEqual(object.morphTargetInfluences, [0, 0, 0, 0, 0]);
+      const expected = expectedMorphs.get(object.geometry)!; assert.ok(expected, 'proxy retains its live geometry');
+      assert.equal(object.geometry.morphAttributes.position!.length, expected.influences.length);
+      assert.equal(object.geometry.morphAttributes.normal!.length, expected.influences.length);
+      assert.deepEqual(object.morphTargetDictionary, expected.dictionary);
+      assert.deepEqual(object.morphTargetInfluences, expected.influences, 'retain the live headroom pose while prewarming');
       const material = object.material as THREE.Material;
       variants.add(`${object.name}:${material.type}:${material.transparent}`);
     });
@@ -238,5 +248,6 @@ test('hidden Volt prewarms morph, transmission, faded-eye and actual caster vari
       if (name !== 'Volt-Body') assert.ok(variants.has(`${name}:MeshPhysicalMaterial:false`));
     }
     assert.deepEqual(volt.diagnostics, before);
+    for (const expected of expectedMorphs.values()) assert.deepEqual(expected.mesh.morphTargetInfluences, expected.influences);
   } finally { preparation.dispose(); volt.dispose(); borrowedTarget.dispose(); }
 });

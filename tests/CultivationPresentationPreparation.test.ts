@@ -14,6 +14,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
   await preview.roomFive.captiveVoltPresentation.prepare(loadVolt);
   const captiveBody = preview.roomFive.captiveVoltPresentation.root.getObjectByName('Volt-Body') as THREE.Mesh;
+  const expectedMorphs = new Map<THREE.BufferGeometry, { mesh: THREE.Mesh; dictionary: Record<string, number>; influences: number[] }>();
+  for (const root of [volt.root, preview.roomFive.captiveVoltPresentation.root]) root.traverse(object => {
+    if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
+    if (object.name === 'Volt-Body') {
+      assert.equal(object.geometry.morphAttributes.position!.length, 6);
+      object.morphTargetInfluences![object.morphTargetDictionary!.Headroom] = 0.35;
+    } else assert.equal(object.geometry.morphAttributes.position!.length, 5);
+    expectedMorphs.set(object.geometry, { mesh: object, dictionary: { ...object.morphTargetDictionary }, influences: [...object.morphTargetInfluences!] });
+  });
   let captiveUploaded = false;
   const voltVariants = new Set<string>();
   const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
@@ -90,7 +99,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       preparedScene.traverseVisible(object => {
         if (object instanceof THREE.Mesh && object.geometry === captiveBody.geometry && object.material instanceof THREE.MeshDepthMaterial) {
           captiveUploaded = true;
-          assert.equal(object.morphTargetInfluences!.length, 5);
+          assert.deepEqual(object.morphTargetDictionary, expectedMorphs.get(captiveBody.geometry)!.dictionary);
+          assert.deepEqual(object.morphTargetInfluences, expectedMorphs.get(captiveBody.geometry)!.influences);
         }
         if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
           assert.equal(object.material.transmission, 0, 'temporary scenes must not allocate Bob transmission targets');
@@ -111,9 +121,11 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
         preparedOwners.add(o.name);
         if (o instanceof THREE.Mesh && o.name.startsWith('Volt-')) {
           assert.equal(o.geometry.morphTargetsRelative, true);
-          assert.equal(o.geometry.morphAttributes.position!.length, 5);
-          assert.equal(o.geometry.morphAttributes.normal!.length, 5);
-          assert.deepEqual(o.morphTargetInfluences, [0, 0, 0, 0, 0]);
+          const expected = expectedMorphs.get(o.geometry)!; assert.ok(expected, 'proxy retains its owning instance geometry');
+          assert.equal(o.geometry.morphAttributes.position!.length, expected.influences.length);
+          assert.equal(o.geometry.morphAttributes.normal!.length, expected.influences.length);
+          assert.deepEqual(o.morphTargetDictionary, expected.dictionary);
+          assert.deepEqual(o.morphTargetInfluences, expected.influences, 'retain the live headroom pose while prewarming');
           voltVariants.add((o.material as THREE.Material).type + ':' + (o.material as THREE.Material).transparent);
         }
         if (o instanceof THREE.Mesh && o.name === 'shadow-map-regression' &&
@@ -144,6 +156,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
+    for (const expected of expectedMorphs.values()) assert.deepEqual(expected.mesh.morphTargetInfluences, expected.influences);
     assert.ok(compiles > 0);
     if (!fail) assert.ok(preparedOwners.has('Bob-Body'), 'transmissive body still enters shader preparation');
     if (!fail) {

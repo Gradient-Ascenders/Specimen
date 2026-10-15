@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
 
 import {
   moveAngleTowards,
@@ -94,7 +94,7 @@ export interface BobCharacterAssetDiagnostics {
 }
 
 async function loadDefaultBobAsset(): Promise<THREE.Group> {
-  return (await new GLTFLoader().loadAsync(BOB_AUTHORED_ASSET_URL)).scene;
+  return loadCharacterAsset(BOB_AUTHORED_ASSET_URL);
 }
 
 function triangleCount(mesh: THREE.Mesh): number {

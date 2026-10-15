@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
 import { moveAngleTowards, shortestAngleDelta } from '../BlobFacing.ts';
 import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
 import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresentationContract.ts';
@@ -117,12 +117,7 @@ export class GoopCharacterPresentation {
       asset: this.asset ? { bodyTriangles: 26804, eyeTriangles: 6912, drawCalls: 3, geometries: 3, materials: 2 } : undefined };
   }
 
-  prepare(loader: GoopCharacterLoader = async () => {
-    const gltf = await new GLTFLoader().loadAsync(ASSET_URL);
-    // GLTF animations are separate from scene.animations.
-    gltf.scene.animations = gltf.animations;
-    return gltf.scene;
-  }): Promise<void> {
+  prepare(loader: GoopCharacterLoader = () => loadCharacterAsset(ASSET_URL)): Promise<void> {
     if (this.disposed) return Promise.reject(new Error('Cannot prepare disposed Goop'));
     if (this.ready) return Promise.resolve();
     if (this.preparation) return this.preparation;
