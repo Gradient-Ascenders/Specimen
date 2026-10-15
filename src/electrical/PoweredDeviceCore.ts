@@ -1,3 +1,4 @@
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 
 import type { ElectricalConnectionTarget } from '../abilities/ElectricalTargetRegistry.ts';
@@ -61,6 +62,7 @@ export interface PoweredDeviceEvents {
 }
 
 export interface PoweredDeviceCoreOptions {
+  readonly audioKind?: 'light' | 'platform' | 'terminal';
   readonly id: string;
   readonly displayName: string;
   readonly hitMeshes: readonly THREE.Mesh[];
@@ -98,6 +100,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
   private latchedValue: boolean;
   private blockedValue = false;
   private disposed = false;
+  private readonly audioKind: 'light' | 'platform' | 'terminal';
 
   constructor(options: PoweredDeviceCoreOptions) {
     if (!options.id.trim()) throw new Error('Powered device ID must be non-empty.');
@@ -108,6 +111,7 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
       throw new Error(`Powered device "${options.id}" requires target hit geometry.`);
     }
 
+    this.audioKind = options.audioKind ?? 'terminal';
     this.id = options.id;
     this.displayName = options.displayName;
     this.hitMeshes = [...options.hitMeshes];
@@ -338,6 +342,10 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     if (this.poweredValue === nextPowered) return;
     this.poweredValue = nextPowered;
     this.readModelValue.powered = nextPowered;
+    if (nextPowered) gameplayAudioEvents.emit('cue', {
+      sound: this.audioKind === 'light' ? 'volt-light-activate-01' : this.audioKind === 'platform' ? 'volt-platform-power-on-01' : 'volt-terminal-activate-01',
+      position: this.copySocketWorldPosition(new THREE.Vector3()),
+    });
     this.events.emit('powerChanged', {
       id: this.id,
       powered: nextPowered,

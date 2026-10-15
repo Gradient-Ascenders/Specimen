@@ -1,3 +1,5 @@
+import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
@@ -109,6 +111,7 @@ const CULTIVATION_BOB_REFLECTION = {
 } as const;
 
 export interface CultivationLevelRuntimeOptions {
+  readonly audio?: AudioPlayback;
   readonly host: HTMLElement;
   readonly input: Input;
   readonly renderLayer: RenderLayer;
@@ -194,6 +197,8 @@ export class CultivationLevelRuntime {
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
+  private readonly audio: AudioPlayback | undefined;
+  private gameplayAudio: GameplayAudio | undefined;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
@@ -240,6 +245,7 @@ export class CultivationLevelRuntime {
 
   constructor(options: CultivationLevelRuntimeOptions) {
     validateLevelProgressionSnapshot(options.progression);
+    this.audio = options.audio;
     this.host = options.host;
     this.input = options.input;
     this.renderLayer = options.renderLayer;
@@ -432,9 +438,10 @@ export class CultivationLevelRuntime {
   }
 
   fixedUpdate(deltaSeconds: number): void {
-    if (this.preparationQueue?.diagnostics.pending) { this.input.endFixedUpdate(); return; }
+    if (this.preparationQueue?.diagnostics.pending) { this.gameplayAudio?.setEnabled(false); this.input.endFixedUpdate(); return; }
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
+    if (resources.deathSequence.isPlaying) this.gameplayAudio?.setEnabled(true);
     if (!resources.deathSequence.isPlaying) {
       resources.authoredPreview?.labArt.acid.update(deltaSeconds);
       if (this.lastDeathSlimeId === 'bob') {
@@ -445,6 +452,7 @@ export class CultivationLevelRuntime {
         resources.nonBobBurst.update(deltaSeconds);
       }
       if (resources.deathSequence.update(deltaSeconds)) resources.deathScreen.show();
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -453,6 +461,7 @@ export class CultivationLevelRuntime {
     ) {
       this.input.setEnabled(false);
       this.input.releasePointerLock();
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -463,10 +472,12 @@ export class CultivationLevelRuntime {
     const debugRoomId = this.consumeAuthoredPreviewTeleport();
     if (debugRoomId !== undefined) {
       this.teleportToAuthoredPreviewRoom(debugRoomId);
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
     if (resources.authoredPreview?.roomFive.controller.complete) {
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate(); return;
     }
 
@@ -614,6 +625,7 @@ export class CultivationLevelRuntime {
           : resources.noMovement,
       );
     }
+    this.gameplayAudio?.update();
     this.input.endFixedUpdate();
   }
 
@@ -1341,6 +1353,14 @@ export class CultivationLevelRuntime {
         unsubscribeBobPresentationEvents,
         unsubscribeManager,
       };
+      if (this.audio) {
+        const gameplayAudio = new GameplayAudio(this.audio, manager, acidProjectileSystem);
+        this.gameplayAudio = gameplayAudio;
+        rollback(() => {
+          gameplayAudio.dispose();
+          if (this.gameplayAudio === gameplayAudio) this.gameplayAudio = undefined;
+        });
+      }
       if (authoredPreview) {
         // Level 1's Digit0 shortcut now enters the authored three-room route
         // immediately. The separate backend-foundation composition remains a
@@ -1369,6 +1389,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly startResources = (): void => {
+    this.gameplayAudio?.setEnabled(true);
     const resources = this.requireResources();
     resources.goopAcidPresentation.resume();
     this.input.resetState();
@@ -1380,6 +1401,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    this.gameplayAudio?.setEnabled(false);
     const resources = this.requireResources();
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
@@ -1387,6 +1409,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.gameplayAudio?.reset();
     const resources = this.requireResources();
     this.input.resetState();
     resources.deathSequence.reset();
@@ -1424,6 +1447,8 @@ export class CultivationLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.gameplayAudio?.dispose();
+    this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.cameraShadowCulling = undefined;
     this.preparationQueue?.dispose(); this.preparationQueue = undefined;
@@ -1842,6 +1867,7 @@ export class CultivationLevelRuntime {
       resources.deathSequence.reset();
       return false;
     }
+    this.gameplayAudio?.died(dyingSlimeId);
     this.lastDeathSlimeId = dyingSlimeId;
     this.input.setEnabled(false);
     this.input.releasePointerLock();
@@ -1851,6 +1877,7 @@ export class CultivationLevelRuntime {
   private readonly retryAfterDeath = (): void => {
     const resources = this.requireResources();
     if (!resources.deathSequence.completeRetry()) return;
+    this.gameplayAudio?.respawn();
     resources.nonBobBurst.reset();
     resources.bobPresentation.finishDeath(resources.pair.bobBody.position);
     resources.goopPresentation.finishDeath(resources.pair.goopBody.position);

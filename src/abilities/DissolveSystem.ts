@@ -1,3 +1,4 @@
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -77,6 +78,9 @@ export class DissolveSystem {
     if (this.burningTargets.has(target)) return 'already-burning';
 
     this.burningTargets.add(target);
+    const position = target.mesh.getWorldPosition(new THREE.Vector3());
+    gameplayAudioEvents.emit('cue', { sound: 'goop-dissolve-start-01', position });
+    gameplayAudioEvents.emit('loop', { key: `dissolve:${target.id}`, sound: 'goop-dissolve-loop-01', position });
     this.events.emit('burnStarted', { target });
     return 'started';
   }
@@ -97,6 +101,8 @@ export class DissolveSystem {
 
       this.burningTargets.delete(target);
       this.completedBurnCountValue += 1;
+      gameplayAudioEvents.emit('stop', { key: `dissolve:${target.id}` });
+      gameplayAudioEvents.emit('cue', { sound: 'goop-dissolve-complete-01', position: target.mesh.getWorldPosition(new THREE.Vector3()) });
       this.events.emit('burnCompleted', { target });
     }
   }
@@ -107,6 +113,7 @@ export class DissolveSystem {
     for (const target of this.targets) {
       if (!this.burningTargets.delete(target)) continue;
       this.resetBurnCountValue += 1;
+      gameplayAudioEvents.emit('stop', { key: `dissolve:${target.id}` });
       this.events.emit('burnReset', { target });
     }
   }
@@ -125,6 +132,7 @@ export class DissolveSystem {
 
   dispose(): void {
     if (this.disposed) return;
+    for (const target of this.burningTargets) gameplayAudioEvents.emit('stop', { key: `dissolve:${target.id}` });
     this.burningTargets.clear();
     this.targetByMesh.clear();
     this.events.clear();

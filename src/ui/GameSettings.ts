@@ -12,6 +12,7 @@ export interface GameSettingsSnapshot {
   readonly mouseSensitivity: number;
   readonly invertVerticalLook: boolean;
   readonly masterVolume: number;
+  readonly soundEffectsVolume: number;
   readonly cameraDistanceMetres: number;
   readonly renderPixelRatioCap: RenderPixelRatioCap;
 }
@@ -24,6 +25,7 @@ export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
   mouseSensitivity: 1,
   invertVerticalLook: false,
   masterVolume: 1,
+  soundEffectsVolume: 0.8,
   cameraDistanceMetres: DEFAULT_CAMERA_RIG_CONFIG.followDistanceMetres,
   renderPixelRatioCap: DEFAULT_RENDER_PIXEL_RATIO_CAP,
 };
@@ -52,6 +54,10 @@ export class GameSettings {
     this.update({ masterVolume: clamp(value, 0, 1) });
   }
 
+  setSoundEffectsVolume(value: number): void {
+    this.update({ soundEffectsVolume: clamp(value, 0, 1) });
+  }
+
   setCameraDistanceMetres(value: number): void {
     this.update({
       cameraDistanceMetres: clamp(
@@ -78,6 +84,7 @@ export class GameSettings {
       next.mouseSensitivity === this.current.mouseSensitivity &&
       next.invertVerticalLook === this.current.invertVerticalLook &&
       next.masterVolume === this.current.masterVolume &&
+      next.soundEffectsVolume === this.current.soundEffectsVolume &&
       next.cameraDistanceMetres === this.current.cameraDistanceMetres &&
       next.renderPixelRatioCap === this.current.renderPixelRatioCap
     ) {

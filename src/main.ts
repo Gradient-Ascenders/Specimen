@@ -1,3 +1,4 @@
+import { AudioManager } from './audio/AudioManager.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import creditsMarkdown from '../CREDITS.md?raw';
 
@@ -22,6 +23,15 @@ if (!app) {
 }
 
 const settings = new GameSettings();
+const audio = new AudioManager(import.meta.env.BASE_URL);
+void audio.preload();
+const unlockAudio = (): void => audio.unlock();
+const focusAudio = (): void => audio.setFocused(!document.hidden && document.hasFocus());
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+window.addEventListener('blur', focusAudio);
+window.addEventListener('focus', focusAudio);
+document.addEventListener('visibilitychange', focusAudio);
 const renderLayer = new RenderLayer({
   host: app,
   pixelRatioCap: settings.value.renderPixelRatioCap,
@@ -32,6 +42,7 @@ const debugAvailable =
   new URLSearchParams(window.location.search).get('debug') === '1';
 const levelOneRuntime = new GreyboxLevelRuntime({
   host: app,
+  audio,
   input,
   renderLayer,
   debugAvailable,
@@ -47,6 +58,7 @@ const gameSession = new GameSessionCoordinator({
     ]);
     return new runtimeModule.CultivationLevelRuntime({
       host: app,
+      audio,
       input,
       renderLayer,
       progression,
@@ -61,6 +73,7 @@ const gameSession = new GameSessionCoordinator({
     ]);
     return new runtimeModule.BlackoutLevelRuntime({
       host: app,
+      audio,
       input,
       renderLayer,
       progression,
@@ -89,6 +102,7 @@ const gameFlow = new GameFlowUI({
     isGameplayInputEnabled: () => input.enabled,
     restartLevel: () => lifecycleCoordinator.restartLevel(),
     applySettings: (nextSettings) => {
+      audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);
       renderLayer.cameraRig.setLookSettings({
         horizontalSensitivityRadiansPerPixel:
           DEFAULT_CAMERA_RIG_CONFIG.horizontalSensitivityRadiansPerPixel *
@@ -221,6 +235,11 @@ const shutdown = (): void => {
   shuttingDown = true;
   cancelAnimationFrame(bootFrame);
   loop.dispose();
+  window.removeEventListener('pointerdown', unlockAudio);
+  window.removeEventListener('keydown', unlockAudio);
+  window.removeEventListener('blur', focusAudio);
+  window.removeEventListener('focus', focusAudio);
+  document.removeEventListener('visibilitychange', focusAudio);
   unsubscribeObjectiveChanged();
   unsubscribeTransitionStarted();
   unsubscribeTransitionCompleted();
@@ -228,6 +247,7 @@ const shutdown = (): void => {
   performanceRecorder?.dispose();
   gameFlow.dispose();
   gameSession.dispose();
+  audio.dispose();
   input.dispose();
   renderLayer.dispose();
 };

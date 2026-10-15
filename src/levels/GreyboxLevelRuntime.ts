@@ -1,3 +1,5 @@
+import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
 import {
 
@@ -146,6 +148,7 @@ const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
   5: ['room-3-acid-surface-material-integration-point'],
 };
 export interface GreyboxLevelRuntimeOptions {
+  readonly audio?: AudioPlayback;
   host: HTMLElement;
   input: Input;
   renderLayer: RenderLayer;
@@ -254,6 +257,8 @@ export class GreyboxLevelRuntime {
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
+  private readonly audio: AudioPlayback | undefined;
+  private gameplayAudio: GameplayAudio | undefined;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
@@ -293,6 +298,7 @@ export class GreyboxLevelRuntime {
     runTwoBodySwitchingRegression();
 
   constructor(options: GreyboxLevelRuntimeOptions) {
+    this.audio = options.audio;
     this.host = options.host;
     this.input = options.input;
     this.renderLayer = options.renderLayer;
@@ -517,6 +523,7 @@ export class GreyboxLevelRuntime {
       slimeVisualState.movementIntentWorld = resources.noMovement;
       testScene.bob.update(deltaSeconds, slimeVisualState);
       testScene.update(deltaSeconds, body.position);
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -531,6 +538,7 @@ export class GreyboxLevelRuntime {
       this.input.wasPressed('debugCompleteLevel')
     ) {
       testPanel.completeLevel();
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -541,6 +549,7 @@ export class GreyboxLevelRuntime {
         : undefined;
     if (requestedDebugRoom !== undefined && testPanel) {
       testPanel.teleportRoom(requestedDebugRoom);
+      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -667,6 +676,7 @@ export class GreyboxLevelRuntime {
       grounded: goopBody.grounded,
     });
     testScene.update(deltaSeconds, body.position, slimePair.activeBody.position);
+    this.gameplayAudio?.update();
     this.input.endFixedUpdate();
   }
 
@@ -1180,6 +1190,7 @@ export class GreyboxLevelRuntime {
       unsubscribeLevelCompleted,
       testPanel,
     };
+    if (this.audio) this.gameplayAudio = new GameplayAudio(this.audio, slimeManager, acidProjectileSystem);
 
     const resources = this.resources;
     resources.unsubscribeSlimeRoster = [
@@ -1196,6 +1207,7 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly startResources = (): void => {
+    this.gameplayAudio?.setEnabled(true);
     const resources = this.requireResources();
     resources.goopAcidPresentation.resume();
     this.input.setEnabled(
@@ -1207,6 +1219,7 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    this.gameplayAudio?.setEnabled(false);
     const resources = this.requireResources();
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
@@ -1214,6 +1227,7 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.gameplayAudio?.reset();
     this.skipToLevelThreeTriggered = false;
     const resources = this.requireResources();
     this.input.resetState();
@@ -1223,6 +1237,7 @@ export class GreyboxLevelRuntime {
     resources.dissolveSystem.reset();
     resources.goopAcidPresentation.reset();
     resources.containmentLevel.reset();
+    this.gameplayAudio?.reset();
     resources.puzzleRegistry.reset();
     resources.slimePair.restoreInitialState();
     this.lastDeathSlimeId = undefined;
@@ -1252,6 +1267,8 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.gameplayAudio?.dispose();
+    this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.lightingPrewarmGeneration += 1;
     this.lightLayout?.dispose(); this.lightLayout = undefined;
@@ -1322,6 +1339,7 @@ export class GreyboxLevelRuntime {
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
     resources.goopAcidPresentation.reset();
+    this.gameplayAudio?.reset();
     resources.puzzleRegistry.resetGroup(DISSOLVE_PUZZLE_GROUP_ID);
     recoverLevelCheckpoint();
     resources.slimePair.captureCurrentRecoveryState();
@@ -1404,6 +1422,7 @@ export class GreyboxLevelRuntime {
       return false;
     }
 
+    this.gameplayAudio?.died(dyingSlimeId);
     this.lastDeathSlimeId = dyingSlimeId;
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
@@ -1417,6 +1436,7 @@ export class GreyboxLevelRuntime {
     const resources = this.requireResources();
     if (!resources.deathSequence.canRetry) return;
     if (!resources.deathSequence.completeRetry()) return;
+    this.gameplayAudio?.respawn();
 
     // completeRetry() executes the retained two-body recovery action, which can
     // restore a different active slime than the one that died. Camera ownership
@@ -1451,6 +1471,7 @@ export class GreyboxLevelRuntime {
       resources.deathScreen.show();
     }
     this.host.dataset.gameState = resources.deathSequence.state;
+    this.gameplayAudio?.update();
     this.input.endFixedUpdate();
   }
 
