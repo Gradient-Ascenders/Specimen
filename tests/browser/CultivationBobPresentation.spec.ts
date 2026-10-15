@@ -582,7 +582,7 @@ test('Cultivation background compilation and primers preserve active lighting an
 });
 
 
-test('Cultivation zero-radiance guards preserve Bob and Goop room pixels', async ({page}) => {
+test('Cultivation retained shaders match early-zero controls for Bob and Goop room pixels', async ({page}) => {
   test.setTimeout(600_000);
   const assertExposed = await exposeCultivationRuntime(page);
   await enterCultivation(page); assertExposed();
@@ -633,9 +633,10 @@ test('Cultivation zero-radiance guards preserve Bob and Goop room pixels', async
         layer.scene.traverseVisible((o: any) => {
           if (!o.isMesh) return; group.add(o.clone(false));
           for (const m of Array.isArray(o.material)?o.material:[o.material])
-            if (m.customProgramCacheKey().includes(':finite-light-branch-v4')) materials.add(m);
+            if (m.customProgramCacheKey().includes(':finite-light-branch-v4')) throw new Error('Level 2 unexpectedly enabled early-zero guards');
+            else if (m.customProgramCacheKey().includes(':finite-light-branch-v3')) materials.add(m);
         });
-        let removed = 0;
+        let guarded = 0;
         const saved = [...materials].map(m => [m,m.onBeforeCompile,m.customProgramCacheKey]);
         try {
           for (const [m,hook,key] of saved) {
@@ -644,17 +645,17 @@ test('Cultivation zero-radiance guards preserve Bob and Goop room pixels', async
               for (const [kind,v] of [['Point','pointLight'],['Spot','spotLight']]) {
                 const call = 'get'+kind+'LightInfo( '+v+', geometryPosition, directLight );';
                 const block = 'if ( any( notEqual( '+v+'.color, vec3( 0.0 ) ) ) ) {\n      '+call+'\n    } else {\n      directLight.color = vec3( 0.0 );\n      directLight.direction = vec3( 0.0 );\n      directLight.visible = false;\n    }';
-                removed += shader.fragmentShader.split(block).length-1;
-                shader.fragmentShader = shader.fragmentShader.replaceAll(block,call);
+                guarded += shader.fragmentShader.split(call).length-1;
+                shader.fragmentShader = shader.fragmentShader.replaceAll(call,block);
               }
             };
-            const controlKey = key.call(m)+':unguarded-pixel-control';
+            const controlKey = key.call(m)+':early-zero-pixel-control';
             m.customProgramCacheKey=()=>controlKey; m.needsUpdate=true;
           }
           await renderer.compileAsync(group,camera,layer.scene); draw();
           const control = read(); let difference = 0;
           for (let i=0;i<baseline.length;i++) difference=Math.max(difference,Math.abs(baseline[i]-control[i]));
-          results.push({room,slime,lit,removed,difference,error:gl.getError()});
+          results.push({room,slime,lit,guarded,difference,error:gl.getError()});
         } finally {
           for (const [m,hook,key] of saved) {m.onBeforeCompile=hook;m.customProgramCacheKey=key;m.needsUpdate=true;}
           group.clear();
@@ -663,10 +664,10 @@ test('Cultivation zero-radiance guards preserve Bob and Goop room pixels', async
     } finally {queue.tick=tick;}
     return results;
   });
-  console.log('zero-radiance pixel controls',results);
+  console.log('retained versus early-zero pixel controls',results);
   expect(results).toHaveLength(2);
   for (const result of results) {
-    expect(result.removed).toBeGreaterThan(0);
+    expect(result.guarded).toBeGreaterThan(0);
     expect(result.difference).toBeLessThanOrEqual(1);
     expect(result.error).toBe(0);
   }

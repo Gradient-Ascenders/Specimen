@@ -31,7 +31,7 @@ export class CultivationContaminationArt {
       map: this.glassAtlas(), transparent: true, opacity: .76,
       side: THREE.DoubleSide, forceSinglePass: true, depthWrite: false, depthTest: true,
       roughness: .24, metalness: .08 });
-    for (const material of [this.dark, this.growth, this.mineral, this.glass, this.amber, this.cool]) optimizeFiniteLightEvaluation(material, true);
+    for (const material of [this.dark, this.growth, this.mineral, this.glass, this.amber, this.cool]) optimizeFiniteLightEvaluation(material);
   }
 
   overrides(builder: GreyboxRoomBuilder): ReadonlyMap<string, THREE.MeshStandardMaterial> {
@@ -242,7 +242,7 @@ export class CultivationContaminationArt {
     material.userData.tileSizeMetres=finish==='wall'?[4,3]:[2,2];
     if (finish === 'wall') this.addRunoff(material);
     if (finish === 'floor') this.addFloorWear(material);
-    optimizeFiniteLightEvaluation(material, true);
+    optimizeFiniteLightEvaluation(material);
     return material;
   }
 

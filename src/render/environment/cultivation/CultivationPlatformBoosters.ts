@@ -22,7 +22,7 @@ export class CultivationPlatformBoosters {
     const hot = new THREE.MeshBasicMaterial({ color: 0xffb36a, toneMapped: false });
     const flame = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .8,
       blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
-    optimizeFiniteLightEvaluation(iron, true); optimizeFiniteLightEvaluation(soot, true);
+    optimizeFiniteLightEvaluation(iron); optimizeFiniteLightEvaluation(soot);
     this.materials.push(iron, soot, hot, flame);
     flame.onBeforeCompile = shader => {
       shader.uniforms.uBoosterTime = this.clock;

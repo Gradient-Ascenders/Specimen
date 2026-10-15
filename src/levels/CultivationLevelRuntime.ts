@@ -294,12 +294,12 @@ export class CultivationLevelRuntime {
       .then(() => {
         if (this.resources !== resources) return;
         if (!resources.authoredPreview) return;
-        // Room 5 renders the lit environment twice for transmission. Avoid
-        // evaluating direction/distance/cones for zero-radiance padding in both passes.
+        // Keep compact light loops and contribution guards. Early-zero guards
+        // regress mandatory compilation on UHD 620.
         this.renderLayer.scene.traverse(object => {
           if (!(object instanceof THREE.Mesh)) return;
           for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-            if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material, true);
+            if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material);
           }
         });
         // Match the first gameplay draw before cloning preparation layouts or
