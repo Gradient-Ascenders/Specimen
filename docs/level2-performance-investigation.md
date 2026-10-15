@@ -1,10 +1,12 @@
 # Level 2 performance investigation — review continuation
 
+**Current retained result:** [Level 2 startup regression resolution](level2-startup-regression.md) supersedes this report's candidate/retention and startup conclusions. The early-zero opt-in evaluated below was subsequently reverted after controlled ablation. Its genuine recordings remain historical evidence of the GPU benefit that is being given up. The other reviewed improvements remain retained.
+
 This continues the reviewed `280e5c1`, `908ca22` and `9374683` changes. Those commits are retained. The PR and remote branch have not been updated. The validation fixes are in `7265101`.
 
-## Retained candidate and scope
+## Evaluated early-zero candidate and scope (subsequently reverted)
 
-Level 2 now opts its existing finite-light helper into the zero-radiance path already used by Levels 1 and 3. Seven call sites cover room material creation, cloned finishes, the scout batches and runtime-owned materials. This matters because the helper is idempotent: changing only the runtime traversal would leave previously configured room materials on the older path.
+The evaluated Level 2 candidate opted its existing finite-light helper into the zero-radiance path already used by Levels 1 and 3. Seven call sites cover room material creation, cloned finishes, the scout batches and runtime-owned materials. This matters because the helper is idempotent: changing only the runtime traversal would leave previously configured room materials on the older path.
 
 Only an exactly zero light color skips direction, distance and cone evaluation. Nonzero contributions, accumulation order, BRDFs, shadow samples and transmission settings retain their existing calculations. The same guard covers the ordinary screen draw and the linear-color environment draw used by transmission. No new renderer, material settings, render targets, shader warmup policy or resource ownership was introduced. The Bob-camera experiment primarily benefited room rendering. An active-Goop control also showed a substantial physical-material benefit; the split depends on character screen coverage and view.
 
@@ -79,13 +81,9 @@ GL-call instrumentation reproduced a 312.6 ms resource primer with zero new prog
 
 The measured API is a synchronization point; that trace alone does not prove that log generation, deferred driver work, or outstanding GPU commands caused the entire wait. A separate pre-primer GPU-drain control took 0–0.1 ms in the largest cases, while the following program-log query still took 283–320.5 ms. This rules out ordinary queued GPU draws as the dominant cause in those samples and localizes the wait to the driver diagnostic/first-use inspection path. It does not identify the driver’s internal implementation. This deliberately synchronized run is excluded from gameplay comparisons. Disabling error checking, skipping primers, or deferring required work into gameplay is not a retained solution.
 
-## Architectural boundary — stopped for design review
+## Rejected rendering architecture
 
-After the small guard, roughly 50 ms is still spent on each environment render in this heavy view. Avoiding that duplicate shading, while retaining full-resolution transmission, requires a rendering-pipeline change. It is outside this incremental patch.
-
-A proposed prototype would give the renderer one owned full-resolution HDR opaque color/depth stage, preserve the existing multisampling, resolve and mip generation, and let transmission consume that retained image. Screen presentation would reuse the same opaque result while preserving current tone mapping, output color space, alpha composition, transparent ordering, depth/occlusion and moving shadow behavior. The stage and its warmups would have explicit resize/restart/unload/dispose ownership. Sharing linear and display opaque work may also reduce the two families of output variants currently prepared; no loading reduction is promised without measurement.
-
-This is not an approved implementation. Three's internal transmission ownership, MSAA/depth compatibility, and the order of tone mapping versus resolve can prevent visual equivalence. A prototype must first pass meaningful full-frame comparisons for both active characters, fades, glass, emissive surfaces, moving searchlights and shadows, plus matched hardware gameplay/loading tests. Any visible difference or first-use stall migration rejects it. If exact equivalence cannot be established, retain the current transmission path and investigate a separate design for conservative per-object light selection. No major pipeline or lighting architecture change has been implemented.
+The subsequent full-resolution Room 5 prototype failed pixel equivalence when reusing the resolved transmission image (maximum 10/255, with both characters visible). That architecture is rejected. The speculative dual-output MRT design is not implemented, and no Three.js renderer fork or dependency patch is authorized. This continuation resolves startup by reverting only the Level 2 early-zero opt-in; it leaves the existing rendering architecture and transmission quality intact. See the current report for retained results and limitations.
 
 ## Reproduction and local evidence
 
