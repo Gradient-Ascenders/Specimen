@@ -2,6 +2,7 @@ import { CultivationSurfaceCleanup } from '../render/environment/cultivation/Cul
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../render/environment/cultivation/CultivationMaintenanceArt.ts';
+import { CultivationPassageArt } from '../render/environment/cultivation/CultivationPassageArt.ts';
 import { CultivationElevatorArt } from '../render/environment/cultivation/CultivationElevatorArt.ts';
 import { AcidLiquidInteractions, type AcidContactBody } from '../render/environment/containment/AcidLiquidInteractions.ts';
 import { CultivationCoverEquipmentArt } from '../render/environment/cultivation/CultivationCoverEquipmentArt.ts';
@@ -113,6 +114,7 @@ export class LevelTwoPreviewScene {
   readonly roomFourGeometry = new THREE.Group();
   readonly roomFive: LevelTwoRoomFiveGreybox;
   readonly maintenanceArt: CultivationMaintenanceArt;
+  readonly passageArt: CultivationPassageArt;
   readonly elevatorArt: CultivationElevatorArt;
   readonly surfaceCleanup: CultivationSurfaceCleanup;
   readonly roomOneToTwoPassage = new LevelTwoLabPassageGreybox({
@@ -175,9 +177,10 @@ export class LevelTwoPreviewScene {
     });
     this.chamberArt.addBoundary(this.roomThree.root);
     this.labArt.dress(this.roomOne.builder, [], this.contaminationArt.overrides(this.roomOne.builder));
-    this.labArt.dress(this.roomOneToTwoPassage.builder);
+    this.labArt.dress(this.roomOneToTwoPassage.builder, [], this.contaminationArt.overrides(this.roomOneToTwoPassage.builder));
     this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
-    this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28);
+    this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28, { wallSides: [-1] });
+    this.passageArt = new CultivationPassageArt(this.roomOneToTwoPassage, this.labArt, this.contaminationArt);
     this.labArt.dress(this.roomTwo.builder, [
       'cultivation-room-2-above-bob-vent',
       'cultivation-room-2-bob-vent-west-jamb',
@@ -403,6 +406,7 @@ export class LevelTwoPreviewScene {
 
   dispose(): void {
     this.surfaceCleanup.dispose();
+    this.passageArt.dispose();
     this.maintenanceArt.dispose();
     this.elevatorArt.dispose();
     this.labArt.dispose();
