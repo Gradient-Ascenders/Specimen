@@ -1,4 +1,4 @@
-import { CultivationLightLayout } from './CultivationLightLayout.ts';
+import { CultivationLightLayout, cultivationAuthoredLightMask } from './CultivationLightLayout.ts';
 import * as THREE from 'three';
 import type { LevelTwoPreviewScene } from '../levels/LevelTwoPreviewScene.ts';
 import type { RenderLayer } from './RenderLayer.ts';
@@ -235,24 +235,7 @@ export class CultivationPreparationQueue {
       if (o.name.startsWith('cultivation-room-3-drone-') && !config.visible[5]) return;
       if (o instanceof THREE.Light) {
         const clone = o.clone(false); o.updateWorldMatrix(true, false); clone.matrix.copy(o.matrixWorld); clone.matrixAutoUpdate = false;
-        if (clone.castShadow && (clone instanceof THREE.SpotLight || clone instanceof THREE.PointLight || clone instanceof THREE.DirectionalLight)) {
-          // Preparation disables shadow updates, so cloned lights never acquire
-          // real shadow maps. PCF receivers still require comparison-enabled
-          // depth textures, including cube textures for point lights.
-          const depth = clone instanceof THREE.PointLight
-            ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
-            : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
-          depth.compareFunction = THREE.LessEqualCompare;
-          depth.minFilter = depth.magFilter = THREE.LinearFilter;
-          const target = clone instanceof THREE.PointLight
-            ? new THREE.WebGLCubeRenderTarget(1)
-            : new THREE.WebGLRenderTarget(1, 1);
-          // r185 supports cube depth attachments; its target option typings
-          // still restrict depthTexture to the two-dimensional texture class.
-          Object.assign(target, {depthTexture: depth});
-          clone.shadow.map = target;
-          shadowTargets.push(target);
-        }
+        clone.layers.mask = cultivationAuthoredLightMask(o);
         scene.add(clone);
       }
       // Foundation presentation remains in the live scene beside authored
@@ -262,15 +245,30 @@ export class CultivationPreparationQueue {
     };
     visit(this.layer.scene);
     const padding = new CultivationLightLayout(scene);
+    // Only the bounded layout needs comparison samplers, including dormant
+    // filler slots. Do not allocate nine unused searchlight maps for a primer.
+    scene.traverseVisible(light => {
+      if (!(light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) ||
+          !light.castShadow || !light.layers.test(this.camera.layers)) return;
+      const depth = light instanceof THREE.PointLight
+        ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
+        : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
+      depth.compareFunction = THREE.LessEqualCompare;
+      depth.minFilter = depth.magFilter = THREE.LinearFilter;
+      const target = light instanceof THREE.PointLight
+        ? new THREE.WebGLCubeRenderTarget(1)
+        : new THREE.WebGLRenderTarget(1, 1);
+      Object.assign(target, {depthTexture: depth});
+      light.shadow.map = target;
+      shadowTargets.push(target);
+    });
     const shadowScene = new THREE.Scene();
-    for (const object of scene.children) if (object instanceof THREE.Light) {
+    scene.traverseVisible(object => { if (object instanceof THREE.Light && object.layers.test(this.camera.layers)) {
       const light = object.clone(false);
       if ((light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) &&
         (object instanceof THREE.SpotLight || object instanceof THREE.PointLight || object instanceof THREE.DirectionalLight)) light.shadow.map = object.shadow.map;
       shadowScene.add(light);
-    }
-    // Padding's point slots also enter the real renderer's previous light state.
-    shadowScene.add(padding.root.clone(true));
+    } });
     config.lightingKey = this.lightingKey(scene);
     try {
     for (const target of shadowTargets) yield {run: () => this.layer.renderer.initRenderTarget(target)};
@@ -429,6 +427,13 @@ export class CultivationPreparationQueue {
       }};
     }
     } finally {
+      // Filler lights belong to padding, while these tiny targets belong to
+      // the preparation step. Clear borrowed references before either owner
+      // is disposed so no map is released twice.
+      for (const root of [scene, shadowScene]) root.traverse(object => {
+        if ((object instanceof THREE.SpotLight || object instanceof THREE.PointLight || object instanceof THREE.DirectionalLight) &&
+            object.shadow.map && shadowTargets.some(target => target === object.shadow.map)) object.shadow.map = null;
+      });
       for (const target of shadowTargets) {
         target.depthTexture?.dispose(); target.depthTexture = null; target.dispose();
       }
