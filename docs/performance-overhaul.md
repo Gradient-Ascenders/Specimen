@@ -1,5 +1,7 @@
 # Performance overhaul — final pass for PR #185
 
+The subsequent Level 2 investigation, retained zero-radiance change, new hardware captures and architectural review boundary are documented in [Level 2 performance investigation](level2-performance-investigation.md). The tables below preserve the earlier reviewed delivery. Subsequent raw position/state checks exposed death-contaminated and stationary room captures in that earlier protocol; those FPS tables must not be treated as verified continuous gameplay. Frozen shader/pixel comparisons remain valid. See the linked report for corrected capture validation and new evidence.
+
 This pass starts from PR #185 head `40de099` on the existing `codex/performance-overhaul` branch. Nothing was pushed and the PR was not updated.
 
 **Retained result:** Level 3's finite-light shading now reuses the tested guard already used in Levels 1/2. In the matched gameplay recordings, Room 1 average GPU time fell **44.66 → 20.83 ms** and Room 2 **37.91 → 19.74 ms**, with 81 programs throughout. A separate frozen-pose comparison produced identical pixels.
