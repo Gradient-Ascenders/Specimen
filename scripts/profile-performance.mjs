@@ -10,9 +10,14 @@ import path from "node:path";
 const root = path.resolve(process.env.PROFILE_ROOT ?? process.cwd());
 const label = process.env.PROFILE_LABEL ?? "candidate";
 if (!/^[a-zA-Z0-9_-]+$/.test(label)) throw new Error("PROFILE_LABEL must be a simple directory name");
+const width = Number(process.env.PROFILE_WIDTH ?? 1280);
+const height = Number(process.env.PROFILE_HEIGHT ?? 720);
+const deviceScaleFactor = Number(process.env.PROFILE_DPR ?? 1);
+const flightRecorder = process.env.PROFILE_RECORDER === "1";
 const runs = Number(process.env.PROFILE_RUNS ?? 2);
 const keyMs = Number(process.env.PROFILE_KEY_MS ?? 900);
 if (!Number.isInteger(runs) || runs < 1 || !Number.isFinite(keyMs) || keyMs <= 0) throw new Error("PROFILE_RUNS must be a positive integer and PROFILE_KEY_MS must be positive");
+if (![width,height].every(v => Number.isInteger(v) && v > 0) || !Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0) throw new Error("PROFILE_WIDTH/HEIGHT must be positive integers and PROFILE_DPR must be positive");
 const out = path.resolve(root, "artifacts/performance-overhaul", label);
 await mkdir(out, { recursive: true });
 let occupied = false;
@@ -39,6 +44,7 @@ const server = spawn(process.execPath, [
 });
 const report = {
 	label,
+	protocol: {width,height,deviceScaleFactor,flightRecorder,headless:process.env.PROFILE_HEADLESS !== "0",keyMs},
 	recordedAt: new Date().toISOString(),
 	assetHashes,
 	runs: [],
@@ -67,10 +73,10 @@ try {
 	for (let run = 0; run < runs; run++) {
 		const context = await browser.newContext({
 			viewport: {
-				width: 1280,
-				height: 720
+				width,
+				height
 			},
-			deviceScaleFactor: 1
+			deviceScaleFactor
 		});
 		const page = await context.newPage();
 		page.setDefaultTimeout(24e4);
@@ -140,6 +146,15 @@ try {
 					};
 				}
 				const renderer = r.renderLayer.renderer;
+                if (!renderer.__shadowCpuProbe) {
+                    renderer.__shadowCpuProbe = true;
+                    const shadowRender = renderer.shadowMap.render;
+                    renderer.shadowMap.render = function(...args) {
+                        const start = performance.now();
+                        try {return shadowRender.apply(this,args);}
+                        finally {globalThis.__shadowCpuMs = performance.now()-start;}
+                    };
+                }
 				if (!renderer.__profiled) {
 					renderer.__profiled = true;
 					const compileSync = renderer.compile;
@@ -220,6 +235,7 @@ try {
 							start: t,
 							cadence: args[1].rawFrameDeltaSeconds * 1e3,
 							render: performance.now() - t,
+                            shadowCpu: globalThis.__shadowCpuMs ?? 0,
 							fixed,
 							programs: renderer.info.programs.length,
 							newPrograms: renderer.info.programs.length - before,
@@ -251,7 +267,7 @@ try {
 				});
 				return r;
 			};
-		}, process.env.PROFILE_GPU === "1");
+		}, process.env.PROFILE_GPU === "1" && !flightRecorder);
 		await page.route("**/assets/*.js", async (route) => {
 			const response = await route.fetch();
 			let body = await response.text();
@@ -288,7 +304,9 @@ try {
 		data.environment = await page.evaluate(() => {
 			const gl = __one.renderLayer.renderer.getContext(), ext = gl.getExtension("WEBGL_debug_renderer_info");
 			return {
-				gpu: gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
+				visible:document.visibilityState, focused:document.hasFocus(),
+                drawingBuffer:[gl.drawingBufferWidth,gl.drawingBufferHeight],effectiveDpr:__one.renderLayer.renderer.getPixelRatio(),
+                gpu: gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
 				maxTextureImageUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
 				timer: !!gl.getExtension("EXT_disjoint_timer_query_webgl2"),
 				viewport: [innerWidth, innerHeight],
@@ -330,6 +348,7 @@ try {
 					quaternion: r.renderLayer.cameraRig.camera.quaternion.toArray()
 				};
 			}, name);
+			if (flightRecorder) { await page.keyboard.press("Shift+KeyP"); console.log(name,room,"recorder started"); }
 			const start = await page.evaluate((name) => {
 				const r = globalThis[name], renderer = r.renderLayer.renderer, gl = renderer.getContext(), ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
 				r.renderLayer.scene.traverse(object => {
@@ -381,9 +400,17 @@ try {
 				"s",
 				"a"
 			]) {
+				await page.mouse.move(700 + (key === "d" ? 50 : 0), 350 + (key === "s" ? 20 : 0), {steps:8});
+				if (key === "w") await page.keyboard.press("Space");
 				await page.keyboard.down(key);
 				await page.waitForTimeout(keyMs);
 				await page.keyboard.up(key);
+			}
+			if (flightRecorder) {
+				await page.keyboard.press("Shift+KeyP");
+				const downloaded = page.waitForEvent("download");
+				await page.keyboard.press("Shift+KeyE");
+				await (await downloaded).saveAs(path.join(out, `run${run}-${name}-${room}-flight.json`));
 			}
 			const result = await page.evaluate(({ name, start }) => {
 				const r = globalThis[name];

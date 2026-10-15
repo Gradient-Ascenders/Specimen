@@ -475,3 +475,97 @@ test('Cultivation draws prepared room and fade shadow variants without creating 
   expect(maintenance.calls).toBeLessThanOrEqual(1);
   expect(await page.evaluate(() => (window as any).__specimenCultivationRuntime.__coldDraws)).toEqual([]);
 });
+
+test('Cultivation background compilation and primers preserve active lighting and shadows', async ({page}) => {
+  test.setTimeout(600_000);
+  const errors: string[] = [];
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('pageerror', error => errors.push(error.message));
+  const assertExposed = await exposeCultivationRuntime(page);
+  await enterCultivation(page); assertExposed();
+  const result = await page.evaluate(async () => {
+    const r = (window as any).__specimenCultivationRuntime;
+    r.stop();
+    const renderer = r.renderLayer.renderer;
+    renderer.setAnimationLoop(null);
+    const queue = r.preparationQueue;
+    const config = queue.configurations.find((c: any) => !c.ready && c.visible[5] && !c.visible[7]);
+    if (!config) throw new Error('Missing a distinct unprepared background layout');
+    const stats = {fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,
+      stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60};
+    // Freeze simulation and presentation time. The live draw must stay byte-identical
+    // while preparation uses other lights, materials, render targets and samplers.
+    const gl = renderer.getContext();
+    const width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
+    const read = () => { const pixels = new Uint8Array(width*height*4);
+      gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,pixels); return pixels; };
+    const draw = () => { r.render(1,stats); return read(); };
+    const tick = queue.tick;
+    queue.tick = () => {};
+    // Finish an already submitted batch, then drive preparation explicitly.
+    // runtime.render's ordinary tail tick must not be counted as a live draw.
+    while (queue.busy) await new Promise(resolve => setTimeout(resolve, 16));
+    const baseline = draw(), repeat = draw();
+    let livePrograms = 0;
+    const liveDraw = r.renderLayer.render;
+    r.renderLayer.render = function(...args: any[]) {
+      const before = renderer.info.programs.length;
+      const result = liveDraw.apply(this,args);
+      livePrograms += renderer.info.programs.length - before;
+      return result;
+    };
+    const difference = (a: Uint8Array,b: Uint8Array) => {
+      let maximum=0; for(let i=0;i<a.length;i++) maximum=Math.max(maximum,Math.abs(a[i]!-b[i]!)); return maximum;
+    };
+    const shadowState = () => [renderer.shadowMap.enabled,renderer.shadowMap.type,
+      renderer.shadowMap.autoUpdate,renderer.shadowMap.needsUpdate];
+    const beforeState = JSON.stringify(shadowState());
+    const lights = () => {
+      const entries: unknown[] = [];
+      r.renderLayer.scene.traverseVisible((object: any) => {
+        if (object.isLight) entries.push([object.uuid,object.intensity,object.color.toArray(),
+          object.castShadow,object.shadow?.map?.uuid]);
+      });
+      return JSON.stringify(entries);
+    };
+    const beforeLights = lights();
+    const iterator = queue.steps(config);
+    let compiles=0, primers=0, maxPixelDifference=difference(baseline,repeat);
+    const stateChanges: string[] = [], glErrors: number[] = [];
+    try {
+      for(let count=0;count<5000;count++) {
+        const step=iterator.next(); if(step.done) break;
+        const promise=step.value.run();
+        const isolated = /compile|prime/.test(step.value.label ?? '');
+        if(isolated) {
+          if(JSON.stringify(shadowState())!==beforeState) stateChanges.push(step.value.label);
+          maxPixelDifference=Math.max(maxPixelDifference,difference(baseline,draw()));
+          const error=gl.getError(); if(error!==gl.NO_ERROR) glErrors.push(error);
+        }
+        await promise;
+        if(isolated) {
+          maxPixelDifference=Math.max(maxPixelDifference,difference(baseline,draw()));
+        }
+        if((step.value.label ?? '').includes('compile')) compiles++;
+        if((step.value.label ?? '').includes('prime')) primers++;
+        if(primers>=2) break;
+      }
+    } finally {
+      iterator.return();
+      try {
+        maxPixelDifference=Math.max(maxPixelDifference,difference(baseline,draw()));
+        if (lights() !== beforeLights) stateChanges.push('live lights/maps after cleanup');
+        const error=gl.getError(); if(error!==gl.NO_ERROR) glErrors.push(error);
+      } finally { queue.tick=tick; r.renderLayer.render=liveDraw; }
+    }
+    return {compiles,primers,maxPixelDifference,livePrograms,stateChanges,glErrors};
+  });
+  console.log("preparation isolation", result);
+  expect(result.compiles).toBeGreaterThan(0);
+  expect(result.primers).toBe(2);
+  expect(result.stateChanges).toEqual([]);
+  expect(result.glErrors).toEqual([]);
+  expect(result.livePrograms).toBe(0);
+  expect(result.maxPixelDifference).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});

@@ -22,6 +22,33 @@ const stats = (values) => {
 const all = [];
 for (const label of labels) {
 	const r = JSON.parse(await readFile(path.join(root, label, "raw.json"), "utf8"));
+    const flightRecordings = new Map();
+    for (const run of r.runs) for (const room of run.rooms.filter(x => x.frames)) {
+        let flight;
+        try {
+            flight = JSON.parse(await readFile(path.join(root, label, `run${run.run}-${room.name}-${room.room}-flight.json`), "utf8"));
+        } catch (error) {
+            if (error.code === "ENOENT") continue;
+            throw error;
+        }
+        const columns = Object.fromEntries(flight.frameColumns.map((name,index) => [name,index]));
+        const rows = new Map();
+        for (const window of flight.hitchWindows) for (const frame of window.frames) {
+            if (!rows.has(frame[columns.sequence]) || frame[columns.gpuStatus] === "valid") rows.set(frame[columns.sequence], frame);
+        }
+        flightRecordings.set(`${run.run}:${room.name}:${room.room}`, {
+            summary: flight.summary,
+            viewport: flight.viewport,
+            webgl: flight.webgl,
+            rawFrameCoverage: rows.size,
+            totalFrames: flight.summary.totalFrames,
+            cadence: stats([...rows.values()].map(row => row[columns.deltaMs])),
+            updateCpu: stats([...rows.values()].map(row => row[columns.updateCpuMs])),
+            renderCpu: stats([...rows.values()].map(row => row[columns.renderCpuMs])),
+            hitches: Object.fromEntries([50,100,150].map(ms => [ms,[...rows.values()].filter(row => row[columns.deltaMs] > ms).length])),
+            gpu: stats([...rows.values()].filter(row => row[columns.gpuStatus] === "valid").map(row => row[columns.gpuMs])),
+        });
+    }
 	all.push({
 		label,
 		errors: r.errors,
@@ -44,6 +71,10 @@ for (const label of labels) {
 				fixed: stats(x.frames.map((f) => f.fixed)),
 				render: stats(x.frames.map((f) => f.render)),
 				gpu: stats(x.frames.map((f) => f.gpu)),
+                flightRecorder: flightRecordings.get(`${d.run}:${x.name}:${x.room}`),
+                shadowCpu: stats(x.frames.map(f => f.shadowCpu)),
+                pacingTrusted: x.frames.every(f => f.visibility === "visible" && f.focused),
+                hitches: Object.fromEntries([50,100,150].map(ms => [ms,x.frames.filter(f => f.drawn !== false && f.cadence > ms).length])),
 				diagnostics: x.diagnostics,
 				preparation: x.preparation && {
 					...x.preparation,

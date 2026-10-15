@@ -1,157 +1,175 @@
-# Performance overhaul: verified checkpoint
+# Performance overhaul — final pass for PR #185
 
-Branch: `codex/performance-overhaul`, based on `cf8fbf2` (main including PRs #180 and #181). Implementation commits: `5925905` and `7de95d5`. The old experiment branch and Room 2 texture work were not changed. Nothing was pushed and no PR was created.
+This pass starts from PR #185 head `40de099` on the existing `codex/performance-overhaul` branch. Nothing was pushed and the PR was not updated.
 
-This checkpoint improves Level 1 startup and fixes preparation correctness. **The overall performance targets are not achieved:** authored Level 2 still takes about a minute to enter, later-room stalls remain, and a complete continuous puzzle/combat traversal has not been measured. Further shader sharing was rejected because it slowed gameplay. No warmups, shadows, texture quality, gameplay content, or default quality settings were removed to produce these results.
+**Retained result:** Level 3's finite-light shading now reuses the tested guard already used in Levels 1/2. In the matched gameplay recordings, Room 1 average GPU time fell **44.66 → 20.83 ms** and Room 2 **37.91 → 19.74 ms**, with 81 programs throughout. A separate frozen-pose comparison produced identical pixels.
 
-## Measurement scope
+**This is not an all-level performance fix or an unconditional merge recommendation.** Level 1 startup remains under the previously achieved approximately 29 seconds, but no additional Level 1 gameplay improvement was established. Authored Level 2 still takes about a minute to load and still has severe stalls. Its unsuccessful optimization candidates were removed.
 
-Windows, Node 24.19.0/npm 11.18.0, hardware Edge through ANGLE D3D11, Intel UHD 620, 1280×720 at DPR 1. The GPU exposes 16 fragment texture units. These are production Vite builds, with runtime instrumentation injected by the diagnostic harness rather than shipped. Level 2 measurements explicitly use its debug-enabled fully authored environment; release content gating is unchanged.
+## Measurement reliability and scope
 
-The final matched pair is `gpu-main` versus `gpu-candidate`, one fresh browser profile each, with no concurrent tests or JSON analysis. Browser/driver shader caches cannot be completely controlled. Earlier independent runs provide variation rather than statistical confidence. Room samples contain only roughly 44–181 frames. Tail percentiles and 1% lows are descriptive, especially with such small samples.
+- Production builds at `?debug=1`, hardware Edge 155 through ANGLE D3D11 on Intel UHD Graphics 620. Every exported recording confirms a 1536×730 viewport, 1920×912 drawing buffer, effective DPR 1.25, and resolution tier 2. No software renderer or quality reduction was used.
+- The owned browser is headed, brought to the front, and launched with native-window occlusion and background timer/render throttling disabled. All sampled harness frames report `visibilityState=visible` and `hasFocus()=true`. No game-side animation clock or visibility policy was overridden.
+- This recovered normal hardware frame delivery rather than the previous near-exact 1,016 ms automated cadence. The exact cause inside that earlier Chrome/extension session was not isolated; its FPS remains excluded. The current baseline's 38.7 ms Level 1 GPU average also agrees reasonably with the earlier manual approximately 40.1 ms result. Occlusion/throttling is a supported explanation, not a proven sole cause.
+- Each room is staged through existing debug controls, settles for one second, then receives W/D/S/A for five seconds each, a jump, and mouse movement. Input and camera/body motion are genuine. Every measured harness frame performed a live draw. Loading/transition screens are excluded. These are representative room sequences, **not a complete native puzzle/combat/lift playthrough**.
+- Final tables use the unmodified flight-recorder exports for both builds. Every recording retains all frame sequences in its deduplicated hitch windows, so the quantiles cover the whole recording rather than just a selected hitch subset. Post-stop export frames in the supplementary harness are excluded from the final table. This same calculation is applied to before and after.
+- FPS is 1000 divided by the recorder's average frame interval. Quantiles use sorted index floor(N×p), capped to N−1; the 1% low is 1000 divided by the mean of the slowest ceil(1%×N) intervals. Strict hitch thresholds use exported frame intervals. Durations below are sums of recorded frame intervals, not `session.durationMs`, which includes stopped time before export.
+- GPU means use all completed valid timer queries; medians use the corresponding raw rows. Missing pending results are not invented. GPU timing is supported in all files, with zero disjoint events. Timer scope includes the runtime's render/preparation commands and submission gaps, not an isolated raster pass. Recorder self-overhead was approximately 0.08–0.18 ms/frame; that does not measure every possible observer/driver side effect.
+- One fresh browser profile was used per full run. Driver shader caches, temperature and power state were not controlled. Single runs and short tails cannot establish small performance differences. Before and after use the same viewport, DPR, backend, inputs and instrumentation. Some Level 1 final samples are slower despite no Level 1 rendering changes; no Level 1 gameplay gain is claimed.
 
-For room measurements the harness stages the same authored room, settles for one second, then sends real W/D/S/A input for 900 ms each. It waits for Level 2 preparation to finish and an actual draw before sampling, excluding fake smoothness from loading-overlay frames. Positions and camera poses are recorded; timing can still change movement endpoints, deaths and cutscenes. Transitions are driven through completion events. **These are short movement samples, not a complete native continuous traversal through lifts, drones, acid, combat and machinery.** Existing browser regressions cover additional movement/climbing/reset contracts but do not fill that measurement gap.
+## Root causes and decisions
 
-GPU timer queries cover the runtime render interval, including preparation and submission gaps, rather than an isolated raster pass. Disjoint results are discarded. Fixed CPU time is the sum of simulation steps in a displayed frame; catch-up frames can contain six steps. Render CPU time is main-thread submission, not GPU execution. Instrumentation itself adds overhead. Geometry/texture counts are resource counts, not byte measurements; tagged instance buffer bytes are not total GPU memory.
+### Level 1
 
-## Verified causes and retained changes
+The earlier pass reduced light-layout permutations from 306 to 99 programs and navigation-to-control from 60.4 to 29.3 seconds. Its loading breakdown was dominated by compilation: 53.79 → 21.28 seconds of compile waits within 58.12 → 25.88 seconds of preparation. Those changes remain intact.
 
-1. **Level 1 light-layout permutations dominate startup.** Nine authored room/door lighting overlaps produced 306 programs. Two padded signatures produce 99, preserving all real light parameters. Zero-radiance padding uses up to five allocated 1×1 shadow maps (ten additional texture objects including depth). The finite-light guard skips padding mathematics. Physical-material spot-light behavior remains unchanged. Frozen-pose comparisons produced identical pixels in Rooms 3/5 and a maximum one-channel difference of 1/255 in Room 1. The diagnostic GPU comparisons were contended by a unit worker, so their timings are not used as authoritative frame-performance evidence.
-2. **Authored Level 2 still spends most of entry in shader preparation.** In the final candidate, entry preparation is 7.87 s and mandatory maintenance is another 49.84 s. Construction is 4.08 s; explicit queue texture initialization is only 0.014 s. Increasing compile/prime batches did not solve this and was reverted. Moving work behind gameplay is not counted as a loading improvement.
-3. **Instance primers were uploading clone storage.** Primers now borrow the actual source instance matrix, colour and morph storage, including separate instances sharing a geometry. Disposal restores proxy-owned storage before disposing it. Level 2 live tagged instance uploads fell from ten/16,448 bytes to one/512 bytes; the remaining service-bay trim allocation is not claimed fixed. Blackout's two live uploads/2,280 bytes moved into preparation. Tests verify source storage survives proxy cleanup.
-4. **Invalid and repeated Level 2 light states caused avoidable work.** Entry visibility is established before Goop's death primer; previously all authored roots could contribute an illegal shader exceeding the 16-sampler limit. Main emitted two sampler errors; candidate emitted none. Refreshing the empty light state now follows actual isolated preparation draws or visibility changes: the measured Room 5 refresh count fell from 43 to zero. Speculative background preparation pauses in Room 5; required current resources remain guarded, and all destination warmups remain present.
+Current gameplay still exceeds this GPU's budget at DPR 1.25, with approximately 26–43 ms GPU means in the final sampled views and large cadence spikes. Programs remain at 99, with no cold programs during sampled live draws. Physics is much smaller than GPU cost in the ordinary views. Source inspection and movement/climbing regressions did not reproduce an interpolation defect; the existing interpolated camera/body contract is preserved. GPU saturation/driver frame delivery is supported by the measurements, but the precise compositor/submission cause of every cadence spike was not isolated. This pass does not claim to fix Level 1 jitter.
 
-Implementation details:
+### Level 2
 
-- `src/render/ContainmentLightLayout.ts`: owns padded light families and their shadow-map teardown.
-- `src/levels/GreyboxLevelRuntime.ts`: prepares materials and synchronizes the layout during every original warmup and live lighting change.
-- `src/render/environment/cultivation/FiniteLightEvaluation.ts`: idempotent finite-light guards; cache-key normalization preserves inherited custom-hook ordering.
-- `src/render/ShadowPrewarmMaterial.ts`: shared source-buffer-aware proxy helper.
-- `src/render/CultivationPreparationQueue.ts`: primes each actual instance buffer, marks it uploaded only after drawing, reports entry/startup time separately, and tracks render-state revisions.
-- Cultivation and Blackout preparation/runtime owners use those proxies and dispose them with their existing lifecycles. Physics, authored colliders, input ownership, reset order and assets are unchanged.
+Entry is dominated by mandatory preparation, particularly maintenance-sector shader preparation, rather than module import or texture decoding. The final run spends 58.69 seconds in presentation preparation: approximately 6.81 seconds for the entry configuration and another 51.77 seconds in mandatory startup work. Runtime resource construction is 4.26 seconds. Module loading, Bob/Goop asset preparation, collision construction and individual shadow/upload costs were not all separately timed; overlapping asynchronous totals must not be added as wall time.
 
-## Loading breakdown
+The render-stall investigation found preparation-primer calls taking 260–303 ms in the baseline, and up to 359 ms in the final run. Their program-count delta was zero. The runtime CPU render interval includes the queue's tail work after the live scene draw: these are first-use preparation/driver stalls even when no new program object is created. The exact blocking GL operation and split between driver initialization, binding/upload work and GPU backpressure remain unresolved. Skipping necessary warmups would move those stalls to first gameplay use and was not retained.
 
-Times are seconds. Startup work happens before the title's Play button becomes ready; navigation-to-control must not be mislabeled as a delay after pressing Play.
+Room 5 is independently GPU-bound: approximately 134 ms average in the final gameplay sample. A frozen-pose experiment measured 142.34 ms with current shading, 149.44 ms with cached shadows, and 66.17 ms with the visible gels removed while shadows remained cached. The shadow comparison shows no meaningful reduction at that pose. The gel diagnostic includes character shading, the transmission-related opaque pass and some character work; it is not a pure transmission-pass timer and was never shipped. Both room surface lighting and the character/transmission path require further work.
 
-| Stage | Main | Candidate |
+The newly corrected dropped-time counter reports **16.25 seconds discarded across 24.43 seconds** of Room 5 frame intervals. Long gaps hit the existing 100 ms/six-step limits, so simulation advances more slowly than wall time even when per-step physics is relatively cheap. That explains part of the perceived movement lag. The safety limits and simulation behavior were preserved.
+
+The outstanding lighting/shadow regression check now interleaves 39 compilation batches and two primers with frozen live draws. It checks pixels, GL errors, actual live-draw program growth, global shadow settings, and live light/map identities after temporary target cleanup. The prior prototype counter incorrectly included queue submissions at the end of `runtime.render`; it was corrected to bracket actual live draws. No extra lighting-state refresh was necessary or retained.
+
+### Level 3
+
+Its persistent light layout includes distant and unpowered fixtures, but ordinary shaders previously evaluated direct-light BRDF work even where Three's own finite-light test reported no contribution. `BlackoutLevelRuntime.preparePresentation()` now applies the existing `optimizeFiniteLightEvaluation(material, true)` before warming all material forms. Real light values, attenuation, shadow samplers, physical transmission, texture maps, geometry and existing shader hooks remain intact. The existing helper is idempotent and preserves inherited hooks/cache keys.
+
+The clean frozen-pose comparison measured **46.62 ms guarded versus 80.76 ms stock median GPU time**, with zero changed pixel channels, zero GL errors and 12 valid queries per mode. Cached-shadow measurements were 45.34/77.70 ms respectively; without gels, 21.03/35.36 ms. Shadows are a small part of that pose's cost; skipping zero-contribution lighting work is the verified retained improvement. Frozen rendering does not establish continuous gameplay pacing; the separate moving gameplay recordings below do.
+
+## Before/after gameplay
+
+Before is `40de099`; after is the final retained game implementation (`280e5c1` plus diagnostic correction `908ca22`). All arrows are before → after. Times are milliseconds.
+
+| Room | Frames / seconds (before → after) | Mean FPS | Frame p50 | p95 | p99 | 1% low FPS | >50 / >100 / >150 ms |
+|---|---|---:|---:|---:|---:|---:|---|
+| L1/R1 | 477 / 21.7 → 444 / 21.9 | 22.0 → 20.2 | 16.7 → 16.7 | 150.0 → 150.3 | 166.7 → 183.3 | 5.5 → 5.4 | 124 / 89 / 20 → 132 / 86 / 28 |
+| L1/R3 | 652 / 21.1 → 595 / 21.2 | 30.8 → 28.0 | 33.3 → 33.3 | 33.6 → 50.0 | 116.6 → 133.3 | 7.5 → 6.5 | 19 / 11 / 1 → 29 / 11 / 2 |
+| L1/R5 | 584 / 21.6 → 584 / 21.2 | 27.1 → 27.5 | 16.7 → 16.8 | 116.5 → 100.1 | 133.4 → 133.3 | 6.7 → 6.9 | 132 / 46 / 2 → 132 / 35 / 1 |
+| L2/R1 | 486 / 22.3 → 461 / 21.9 | 21.8 → 21.1 | 33.3 → 33.3 | 150.0 → 150.1 | 183.2 → 233.3 | 5.4 → 3.5 | 105 / 59 / 21 → 87 / 69 / 24 |
+| L2/R2 | 389 / 21.8 → 398 / 22.0 | 17.8 → 18.1 | 16.7 → 16.7 | 183.3 → 183.3 | 216.6 → 200.0 | 4.6 → 4.8 | 97 / 95 / 65 → 103 / 100 / 65 |
+| L2/R3 | 340 / 22.5 → 341 / 22.5 | 15.1 → 15.2 | 33.3 → 33.3 | 216.6 → 216.6 | 233.3 → 233.4 | 4.0 → 4.2 | 88 / 75 / 61 → 88 / 76 / 61 |
+| L2/R4 | 264 / 23.2 → 260 / 22.9 | 11.4 → 11.3 | 33.3 → 33.3 | 300.0 → 300.0 | 333.2 → 366.7 | 2.9 → 2.6 | 72 / 70 / 70 → 75 / 72 / 71 |
+| L2/R5 | 168 / 24.0 → 172 / 24.4 | 7.0 → 7.0 | 33.4 → 33.3 | 499.9 → 499.7 | 516.6 → 499.9 | 1.9 → 2.0 | 47 / 43 / 43 → 49 / 47 / 47 |
+| L3/R1 | 422 / 22.1 → 743 / 21.1 | 19.1 → 35.2 | 50.0 → 33.3 | 83.5 → 50.0 | 100.0 → 50.1 | 10.0 → 19.9 | 142 / 2 / 0 → 18 / 0 / 0 |
+| L3/R2 | 478 / 21.6 → 770 / 21.0 | 22.1 → 36.6 | 33.7 → 33.2 | 66.9 → 50.0 | 83.6 → 50.2 | 9.4 → 17.1 | 133 / 2 / 0 → 20 / 1 / 0 |
+
+
+| Room | GPU mean | GPU p50 | CPU update mean | CPU render mean | CPU render p95 | Valid GPU queries |
+|---|---:|---:|---:|---:|---:|---|
+| L1/R1 | 38.7 → 42.7 | 37.7 → 39.2 | 0.9 → 0.8 | 11.8 → 13.5 | 19.9 → 20.2 | 471/477 → 439/444 |
+| L1/R3 | 22.2 → 25.6 | 21.7 → 24.7 | 0.3 → 0.3 | 7.2 → 9.1 | 12.0 → 14.0 | 646/652 → 589/595 |
+| L1/R5 | 30.3 → 29.8 | 29.8 → 29.4 | 0.9 → 0.8 | 16.1 → 16.5 | 26.6 → 27.4 | 579/584 → 579/584 |
+| L2/R1 | 36.0 → 37.8 | 37.8 → 39.5 | 1.9 → 1.9 | 8.2 → 8.5 | 12.9 → 13.4 | 480/486 → 455/461 |
+| L2/R2 | 49.4 → 48.7 | 48.3 → 48.2 | 2.4 → 2.3 | 22.1 → 21.8 | 28.4 → 59.7 | 384/389 → 393/398 |
+| L2/R3 | 59.4 → 59.5 | 59.3 → 59.3 | 5.1 → 4.8 | 28.5 → 26.5 | 39.8 → 40.0 | 334/340 → 336/341 |
+| L2/R4 | 79.8 → 80.0 | 78.0 → 78.1 | 2.6 → 2.4 | 33.0 → 32.3 | 38.3 → 42.5 | 260/264 → 253/260 |
+| L2/R5 | 135.2 → 134.0 | 133.3 → 132.7 | 14.9 → 14.8 | 10.7 → 9.9 | 15.1 → 13.0 | 162/168 → 167/172 |
+| L3/R1 | 44.7 → 20.8 | 37.2 → 17.8 | 1.0 → 0.6 | 5.0 → 4.7 | 7.3 → 7.1 | 416/422 → 737/743 |
+| L3/R2 | 37.9 → 19.7 | 32.2 → 17.5 | 0.8 → 0.5 | 4.8 → 4.6 | 7.0 → 7.1 | 472/478 → 764/770 |
+
+
+| End-of-export room | Draw calls / triangles | Programs | Geometries / textures |
+|---|---|---|---|
+| L1/R1 | 246 / 137048 → 309 / 144604 | 99 → 99 | 604 / 70 → 604 / 70 |
+| L1/R3 | 144 / 22548 → 243 / 41132 | 99 → 99 | 604 / 70 → 604 / 70 |
+| L1/R5 | 437 / 171564 → 495 / 176112 | 99 → 99 | 604 / 70 → 604 / 70 |
+| L2/R1 | 132 / 111803 → 131 / 111778 | 229 → 227 | 530 / 59 → 530 / 59 |
+| L2/R2 | 382 / 131574 → 382 / 131574 | 316 → 312 | 674 / 65 → 674 / 65 |
+| L2/R3 | 737 / 505276 → 737 / 505276 | 398 → 390 | 794 / 67 → 794 / 67 |
+| L2/R4 | 581 / 588214 → 581 / 588214 | 523 → 523 | 822 / 65 → 822 / 65 |
+| L2/R5 | 159 / 45761 → 159 / 45761 | 523 → 523 | 834 / 103 → 834 / 103 |
+| L3/R1 | 143 / 6220 → 133 / 5868 | 81 → 81 | 436 / 56 → 436 / 56 |
+| L3/R2 | 141 / 6088 → 132 / 5836 | 81 → 81 | 436 / 56 → 436 / 56 |
+
+
+Every sampled live draw introduced zero new programs. Level 2's program count can grow during background preparation, so intermediate room endpoint counts vary with scheduling; it ends at 523 in both runs. Resource counters include Three.js shadow/transmission work. Geometries/textures are counts, not GPU byte measurements. Movement endpoints can differ because of frame pacing, collisions, death/recovery and fixed-step clamping; these resource snapshots are not an identical-pose draw-call A/B.
+
+Level 3 Room 1 p95 is 83.5 → 50.0 ms and 1% low 10.0 → 19.9 FPS; Room 2 p95 is 66.9 → 50.0 ms and 1% low 9.4 → 17.1 FPS. These establish a substantial improvement on this machine, not a 60 FPS guarantee. Level 1/2 gameplay targets remain unmet.
+
+## Loading
+
+Seconds, from the same current before/after runs. Most Level 1 work occurs before Play is ready; navigation-to-control must not be described as a delay after pressing Play.
+
+| Phase | Before | After |
 |---|---:|---:|
-| Level 1 navigation → responsive control | 60.416 | 29.296 |
-| Navigation → Play ready | 60.246 | 29.139 |
-| Play click → responsive control | 0.170 | 0.157 |
-| Level 1 construction | 1.003 | 1.872 |
-| Level 1 preparation | 58.119 | 25.881 |
-| Lighting warmup loop, within preparation | 57.794 | 25.506 |
-| Compile waits, within lighting loop | 53.794 | 21.279 |
-| Resource primer draws, within lighting loop | 3.942 | 4.169 |
-| Level 1 unload during handoff | 0.199 | 0.057 |
-| Full authored Level 2 transition | 70.340 | 62.361 |
-| Level 2 construction | 5.247 | 4.085 |
-| Level 2 preparation | 64.199 | 57.834 |
-| Queue entry preparation | 9.795 | 7.869 |
-| Queue mandatory maintenance | 54.045 | 49.838 |
-| Queue texture initialization | 0.024 | 0.014 |
-| Queue primer draws | 0.779 | 0.552 |
-| Largest synchronous queue step, milliseconds | 63.2 | 48.3 |
-| Level 3 transition | 17.535 | 18.358 |
-| Level 3 construction | 0.180 | 0.142 |
-| Level 3 preparation | 16.495 | 17.265 |
+| Level 1 navigation → control | 25.171 | 26.873 |
+| Navigation → Play ready | 24.981 | 26.553 |
+| Play click → control | 0.190 | 0.319 |
+| Level 1 resource construction (`load`) | 0.970 | 1.114 |
+| Level 1 lighting/presentation preparation | 22.774 | 24.021 |
+| Compile waits within that preparation | 18.699 | 19.418 |
+| Level 1 unload | 0.074 | 0.056 |
+| Fully authored Level 2 transition | 62.015 | 63.924 |
+| Level 2 resource construction (`load`) | 4.020 | 4.263 |
+| Level 2 presentation preparation | 57.178 | 58.688 |
+| Queue entry preparation | 6.219 | 6.808 |
+| Remaining mandatory startup queue work | 50.854 | 51.771 |
+| Level 3 transition | 17.058 | 14.639 |
+| Level 3 resource construction (`load`) | 0.114 | 0.106 |
+| Level 3 presentation preparation | 16.179 | 13.398 |
 
-Nested asynchronous compile totals overlap other phase measurements and must not be added to wall time. The queue historically called entry plus maintenance `initialMs`; candidate reports the distinction. Module loading, collision construction, individual Bob/Goop asset preparation, shadow-only draws and upload time are not all separately isolated. The unassigned Level 2 transition residual is about 0.89/0.44 s; it is not a precise module-import measurement. Explicit queue GPU preparation is only part of total GPU initialization. No fabricated complete attribution is supplied.
+Level 1's approximately 29-second target and 99-program signature remain preserved, but the current single-run startup difference is not an improvement. Level 2 is unchanged by retained optimizations. Queue counters measured across startup **and all sampled rooms** are approximately 154 seconds of asynchronous compile waits and 8.3–8.4 seconds of primer submission; these include later work and are not additional entry phases. Explicit queue texture initialization across that whole run is about 18 ms, not a complete texture-loading/decoding measurement.
 
-Independent earlier runs: main Level 1 60.666 s, authored Level 2 65.068 s, Level 3 20.406 s; candidate Level 1 40.569/32.357 s, Level 2 75.345/72.642 s, Level 3 19.330/17.588 s. Thus Level 1's large improvement is supported across runs; **Level 2's 11% reduction in the final pair is not a robust or dramatic loading fix**, and Level 3 variation is not credited as an optimization.
+A restart resets existing resources rather than repeating all loading; browser restart/reload checks cover that contract. Driver-cold startup and exhaustive warm-restart timing distributions were not established in this final pass.
 
-The old experimental commits were evaluated on their own common asset base, not automatically cherry-picked. Old parent `97e5dc0` measured 66.624 s cold-profile / 5.735 s immediate repeat; experiment `6e92794` (including `ff64cab`) measured 60.992 / 6.126 s. This did not reproduce the reported loading regression. Shader-cache sensitivity is clear, but it does not establish why the user's earlier build regressed. Comparing the old experiment directly with newer Goop assets would not isolate its cause.
+## Rejected work
 
-## Frame delivery and GPU cost
+- A program/geometry primer-binding cache showed no clear gameplay benefit: the Level 2 experiment still had roughly 60.8-second entry and CPU render outliers above 330 ms. First instance uploads and unknown bindings were retained, but the added cache complexity was not justified. It was removed; the original queue warmups and scheduling are preserved.
+- Reusing the existing unrolled physical-material spotlight loop for ordinary Room 5 materials was pixel-identical but slower: 142.34 → 166.75 ms median GPU time at the same frozen pose. It was not applied to production.
+- The first version of that diagnostic had a missing newline in a shader splice. It emitted shader errors and changed pixels; those timings are excluded. The corrected control explicitly rejects GL errors/pixel differences and completed with zero errors. An earlier optional frozen probe stalled while polling on RAF after stopping the game animation loop; its optional result was discarded. The moving recorder exports completed before that probe and are not substituted for the clean final run.
+- Earlier shader-output sharing and larger preparation batches remain rejected as documented in the previous checkpoint (`2de93c4`). No render features were disabled in the shipped implementation.
 
-Each cell is main → candidate. Frame times are milliseconds; FPS is 1000 / mean cadence. The 1% low is 1000 / the mean of the slowest ceil(1% × N) frame intervals. Quantiles use sorted sample index floor(N × percentile), capped to N−1.
+## Retained code and ownership
 
-| Level/room | Frame p50 | p95 | p99 | Mean FPS | 1% low FPS | GPU p50 | Fixed CPU p50 | Render CPU p50 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| L1/R1 | 33.4 → 33.3 | 50.1 → 49.9 | 183.2 → 50.1 | 26.7 → 34.8 | 5.5 → 10.0 | 32.1 → 22.7 | 0.8 → 0.6 | 9.8 → 9.2 |
-| L1/R3 | 33.1 → 16.7 | 49.9 → 33.4 | 116.6 → 83.2 | 36.5 → 49.4 | 7.5 → 9.2 | 20.5 → 13.8 | 0.2 → 0.1 | 8.1 → 6.0 |
-| L1/R5 | 33.3 → 17.0 | 50.1 → 33.4 | 66.8 → 33.5 | 33.0 → 40.4 | 10.9 → 29.8 | 23.8 → 19.6 | 0.1 → 0.1 | 20.6 → 20.9 |
-| L2/R1 | 33.3 → 16.9 | 50.0 → 33.4 | 83.3 → 66.8 | 33.0 → 39.1 | 10.9 → 12.0 | 26.4 → 21.9 | 2.6 → 2.2 | 11.4 → 10.9 |
-| L2/R2 | 33.3 → 33.3 | 83.3 → 50.2 | 99.9 → 116.7 | 28.3 → 27.5 | 10.0 → 8.0 | 29.3 → 30.7 | 2.5 → 2.9 | 11.2 → 13.4 |
-| L2/R3 | 33.4 → 33.4 | 50.1 → 50.1 | 50.2 → 50.1 | 25.4 → 25.6 | 19.9 → 20.0 | 34.7 → 35.7 | 4.4 → 4.4 | 21.1 → 22.7 |
-| L2/R4 | 50.0 → 50.0 | 116.5 → 66.7 | 166.6 → 99.9 | 17.9 → 19.1 | 6.0 → 10.0 | 49.0 → 48.4 | 3.6 → 5.6 | 21.2 → 28.7 |
-| L2/R5 | 83.4 → 83.3 | 149.9 → 100.0 | 300.0 → 299.9 | 11.0 → 12.6 | 3.3 → 3.3 | 88.4 → 76.6 | 28.8 → 25.0 | 12.6 → 10.8 |
-| L3/R1 | 33.2 → 16.8 | 50.1 → 50.0 | 50.5 → 50.1 | 33.8 → 36.1 | 17.1 → 19.9 | 18.5 → 16.9 | 0.7 → 0.6 | 2.9 → 2.8 |
-| L3/R2 | 49.8 → 33.4 | 83.3 → 66.8 | 99.9 → 83.4 | 21.2 → 23.4 | 10.0 → 12.0 | 34.1 → 31.3 | 0.1 → 0.1 | 7.1 → 6.0 |
+- `280e5c1`: `src/levels/BlackoutLevelRuntime.ts` applies the existing finite-light optimization after character assets are ready and before all original warmups. It adds no renderer pass, dependency or owned GPU resource. Existing runtime material disposal remains responsible for programs/materials.
+- `908ca22`: `src/core/Loop.ts` counts time discarded by both the frame-delta clamp and the accumulator step cap. Two regressions verify the same six-step/custom-step budgets and absence of a later backlog. Only diagnostics change; the counter is consumed by the flight recorder, not gameplay authority.
+- The final evidence commit extends the profiling CLI with viewport/DPR, headed operation and genuine recorder exports; it adds the interleaved Level 2 regression and this report. Capture code stays outside the shipped game.
 
-All measured real gameplay draws introduced zero new programs. This does not prove that background preparation is harmless along every native arrival route. Level 2 staged entry waits remain: Rooms 2/3/4 took 9.40/13.33/14.19 s on main versus 9.08/12.18/12.51 s on candidate. They are real blocking overlays and are reported separately, not counted as gameplay frames.
+No physics, collision, checkpoint, ability, puzzle, character ownership, authored geometry, PR #180 texture asset, quality setting, audio resource, Vite relative base or release/debug content gate was changed. No third-party resources or dependencies were introduced.
 
-Room 5 is still far over a 16.7 ms budget: median GPU interval 76.6 ms, plus 25 ms of fixed work across catch-up steps. A contended 20-second diagnostic saw gaps up to 383 ms with no contemporaneous cold program or preparation completion. GC alone did not explain them. That trace is excluded from the controlled comparison because a unit worker was running. **The precise cause of every 100–350 ms gap remains unresolved.** Source inspection identifies many moving searchlight shadows, point-light cube faces, physical transmission and catch-up simulation as investigation targets, not independently measured causes of the full gap.
+## Validation
 
-A frozen-scene diagnostic under the rejected sharing prototype showed shadow updates contributing approximately 10.2/1.6/3.5 ms in Level 1 Rooms 1/3/5, with identical cached-shadow pixels at that frozen pose. This is not a live Level 2 shadow budget or permission to stop shadow updates. The integrated GPU does not sustain 60 FPS at default quality in the heavy views measured here.
+- **90 targeted Node tests passed**, covering finite shaders, frame diagnostics/recorder, shadow ownership/cache/preparation, Cultivation preparation, Blackout runtime/gameplay and PR #180 texture/material data contracts.
+- Type-check and production build passed; the existing Vite large-chunk warning remains.
+- **12 hardware browser regressions passed** (6.0 minutes), including the new compilation/primer interleaving and cleanup check.
+- **2 nested-path production smoke tests passed on their first run** (2.2 minutes): plain production boot/credits/start/restart, then authored Cultivation/Blackout transitions and restarts. No console/request failures were reported. Production validation passed all 81 files.
+- Gameplay captures: zero console/page/network errors in both final comparison runs, all samples visible/focused, no cold live programs, hardware timer queries supported with zero disjoint events.
+- Clean controlled GPU/pixel comparisons: zero GL errors, unchanged pixels for lighting alternatives and cached shadows. Removing gels was diagnostic only and is not a visual-equivalence claim.
 
-## Resource evidence
+The browser suites cover movement, reversal, climbing, death timing, fades, switching/merge/split, active maps, restart/reload and unload ownership across the three levels. This is not an exhaustive long-duration GPU-memory leak proof, full native puzzle/combat traversal or validation on a second GPU. Subjective camera/character feel still needs manual review. The Intel UHD 620 does not sustain 60 FPS at default quality in the heavy views.
 
-Calls/triangles include shadow and transmission rendering as reported by Three.js. End-of-sample values can vary with the movement endpoint. Resource counts do not imply byte-accurate memory or prove an absence of leaks.
+## Reproduction and artifacts
 
-| Sample | Main calls / triangles / geometries / textures / programs | Candidate |
-|---|---|---|
-| L1/R1 | 353 / 185326 / 604 / 60 / 306 | 351 / 178414 / 604 / 70 / 99 |
-| L1/R3 | 237 / 39684 / 604 / 60 / 306 | 237 / 39684 / 604 / 70 / 99 |
-| L1/R5 | 486 / 164472 / 604 / 60 / 306 | 486 / 164472 / 604 / 70 / 99 |
-| L2/R1 | 164 / 169703 / 529 / 88 / 211 | 164 / 169703 / 529 / 59 / 197 |
-| L2/R2 | 382 / 145540 / 665 / 88 / 288 | 381 / 138706 / 674 / 63 / 274 |
-| L2/R3 | 737 / 505276 / 792 / 90 / 363 | 737 / 505276 / 793 / 69 / 349 |
-| L2/R4 | 557 / 571941 / 820 / 92 / 462 | 559 / 578853 / 821 / 73 / 443 |
-| L2/R5 | 159 / 45761 / 833 / 92 / 479 | 159 / 45761 / 834 / 92 / 450 |
-| L3/R1 | 211 / 56756 / 436 / 56 / 86 | 211 / 56756 / 436 / 56 / 81 |
-| L3/R2 | 279 / 10612 / 436 / 56 / 86 | 286 / 11544 / 436 / 56 / 81 |
-
-Tagged actual instance buffer uploads:
-
-| Level | Main preparation / live | Candidate preparation / live |
-|---|---|---|
-| 1 | 166 / 46072 bytes; none live | 166 / 46072 bytes; none live |
-| 2 | 8 / 9960 bytes; 10 / 16448 bytes | 25 / 37944 bytes; 1 / 512 bytes |
-| 3 | 6 / 9768 bytes; 2 / 2280 bytes | 8 / 12048 bytes; none live |
-
-The number before each byte count is the allocation count. Heap samples and long-task records are available in raw artifacts, but no trustworthy attribution of heap growth or total GPU bytes was established. Restart/reload and ownership tests pass; exhaustive multi-cycle memory profiling remains outstanding.
-
-## Rejected experiments
-
-- Larger Level 2 preparation batches: did not consistently shorten entry; original scheduling limits retained.
-- Dynamic finite-light loop counts: no meaningful loading gain; reverted.
-- Shared canvas/offscreen shader output: reduced startup programs and authored Level 2 entry to roughly 48–52 s, but slowed gameplay. A same-page frozen-pose A/B still increased GPU time about 16% in Room 1 and 11% in Room 5. Pixel output was equal in Rooms 1/3 and differed by at most 2/255 in a small Room 5 area. The prototype was removed in accordance with the no-regression requirement; its source and evidence remain ignored. It is not a proposed ready-to-ship solution.
-- Captures contaminated by concurrent workers or a large PowerShell JSON parser are excluded from the final matched pair. The first invalid visual baseline is also excluded; only the corrected comparison is used.
-
-## Verification
-
-- Targeted tests: 18 passed (finite-light behavior/cache keys, layout/disposal, preparation scheduling, source-buffer uploads).
-- Full Node suite: 804/807 passed. Two unchanged Python-generator hash assertions fail because Windows checked the files out with CRLF while expected hashes match their committed LF bytes. The production symlink test fails with Windows EPERM. These environmental failures were investigated; checks were not weakened.
-- Type-check and production build: passed. Vite retains its existing large-chunk warning.
-- Hardware Edge browser regressions: 11 passed, covering Level 1 traversal/program stability, plain production prewarm, movement/reversal, sticky climbs, damage/death timing, reflections across restart/reload, authored Cultivation rooms/fade/death/cleanup, and Blackout movement/switch/merge/split/cleanup.
-- Production validation: 27 files passed. Relative base and asset casing are preserved.
-- Canonical `npm run archive`: blocked by missing `unzip.exe` on this machine. A Windows .NET ZIP fallback was created and extracted; all 27 file names and SHA-256 file contents matched `dist`. ZIP SHA-256: `143dc765577f6745cb7f5518379661429afec41c702d1b84ff72c19d18bf4bd6`. This is not a claim that the canonical archive command passed.
-- Nested extracted-archive smoke on hardware Edge: plain production boot/credits/Play/restart passed. The authored transition/restart test reached Blackout but initially reported a maintenance-map HTTP 200 request ending in `net::ERR_ABORTED`; the unchanged test passed on its single retry (2.2 min). This intermittent request failure remains recorded, rather than claiming an entirely clean initial run. No route interception or runtime injection was used. The final extracted archive was rechecked against the current build: all 27 file hashes match.
-
-No dependencies or third-party resources were introduced. No full native playthrough, exhaustive leak proof, uniformly responsive background-preparation proof, or elimination of later-room freezes is claimed.
-
-## Reproduction and evidence
-
-From this worktree in PowerShell, using the pinned Node/npm versions:
+From the existing worktree with Node 24.x/npm 11.x:
 
 ```powershell
 npm ci
 npm run build
-$env:PROFILE_LABEL = 'candidate'
-$env:PROFILE_RUNS = '2'
-$env:PROFILE_GPU = '1'
+$env:PROFILE_LABEL = 'review'
+$env:PROFILE_RUNS = '1'
+$env:PROFILE_HEADLESS = '0'
+$env:PROFILE_WIDTH = '1536'
+$env:PROFILE_HEIGHT = '730'
+$env:PROFILE_DPR = '1.25'
+$env:PROFILE_KEY_MS = '5000'
+$env:PROFILE_RECORDER = '1'
 node scripts/profile-performance.mjs
-node scripts/summarize-performance.mjs candidate
+node scripts/summarize-performance.mjs review
 ```
 
-Verification commands were `npm test`, `npm run type-check`, `npm run build`, `npm run validate:production`, and targeted Node tests for `FiniteLightEvaluation`, `ContainmentLightLayout`, `ShadowPreparation` and `CultivationPresentationPreparation`. Browser suites were `BlackoutBobPresentation`, `CultivationBobPresentation` and `LevelOneShaderProgramStability`, using an ignored local Playwright configuration selecting hardware Edge/D3D11, one worker and the existing 640×360 regression viewport. Nested smoke used `ProductionSmoke.spec.ts` against the extracted archive at `/group-folder/` with the same backend. Hardware settings for regression tests differ from the 1280×720 performance captures.
+Do not run tests, builds, other GPU workloads or expensive analysis during captures. Recorder and supplementary harness GPU queries are mutually exclusive. `PROFILE_GPU=1` is available when recorder mode is off; legacy startup/Level 1-only and reference-dist options remain supported. Constructor instrumentation fails visibly if future minification changes its expected shape.
 
-Run captures without concurrent builds, tests, parsers or GPU workloads. A fresh harness invocation launches a fresh browser profile; a second run within it uses a new context but retains process/driver cache effects. Immediate Level 1 repeats and repeats after a full game can have very different cache behavior. Use identical viewport, DPR, backend, paths and sequencing for comparisons.
+Raw exports, screenshots, frame/phase data, browser version and build asset hashes are ignored under `artifacts/performance-overhaul/pr185-before/` and `pr185-final/`. Clean frozen controls are in `pr185-controlled-valid/raw.json`; rejected experiments remain ignored. `scripts/summarize-performance.mjs pr185-before pr185-final` regenerates the combined summary. The raw JSON was never rewritten to adjust results.
 
-Optional environment variables: `PROFILE_BROWSER` (default `msedge`), `PROFILE_HEADLESS=0` for headed diagnostics, `PROFILE_MODE=startup` to omit room samples, `PROFILE_SCOPE=one` to end after Level 1, `PROFILE_KEY_MS` (default 900), `PROFILE_ROOT`, and `PROFILE_DIST` for a preserved reference build. The harness instruments current minified composition-root constructors; a future build-shape change must fail visibly rather than silently treating missing data as success. Never compare foundation-only Level 2 with authored Level 2. Raw files, screenshots, cache keys, staged poses, environment, build asset hashes and summaries go under ignored `artifacts/performance-overhaul/<label>/`.
+Relevant unit commands and logs are recorded in ignored `artifacts/final-pass-unit.log`. Hardware regressions use the existing three presentation/program-stability suites and an ignored local Edge/D3D11 Playwright adapter at 640×360; the new test is in the normal Cultivation suite and can also run with the standard project configuration. Regression viewport and performance-capture viewport differ intentionally. Nested smoke serves shipped files at `/group-folder/` without route interception/runtime injection.
 
-Final pair: `gpu-main/raw.json` and `gpu-candidate/raw.json` in this worktree. Earlier `matched-main`, `final`, `verified-visual-gpu` and isolated old-branch evidence live under the original checkout's ignored artifacts; the old experiment's capture is inside its extracted `experiment-source`. Rejected prototype captures are in this worktree's ignored `display-*` directories. These machine-local artifacts are intentionally not committed. Run `node scripts/summarize-performance.mjs gpu-main gpu-candidate` to regenerate the final summary.
+The branch contains local commits only. Compare the final work against the PR's starting head with `git diff 40de099..HEAD`. The final delivery names the documentation/evidence commit and clean status. The existing untracked `performance-overhaul-review.patch` is preserved unchanged at `artifacts/pr185-final-review/performance-overhaul-review.patch` rather than committed.
 
-The next useful investigation is a reproducible full native Level 2 route with separately timed shadow, transmission, render submission and fixed-step work, followed by a smaller verified shader-variant reduction that preserves GPU cost. The current evidence does not justify another unbounded shader rewrite or a claim that Level 2 is fixed.
+The next investigation should isolate live transmission/opaque shader cost and GPU submission/backpressure on a reproducible native Level 2 route. Neither a shadow-only fix, larger preparation batches nor the tested shader-loop alternative resolves the measured bottleneck. This report does not support claiming that Level 2 or all-level frame pacing is fixed.
