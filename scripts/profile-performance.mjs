@@ -152,7 +152,7 @@ try {
                     renderer.shadowMap.render = function(...args) {
                         const start = performance.now();
                         try {return shadowRender.apply(this,args);}
-                        finally {globalThis.__shadowCpuMs = performance.now()-start;}
+                        finally {globalThis.__shadowCpuMs = (globalThis.__shadowCpuMs ?? 0) + performance.now()-start;}
                     };
                 }
 				if (!renderer.__profiled) {
@@ -228,6 +228,7 @@ try {
 				const render = r.render;
 				r.render = function(...args) {
 					const t = performance.now(), before = renderer.info.programs.length, beforeKeys = profile.liveKeyCalls ?? 0;
+                    globalThis.__shadowCpuMs = 0;
 					try {
 						return render.apply(this, args);
 					} finally {

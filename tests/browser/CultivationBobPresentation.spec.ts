@@ -506,6 +506,17 @@ test('Cultivation background compilation and primers preserve active lighting an
     // runtime.render's ordinary tail tick must not be counted as a live draw.
     while (queue.busy) await new Promise(resolve => setTimeout(resolve, 16));
     const baseline = draw(), repeat = draw();
+    let litPixels = 0, minChannel = 255, maxChannel = 0;
+    for (let i = 0; i < baseline.length; i += 4) {
+      const brightness = Math.max(baseline[i], baseline[i + 1], baseline[i + 2]);
+      if (brightness > 8) litPixels++;
+      minChannel = Math.min(minChannel, brightness);
+      maxChannel = Math.max(maxChannel, brightness);
+    }
+    // Reject black/blank captures before comparing preparation against them.
+    if (litPixels < width * height * 0.01 || maxChannel - minChannel < 16) {
+      throw new Error(`Empty baseline framebuffer: ${litPixels} lit pixels, range ${minChannel}–${maxChannel}`);
+    }
     let livePrograms = 0;
     const liveDraw = r.renderLayer.render;
     r.renderLayer.render = function(...args: any[]) {

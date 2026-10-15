@@ -160,8 +160,8 @@ $env:PROFILE_HEIGHT = '730'
 $env:PROFILE_DPR = '1.25'
 $env:PROFILE_KEY_MS = '5000'
 $env:PROFILE_RECORDER = '1'
-node scripts/profile-performance.mjs
-node scripts/summarize-performance.mjs review
+node scripts/profile-performance.mjs # Capture raw.json and flight-recorder exports first.
+node scripts/summarize-performance.mjs review # Summarize that completed capture.
 ```
 
 Do not run tests, builds, other GPU workloads or expensive analysis during captures. Recorder and supplementary harness GPU queries are mutually exclusive. `PROFILE_GPU=1` is available when recorder mode is off; legacy startup/Level 1-only and reference-dist options remain supported. Constructor instrumentation fails visibly if future minification changes its expected shape.
