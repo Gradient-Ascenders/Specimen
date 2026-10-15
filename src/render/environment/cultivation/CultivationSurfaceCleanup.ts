@@ -24,6 +24,7 @@ export class CultivationSurfaceCleanup {
     }
     for (const child of scene.roomFour.root.children) if (child.name.startsWith('room-4-shaft-module-')) moving.set(child, child);
     moving.set(scene.roomFive.brokenCore, scene.roomFive.brokenCore);
+    moving.set(scene.filtrationArt.fan, scene.filtrationArt.fan);
     const domain = (mesh: THREE.Mesh): object => {
       let motion: object | undefined;
       for (let parent: THREE.Object3D | null = mesh; parent; parent = parent.parent) {

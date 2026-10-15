@@ -2,6 +2,8 @@ import { CultivationSurfaceCleanup } from '../render/environment/cultivation/Cul
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../render/environment/cultivation/CultivationMaintenanceArt.ts';
+import { CultivationPassageArt } from '../render/environment/cultivation/CultivationPassageArt.ts';
+import { CultivationFiltrationPassageArt } from '../render/environment/cultivation/CultivationFiltrationPassageArt.ts';
 import { CultivationElevatorArt } from '../render/environment/cultivation/CultivationElevatorArt.ts';
 import { AcidLiquidInteractions, type AcidContactBody } from '../render/environment/containment/AcidLiquidInteractions.ts';
 import { CultivationCoverEquipmentArt } from '../render/environment/cultivation/CultivationCoverEquipmentArt.ts';
@@ -113,6 +115,8 @@ export class LevelTwoPreviewScene {
   readonly roomFourGeometry = new THREE.Group();
   readonly roomFive: LevelTwoRoomFiveGreybox;
   readonly maintenanceArt: CultivationMaintenanceArt;
+  readonly passageArt: CultivationPassageArt;
+  readonly filtrationArt: CultivationFiltrationPassageArt;
   readonly elevatorArt: CultivationElevatorArt;
   readonly surfaceCleanup: CultivationSurfaceCleanup;
   readonly roomOneToTwoPassage = new LevelTwoLabPassageGreybox({
@@ -175,23 +179,29 @@ export class LevelTwoPreviewScene {
     });
     this.chamberArt.addBoundary(this.roomThree.root);
     this.labArt.dress(this.roomOne.builder, [], this.contaminationArt.overrides(this.roomOne.builder));
-    this.labArt.dress(this.roomOneToTwoPassage.builder);
+    this.labArt.dress(this.roomOneToTwoPassage.builder, [], this.contaminationArt.overrides(this.roomOneToTwoPassage.builder));
     this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
-    this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28);
+    this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28, { wallSides: [-1] });
+    this.passageArt = new CultivationPassageArt(this.roomOneToTwoPassage, this.labArt, this.contaminationArt);
     this.labArt.dress(this.roomTwo.builder, [
       'cultivation-room-2-above-bob-vent',
       'cultivation-room-2-bob-vent-west-jamb',
       'cultivation-room-2-bob-vent-east-jamb',
     ], this.contaminationArt.overrides(this.roomTwo.builder));
-    this.labArt.dress(this.roomTwoToThreeGoopPassage.builder);
-    this.labArt.dress(this.roomTwoToThreeBobAirDuct.builder);
+    this.labArt.dress(this.roomTwoToThreeGoopPassage.builder, [], this.contaminationArt.overrides(this.roomTwoToThreeGoopPassage.builder));
+    this.labArt.dress(this.roomTwoToThreeBobAirDuct.builder, [], new Map(
+      this.roomTwoToThreeBobAirDuct.collisionMeshes.filter(mesh => mesh.userData.textureRole === 'air-duct-metal')
+        .map(mesh => [mesh.name, this.contaminationArt.finishes.metal]),
+    ));
     this.labArt.addFixtures(this.roomTwo.root, 38, 24, 45, {
       wallSides: [1],
       fillHeightMetres: 14,
       fillPositionsZ: [12, 34],
       shadowTargets: [[-17, 17, 27], [0, 0, 34]],
     });
-    this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28);
+    this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28, { wallSides: [] });
+    this.filtrationArt = new CultivationFiltrationPassageArt(this.roomTwoToThreeGoopPassage,
+      this.roomTwoToThreeBobAirDuct, this.labArt, this.contaminationArt);
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);
@@ -357,6 +367,7 @@ export class LevelTwoPreviewScene {
 
     this.roomOneToTwoPassage.update(deltaSeconds, occupants);
     this.roomTwoToThreeGoopPassage.update(deltaSeconds, occupants);
+    this.filtrationArt.update(deltaSeconds);
     this.roomFour.update(deltaSeconds, occupants);
     this.roomFive.update(deltaSeconds, occupants);
   }
@@ -396,6 +407,7 @@ export class LevelTwoPreviewScene {
     this.roomOneToTwoPassage.reset();
     this.roomTwo.reset();
     this.roomTwoToThreeGoopPassage.reset();
+    this.filtrationArt.reset();
     this.roomThree.reset();
     this.roomFour.reset();
     this.roomFive.reset();
@@ -403,6 +415,8 @@ export class LevelTwoPreviewScene {
 
   dispose(): void {
     this.surfaceCleanup.dispose();
+    this.passageArt.dispose();
+    this.filtrationArt.dispose();
     this.maintenanceArt.dispose();
     this.elevatorArt.dispose();
     this.labArt.dispose();
