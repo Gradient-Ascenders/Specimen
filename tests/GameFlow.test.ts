@@ -7,6 +7,7 @@ import {
   GameFlowStateModel,
   getGameFlowKeyboardAction,
   parseCreditsInlineParts,
+  type GameFlowState,
 } from '../src/ui/GameFlowUI.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 
@@ -113,6 +114,20 @@ test('pause requires unmodified P while Escape remains a nested-menu cancel', ()
   assert.equal(getGameFlowKeyboardAction('Escape', 'settings'), 'back');
   assert.equal(getGameFlowKeyboardAction('Escape', 'credits'), 'back');
   assert.equal(getGameFlowKeyboardAction('Escape', 'playing'), null);
+});
+
+test('unmodified F1 toggles the HUD independently of game flow state', () => {
+  const states: readonly GameFlowState[] = [
+    'loading', 'title', 'playing', 'paused', 'settings', 'credits',
+    'restarting', 'transitioning', 'transitionFailed',
+  ];
+  for (const state of states) {
+    assert.equal(getGameFlowKeyboardAction('F1', state), 'toggleHUD');
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
+      assert.equal(getGameFlowKeyboardAction('F1', state, { [modifier]: true }), null);
+    }
+  }
+  assert.equal(getGameFlowKeyboardAction('F2', 'playing'), null);
 });
 
 test('flow state subscriptions emit immediately and clean up explicitly', () => {

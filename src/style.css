@@ -39,6 +39,19 @@ canvas {
   display: none !important;
 }
 
+/* F1 also covers guidance mounted by later levels. Keep aiming, menus,
+   loading and death screens usable, and preserve each overlay's own state. */
+#app:has(> .game-flow[data-hud-hidden='true']) :is(
+  .game-hud,
+  .test-panel,
+  .performance-recorder,
+  .security-network-status,
+  .elevator-encounter-status,
+  .maintenance-drone-hud
+) {
+  display: none !important;
+}
+
 /* Development diagnostics remain deliberately utilitarian. */
 .test-panel {
   z-index: 5;

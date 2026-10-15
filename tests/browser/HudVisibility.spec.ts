@@ -1,0 +1,188 @@
+import { fileURLToPath } from 'node:url';
+import { build } from 'vite';
+import type { DeathScreen } from '../../src/ui/DeathScreen.ts';
+import type { GameFlowUI } from '../../src/ui/GameFlowUI.ts';
+import { test, expect } from './fixtures.ts';
+
+declare global {
+  interface Window {
+    __hudTest: { flow: GameFlowUI; death: DeathScreen };
+  }
+}
+
+test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownership', async ({ page }, testInfo) => {
+  // Exercise the actual UI and shared styles without paying for WebGL shader
+  // preparation on every keyboard assertion. Only gameplay actions are stubbed.
+  const fixtureId = fileURLToPath(new URL('./__hud-visibility-fixture.ts', import.meta.url));
+  const result = await build({
+    root: fileURLToPath(new URL('../../', import.meta.url)),
+    configFile: false,
+    logLevel: 'silent',
+    plugins: [{
+      name: 'hud-visibility-fixture',
+      enforce: 'pre',
+      resolveId: id => id === fixtureId ? `\0${fixtureId}` : undefined,
+      load: id => id === `\0${fixtureId}` ? `
+        export { GameFlowUI } from '/src/ui/GameFlowUI.ts';
+        export { GameSettings } from '/src/ui/GameSettings.ts';
+        export { DeathScreen } from '/src/ui/DeathScreen.ts';
+        import '/src/style.css';
+        import '/src/ui/ui-theme.css';
+      ` : undefined,
+    }],
+    build: { write: false, lib: { entry: fixtureId, formats: ['es'] } },
+  });
+  const bundle = Array.isArray(result) ? result[0] : result;
+  if (!bundle || !('output' in bundle)) throw new Error('HUD fixture did not build.');
+  const script = bundle.output.find(item => item.type === 'chunk');
+  const style = bundle.output.find(item => item.type === 'asset' && item.fileName.endsWith('.css'));
+  if (!script || script.type !== 'chunk' || !style || style.type !== 'asset') {
+    throw new Error('HUD fixture requires bundled JavaScript and shared CSS.');
+  }
+  await page.route('**/__hud-fixture.js', route => route.fulfill({ contentType: 'text/javascript', body: script.code }));
+  await page.route('**/__hud-fixture.css', route => route.fulfill({
+    contentType: 'text/css',
+    body: typeof style.source === 'string' ? style.source : Buffer.from(style.source),
+  }));
+  await page.route('**/__hud-fixture', route => route.fulfill({
+    contentType: 'text/html',
+    body: '<!doctype html><html><head><link rel="stylesheet" href="./__hud-fixture.css"></head><body><main id="app"><canvas></canvas></main></body></html>',
+  }));
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('./__hud-fixture');
+  await page.evaluate(async () => {
+    const fixtureUrl = new URL('./__hud-fixture.js', location.href).href;
+    const { GameFlowUI, GameSettings, DeathScreen } = await import(fixtureUrl);
+    let inputEnabled = false;
+    const app = document.querySelector<HTMLElement>('#app')!;
+    const flow: GameFlowUI = new GameFlowUI({
+      settings: new GameSettings(),
+      creditsMarkdown: '',
+      actions: {
+        startGameplay: () => { inputEnabled = true; },
+        stopGameplay: () => { inputEnabled = false; },
+        setGameplayInputEnabled: (enabled: boolean) => { inputEnabled = enabled; },
+        isGameplayInputEnabled: () => inputEnabled,
+        isPointerLocked: () => false,
+        setDebugInteractionEnabled: () => {},
+        requestPointerLock: () => {},
+        releasePointerLock: () => {},
+        restartLevel: () => {},
+        applySettings: () => {},
+      },
+    });
+    flow.subscribe(state => { app.dataset.gameState = state; });
+    flow.setObjective('Test objective');
+    app.append(flow.element);
+    const death = new DeathScreen({ onRetry: () => {}, backgroundElements: [] });
+    app.append(death.element);
+    Object.assign(window, { __hudTest: { flow, death } });
+    flow.completeBoot();
+  });
+  const flow = page.locator('.game-flow');
+  const title = page.locator('[data-flow-panel="title"]');
+  await expect(title).toBeVisible();
+  await expect(flow).toHaveAttribute('data-hud-hidden', 'false');
+  await page.keyboard.press('F1');
+  await expect(title).toBeVisible();
+  await page.keyboard.press('F1');
+
+  await title.locator('[data-action="start"]').click();
+  await expect(flow).toHaveAttribute('data-state', 'playing');
+  const hud = page.locator('.game-hud');
+  await expect(hud).toBeVisible();
+  await expect(page.locator('[data-current-objective]')).toBeVisible();
+  await expect(page.locator('.hud-roster')).toBeVisible();
+  await expect(page.locator('.hud-hint')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('hud-visible.png') });
+
+  await page.keyboard.press('F1');
+  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+  await expect(hud).toBeHidden();
+  await expect(flow).toHaveAttribute('data-state', 'playing');
+  await expect(page.locator('#app')).toHaveAttribute('data-game-state', 'playing');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('hud-hidden.png') });
+
+  // A held F1 must neither flicker the HUD nor invoke browser Help.
+  expect(await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      code: 'F1', key: 'F1', repeat: true, bubbles: true, cancelable: true,
+    });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  })).toBe(true);
+  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+  await page.keyboard.press('Shift+F1');
+  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+
+  // Level-owned overlays are appended later and can update their own display
+  // while capture mode is active. Probe those classes without loading a level.
+  const overlayClasses = [
+    'test-panel', 'performance-recorder', 'security-network-status',
+    'elevator-encounter-status', 'maintenance-drone-hud',
+  ];
+  const aimClasses = [
+    'volt-electrical-overlay', 'specimen-combat-overlay', 'goop-aim-crosshair',
+  ];
+  await page.evaluate(({ overlayClasses, aimClasses }) => {
+    for (const className of [...overlayClasses, ...aimClasses]) {
+      const overlay = document.createElement('div');
+      overlay.className = className;
+      if (aimClasses.includes(className)) overlay.dataset.aimProbe = className;
+      else overlay.dataset.hudProbe = className;
+      overlay.textContent = 'HUD overlay';
+      overlay.style.display = 'block';
+      document.querySelector('#app')!.append(overlay);
+    }
+  }, { overlayClasses, aimClasses });
+  const probes = page.locator('[data-hud-probe]');
+  const aimProbes = page.locator('[data-aim-probe]');
+  await expect(probes).toHaveCount(overlayClasses.length);
+  await expect(aimProbes).toHaveCount(aimClasses.length);
+  for (const probe of await probes.all()) await expect(probe).toBeHidden();
+  for (const probe of await aimProbes.all()) await expect(probe).toBeVisible();
+
+  await page.keyboard.press('KeyP');
+  const pause = page.locator('[data-flow-panel="paused"]');
+  await expect(pause).toBeVisible();
+  await expect(pause.locator('[data-action="resume"]')).toBeVisible();
+  await pause.locator('[data-action="resume"]').click();
+  await expect(flow).toHaveAttribute('data-state', 'playing');
+  await expect(hud).toBeHidden();
+
+  // An overlay hidden by its own runtime must stay hidden after restoring HUD.
+  await probes.first().evaluate(overlay => { overlay.hidden = true; });
+  await aimProbes.first().evaluate(overlay => { overlay.hidden = true; });
+  await page.keyboard.press('F1');
+  await expect(flow).toHaveAttribute('data-hud-hidden', 'false');
+  await expect(hud).toBeVisible();
+  await expect(probes.first()).toBeHidden();
+  for (const probe of (await probes.all()).slice(1)) await expect(probe).toBeVisible();
+  await expect(aimProbes.first()).toBeHidden();
+  for (const probe of (await aimProbes.all()).slice(1)) await expect(probe).toBeVisible();
+  await probes.evaluateAll(overlays => overlays.forEach(overlay => overlay.remove()));
+  await aimProbes.evaluateAll(overlays => overlays.forEach(overlay => overlay.remove()));
+
+  await page.keyboard.press('F1');
+  await page.keyboard.press('KeyP');
+  await pause.locator('[data-action="restart"]').click();
+  await expect(flow).toHaveAttribute('data-state', 'playing');
+  await expect(hud).toBeHidden();
+
+  await page.evaluate(() => window.__hudTest.death.show());
+  await expect(page.locator('.death-screen')).toBeVisible();
+  await page.evaluate(() => window.__hudTest.death.hide());
+
+  await page.evaluate(() => window.__hudTest.flow.beginLevelTransition('Entering next level'));
+  await expect(page.locator('[data-flow-panel="transitioning"]')).toBeVisible();
+  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+  await page.evaluate(() => window.__hudTest.flow.finishLevelTransition());
+  await page.locator('[data-action="enter-level"]').click();
+  await expect(flow).toHaveAttribute('data-state', 'playing');
+  await expect(hud).toBeHidden();
+  await page.keyboard.press('F1');
+  await expect(hud).toBeVisible();
+  expect(errors).toEqual([]);
+});

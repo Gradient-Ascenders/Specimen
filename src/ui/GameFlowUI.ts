@@ -39,7 +39,7 @@ export const gameFlowCanPause = (
   gameplayInputEnabled: boolean,
 ): boolean => state === 'playing' && gameplayInputEnabled;
 
-export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
+export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back' | 'toggleHUD';
 
 export interface GameFlowKeyboardModifiers {
   readonly altKey?: boolean;
@@ -55,6 +55,7 @@ export const getGameFlowKeyboardAction = (
 ): GameFlowKeyboardAction | null => {
   const hasModifier = modifiers.altKey || modifiers.ctrlKey ||
     modifiers.metaKey || modifiers.shiftKey;
+  if (!hasModifier && code === 'F1') return 'toggleHUD';
   if (!hasModifier && code === 'KeyP' && state === 'playing') return 'pause';
   if (!hasModifier && code === 'KeyP' && state === 'paused') return 'resume';
   if (code === 'Escape' && (state === 'settings' || state === 'credits')) {
@@ -530,6 +531,7 @@ export class GameFlowUI {
   private createElement(creditsMarkdown: string): HTMLElement {
     const root = this.hostDocument.createElement('div');
     root.className = 'game-flow';
+    root.dataset.hudHidden = 'false';
     root.innerHTML = `
       <section class="flow-screen loading-screen" data-flow-panel="loading" aria-labelledby="loading-title">
         <div class="system-state">
@@ -904,12 +906,23 @@ export class GameFlowUI {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat) return;
     const action = getGameFlowKeyboardAction(
       event.code,
       this.model.state,
       event,
     );
+
+    if (action === 'toggleHUD') {
+      // Consume held-key repeats too, so F1 never opens the browser's Help.
+      event.preventDefault();
+      if (!event.repeat) {
+        this.element.dataset.hudHidden = String(
+          this.element.dataset.hudHidden !== 'true',
+        );
+      }
+      return;
+    }
+    if (event.repeat) return;
 
     if (action === 'pause') {
       if (!this.actions.isGameplayInputEnabled()) return;

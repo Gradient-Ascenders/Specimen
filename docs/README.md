@@ -34,6 +34,10 @@ for implementation details and historical evidence.
 - [Continuous integration](operations/continuous-integration.md)
 - [Build and deployment](operations/deployment.md)
 - [Playtesting](operations/playtesting.md)
+- [Bob's trailer opening](operations/trailer-opening.md) — replayable in-engine
+  opening, recording controls, and capture-only startup.
+- [Goop's trailer introduction](operations/trailer-goop.md) — Goop intercepts a
+  drone attack on Bob and destroys the attacker with an acid shot.
 
 Generated screenshots, videos, browser logs, benchmark output, and one-off
 review notes do not belong in this directory. Attach review evidence to the

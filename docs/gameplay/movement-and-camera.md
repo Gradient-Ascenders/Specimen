@@ -43,3 +43,12 @@ Level volumes may request contextual profiles for framing, but they cannot take
 gameplay ownership or move a body. Slime switches retarget the same camera rig
 and clear stale smoothing/aim transients. Aiming may adjust presentation and
 targeting while preserving the authoritative body and line-of-sight rules.
+
+## HUD visibility
+
+Press **F1** to hide the gameplay HUD for clean footage; press it again to
+restore it. This includes objectives, the slime roster, control hints, and
+debug/recorder text. Aiming overlays remain visible while aiming. Gameplay
+continues normally. Pause, loading, and death screens remain available. The
+toggle persists across slime switches, level transitions, and restarts within
+the current session.
