@@ -59,11 +59,12 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
   await page.waitForFunction(
     () => (window as any).__cleanSession.runtime.input.pointerLocked,
   );
-  const draw = () =>
-    page.evaluate(() => {
+  const draw = (stage = 'intermediate') =>
+    page.evaluate((stage) => {
       const rt = (window as any).__cleanSession.runtime;
       rt.input.endPointerUpdate();
       const layer = rt.renderLayer, render = layer.render.bind(layer);
+      const initialPrograms = new Set(layer.renderer.info.programs ?? []);
       let liveProgramGrowth = 0;
       layer.render = () => {
         const before = layer.renderer.info.programs.length;
@@ -79,10 +80,18 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
         droppedSimulationTimeSeconds: 0,
         renderFps: 60,
       }); } finally { layer.render = render; }
-      if (liveProgramGrowth) throw new Error(`F1 live draw created ${liveProgramGrowth} shader programs`);
+      if (liveProgramGrowth) {
+        const additions = (layer.renderer.info.programs ?? [])
+          .filter((program: { id: number; cacheKey: string }) => !initialPrograms.has(program))
+          .map((program: { id: number; cacheKey: string }) => ({
+            id: program.id,
+            signature: String(program.cacheKey ?? '').slice(0, 400),
+          }));
+        throw new Error(`F1 ${stage} live draw created ${liveProgramGrowth} shader programs: ${JSON.stringify(additions)}`);
+      }
       const error = rt.renderLayer.renderer.getContext().getError();
       if (error) throw new Error(`WebGL error ${error} during F1 rendering`);
-    });
+    }, stage);
   const step = (count: number) =>
     page.evaluate((count) => {
       const rt = (window as any).__cleanSession.runtime;
@@ -125,7 +134,7 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
     page.locator('[data-clean-gameplay-aiming][data-clean-gameplay-essential]'),
   ).toHaveCount(0);
   const capture = async (level: number, name: string) => {
-    await draw();
+    await draw(`Level ${level} ${name}`);
     await page.screenshot({
       path: resolve(directory, `level-${level}-${name}.png`),
       timeout: 120_000,
