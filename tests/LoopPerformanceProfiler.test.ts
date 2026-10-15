@@ -78,3 +78,33 @@ test('enabled loop profiling brackets one complete frame', () => {
   assert.equal(capturedStats?.stepsThisFrame, 1);
   loop.dispose();
 });
+
+test('long-frame diagnostics include the clamp without changing the six-step simulation budget', () => {
+  const hosts = createHosts();
+  let updates = 0;
+  const loop = new Loop({ ...hosts, fixedUpdate: () => { updates += 1; }, render: () => {} });
+  loop.tick(0);
+  loop.tick(1000);
+  assert.equal(updates, 6);
+  assert.equal(loop.stats.stepsThisFrame, 6);
+  assert.equal(loop.stats.rawFrameDeltaSeconds, 1);
+  assert.equal(loop.stats.frameDeltaSeconds, .1);
+  assert.ok(Math.abs(loop.stats.droppedSimulationTimeSeconds - .9) < 1e-9);
+  loop.tick(1000 + 1000 / 60);
+  assert.equal(updates, 7, 'discarded time does not create a later catch-up backlog');
+  assert.equal(loop.stats.droppedSimulationTimeSeconds, 0);
+  loop.dispose();
+});
+
+test('dropped-time diagnostics sum frame clamping and a custom fixed-step cap', () => {
+  const hosts = createHosts();
+  let updates = 0;
+  const loop = new Loop({ ...hosts, maxStepsPerFrame: 2,
+    fixedUpdate: () => { updates += 1; }, render: () => {} });
+  loop.tick(0);
+  loop.tick(1000);
+  assert.equal(updates, 2);
+  assert.ok(Math.abs(loop.stats.droppedSimulationTimeSeconds - (1 - 2 / 60)) < 1e-9);
+  assert.ok(loop.stats.interpolationAlpha < 1);
+  loop.dispose();
+});

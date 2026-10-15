@@ -174,11 +174,13 @@ export class Loop {
     // If a custom configuration ever allows more accumulated work than the
     // hard step cap can consume, keep only the interpolation remainder. This
     // prevents a backlog from carrying a spiral-of-death into later frames.
-    let droppedSimulationTimeSeconds = 0;
+    // Account for both limits. This is diagnostic only: the fixed-step budget
+    // and accumulator are unchanged when the browser delivers a long frame.
+    let droppedSimulationTimeSeconds = rawFrameDeltaSeconds - frameDeltaSeconds;
     if (this.accumulatorSeconds >= this.stats.fixedDeltaSeconds) {
       const remainder =
         this.accumulatorSeconds % this.stats.fixedDeltaSeconds;
-      droppedSimulationTimeSeconds = this.accumulatorSeconds - remainder;
+      droppedSimulationTimeSeconds += this.accumulatorSeconds - remainder;
       this.accumulatorSeconds = remainder;
     }
 
