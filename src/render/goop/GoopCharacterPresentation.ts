@@ -133,7 +133,9 @@ export class GoopCharacterPresentation {
       try {
         if (this.disposed) { disposeGoopAsset(root); return; }
         const asset = validateGoopAsset(root);
-        const detailIndices = await detailLoader?.();
+        let detailIndices: readonly CharacterDetailIndices[] | undefined;
+        try { detailIndices = await detailLoader?.(); }
+        catch { /* Optional LOD fetch/decode failures retain the authored GLB. */ }
         if (this.disposed) { disposeGoopAsset(root); return; }
         const imported = new Set<THREE.Material>();
         for (const mesh of [asset.body, ...asset.eyes]) {
@@ -167,7 +169,10 @@ export class GoopCharacterPresentation {
         root.position.y = 0.45;
         this.shape.add(root);
         this.asset = asset; this.materials = materials;
-        if (detailIndices) this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices);
+        if (detailIndices) {
+          try { this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices); }
+          catch { /* Source validation happens before any geometry is changed. */ }
+        }
         this.applyVisibility(); this.present();
       } catch (error) {
         this.detail?.dispose(); this.detail = undefined;

@@ -152,6 +152,9 @@ triangles versus 33,716/38,208 at full detail. Bob stays unchanged.
 
 Preparation loads each bank through a Vite-managed URL, validates it against the
 source vertex counts, and appends the indices to one per-instance index buffer.
+The bank is optional: fetch, decode or source-validation failure leaves the
+original full-detail GLB indices intact and does not reject character or level
+preparation. Disposal while the bank is pending still releases the late asset.
 `CharacterDetail` changes only the geometry's draw range: no extra geometry,
 vertex/morph texture, material, shader variant or first-transition upload is
 needed. Visible, depth, distance and transmission passes use the same range;

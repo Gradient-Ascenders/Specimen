@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import * as THREE from 'three';
-import { CharacterDetail, readCharacterDetail } from '../src/render/slime/CharacterDetail.ts';
+import { CharacterDetail, loadCharacterDetail, readCharacterDetail } from '../src/render/slime/CharacterDetail.ts';
 import { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { GelRendering } from '../src/render/slime/GelRendering.ts';
@@ -78,14 +78,56 @@ for (const character of ['goop', 'volt'] as const) test(`${character} distant de
   assert.equal(released, 3, 'each shared geometry and its index bank are disposed exactly once');
 });
 
-for (const character of ['goop', 'volt'] as const) test(`${character} releases late detail loads and can retry a failed bank`, async () => {
+for (const character of ['goop', 'volt'] as const) {
+  for (const failure of ['network', 'http', 'body', 'decode', 'mismatch', 'synchronous'] as const) {
+    test(`${character} prepares full detail after optional LOD ${failure} failure`, async t => {
+      const rendering = new GelRendering({ transmissionResolutionScale: 1 });
+      const p = character === 'goop' ? new GoopCharacterPresentation(undefined, rendering) : new VoltCharacterPresentation(undefined, rendering);
+      t.after(() => p.dispose());
+      const root = await (character === 'goop' ? loadGoop() : loadVolt());
+      const meshes: THREE.Mesh[] = [];
+      root.traverse(object => { if (object instanceof THREE.Mesh) meshes.push(object); });
+      const originals = meshes.map(mesh => ({ index: mesh.geometry.index, range: { ...mesh.geometry.drawRange }, morphs: mesh.geometry.morphAttributes }));
+      const releases = new Map<THREE.BufferGeometry, number>();
+      for (const mesh of meshes) mesh.geometry.addEventListener('dispose', () => releases.set(mesh.geometry, (releases.get(mesh.geometry) ?? 0) + 1));
+      t.mock.method(globalThis, 'fetch', async () => {
+        if (failure === 'network') throw new Error('detail offline');
+        if (failure === 'http') return new Response('missing', { status: 404 });
+        if (failure === 'body') return new Response(new ReadableStream({ start(controller) { controller.error(new Error('incomplete detail')); } }));
+        return new Response('invalid detail bytes');
+      });
+      const detailLoader = () => {
+        if (failure === 'synchronous') throw new Error('detail loader failed');
+        if (failure === 'mismatch') return bank(character).then(records => records.map((record, i) =>
+          i === records.length - 1 ? { ...record, vertices: record.vertices + 1 } : record));
+        return loadCharacterDetail('https://specimen.invalid/optional-lod.bin');
+      };
+      await p.prepare(async () => root, detailLoader);
+      assert.equal(p.ready, true);
+      assert.equal(p.detailDiagnostics, undefined);
+      assert.ok(p.root.getObjectByName(`${character === 'goop' ? 'Goop' : 'Volt'}-Body`));
+      assert.equal(rendering.materialCount, 1);
+      const camera = new THREE.PerspectiveCamera(60);
+      camera.position.z = 50; p.updateDetail(camera); p.present();
+      for (let i = 0; i < meshes.length; i++) {
+        const mesh = meshes[i]!, original = originals[i]!;
+        assert.equal(mesh.geometry.index, original.index, 'fallback preserves the original full-detail index buffer');
+        assert.deepEqual(mesh.geometry.drawRange, original.range);
+        assert.equal(mesh.geometry.morphAttributes, original.morphs);
+        assert.ok(mesh.customDepthMaterial && mesh.customDistanceMaterial);
+        assert.equal(releases.get(mesh.geometry), undefined, 'the usable GLB must not be released on LOD failure');
+      }
+      await p.prepare(async () => { throw new Error('must not reload a ready character'); }, detailLoader);
+      p.dispose(); p.dispose();
+      assert.equal(rendering.materialCount, 0);
+      for (const mesh of meshes) assert.equal(releases.get(mesh.geometry), 1);
+    });
+  }
+}
+
+for (const character of ['goop', 'volt'] as const) for (const outcome of ['resolve', 'reject'] as const) test(`${character} releases a late detail load after disposal (${outcome})`, async () => {
   const create = () => character === 'goop' ? new GoopCharacterPresentation() : new VoltCharacterPresentation();
   const load = character === 'goop' ? loadGoop : loadVolt;
-  const p = create();
-  await assert.rejects(p.prepare(load, async () => { throw new Error('detail offline'); }), /detail offline/);
-  assert.equal(p.ready, false);
-  await p.prepare(load, () => bank(character));
-  assert.equal(p.ready, true); p.dispose();
   const late = create(), root = await load();
   const resources = new Set<THREE.BufferGeometry | THREE.Material | THREE.Texture>();
   root.traverse(o => { if (o instanceof THREE.Mesh) {
@@ -97,10 +139,13 @@ for (const character of ['goop', 'volt'] as const) test(`${character} releases l
   } });
   const releases = new Map<object, number>();
   for (const resource of resources) resource.addEventListener('dispose', () => releases.set(resource, (releases.get(resource) ?? 0) + 1));
-  let started!: () => void, finish!: (indices: Awaited<ReturnType<typeof bank>>) => void;
+  let started!: () => void, finish!: (indices: Awaited<ReturnType<typeof bank>>) => void, fail!: (error: Error) => void;
   const loading = new Promise<void>(resolve => { started = resolve; });
-  const pending = late.prepare(async () => root, () => { started(); return new Promise(resolve => { finish = resolve; }); });
-  await loading; late.dispose(); finish(await bank(character)); await pending;
+  const pending = late.prepare(async () => root, () => { started(); return new Promise((resolve, reject) => { finish = resolve; fail = reject; }); });
+  await loading; late.dispose();
+  if (outcome === 'resolve') finish(await bank(character));
+  else fail(new Error('late detail failure'));
+  await pending;
   assert.equal(late.ready, false); assert.equal(root.children.length, 0);
   for (const resource of resources) assert.equal(releases.get(resource), 1);
 });

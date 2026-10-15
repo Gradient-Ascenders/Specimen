@@ -142,7 +142,9 @@ export class VoltCharacterPresentation {
       try {
         if (this.disposed) { disposeVoltAsset(root); return; }
         const asset = validateVoltAsset(root);
-        const detailIndices = await detailLoader?.();
+        let detailIndices: readonly CharacterDetailIndices[] | undefined;
+        try { detailIndices = await detailLoader?.(); }
+        catch { /* Optional LOD fetch/decode failures retain the authored GLB. */ }
         if (this.disposed) { disposeVoltAsset(root); return; }
         this.headroom.prepare(asset.body);
         const imported = new Set<THREE.Material>([asset.body.material, ...asset.eyes.map(eye => eye.material)].flat());
@@ -165,7 +167,10 @@ export class VoltCharacterPresentation {
         }
         disposeVoltMaterials(imported, new Set(asset.maps));
         this.shape.add(root); this.asset = asset; this.materials = materials;
-        if (detailIndices) this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices);
+        if (detailIndices) {
+          try { this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices); }
+          catch { /* Source validation happens before any geometry is changed. */ }
+        }
         this.applyVisibility(); this.present();
       } catch (error) {
         this.detail?.dispose(); this.detail = undefined;
