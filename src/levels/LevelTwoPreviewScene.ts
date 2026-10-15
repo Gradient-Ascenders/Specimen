@@ -1,3 +1,4 @@
+import type { GelRendering } from '../render/slime/GelRendering.ts';
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
@@ -155,6 +156,7 @@ export class LevelTwoPreviewScene {
 
   constructor(
     requestFailure: (failure: LevelTwoPreviewHazardFailure) => void,
+    gelRendering?: GelRendering,
   ) {
     this.root.name = 'cultivation-level-2-authored-preview';
     this.root.position.x = LEVEL_TWO_PREVIEW_WORLD_OFFSET_X;
@@ -205,7 +207,7 @@ export class LevelTwoPreviewScene {
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);
-    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure);
+    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering);
     this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
     this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt);
     this.roomOneToTwoPassage.root.position.z =

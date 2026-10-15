@@ -1,3 +1,4 @@
+import { DEFAULT_GEL_RENDERING_MODE, type GelRenderingMode } from '../render/slime/GelRendering.ts';
 import {
   DEFAULT_CAMERA_RIG_CONFIG,
   MAX_FOLLOW_DISTANCE_METRES,
@@ -9,6 +10,7 @@ import {
 } from '../render/RenderResolution.ts';
 
 export interface GameSettingsSnapshot {
+  readonly gelRenderingMode: GelRenderingMode;
   readonly mouseSensitivity: number;
   readonly invertVerticalLook: boolean;
   readonly masterVolume: number;
@@ -22,6 +24,7 @@ export type GameSettingsListener = (
 ) => void;
 
 export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
+  gelRenderingMode: DEFAULT_GEL_RENDERING_MODE,
   mouseSensitivity: 1,
   invertVerticalLook: false,
   masterVolume: 1,
@@ -68,6 +71,10 @@ export class GameSettings {
     });
   }
 
+  setGelRenderingMode(value: GelRenderingMode): void {
+    this.update({ gelRenderingMode: value });
+  }
+
   setRenderPixelRatioCap(value: RenderPixelRatioCap): void {
     this.update({ renderPixelRatioCap: value });
   }
@@ -81,6 +88,7 @@ export class GameSettings {
   private update(patch: Partial<GameSettingsSnapshot>): void {
     const next = { ...this.current, ...patch };
     if (
+      next.gelRenderingMode === this.current.gelRenderingMode &&
       next.mouseSensitivity === this.current.mouseSensitivity &&
       next.invertVerticalLook === this.current.invertVerticalLook &&
       next.masterVolume === this.current.masterVolume &&

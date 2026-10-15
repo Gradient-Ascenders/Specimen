@@ -31,6 +31,95 @@ live game, and must dispose temporary render targets, shadow maps, geometries,
 and materials on completion or cancellation. Runtime rendering must remain
 correct when preparation is skipped or fails.
 
+## Gel rendering quality
+
+Settings → Character gel controls a session-owned `RenderLayer.gelRendering`
+policy independently of canvas resolution. It applies to Bob, Goop and Volt,
+including captive forms, hidden roster members and characters loaded after a
+level transition. A future minimum-hardware preset (#190) should select
+`minimum` through this same policy. Hardware detection and a canvas pixel
+budget are separate work; the default remains the authored physical look.
+
+| Setting / policy value | Material path | Transmission target |
+|---|---|---|
+| Minimum hardware / `minimum` | Non-transmissive physical gel with authored tint, roughness, clearcoat, Fresnel specular, reflection map and emission | No character-triggered capture, resolve or mipmaps |
+| Balanced / `reduced-transmission` | Authored physical transmission | Half width and height (25% of capture pixels), using Three's `transmissionResolutionScale = 0.5` |
+| High / `physical` | Authored physical transmission | Full resolution, original renderer defaults |
+
+Minimum gel loses background refraction and volume attenuation; its tint is
+more solid. It keeps the authored silhouettes, cyan/green/gold colors, glossy
+eyes, elastic motion, shadows, camera/aim fades and Volt's mapped glow and
+level-owned navigation light. It adds no artificial emission to Bob or Goop.
+Balanced softens transmitted detail and edges. It still submits the opaque
+environment twice and retains multisampling, resolve and mipmap costs. It
+reduces fragment work in the capture, not scene submission or the main pass.
+Minimum is the selected strategy for minimum hardware because it eliminates
+that duplicated scene work even when a gel covers few pixels. A non-transmissive
+`MeshPhysicalMaterial` retains these existing surface features without shader
+patches or a renderer fork; choosing `MeshStandardMaterial` would also remove
+the authored clearcoat/specular controls.
+
+The policy captures each body's authored transmission once (Bob/Goop 0.28,
+Volt 0.55) and restores it when leaving minimum mode. Opacity and reset never
+restore transmission themselves. Body transparency stays enabled across modes
+so existing prepared camera-fade variants and shadow masks remain applicable.
+Disposed bodies unregister; shader-preparation copies borrow the selected
+material settings without registering. Three owns any cached transmission
+targets: switching to minimum stops their use, but does not free a previously
+allocated target. Renderer disposal releases them. No per-frame material
+traversal or additional render target is introduced.
+
+Changing gel quality can compile a new surface variant. It explicitly invalidates
+the debug recorder's fixed-configuration Level 1 shader-growth check and records
+the reason in its status and exports. It does not disable WebGL shader error
+reporting. The guard remains active for journeys that keep their startup quality.
+
+### Reproduce the comparison
+
+Use Node 24 and the package-manager version in `package.json`, then run:
+
+```sh
+npm ci
+npm run type-check
+npm test
+npm run build
+npx playwright test tests/browser/GelRendering.spec.ts
+SPECIMEN_GEL_RENDERING_MODE=minimum npx playwright test tests/browser/VoltPresentation.spec.ts
+npm run validate:production
+```
+
+The gel comparison intercepts the production bundle only to expose the existing
+render layer to the test. It freezes a real Level 1 view and compares physical,
+half-resolution and minimum gel at exactly the same camera, actors, viewport
+and drawing buffer, then repeats modes to check bounded resources. It writes
+screenshots and raw `comparison.json` to `artifacts/evidence/issue-188/`.
+It asserts nonblank frames, zero GL errors, zero transmission-environment draws
+in minimum mode, half-sized balanced targets, and stable warm texture/program
+counts. WebGL timer queries, when available, record six independent full
+frames and one sequential, non-nested pass breakdown: transmission environment,
+screen environment, character, shadows and resolve/mipmap. Sum segments with
+the same scope for that pass frame; do not sum full-frame samples. Instrumented
+pass timings include boundary overhead and are attribution controls, not FPS.
+
+Set `GEL_CAPTURE_WIDTH`, `GEL_CAPTURE_HEIGHT` and `GEL_CAPTURE_DPR` for a matched
+viewport/buffer comparison. `SPECIMEN_BROWSER_CDP_URL` connects the tests to a
+caller-owned physical browser. The lifecycle journey accepts the same three
+mode names through `SPECIMEN_GEL_RENDERING_MODE` and exercises rescue, dark-room
+lighting, aiming, switching, death/retry, merge/split, restart, failed loads and
+unload. The minimum journey records first-death shader-program growth separately
+and requires stable subsequent retry cycles; shader warmup remains part of #191.
+Its mode-specific artifacts go under the same issue directory. This
+journey explicitly enables the existing debug/authored Level 2 route; it does
+not resolve the production-content parity work in #197.
+
+Software rendering validates correctness only. Issue #188 still requires
+matched interactive production captures on the confirmed assessment GPU,
+including the worst rooms, and numeric budgets from #187/#198 before hardware
+performance acceptance. Historical UHD 620 pass timings are motivation, not
+new measurements. Neither reduced target area nor removed draws alone proves
+a target-device frame-time budget. Attach raw captures and visual evidence to
+the review; obtain independent visual/implementation review before closure.
+
 ## Character and content assets
 
 Production Bob is loaded from `assets/characters/bob/bob-authored.glb`; its

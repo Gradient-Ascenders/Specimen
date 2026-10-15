@@ -1,3 +1,4 @@
+import type { GelRendering } from '../render/slime/GelRendering.ts';
 import { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import * as THREE from 'three';
 
@@ -122,7 +123,7 @@ export class RoomFiveGreybox {
   private readonly laserMotions: readonly RoomFiveLaserMotion[];
   private readonly laserTranslationOffset = new THREE.Vector3();
   private readonly leverHandle: THREE.Mesh;
-  readonly goopPresentation = new GoopCharacterPresentation();
+  readonly goopPresentation: GoopCharacterPresentation;
   private readonly containedGoopPosition = new THREE.Vector3(0, 76.546, 110);
   private readonly goopPresentationState = {
     locomotionPositionWorld: new THREE.Vector3(),
@@ -139,7 +140,9 @@ export class RoomFiveGreybox {
   constructor(
     requestFailure: (failure: RoomFiveHazardFailure) => void,
     artResources: ContainmentArtResources,
+    gelRendering?: GelRendering,
   ) {
+    this.goopPresentation = new GoopCharacterPresentation(undefined, gelRendering);
     this.goopWoodenDoor = this.buildShell();
     const solubleDoorMaterial = artResources.materials.solubleComposite.clone();
     solubleDoorMaterial.name = 'room-5-soluble-biological-composite-source';
