@@ -879,7 +879,7 @@ export class GreyboxLevelRuntime {
       (failure: ContainmentHazardFailure) => {
         containmentLevel.requestHazardFailure(failure);
       },
-      { includeDevelopmentHelpers: this.debugAvailable },
+      { includeDevelopmentHelpers: this.debugAvailable, gelRendering: this.renderLayer.gelRendering },
     );
     testScene.bob.setReflectionEnvironment(bobReflectionEnvironment.texture);
     this.renderLayer.scene.add(testScene.root);

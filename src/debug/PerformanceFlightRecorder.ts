@@ -149,6 +149,7 @@ export interface ShaderProgramGuardSnapshot {
   readonly baselineProgramCount: number | null;
   readonly highestProgramCount: number | null;
   readonly growthEventCount: number;
+  readonly invalidatedBy?: string;
 }
 
 interface DisjointTimerQueryExtension {
@@ -404,6 +405,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private gpuContext: WebGL2RenderingContext | null = null;
   private gpuSupportReason = 'recording has not started';
   private shaderProgramGuardArmed = false;
+  private shaderProgramGuardInvalidation: string | undefined;
   private shaderProgramBaseline: number | null = null;
   private highestShaderProgramCount: number | null = null;
 
@@ -467,7 +469,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   /** Arm after prewarm and the hidden boot renders establish Level 1's baseline. */
   armLevelOneShaderProgramGuard(baselineProgramCount: number): void {
-    if (this.disposed || this.shaderProgramBaseline !== null) return;
+    if (this.disposed || this.shaderProgramBaseline !== null || this.shaderProgramGuardInvalidation) return;
     this.shaderProgramGuardArmed = true;
     this.shaderProgramBaseline = baselineProgramCount;
     this.highestShaderProgramCount = baselineProgramCount;
@@ -512,6 +514,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       baselineProgramCount: this.shaderProgramBaseline,
       highestProgramCount: this.highestShaderProgramCount,
       growthEventCount: this.shaderProgramGrowthEvents.length,
+      ...(this.shaderProgramGuardInvalidation ? { invalidatedBy: this.shaderProgramGuardInvalidation } : {}),
     };
   }
 
@@ -520,6 +523,13 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     this.shaderProgramGuardArmed = false;
     this.shaderProgramGuardStatus.textContent =
       `Level 1 shader guard complete · baseline ${this.shaderProgramBaseline} · highest ${this.highestShaderProgramCount}`;
+  }
+
+  /** A deliberate material quality change invalidates the fixed startup baseline. */
+  invalidateLevelOneShaderProgramGuard(reason: string): void {
+    this.shaderProgramGuardArmed = false;
+    this.shaderProgramGuardInvalidation = reason;
+    this.shaderProgramGuardStatus.textContent = `Level 1 shader guard invalidated · ${reason}`;
   }
 
   start(): void {

@@ -1,3 +1,4 @@
+import type { GelRendering } from './GelRendering.ts';
 import * as THREE from 'three';
 
 import {
@@ -18,6 +19,7 @@ interface GelUniforms {
 }
 
 export interface GelMaterialDiagnostics {
+  readonly transmission: number;
   readonly selfLit: boolean;
   readonly catchlightCount: number;
   readonly maximumSecondaryDisplacementMetres: number;
@@ -34,7 +36,7 @@ export interface GelMaterialDiagnostics {
 /**
  * Configurable scene-lit gel with surface-scale secondary deformation.
  *
- * The physical BRDF owns lighting and transmission. The custom vertex work is
+ * The physical BRDF owns lighting and optional transmission. The custom vertex work is
  * deliberately limited to a few millimetres of idle wobble and local impact
  * ripple; character owners supply their major silhouette changes.
  */
@@ -54,7 +56,7 @@ export class GelBodyMaterial extends THREE.MeshPhysicalMaterial {
     impactAge: { value: BOB_IMPACT_RIPPLE_DURATION_SECONDS },
   };
 
-  constructor(profile?: GelMaterialProfile) {
+  constructor(profile?: GelMaterialProfile, rendering?: GelRendering) {
     super({
       name: 'Bob-Gel-Body',
       color: 0x18cddd,
@@ -78,6 +80,7 @@ export class GelBodyMaterial extends THREE.MeshPhysicalMaterial {
     });
 
     this.profile = profile;
+    rendering?.register(this);
     this.onBeforeCompile = (shader) => {
       shader.uniforms.uBobSecondaryTime = this.bobUniforms.time;
       shader.uniforms.uBobImpactPointLocal =
@@ -184,9 +187,9 @@ export class GelMaterialSet {
   private targetBodyReflectionIntensity = 0;
   private targetEyeReflectionIntensity = 0;
 
-  constructor(profile?: GelMaterialProfile) {
+  constructor(profile?: GelMaterialProfile, rendering?: GelRendering) {
     this.profile = profile;
-    this.body = new GelBodyMaterial(profile);
+    this.body = new GelBodyMaterial(profile, rendering);
     if (profile) {
       this.eyes.setValues(profile.eyes);
       this.bodyDepth.name = `${profile.name}-Gel-Depth`;
@@ -206,6 +209,7 @@ export class GelMaterialSet {
     const eyesSelfLit =
       this.eyes.emissiveIntensity > 0 && this.eyes.emissive.getHex() !== 0;
     return {
+      transmission: this.body.transmission,
       selfLit: bodySelfLit || eyesSelfLit,
       catchlightCount: 0,
       maximumSecondaryDisplacementMetres:
@@ -290,8 +294,8 @@ export class GelMaterialSet {
     const boundedOpacity = THREE.MathUtils.clamp(opacity, 0, 1);
     this.shadowOpacity.value = boundedOpacity;
     this.body.opacity = boundedOpacity;
-    // Transmission requires a transparent program even at full presentation
-    // opacity, so keep this flag stable across camera-proximity fades.
+    // Keep a transparent program in every gel mode so camera-proximity fades
+    // retain their prepared shader variant at full presentation opacity.
     this.body.transparent = true;
     this.body.depthWrite = boundedOpacity >= 1;
     this.eyes.opacity = boundedOpacity;
