@@ -1,5 +1,6 @@
 import { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import * as THREE from 'three';
+import { GAMEPLAY_UI_LAYER } from '../render/GameplayUiLayer.ts';
 
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
 import type { SurfaceTag } from '../physics/SurfaceRegistry.ts';
@@ -327,6 +328,7 @@ export class ContainmentTeachingScene {
       roomOneMarkerMaterial,
     );
     roomOneMarker.name = 'room-1-safe-spawn-marker';
+    roomOneMarker.layers.set(GAMEPLAY_UI_LAYER);
     roomOneMarker.position.set(SPAWN_POSITION.x, SPAWN_POSITION.y - 0.46, SPAWN_POSITION.z);
     roomOneMarker.rotation.x = Math.PI / 2;
     this.root.add(roomOneMarker);
@@ -335,6 +337,7 @@ export class ContainmentTeachingScene {
     this.ownedGeometries.add(roomTwoMarkerGeometry);
     const roomTwoMarker = new THREE.Mesh(roomTwoMarkerGeometry, exitMaterial);
     roomTwoMarker.name = 'room-2-safe-recovery-marker';
+    roomTwoMarker.layers.set(GAMEPLAY_UI_LAYER);
     roomTwoMarker.position.set(
       ROOM_2_SAFE_LANDING_POSITION.x,
       ROOM_2_FLOOR_TOP_Y + 0.01,

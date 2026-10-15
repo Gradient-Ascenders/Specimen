@@ -5,6 +5,7 @@ import { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegis
 import { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { ElectricalTargetHighlights } from '../src/render/electrical/ElectricalTargetHighlights.ts';
+import { GAMEPLAY_UI_LAYER, withGameplayUiVisibility } from '../src/render/GameplayUiLayer.ts';
 
 test('conducting highlights follow available devices, respect depth, and clean up registrations', () => {
   const world = new CollisionWorld();
@@ -33,6 +34,12 @@ test('conducting highlights follow available devices, respect depth, and clean u
     highlights.update(state);
     const helper = highlights.root.children[0] as THREE.BoxHelper;
     assert.equal(helper.visible, true);
+    const camera = new THREE.PerspectiveCamera();
+    camera.layers.enable(GAMEPLAY_UI_LAYER);
+    withGameplayUiVisibility(camera, false, () => {
+      assert.equal(camera.layers.test(helper.layers), true, 'F1 retains aiming outlines');
+      assert.equal(helper.visible, true);
+    });
     assert.equal(helper.material.depthTest, true, 'outlines must not reveal targets through walls');
     assert.equal(helper.material.depthWrite, false);
     assert.equal(helper.material.color.getHex(), 0xffd45c);
@@ -48,6 +55,9 @@ test('conducting highlights follow available devices, respect depth, and clean u
     assert.equal(highlights.root.visible, false, 'switching away or leaving aim hides outlines');
     const removeLater = registry.register(makeTarget('lift', laterMesh));
     assert.equal(highlights.root.children.length, 2);
+    withGameplayUiVisibility(camera, false, () => {
+      assert.equal(camera.layers.test(highlights.root.children[1]!.layers), true, 'late target registrations remain visible during clean rendering');
+    });
     removeLater(); unregister();
     assert.equal(highlights.root.children.length, 0);
     assert.equal(mesh.material, originalMaterial, 'power feedback materials must remain device-owned');

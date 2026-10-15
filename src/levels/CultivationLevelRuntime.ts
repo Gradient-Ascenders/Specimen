@@ -441,6 +441,13 @@ export class CultivationLevelRuntime {
     };
   }
 
+  prepareCleanGameplay(): void {
+    if (!this.debugVisible) return;
+    const resources = this.requireResources();
+    this.closeDebugInspection(this.lifecycle.state === 'running' &&
+      resources.deathSequence.isPlaying && resources.controller.readModel.state === 'playing');
+  }
+
   setDebugInteractionEnabled(enabled: boolean): void {
     this.debugInteractionEnabled = enabled;
     if (!enabled && this.debugVisible) this.closeDebugInspection(false);
@@ -2083,6 +2090,7 @@ export class CultivationLevelRuntime {
       return;
     }
     event.preventDefault();
+    if (this.host.dataset.cleanGameplay === 'true') return;
     if (this.debugVisible) {
       const resources = this.requireResources();
       this.closeDebugInspection(

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GAMEPLAY_UI_LAYER } from '../render/GameplayUiLayer.ts';
 
 import {
   CollisionHit,
@@ -113,6 +114,7 @@ export class SlimePairPresentation {
     });
     const sprite = new THREE.Sprite(material);
     sprite.name = `${slimeId}-inactive-body-locator`;
+    sprite.layers.set(GAMEPLAY_UI_LAYER);
     sprite.renderOrder = 100;
     this.root.add(sprite);
     return { sprite, material };
