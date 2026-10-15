@@ -50,7 +50,7 @@ export class BlackoutPresentationPreparation {
           const back = copyPrewarmMaterial(copy); back.side = THREE.BackSide; back.forceSinglePass = true;
           this.materials.push(back); visible.add(clone(object, back));
         }
-        if (!(object instanceof THREE.Mesh) || !object.castShadow) continue;
+        if (!(object instanceof THREE.Mesh) || !(object.castShadow || object.userData.characterShadowCaster)) continue;
         for (const distance of [false, true]) {
           if (distance ? !point : !hasDepth) continue;
           const shadow = createShadowPrewarmMaterial(object, material, distance);

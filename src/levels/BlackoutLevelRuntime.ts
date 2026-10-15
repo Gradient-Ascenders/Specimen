@@ -1,3 +1,4 @@
+import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
@@ -211,7 +212,12 @@ interface BlackoutRuntimeResources {
   readonly goopMovementIntent: THREE.Vector3;
   readonly renderedBobPosition: THREE.Vector3;
   bobDeathActive: boolean;
-  readonly visuals: Readonly<Record<'volt', THREE.Mesh>>;
+  readonly voltPresentation: VoltCharacterPresentation;
+  readonly voltPresentationState: VoltCharacterPresentationState;
+  readonly voltMovementEvents: EventBus<MovementEvents>;
+  readonly voltMovementIntent: THREE.Vector3;
+  readonly renderedVoltPosition: THREE.Vector3;
+  voltDeathActive: boolean;
   readonly voltLight: THREE.PointLight;
   readonly movement: THREE.Vector3;
   readonly jump: JumpInputState;
@@ -403,9 +409,11 @@ export class BlackoutLevelRuntime {
       true,
     );
     resources.goopPresentation.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
+    resources.voltPresentation.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
     return this.presentationPreparation ??= Promise.all([
       resources.bobPresentation.prepare(),
       resources.goopPresentation.prepare(),
+      resources.voltPresentation.prepare(),
     ]).then(async () => {
       if (this.resources !== resources) return;
       const preparation = new BlackoutPresentationPreparation();
@@ -413,6 +421,10 @@ export class BlackoutLevelRuntime {
       await preparation.prepare(this.renderLayer, this.preparationCamera.copy(this.renderLayer.cameraRig.camera));
       if (this.resources !== resources) return;
       resources.goopPresentation.primeDeathResources(resources.group.goopBody.position, root => {
+        withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+          renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
+      });
+      resources.voltPresentation.primeDeathResources(resources.group.voltBody.position, root => {
         withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
           renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
       });
@@ -568,6 +580,10 @@ export class BlackoutLevelRuntime {
     )) {
       return false;
     }
+    resources.voltDeathActive = resources.specimenForm.readModel.controlledForm === 'group' && resources.group.activeSlimeId === 'volt';
+    if (resources.voltDeathActive && !resources.voltPresentation.startDeath(resources.group.voltBody.position)) {
+      resources.voltDeathActive = false; resources.deathSequence.reset(); return false;
+    }
     resources.goopDeathActive = resources.specimenForm.readModel.controlledForm === 'group' && resources.group.activeSlimeId === 'goop';
     if (resources.goopDeathActive && !resources.goopPresentation.startDeath(resources.group.goopBody.position)) {
       resources.goopDeathActive = false; resources.deathSequence.reset(); return false;
@@ -698,11 +714,14 @@ export class BlackoutLevelRuntime {
     };
     resources.bobMovementIntent.set(0, 0, 0);
     resources.goopMovementIntent.set(0, 0, 0);
+    resources.voltMovementIntent.set(0, 0, 0);
     resources.bobPresentation.setPosition(resources.group.bobBody.position);
     resources.bobPresentation.reset();
     resources.goopPresentation.setPosition(resources.group.goopBody.position);
     resources.goopPresentation.reset();
     resources.goopDeathActive = false;
+    resources.voltPresentation.setPosition(resources.group.voltBody.position);
+    resources.voltPresentation.reset(); resources.voltDeathActive = false;
     this.renderLayer.cameraRig.reset();
     this.retargetCamera(resources);
     this.syncVisuals(resources);
@@ -806,6 +825,7 @@ export class BlackoutLevelRuntime {
         resources.bobPresentation.updateDeath(deltaSeconds);
       }
       if (resources.goopDeathActive) resources.goopPresentation.updateDeath(deltaSeconds);
+      if (resources.voltDeathActive) resources.voltPresentation.updateDeath(deltaSeconds);
       if (resources.deathSequence.update(deltaSeconds)) {
         resources.deathScreen.show();
         this.host.dataset.gameState = resources.deathSequence.state;
@@ -961,6 +981,7 @@ export class BlackoutLevelRuntime {
       : resources.group.activeBody;
     resources.bobMovementIntent.set(0, 0, 0);
     resources.goopMovementIntent.set(0, 0, 0);
+    resources.voltMovementIntent.set(0, 0, 0);
 
     // Switching changes input ownership, not gravity. Keep the other bodies
     // falling and landing; mounted Volt is carried by the drone instead.
@@ -1034,6 +1055,8 @@ export class BlackoutLevelRuntime {
           // The maintenance drone reuses and clears movement below. Preserve
           // Goop's actual intent for presentation just as Bob already does.
           resources.goopMovementIntent.copy(resources.movement);
+        } else if (!specimenGameplay && body === resources.group.voltBody) {
+          resources.voltMovementIntent.copy(resources.movement);
         }
         body.update(deltaSeconds, resources.movement, resources.jump);
 
@@ -1283,6 +1306,9 @@ export class BlackoutLevelRuntime {
       interpolateBodyPosition(resources.group.goopBody, interpolationAlpha, resources.renderedGoopPosition);
       resources.goopPresentation.setPosition(resources.renderedGoopPosition);
       resources.goopPresentation.present(interpolationAlpha);
+      interpolateBodyPosition(resources.group.voltBody, interpolationAlpha, resources.renderedVoltPosition);
+      resources.voltPresentation.setPosition(resources.renderedVoltPosition);
+      resources.voltPresentation.present(interpolationAlpha);
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
         this.lifecycle.state === 'running' && resources.deathSequence.isPlaying ? stats.frameDeltaSeconds : 0,
@@ -1345,6 +1371,11 @@ export class BlackoutLevelRuntime {
       // PMREM is shared with Bob. Dark rooms receive no permanent reflection fill.
       const reflectionWeight = resources.goopReflectionLighting.weightAt(resources.renderedGoopPosition);
       resources.goopPresentation.setReflectionIntensity(0.12 * reflectionWeight, 0.28 * reflectionWeight);
+      resources.voltPresentation.setOpacity(resources.group.activeSlimeId === 'volt'
+        ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
+          this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
+      const voltReflection = resources.goopReflectionLighting.weightAt(resources.renderedVoltPosition);
+      resources.voltPresentation.setReflectionIntensity(0.12 * voltReflection, 0.28 * voltReflection);
     }
     resources?.hallwayShadows?.prepareFrame(resources.hallwayShadowParticipants);
     this.renderLayer.render();
@@ -1429,6 +1460,8 @@ export class BlackoutLevelRuntime {
       const movementEvents = new EventBus<MovementEvents>();
       rollback(() => movementEvents.clear());
       const goopMovementEvents = new EventBus<MovementEvents>();
+      const voltMovementEvents = new EventBus<MovementEvents>();
+      rollback(() => voltMovementEvents.clear());
       rollback(() => goopMovementEvents.clear());
       const cp1 = BLACKOUT_CHECKPOINTS[0]!;
       const makeBody = (id: 'bob' | 'goop' | 'volt') => {
@@ -1437,7 +1470,7 @@ export class BlackoutLevelRuntime {
           world: collisionWorld,
           surfaces: surfaceRegistry,
           initialPosition: cp1.bodyPositions[id],
-          events: id === 'bob' ? movementEvents : id === 'goop' ? goopMovementEvents : undefined,
+          events: id === 'bob' ? movementEvents : id === 'goop' ? goopMovementEvents : voltMovementEvents,
           config: {
             movementCollisionMask:
               CollisionLayer.Movement |
@@ -1557,16 +1590,14 @@ export class BlackoutLevelRuntime {
       });
       rollback(() => deathScreen.dispose());
       this.host.append(deathScreen.element);
-      const visuals = {
-        volt: createSlimeVisual(0xffdf45, 0x6d5600),
-      } as const;
-      for (const visual of Object.values(visuals)) {
-        // Arm cleanup before attachment. THREE.Scene.add mutates parentage
-        // before returning, so an injected/observer failure after attachment
-        // must still remove and dispose the just-added visual.
-        rollback(() => disposeSlimeVisual(visual));
-        this.renderLayer.scene.add(visual);
-      }
+      const voltPresentation = new VoltCharacterPresentation(group.voltBody.radiusMetres);
+      rollback(() => voltPresentation.dispose());
+      voltPresentation.setCollisionWorld(collisionWorld);
+      voltPresentation.setPosition(group.voltBody.position);
+      this.renderLayer.scene.add(voltPresentation.root);
+      rollback(voltMovementEvents.on('landed', event => voltPresentation.onLanding(group.voltBody.groundNormal, event.impactSpeedMetresPerSecond)));
+      rollback(voltMovementEvents.on('jumped', event => voltPresentation.onLaunch(event)));
+      const voltPresentationState = createBobPresentationState(group.voltBody);
       const goopPresentation = new GoopCharacterPresentation(group.goopBody.radiusMetres);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(group.goopBody.position);
@@ -1600,7 +1631,7 @@ export class BlackoutLevelRuntime {
       }
       voltLight.name = 'blackout-volt-foundation-light';
       voltLight.castShadow = false;
-      visuals.volt.add(voltLight);
+      voltPresentation.placement.add(voltLight);
 
       const specimenVisual = createSpecimenVisual();
       rollback(() => disposeSlimeVisual(specimenVisual));
@@ -1826,7 +1857,8 @@ export class BlackoutLevelRuntime {
         goopMovementIntent: new THREE.Vector3(),
         renderedBobPosition: new THREE.Vector3(),
         bobDeathActive: false,
-        visuals,
+        voltPresentation, voltPresentationState, voltMovementEvents, voltMovementIntent: new THREE.Vector3(),
+        renderedVoltPosition: new THREE.Vector3(), voltDeathActive: false,
         voltLight,
         movement: new THREE.Vector3(),
         jump: { pressed: false, held: false, released: false, cancelled: false },
@@ -1954,12 +1986,15 @@ export class BlackoutLevelRuntime {
     resources.movement.set(0, 0, 0);
     resources.bobMovementIntent.set(0, 0, 0);
     resources.goopMovementIntent.set(0, 0, 0);
+    resources.voltMovementIntent.set(0, 0, 0);
     resources.bobDeathActive = false;
     resources.bobPresentation.setPosition(resources.group.bobBody.position);
     resources.bobPresentation.reset();
     resources.goopPresentation.setPosition(resources.group.goopBody.position);
     resources.goopPresentation.reset();
     resources.goopDeathActive = false;
+    resources.voltPresentation.setPosition(resources.group.voltBody.position);
+    resources.voltPresentation.reset(); resources.voltDeathActive = false;
     clearJump(resources.jump, false);
     this.completionEmitted = false;
     this.renderLayer.cameraRig.reset();
@@ -2013,12 +2048,11 @@ export class BlackoutLevelRuntime {
 
     resources.movementEvents.clear();
     resources.goopMovementEvents.clear();
+    resources.voltMovementEvents.clear();
     resources.bobPresentation.dispose();
     resources.goopPresentation.dispose();
     resources.bobReflectionEnvironment?.dispose();
-    for (const visual of Object.values(resources.visuals)) {
-      disposeSlimeVisual(visual);
-    }
+    resources.voltPresentation.dispose();
     disposeSlimeVisual(resources.specimenVisual);
     resources.puzzleRegistry.clear();
     resources.manager.clearLevelRegistrations();
@@ -2158,6 +2192,7 @@ export class BlackoutLevelRuntime {
     resources.movement.set(0, 0, 0);
     resources.bobMovementIntent.set(0, 0, 0);
     resources.goopMovementIntent.set(0, 0, 0);
+    resources.voltMovementIntent.set(0, 0, 0);
     if (resumeInput || !resources.bobDeathActive) {
       resources.bobPresentation.setPosition(resources.group.bobBody.position);
       resources.bobPresentation.reset();
@@ -2166,6 +2201,10 @@ export class BlackoutLevelRuntime {
     if (resumeInput || !resources.goopDeathActive) {
       resources.goopPresentation.setPosition(resources.group.goopBody.position);
       resources.goopPresentation.reset(); resources.goopDeathActive = false;
+    }
+    if (resumeInput || !resources.voltDeathActive) {
+      resources.voltPresentation.setPosition(resources.group.voltBody.position);
+      resources.voltPresentation.reset(); resources.voltDeathActive = false;
     }
     clearJump(resources.jump, true);
     this.renderLayer.cameraRig.reset();
@@ -2195,6 +2234,8 @@ export class BlackoutLevelRuntime {
     if (!resources.deathSequence.completeRetry()) return;
     this.gameplayAudio?.respawn();
     resources.goopPresentation.finishDeath(resources.group.goopBody.position);
+    resources.voltPresentation.finishDeath(resources.group.voltBody.position);
+    resources.voltDeathActive = false;
     resources.goopDeathActive = false;
     if (resources.bobDeathActive) {
       resources.bobPresentation.finishDeath(resources.group.bobBody.position);
@@ -2232,6 +2273,7 @@ export class BlackoutLevelRuntime {
     }
   }
 
+  private readonly voltAimDirection = new THREE.Vector3();
   private updateBobPresentation(
     deltaSeconds: number,
     resources: BlackoutRuntimeResources,
@@ -2253,6 +2295,12 @@ export class BlackoutLevelRuntime {
     resources.goopPresentationState.grounded = resources.group.goopBody.grounded;
     resources.goopPresentationState.movementIntentWorld = resources.goopMovementIntent;
     resources.goopPresentation.update(deltaSeconds, resources.goopPresentationState);
+    resources.voltPresentationState.grounded = resources.maintenanceDrone.voltMounted || resources.group.voltBody.grounded;
+    resources.voltPresentationState.movementIntentWorld = resources.voltMovementIntent;
+    resources.voltPresentation.setAimDirection(resources.electricalSystem.readModel.aimActive
+      ? this.renderLayer.cameraRig.camera.getWorldDirection(this.voltAimDirection) : undefined);
+    resources.voltPresentation.setPosition(resources.group.voltBody.position);
+    resources.voltPresentation.update(deltaSeconds, resources.voltPresentationState);
   }
 
   private retargetCamera(resources: BlackoutRuntimeResources): void {
@@ -2269,7 +2317,7 @@ export class BlackoutLevelRuntime {
   private syncVisuals(resources: BlackoutRuntimeResources): void {
     resources.bobPresentation.setPosition(resources.group.bobBody.position);
     resources.goopPresentation.setPosition(resources.group.goopBody.position);
-    resources.visuals.volt.position.copy(resources.group.voltBody.position);
+    resources.voltPresentation.setPosition(resources.group.voltBody.position);
     resources.specimenVisual.position.copy(resources.specimenBody.position);
 
     const specimenControlled =
@@ -2279,11 +2327,9 @@ export class BlackoutLevelRuntime {
     if (!resources.bobDeathActive) {
       resources.bobPresentation.setVisible(groupVisible);
     }
-    for (const visual of Object.values(resources.visuals)) {
-      visual.visible = groupVisible;
-    }
+    resources.voltPresentation.setVisible(groupVisible);
     resources.specimenVisual.visible = specimenControlled;
-    resources.voltLight.visible = !specimenControlled;
+    resources.voltLight.visible = !specimenControlled && !resources.voltDeathActive;
     resources.specimenLight.visible = specimenControlled;
 
     // Aim presentation hides only the currently controlled body material.
@@ -2291,12 +2337,7 @@ export class BlackoutLevelRuntime {
       !specimenControlled &&
       resources.manager.activeSlimeId === 'volt' &&
       resources.electricalSystem.readModel.aimActive;
-    const voltMaterials = Array.isArray(resources.visuals.volt.material)
-      ? resources.visuals.volt.material
-      : [resources.visuals.volt.material];
-    for (const material of voltMaterials) {
-      material.visible = !hideVoltBody;
-    }
+    resources.voltPresentation.setVisible(groupVisible && !hideVoltBody);
 
     const hideGoopBody =
       !specimenControlled &&
@@ -2474,22 +2515,6 @@ function createSpecimenVisual(): THREE.Mesh<THREE.SphereGeometry, THREE.MeshStan
   visual.castShadow = true;
   visual.receiveShadow = true;
   visual.visible = false;
-  return visual;
-}
-
-function createSlimeVisual(colour: number, emissive: number): THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial> {
-  const visual = new THREE.Mesh(
-    new THREE.SphereGeometry(0.45, 20, 14),
-    new THREE.MeshStandardMaterial({
-      color: colour,
-      emissive,
-      emissiveIntensity: 0.7,
-      roughness: 0.35,
-    }),
-  );
-  visual.name = 'blackout-foundation-slime';
-  visual.castShadow = true;
-  visual.receiveShadow = true;
   return visual;
 }
 

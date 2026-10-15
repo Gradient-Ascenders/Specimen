@@ -96,7 +96,7 @@ test('Level 2 zero shortcut works without debug preview and is one-shot', () => 
     },
     pair: { bobBody: { position: new THREE.Vector3(1, 2, 3) } },
     voltBody: { recoverAt(position: THREE.Vector3) { assert.deepEqual(position.toArray(), [1, 2, 3]); } },
-    voltVisual: { visible: false },
+    voltPresentation: { reset() {}, setPosition() {}, setVisible() {} },
   };
   runtime.events.on('completed', (event) => { emitted = event; });
   let prevented = false;
@@ -137,7 +137,7 @@ test('final lever hands off to Level 3 once Volt is released and unlocked, witho
       getRosterState: () => [], activeSlimeId: 'bob',
     },
     voltBody: { recoverAt(position: THREE.Vector3) { assert.deepEqual(position.toArray(), [0, 2.65, 64]); } },
-    voltVisual: { visible: false },
+    voltPresentation: { reset() {}, setPosition() {}, setVisible() {} },
   };
   const internals = runtime as unknown as {
     resources: typeof resources; authoredPreviewProgression: { roomId: number };
