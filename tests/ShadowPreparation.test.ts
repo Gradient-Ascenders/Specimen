@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -78,7 +79,7 @@ test('tiny preparation viewports retain a physical transmission texel below nati
 
 test('cancelled Cultivation compile releases owned maps once and cannot overwrite the next shadow owner', async () => {
   const {renderer, borrowedTarget} = fixture(), scene = new THREE.Scene();
-  const preview = new LevelTwoPreviewScene(() => {}); scene.add(preview.root);
+  const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets); scene.add(preview.root);
   const policy = new RenderShadowPolicy(renderer.shadowMap);
   const camera = new THREE.PerspectiveCamera();
   const layer = {renderer, scene, cameraRig: {camera}, withShadowPreparation: policy.withPreparation.bind(policy)} as unknown as RenderLayer;
@@ -277,7 +278,7 @@ test('hidden Volt prewarms morph, transmission, faded-eye and actual caster vari
 
 test('instance primers upload both live buffers sharing a geometry and never dispose borrowed storage', async () => {
   const { renderer, borrowedTarget } = fixture();
-  const scene = new THREE.Scene(), preview = new LevelTwoPreviewScene(() => {});
+  const scene = new THREE.Scene(), preview = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   scene.add(preview.root);
   const geometry = new THREE.BoxGeometry(), material = new THREE.MeshStandardMaterial();
   geometry.morphAttributes.position = [geometry.getAttribute('position').clone()];

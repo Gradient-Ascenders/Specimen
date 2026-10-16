@@ -53,6 +53,18 @@ test('conducting highlights follow available devices, respect depth, and clean u
     assert.equal(helper.visible, false);
     highlights.update({...state, aimActive: false});
     assert.equal(highlights.root.visible, false, 'switching away or leaving aim hides outlines');
+    let updates = 0;
+    const update = helper.update.bind(helper);
+    helper.update = () => { updates++; update(); };
+    highlights.update({...state, aimActive: false});
+    highlights.update(state, false);
+    assert.equal(updates, 0, 'inactive aiming never rebuilds target bounds');
+    available = true;
+    mesh.position.x = 45; mesh.updateMatrixWorld(true);
+    highlights.update(state);
+    assert.equal(updates, 1); assert.equal(helper.visible, true);
+    helper.geometry.computeBoundingBox();
+    assert.equal(helper.geometry.boundingBox!.getCenter(new THREE.Vector3()).x, 45, 're-entering aim refreshes moved targets');
     const removeLater = registry.register(makeTarget('lift', laterMesh));
     assert.equal(highlights.root.children.length, 2);
     withGameplayUiVisibility(camera, false, () => {

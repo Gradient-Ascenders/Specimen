@@ -119,40 +119,52 @@ export class CultivationMaintenanceArt {
     // bevels and underside fittings remain fully detailed in the visible pass.
     const hullMaterial = new THREE.MeshBasicMaterial({colorWrite:false, depthWrite:false});
     this.materials.push(hullMaterial); b.borrowedMaterials.add(hullMaterial);
-    const hulls = new Map<string, THREE.BufferGeometry[]>();
+    const hulls = new Map<string, THREE.Mesh[]>();
     for (const platform of platforms) {
-      platform.updateMatrix();
-      let hull = platform.geometry.clone();
-      if (hull.index) { const indexed = hull; hull = indexed.toNonIndexed(); indexed.dispose(); }
-      for (const name of Object.keys(hull.attributes)) if (!['position','normal'].includes(name)) hull.deleteAttribute(name);
-      hull.applyMatrix4(platform.matrix);
       const key = [platform.position.x, platform.position.y, platform.position.z].map(n => Math.floor(n / 10)).join(',');
-      const list = hulls.get(key) ?? []; list.push(hull); hulls.set(key, list);
+      const list = hulls.get(key) ?? []; list.push(platform); hulls.set(key, list);
     }
-    for (const pieces of hulls.values()) {
-      const geometry = mergeGeometries(pieces)!; pieces.forEach(g => g.dispose());
+    for (const [key, sources] of hulls) {
+      const geometry = lab.assets.geometry(`room-5-shadow-hulls-${key}`, () => {
+        const pieces = sources.map(platform => {
+          platform.updateMatrix();
+          let hull = platform.geometry.clone();
+          if (hull.index) { const indexed = hull; hull = indexed.toNonIndexed(); indexed.dispose(); }
+          for (const name of Object.keys(hull.attributes)) if (!['position','normal'].includes(name)) hull.deleteAttribute(name);
+          return hull.applyMatrix4(platform.matrix);
+        });
+        const merged = mergeGeometries(pieces)!; pieces.forEach(g => g.dispose());
+        return merged;
+      });
       const hull = new THREE.Mesh(geometry, hullMaterial); hull.name = 'room-5-platform-shadow-hulls'; hull.userData.presentationOnly = true;
       room.root.add(hull); this.batches.push(hull);
     }
     this.podArt = new CultivationVoltPodArt(room, lab);
     // Keep spatial batches small enough for camera and shadow-frustum rejection.
-    const parts = new Map<string, { material: THREE.Material; geometries: THREE.BufferGeometry[] }>();
+    const parts = new Map<string, { material: THREE.Material; sources: THREE.Mesh[] }>();
     for (const mesh of candidates) {
       const material = mesh.material as THREE.Material;
       const zone = mesh.position.x > 29 ? 'sewer' : mesh.position.y < 0 ? 'maintenance' : 'chamber';
       const key = `${zone}:${Math.floor(mesh.position.z / 24)}:${material.uuid}`;
       let part = parts.get(key);
-      if (!part) { part = { material, geometries: [] }; parts.set(key, part); }
-      mesh.updateMatrix();
-      let geometry = mesh.geometry.clone();
-      if (geometry.index) { const indexed = geometry; geometry = indexed.toNonIndexed(); indexed.dispose(); }
-      for (const attribute of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv', 'membranePanel'].includes(attribute)) geometry.deleteAttribute(attribute);
-      geometry.applyMatrix4(mesh.matrix); part.geometries.push(geometry);
+      if (!part) { part = { material, sources: [] }; parts.set(key, part); }
+      part.sources.push(mesh);
       this.originals.push({ mesh, material: mesh.material }); mesh.material = this.hidden;
     }
+    let batchIndex = 0;
     for (const [key, part] of parts) {
-      const geometry = mergeGeometries(part.geometries, false)!;
-      for (const piece of part.geometries) piece.dispose();
+      const geometry = lab.assets.geometry(`room-5-static-${batchIndex++}`, () => {
+        const pieces = part.sources.map(mesh => {
+          mesh.updateMatrix();
+          let geometry = mesh.geometry.clone();
+          if (geometry.index) { const indexed = geometry; geometry = indexed.toNonIndexed(); indexed.dispose(); }
+          for (const attribute of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv', 'membranePanel'].includes(attribute)) geometry.deleteAttribute(attribute);
+          return geometry.applyMatrix4(mesh.matrix);
+        });
+        const merged = mergeGeometries(pieces, false)!;
+        for (const piece of pieces) piece.dispose();
+        return merged;
+      });
       const mesh = new THREE.Mesh(geometry, part.material);
       mesh.name = `room-5-art-static-${key.split(':').slice(0, 2).join('-')}`;
       mesh.userData.presentationOnly = true; room.root.add(mesh); this.batches.push(mesh);

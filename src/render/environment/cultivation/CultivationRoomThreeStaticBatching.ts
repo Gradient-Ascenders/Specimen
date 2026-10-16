@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { CultivationAssetSource } from './CultivationBakedAssets.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export interface CultivationRoomThreeStaticBatchDiagnostics {
@@ -19,6 +20,7 @@ export interface CultivationRoomThreeStaticBatchDiagnostics {
 export function consolidateCultivationRoomThreeStaticColliders(
   roomRoot: THREE.Group,
   collisionMeshes: readonly THREE.Mesh[],
+  assets?: CultivationAssetSource,
 ): CultivationRoomThreeStaticBatchDiagnostics {
   roomRoot.updateWorldMatrix(true, true);
   const groups = new Map<THREE.Material, THREE.Mesh[]>();
@@ -45,22 +47,26 @@ export function consolidateCultivationRoomThreeStaticColliders(
 
   for (const [material, sources] of groups) {
     if (sources.length < 2) continue;
-    const transformed = sources.map((source) => {
-      roomLocalMatrix.multiplyMatrices(inverseRoomMatrix, source.matrixWorld);
-      return source.geometry.clone().applyMatrix4(roomLocalMatrix);
-    });
-    const geometry = mergeGeometries(transformed, false);
-    for (const temporary of transformed) temporary.dispose();
-    if (!geometry) {
-      invisibleColliderMaterial.dispose();
-      throw new Error(
-        `Unable to batch Room 3 colliders: ${sources
-          .map((source) => source.name)
-          .join(', ')}.`,
-      );
-    }
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
+    const generate = () => {
+      const transformed = sources.map((source) => {
+        roomLocalMatrix.multiplyMatrices(inverseRoomMatrix, source.matrixWorld);
+        return source.geometry.clone().applyMatrix4(roomLocalMatrix);
+      });
+      const geometry = mergeGeometries(transformed, false);
+      for (const temporary of transformed) temporary.dispose();
+      if (!geometry) {
+        invisibleColliderMaterial.dispose();
+        throw new Error(
+          `Unable to batch Room 3 colliders: ${sources
+            .map((source) => source.name)
+            .join(', ')}.`,
+        );
+      }
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+      return geometry;
+    };
+    const geometry = assets ? assets.geometry(`room-3-colliders-${batchCount + 1}`, generate) : generate();
     const batch = new THREE.Mesh(geometry, material);
     batchCount += 1;
     batch.name = `cultivation-room-3-static-visual-batch-${batchCount}`;

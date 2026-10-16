@@ -1,3 +1,4 @@
+import { cultivationAssets } from './lib/read-cultivation-assets.ts';
 import * as THREE from 'three';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -10,7 +11,7 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 
 // Evaluate the real room constructors instead of parsing source-code literals.
-const preview = new LevelTwoPreviewScene(() => {});
+const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets);
 const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
 const dummy = new KinematicBody({ world, surfaces, initialPosition: new THREE.Vector3(-100, -100, -100) });
 const roomFiveDrones = new RoomFiveDroneEncounter(preview.roomFive, world, surfaces, dummy, dummy, () => false);

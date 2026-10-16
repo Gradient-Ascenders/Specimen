@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { AudioManager, type AudioPlayback } from '../src/audio/AudioManager.ts';
 import { GameplayAudio } from '../src/audio/GameplayAudio.ts';
 import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
-import { SOUND_DEFINITIONS, soundUrl, type SoundId } from '../src/audio/SoundCatalog.ts';
+import { SOUND_BANKS, SOUND_DEFINITIONS, soundUrl, type SoundId } from '../src/audio/SoundCatalog.ts';
 import { EventBus } from '../src/core/EventBus.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import type { MovementEvents } from '../src/physics/MovementEvents.ts';
@@ -123,6 +123,67 @@ test('one failed decode does not prevent other assets playing; stale one-shots a
     audio.play('bob-jump-01'); audio.play('goop-jump-01');
     assert.equal(context.sources.length,1);
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('progression banks deduplicate overlapping loads and unlock, with at most four concurrent decodes', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  const requests: string[] = [];
+  let active = 0, peak = 0, contexts = 0;
+  context.decodeAudioData = async () => {
+    active++; peak = Math.max(peak, active);
+    await new Promise(resolve => setImmediate(resolve));
+    active--; return { duration: 1 };
+  };
+  globalThis.fetch = async url => { requests.push(String(url)); return new Response(new Uint8Array([1])); };
+  const audio = new AudioManager('/group-folder/', () => { contexts++; return context as unknown as AudioContext; });
+  try {
+    const initial = audio.preload(SOUND_BANKS.containment);
+    const preload = audio.preload.bind(audio);
+    let gesturePreloads = 0;
+    audio.preload = sounds => { gesturePreloads++; return preload(sounds); };
+    for (let i = 0; i < 100; i++) audio.unlock();
+    assert.equal(gesturePreloads, 1, 'key auto-repeat must not rebuild bank promises');
+    await Promise.all([initial, audio.preload(SOUND_BANKS.containment)]);
+    assert.equal(requests.length, 34); assert.equal(contexts, 1);
+    assert.ok(requests.every(url => !url.includes('/volt/') && !url.includes('/turrets/')));
+    assert.equal(peak, 4); assert.equal(audio.diagnostics.pending, 0);
+    await Promise.all([audio.preload(SOUND_BANKS.cultivation), audio.preload(SOUND_BANKS.containment)]);
+    assert.equal(requests.length, 41); assert.equal(audio.diagnostics.loaded, 41);
+    assert.ok(requests.some(url => url.includes('/turrets/')), 'Cultivation combat already has turrets');
+    assert.ok(SOUND_BANKS.cultivation.includes('volt-jump-01'));
+    assert.ok(!SOUND_BANKS.cultivation.includes('volt-aim-enter-01'), 'electrical cues wait for Blackout');
+    await audio.preload(SOUND_BANKS.blackout);
+    assert.equal(requests.length, 54); assert.equal(new Set(requests).size, 54);
+    assert.equal(contexts, 1); assert.equal(peak, 4);
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('dispose cancels queued audio and ignores decodes that complete after teardown', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  const decodes: Array<() => void> = [];
+  let requests = 0;
+  context.decodeAudioData = () => new Promise(resolve => decodes.push(() => resolve({ duration: 1 })));
+  globalThis.fetch = async () => { requests++; return new Response(new Uint8Array([1])); };
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    const pending = audio.preload();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(decodes.length, 4);
+    audio.dispose();
+    for (const finish of decodes) finish();
+    await pending;
+    assert.equal(requests, 4); assert.equal(audio.diagnostics.loaded, 0);
+    assert.equal(audio.diagnostics.pending, 0); assert.equal(audio.diagnostics.activeLoads, 0);
+    await audio.preload(); audio.unlock(); assert.equal(requests, 4);
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('unsupported audio is optional and only attempts one context across banks', async () => {
+  let attempts = 0;
+  const audio = new AudioManager('./', () => { attempts++; throw new Error('unsupported'); });
+  await Promise.all([audio.preload(SOUND_BANKS.containment), audio.preload(SOUND_BANKS.cultivation)]);
+  audio.unlock();
+  assert.equal(attempts, 1); assert.equal(audio.diagnostics.loaded, 0); audio.dispose();
 });
 
 class Playback implements AudioPlayback {

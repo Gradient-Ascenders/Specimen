@@ -21,7 +21,14 @@ export class ElectricalTargetHighlights {
 
   update(state: VoltElectricalReadModel, aimAllowed = true): void {
     const visible = aimAllowed && state.aimActive;
+    const wasVisible = this.root.visible;
     this.root.visible = visible;
+    // The hidden parent suppresses all helpers. Do not query targets or rebuild
+    // their bounds when Volt is not aiming; refresh them on the next aim frame.
+    if (!visible) {
+      if (wasVisible) for (const child of this.root.children) child.visible = false;
+      return;
+    }
     for (const [registration, helpers] of this.entries) {
       const target = registration.target;
       const selected = state.selectedTargetValid && state.selectedTargetId === target.id;

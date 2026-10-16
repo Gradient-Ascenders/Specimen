@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -12,7 +13,7 @@ import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 
 test('Room 3 constructs seven drones and resets one-to-one cable release', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes);
@@ -122,7 +123,7 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
 });
 
 test('split-room eligibility keeps Room 3 live without targeting the body left in Room 2', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes);

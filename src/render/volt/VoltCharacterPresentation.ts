@@ -1,6 +1,7 @@
 import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
+import { CharacterDetail, loadCharacterDetail, type CharacterDetailIndices } from '../slime/CharacterDetail.ts';
 import { moveAngleTowards, shortestAngleDelta } from '../BlobFacing.ts';
 import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
 import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresentationContract.ts';
@@ -13,6 +14,8 @@ import { GEL_LAUNCH_SECONDS, GEL_LANDING_SECONDS, GEL_MAXIMUM_BASE_OFFSET_METRES
   gelLandingSquash, gelAirborneStretch } from '../slime/GelElasticMotion.ts';
 
 const ASSET_URL = new URL('../../../assets/characters/volt/volt.glb', import.meta.url).href;
+const DETAIL_URL = new URL('../../assets/characters/volt-lod.bin', import.meta.url).href;
+const defaultLoader = () => loadCharacterAsset(ASSET_URL);
 export type VoltCharacterLoader = () => Promise<THREE.Group>;
 export interface VoltCharacterPresentationState {
   readonly locomotionPositionWorld: Vector3State;
@@ -25,6 +28,7 @@ export interface VoltCharacterPresentationState {
 /** Per-instance authored gel. Placement, facing and burst are separate so a
  * level-owned navigation light follows placement even while aiming or fading. */
 export class VoltCharacterPresentation {
+  private detail: CharacterDetail | undefined;
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
   private readonly gelRendering: GelRendering | undefined;
@@ -120,22 +124,28 @@ export class VoltCharacterPresentation {
         landingRippleAgeSeconds: this.rippleAge },
       headroom: this.headroom.diagnostics,
       meshes: this.asset ? [this.asset.body, ...this.asset.eyes].map(mesh => ({ name: mesh.name,
-        vertices: mesh.geometry.getAttribute('position').count, triangles: mesh.geometry.index!.count / 3,
+        vertices: mesh.geometry.getAttribute('position').count,
+        triangles: (Number.isFinite(mesh.geometry.drawRange.count) ? mesh.geometry.drawRange.count : mesh.geometry.index!.count) / 3,
         weights: Object.fromEntries(VOLT_MORPHS.map(name => [name, mesh.morphTargetInfluences![mesh.morphTargetDictionary![name]]])),
         castShadow: mesh.castShadow })) : [],
       shadowCasting: this.shadows && this.character.visible, deathActive: this.deathActive,
       deathBurst: this.burst.diagnostics, materials: this.materials?.diagnostics,
       asset: this.asset ? { triangles: 38208, drawCalls: 3, geometries: 3, materials: 2 } : undefined };
   }
-  prepare(loader: VoltCharacterLoader = () => loadCharacterAsset(ASSET_URL)): Promise<void> {
+  prepare(loader: VoltCharacterLoader = defaultLoader,
+    detailLoader: (() => Promise<readonly CharacterDetailIndices[]>) | undefined = loader === defaultLoader ? () => loadCharacterDetail(DETAIL_URL) : undefined): Promise<void> {
     if (this.disposed) return Promise.reject(new Error('Cannot prepare disposed Volt'));
     if (this.ready) return Promise.resolve();
     if (this.preparation) return this.preparation;
-    const pending = Promise.resolve().then(loader).then(root => {
+    const pending = Promise.resolve().then(loader).then(async root => {
       let materials: VoltMaterialSet | undefined;
       try {
         if (this.disposed) { disposeVoltAsset(root); return; }
         const asset = validateVoltAsset(root);
+        let detailIndices: readonly CharacterDetailIndices[] | undefined;
+        try { detailIndices = await detailLoader?.(); }
+        catch { /* Optional LOD fetch/decode failures retain the authored GLB. */ }
+        if (this.disposed) { disposeVoltAsset(root); return; }
         this.headroom.prepare(asset.body);
         const imported = new Set<THREE.Material>([asset.body.material, ...asset.eyes.map(eye => eye.material)].flat());
         materials = new VoltMaterialSet(...asset.maps, this.gelRendering);
@@ -157,8 +167,14 @@ export class VoltCharacterPresentation {
         }
         disposeVoltMaterials(imported, new Set(asset.maps));
         this.shape.add(root); this.asset = asset; this.materials = materials;
+        if (detailIndices) {
+          try { this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices); }
+          catch { /* Source validation happens before any geometry is changed. */ }
+        }
         this.applyVisibility(); this.present();
       } catch (error) {
+        this.detail?.dispose(); this.detail = undefined;
+        this.asset = undefined; this.materials = undefined;
         this.headroom.releaseAsset();
         if (materials) {
           // Replacement can fail before every shadow variant has attached.
@@ -178,6 +194,8 @@ export class VoltCharacterPresentation {
     void pending.finally(() => { if (this.preparation === pending) this.preparation = undefined; }).catch(() => {});
     return pending;
   }
+  updateDetail(camera: THREE.Camera): void { this.detail?.update(camera); }
+  get detailDiagnostics() { return this.detail?.diagnostics; }
   setPosition(position: Vector3State): void { this.placement.position.set(position.x, position.y, position.z); }
   setCollisionWorld(world: CollisionWorld): void { this.headroom.setCollisionWorld(world); }
   setYaw(yaw: number): void {
@@ -378,6 +396,7 @@ export class VoltCharacterPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.detail?.dispose(); this.detail = undefined;
     this.headroom.dispose();
     if (this.asset) disposeVoltAsset(this.asset.root, this.environment);
     this.asset = undefined; this.materials = undefined;

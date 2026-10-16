@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
 
-test('54 OGGs decode beneath nested base and gameplay owns charge, movement, pause and reset audio', async ({ page }) => {
+test('audio banks decode beneath nested base and gameplay owns charge, movement, pause and reset audio', async ({ page }) => {
   const errors: string[] = [], audioRequests: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -16,16 +17,30 @@ test('54 OGGs decode beneath nested base and gameplay owns charge, movement, pau
   });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
-  await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.loaded === 54);
-  expect(new Set(audioRequests).size).toBe(54);
-  expect(audioRequests.every(url => new URL(url).pathname.startsWith('/group-folder/assets/audio/'))).toBe(true);
-  // This test advances gameplay manually. Stop rendering before Start so a
-  // software-rendered gameplay frame cannot block the audio/input checks.
+  // Audio/input checks advance gameplay manually. Stop costly software-rendered
+  // frames before waiting on asynchronous decoding, not after that wait.
   await page.evaluate(() => (window as any).__audioRuntime.renderLayer.setAnimationLoop(null));
+  await expect.poll(() => page.evaluate(() => {
+    const { loaded, failed, pending } = (window as any).__audioRuntime.audio.diagnostics;
+    return { loaded, failed, pending };
+  }), { timeout: 60_000 }).toEqual({ loaded: SOUND_BANKS.containment.length, failed: [], pending: 0 });
+  expect(new Set(audioRequests).size).toBe(SOUND_BANKS.containment.length);
+  expect(audioRequests.some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
+  expect(audioRequests.every(url => new URL(url).pathname.startsWith('/group-folder/assets/audio/'))).toBe(true);
   // Start is the trusted gesture that unlocks audio and requests pointer lock.
   await page.locator('[data-action="start"]').click();
   await page.waitForFunction(() => document.pointerLockElement === document.querySelector('canvas'));
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
+  // Unlock must not silently expand the bank. Later factories warm their
+  // cumulative banks before entry; verify actual browser OGG decoding too.
+  expect(new Set(audioRequests).size).toBe(SOUND_BANKS.containment.length);
+  await page.evaluate(async banks => {
+    const audio = (window as any).__audioRuntime.audio;
+    await audio.preload(banks.cultivation);
+    if (audio.diagnostics.loaded !== banks.cultivation.length) throw new Error('Cultivation bank missing');
+    await audio.preload(banks.blackout);
+  }, SOUND_BANKS);
+  expect(new Set(audioRequests).size).toBe(54);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});

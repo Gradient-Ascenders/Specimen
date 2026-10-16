@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -21,7 +22,7 @@ test('filtration niches preserve both routes and the Bob-controlled Goop entry l
     innerWidthMetres: 2, innerHeightMetres: 2.1, lengthMetres: 28,
   });
   duct.root.position.set(8, 18.8, 0);
-  const lab = new CultivationLabMaterials(), contamination = new CultivationContaminationArt(lab);
+  const lab = new CultivationLabMaterials(cultivationAssets), contamination = new CultivationContaminationArt(lab);
   lab.dress(passage.builder, [], contamination.overrides(passage.builder)); lab.dress(duct.builder);
   const colliders = [...passage.collisionMeshes, ...duct.collisionMeshes];
   const snapshots = colliders.map(mesh => ({ mesh, geometry: mesh.geometry, material: mesh.material,
@@ -62,7 +63,7 @@ test('filtration niches preserve both routes and the Bob-controlled Goop entry l
 });
 
 test('filtration art has a bounded submission budget and one culled, resettable, collision-free fan', () => {
-  const scene = new LevelTwoPreviewScene(() => {}), art = scene.filtrationArt;
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets), art = scene.filtrationArt;
   const meshes: THREE.Mesh[] = [];
   for (const root of [art.root, art.ductRoot]) root.traverse(o => { if (o instanceof THREE.Mesh) meshes.push(o); });
   const geometries = meshes.map(mesh => mesh.geometry);
@@ -97,7 +98,7 @@ test('filtration art has a bounded submission budget and one culled, resettable,
 });
 
 test('filtration lifecycle releases owned allocations once and retains borrowed maps and fixture materials', () => {
-  const scene = new LevelTwoPreviewScene(() => {}), art = scene.filtrationArt;
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets), art = scene.filtrationArt;
   // Undo cleanup before recording original allocations, matching runtime unload.
   scene.surfaceCleanup.dispose();
   const borrowed = new Set<THREE.Material>([...Object.values(scene.contaminationArt.finishes), scene.labArt.fixture]);

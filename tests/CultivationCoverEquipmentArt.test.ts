@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -7,7 +8,7 @@ import { CultivationLabMaterials } from '../src/render/environment/cultivation/C
 import { CultivationCoverEquipmentArt, COVER_EQUIPMENT } from '../src/render/environment/cultivation/CultivationCoverEquipmentArt.ts';
 
 test('all eight unique equipment models preserve cover geometry and sightline volumes', () => {
- const baseline=new LevelTwoRoomThreeGreybox(()=>{}), lab=new CultivationLabMaterials(), art=new CultivationCoverEquipmentArt();
+ const baseline=new LevelTwoRoomThreeGreybox(()=>{}), lab=new CultivationLabMaterials(cultivationAssets), art=new CultivationCoverEquipmentArt(cultivationAssets);
  const room=new LevelTwoRoomThreeGreybox(()=>{},builder=>{lab.dress(builder,[],art.overrides());art.build(builder);});
  assert.equal(COVER_EQUIPMENT.length,8);
  assert.equal(new Set(COVER_EQUIPMENT.map(item=>item.identity)).size,8);

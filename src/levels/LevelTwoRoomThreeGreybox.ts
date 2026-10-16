@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import { GreyboxDropPreview } from './GreyboxDropPreview.ts';
 
@@ -75,6 +76,7 @@ export class LevelTwoRoomThreeGreybox {
   constructor(
     requestFailure: (failure: LevelTwoRoomThreeHazardFailure) => void,
     prepareArt?: (builder: GreyboxRoomBuilder) => void,
+    assets?: CultivationAssetSource,
   ) {
     this.root.userData.levelId = 'cultivation';
     this.root.userData.roomId = 3;
@@ -100,6 +102,7 @@ export class LevelTwoRoomThreeGreybox {
       consolidateCultivationRoomThreeStaticColliders(
         this.root,
         this.collisionMeshes,
+        assets,
       );
 
     const hazards = this.createLasers();

@@ -1,4 +1,4 @@
-import { SOUND_DEFINITIONS, soundUrl, type SoundId } from './SoundCatalog.ts';
+import { SOUND_BANKS, SOUND_DEFINITIONS, soundUrl, type SoundId } from './SoundCatalog.ts';
 import type { AudioPosition } from './GameplayAudioEvents.ts';
 
 interface Voice {
@@ -27,7 +27,11 @@ export class AudioManager implements AudioPlayback {
   private readonly buffers = new Map<SoundId, AudioBuffer>();
   private readonly voices = new Set<Voice>();
   private readonly loops = new Map<string, LoopRequest>();
-  private preloadPromise: Promise<void> | undefined;
+  private contextAttempted = false;
+  private readonly pending = new Map<SoundId, Promise<void>>();
+  private readonly loadQueue: Array<{ sound: SoundId; resolve: () => void }> = [];
+  private activeLoads = 0;
+  private readonly loadingAbort = new AbortController();
   private paused = true;
   private focused = true;
   private unlocked = false;
@@ -48,16 +52,28 @@ export class AudioManager implements AudioPlayback {
   get diagnostics() {
     return { loaded: this.buffers.size, failed: [...this.failed], voices: this.voices.size,
       loops: this.loops.size, played: this.playedCount, contextState: this.context?.state ?? 'unavailable',
-      paused: this.paused, masterVolume: this.masterVolume, effectsVolume: this.effectsVolume };
+      paused: this.paused, masterVolume: this.masterVolume, effectsVolume: this.effectsVolume,
+      pending: this.pending.size, activeLoads: this.activeLoads };
   }
 
-  preload(): Promise<void> {
-    if (this.preloadPromise) return this.preloadPromise;
-    this.preloadPromise = this.load();
-    return this.preloadPromise;
+  preload(sounds: readonly SoundId[] = SOUND_BANKS.blackout): Promise<void> {
+    if (this.disposed || !this.ensureContext()) return Promise.resolve();
+    const promises = sounds.map(sound => {
+      if (this.buffers.has(sound) || this.failed.has(sound)) return Promise.resolve();
+      let pending = this.pending.get(sound);
+      if (!pending) {
+        pending = new Promise<void>(resolve => { this.loadQueue.push({ sound, resolve }); });
+        this.pending.set(sound, pending);
+      }
+      return pending;
+    });
+    this.pumpLoads();
+    return Promise.all(promises).then(() => {});
   }
 
-  private async load(): Promise<void> {
+  private ensureContext(): boolean {
+    if (this.contextAttempted) return !!this.context;
+    this.contextAttempted = true;
     try {
       this.context = this.createContext();
       this.master = this.context.createGain();
@@ -69,25 +85,50 @@ export class AudioManager implements AudioPlayback {
       this.compressor.connect(this.master);
       this.master.connect(this.context.destination);
       this.setVolumes(this.masterVolume, this.effectsVolume);
-    } catch { return; } // Audio is optional on unsupported devices.
-    const context = this.context;
-    await Promise.all((Object.keys(SOUND_DEFINITIONS) as SoundId[]).map(async sound => {
-      try {
-        const response = await fetch(soundUrl(sound, this.base));
-        if (!response.ok) throw new Error('Audio request failed');
-        const buffer = await context.decodeAudioData(await response.arrayBuffer());
-        if (!(buffer.duration > 0)) throw new Error('Empty audio');
-        if (!this.disposed) this.buffers.set(sound, buffer);
-      } catch { if (!this.disposed) this.failed.add(sound); }
-    }));
-    this.reconcileLoops();
+    } catch {
+      void this.context?.close().catch(() => {});
+      this.context = undefined;
+      return false; // Audio is optional on unsupported devices.
+    }
+    this.syncContext();
+    return true;
+  }
+
+  private pumpLoads(): void {
+    // Bound both network requests and concurrent decodes during level loading.
+    while (!this.disposed && this.activeLoads < 4 && this.loadQueue.length) {
+      const { sound, resolve } = this.loadQueue.shift()!;
+      this.activeLoads++;
+      void this.loadSound(sound).finally(() => {
+        this.activeLoads--;
+        this.pending.delete(sound);
+        resolve();
+        this.pumpLoads();
+      });
+    }
+  }
+
+  private async loadSound(sound: SoundId): Promise<void> {
+    try {
+      const response = await fetch(soundUrl(sound, this.base), { signal: this.loadingAbort.signal });
+      if (!response.ok) throw new Error('Audio request failed');
+      const bytes = await response.arrayBuffer();
+      if (this.disposed) return;
+      const buffer = await this.context!.decodeAudioData(bytes);
+      if (!(buffer.duration > 0)) throw new Error('Empty audio');
+      if (!this.disposed) { this.buffers.set(sound, buffer); this.reconcileLoops(); }
+    } catch { if (!this.disposed) this.failed.add(sound); }
   }
 
   /** Call synchronously in a trusted pointer/key event; never replay old shots. */
   unlock(): void {
     if (this.disposed) return;
-    this.unlocked = true;
-    void this.preload();
+    // Pointer/key auto-repeat must not allocate a new bank-sized Promise.all
+    // on every gesture. Still retry context resume on later trusted events.
+    if (!this.unlocked) {
+      this.unlocked = true;
+      void this.preload(SOUND_BANKS.containment);
+    }
     this.syncContext();
   }
 
@@ -206,6 +247,10 @@ export class AudioManager implements AudioPlayback {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.loadingAbort.abort();
+    for (const { sound, resolve } of this.loadQueue.splice(0)) {
+      this.pending.delete(sound); resolve();
+    }
     this.stopAll(); this.buffers.clear();
     this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
     void this.context?.close().catch(() => {});

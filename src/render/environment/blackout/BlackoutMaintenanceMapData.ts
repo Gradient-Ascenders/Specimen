@@ -1,4 +1,5 @@
 import { BLACKOUT_MATERIAL_FAMILIES, BLACKOUT_MAINTENANCE_FINISHES, type BlackoutMaterialFamily } from './BlackoutMaintenanceFinish.ts';
+import { readGzipResponse } from '../ReadGzipResponse.ts';
 
 /** Versioned, lossless RGBA8 bundle. DataTexture orientation is unchanged. */
 export const BLACKOUT_MAP_MAGIC = 'SPCBM001';
@@ -37,9 +38,7 @@ export async function loadBlackoutMaintenanceMapData(url: URL, signal?: AbortSig
     const response = await fetch(url, { signal });
     if (!response.ok) throw new Error(`HTTP ${response.status} loading ${url.pathname}`);
     if (!response.body) throw new Error('Empty Blackout map response.');
-    const stream = response.body.pipeThrough(new DecompressionStream('gzip'), { signal });
-    const buffer = await new Response(stream).arrayBuffer();
-    signal?.throwIfAborted();
+    const buffer = await readGzipResponse(response, signal);
     return readBlackoutMaintenanceMapData(buffer);
   } catch (error) {
     if (signal?.aborted) throw signal.reason;
