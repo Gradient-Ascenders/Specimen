@@ -16,6 +16,7 @@ import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTarget
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
+import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -828,6 +829,78 @@ test('ordinary production ignores authored room teleport keys', () => {
     for (const action of ['debugTeleportRoomTwo', 'debugTeleportRoomThree'] as const) {
       f.input.press(action); f.tick(); f.input.release(action); f.tick();
       assert.equal(f.runtime.roomState.roomId, 'room-1');
+    }
+  } finally { f.cleanup(); }
+});
+
+for (const room of [1, 2] as const) for (const slime of ['bob', 'volt'] as const) {
+  test(`Room ${room} emits one ${slime} acid impact before death, animates it, and clears it on recovery`, () => {
+    const f = createFixture();
+    try {
+      if (room === 2) { f.input.press('debugTeleportRoomTwo'); f.tick(); f.input.release('debugTeleportRoomTwo'); }
+      const r = electricalRoomInternals(f.runtime);
+      const owner = room === 1 ? r.maintenanceBay.bay : r.transit.room;
+      const mesh = owner.root.getObjectByName(room === 1 ? 'animated-acid-surface' : 'transit-acid-surface') as THREE.Mesh;
+      const material = mesh.material as AcidSurfaceMaterial;
+      const victim = slime === 'bob' ? r.group.bobBody : r.group.voltBody;
+      const surfaceY = new THREE.Box3().setFromObject(mesh).max.y;
+      const shader = {uniforms: {}, vertexShader: '', fragmentShader: ''};
+      material.onBeforeCompile(shader as never, {} as never);
+      const uniforms = shader.uniforms as Record<string, {value: any}>;
+      // Sample in open basin space, away from platforms, lasers and drones.
+      victim.teleport(new THREE.Vector3(room === 1 ? -10 : 18, room === 1 ? -.351 : -.201, room === 1 ? 20 : 95));
+      f.tick();
+      assert.equal(f.input.enabled, false, 'the existing acid failure path stops gameplay');
+      assert.equal(material.interactionDiagnostics.emitted, 1);
+      const impact = uniforms.uRipples.value[0] as THREE.Vector4;
+      assert.ok(Math.abs(impact.x - victim.position.x) < 1e-6);
+      assert.ok(Math.abs(impact.y - victim.position.z) < 1e-6);
+      assert.ok(Math.abs(uniforms.uRippleSurfaceY.value[0] - surfaceY) < 1e-6);
+      const time = material.diagnostics.timeSeconds;
+      f.tick(30);
+      assert.ok(material.diagnostics.timeSeconds > time, 'the death impact continues expanding');
+      assert.equal(material.interactionDiagnostics.emitted, 1, 'death steps cannot resample or repeat the splash');
+      f.runtime.stop(); const pausedTime = material.diagnostics.timeSeconds; f.tick(10);
+      assert.equal(material.diagnostics.timeSeconds, pausedTime);
+      f.runtime.start(); f.runtime.recoverActiveCheckpoint();
+      assert.equal(material.interactionDiagnostics.active, 0);
+      owner.acidInteractions.fallPulse(victim);
+      f.runtime.restartLevel();
+      assert.equal(material.interactionDiagnostics.active, 0);
+    } finally { f.cleanup(); }
+  });
+}
+
+test('Goop remains immune while a real persistent body wakes each basin; generic failures do not project acid impacts', () => {
+  const f = createFixture();
+  try {
+    const r = electricalRoomInternals(f.runtime);
+    f.switchSlime(); f.switchSlime(); // Volt -> Bob -> Goop.
+    for (const [owner, x, z, name] of [
+      [r.maintenanceBay.bay, -10, 20, 'animated-acid-surface'],
+      [r.transit.room, 18, 95, 'transit-acid-surface'],
+    ] as const) {
+      if (owner === r.transit.room) {
+        f.input.press('debugTeleportRoomTwo'); f.tick(); f.input.release('debugTeleportRoomTwo');
+        f.switchSlime(); // CP3 selects Bob; take control of Goop.
+      }
+      const material = (owner.root.getObjectByName(name) as THREE.Mesh).material as AcidSurfaceMaterial;
+      r.group.goopBody.teleport(new THREE.Vector3(x, 1.5, z));
+      f.tick(50);
+      assert.equal(f.input.enabled, true, 'Goop never requests an acid death');
+      const emitted = material.interactionDiagnostics.emitted;
+      assert.ok(emitted >= 1, `${name} emits an initial contact`);
+      f.input.press('moveRight');
+      f.tick(12);
+      f.input.release('moveRight');
+      assert.ok(material.interactionDiagnostics.emitted > emitted);
+      owner.acidInteractions.reset();
+    }
+    r.group.goopBody.teleport(new THREE.Vector3(8, .86, 84));
+    f.runtime.requestFailure();
+    for (const [owner, name] of [[r.maintenanceBay.bay, 'animated-acid-surface'], [r.transit.room, 'transit-acid-surface']] as const) {
+      const material = (owner.root.getObjectByName(name) as THREE.Mesh).material as AcidSurfaceMaterial;
+      assert.equal(material.interactionDiagnostics.active, 0, 'non-acid deaths do not project a ripple');
     }
   } finally { f.cleanup(); }
 });

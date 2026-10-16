@@ -65,3 +65,48 @@ test('nearby elevated platforms and teleports do not create acid wakes; reset cl
  assert.throws(()=>material.disturb(NaN,0,0,1),/finite/);
  surface.geometry.dispose();material.dispose();
 });
+
+test('three stable slots track world-space contact, wakes, takeoff and velocity-scaled landing without reallocating uniforms', () => {
+ const {material,surface}=setup();
+ const parent=new THREE.Group();parent.position.set(100,5,200);parent.add(surface);
+ const contacts=new AcidLiquidInteractions(material,surface,3);
+ const bodies=[-2,0,2].map(x=>({position:new THREE.Vector3(100+x,5.46,200+x),velocity:new THREE.Vector3(2,0,0),radiusMetres:.46}));
+ const shader={uniforms:{},vertexShader:'',fragmentShader:''};material.onBeforeCompile(shader as never,{} as never);
+ const u=shader.uniforms as Record<string,{value:any}>, ripples=u.uRipples.value as THREE.Vector4[];
+ const version=material.version,key=material.customProgramCacheKey();
+ contacts.update(1/60,bodies);
+ assert.equal(material.interactionDiagnostics.emitted,3);
+ assert.deepEqual(ripples.slice(0,3).map(v=>[v.x,v.y]),[[98,198],[100,200],[102,202]]);
+ assert.ok([...u.uRippleSurfaceY.value].slice(0,3).every(y=>Math.abs(y-5)<1e-6));
+ contacts.update(.15,bodies);assert.equal(material.interactionDiagnostics.emitted,6);
+ bodies[1].position.y=6;bodies[1].velocity.y=7;contacts.update(1/60,bodies);
+ assert.equal(ripples[6].w,.45,'Goop emits a takeoff disturbance at its previous surface contact');
+ bodies[1].velocity.y=-10;contacts.update(1/60,bodies);
+ bodies[1].position.y=5.46;bodies[1].velocity.y=0;contacts.update(1/60,bodies);
+ assert.ok(ripples[7].w>1.5,'landing retains the prior downward velocity');
+ bodies[2].position.x+=4;contacts.update(.15,bodies);
+ assert.equal(ripples[8].x,98,'only the first body wakes while the third teleports and Goop cools down');
+ assert.equal(material.version,version);assert.equal(material.customProgramCacheKey(),key);
+ assert.equal(u.uRipples.value,ripples);
+ contacts.reset();assert.equal(material.interactionDiagnostics.active,0);
+ for(const body of bodies)body.position.y=8;
+ contacts.update(.2,bodies);assert.equal(material.interactionDiagnostics.active,0);
+ assert.throws(()=>new AcidLiquidInteractions(material,surface,0),/capacity/);
+ surface.geometry.dispose();material.dispose();
+});
+
+test('projected lethal impacts are bounded and deduplicated against contact and later death steps', () => {
+ const {material,surface,body}=setup();
+ const contacts=new AcidLiquidInteractions(material,surface,3);
+ const bodies=[body];contacts.update(1/60,bodies);
+ contacts.fallPulse(body);contacts.fallPulse(body);
+ assert.equal(material.interactionDiagnostics.emitted,1);
+ body.position.y=.46;contacts.update(.2,bodies);contacts.fallPulse(body);
+ assert.equal(material.interactionDiagnostics.emitted,1,'projected lethal contact cannot emit again while dying');
+ contacts.reset();contacts.update(1/60,bodies);
+ const count=material.interactionDiagnostics.emitted;contacts.fallPulse(body);
+ assert.equal(material.interactionDiagnostics.emitted,count,'a direct contact splash already represents the impact');
+ contacts.reset();body.position.x=20;contacts.update(.2,bodies);contacts.fallPulse(body);
+ assert.equal(material.interactionDiagnostics.active,0);
+ surface.geometry.dispose();material.dispose();
+});

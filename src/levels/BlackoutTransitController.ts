@@ -410,8 +410,14 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       if (laser.intersects(this.voltLaserTarget)) return 'volt';
     }
 
-    if (this.room.acidAt(bodies.bob.position)) return 'bob';
-    if (this.room.acidAt(bodies.volt.position)) return 'volt';
+    if (this.room.acidAt(bodies.bob.position)) {
+      this.room.acidInteractions.fallPulse(bodies.bob);
+      return 'bob';
+    }
+    if (this.room.acidAt(bodies.volt.position)) {
+      this.room.acidInteractions.fallPulse(bodies.volt);
+      return 'volt';
+    }
     if (this.room.exitAt(bodies.bob.position) && this.room.exitAt(bodies.goop.position) && this.room.exitAt(bodies.volt.position) && this.bridgeLocked) this.complete = true;
     const bobOnPad = (mesh: THREE.Mesh, tolerance: number) => bodies.bob.isSupportedBy(mesh) && Math.abs(bodies.bob.position.z - mesh.position.z) <= tolerance;
     if (this.covers[0]?.deployed && bobOnPad(this.room.bobRoutePlatforms[1]!, 1.5)) this.checkpointTutorialReached = true;

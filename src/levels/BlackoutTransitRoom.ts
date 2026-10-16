@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { AcidSurfaceMaterial } from '../render/environment/containment/AcidSurfaceMaterial.ts';
+import { AcidLiquidInteractions } from '../render/environment/containment/AcidLiquidInteractions.ts';
 import type { BlackoutMaintenanceMaterials } from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import { mapBlackoutBoxUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
 import { borrowBlackoutMaps } from '../render/environment/blackout/BlackoutTransitMaterials.ts';
@@ -103,6 +104,7 @@ type BoxPosition = readonly [number, number, number];
 export class BlackoutTransitRoom {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
+  readonly acidInteractions: AcidLiquidInteractions;
   readonly bobRoutePlatforms: THREE.Mesh[] = [];
   readonly stickyWalls: THREE.Mesh[] = [];
   readonly liftSlots = BLACKOUT_TRANSIT_LIFT_SLOTS.map((slot) => ({
@@ -206,6 +208,8 @@ export class BlackoutTransitRoom {
           object.userData.textureRole !== 'acid-floor' && !object.name.includes('hallway-bulb')) immutable.push(object);
     });
     this.staticVisuals = consolidateStaticRoomVisuals(this.root, immutable);
+    this.acidInteractions = new AcidLiquidInteractions(this.acidMaterial,
+      this.root.getObjectByName('transit-acid-surface') as THREE.Mesh, 3);
   }
 
   acidAt(position: TransitPosition): boolean {
@@ -241,6 +245,7 @@ export class BlackoutTransitRoom {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.acidInteractions.reset();
     this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries = new Set<THREE.BufferGeometry>();
