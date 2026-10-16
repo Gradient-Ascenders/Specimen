@@ -31,6 +31,7 @@ for(const label of labels){
     const duration=intervals.reduce((s,v)=>s+v,0);
     return {pair:run.pair,cache:run.cache,browser:run.browser,environment:run.environment,
       navigationToControlMs:run.navigationToControlMs,startToControlMs:run.startToControlMs,levelTwoLoadMs:run.levelTwoLoadMs,
+      stagedRouteToGameplayMs:run.gameplayStartAt,roomRequestWaitMs:run.rooms.reduce((s,r)=>s+r.waitMs,0),
       preparationMs:prep.ms,queueStartupMs:c.queue.startupMs,
       laterOverlayMs:c.waits.filter(w=>w.owner==='two'&&w.start>=run.levelTwoReadyMs).reduce((s,w)=>s+w.ms,0),roomRequests:run.rooms,
       startupPrograms:startupFrames[0]?.programs,finalPrograms:c.programs.length,uniqueProgramKeys:new Set(c.programs.map(p=>p.key)).size,

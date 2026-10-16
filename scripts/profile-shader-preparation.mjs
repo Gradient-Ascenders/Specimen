@@ -51,6 +51,7 @@ try {
       globalThis.__attachRuntime = (r,name) => {
         name ??= r.authoredRoomOne ? 'three' : 'two'; owner=name;
         const layer=r.renderLayer, renderer=layer.renderer;
+        renderer.__shaderCaptureRuntime=r;
         if(!renderer.__shaderCapture) {
           renderer.__shaderCapture=true;
           const gl=renderer.getContext(), timer=gl.getExtension('EXT_disjoint_timer_query_webgl2');
@@ -72,7 +73,7 @@ try {
           };
           const compile=renderer.compileAsync;
           renderer.compileAsync=function(...args) {
-            const config=r.preparationQueue?.active;
+            const config=this.__shaderCaptureRuntime.preparationQueue?.active;
             const entry={owner,phase,start:performance.now(),objects:args[0].children.length,before:this.info.programs.length,
               configuration:config?{z:config.z,dark:config.dark,visible:config.visible,lightingKey:config.lightingKey}:undefined};
             capture.compiles.push(entry);

@@ -24,12 +24,13 @@ for(const [index,group] of groups.entries()) {
         gel:g.gelRenderingMode,transmission:g.transmissionResolutionScale,pixelRatio:Math.round(g.pixelRatio*1e6)/1e6,
         extensions:[...e.extensions].sort()}));
     }
-    if(runs.some(r=>!Number.isFinite(r.submittedCompileObjects)))throw Error('Regenerate summaries with the current summarizer');
+    if(runs.some(r=>!Number.isFinite(r.submittedCompileObjects)||!Number.isFinite(r.stagedRouteToGameplayMs)))throw Error('Regenerate summaries with the current summarizer');
     const m=fn=>median(runs.map(fn)), g=fn=>median(valid.map(fn));
     byCache[cache]={runs:runs.length,validGameplayRuns:valid.length,
       medianLevelTwoLoadMs:m(r=>r.levelTwoLoadMs),medianLaterOverlayMs:m(r=>r.laterOverlayMs),
       medianTotalLevelTwoWaitMs:m(r=>r.levelTwoLoadMs+r.laterOverlayMs),
       medianNavigationPlusLevelTwoWaitMs:m(r=>r.navigationToControlMs+r.levelTwoLoadMs+r.laterOverlayMs),
+      medianStagedRouteToGameplayMs:m(r=>r.stagedRouteToGameplayMs),medianRoomRequestWaitMs:m(r=>r.roomRequestWaitMs),
       medianNavigationToControlMs:m(r=>r.navigationToControlMs),medianStartToControlMs:m(r=>r.startToControlMs),
       startupPrograms:range(runs.map(r=>r.startupPrograms)),finalPrograms:range(runs.map(r=>r.finalPrograms)),
       medianCompileSubmissions:m(r=>r.compileSubmissions),medianSubmissionCpuMs:m(r=>r.compileSubmissionCpuMs),

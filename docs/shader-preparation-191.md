@@ -1,5 +1,9 @@
 # Shader preparation (#191)
 
+Historical pre-integration report. See [the Standard loading and latest-main
+follow-up](shader-preparation-191-follow-up.md) for subsequent measurements,
+integration, validation and the current review candidate.
+
 Baseline: `0cbd21ade13b5dba584d1858c49db93747a8dadf`.
 Implementation branch: `codex/191-shader-preparation`. No push/PR/merge is part
 of this work. The photographed expected Wits target is an ASUS NUC12WSK-B,
@@ -388,7 +392,8 @@ geometry, textures, uniforms, instance attributes and morph state survive.
 Interleaved preparation preserves pixels, light masks, shadow ownership and
 renderer state synchronously. Resource counts are not VRAM byte measurements.
 
-Production ZIP: `artifacts/specimen-production.zip`, SHA-256
+Historical production ZIP (preserved before the follow-up rebuild):
+`artifacts/specimen-production-191-pre-integration.zip`, SHA-256
 `2BDA7B99525F24983525D33590D9D889231AE7CB8E9B50AF38F714C3E26B2BD7`.
 
 Review evidence is packaged separately as `artifacts/191-review-evidence.zip`.
