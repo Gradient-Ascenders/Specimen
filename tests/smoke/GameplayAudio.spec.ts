@@ -139,3 +139,86 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   expect(unloaded.loops).toBe(0); expect(unloaded.voices).toBe(0);
   expect(unloaded.failed).toEqual([]); expect(errors).toEqual([]);
 });
+
+test('Volt uses selected electrical clips, one quiet power loop and clean disconnect and restart', async ({ page }) => {
+  const errors: string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+  await page.route('**/assets/*.js',async route=>{
+    const response=await route.fetch(); let source=await response.text();
+    source=source.replace(/([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/,
+      '(globalThis.__voltInitial=$1,$1.prepareLightingPrograms()).then(');
+    source=source.replace(/export\{([A-Za-z_$][\w$]*) as BlackoutLevelRuntime\};/,
+      'class AudioBlackout extends $1{constructor(...args){super(...args);globalThis.__voltAudio=this}}export{AudioBlackout as BlackoutLevelRuntime};');
+    await route.fulfill({response,body:source});
+  });
+  await page.goto('./?debug=1',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('[data-action="start"]')).toBeVisible({timeout:180_000});
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
+  await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  await page.evaluate(()=>(window as any).__voltInitial.renderLayer.setAnimationLoop(null));
+  await page.locator('[data-action="start"]').click();
+  await page.keyboard.press('Minus');
+  await expect(page.locator('[data-action="enter-level"]')).toContainText('Enter Level 3',{timeout:180_000});
+  await page.locator('[data-action="enter-level"]').click();
+  await page.waitForFunction(()=>(window as any).__voltAudio?.state==='running',null,{timeout:180_000});
+  await page.evaluate(()=>(window as any).__voltAudio.renderLayer.setAnimationLoop(null));
+  await page.waitForFunction(()=>{
+    const audio=(window as any).__voltAudio.audio;
+    return audio.diagnostics.contextState==='running' && audio.diagnostics.pending===0;
+  });
+  const connected=await page.evaluate(()=>{
+    const rt=(window as any).__voltAudio, r=rt.resources;
+    r.manager.activate('volt');
+    r.group.voltBody.teleport({x:-9,y:0.46,z:48});
+    r.maintenanceBay.receiver.position.x=-9; r.maintenanceBay.receiver.updateWorldMatrix(true,true);
+    rt.renderLayer.cameraRig.copyAimRay=(origin:any,direction:any)=>{
+      origin.copy(r.group.voltBody.position);
+      r.maintenanceBay.target.copySocketWorldPosition(direction).sub(origin).normalize();
+    };
+    rt.gameplayAudio.update();
+    const controls={aimHeld:true,fireHeld:false,firePressed:false,gameplayInputEnabled:true,pointerLocked:true};
+    r.electricalSystem.update(1/60,controls);
+    r.electricalSystem.update(1/60,{...controls,fireHeld:true,firePressed:true});
+    return {target:r.electricalSystem.readModel.connectedTargetId,keys:[...rt.audio.loops.keys()],
+      sounds:[...rt.audio.voices].map((v:any)=>v.sound)};
+  });
+  expect(connected.target).toBe('maintenance-bay-circuit');
+  expect(connected.keys.filter(key=>key==='volt:circuit')).toHaveLength(1);
+  expect(connected.keys.some(key=>key.startsWith('charge:'))).toBe(false);
+  expect(connected.sounds).toContain('volt-shoot-01'); expect(connected.sounds).toContain('volt-circuit-connect-01');
+  await page.waitForFunction(()=>{
+    const rt=(window as any).__voltAudio;
+    return [...rt.audio.voices].some((v:any)=>v.key==='volt:circuit' && v.gain.gain.value>0);
+  });
+  const powered=await page.evaluate(()=>{
+    const rt=(window as any).__voltAudio,r=rt.resources;
+    for(let i=0;i<60;i++)r.maintenanceBay.update(1/60,{bob:r.group.bobBody,goop:r.group.goopBody,volt:r.group.voltBody});
+    const loop=[...rt.audio.voices].find((v:any)=>v.key==='volt:circuit') as any;
+    return {sounds:[...rt.audio.voices].map((v:any)=>v.sound),gain:loop.gain.gain.value,
+      channels:loop.source.buffer.numberOfChannels,loaded:rt.audio.diagnostics.loaded};
+  });
+  expect(powered.loaded).toBe(SOUND_BANKS.blackout.length);
+  expect(powered.sounds.filter(sound=>sound==='volt-charge-ready-01')).toHaveLength(1);
+  expect(powered.gain).toBeLessThan(0.1); expect(powered.channels).toBe(1);
+  await page.keyboard.press('KeyP');
+  await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
+  await page.waitForFunction(()=>(window as any).__voltAudio.audio.diagnostics.contextState==='suspended');
+  await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
+  await page.waitForFunction(()=>(window as any).__voltAudio.audio.diagnostics.contextState==='running');
+  expect(await page.evaluate(()=>[...(window as any).__voltAudio.audio.voices].filter((v:any)=>v.key==='volt:circuit').length)).toBe(1);
+  const disconnected=await page.evaluate(()=>{
+    const rt=(window as any).__voltAudio;
+    rt.resources.electricalSystem.disconnect('intentional');
+    return {keys:[...rt.audio.loops.keys()],sounds:[...rt.audio.voices].map((v:any)=>v.sound)};
+  });
+  expect(disconnected.keys).not.toContain('volt:circuit'); expect(disconnected.sounds).toContain('volt-circuit-release-01');
+  await page.keyboard.press('KeyP');
+  await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
+  expect(await page.evaluate(()=>(window as any).__voltAudio.audio.diagnostics.loops)).toBe(0);
+  await page.evaluate(()=>(window as any).__voltAudio.unload());
+  expect(await page.evaluate(()=>(window as any).__voltAudio.audio.diagnostics.voices)).toBe(0);
+  expect(errors).toEqual([]);
+});

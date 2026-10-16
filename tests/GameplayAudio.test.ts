@@ -64,9 +64,9 @@ const useLegacySpatialApi = (node: Node): number[] => {
   return position;
 };
 
-test('all 32 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 18 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 32);
+  assert.equal(ids.length, 18);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
@@ -87,10 +87,10 @@ test('cached loading, autoplay, keyed loops, pause, position, limits, volume and
     assert.equal(requests,SOUND_BANKS.blackout.length); assert.equal(audio.diagnostics.loaded,SOUND_BANKS.blackout.length);
     audio.setPaused(false);
     audio.play('bob-jump-01'); assert.equal(context.sources.length,0);
-    audio.startLoop('move','volt-movement-loop-01', { x: 1,y: 2,z: 3 });
+    audio.startLoop('move','volt-circuit-hold-loop-01', { x: 1,y: 2,z: 3 });
     audio.unlock(); await Promise.resolve();
     assert.equal(context.sources.length,1);
-    for (let i=0;i<10;i++) audio.startLoop('move','volt-movement-loop-01',{ x: 4,y: 2,z: 3 });
+    for (let i=0;i<10;i++) audio.startLoop('move','volt-circuit-hold-loop-01',{ x: 4,y: 2,z: 3 });
     assert.equal(context.sources.length,1); assert.equal(context.panners[0].positionX.value,4);
     audio.setPaused(true); await Promise.resolve();
     audio.play('bob-jump-01'); assert.equal(context.sources.length,1);
@@ -99,7 +99,7 @@ test('cached loading, autoplay, keyed loops, pause, position, limits, volume and
     audio.play('bob-jump-01');
     assert.equal(context.sources[1].buffer, (audio as any).buffers.get('bob-jump-01'));
     for(let i=0;i<20;i++) { context.currentTime += 0.1; audio.play('bob-jump-01'); }
-    assert.equal(audio.diagnostics.voices,4); // movement + three jump voices
+    assert.equal(audio.diagnostics.voices,4); // power loop + three jump voices
     audio.setVolumes(0,0.25);
     assert.equal((audio as any).master.gain.value,0);
     assert.equal((audio as any).effects.gain.value,0.25);
@@ -107,7 +107,7 @@ test('cached loading, autoplay, keyed loops, pause, position, limits, volume and
     audio.setFocused(true); await Promise.resolve(); assert.equal(context.state,'running');
     audio.stopLoop('move'); audio.stopLoop('move'); assert.equal(audio.diagnostics.loops,0);
     for (const sound of Object.keys(SOUND_DEFINITIONS) as SoundId[]) {
-      if (!SOUND_DEFINITIONS[sound].loop) { context.currentTime += 0.1; audio.play(sound); }
+      if (!SOUND_DEFINITIONS[sound].loop) for(let i=0;i<3;i++) { context.currentTime += 0.1; audio.play(sound); }
     }
     assert.equal(audio.diagnostics.voices,24);
     audio.stopAll(); assert.equal(audio.diagnostics.voices,0);
@@ -179,8 +179,8 @@ test('progression banks deduplicate overlapping loads and unlock, with at most f
     await Promise.all([audio.preload(SOUND_BANKS.cultivation), audio.preload(SOUND_BANKS.containment)]);
     assert.equal(requests.length, SOUND_BANKS.cultivation.length); assert.equal(audio.diagnostics.loaded, SOUND_BANKS.cultivation.length);
     assert.ok(requests.some(url => url.includes('/turrets/')), 'Cultivation combat already has turrets');
-    assert.ok(SOUND_BANKS.cultivation.includes('volt-jump-01'));
-    assert.ok(!SOUND_BANKS.cultivation.includes('volt-aim-enter-01'), 'electrical cues wait for Blackout');
+    assert.ok(SOUND_BANKS.cultivation.includes('bob-jump-01'), 'rescued Volt shares body cues');
+    assert.ok(!SOUND_BANKS.cultivation.some(id=>id.startsWith('volt-')), 'electrical cues wait for Blackout');
     await audio.preload(SOUND_BANKS.blackout);
     assert.equal(requests.length, SOUND_BANKS.blackout.length); assert.equal(new Set(requests).size, SOUND_BANKS.blackout.length);
     assert.equal(contexts, 1); assert.equal(peak, 4);
@@ -278,7 +278,7 @@ test('Volt unlocked later in Cultivation acquires jump and landing audio exactly
     manager.events.emit('registered',{slimeId:'volt'});
     bodies.volt.events.emit('jumped',{chargeFraction:0,speedMetresPerSecond:4,directionWorld:{x:0,y:1,z:0}});
     bodies.volt.events.emit('landed',{impactSpeedMetresPerSecond:9});
-    assert.deepEqual(audio.cues,['volt-jump-01','volt-land-hard-01']);
+    assert.deepEqual(audio.cues,['bob-jump-01','bob-land-hard-01']);
     registered.delete('volt');
     bodies.volt.events.emit('landed',{impactSpeedMetresPerSecond:9});
     assert.equal(audio.cues.length,2);
@@ -394,16 +394,21 @@ test('a real heavy Bob landing and its passive rebound produce one hard-landing 
   } finally { director.dispose(); world.clear(); floor.geometry.dispose(); }
 });
 
-test('merged control clears original-character loops and follows the actual controlled body', () => {
-  const {audio,director,manager}=directorFixture();
+test('merged control clears original-character travel and follows the actual controlled body', () => {
+  const {audio,director,manager,bodies}=directorFixture();
   try {
     manager.activeSlimeId='volt';
     director.setEnabled(true); director.update();
-    assert.ok(audio.loops.has('character:movement'));
+    bodies.volt.locomotionPosition.x+=1.3; director.update();
+    assert.deepEqual(audio.cues,['bob-contact-01']);
+    bodies.volt.locomotionPosition.x+=1.3;
     (director as any).controlledBody=()=>({position:{x:50,y:2,z:20}});
     director.update();
     assert.equal(audio.loops.size,0);
     assert.deepEqual(audio.listener,{x:50,y:2,z:20});
+    assert.deepEqual(audio.cues,['bob-contact-01']);
+    (director as any).controlledBody=()=>manager.activeBody; director.update();
+    assert.equal(audio.cues.length,1, 'merged travel must not leave a stored step');
   } finally {director.dispose();}
 });
 
@@ -487,7 +492,7 @@ test('electrical discharge/connect/power transitions do not retrigger during a h
   try {
     for(let i=0;i<20;i++) volt.update(1/60,controls);
     assert.equal(volt.connected,true);
-    for(const sound of ['volt-shoot-01','volt-electric-impact-01','volt-circuit-connect-01','volt-light-activate-01']) assert.equal(cues.filter(s=>s===sound).length,1);
+    for(const sound of ['volt-shoot-01','volt-circuit-connect-01','volt-charge-ready-01']) assert.equal(cues.filter(s=>s===sound).length,1);
     assert.deepEqual(loops,['volt:circuit']);
     manager.activeSlimeId='bob'; volt.update(1/60,controls); assert.equal(volt.connected,true);
     volt.disconnect('movement'); volt.disconnect('movement');
@@ -525,7 +530,7 @@ test('real jump and floor landing select single cues without duplicate obstacle 
   } finally { director.dispose(); world.clear(); floor.geometry.dispose(); }
 });
 
-test('authored timed light receivers start charging, become ready once and cancel on reset', () => {
+test('timed receivers sound completion once, share tether audio and stay silent on cancelled charging', () => {
   const room=new BlackoutTransitRoom(), world=new CollisionWorld(), surfaces=new SurfaceRegistry();
   world.registerAll(room.collisionMeshes); surfaces.registerAll(room.collisionMeshes);
   const registry=new ElectricalTargetRegistry(world);
@@ -538,11 +543,14 @@ test('authored timed light receivers start charging, become ready once and cance
     const receiver=controller.lights[0]; receiver.target.setConnectionState(true);
     for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(15),goop:fake(18),volt:fake(-16)});
     assert.equal(cues.filter(s=>s==='volt-charge-ready-01').length,1);
-    assert.equal(cues.filter(s=>s==='volt-light-activate-01').length,1);
-    assert.equal(loops.filter(k=>k===`charge:${receiver.target.id}`).length,1);
-    assert.ok(stops.includes(`charge:${receiver.target.id}`));
+    assert.deepEqual(cues,['volt-charge-ready-01']);
+    assert.deepEqual(loops,[], 'charging must not layer another buzz over the tether');
+    assert.deepEqual(stops,[]);
     controller.reset(); receiver.target.setConnectionState(true); controller.reset();
-    assert.equal(stops.filter(k=>k===`charge:${receiver.target.id}`).length,3);
+    assert.deepEqual(cues,['volt-charge-ready-01']);
+    receiver.target.setConnectionState(true);
+    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(15),goop:fake(18),volt:fake(-16)});
+    assert.deepEqual(cues,['volt-charge-ready-01','volt-charge-ready-01']);
   } finally { for(const off of offs)off(); controller.dispose(); registry.dispose(); room.dispose(); world.clear(); surfaces.clear(); }
 });
 
@@ -587,4 +595,57 @@ test('acid pool ambience follows the nearest surface, survives switching and cle
     bodies.goop.position.x=0; director.update(); assert.equal(audio.loops.size,0);
     bodies.goop.position.x=52; director.update(); director.dispose(); assert.equal(audio.loops.size,0);
   } finally { director.dispose(); }
+});
+
+
+test('Volt shares body sounds and resolved-distance contacts, with no idle or movement loops', () => {
+  const {audio,bodies,manager,director}=directorFixture();
+  try {
+    manager.activeSlimeId='volt'; director.setEnabled(true); director.update();
+    bodies.volt.position.x+=10; director.update(); assert.equal(audio.cues.length,0);
+    bodies.volt.locomotionPosition.x+=1.3; director.update();
+    assert.deepEqual(audio.cues,['bob-contact-01']); assert.equal(audio.levels[0],0.35);
+    bodies.volt.velocity.x=0; director.update(); assert.equal(audio.loops.size,0);
+    bodies.volt.events.emit('jumped',{chargeFraction:1,speedMetresPerSecond:8,directionWorld:{x:0,y:1,z:0}});
+    bodies.volt.events.emit('landed',{impactSpeedMetresPerSecond:3});
+    bodies.volt.events.emit('landed',{impactSpeedMetresPerSecond:9});
+    bodies.volt.events.emit('obstacleImpact',{speedMetresPerSecond:4});
+    bodies.volt.events.emit('attached',{}); bodies.volt.events.emit('detached',{lostSupport:false});
+    director.died('volt'); director.update(); director.respawn();
+    assert.deepEqual(audio.cues,['bob-contact-01','bob-jump-01','bob-land-soft-01','bob-land-hard-01','bob-contact-01','bob-fall-01','bob-contact-01']);
+  } finally { director.dispose(); }
+});
+
+test('powered devices reuse a quieter completion cue and gameplay forwards its playback scale', () => {
+  const {audio,director}=directorFixture();
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1));
+  const core=new PoweredDeviceCore({id:'lamp-audio',displayName:'Lamp',hitMeshes:[mesh],audioKind:'light'});
+  try {
+    director.setEnabled(true);
+    core.setConnectionState(true); core.setConnectionState(true);
+    assert.deepEqual(audio.cues,['volt-charge-ready-01']); assert.deepEqual(audio.levels,[0.45]);
+    gameplayAudioEvents.emit('cue',{sound:'volt-charge-ready-01'});
+    assert.deepEqual(audio.levels,[0.45,1]);
+    director.reset(); core.setConnectionState(false); core.setConnectionState(true);
+    assert.equal(audio.cues.length,2, 'restoration must not sound device activation');
+  } finally {core.dispose(); director.dispose(); mesh.geometry.dispose();}
+});
+
+test('sustained power is mixed quietly with one voice, pauses cleanly and stops on disconnect', async () => {
+  const originalFetch=globalThis.fetch, context=new Context();
+  globalThis.fetch=async()=>new Response(new Uint8Array([1]));
+  const audio=new AudioManager('./',()=>context as unknown as AudioContext);
+  try {
+    await audio.preload(['volt-circuit-hold-loop-01','volt-circuit-connect-01']);
+    audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    for(let i=0;i<60;i++) audio.startLoop('volt:circuit','volt-circuit-hold-loop-01');
+    audio.play('volt-circuit-connect-01');
+    const voices=[...(audio as any).voices];
+    const loop=voices.find(v=>v.key==='volt:circuit'), connection=voices.find(v=>!v.key);
+    assert.ok(loop.gain.gain.value < connection.gain.gain.value*0.2, 'power must sit well below the one-shots');
+    assert.equal(context.sources.filter(s=>s.loop).length,1);
+    audio.setPaused(true); await Promise.resolve(); assert.equal(context.state,'suspended');
+    audio.setPaused(false); await Promise.resolve(); assert.equal(context.sources.filter(s=>s.loop).length,1);
+    audio.stopLoop('volt:circuit'); assert.equal(audio.diagnostics.loops,0); assert.equal(loop.source.stopped,true);
+  } finally {audio.dispose(); globalThis.fetch=originalFetch;}
 });

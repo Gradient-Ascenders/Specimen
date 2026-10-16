@@ -14,7 +14,6 @@ export class GameplayAudio {
   private resetting = false;
   private resetGeneration = 0;
   private readonly unsubscribers: (() => void)[] = [];
-  private readonly characterLoops = ['character:movement', 'character:idle'];
   private readonly bodyMotion = { x: 0, y: 0, z: 0 };
   private bodyMotionTracked = false;
   private bodyContactMetres = 0;
@@ -35,8 +34,8 @@ export class GameplayAudio {
     this.acidPools = acidPools;
     this.controlledBody = controlledBody;
     this.unsubscribers.push(
-      gameplayAudioEvents.on('cue', ({ sound, position }) => {
-        if (this.enabled && !this.dead && !this.resetting) audio.play(sound, position);
+      gameplayAudioEvents.on('cue', ({ sound, position, volumeScale }) => {
+        if (this.enabled && !this.dead && !this.resetting) audio.play(sound, position, false, volumeScale);
       }),
       gameplayAudioEvents.on('loop', ({ key, sound, position }) => {
         if (this.enabled && !this.dead && !this.resetting) audio.startLoop(key, sound, position);
@@ -54,15 +53,15 @@ export class GameplayAudio {
       };
       this.unsubscribers.push(
         body.events.on('jumped', ({ chargeFraction }) => {
-          if (id !== 'volt') this.clearBodyTravel();
-          cue(id === 'volt' ? 'volt-jump-01' : id === 'bob' && chargeFraction >= 0.8 ? 'bob-charged-jump-01' : 'bob-jump-01', true);
+          this.clearBodyTravel();
+          cue(id === 'bob' && chargeFraction >= 0.8 ? 'bob-charged-jump-01' : 'bob-jump-01', true);
         }),
         body.events.on('landed', ({ impactSpeedMetresPerSecond: speed }) => {
-          if (id !== 'volt') this.clearBodyTravel();
-          cue(id === 'volt' ? speed >= 8 ? 'volt-land-hard-01' : 'volt-land-01' : speed >= 8 ? 'bob-land-hard-01' : 'bob-land-soft-01', true);
+          this.clearBodyTravel();
+          cue(speed >= 8 ? 'bob-land-hard-01' : 'bob-land-soft-01', true);
         }),
         body.events.on('obstacleImpact', () => {
-          if (id !== 'volt') { this.clearBodyTravel(); cue('bob-contact-01', true, 0.8); }
+          this.clearBodyTravel(); cue('bob-contact-01', true, 0.8);
         }),
       );
       if (id === 'bob') this.unsubscribers.push(
@@ -103,12 +102,7 @@ export class GameplayAudio {
     const normalSpeed = v.x * n.x + v.y * n.y + v.z * n.z;
     const tangentSpeedSquared = Math.max(0, v.x*v.x + v.y*v.y + v.z*v.z - normalSpeed*normalSpeed);
     const moving = body.grounded && tangentSpeedSquared > 0.04;
-    if (moving && id === 'volt') this.audio.startLoop('character:movement', 'volt-movement-loop-01', body.position);
-    else this.audio.stopLoop('character:movement');
-    if (id !== 'volt') this.updateBodyMovement(body, moving);
-    if (!moving && body.grounded && id === 'volt')
-      this.audio.startLoop('character:idle', 'volt-idle-sparks-loop-01', body.position);
-    else this.audio.stopLoop('character:idle');
+    this.updateBodyMovement(body, moving);
   }
 
   private updateBodyMovement(body: KinematicBody, moving: boolean): void {
@@ -159,7 +153,7 @@ export class GameplayAudio {
 
   died(id: string | undefined): void {
     this.reset();
-    if ((id === 'bob' || id === 'goop') && this.enabled) this.audio.play('bob-fall-01', this.manager.getBody(id)?.position);
+    if ((id === 'bob' || id === 'goop' || id === 'volt') && this.enabled) this.audio.play('bob-fall-01', this.manager.getBody(id)?.position);
     // Allow the death one-shot to finish; reject further world events.
     this.dead = true;
   }
@@ -169,11 +163,9 @@ export class GameplayAudio {
     this.resetting = false;
     this.setEnabled(true);
     const id = this.manager.activeSlimeId;
-    if (id === 'bob' || id === 'goop') this.audio.play('bob-contact-01', this.manager.activeBody?.position, false, 0.8);
-    else if (id === 'volt') this.audio.play('volt-respawn-01', this.manager.activeBody?.position);
+    if (id === 'bob' || id === 'goop' || id === 'volt') this.audio.play('bob-contact-01', this.manager.activeBody?.position, false, 0.8);
   }
   private clearCharacter(): void {
-    for (const key of this.characterLoops) this.audio.stopLoop(key);
     this.clearBodyTravel();
   }
   reset(): void {
