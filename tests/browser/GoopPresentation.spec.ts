@@ -7,6 +7,7 @@ import { expect, test } from './fixtures.ts';
 test.use({ video: 'on' });
 test('authored Goop owns reveal, normal play, independent death and all-level recovery', async ({ page }) => {
   test.setTimeout(1_800_000);
+  page.setDefaultTimeout(30_000);
   const recordingStartedAt = Date.now();
   const directory = resolve('artifacts/evidence/goop');
   await mkdir(directory, { recursive: true });
@@ -22,8 +23,8 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
   await page.route('**/assets/*.js', async route => {
     const response = await route.fetch();
     let body = await response.text();
-    body = body.replace(/([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/,
-      '(globalThis.__goopContainment=$1,$1.prepareLightingPrograms()).then(');
+    body = body.replace(/\{initialRuntime:([A-Za-z_$][\w$]*)/,
+      '{initialRuntime:globalThis.__goopContainment=$1');
     body = body.replace(/return new ([A-Za-z_$][\w$]*)\.CultivationLevelRuntime\(/,
       'return globalThis.__goopCultivation=new $1.CultivationLevelRuntime(');
     const blackout = body.match(/export\{([A-Za-z_$][\w$]*) as BlackoutLevelRuntime\};/);
@@ -61,6 +62,24 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-action="start"]').click();
   await page.waitForFunction(() => (window as any).__goopContainment?.state === 'running', null, { timeout: 180_000 });
+  const firstGoopDraw = await page.evaluate(() => {
+    const rt = (window as any).__goopContainment, r = rt.resources;
+    if (r.slimeManager.isAvailable('goop')) throw new Error('Goop must start locked');
+    // Stage the post-rescue roster for isolated presentation checks. Actual
+    // locked-to-release progression remains covered by production smoke.
+    const layer = rt.renderLayer, renderer = layer.renderer, gl = renderer.getContext();
+    const before = renderer.info.programs.length, inspect = gl.getProgramInfoLog;
+    let inspections = 0;
+    gl.getProgramInfoLog = function(...args: any[]) { inspections++; return inspect.apply(this, args); };
+    try {
+      r.slimeManager.unlock('goop');
+      r.slimePair.captureCurrentRecoveryState();
+      rt.render(1, { fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 0, frameDeltaSeconds: 0,
+        stepsThisFrame: 0, interpolationAlpha: 1, droppedSimulationTimeSeconds: 0, renderFps: 60 });
+      return { newPrograms: renderer.info.programs.length - before, inspections };
+    } finally { gl.getProgramInfoLog = inspect; }
+  });
+  expect(firstGoopDraw).toEqual({ newPrograms: 0, inspections: 0 });
   const initial = await sample('__goopContainment', 'containment-cold');
   expect(initial.goop.asset).toEqual({ bodyTriangles: 26804, eyeTriangles: 6912, drawCalls: 3, geometries: 3, materials: 2 });
   expect(initial.goop.materials.selfLit).toBe(false);
@@ -91,6 +110,12 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
   await page.keyboard.press('Space'); await frames(5);
   await sample('__goopContainment', 'normal-jump');
   await screenshot('normal-jump');
+  // Aim is a browser-input assertion: require the canvas to own pointer lock
+  // after the camera screenshots before sending the actual mouse gesture.
+  if (!await page.evaluate(() => document.pointerLockElement?.tagName === 'CANVAS')) {
+    await page.locator('canvas').click();
+    await page.waitForFunction(() => document.pointerLockElement?.tagName === 'CANVAS');
+  }
   await page.mouse.down({ button: 'right' });
   await page.waitForFunction(() => (window as any).__goopContainment.resources.acidProjectileSystem.aimReadModel.active);
   await frames();
@@ -112,7 +137,7 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
   const bobBefore = faded.bobPosition;
   expect(await page.evaluate(() => {
     const rt = (window as any).__goopContainment;
-    return rt.requestPlayerDeath(() => rt.resources.slimePair.restoreInitialState(), rt.resources);
+    return rt.requestPlayerDeath(() => rt.resources.slimePair.restoreRecoveryState(), rt.resources);
   })).toBe(true);
   await page.waitForFunction(() => !(window as any).__goopContainment.resources.testScene.goop.diagnostics.visible);
   const death = await sample('__goopContainment', 'containment-death');
@@ -127,7 +152,7 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
   await page.evaluate(() => {
     const rt = (window as any).__goopContainment;
     rt.switchActiveSlime(rt.resources);
-    rt.requestPlayerDeath(() => rt.resources.slimePair.restoreInitialState(), rt.resources);
+    rt.requestPlayerDeath(() => rt.resources.slimePair.restoreRecoveryState(), rt.resources);
   });
   await expect(page.locator('.death-retry')).toBeVisible({ timeout: 30_000 });
   await page.locator('.death-retry').click(); await frames();

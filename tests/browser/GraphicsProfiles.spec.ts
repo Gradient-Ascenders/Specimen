@@ -34,6 +34,9 @@ async function boot(page: Page, url = '/?debug=1'): Promise<void> {
 }
 
 async function draw(page: Page): Promise<any> {
+  // Shader-affecting settings now complete behind the production readiness gate.
+  // Inspect the requested profile only after its material mutation is applied.
+  await expect(page.locator('[data-graphics-preparation]')).toBeHidden({ timeout: 240_000 });
   return page.evaluate(() => {
     const rt = (window as any).__graphicsSession.runtime, layer = rt.renderLayer;
     rt.render(1, { fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 0, frameDeltaSeconds: 0,
@@ -76,6 +79,7 @@ async function settings(page: Page): Promise<void> {
 }
 
 async function resume(page: Page): Promise<void> {
+  await expect(page.locator('[data-graphics-preparation]')).toBeHidden({ timeout: 240_000 });
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
 }
@@ -137,10 +141,13 @@ test('profiles bound high-DPI/resize work, retain native HUD and survive all lev
   const cdp = await context.newCDPSession(page);
   for (const deviceScaleFactor of [2, 1.25, 1]) {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor, mobile: false });
-    await page.waitForFunction(dpr => window.devicePixelRatio === dpr, deviceScaleFactor);
+    // Native Edge can expose DPR 1 as 1.0000000149011612. Wait for the
+    // emulated density within its numeric precision, with a bounded timeout.
+    await page.waitForFunction(dpr => Math.abs(window.devicePixelRatio - dpr) < 1e-6,
+      deviceScaleFactor, { timeout: 10_000 });
     await page.evaluate(() => new Promise(requestAnimationFrame));
     const row = await draw(page); rows.push({ phase: 'dpi-change', ...row }); assertBudget(row);
-    expect(row.diagnostics.devicePixelRatio).toBe(deviceScaleFactor);
+    expect(row.diagnostics.devicePixelRatio).toBeCloseTo(deviceScaleFactor, 6);
     await expect(page.locator('[data-graphics-diagnostics]')).toContainText(`display DPR ${deviceScaleFactor.toFixed(2)}`);
   }
   await cdp.send('Emulation.clearDeviceMetricsOverride'); await cdp.detach();
@@ -223,6 +230,12 @@ test('one-pixel-wide transmissive viewports keep complete physical framebuffers 
   const rows: any[] = [];
   for (const viewport of [{ width: 1, height: 360 }, { width: 640, height: 1 }, { width: 1, height: 1 }]) {
     await page.setViewportSize(viewport);
+    // Native headed browsers can round a one-pixel emulated window up. Pin
+    // the actual render host so this remains a one-CSS-pixel framebuffer test.
+    await page.evaluate(({ width, height }) => {
+      const host = document.getElementById('app')!;
+      host.style.width = `${width}px`; host.style.height = `${height}px`;
+    }, viewport);
     for (const [gelRenderingMode, graphicsPreset] of [
       ['reduced-transmission', 'normal'], ['physical', 'normal'],
       ['minimum', 'normal'], ['physical', 'performance'],
@@ -246,13 +259,15 @@ test('one-pixel-wide transmissive viewports keep complete physical framebuffers 
             stepsThisFrame: 0, interpolationAlpha: 1, droppedSimulationTimeSeconds: 0, renderFps: 60 });
           return { diagnostics: layer.getGraphicsDiagnostics(), targets, glError: gl.getError(),
             canvas: [layer.canvas.width, layer.canvas.height],
-            css: [layer.canvas.clientWidth, layer.canvas.clientHeight], aspect: layer.cameraRig.camera.aspect };
+            css: [layer.canvas.clientWidth, layer.canvas.clientHeight], aspect: layer.cameraRig.camera.aspect,
+            layout: { inner: [innerWidth,innerHeight], host: [layer.canvas.parentElement!.clientWidth,layer.canvas.parentElement!.clientHeight],
+              canvasWidth: getComputedStyle(layer.canvas).width, hostWidth: getComputedStyle(layer.canvas.parentElement!).width } };
         } finally { renderer.setRenderTarget = original; }
       }, { gelRenderingMode, graphicsPreset });
       rows.push(row);
       const d = row.diagnostics, minimum = Math.ceil(1 / d.transmissionResolutionScale);
       expect(row.glError).toBe(0);
-      expect(row.css).toEqual([viewport.width, viewport.height]);
+      expect(row.css, JSON.stringify(row)).toEqual([viewport.width, viewport.height]);
       expect(row.aspect).toBeCloseTo(viewport.width / viewport.height, 6);
       expect(row.canvas).toEqual([d.drawingBufferWidth, d.drawingBufferHeight]);
       expect(Math.min(...row.canvas)).toBe(minimum);
@@ -282,6 +297,13 @@ test('report real buffer/profile differences separately from shader performance'
     const page = await context.newPage();
     try {
       await boot(page, new URL('?debug=1', build.url).href);
+      await page.evaluate(() => {
+        const rig = (window as any).__graphicsSession.runtime.renderLayer.cameraRig;
+        rig.update(1, 0);
+        // This is explicitly a fixed-camera buffer/quality comparison. Settings
+        // preparation may render; those draws must retain the reference pose.
+        rig.update = () => {};
+      });
       for (const profile of build.name === 'candidate' ? ['minimum', 'standard', 'minimum', 'standard'] : ['legacy-default']) {
         if (profile !== 'legacy-default') {
           await settings(page); await page.locator('[data-setting="graphics-profile"]').selectOption(profile); await resume(page);

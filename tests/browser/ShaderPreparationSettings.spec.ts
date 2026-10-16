@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures.ts';
+import { writeFile } from 'node:fs/promises';
 
 test('all levels retain first-use coverage through graphics cycles, fades, switching and restart', async ({page}, info) => {
   test.setTimeout(900_000);
@@ -77,6 +78,8 @@ test('all levels retain first-use coverage through graphics cycles, fades, switc
       await page.locator('[data-action="enter-level"]').click({timeout:240_000});
     }
   }
-  await info.attach('graphics-cycles',{body:JSON.stringify(evidence,null,2),contentType:'application/json'});
+  const evidencePath=info.outputPath('graphics-cycles.json');
+  await writeFile(evidencePath,JSON.stringify(evidence,null,2));
+  await info.attach('graphics-cycles',{path:evidencePath,contentType:'application/json'});
   expect(errors).toEqual([]);
 });

@@ -10,10 +10,10 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   // replacing gameplay or audio code. Plain production smoke remains separate.
   await page.route('**/assets/index-*.js', async route => {
     const response = await route.fetch(), source = await response.text();
-    const pattern = /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
+    const pattern = /\{initialRuntime:/;
     expect(source).toMatch(pattern);
     await route.fulfill({ response, body: source.replace(pattern,
-      '(globalThis.__audioRuntime=$1,$1.prepareLightingPrograms()).then(') });
+      '{initialRuntime:globalThis.__audioRuntime=') });
   });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });

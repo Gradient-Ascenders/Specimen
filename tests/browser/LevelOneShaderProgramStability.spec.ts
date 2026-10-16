@@ -47,7 +47,12 @@ interface ProductionTraversalRuntime {
     };
     readonly slimePair: {
       readonly activeBody: unknown;
+      readonly activeSlimeId: 'bob' | 'goop';
       switchActive(): boolean;
+    };
+    readonly slimeManager: {
+      isAvailable(id: 'goop'): boolean;
+      unlock(id: 'goop'): boolean;
     };
     readonly containmentLevel: {
       setActiveBody(body: unknown): void;
@@ -168,7 +173,7 @@ const exposeProductionTraversalRuntime = async (
     const response = await route.fetch();
     const body = await response.text();
     const prewarmCall =
-      /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
+      /\{initialRuntime:([A-Za-z_$][\w$]*)/;
     const match = body.match(prewarmCall);
     if (!match?.[1]) {
       await route.fulfill({ response, body });
@@ -178,7 +183,7 @@ const exposeProductionTraversalRuntime = async (
     const runtimeIdentifier = match[1];
     const instrumentedBody = body.replace(
       prewarmCall,
-      `(globalThis.__specimenProductionTraversalRuntime=${runtimeIdentifier},${runtimeIdentifier}.prepareLightingPrograms()).then(`,
+      `{initialRuntime:globalThis.__specimenProductionTraversalRuntime=${runtimeIdentifier}`,
     );
     injectedBundleCount += 1;
     await route.fulfill({ response, body: instrumentedBody });
@@ -249,7 +254,8 @@ const sweepCamera = async (page: Page): Promise<void> => {
   );
   if (!pointerLocked) {
     await canvas.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
-    await page.waitForFunction(() => document.pointerLockElement?.tagName === 'CANVAS');
+    await page.waitForFunction(() => document.pointerLockElement?.tagName === 'CANVAS',
+      null, { timeout: 10_000 });
   }
   await page.evaluate(() => {
     for (const [movementX, movementY] of [[180, -80], [-360, 160], [180, -80]]) {
@@ -353,6 +359,8 @@ const traverseRepresentativeLevelOnePaths = async (
   page: Page,
   assertProgramsStable: AssertProgramsStable,
 ): Promise<void> => {
+  expect(await page.evaluate(() => (window as any).__specimenProductionTraversalRuntime
+    .resources.slimeManager.isAvailable('goop'))).toBe(false);
   await visitRoom(page, 1);
   await sweepCamera(page);
   await page.keyboard.down('w');
@@ -366,8 +374,16 @@ const traverseRepresentativeLevelOnePaths = async (
   await visitRoom(page, 2);
   await sweepCamera(page);
   await assertProgramsStable('Room 2 camera sweep');
+  // This shader fixture stages a post-rescue roster before testing Goop's
+  // otherwise locked acid variants. Authored rescue is covered by smoke.
+  await page.evaluate(() => (window as any).__specimenProductionTraversalRuntime
+    .resources.slimeManager.unlock('goop'));
   await page.keyboard.press('Tab');
-  await waitForRenderedFrames(page);
+  await page.waitForFunction(() => (window as any).__specimenProductionTraversalRuntime
+    .resources.slimePair.activeSlimeId === 'goop', null, { timeout: 10_000 });
+  // Room teleports move only the authoritative active body. Place Goop at the
+  // Room 2 checkpoint too, rather than firing from his separate initial body.
+  await visitRoom(page, 2);
   await assertProgramsStable('Room 2 Goop switch');
   const acidBefore = await readAcidPresentationSample(page);
   await sweepCamera(page);
@@ -420,8 +436,12 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   page,
 }) => {
   test.setTimeout(600_000);
+  const assertExposed = await exposeProductionTraversalRuntime(page);
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
+  assertExposed();
   await expect(page.locator(GUARD_SELECTOR)).toBeVisible({ timeout: 120_000 });
+  // The guard is armed when prepared gameplay takes ownership from the title.
+  await page.locator('[data-action="start"]').click({ timeout: 180_000 });
   await expect.poll(
     async () => (await page.locator(GUARD_SELECTOR).textContent()) ?? '',
     { timeout: 120_000, message: 'Waiting for Level 1 hidden-boot warm-up' },
@@ -439,7 +459,6 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
     baseline,
   );
 
-  await page.locator('[data-action="start"]').click();
   await waitForRenderedFrames(page);
   await readStableGuard(page, 'gameplay start', baseline);
 
