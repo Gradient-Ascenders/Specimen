@@ -43,6 +43,7 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   expect(new Set(audioRequests).size).toBe(SOUND_BANKS.blackout.length);
   expect(new Set(audioRequests.filter(url => url.includes('/bob/'))).size).toBe(7);
   expect(new Set(audioRequests.filter(url => url.includes('/goop/'))).size).toBe(5);
+  expect(new Set(audioRequests.filter(url => url.includes('/world/'))).size).toBe(6);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
@@ -134,6 +135,26 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   await step(1);
   expect(await page.evaluate(() => [...(window as any).__audioRuntime.audio.voices]
     .some((voice: any) => voice.sound === 'bob-contact-01'))).toBe(true);
+  const worldSounds=await page.evaluate(()=>{
+    const rt=(window as any).__audioRuntime,r=rt.resources,room=r.testScene.roomThree;
+    room.root.visible=true;room.lasers.root.visible=true;
+    const laser=room.lasers.hazards.find((h:any)=>h.enabled);
+    r.body.teleport({x:(laser.start.x+laser.end.x)/2,y:(laser.start.y+laser.end.y)/2+1,z:(laser.start.z+laser.end.z)/2});
+    rt.gameplayAudio.update();
+    const humming=[...rt.audio.voices].filter((v:any)=>v.sound==='world-laser-loop-01').map((v:any)=>({channels:v.source.buffer.numberOfChannels,loop:v.source.loop}));
+    for(const hazard of room.lasers.hazards)hazard.setCircuitGateEnabled(false);
+    rt.gameplayAudio.update();
+    const laserStopped=![...rt.audio.voices].some((v:any)=>v.sound==='world-laser-loop-01');
+    const platform=r.testScene.roomFour.elevatorPlatform;
+    r.testScene.roomFour.root.visible=true;
+    r.body.teleport({x:platform.position.x,y:platform.position.y+1,z:platform.position.z});
+    platform.setActive(true);platform.update(.1);rt.gameplayAudio.update();
+    const moving=[...rt.audio.voices].some((v:any)=>v.sound==='world-machinery-loop-01');
+    platform.hold();rt.gameplayAudio.update();
+    const heldSilent=![...rt.audio.voices].some((v:any)=>v.sound==='world-machinery-loop-01');
+    return {humming,laserStopped,moving,heldSilent};
+  });
+  expect(worldSounds).toEqual({humming:[{channels:1,loop:true}],laserStopped:true,moving:true,heldSilent:true});
   await page.evaluate(() => (window as any).__audioRuntime.unload());
   const unloaded=await page.evaluate(()=>(window as any).__audioRuntime.audio.diagnostics);
   expect(unloaded.loops).toBe(0); expect(unloaded.voices).toBe(0);
@@ -196,6 +217,7 @@ test('Volt uses selected electrical clips, one quiet power loop and clean discon
   const powered=await page.evaluate(()=>{
     const rt=(window as any).__voltAudio,r=rt.resources;
     for(let i=0;i<60;i++)r.maintenanceBay.update(1/60,{bob:r.group.bobBody,goop:r.group.goopBody,volt:r.group.voltBody});
+    r.group.bobBody.teleport({x:6,y:.46,z:52});r.manager.activate('bob');rt.gameplayAudio.update();
     const loop=[...rt.audio.voices].find((v:any)=>v.key==='volt:circuit') as any;
     return {sounds:[...rt.audio.voices].map((v:any)=>v.sound),gain:loop.gain.gain.value,
       channels:loop.source.buffer.numberOfChannels,loaded:rt.audio.diagnostics.loaded};
@@ -203,6 +225,13 @@ test('Volt uses selected electrical clips, one quiet power loop and clean discon
   expect(powered.loaded).toBe(SOUND_BANKS.blackout.length);
   expect(powered.sounds.filter(sound=>sound==='volt-charge-ready-01')).toHaveLength(1);
   expect(powered.gain).toBeLessThan(0.1); expect(powered.channels).toBe(1);
+  expect(powered.sounds).toContain('world-door-movement-loop-01');
+  const arrived=await page.evaluate(()=>{
+    const rt=(window as any).__voltAudio;
+    rt.resources.maintenanceBay.door.update(1,[]);rt.gameplayAudio.update();
+    return [...rt.audio.voices].map((v:any)=>v.sound);
+  });
+  expect(arrived).not.toContain('world-door-movement-loop-01');expect(arrived).toContain('world-door-stop-01');
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.waitForFunction(()=>(window as any).__voltAudio.audio.diagnostics.contextState==='suspended');

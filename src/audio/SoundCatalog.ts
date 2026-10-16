@@ -17,6 +17,12 @@ export const SOUND_DEFINITIONS = {
   'volt-circuit-hold-loop-01': { path: 'assets/audio/volt/volt-circuit-hold-loop-01.ogg', loop: true, volume: 0.055, maxVoices: 1 },
   'volt-circuit-release-01': { path: 'assets/audio/volt/volt-circuit-release-01.ogg', loop: false, volume: 0.38, maxVoices: 3 },
   'volt-shoot-01': { path: 'assets/audio/volt/volt-shoot-01.ogg', loop: false, volume: 0.5, maxVoices: 3 },
+  'world-door-movement-loop-01': { path: 'assets/audio/world/world-door-movement-loop-01.ogg', loop: true, volume: 0.14, maxVoices: 2 },
+  'world-door-stop-01': { path: 'assets/audio/world/world-door-stop-01.ogg', loop: false, volume: 0.38, maxVoices: 3 },
+  'world-machinery-loop-01': { path: 'assets/audio/world/world-machinery-loop-01.ogg', loop: true, volume: 0.09, maxVoices: 2 },
+  'world-laser-loop-01': { path: 'assets/audio/world/world-laser-loop-01.ogg', loop: true, volume: 0.065, maxVoices: 1 },
+  'world-activation-01': { path: 'assets/audio/world/world-activation-01.ogg', loop: false, volume: 0.45, maxVoices: 3 },
+  'world-release-01': { path: 'assets/audio/world/world-release-01.ogg', loop: false, volume: 0.27, maxVoices: 3 },
   'specimen-turret-shot': { path: 'assets/audio/turrets/specimen-turret-shot.ogg', loop: false, volume: 0.65, maxVoices: 3 },
 } as const;
 export type SoundId = keyof typeof SOUND_DEFINITIONS;
@@ -24,7 +30,7 @@ const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
 // Rescued Volt uses shared body cues in Cultivation; electrical effects wait for L3.
 /** Cumulative banks start warming ahead of each level's visual preparation. */
 export const SOUND_BANKS = {
-  containment: ALL_SOUND_IDS.filter(id => id.startsWith('bob-') || id.startsWith('goop-')),
+  containment: ALL_SOUND_IDS.filter(id => id.startsWith('bob-') || id.startsWith('goop-') || id.startsWith('world-')),
   cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-')),
   blackout: ALL_SOUND_IDS,
 } as const;

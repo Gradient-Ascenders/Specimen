@@ -160,5 +160,59 @@
     "channels": 1,
     "peak": 0.72509,
     "loop": false
+  },
+  {
+    "id": "world-activation-01",
+    "path": "assets/audio/world/world-activation-01.ogg",
+    "durationSeconds": 0.27,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.42868,
+    "loop": false
+  },
+  {
+    "id": "world-door-movement-loop-01",
+    "path": "assets/audio/world/world-door-movement-loop-01.ogg",
+    "durationSeconds": 0.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.12755,
+    "loop": true
+  },
+  {
+    "id": "world-door-stop-01",
+    "path": "assets/audio/world/world-door-stop-01.ogg",
+    "durationSeconds": 1.1,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.61441,
+    "loop": false
+  },
+  {
+    "id": "world-laser-loop-01",
+    "path": "assets/audio/world/world-laser-loop-01.ogg",
+    "durationSeconds": 3.88,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.10009,
+    "loop": true
+  },
+  {
+    "id": "world-machinery-loop-01",
+    "path": "assets/audio/world/world-machinery-loop-01.ogg",
+    "durationSeconds": 3.88,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.21094,
+    "loop": true
+  },
+  {
+    "id": "world-release-01",
+    "path": "assets/audio/world/world-release-01.ogg",
+    "durationSeconds": 0.32,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.48068,
+    "loop": false
   }
 ]

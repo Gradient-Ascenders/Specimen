@@ -1,3 +1,4 @@
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
 
 import type { SerializableValue } from '../levels/BlackoutRuntimeState.ts';
@@ -600,6 +601,7 @@ export class RotatingBridgeDevice implements ElectricalDevice {
   private progressValue = 0;
   private mechanicalPermission: boolean;
   private disposed = false;
+  private readonly worldAudio: WorldAudioSource;
 
   constructor(options: RotatingBridgeOptions) {
     if (
@@ -665,6 +667,7 @@ export class RotatingBridgeDevice implements ElectricalDevice {
       powerMode: options.powerMode,
       initialLatched: options.initialLatched,
     });
+    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue, settled: () => this.progressValue === 0 || this.progressValue === 1 });
   }
 
   get progress(): number {
@@ -700,6 +703,7 @@ export class RotatingBridgeDevice implements ElectricalDevice {
     );
     this.applyProgress();
     this.core.setBlocked(false);
+    this.worldAudio.reset();
   }
 
   reset(): void {
@@ -708,6 +712,7 @@ export class RotatingBridgeDevice implements ElectricalDevice {
     this.mechanicalPermission = this.initialMechanicalPermission;
     this.applyProgress();
     this.core.setBlocked(false);
+    this.worldAudio.reset();
   }
 
   updateMechanics(
@@ -768,6 +773,7 @@ export class RotatingBridgeDevice implements ElectricalDevice {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.worldAudio.dispose();
     this.core.dispose();
     this.collisionWorld.unregister(this.collisionMesh);
     this.surfaceRegistry.unregister(this.collisionMesh);

@@ -1406,7 +1406,7 @@ export class CultivationLevelRuntime {
         unsubscribeManager,
       };
       if (this.audio) {
-        const gameplayAudio = new GameplayAudio(this.audio, manager, authoredPreview?.acidInteractions.map(pool => pool.surfaceBounds) ?? []);
+        const gameplayAudio = new GameplayAudio(this.audio, manager, authoredPreview?.acidInteractions.map(pool => pool.surfaceBounds) ?? [], undefined, this.renderLayer.scene);
         this.gameplayAudio = gameplayAudio;
         rollback(() => {
           gameplayAudio.dispose();

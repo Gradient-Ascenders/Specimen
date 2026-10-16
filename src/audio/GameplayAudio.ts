@@ -1,3 +1,5 @@
+import type { Object3D } from 'three';
+import { WorldAudio } from './WorldAudio.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { SlimeManager } from '../slimes/SlimeManager.ts';
 import type { AudioPlayback } from './AudioManager.ts';
@@ -17,6 +19,7 @@ export class GameplayAudio {
   private readonly bodyMotion = { x: 0, y: 0, z: 0 };
   private bodyMotionTracked = false;
   private bodyContactMetres = 0;
+  private readonly worldAudio: WorldAudio | undefined;
   private readonly audio: AudioPlayback;
   private readonly manager: SlimeManager<KinematicBody>;
   private readonly acidPools: readonly AcidPoolBounds[];
@@ -28,13 +31,18 @@ export class GameplayAudio {
     manager: SlimeManager<KinematicBody>,
     acidPools: readonly AcidPoolBounds[] = [],
     controlledBody: () => KinematicBody | undefined = () => manager.activeBody,
+    worldRoot?: Object3D,
   ) {
     this.audio = audio;
     this.manager = manager;
     this.acidPools = acidPools;
     this.controlledBody = controlledBody;
+    this.worldAudio = worldRoot ? new WorldAudio(audio, worldRoot) : undefined;
     this.unsubscribers.push(
-      gameplayAudioEvents.on('cue', ({ sound, position, volumeScale }) => {
+      gameplayAudioEvents.on('cue', ({ sound, position, volumeScale, maxDistance }) => {
+        const listener = this.controlledBody()?.position;
+        if (maxDistance !== undefined && position && (!listener ||
+          (position.x-listener.x)**2 + (position.y-listener.y)**2 + (position.z-listener.z)**2 > maxDistance**2)) return;
         if (this.enabled && !this.dead && !this.resetting) audio.play(sound, position, false, volumeScale);
       }),
       gameplayAudioEvents.on('loop', ({ key, sound, position }) => {
@@ -96,6 +104,7 @@ export class GameplayAudio {
     const controlled = this.controlledBody();
     if (controlled) this.audio.setListener(controlled.position);
     this.updateAcidPools(controlled?.position);
+    this.worldAudio?.update(controlled?.position);
     if (controlled !== body) { this.clearCharacter(); return; }
     if (!body || (id !== 'bob' && id !== 'goop' && id !== 'volt')) { this.clearCharacter(); return; }
     const v = body.velocity, n = body.groundNormal;
@@ -172,6 +181,7 @@ export class GameplayAudio {
     this.dead = false;
     this.resetting = true;
     this.clearCharacter();
+    this.worldAudio?.reset();
     this.audio.stopAll();
     const generation = ++this.resetGeneration;
     queueMicrotask(() => {
@@ -182,5 +192,6 @@ export class GameplayAudio {
     this.enabled = false;
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.reset();
+    this.worldAudio?.dispose();
   }
 }

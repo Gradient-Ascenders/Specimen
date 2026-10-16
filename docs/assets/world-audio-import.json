@@ -1,0 +1,79 @@
+{
+  "archive": "assets/audio/world/world-interaction-sounds.tar",
+  "archiveSha256": "98299cfa6c423c3f23e1bfb579d04b8bab1874262797a954304a2b524ab1775c",
+  "processing": "Stereo average to mono, DC removal, documented trims, circular overlaps for loops; gain only, 2 ms one-shot edge fades, OGG Vorbis.",
+  "clips": [
+    {
+      "id": "world-door-movement-loop-01",
+      "source": "door-movement.wav",
+      "sourceSha256": "2daf948347d47a5c277f6a6f7b22d1480a6ee510b9e9b94b37ca6417d4a19eb8",
+      "sourceDurationSeconds": 2.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 1.12,
+      "circularOverlapSeconds": 0.08,
+      "gain": 0.293467,
+      "rms": 0.034773
+    },
+    {
+      "id": "world-door-stop-01",
+      "source": "door-movement.wav",
+      "sourceSha256": "2daf948347d47a5c277f6a6f7b22d1480a6ee510b9e9b94b37ca6417d4a19eb8",
+      "sourceDurationSeconds": 2.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.9,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 0.800167,
+      "rms": 0.06452
+    },
+    {
+      "id": "world-machinery-loop-01",
+      "source": "machinery-loop.wav",
+      "sourceSha256": "4d68a04d355a3e4409fd4ce70ba2fc49995aaba97d81b656b4970af7393d1c56",
+      "sourceDurationSeconds": 4.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0.12,
+      "gain": 0.207163,
+      "rms": 0.034571
+    },
+    {
+      "id": "world-laser-loop-01",
+      "source": "laser-hum-loop.wav",
+      "sourceSha256": "bc6ddfc4cbc950850d734322974dc294d11edd96990a0a62be515ced4c35d445",
+      "sourceDurationSeconds": 4.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0.12,
+      "gain": 0.108684,
+      "rms": 0.035183
+    },
+    {
+      "id": "world-activation-01",
+      "source": "mechanical-activation.wav",
+      "sourceSha256": "422219557d0432f94fe4e0f56a21bdf0c1adf3f9c34960949e152fa3cab8d1ed",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.16,
+      "trimEndSeconds": 0.57,
+      "circularOverlapSeconds": 0,
+      "gain": 0.369375,
+      "rms": 0.061076
+    },
+    {
+      "id": "world-release-01",
+      "source": "mechanical-activation.wav",
+      "sourceSha256": "422219557d0432f94fe4e0f56a21bdf0c1adf3f9c34960949e152fa3cab8d1ed",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.53,
+      "trimEndSeconds": 0.15,
+      "circularOverlapSeconds": 0,
+      "gain": 0.518254,
+      "rms": 0.062954
+    }
+  ]
+}

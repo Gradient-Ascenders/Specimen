@@ -29,6 +29,7 @@ export class PressurePlate {
   private readonly requiredOccupants: number;
   private readonly unsubscribe: () => void;
   private pressed = false;
+  private resetting = false;
 
   constructor(options: PressurePlateOptions) {
     this.root.name = `${options.id}-pressure-plate`;
@@ -76,7 +77,8 @@ export class PressurePlate {
   }
 
   reset(): void {
-    this.trigger.clear();
+    this.resetting = true;
+    try { this.trigger.clear(); } finally { this.resetting = false; }
   }
 
   dispose(): void {
@@ -94,6 +96,10 @@ export class PressurePlate {
     this.top.material.color.setHex(pressed ? 0x88e6a1 : 0xd8b34a);
     this.top.material.emissive.setHex(pressed ? 0x12552a : 0x4a3003);
     if (pressed && this.trigger.occupants.has('goop')) gameplayAudioEvents.emit('cue', { sound: 'bob-contact-01', position: this.root.getWorldPosition(new THREE.Vector3()) });
+    if (!this.resetting) gameplayAudioEvents.emit('cue', {
+      sound: pressed ? 'world-activation-01' : 'world-release-01',
+      position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 16,
+    });
     this.events.emit('changed', { plate: this, pressed });
   }
 

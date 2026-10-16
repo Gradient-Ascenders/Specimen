@@ -64,16 +64,16 @@ const useLegacySpatialApi = (node: Node): number[] => {
   return position;
 };
 
-test('all 18 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 24 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 18);
+  assert.equal(ids.length, 24);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
     assert.equal(new URL(soundUrl(id), 'https://example.test/group-folder/').pathname, `/group-folder/${path}`);
     assert.equal(soundUrl(id, '/group-folder/'), `/group-folder/${path}`);
   }
-  for (const folder of ['bob','goop','volt','turrets'])
+  for (const folder of ['bob','goop','volt','world','turrets'])
     assert.ok(readdirSync(new URL(`../public/assets/audio/${folder}/`, import.meta.url)).every(f => f.endsWith('.ogg')));
 });
 
@@ -648,4 +648,23 @@ test('sustained power is mixed quietly with one voice, pauses cleanly and stops 
     audio.setPaused(false); await Promise.resolve(); assert.equal(context.sources.filter(s=>s.loop).length,1);
     audio.stopLoop('volt:circuit'); assert.equal(audio.diagnostics.loops,0); assert.equal(loop.source.stopped,true);
   } finally {audio.dispose(); globalThis.fetch=originalFetch;}
+});
+
+
+test('remote world controls are culled and paused, dead or restoring levels reject cues',()=>{
+  const {audio,director,bodies}=directorFixture();
+  try {
+    director.setEnabled(true);
+    gameplayAudioEvents.emit('cue',{sound:'world-activation-01',position:{x:100,y:1,z:0},maxDistance:16});
+    assert.equal(audio.cues.length,0);
+    gameplayAudioEvents.emit('cue',{sound:'world-activation-01',position:{x:1,y:1,z:0},maxDistance:16});
+    assert.deepEqual(audio.cues,['world-activation-01']);
+    director.setEnabled(false);gameplayAudioEvents.emit('cue',{sound:'world-release-01'});assert.equal(audio.cues.length,1);
+    director.setEnabled(true);director.died('bob');const count=audio.cues.length;
+    gameplayAudioEvents.emit('cue',{sound:'world-activation-01'});assert.equal(audio.cues.length,count);
+    director.respawn();director.reset();const restored=audio.cues.length;
+    gameplayAudioEvents.emit('cue',{sound:'world-activation-01'});assert.equal(audio.cues.length,restored);
+    bodies.bob.position.x=100;director.update();
+    gameplayAudioEvents.emit('cue',{sound:'world-activation-01',position:{x:100,y:1,z:0},maxDistance:16});assert.equal(audio.cues.length,restored+1);
+  } finally {director.dispose();}
 });

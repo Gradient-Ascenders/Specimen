@@ -1,3 +1,4 @@
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 import { mapBlackoutBoxUVs, mapBlackoutPropUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
@@ -107,6 +108,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private readonly surfaces: SurfaceRegistry;
   private bridgeRelease = 0;
   private bridgeProgress = 0;
+  private readonly bridgeAudio: WorldAudioSource;
   private readonly bridgeStartPosition = new THREE.Vector3();
   private readonly bridgeEndPosition = new THREE.Vector3();
   private checkpointTutorialReached = false;
@@ -356,6 +358,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       this.root.removeFromParent();
       throw error;
     }
+    this.bridgeAudio = new WorldAudioSource({ root: this.bridge, kind: 'machinery', progress: () => this.bridgeProgress, settled: () => this.bridgeProgress === 0 || this.bridgeProgress === 1, enabled: () => this.active });
   }
 
   get isActive(): boolean { return this.active; }
@@ -476,6 +479,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.laserElapsed = 0;
     this.laserPresentation?.sync();
     this.updateBridgeMeshes();
+    this.bridgeAudio.reset();
     for (const lift of this.lifts) lift.core.setAvailable(this.active);
     for (let i = 0; i < this.lifts.length; i++) this.updateLiftVisual(i);
     for (let i = 0; i < this.drones.length; i++) {
@@ -516,6 +520,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.bridgeRelease = 0; this.checkpointTutorialReached = false; this.checkpointStage = 0; this.complete = false;
     this.bridgeProgress = 0;
     this.updateBridgeMeshes();
+    this.bridgeAudio.reset();
     this.updateLampBanks();
     this.updateSwitchButton();
   }
@@ -523,6 +528,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.bridgeAudio.dispose();
     for (const unregister of [...this.targetUnregisters].reverse()) unregister();
     this.targetUnregisters.length = 0;
     for (const lift of [...this.lifts].reverse()) {
@@ -667,7 +673,12 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const dx = bob.position.x - switchPoint.x, dy = bob.position.y - switchPoint.y, dz = bob.position.z - switchPoint.z;
     const close = dx * dx + dy * dy + dz * dz <= 0.9 * 0.9;
     const wallHeld = bob.attached && (bob.attachmentSurfaceName.includes('switch') || bob.attachmentSurfaceName.includes('bob-bridge-switch-sticky-wall'));
+    const wasHeld = this.switchHeld;
     this.switchHeld = !this.bridgeLocked && close && wallHeld;
+    if (wasHeld !== this.switchHeld) gameplayAudioEvents.emit('cue', {
+      sound: this.switchHeld ? 'world-activation-01' : 'world-release-01',
+      position: this.room.switchButton.getWorldPosition(new THREE.Vector3()), maxDistance: 16,
+    });
     this.updateSwitchButton();
     if (this.bridgeLocked) this.bridgeProgress = 1;
     else if (this.switchHeld) this.bridgeRelease = 0;
