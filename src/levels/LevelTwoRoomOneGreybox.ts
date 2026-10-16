@@ -100,6 +100,7 @@ export class LevelTwoRoomOneGreybox {
   update(deltaSeconds: number, goopBody?: KinematicBody): void {
     for (const drop of this.platformDrops) {
       const wasFalling = drop.state === 'falling';
+      if (!wasFalling) continue;
       drop.mesh.getWorldPosition(this.previousDropWorldPosition);
       drop.update(deltaSeconds);
       drop.mesh.getWorldPosition(this.currentDropWorldPosition);

@@ -427,7 +427,9 @@ test(`Cultivation draws prepared room and fade shadow variants without creating 
   const assertExposed = await exposeCultivationRuntime(page);
   await enterCultivation(page); assertExposed();
   await page.evaluate(preset => {
-    (window as any).__specimenCultivationRuntime.renderLayer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
+    const layer = (window as any).__specimenCultivationRuntime.renderLayer;
+    layer.setGraphicsSettings({ ...layer.graphicsSettings, graphicsPreset: preset,
+      renderPixelRatioCap: preset === 'performance' ? 0.75 : 2 });
   }, preset);
   await page.evaluate(() => {
     const r = (window as any).__specimenCultivationRuntime;
@@ -579,7 +581,8 @@ test(`Cultivation background compilation and primers preserve active lighting an
   const result = await page.evaluate(async preset => {
     const r = (window as any).__specimenCultivationRuntime;
     r.stop();
-    r.renderLayer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
+    r.renderLayer.setGraphicsSettings({ ...r.renderLayer.graphicsSettings, graphicsPreset: preset,
+      renderPixelRatioCap: preset === 'performance' ? 0.75 : 2 });
     const renderer = r.renderLayer.renderer;
     renderer.setAnimationLoop(null);
     const queue = r.preparationQueue;

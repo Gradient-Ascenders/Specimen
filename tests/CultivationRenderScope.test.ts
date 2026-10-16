@@ -4,6 +4,8 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { LevelTwoPreviewScene, LEVEL_TWO_ROOM_FOUR_OFFSET_Z, LEVEL_TWO_ROOM_FIVE_OFFSET_Z } from '../src/levels/LevelTwoPreviewScene.ts';
 import { CollisionWorld, CollisionHit } from '../src/physics/CollisionWorld.ts';
+import { DissolveTarget } from '../src/abilities/DissolveTarget.ts';
+import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 
 test('render scope hides distant rooms while keeping authored collision and split-body simulation', () => {
   const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
@@ -60,4 +62,77 @@ test('render scope hides distant rooms while keeping authored collision and spli
     scene.reset(); scene.updatePresentationVisibility({ z: 4 }, { z: 8 });
     assert.equal(scene.roomOne.root.visible, true); assert.equal(scene.roomFive.root.visible, false);
   } finally { world.clear(); scene.dispose(); }
+});
+
+test('workload scopes suspend dormant updates, preserve hidden occupants and finish remote drops', context => {
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
+  try {
+    const second = context.mock.method(scene.roomTwo, 'update');
+    const fifth = context.mock.method(scene.roomFive, 'update');
+    const captive = context.mock.method(scene.roomFive, 'updateCosmetics');
+    scene.updatePresentationVisibility({ z: 4 }, { z: 8 });
+    scene.update(.1, 1, []);
+    assert.deepEqual(scene.workload.snapshot().resident, [1, 2, 3, 4, 5]);
+    assert.deepEqual(scene.workload.snapshot().simulated, [1]);
+    assert.deepEqual(scene.workload.snapshot().rendered, [1]);
+    assert.equal(second.mock.callCount(), 0); assert.equal(fifth.mock.callCount(), 0);
+    assert.equal(captive.mock.callCount(), 0);
+    scene.update(.1, 1, [], undefined, new Set([3]));
+    assert.deepEqual(scene.workload.snapshot().simulated, [1, 3], 'live encounter projectiles retain simulation ownership');
+    const goop = { id: 'goop' as const, position: scene.copyRoomSpawnPosition(2, 'goop', new THREE.Vector3()), radiusMetres: .46 };
+    scene.update(.1, 1, [goop]);
+    assert.deepEqual(scene.workload.snapshot().simulated, [1, 2]);
+    assert.equal(second.mock.callCount(), 1, 'hidden persistent body keeps its room simulated');
+
+    const collisionWorld = new CollisionWorld(), surfaceRegistry = new SurfaceRegistry();
+    const targets = scene.solubleTargetMeshes.map(mesh => new DissolveTarget({ mesh,
+      id: mesh.userData.solubleId, collisionWorld, surfaceRegistry, dissolveDurationSeconds: .5, collisionDisableProgress: .9 }));
+    scene.bindDissolveTargets(targets);
+    const drop = scene.roomThree.wallDrops[0];
+    const support = targets.find(target => target.id === drop.solubleTargetId)!;
+    support.advance(support.dissolveDurationSeconds);
+    scene.update(.1, 1, []);
+    assert.ok(scene.workload.simulated.has(3));
+    assert.equal(drop.state, 'falling');
+    scene.update(10, 1, []);
+    assert.equal(drop.state, 'landed', 'released geometry finishes while its room is hidden and empty');
+    scene.update(.1, 1, []);
+    assert.equal(scene.workload.simulated.has(3), false);
+    for (const target of targets) target.dispose();
+
+    scene.updatePresentationVisibility({ z: 275 }, { z: 280 });
+    scene.update(.1, 1, []);
+    assert.equal(captive.mock.callCount(), 1, 'cosmetics follow the camera independently of simulation');
+    assert.equal(fifth.mock.callCount(), 0);
+    scene.workload.prepared.add(5);
+    scene.reset();
+    assert.deepEqual(scene.workload.snapshot().simulated, []);
+    assert.deepEqual(scene.workload.snapshot().rendered, [1]);
+    assert.ok(scene.workload.prepared.has(5), 'restart retains ready GPU resources');
+  } finally { scene.dispose(); }
+  assert.deepEqual(scene.workload.snapshot().resident, []);
+  assert.deepEqual(scene.workload.snapshot().prepared, []);
+});
+
+test('immutable local transforms freeze while lift, fan, controls and rescue assemblies remain live', () => {
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
+  try {
+    const diagnostic = scene.getWorkloadDiagnostics();
+    assert.ok(diagnostic.frozenTransforms > 1000);
+    assert.ok(diagnostic.automaticMatrices < 500);
+    for (const object of [...scene.roomTwo.dynamicTransformRoots, ...scene.roomThree.dynamicTransformRoots,
+      ...scene.roomFour.dynamicTransformRoots, ...scene.roomFive.dynamicTransformRoots, scene.filtrationArt.fan]) {
+      assert.equal(object.matrixAutoUpdate, true, object.name);
+    }
+    scene.roomFour.controller.restoreArrival();
+    const before = scene.roomFour.arrivalWall.getWorldPosition(new THREE.Vector3());
+    scene.update(.1, 5, []);
+    assert.notDeepEqual(scene.roomFour.arrivalWall.getWorldPosition(new THREE.Vector3()), before);
+    const staticMesh = scene.roomOne.collisionMeshes.find(mesh => !mesh.matrixAutoUpdate)!;
+    const local = staticMesh.position.clone();
+    scene.root.position.x += 10;
+    assert.equal(staticMesh.getWorldPosition(new THREE.Vector3()).x, local.x + scene.root.position.x);
+    scene.reset();
+    assert.equal(scene.roomFour.arrivalWall.matrixAutoUpdate, true);
+  } finally { scene.dispose(); }
 });

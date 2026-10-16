@@ -96,6 +96,28 @@ test('room-local static batching preserves bounds and independent assemblies', (
   glass.dispose();
 });
 
+test('spatial cells use room coordinates and preserve shadow, layer and draw ordering boundaries', () => {
+  const material = new THREE.MeshStandardMaterial(), geometry = new THREE.BoxGeometry();
+  const build = (translated: boolean) => {
+    const root = new THREE.Group();
+    if (translated) { root.position.set(103, 7, -42); root.rotation.y = .8; }
+    for (const x of [0, 1, 17, 18]) root.add(visualMesh(`part-${x}`, geometry, material, [x, 0, 0]));
+    const shadow = visualMesh('different-shadow', geometry, material, [0, 0, 0]); shadow.castShadow = true;
+    const layer = visualMesh('different-layer', geometry, material, [0, 0, 0]); layer.layers.set(2);
+    const order = visualMesh('different-order', geometry, material, [0, 0, 0]); order.renderOrder = 1;
+    root.add(shadow, layer, order);
+    const result = consolidateContainmentRoomStaticVisuals(root);
+    assert.equal(result.diagnostics.batchCount, 2);
+    assert.equal(result.diagnostics.drawCallsRemoved, 2);
+    for (const source of [shadow, layer, order]) assert.equal(source.parent, root);
+    const names = root.children.filter(o => o.userData.staticBatchSourceNames)
+      .map(o => o.userData.staticBatchSourceNames);
+    assert.deepEqual(names, [['part-0', 'part-1'], ['part-17', 'part-18']]);
+    result.dispose();
+  };
+  try { build(false); build(true); } finally { material.dispose(); geometry.dispose(); }
+});
+
 function visualMesh(
   name: string,
   geometry: THREE.BufferGeometry,

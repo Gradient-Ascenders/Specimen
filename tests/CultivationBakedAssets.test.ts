@@ -98,7 +98,7 @@ test('async loader accepts a nested asset URL and reports HTTP failure', async t
     assert.equal(request.href, url.href);
     return new Response(bytes);
   });
-  assert.equal((await loadCultivationBakedAssets(url)).manifest.repairs.length, 137);
+  assert.equal((await loadCultivationBakedAssets(url)).manifest.repairs.length, cultivationAssets.manifest.repairs.length);
   t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
   await assert.rejects(loadCultivationBakedAssets(url), /HTTP 404/);
 });

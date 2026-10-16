@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { LARGE_STATIC_BATCH_CELL_SIZE, staticBatchKey } from '../../StaticBatchPolicy.ts';
 import type { CultivationAssetSource } from './CultivationBakedAssets.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -14,7 +15,7 @@ export interface CultivationRoomThreeStaticBatchDiagnostics {
  *
  * The authored meshes stay parented, visible, and identity-stable for collision,
  * surface queries, debug overlays, and route metadata. An invisible material
- * suppresses their individual renderer submissions while room-local merged
+ * suppresses their individual renderer submissions while room-cell merged
  * meshes reproduce the same opaque visuals.
  */
 export function consolidateCultivationRoomThreeStaticColliders(
@@ -23,14 +24,16 @@ export function consolidateCultivationRoomThreeStaticColliders(
   assets?: CultivationAssetSource,
 ): CultivationRoomThreeStaticBatchDiagnostics {
   roomRoot.updateWorldMatrix(true, true);
-  const groups = new Map<THREE.Material, THREE.Mesh[]>();
+  const groups = new Map<string, THREE.Mesh[]>();
+  const inverseRoot = roomRoot.matrixWorld.clone().invert();
   for (const mesh of collisionMeshes) {
     if (!isBatchCandidate(mesh)) continue;
     const material = mesh.material;
     if (Array.isArray(material)) continue;
-    const group = groups.get(material) ?? [];
+    const key = staticBatchKey(mesh, material, inverseRoot, LARGE_STATIC_BATCH_CELL_SIZE);
+    const group = groups.get(key) ?? [];
     group.push(mesh);
-    groups.set(material, group);
+    groups.set(key, group);
   }
 
   const invisibleColliderMaterial = new THREE.MeshBasicMaterial({
@@ -45,7 +48,8 @@ export function consolidateCultivationRoomThreeStaticColliders(
   let batchCount = 0;
   let sourceMeshCount = 0;
 
-  for (const [material, sources] of groups) {
+  for (const sources of groups.values()) {
+    const material = sources[0].material;
     if (sources.length < 2) continue;
     const generate = () => {
       const transformed = sources.map((source) => {
@@ -68,6 +72,10 @@ export function consolidateCultivationRoomThreeStaticColliders(
     };
     const geometry = assets ? assets.geometry(`room-3-colliders-${batchCount + 1}`, generate) : generate();
     const batch = new THREE.Mesh(geometry, material);
+    batch.castShadow = sources[0].castShadow;
+    batch.receiveShadow = sources[0].receiveShadow;
+    batch.renderOrder = sources[0].renderOrder;
+    batch.layers.mask = sources[0].layers.mask;
     batchCount += 1;
     batch.name = `cultivation-room-3-static-visual-batch-${batchCount}`;
     batch.userData.presentationOnly = true;
