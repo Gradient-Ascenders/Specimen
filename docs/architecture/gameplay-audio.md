@@ -95,6 +95,10 @@ All names below identify `.ogg` files. Loop behavior is explicit; other sounds a
 
 ## Validation
 
-`npm run type-check`, `npm test`, `npm run build`, `npm run validate:production`, `npm run test:smoke`, and relevant `npm run test:browser` checks cover this change. The dedicated audio smoke test exposes the existing runtime for observation without replacing game/audio logic; existing production smoke runs without runtime injection.
+`npm run type-check`, `npm test`, `npm run build`, `npm run validate:production`,
+`npm run test:smoke`, `npm run test:integration`, and relevant
+`npm run test:browser` checks cover this change. The dedicated audio integration
+test exposes the existing runtime for observation without replacing game/audio
+logic; the production smoke tests run without runtime injection.
 
 Browser checks can verify decoding, resources and gameplay synchronization, but do not establish a human listening review on speakers/headphones. Cross-browser and subjective final mix review remain useful before release. See the PR for actual executed results.

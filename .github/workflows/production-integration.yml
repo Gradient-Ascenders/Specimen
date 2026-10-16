@@ -1,0 +1,119 @@
+name: Production integration
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: production-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  production-integration:
+    name: Production integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out integration revision
+        uses: actions/checkout@v7
+
+      - name: Use pinned Node.js version and cache npm downloads
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Use pinned npm version
+        run: npm install --global npm@11.18.0
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build for production
+        run: npm run build
+
+      - name: Validate production layout and references
+        run: npm run validate:production
+
+      - name: Cache Chromium
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run production integration journeys
+        timeout-minutes: 25
+        run: npm run test:integration
+
+      - name: Upload browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-integration-${{ github.run_id }}-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  firefox-smoke:
+    name: Firefox smoke
+    runs-on: ubuntu-latest
+    # Cold Firefox/system-library installation can take longer than the test.
+    timeout-minutes: 20
+    steps:
+      - name: Check out integration revision
+        uses: actions/checkout@v7
+
+      - name: Use pinned Node.js version and cache npm downloads
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Use pinned npm version
+        run: npm install --global npm@11.18.0
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build for production
+        run: npm run build
+
+      - name: Cache Firefox
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-firefox-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Firefox
+        run: npx playwright install --with-deps firefox
+
+      - name: Smoke-test production startup
+        timeout-minutes: 5
+        env:
+          SPECIMEN_BROWSER_NAME: firefox
+        run: >-
+          npx playwright test tests/smoke/ProductionSmoke.spec.ts
+          --grep "plain production boots"
+          --config playwright.smoke.config.ts
+
+      - name: Upload Firefox diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: firefox-smoke-${{ github.run_id }}-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

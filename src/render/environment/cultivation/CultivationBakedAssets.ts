@@ -115,7 +115,9 @@ export class CultivationBakedAssets implements CultivationAssetSource {
   }
 
   private array(spec: BakedArray): THREE.TypedArray {
-    const Type = Object.hasOwn(arrayTypes, spec.type) ? arrayTypes[spec.type] : undefined;
+    const Type = Object.prototype.hasOwnProperty.call(arrayTypes, spec.type)
+      ? arrayTypes[spec.type]
+      : undefined;
     if (!Type || !Number.isSafeInteger(spec.offset) || !Number.isSafeInteger(spec.length) || spec.offset < 0 ||
         spec.length < 0 || spec.offset % Type.BYTES_PER_ELEMENT ||
         spec.offset + spec.length * Type.BYTES_PER_ELEMENT > this.bytes.byteLength - this.byteOffset) {

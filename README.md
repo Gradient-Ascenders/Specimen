@@ -62,12 +62,15 @@ steps.
 
 ## Continuous integration
 
-Two workflows separate merge checks from submission packaging:
+Three primary workflows separate fast merge checks, deep browser coverage, and
+submission packaging:
 
 - **PR validation** runs on new and updated PRs targeting `main`. Unit tests and
-  production verification run in parallel. Production verification builds once,
-  validates static files, and smoke-tests the game from a nested HTTP path.
-  New commits cancel obsolete runs.
+  Chromium production smoke checks run in parallel. Production verification
+  builds, validates static files, and exercises both release smoke journeys from
+  a nested HTTP path. New commits cancel obsolete runs.
+- **Production integration** runs the longer software-rendered gameplay journeys
+  and Firefox startup after merges to `main`, nightly, and on demand.
 - **Submission build** runs on pushes to `main` and can be started manually on
   `main`. It builds the exact event revision, verifies the extracted archive,
   and publishes `specimen-<12-character-commit>.zip` with a checksum and Tiny
