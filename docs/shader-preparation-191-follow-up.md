@@ -1,5 +1,7 @@
 # Issue #191: Standard loading and latest-main integration
 
+Subsequent review follow-up: [direct transmission resource switching](shader-preparation-191-transmission.md).
+
 This follows [the initial implementation report](shader-preparation-191.md).
 The work remains on `codex/191-shader-preparation`; no push, PR creation or PR
 merge is authorized. Merging upstream main into the feature branch is explicitly
