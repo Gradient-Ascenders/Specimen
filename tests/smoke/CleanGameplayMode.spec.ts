@@ -156,6 +156,11 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
       'data-state',
       'playing',
     );
+    // AudioContext.resume() completes asynchronously after the entry gesture.
+    // Compare F1's effect only after that unrelated transition has settled.
+    await page.waitForFunction(() =>
+      (window as any).__cleanSession.runtime.audio.diagnostics.contextState === 'running',
+    );
     expect(
       await page.evaluate(() => {
         const resources = (window as any).__cleanSession.runtime.resources;
@@ -289,6 +294,18 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
     expect(moved.position).not.toEqual(start.position);
     expect(moved.input).toBe(true);
     const active = (await step(0)).active;
+    if (level === 1) {
+      // Fresh Containment intentionally has only Bob. Verify clean mode keeps
+      // that gate, then stage Goop availability for the switching/aiming checks.
+      expect(await page.evaluate(() =>
+        (window as any).__cleanSession.runtime.resources.slimeManager.isAvailable('goop'),
+      )).toBe(false);
+      await page.keyboard.press('Tab');
+      expect((await step(1)).active).toBe(active);
+      expect(await page.evaluate(() =>
+        (window as any).__cleanSession.runtime.resources.slimeManager.unlock('goop'),
+      )).toBe(true);
+    }
     await page.keyboard.press('Tab');
     const switched = await step(1);
     expect(switched.active).not.toBe(active);
