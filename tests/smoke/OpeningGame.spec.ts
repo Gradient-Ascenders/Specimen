@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('plain production plays Bob awakening while Level 1 loads, then hands off once ready', async ({ page }) => {
+test('plain production plays Bob awakening while Level 1 loads, then hands off once ready', async ({ page }, info) => {
   test.setTimeout(360_000);
   const errors: string[] = [], stages = new Set<string>();
   let goopRequests = 0;
@@ -34,7 +34,12 @@ test('plain production plays Bob awakening while Level 1 loads, then hands off o
   // Capture the real staged sequence without skipping, seeking or replacing it.
   await expect.poll(async () => {
     const stage = await host.getAttribute('data-opening-stage');
-    if (stage) stages.add(stage);
+    if (stage && !stages.has(stage)) {
+      stages.add(stage);
+      if (['laboratory', 'experiments', 'cracking', 'forming', 'complete'].includes(stage)) {
+        await page.screenshot({ path: info.outputPath(`opening-${stage}.png`) });
+      }
+    }
     return stage;
   }, { timeout: 180_000, intervals: [100, 200, 300] }).toBe('complete');
   expect([...stages]).toEqual(expect.arrayContaining(['laboratory', 'experiments', 'bob-door', 'entering',
@@ -48,6 +53,7 @@ test('plain production plays Bob awakening while Level 1 loads, then hands off o
   await expect(host).not.toHaveAttribute('data-opening-state');
   await expect(host).not.toHaveAttribute('data-title-backdrop');
   await expect(page.locator('canvas')).toHaveCount(1);
+  await page.screenshot({ path: info.outputPath('opening-gameplay-handoff.png') });
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.locator('[data-action="restart"]').click();
