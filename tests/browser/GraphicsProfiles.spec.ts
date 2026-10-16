@@ -212,6 +212,65 @@ test('profiles bound high-DPI/resize work, retain native HUD and survive all lev
   expect(errors).toEqual([]);
 });
 
+test('one-pixel-wide transmissive viewports keep complete physical framebuffers across quality changes', async ({ page }) => {
+  test.setTimeout(300_000);
+  errors.length = 0;
+  await mkdir(directory, { recursive: true });
+  await boot(page);
+  // The normal UI has a 320px minimum. Override it only in this regression so
+  // the production RenderLayer actually receives a one-CSS-pixel host.
+  await page.addStyleTag({ content: 'html, body, #app { min-width: 0 !important; }' });
+  const rows: any[] = [];
+  for (const viewport of [{ width: 1, height: 360 }, { width: 640, height: 1 }, { width: 1, height: 1 }]) {
+    await page.setViewportSize(viewport);
+    for (const [gelRenderingMode, graphicsPreset] of [
+      ['reduced-transmission', 'normal'], ['physical', 'normal'],
+      ['minimum', 'normal'], ['physical', 'performance'],
+    ]) {
+      const row = await page.evaluate(({ gelRenderingMode, graphicsPreset }) => {
+        const rt = (window as any).__graphicsSession.runtime, layer = rt.renderLayer, renderer = layer.renderer;
+        layer.setGraphicsSettings({ graphicsProfile: 'standard', graphicsPreset, gelRenderingMode,
+          renderPixelRatioCap: 0.75, renderScale: 0.5 });
+        const gl = renderer.getContext(), targets: { width: number; height: number; complete: boolean }[] = [];
+        const original = renderer.setRenderTarget;
+        renderer.setRenderTarget = function(this: any, target: any, ...args: any[]) {
+          const result = original.call(this, target, ...args);
+          if (target?.samples > 0) targets.push({ width: target.width, height: target.height,
+            complete: gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE });
+          return result;
+        };
+        try {
+          // This must be a real production draw, not just a resolution-policy
+          // assertion: the transmission pass owns a separate multisampled FBO.
+          rt.render(1, { fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 0, frameDeltaSeconds: 0,
+            stepsThisFrame: 0, interpolationAlpha: 1, droppedSimulationTimeSeconds: 0, renderFps: 60 });
+          return { diagnostics: layer.getGraphicsDiagnostics(), targets, glError: gl.getError(),
+            canvas: [layer.canvas.width, layer.canvas.height],
+            css: [layer.canvas.clientWidth, layer.canvas.clientHeight], aspect: layer.cameraRig.camera.aspect };
+        } finally { renderer.setRenderTarget = original; }
+      }, { gelRenderingMode, graphicsPreset });
+      rows.push(row);
+      const d = row.diagnostics, minimum = Math.ceil(1 / d.transmissionResolutionScale);
+      expect(row.glError).toBe(0);
+      expect(row.css).toEqual([viewport.width, viewport.height]);
+      expect(row.aspect).toBeCloseTo(viewport.width / viewport.height, 6);
+      expect(row.canvas).toEqual([d.drawingBufferWidth, d.drawingBufferHeight]);
+      expect(Math.min(...row.canvas)).toBe(minimum);
+      expect(row.canvas[0] * row.canvas[1]).toBeLessThanOrEqual(d.pixelBudget);
+      // A mode change at the same CSS size/DPR must also change the physical
+      // minimum: half-refraction -> full -> no refraction -> capped full.
+      if (gelRenderingMode !== 'minimum') expect(row.targets.length).toBeGreaterThan(0);
+      for (const target of row.targets) {
+        expect(Math.floor(target.width)).toBeGreaterThanOrEqual(1);
+        expect(Math.floor(target.height)).toBeGreaterThanOrEqual(1);
+        expect(target.complete).toBe(true);
+      }
+    }
+  }
+  await writeFile(resolve(directory, 'transmission-narrow.json'), JSON.stringify({ hashes, rows, errors }, null, 2));
+  expect(errors).toEqual([]);
+});
+
 test('report real buffer/profile differences separately from shader performance', async ({ browser, baseURL }) => {
   test.setTimeout(600_000);
   errors.length = 0;

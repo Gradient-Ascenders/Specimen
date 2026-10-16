@@ -60,7 +60,12 @@ adds them to its frame rows and export snapshot; old columns retain their order.
 The requested density is `min(max(1, displayDPR), densityCap) × renderScale`.
 The actual density is the minimum of this, `sqrt(pixelBudget / CSS area)` and
 the device's texture/renderbuffer/viewport limits. A longest-edge bound and a
-one-physical-pixel floor also handle degenerate/narrow viewports. Integer
+capture-aware physical-pixel floor also handle degenerate/narrow viewports. The
+shortest side is at least `ceil(1 / transmissionResolutionScale)` pixels (two
+for half-resolution refraction), so its multisampled target retains a physical
+texel even for a one-CSS-pixel host. The longest edge reserves that short-side
+cost inside the same absolute pixel budget, including pathological aspect ratios.
+Changes to the capture floor resize the canvas even at unchanged CSS size/DPR. Integer
 rounding never increases area beyond the budget. These are area limits, not a
 mandatory 16:9 render target; camera framing always uses the CSS aspect ratio.
 
@@ -120,6 +125,13 @@ pixels/aspect, native HUD, two level handoffs and three level restarts, late cha
 map disposal, GL/console/network errors, and 50% scaling with reduced refraction
 during handoff. The scene is staged/frozen for deterministic checks; this is not
 a native puzzle-completion or sustained gameplay benchmark.
+
+A dedicated narrow-host regression overrides the UI's normal 320px minimum and
+performs real production draws at 1×360, 640×1 and 1×1 CSS pixels. It checks
+multisampled target dimensions, actual framebuffer completeness and GL errors
+while toggling half/full/no refraction and the additional Performance cap. This
+regression was added in response to review; it has not been browser/GPU-executed
+locally because computer testing remains stopped.
 
 For a matched before/after capture, separately build/serve untouched `c3e9ed8`
 and the candidate, then supply `SPECIMEN_GRAPHICS_BASELINE_URL` alongside
@@ -217,3 +229,18 @@ captures remain evidence for their original recorded build, not this integration
 Merge verification: all 141 unit test-file groups passed with bounded concurrency,
 along with type-checking, the production build and production asset validation
 (83 files). The six focused graphics/settings/primer groups also passed.
+
+## Review follow-up: one-pixel transmission targets
+
+The canvas minimum now derives from the effective transmission capture scale,
+and the longest-edge bound reserves its short-side cost within the pixel budget.
+The resize cache also checks physical dimensions, covering gel or Performance-cap
+changes at unchanged CSS size and DPR. Unit regressions cover full/half/quarter
+capture, sub-native scaling, extreme aspect ratios, tiny budgets and incompatible
+device/pixel limits. The new narrow-host browser regression is described above;
+discovery succeeded, but no browser or GPU tests were run for this follow-up.
+
+Repository verification passed: all 144 unit test-file groups (bounded
+concurrency), four focused graphics/gel/primer groups, type-checking, production
+build, production validation (85 files) and diff checks. Playwright discovered
+five graphics cases across the two graphics files; discovery is not execution.

@@ -49,6 +49,50 @@ test('pathological narrow windows and tiny budgets never allocate zero or exceed
   }
 });
 
+test('fractional refraction keeps a physical texel in one-CSS-pixel viewports', () => {
+  for (const transmissionScale of [1, 0.5, 0.25]) {
+    const minimumDrawingBufferDimension = Math.ceil(1 / transmissionScale);
+    for (const [width, height] of [[1, 1], [1, 900], [900, 1], [1, 100000], [100000, 1]]) {
+      for (const renderScale of [0.5, 0.75, 1] as const) {
+        const size = resolveRenderResolution(width, height, 1, {
+          pixelRatioCap: 0.75, renderScale, pixelBudget: GRAPHICS_PROFILES.standard.pixelBudget,
+          maximumWidth: 4096, maximumHeight: 2048, minimumDrawingBufferDimension,
+        });
+        assert.ok(Math.floor(size.drawingBufferWidth * transmissionScale) >= 1);
+        assert.ok(Math.floor(size.drawingBufferHeight * transmissionScale) >= 1);
+        assert.ok(size.drawingBufferWidth * size.drawingBufferHeight <= GRAPHICS_PROFILES.standard.pixelBudget);
+        assert.ok(size.drawingBufferWidth <= 4096 && size.drawingBufferHeight <= 2048);
+        assert.equal(Math.floor(size.logicalWidth * size.effectivePixelRatio), size.drawingBufferWidth);
+        assert.equal(Math.floor(size.logicalHeight * size.effectivePixelRatio), size.drawingBufferHeight);
+        assert.deepEqual([size.viewportWidth, size.viewportHeight], [width, height]);
+      }
+    }
+  }
+});
+
+test('capture-aware longest-edge bounds reserve the minimum short side within even a tiny budget', () => {
+  for (const minimumDrawingBufferDimension of [2, 4]) {
+    for (const pixelBudget of [minimumDrawingBufferDimension ** 2, minimumDrawingBufferDimension ** 2 + 1, 100]) {
+      for (const [width, height] of [[1, 100000], [100000, 1], [1920, 1080]]) {
+        const size = resolveRenderResolution(width, height, 3, {
+          pixelRatioCap: 2, renderScale: 1, pixelBudget, minimumDrawingBufferDimension,
+        });
+        assert.ok(size.drawingBufferWidth >= minimumDrawingBufferDimension);
+        assert.ok(size.drawingBufferHeight >= minimumDrawingBufferDimension);
+        assert.ok(size.drawingBufferWidth * size.drawingBufferHeight <= pixelBudget);
+      }
+    }
+  }
+});
+
+test('an impossible capture floor is rejected without silently exceeding a hard limit', () => {
+  const options = { pixelRatioCap: 1 as const, renderScale: 1 as const, pixelBudget: 4,
+    minimumDrawingBufferDimension: 2 };
+  for (const limits of [{ pixelBudget: 3 }, { maximumWidth: 1 }, { maximumHeight: 1 }]) {
+    assert.throws(() => resolveRenderResolution(1, 900, 1, { ...options, ...limits }), RangeError);
+  }
+});
+
 test('render tiers respect device density within the supported DPR range', () => {
   assert.equal(resolveRenderPixelRatio(1.25, 2), 1.25);
   assert.equal(resolveRenderPixelRatio(1.25, 1.5), 1.25);

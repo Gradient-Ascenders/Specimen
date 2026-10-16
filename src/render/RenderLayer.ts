@@ -391,13 +391,18 @@ export class RenderLayer {
         renderScale: this.graphicsSettings.renderScale,
         pixelBudget: GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile].pixelBudget,
         maximumWidth: this.maximumWidth, maximumHeight: this.maximumHeight,
+        minimumDrawingBufferDimension: Math.ceil(1 / this.renderer.transmissionResolutionScale),
       });
     const { viewportWidth: width, viewportHeight: height, effectivePixelRatio: pixelRatio } = size;
+    // Refraction quality can change the physical minimum at unchanged CSS/DPR.
+    this.renderer.getDrawingBufferSize(this.drawingBufferSize);
 
     if (
       width === this.viewportWidth &&
       height === this.viewportHeight &&
-      pixelRatio === this.renderer.getPixelRatio()
+      pixelRatio === this.renderer.getPixelRatio() &&
+      size.drawingBufferWidth === this.drawingBufferSize.x &&
+      size.drawingBufferHeight === this.drawingBufferSize.y
     ) {
       this.notifyGraphicsDiagnostics();
       return;
