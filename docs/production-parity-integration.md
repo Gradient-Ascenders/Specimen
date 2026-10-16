@@ -46,20 +46,23 @@ Cultivation bake, Goop/Volt detail banks and acid noise all reproduce exactly.
 
 ## Automatic submission handoff
 
-`.github/workflows/submission-build.yml` already does the required work and is
-unchanged: a push to `main` checks out the event revision, installs locked
-versions, runs unit tests, builds and byte-validates the production archive,
-smoke-tests the extracted ZIP under `/group-folder/`, uploads the actual ZIP
-without another ZIP wrapper and writes its download URL/hash to the summary.
-The `npm run test:smoke` glob includes the production-parity regressions.
+`.github/workflows/submission-build.yml` does the required packaging work: a
+push to `main` checks out the event revision, installs locked versions, runs
+unit tests, builds and byte-validates the production archive, smoke-tests the
+extracted ZIP under `/group-folder/`, uploads the actual ZIP without another
+ZIP wrapper and writes its download URL/hash to the summary.
+The production integration workflow runs the production-parity regressions
+after the merge to `main`; `npm run test:smoke` remains the fast extracted
+archive release gate.
 
 The latest existing Linux run for the integrated main baseline succeeded:
 [Submission build 38833558657](https://github.com/Gradient-Ascenders/Specimen/actions/runs/38833558657).
 Unit, archive, nested smoke, artifact upload and summary steps all passed.
 It published non-expired artifact `specimen-11456d2b131b.zip` (ID 12017534533).
-The baseline's six smoke journeys took 8m38s; the existing PR smoke step allows
-25 minutes and submission job allows 45 minutes. PR checks on the new commits
-will run after publication; the earlier successful run is baseline evidence.
+At the time of this integration, the baseline's six combined browser journeys
+took 8m38s. The current workflow now separates the fast release smoke from
+those longer production-integration journeys; the earlier successful run
+remains baseline evidence.
 
 ## Integrated local validation
 

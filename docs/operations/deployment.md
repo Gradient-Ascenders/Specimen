@@ -54,7 +54,8 @@ server (PowerShell):
 $env:SPECIMEN_SMOKE_ARCHIVE = 'artifacts/specimen-production.zip'
 # Optional installed hardware browser; omit to use software Chromium.
 $env:SPECIMEN_BROWSER_CHANNEL = 'msedge'
-npm run test:smoke -- ProductionParity ProductionSmoke
+npm run test:smoke
+npm run test:integration
 ```
 
 `ProductionParity` opens the plain URL and observes the composition root without
