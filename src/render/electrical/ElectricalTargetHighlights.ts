@@ -8,6 +8,7 @@ export class ElectricalTargetHighlights {
   readonly root = new THREE.Group();
   private readonly entries = new Map<ElectricalTargetRegistration, THREE.BoxHelper[]>();
   private readonly unsubscribe: (() => void)[];
+  private readonly socketPosition = new THREE.Vector3();
 
   constructor(registry: ElectricalTargetRegistry) {
     this.root.name = 'volt-conducting-target-highlights';
@@ -31,15 +32,24 @@ export class ElectricalTargetHighlights {
     }
     for (const [registration, helpers] of this.entries) {
       const target = registration.target;
-      const selected = state.selectedTargetValid && state.selectedTargetId === target.id;
+      const targeted = state.selectedTargetId === target.id;
+      const selected = state.selectedTargetValid && targeted;
       const connected = state.connectedTargetId === target.id;
+      target.copySocketWorldPosition(this.socketPosition);
+      const dx = this.socketPosition.x - state.beamStart.x;
+      const dy = this.socketPosition.y - state.beamStart.y;
+      const dz = this.socketPosition.z - state.beamStart.z;
+      const nearby = dx * dx + dy * dy + dz * dz <= state.acquisitionRangeMetres ** 2;
       for (let i = 0; i < helpers.length; i++) {
         const helper = helpers[i]!;
-        helper.visible = visible && target.isAvailable() && target.hitMeshes[i]!.visible;
+        // A live tether can outlive acquisition range; unrelated distant
+        // machines never enter electrical vision. Occlusion stays depth-tested.
+        helper.visible = target.isAvailable() && (nearby || connected) && target.hitMeshes[i]!.visible;
         if (!helper.visible) continue;
         helper.update();
-        helper.material.color.setHex(selected || connected ? 0x6dffac : 0xffd45c);
-        helper.material.opacity = selected || connected ? 1 : 0.72;
+        helper.material.color.setHex(connected ? (state.connectionUnstable ? 0xff9e25 : 0xffe774)
+          : selected ? 0xffffb0 : targeted ? 0xffab45 : 0xffd45c);
+        helper.material.opacity = connected || selected ? 1 : targeted ? 0.9 : 0.5;
       }
     }
   }

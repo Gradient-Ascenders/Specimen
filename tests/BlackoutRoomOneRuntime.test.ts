@@ -406,6 +406,10 @@ test('conducting outlines appear only for actively aiming Volt, including render
     f.render(); assertHidden();
     f.input.press('aimAbility'); f.tick(); f.render();
     assert.equal(highlights.visible, true);
+    assert.ok(highlights.children.every(child => !child.visible), 'CP1 does not reveal the distant circuit');
+    const resources = electricalRoomInternals(f.runtime);
+    resources.group.voltBody.teleport(new THREE.Vector3(-9, 0.46, 51.5));
+    f.tick(); f.render();
     assert.ok(highlights.children.some(child => child.visible));
     f.input.release('aimAbility'); f.render(); assertHidden();
     f.input.press('aimAbility'); f.tick(); f.render();
