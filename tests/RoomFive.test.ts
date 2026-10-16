@@ -221,6 +221,8 @@ test('dark-room lights follow drone power, damage recovery, and the moving Volt 
     assert.equal((s.room.root.getObjectByName('room-5-volt-glow') as THREE.PointLight).castShadow, true);
     assert.ok(search.distance > 0 && search.distance <= 15);
     const ray = s.room.root.getObjectByName('room-5-red-scanner-0') as THREE.Mesh<THREE.ConeGeometry>;
+    s.encounter.update(1 / 60);
+    s.encounter.updatePresentation(0, new THREE.PerspectiveCamera());
     assert.equal(ray.geometry.parameters.height, 15);
     assert.ok(ray.position.distanceTo(search.position) < 1e-8, 'beam and shadow light share the flying eye');
     const rayMaterial = ray.material as THREE.MeshBasicMaterial;
@@ -245,6 +247,24 @@ test('dark-room lights follow drone power, damage recovery, and the moving Volt 
     assert.equal(s.room.reunionDoor.children.filter(child => child.name.includes('hidden-exit-skin')).length, 3);
     const floor = s.room.root.getObjectByName('room-5-chamber-acid-bed') as THREE.Mesh;
     assert.ok(floor.material instanceof AcidSurfaceMaterial, 'dressed chamber uses the shared dynamic acid shader');
+  } finally { s.dispose(); }
+});
+
+test('first draw after reset uses the reset drone pose even without a fixed update', () => {
+  const s = setup(), camera = new THREE.PerspectiveCamera(110, 1, .1, 200);
+  try {
+    for (let i = 0; i < 180; i++) s.encounter.update(1 / 60);
+    camera.position.copy(s.room.root.localToWorld(new THREE.Vector3(0, 20, 0)));
+    camera.lookAt(s.room.root.localToWorld(new THREE.Vector3(0, 20, 40)));
+    s.encounter.updatePresentation(.1, camera);
+    s.encounter.reset();
+    s.encounter.updatePresentation(0, camera);
+    const drone = s.encounter.drones[0];
+    const beam = s.room.root.getObjectByName('room-5-red-scanner-0')!;
+    const eye = drone.root.position.clone().addScaledVector(drone.readModel.scanDirection, 1.4);
+    assert.ok(beam.position.distanceTo(eye) < 1e-8);
+    const forward = new THREE.Vector3(0, -1, 0).applyQuaternion(beam.quaternion);
+    assert.ok(forward.distanceTo(new THREE.Vector3().copy(drone.readModel.scanDirection)) < 1e-8);
   } finally { s.dispose(); }
 });
 
@@ -782,4 +802,54 @@ test('Goop crosses the sewer ramp in both directions without jumping, including 
       }
     }
   } finally { s.dispose(); }
+});
+
+test('cosmetic draw cadence leaves detection, projectile impacts and damage identical through toggles and reset', () => {
+  const camera = new THREE.PerspectiveCamera(110, 1, .1, 150);
+  const run = (drawEvery: number) => {
+    const s = setup();
+    s.room.restoreCheckpoint('split'); s.encounter.reset();
+    const events: unknown[] = [], frames: unknown[] = [];
+    const off = [
+      s.encounter.projectiles.events.on('spawned', e => events.push(['spawned', { ...e }])),
+      s.encounter.projectiles.events.on('worldImpact', e => events.push(['world', { ...e }])),
+      s.encounter.projectiles.events.on('slimeImpact', e => events.push(['slime', { ...e }])),
+      s.encounter.damage.events.on('damaged', e => events.push(['damage', { ...e }])),
+    ];
+    let cosmeticSweeps = 0;
+    const sweep = s.world.sweepSphere.bind(s.world);
+    s.world.sweepSphere = (...args) => { if (args[2] === .01) cosmeticSweeps++; return sweep(...args); };
+    try {
+      for (let frame = 0; frame < 360; frame++) {
+        if (frame === 90) s.room.controller.security.select('red');
+        if (frame === 150) s.room.controller.security.toggle('red');
+        if (frame === 240) { s.room.restoreCheckpoint('split'); s.encounter.reset(); }
+        const drone = s.encounter.drones[0];
+        const target = drone.root.position.clone().addScaledVector(drone.readModel.scanDirection, 6);
+        s.bob.recoverAt(s.room.root.localToWorld(target));
+        const before = cosmeticSweeps;
+        s.encounter.update(1 / 60);
+        assert.equal(cosmeticSweeps, before, 'fixed gameplay never clips scanner geometry');
+        if (drawEvery && frame % drawEvery === 0) {
+          camera.position.copy(s.bob.position).add(new THREE.Vector3(0, 4, -8)); camera.lookAt(s.bob.position);
+          s.encounter.updatePresentation(drawEvery / 60, camera);
+        }
+        frames.push(JSON.parse(JSON.stringify({ drones: s.encounter.drones.map(d => d.readModel),
+          projectiles: s.encounter.projectiles.states, health: s.encounter.damage.health })));
+      }
+    } finally { off.forEach(unsubscribe => unsubscribe()); s.world.sweepSphere = sweep; s.dispose(); }
+    return { frames, events, cosmeticSweeps };
+  };
+  {
+    const noDraw = run(0), everyDraw = run(1), catchUp = run(6);
+    assert.equal(noDraw.cosmeticSweeps, 0);
+    assert.ok(everyDraw.cosmeticSweeps > 0 && catchUp.cosmeticSweeps > 0);
+    assert.ok(noDraw.events.some(e => (e as unknown[])[0] === 'spawned'), 'exercise real projectile fire');
+    assert.ok(noDraw.events.some(e => (e as unknown[])[0] === 'damage'), 'exercise real hit/damage');
+    for (let i = 0; i < noDraw.frames.length; i++) {
+      assert.deepEqual(everyDraw.frames[i], noDraw.frames[i], `normal frame ${i}`);
+      assert.deepEqual(catchUp.frames[i], noDraw.frames[i], `catch-up frame ${i}`);
+    }
+    assert.deepEqual(everyDraw.events, noDraw.events); assert.deepEqual(catchUp.events, noDraw.events);
+  }
 });
