@@ -137,7 +137,7 @@ function assertExportMetadata(
 ): void {
   const rootMetadata = assetRoot.userData;
   if (
-    !Object.hasOwn(APPROVED_PROFILES, rootMetadata.contract) ||
+    !Object.prototype.hasOwnProperty.call(APPROVED_PROFILES, rootMetadata.contract) ||
     rootMetadata.local_up !== '+Y' ||
     rootMetadata.local_forward !== '-Z' ||
     rootMetadata.collider_radius_metres !== EXPECTED_COLLIDER_RADIUS_METRES

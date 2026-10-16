@@ -671,7 +671,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       activeCapturedFrame.recorderOverheadMs = this.currentOverheadMs;
     }
     const finalizedCapturedFrame = this.hitchWindows.length > 0
-      ? findWindowFrame(this.hitchWindows.at(-1)!, frame.sequence)
+      ? findWindowFrame(this.hitchWindows[this.hitchWindows.length - 1]!, frame.sequence)
       : undefined;
     if (finalizedCapturedFrame) {
       finalizedCapturedFrame.recorderOverheadMs = this.currentOverheadMs;
@@ -841,7 +841,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   }
 
   private appendFrame(window: HitchWindow, frame: RecordedFrame): void {
-    const previous = window.frames.at(-1);
+    const previous = window.frames[window.frames.length - 1];
     if (previous?.sequence === frame.sequence) return;
     if (window.frames.length >= this.config.maximumWindowFrames) {
       window.truncated = true;
