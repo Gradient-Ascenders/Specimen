@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
+import { openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 // Read-only production instrumentation; no globals are added to shipped code.
 // Frozen camera controls establish pass attribution, not interactive FPS.
@@ -35,6 +36,7 @@ test('gel modes bound transmission work and resources at identical production po
   await page.keyboard.press('KeyP');
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'paused');
   await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  await openAdvancedGraphics(page);
   await page.locator('[data-setting="gel-rendering"]').selectOption('minimum');
   expect(await page.evaluate(() => (window as any).__gelLayer.gelRendering.value)).toBe('minimum');
   await page.locator('[data-setting="gel-rendering"]').selectOption('physical');

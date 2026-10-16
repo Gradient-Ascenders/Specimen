@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { confirmRestart, openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 // No route interception or runtime injection: these are the shipped files.
 const watchProductionRequests = (page: Page, baseURL: string): Set<string> => {
@@ -34,11 +35,13 @@ const assertPlaying = async (page: Page): Promise<void> => {
   }));
 };
 
-const restartFromPause = async (page: Page): Promise<void> => {
+const restartFromPause = async (page: Page, level = 'Containment · 01'): Promise<void> => {
   await page.keyboard.press('KeyP');
   const pause = page.locator('[data-flow-panel="paused"]');
   await expect(pause).toBeVisible();
+  await expect(pause.locator('[data-pause-level]')).toHaveText(level);
   await pause.locator('[data-action="restart"]').click();
+  await confirmRestart(page);
   await assertPlaying(page);
   await page.keyboard.press('KeyP');
   await expect(pause.locator('[data-restart-status]')).toHaveText('Trial restored.');
@@ -84,12 +87,13 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   const start = page.locator('[data-flow-panel="title"] [data-action="start"]');
   await expect(start).toBeVisible({ timeout: 120_000 });
   await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await openAdvancedGraphics(page);
   await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await start.click();
   await assertPlaying(page);
-  expect([...voltAssets], 'Containment must not load Volt').toEqual([]);
+  expect(voltAssets.size, 'The title pod previews the authored Volt model').toBe(1);
   expect(cultivationAssets.size, 'Containment must not load the Cultivation bake').toBe(0);
   await expect.poll(() => audioAssets.size).toBe(34);
   expect([...audioAssets].some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
@@ -111,7 +115,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
       expect(cultivationAssets.size, 'Cultivation must load its baked assets before playing').toBe(1);
       expect([...cultivationAssets][0]).toContain('/group-folder/assets/authored-assets-');
     }
-    await restartFromPause(page);
+    await restartFromPause(page, level === 2 ? 'Cultivation · 02' : 'Blackout · 03');
   }
   await expect(page.locator('[data-slime-id="volt"]')).toHaveAttribute('data-state', 'active');
   expect(voltAssets.size, 'The shipped authored Volt GLB must load').toBe(1);

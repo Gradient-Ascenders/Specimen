@@ -6,6 +6,13 @@ Specimen ships 54 OGG effects: Bob 16, Goop 18, Volt 19, turrets 1. Of these, 51
 
 `src/audio/SoundCatalog.ts` registers every asset. `AudioManager` owns one application Web Audio context, cached decoded buffers, an effects gain, compressor and master gain. `GameplayAudio` owns each level's event subscriptions, character loops and reset suppression. Typed `gameplayAudioEvents` notifications are presentation-only; gameplay never reads audio state. Each current runtime receives the same manager from `main.ts`. Standalone gameplay fixtures need no browser audio context.
 
+Menu navigation, confirmation and Back use short synthesized sine cues through a
+separate menu gain in the same context, compressor and master chain. They obey
+both volume sliders, require an unlocked context, and stop on blur. Navigation
+is limited to one cue per 90 ms and at most four cues can overlap. While paused,
+the gameplay effects gain is muted; a menu cue briefly wakes the context, then
+suspends it again when the last cue ends. No extra audio files are fetched.
+
 Movement uses authoritative KinematicBody events and resolved grounded velocity, not keyboard detection. Acid shots, collisions, burns, electrical connections, receiver charge thresholds, powered devices and turret projectiles publish notifications only after their gameplay conditions succeed. Loop keys identify the character channel, acid projectile, dissolve target, charge receiver or established tether. Character switching clears only character loops; existing corrosion, projectiles and an inactive Volt tether retain ownership.
 
 ## Assets and provenance
@@ -27,7 +34,7 @@ Voices are bounded at 24 globally and three per one-shot effect. Each standard l
 ## Lifecycle
 
 - Boot preloads/decode-caches the 34 Bob/Goop clips while playback stays suspended. The Cultivation factory adds the shared turret and six rescued-Volt movement/recovery clips (41 total); Blackout adds his electrical clips (54 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
-- Pause/menus suspend the context and clear transient character loops. World loops preserve their offsets and resume once. Browser blur/visibility adds an independent suspension gate. Fixed-step state recreates character movement/charge loops only if still valid.
+- Pause/menus mute gameplay, suspend the context between menu cues, and clear transient character loops. World loops preserve their offsets while the context is suspended and resume once. Browser blur/visibility adds an independent suspension gate. Fixed-step state recreates character movement/charge loops only if still valid.
 - Death stops existing voices, plays Bob's accepted-failure cue when applicable, and rejects further world sounds until successful recovery. Retry sounds the restored active identity.
 - Restart/checkpoint/puzzle reset clears voices and suppresses restoration notifications until the next gameplay update. Projectile impact, expiry, reset and disposal immediately stop flight ownership; burn completion/reset/disposal stop corrosion ownership.
 - Unload/transition removes level subscriptions and all sources. Shutdown removes browser handlers, disconnects audio graph resources and closes the context. Blackout's terminal completion explicitly clears and suspends audio; its session retains the completed scene. Merging clears original-character loops and the merged Specimen owns listener position without borrowing a slime's movement sounds.

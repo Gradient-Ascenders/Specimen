@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
+import { confirmRestart } from '../helpers/MenuNavigation.ts';
 
 test('audio banks decode beneath nested base and gameplay owns charge, movement, pause and reset audio', async ({ page }) => {
   const errors: string[] = [], audioRequests: string[] = [];
@@ -71,6 +72,7 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'suspended');
   await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  await page.getByRole('tab', { name: 'Audio', exact: true }).click();
   await page.locator('[data-setting="volume"]').press('Home');
   await page.locator('[data-setting="effects-volume"]').press('Home');
   for (let i=0;i<7;i++) await page.locator('[data-setting="effects-volume"]').press('ArrowRight');
@@ -78,6 +80,7 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   expect(volume.masterVolume).toBe(0); expect(volume.effectsVolume).toBe(0.35);
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
+  await confirmRestart(page);
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
   const reset=await step(1);
   expect(reset.keys).not.toContain('character:charge');

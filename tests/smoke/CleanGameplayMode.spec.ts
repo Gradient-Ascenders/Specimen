@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { confirmRestart, openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 for (const preset of ['normal', 'performance'] as const) {
 test(`F1 preserves ${preset} gameplay across three levels and captures normal, clean and restored views`, async ({
@@ -47,6 +48,7 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
   await page.keyboard.press('F1');
   await expect(app).not.toHaveAttribute('data-clean-gameplay');
   await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await openAdvancedGraphics(page);
   await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
   if (preset === 'performance') await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
@@ -488,6 +490,7 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
     await page
       .locator('[data-flow-panel="paused"] [data-action="restart"]')
       .click();
+    await confirmRestart(page);
     await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
     await draw();
     await assertCleanHud();

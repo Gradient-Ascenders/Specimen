@@ -23,6 +23,8 @@ import {
   createBrandMarkMarkup,
   createBrandedScannerMarkup,
 } from './Branding.ts';
+import { isTitleSpecimenId, TITLE_SPECIMEN_ORDER, TITLE_SPECIMEN_VIEWS,
+  type TitleSpecimenId, type TitleSpecimenRegion } from './TitleSpecimenView.ts';
 
 export type GameFlowState =
   | 'loading'
@@ -327,6 +329,8 @@ export interface GameFlowActions {
   applySettings(settings: Readonly<GameSettingsSnapshot>): void;
   getGraphicsDiagnostics?(): GraphicsDiagnostics;
   subscribeGraphicsDiagnostics?(listener: () => void): () => void;
+  playMenuSound?(cue: 'navigate' | 'confirm' | 'back'): void;
+  previewTitleSpecimen?(id: TitleSpecimenId | null, replay?: boolean): void;
 }
 
 export interface SlimeHUDSource {
@@ -395,6 +399,14 @@ export class GameFlowUI {
   private readonly unsubscribeSlimeHUD: () => void;
   private readonly switchFeedbackModel = new SlimeSwitchFeedbackModel();
   private restartPending = false;
+  private restartConfirmationOpen = false;
+  private activeSettingsTab = 'controls';
+  private levelLabel = 'Containment · 01';
+  private returnFocus: HTMLElement | undefined;
+  private pointerSpecimen: TitleSpecimenId | null = null;
+  private focusedSpecimen: TitleSpecimenId | null = null;
+  private previewedSpecimen: TitleSpecimenId | null = null;
+  private readonly specimenRegionStyles = new Map<TitleSpecimenId, string>();
   private disposed = false;
 
   constructor(options: GameFlowUIOptions) {
@@ -483,6 +495,22 @@ export class GameFlowUI {
     return this.model.state === 'playing';
   }
 
+  get titleBackdropVisible(): boolean {
+    return this.state === 'title' ||
+      ((this.state === 'settings' || this.state === 'credits') && this.model.menuOrigin === 'title');
+  }
+
+  setTitleSpecimenRegions(regions: readonly TitleSpecimenRegion[]): void {
+    for (const region of regions) {
+      const style = `left:${region.left * 100}%;top:${region.top * 100}%;width:${region.width * 100}%;height:${region.height * 100}%;`;
+      if (this.specimenRegionStyles.get(region.id) === style) continue;
+      this.specimenRegionStyles.set(region.id, style);
+      const button = this.requireElement<HTMLButtonElement>(`[data-title-specimen="${region.id}"]`);
+      button.style.cssText = style;
+      button.hidden = region.width <= 0 || region.height <= 0;
+    }
+  }
+
   completeBoot(): void {
     if (!this.model.completeBoot()) return;
     this.syncState();
@@ -496,6 +524,7 @@ export class GameFlowUI {
     const nextObjective = objective.trim();
     if (!nextObjective) throw new Error('Gameplay objectives cannot be empty.');
     this.objective.textContent = nextObjective;
+    this.requireElement('[data-pause-objective]').textContent = nextObjective;
   }
 
   beginLevelTransition(
@@ -519,6 +548,8 @@ export class GameFlowUI {
 
   finishLevelTransition(levelId: 'level-2' | 'level-3' = 'level-2'): void {
     if (this.model.state !== 'transitioning') return;
+    this.levelLabel = levelId === 'level-2' ? 'Cultivation · 02' : 'Blackout · 03';
+    this.requireElement('[data-pause-level]').textContent = this.levelLabel;
     const levelName = levelId === 'level-2' ? 'Level 2' : 'Level 3';
     this.transitionMessage.textContent = `${levelName} ready`;
     const label = this.transitionContinueButton.querySelector('span');
@@ -563,6 +594,9 @@ export class GameFlowUI {
       </section>
 
       <section class="flow-screen title-screen" data-flow-panel="title" aria-labelledby="title-heading" hidden>
+        <div class="title-specimen-hotspots" role="group" aria-label="Preview specimen abilities">
+          ${TITLE_SPECIMEN_ORDER.map(id => `<button class="title-specimen-hotspot" type="button" data-title-specimen="${id}" aria-label="${id === 'bob' ? 'Bob' : id === 'goop' ? 'Goop' : 'Volt'}: preview ${TITLE_SPECIMEN_VIEWS[id].ability.toLowerCase()}" hidden></button>`).join('')}
+        </div>
         <div class="title-composition">
           <header class="title-branding">
             ${createBrandMarkMarkup('detailed', 'title-brand-mark')}
@@ -572,6 +606,7 @@ export class GameFlowUI {
             </div>
           </header>
           <p class="title-tagline">Explore <span>·</span> Adapt <span>·</span> Transcend</p>
+          <p class="title-description">Three specimens. One way out.<br>Discover what you can become.</p>
           <div class="flow-actions game-menu title-actions">
             <button class="primary-action menu-action" data-action="start" data-autofocus>
               <span class="menu-index" aria-hidden="true">01</span>
@@ -590,7 +625,9 @@ export class GameFlowUI {
             </button>
           </div>
           <div class="signal-rule title-signal" aria-hidden="true"><span></span></div>
+          <p class="title-footer"><span class="status-light" aria-hidden="true"></span> Single-player puzzle platformer</p>
         </div>
+        <div class="title-specimen-caption" role="status" aria-live="polite" aria-atomic="true"><span class="system-label" data-title-specimen-label>Specimen array / 03</span><span data-title-specimen-name>Goop · Bob · Volt</span><span class="specimen-caption-status" data-title-specimen-ability>● &nbsp; Hover a specimen to preview</span></div>
       </section>
 
       <aside class="game-hud" data-flow-panel="playing" aria-label="Gameplay guidance" hidden>
@@ -624,14 +661,14 @@ export class GameFlowUI {
             </div>
           </header>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <div class="pause-session">
+            <p class="system-label" data-pause-level>Containment · 01</p>
+            <p class="pause-objective" data-pause-objective>Climb through the vent</p>
+          </div>
           <div class="flow-actions game-menu pause-actions">
             <button class="primary-action menu-action" data-action="resume" data-autofocus>
               <span>Resume</span>
               <span class="menu-arrow" aria-hidden="true">→</span>
-            </button>
-            <button class="menu-action pause-restart" data-action="restart">
-              <span>Restart trial</span>
-              <span class="menu-arrow" aria-hidden="true">↻</span>
             </button>
             <button class="menu-action" data-action="settings">
               <span>Settings</span>
@@ -641,9 +678,24 @@ export class GameFlowUI {
               <span>Credits</span>
               <span class="menu-arrow" aria-hidden="true">→</span>
             </button>
+            <button class="menu-action pause-restart" data-action="restart">
+              <span>Restart trial</span>
+              <span class="menu-arrow" aria-hidden="true">↻</span>
+            </button>
           </div>
           <p class="system-status" data-restart-status role="status" aria-live="polite"></p>
           <p class="pause-hint" aria-hidden="true"><kbd>P</kbd> Resume</p>
+        </div>
+        <div class="restart-confirmation" data-restart-confirmation role="alertdialog" aria-modal="true" aria-labelledby="restart-confirm-heading" aria-describedby="restart-confirm-copy" hidden>
+          <div class="system-panel restart-confirm-card">
+            <p class="system-label">Reset current trial</p>
+            <h2 id="restart-confirm-heading">Start this level over?</h2>
+            <p class="system-copy" id="restart-confirm-copy">Your progress in this level will be lost. Your settings will be kept.</p>
+            <div class="confirmation-actions">
+              <button class="system-action primary-action" data-action="cancel-restart">Cancel</button>
+              <button class="system-action danger-action" data-action="confirm-restart">Restart level <span aria-hidden="true">↻</span></button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -657,6 +709,14 @@ export class GameFlowUI {
             </div>
           </header>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <div class="settings-tabs" role="tablist" aria-label="Settings categories">
+            <button id="settings-tab-controls" role="tab" aria-selected="true" aria-controls="settings-controls" data-settings-tab="controls" data-autofocus>Controls</button>
+            <button id="settings-tab-audio" role="tab" aria-selected="false" aria-controls="settings-audio" data-settings-tab="audio" tabindex="-1">Audio</button>
+            <button id="settings-tab-graphics" role="tab" aria-selected="false" aria-controls="settings-graphics" data-settings-tab="graphics" tabindex="-1">Graphics</button>
+          </div>
+          <div class="settings-content">
+          <section id="settings-controls" class="settings-category" role="tabpanel" aria-labelledby="settings-tab-controls" data-settings-category="controls">
+          <p class="category-intro">Make yourself at home.</p>
           <div class="setting-row">
             <div class="setting-heading">
               <label for="mouse-sensitivity">Mouse sensitivity</label>
@@ -678,13 +738,16 @@ export class GameFlowUI {
             </div>
             <input id="camera-distance" data-setting="camera-distance" type="range" min="${MIN_FOLLOW_DISTANCE_METRES}" max="${MAX_FOLLOW_DISTANCE_METRES}" step="0.1">
           </div>
+          </section>
+          <section id="settings-audio" class="settings-category" role="tabpanel" aria-labelledby="settings-tab-audio" data-settings-category="audio" hidden>
+          <p class="category-intro">Find your balance.</p>
           <div class="setting-row">
             <div class="setting-heading">
               <label for="master-volume">Master volume</label>
               <output for="master-volume" data-setting-output="volume"></output>
             </div>
             <input id="master-volume" data-setting="volume" type="range" min="0" max="100" step="5">
-            <p class="setting-note">Stored for this session. Controls all game audio.</p>
+            <p class="setting-note">Controls all game and menu audio.</p>
           </div>
           <div class="setting-row">
             <div class="setting-heading">
@@ -693,59 +756,71 @@ export class GameFlowUI {
             </div>
             <input id="effects-volume" data-setting="effects-volume" type="range" min="0" max="100" step="5">
           </div>
+          </section>
+          <section id="settings-graphics" class="settings-category" role="tabpanel" aria-labelledby="settings-tab-graphics" data-settings-category="graphics" hidden>
+          <p class="category-intro">A clear view of the unknown.</p>
           <div class="setting-row">
             <div class="setting-heading"><label for="graphics-profile">Graphics profile</label></div>
             <select id="graphics-profile" data-setting="graphics-profile" aria-describedby="graphics-profile-note">
-              <option value="minimum">Minimum hardware — recommended starting point</option>
-              <option value="standard">Standard — sharper image and refraction</option>
-              <option value="custom" disabled>Custom — choose a profile to reset</option>
+              <option value="minimum">Minimum · faster</option>
+              <option value="standard">Standard · sharper</option>
+              <option value="custom" disabled>Custom</option>
             </select>
-            <p class="setting-note" id="graphics-profile-note">Sets resolution, gel, shadow detail and decorative effects together. Gameplay, hazard lights and beams are unchanged. Changes last for this session.</p>
-            <p class="setting-note" data-graphics-diagnostics></p>
+            <p class="setting-note" id="graphics-profile-note">Minimum is recommended for slower devices. Standard adds sharper detail and light refraction.</p>
           </div>
+          <details class="settings-advanced">
+          <summary>Advanced graphics</summary>
+          <p class="setting-note">Fine-tune image quality and performance.</p>
           <div class="setting-row">
             <div class="setting-heading">
-              <label for="graphics-preset">Additional performance cap</label>
+              <label for="graphics-preset">Performance cap</label>
             </div>
             <select id="graphics-preset" data-setting="graphics-preset">
-              <option value="normal">Off — profile settings</option>
-              <option value="performance">On — cap density and refraction</option>
+              <option value="normal">Off</option>
+              <option value="performance">On</option>
             </select>
-            <p class="setting-note">Optional extra limit: caps density at 1× before render scaling and refraction at half resolution. Keeps your selected density/gel choices for when it is switched off. The profile's pixel budget always applies.</p>
+            <p class="setting-note">Limits pixel density and refraction quality for smoother play.</p>
           </div>
           <div class="setting-row">
             <div class="setting-heading">
-              <label for="render-resolution">Render resolution</label>
+              <label for="render-resolution">Pixel density</label>
             </div>
             <select id="render-resolution" data-setting="render-resolution">
-              <option value="0.75">Display density cap — 0.75×</option>
-              <option value="1">Display density cap — 1.0×</option>
-              <option value="1.5">Display density cap — 1.5×</option>
-              <option value="2">Display density cap — 2.0×</option>
+              <option value="0.75">0.75×</option>
+              <option value="1">1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
             </select>
-            <p class="setting-note">Density before render scaling. The profile's absolute pixel limit always applies; interface resolution is unchanged.</p>
+            <p class="setting-note">Higher values sharpen the image and use more graphics power.</p>
           </div>
           <div class="setting-row">
             <div class="setting-heading"><label for="render-scale">3D render scale</label></div>
             <select id="render-scale" data-setting="render-scale">
-              <option value="0.5">50% — fastest, softest</option>
-              <option value="0.75">75% — reduced detail</option>
-              <option value="1">100% — full selected density</option>
+              <option value="0.5">50% · faster</option>
+              <option value="0.75">75% · balanced</option>
+              <option value="1">100% · sharper</option>
             </select>
-            <p class="setting-note">Scales width and height. Large windows may be scaled further to stay within the pixel budget.</p>
+            <p class="setting-note">Reduce for smoother play. Menu text stays sharp.</p>
           </div>
           <div class="setting-row">
             <div class="setting-heading"><label for="gel-rendering">Character gel</label></div>
             <select id="gel-rendering" data-setting="gel-rendering">
-              <option value="minimum">Minimum hardware — glossy gel</option>
-              <option value="reduced-transmission">Balanced — soft refraction</option>
-              <option value="physical">High — full refraction</option>
+              <option value="minimum">Glossy</option>
+              <option value="reduced-transmission">Soft refraction</option>
+              <option value="physical">Full refraction</option>
             </select>
             <p class="setting-note">Glossy gel keeps reflections and character glow. Refraction adds background distortion at a higher graphics cost.</p>
           </div>
-          <button class="system-action system-back" data-action="back" data-autofocus>
+          <details class="graphics-diagnostics"><summary>Rendering details</summary><p class="setting-note" data-graphics-diagnostics></p></details>
+          </details>
+          </section>
+          </div>
+          <footer class="system-panel-footer">
+          <button class="system-action system-back" data-action="back">
             <span aria-hidden="true">←</span><span>Back</span>
           </button>
+          <p class="setting-note">Applied instantly · This session</p>
+          </footer>
         </div>
       </section>
 
@@ -761,16 +836,18 @@ export class GameFlowUI {
           </header>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
           <div class="credits-ledger" aria-label="Credits ledger"></div>
+          <footer class="system-panel-footer">
           <button class="system-action system-back" data-action="back" data-autofocus>
             <span aria-hidden="true">←</span><span>Back</span>
           </button>
+          </footer>
         </div>
       </section>
 
       <section class="flow-screen" data-flow-panel="restarting" aria-labelledby="restarting-heading" hidden>
         <div class="system-state">
           ${createBrandedScannerMarkup()}
-          <p class="system-label">Containment runtime · 01</p>
+          <p class="system-label" data-restart-level>Containment · 01</p>
           <h1 id="restarting-heading">Reconstituting specimen</h1>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
           <p class="system-copy" role="status" aria-live="polite">Restoring the trial state.</p>
@@ -814,6 +891,12 @@ export class GameFlowUI {
   private bindActions(): void {
     const signal = this.listeners.signal;
     this.element.addEventListener('click', this.onClick, { signal });
+    this.element.addEventListener('pointerover', this.onMenuHover, { signal });
+    this.element.addEventListener('focusin', this.onMenuFocus, { signal });
+    this.element.addEventListener('pointerover', this.onSpecimenPointerOver, { signal });
+    this.element.addEventListener('pointerout', this.onSpecimenPointerOut, { signal });
+    this.element.addEventListener('focusin', this.onSpecimenFocus, { signal });
+    this.element.addEventListener('focusout', this.onSpecimenBlur, { signal });
     this.sensitivityInput.addEventListener('input', this.onSensitivityInput, {
       signal,
     });
@@ -862,6 +945,10 @@ export class GameFlowUI {
     const state = this.model.state;
     this.element.dataset.state = state;
     this.element.dataset.menuOrigin = this.model.menuOrigin;
+    if (state !== 'title') {
+      this.pointerSpecimen = this.focusedSpecimen = null;
+      this.previewTitleSpecimen(null);
+    }
     for (const [panelState, panel] of this.panels) {
       panel.hidden = panelState !== state;
     }
@@ -874,9 +961,15 @@ export class GameFlowUI {
     if (FULL_SCREEN_STATES.has(state)) this.actions.releasePointerLock();
 
     const focusTarget = this.focusTargets.get(state);
+    const restoreFocus = this.returnFocus;
+    this.returnFocus = undefined;
     if (focusTarget) {
       queueMicrotask(() => {
-        if (!this.disposed && this.model.state === state) focusTarget.focus();
+        if (!this.disposed && this.model.state === state) {
+          const settingsTab = state === 'settings'
+            ? this.requireElement(`[data-settings-tab="${this.activeSettingsTab}"]`) : undefined;
+          (restoreFocus ?? settingsTab ?? focusTarget).focus({ preventScroll: true });
+        }
       });
     }
   }
@@ -906,6 +999,7 @@ export class GameFlowUI {
   private restart(): void {
     if (this.restartPending || !this.model.beginRestart()) return;
     this.restartPending = true;
+    this.requireElement('[data-restart-level]').textContent = this.levelLabel;
     this.restartStatus.textContent = '';
     this.switchFeedbackModel.clear();
     this.switchFeedback.textContent = '';
@@ -936,11 +1030,104 @@ export class GameFlowUI {
     return element;
   }
 
+  private selectSettingsTab(id: string, focus = false): void {
+    const tab = this.element.querySelector<HTMLElement>(`[data-settings-tab="${id}"]`);
+    if (!tab) return;
+    this.activeSettingsTab = id;
+    for (const item of this.element.querySelectorAll<HTMLElement>('[data-settings-tab]')) {
+      const selected = item === tab;
+      item.setAttribute('aria-selected', String(selected));
+      item.tabIndex = selected ? 0 : -1;
+    }
+    for (const panel of this.element.querySelectorAll<HTMLElement>('[data-settings-category]')) {
+      panel.hidden = panel.dataset.settingsCategory !== id;
+    }
+    this.requireElement('.settings-content').scrollTop = 0;
+    if (focus) tab.focus({ preventScroll: true });
+  }
+
+  private showRestartConfirmation(open: boolean): void {
+    this.restartConfirmationOpen = open;
+    this.requireElement('[data-restart-confirmation]').hidden = !open;
+    this.requireElement('.pause-rail').inert = open;
+    this.requireElement(`[data-action="${open ? 'cancel-restart' : 'restart'}"]`).focus({ preventScroll: true });
+  }
+
+  private readonly onMenuHover = (event: PointerEvent): void => {
+    const button = (event.target as Element | null)?.closest('button, summary');
+    if (!button || button.contains(event.relatedTarget as Node | null)) return;
+    if (button instanceof HTMLButtonElement && button.disabled) return;
+    this.actions.playMenuSound?.('navigate');
+  };
+
+  private readonly onMenuFocus = (event: FocusEvent): void => {
+    if ((event.target as Element | null)?.matches('button, summary')) {
+      this.actions.playMenuSound?.('navigate');
+    }
+  };
+
+  private specimenFromTarget(target: EventTarget | null): TitleSpecimenId | null {
+    const id = (target as Element | null)?.closest?.<HTMLElement>('[data-title-specimen]')?.dataset.titleSpecimen;
+    return isTitleSpecimenId(id) ? id : null;
+  }
+
+  private previewTitleSpecimen(id: TitleSpecimenId | null, replay = false): void {
+    if (id === this.previewedSpecimen && !replay) return;
+    this.previewedSpecimen = id;
+    this.element.classList.toggle('is-title-blackout', id === 'volt');
+    const caption = this.requireElement('.title-specimen-caption');
+    const view = id ? TITLE_SPECIMEN_VIEWS[id] : null;
+    if (id) caption.dataset.specimen = id;
+    else delete caption.dataset.specimen;
+    caption.style.setProperty('--specimen-accent', view?.color ?? '#83dfd0');
+    this.requireElement('[data-title-specimen-label]').textContent = view?.label ?? 'Specimen array / 03';
+    this.requireElement('[data-title-specimen-name]').textContent = view?.name ?? 'Goop · Bob · Volt';
+    this.requireElement('[data-title-specimen-ability]').textContent = `●  ${view?.ability ?? 'Hover a specimen to preview'}`;
+    this.actions.previewTitleSpecimen?.(id, replay);
+  }
+
+  private readonly onSpecimenPointerOver = (event: PointerEvent): void => {
+    if (this.state !== 'title') return;
+    const id = this.specimenFromTarget(event.target);
+    if (!id) return;
+    this.pointerSpecimen = id;
+    this.previewTitleSpecimen(id);
+  };
+
+  private readonly onSpecimenPointerOut = (event: PointerEvent): void => {
+    if (!this.specimenFromTarget(event.target)) return;
+    this.pointerSpecimen = this.specimenFromTarget(event.relatedTarget);
+    this.previewTitleSpecimen(this.pointerSpecimen ?? this.focusedSpecimen);
+  };
+
+  private readonly onSpecimenFocus = (event: FocusEvent): void => {
+    if (this.state !== 'title') return;
+    this.focusedSpecimen = this.specimenFromTarget(event.target);
+    this.previewTitleSpecimen(this.pointerSpecimen ?? this.focusedSpecimen);
+  };
+
+  private readonly onSpecimenBlur = (event: FocusEvent): void => {
+    this.focusedSpecimen = this.specimenFromTarget(event.relatedTarget);
+    this.previewTitleSpecimen(this.pointerSpecimen ?? this.focusedSpecimen);
+  };
+
   private readonly onClick = (event: MouseEvent): void => {
+    const specimen = this.specimenFromTarget(event.target);
+    if (specimen && this.state === 'title') {
+      this.previewTitleSpecimen(specimen, true);
+      return;
+    }
+    const tab = (event.target as Element | null)?.closest<HTMLElement>('[data-settings-tab]');
+    if (tab && this.state === 'settings') {
+      this.actions.playMenuSound?.('confirm');
+      this.selectSettingsTab(tab.dataset.settingsTab!);
+      return;
+    }
     const target = (event.target as Element | null)?.closest<HTMLButtonElement>(
       'button[data-action]',
     );
     if (!target) return;
+    this.actions.playMenuSound?.(target.dataset.action === 'back' || target.dataset.action === 'cancel-restart' ? 'back' : 'confirm');
 
     switch (target.dataset.action) {
       case 'start':
@@ -956,7 +1143,16 @@ export class GameFlowUI {
         this.resume();
         break;
       case 'restart':
-        this.restart();
+        if (this.state === 'paused') this.showRestartConfirmation(true);
+        break;
+      case 'cancel-restart':
+        this.showRestartConfirmation(false);
+        break;
+      case 'confirm-restart':
+        if (this.restartConfirmationOpen && this.state === 'paused') {
+          this.showRestartConfirmation(false);
+          this.restart();
+        }
         break;
       case 'enter-level':
         if (this.model.state !== 'transitioning' || target.hidden) break;
@@ -967,18 +1163,47 @@ export class GameFlowUI {
         }
         break;
       case 'settings':
-        if (this.model.openSettings()) this.syncState();
+        if (this.model.openSettings()) {
+          this.returnFocus = undefined;
+          this.syncState();
+        }
         break;
       case 'credits':
         if (this.model.openCredits()) this.syncState();
         break;
       case 'back':
+        this.returnFocus = this.panels.get(this.model.menuOrigin)?.querySelector<HTMLElement>(`[data-action="${this.state}"]`) ?? undefined;
         if (this.model.back()) this.syncState();
         break;
     }
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (this.restartConfirmationOpen) {
+      if (event.code === 'Escape') {
+        event.preventDefault();
+        this.actions.playMenuSound?.('back');
+        this.showRestartConfirmation(false);
+      } else if (event.code === 'Tab') {
+        this.trapFocus(event, this.requireElement('[data-restart-confirmation]'));
+      } else if (event.code === 'KeyP') event.preventDefault();
+      return;
+    }
+    if (event.code === 'Tab' && FULL_SCREEN_STATES.has(this.state)) {
+      const panel = this.panels.get(this.state);
+      if (panel) this.trapFocus(event, panel);
+      return;
+    }
+    const tab = (event.target as Element | null)?.closest<HTMLElement>('[data-settings-tab]');
+    if (tab && this.state === 'settings' && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.code)) {
+      event.preventDefault();
+      const ids = ['controls', 'audio', 'graphics'];
+      const current = ids.indexOf(this.activeSettingsTab);
+      const next = event.code === 'Home' ? 0 : event.code === 'End' ? 2
+        : (current + (event.code === 'ArrowRight' ? 1 : 2)) % 3;
+      this.selectSettingsTab(ids[next]!, true);
+      return;
+    }
     if (event.repeat) return;
     const action = getGameFlowKeyboardAction(
       event.code,
@@ -989,12 +1214,14 @@ export class GameFlowUI {
     if (action === 'pause') {
       if (!this.actions.isGameplayInputEnabled()) return;
       event.preventDefault();
+      this.actions.playMenuSound?.('confirm');
       this.pause();
       return;
     }
 
     if (action === 'resume') {
       event.preventDefault();
+      this.actions.playMenuSound?.('confirm');
       this.resume();
       return;
     }
@@ -1004,9 +1231,24 @@ export class GameFlowUI {
     // onPointerLockChange and resolves to the same authoritative pause state.
     if (action === 'back') {
       event.preventDefault();
+      this.actions.playMenuSound?.('back');
+      this.returnFocus = this.panels.get(this.model.menuOrigin)?.querySelector<HTMLElement>(`[data-action="${this.state}"]`) ?? undefined;
       if (this.model.back()) this.syncState();
     }
   };
+
+  private trapFocus(event: KeyboardEvent, panel: HTMLElement): void {
+    const items = [...panel.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, a[href]')]
+      .filter(item => item.tabIndex >= 0 && item.getClientRects().length > 0 && !item.closest('[inert]'));
+    const first = items[0], last = items.at(-1);
+    if (!first || !last) return;
+    const active = this.hostDocument.activeElement;
+    if (event.shiftKey && (active === first || !panel.contains(active))) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && (active === last || !panel.contains(active))) {
+      event.preventDefault(); first.focus();
+    }
+  }
 
   private readonly onWindowBlur = (): void => {
     this.pause();
@@ -1105,8 +1347,8 @@ export class GameFlowUI {
     const diagnostics = this.actions.getGraphicsDiagnostics?.();
     this.graphicsDiagnostics.textContent = [
       `${graphicsProfileName(settings) === 'custom' ? 'Custom, based on ' : ''}${profile.label}`,
-      diagnostics ? `${diagnostics.drawingBufferWidth} × ${diagnostics.drawingBufferHeight} px` : '',
-      `≤ ${(profile.pixelBudget / 1_000_000).toFixed(2)} million pixels`,
+      diagnostics ? `${diagnostics.presentationActive ? 'Title display: ' : ''}${diagnostics.drawingBufferWidth} × ${diagnostics.drawingBufferHeight} px` : '',
+      `gameplay ≤ ${(profile.pixelBudget / 1_000_000).toFixed(2)} million pixels`,
       diagnostics ? `display DPR ${diagnostics.devicePixelRatio.toFixed(2)}, effective ${diagnostics.pixelRatio.toFixed(2)}×` : '',
       `${Math.round(settings.renderScale * 100)}% scale`,
       `extra performance cap: ${settings.graphicsPreset === 'performance' ? 'on' : 'off'}`,

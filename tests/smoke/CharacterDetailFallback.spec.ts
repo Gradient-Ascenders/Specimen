@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { confirmRestart, openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout preparation', async ({ page }) => {
   const failures: string[] = [];
@@ -40,6 +41,7 @@ test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout pr
   expect(detailRequests.volt).toBe(0);
   expect(characterAssets.has('goop')).toBe(true);
   await title.locator('[data-action="settings"]').click();
+  await openAdvancedGraphics(page);
   await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
@@ -59,6 +61,7 @@ test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout pr
   }
   await page.keyboard.press('KeyP');
   await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
+  await confirmRestart(page);
   await assertPlaying();
   expect(failures).toEqual([]);
 });

@@ -4,6 +4,13 @@ export type RenderPixelRatioCap = (typeof RENDER_PIXEL_RATIO_CAPS)[number];
 
 export const DEFAULT_RENDER_PIXEL_RATIO_CAP: RenderPixelRatioCap = 1;
 
+/** The small title scene stays crisp independently of gameplay quality. */
+export const TITLE_RENDER_RESOLUTION = {
+  pixelRatioCap: 2,
+  renderScale: 1,
+  pixelBudget: 1920 * 1080,
+} as const;
+
 export const RENDER_SCALES = [0.5, 0.75, 1] as const;
 export type RenderScale = (typeof RENDER_SCALES)[number];
 export const isRenderScale = (value: number): value is RenderScale =>

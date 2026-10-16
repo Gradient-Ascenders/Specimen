@@ -29,6 +29,8 @@ class Parameter {
   value = 0;
   setTargetAtTime(value: number) { this.value = value; }
   linearRampToValueAtTime(value: number) { this.value = value; }
+  setValueAtTime(value: number) { this.value = value; }
+  exponentialRampToValueAtTime(value: number) { this.value = value; }
 }
 class Node {
   gain = new Parameter();
@@ -44,15 +46,63 @@ class Context {
   state = 'suspended'; currentTime = 0;
   destination = new Node(); listener = new Node();
   sources: Node[] = []; panners: Node[] = [];
+  oscillators: Oscillator[] = [];
   createGain() { return new Node(); }
   createDynamicsCompressor() { return new Node(); }
   createBufferSource() { const node = new Node(); this.sources.push(node); return node; }
   createPanner() { const node = new Node(); this.panners.push(node); return node; }
+  createOscillator() { const node = new Oscillator(); this.oscillators.push(node); return node; }
   async decodeAudioData() { return { duration: 1 }; }
   async resume() { this.state = 'running'; }
   async suspend() { this.state = 'suspended'; }
   async close() { this.state = 'closed'; }
 }
+
+class Oscillator extends Node {
+  frequency = new Parameter();
+  type = 'sine';
+  override stop() { this.stopped = true; }
+}
+
+test('menu cues wake the shared context while gameplay stays paused and muted', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    audio.playMenuCue('navigate');
+    assert.equal(context.oscillators.length, 0, 'hover must not unlock audio');
+    audio.playMenuCue('confirm');
+    await Promise.resolve();
+    assert.equal(context.state, 'running');
+    assert.equal(context.oscillators.length, 1);
+    assert.equal(audio.diagnostics.paused, true);
+    assert.equal((audio as any).effects.gain.value, 0, 'paused gameplay must remain silent');
+    assert.equal((audio as any).menu.gain.value, 0.8);
+    audio.play('bob-jump-01');
+    assert.equal(context.sources.length, 0);
+    context.oscillators[0].onended?.();
+    await Promise.resolve();
+    assert.equal(context.state, 'suspended');
+    assert.equal(context.oscillators[0].disconnected, true);
+    audio.setVolumes(0, 0.5);
+    audio.playMenuCue('confirm');
+    assert.equal(context.oscillators.length, 1, 'master mute applies to menu cues');
+    audio.setVolumes(1, 0);
+    audio.playMenuCue('confirm');
+    assert.equal(context.oscillators.length, 1, 'effects mute applies to menu cues');
+    audio.setVolumes(1, 0.4);
+    audio.setFocused(false);
+    audio.playMenuCue('back');
+    assert.equal(context.oscillators.length, 1);
+    audio.setFocused(true);
+    audio.setPaused(false);
+    audio.playMenuCue('confirm');
+    context.oscillators[1].onended?.();
+    await Promise.resolve();
+    assert.equal(context.state, 'running', 'ending a cue must not suspend live gameplay');
+    assert.equal((audio as any).effects.gain.value, 0.4);
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
 
 test('all 54 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];

@@ -10,6 +10,7 @@ import { GameSessionCoordinator } from './levels/GameSessionCoordinator.ts';
 import { GreyboxLevelRuntime } from './levels/GreyboxLevelRuntime.ts';
 import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
 import { RenderLayer } from './render/RenderLayer.ts';
+import { TitlePresentation } from './render/TitlePresentation.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
@@ -40,6 +41,10 @@ const renderLayer = new RenderLayer({
   graphics: settings.value,
 });
 const input = new Input({ pointerLockElement: renderLayer.canvas });
+const titlePresentation = new TitlePresentation(renderLayer.gelRendering);
+const titleReady = titlePresentation.prepare().catch((error: unknown) => {
+  console.warn('Title specimen could not be prepared.', error);
+});
 renderLayer.canvas.dataset.gameplayCanvas = 'true';
 const debugAvailable =
   import.meta.env.DEV ||
@@ -144,6 +149,8 @@ const gameFlow = new GameFlowUI({
     },
     getGraphicsDiagnostics: () => renderLayer.getGraphicsDiagnostics(),
     subscribeGraphicsDiagnostics: listener => renderLayer.subscribeGraphicsDiagnostics(listener),
+    playMenuSound: cue => audio.playMenuCue(cue),
+    previewTitleSpecimen: (id, replay) => titlePresentation.previewSpecimen(id, replay),
   },
 });
 const cleanGameplayMode = new CleanGameplayMode({
@@ -151,6 +158,13 @@ const cleanGameplayMode = new CleanGameplayMode({
   flow: gameFlow,
   prepareGameplay: () => gameSession.prepareCleanGameplay(),
   present: (clean) => renderLayer.setCleanGameplayMode(clean),
+});
+const unsubscribeTitlePresentation = gameFlow.subscribe(state => {
+  titlePresentation.setInteractive(state === 'title');
+  if (state === 'playing') {
+    titlePresentation.dispose();
+    renderLayer.restoreGameplayResolution();
+  }
 });
 const unsubscribeObjectiveChanged = gameSession.events.on(
   'objectiveChanged',
@@ -180,7 +194,12 @@ gameSession.load();
 const loop = new Loop({
   fixedUpdate: (deltaSeconds) => gameSession.fixedUpdate(deltaSeconds),
   render: (interpolationAlpha, stats) => {
-    gameSession.render(interpolationAlpha, stats);
+    if (gameFlow.titleBackdropVisible) {
+      titlePresentation.render(renderLayer, stats.frameDeltaSeconds);
+      if (gameFlow.state === 'title') gameFlow.setTitleSpecimenRegions(titlePresentation.specimenRegions);
+    } else {
+      gameSession.render(interpolationAlpha, stats);
+    }
     sampleLevelOneShaderPrograms?.();
   },
 });
@@ -223,6 +242,9 @@ if (debugAvailable) {
 }
 const startRenderLoop = (): void => {
   if (shuttingDown) return;
+  // Warm the menu's light/material signatures under the loading surface too,
+  // before capturing the fixed-configuration shader baseline.
+  titlePresentation.render(renderLayer, 0);
   renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
   // Present authoritative Room 1 frames before the loading UI yields control.
   bootFrame = requestAnimationFrame(() => {
@@ -251,12 +273,12 @@ bootFrame = requestAnimationFrame(() => {
       if (verification) {
         app.dataset.levelOnePrewarm = JSON.stringify(verification);
       }
-      startRenderLoop();
+      void titleReady.then(startRenderLoop);
     },
     (error) => {
       if (shuttingDown) return;
       console.error('Containment lighting prewarm failed.', error);
-      startRenderLoop();
+      void titleReady.then(startRenderLoop);
     },
   );
 });
@@ -274,10 +296,12 @@ const shutdown = (): void => {
   unsubscribeTransitionStarted();
   unsubscribeTransitionCompleted();
   unsubscribeTransitionFailed();
+  unsubscribeTitlePresentation();
   performanceRecorder?.dispose();
   cleanGameplayMode.dispose();
   gameFlow.dispose();
   gameSession.dispose();
+  titlePresentation.dispose();
   audio.dispose();
   input.dispose();
   renderLayer.dispose();

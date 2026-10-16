@@ -23,6 +23,9 @@ export class AudioManager implements AudioPlayback {
   private context: AudioContext | undefined;
   private master: GainNode | undefined;
   private effects: GainNode | undefined;
+  private menu: GainNode | undefined;
+  private readonly menuVoices = new Set<OscillatorNode>();
+  private lastMenuCueMs = -Infinity;
   private compressor: DynamicsCompressorNode | undefined;
   private readonly buffers = new Map<SoundId, AudioBuffer>();
   private readonly voices = new Set<Voice>();
@@ -78,10 +81,12 @@ export class AudioManager implements AudioPlayback {
       this.context = this.createContext();
       this.master = this.context.createGain();
       this.effects = this.context.createGain();
+      this.menu = this.context.createGain();
       this.compressor = this.context.createDynamicsCompressor();
       this.compressor.threshold.value = -12;
       this.compressor.ratio.value = 4;
       this.effects.connect(this.compressor);
+      this.menu.connect(this.compressor);
       this.compressor.connect(this.master);
       this.master.connect(this.context.destination);
       this.setVolumes(this.masterVolume, this.effectsVolume);
@@ -138,18 +143,60 @@ export class AudioManager implements AudioPlayback {
     this.effectsVolume = clamp(effects);
     if (this.context && this.master && this.effects) {
       this.master.gain.setTargetAtTime(this.masterVolume, this.context.currentTime, 0.025);
-      this.effects.gain.setTargetAtTime(this.effectsVolume, this.context.currentTime, 0.025);
+      if (this.paused) this.effects.gain.setValueAtTime(0, this.context.currentTime);
+      else this.effects.gain.setTargetAtTime(this.effectsVolume, this.context.currentTime, 0.025);
+      this.menu?.gain.setTargetAtTime(this.effectsVolume, this.context.currentTime, 0.025);
     }
   }
 
-  setPaused(paused: boolean): void { this.paused = paused; this.syncContext(); }
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (this.context && this.effects) {
+      if (paused) this.effects.gain.setValueAtTime(0, this.context.currentTime);
+      else this.effects.gain.setTargetAtTime(this.effectsVolume, this.context.currentTime, 0.025);
+    }
+    this.syncContext();
+  }
   setFocused(focused: boolean): void { this.focused = focused; this.syncContext(); }
   private syncContext(): void {
     const context = this.context;
     if (!context || this.disposed || context.state === 'closed') return;
-    const shouldRun = this.unlocked && !this.paused && this.focused;
+    const shouldRun = this.unlocked && (!this.paused || this.menuVoices.size > 0) && this.focused;
     const operation = shouldRun ? context.resume() : context.suspend();
     void operation.then(() => { if (shouldRun) this.reconcileLoops(); }).catch(() => {});
+  }
+
+  /** Quiet synthesized UI cues share master/effects volume and the one context.
+   * Gameplay has its own muted bus while a cue briefly wakes a paused context. */
+  playMenuCue(cue: 'navigate' | 'confirm' | 'back'): void {
+    if (cue !== 'navigate') this.unlock();
+    if (!this.unlocked || !this.focused || this.disposed || !this.context || !this.menu ||
+      this.masterVolume === 0 || this.effectsVolume === 0 || this.menuVoices.size >= 4) return;
+    const nowMs = performance.now();
+    if (cue === 'navigate' && nowMs - this.lastMenuCueMs < 90) return;
+    this.lastMenuCueMs = nowMs;
+    const context = this.context;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    const duration = cue === 'navigate' ? 0.035 : 0.075;
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(cue === 'back' ? 520 : cue === 'confirm' ? 740 : 620, now);
+    oscillator.frequency.exponentialRampToValueAtTime(cue === 'back' ? 380 : 900, now + duration);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(cue === 'navigate' ? 0.022 : 0.035, now + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    oscillator.connect(gain);
+    gain.connect(this.menu);
+    this.menuVoices.add(oscillator);
+    oscillator.onended = () => {
+      this.menuVoices.delete(oscillator);
+      oscillator.disconnect(); gain.disconnect();
+      this.syncContext();
+    };
+    this.syncContext();
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.01);
   }
 
   play(sound: SoundId, position?: AudioPosition, varyPitch = false): void {
@@ -252,7 +299,9 @@ export class AudioManager implements AudioPlayback {
       this.pending.delete(sound); resolve();
     }
     this.stopAll(); this.buffers.clear();
-    this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
+    for (const oscillator of this.menuVoices) oscillator.stop();
+    this.menuVoices.clear();
+    this.menu?.disconnect(); this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
     void this.context?.close().catch(() => {});
   }
 }

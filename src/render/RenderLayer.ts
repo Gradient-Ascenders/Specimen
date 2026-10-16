@@ -12,6 +12,7 @@ import {
   type RenderPixelRatioCap,
   type RenderScale,
   resolveRenderResolution,
+  TITLE_RENDER_RESOLUTION,
 } from './RenderResolution.ts';
 
 export const RENDER_EXPOSURE = 1;
@@ -102,6 +103,7 @@ export class RenderShadowPolicy {
 }
 
 export interface GraphicsDiagnostics {
+  readonly presentationActive?: boolean;
   readonly viewportWidth: number;
   readonly viewportHeight: number;
   readonly drawingBufferWidth: number;
@@ -173,6 +175,7 @@ export class RenderLayer {
   private viewportHeight = 0;
   private disposed = false;
   private cleanGameplay = false;
+  private presentationActive = false;
 
   constructor(options: RenderLayerOptions) {
     this.host = options.host;
@@ -223,6 +226,7 @@ export class RenderLayer {
   }
 
   render(): void {
+    this.restoreGameplayResolution();
     // A numeric check is also needed when display emulation/browser changes
     // update DPR without delivering a resolution media-query event.
     if (this.lastDevicePixelRatio !== this.hostWindow.devicePixelRatio) {
@@ -236,6 +240,24 @@ export class RenderLayer {
 
   setCleanGameplayMode(clean: boolean): void {
     this.cleanGameplay = clean;
+  }
+
+  /** Small menu scenes get native display density and their own bounded budget. */
+  renderPresentation(draw: (renderer: THREE.WebGLRenderer) => void): void {
+    if (!this.presentationActive) {
+      this.presentationActive = true;
+      this.resize();
+    }
+    if (this.lastDevicePixelRatio !== this.hostWindow.devicePixelRatio) {
+      this.resize(); this.watchDevicePixelRatio();
+    }
+    this.shadowPolicy.withPreparation(false, () => draw(this.renderer));
+  }
+
+  restoreGameplayResolution(): void {
+    if (!this.presentationActive) return;
+    this.presentationActive = false;
+    this.resize();
   }
 
   requestShadowConfiguration(
@@ -290,6 +312,7 @@ export class RenderLayer {
     this.renderer.getDrawingBufferSize(this.drawingBufferSize);
     const settings = this.graphicsSettings, profile = GRAPHICS_PROFILES[settings.graphicsProfile];
     return {
+      presentationActive: this.presentationActive,
       viewportWidth: this.viewportWidth, viewportHeight: this.viewportHeight,
       drawingBufferWidth: this.drawingBufferSize.x, drawingBufferHeight: this.drawingBufferSize.y,
       pixelRatio: this.renderer.getPixelRatio(), pixelRatioCap: this.effectivePixelRatioCap,
@@ -390,6 +413,7 @@ export class RenderLayer {
         pixelRatioCap: this.effectivePixelRatioCap,
         renderScale: this.graphicsSettings.renderScale,
         pixelBudget: GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile].pixelBudget,
+        ...(this.presentationActive ? TITLE_RENDER_RESOLUTION : {}),
         maximumWidth: this.maximumWidth, maximumHeight: this.maximumHeight,
         minimumDrawingBufferDimension: Math.ceil(1 / this.renderer.transmissionResolutionScale),
       });

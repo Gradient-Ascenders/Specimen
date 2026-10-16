@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
+import { confirmRestart, openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 const directory = resolve('artifacts/evidence/issue-190');
 const errors: string[] = [];
@@ -73,6 +74,7 @@ async function settings(page: Page): Promise<void> {
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  await openAdvancedGraphics(page);
 }
 
 async function resume(page: Page): Promise<void> {
@@ -186,6 +188,7 @@ test('profiles bound high-DPI/resize work, retain native HUD and survive all lev
     }
     await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
+    await confirmRestart(page);
     await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 240_000 });
     const after = await draw(page); assertBudget(after);
     expect(after.diagnostics.graphicsProfile).toBe('standard');

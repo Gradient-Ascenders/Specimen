@@ -12,6 +12,40 @@ The renderer uses a relative Vite base so built assets work at a domain root or
 nested static-host path. Runtime asset references must remain Vite-managed or
 relative and must match Linux filename casing.
 
+The title and its submenus use `TitlePresentation`: a small separate scene with
+the existing Goop, Bob and Volt assets in matching specimen chambers, and a
+dedicated camera. Goop appears to Bob's left and Volt to his right; the flank
+pods sit slightly farther back. Framing adapts to place the array beside the
+desktop menu and above the portrait menu. The title loads visual character
+assets without their optional gameplay LOD banks or unlocking gameplay bodies.
+It shares the gameplay canvas through `RenderLayer.renderPresentation`, with a separate
+native-density budget of 1920 × 1080 pixels (DPR capped at 2). A four-sample MSAA
+HDR render target smooths the chamber and character edges; `OutputPass` performs
+the final tone mapping and display conversion. It renders without shadow passes
+and never updates the level or gameplay camera. Gameplay immediately restores
+its selected resolution on Start. The hidden loading surface warms both title
+passes before recording the shader baseline.
+Breathing and equipment pulses respect reduced-motion preferences. All title
+geometry, materials and render targets are released when gameplay first starts,
+or at shutdown.
+
+Projected buttons track the resting bounds of each title character. Hover,
+keyboard focus, or tapping previews Bob's jump, Goop's acid projectile, or Volt's
+illumination blackout and updates the live specimen panel. While Volt is hovered,
+the room, other specimens and menu dim; Volt remains lit by his emission and a
+local golden light. Leaving him smoothly restores the scene. Targets remain stationary
+during the demonstrations to avoid repeated entry/exit as Bob jumps. These are
+visual-only effects with bounded reusable geometry; leaving the title resets
+them, and the hidden boot draw primes every effect before the shader baseline.
+The zero-intensity local light is included at boot, avoiding a new shader variant
+on hover. Reduced motion lowers jump/recoil intensity and disables
+automatic repeats. Gameplay abilities, projectiles and input remain level-owned.
+
+Settings groups Controls, Audio and Graphics into keyboard-accessible tabs.
+Advanced graphics and rendering diagnostics are expandable; the header and Back
+remain outside the scrolling content. Pause shows the current level/objective
+and requires confirmation before restarting the level.
+
 ## Materials, lighting, and shadows
 
 Shared presentation helpers may reuse geometry, materials, and procedural
@@ -33,7 +67,7 @@ correct when preparation is skipped or fails.
 
 ## Gel rendering quality
 
-Settings → Character gel controls a session-owned `RenderLayer.gelRendering`
+Settings → Graphics → Advanced graphics → Character gel controls a session-owned `RenderLayer.gelRendering`
 policy independently of canvas resolution. It applies to Bob, Goop and Volt,
 including captive forms, hidden roster members and characters loaded after a
 level transition. The [bounded graphics profiles](../graphics-profiles.md) select

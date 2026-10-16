@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
+import { openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 // Match the existing production-bundle exposure convention. No game globals
 // or alternative gameplay controllers are shipped for this fixture.
@@ -56,6 +57,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
   await page.addStyleTag({ content: '.game-hud, .performance-recorder, .security-network-status { visibility: hidden !important; }' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await openAdvancedGraphics(page);
   await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
   if (preset === 'performance') await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   if (gelMode) {
@@ -64,8 +66,8 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-action="start"]').click();
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 180_000 });
-  // The containment roster remains locked and does not load Volt.
-  expect(await page.evaluate(() => performance.getEntriesByType('resource').some(e => /volt-[^/]+\.glb/.test(e.name)))).toBe(false);
+  // The title previews Volt; the containment gameplay roster remains locked.
+  expect(await page.evaluate(() => performance.getEntriesByType('resource').some(e => /volt-[^/]+\.glb/.test(e.name)))).toBe(true);
   await page.keyboard.press('Digit0');
   await expect(page.locator('[data-action="enter-level"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-action="enter-level"]').click();

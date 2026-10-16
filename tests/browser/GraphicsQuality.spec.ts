@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures.ts';
+import { openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 test.use({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1.25 });
 
@@ -24,6 +25,7 @@ for (const query of ['', '?debug=1']) {
     const title = page.locator('[data-flow-panel="title"]');
     await expect(title).toBeVisible({ timeout: 180_000 });
     await title.locator('[data-action="settings"]').click();
+    await openAdvancedGraphics(page);
     const preset = page.locator('[data-setting="graphics-preset"]');
     const resolution = page.locator('[data-setting="render-resolution"]');
     const gel = page.locator('[data-setting="gel-rendering"]');

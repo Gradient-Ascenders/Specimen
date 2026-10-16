@@ -1,8 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveRenderPixelRatio, resolveRenderResolution } from '../src/render/RenderResolution.ts';
+import { resolveRenderPixelRatio, resolveRenderResolution, TITLE_RENDER_RESOLUTION } from '../src/render/RenderResolution.ts';
 import { GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
+
+test('title display retains native resolution independently of minimum gameplay settings', () => {
+  const title = resolveRenderResolution(1440, 900, 1, TITLE_RENDER_RESOLUTION);
+  assert.deepEqual([title.drawingBufferWidth, title.drawingBufferHeight], [1440, 900]);
+  const gameplay = resolveRenderResolution(1440, 900, 1, {
+    pixelRatioCap: 1, renderScale: 0.5, pixelBudget: GRAPHICS_PROFILES.minimum.pixelBudget,
+  });
+  assert.deepEqual([gameplay.drawingBufferWidth, gameplay.drawingBufferHeight], [720, 450]);
+  for (const [width, height, dpr] of [[1440, 900, 2], [3840, 2160, 3], [320, 900, 3]]) {
+    const size = resolveRenderResolution(width, height, dpr, TITLE_RENDER_RESOLUTION);
+    assert.ok(size.drawingBufferWidth * size.drawingBufferHeight <= TITLE_RENDER_RESOLUTION.pixelBudget);
+    assert.ok(size.effectivePixelRatio <= 2);
+    assert.equal(size.viewportWidth, width);
+    assert.equal(size.viewportHeight, height);
+  }
+});
 
 test('render tiers cap high-DPI pixel workload at their configured density', () => {
   assert.equal(resolveRenderPixelRatio(3, 2), 2);
