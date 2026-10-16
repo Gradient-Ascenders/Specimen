@@ -118,6 +118,8 @@ export class CollisionWorld {
   private readonly staticMaximumRadiusScale = new THREE.Vector3(1, 1, 1);
   private staticBroadphaseDirty = false;
   private broadphaseStamp = 0;
+  private lineOfSightRevision = 0;
+  private readonly lineOfSightSnapshots = new WeakMap<THREE.Mesh, { visible: boolean; matrix: THREE.Matrix4 }>();
 
   private readonly localStart = new THREE.Vector3();
   private readonly localEnd = new THREE.Vector3();
@@ -181,6 +183,7 @@ export class CollisionWorld {
       minimumWorldScale: 0,
       broadphaseStamp: 0,
     });
+    this.lineOfSightRevision++;
     if (transformMode === ColliderTransformMode.Static) {
       this.staticBroadphaseDirty = true;
     }
@@ -201,6 +204,7 @@ export class CollisionWorld {
         this.staticBroadphaseDirty = true;
       }
       this.colliders.splice(index, 1);
+      this.lineOfSightRevision++;
     }
   }
 
@@ -210,6 +214,7 @@ export class CollisionWorld {
     if (!collider) {
       throw new Error(`Collider ${mesh.name || '<unnamed>'} is not registered.`);
     }
+    if (collider.layerMask !== layerMask) this.lineOfSightRevision++;
     collider.layerMask = layerMask;
   }
 
@@ -225,6 +230,7 @@ export class CollisionWorld {
     }
     collider.transformMode = transformMode;
     collider.transformCacheValid = false;
+    this.lineOfSightRevision++;
   }
 
   /**
@@ -234,12 +240,14 @@ export class CollisionWorld {
   invalidateTransform(mesh: THREE.Mesh): void {
     const collider = this.getRegisteredCollider(mesh);
     collider.transformCacheValid = false;
+    this.lineOfSightRevision++;
     if (collider.transformMode === ColliderTransformMode.Static) {
       this.staticBroadphaseDirty = true;
     }
   }
 
   clear(): void {
+    this.lineOfSightRevision++;
     this.colliders.length = 0;
     this.staticBroadphaseGrid.clear();
     this.globalStaticColliders.length = 0;
@@ -248,6 +256,32 @@ export class CollisionWorld {
 
   get colliderCount(): number {
     return this.colliders.length;
+  }
+
+  /** Presentation cache invalidation, sampled once per draw, never per cone edge.
+   * Follows query semantics: mesh visibility (not room-render ancestry), layer
+   * membership, dynamic parent transforms and explicit static invalidation.
+   * Does not change sweep diagnostics or gameplay query frequency.
+   */
+  getLineOfSightRevision(): number {
+    return this.withStableQueryTransforms(() => {
+      for (const collider of this.colliders) {
+        if ((collider.layerMask & CollisionLayer.LineOfSight) === 0) continue;
+        if (collider.transformMode === ColliderTransformMode.Dynamic || !collider.transformCacheValid)
+          this.refreshTransformCache(collider);
+        const { mesh } = collider;
+        const snapshot = this.lineOfSightSnapshots.get(mesh);
+        if (!snapshot) {
+          this.lineOfSightSnapshots.set(mesh, { visible: mesh.visible, matrix: collider.cachedWorld.clone() });
+          this.lineOfSightRevision++;
+        } else if (snapshot.visible !== mesh.visible || !snapshot.matrix.equals(collider.cachedWorld)) {
+          snapshot.visible = mesh.visible;
+          snapshot.matrix.copy(collider.cachedWorld);
+          this.lineOfSightRevision++;
+        }
+      }
+      return this.lineOfSightRevision;
+    });
   }
 
   getLastSweepDiagnostics(): CollisionSweepDiagnostics {
