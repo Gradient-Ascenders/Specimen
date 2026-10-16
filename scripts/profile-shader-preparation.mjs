@@ -85,7 +85,9 @@ try {
           };
           const draw=renderer.render;
           renderer.render=function(...args) {
-            const previous=phase; phase=phase==='gameplay-live'?'gameplay-live':'primer';
+            const cinematic=document.querySelector('.game-flow')?.getAttribute('data-state')==='opening' &&
+              args[0]!==this.__shaderCaptureRuntime.renderLayer.scene && !this.getScissorTest();
+            const previous=phase; phase=phase==='gameplay-live'?'gameplay-live':cinematic?'cinematic-live':'primer';
             const entry={owner,phase,start:performance.now(),before:this.info.programs.length};
             try {return draw.apply(this,args);} finally {entry.ms=performance.now()-entry.start;entry.after=this.info.programs.length;capture.draws.push(entry);phase=previous;}
           };
