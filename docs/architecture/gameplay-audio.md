@@ -32,6 +32,21 @@ Voices are bounded at 24 globally and three per one-shot effect. Each standard l
 - Restart/checkpoint/puzzle reset clears voices and suppresses restoration notifications until the next gameplay update. Projectile impact, expiry, reset and disposal immediately stop flight ownership; burn completion/reset/disposal stop corrosion ownership.
 - Unload/transition removes level subscriptions and all sources. Shutdown removes browser handlers, disconnects audio graph resources and closes the context. Blackout's terminal completion explicitly clears and suspends audio; its session retains the completed scene. Merging clears original-character loops and the merged Specimen owns listener position without borrowing a slime's movement sounds.
 
+## Background music
+
+Four team-approved OGG tracks are stored in `public/assets/audio/music/` and
+credited in `CREDITS.md`. `BackgroundMusic` streams them with at most two
+HTMLAudioElements rather than decoding them into the sound-effects buffer bank.
+It uses no per-frame update work and does not change the 34/41/54 sound-effects
+bank counts. Music follows the existing menu, pause, opening, transition, level
+and completion state, and uses the master volume without the effects slider.
+
+The title track attempts to play as soon as the title is shown. Browsers can
+reject audible autoplay with `NotAllowedError` until a trusted user gesture;
+the main menu then exposes an explicit **Enable music** button. Existing global
+key/pointer listeners retry playback without restarting the currently selected
+song. This is a browser permission boundary, not a soundtrack load failure.
+
 ## Complete mapping
 
 All names below identify `.ogg` files. Loop behavior is explicit; other sounds are one-shots.
