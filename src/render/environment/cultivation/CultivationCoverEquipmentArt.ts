@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 import { createCultivationEquipmentWear } from './CultivationEquipmentWear.ts';
+import { LARGE_STATIC_BATCH_CELL_SIZE, staticBatchCell } from '../../StaticBatchPolicy.ts';
 
 export const COVER_EQUIPMENT = [
   { name: 'cultivation-room-3-goop-checkpoint-shield', identity: 'Decontamination unit', label: 'DECON', yawDegrees: 0, size: [8, 4.5, 1] },
@@ -30,7 +31,8 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
   readonly root = new THREE.Group();
   readonly propBounds = new Map<string, THREE.Box3>();
   private readonly finishes: Record<Finish, THREE.MeshStandardMaterial>;
-  private readonly parts = new Map<Finish, THREE.BufferGeometry[]>();
+  private readonly parts = new Map<string, THREE.BufferGeometry[]>();
+  private readonly shadowHullMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   private disposed = false;
   private triangleCount = 0;
 
@@ -72,6 +74,7 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
         const collider = builder.root.getObjectByName(item.name) as THREE.Mesh;
         if (!collider) throw new Error(`Missing authored cover: ${item.name}`);
         const transform = new THREE.Matrix4().multiplyMatrices(inverse, collider.matrixWorld);
+        const cell = staticBatchCell(new THREE.Vector3().setFromMatrixPosition(transform), LARGE_STATIC_BATCH_CELL_SIZE);
         const bounds = new THREE.Box3();
         // A quarter turn exchanges the authored width/depth used to model the
         // cabinet, keeping its world footprint aligned with the unchanged cover.
@@ -96,8 +99,9 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
           g.applyMatrix4(orientation);
           g.computeBoundingBox(); bounds.union(g.boundingBox!);
           g.applyMatrix4(transform);
-          const bucket = this.parts.get(role) ?? [];
-          bucket.push(g); this.parts.set(role, bucket);
+          const key = `${role}:${cell}`;
+          const bucket = this.parts.get(key) ?? [];
+          bucket.push(g); this.parts.set(key, bucket);
         };
         const box = (role: Finish, size: Triple, position: Triple, radius = 0.055, rotation?: Triple) => {
           const geometry = radius > 0 ? new RoundedBoxGeometry(...size, 1, Math.min(radius, ...size.map(v => v / 3))) : new THREE.BoxGeometry(...size);
@@ -238,12 +242,42 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
     for (const [name, values] of Object.entries(bounds)) {
       this.propBounds.set(name, new THREE.Box3(new THREE.Vector3().fromArray(values), new THREE.Vector3().fromArray(values, 3)));
     }
-    for (const [role, geometry] of Object.entries(baked)) {
+    const namedRoles = new Set<string>();
+    for (const [key, geometry] of Object.entries(baked)) {
+      const [role, ...cell] = key.split(':');
       this.triangleCount += geometry.getAttribute('position').count / 3;
       const mesh = new THREE.Mesh(geometry, this.finishes[role as Finish]);
-      mesh.name = `cover-props-${role}-batch`;
+      mesh.name = namedRoles.has(role) ? `cover-props-${role}-cell-${cell.join('-')}-batch` : `cover-props-${role}-batch`;
+      namedRoles.add(role);
       mesh.userData.presentationOnly = true;
+      mesh.userData.staticBatchCell = cell.join(':');
+      mesh.userData.shadowProxyReceiver = true;
       this.root.add(mesh);
+    }
+    // Match the maintenance decks: detailed fittings receive shadows while
+    // the unchanged cover envelopes provide cheap, stable caster silhouettes.
+    const hulls = this.assets.geometries('cover-shadow-hulls', () => {
+      builder.root.updateWorldMatrix(true, true);
+      const inverse = builder.root.matrixWorld.clone().invert();
+      const cells = new Map<string, THREE.BufferGeometry[]>();
+      for (const item of COVER_EQUIPMENT) {
+        const collider = builder.root.getObjectByName(item.name) as THREE.Mesh;
+        const matrix = new THREE.Matrix4().multiplyMatrices(inverse, collider.matrixWorld);
+        const cell = staticBatchCell(new THREE.Vector3().setFromMatrixPosition(matrix), LARGE_STATIC_BATCH_CELL_SIZE);
+        const pieces = cells.get(cell) ?? [];
+        pieces.push(collider.geometry.clone().applyMatrix4(matrix)); cells.set(cell, pieces);
+      }
+      return Object.fromEntries([...cells].map(([cell, pieces]) => {
+        const geometry = mergeGeometries(pieces)!;
+        for (const piece of pieces) piece.dispose();
+        return [cell, geometry];
+      }));
+    });
+    for (const [cell, geometry] of Object.entries(hulls)) {
+      const hull = new THREE.Mesh(geometry, this.shadowHullMaterial);
+      hull.name = `cover-props-shadow-hull-${cell}`;
+      Object.assign(hull.userData, { presentationOnly: true, shadowHull: true, staticBatchCell: cell });
+      this.root.add(hull);
     }
     builder.root.add(this.root);
   }
@@ -259,6 +293,7 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
     this.root.traverse(object => { if (object instanceof THREE.Mesh) object.geometry.dispose(); });
     this.root.clear();
     Object.values(this.finishes).forEach(material => material.dispose());
+    this.shadowHullMaterial.dispose();
     this.material.dispose();
     this.textures.forEach(texture => texture.dispose());
   }

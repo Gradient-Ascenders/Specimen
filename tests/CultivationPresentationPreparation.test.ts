@@ -154,7 +154,9 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   };
   const policy = new RenderShadowPolicy(renderer.shadowMap);
   const layer = { scene, renderer, withShadowPreparation: policy.withPreparation.bind(policy), cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
+  const liveScopes = preview.workload.snapshot();
   const queue = new CultivationPreparationQueue(layer, preview);
+  assert.deepEqual(preview.workload.snapshot(), liveScopes, 'enumerating speculative layouts cannot change live scopes');
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
@@ -312,7 +314,11 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     if (!fail) assert.equal(captiveUploaded, true, 'non-casting captive gel uploads its geometry and morphs before first use');
   } finally {
     volt.dispose();
-    queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
+    queue.dispose();
+    assert.equal(preview.workload.prepared.size, 0);
+    assert.equal(preview.workload.preparing.size, 0);
+    assert.equal(queue.diagnostics.pending, false);
+    lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
     reflectiveMaterial.dispose(); renderTarget.dispose();
     gel.dispose();
     foundationMaterial.dispose();

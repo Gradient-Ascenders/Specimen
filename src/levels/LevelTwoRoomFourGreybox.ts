@@ -104,6 +104,18 @@ export class LevelTwoRoomFourGreybox {
     this.reset();
   }
 
+  get dynamicTransformRoots(): readonly THREE.Object3D[] {
+    return [this.entrance.root, this.boardingWall, this.boardingGuard, this.arrivalWall, this.shield,
+      ...this.entrancePieces.map(piece => piece.mesh), ...this.modules, ...this.droneRoots];
+  }
+
+  get hasPendingWork(): boolean {
+    const state = this.controller.readModel.state;
+    return (state !== 'waitingForSlimes' && state !== 'complete') ||
+      this.entrance.root.position.y !== this.controller.progress * 120 ||
+      this.arrivalWall.position.y !== 1.3 + 2.4 * Math.min(1, this.controller.readModel.arrivalElapsed / 1.5);
+  }
+
   update(dt: number, occupants: readonly SphereTriggerOccupant[]): void {
     let bob = false, goop = false;
     for (const occupant of occupants) {

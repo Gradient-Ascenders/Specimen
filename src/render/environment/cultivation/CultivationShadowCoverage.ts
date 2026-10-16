@@ -10,7 +10,7 @@ export function applyCultivationShadowRoles(root: THREE.Object3D, excludedMateri
     const excluded = object.name === 'room-5-captive-volt' || object.userData.textureRole === 'acid-floor' ||
       object.userData.hazardRole === 'radioactive';
     // Detailed ceramic decks receive; their existing low-poly hulls alone cast.
-    const hull = object.name === 'room-5-platform-shadow-hulls';
+    const hull = object.name === 'room-5-platform-shadow-hulls' || object.userData.shadowHull === true;
     object.castShadow = hull || (solid && !excluded && !object.userData.shadowProxyReceiver);
     object.receiveShadow = solid && !excluded;
   });

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { LevelTwoRoomThreeGreybox } from '../src/levels/LevelTwoRoomThreeGreybox.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 import { CultivationCoverEquipmentArt, COVER_EQUIPMENT } from '../src/render/environment/cultivation/CultivationCoverEquipmentArt.ts';
+import { applyCultivationShadowRoles } from '../src/render/environment/cultivation/CultivationShadowCoverage.ts';
 
 test('all eight unique equipment models preserve cover geometry and sightline volumes', () => {
  const baseline=new LevelTwoRoomThreeGreybox(()=>{}), lab=new CultivationLabMaterials(cultivationAssets), art=new CultivationCoverEquipmentArt(cultivationAssets);
@@ -39,9 +40,22 @@ test('all eight unique equipment models preserve cover geometry and sightline vo
   assert.ok(bounds.getSize(new THREE.Vector3()).x >= item.size[0]);
   assert.ok(bounds.getSize(new THREE.Vector3()).y >= item.size[1]);
  }
- assert.equal(art.diagnostics.drawCalls,6);
+ assert.ok(art.diagnostics.drawCalls <= 56);
+ assert.ok(art.diagnostics.drawCalls > 6, 'distant props retain independent culling bounds');
+ assert.equal(new Set(art.root.children.filter(mesh => !mesh.userData.shadowHull).map(mesh => (mesh as THREE.Mesh).material)).size, 6, 'spatial batches reuse the six finishes');
  assert.equal(art.diagnostics.propCount,8);
  assert.equal(art.diagnostics.newTextures,4);
+ applyCultivationShadowRoles(art.root);
+ let hullTriangles = 0;
+ art.root.traverse(object => {
+  if (!(object instanceof THREE.Mesh)) return;
+  if (object.userData.shadowHull) {
+   assert.equal(object.castShadow, true);
+   assert.equal((object.material as THREE.Material).colorWrite, false);
+   hullTriangles += (object.geometry.index?.count ?? object.geometry.attributes.position.count) / 3;
+  } else { assert.equal(object.castShadow, false); assert.equal(object.receiveShadow, true); }
+ });
+ assert.equal(hullTriangles, 8 * 12, 'only the stable cover envelopes enter the shadow passes');
  let disposedTextures=0;
  for(const texture of art.textures)texture.addEventListener('dispose',()=>disposedTextures++);
  let disposed=0;art.material.addEventListener('dispose',()=>disposed++);

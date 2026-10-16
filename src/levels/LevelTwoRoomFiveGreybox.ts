@@ -221,8 +221,21 @@ export class LevelTwoRoomFiveGreybox {
       }
     }));
   }
-  update(dt: number, occupants: readonly LevelTwoRoomTwoOccupant[]): void {
+  get hasPendingWork(): boolean { return this.resetControls.length > 0 || this.controller.releasing; }
+
+  get dynamicTransformRoots(): readonly THREE.Object3D[] {
+    return [this.pod, this.captiveVolt, this.captiveVoltPresentation.root, this.brokenCore, this.lever,
+      this.reunionDoor, this.exitDoor, this.shortcut, this.shortcutEntry, ...this.reunionFloors,
+      ...this.glassPanels, ...this.solubleTargetMeshes,
+      ...[...this.controls.values()].map(control => control.parent!)];
+  }
+
+  updateCosmetics(dt: number): void {
     this.captiveVoltPresentation.update(dt, this.captiveState);
+  }
+
+  update(dt: number, occupants: readonly LevelTwoRoomTwoOccupant[], present = true): void {
+    if (present) this.updateCosmetics(dt);
     for (const target of this.resetControls) target.reset(); this.resetControls.length = 0;
     let usingLever = false;
     for (const occupant of occupants) {
