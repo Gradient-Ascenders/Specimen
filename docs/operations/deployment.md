@@ -43,8 +43,9 @@ restart.
 ## Ordinary production acceptance
 
 Open the assigned URL without query parameters. All five authored Cultivation
-rooms load by default; `?debug=1` only enables developer tools. Normal graphics
-remain the default; Performance and explicit 0.75× resolution are optional.
+rooms load by default; `?debug=1` only enables developer tools. The Minimum
+hardware profile with the Normal graphics preset is the default. Standard and the extra Performance cap are optional; resolution
+scale and the pixel-ratio cap remain explicit settings.
 
 After `npm run archive`, run the archive itself through the nested-path smoke
 server (PowerShell):
@@ -57,7 +58,10 @@ npm run test:smoke -- ProductionParity ProductionSmoke
 ```
 
 `ProductionParity` opens the plain URL and observes the composition root without
-enabling debug mode. It verifies authored objects, populated texture maps,
+enabling debug mode. Its three journeys cover Minimum hardware/Normal,
+Standard/Normal, and Standard/Performance at an explicit 0.75x pixel-ratio cap.
+It verifies the actual baked asset request and applied repairs, authored
+objects, populated texture maps,
 characters, encounters, preparation, each Level 2 room, restarts, Volt release,
 all three levels, and network/console/WebGL errors. Controller contracts stage
 completion and room entry: this regression is not an unassisted puzzle

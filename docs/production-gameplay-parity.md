@@ -1,5 +1,7 @@
 # Production gameplay parity — 16 October 2026
 
+This is the original pre-integration record. See [production parity integration](production-parity-integration.md) for the current main integration, resolved Windows provenance checks and new validation.
+
 Baseline: `origin/main` at `e53d27d` (merged PRs #200 and #201).
 Branch: `fix/production-gameplay-parity`.
 

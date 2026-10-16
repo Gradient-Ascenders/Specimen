@@ -18,6 +18,7 @@ const snapshot = (page: Page) => page.evaluate(() => {
   const rt = (window as any).__paritySession.runtime, r = rt.resources;
   const names: string[] = [], textures = new Set<string>();
   let texturedMeshes = 0;
+  const graphics = rt.renderLayer.getGraphicsDiagnostics();
   rt.renderLayer.scene.traverse((o: any) => {
     if (o.name) names.push(o.name);
     if (!o.isMesh) return;
@@ -33,7 +34,13 @@ const snapshot = (page: Page) => page.evaluate(() => {
     goop: (r.goopPresentation ?? r.testScene?.goop)?.ready,
     colliders: r.collisionWorld.colliderCount,
     dpr: rt.renderLayer.getDiagnostics().pixelRatio,
-    preset: rt.renderLayer.graphicsPreset,
+    preset: graphics.graphicsPreset,
+    graphics,
+    baked: r.authoredPreview ? {
+      version: r.authoredPreview.assets.manifest.version,
+      expectedRepairs: r.authoredPreview.assets.manifest.repairs.length,
+      repairs: r.authoredPreview.surfaceCleanup.repairedMeshes,
+    } : undefined,
     acid: Boolean(r.acidProjectileSystem),
     dissolve: Boolean(r.dissolveSystem),
     electrical: Boolean(r.electricalSystem),
@@ -42,8 +49,13 @@ const snapshot = (page: Page) => page.evaluate(() => {
   };
 });
 
-for (const preset of ['normal', 'performance'] as const) {
-  test(`no-query ${preset} production contains authored gameplay across all levels`, async ({ page, baseURL }, info) => {
+const scenarios = [
+  { profile: 'minimum', preset: 'normal', expectedDpr: 0.75 },
+  { profile: 'standard', preset: 'normal', expectedDpr: 1 },
+  { profile: 'standard', preset: 'performance', expectedDpr: 0.75 },
+] as const;
+for (const { profile, preset, expectedDpr } of scenarios) {
+  test(`no-query ${profile} ${preset} production contains authored gameplay across all levels`, async ({ page, baseURL }, info) => {
     test.setTimeout(600_000);
     const failures: string[] = [], requests: string[] = [];
     page.on('pageerror', e => failures.push(e.message));
@@ -60,12 +72,15 @@ for (const preset of ['normal', 'performance'] as const) {
     await page.goto('./', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
     expect(new URL(page.url()).search).toBe('');
+    await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+    await expect(page.locator('[data-setting="graphics-profile"]')).toHaveValue('minimum');
+    await expect(page.locator('[data-setting="graphics-preset"]')).toHaveValue('normal');
+    await page.locator('[data-setting="graphics-profile"]').selectOption(profile);
     if (preset === 'performance') {
-      await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
       await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
       await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
-      await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     }
+    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     await page.locator('[data-action="start"]').click();
     const evidence: unknown[] = [];
     for (const level of [1, 2, 3]) {
@@ -78,13 +93,18 @@ for (const preset of ['normal', 'performance'] as const) {
       expect(s.glError).toBe(0);
       expect(s.preset).toBe(preset);
       expect(s.acid).toBe(true); expect(s.dissolve).toBe(true);
-      if (preset === 'performance') expect(s.dpr).toBe(0.75);
+      expect(s.dpr).toBe(expectedDpr);
+      expect(s.graphics.graphicsProfileBase).toBe(profile);
+      expect(s.graphics.gelRenderingMode).toBe(profile === 'minimum' ? 'minimum' : 'reduced-transmission');
+      expect(s.graphics.shadowMapSizeCap).toBe(profile === 'minimum' ? 512 : 1024);
+      expect(s.graphics.drawingBufferWidth * s.graphics.drawingBufferHeight).toBeLessThanOrEqual(s.graphics.pixelBudget);
       if (level === 1) expect(s.names).toContain('room-1-production-art');
       if (level === 2) {
         expect(s.names).toContain('cultivation-level-2-authored-preview');
         expect(s.rooms).toEqual([true, true, true, true, true]);
         expect(s.encounters).toEqual([true, true, true]);
         expect(s.preparation).toBeTruthy();
+        expect(s.baked).toEqual({ version: 1, repairs: 137, expectedRepairs: 137 });
       }
       if (level === 3) {
         expect(s.electrical).toBe(true);
@@ -171,6 +191,7 @@ for (const preset of ['normal', 'performance'] as const) {
     }
     expect(requests.some(p => /\/volt-[^/]+\.glb$/.test(p))).toBe(true);
     expect(requests.some(p => /\/maintenance-maps-[^/]+\.bin$/.test(p))).toBe(true);
+    expect(requests.some(p => /\/authored-assets-[^/]+\.bin$/.test(p))).toBe(true);
     expect(requests.some(p => /CultivationLevelDebug|PerformanceFlightRecorder/.test(p))).toBe(false);
     expect(failures).toEqual([]);
     const evidencePath = info.outputPath('content-evidence.json');

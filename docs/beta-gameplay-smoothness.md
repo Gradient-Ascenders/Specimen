@@ -1,5 +1,10 @@
 # Beta gameplay smoothness — 15 October 2026
 
+This is the historical #201 measurement record. Current profile defaults and
+resolution composition are documented in [graphics profiles](graphics-profiles.md).
+The [production parity integration](production-parity-integration.md) verifies
+those profiles with the ordinary production route.
+
 Baseline: origin/main b00978e (merged PR #185), on fix/beta-gameplay-smoothness. No renderer fork, dependency patch, gameplay change or shader rewrite. Normal graphics remains the default. All changes and evidence are local; no push or PR.
 
 ## Demo settings
