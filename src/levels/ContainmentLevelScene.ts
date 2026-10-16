@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import { RoomOneMonitor } from '../render/environment/containment/RoomOneMonitor.ts';
 import { fitContainmentShadowCullingBounds } from '../render/environment/containment/ContainmentShadowCoverage.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -152,6 +153,7 @@ export class ContainmentLevelScene {
   readonly roomFour: RoomFourGreybox;
   readonly roomFive: RoomFiveGreybox;
   readonly lighting: ContainmentLightingRig;
+  readonly roomOneMonitor: RoomOneMonitor;
   readonly staticBatchDiagnostics: readonly ContainmentStaticBatchDiagnostics[];
   private readonly staticBatches: readonly ContainmentStaticBatchResult[];
   private readonly measuredFirstUseGeometryResources: readonly THREE.Mesh[];
@@ -216,6 +218,10 @@ export class ContainmentLevelScene {
     );
     this.lighting.configureRoomOneShadowReceivers(this.teaching.roomOneArt);
     fitContainmentShadowCullingBounds(this.root);
+    // Attach after the measured batches are built: the independently-owned
+    // screen must not alter first-use batch identities or gameplay collision.
+    this.roomOneMonitor = new RoomOneMonitor(this.artResources);
+    this.teaching.roomOneArt.root.add(this.roomOneMonitor.root);
     this.measuredFirstUseGeometryResources =
       resolveMeasuredFirstUseGeometryResources(this.root);
     // Preserve light-bearing ancestry (including the elevator warning lamps):
@@ -347,6 +353,7 @@ export class ContainmentLevelScene {
   }
 
   update(deltaSeconds: number, bobPosition?: Vector3State, activePosition = bobPosition): void {
+    this.roomOneMonitor.update(deltaSeconds);
     if (activePosition) this.lighting.setTraversalPosition(activePosition);
     if (bobPosition) {
       this.lighting.setBobInDarkDuct(
@@ -360,6 +367,7 @@ export class ContainmentLevelScene {
 
   resetPresentation(): void {
     this.lighting.reset();
+    this.roomOneMonitor.reset();
   }
 
   reconcilePresentationAfterRecovery(bobPosition: Vector3State): void {
@@ -379,6 +387,7 @@ export class ContainmentLevelScene {
   }
 
   dispose(): void {
+    this.roomOneMonitor.dispose();
     this.lighting.dispose();
     for (const staticBatch of this.staticBatches) staticBatch.dispose();
     this.roomFive.dispose();

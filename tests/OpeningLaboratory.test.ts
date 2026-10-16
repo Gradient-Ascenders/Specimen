@@ -5,11 +5,12 @@ import * as THREE from 'three';
 import { OpeningGameScene, type OpeningSceneOptions } from '../src/cinematics/OpeningGameScene.ts';
 import { OPENING_GAME_TIMING as T, sampleOpeningGame } from '../src/cinematics/OpeningGameTimeline.ts';
 import { OpeningLaboratory, OPENING_DOOR_SHOTS, OPENING_EXPERIMENTS, OPENING_LAB_LAYOUT as L } from '../src/cinematics/OpeningLaboratory.ts';
-import { OPENING_ROOM_ONE_LAYOUT as R } from '../src/cinematics/OpeningRoomOne.ts';
+import { OpeningRoomOne, OPENING_ROOM_ONE_LAYOUT as R } from '../src/cinematics/OpeningRoomOne.ts';
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
 import { createContainmentExperimentDirectoryTexture } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
 import { TitleScreenScene } from '../src/ui/TitleScreenScene.ts';
 import { RoomOneArt } from '../src/render/environment/containment/RoomOneArt.ts';
+import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 
 const createScene = (options?: OpeningSceneOptions) => { const scene = new OpeningGameScene(new TitleScreenScene(), undefined, options); scene.begin(); return scene; };
 
@@ -393,6 +394,34 @@ test('the fly-through uses fixed pooled resources, four light slots, one cached 
   } finally { scene.dispose(); }
 });
 
+test('opening room releases source and generated instances once without disposing shared assets', context => {
+  const resources = new ContainmentArtResources();
+  const disposals = new Map<THREE.InstancedMesh, number>();
+  const originalDispose = THREE.InstancedMesh.prototype.dispose;
+  context.mock.method(THREE.InstancedMesh.prototype, 'dispose', function(this: THREE.InstancedMesh) {
+    disposals.set(this, (disposals.get(this) ?? 0) + 1);
+    originalDispose.call(this);
+  });
+  const room = new OpeningRoomOne(resources);
+  const batches: THREE.InstancedMesh[] = [];
+  room.root.traverse(object => {
+    if (object instanceof THREE.InstancedMesh && object.userData.staticBatchSourceNames) batches.push(object);
+  });
+  let sharedDisposals = 0;
+  for (const resource of [resources.geometries.unitBox, resources.materials.mainCeramic, resources.textures.ceramicNormal]) {
+    resource.addEventListener('dispose', () => { sharedDisposals++; });
+  }
+  try {
+    assert.ok(batches.length > 0, 'exercise generated instance buffers, not only merged geometry');
+    room.dispose(); room.dispose();
+    for (const batch of batches) assert.equal(disposals.get(batch), 1, batch.name);
+    assert.ok([...disposals.keys()].some(instance => instance.name === 'room-1-containment-box-deterministic-glass-debris'),
+      'excluded source instances must still be released');
+    for (const [instance, count] of disposals) assert.equal(count, 1, instance.name);
+    assert.equal(sharedDisposals, 0, 'the room borrows shared geometry, materials and textures');
+  } finally { room.dispose(); resources.dispose(); }
+});
+
 test('cinematic disposal releases the wing/atlas and borrowed-room resources exactly once', () => {
   const room = new TitleScreenScene(), wing = new OpeningLaboratory(room);
   const resources = new Set<THREE.EventDispatcher<any>>();
@@ -414,7 +443,7 @@ test('cinematic disposal releases the wing/atlas and borrowed-room resources exa
   assert.equal(room.scene.children.length, 0);
 });
 
-test('startup construction and each isolated GPU submission yield before playback, without a second shader compile', async () => {
+test('startup yields between isolated submissions, primes the actual first view under black and drains its GPU queue', async () => {
   let turn = 0;
   const jobs: number[] = [];
   const scene = createScene({ deferConstruction: true, yieldFrame: async () => {
@@ -433,7 +462,10 @@ test('startup construction and each isolated GPU submission yield before playbac
   assert.equal(scene.room.scene.getObjectByName('opening-menu-egg-fracture'), undefined,
     'The Start-handler constructor must leave the warmed title intact.');
   let viewport = new THREE.Vector4(0, 0, 640, 360), scissor = viewport.clone(), scissorTest = false;
-  let compiles = 0, draws = 0;
+  let target: THREE.WebGLRenderTarget | null = null;
+  const targetDisposals = new Map<THREE.WebGLRenderTarget, number>();
+  let compiles = 0, draws = 0, fencePolls = 0, fencesReleased = 0;
+  const fence = {} as WebGLSync;
   const renderer = {
     transmissionResolutionScale: 0.5, info: { render: { calls: 4, triangles: 10, points: 0, lines: 0 } },
     shadowMap: { enabled: true, type: THREE.PCFShadowMap, autoUpdate: false, needsUpdate: false },
@@ -442,7 +474,15 @@ test('startup construction and each isolated GPU submission yield before playbac
     getScissor: (out: THREE.Vector4) => out.copy(scissor),
     setScissor: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y, w, h); },
     getScissorTest: () => scissorTest, setScissorTest: (value: boolean) => { scissorTest = value; },
-    getRenderTarget: () => null, setRenderTarget() {}, getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
+    getRenderTarget: () => target,
+    setRenderTarget(value: THREE.WebGLRenderTarget | null) { target = value; },
+    getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
+    getContext: () => ({
+      SYNC_GPU_COMMANDS_COMPLETE: 1, ALREADY_SIGNALED: 2, CONDITION_SATISFIED: 4, WAIT_FAILED: 8,
+      fenceSync: () => fence, flush() {}, isContextLost: () => false,
+      clientWaitSync: () => ++fencePolls === 1 ? 16 : 4,
+      deleteSync: (value: WebGLSync) => { assert.equal(value, fence); fencesReleased++; },
+    }),
     compileAsync: async () => {
       compiles++;
       jobs.push(turn);
@@ -453,7 +493,21 @@ test('startup construction and each isolated GPU submission yield before playbac
     render: (_root: THREE.Scene, camera: THREE.PerspectiveCamera) => {
       draws++;
       jobs.push(turn);
-      assert.ok(scissor.x + scissor.z < 0 && scissorTest, 'The primer cannot overwrite the title/blackout frame.');
+      if (draws < 3) {
+        assert.ok(target instanceof THREE.WebGLRenderTarget, 'Resource-only primers stay off the default framebuffer.');
+        assert.equal(target.width, 1); assert.equal(target.height, 1);
+        if (!targetDisposals.has(target)) {
+          const current = target; targetDisposals.set(current, 0);
+          current.addEventListener('dispose', () => targetDisposals.set(current, targetDisposals.get(current)! + 1));
+        }
+        assert.ok(viewport.x === 0 && scissorTest);
+      } else {
+        assert.equal(target, null, 'One real canvas view is primed under the initial painted blackout.');
+        assert.deepEqual(viewport.toArray(), [0, 0, 640, 360]);
+        assert.equal(scissorTest, false);
+        assert.equal(scene.laboratory.root.visible, true);
+        assert.equal(scene.laboratory.observatory.visible, false);
+      }
       if (draws === 1) {
         assert.deepEqual(viewport.toArray(), [0, 0, 640, 360], 'Prime the eventual camera-owned transmission dimensions.');
         assert.equal(renderer.transmissionResolutionScale, 0.5);
@@ -468,10 +522,13 @@ test('startup construction and each isolated GPU submission yield before playbac
   try {
     const layer = { renderer, withShadowPreparation: policy.withPreparation.bind(policy) } as unknown as RenderLayer;
     await Promise.all([scene.prepare(layer), scene.prepare(layer)]);
-    assert.equal(compiles, 1); assert.equal(draws, 2);
-    assert.equal(new Set(jobs).size, 3, 'Compilation and both uploads must run in separate yielded jobs.');
+    assert.equal(compiles, 1); assert.equal(draws, 3);
+    assert.equal(new Set(jobs).size, 4, 'Compilation, isolated uploads and the real first view each yield.');
+    assert.equal(fencePolls, 2); assert.equal(fencesReleased, 1);
     assert.deepEqual(viewport.toArray(), [0, 0, 640, 360]);
     assert.equal(renderer.transmissionResolutionScale, 0.5); assert.equal(scissorTest, false);
+    assert.equal(target, null); assert.equal(targetDisposals.size, 1);
+    assert.deepEqual([...targetDisposals.values()], [1], 'release the shared temporary framebuffer exactly once');
     assert.equal(scene.room.camera.far, 24);
     assert.equal(scene.laboratory.root.visible, false);
   } finally { scene.dispose(); }
