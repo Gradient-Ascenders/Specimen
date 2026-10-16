@@ -424,8 +424,11 @@ export class CultivationPreparationQueue {
     for (const [objects, shadowTarget, targetScene] of passes) {
       for (let i = 0; i < objects.length;) {
         // A requested room can submit a larger compiler batch while the loading
-        // screen is already up. Background work keeps its small gameplay slices.
-        const batch = objects.slice(i, i + (this.priority === config ? 32 : 8));
+        // screen is already up. Introduce one background object at a time:
+        // parallel driver compilation still competes with live draws AFTER a
+        // submission returns, beyond the synchronous slice budget. Keep the
+        // remaining work resumable and promote it on demand at the doorway.
+        const batch = objects.slice(i, i + (this.priority === config ? 32 : 1));
         i += batch.length;
         const group = new THREE.Group(); group.add(...batch);
         yield {label: targetScene === shadowScene ? 'shadow-compile' : shadowTarget ? 'transmission-compile' : 'compile', run: () => {
