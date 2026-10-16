@@ -321,6 +321,18 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum'])
     for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
     if (!fail) assert.equal(captiveUploaded, true, 'non-casting captive gel uploads its geometry and morphs before first use');
+    if (variant === 'startup') {
+      preview.workload.clearPreparation();
+      const replacement = new CultivationPreparationQueue(layer, preview);
+      try {
+        await replacement.prepareInitial();
+        const readyScopes = preview.workload.snapshot();
+        assert.ok(readyScopes.prepared.length > 0);
+        queue.dispose();
+        assert.deepEqual(preview.workload.snapshot(), readyScopes,
+          'retiring the old settings queue cannot clear its replacement readiness scopes');
+      } finally { replacement.dispose(); }
+    }
   } finally {
     volt.dispose();
     queue.dispose();

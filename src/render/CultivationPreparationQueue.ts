@@ -95,8 +95,10 @@ export class CultivationPreparationQueue {
   }
 
   private complete(config: Configuration, elapsedMs: number): void {
-    for (let i = 0; i < config.visible.length; i++) if (config.visible[i]) this.preview.workload.prepared.add(ROOT_ROOMS[i]);
-    if (this.active === config) this.preview.workload.preparing.clear();
+    if (this.preview.root.userData.preparation === this.diagnostics) {
+      for (let i = 0; i < config.visible.length; i++) if (config.visible[i]) this.preview.workload.prepared.add(ROOT_ROOMS[i]);
+      if (this.active === config) this.preview.workload.preparing.clear();
+    }
     config.ready = true; this.diagnostics.completed++;
     this.diagnostics.configurations.push({z:config.z, dark:config.dark, elapsedMs});
   }
@@ -213,8 +215,10 @@ export class CultivationPreparationQueue {
       if (!this.iterator) {
         this.active = requested ?? this.configurations.find(c => !c.ready);
         if (!this.active) return;
-        this.preview.workload.preparing.clear();
-        for (let i = 0; i < this.active.visible.length; i++) if (this.active.visible[i]) this.preview.workload.preparing.add(ROOT_ROOMS[i]);
+        if (this.preview.root.userData.preparation === this.diagnostics) {
+          this.preview.workload.preparing.clear();
+          for (let i = 0; i < this.active.visible.length; i++) if (this.active.visible[i]) this.preview.workload.preparing.add(ROOT_ROOMS[i]);
+        }
         const suspended = this.suspended.get(this.active);
         this.suspended.delete(this.active);
         this.configStarted = performance.now() - (suspended?.elapsedMs ?? 0);
@@ -513,7 +517,9 @@ export class CultivationPreparationQueue {
     this.disposed = true; this.iterator?.return(undefined); this.iterator = undefined;
     this.diagnostics.pending = false;
     this.priority = this.upcoming = undefined;
-    this.preview.workload.clearPreparation();
+    // Settings retain the old queue's compiler resources until its replacement
+    // is ready. Retiring it must not erase the new owner's workload records.
+    if (this.preview.root.userData.preparation === this.diagnostics) this.preview.workload.clearPreparation();
     for (const work of this.suspended.values()) work.iterator.return(undefined);
     this.suspended.clear();
     this.overlay?.remove();

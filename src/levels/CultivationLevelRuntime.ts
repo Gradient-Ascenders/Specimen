@@ -317,6 +317,7 @@ export class CultivationLevelRuntime {
   async prepareGraphics(): Promise<void> {
     const resources = this.requireResources(), previous = this.preparationQueue;
     this.preparationQueue = undefined;
+    resources.authoredPreview?.workload.clearPreparation();
     this.presentationPreparation = undefined;
     try {
       await this.preparePresentation();
