@@ -12,6 +12,7 @@ type BroadphaseGrid = Map<number, BroadphaseYCells>;
 
 interface RegisteredCollider {
   readonly mesh: THREE.Mesh;
+  readonly registryOrder: number;
   layerMask: number;
   transformMode: ColliderTransformMode;
   transformCacheValid: boolean;
@@ -32,9 +33,21 @@ export interface CollisionWorldOptions {
 
 export interface CollisionSweepDiagnostics {
   readonly registeredColliders: number;
+  /** Evaluated on diagnostic reads using the last sweep filters and current registry. */
   readonly eligibleColliders: number;
   readonly broadphaseCandidates: number;
   readonly narrowPhaseChecks: number;
+}
+
+/** Work counters for the last sweep OR ray; reading these never scans the registry. */
+export interface CollisionQueryDiagnostics {
+  readonly registeredColliders: number;
+  readonly dynamicCollidersVisited: number;
+  readonly staticEntriesVisited: number;
+  readonly candidates: number;
+  readonly narrowPhaseChecks: number;
+  /** New reusable candidate slots, not a measurement of engine/VM allocations. */
+  readonly candidateBufferGrowth: number;
 }
 
 export const ColliderTransformMode = {
@@ -112,12 +125,26 @@ export class CollisionHit {
  */
 export class CollisionWorld {
   private readonly colliders: RegisteredCollider[] = [];
+  private readonly dynamicColliders: RegisteredCollider[] = [];
+  private nextRegistryOrder = 0;
+  // Keep storage at its high-water mark between queries. Lifecycle mutations
+  // release references; ordinary queries allocate no candidate arrays or sets.
+  private readonly queryCandidates: RegisteredCollider[] = [];
+  private readonly sortScratch: RegisteredCollider[] = [];
+  private readonly sortBuckets = new Uint32Array(256);
+  private queryCandidateCount = 0;
+  private queryDynamicVisits = 0;
+  private queryStaticVisits = 0;
+  private queryNarrowChecks = 0;
+  private queryBufferGrowth = 0;
   private readonly broadphaseEnabled: boolean;
   private readonly staticBroadphaseGrid: BroadphaseGrid = new Map();
   private readonly globalStaticColliders: RegisteredCollider[] = [];
   private readonly staticMaximumRadiusScale = new THREE.Vector3(1, 1, 1);
   private staticBroadphaseDirty = false;
   private broadphaseStamp = 0;
+  private lineOfSightRevision = 0;
+  private readonly lineOfSightSnapshots = new WeakMap<THREE.Mesh, { visible: boolean; matrix: THREE.Matrix4 }>();
 
   private readonly localStart = new THREE.Vector3();
   private readonly localEnd = new THREE.Vector3();
@@ -127,7 +154,8 @@ export class CollisionWorld {
   private readonly worldEnd = new THREE.Vector3();
   private readonly sweepBounds = new THREE.Box3();
 
-  private lastEligibleColliderCount = 0;
+  private lastSweepMask = CollisionLayer.None as number;
+  private lastSweepIgnoredCollider: THREE.Mesh | undefined;
   private lastBroadphaseCandidateCount = 0;
   private lastNarrowPhaseCheckCount = 0;
 
@@ -167,8 +195,9 @@ export class CollisionWorld {
       throw new Error(`Collider ${mesh.name || '<unnamed>'} has no bounding box.`);
     }
 
-    this.colliders.push({
+    const collider: RegisteredCollider = {
       mesh,
+      registryOrder: this.nextRegistryOrder++,
       layerMask,
       transformMode,
       transformCacheValid: false,
@@ -180,7 +209,11 @@ export class CollisionWorld {
       worldRadiusScale: new THREE.Vector3(1, 1, 1),
       minimumWorldScale: 0,
       broadphaseStamp: 0,
-    });
+    };
+    this.colliders.push(collider);
+    this.transformQueryStamp++;
+    if (transformMode === ColliderTransformMode.Dynamic) this.dynamicColliders.push(collider);
+    this.lineOfSightRevision++;
     if (transformMode === ColliderTransformMode.Static) {
       this.staticBroadphaseDirty = true;
     }
@@ -200,7 +233,14 @@ export class CollisionWorld {
       if (this.colliders[index]?.transformMode === ColliderTransformMode.Static) {
         this.staticBroadphaseDirty = true;
       }
+      const collider = this.colliders[index];
+      if (collider.transformMode === ColliderTransformMode.Dynamic) {
+        this.dynamicColliders.splice(this.dynamicColliders.indexOf(collider), 1);
+      }
       this.colliders.splice(index, 1);
+      if (this.lastSweepIgnoredCollider === mesh) this.lastSweepIgnoredCollider = undefined;
+      this.queryCandidates.length = this.sortScratch.length = this.queryCandidateCount = 0;
+      this.lineOfSightRevision++;
     }
   }
 
@@ -210,6 +250,7 @@ export class CollisionWorld {
     if (!collider) {
       throw new Error(`Collider ${mesh.name || '<unnamed>'} is not registered.`);
     }
+    if (collider.layerMask !== layerMask) this.lineOfSightRevision++;
     collider.layerMask = layerMask;
   }
 
@@ -223,8 +264,14 @@ export class CollisionWorld {
     ) {
       this.staticBroadphaseDirty = true;
     }
+    if (collider.transformMode !== transformMode) {
+      if (transformMode === ColliderTransformMode.Dynamic) this.dynamicColliders.push(collider);
+      else this.dynamicColliders.splice(this.dynamicColliders.indexOf(collider), 1);
+    }
     collider.transformMode = transformMode;
     collider.transformCacheValid = false;
+    this.transformQueryStamp++;
+    this.lineOfSightRevision++;
   }
 
   /**
@@ -234,13 +281,20 @@ export class CollisionWorld {
   invalidateTransform(mesh: THREE.Mesh): void {
     const collider = this.getRegisteredCollider(mesh);
     collider.transformCacheValid = false;
+    this.transformQueryStamp++;
+    this.lineOfSightRevision++;
     if (collider.transformMode === ColliderTransformMode.Static) {
       this.staticBroadphaseDirty = true;
     }
   }
 
   clear(): void {
+    this.lineOfSightRevision++;
     this.colliders.length = 0;
+    this.nextRegistryOrder = 0;
+    this.dynamicColliders.length = 0;
+    this.queryCandidates.length = this.sortScratch.length = this.queryCandidateCount = 0;
+    this.lastSweepIgnoredCollider = undefined;
     this.staticBroadphaseGrid.clear();
     this.globalStaticColliders.length = 0;
     this.staticBroadphaseDirty = false;
@@ -250,17 +304,62 @@ export class CollisionWorld {
     return this.colliders.length;
   }
 
+  /** Presentation cache invalidation, sampled once per draw, never per cone edge.
+   * Follows query semantics: mesh visibility (not room-render ancestry), layer
+   * membership, dynamic parent transforms and explicit static invalidation.
+   * Does not change sweep diagnostics or gameplay query frequency.
+   */
+  getLineOfSightRevision(): number {
+    return this.withStableQueryTransforms(() => {
+      for (const collider of this.colliders) {
+        if ((collider.layerMask & CollisionLayer.LineOfSight) === 0) continue;
+        if (collider.transformMode === ColliderTransformMode.Dynamic || !collider.transformCacheValid)
+          this.refreshTransformCache(collider);
+        const { mesh } = collider;
+        const snapshot = this.lineOfSightSnapshots.get(mesh);
+        if (!snapshot) {
+          this.lineOfSightSnapshots.set(mesh, { visible: mesh.visible, matrix: collider.cachedWorld.clone() });
+          this.lineOfSightRevision++;
+        } else if (snapshot.visible !== mesh.visible || !snapshot.matrix.equals(collider.cachedWorld)) {
+          snapshot.visible = mesh.visible;
+          snapshot.matrix.copy(collider.cachedWorld);
+          this.lineOfSightRevision++;
+        }
+      }
+      return this.lineOfSightRevision;
+    });
+  }
+
   getLastSweepDiagnostics(): CollisionSweepDiagnostics {
     return {
       registeredColliders: this.colliders.length,
-      eligibleColliders: this.lastEligibleColliderCount,
+      eligibleColliders: this.lastSweepEligibleColliderCount,
       broadphaseCandidates: this.lastBroadphaseCandidateCount,
       narrowPhaseChecks: this.lastNarrowPhaseCheckCount,
     };
   }
 
+  getLastQueryDiagnostics(): CollisionQueryDiagnostics {
+    return {
+      registeredColliders: this.colliders.length,
+      dynamicCollidersVisited: this.queryDynamicVisits,
+      staticEntriesVisited: this.queryStaticVisits,
+      candidates: this.queryCandidateCount,
+      narrowPhaseChecks: this.queryNarrowChecks,
+      candidateBufferGrowth: this.queryBufferGrowth,
+    };
+  }
+
   get lastSweepEligibleColliderCount(): number {
-    return this.lastEligibleColliderCount;
+    // This optional global statistic must not put a registry traversal back in
+    // every movement, camera, projectile or cosmetic query.
+    if (this.lastSweepMask === CollisionLayer.None) return 0;
+    let count = 0;
+    for (const collider of this.colliders) {
+      if ((collider.layerMask & this.lastSweepMask) !== 0 &&
+          collider.mesh !== this.lastSweepIgnoredCollider && collider.mesh.visible) count++;
+    }
+    return count;
   }
 
   get lastSweepBroadphaseCandidateCount(): number {
@@ -296,12 +395,16 @@ export class CollisionWorld {
     this.validateLayerMask(queryMask);
     outHit.reset();
     this.resetSweepDiagnostics();
+    this.resetQueryDiagnostics();
     if (this.stableQueryDepth === 0) this.transformQueryStamp += 1;
 
     if (queryMask === CollisionLayer.None) return false;
 
     const displacementLength = displacement.length();
     if (displacementLength <= AXIS_EPSILON) return false;
+
+    this.lastSweepMask = queryMask;
+    this.lastSweepIgnoredCollider = ignoredCollider;
 
     let closestFraction = Number.POSITIVE_INFINITY;
     let closestCollider: RegisteredCollider | undefined;
@@ -316,21 +419,18 @@ export class CollisionWorld {
       );
     }
 
-    for (const collider of this.colliders) {
+    const candidates = this.broadphaseEnabled ? this.queryCandidates : this.colliders;
+    const candidateCount = this.broadphaseEnabled ? this.queryCandidateCount : candidates.length;
+    for (let index = 0; index < candidateCount; index++) {
+      const collider = candidates[index];
       if ((collider.layerMask & queryMask) === 0) continue;
 
       const mesh = collider.mesh;
       if (mesh === ignoredCollider) continue;
       if (!mesh.visible) continue;
 
-      this.lastEligibleColliderCount += 1;
-      if (
-        this.broadphaseEnabled &&
-        collider.broadphaseStamp !== this.broadphaseStamp
-      ) {
-        continue;
-      }
       this.lastBroadphaseCandidateCount += 1;
+      if (!this.broadphaseEnabled) this.queryCandidateCount++;
 
       if (
         !this.broadphaseEnabled &&
@@ -347,6 +447,7 @@ export class CollisionWorld {
       const minimumScale = collider.minimumWorldScale;
       if (minimumScale <= AXIS_EPSILON) continue;
       this.lastNarrowPhaseCheckCount += 1;
+      this.queryNarrowChecks++;
 
       // A world-space sphere transformed through non-uniform scale becomes an
       // ellipsoid. Expanding by radius / minScale is conservative and avoids
@@ -430,6 +531,7 @@ export class CollisionWorld {
 
     this.validateLayerMask(queryMask);
     outHit.reset();
+    this.resetQueryDiagnostics();
     if (this.stableQueryDepth === 0) this.transformQueryStamp += 1;
     if (queryMask === CollisionLayer.None) return false;
 
@@ -451,15 +553,12 @@ export class CollisionWorld {
     let closestFraction = Number.POSITIVE_INFINITY;
     let closestCollider: RegisteredCollider | undefined;
 
-    for (const collider of this.colliders) {
+    const candidates = this.broadphaseEnabled ? this.queryCandidates : this.colliders;
+    const candidateCount = this.broadphaseEnabled ? this.queryCandidateCount : candidates.length;
+    for (let index = 0; index < candidateCount; index++) {
+      const collider = candidates[index];
       if ((collider.layerMask & queryMask) === 0) continue;
       if (collider.mesh === ignoredCollider || !collider.mesh.visible) continue;
-      if (
-        this.broadphaseEnabled &&
-        collider.broadphaseStamp !== this.broadphaseStamp
-      ) {
-        continue;
-      }
       if (
         !this.broadphaseEnabled &&
         (collider.transformMode === ColliderTransformMode.Dynamic ||
@@ -472,6 +571,8 @@ export class CollisionWorld {
       this.localEnd.copy(this.worldEnd).applyMatrix4(collider.inverseWorld);
       this.localDisplacement.subVectors(this.localEnd, this.localStart);
 
+      if (!this.broadphaseEnabled) this.queryCandidateCount++;
+      this.queryNarrowChecks++;
       const fraction = this.raycastLocalBox(
         collider.localBounds,
         this.localStart,
@@ -500,7 +601,8 @@ export class CollisionWorld {
   }
 
   private resetSweepDiagnostics(): void {
-    this.lastEligibleColliderCount = 0;
+    this.lastSweepMask = CollisionLayer.None;
+    this.lastSweepIgnoredCollider = undefined;
     this.lastBroadphaseCandidateCount = 0;
     this.lastNarrowPhaseCheckCount = 0;
   }
@@ -525,17 +627,18 @@ export class CollisionWorld {
       Math.max(origin.z, this.worldEnd.z),
     );
 
-    this.markStaticBroadphaseCandidates(radius);
-    for (const collider of this.colliders) {
-      if (collider.transformMode !== ColliderTransformMode.Dynamic) continue;
+    this.collectStaticBroadphaseCandidates(radius, queryMask, ignoredCollider);
+    for (const collider of this.dynamicColliders) {
+      this.queryDynamicVisits++;
       if ((collider.layerMask & queryMask) === 0) continue;
       if (collider.mesh === ignoredCollider || !collider.mesh.visible) continue;
 
       this.refreshTransformCache(collider);
       if (this.intersectsExpandedSweep(collider, radius)) {
-        collider.broadphaseStamp = this.broadphaseStamp;
+        this.appendCandidate(collider);
       }
     }
+    this.sortCandidates();
   }
 
   private advanceBroadphaseStamp(): void {
@@ -609,7 +712,9 @@ export class CollisionWorld {
     }
   }
 
-  private markStaticBroadphaseCandidates(radius: number): void {
+  private collectStaticBroadphaseCandidates(
+    radius: number, queryMask: number, ignoredCollider: THREE.Mesh | undefined,
+  ): void {
     const minimumX = this.worldToCell(
       this.sweepBounds.min.x - radius * this.staticMaximumRadiusScale.x,
     );
@@ -633,20 +738,25 @@ export class CollisionWorld {
       (maximumY - minimumY + 1) *
       (maximumZ - minimumZ + 1);
 
-    if (queryCellCount > this.colliders.length) {
-      for (const collider of this.colliders) {
-        if (
-          collider.transformMode === ColliderTransformMode.Static &&
-          this.intersectsExpandedSweep(collider, radius)
-        ) {
-          collider.broadphaseStamp = this.broadphaseStamp;
+    for (const collider of this.globalStaticColliders) {
+      this.collectStaticCandidate(collider, queryMask, ignoredCollider);
+    }
+    // Very long/diagonal queries walk occupied spatial cells instead of probing
+    // an unbounded empty volume or falling back to the full collider registry.
+    if (queryCellCount > 4096) {
+      for (const [x, yCells] of this.staticBroadphaseGrid) {
+        if (x < minimumX || x > maximumX) continue;
+        for (const [y, zCells] of yCells) {
+          if (y < minimumY || y > maximumY) continue;
+          for (const [z, cell] of zCells) {
+            if (z < minimumZ || z > maximumZ) continue;
+            for (const collider of cell) {
+              this.collectStaticCandidate(collider, queryMask, ignoredCollider);
+            }
+          }
         }
       }
       return;
-    }
-
-    for (const collider of this.globalStaticColliders) {
-      collider.broadphaseStamp = this.broadphaseStamp;
     }
     for (let x = minimumX; x <= maximumX; x += 1) {
       const yCells = this.staticBroadphaseGrid.get(x);
@@ -658,11 +768,108 @@ export class CollisionWorld {
           const cell = zCells.get(z);
           if (!cell) continue;
           for (const collider of cell) {
-            collider.broadphaseStamp = this.broadphaseStamp;
+            this.collectStaticCandidate(collider, queryMask, ignoredCollider);
           }
         }
       }
     }
+  }
+
+  private collectStaticCandidate(
+    collider: RegisteredCollider, queryMask: number,
+    ignoredCollider: THREE.Mesh | undefined,
+  ): void {
+    this.queryStaticVisits++;
+    if (collider.broadphaseStamp === this.broadphaseStamp) return;
+    collider.broadphaseStamp = this.broadphaseStamp;
+    if ((collider.layerMask & queryMask) === 0 ||
+        collider.mesh === ignoredCollider || !collider.mesh.visible) return;
+    this.appendCandidate(collider);
+  }
+
+  private resetQueryDiagnostics(): void {
+    this.queryCandidateCount = 0;
+    this.queryDynamicVisits = 0;
+    this.queryStaticVisits = 0;
+    this.queryNarrowChecks = 0;
+    this.queryBufferGrowth = 0;
+  }
+
+  private appendCandidate(collider: RegisteredCollider): void {
+    if (this.queryCandidateCount === this.queryCandidates.length) this.queryBufferGrowth++;
+    this.queryCandidates[this.queryCandidateCount++] = collider;
+  }
+
+  /** Restore registry order using reusable storage, with no per-query sort arrays. */
+  private sortCandidates(): void {
+    const candidates = this.queryCandidates;
+    const count = this.queryCandidateCount;
+    // Single-cell queries often arrive in registry order already, especially
+    // dense cells. Avoid paying O(k log k) to sort an ordered candidate list.
+    let ordered = true;
+    for (let index = 1; index < count; index++) {
+      if (candidates[index - 1].registryOrder > candidates[index].registryOrder) {
+        ordered = false;
+        break;
+      }
+    }
+    if (ordered) return;
+    if (count >= 128) {
+      this.radixSortCandidates();
+      return;
+    }
+    // Heap sorting is cheaper than clearing the radix buckets for small sets.
+    for (let root = Math.floor(count / 2) - 1; root >= 0; root--) this.siftCandidates(root, count);
+    for (let end = count - 1; end > 0; end--) {
+      const last = candidates[end];
+      candidates[end] = candidates[0];
+      candidates[0] = last;
+      this.siftCandidates(0, end);
+    }
+  }
+
+  private radixSortCandidates(): void {
+    const count = this.queryCandidateCount;
+    let source = this.queryCandidates, destination = this.sortScratch;
+    if (destination.length < count) this.queryBufferGrowth += count - destination.length;
+    let maximumOrder = 0;
+    for (let index = 0; index < count; index++) maximumOrder = Math.max(maximumOrder, source[index].registryOrder);
+    // Arithmetic digits preserve orders beyond 32 bits. Unlike comparison
+    // sorting, dense candidate sets cost only a few sequential passes.
+    for (let divisor = 1; divisor <= maximumOrder; divisor *= 256) {
+      this.sortBuckets.fill(0);
+      for (let index = 0; index < count; index++) {
+        this.sortBuckets[Math.floor(source[index].registryOrder / divisor) % 256]++;
+      }
+      let offset = 0;
+      for (let bucket = 0; bucket < 256; bucket++) {
+        const size = this.sortBuckets[bucket];
+        this.sortBuckets[bucket] = offset;
+        offset += size;
+      }
+      for (let index = 0; index < count; index++) {
+        const collider = source[index];
+        destination[this.sortBuckets[Math.floor(collider.registryOrder / divisor) % 256]++] = collider;
+      }
+      const previousSource = source;
+      source = destination;
+      destination = previousSource;
+    }
+    if (source !== this.queryCandidates) {
+      for (let index = 0; index < count; index++) this.queryCandidates[index] = source[index];
+    }
+  }
+
+  private siftCandidates(root: number, count: number): void {
+    const candidates = this.queryCandidates;
+    const value = candidates[root];
+    for (let child = root * 2 + 1; child < count; child = root * 2 + 1) {
+      if (child + 1 < count && candidates[child].registryOrder < candidates[child + 1].registryOrder) child++;
+      if (value.registryOrder >= candidates[child].registryOrder) break;
+      candidates[root] = candidates[child];
+      root = child;
+    }
+    candidates[root] = value;
   }
 
   private worldToCell(coordinate: number): number {

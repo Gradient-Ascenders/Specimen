@@ -1,7 +1,14 @@
 import { defineConfig } from '@playwright/test';
 
 const productionUrl = 'http://127.0.0.1:4173/group-folder/';
-const browserChannel = process.env.SPECIMEN_BROWSER_CHANNEL;
+const requestedBrowser = process.env.SPECIMEN_BROWSER_NAME ?? 'chromium';
+if (!['chromium', 'firefox', 'webkit'].includes(requestedBrowser)) {
+  throw new Error(`Unsupported SPECIMEN_BROWSER_NAME: ${requestedBrowser}`);
+}
+const browserName = requestedBrowser as 'chromium' | 'firefox' | 'webkit';
+const browserChannel = browserName === 'chromium'
+  ? process.env.SPECIMEN_BROWSER_CHANNEL
+  : undefined;
 
 export default defineConfig({
   testDir: './tests/smoke',
@@ -25,14 +32,19 @@ export default defineConfig({
     launchOptions: {
       args: [
         // Exercise a consistent CPU renderer on local and GPU-less CI runners.
-        ...(browserChannel ? [] : ['--use-gl=angle', '--use-angle=swiftshader']),
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
+        ...(browserName === 'chromium' && !browserChannel
+          ? [
+              '--use-gl=angle',
+              '--use-angle=swiftshader',
+              '--disable-background-timer-throttling',
+              '--disable-backgrounding-occluded-windows',
+              '--disable-renderer-backgrounding',
+            ]
+          : []),
       ],
     },
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [{ name: browserName, use: { browserName } }],
   webServer: {
     command: 'node scripts/serve-production-smoke.mjs',
     url: productionUrl,

@@ -523,6 +523,76 @@ or frame-time budgets. The production content-path decision, target GPU/browser
 qualification and independent implementation/visual approval remain the
 separate requirements of the performance parent issue and review workflow.
 
+### Cultivation scanner-beam presentation
+
+Room 5 scanner cones use `ScannerBeamPresentation` once per runtime render,
+after camera and room visibility selection and mandatory preparation. Fixed
+updates still own patrols, guard detection/LOS, damage and projectile collision;
+they perform no cosmetic beam clipping. The presentation reads the final drone
+pose, including resets followed by a render without a fixed step.
+
+The work budget is two cones per draw, at most 48 cosmetic sphere sweeps for
+the current 24-sided geometry. Dirty cones are eligible at 10 Hz; missed samples
+are never replayed during catch-up. Budget pressure can extend refresh latency
+beyond 100 ms. A round-robin cursor prevents starvation.
+Enabled state, ancestor visibility, material visibility/opacity, camera layers
+and a frustum test against the **original unclipped** bounds gate the work. When
+none qualify, neither a blocker snapshot nor clipping queries run. Camera entry,
+network reactivation and reset invalidate the cache immediately. A newly visible
+cone waits hidden until its fresh sample fits the budget. Nine simultaneous new
+cones need at most five draws; that handoff and the 100 ms moving-cover cadence
+need visual review on the assessment machine. These are work/cadence caps, not
+an asserted millisecond budget.
+
+`CollisionWorld.getLineOfSightRevision()` samples collider changes once per
+eligible draw. It tracks dynamic transforms (including parents), mesh visibility,
+registration/removal, layer changes, static invalidation and clear. It follows
+physics visibility semantics, independently of render-only room ancestry. A cone
+retains its clipped vertices until its world pose or blocker revision changes;
+its geometry is not uploaded again while unchanged. All refreshes in one draw
+share stable query transforms. The original collider/material ownership and
+encounter disposal contracts remain in place; the cache creates no GPU resources.
+
+Each cone retains independent edge clipping so partial cover leaves clear edges
+visible. Duplicate apex/seam vertices share collision samples, reducing 25 sweeps
+to 24 without changing the 24-sided mesh. The existing conservative whole-cone
+`length()` alternative uses 33 samples and erases that partial visibility; it is
+not selected. Lower angular resolution would need separate visual qualification.
+World-matrix sampling also handles translated, rotated or scaled room ancestors.
+
+Use the pinned Node/npm toolchain, build both checkouts, and run matched captures
+sequentially. The browser script exposes the shipped session for staging only,
+uses the ordinary production URL, checks console/network/GL errors, and records
+full runtime fixed-update plus render CPU alongside isolated clipping attribution.
+It exercises one-step and six-step draws, moving blockers and network toggles.
+The Node diagnostic uses the full production collider registry around an isolated
+encounter and records raw sweep/timing samples plus gameplay-state hashes.
+
+```bash
+node scripts/benchmark-scanner-beams.ts --root <baseline-checkout> --output artifacts/scanner-beams/isolated-before.json
+node scripts/benchmark-scanner-beams.ts --output artifacts/scanner-beams/isolated-after.json
+node scripts/profile-scanner-beams.mjs --url <baseline-production-url> --label before
+node scripts/profile-scanner-beams.mjs --url <candidate-production-url> --label after
+```
+
+`--cdp <url>` selects a caller-owned assessment Chromium; `--executable <path>`
+selects a local Chromium. `--software` enables SwiftShader for correctness only.
+`--probe` adds an unbudgeted all-visible/all-refreshed screenshot control after
+sampling; it is never part of the measured or shipped presentation path.
+Retain the JSON/PNG evidence under ignored `artifacts/scanner-beams/` and attach
+it to review. Fixed bodies and staged camera/blocker states provide attribution,
+not a native gameplay/FPS qualification. Browser frame CPU includes renderer
+submission/driver stalls and is not GPU time. Compare full-frame measurements,
+not only the isolated encounter, and verify gameplay hashes match.
+
+The confirmed assessment system is an ASUS NUC12WSK-B, Core i3-1220P (12 logical
+processors), Alder Lake GT2 integrated Intel Graphics, 16 GiB RAM, 500.1 GB
+storage, Ubuntu 24.04.1 LTS x86-64, GNOME 46/Wayland, kernel 6.8.0-124-generic.
+Browser/backend, power configuration and numeric acceptance budgets still need
+recording under #187/#198. Local CPU/SwiftShader results do not qualify this GPU;
+independent implementation/visual review and target-machine captures remain
+required before issue closure.
+
 ### Production checks
 
 For rendering changes, verify the ordinary journey and affected level under a

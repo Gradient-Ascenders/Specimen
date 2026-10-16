@@ -42,7 +42,7 @@ export class RenderShadowPolicy {
   }
 
   get activeOwner(): string | undefined {
-    return this.requests.at(-1)?.owner;
+    return this.requests[this.requests.length - 1]?.owner;
   }
 
   /** Compilation/draw setup is synchronous even when the action returns a promise. */
@@ -90,7 +90,7 @@ export class RenderShadowPolicy {
   }
 
   private apply(): void {
-    const enabled = this.requests.at(-1)?.enabled ?? false;
+    const enabled = this.requests[this.requests.length - 1]?.enabled ?? false;
     const changed = this.shadowMap.enabled !== enabled ||
       this.shadowMap.type !== THREE.PCFShadowMap || !this.shadowMap.autoUpdate;
     this.shadowMap.enabled = enabled;
@@ -399,7 +399,7 @@ export class RenderLayer {
     this.renderer.setAnimationLoop(null);
     this.hostWindow.removeEventListener('resize', this.resize);
     this.resizeObserver?.disconnect();
-    this.dprQuery?.removeEventListener('change', this.onDevicePixelRatioChange);
+    this.removeDevicePixelRatioListener();
     this.graphicsResources.dispose();
     this.graphicsListeners.clear();
     this.shadowPolicy.dispose();
@@ -447,9 +447,22 @@ export class RenderLayer {
   };
 
   private watchDevicePixelRatio(): void {
-    this.dprQuery?.removeEventListener('change', this.onDevicePixelRatioChange);
+    this.removeDevicePixelRatioListener();
     this.dprQuery = this.hostWindow.matchMedia(`(resolution: ${this.hostWindow.devicePixelRatio}dppx)`);
-    this.dprQuery.addEventListener('change', this.onDevicePixelRatioChange);
+    if (typeof this.dprQuery.addEventListener === 'function') {
+      this.dprQuery.addEventListener('change', this.onDevicePixelRatioChange);
+    } else {
+      this.dprQuery.addListener(this.onDevicePixelRatioChange);
+    }
+  }
+
+  private removeDevicePixelRatioListener(): void {
+    if (!this.dprQuery) return;
+    if (typeof this.dprQuery.removeEventListener === 'function') {
+      this.dprQuery.removeEventListener('change', this.onDevicePixelRatioChange);
+    } else {
+      this.dprQuery.removeListener(this.onDevicePixelRatioChange);
+    }
   }
 
   private notifyGraphicsDiagnostics(): void {
