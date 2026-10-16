@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { validateProductionBuild } from './lib/production-build.mjs';
+import { windowsZip } from './lib/windows-zip.mjs';
 
 const namespace = '/group-folder/';
 const contentTypes = {
@@ -23,11 +24,15 @@ try {
   if (process.env.SPECIMEN_SMOKE_ARCHIVE) {
     temporaryRoot = await mkdtemp(join(tmpdir(), 'specimen-smoke-'));
     root = join(temporaryRoot, 'site');
-    const result = spawnSync('unzip', [
-      '-q', resolve(process.env.SPECIMEN_SMOKE_ARCHIVE), '-d', root,
-    ], { encoding: 'utf8', timeout: 30_000 });
-    if (result.error) throw result.error;
-    if (result.status !== 0) throw new Error(`Archive extraction failed: ${result.stderr}`);
+    if (process.platform === 'win32') {
+      windowsZip('extract', resolve(process.env.SPECIMEN_SMOKE_ARCHIVE), root);
+    } else {
+      const result = spawnSync('unzip', [
+        '-q', resolve(process.env.SPECIMEN_SMOKE_ARCHIVE), '-d', root,
+      ], { encoding: 'utf8', timeout: 30_000 });
+      if (result.error) throw result.error;
+      if (result.status !== 0) throw new Error(`Archive extraction failed: ${result.stderr}`);
+    }
   }
   await validateProductionBuild(root);
 
@@ -39,12 +44,18 @@ try {
         return;
       }
       const path = resolve(root, pathname.slice(namespace.length) || 'index.html');
-      if (!path.startsWith(`${root}${sep}`) || !(await stat(path)).isFile()) {
+      if (!path.startsWith(`${root}${sep}`)) {
+        response.writeHead(404).end();
+        return;
+      }
+      const file = await stat(path);
+      if (!file.isFile()) {
         response.writeHead(404).end();
         return;
       }
       response.writeHead(200, {
         'Content-Type': contentTypes[extname(path)] ?? 'application/octet-stream',
+        'Content-Length': file.size,
         'Cache-Control': 'no-store',
       });
       if (request.method === 'HEAD') response.end();

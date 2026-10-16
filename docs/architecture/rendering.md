@@ -116,8 +116,9 @@ lighting, aiming, switching, death/retry, merge/split, restart, failed loads and
 unload. The minimum journey records first-death shader-program growth separately
 and requires stable subsequent retry cycles; shader warmup remains part of #191.
 Its mode-specific artifacts go under the same issue directory. This
-journey explicitly enables the existing debug/authored Level 2 route; it does
-not resolve the production-content parity work in #197.
+journey explicitly enables developer controls for staging. The separate
+`ProductionParity` smoke journey verifies authored content at the ordinary
+production URL without debug flags.
 
 Software rendering validates correctness only. Issue #188 still requires
 matched interactive production captures on the confirmed assessment GPU,

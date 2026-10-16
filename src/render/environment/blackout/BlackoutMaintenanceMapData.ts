@@ -37,7 +37,12 @@ export async function loadBlackoutMaintenanceMapData(url: URL, signal?: AbortSig
     const response = await fetch(url, { signal });
     if (!response.ok) throw new Error(`HTTP ${response.status} loading ${url.pathname}`);
     if (!response.body) throw new Error('Empty Blackout map response.');
-    const stream = response.body.pipeThrough(new DecompressionStream('gzip'), { signal });
+    // Finish the HTTP transfer before decoding. A streaming decoder can
+    // finish before Chromium reports network completion; buffering this small
+    // compressed bundle also keeps transport errors in the preparation promise.
+    const compressed = await response.arrayBuffer();
+    signal?.throwIfAborted();
+    const stream = new Response(compressed).body!.pipeThrough(new DecompressionStream('gzip'), { signal });
     const buffer = await new Response(stream).arrayBuffer();
     signal?.throwIfAborted();
     return readBlackoutMaintenanceMapData(buffer);

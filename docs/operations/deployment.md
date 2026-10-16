@@ -14,6 +14,9 @@ unzip -Z1 artifacts/specimen-production.zip
 unzip -t artifacts/specimen-production.zip
 ```
 
+On Windows, `npm run archive` uses the built-in .NET ZIP implementation; no
+Unix zip/unzip installation is required.
+
 `index.html` must be at the ZIP root and hashed bundles beneath `assets/`.
 There must be no enclosing `dist/`, source tree, dependency tree, documentation,
 or development configuration. Keep the archive and its SHA-256 outside Git.
@@ -36,6 +39,31 @@ Do not validate deployment with `file://`, the development server, or only
 filename casing, and return successfully. Run a clean playthrough and a
 failure-heavy playthrough covering pause, Retry, checkpoints, transitions, and
 restart.
+
+## Ordinary production acceptance
+
+Open the assigned URL without query parameters. All five authored Cultivation
+rooms load by default; `?debug=1` only enables developer tools. Normal graphics
+remain the default; Performance and explicit 0.75× resolution are optional.
+
+After `npm run archive`, run the archive itself through the nested-path smoke
+server (PowerShell):
+
+```powershell
+$env:SPECIMEN_SMOKE_ARCHIVE = 'artifacts/specimen-production.zip'
+# Optional installed hardware browser; omit to use software Chromium.
+$env:SPECIMEN_BROWSER_CHANNEL = 'msedge'
+npm run test:smoke -- ProductionParity ProductionSmoke
+```
+
+`ProductionParity` opens the plain URL and observes the composition root without
+enabling debug mode. It verifies authored objects, populated texture maps,
+characters, encounters, preparation, each Level 2 room, restarts, Volt release,
+all three levels, and network/console/WebGL errors. Controller contracts stage
+completion and room entry: this regression is not an unassisted puzzle
+playthrough. `ProductionSmoke` also retains the unmodified plain startup journey
+and explicit debug shortcut journey. Screenshots/traces/results are generated
+under `test-results/` and the Playwright report.
 
 ## Publish and verify
 

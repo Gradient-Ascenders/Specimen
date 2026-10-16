@@ -4,9 +4,13 @@ Baseline: origin/main b00978e (merged PR #185), on fix/beta-gameplay-smoothness.
 
 ## Demo settings
 
-Use the production build with ?debug=1, then Settings → Graphics preset → Performance and Render resolution → 0.75×. Keep the same browser window size throughout the demonstration. At the measured 1536 × 730 viewport this produces a 1152 × 547 drawing buffer, effective DPR 0.75, and transmissionResolutionScale 0.5. The DOM interface stays at native resolution. Performance by itself caps resolution at 1×; the lower 0.75× choice is explicit and optional. Normal remembers the selected resolution and restores full transmission detail. Selecting a resolution explicitly changes that session preference.
+Use the production build at its ordinary URL, then Settings → Graphics preset → Performance and Render resolution → 0.75×. Keep the same browser window size throughout the demonstration. At the measured 1536 × 730 viewport this produces a 1152 × 547 drawing buffer, effective DPR 0.75, and transmissionResolutionScale 0.5. The DOM interface stays at native resolution. Performance by itself caps resolution at 1×; the lower 0.75× choice is explicit and optional. Normal remembers the selected resolution and restores full transmission detail. Selecting a resolution explicitly changes that session preference.
 
-**Detailed Level 2 is still gated by ?debug=1 in this baseline.** A plain production URL uses the Cultivation foundation scene. The beta route must include the query parameter; this pass does not change content gating. The debug route also exposes diagnostic UI/shortcuts. Allow mandatory preparation to finish behind the loading screen before demonstrating movement; no warmup was removed or deferred into play.
+**Production content update:** the production parity fix makes the detailed,
+textured five-room Level 2 available at the ordinary URL. The earlier measured
+baseline required `?debug=1`; it now only enables diagnostics and shortcuts.
+Allow mandatory preparation to finish behind the loading screen before
+movement; no warmup was removed or deferred into play.
 
 The 0.75× image is softer, especially thin geometry and refracted detail. Lighting, PCF shadows, materials, transmission amount, navigation light, gameplay cues and HUD resolution are retained. Room 5 remains substantially slower than the other levels. These measurements do not establish sustained 60 FPS.
 

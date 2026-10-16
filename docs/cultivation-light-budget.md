@@ -9,8 +9,10 @@ review, merge and assessment-hardware qualification under #198.
 This change addresses the authored **Level 2** light arrays identified in #189.
 It does not replace Level 1/3's rigs, change transmission/resolution, alter
 colliders or change drone detection, shooting, damage, patrols or power logic.
-The full authored path is production `?debug=1`; #197 still owns production-content
-parity. Removing authored content is not used as an optimization.
+In the original measured baseline the full authored path required production
+`?debug=1`; the subsequent production parity fix enables it at the ordinary URL.
+The `ProductionParity` smoke tests now check ordinary production content
+separately. Removing authored content is not used as an optimization.
 
 These are provisional engineering caps, not an agreed assessment-PC profile:
 
