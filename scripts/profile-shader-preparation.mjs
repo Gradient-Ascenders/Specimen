@@ -29,7 +29,7 @@ if(backgroundBatch!==undefined&&(!Number.isInteger(backgroundBatch)||backgroundB
 const output = path.resolve('artifacts/shader-preparation', values.label); await mkdir(output,{recursive:true});
 const hashes = {};
 for (const file of await readdir(path.join(values.dist,'assets'))) if (file.endsWith('.js')) hashes[file] = createHash('sha256').update(await readFile(path.join(values.dist,'assets',file))).digest('hex');
-const report = { schema:2, recordedAt:new Date().toISOString(), protocol:{...values, startupRoute, viewport:[960,600],dpr:1,
+const report = { schema:2, recordedAt:new Date().toISOString(), protocol:{...values, requestedStartupRoute:startupRoute, viewport:[960,600],dpr:1,
   route:'ordinary production; controller-staged completion/room entries; bounded real input; not full puzzle playthrough',
   cache:'fresh browser per pair; warm navigation in same context; HTTP routing disables HTTP cache; OS/driver cache uncontrolled'}, hashes, runs:[] };
 const server = spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--outDir',values.dist,'--host','127.0.0.1','--port','4191','--strictPort'],{stdio:'ignore',windowsHide:true});
@@ -155,7 +155,9 @@ try {
       });
       row.startAt=await page.evaluate(()=>performance.now());
       await page.locator('[data-flow-panel="title"] [data-action="start"]').click();
-      if(values.opening==='skip')await page.locator('[data-action="skip-opening"]').click();
+      const hasOpening=await page.locator('.game-flow').getAttribute('data-state')==='opening';
+      row.startupRoute=hasOpening?startupRoute:'pre-cinematic-v1';
+      if(values.opening==='skip'&&hasOpening)await page.locator('[data-action="skip-opening"]').click();
       await page.waitForFunction(()=>globalThis.__shaderSession.runtime.state==='running'&&globalThis.__shaderSession.runtime.input.enabled);
       await page.waitForFunction(t=>__shaderCapture.frames.some(f=>f.owner==='one'&&f.state==='running'&&f.drawn&&f.start>=t),row.startAt);
       row.navigationToControlMs=await page.evaluate(()=>performance.now()); row.startToControlMs=row.navigationToControlMs-row.startAt;
