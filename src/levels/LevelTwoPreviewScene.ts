@@ -102,7 +102,7 @@ const ROOM_SPAWNS: Readonly<
   5: { bob: new THREE.Vector3(-1, .86, 9.1), goop: new THREE.Vector3(1, .86, 9.1) },
 };
 
-/** Development-only composition of the three currently authored Cultivation rooms. */
+/** Released composition of all five authored Cultivation rooms. */
 export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly root = new THREE.Group();
   readonly acidInteractions: readonly AcidLiquidInteractions[];
@@ -163,7 +163,6 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     super(assets);
     this.root.name = 'cultivation-level-2-authored-preview';
     this.root.position.x = LEVEL_TWO_PREVIEW_WORLD_OFFSET_X;
-    this.root.userData.developmentOnly = true;
 
     this.roomOne = new LevelTwoRoomOneGreybox(requestFailure);
     this.roomTwo = new LevelTwoRoomTwoGreybox(

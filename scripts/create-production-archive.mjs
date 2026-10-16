@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateProductionBuild } from './lib/production-build.mjs';
+import { windowsZip } from './lib/windows-zip.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const buildDirectory = join(projectRoot, 'dist');
@@ -58,23 +59,38 @@ const main = async () => {
       await utimes(destination, archiveTimestamp, archiveTimestamp);
     }
 
-    // Use argv rather than stdin: a missing stdin EOF can stall zip -@.
-    run('zip', ['-X', '-q', '-nw', temporaryArchive, '--', ...buildFiles], {
-      cwd: stagingDirectory,
-      env: { ...process.env, TZ: 'UTC' },
-    });
-    run('unzip', ['-t', temporaryArchive]);
-
-    const archivedFiles = run('unzip', ['-Z1', temporaryArchive])
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .sort();
+    let listing;
+    if (process.platform === 'win32') {
+      windowsZip('create', temporaryArchive, stagingDirectory);
+      listing = windowsZip('list', temporaryArchive);
+    } else {
+      // Use argv rather than stdin: a missing stdin EOF can stall zip -@.
+      run('zip', ['-X', '-q', '-nw', temporaryArchive, '--', ...buildFiles], {
+        cwd: stagingDirectory,
+        env: { ...process.env, TZ: 'UTC' },
+      });
+      run('unzip', ['-t', temporaryArchive]);
+      listing = run('unzip', ['-Z1', temporaryArchive]);
+    }
+    const archivedFiles = listing.trim().split(/\r?\n/).filter(Boolean).sort();
 
     if (JSON.stringify(archivedFiles) !== JSON.stringify(buildFiles)) {
       throw new Error(
         `Archive entries do not match dist/.\nExpected: ${buildFiles.join(', ')}\nActual: ${archivedFiles.join(', ')}`,
       );
+    }
+
+    // Verify decompressed bytes too, not only the archive's entry names.
+    const verificationDirectory = join(temporaryRoot, 'verified');
+    if (process.platform === 'win32') {
+      windowsZip('extract', temporaryArchive, verificationDirectory);
+    } else {
+      run('unzip', ['-q', temporaryArchive, '-d', verificationDirectory]);
+    }
+    for (const file of buildFiles) {
+      const original = await readFile(join(buildDirectory, file));
+      const archived = await readFile(join(verificationDirectory, file));
+      if (!original.equals(archived)) throw new Error(`Archive byte mismatch: ${file}`);
     }
 
     await mkdir(artifactDirectory, { recursive: true });

@@ -1,3 +1,4 @@
+import { CULTIVATION_LEVEL_GAMEPLAY_SUPPORT as gameplay } from './CultivationLevelGameplay.ts';
 import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
 import type { CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
@@ -120,7 +121,7 @@ export interface CultivationLevelRuntimeOptions {
   readonly window?: Window;
   readonly debugAvailable?: boolean;
   readonly debugSupport?: CultivationLevelDebugSupport;
-  readonly authoredAssets?: CultivationAssetSource;
+  readonly authoredAssets: CultivationAssetSource;
 }
 
 interface CultivationRuntimeResources {
@@ -133,7 +134,7 @@ interface CultivationRuntimeResources {
   readonly voltMovementEvents: EventBus<MovementEvents>;
   readonly renderedVoltPosition: THREE.Vector3;
   readonly scene: CultivationLevelScene;
-  readonly authoredPreview: LevelTwoPreviewScene | undefined;
+  readonly authoredPreview: LevelTwoPreviewScene;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
   readonly dissolveTargets: readonly DissolveTarget[];
@@ -209,7 +210,7 @@ export class CultivationLevelRuntime {
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
   private readonly debugSupport: CultivationLevelDebugSupport | undefined;
-  private readonly authoredAssets: CultivationAssetSource | undefined;
+  private readonly authoredAssets: CultivationAssetSource;
   private readonly initialProgression: LevelProgressionSnapshot;
   private readonly lifecycle: LevelLifecycle;
   private readonly hudListeners = new Set<SlimeHUDListener>();
@@ -261,7 +262,7 @@ export class CultivationLevelRuntime {
     if (this.debugAvailable && !this.debugSupport) {
       throw new Error('Cultivation debug support must be loaded when debugging is enabled.');
     }
-    if (this.debugAvailable && !this.authoredAssets) {
+    if (!this.authoredAssets) {
       throw new Error('Cultivation authored assets must be loaded before scene construction.');
     }
     this.initialProgression = {
@@ -620,7 +621,7 @@ export class CultivationLevelRuntime {
       }
       // A fatal frame must not also promote the checkpoint that Retry restores.
       if (resources.deathSequence.isPlaying) {
-        const nextProgression = this.debugSupport!.advancePreviewProgression(
+        const nextProgression = gameplay.advancePreviewProgression(
           this.authoredPreviewProgression!,
           resolvedRooms,
         );
@@ -865,13 +866,11 @@ export class CultivationLevelRuntime {
       const scene = new CultivationLevelScene(CULTIVATION_FOUNDATION_MANIFEST);
       rollback(() => scene.dispose());
       this.renderLayer.scene.add(scene.root);
-      const authoredPreview = this.debugAvailable
-        ? new this.debugSupport!.PreviewScene(
-            (failure) => this.handleAuthoredPreviewFailure(failure),
-            this.authoredAssets!,
-            this.renderLayer.gelRendering,
-          )
-        : undefined;
+      const authoredPreview = new gameplay.PreviewScene(
+        (failure) => this.handleAuthoredPreviewFailure(failure),
+        this.authoredAssets,
+        this.renderLayer.gelRendering,
+      );
       if (authoredPreview) {
         rollback(() => authoredPreview.dispose());
         this.renderLayer.scene.add(authoredPreview.root);
@@ -963,8 +962,7 @@ export class CultivationLevelRuntime {
         },
       );
 
-      // Volt remains locked in the Level 1 harness; Level 2 can unlock him at
-      // its finale whether or not authored-preview content is enabled.
+      // Volt unlocks at the authored finale; the roster persists into Level 3.
       const manager = new SlimeManager<KinematicBody>(SLIME_DEFINITIONS.map(definition =>
         definition.id === 'volt' ? { ...definition, betaAvailability: 'playable' as const } : definition));
       rollback(() => manager.dispose());
@@ -1103,7 +1101,7 @@ export class CultivationLevelRuntime {
       const deathSequence = new DeathSequence();
       let radiation: RadioactiveHazardSystem | undefined;
       const roomThreeEncounter = authoredPreview
-        ? this.debugSupport!.createRoomThreeEncounter({
+        ? gameplay.createRoomThreeEncounter({
             supportsById: targetById,
             collisionWorld,
             surfaceRegistry,
@@ -1119,23 +1117,23 @@ export class CultivationLevelRuntime {
         authoredPreview.roomThree.root.add(roomThreeEncounter.root);
       }
       const roomThreeController = roomThreeEncounter && authoredPreview
-        ? new this.debugSupport!.RoomThreeController(
+        ? new gameplay.RoomThreeController(
             authoredPreview.roomThree.root,
             () => roomThreeEncounter.readModel.groundDisabledCount,
           )
         : undefined;
       if (roomThreeController) rollback(() => roomThreeController.dispose());
-      const roomFourEncounter = authoredPreview ? new this.debugSupport!.ElevatorDroneEncounter(
+      const roomFourEncounter = authoredPreview ? new gameplay.ElevatorDroneEncounter(
         authoredPreview.roomFour, collisionWorld, surfaceRegistry, bobBody, goopBody,
         previewDissolveTargets, dissolveSystem,
         (slimeId) => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), slimeId),
         authoredPreview.coverArt.droneSurfaceMaps,
       ) : undefined;
       if (roomFourEncounter) rollback(() => roomFourEncounter.dispose());
-      const roomFourView = authoredPreview ? new this.debugSupport!.ElevatorEncounterView() : undefined;
+      const roomFourView = authoredPreview ? new gameplay.ElevatorEncounterView() : undefined;
       if (roomFourView) { rollback(() => roomFourView.dispose()); this.host.append(roomFourView.element); }
       const roomFourProjectiles = roomFourEncounter
-        ? new this.debugSupport!.DroneProjectilePresentation(roomFourEncounter.projectiles.states) : undefined;
+        ? new gameplay.DroneProjectilePresentation(roomFourEncounter.projectiles.states) : undefined;
       if (roomFourProjectiles) {
         rollback(() => roomFourProjectiles.dispose());
         roomFourProjectiles.mesh.name = 'cultivation-room-4-drone-projectiles';
@@ -1143,7 +1141,7 @@ export class CultivationLevelRuntime {
         this.renderLayer.scene.add(roomFourProjectiles.mesh);
       }
       const roomFourDamage = roomFourEncounter
-        ? new this.debugSupport!.DamageVignette({ damage: roomFourEncounter.damage }) : undefined;
+        ? new gameplay.DamageVignette({ damage: roomFourEncounter.damage }) : undefined;
       if (roomFourDamage) { rollback(() => roomFourDamage.dispose()); this.host.append(roomFourDamage.element); }
 
       controller = new CultivationLevelController({
@@ -1231,7 +1229,7 @@ export class CultivationLevelRuntime {
       );
       bobPresentation.setPosition(bobBody.position);
       rollback(() => bobPresentation.dispose());
-      const roomFiveEncounter = authoredPreview ? new this.debugSupport!.RoomFiveDroneEncounter(
+      const roomFiveEncounter = authoredPreview ? new gameplay.RoomFiveDroneEncounter(
         authoredPreview.roomFive, collisionWorld, surfaceRegistry, bobBody, goopBody,
         id => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), id), authoredPreview.labArt.metal) : undefined;
       if (roomFiveEncounter) {
@@ -1241,9 +1239,9 @@ export class CultivationLevelRuntime {
         this.renderLayer.scene.add(roomFiveEncounter.presentation.mesh);
       }
       authoredPreview?.roomFive.bindBurns(dissolveSystem);
-      const roomFiveDamage = roomFiveEncounter ? new this.debugSupport!.DamageVignette({ damage: roomFiveEncounter.damage }) : undefined;
+      const roomFiveDamage = roomFiveEncounter ? new gameplay.DamageVignette({ damage: roomFiveEncounter.damage }) : undefined;
       if (roomFiveDamage) { rollback(() => roomFiveDamage.dispose()); this.host.append(roomFiveDamage.element); }
-      const roomFiveView = authoredPreview ? new this.debugSupport!.SecurityNetworkView() : undefined;
+      const roomFiveView = authoredPreview ? new gameplay.SecurityNetworkView() : undefined;
       if (roomFiveView) { rollback(() => roomFiveView.dispose()); this.host.append(roomFiveView.element); }
       this.renderLayer.scene.add(bobPresentation.root);
       const goopAcidPresentation = new GoopAcidPresentation({
@@ -1256,7 +1254,7 @@ export class CultivationLevelRuntime {
       });
       rollback(() => goopAcidPresentation.dispose());
       const droneProjectilePresentation = roomThreeEncounter
-        ? new this.debugSupport!.DroneProjectilePresentation(
+        ? new gameplay.DroneProjectilePresentation(
             roomThreeEncounter.projectiles.states,
           )
         : undefined;
@@ -1266,7 +1264,7 @@ export class CultivationLevelRuntime {
         this.renderLayer.scene.add(droneProjectilePresentation.mesh);
       }
       const damageVignette = roomThreeEncounter
-        ? new this.debugSupport!.DamageVignette({
+        ? new gameplay.DamageVignette({
             damage: roomThreeEncounter.damage,
           })
         : undefined;
@@ -1415,10 +1413,7 @@ export class CultivationLevelRuntime {
         });
       }
       if (authoredPreview) {
-        // Level 1's Digit0 shortcut now enters the authored three-room route
-        // immediately. The separate backend-foundation composition remains a
-        // reusable implementation harness, but is no longer a competing
-        // player destination in development builds.
+        // Normal entry and restart share the authored five-room recovery path.
         if (!this.teleportToAuthoredPreviewRoom(1)) {
           throw new Error('Could not enter authored Cultivation Room 1.');
         }
@@ -1625,7 +1620,7 @@ export class CultivationLevelRuntime {
     this.roomFiveCheckpoint = 'split';
 
     this.authoredPreviewProgression =
-      this.debugSupport!.createPreviewProgression(roomId);
+      gameplay.createPreviewProgression(roomId);
     this.authoredPreviewRecoveryActiveSlimeId =
       resources.manager.activeSlimeId!;
     resources.acidProjectileSystem.reset();
@@ -1718,7 +1713,7 @@ export class CultivationLevelRuntime {
     if (c.complete) return;
     // Elevator completion establishes recovery even before either slime exits.
     if (this.authoredPreviewRoomId === 4 && preview.roomFour.controller.readModel.state === 'complete') {
-      this.authoredPreviewProgression = this.debugSupport!.createPreviewProgression(5);
+      this.authoredPreviewProgression = gameplay.createPreviewProgression(5);
       this.captureAuthoredPreviewCheckpoint(resources);
       this.emitAuthoredPreviewObjective();
     }
@@ -1811,7 +1806,7 @@ export class CultivationLevelRuntime {
     if (roomId === undefined) return;
     this.events.emit('objectiveChanged', {
       roomId,
-      objective: roomId === 5 ? this.resources!.authoredPreview!.roomFive.controller.objective : roomId === 4 ? this.resources!.authoredPreview!.roomFour.controller.objective : this.debugSupport!.roomObjectives[roomId],
+      objective: roomId === 5 ? this.resources!.authoredPreview!.roomFive.controller.objective : roomId === 4 ? this.resources!.authoredPreview!.roomFour.controller.objective : gameplay.roomObjectives[roomId],
     });
   }
 
@@ -2132,6 +2127,7 @@ export class CultivationLevelRuntime {
 
   private readonly onSkipToLevelThree = (event: KeyboardEvent): void => {
     if (
+      !this.debugAvailable ||
       (event.code !== 'Digit0' && event.code !== 'Numpad0') ||
       event.repeat ||
       this.skipToLevelThreeTriggered ||

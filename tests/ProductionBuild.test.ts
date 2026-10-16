@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -54,9 +54,12 @@ test('production validation rejects enclosing directories, source files, and sec
 
 test('production validation requires index at the root and rejects symlinks', async (t) => {
   const root = await makeBuild(t);
-  await symlink('game.js', join(root, 'assets/link.js'));
+  // Directory junctions exercise symbolic-link rejection on Windows without
+  // requiring the privileged file-symlink capability.
+  await symlink(join(root, 'assets'), join(root, 'linked-assets'),
+    process.platform === 'win32' ? 'junction' : 'dir');
   await assert.rejects(validateProductionBuild(root), /Unsupported build entry/);
-  await rm(join(root, 'assets/link.js'));
+  await unlink(join(root, 'linked-assets'));
   await rm(join(root, 'index.html'));
   await assert.rejects(validateProductionBuild(root), /index.html is required/);
 });
