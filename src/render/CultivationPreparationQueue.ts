@@ -160,12 +160,12 @@ export class CultivationPreparationQueue {
     this.diagnostics.initialMs = performance.now() - started;
   }
 
-  async prepareCurrent(): Promise<void> {
-    if (this.requireCurrent(false)) return;
+  async prepareCurrent(dark: boolean): Promise<void> {
+    if (this.disposed || this.requireCurrent(dark)) return;
     const config = this.priority!;
     // Never carry live light masks through an asynchronous compiler wait.
     await this.prepareConfiguration(config);
-    this.requireCurrent(false);
+    if (!this.disposed) this.requireCurrent(dark);
   }
 
   /** Pay the expensive maintenance/shadow first draws during level startup,

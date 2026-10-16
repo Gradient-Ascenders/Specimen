@@ -297,6 +297,11 @@ export class CultivationLevelRuntime {
   private constructionMs = 0;
   private preparingRenderResources = false;
   private cameraShadowCulling: CameraShadowCulling | undefined;
+  private isDarkRoom(resources: CultivationRuntimeResources,
+    lightingRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position)): boolean {
+    return lightingRoom === 5 || (lightingRoom === 4
+      && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
+  }
   async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
     const resources = this.requireResources(), queue = this.preparationQueue;
     while (this.resources === resources && this.preparationQueue === queue) {
@@ -308,7 +313,7 @@ export class CultivationLevelRuntime {
       if (!queue?.diagnostics.pending) return;
       this.lightLayout?.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
       let ready: Promise<void>;
-      try { ready = queue.prepareCurrent(); }
+      try { ready = queue.prepareCurrent(this.isDarkRoom(resources)); }
       finally { this.lightLayout?.restore(); }
       await ready;
     }
@@ -326,7 +331,7 @@ export class CultivationLevelRuntime {
       // cover the current doorway before the session allows another live draw.
       this.lightLayout.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
       let preparation: Promise<void>;
-      try { preparation = (this.preparationQueue as CultivationPreparationQueue).prepareCurrent(); }
+      try { preparation = (this.preparationQueue as CultivationPreparationQueue).prepareCurrent(this.isDarkRoom(resources)); }
       finally { this.lightLayout.restore(); }
       await preparation;
     } finally { previous?.dispose(); }
@@ -739,8 +744,7 @@ export class CultivationLevelRuntime {
     if (lightingRoom === 4 || (lightingRoom === 3 && resources.authoredPreview?.roomFourGeometry.visible)) {
       this.preparationQueue?.anticipateLiftExit();
     }
-    const darkRoom = lightingRoom === 5 || (lightingRoom === 4
-      && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
+    const darkRoom = this.isDarkRoom(resources, lightingRoom);
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
