@@ -6,6 +6,7 @@ import {
   DEFAULT_RENDER_PIXEL_RATIO_CAP,
   type RenderPixelRatioCap,
   resolveRenderPixelRatio,
+  resolveBudgetedPixelRatio,
 } from './RenderResolution.ts';
 
 export const RENDER_EXPOSURE = 1;
@@ -137,6 +138,7 @@ export class RenderLayer {
   private readonly resizeObserver: ResizeObserver | undefined;
 
   private pixelRatioCap: RenderPixelRatioCap;
+  private presentationPixelBudget: number | undefined;
   private viewportWidth = 0;
   private viewportHeight = 0;
   private disposed = false;
@@ -203,6 +205,16 @@ export class RenderLayer {
   setPixelRatioCap(cap: RenderPixelRatioCap): void {
     if (this.disposed || cap === this.pixelRatioCap) return;
     this.pixelRatioCap = cap;
+    this.resize();
+  }
+
+  /** Menu-only override; clearing it restores the current gameplay preference. */
+  setPresentationPixelBudget(pixelBudget: number | undefined): void {
+    if (this.disposed) return;
+    if (pixelBudget !== undefined && (!Number.isFinite(pixelBudget) || pixelBudget < 1)) {
+      throw new RangeError('Pixel budget must be positive.');
+    }
+    this.presentationPixelBudget = pixelBudget;
     this.resize();
   }
 
@@ -278,10 +290,9 @@ export class RenderLayer {
 
     const width = Math.max(1, Math.floor(this.host.clientWidth));
     const height = Math.max(1, Math.floor(this.host.clientHeight));
-    const pixelRatio = resolveRenderPixelRatio(
-      this.hostWindow.devicePixelRatio,
-      this.pixelRatioCap,
-    );
+    const pixelRatio = resolveBudgetedPixelRatio(width, height, resolveRenderPixelRatio(
+      this.hostWindow.devicePixelRatio, this.pixelRatioCap,
+    ), this.presentationPixelBudget);
 
     if (
       width === this.viewportWidth &&
@@ -293,8 +304,9 @@ export class RenderLayer {
 
     this.viewportWidth = width;
     this.viewportHeight = height;
-    this.renderer.setPixelRatio(pixelRatio);
-    this.renderer.setSize(width, height, false);
+    const minimumLogicalDimension = (1 + Number.EPSILON * 2) / pixelRatio;
+    this.renderer.setDrawingBufferSize(Math.max(width, minimumLogicalDimension),
+      Math.max(height, minimumLogicalDimension), pixelRatio);
     this.cameraRig.resize(width, height);
   };
 }

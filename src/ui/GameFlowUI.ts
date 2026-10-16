@@ -546,31 +546,28 @@ export class GameFlowUI {
       <section class="flow-screen title-screen" data-flow-panel="title" aria-labelledby="title-heading" hidden>
         <div class="title-composition">
           <header class="title-branding">
-            ${createBrandMarkMarkup('detailed', 'title-brand-mark')}
-            <div>
-              <p class="flow-eyebrow">Containment · Trial 01</p>
-              <h1 id="title-heading">Specimen</h1>
+            <div class="title-signature">
+              ${createBrandMarkMarkup('detailed', 'title-brand-mark')}
+              <p class="title-tagline">Explore <span aria-hidden="true">·</span> Adapt <span aria-hidden="true">·</span> Transcend</p>
             </div>
+            <h1 id="title-heading">Specimen</h1>
           </header>
-          <p class="title-tagline">Explore <span>·</span> Adapt <span>·</span> Transcend</p>
-          <div class="flow-actions game-menu title-actions">
+          <div class="title-divider" aria-hidden="true"></div>
+          <p class="title-description">Something is waking.<br><span>Escape was never part of the experiment.</span></p>
+          <nav class="flow-actions game-menu title-actions" aria-label="Main menu">
             <button class="primary-action menu-action" data-action="start" data-autofocus>
-              <span class="menu-index" aria-hidden="true">01</span>
               <span>Start trial</span>
               <span class="menu-arrow" aria-hidden="true">→</span>
             </button>
             <button class="menu-action" data-action="settings">
-              <span class="menu-index" aria-hidden="true">02</span>
               <span>Settings</span>
               <span class="menu-arrow" aria-hidden="true">→</span>
             </button>
             <button class="menu-action" data-action="credits">
-              <span class="menu-index" aria-hidden="true">03</span>
               <span>Credits</span>
               <span class="menu-arrow" aria-hidden="true">→</span>
             </button>
-          </div>
-          <div class="signal-rule title-signal" aria-hidden="true"><span></span></div>
+          </nav>
         </div>
       </section>
 

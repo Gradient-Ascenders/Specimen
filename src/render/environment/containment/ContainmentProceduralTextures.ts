@@ -257,6 +257,7 @@ function dataTexture(
 const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   ' ': [],
   '-': [[0.15, 0.52, 0.85, 0.52]],
+  ':': [[0.5, 0.3, 0.5, 0.34], [0.5, 0.7, 0.5, 0.74]],
   '0': [[0.2, 0.08, 0.8, 0.08], [0.8, 0.08, 0.92, 0.2], [0.92, 0.2, 0.92, 0.8], [0.92, 0.8, 0.8, 0.92], [0.8, 0.92, 0.2, 0.92], [0.2, 0.92, 0.08, 0.8], [0.08, 0.8, 0.08, 0.2], [0.08, 0.2, 0.2, 0.08], [0.2, 0.82, 0.8, 0.18]],
   '1': [[0.28, 0.24, 0.5, 0.08], [0.5, 0.08, 0.5, 0.92], [0.25, 0.92, 0.78, 0.92]],
   '2': [[0.12, 0.25, 0.28, 0.08], [0.28, 0.08, 0.72, 0.08], [0.72, 0.08, 0.9, 0.25], [0.9, 0.25, 0.12, 0.92], [0.12, 0.92, 0.9, 0.92]],
@@ -285,6 +286,7 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   T: [[0.06, 0.08, 0.94, 0.08], [0.5, 0.08, 0.5, 0.92]],
   U: [[0.08, 0.08, 0.08, 0.74], [0.08, 0.74, 0.26, 0.92], [0.26, 0.92, 0.74, 0.92], [0.74, 0.92, 0.92, 0.74], [0.92, 0.74, 0.92, 0.08]],
   V: [[0.08, 0.08, 0.5, 0.92], [0.5, 0.92, 0.92, 0.08]],
+  W: [[0.06, 0.08, 0.22, 0.92], [0.22, 0.92, 0.5, 0.5], [0.5, 0.5, 0.78, 0.92], [0.78, 0.92, 0.94, 0.08]],
   Y: [[0.08, 0.08, 0.5, 0.5], [0.92, 0.08, 0.5, 0.5], [0.5, 0.5, 0.5, 0.92]],
   Z: [[0.08, 0.08, 0.92, 0.08], [0.92, 0.08, 0.08, 0.92], [0.08, 0.92, 0.92, 0.92]],
 };
@@ -380,6 +382,30 @@ function createSignageAtlas(): {
   return { texture, regions };
 }
 
+/** Small, static identification plate using the same vector lettering as room signs. */
+export function createContainmentSpecimenLabelTexture(specimen: string, threat: string): THREE.DataTexture {
+  const width = SIGN_ATLAS_WIDTH, height = 192;
+  const lines = [`SPECIMEN: ${specimen.toUpperCase()}`, `DANGER THREAT: ${threat.toUpperCase()}`];
+  for (const character of lines.join('')) {
+    if (!VECTOR_GLYPHS[character]) throw new Error(`Unsupported specimen label character: ${character}`);
+  }
+  const pixels = new Uint8Array(width * height * 4);
+  const border: Rgba = [57, 88, 94, 255], background: Rgba = [12, 24, 29, 255];
+  const cyan: Rgba = [118, 203, 195, 255], primary: Rgba = [222, 239, 235, 255];
+  const amber: Rgba = [227, 181, 102, 255];
+  fillRect(pixels, 0, 0, width, height, border);
+  fillRect(pixels, 3, 3, width - 6, height - 6, background);
+  fillRect(pixels, 14, 20, 4, height - 40, cyan);
+  fillRect(pixels, 36, 99, 440, 1, border);
+  fillRect(pixels, 476, 30, 7, 7, amber);
+  drawVectorTextFit(pixels, lines[0], 36, 30, 430, 44, primary, 4.2);
+  drawVectorTextFit(pixels, lines[1], 36, 124, 444, 25, amber, 2.5);
+  const texture = dataTexture('containment-specimen-identification-plate', pixels, width, height,
+    false, THREE.SRGBColorSpace);
+  texture.userData.labelLines = lines;
+  return texture;
+}
+
 function drawVectorTextFit(
   pixels: Uint8Array,
   text: string,
@@ -420,6 +446,7 @@ function drawAntialiasedSegment(
   width: number,
   colour: Rgba,
 ): void {
+  const pixelHeight = pixels.length / (SIGN_ATLAS_WIDTH * 4);
   const radius = width * 0.5;
   const minX = Math.floor(Math.min(x1, x2) - radius - 1);
   const maxX = Math.ceil(Math.max(x1, x2) + radius + 1);
@@ -430,7 +457,7 @@ function drawAntialiasedSegment(
   const lengthSquared = dx * dx + dy * dy;
   for (let y = minY; y <= maxY; y += 1) {
     for (let x = minX; x <= maxX; x += 1) {
-      if (x < 0 || x >= SIGN_ATLAS_WIDTH || y < 0 || y >= SIGN_ATLAS_HEIGHT) continue;
+      if (x < 0 || x >= SIGN_ATLAS_WIDTH || y < 0 || y >= pixelHeight) continue;
       const projection = lengthSquared === 0
         ? 0
         : THREE.MathUtils.clamp(((x - x1) * dx + (y - y1) * dy) / lengthSquared, 0, 1);
@@ -458,9 +485,10 @@ function fillRect(
   height: number,
   colour: Rgba,
 ): void {
+  const pixelHeight = pixels.length / (SIGN_ATLAS_WIDTH * 4);
   for (let py = y; py < y + height; py += 1) {
     for (let px = x; px < x + width; px += 1) {
-      if (px < 0 || px >= SIGN_ATLAS_WIDTH || py < 0 || py >= SIGN_ATLAS_HEIGHT) continue;
+      if (px < 0 || px >= SIGN_ATLAS_WIDTH || py < 0 || py >= pixelHeight) continue;
       const offset = (py * SIGN_ATLAS_WIDTH + px) * 4;
       pixels[offset] = colour[0];
       pixels[offset + 1] = colour[1];

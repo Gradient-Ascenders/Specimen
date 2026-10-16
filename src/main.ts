@@ -11,6 +11,7 @@ import { RenderLayer } from './render/RenderLayer.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
+import { TitleScreenPresentation } from './ui/TitleScreenPresentation.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -104,6 +105,7 @@ function startGame(): void {
     },
   });
   const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
+  let titlePresentation: TitleScreenPresentation | undefined;
   const gameFlow = new GameFlowUI({
     settings,
     creditsMarkdown,
@@ -143,6 +145,17 @@ function startGame(): void {
   let performanceRecorder:
     | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
     | undefined;
+  const unsubscribeTitlePresentation = gameFlow.subscribe((state) => {
+    if (state !== 'playing' || warmedLevelOneProgramBaseline !== undefined) return;
+    titlePresentation?.dispose();
+    titlePresentation = undefined;
+    // Title-only programs must not inflate the gameplay shader guard baseline.
+    warmedLevelOneProgramBaseline = renderLayer.renderer.info.programs?.length ?? 0;
+    if (levelOneShaderProgramGuardActive && performanceRecorder) {
+      performanceRecorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline);
+      sampleLevelOneShaderPrograms = () => performanceRecorder?.sampleLevelOneShaderPrograms();
+    }
+  });
   const unsubscribeObjectiveChanged = gameSession.events.on(
     'objectiveChanged',
     ({ objective }) => gameFlow.setObjective(objective),
@@ -167,10 +180,17 @@ function startGame(): void {
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);
   gameSession.load();
+  titlePresentation = new TitleScreenPresentation({ renderLayer, host: app });
 
   const loop = new Loop({
-    fixedUpdate: (deltaSeconds) => gameSession.fixedUpdate(deltaSeconds),
+    fixedUpdate: (deltaSeconds) => {
+      if (!titlePresentation) gameSession.fixedUpdate(deltaSeconds);
+    },
     render: (interpolationAlpha, stats) => {
+      if (titlePresentation) {
+        titlePresentation.render(stats.frameDeltaSeconds);
+        return;
+      }
       gameSession.render(interpolationAlpha, stats);
       sampleLevelOneShaderPrograms?.();
     },
@@ -209,21 +229,20 @@ function startGame(): void {
       },
     );
   }
-  const startRenderLoop = (): void => {
+  const startRenderLoop = async (): Promise<void> => {
+    try {
+      await titlePresentation?.prepare();
+    } catch (error: unknown) {
+      if (shuttingDown) return;
+      console.error('Title room preparation failed; using the gameplay backdrop.', error);
+      titlePresentation?.dispose();
+      titlePresentation = undefined;
+    }
     if (shuttingDown) return;
     renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
-    // Present authoritative Room 1 frames before the loading UI yields control.
+    // Present the same title room in dev and production before enabling Start.
     bootFrame = requestAnimationFrame(() => {
       bootFrame = requestAnimationFrame(() => {
-        warmedLevelOneProgramBaseline =
-          renderLayer.renderer.info.programs?.length ?? 0;
-        if (levelOneShaderProgramGuardActive && performanceRecorder) {
-          performanceRecorder.armLevelOneShaderProgramGuard(
-            warmedLevelOneProgramBaseline,
-          );
-          sampleLevelOneShaderPrograms = () =>
-            performanceRecorder?.sampleLevelOneShaderPrograms();
-        }
         gameFlow.completeBoot();
       });
     });
@@ -239,12 +258,12 @@ function startGame(): void {
         if (verification) {
           app.dataset.levelOnePrewarm = JSON.stringify(verification);
         }
-        startRenderLoop();
+        void startRenderLoop();
       },
       (error) => {
         if (shuttingDown) return;
         console.error('Containment lighting prewarm failed.', error);
-        startRenderLoop();
+        void startRenderLoop();
       },
     );
   });
@@ -262,6 +281,8 @@ function startGame(): void {
     unsubscribeTransitionStarted();
     unsubscribeTransitionCompleted();
     unsubscribeTransitionFailed();
+    unsubscribeTitlePresentation();
+    titlePresentation?.dispose();
     performanceRecorder?.dispose();
     gameFlow.dispose();
     gameSession.dispose();

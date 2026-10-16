@@ -54,6 +54,9 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   await expect(page).toHaveTitle('Specimen');
   const title = page.locator('[data-flow-panel="title"]');
   await expect(title).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('#app')).toHaveAttribute('data-title-backdrop', 'ready');
+  expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => canvas.width * canvas.height))
+    .toBeLessThanOrEqual(1280 * 720);
   await title.locator('[data-action="credits"]').click();
   const credits = page.locator('[data-flow-panel="credits"]');
   await expect(credits).toBeVisible();
@@ -61,6 +64,7 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   await credits.locator('[data-action="back"]').click();
   await title.locator('[data-action="start"]').click();
   await assertPlaying(page);
+  await expect(page.locator('#app')).not.toHaveAttribute('data-title-backdrop', /.+/);
   await page.keyboard.press('KeyW', { delay: 150 });
   await restartFromPause(page);
   expect([...failures], 'Production console/network errors').toEqual([]);

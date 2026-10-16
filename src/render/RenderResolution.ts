@@ -19,3 +19,11 @@ export const resolveRenderPixelRatio = (
     : 1;
   return Math.min(Math.max(1, safeDevicePixelRatio), cap);
 };
+
+/** A temporary presentation cap never overwrites the player's graphics setting. */
+export function resolveBudgetedPixelRatio(width: number, height: number, requested: number, pixelBudget?: number): number {
+  if (pixelBudget === undefined) return requested;
+  if (!Number.isFinite(pixelBudget) || pixelBudget < 1) throw new RangeError('Pixel budget must be positive.');
+  const budget = Math.floor(pixelBudget);
+  return Math.min(requested, Math.sqrt(budget / width / height), budget / Math.max(width, height));
+}
