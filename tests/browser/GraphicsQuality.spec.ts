@@ -27,6 +27,10 @@ for (const query of ['', '?debug=1']) {
     const preset = page.locator('[data-setting="graphics-preset"]');
     const resolution = page.locator('[data-setting="render-resolution"]');
     const gel = page.locator('[data-setting="gel-rendering"]');
+    // #190 defaults to Minimum. Establish the Standard/full-refraction custom
+    // baseline before checking main's independent density/refraction cap.
+    await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
+    await gel.selectOption('physical');
     await expect(preset).toHaveValue('normal');
     await expect(gel).toHaveValue('physical');
     await resolution.selectOption('1.5');

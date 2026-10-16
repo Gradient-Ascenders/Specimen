@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -12,7 +13,7 @@ import { DroneProjectileSystem } from '../src/hazards/DroneProjectileSystem.ts';
 import { SlimeDamageSystem } from '../src/systems/SlimeDamageSystem.ts';
 
 test('Room 3 wooden latches release independently and remain down until reset', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
@@ -72,7 +73,7 @@ test('Room 3 wooden latches release independently and remain down until reset', 
 });
 
 test('Blender parkour gaps can be landed with the real charged-jump controller', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   // Evaluate Room 2's solved pose: the release/reset behaviour is covered by
   // LevelTwoPreview.test.ts; here the actual revised landing geometry matters.
   for (const drop of scene.roomTwo.blockDrops) {
@@ -139,7 +140,7 @@ test('Blender parkour gaps can be landed with the real charged-jump controller',
 });
 
 test('Room 3 individual barricades leave an exposed final approach', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld();
   world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
   for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
@@ -155,7 +156,7 @@ test('Room 3 individual barricades leave an exposed final approach', () => {
 });
 
 test('Room 3 second sticky wall joins its platform without an exposed sticky edge', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
@@ -192,7 +193,7 @@ test('Room 3 second sticky wall joins its platform without an exposed sticky edg
 });
 
 test('Bob jumps directly from the final released block to the vent adhesion', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   assert.equal(scene.root.getObjectByName('cultivation-room-2-vent-takeoff-platform'), undefined);
   const block = scene.roomTwo.blockDrops[2].mesh;
   const final = block.userData.landingPosition as number[];
@@ -223,7 +224,7 @@ test('Bob jumps directly from the final released block to the vent adhesion', ()
 });
 
 test('each hanging drone can detect and fire on its new exposed Bob approach', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
@@ -305,7 +306,7 @@ test('each hanging drone can detect and fire on its new exposed Bob approach', (
 });
 
 for (const index of [0, 1, 2]) test(`Bob can traverse lowered sticky wall ${index + 1}`, () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);

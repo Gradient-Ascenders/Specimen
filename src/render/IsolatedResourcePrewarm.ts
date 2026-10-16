@@ -17,7 +17,7 @@ export function withIsolatedPrewarmState<T>(
   const transmissionResolutionScale = renderer.transmissionResolutionScale;
   // setRenderTarget restores the viewport with floor(), unlike setViewport's
   // round(). Keep at least one physical pixel after either path at low DPR.
-  const span = Math.max(1, Math.ceil(1 / renderer.getPixelRatio()));
+  const span = Math.max(1, Math.ceil(1 / (renderer.getPixelRatio?.() ?? 1)));
   const origin = target ? 0 : -2 * span;
   // frame is an internal upload-generation key; it must remain monotonic.
   const { calls, triangles, points, lines } = renderer.info.render;

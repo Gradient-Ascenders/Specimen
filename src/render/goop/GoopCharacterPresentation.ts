@@ -1,6 +1,7 @@
 import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
+import { CharacterDetail, loadCharacterDetail, type CharacterDetailIndices } from '../slime/CharacterDetail.ts';
 import { moveAngleTowards, shortestAngleDelta } from '../BlobFacing.ts';
 import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
 import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresentationContract.ts';
@@ -11,6 +12,8 @@ import { GoopPolishMotion, GOOP_CREST_LAG_METRES, GOOP_LANDING_RIPPLE_METRES } f
 import { GEL_LAUNCH_SECONDS, GEL_LANDING_SECONDS, gelLandingSquash, gelAirborneStretch } from '../slime/GelElasticMotion.ts';
 
 const ASSET_URL = new URL('../../../assets/characters/goop/goop.glb', import.meta.url).href;
+const DETAIL_URL = new URL('../../assets/characters/goop-lod.bin', import.meta.url).href;
+const defaultLoader = () => loadCharacterAsset(ASSET_URL);
 const LAUNCH_SECONDS = GEL_LAUNCH_SECONDS;
 const LANDING_SECONDS = GEL_LANDING_SECONDS;
 const DAMAGE_SECONDS = 0.22;
@@ -37,6 +40,7 @@ export interface GoopCharacterPresentationState {
 
 /** Visual-only elastic body motion, seated eyes, and a trailing ground skirt. */
 export class GoopCharacterPresentation {
+  private detail: CharacterDetail | undefined;
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
   private readonly gelRendering: GelRendering | undefined;
@@ -120,13 +124,18 @@ export class GoopCharacterPresentation {
       asset: this.asset ? { bodyTriangles: 26804, eyeTriangles: 6912, drawCalls: 3, geometries: 3, materials: 2 } : undefined };
   }
 
-  prepare(loader: GoopCharacterLoader = () => loadCharacterAsset(ASSET_URL)): Promise<void> {
+  prepare(loader: GoopCharacterLoader = defaultLoader,
+    detailLoader: (() => Promise<readonly CharacterDetailIndices[]>) | undefined = loader === defaultLoader ? () => loadCharacterDetail(DETAIL_URL) : undefined): Promise<void> {
     if (this.disposed) return Promise.reject(new Error('Cannot prepare disposed Goop'));
     if (this.ready) return Promise.resolve();
     if (this.preparation) return this.preparation;
-    const pending = Promise.resolve().then(loader).then(root => {
+    const pending = Promise.resolve().then(loader).then(async root => {
       try {
+        if (this.disposed) { disposeGoopAsset(root); return; }
         const asset = validateGoopAsset(root);
+        let detailIndices: readonly CharacterDetailIndices[] | undefined;
+        try { detailIndices = await detailLoader?.(); }
+        catch { /* Optional LOD fetch/decode failures retain the authored GLB. */ }
         if (this.disposed) { disposeGoopAsset(root); return; }
         const imported = new Set<THREE.Material>();
         for (const mesh of [asset.body, ...asset.eyes]) {
@@ -160,13 +169,24 @@ export class GoopCharacterPresentation {
         root.position.y = 0.45;
         this.shape.add(root);
         this.asset = asset; this.materials = materials;
+        if (detailIndices) {
+          try { this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices); }
+          catch { /* Source validation happens before any geometry is changed. */ }
+        }
         this.applyVisibility(); this.present();
-      } catch (error) { disposeGoopAsset(root, this.environment); throw error; }
+      } catch (error) {
+        this.detail?.dispose(); this.detail = undefined;
+        this.asset = undefined; this.materials = undefined;
+        disposeGoopAsset(root, this.environment); throw error;
+      }
     });
     this.preparation = pending;
     void pending.finally(() => { if (this.preparation === pending) this.preparation = undefined; }).catch(() => {});
     return pending;
   }
+
+  updateDetail(camera: THREE.Camera): void { this.detail?.update(camera); }
+  get detailDiagnostics() { return this.detail?.diagnostics; }
 
   setPosition(position: Vector3State): void { this.position.set(position.x, position.y, position.z); this.character.position.copy(this.position); }
   setYaw(yaw: number): void {
@@ -375,6 +395,7 @@ export class GoopCharacterPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.detail?.dispose(); this.detail = undefined;
     if (this.asset) disposeGoopAsset(this.asset.root, this.environment);
     this.asset = undefined; this.materials = undefined;
     this.burst.dispose(); this.root.removeFromParent(); this.root.clear(); this.applyVisibility();

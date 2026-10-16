@@ -1,3 +1,5 @@
+import { ACID_NOISE_SIZE, ACID_NOISE_PERIOD } from './acidNoise.generated.ts';
+
 export const acidSurfaceVertexPars = /* glsl */ `
 varying vec3 vAcidWorldPosition;
 `;
@@ -8,6 +10,7 @@ vAcidWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
 
 export const acidSurfaceFragmentPars = /* glsl */ `
 uniform float uTime;
+uniform sampler2D uAcidNoise;
 uniform vec4 uRipples[12];
 uniform float uRippleSurfaceY[12];
 uniform vec3 uDeepColour;
@@ -51,25 +54,12 @@ float acidValueNoise(vec2 coordinate) {
   float southEast = acidHash12(cell + vec2(1.0, 0.0));
   float northWest = acidHash12(cell + vec2(0.0, 1.0));
   float northEast = acidHash12(cell + vec2(1.0, 1.0));
-  return mix(
-    mix(southWest, southEast, blend.x),
-    mix(northWest, northEast, blend.x),
-    blend.y
-  );
+  return mix(mix(southWest, southEast, blend.x), mix(northWest, northEast, blend.x), blend.y);
 }
 
 float acidFbm(vec2 coordinate) {
-  float value = 0.0;
-  float amplitude = 0.54;
-  mat2 rotation = mat2(0.80, 0.60, -0.60, 0.80);
-  value += acidValueNoise(coordinate) * amplitude;
-  coordinate = rotation * coordinate * 2.03 + vec2(7.1, -3.8);
-  amplitude *= 0.5;
-  value += acidValueNoise(coordinate) * amplitude;
-  coordinate = rotation * coordinate * 2.07 + vec2(-2.6, 11.4);
-  amplitude *= 0.5;
-  value += acidValueNoise(coordinate) * amplitude;
-  return value / 0.945;
+  // Bake all three octaves together: one fetch per field, not per octave.
+  return texture2D(uAcidNoise, (coordinate + ${ACID_NOISE_PERIOD / 2}.0) / ${ACID_NOISE_PERIOD}.0 + ${0.5 / ACID_NOISE_SIZE}).r;
 }
 
 void evaluateAcidBubbles(

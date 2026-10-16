@@ -1,3 +1,4 @@
+import { cultivationAssets } from './lib/read-cultivation-assets.ts';
 import { performance } from 'node:perf_hooks';
 
 import * as THREE from 'three';
@@ -163,7 +164,7 @@ const createContainmentScene = (): BenchmarkScene =>
     name: 'containment',
   });
 const createCultivationPreviewScene = (): BenchmarkScene =>
-  Object.assign(new LevelTwoPreviewScene(() => {}), {
+  Object.assign(new LevelTwoPreviewScene(() => {}, cultivationAssets), {
     name: 'cultivation-preview',
     cameraObstructionMeshes: [] as readonly THREE.Mesh[],
   });

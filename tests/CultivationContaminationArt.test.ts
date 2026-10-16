@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -6,7 +7,7 @@ import { CultivationContaminationArt } from '../src/render/environment/cultivati
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 
 test('dressing releases original geometry without disposing borrowed replacements or proxies', () => {
-  const lab = new CultivationLabMaterials(), art = new CultivationContaminationArt(lab);
+  const lab = new CultivationLabMaterials(cultivationAssets), art = new CultivationContaminationArt(lab);
   const root = new THREE.Group(), warning = new THREE.MeshStandardMaterial();
   art.addRoom(root, 1, warning);
   const mesh = art.roots[0].children.find(object => object instanceof THREE.Mesh) as THREE.Mesh;
@@ -28,7 +29,7 @@ test('dressing releases original geometry without disposing borrowed replacement
 });
 
 test('contamination survives retries without duplication and disposes owned resources exactly once', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const art = scene.contaminationArt;
   const owned = new Set<THREE.Material | THREE.BufferGeometry | THREE.Texture>([
     ...art.textures, ...Object.values(art.finishes), art.glass,

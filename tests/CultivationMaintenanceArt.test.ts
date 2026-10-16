@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -39,7 +40,7 @@ test('patrol drone detailing fits its envelope and retains its live eye with bat
 
 test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and checkpoint/reset transforms', () => {
   const before = new LevelTwoRoomFiveGreybox(() => {}), room = new LevelTwoRoomFiveGreybox(() => {});
-  const lab = new CultivationLabMaterials(), contamination = new CultivationContaminationArt(lab);
+  const lab = new CultivationLabMaterials(cultivationAssets), contamination = new CultivationContaminationArt(lab);
   const lights = (root: THREE.Object3D) => { const values: {name: string; settings: unknown[]}[] = []; root.traverse(o => {
     if (o instanceof THREE.PointLight) values.push({name:o.name, settings:[o.color.getHex(), o.intensity, o.distance, o.decay, o.castShadow, o.position.toArray()]});
   }); return values; };

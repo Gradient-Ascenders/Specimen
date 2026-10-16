@@ -1,8 +1,9 @@
+import { cultivationAssets } from './lib/read-cultivation-assets.ts';
 import { visitLevelTwoSurfaceStates } from './lib/level-two-surface-states.ts';
 import { writeFileSync } from 'node:fs';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
-const scene = new LevelTwoPreviewScene(() => {});
+const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
 const reports: Record<string, ReturnType<typeof auditOpaqueSurfaces>> = {};
 visitLevelTwoSurfaceStates(scene, name => {
   const report = auditOpaqueSurfaces(scene.root, Number(process.env.SURFACE_TOLERANCE ?? .002));

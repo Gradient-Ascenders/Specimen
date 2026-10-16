@@ -1,5 +1,7 @@
 import { AudioManager } from './audio/AudioManager.ts';
+import { SOUND_BANKS } from './audio/SoundCatalog.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
+import { loadCultivationBakedAssets } from './render/environment/cultivation/CultivationBakedAssets.ts';
 import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
@@ -25,7 +27,7 @@ if (!app) {
 
 const settings = new GameSettings();
 const audio = new AudioManager(import.meta.env.BASE_URL);
-void audio.preload();
+void audio.preload(SOUND_BANKS.containment);
 const unlockAudio = (): void => audio.unlock();
 const focusAudio = (): void => audio.setFocused(!document.hidden && document.hasFocus());
 window.addEventListener('pointerdown', unlockAudio);
@@ -35,7 +37,7 @@ window.addEventListener('focus', focusAudio);
 document.addEventListener('visibilitychange', focusAudio);
 const renderLayer = new RenderLayer({
   host: app,
-  pixelRatioCap: settings.value.renderPixelRatioCap,
+  graphics: settings.value,
 });
 const input = new Input({ pointerLockElement: renderLayer.canvas });
 renderLayer.canvas.dataset.gameplayCanvas = 'true';
@@ -52,11 +54,15 @@ const levelOneRuntime = new GreyboxLevelRuntime({
 const gameSession = new GameSessionCoordinator({
   initialRuntime: levelOneRuntime,
   createLevelTwo: async (progression) => {
-    const [runtimeModule, debugModule] = await Promise.all([
+    // Start the next bank before module/visual preparation, without allowing
+    // optional audio or a stalled device decoder to hold up the transition.
+    void audio.preload(SOUND_BANKS.cultivation);
+    const [runtimeModule, debugModule, authoredAssets] = await Promise.all([
       import('./levels/CultivationLevelRuntime.ts'),
       debugAvailable
         ? import('./debug/CultivationLevelDebug.ts')
         : Promise.resolve(undefined),
+      loadCultivationBakedAssets(new URL('./assets/cultivation/authored-assets.bin', import.meta.url)),
     ]);
     return new runtimeModule.CultivationLevelRuntime({
       host: app,
@@ -66,9 +72,11 @@ const gameSession = new GameSessionCoordinator({
       progression,
       debugAvailable,
       debugSupport: debugModule?.CULTIVATION_LEVEL_DEBUG_SUPPORT,
+      authoredAssets,
     });
   },
   createLevelThree: async (progression) => {
+    void audio.preload(SOUND_BANKS.blackout);
     const [runtimeModule, maintenanceMaps] = await Promise.all([
       import('./levels/BlackoutLevelRuntime.ts'),
       loadBlackoutMaintenanceMapData(new URL('./assets/blackout/maintenance-maps.bin', import.meta.url)),
@@ -125,15 +133,16 @@ const gameFlow = new GameFlowUI({
       renderLayer.cameraRig.setFollowDistanceMetres(
         nextSettings.cameraDistanceMetres,
       );
-      renderLayer.setGraphicsSettings(nextSettings.graphicsPreset, nextSettings.renderPixelRatioCap);
       if (renderLayer.gelRendering.value !== nextSettings.gelRenderingMode) {
         levelOneShaderProgramGuardActive = false;
         sampleLevelOneShaderPrograms = undefined;
         levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
         performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
       }
-      renderLayer.gelRendering.setMode(nextSettings.gelRenderingMode);
+      renderLayer.setGraphicsSettings(nextSettings);
     },
+    getGraphicsDiagnostics: () => renderLayer.getGraphicsDiagnostics(),
+    subscribeGraphicsDiagnostics: listener => renderLayer.subscribeGraphicsDiagnostics(listener),
   },
 });
 const cleanGameplayMode = new CleanGameplayMode({

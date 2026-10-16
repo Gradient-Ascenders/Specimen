@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -58,9 +59,27 @@ test('preparation restores render target face, viewport, counters and shadow sta
   target.dispose(); borrowedTarget.dispose();
 });
 
+test('tiny preparation viewports retain a physical transmission texel below native resolution', () => {
+  for (const density of [.1, .5, .75, 1, 2]) for (const transmissionResolutionScale of [.5, 1]) {
+    const { renderer, snapshot, borrowedTarget } = fixture();
+    const scaled = Object.assign(renderer, { getPixelRatio: () => density, transmissionResolutionScale });
+    const before = snapshot(), target = new THREE.WebGLRenderTarget(1, 1);
+    for (const destination of [undefined, target]) withIsolatedPrewarmState(scaled as unknown as THREE.WebGLRenderer, () => {
+      const [x, y, width, height] = snapshot().viewport;
+      assert.equal(scaled.transmissionResolutionScale, 1);
+      assert.ok(Math.floor(width * density * scaled.transmissionResolutionScale) >= 1);
+      assert.ok(Math.floor(height * density * scaled.transmissionResolutionScale) >= 1);
+      if (!destination) assert.ok(x + width < 0 && y + height < 0);
+      assert.ok(width * density < 4 && height * density < 4);
+    }, destination);
+    assert.deepEqual(snapshot(), before);
+    target.dispose(); borrowedTarget.dispose();
+  }
+});
+
 test('cancelled Cultivation compile releases owned maps once and cannot overwrite the next shadow owner', async () => {
   const {renderer, borrowedTarget} = fixture(), scene = new THREE.Scene();
-  const preview = new LevelTwoPreviewScene(() => {}); scene.add(preview.root);
+  const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets); scene.add(preview.root);
   const policy = new RenderShadowPolicy(renderer.shadowMap);
   const camera = new THREE.PerspectiveCamera();
   const layer = {renderer, scene, cameraRig: {camera}, withShadowPreparation: policy.withPreparation.bind(policy)} as unknown as RenderLayer;
@@ -259,7 +278,7 @@ test('hidden Volt prewarms morph, transmission, faded-eye and actual caster vari
 
 test('instance primers upload both live buffers sharing a geometry and never dispose borrowed storage', async () => {
   const { renderer, borrowedTarget } = fixture();
-  const scene = new THREE.Scene(), preview = new LevelTwoPreviewScene(() => {});
+  const scene = new THREE.Scene(), preview = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   scene.add(preview.root);
   const geometry = new THREE.BoxGeometry(), material = new THREE.MeshStandardMaterial();
   geometry.morphAttributes.position = [geometry.getAttribute('position').clone()];

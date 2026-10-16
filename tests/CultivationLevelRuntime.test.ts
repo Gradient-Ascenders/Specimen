@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -8,6 +9,18 @@ import type { Input } from '../src/core/Input.ts';
 import { CultivationLevelRuntime } from '../src/levels/CultivationLevelRuntime.ts';
 import { CultivationRoomFiveController } from '../src/levels/CultivationRoomFiveController.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
+
+test('ordinary production requires the baked authored assets before construction', () => {
+  assert.throws(() => new CultivationLevelRuntime({
+    host: { dataset: {} } as unknown as HTMLElement,
+    input: {} as Input,
+    renderLayer: {} as RenderLayer,
+    progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
+    window: new EventTarget() as unknown as Window,
+    debugAvailable: false,
+    authoredAssets: undefined!,
+  }), /authored assets must be loaded/);
+});
 
 test('failed Cultivation construction rolls back attached resources', () => {
   const scene = new THREE.Scene();
@@ -39,6 +52,7 @@ test('failed Cultivation construction rolls back attached resources', () => {
   } as unknown as Input;
   const host = { dataset: {} } as unknown as HTMLElement;
   const runtime = new CultivationLevelRuntime({
+    authoredAssets: cultivationAssets,
     host,
     input,
     renderLayer,
@@ -70,6 +84,7 @@ test('Level 2 zero shortcut is debug-only and one-shot', () => {
     releasePointerLock: () => undefined,
   } as unknown as Input;
   const runtime = new CultivationLevelRuntime({
+    authoredAssets: cultivationAssets,
     host: { dataset: {} } as unknown as HTMLElement,
     input,
     renderLayer: { scene: new THREE.Scene() } as unknown as RenderLayer,
@@ -125,6 +140,7 @@ test('final lever hands off to Level 3 once Volt is released and unlocked, witho
   let enabled = true, unlocked = false, registered = false, transitions = 0;
   const input = { setEnabled(value: boolean) { enabled = value; }, releasePointerLock() {} } as unknown as Input;
   const runtime = new CultivationLevelRuntime({
+    authoredAssets: cultivationAssets,
     host: { dataset: {} } as unknown as HTMLElement, input,
     renderLayer: { scene: new THREE.Scene() } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
