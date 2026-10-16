@@ -19,6 +19,7 @@ export interface GameSessionEvents {
   transitionStarted: { readonly levelId: SessionLevelId; readonly message: string };
   transitionCompleted: { readonly levelId: SessionLevelId };
   transitionFailed: { readonly levelId: SessionLevelId; readonly message: string };
+  gameCompleted: {};
 }
 
 type RuntimeFactory = (
@@ -204,6 +205,10 @@ export class GameSessionCoordinator {
   }
 
   private onLevelCompleted(nextLevelId: string): void {
+    if (nextLevelId === 'complete' && !this.disposed) {
+      this.events.emit('gameCompleted', {});
+      return;
+    }
     if (this.graphicsPreparation.pending) {
       const runtime = this.runtime;
       void this.graphicsPreparation.settled.then(() => {
