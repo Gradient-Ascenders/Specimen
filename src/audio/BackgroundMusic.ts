@@ -38,7 +38,8 @@ export class BackgroundMusic {
   private active = 0;
   private requested: MusicTrack | null = null;
   private enabled = false;
-  private unlocked = false;
+  private autoplayBlocked = false;
+  private autoplayBlockedListener: ((blocked: boolean) => void) | undefined;
   private focused = true;
   private disposed = false;
   private master = 1;
@@ -55,11 +56,24 @@ export class BackgroundMusic {
     }
   }
 
+  /** Report browser autoplay restrictions to the title screen without affecting gameplay. */
+  setAutoplayBlockedListener(listener: (blocked: boolean) => void): void {
+    this.autoplayBlockedListener = listener;
+    listener(this.autoplayBlocked);
+  }
+
+  private setAutoplayBlocked(blocked: boolean): void {
+    if (this.autoplayBlocked === blocked) return;
+    this.autoplayBlocked = blocked;
+    this.autoplayBlockedListener?.(blocked);
+  }
+
   setScene(track: MusicTrack | null, play: boolean): void {
     if (this.disposed) return;
     const changed = this.requested !== track;
     this.requested = track;
     this.enabled = play;
+    if (changed || !play) this.setAutoplayBlocked(false);
     if (!this.canPlay()) {
       this.cancelFade();
       for (const player of this.players) player.pause();
@@ -74,10 +88,12 @@ export class BackgroundMusic {
     else this.resume();
   }
 
-  /** Must be called synchronously from a trusted key/pointer event. */
+  /**
+   * Retry when the user interacts if a browser denied the initial autoplay
+   * attempt. The browser, not the game, determines whether that gesture is
+   * required. This never resets the track's playback position.
+   */
   unlock(): void {
-    if (this.disposed) return;
-    this.unlocked = true;
     if (this.canPlay()) this.resume();
   }
 
@@ -99,8 +115,7 @@ export class BackgroundMusic {
 
   private get targetVolume(): number { return this.master * this.musicGain; }
   private get current(): MusicElement { return this.players[this.active]; }
-  private get canStart(): boolean { return this.unlocked && this.focused && this.enabled; }
-  private canPlay(): boolean { return !this.disposed && this.canStart; }
+  private canPlay(): boolean { return !this.disposed && this.focused && this.enabled; }
   private url(track: MusicTrack): string { return this.base + MUSIC_PATHS[track]; }
 
   private resume(): void {
@@ -126,6 +141,12 @@ export class BackgroundMusic {
     next.src = this.url(track);
     next.volume = 0;
     this.active = nextIndex;
+    if (!previous.src) {
+      // First title appearance should not wait for a crossfade from silence.
+      next.volume = this.targetVolume;
+      this.start(next);
+      return;
+    }
     this.start(next);
     this.fade(previous, next);
   }
@@ -146,8 +167,24 @@ export class BackgroundMusic {
   }
 
   private start(player: MusicElement): void {
-    // Browser autoplay rejection is optional: the next trusted gesture retries.
-    try { void player.play().catch(() => {}); } catch { /* no audio device */ }
+    // Attempt menu playback immediately; compliant browsers can permit it on
+    // revisits or when the user has granted this origin autoplay permission.
+    // A fresh Chromium profile can reject audible playback without a gesture.
+    const failed = (error: unknown): void => {
+      if (this.disposed || this.current !== player || !this.canPlay() || !player.paused) return;
+      if (typeof error === 'object' && error !== null &&
+        'name' in error && error.name === 'NotAllowedError') {
+        this.setAutoplayBlocked(true);
+      }
+    };
+    try {
+      void player.play().then(
+        () => { if (!this.disposed && this.current === player) this.setAutoplayBlocked(false); },
+        failed,
+      );
+    } catch (error) {
+      failed(error);
+    }
   }
 
   private cancelFade(): void {
@@ -161,6 +198,7 @@ export class BackgroundMusic {
     if (this.disposed) return;
     this.disposed = true;
     this.cancelFade();
+    this.autoplayBlockedListener = undefined;
     for (const player of this.players) {
       player.pause();
       player.removeAttribute('src');
