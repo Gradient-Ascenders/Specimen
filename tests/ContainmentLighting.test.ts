@@ -352,6 +352,11 @@ test('Room 5 maps authoritative ending progress through alarm, locks, opening an
   scene.roomFive.updateEnding(0.4);
   scene.update(0.01);
   assert.equal(scene.roomFive.endingState, 'released');
+  const releasedPosition = scene.roomFive.goopReleasePosition;
+  assert.ok(releasedPosition.distanceTo(new THREE.Vector3(0, 67.746, 112)) < 1e-9);
+  releasedPosition.set(100, 100, 100);
+  assert.ok(scene.roomFive.goopReleasePosition.distanceTo(new THREE.Vector3(0, 67.746, 112)) < 1e-9,
+    'handoff receives a copy of the scripted position without exposing mutable sequence state');
   assert.equal(scene.lightingDiagnostics.goopReleaseState, 'released');
   assert.equal(scene.lightingDiagnostics.activeParticleCount, 0);
 
