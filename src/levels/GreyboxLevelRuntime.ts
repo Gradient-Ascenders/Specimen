@@ -409,6 +409,10 @@ export class GreyboxLevelRuntime {
     this.lifecycle.start();
   }
 
+  async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
+    this.renderLayer.prepareRenderResources(() => this.render(alpha, stats));
+  }
+
   /** Precompile Containment signatures and prime known cold resources while loading. */
   async prepareGraphics(): Promise<void> {
     const previous = new Set(this.depthPrewarmGroups);

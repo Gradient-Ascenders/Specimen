@@ -294,7 +294,25 @@ export class CultivationLevelRuntime {
   private lightLayout: CultivationLightLayout | undefined;
   private lightLayoutKey = '';
   private constructionMs = 0;
+  private preparingRenderResources = false;
   private cameraShadowCulling: CameraShadowCulling | undefined;
+  async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
+    const resources = this.requireResources(), queue = this.preparationQueue;
+    while (this.resources === resources && this.preparationQueue === queue) {
+      // The real render establishes visibility, bounded lights and demand
+      // readiness. It can return before drawing at a newly entered doorway.
+      this.preparingRenderResources = true;
+      try { this.renderLayer.prepareRenderResources(() => this.render(alpha, stats)); }
+      finally { this.preparingRenderResources = false; }
+      if (!queue?.diagnostics.pending) return;
+      this.lightLayout?.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
+      let ready: Promise<void>;
+      try { ready = queue.prepareCurrent(); }
+      finally { this.lightLayout?.restore(); }
+      await ready;
+    }
+  }
+
   async prepareGraphics(): Promise<void> {
     const resources = this.requireResources(), previous = this.preparationQueue;
     this.preparationQueue = undefined;
@@ -834,7 +852,7 @@ export class CultivationLevelRuntime {
     // lower sector, speculative upper-room work is not needed for this view
     // and competes with its searchlights. Demand preparation above still
     // guards every draw, and background work resumes if ownership returns.
-    if (lightingRoom !== 5) this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
+    if (lightingRoom !== 5 && !this.preparingRenderResources) this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
 
     this.debugElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (this.debugVisible && resources.debugPanel && this.debugElapsedSeconds >= 0.25) {

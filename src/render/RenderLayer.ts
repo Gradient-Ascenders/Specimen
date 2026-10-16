@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 import { GelRendering, type GelRenderingMode } from './slime/GelRendering.ts';
 
 import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
@@ -244,6 +245,25 @@ export class RenderLayer {
       this.resize(); this.watchDevicePixelRatio();
     }
     this.graphicsResources.sync();
+    if (this.preparingRenderResources) {
+      // A running camera may see no gel at all (aiming hides the active body).
+      // Three skips transmission storage in that case. Force one owned body
+      // into the retained camera's render list, preserving bounded live lights
+      // and restoring every visibility/layer/culling change synchronously.
+      let primer: THREE.Mesh | undefined;
+      this.scene.traverse(object => {
+        if (primer || !(object instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        if (materials.some(material => material instanceof THREE.MeshPhysicalMaterial &&
+          material.visible && material.transmission > 0 && this.gelRendering.owns(material))) primer = object;
+      });
+      if (!primer) throw new Error('No owned transmissive body is available for resource preparation.');
+      const resource = primer;
+      // A gel-only layer mask must never clear/update cached live shadow maps.
+      this.withShadowPreparation(this.renderer.shadowMap.enabled, () =>
+        renderIsolatedPrewarmResources(this.renderer, this.scene, this.cameraRig.camera, [resource], {includeHidden:true}));
+      return;
+    }
     withGameplayUiVisibility(this.cameraRig.camera, !this.cleanGameplay, () => {
       this.renderer.render(this.scene, this.cameraRig.camera);
     });
@@ -251,6 +271,21 @@ export class RenderLayer {
 
   setCleanGameplayMode(clean: boolean): void {
     this.cleanGameplay = clean;
+  }
+
+  private preparingRenderResources = false;
+  /** Exercise Three's camera-owned storage at gameplay dimensions, behind the
+   * session gate. Keep the live framebuffer untouched and restore GPU state. */
+  prepareRenderResources(draw: () => void): void {
+    const viewport = this.renderer.getViewport(new THREE.Vector4());
+    const scale = this.renderer.transmissionResolutionScale;
+    withIsolatedPrewarmState(this.renderer, () => {
+      this.renderer.setViewport(viewport);
+      this.renderer.transmissionResolutionScale = scale;
+      this.preparingRenderResources = true;
+      try { draw(); }
+      finally { this.preparingRenderResources = false; }
+    });
   }
 
   requestShadowConfiguration(

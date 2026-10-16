@@ -400,6 +400,10 @@ export class BlackoutLevelRuntime {
     }
     this.lifecycle.load();
   }
+  async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
+    this.renderLayer.prepareRenderResources(() => this.render(alpha, stats));
+  }
+
   async prepareGraphics(): Promise<void> {
     const previous = this.programPreparation;
     this.presentationPreparation = undefined;

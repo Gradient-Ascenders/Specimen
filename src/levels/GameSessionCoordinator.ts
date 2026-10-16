@@ -52,7 +52,7 @@ export class GameSessionCoordinator {
   private resumeAfterGraphics = false;
   private initialPreparationPending = false;
   private graphicsOwnerGeneration = 0;
-  private queuedGraphics: {key: string; apply: () => void} | undefined;
+  private queuedGraphics: {key: string; apply: () => void; resourceKey?: string} | undefined;
   private readonly graphicsPreparation = new GraphicsPreparation((pending, error) => {
     if (pending && this.runtime.state === 'running') {
       this.resumeAfterGraphics = true; this.runtime.stop();
@@ -81,11 +81,18 @@ export class GameSessionCoordinator {
     if (!this.transitionFailed) this.runtime.start();
   }
   stop(): void { this.resumeAfterGraphics = false; if (!this.transitionFailed) this.runtime.stop(); }
-  applyGraphicsSettings(key: string, apply: () => void): void {
+  applyGraphicsSettings(key: string, apply: () => void, resourceKey?: string): void {
     if (this.disposed) return;
-    if (this.transitionPending || this.initialPreparationPending) { this.queuedGraphics = {key, apply}; return; }
+    if (this.transitionPending || this.initialPreparationPending) { this.queuedGraphics = {key, apply, resourceKey}; return; }
     const runtime = this.runtime;
-    this.graphicsPreparation.update(key, apply, () => runtime.prepareGraphics?.() ?? Promise.resolve());
+    this.graphicsPreparation.update(key, apply, () => runtime.prepareGraphics?.() ?? Promise.resolve(),
+      resourceKey === undefined ? undefined : {key:resourceKey, prepare:() => {
+        if (resourceKey === 'no-transmission') return Promise.resolve();
+        return runtime.prepareRenderResources?.(this.renderedInterpolationAlpha, {
+          fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,stepsThisFrame:0,
+          interpolationAlpha:this.renderedInterpolationAlpha,droppedSimulationTimeSeconds:0,renderFps:0,
+        }) ?? runtime.prepareGraphics?.() ?? Promise.resolve();
+      }});
   }
   async prepareInitialGraphics(): Promise<void> {
     const runtime = this.runtime;
@@ -107,7 +114,7 @@ export class GameSessionCoordinator {
   }
   private flushGraphicsSettings(): void {
     const request = this.queuedGraphics; this.queuedGraphics = undefined;
-    if (request) this.applyGraphicsSettings(request.key, request.apply);
+    if (request) this.applyGraphicsSettings(request.key, request.apply, request.resourceKey);
   }
   restartLevel(): void {
     if (this.transitionFailed) throw new Error('Cannot restart after a failed level transition.');

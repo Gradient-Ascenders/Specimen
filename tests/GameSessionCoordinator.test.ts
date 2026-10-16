@@ -76,6 +76,29 @@ test('graphics changes gate simulation/draws, honor pause intent and release lat
   assert.equal(runtime.state,'unloaded','late compiler completion must not restart unloaded resources');session.dispose();
 });
 
+for(const intent of ['resume','pause','restart','unload'] as const) test(`resource-only preparation preserves ${intent} intent`,async()=>{
+  const runtime=new MockRuntime('level-1',progression) as MockRuntime & {
+    prepareRenderResources(alpha:number,stats:Readonly<import('../src/core/Loop.ts').LoopStats>):Promise<void>;
+    prepareGraphics():Promise<void>;
+  };
+  let finish!:()=>void,draws=0,updates=0;
+  runtime.render=()=>draws++;runtime.fixedUpdate=()=>updates++;
+  runtime.prepareGraphics=async()=>{throw Error('must retain shader preparation');};
+  runtime.prepareRenderResources=(_alpha,stats)=>{
+    assert.equal(stats.rawFrameDeltaSeconds,0);assert.equal(stats.frameDeltaSeconds,0);
+    return new Promise<void>(r=>{finish=r;});
+  };
+  const session=new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('transmission',()=>{},'half');session.load();session.start();
+  session.applyGraphicsSettings('transmission',()=>{},'full');
+  session.render(1,{} as any);session.fixedUpdate(1/60);
+  assert.equal(runtime.state,'stopped');assert.equal(draws,0);assert.equal(updates,0);
+  if(intent==='pause')session.stop();if(intent==='restart')session.restartLevel();if(intent==='unload')session.unload();
+  finish();await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.equal(runtime.state,intent==='unload'?'unloaded':intent==='pause'?'stopped':'running');
+  assert.equal(runtime.calls.includes('restart'),intent==='restart');session.dispose();
+});
+
 test('settings cannot mutate materials during normal startup preparation', async () => {
   const runtime=new MockRuntime('level-1',progression); let finish!:()=>void;
   let preparations=0;const applied:string[]=[];

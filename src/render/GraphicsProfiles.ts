@@ -1,6 +1,7 @@
 import type { GelRenderingMode } from './slime/GelRendering.ts';
 import type { RenderPixelRatioCap, RenderScale } from './RenderResolution.ts';
 import type { GraphicsPreset } from './GraphicsQuality.ts';
+import { resolveGraphicsQuality } from './GraphicsQuality.ts';
 
 export const GRAPHICS_PROFILE_IDS = ['minimum', 'standard'] as const;
 export type GraphicsProfileId = (typeof GRAPHICS_PROFILE_IDS)[number];
@@ -19,6 +20,15 @@ export interface GraphicsSettings {
  * resource/uniform changes. Physical and reduced transmission share programs. */
 export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRenderingMode'>): string {
   return settings.gelRenderingMode === 'minimum' ? 'opaque-gel' : 'transmissive-gel';
+}
+
+/** Target storage can change without shader source changing. Include requested
+ * capture dimensions as well as scale; harmless input/audio settings stay free. */
+export function graphicsTransmissionResourceKey(settings: GraphicsSettings): string {
+  if (settings.gelRenderingMode === 'minimum') return 'no-transmission';
+  const quality = resolveGraphicsQuality(settings.graphicsPreset, settings.renderPixelRatioCap);
+  const scale = Math.min(quality.transmissionResolutionScale, settings.gelRenderingMode === 'reduced-transmission' ? .5 : 1);
+  return [scale, quality.pixelRatioCap, settings.renderScale, GRAPHICS_PROFILES[settings.graphicsProfile].pixelBudget].join(':');
 }
 
 export const GRAPHICS_PROFILES = {

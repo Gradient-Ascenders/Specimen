@@ -21,10 +21,10 @@ test('active levels prepare direct transmission-scale switches before the resume
   for(const level of [1,2,3]) {
     await expect(page.locator('.game-flow')).toHaveAttribute('data-state','playing',{timeout:240_000});
     await page.waitForFunction(()=>(window as any).__transmissionSession.runtime.input.enabled);
-    for(const mode of ['physical','reduced-transmission','physical','reduced-transmission']) {
-      await page.evaluate(async mode=>{
+    for(const [index,mode] of ['physical','reduced-transmission','physical','reduced-transmission'].entries()) {
+      await page.evaluate(async ({mode,hidden})=>{
         const session=(window as any).__transmissionSession,rt=session.runtime,layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
-        const rows:any[]=[],storage:any[]=[],inspections:any[]=[],gates:any[]=[],originals=new Map<string,any>();
+        const rows:any[]=[],storage:any[]=[],inspections:any[]=[],gates:any[]=[],preparedDraws:any[]=[],shadowChecks:any[]=[],originals=new Map<string,any>();
         const originalDraw=layer.render,compile=renderer.compileAsync,prepare=rt.prepareGraphics;
         const queue=rt.preparationQueue,depthGroups=rt.depthPrewarmGroups?.length;
         let live=false,compiles=0,shaderPasses=0,last=performance.now(),requestedAt=0;
@@ -40,18 +40,40 @@ test('active levels prepare direct transmission-scale switches before the resume
         const unsubscribe=session.events.on('graphicsPreparationChanged',(state:any)=>gates.push({...state,at:performance.now()}));
         layer.render=function(...args:any[]){
           const start=performance.now(),before=renderer.info.programs.length,active=rt.state==='running';live=active;
+          const shadows:any[]=[];const globalShadow={autoUpdate:renderer.shadowMap.autoUpdate,needsUpdate:renderer.shadowMap.needsUpdate};
+          if(!active){
+            layer.scene.traverse((object:any)=>{if(object.shadow)shadows.push({shadow:object.shadow,autoUpdate:object.shadow.autoUpdate,needsUpdate:object.shadow.needsUpdate});});
+            // A gel-only primer must not consume pending cached-map updates or
+            // clear live caster maps with all other geometry layer-excluded.
+            for(const entry of shadows){entry.shadow.autoUpdate=false;entry.shadow.needsUpdate=true;}
+            renderer.shadowMap.autoUpdate=true;renderer.shadowMap.needsUpdate=true;
+          }
+          const shadowState=()=>({enabled:renderer.shadowMap.enabled,type:renderer.shadowMap.type,
+            autoUpdate:renderer.shadowMap.autoUpdate,needsUpdate:renderer.shadowMap.needsUpdate,
+            lights:shadows.map(({shadow})=>[shadow.autoUpdate,shadow.needsUpdate,shadow.map?.uuid,shadow.mapPass?.uuid])});
+          const shadowBefore=shadowState();
+          const visibility=new Map<any,boolean>();
+          if(rt.__transmissionProbe.hideTransmission)layer.scene.traverse((object:any)=>{
+            const materials=object.material?(Array.isArray(object.material)?object.material:[object.material]):[];
+            if(materials.some((material:any)=>material.transmission>0)){visibility.set(object,object.visible);object.visible=false;}
+          });
           try{return originalDraw.apply(this,args);}finally{live=false;if(active) {
-            rows.push({at:start,intervalMs:start-last,cpuMs:performance.now()-start,newPrograms:renderer.info.programs.length-before,
+            rows.push({at:start,hiddenTransmission:rt.__transmissionProbe.hideTransmission,intervalMs:start-last,cpuMs:performance.now()-start,newPrograms:renderer.info.programs.length-before,
               storage:storage.filter(x=>x.live),inspections:inspections.filter(x=>x.live),error:gl.getError()});
             storage.splice(0,storage.length,...storage.filter(x=>!x.live));inspections.splice(0,inspections.length,...inspections.filter(x=>!x.live));
             last=start;
-          }}
+          }else {preparedDraws.push({newPrograms:renderer.info.programs.length-before,cpuMs:performance.now()-start});
+            shadowChecks.push({before:shadowBefore,after:shadowState()});
+            Object.assign(renderer.shadowMap,globalShadow);
+            for(const entry of shadows)Object.assign(entry.shadow,{autoUpdate:entry.autoUpdate,needsUpdate:entry.needsUpdate});
+          }
+          for(const [object,visible]of visibility)object.visible=visible;}
         };
-        rt.__transmissionProbe={rows,finish:()=>{
+        rt.__transmissionProbe={rows,hideTransmission:hidden,finish:()=>{
           layer.render=originalDraw;renderer.compileAsync=compile;rt.prepareGraphics=prepare;unsubscribe();
           for(const [method,original] of originals)gl[method]=original;
           const debug=gl.getExtension('WEBGL_debug_renderer_info');
-          return {mode,rows,requestToFirstDrawMs:rows[0]?.at-requestedAt,preparationStorage:storage,preparationInspections:inspections,gates,compiles,shaderPasses,
+          return {mode,hidden,rows,preparedDraws,shadowChecks,requestToFirstDrawMs:rows[0]?.at-requestedAt,preparationStorage:storage,preparationInspections:inspections,gates,compiles,shaderPasses,
             queueUnchanged:queue===rt.preparationQueue,depthGroupsUnchanged:depthGroups===rt.depthPrewarmGroups?.length,
             resources:{...renderer.info.memory},programs:renderer.info.programs.length,
             graphics:layer.getGraphicsDiagnostics(),renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)};
@@ -65,8 +87,12 @@ test('active levels prepare direct transmission-scale switches before the resume
         // running. No paused/menu draw can consume the allocation first.
         session.applyGraphicsSettings('transmissive-gel',()=>layer.setGraphicsSettings({...layer.graphicsSettings,gelRenderingMode:mode}),
           `transmission:${mode==='physical'?1:.5}`);
-      },mode);
+      },{mode,hidden:index>=2});
       await page.waitForFunction(()=>(window as any).__transmissionSession.runtime.__transmissionProbe.rows.length>=12,null,{timeout:240_000});
+      if(index>=2){
+        await page.evaluate(()=>(window as any).__transmissionSession.runtime.__transmissionProbe.hideTransmission=false);
+        await page.waitForFunction(()=>(window as any).__transmissionSession.runtime.__transmissionProbe.rows.length>=24);
+      }
       evidence.push({level,...await page.evaluate(()=>(window as any).__transmissionSession.runtime.__transmissionProbe.finish())});
       await writeFile(info.outputPath('transmission-switches.json'),JSON.stringify({evidence,errors},null,2));
     }
@@ -87,7 +113,13 @@ test('active levels prepare direct transmission-scale switches before the resume
     // this switch. It must remain the same queue, with no full preparation pass.
     if(sample.level!==2)expect(sample.compiles).toBe(0);
     expect(sample.shaderPasses).toBe(0);
+    expect(sample.gates.map((gate:any)=>gate.pending)).toEqual([true,false]);
+    expect(sample.gates.every((gate:any)=>!gate.failed)).toBe(true);
     expect(sample.queueUnchanged).toBe(true);expect(sample.depthGroupsUnchanged).toBe(true);
+    expect(sample.preparationInspections).toEqual([]);
+    for(const draw of sample.preparedDraws)expect(draw.newPrograms).toBe(0);
+    expect(sample.shadowChecks.length).toBeGreaterThan(0);
+    for(const check of sample.shadowChecks)expect(check.after).toEqual(check.before);
     for(const frame of sample.rows){expect(frame.newPrograms).toBe(0);expect(frame.inspections).toEqual([]);expect(frame.storage).toEqual([]);expect(frame.error).toBe(0);}
     expect(sample.graphics.transmissionResolutionScale).toBe(sample.mode==='physical'?1:.5);
   }
