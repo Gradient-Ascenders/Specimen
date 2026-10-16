@@ -1,0 +1,93 @@
+.opening-trailer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.opening-trailer-start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+  background: rgb(1 3 5 / 76%);
+  pointer-events: auto;
+}
+
+.opening-trailer-start h1 {
+  margin: 0;
+  font-family: Michroma, sans-serif;
+  font-size: clamp(1.5rem, 4vw, 3rem);
+}
+
+.opening-trailer-start p {
+  margin: 0;
+}
+
+.opening-trailer-hint {
+  color: #9cafb9;
+  font-size: 0.8rem;
+}
+
+.opening-trailer button {
+  padding: 0.7rem 1rem;
+  border: 1px solid rgb(142 231 239 / 35%);
+  border-radius: 0.3rem;
+  color: #e2f4f5;
+  background: #10242b;
+  font: inherit;
+  cursor: pointer;
+}
+
+.opening-trailer button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.opening-trailer-controls {
+  position: absolute;
+  inset: auto 1rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid rgb(142 231 239 / 20%);
+  border-radius: 0.4rem;
+  background: rgb(2 10 14 / 92%);
+  font-size: 0.8rem;
+  pointer-events: auto;
+}
+
+.opening-trailer-controls label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.opening-trailer-controls input {
+  min-width: 5rem;
+  width: 100%;
+  accent-color: #60dce7;
+}
+
+.opening-trailer-controls a {
+  color: #c2e7ea;
+}
+
+.trailer-shot-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.3rem;
+}
+
+.trailer-shot-links a {
+  color: #acd4d2;
+  font-size: 0.85rem;
+}
