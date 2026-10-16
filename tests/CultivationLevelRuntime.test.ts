@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import * as THREE from 'three';
 
+import { CULTIVATION_LEVEL_DEBUG_SUPPORT } from '../src/debug/CultivationLevelDebug.ts';
 import type { Input } from '../src/core/Input.ts';
 import { CultivationLevelRuntime } from '../src/levels/CultivationLevelRuntime.ts';
 import { CultivationRoomFiveController } from '../src/levels/CultivationRoomFiveController.ts';
@@ -61,7 +62,7 @@ test('failed Cultivation construction rolls back attached resources', () => {
   assert.equal(scene.children.length, 0);
 });
 
-test('Level 2 zero shortcut works without debug preview and is one-shot', () => {
+test('Level 2 zero shortcut is debug-only and one-shot', () => {
   const inputStates: boolean[] = [];
   const input = {
     enabled: true,
@@ -74,7 +75,8 @@ test('Level 2 zero shortcut works without debug preview and is one-shot', () => 
     renderLayer: { scene: new THREE.Scene() } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
     window: new EventTarget() as unknown as Window,
-    debugAvailable: false,
+    debugAvailable: true,
+    debugSupport: CULTIVATION_LEVEL_DEBUG_SUPPORT,
   });
   let unlocked = false;
   let emitted: unknown;
@@ -104,6 +106,12 @@ test('Level 2 zero shortcut works without debug preview and is one-shot', () => 
     code: 'Numpad0', repeat: false, target: null,
     preventDefault: () => { prevented = true; },
   } as unknown as KeyboardEvent;
+  (runtime as unknown as { debugAvailable: boolean }).debugAvailable = false;
+  internals.onSkipToLevelThree(keyEvent);
+  assert.equal(unlocked, false);
+  assert.equal(prevented, false);
+  assert.deepEqual(inputStates, []);
+  (runtime as unknown as { debugAvailable: boolean }).debugAvailable = true;
   internals.onSkipToLevelThree(keyEvent);
   internals.onSkipToLevelThree(keyEvent);
 

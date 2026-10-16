@@ -80,6 +80,7 @@ const gameSession = new GameSessionCoordinator({
       renderLayer,
       progression,
       authoredRoomOne: true,
+      debugAvailable,
       maintenanceMaps,
     });
   },

@@ -1732,6 +1732,7 @@ export class GreyboxLevelRuntime {
 
   private readonly onSkipToLevelThree = (event: KeyboardEvent): void => {
     if (
+      !this.debugAvailable ||
       (event.code !== 'Minus' && event.code !== 'NumpadSubtract') ||
       event.repeat || this.skipToLevelThreeTriggered ||
       this.lifecycle.state !== 'running' || !this.input.enabled ||

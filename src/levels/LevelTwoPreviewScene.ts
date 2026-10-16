@@ -101,7 +101,7 @@ const ROOM_SPAWNS: Readonly<
   5: { bob: new THREE.Vector3(-1, .86, 9.1), goop: new THREE.Vector3(1, .86, 9.1) },
 };
 
-/** Development-only composition of the three currently authored Cultivation rooms. */
+/** Released composition of all five authored Cultivation rooms. */
 export class LevelTwoPreviewScene {
   readonly root = new THREE.Group();
   readonly acidInteractions: readonly AcidLiquidInteractions[];
