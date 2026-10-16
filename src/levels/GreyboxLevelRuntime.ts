@@ -2083,11 +2083,15 @@ export class GreyboxLevelRuntime {
       // full-size target too; preparing only the clone still leaves gameplay
       // with a first-frame allocation. Copy/restore its pose synchronously.
       const gameplayViewport = renderer.getViewport(new THREE.Vector4());
+      const gameplayTransmissionScale = renderer.transmissionResolutionScale;
       const savedCamera = camera.clone();
       try {
         camera.copy(prewarmCamera);
         withIsolatedPrewarmState(renderer, () => {
           renderer.setViewport(gameplayViewport);
+          // Isolation defaults to scale 1 for its tiny primers. This full-size
+          // retained-camera target must match the selected gameplay profile.
+          renderer.transmissionResolutionScale = gameplayTransmissionScale;
           this.renderLayer.withShadowPreparation(true, () =>
             renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, camera,
               createRoomPrewarmSources(resources, 1), { includeHidden: true }));

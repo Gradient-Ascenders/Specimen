@@ -499,7 +499,8 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   );
 });
 
-test('plain production completes prewarm before Level 1 traversal', async ({
+for (const profile of ['minimum','standard'] as const) {
+test(`plain production completes prewarm before Level 1 traversal (${profile})`, async ({
   page,
 }) => {
   test.setTimeout(600_000);
@@ -511,6 +512,13 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     await exposeProductionTraversalRuntime(page);
   await page.addInitScript(() => {
     let createdPrograms = 0;
+    let programInspections = 0;
+    const inspect = WebGL2RenderingContext.prototype.getProgramInfoLog;
+    WebGL2RenderingContext.prototype.getProgramInfoLog = function(program) {
+      programInspections++;
+      return inspect.call(this, program);
+    };
+    Object.defineProperty(window, '__specimenProgramInspectionCount', { get: () => programInspections });
     const originalCreateProgram = WebGL2RenderingContext.prototype.createProgram;
     WebGL2RenderingContext.prototype.createProgram = function () {
       createdPrograms += 1;
@@ -539,8 +547,15 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     burstProgramDelta: 0,
   });
   await expect(page.locator('[data-action="start"]')).toBeVisible();
+  if (profile === 'standard') {
+    await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+    await page.locator('[data-setting="graphics-profile"]').selectOption(profile);
+    await expect(page.locator('[data-graphics-preparation]')).toBeHidden({timeout:180_000});
+    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  }
   await waitForRenderedFrames(page, 2);
   const warmedProgramCount = await readCreatedProgramCount(page);
+  const warmedInspections = await page.evaluate(() => (window as any).__specimenProgramInspectionCount);
   expect(warmedProgramCount).toBeGreaterThan(0);
 
   await page.locator('[data-action="start"]').click();
@@ -550,6 +565,8 @@ test('plain production completes prewarm before Level 1 traversal', async ({
       await readCreatedProgramCount(page),
       `${label}: plain-production WebGL program count changed`,
     ).toBe(warmedProgramCount);
+    expect(await page.evaluate(() => (window as any).__specimenProgramInspectionCount),
+      `${label}: lazy program inspection after preparation`).toBe(warmedInspections);
   });
 
   expect(await readCreatedProgramCount(page)).toBe(warmedProgramCount);
@@ -558,6 +575,7 @@ test('plain production completes prewarm before Level 1 traversal', async ({
       message.includes('Containment lighting prewarm failed')),
   ).toBe(false);
 });
+}
 
 test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async ({ page }) => {
   test.setTimeout(240_000);
