@@ -123,6 +123,26 @@ test('pod supports do not stripe the egg with bar shadows, while the egg still r
   title.dispose();
 });
 
+test('vertical observation-room lights are seated in housings anchored into the wall', () => {
+  const title = new TitleScreenScene(), matrix = new THREE.Matrix4(), point = new THREE.Vector3();
+  try {
+    title.scene.updateMatrixWorld(true);
+    const strips = title.scene.getObjectByName('title-recessed-wall-lights') as THREE.InstancedMesh;
+    const mounts = title.scene.getObjectByName('title-wall-light-mounts') as THREE.InstancedMesh;
+    assert.equal(strips.count, 6); assert.equal(mounts.count, 6);
+    for (let index = 0; index < strips.count; index++) {
+      strips.getMatrixAt(index, matrix); point.set(0, 0, 0).applyMatrix4(matrix).applyMatrix4(strips.matrixWorld);
+      const outward = point.clone().sub(new THREE.Vector3(0, point.y, -0.5)).normalize();
+      const hit = new THREE.Raycaster(point, outward, 0, 0.025).intersectObject(mounts)[0];
+      assert.equal(hit?.instanceId, index, 'Each lit strip must touch its own backing housing.');
+      mounts.getMatrixAt(index, matrix);
+      point.set(0, 0, 0.5).applyMatrix4(matrix).applyMatrix4(mounts.matrixWorld);
+      assert.ok(Math.hypot(point.x, point.z + 0.5) > 6.1,
+        'The rear of the housing penetrates the real wall, not empty air between panels.');
+    }
+  } finally { title.dispose(); }
+});
+
 test('two-line specimen plate replaces the four-light panel on the front of the pedestal', () => {
   const title = new TitleScreenScene();
   const plate = title.pod.getObjectByName('title-pod-specimen-label');
@@ -289,4 +309,13 @@ test('saved menu-motion preference updates the title without overriding system r
   presentation.setReducedMotion(false); presentation.render(0);
   assert.equal(fixture.host.dataset.titleMotion, 'still');
   presentation.dispose();
+});
+
+test('the opening can take ownership of the actual title room without disposing its shared pod', async () => {
+  const fixture = presentationFixture();
+  const preparation = fixture.presentation.prepare(); fixture.resolveCompile(); await preparation;
+  fixture.presentation.dispose({ keepScene: true });
+  assert.equal(fixture.sceneDisposals(), 0);
+  assert.deepEqual(fixture.host.dataset, {});
+  assert.equal(fixture.budgets.at(-1), TITLE_PIXEL_BUDGET, 'The cinematic takes the cap without reallocating the buffer.');
 });

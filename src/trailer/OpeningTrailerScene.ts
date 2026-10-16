@@ -39,10 +39,10 @@ export class OpeningTrailerScene {
 
   constructor() {
     this.root.name = 'trailer-bob-opening';
-    // The gameplay egg's lower half sits inside the machine's solid base. For
-    // the close-up, seat the whole shell on the actual glass-chamber floor.
+    // The trailer's smaller shell sits on the same chamber floor as the menu
+    // and gameplay pod, leaving room for its in-container partial hatch.
     this.room.eggRoot.position.y = 2.14;
-    this.room.eggRoot.scale.y = 0.96;
+    this.room.eggRoot.scale.set(0.82, 0.96, 0.82);
     const clearanceCentre = BOB_HATCH_CENTRE.clone().sub(this.room.eggRoot.position)
       .divide(this.room.eggRoot.scale);
     clearanceCentre.y = 0;
@@ -90,7 +90,7 @@ export class OpeningTrailerScene {
       object.receiveShadow = true;
       // Transparent glass is not an opaque blocker of the specimen key light.
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      object.castShadow = !object.userData.trailerDetail &&
+      object.castShadow = !object.userData.trailerDetail && !object.userData.specimenPodShadowlessSupport &&
         materials.some(material => !material.transparent && material !== this.resources.materials.neutralFixture);
     });
     this.apply(sampleOpeningTrailer(0));

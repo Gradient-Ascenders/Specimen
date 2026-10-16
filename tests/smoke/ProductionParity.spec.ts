@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -82,6 +83,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
     }
     await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     await page.locator('[data-action="start"]').click();
+    await finishOpening(page);
     const evidence: unknown[] = [];
     for (const level of [1, 2, 3]) {
       await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');

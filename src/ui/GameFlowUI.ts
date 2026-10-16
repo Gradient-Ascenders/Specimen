@@ -30,6 +30,7 @@ import {
 export type GameFlowState =
   | 'loading'
   | 'title'
+  | 'opening'
   | 'playing'
   | 'paused'
   | 'settings'
@@ -245,6 +246,14 @@ export class GameFlowStateModel {
     return this.transitionFrom('title', 'playing');
   }
 
+  beginOpening(): boolean {
+    return this.transitionFrom('title', 'opening');
+  }
+
+  finishOpening(): boolean {
+    return this.transitionFrom('opening', 'playing');
+  }
+
   pause(): boolean {
     return this.transitionFrom('playing', 'paused');
   }
@@ -318,6 +327,9 @@ export class GameFlowStateModel {
 }
 
 export interface GameFlowActions {
+  playOpening?(): void;
+  skipOpening?(): void;
+  retryOpening?(): void;
   startGameplay(): void;
   stopGameplay(): void;
   setGameplayInputEnabled(enabled: boolean): void;
@@ -348,6 +360,7 @@ export interface GameFlowUIOptions {
 const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'loading',
   'title',
+  'opening',
   'paused',
   'settings',
   'credits',
@@ -356,7 +369,7 @@ const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'transitionFailed',
 ]);
 
-const MENU_NAVIGATION_STATES = new Set<GameFlowState>(['title', 'paused', 'settings', 'credits']);
+const MENU_NAVIGATION_STATES = new Set<GameFlowState>(['title', 'opening', 'paused', 'settings', 'credits']);
 
 export class GameFlowUI {
   readonly element: HTMLElement;
@@ -521,6 +534,25 @@ export class GameFlowUI {
     this.syncState();
   }
 
+  finishOpening(userGesture = false): void {
+    if (this.model.state !== 'opening') return;
+    this.actions.startGameplay();
+    if (!this.model.finishOpening()) return;
+    this.syncState();
+    // Automatic playback cannot claim a fresh browser user activation.
+    if (userGesture) this.actions.requestPointerLock();
+  }
+
+  setOpeningStatus(message: string, failed: boolean): void {
+    const status = this.requireElement('[data-opening-status]');
+    if (status.textContent !== message) status.textContent = message;
+    this.requireElement<HTMLButtonElement>('[data-action="retry-opening"]').hidden = !failed;
+  }
+
+  setOpeningFade(opacity: number): void {
+    this.element.style.setProperty('--opening-fade', String(opacity));
+  }
+
   subscribe(listener: GameFlowStateListener): () => void {
     return this.model.subscribe(listener);
   }
@@ -620,6 +652,17 @@ export class GameFlowUI {
               <span class="menu-arrow" aria-hidden="true">→</span>
             </button>
           </nav>
+        </div>
+      </section>
+
+      <section class="flow-screen opening-screen" data-flow-panel="opening" aria-label="Bob's awakening" hidden>
+        <div class="opening-fade" aria-hidden="true"></div>
+        <div class="opening-letterbox opening-letterbox-top" aria-hidden="true"></div>
+        <div class="opening-letterbox opening-letterbox-bottom" aria-hidden="true"></div>
+        <div class="opening-controls">
+          <p class="system-status" data-opening-status role="status" aria-live="polite"></p>
+          <button type="button" class="system-action" data-action="retry-opening" hidden>Retry preparation</button>
+          <button type="button" class="system-action" data-action="skip-opening" data-autofocus><span>Skip intro</span><span aria-hidden="true">Esc →</span></button>
         </div>
       </section>
 
@@ -883,6 +926,11 @@ export class GameFlowUI {
 
     switch (target.dataset.action) {
       case 'start':
+        if (this.actions.playOpening && this.model.beginOpening()) {
+          this.syncState();
+          this.actions.playOpening();
+          break;
+        }
         if (this.model.state === 'title') {
           this.actions.startGameplay();
         }
@@ -890,6 +938,12 @@ export class GameFlowUI {
           this.syncState();
           this.actions.requestPointerLock();
         }
+        break;
+      case 'skip-opening':
+        if (this.model.state === 'opening') this.actions.skipOpening?.();
+        break;
+      case 'retry-opening':
+        if (this.model.state === 'opening') this.actions.retryOpening?.();
         break;
       case 'resume':
         this.resume();
@@ -932,6 +986,12 @@ export class GameFlowUI {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (this.model.state === 'opening' && event.code === 'Escape' &&
+      !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+      event.preventDefault();
+      if (!event.repeat) this.actions.skipOpening?.();
+      return;
+    }
     const action = getGameFlowKeyboardAction(
       event.code,
       this.model.state,
@@ -1121,7 +1181,8 @@ export class GameFlowUI {
   private navigateMenu(action: MenuAction): void {
     if (!this.menuNavigable) return;
     if (action === 'back') {
-      if (this.model.state === 'paused') this.resume();
+      if (this.model.state === 'opening') this.actions.skipOpening?.();
+      else if (this.model.state === 'paused') this.resume();
       else if (this.model.back()) this.syncState();
       return;
     }

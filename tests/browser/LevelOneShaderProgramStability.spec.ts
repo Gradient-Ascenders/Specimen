@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import type { Page } from '@playwright/test';
 import type * as THREE from 'three';
 import { expect, test } from './fixtures.ts';
@@ -421,6 +422,8 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
 }) => {
   test.setTimeout(600_000);
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
   await expect(page.locator(GUARD_SELECTOR)).toBeVisible({ timeout: 120_000 });
   await expect.poll(
     async () => (await page.locator(GUARD_SELECTOR).textContent()) ?? '',
@@ -439,7 +442,6 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
     baseline,
   );
 
-  await page.locator('[data-action="start"]').click();
   await waitForRenderedFrames(page);
   await readStableGuard(page, 'gameplay start', baseline);
 
@@ -505,6 +507,8 @@ test('plain production completes prewarm before Level 1 traversal', async ({
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   assertTraversalRuntimeExposed();
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
   const app = page.locator('#app[data-level-one-prewarm]');
   await expect(app).toBeVisible({ timeout: 120_000 });
   const verification = JSON.parse(
@@ -519,12 +523,10 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     burstGeometryDelta: 0,
     burstProgramDelta: 0,
   });
-  await expect(page.locator('[data-action="start"]')).toBeVisible();
   await waitForRenderedFrames(page, 2);
   const warmedProgramCount = await readCreatedProgramCount(page);
   expect(warmedProgramCount).toBeGreaterThan(0);
 
-  await page.locator('[data-action="start"]').click();
   await waitForRenderedFrames(page, 2);
   await traverseRepresentativeLevelOnePaths(page, async (label) => {
     expect(
@@ -566,6 +568,7 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
   assertExposed();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   await page.evaluate(() => {
     const host = window as Window & {
@@ -717,6 +720,7 @@ test('Room 3 final sticky-wall climb reuses GPU programs and bindings without ch
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
   assertExposed();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   const result = await page.evaluate(() => {
     const host = window as Window & {
@@ -806,6 +810,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
 
   const readReflectionState = async () => page.evaluate(() => {
@@ -980,6 +985,7 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
 
   const readBob = async () => page.evaluate(() => {
@@ -1080,6 +1086,7 @@ test('Level 1 damage holds the burst at frame zero through Stress anticipation',
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
 
   const observation = await page.evaluate(() => {
     const runtime = (

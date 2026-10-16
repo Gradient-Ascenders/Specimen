@@ -5,7 +5,7 @@ import { loadCultivationBakedAssets } from './render/environment/cultivation/Cul
 import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
-import { Loop } from './core/Loop.ts';
+import { Loop, type LoopStats } from './core/Loop.ts';
 import { GameSessionCoordinator } from './levels/GameSessionCoordinator.ts';
 import { GreyboxLevelRuntime } from './levels/GreyboxLevelRuntime.ts';
 import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
@@ -14,6 +14,9 @@ import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
 import { TitleScreenPresentation } from './ui/TitleScreenPresentation.ts';
+import { TitleScreenScene } from './ui/TitleScreenScene.ts';
+import { OpeningGameScene } from './cinematics/OpeningGameScene.ts';
+import { OpeningGamePresentation } from './cinematics/OpeningGamePresentation.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
@@ -69,6 +72,7 @@ function startGame(): void {
     input,
     renderLayer,
     debugAvailable,
+    yieldPreparation: () => new Promise(resolve => requestAnimationFrame(() => resolve())),
   });
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
@@ -116,6 +120,9 @@ function startGame(): void {
   });
   const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
   let titlePresentation: TitleScreenPresentation | undefined;
+  let openingPresentation: OpeningGamePresentation | undefined;
+  let lastFrameStats: Readonly<LoopStats> | undefined;
+  let titleRoom: TitleScreenScene | undefined = new TitleScreenScene();
   let warmedLevelOneProgramBaseline: number | undefined;
   let levelOneShaderProgramGuardActive = true;
   let levelOneShaderProgramGuardInvalidation: string | undefined;
@@ -128,6 +135,39 @@ function startGame(): void {
     creditsMarkdown,
     slimeHUD: gameSession,
     actions: {
+      playOpening: () => {
+        if (!titleRoom) return;
+        titlePresentation?.dispose({ keepScene: true });
+        titlePresentation = undefined;
+        const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
+        titleRoom = undefined; // The opening now owns all room CPU/GPU resources.
+        openingPresentation = new OpeningGamePresentation({
+          scene, renderLayer, host: app,
+          reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+          prepareLevel: () => {
+            gameSession.load();
+            return levelOneRuntime.prepareLightingPrograms().then(() => {
+              if (shuttingDown) return;
+              const verification = levelOneRuntime.levelOnePrewarmVerification;
+              if (verification) app.dataset.levelOnePrewarm = JSON.stringify(verification);
+            });
+          },
+          onComplete: (userGesture) => {
+            levelOneRuntime.completeOpening();
+            openingPresentation?.dispose();
+            openingPresentation = undefined;
+            gameFlow.finishOpening(userGesture);
+            // Paint the warmed gameplay frame in the same task that removes
+            // the black cinematic fade; never flash the final intro camera.
+            if (lastFrameStats) gameSession.render(0, lastFrameStats);
+          },
+          onStatus: (message, failed) => gameFlow.setOpeningStatus(message, failed),
+          onFade: opacity => gameFlow.setOpeningFade(opacity),
+        });
+        openingPresentation.start();
+      },
+      skipOpening: () => openingPresentation?.skip(),
+      retryOpening: () => openingPresentation?.retry(),
       startGameplay: () => lifecycleCoordinator.startGameplay(),
       stopGameplay: () => lifecycleCoordinator.stopGameplay(),
       setGameplayInputEnabled: (enabled) => input.setEnabled(enabled),
@@ -205,18 +245,22 @@ function startGame(): void {
   );
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);
-  gameSession.load();
   titlePresentation = new TitleScreenPresentation({ renderLayer, host: app,
-    reduceMotion: settings.value.reduceMenuMotion });
+    scene: titleRoom, reduceMotion: settings.value.reduceMenuMotion });
 
   const loop = new Loop({
     fixedUpdate: (deltaSeconds) => {
-      if (!titlePresentation) gameSession.fixedUpdate(deltaSeconds);
+      if (!titlePresentation && !openingPresentation) gameSession.fixedUpdate(deltaSeconds);
     },
     render: (interpolationAlpha, stats) => {
+      lastFrameStats = stats;
       gameFlow.updateFrame(stats.rawFrameDeltaSeconds);
       if (titlePresentation) {
         titlePresentation.render(stats.frameDeltaSeconds);
+        return;
+      }
+      if (openingPresentation) {
+        openingPresentation.render(stats.frameDeltaSeconds);
         return;
       }
       gameSession.render(interpolationAlpha, stats);
@@ -265,9 +309,7 @@ function startGame(): void {
       await titlePresentation?.prepare();
     } catch (error: unknown) {
       if (shuttingDown) return;
-      console.error('Title room preparation failed; using the gameplay backdrop.', error);
-      titlePresentation?.dispose();
-      titlePresentation = undefined;
+      console.error('Title room preparation failed.', error);
     }
     if (shuttingDown) return;
     renderLayer.setAnimationLoop((timestampMs) => loop.tick(timestampMs));
@@ -279,24 +321,10 @@ function startGame(): void {
     });
   };
 
-  // Let the loading state paint once, then compile every Level 1 light signature
-  // before normal rendering or gameplay can begin.
+  // Only the small observation chamber blocks the title. Level 1 construction,
+  // asset preparation and shader priming overlap the opening after Start.
   bootFrame = requestAnimationFrame(() => {
-    void levelOneRuntime.prepareLightingPrograms().then(
-      () => {
-        if (shuttingDown) return;
-        const verification = levelOneRuntime.levelOnePrewarmVerification;
-        if (verification) {
-          app.dataset.levelOnePrewarm = JSON.stringify(verification);
-        }
-        void startRenderLoop();
-      },
-      (error) => {
-        if (shuttingDown) return;
-        console.error('Containment lighting prewarm failed.', error);
-        void startRenderLoop();
-      },
-    );
+    void startRenderLoop();
   });
 
   const shutdown = (): void => {
@@ -314,6 +342,7 @@ function startGame(): void {
     unsubscribeTransitionFailed();
     unsubscribeTitlePresentation();
     titlePresentation?.dispose();
+    openingPresentation?.dispose();
     performanceRecorder?.dispose();
     cleanGameplayMode.dispose();
     gameFlow.dispose();

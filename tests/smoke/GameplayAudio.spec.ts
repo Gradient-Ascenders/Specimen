@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from '@playwright/test';
 import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
 
@@ -17,6 +18,8 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
+  await page.locator('[data-action="start"]').click();
+  await finishOpening(page, false);
   // Audio/input checks advance gameplay manually. Stop costly software-rendered
   // frames before waiting on asynchronous decoding, not after that wait.
   await page.evaluate(() => (window as any).__audioRuntime.renderLayer.setAnimationLoop(null));
@@ -27,8 +30,8 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   expect(new Set(audioRequests).size).toBe(SOUND_BANKS.containment.length);
   expect(audioRequests.some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
   expect(audioRequests.every(url => new URL(url).pathname.startsWith('/group-folder/assets/audio/'))).toBe(true);
-  // Start is the trusted gesture that unlocks audio and requests pointer lock.
-  await page.locator('[data-action="start"]').click();
+  // Start unlocks audio; the post-cutscene canvas gesture acquires pointer lock.
+  await page.locator('canvas').click();
   await page.waitForFunction(() => document.pointerLockElement === document.querySelector('canvas'));
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
   // Unlock must not silently expand the bank. Later factories warm their
