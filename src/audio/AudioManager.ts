@@ -9,6 +9,45 @@ interface Voice {
   readonly key?: string;
 }
 interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition }
+type SpatialAudioTarget = {
+  readonly positionX?: AudioParam;
+  readonly positionY?: AudioParam;
+  readonly positionZ?: AudioParam;
+  setPosition?: (x: number, y: number, z: number) => void;
+};
+type AudioContextConstructor = new () => AudioContext;
+type AudioContextGlobal = typeof globalThis & {
+  readonly webkitAudioContext?: AudioContextConstructor;
+};
+
+const createBrowserAudioContext = (): AudioContext => {
+  const scope = globalThis as AudioContextGlobal;
+  const Context = scope.AudioContext ?? scope.webkitAudioContext;
+  if (!Context) throw new Error('Web Audio is unavailable.');
+  return new Context();
+};
+
+/** Modern Firefox/Chromium expose AudioParams; older Firefox/Safari use setPosition. */
+const setSpatialPosition = (target: SpatialAudioTarget, position: AudioPosition): void => {
+  try {
+    const { positionX, positionY, positionZ } = target;
+    if (positionX && positionY && positionZ) {
+      positionX.value = position.x;
+      positionY.value = position.y;
+      positionZ.value = position.z;
+      return;
+    }
+  } catch {
+    // A partial/nonstandard AudioParam implementation can still expose the
+    // older atomic setter below. Optional audio must never stop gameplay.
+  }
+  try {
+    target.setPosition?.(position.x, position.y, position.z);
+  } catch {
+    // Spatial audio is optional. Leave the node at its default position.
+  }
+};
+
 export interface AudioPlayback {
   play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean): void;
   startLoop(key: string, sound: SoundId, position?: AudioPosition): void;
@@ -31,7 +70,9 @@ export class AudioManager implements AudioPlayback {
   private readonly pending = new Map<SoundId, Promise<void>>();
   private readonly loadQueue: Array<{ sound: SoundId; resolve: () => void }> = [];
   private activeLoads = 0;
-  private readonly loadingAbort = new AbortController();
+  private readonly loadingAbort = typeof AbortController === 'undefined'
+    ? undefined
+    : new AbortController();
   private paused = true;
   private focused = true;
   private unlocked = false;
@@ -44,7 +85,7 @@ export class AudioManager implements AudioPlayback {
 
   private readonly base: string;
   private readonly createContext: () => AudioContext;
-  constructor(base = './', createContext = () => new AudioContext()) {
+  constructor(base = './', createContext = createBrowserAudioContext) {
     this.base = base;
     this.createContext = createContext;
   }
@@ -110,11 +151,13 @@ export class AudioManager implements AudioPlayback {
 
   private async loadSound(sound: SoundId): Promise<void> {
     try {
-      const response = await fetch(soundUrl(sound, this.base), { signal: this.loadingAbort.signal });
+      const response = await fetch(soundUrl(sound, this.base), this.loadingAbort
+        ? { signal: this.loadingAbort.signal }
+        : undefined);
       if (!response.ok) throw new Error('Audio request failed');
       const bytes = await response.arrayBuffer();
       if (this.disposed) return;
-      const buffer = await this.context!.decodeAudioData(bytes);
+      const buffer = await this.decodeAudioData(bytes);
       if (!(buffer.duration > 0)) throw new Error('Empty audio');
       if (!this.disposed) { this.buffers.set(sound, buffer); this.reconcileLoops(); }
     } catch { if (!this.disposed) this.failed.add(sound); }
@@ -189,9 +232,36 @@ export class AudioManager implements AudioPlayback {
   setListener(position: AudioPosition): void {
     const listener = this.context?.listener;
     if (!listener) return;
-    listener.positionX.value = position.x;
-    listener.positionY.value = position.y;
-    listener.positionZ.value = position.z;
+    setSpatialPosition(listener, position);
+  }
+
+  private decodeAudioData(bytes: ArrayBuffer): Promise<AudioBuffer> {
+    const context = this.context;
+    if (!context) return Promise.reject(new Error('Web Audio is unavailable.'));
+    return new Promise<AudioBuffer>((resolve, reject) => {
+      let settled = false;
+      const succeed = (buffer: AudioBuffer): void => {
+        if (settled) return;
+        settled = true;
+        resolve(buffer);
+      };
+      const fail = (error?: unknown): void => {
+        if (settled) return;
+        settled = true;
+        reject(error ?? new Error('Audio decode failed.'));
+      };
+      try {
+        // Supplying callbacks supports pre-Promise Safari implementations.
+        // Current implementations also return a Promise; the settled guard
+        // safely accepts whichever completion mechanism fires first.
+        const decoding = context.decodeAudioData(bytes, succeed, fail);
+        if (decoding && typeof decoding.then === 'function') {
+          void decoding.then(succeed, fail);
+        }
+      } catch (error) {
+        fail(error);
+      }
+    });
   }
 
   private canPlay(): boolean {
@@ -231,9 +301,7 @@ export class AudioManager implements AudioPlayback {
   }
   private positionVoice(voice: Voice, position?: AudioPosition): void {
     if (!position || !voice.panner) return;
-    voice.panner.positionX.value = position.x;
-    voice.panner.positionY.value = position.y;
-    voice.panner.positionZ.value = position.z;
+    setSpatialPosition(voice.panner, position);
   }
   private stopVoice(voice: Voice): void {
     try { voice.source.stop(); } catch { /* already ended */ }
@@ -247,7 +315,7 @@ export class AudioManager implements AudioPlayback {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.loadingAbort.abort();
+    this.loadingAbort?.abort();
     for (const { sound, resolve } of this.loadQueue.splice(0)) {
       this.pending.delete(sound); resolve();
     }

@@ -54,6 +54,16 @@ class Context {
   async close() { this.state = 'closed'; }
 }
 
+const useLegacySpatialApi = (node: Node): number[] => {
+  delete (node as Partial<Node>).positionX;
+  delete (node as Partial<Node>).positionY;
+  delete (node as Partial<Node>).positionZ;
+  const position: number[] = [];
+  (node as Node & { setPosition(x: number, y: number, z: number): void }).setPosition =
+    (x, y, z) => { position.splice(0, position.length, x, y, z); };
+  return position;
+};
+
 test('all 54 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
   assert.equal(ids.length, 54);
@@ -184,6 +194,33 @@ test('unsupported audio is optional and only attempts one context across banks',
   await Promise.all([audio.preload(SOUND_BANKS.containment), audio.preload(SOUND_BANKS.cultivation)]);
   audio.unlock();
   assert.equal(attempts, 1); assert.equal(audio.diagnostics.loaded, 0); audio.dispose();
+});
+
+test('legacy Web Audio positioning and callback decoding cannot stop gameplay', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  const listenerPosition = useLegacySpatialApi(context.listener);
+  const pannerPositions: number[][] = [];
+  context.createPanner = () => {
+    const node = new Node();
+    pannerPositions.push(useLegacySpatialApi(node));
+    context.panners.push(node);
+    return node;
+  };
+  context.decodeAudioData = ((_: ArrayBuffer, success: (buffer: { duration: number }) => void) => {
+    queueMicrotask(() => success({ duration: 1 }));
+    return undefined;
+  }) as unknown as Context['decodeAudioData'];
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    await audio.preload(['bob-jump-01']);
+    audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    audio.setListener({ x: 7, y: 8, z: 9 });
+    audio.play('bob-jump-01', { x: 4, y: 5, z: 6 });
+    assert.deepEqual(listenerPosition, [7, 8, 9]);
+    assert.equal(context.panners.length, 1);
+    assert.deepEqual(pannerPositions, [[4, 5, 6]]);
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
 class Playback implements AudioPlayback {
