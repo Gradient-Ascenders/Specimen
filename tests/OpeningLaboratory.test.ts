@@ -508,6 +508,10 @@ test('startup yields between isolated submissions, primes the actual first view 
         assert.equal(scene.laboratory.root.visible, true);
         assert.equal(scene.laboratory.observatory.visible, false);
       }
+      if (draws === 1) {
+        assert.deepEqual(viewport.toArray(), [0, 0, 640, 360], 'Prime the eventual camera-owned transmission dimensions.');
+        assert.equal(renderer.transmissionResolutionScale, 0.5);
+      }
       if (draws === 2) {
         assert.equal(camera.position.z, L.backZ + 12);
         assert.equal(scene.laboratory.root.visible, true);

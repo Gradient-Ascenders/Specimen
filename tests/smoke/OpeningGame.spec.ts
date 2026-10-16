@@ -82,7 +82,7 @@ test('default live opening does only light asset preparation and cannot run Leve
   expect(errors).toEqual([]);
 });
 
-test('default live opening streams bytes during the awakening and finishes Level 1 under the final fade', async ({ page }) => {
+test('default live opening streams bytes during the awakening and finishes Level 1 under the final fade', async ({ page }, info) => {
   test.setTimeout(360_000);
   const errors: string[] = [];
   let goopRequests = 0;
@@ -124,13 +124,23 @@ test('default live opening streams bytes during the awakening and finishes Level
       if (stage) stages.add(stage);
     }).observe(host, { attributes: true, attributeFilter: ['data-opening-stage'], attributeOldValue: true });
   });
+  const capturedStages = new Set<string>();
+  const captureStage = async () => {
+    const stage = await host.getAttribute('data-opening-stage');
+    if (stage && !capturedStages.has(stage) &&
+      ['laboratory', 'experiments', 'cracking', 'forming', 'complete'].includes(stage)) {
+      capturedStages.add(stage);
+      await page.screenshot({ path: info.outputPath(`opening-${stage}.png`) });
+    }
+    return stage;
+  };
   expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => canvas.width * canvas.height)).toBeLessThanOrEqual(1280 * 720);
-  await expect(host).toHaveAttribute('data-opening-stage', 'experiments', { timeout: 180_000 });
+  await expect.poll(captureStage, { timeout: 180_000, intervals: [100, 200, 300] }).toBe('experiments');
   await expect(host).toHaveAttribute('data-opening-state', 'playing');
   await expect(host).not.toHaveAttribute('data-level-one-prewarm');
   // Capture the real staged sequence without skipping, seeking or replacing it.
   // Keep the download delayed for the entire movie: it must not hold the tour.
-  await expect(host).toHaveAttribute('data-opening-stage', 'complete', { timeout: 180_000 });
+  await expect.poll(captureStage, { timeout: 180_000, intervals: [100, 200, 300] }).toBe('complete');
   await expect(host).toHaveAttribute('data-opening-state', 'waiting');
   await expect(flow).toHaveAttribute('data-state', 'opening');
   await expect(page.locator('.opening-fade')).toHaveCSS('opacity', '1');
@@ -147,6 +157,7 @@ test('default live opening streams bytes during the awakening and finishes Level
   await expect(host).not.toHaveAttribute('data-opening-mode');
   await expect(host).not.toHaveAttribute('data-title-backdrop');
   await expect(page.locator('canvas')).toHaveCount(1);
+  await page.screenshot({ path: info.outputPath('opening-gameplay-handoff.png') });
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.locator('[data-action="restart"]').click();

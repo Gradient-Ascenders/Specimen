@@ -106,7 +106,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
         expect(s.rooms).toEqual([true, true, true, true, true]);
         expect(s.encounters).toEqual([true, true, true]);
         expect(s.preparation).toBeTruthy();
-        expect(s.baked).toEqual({ version: 1, repairs: 137, expectedRepairs: 137 });
+        expect(s.baked).toEqual({ version: 1, repairs: 138, expectedRepairs: 138 });
       }
       if (level === 3) {
         expect(s.electrical).toBe(true);

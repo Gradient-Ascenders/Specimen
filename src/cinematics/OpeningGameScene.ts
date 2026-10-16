@@ -160,12 +160,18 @@ export class OpeningGameScene {
     await renderLayer.withShadowPreparation(true, () => renderLayer.renderer.compileAsync(this.room.scene, this.room.camera));
     await yieldFrame();
     if (this.disposed) return;
+    const transmissionViewport = renderLayer.renderer.getViewport(new THREE.Vector4());
+    const transmissionScale = renderLayer.renderer.transmissionResolutionScale;
     const prewarmTarget = new THREE.WebGLRenderTarget(1, 1);
     try {
       // Keep even fully clipped warm-up draws off the default framebuffer:
       // they can present its discarded backbuffer between 30Hz intro frames.
       // Nested shadow/transmission passes stay isolated as well.
       withIsolatedPrewarmState(renderLayer.renderer, () => renderLayer.withShadowPreparation(true, () => {
+        // Retain main's camera-owned transmission sizing without allowing
+        // hidden resource draws to touch the default framebuffer.
+        renderLayer.renderer.setViewport(transmissionViewport);
+        renderLayer.renderer.transmissionResolutionScale = transmissionScale;
         renderLayer.renderer.shadowMap.needsUpdate = true;
         renderLayer.renderer.render(this.room.scene, this.room.camera);
       }), prewarmTarget);

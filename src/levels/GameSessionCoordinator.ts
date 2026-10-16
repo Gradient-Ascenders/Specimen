@@ -1,4 +1,5 @@
 import { EventBus } from '../core/EventBus.ts';
+import { GraphicsPreparation } from '../render/GraphicsPreparation.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import type { PerformanceGameplaySnapshot } from '../core/PerformanceSnapshot.ts';
 import {
@@ -13,6 +14,7 @@ import type { LevelProgressionSnapshot } from './LevelProgression.ts';
 export type SessionLevelId = 'level-2' | 'level-3';
 
 export interface GameSessionEvents {
+  graphicsPreparationChanged: { readonly pending: boolean; readonly failed: boolean };
   objectiveChanged: { readonly roomId: string | number; readonly objective: string };
   transitionStarted: { readonly levelId: SessionLevelId; readonly message: string };
   transitionCompleted: { readonly levelId: SessionLevelId };
@@ -47,6 +49,19 @@ export class GameSessionCoordinator {
   private debugInteractionEnabled = true;
   private disposed = false;
   private renderedInterpolationAlpha = 0;
+  private resumeAfterGraphics = false;
+  private initialPreparationPending = false;
+  private graphicsOwnerGeneration = 0;
+  private queuedGraphics: {key: string; apply: () => void; resourceKey?: string} | undefined;
+  private readonly graphicsPreparation = new GraphicsPreparation((pending, error) => {
+    if (pending && this.runtime.state === 'running') {
+      this.resumeAfterGraphics = true; this.runtime.stop();
+    }
+    this.events.emit('graphicsPreparationChanged', {pending, failed: error !== undefined});
+    if (!pending && this.resumeAfterGraphics && !this.disposed && !this.transitionPending) {
+      this.resumeAfterGraphics = false; this.runtime.start();
+    }
+  });
 
   constructor(options: GameSessionCoordinatorOptions) {
     this.runtime = options.initialRuntime;
@@ -61,13 +76,64 @@ export class GameSessionCoordinator {
   }
 
   load(): void { this.runtime.load(); }
-  start(): void { if (!this.transitionFailed) this.runtime.start(); }
-  stop(): void { if (!this.transitionFailed) this.runtime.stop(); }
+  start(): void {
+    if (this.graphicsPreparation.pending) { this.resumeAfterGraphics = true; return; }
+    if (!this.transitionFailed) this.runtime.start();
+  }
+  stop(): void { this.resumeAfterGraphics = false; if (!this.transitionFailed) this.runtime.stop(); }
+  applyGraphicsSettings(key: string, apply: () => void, resourceKey?: string): void {
+    if (this.disposed) return;
+    if (this.transitionPending || this.initialPreparationPending) { this.queuedGraphics = {key, apply, resourceKey}; return; }
+    const runtime = this.runtime;
+    // The title now precedes runtime construction. Apply its settings without
+    // constructing a level; the opening's mandatory initial pass prepares them.
+    this.graphicsPreparation.update(key, apply, () => runtime.state === 'unloaded'
+      ? Promise.resolve() : runtime.prepareGraphics?.() ?? Promise.resolve(),
+      resourceKey === undefined ? undefined : {key:resourceKey, prepare:() => {
+        if (runtime.state === 'unloaded' || resourceKey === 'no-transmission') return Promise.resolve();
+        return runtime.prepareRenderResources?.(this.renderedInterpolationAlpha, {
+          fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,stepsThisFrame:0,
+          interpolationAlpha:this.renderedInterpolationAlpha,droppedSimulationTimeSeconds:0,renderFps:0,
+        }) ?? runtime.prepareGraphics?.() ?? Promise.resolve();
+      }});
+  }
+  async prepareInitialGraphics(): Promise<void> {
+    const runtime = this.runtime;
+    const generation = this.graphicsOwnerGeneration;
+    let prepared = false;
+    this.initialPreparationPending = true;
+    try {
+      await runtime.prepareGraphics?.();
+      if (this.disposed || runtime !== this.runtime || generation !== this.graphicsOwnerGeneration) return;
+      this.graphicsPreparation.adoptPrepared();
+      prepared = true;
+    } finally {
+      if (generation === this.graphicsOwnerGeneration) {
+        this.initialPreparationPending = false;
+        if (prepared && !this.disposed && runtime === this.runtime) this.flushGraphicsSettings();
+        else this.queuedGraphics = undefined;
+      }
+    }
+  }
+  private flushGraphicsSettings(): void {
+    const request = this.queuedGraphics; this.queuedGraphics = undefined;
+    if (request) this.applyGraphicsSettings(request.key, request.apply, request.resourceKey);
+  }
   restartLevel(): void {
     if (this.transitionFailed) throw new Error('Cannot restart after a failed level transition.');
+    if (this.graphicsPreparation.pending) {
+      const runtime = this.runtime, generation = this.graphicsOwnerGeneration;
+      void this.graphicsPreparation.settled.then(() => {
+        if (!this.disposed && runtime === this.runtime && generation === this.graphicsOwnerGeneration && !this.graphicsPreparation.pending) runtime.restartLevel();
+      });
+      return;
+    }
     this.runtime.restartLevel();
   }
   unload(): void {
+    ++this.graphicsOwnerGeneration; this.initialPreparationPending = false;
+    this.queuedGraphics = undefined;
+    this.resumeAfterGraphics = false; this.graphicsPreparation.cancel();
     this.cancelPendingTransition();
     this.runtime.unload();
   }
@@ -81,11 +147,11 @@ export class GameSessionCoordinator {
   }
 
   fixedUpdate(deltaSeconds: number): void {
-    if (!this.transitionPending && !this.transitionFailed) this.runtime.fixedUpdate(deltaSeconds);
+    if (!this.transitionPending && !this.transitionFailed && !this.graphicsPreparation.pending) this.runtime.fixedUpdate(deltaSeconds);
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
-    if (this.transitionPending || this.transitionFailed) return;
+    if (this.transitionPending || this.transitionFailed || this.graphicsPreparation.pending) return;
     // The browser loop keeps ticking behind menus. Reusing its changing alpha
     // against frozen physics snapshots makes paused bodies and morphs oscillate.
     if (this.runtime.state === 'running') this.renderedInterpolationAlpha = interpolationAlpha;
@@ -109,6 +175,9 @@ export class GameSessionCoordinator {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    ++this.graphicsOwnerGeneration;
+    this.queuedGraphics = undefined;
+    this.resumeAfterGraphics = false; this.graphicsPreparation.cancel();
     this.cancelPendingTransition();
     this.unbindRuntime();
     this.runtime.dispose();
@@ -135,6 +204,13 @@ export class GameSessionCoordinator {
   }
 
   private onLevelCompleted(nextLevelId: string): void {
+    if (this.graphicsPreparation.pending) {
+      const runtime = this.runtime;
+      void this.graphicsPreparation.settled.then(() => {
+        if (!this.disposed && runtime === this.runtime && !this.graphicsPreparation.pending) this.onLevelCompleted(nextLevelId);
+      });
+      return;
+    }
     if (
       (nextLevelId !== 'level-2' && nextLevelId !== 'level-3') ||
       this.transitionPending || this.transitionFailed || this.disposed
@@ -236,6 +312,8 @@ export class GameSessionCoordinator {
       const complete = () => {
         if (!this.isCurrentTransition(transitionGeneration)) return;
         this.transitionPending = false;
+        this.graphicsPreparation.adoptPrepared();
+        this.flushGraphicsSettings();
         this.events.emit('transitionCompleted', { levelId: target });
       };
       const preparation = nextRuntime.preparePresentation?.();

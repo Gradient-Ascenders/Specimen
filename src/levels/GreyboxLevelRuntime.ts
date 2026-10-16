@@ -45,6 +45,7 @@ import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { prepareCharacterCameraFades } from '../render/slime/PrepareCharacterCameraFades.ts';
+import { requiresTransmissionPreparation } from '../render/TransmissionPreparation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { createPrewarmResourceBatches, renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
 import { ProgramBindingPrewarm } from '../render/ProgramBindingPrewarm.ts';
@@ -418,6 +419,10 @@ export class GreyboxLevelRuntime {
     this.lifecycle.start();
   }
 
+  async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
+    this.renderLayer.prepareRenderResources(() => this.render(alpha, stats));
+  }
+
   /** The app intro owns time/camera; gameplay only retains its visual aftermath. */
   completeOpening(): void {
     this.openingCompleted = true;
@@ -431,6 +436,19 @@ export class GreyboxLevelRuntime {
   }
 
   /** Precompile Containment signatures and prime known cold resources while loading. */
+  async prepareGraphics(): Promise<void> {
+    const previous = new Set(this.depthPrewarmGroups);
+    this.lightingPrewarmPromise = undefined;
+    try { await this.prepareLightingPrograms(); }
+    finally {
+      for (const batch of previous) if (!this.compilingDepthGroups.has(batch)) {
+        batch.dispose();
+        const index = this.depthPrewarmGroups.indexOf(batch);
+        if (index !== -1) this.depthPrewarmGroups.splice(index, 1);
+      }
+    }
+  }
+
   prepareLightingPrograms(): Promise<void> {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
@@ -1904,7 +1922,7 @@ export class GreyboxLevelRuntime {
             // target without canvas tone mapping. Warm that program variant
             // too, even when a surface misses the hidden boot camera frustum.
             const opaqueSubset = new THREE.Group();
-            for (const source of compileSubset.children) {
+            for (const source of requiresTransmissionPreparation(this.renderLayer.scene) ? compileSubset.children : []) {
               if (!isRenderableObject(source)) continue;
               const materials = (
                 Array.isArray(source.material)
@@ -2130,12 +2148,16 @@ export class GreyboxLevelRuntime {
       // with a first-frame allocation. Copy/restore its pose synchronously.
       await this.yieldPreparation?.();
       if (!isCurrent()) return;
-      const gameplayViewport = renderer.getViewport(new THREE.Vector4());
+      const gameplayViewport = this.renderLayer.getGameplayPrewarmViewport(new THREE.Vector4());
+      const gameplayTransmissionScale = renderer.transmissionResolutionScale;
       const savedCamera = camera.clone();
       try {
         camera.copy(prewarmCamera);
         withIsolatedPrewarmState(renderer, () => {
           renderer.setViewport(gameplayViewport);
+          // Isolation defaults to scale 1 for its tiny primers. This full-size
+          // retained-camera target must match the selected gameplay profile.
+          renderer.transmissionResolutionScale = gameplayTransmissionScale;
           this.renderLayer.withShadowPreparation(true, () =>
             renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, camera,
               createRoomPrewarmSources(resources, 1), { includeHidden: true }));

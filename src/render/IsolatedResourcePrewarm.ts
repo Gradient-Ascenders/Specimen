@@ -20,6 +20,40 @@ export function createPrewarmResourceBatches(
   return batches;
 }
 
+/** Exercise transmissive screen programs through the retained scene/camera so
+ * Three reuses its live transmission target rather than leaking one per proxy
+ * scene. Caller supplies cloned bounded lights/maps and suppresses shadow work.
+ * This is a real draw, including lazy inspection and vertex bindings. */
+export function renderIsolatedConfiguration(
+  renderer: THREE.WebGLRenderer, liveScene: THREE.Scene, camera: THREE.Camera,
+  preparedScene: THREE.Scene, resources: readonly THREE.Object3D[],
+): void {
+  const cameraMask = camera.layers.mask;
+  const masks = new Map<THREE.Object3D, number>();
+  const remember = (object: THREE.Object3D): void => { masks.set(object, object.layers.mask); };
+  liveScene.traverse(object => {
+    remember(object); object.layers.disable(ISOLATED_RESOURCE_PREWARM_LAYER);
+  });
+  preparedScene.traverse(object => {
+    if (!(object instanceof THREE.Light)) return;
+    remember(object);
+    const selected = object.layers.test(camera.layers);
+    object.layers.mask = 0;
+    if (selected) object.layers.enable(ISOLATED_RESOURCE_PREWARM_LAYER);
+  });
+  for (const resource of resources) {
+    resource.traverse(object => { remember(object); object.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER); });
+    preparedScene.add(resource);
+  }
+  liveScene.add(preparedScene); camera.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
+  try { renderer.render(liveScene, camera); }
+  finally {
+    camera.layers.mask = cameraMask; preparedScene.removeFromParent();
+    for (const resource of resources) resource.removeFromParent();
+    for (const [object, mask] of masks) object.layers.mask = mask;
+  }
+}
+
 /** Restore synchronously, even when action returns a pending compilation. */
 export function withIsolatedPrewarmState<T>(
   renderer: THREE.WebGLRenderer,

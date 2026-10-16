@@ -155,3 +155,19 @@ test('cheap frame snapshots record profile/quality and actual drawing buffer wit
   assert.equal(snapshot.gelRenderingMode, 'minimum'); assert.equal(snapshot.shadowMapSizeCap, 512);
   assert.deepEqual([snapshot.drawingBufferWidth, snapshot.drawingBufferHeight], [1280, 720]);
 });
+
+test('gameplay primer viewport uses future physical dimensions without resizing the cinematic', () => {
+  const layer = Object.create(RenderLayer.prototype) as any;
+  layer.host = {clientWidth:1920, clientHeight:1080}; layer.hostWindow = {devicePixelRatio:2};
+  layer.graphicsSettings = {...GRAPHICS_PROFILES.standard.settings, renderScale:0.75};
+  layer.effectivePixelRatioCap = 1.5; layer.maximumWidth = 16384; layer.maximumHeight = 16384;
+  // The bounded cinematic owns a 1x renderer; deriving from its current viewport
+  // would underprepare high-DPI gameplay and overprepare a reduced render scale.
+  layer.renderer = {getPixelRatio:()=>1, transmissionResolutionScale:0.5};
+  const size = resolveRenderResolution(1920,1080,2,{pixelRatioCap:1.5,renderScale:0.75,
+    pixelBudget:GRAPHICS_PROFILES.standard.pixelBudget,minimumDrawingBufferDimension:2});
+  const viewport = layer.getGameplayPrewarmViewport(new THREE.Vector4());
+  assert.deepEqual(viewport.toArray(),[0,0,size.drawingBufferWidth,size.drawingBufferHeight]);
+  // No setSize/setViewport method exists on this spy: deriving dimensions must
+  // not clear the visible cinematic or allocate another camera/render target.
+});
