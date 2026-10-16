@@ -9,8 +9,8 @@ import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
-for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
-  const mode = variant === 'startup-minimum' ? 'startup' : variant;
+for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
+  const mode = variant === 'startup-minimum' || variant.startsWith('current-dark') ? 'startup' : variant;
   const fail = mode === 'failure';
   const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
@@ -321,6 +321,47 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum'])
     for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
     if (!fail) assert.equal(captiveUploaded, true, 'non-casting captive gel uploads its geometry and morphs before first use');
+    if (variant.startsWith('current-dark')) {
+      preview.updatePresentationVisibility({z:4}, {z:4}); lighting.sync(scene);
+      assert.equal(queue.requireCurrent(false), true, 'the matching bright configuration is already prepared');
+      const extra = new THREE.SpotLight(); scene.add(extra);
+      // A different visible light signature prevents legitimate bright/dark
+      // subset reuse, so the dark demand really needs asynchronous preparation.
+      assert.equal(queue.requireCurrent(true), false);
+      const rendererState = () => ({viewport:viewport.toArray(),scissor:scissor.toArray(),scissorTest,
+        transmission:(renderer as any).transmissionResolutionScale,shadow:{...renderer.shadowMap}});
+      const savedState = rendererState(), before = compiles;
+      holdNextCompile = true; releaseCompile = undefined;
+      let settled = false;
+      const ready = queue.prepareCurrent(true).then(() => {settled=true;});
+      try {
+        const deadline = performance.now()+5000;
+        while (!releaseCompile && !settled && performance.now()<deadline) await new Promise(resolve=>setTimeout(resolve,0));
+        assert.ok(releaseCompile, 'dark preparation must reach a real asynchronous compiler step instead of returning bright readiness');
+        assert.equal(settled,false); assert.equal(queue.diagnostics.pending,true);
+        assert.deepEqual(rendererState(),savedState,'restore renderer/light state before awaiting the driver');
+        // A timer must run while compilation is held: no synchronous retry or
+        // microtask-only resource-preparation loop may starve the driver.
+        await new Promise(resolve=>setTimeout(resolve,0));
+        assert.equal(settled,false);
+        if (variant === 'current-dark-cancel') queue.dispose();
+        releaseCompile!(); await ready;
+        if (variant === 'current-dark-cancel') {
+          assert.equal(queue.diagnostics.pending,false,'late completion cannot re-arm a disposed queue');
+          assert.equal(preview.workload.prepared.size,0); assert.equal(preview.workload.preparing.size,0);
+        } else {
+          assert.equal(queue.requireCurrent(true),true,'prepare the actual dark demand');
+          assert.equal(queue.diagnostics.pending,false); assert.ok(compiles>before);
+          const completed = compiles;
+          await queue.prepareCurrent(true);
+          assert.equal(compiles,completed,'ready dark configuration does not repeat shader work');
+        }
+        assert.deepEqual(rendererState(),savedState);
+      } finally {
+        releaseCompile?.(); await ready;
+        extra.removeFromParent(); lighting.restore();
+      }
+    }
     if (variant === 'startup') {
       preview.workload.clearPreparation();
       const replacement = new CultivationPreparationQueue(layer, preview);

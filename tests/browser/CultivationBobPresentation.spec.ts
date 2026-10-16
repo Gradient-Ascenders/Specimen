@@ -805,3 +805,89 @@ test('Cultivation retained shaders match early-zero controls for Bob and Goop ro
   }
   expect(errors).toEqual([]);
 });
+
+test('dark-room graphics preparation awaits the pending configuration when bright is ready', async ({page},info) => {
+  test.setTimeout(600_000);
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  page.on('console',message=>{if(message.type()==='error'||/GL_INVALID_|CONTEXT_LOST_WEBGL/.test(message.text()))errors.push(message.text());});
+  await exposeCultivationRuntime(page); await enterCultivation(page); await prepareGraphics(page,'normal');
+  await page.evaluate(async()=>{
+    const rt=(window as any).__specimenCultivationRuntime,session=(window as any).__specimenSession,queue=rt.preparationQueue;
+    const layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
+    rt.stop(); rt.teleportToAuthoredPreviewRoom(5);
+    const stats={fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,stepsThisFrame:0,
+      interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60};
+    while(queue.busy)await new Promise(requestAnimationFrame);
+    rt.render(1,stats);
+    while(queue.busy)await new Promise(requestAnimationFrame);
+    const visible=queue.roots.map((root:any)=>root.visible);
+    const matches=(config:any)=>config.visible.every((value:boolean,i:number)=>value===visible[i]);
+    const dark=queue.configurations.find((config:any)=>matches(config)&&config.dark);
+    if(!dark?.ready||!rt.resources.scene.root.userData.darkRoomLighting)throw Error('Expected prepared actual Room 5 dark gameplay');
+    queue.requireCurrent(false);
+    const bright=queue.configurations.find((config:any)=>matches(config)&&!config.dark);
+    // Simulate an earlier bright configuration with a different prepared light
+    // signature. GPU programs stay intact; only readiness metadata is invalidated.
+    // This prevents legitimate subset reuse from masking the selection bug.
+    for(const config of queue.configurations)if(config.ready)config.lightingKey='review-earlier-light-layout';
+    bright.ready=true;dark.ready=false;
+    const evidence=rt.__darkPreparation={arguments:[],resourceRenders:0,timerTurns:0,live:[],gates:[],queueRetained:false};
+    const prototype=Object.getPrototypeOf(queue),prepareCurrent=prototype.prepareCurrent;
+    prototype.prepareCurrent=function(dark:boolean){evidence.arguments.push(dark);return prepareCurrent.call(this,dark);};
+    const compile=renderer.compileAsync;
+    renderer.compileAsync=async function(...args:any[]){
+      const pending=compile.apply(this,args);
+      await new Promise<void>(resolve=>setTimeout(()=>{evidence.timerTurns++;resolve();},0));
+      return pending;
+    };
+    const render=rt.render;
+    rt.render=function(...args:any[]){
+      if(this.preparingRenderResources&&++evidence.resourceRenders>3)throw Error('Dark demand retried without awaiting preparation');
+      return render.apply(this,args);
+    };
+    const draw=layer.render,originals=new Map<string,any>();let current:any;
+    for(const method of ['getProgramInfoLog','getShaderInfoLog','texImage2D','texStorage2D','renderbufferStorage','renderbufferStorageMultisample']){
+      const original=gl[method];originals.set(method,original);
+      gl[method]=function(...args:any[]){if(current)current.calls.push(method);return original.apply(this,args);};
+    }
+    layer.render=function(...args:any[]){
+      const row=rt.state==='running'?{at:performance.now(),calls:[],newPrograms:0,error:0}:undefined;
+      const before=renderer.info.programs.length;current=row;
+      try{return draw.apply(this,args);}finally{current=undefined;if(row){row.newPrograms=renderer.info.programs.length-before;row.error=gl.getError();evidence.live.push(row);}}
+    };
+    const unsubscribe=session.events.on('graphicsPreparationChanged',(state:any)=>evidence.gates.push({...state}));
+    rt.__finishDarkPreparation=()=>{
+      prototype.prepareCurrent=prepareCurrent;renderer.compileAsync=compile;rt.render=render;layer.render=draw;unsubscribe();
+      for(const [method,original]of originals)gl[method]=original;
+    };
+    rt.start();
+    session.applyGraphicsSettings('transmissive-gel',()=>layer.setGraphicsSettings({...layer.graphicsSettings,gelRenderingMode:'reduced-transmission'}),'review-dark-half');
+    await session.graphicsPreparation.settled;
+    if(session.graphicsPreparation.pending)throw session.graphicsPreparation.failure??Error('Preparation remained pending');
+    evidence.queueRetained=rt.preparationQueue===queue;
+    evidence.darkReady=dark.ready;evidence.brightReady=bright.ready;evidence.pending=queue.diagnostics.pending;
+  });
+  await page.waitForFunction(()=>(window as any).__specimenCultivationRuntime.__darkPreparation.live.length>=12);
+  for(const [key,mode]of [['opaque-gel','minimum'],['transmissive-gel','physical']]){
+    const before=await page.evaluate(async({key,mode})=>{
+      const rt=(window as any).__specimenCultivationRuntime,session=(window as any).__specimenSession,layer=rt.renderLayer;
+      const before=rt.__darkPreparation.live.length;
+      session.applyGraphicsSettings(key,()=>layer.setGraphicsSettings({...layer.graphicsSettings,gelRenderingMode:mode}),mode==='minimum'?'no-transmission':'review-dark-full');
+      await session.graphicsPreparation.settled;
+      if(session.graphicsPreparation.pending)throw session.graphicsPreparation.failure??Error('Shader preparation remained pending');
+      return before;
+    },{key,mode});
+    await page.waitForFunction(before=>(window as any).__specimenCultivationRuntime.__darkPreparation.live.length>=before+12,before);
+  }
+  const evidence=await page.evaluate(()=>{const rt=(window as any).__specimenCultivationRuntime;rt.__finishDarkPreparation();return rt.__darkPreparation;});
+  await info.attach('dark-room-preparation',{body:JSON.stringify({evidence,errors},null,2),contentType:'application/json'});
+  expect(evidence.brightReady).toBe(true);expect(evidence.darkReady).toBe(true);expect(evidence.pending).toBe(false);
+  expect(evidence.arguments.length).toBeGreaterThanOrEqual(3);
+  expect(evidence.arguments.every((dark:boolean)=>dark===true)).toBe(true);
+  expect(evidence.resourceRenders).toBeLessThanOrEqual(3);expect(evidence.timerTurns).toBeGreaterThan(0);
+  expect(evidence.queueRetained).toBe(true);
+  expect(evidence.gates.map((gate:any)=>gate.pending)).toEqual([true,false,true,false,true,false]);
+  for(const frame of evidence.live){expect(frame.newPrograms).toBe(0);expect(frame.calls).toEqual([]);expect(frame.error).toBe(0);}
+  expect(errors).toEqual([]);
+});
