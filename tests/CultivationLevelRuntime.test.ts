@@ -1,12 +1,26 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import * as THREE from 'three';
 
+import { CULTIVATION_LEVEL_DEBUG_SUPPORT } from '../src/debug/CultivationLevelDebug.ts';
 import type { Input } from '../src/core/Input.ts';
 import { CultivationLevelRuntime } from '../src/levels/CultivationLevelRuntime.ts';
 import { CultivationRoomFiveController } from '../src/levels/CultivationRoomFiveController.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
+
+test('ordinary production requires the baked authored assets before construction', () => {
+  assert.throws(() => new CultivationLevelRuntime({
+    host: { dataset: {} } as unknown as HTMLElement,
+    input: {} as Input,
+    renderLayer: {} as RenderLayer,
+    progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
+    window: new EventTarget() as unknown as Window,
+    debugAvailable: false,
+    authoredAssets: undefined!,
+  }), /authored assets must be loaded/);
+});
 
 test('failed Cultivation construction rolls back attached resources', () => {
   const scene = new THREE.Scene();
@@ -38,6 +52,7 @@ test('failed Cultivation construction rolls back attached resources', () => {
   } as unknown as Input;
   const host = { dataset: {} } as unknown as HTMLElement;
   const runtime = new CultivationLevelRuntime({
+    authoredAssets: cultivationAssets,
     host,
     input,
     renderLayer,
@@ -61,7 +76,7 @@ test('failed Cultivation construction rolls back attached resources', () => {
   assert.equal(scene.children.length, 0);
 });
 
-test('Level 2 zero shortcut works without debug preview and is one-shot', () => {
+test('Level 2 zero shortcut is debug-only and one-shot', () => {
   const inputStates: boolean[] = [];
   const input = {
     enabled: true,
@@ -69,12 +84,14 @@ test('Level 2 zero shortcut works without debug preview and is one-shot', () => 
     releasePointerLock: () => undefined,
   } as unknown as Input;
   const runtime = new CultivationLevelRuntime({
+    authoredAssets: cultivationAssets,
     host: { dataset: {} } as unknown as HTMLElement,
     input,
     renderLayer: { scene: new THREE.Scene() } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
     window: new EventTarget() as unknown as Window,
-    debugAvailable: false,
+    debugAvailable: true,
+    debugSupport: CULTIVATION_LEVEL_DEBUG_SUPPORT,
   });
   let unlocked = false;
   let emitted: unknown;
@@ -96,7 +113,7 @@ test('Level 2 zero shortcut works without debug preview and is one-shot', () => 
     },
     pair: { bobBody: { position: new THREE.Vector3(1, 2, 3) } },
     voltBody: { recoverAt(position: THREE.Vector3) { assert.deepEqual(position.toArray(), [1, 2, 3]); } },
-    voltVisual: { visible: false },
+    voltPresentation: { reset() {}, setPosition() {}, setVisible() {} },
   };
   runtime.events.on('completed', (event) => { emitted = event; });
   let prevented = false;
@@ -104,6 +121,12 @@ test('Level 2 zero shortcut works without debug preview and is one-shot', () => 
     code: 'Numpad0', repeat: false, target: null,
     preventDefault: () => { prevented = true; },
   } as unknown as KeyboardEvent;
+  (runtime as unknown as { debugAvailable: boolean }).debugAvailable = false;
+  internals.onSkipToLevelThree(keyEvent);
+  assert.equal(unlocked, false);
+  assert.equal(prevented, false);
+  assert.deepEqual(inputStates, []);
+  (runtime as unknown as { debugAvailable: boolean }).debugAvailable = true;
   internals.onSkipToLevelThree(keyEvent);
   internals.onSkipToLevelThree(keyEvent);
 
@@ -117,6 +140,7 @@ test('final lever hands off to Level 3 once Volt is released and unlocked, witho
   let enabled = true, unlocked = false, registered = false, transitions = 0;
   const input = { setEnabled(value: boolean) { enabled = value; }, releasePointerLock() {} } as unknown as Input;
   const runtime = new CultivationLevelRuntime({
+    authoredAssets: cultivationAssets,
     host: { dataset: {} } as unknown as HTMLElement, input,
     renderLayer: { scene: new THREE.Scene() } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop'], activeSlimeId: 'bob' },
@@ -137,7 +161,7 @@ test('final lever hands off to Level 3 once Volt is released and unlocked, witho
       getRosterState: () => [], activeSlimeId: 'bob',
     },
     voltBody: { recoverAt(position: THREE.Vector3) { assert.deepEqual(position.toArray(), [0, 2.65, 64]); } },
-    voltVisual: { visible: false },
+    voltPresentation: { reset() {}, setPosition() {}, setVisible() {} },
   };
   const internals = runtime as unknown as {
     resources: typeof resources; authoredPreviewProgression: { roomId: number };

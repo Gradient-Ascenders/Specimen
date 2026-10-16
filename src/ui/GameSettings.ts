@@ -1,20 +1,22 @@
+import type { GelRenderingMode } from '../render/slime/GelRendering.ts';
+import { DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_PROFILES, type GraphicsProfileId, type GraphicsSettings } from '../render/GraphicsProfiles.ts';
 import {
   DEFAULT_CAMERA_RIG_CONFIG,
   MAX_FOLLOW_DISTANCE_METRES,
   MIN_FOLLOW_DISTANCE_METRES,
 } from '../render/CameraRig.ts';
 import {
-  DEFAULT_RENDER_PIXEL_RATIO_CAP,
   type RenderPixelRatioCap,
+  type RenderScale,
 } from '../render/RenderResolution.ts';
+import type { GraphicsPreset } from '../render/GraphicsQuality.ts';
 
-export interface GameSettingsSnapshot {
+export interface GameSettingsSnapshot extends GraphicsSettings {
   readonly mouseSensitivity: number;
   readonly invertVerticalLook: boolean;
   readonly masterVolume: number;
   readonly soundEffectsVolume: number;
   readonly cameraDistanceMetres: number;
-  readonly renderPixelRatioCap: RenderPixelRatioCap;
 }
 
 export type GameSettingsListener = (
@@ -22,12 +24,12 @@ export type GameSettingsListener = (
 ) => void;
 
 export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
+  ...DEFAULT_GRAPHICS_SETTINGS,
   mouseSensitivity: 1,
   invertVerticalLook: false,
   masterVolume: 1,
   soundEffectsVolume: 0.8,
   cameraDistanceMetres: DEFAULT_CAMERA_RIG_CONFIG.followDistanceMetres,
-  renderPixelRatioCap: DEFAULT_RENDER_PIXEL_RATIO_CAP,
 };
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
@@ -68,8 +70,25 @@ export class GameSettings {
     });
   }
 
+  setGelRenderingMode(value: GelRenderingMode): void {
+    this.update({ gelRenderingMode: value });
+  }
+
+  setGraphicsProfile(value: GraphicsProfileId): void {
+    // One atomic notification; do not briefly render mixed preset settings.
+    this.update(GRAPHICS_PROFILES[value].settings);
+  }
+
+  setRenderScale(value: RenderScale): void {
+    this.update({ renderScale: value });
+  }
+
   setRenderPixelRatioCap(value: RenderPixelRatioCap): void {
     this.update({ renderPixelRatioCap: value });
+  }
+
+  setGraphicsPreset(value: GraphicsPreset): void {
+    this.update({ graphicsPreset: value });
   }
 
   subscribe(listener: GameSettingsListener): () => void {
@@ -81,12 +100,16 @@ export class GameSettings {
   private update(patch: Partial<GameSettingsSnapshot>): void {
     const next = { ...this.current, ...patch };
     if (
+      next.gelRenderingMode === this.current.gelRenderingMode &&
+      next.graphicsProfile === this.current.graphicsProfile &&
+      next.renderScale === this.current.renderScale &&
       next.mouseSensitivity === this.current.mouseSensitivity &&
       next.invertVerticalLook === this.current.invertVerticalLook &&
       next.masterVolume === this.current.masterVolume &&
       next.soundEffectsVolume === this.current.soundEffectsVolume &&
       next.cameraDistanceMetres === this.current.cameraDistanceMetres &&
-      next.renderPixelRatioCap === this.current.renderPixelRatioCap
+      next.renderPixelRatioCap === this.current.renderPixelRatioCap &&
+      next.graphicsPreset === this.current.graphicsPreset
     ) {
       return;
     }

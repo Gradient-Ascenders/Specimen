@@ -28,3 +28,6 @@ Thumbs.db
 
 # Character generator caches
 assets/characters/**/__pycache__/
+
+# Legacy local Volt studio/review captures; new captures use artifacts/.
+assets/characters/volt/evidence/

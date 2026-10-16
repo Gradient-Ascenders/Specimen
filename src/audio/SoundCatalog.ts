@@ -56,5 +56,18 @@ export const SOUND_DEFINITIONS = {
   'specimen-turret-shot': { path: 'assets/audio/turrets/specimen-turret-shot.ogg', loop: false, volume: 0.65, maxVoices: 3 },
 } as const;
 export type SoundId = keyof typeof SOUND_DEFINITIONS;
+const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
+// Cultivation rescues Volt but does not expose his electrical ability. Its
+// combat rooms already use the shared turret cue, so that must not wait for L3.
+const CULTIVATION_VOLT_SOUNDS: readonly SoundId[] = [
+  'volt-jump-01', 'volt-land-01', 'volt-land-hard-01',
+  'volt-movement-loop-01', 'volt-idle-sparks-loop-01', 'volt-respawn-01',
+];
+/** Cumulative banks start warming ahead of each level's visual preparation. */
+export const SOUND_BANKS = {
+  containment: ALL_SOUND_IDS.filter(id => id.startsWith('bob-') || id.startsWith('goop-')),
+  cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-') || CULTIVATION_VOLT_SOUNDS.includes(id)),
+  blackout: ALL_SOUND_IDS,
+} as const;
 export interface SoundDefinition { readonly path: string; readonly loop: boolean; readonly volume: number; readonly maxVoices: number }
 export const soundUrl = (id: SoundId, base = "./"): string => `${base}${SOUND_DEFINITIONS[id].path}`;

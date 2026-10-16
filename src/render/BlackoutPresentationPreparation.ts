@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import type { RenderLayer } from './RenderLayer.ts';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
-import { copyPrewarmMaterial, createShadowPrewarmMaterial } from './ShadowPrewarmMaterial.ts';
+import { copyPrewarmMaterial, createShadowPrewarmMaterial, clonePrewarmDrawable } from './ShadowPrewarmMaterial.ts';
 
 /** Blackout has one retained light signature through power, switching and merge.
  * Prepare hidden forms and caster passes without advancing encounter authority. */
 export class BlackoutPresentationPreparation {
   readonly diagnostics = { durationMs: 0, visibleVariants: 0, shadowVariants: 0, programsAfter: 0 };
   private readonly materials: THREE.Material[] = [];
-  private readonly instances: THREE.InstancedMesh[] = [];
+  private readonly instanceDisposers: (() => void)[] = [];
   private readonly target = new THREE.WebGLRenderTarget(1, 1);
   private disposed = false;
   private busy = false;
@@ -26,12 +26,11 @@ export class BlackoutPresentationPreparation {
     const hasDepth = shadowScene.children.some(o => o instanceof THREE.Light && o.castShadow && !(o instanceof THREE.PointLight));
     const point = shadowScene.children.find(o => o instanceof THREE.PointLight && o.castShadow);
     const clone = (source: THREE.Mesh | THREE.Line | THREE.Points | THREE.Sprite, material: THREE.Material) => {
-      const proxy = source.clone(false) as typeof source;
+      const proxy = clonePrewarmDrawable(source, this.instanceDisposers) as typeof source;
       source.updateWorldMatrix(true, false);
       proxy.matrix.copy(source.matrixWorld); proxy.matrixAutoUpdate = false;
       proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;
       proxy.material = material;
-      if (proxy instanceof THREE.InstancedMesh) this.instances.push(proxy);
       return proxy;
     };
     layer.scene.traverse(object => {
@@ -50,7 +49,7 @@ export class BlackoutPresentationPreparation {
           const back = copyPrewarmMaterial(copy); back.side = THREE.BackSide; back.forceSinglePass = true;
           this.materials.push(back); visible.add(clone(object, back));
         }
-        if (!(object instanceof THREE.Mesh) || !object.castShadow) continue;
+        if (!(object instanceof THREE.Mesh) || !(object.castShadow || object.userData.characterShadowCaster)) continue;
         for (const distance of [false, true]) {
           if (distance ? !point : !hasDepth) continue;
           const shadow = createShadowPrewarmMaterial(object, material, distance);
@@ -106,8 +105,8 @@ export class BlackoutPresentationPreparation {
     if (this.released) return;
     this.released = true;
     for (const material of this.materials) material.dispose();
-    for (const instance of this.instances) instance.dispose();
-    this.materials.length = 0; this.instances.length = 0;
+    for (const dispose of this.instanceDisposers) dispose();
+    this.materials.length = 0; this.instanceDisposers.length = 0;
     this.target.dispose();
   }
 }

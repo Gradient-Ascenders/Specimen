@@ -14,15 +14,24 @@ export function withIsolatedPrewarmState<T>(
   const previousTarget = renderer.getRenderTarget();
   const face = renderer.getActiveCubeFace();
   const mip = renderer.getActiveMipmapLevel();
+  const transmissionResolutionScale = renderer.transmissionResolutionScale;
+  // setRenderTarget restores the viewport with floor(), unlike setViewport's
+  // round(). Keep at least one physical pixel after either path at low DPR.
+  const span = Math.max(1, Math.ceil(1 / (renderer.getPixelRatio?.() ?? 1)));
+  const origin = target ? 0 : -2 * span;
   // frame is an internal upload-generation key; it must remain monotonic.
   const { calls, triangles, points, lines } = renderer.info.render;
   try {
+    // Primers use a one-pixel viewport. Fractional transmission scale would
+    // round the internal transmission framebuffer down to zero pixels.
+    renderer.transmissionResolutionScale = 1;
     if (target) renderer.setRenderTarget(target);
-    renderer.setViewport(target ? 0 : -2, target ? 0 : -2, 1, 1);
-    renderer.setScissor(target ? 0 : -2, target ? 0 : -2, 1, 1);
+    renderer.setViewport(origin, origin, span, span);
+    renderer.setScissor(origin, origin, span, span);
     renderer.setScissorTest(true);
     return action();
   } finally {
+    renderer.transmissionResolutionScale = transmissionResolutionScale;
     renderer.setRenderTarget(previousTarget, face, mip);
     renderer.setViewport(viewport);
     renderer.setScissor(scissor);

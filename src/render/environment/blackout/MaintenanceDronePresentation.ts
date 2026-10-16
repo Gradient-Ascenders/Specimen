@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { markDecorativeEffect } from '../../GraphicsResourcePolicy.ts';
 import { disposeShadowLight, setShadowMapUpdatesActive } from '../../ShadowLightResources.ts';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
@@ -142,6 +143,7 @@ export class MaintenanceDronePresentation {
     this.dustPositions = new Float32Array(30 * 3);
     this.dustGeometry = this.own(new THREE.BufferGeometry());
     this.dustGeometry.setAttribute('position', new THREE.BufferAttribute(this.dustPositions, 3));
+    markDecorativeEffect(this.dustGeometry);
     const dustMat = new THREE.PointsMaterial({ color: 0xd8bd7a, size: .035, transparent: true, opacity: .34, depthWrite: false });
     this.materials.add(dustMat); this.dust = new THREE.Points(this.dustGeometry, dustMat); this.root.add(this.dust);
     this.sparkGeometry = this.own(new THREE.BufferGeometry());

@@ -70,15 +70,35 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   expect([...failures], 'Production console/network errors').toEqual([]);
 });
 
-test('production loads Cultivation and Blackout and restarts each at a nested path', async ({
+test('Performance production loads Cultivation and Blackout and restarts each at a nested path', async ({
   page, baseURL,
 }) => {
   const failures = watchProductionRequests(page, baseURL!);
+  const voltAssets = new Set<string>();
+  const cultivationAssets = new Set<string>();
+  const audioAssets = new Set<string>();
+  const detailAssets = new Set<string>();
+  page.on('response', response => {
+    if (/\/volt-[^/]+\.glb$/.test(new URL(response.url()).pathname) && response.ok()) voltAssets.add(response.url());
+    if (/\/authored-assets-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) cultivationAssets.add(response.url());
+    if (/\/assets\/audio\/.*\.ogg$/.test(new URL(response.url()).pathname) && response.ok()) audioAssets.add(response.url());
+    if (/\/(goop|volt)-lod-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) detailAssets.add(response.url());
+  });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
   const start = page.locator('[data-flow-panel="title"] [data-action="start"]');
   await expect(start).toBeVisible({ timeout: 120_000 });
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
+  await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await start.click();
   await assertPlaying(page);
+  expect([...voltAssets], 'Containment must not load Volt').toEqual([]);
+  expect(cultivationAssets.size, 'Containment must not load the Cultivation bake').toBe(0);
+  await expect.poll(() => audioAssets.size).toBe(34);
+  expect([...audioAssets].some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
+  expect(detailAssets.size).toBe(1);
+  expect([...detailAssets][0]).toContain('/group-folder/assets/goop-lod-');
 
   // Existing debug shortcuts advance progression; this does not solve puzzles.
   // Keep diagnostics hidden and use the normal transition/enter UI.
@@ -89,8 +109,16 @@ test('production loads Cultivation and Blackout and restarts each at a nested pa
     await expect(enterLevel).toContainText(`Enter Level ${level}`);
     await enterLevel.click();
     await assertPlaying(page);
+    await expect.poll(() => audioAssets.size).toBe(level === 2 ? 41 : 54);
+    expect(detailAssets.size).toBe(2);
+    if (level === 2) {
+      expect(cultivationAssets.size, 'Cultivation must load its baked assets before playing').toBe(1);
+      expect([...cultivationAssets][0]).toContain('/group-folder/assets/authored-assets-');
+    }
     await restartFromPause(page);
   }
   await expect(page.locator('[data-slime-id="volt"]')).toHaveAttribute('data-state', 'active');
+  expect(voltAssets.size, 'The shipped authored Volt GLB must load').toBe(1);
+  expect([...voltAssets][0]).toContain('/group-folder/assets/volt-');
   expect([...failures], 'Production transition console/network errors').toEqual([]);
 });

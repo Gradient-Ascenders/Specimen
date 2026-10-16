@@ -1,5 +1,7 @@
 import { AudioManager } from './audio/AudioManager.ts';
+import { SOUND_BANKS } from './audio/SoundCatalog.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
+import { loadCultivationBakedAssets } from './render/environment/cultivation/CultivationBakedAssets.ts';
 import creditsMarkdown from '../CREDITS.md?raw';
 
 import { Input } from './core/Input.ts';
@@ -12,6 +14,7 @@ import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
 import { TitleScreenPresentation } from './ui/TitleScreenPresentation.ts';
+import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -43,7 +46,7 @@ function startGame(): void {
 
   const settings = new GameSettings();
   const audio = new AudioManager(import.meta.env.BASE_URL);
-  void audio.preload();
+  void audio.preload(SOUND_BANKS.containment);
   const unlockAudio = (): void => audio.unlock();
   const focusAudio = (): void => audio.setFocused(!document.hidden && document.hasFocus());
   window.addEventListener('pointerdown', unlockAudio);
@@ -53,9 +56,10 @@ function startGame(): void {
   document.addEventListener('visibilitychange', focusAudio);
   const renderLayer = new RenderLayer({
     host: app,
-    pixelRatioCap: settings.value.renderPixelRatioCap,
+    graphics: settings.value,
   });
   const input = new Input({ pointerLockElement: renderLayer.canvas });
+  renderLayer.canvas.dataset.gameplayCanvas = 'true';
   const debugAvailable =
     import.meta.env.DEV ||
     new URLSearchParams(window.location.search).get('debug') === '1';
@@ -69,11 +73,14 @@ function startGame(): void {
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
-      const [runtimeModule, debugModule] = await Promise.all([
+      // Optional audio must not delay module or authored-asset preparation.
+      void audio.preload(SOUND_BANKS.cultivation);
+      const [runtimeModule, debugModule, authoredAssets] = await Promise.all([
         import('./levels/CultivationLevelRuntime.ts'),
         debugAvailable
           ? import('./debug/CultivationLevelDebug.ts')
           : Promise.resolve(undefined),
+        loadCultivationBakedAssets(new URL('./assets/cultivation/authored-assets.bin', import.meta.url)),
       ]);
       return new runtimeModule.CultivationLevelRuntime({
         host: app,
@@ -83,9 +90,11 @@ function startGame(): void {
         progression,
         debugAvailable,
         debugSupport: debugModule?.CULTIVATION_LEVEL_DEBUG_SUPPORT,
+        authoredAssets,
       });
     },
     createLevelThree: async (progression) => {
+      void audio.preload(SOUND_BANKS.blackout);
       const [runtimeModule, maintenanceMaps] = await Promise.all([
         import('./levels/BlackoutLevelRuntime.ts'),
         loadBlackoutMaintenanceMapData(new URL('./assets/blackout/maintenance-maps.bin', import.meta.url)),
@@ -97,6 +106,7 @@ function startGame(): void {
         renderLayer,
         progression,
         authoredRoomOne: true,
+        debugAvailable,
         maintenanceMaps,
       });
     },
@@ -106,6 +116,13 @@ function startGame(): void {
   });
   const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
   let titlePresentation: TitleScreenPresentation | undefined;
+  let warmedLevelOneProgramBaseline: number | undefined;
+  let levelOneShaderProgramGuardActive = true;
+  let levelOneShaderProgramGuardInvalidation: string | undefined;
+  let sampleLevelOneShaderPrograms: (() => void) | undefined;
+  let performanceRecorder:
+    | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
+    | undefined;
   const gameFlow = new GameFlowUI({
     settings,
     creditsMarkdown,
@@ -135,16 +152,24 @@ function startGame(): void {
         renderLayer.cameraRig.setFollowDistanceMetres(
           nextSettings.cameraDistanceMetres,
         );
-        renderLayer.setPixelRatioCap(nextSettings.renderPixelRatioCap);
+        if (renderLayer.gelRendering.value !== nextSettings.gelRenderingMode) {
+          levelOneShaderProgramGuardActive = false;
+          sampleLevelOneShaderPrograms = undefined;
+          levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
+          performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
+        }
+        renderLayer.setGraphicsSettings(nextSettings);
       },
+      getGraphicsDiagnostics: () => renderLayer.getGraphicsDiagnostics(),
+      subscribeGraphicsDiagnostics: listener => renderLayer.subscribeGraphicsDiagnostics(listener),
     },
   });
-  let warmedLevelOneProgramBaseline: number | undefined;
-  let levelOneShaderProgramGuardActive = true;
-  let sampleLevelOneShaderPrograms: (() => void) | undefined;
-  let performanceRecorder:
-    | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
-    | undefined;
+  const cleanGameplayMode = new CleanGameplayMode({
+    host: app,
+    flow: gameFlow,
+    prepareGameplay: () => gameSession.prepareCleanGameplay(),
+    present: (clean) => renderLayer.setCleanGameplayMode(clean),
+  });
   const unsubscribeTitlePresentation = gameFlow.subscribe((state) => {
     if (state !== 'playing' || warmedLevelOneProgramBaseline !== undefined) return;
     titlePresentation?.dispose();
@@ -212,6 +237,9 @@ function startGame(): void {
         });
         performanceRecorder = recorder;
         loop.setProfiler(recorder);
+        if (levelOneShaderProgramGuardInvalidation) {
+          recorder.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
+        }
         if (
           levelOneShaderProgramGuardActive &&
           warmedLevelOneProgramBaseline !== undefined
@@ -284,6 +312,7 @@ function startGame(): void {
     unsubscribeTitlePresentation();
     titlePresentation?.dispose();
     performanceRecorder?.dispose();
+    cleanGameplayMode.dispose();
     gameFlow.dispose();
     gameSession.dispose();
     audio.dispose();

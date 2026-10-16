@@ -1,0 +1,595 @@
+{
+  "label": "candidate-flame-probe",
+  "url": "http://127.0.0.1:4185/",
+  "recordedAt": "2026-10-15T21:00:24.412Z",
+  "protocol": {
+    "content": "authored Cultivation, production ?debug=1 (#197 unresolved)",
+    "viewport": [
+      960,
+      600
+    ],
+    "dpr": 1,
+    "scope": "frozen full WebGL render, including transmission; ABBA updating/cached/cached/updating shadows; no sustained gameplay claim",
+    "samples": 8
+  },
+  "assets": {
+    "http://127.0.0.1:4185/assets/three.core-YV7fhFn3.js": "bcca9165dc9e5ad298da78d02215dc926cfea8a2e657ada641b814302a7173e3",
+    "http://127.0.0.1:4185/assets/GelElasticMotion-cbJOC4Pt.js": "3fe33f6dd918f39c45c56afbda415aa76013baeb52a6178b9b4e019dbfef1cfb",
+    "http://127.0.0.1:4185/assets/index-1NLz0IeU.js": "6266094441bd5a124dcf9b04a2d3e5f51c0bf314ed7ec13b165fefb1cdd475c6",
+    "http://127.0.0.1:4185/assets/PerformanceFlightRecorder-DiyYl79G.js": "5e79b66cdbf4e98cdde387b9b0d49946e88fb372c214708798f0d69f2f0b5523",
+    "http://127.0.0.1:4185/assets/LevelProgression-BkWMhF_c.js": "12d648718bf3b61171823bf0701ef10c32bcbef60e7a413d67098059931820dd",
+    "http://127.0.0.1:4185/assets/VoltCharacterPresentation-Btw1ef8r.js": "50e2596f991f0464ab78bfe1f96fc123ac60d47352c22248703985b1b4f24698",
+    "http://127.0.0.1:4185/assets/DroneProjectilePresentation-DqJOoxVv.js": "3629792b1071b4d5d87eba7e8836890773c2ddc34530d110609059c6cf135e1c",
+    "http://127.0.0.1:4185/assets/CultivationLevelRuntime-DyyutD5l.js": "0749555d42d0dbdc4cc69d12fea5c5092ae5b150fcc0b589ba8b60bf166077b8",
+    "http://127.0.0.1:4185/assets/CultivationLevelDebug-BSid86uc.js": "7afecda95e105e2469bc80c1eecd6f6c37bcd3901645c3da46a2316ce2a5dbfd"
+  },
+  "loading": {
+    "levelOneReadyMs": 11489.1008,
+    "levelTwoReadyMs": 15316.1858
+  },
+  "poses": [
+    {
+      "name": "route-bob",
+      "camera": [
+        59.5,
+        22,
+        284
+      ],
+      "quaternion": [
+        -0.035729857554919205,
+        0.9497890972129484,
+        0.11800770307202162,
+        0.28757299961954585
+      ],
+      "actor": [
+        51.5,
+        18.36,
+        296
+      ],
+      "character": "bob",
+      "darkBlend": 1,
+      "warmupMs": 41.200000047683716,
+      "beforeWarm": 207,
+      "warmedPrograms": 207,
+      "programsAfter": 207,
+      "budget": {
+        "profile": "maintenance",
+        "pointSlots": 4,
+        "spotSlots": 3,
+        "pointShadowSlots": 1,
+        "spotShadowSlots": 3,
+        "authoredPoints": 16,
+        "authoredSpots": 10,
+        "selectedPoints": 2,
+        "selectedSpots": 2,
+        "zeroRadiance": 1,
+        "outsideView": 13,
+        "scheduledShadowPasses": 2,
+        "selectedNames": [
+          "room-5-platform-booster-spill-0",
+          "room-5-platform-booster-spill-1",
+          "room-5-blue-security-1-search-light",
+          "room-5-green-security-2-search-light"
+        ]
+      },
+      "modes": [
+        {
+          "cachedShadows": false,
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 3
+          },
+          "disjoint": false,
+          "incomplete": 0,
+          "cpu": {
+            "count": 8,
+            "mean": 4.500000059604645,
+            "p50": 4.6000001430511475,
+            "p95": 5
+          },
+          "gpu": {
+            "count": 8,
+            "mean": 2.73585625,
+            "p50": 2.72312,
+            "p95": 3.44725
+          },
+          "raw": {
+            "cpu": [
+              4.800000190734863,
+              4.3999998569488525,
+              5,
+              4.6000001430511475,
+              4.199999809265137,
+              4.1000001430511475,
+              4.6000001430511475,
+              4.300000190734863
+            ],
+            "gpu": [
+              2.22236,
+              3.42522,
+              2.37866,
+              2.72312,
+              2.1932,
+              3.44725,
+              2.22796,
+              3.26908
+            ]
+          }
+        },
+        {
+          "cachedShadows": true,
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 3
+          },
+          "disjoint": false,
+          "incomplete": 0,
+          "cpu": {
+            "count": 8,
+            "mean": 3.6874999701976776,
+            "p50": 3.700000047683716,
+            "p95": 4
+          },
+          "gpu": {
+            "count": 8,
+            "mean": 2.1807649999999996,
+            "p50": 2.18512,
+            "p95": 2.20264
+          },
+          "raw": {
+            "cpu": [
+              4,
+              3.5999999046325684,
+              3.700000047683716,
+              3.6999998092651367,
+              3.5999999046325684,
+              3.5,
+              3.700000047683716,
+              3.700000047683716
+            ],
+            "gpu": [
+              2.141,
+              2.1718,
+              2.20264,
+              2.178,
+              2.18512,
+              2.18784,
+              2.18228,
+              2.19744
+            ]
+          }
+        },
+        {
+          "cachedShadows": true,
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 3
+          },
+          "disjoint": false,
+          "incomplete": 0,
+          "cpu": {
+            "count": 8,
+            "mean": 3.487500011920929,
+            "p50": 3.5,
+            "p95": 3.6000001430511475
+          },
+          "gpu": {
+            "count": 8,
+            "mean": 2.2771375000000003,
+            "p50": 2.19608,
+            "p95": 2.47737
+          },
+          "raw": {
+            "cpu": [
+              3.6000001430511475,
+              3.4000000953674316,
+              3.6000001430511475,
+              3.5999999046325684,
+              3.299999952316284,
+              3.5,
+              3.3999998569488525,
+              3.5
+            ],
+            "gpu": [
+              2.40192,
+              2.18532,
+              2.39333,
+              2.184,
+              2.18616,
+              2.19292,
+              2.47737,
+              2.19608
+            ]
+          }
+        },
+        {
+          "cachedShadows": false,
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 3
+          },
+          "disjoint": false,
+          "incomplete": 0,
+          "cpu": {
+            "count": 8,
+            "mean": 4.025000035762787,
+            "p50": 4,
+            "p95": 4.6000001430511475
+          },
+          "gpu": {
+            "count": 8,
+            "mean": 2.7863625,
+            "p50": 2.80307,
+            "p95": 2.96403
+          },
+          "raw": {
+            "cpu": [
+              4.200000047683716,
+              3.8999998569488525,
+              4.400000095367432,
+              4.6000001430511475,
+              3.700000047683716,
+              3.5999999046325684,
+              3.8000001907348633,
+              4
+            ],
+            "gpu": [
+              2.96403,
+              2.65316,
+              2.87373,
+              2.7356,
+              2.63552,
+              2.80307,
+              2.95718,
+              2.66861
+            ]
+          }
+        }
+      ],
+      "states": [
+        {
+          "power": "red",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 5
+          },
+          "programs": 207,
+          "maps": 6
+        },
+        {
+          "power": "blue",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 4
+          },
+          "programs": 207,
+          "maps": 7
+        },
+        {
+          "power": "green",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 4
+          },
+          "programs": 207,
+          "maps": 7
+        },
+        {
+          "power": "released",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 3
+          },
+          "programs": 207,
+          "maps": 8
+        },
+        {
+          "power": "reset",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 5
+          },
+          "programs": 207,
+          "maps": 8
+        },
+        {
+          "power": "red",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 5
+          },
+          "programs": 207,
+          "maps": 8
+        },
+        {
+          "power": "blue",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 4
+          },
+          "programs": 207,
+          "maps": 8
+        },
+        {
+          "power": "green",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 4
+          },
+          "programs": 207,
+          "maps": 8
+        },
+        {
+          "power": "reset",
+          "counts": {
+            "points": 4,
+            "spots": 3,
+            "pointShadows": 1,
+            "spotShadows": 3,
+            "radiant": 5
+          },
+          "programs": 207,
+          "maps": 8
+        }
+      ],
+      "boosterDiagnostics": [
+        {
+          "name": "room-5-booster-engine-hardware",
+          "material": "MeshStandardMaterial",
+          "drawCalls": 76,
+          "visible": true,
+          "mask": 1,
+          "count": 1,
+          "world": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            64,
+            0,
+            242,
+            1
+          ],
+          "bounds": {},
+          "instance": [],
+          "opacity": 1
+        },
+        {
+          "name": "room-5-booster-engine-hardware",
+          "material": "MeshStandardMaterial",
+          "drawCalls": 76,
+          "visible": true,
+          "mask": 1,
+          "count": 1,
+          "world": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            64,
+            0,
+            242,
+            1
+          ],
+          "bounds": {},
+          "instance": [],
+          "opacity": 1
+        },
+        {
+          "name": "room-5-booster-engine-hardware",
+          "material": "MeshBasicMaterial",
+          "drawCalls": 76,
+          "visible": true,
+          "mask": 1,
+          "count": 1,
+          "world": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            64,
+            0,
+            242,
+            1
+          ],
+          "bounds": {},
+          "instance": [],
+          "opacity": 1
+        },
+        {
+          "name": "room-5-platform-booster-flames",
+          "material": "MeshBasicMaterial",
+          "drawCalls": 38,
+          "visible": true,
+          "mask": 1,
+          "count": 21,
+          "world": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            64,
+            0,
+            242,
+            1
+          ],
+          "bounds": {
+            "center": [
+              -7.019445688382101,
+              14.403204195872998,
+              45.01251867191925
+            ],
+            "radius": 24.90932698004299
+          },
+          "instance": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            -12,
+            8.680000305175781,
+            23,
+            1
+          ],
+          "opacity": 0.8,
+          "time": 0.016666666666666666
+        }
+      ]
+    }
+  ],
+  "lifecycle": {
+    "restarts": [
+      {
+        "programs": 207,
+        "geometries": 815,
+        "textures": 74
+      },
+      {
+        "programs": 207,
+        "geometries": 815,
+        "textures": 74
+      },
+      {
+        "programs": 207,
+        "geometries": 815,
+        "textures": 74
+      }
+    ],
+    "mapsAtUnload": 8,
+    "allMapsReleasedOnce": true
+  },
+  "errors": [],
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+    "gpu": "ANGLE (AMD, AMD Radeon RX 6600 (0x000073FF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "timer": true,
+    "software": false,
+    "buffer": [
+      960,
+      600
+    ],
+    "maxTextureImageUnits": 16,
+    "queue": {
+      "constructionMs": 3200.9000000953674,
+      "initialMs": 3064.600000143051,
+      "startupMs": 11577.800000190735,
+      "workMs": 530.6000001430511,
+      "textureMs": 9.199999332427979,
+      "compileWaitMs": 11215.10000038147,
+      "primeMs": 203.20000004768372,
+      "maxStepMs": 53.30000019073486,
+      "slowSteps": [
+        {
+          "label": "compile",
+          "ms": 20.5,
+          "z": 0,
+          "dark": false
+        },
+        {
+          "label": "compile",
+          "ms": 53.30000019073486,
+          "z": 230,
+          "dark": true
+        },
+        {
+          "label": "transmission-compile",
+          "ms": 28.5,
+          "z": 230,
+          "dark": true
+        }
+      ],
+      "completed": 2,
+      "reused": 0,
+      "total": 12,
+      "pending": false,
+      "configurations": [
+        {
+          "z": 0,
+          "dark": false,
+          "elapsedMs": 3059
+        },
+        {
+          "z": 230,
+          "dark": true,
+          "elapsedMs": 8510.600000143051
+        }
+      ]
+    }
+  }
+}

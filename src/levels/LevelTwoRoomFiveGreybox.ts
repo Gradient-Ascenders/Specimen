@@ -1,4 +1,6 @@
+import type { GelRendering } from '../render/slime/GelRendering.ts';
 import * as THREE from 'three';
+import { VoltCharacterPresentation } from '../render/volt/VoltCharacterPresentation.ts';
 import { RoomFiveVentWaste } from './RoomFiveVentWaste.ts';
 import { addRoomFiveCover } from './RoomFiveCover.ts';
 import { addRoomFiveParkour } from './RoomFiveParkour.ts';
@@ -38,9 +40,12 @@ export class LevelTwoRoomFiveGreybox {
   readonly shortcut: THREE.Mesh;
   private readonly shortcutEntry: THREE.Mesh;
   readonly pod = new THREE.Group();
-  readonly captiveVolt: THREE.Mesh;
+  readonly captiveVolt = new THREE.Group();
+  readonly captiveVoltPresentation: VoltCharacterPresentation;
   readonly brokenCore: THREE.Mesh;
   private readonly glassPanels: THREE.Mesh[] = [];
+  private readonly captiveState = { locomotionPositionWorld: new THREE.Vector3(), velocityWorld: new THREE.Vector3(),
+    movementIntentWorld: new THREE.Vector3(), grounded: true, maximumLocomotionSpeedMetresPerSecond: 5.5 };
   private readonly local = new THREE.Vector3();
   private readonly bobLocal = new THREE.Vector3();
   private readonly goopLocal = new THREE.Vector3();
@@ -52,7 +57,8 @@ export class LevelTwoRoomFiveGreybox {
   private appliedContactOrder = 0;
   readonly sewer: RoomFiveSewer;
   private readonly requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void;
-  constructor(requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void) {
+  constructor(requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void, gelRendering?: GelRendering) {
+    this.captiveVoltPresentation = new VoltCharacterPresentation(undefined, gelRendering);
     this.requestFailure = requestFailure;
     const b = this.builder, m = b.materials;
     const box = (name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material = m.wall, sticky = false) => {
@@ -161,15 +167,15 @@ export class LevelTwoRoomFiveGreybox {
       this.glassPanels.push(podBox(`pod-glass-z-${side}`, [6, 4, .12], [0, 0, side * 3], m.glass));
       b.addVisualBox({ name: `room-5-pod-cable-${side}`, size: [.2, 11, .2], position: [side * 2.5, 32.5, 49], material: m.cable });
     }
-    this.captiveVolt = new THREE.Mesh(new THREE.SphereGeometry(.65, 20, 12), new THREE.MeshStandardMaterial({ color: 0xffe85c, emissive: 0xffd21a, emissiveIntensity: 1.5 }));
-    this.captiveVolt.name = 'room-5-captive-volt'; this.pod.add(this.captiveVolt);
+    this.captiveVolt.name = 'room-5-captive-volt';
+    this.captiveVolt.add(this.captiveVoltPresentation.root); this.pod.add(this.captiveVolt);
+    this.captiveVoltPresentation.setShadowCasting(false);
     const voltGlow = b.addLight('room-5-volt-glow', [0, 0, 0], 0xffdc35, 50, 12);
     this.pod.add(voltGlow);
     voltGlow.castShadow = true; voltGlow.shadow.mapSize.set(512, 512);
     voltGlow.shadow.bias = -.0002; voltGlow.shadow.normalBias = .025;
     voltGlow.shadow.camera.near = .2;
     // Volt and the transparent glass must not eclipse the light inside the pod.
-    this.captiveVolt.castShadow = false;
     // Ground-level reunion route, separate from the upper puzzle route.
     this.reunionFloors.push(box('reunion-floor', [32, .5, 12], [4, -4, 65], m.floor));
     this.reunionFloors.push(box('reunion-east-landing', [8, .5, 5], [24, -4, 61.5], m.floor));
@@ -216,6 +222,7 @@ export class LevelTwoRoomFiveGreybox {
     }));
   }
   update(dt: number, occupants: readonly LevelTwoRoomTwoOccupant[]): void {
+    this.captiveVoltPresentation.update(dt, this.captiveState);
     for (const target of this.resetControls) target.reset(); this.resetControls.length = 0;
     let usingLever = false;
     for (const occupant of occupants) {
@@ -269,6 +276,7 @@ export class LevelTwoRoomFiveGreybox {
       else panel.position.z = side * (3 + Math.max(0, t - .6) * 8);
     }
     this.captiveVolt.visible = !c.rescued;
+    this.captiveVoltPresentation.setVisible(!c.rescued);
     this.reunionDoor.position.y = -8.7 + 5.5 * Math.max(0, (t - .75) / .25);
     this.exitDoor.position.y = 2.5 + (c.exitPowered ? 5.5 : 0);
     this.shortcut.position.y = c.rescued ? 28.75 : 40;
@@ -284,6 +292,7 @@ export class LevelTwoRoomFiveGreybox {
   }
   restoreCheckpoint(checkpoint: RoomFiveCheckpoint): void {
     this.controller.reset(checkpoint);
+    this.captiveVoltPresentation.reset();
     if (checkpoint !== 'split') {
       const core = this.targets.find(target => target.mesh === this.brokenCore);
       if (core && !core.completed) core.advance(core.dissolveDurationSeconds);
@@ -292,9 +301,10 @@ export class LevelTwoRoomFiveGreybox {
   }
   reset(): void {
     this.resetControls.length = 0; this.controller.reset();
+    this.captiveVoltPresentation.reset();
     this.contactOrder.clear(); this.nextContactOrder = 0; this.appliedContactOrder = 0;
     for (const target of this.targets) target.reset();
     this.syncPresentation();
   }
-  dispose(): void { for (const unsubscribe of this.subscriptions) unsubscribe(); this.builder.dispose(); }
+  dispose(): void { for (const unsubscribe of this.subscriptions) unsubscribe(); this.captiveVoltPresentation.dispose(); this.builder.dispose(); }
 }

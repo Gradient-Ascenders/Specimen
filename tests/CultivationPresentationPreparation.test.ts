@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -5,10 +6,26 @@ import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
 import { CultivationLightLayout } from '../src/render/CultivationLightLayout.ts';
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
+import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
 for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
   const fail = mode === 'failure';
-  const preview = new LevelTwoPreviewScene(() => {}), scene = new THREE.Scene(); scene.add(preview.root);
+  const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
+  const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
+  await preview.roomFive.captiveVoltPresentation.prepare(loadVolt);
+  const captiveBody = preview.roomFive.captiveVoltPresentation.root.getObjectByName('Volt-Body') as THREE.Mesh;
+  const expectedMorphs = new Map<THREE.BufferGeometry, { mesh: THREE.Mesh; dictionary: Record<string, number>; influences: number[] }>();
+  for (const root of [volt.root, preview.roomFive.captiveVoltPresentation.root]) root.traverse(object => {
+    if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
+    if (object.name === 'Volt-Body') {
+      assert.equal(object.geometry.morphAttributes.position!.length, 6);
+      object.morphTargetInfluences![object.morphTargetDictionary!.Headroom] = 0.35;
+    } else assert.equal(object.geometry.morphAttributes.position!.length, 5);
+    expectedMorphs.set(object.geometry, { mesh: object, dictionary: { ...object.morphTargetDictionary }, influences: [...object.morphTargetInfluences!] });
+  });
+  let captiveUploaded = false;
+  const voltVariants = new Set<string>();
   const shared = new THREE.MeshStandardMaterial(), shape = new THREE.BoxGeometry();
   const ordinary = new THREE.Mesh(shape, shared), instanced = new THREE.InstancedMesh(shape, shared, 1);
   ordinary.name = instanced.name = 'variant-regression'; scene.add(ordinary, instanced);
@@ -62,6 +79,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   const priorRaf = globalThis.requestAnimationFrame;
   globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
   const renderer = {
+    getPixelRatio: () => 1,
     extensions: {has: () => mode !== 'lift'},
     shadowMap: { enabled: false, autoUpdate: true, needsUpdate: false, type: THREE.BasicShadowMap as THREE.ShadowMapType },
     getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},
@@ -79,15 +97,20 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
     info: {render: {calls: 0, triangles: 0, points: 0, lines: 0, frame: 0}},
     compile() {},
-    render(preparedScene: THREE.Scene) {
+    render(preparedScene: THREE.Scene, camera: THREE.Camera) {
       preparedScene.traverseVisible(object => {
+        if (object instanceof THREE.Mesh && object.geometry === captiveBody.geometry && object.material instanceof THREE.MeshDepthMaterial) {
+          captiveUploaded = true;
+          assert.deepEqual(object.morphTargetDictionary, expectedMorphs.get(captiveBody.geometry)!.dictionary);
+          assert.deepEqual(object.morphTargetInfluences, expectedMorphs.get(captiveBody.geometry)!.influences);
+        }
         if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
           assert.equal(object.material.transmission, 0, 'temporary scenes must not allocate Bob transmission targets');
         }
       });
       if (!renderer.shadowMap.enabled) return;
       preparedScene.traverseVisible(object => {
-        if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight) || !object.castShadow) return;
+        if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight) || !object.castShadow || !object.layers.test(camera.layers)) return;
         const texture = object.shadow.map?.depthTexture;
         assert.ok(texture, 'shadow-enabled preparation must provide depth textures for its samplers');
         assert.ok(initializedShadowTargets.has(object.shadow.map!), 'depth attachments must be initialized before drawing receivers');
@@ -98,6 +121,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     async compileAsync(group: THREE.Group, _camera: THREE.Camera, targetScene: THREE.Scene) {
       group.traverse(o => {
         preparedOwners.add(o.name);
+        if (o instanceof THREE.Mesh && o.name.startsWith('Volt-')) {
+          assert.equal(o.geometry.morphTargetsRelative, true);
+          const expected = expectedMorphs.get(o.geometry)!; assert.ok(expected, 'proxy retains its owning instance geometry');
+          assert.equal(o.geometry.morphAttributes.position!.length, expected.influences.length);
+          assert.equal(o.geometry.morphAttributes.normal!.length, expected.influences.length);
+          assert.deepEqual(o.morphTargetDictionary, expected.dictionary);
+          assert.deepEqual(o.morphTargetInfluences, expected.influences, 'retain the live headroom pose while prewarming');
+          voltVariants.add((o.material as THREE.Material).type + ':' + (o.material as THREE.Material).transparent);
+        }
         if (o instanceof THREE.Mesh && o.name === 'shadow-map-regression' &&
           (o.material instanceof THREE.MeshDepthMaterial || o.material instanceof THREE.MeshDistanceMaterial)) mapsInShadow.add(!!o.material.map);
       });
@@ -106,7 +138,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
         assert.equal(targetScene.fog, null, 'real shadow draws use the empty scene, without visible-pass fog');
         assert.equal(targetScene.environment, null, 'custom depth/distance programs do not borrow visible-pass environment');
         const lights: THREE.Light[] = [];
-        targetScene.traverseVisible(o => { if (o instanceof THREE.Light) lights.push(o); });
+        targetScene.traverseVisible(o => { if (o instanceof THREE.Light && o.layers.test(_camera.layers)) lights.push(o); });
         assert.ok(lights.some(light => light.castShadow), 'retain the live shadow-light layout');
         assert.equal(lights.some(light => light.type === 'Light'), false, 'do not warm an unused empty-light shadow layout');
         shadowLayouts.add('live-layout');
@@ -126,8 +158,15 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
+    for (const expected of expectedMorphs.values()) assert.deepEqual(expected.mesh.morphTargetInfluences, expected.influences);
     assert.ok(compiles > 0);
     if (!fail) assert.ok(preparedOwners.has('Bob-Body'), 'transmissive body still enters shader preparation');
+    if (!fail) {
+      assert.ok(voltVariants.has('MeshPhysicalMaterial:true'));
+      assert.ok(voltVariants.has('MeshPhysicalMaterial:false'));
+      assert.ok(voltVariants.has('MeshDepthMaterial:false'), 'hidden playable Volt still prepares its requested shadow caster');
+      assert.equal(volt.diagnostics.visible, false); assert.equal(volt.diagnostics.opacity, 1);
+    }
     if (!fail) assert.ok(preparedOwners.has(foundationMesh.name), 'visible foundation meshes need every authored room signature');
     assert.equal(
       initializedTextures.has(renderTarget.texture),
@@ -184,6 +223,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
           queue.tick(0, true); await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
+      assert.ifError((queue as unknown as { failure?: unknown }).failure);
       assert.equal(queue.requireCurrent(true), true, 'the requested room finishes');
       assert.equal(queue.diagnostics.completed, mode === 'lift' ? 3 : 2, 'earlier background work remains suspended until the lift and Room 5 are ready');
       assert.equal(queue.diagnostics.configurations[mode === 'lift' ? 2 : 1].z, 230);
@@ -220,6 +260,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.deepEqual(mapsInShadow, new Set([true, false]), 'mapped and unmapped shadows are both prepared');
     }
     if (mode === 'startup') {
+      assert.ok(queue.diagnostics.startupMs >= queue.diagnostics.initialMs, 'report entry and full startup separately');
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
       assert.equal(queue.diagnostics.completed, 2, 'startup prepares initial and the shared lift/encounter layout');
@@ -234,6 +275,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
           await new Promise(resolve => setTimeout(resolve, 0));
         }
       } finally { clock.mock.restore(); }
+      assert.ifError((queue as unknown as { failure?: unknown }).failure);
       assert.equal(queue.diagnostics.completed, 3, 'the lift is ready before braking');
       assert.equal(queue.diagnostics.configurations[2].dark, false);
       const preparedCompiles = compiles;
@@ -267,7 +309,9 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     const after: THREE.Object3D[] = []; scene.traverse(o => after.push(o)); assert.deepEqual(after, objects);
     for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
+    if (!fail) assert.equal(captiveUploaded, true, 'non-casting captive gel uploads its geometry and morphs before first use');
   } finally {
+    volt.dispose();
     queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
     reflectiveMaterial.dispose(); renderTarget.dispose();
     gel.dispose();

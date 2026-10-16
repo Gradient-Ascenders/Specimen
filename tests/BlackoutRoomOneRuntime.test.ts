@@ -13,6 +13,9 @@ import type { BlackoutTransitController } from '../src/levels/BlackoutTransitCon
 import type { BlackoutMaintenanceBayController } from '../src/levels/BlackoutMaintenanceBayController.ts';
 import type { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
 import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -134,7 +137,7 @@ function mutableRoomOneBodies(runtime: BlackoutLevelRuntime): Readonly<Record<'b
   return roomOneInternals(runtime).bodies;
 }
 
-function createFixture() {
+function createFixture(debugAvailable = true) {
   const document = new TestDocument();
   const previousDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', { configurable: true, value: document });
@@ -148,6 +151,7 @@ function createFixture() {
     renderLayer: { scene, canvas: document.createElement(), cameraRig, render: () => {} } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt' },
     authoredRoomOne: true,
+    debugAvailable,
     maintenanceMaps,
   });
   runtime.load();
@@ -167,12 +171,139 @@ function createFixture() {
 function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
   return (runtime as unknown as { resources: {
     group: { bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody };
+    voltPresentation: VoltCharacterPresentation;
     maintenanceBay: BlackoutMaintenanceBayController;
     transit: BlackoutTransitController;
     electricalSystem: VoltElectricalSystem<KinematicBody>;
     electricalTargets: ElectricalTargetRegistry;
   } }).resources;
 }
+
+function assertVoltBelowCeiling(body: THREE.Mesh, ceiling: THREE.Mesh): number {
+  body.updateWorldMatrix(true, false); ceiling.updateWorldMatrix(true, false);
+  const inverseCeiling = new THREE.Matrix4().copy(ceiling.matrixWorld).invert();
+  const bounds = ceiling.geometry.boundingBox!, point = new THREE.Vector3(), local = new THREE.Vector3();
+  let top = -Infinity;
+  for (let i = 0; i < body.geometry.getAttribute('position').count; i++) {
+    body.getVertexPosition(i, point); point.applyMatrix4(body.matrixWorld); top = Math.max(top, point.y);
+    local.copy(point).applyMatrix4(inverseCeiling);
+    if (local.x >= bounds.min.x && local.x <= bounds.max.x && local.z >= bounds.min.z && local.z <= bounds.max.z) {
+      assert.ok(local.y <= bounds.min.y + 1e-5, `Volt vertex ${i} penetrates ${ceiling.name} by ${local.y - bounds.min.y} m`);
+    }
+  }
+  return top;
+}
+
+test('real Volt GLB normal jump clears the actual maintenance-vent ceiling at every render alpha', async () => {
+  const f = createFixture();
+  try {
+    const r = electricalRoomInternals(f.runtime), volt = r.group.voltBody;
+    await r.voltPresentation.prepare(loadVolt);
+    const mesh = r.voltPresentation.root.getObjectByName('Volt-Body') as THREE.Mesh;
+    const ceiling = r.maintenanceBay.bay.collisionMeshes.find(m => m.name === 'vent-duct-ceiling')!;
+    const ceilingBottom = new THREE.Box3().setFromObject(ceiling).min.y;
+    assert.ok(Math.abs(ceilingBottom - 2.2) < 1e-6);
+    volt.teleport(new THREE.Vector3(-6, 0.46, 57)); f.tick(10);
+    assert.equal(volt.grounded, true); assert.equal(volt.radiusMetres, 0.45);
+    assert.equal(r.voltPresentation.diagnostics.headroom.compression, 0, 'preserve the neutral crest with ample grounded headroom');
+    f.input.press('jump');
+    let peakColliderTop = 0, peakVisualTop = 0, uncompressedTop = 0, maximumCompression = 0;
+    const point = new THREE.Vector3();
+    for (let frame = 0; frame < 60; frame++) {
+      f.tick(); if (frame === 0) f.input.release('jump');
+      peakColliderTop = Math.max(peakColliderTop, volt.position.y + volt.radiusMetres);
+      for (const alpha of [0, 0.5, 1]) {
+        f.runtime.render(alpha, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>);
+        peakVisualTop = Math.max(peakVisualTop, assertVoltBelowCeiling(mesh, ceiling));
+      }
+      maximumCompression = Math.max(maximumCompression, r.voltPresentation.diagnostics.headroom.compression);
+      if (frame === 14) {
+        const target = mesh.morphTargetDictionary!.Headroom, weight = mesh.morphTargetInfluences![target]!;
+        mesh.morphTargetInfluences![target] = 0;
+        for (let i = 0; i < mesh.geometry.getAttribute('position').count; i++) {
+          mesh.getVertexPosition(i, point); point.applyMatrix4(mesh.matrixWorld); uncompressedTop = Math.max(uncompressedTop, point.y);
+        }
+        mesh.morphTargetInfluences![target] = weight;
+      }
+    }
+    assert.equal(volt.lastJumpSpeedMetresPerSecond, DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond);
+    assert.ok(peakColliderTop > 1.65 && peakColliderTop < 1.8, 'ordinary jump tuning and unobstructed collider apex');
+    assert.ok(uncompressedTop > 2.65, 'reproduce the reviewer\'s approximately half-metre crest penetration');
+    assert.ok(peakVisualTop <= ceilingBottom - 0.02); assert.ok(maximumCompression > 0 && maximumCompression < 1);
+    volt.teleport(new THREE.Vector3(-6, 0.46, 49)); f.tick(90); f.render();
+    assert.equal(r.voltPresentation.diagnostics.headroom.compression, 0, 'restore authored height after exiting the passage');
+    f.runtime.restartLevel(); f.render(); assert.equal(r.voltPresentation.diagnostics.headroom.compression, 0);
+  } finally { f.cleanup(); }
+});
+
+test('real Volt GLB traverses and jumps through flat and rising ducts without ceiling clipping', async () => {
+  const f = createFixture();
+  try {
+    const r = electricalRoomInternals(f.runtime), volt = r.group.voltBody;
+    await r.voltPresentation.prepare(loadVolt);
+    const mesh = r.voltPresentation.root.getObjectByName('Volt-Body') as THREE.Mesh;
+    const flat = r.maintenanceBay.bay.collisionMeshes.find(m => m.name === 'vent-duct-ceiling')!;
+    const rising = r.maintenanceBay.bay.collisionMeshes.find(m => m.name === 'volt-rising-duct-ceiling')!;
+    volt.teleport(new THREE.Vector3(-6, 0.46, 53)); f.tick(10); f.input.press('moveBackward');
+    for (let frame = 0; frame < 100; frame++) {
+      if (frame === 30) f.input.press('jump');
+      f.tick(); if (frame === 30) f.input.release('jump');
+      if (frame % 5 === 0) for (const alpha of [0, 0.5, 1]) {
+        f.runtime.render(alpha, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>); assertVoltBelowCeiling(mesh, flat);
+      }
+    }
+    f.input.release('moveBackward'); assert.ok(volt.position.z > 60, 'ordinary input traverses the straight duct');
+    volt.teleport(new THREE.Vector3(-16, 1.6, 69)); f.tick(30); assert.equal(volt.grounded, true);
+    const startZ = volt.position.z; f.input.press('moveBackward'); f.input.press('jump');
+    for (let frame = 0; frame < 60; frame++) {
+      f.tick(); if (frame === 0) f.input.release('jump');
+      if (frame % 5 === 0) for (const alpha of [0, 0.5, 1]) {
+        f.runtime.render(alpha, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>); assertVoltBelowCeiling(mesh, rising);
+      }
+    }
+    f.input.release('moveBackward'); assert.ok(volt.position.z > startZ + 3, 'ordinary input climbs the authored sloping duct');
+    assert.equal(volt.radiusMetres, 0.45);
+  } finally { f.cleanup(); }
+});
+
+test('authored Room 1 Volt keeps identity events, light, interpolated placement and death/recovery ownership', async () => {
+  const f = createFixture();
+  try {
+    const r = (f.runtime as unknown as { resources: {
+      group: { voltBody: KinematicBody };
+      voltPresentation: VoltCharacterPresentation;
+      voltLight: THREE.PointLight;
+      voltMovementEvents: { emit(name: string, event: unknown): void };
+      bobPresentation: { diagnostics: { stretch: number; squash: number } };
+      goopPresentation: { diagnostics: { stretch: number; squash: number } };
+    } }).resources;
+    await r.voltPresentation.prepare(loadVolt);
+    assert.deepEqual(r.voltPresentation.diagnostics.asset, { triangles: 38208, drawCalls: 3, geometries: 3, materials: 2 });
+    assert.equal(r.voltLight.parent, r.voltPresentation.placement);
+    assert.equal(r.voltLight.intensity, 16); assert.equal(r.voltLight.distance, 8); assert.equal(r.voltLight.decay, 2);
+    assert.equal(r.voltLight.color.getHex(), 0xffdf75); assert.equal(r.voltLight.castShadow, false);
+    const body = r.group.voltBody;
+    body.teleport(new THREE.Vector3(0, 3, 3));
+    r.voltMovementEvents.emit('jumped', { directionWorld: new THREE.Vector3(0, 1, 0), speedMetresPerSecond: 6, chargeFraction: 0 });
+    f.tick(); assert.ok(r.voltPresentation.diagnostics.weights.Stretch > 0);
+    assert.equal(r.bobPresentation.diagnostics.stretch, 0); assert.equal(r.goopPresentation.diagnostics.stretch, 0);
+    f.runtime.render(0.5, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>);
+    const expected = new THREE.Vector3().lerpVectors(body.previousPosition, body.position, 0.5);
+    assert.ok(r.voltPresentation.placement.position.distanceTo(expected) < 1e-8);
+    assert.ok(r.voltLight.getWorldPosition(new THREE.Vector3()).distanceTo(expected) < 1e-8);
+    r.voltPresentation.setOpacity(0); assert.equal(r.voltLight.visible, true);
+    r.voltPresentation.setOpacity(1);
+    assert.equal(f.runtime.requestFailure(), true); assert.equal(f.runtime.requestFailure(), false);
+    f.tick(8); f.render(); assert.equal(r.voltPresentation.diagnostics.visible, false);
+    // Keep the warmed point-light slot to avoid compiling a new shader when Volt dies.
+    assert.equal(r.voltLight.visible, true); assert.equal(r.voltLight.intensity, 0);
+    assert.equal(r.voltPresentation.diagnostics.deathActive, true);
+    f.runtime.restartLevel(); f.render(); assert.equal(r.voltPresentation.diagnostics.deathActive, false);
+    assert.equal(r.voltPresentation.diagnostics.opacity, 1); assert.equal(r.voltLight.visible, true);
+    assert.equal(r.voltLight.intensity, 16);
+    assert.ok(Object.values(r.voltPresentation.diagnostics.weights).every(weight => weight === 0));
+  } finally { f.cleanup(); }
+});
 
 test('Room 1 CP1 and CP2 cannot acquire the distant maintenance circuit, but approaching it still works', () => {
   const f = createFixture();
@@ -687,4 +818,16 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
     f.runtime.start();f.runtime.restartLevel();assert.equal(resources().scene.maintenanceBay.surfaceMaterials.get('wallPanel').map,second);
     f.runtime.dispose();assert.equal((f.runtime as unknown as {maintenanceMaps:unknown}).maintenanceMaps,undefined);
   } finally {f.cleanup();}
+});
+
+
+test('ordinary production ignores authored room teleport keys', () => {
+  const f = createFixture(false);
+  try {
+    assert.equal(f.runtime.roomState.roomId, 'room-1');
+    for (const action of ['debugTeleportRoomTwo', 'debugTeleportRoomThree'] as const) {
+      f.input.press(action); f.tick(); f.input.release(action); f.tick();
+      assert.equal(f.runtime.roomState.roomId, 'room-1');
+    }
+  } finally { f.cleanup(); }
 });

@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -9,7 +10,7 @@ import { CultivationElevatorArt } from '../src/render/environment/cultivation/Cu
 
 test('elevator art preserves collider geometry and the full descent/reset transforms', () => {
   const baseline = new LevelTwoRoomFourGreybox(), room = new LevelTwoRoomFourGreybox();
-  const lab = new CultivationLabMaterials(), chamber = new CultivationChamberMaterials();
+  const lab = new CultivationLabMaterials(cultivationAssets), chamber = new CultivationChamberMaterials(cultivationAssets);
   const contamination = new CultivationContaminationArt(lab);
   const art = new CultivationElevatorArt(room, lab, chamber, contamination);
   const occupants = [{ id: 'bob', position: new THREE.Vector3(-2, .66, 9), radiusMetres: .46 },

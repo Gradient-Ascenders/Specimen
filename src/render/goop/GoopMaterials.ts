@@ -1,3 +1,4 @@
+import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { GelMaterialSet, type GelMaterialProfile } from '../slime/GelMaterials.ts';
 import { GOOP_EYE_BOUNDS } from './GoopAsset.ts';
@@ -61,8 +62,8 @@ export class GoopMaterialSet extends GelMaterialSet {
   private readonly landingRipple: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2(0, 0.65) };
   private readonly eyeClosure: THREE.IUniform<number> = { value: 0 };
 
-  constructor() {
-    super(profile);
+  constructor(rendering?: GelRendering) {
+    super(profile, rendering);
     // The shared wave evaluation accepts identity-specific protection functions.
     for (const material of [this.body, this.bodyDepth, this.bodyDistance]) {
       const hook = material.onBeforeCompile;

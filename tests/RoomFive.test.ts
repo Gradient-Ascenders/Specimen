@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
@@ -17,6 +18,27 @@ import { DissolveSystem } from '../src/abilities/DissolveSystem.ts';
 import { AcidProjectileSystem } from '../src/abilities/AcidProjectileSystem.ts';
 import { ROOM_FIVE_JUMPS } from '../src/levels/RoomFiveParkour.ts';
 import { RoomFivePatrol } from '../src/hazards/RoomFivePatrol.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+
+test('authored captive Volt follows the existing pod release, remains a non-caster and resets independently', async () => {
+  const room = new LevelTwoRoomFiveGreybox(() => {});
+  try {
+    await room.captiveVoltPresentation.prepare(loadVolt);
+    const p = room.captiveVoltPresentation;
+    assert.equal(p.root.parent, room.captiveVolt); assert.equal(room.captiveVolt.parent, room.pod);
+    assert.equal(p.diagnostics.meshes.length, 3); assert.ok(p.diagnostics.meshes.every(mesh => !mesh.castShadow));
+    const glow = room.pod.getObjectByName('room-5-volt-glow') as THREE.PointLight;
+    assert.equal(glow.parent, room.pod); assert.equal(glow.castShadow, true);
+    room.restoreCheckpoint('controls'); room.controller.update(1.5, false, false, false, true);
+    const start = room.pod.position.clone(); room.controller.update(2, false, false, false, false); room.syncPresentation();
+    assert.notDeepEqual(room.pod.position.toArray(), start.toArray()); assert.equal(p.diagnostics.visible, true);
+    assert.equal(p.diagnostics.speed, 0); assert.equal(p.diagnostics.facingYawRadians, 0);
+    room.controller.update(2, false, false, false, false); room.syncPresentation();
+    assert.equal(p.diagnostics.visible, false); assert.equal(room.captiveVolt.visible, false);
+    room.restoreCheckpoint('split'); assert.equal(p.diagnostics.visible, true); assert.equal(room.captiveVolt.visible, true);
+    assert.ok(Object.values(p.diagnostics.weights).every(weight => weight === 0));
+  } finally { room.dispose(); }
+});
 
 test('pausing one patrol creates a shared four-second opening; reset removes the offset', () => {
   const forward = new THREE.Vector3(0, -.3, -1).normalize();
@@ -193,8 +215,8 @@ test('dark-room lights follow drone power, damage recovery, and the moving Volt 
     assert.equal(search.angle, .4);
     assert.equal(search.castShadow, true);
     assert.equal(search.shadow.mapSize.x, 512);
-    assert.equal(s.room.captiveVolt.castShadow, false);
-    assert.equal((s.room.captiveVolt.material as THREE.MeshStandardMaterial).color.getHex(), 0xffe85c);
+    assert.equal(s.room.captiveVoltPresentation.diagnostics.shadowCasting, false);
+    assert.equal(s.room.captiveVoltPresentation.root.parent, s.room.captiveVolt);
     assert.equal((s.room.root.getObjectByName('room-5-volt-glow') as THREE.PointLight).color.getHex(), 0xffdc35);
     assert.equal((s.room.root.getObjectByName('room-5-volt-glow') as THREE.PointLight).castShadow, true);
     assert.ok(search.distance > 0 && search.distance <= 15);
@@ -245,7 +267,7 @@ test('sewer reboot, paired checkpoints and rescue retries preserve the right sta
 
 function setup() {
   const room = new LevelTwoRoomFiveGreybox(() => {});
-  const lab = new CultivationLabMaterials();
+  const lab = new CultivationLabMaterials(cultivationAssets);
   const contamination = new CultivationContaminationArt(lab);
   const art = new CultivationMaintenanceArt(room, lab, contamination);
   room.root.position.set(64, 0, 249); room.root.updateMatrixWorld(true);
@@ -313,7 +335,7 @@ test('retained searchlights follow gaze and power without changing authoritative
     assert.ok(lights.every(light => light.shadow.map !== null && !light.shadow.autoUpdate && !light.shadow.needsUpdate));
     s.room.controller.security.reset(); s.encounter.reset(); s.encounter.update(1 / 60);
     assert.ok(lights.every(light => light.intensity > 0 && light.shadow.autoUpdate));
-    assert.equal(s.room.captiveVolt.castShadow, false);
+    assert.equal(s.room.captiveVoltPresentation.diagnostics.shadowCasting, false);
     assert.ok(s.room.glassPanels.every(mesh => !mesh.castShadow));
     s.room.root.traverse(o => {
       if (!(o instanceof THREE.Mesh)) return;

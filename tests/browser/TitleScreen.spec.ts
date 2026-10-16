@@ -40,6 +40,7 @@ for (const query of ['', '?debug=1']) {
     await page.screenshot({ path: testInfo.outputPath('egg-room-title.png') });
     await title.locator('[data-action="settings"]').click();
     const settings = page.locator('[data-flow-panel="settings"]');
+    await settings.locator('[data-setting="graphics-profile"]').selectOption('standard');
     await settings.locator('[data-setting="render-resolution"]').selectOption('1.5');
     await expect(host).toHaveAttribute('data-title-backdrop', 'ready');
     expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => canvas.width * canvas.height))

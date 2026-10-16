@@ -9,6 +9,8 @@ import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
 import type { KinematicBody } from '../src/physics/KinematicBody.ts';
 import type { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
+import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
 class FakeButton {
   private clickListener: (() => void) | null = null;
@@ -113,7 +115,7 @@ test('failed Blackout construction rolls back a visual even when scene.add attac
     assert.equal(runtime.state, 'unloaded');
     assert.equal(scene.children.length, 0);
     assert.equal(
-      scene.children.some((child) => child.name === 'blackout-foundation-slime'),
+      scene.children.some((child) => child.name === 'player-slime-volt-presentation'),
       false,
     );
     assert.equal(dialog.removed, true);
@@ -399,9 +401,9 @@ test('Blackout mounts shared Bob presentation and owns its lifecycle alongside a
       assert.ok(bobRoot, 'Blackout should mount the shared Bob presentation root');
       assert.ok(bobCharacter, 'Blackout should use the shared Bob character hierarchy');
       assert.equal(
-        scene.children.filter((child) => child.name === 'blackout-foundation-slime').length,
+        scene.children.filter((child) => child.name === 'player-slime-volt-presentation').length,
         1,
-        'Volt retains its existing plain presentation',
+        'Volt mounts its own authored presentation',
       );
       assert.deepEqual(bobCharacter.position.toArray(), [-2, 0.46, 2]);
 
@@ -626,6 +628,10 @@ test('Blackout render consumes pointer movement on a frame with zero fixed steps
     // update. The sample must be queued before endPointerUpdate clears it.
     input.pointerDeltaX = 12;
     input.pointerDeltaY = -7;
+    const electrical = (runtime as any).resources.electricalPresentation;
+    const updateElectrical = electrical.update.bind(electrical);
+    let electricalUpdates = 0;
+    electrical.update = (...args: unknown[]) => { electricalUpdates++; return updateElectrical(...args); };
     runtime.render(
       0,
       {
@@ -639,9 +645,12 @@ test('Blackout render consumes pointer movement on a frame with zero fixed steps
     assert.equal(cameraRig.queuedLookY, 0);
     assert.equal(input.pointerDeltaX, 0);
     assert.equal(input.pointerDeltaY, 0);
+    assert.equal(electricalUpdates, 1, 'one visual update per rendered frame, including zero-step frames');
 
     // A later fixed update cannot consume the already-rendered sample again.
     runtime.fixedUpdate(1 / 60);
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(electricalUpdates, 1, 'catch-up physics steps do not rebuild electrical VFX');
     assert.equal(cameraRig.appliedLookX, 12);
     assert.equal(cameraRig.appliedLookY, -7);
 
@@ -656,7 +665,7 @@ test('Blackout render consumes pointer movement on a frame with zero fixed steps
 });
 
 
-test('Blackout merge hands control to Specimen once, disables switching, and exposes merged HUD state', () => {
+test('Blackout merge hands control to Specimen once, disables switching, and exposes merged HUD state', async () => {
   const originalDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
@@ -688,11 +697,17 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
     runtime.load();
     runtime.start();
 
-    const groupBodies = scene.getObjectsByProperty('name', 'blackout-foundation-slime') as THREE.Mesh[];
+    const groupBodies = scene.getObjectsByProperty('name', 'player-slime-volt-presentation') as THREE.Mesh[];
+    const volt = (runtime as unknown as { resources: { voltPresentation: VoltCharacterPresentation } }).resources.voltPresentation;
+    await volt.prepare(loadVolt);
     const specimen = scene.getObjectByName('blackout-specimen-body') as THREE.Mesh;
     assert.equal(groupBodies.length, 1);
     assert.ok(scene.getObjectByName("player-slime-goop-presentation"));
-    assert.ok(groupBodies.every(mesh => mesh.castShadow && mesh.receiveShadow && mesh.visible));
+    assert.ok(groupBodies.every(root => root.getObjectByName('player-slime-volt-character')));
+    for (const name of ['Volt-Body', 'Volt-Eye-Left', 'Volt-Eye-Right']) {
+      const mesh = volt.root.getObjectByName(name) as THREE.Mesh;
+      assert.ok(mesh.castShadow && mesh.receiveShadow && mesh.visible);
+    }
     assert.ok(specimen.castShadow && specimen.receiveShadow);
     assert.equal(specimen.visible, false);
 
@@ -724,7 +739,7 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
     assert.equal(runtime.specimenFormReadModel?.controlledForm, 'specimen');
     assert.equal(runtime.specimenFormReadModel?.mergeProgress, 1);
     runtime.render(0, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>);
-    assert.ok(groupBodies.every(mesh => !mesh.visible));
+    assert.ok(groupBodies.every(root => !root.getObjectByName('player-slime-volt-character')!.visible));
     assert.equal(specimen.visible, true);
 
     const hud = runtime.getSlimeHUDSnapshot();

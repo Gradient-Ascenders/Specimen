@@ -39,16 +39,12 @@ canvas {
   display: none !important;
 }
 
-/* F1 also covers guidance mounted by later levels. Keep aiming, menus,
-   loading and death screens usable, and preserve each overlay's own state. */
-#app:has(> .game-flow[data-hud-hidden='true']) :is(
-  .game-hud,
-  .test-panel,
-  .performance-recorder,
-  .security-network-status,
-  .elevator-encounter-status,
-  .maintenance-drone-hud
-) {
+/* Hide current and future HUD overlays, including inline styles. Aiming UI
+ * keeps its own visibility rules; menus/recovery/loading remain functional.
+ * Only the real gameplay canvas is exempted among canvases. */
+#app[data-clean-gameplay="true"] > :not([data-gameplay-canvas]):not(.game-flow):not([data-clean-gameplay-essential]):not([data-clean-gameplay-aiming]),
+#app[data-clean-gameplay="true"] .specimen-combat-label,
+#app[data-clean-gameplay="true"] > .game-flow[data-state="playing"] {
   display: none !important;
 }
 

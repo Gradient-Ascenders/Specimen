@@ -1,8 +1,8 @@
-import { CultivationLightLayout } from './CultivationLightLayout.ts';
+import { CultivationLightLayout, cultivationAuthoredLightMask } from './CultivationLightLayout.ts';
 import * as THREE from 'three';
 import type { LevelTwoPreviewScene } from '../levels/LevelTwoPreviewScene.ts';
 import type { RenderLayer } from './RenderLayer.ts';
-import { copyPrewarmMaterial, createShadowPrewarmMaterial } from './ShadowPrewarmMaterial.ts';
+import { copyPrewarmMaterial, createShadowPrewarmMaterial, clonePrewarmDrawable } from './ShadowPrewarmMaterial.ts';
 import { withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
@@ -11,14 +11,16 @@ interface Step { label?: string; run: () => void | Promise<unknown>; }
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
 export class CultivationPreparationQueue {
-  readonly diagnostics = { constructionMs: 0, initialMs: 0, workMs: 0, textureMs: 0, compileWaitMs: 0, primeMs: 0, maxStepMs: 0,
+  readonly diagnostics = { constructionMs: 0, initialMs: 0, startupMs: 0, workMs: 0, textureMs: 0, compileWaitMs: 0, primeMs: 0, maxStepMs: 0,
     slowSteps: [] as {label: string; ms: number; z: number; dark: boolean}[], completed: 0, reused: 0, total: 0, pending: false, configurations: [] as {z: number; dark: boolean; elapsedMs: number}[] };
   private readonly roots: THREE.Group[];
   private readonly configurations: Configuration[] = [];
   private readonly textures = new Set<THREE.Texture>();
   private readonly uploaded = new Set<THREE.BufferGeometry>();
+  private readonly uploadedInstanceAttributes = new Set<THREE.InstancedBufferAttribute>();
+  private readonly proxySources = new WeakMap<Drawable, Drawable>();
   private readonly retained: THREE.Material[] = [];
-  private readonly temporaryInstances: THREE.InstancedMesh[] = [];
+  private readonly instanceDisposers: (() => void)[] = [];
   private readonly target = new THREE.WebGLRenderTarget(1, 1);
   private readonly camera: THREE.Camera;
   private readonly backgroundSupported: boolean;
@@ -26,6 +28,8 @@ export class CultivationPreparationQueue {
   private iterator: Generator<Step> | undefined;
   private readonly suspended = new Map<Configuration, {iterator: Generator<Step>; elapsedMs: number}>();
   private busy = false;
+  /** Changes only when isolated GPU work can disturb the renderer light state. */
+  renderStateRevision = 0;
   private disposed = false;
   private released = false;
   private failure: unknown;
@@ -65,6 +69,7 @@ export class CultivationPreparationQueue {
     preview.root.userData.preparation = this.diagnostics;
     if (host && typeof document !== 'undefined') {
       this.overlay = document.createElement('div'); this.overlay.setAttribute('role', 'status'); this.overlay.hidden = true;
+      this.overlay.setAttribute('data-clean-gameplay-essential', '');
       Object.assign(this.overlay.style, {position:'absolute', inset:'0', background:'#07110f', color:'#dbe9e4',
         zIndex:'80', display:'none', placeItems:'center', fontFamily:'sans-serif'});
       host.append(this.overlay);
@@ -149,14 +154,11 @@ export class CultivationPreparationQueue {
   async prepareStartup(): Promise<void> {
     const started = performance.now();
     await this.prepareInitial();
-    // Keep startup's cost unchanged. The ordinary lift layout is prepared in
-    // background on approach; the expensive Room 5 layout still loads here.
+    // Both entry and maintenance first draws stay behind the loading screen.
     this.upcoming = this.liftExitConfiguration();
     if (this.upcoming) await this.prepareConfiguration(this.upcoming);
-    // Room 5 retains the lift's finite lights even once its geometry is culled.
-    // The arrival preparation therefore also covers the entire maintenance room.
     this.priority = undefined;
-    this.diagnostics.initialMs = performance.now() - started;
+    this.diagnostics.startupMs = performance.now() - started;
   }
 
   private async prepareConfiguration(config: Configuration): Promise<void> {
@@ -234,24 +236,7 @@ export class CultivationPreparationQueue {
       if (o.name.startsWith('cultivation-room-3-drone-') && !config.visible[5]) return;
       if (o instanceof THREE.Light) {
         const clone = o.clone(false); o.updateWorldMatrix(true, false); clone.matrix.copy(o.matrixWorld); clone.matrixAutoUpdate = false;
-        if (clone.castShadow && (clone instanceof THREE.SpotLight || clone instanceof THREE.PointLight || clone instanceof THREE.DirectionalLight)) {
-          // Preparation disables shadow updates, so cloned lights never acquire
-          // real shadow maps. PCF receivers still require comparison-enabled
-          // depth textures, including cube textures for point lights.
-          const depth = clone instanceof THREE.PointLight
-            ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
-            : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
-          depth.compareFunction = THREE.LessEqualCompare;
-          depth.minFilter = depth.magFilter = THREE.LinearFilter;
-          const target = clone instanceof THREE.PointLight
-            ? new THREE.WebGLCubeRenderTarget(1)
-            : new THREE.WebGLRenderTarget(1, 1);
-          // r185 supports cube depth attachments; its target option typings
-          // still restrict depthTexture to the two-dimensional texture class.
-          Object.assign(target, {depthTexture: depth});
-          clone.shadow.map = target;
-          shadowTargets.push(target);
-        }
+        clone.layers.mask = cultivationAuthoredLightMask(o);
         scene.add(clone);
       }
       // Foundation presentation remains in the live scene beside authored
@@ -261,15 +246,30 @@ export class CultivationPreparationQueue {
     };
     visit(this.layer.scene);
     const padding = new CultivationLightLayout(scene);
+    // Only the bounded layout needs comparison samplers, including dormant
+    // filler slots. Do not allocate nine unused searchlight maps for a primer.
+    scene.traverseVisible(light => {
+      if (!(light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) ||
+          !light.castShadow || !light.layers.test(this.camera.layers)) return;
+      const depth = light instanceof THREE.PointLight
+        ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
+        : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
+      depth.compareFunction = THREE.LessEqualCompare;
+      depth.minFilter = depth.magFilter = THREE.LinearFilter;
+      const target = light instanceof THREE.PointLight
+        ? new THREE.WebGLCubeRenderTarget(1)
+        : new THREE.WebGLRenderTarget(1, 1);
+      Object.assign(target, {depthTexture: depth});
+      light.shadow.map = target;
+      shadowTargets.push(target);
+    });
     const shadowScene = new THREE.Scene();
-    for (const object of scene.children) if (object instanceof THREE.Light) {
+    scene.traverseVisible(object => { if (object instanceof THREE.Light && object.layers.test(this.camera.layers)) {
       const light = object.clone(false);
       if ((light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) &&
         (object instanceof THREE.SpotLight || object instanceof THREE.PointLight || object instanceof THREE.DirectionalLight)) light.shadow.map = object.shadow.map;
       shadowScene.add(light);
-    }
-    // Padding's point slots also enter the real renderer's previous light state.
-    shadowScene.add(padding.root.clone(true));
+    } });
     config.lightingKey = this.lightingKey(scene);
     try {
     for (const target of shadowTargets) yield {run: () => this.layer.renderer.initRenderTarget(target)};
@@ -277,6 +277,8 @@ export class CultivationPreparationQueue {
     const materialCopies = new Map<string, THREE.Material>();
     const programs: Drawable[] = [], primes: Drawable[] = [], shadows: THREE.Mesh[] = [];
     let collected = 0;
+    const scheduledGeometry = new Set<THREE.BufferGeometry>();
+    const scheduledInstances = new Set<THREE.InstancedBufferAttribute>();
     for (const source of drawables) {
       const materials = Array.isArray(source.material) ? source.material : [source.material];
       // Collider-only originals and replaced art never submit a visible draw.
@@ -287,10 +289,13 @@ export class CultivationPreparationQueue {
       const feature = source.type + ':' + source.receiveShadow + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
         Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize + ':' + a.normalized).sort().join(',') + ':' +
         Object.entries(geometry.morphAttributes).map(([name, entries]) => name + ':' + entries.length).sort().join(',');
-      const proxy = source.clone(false) as Drawable; proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;
+      const proxy = clonePrewarmDrawable(source, this.instanceDisposers) as Drawable; proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;
       source.updateWorldMatrix(true, false); proxy.matrix.copy(source.matrixWorld); proxy.matrixAutoUpdate = false;
-      if (proxy instanceof THREE.InstancedMesh) this.temporaryInstances.push(proxy);
-      const needsBuffer = !this.uploaded.has(geometry);
+      this.proxySources.set(proxy, source);
+      const needsBuffer = (!this.uploaded.has(geometry) && !scheduledGeometry.has(geometry)) ||
+        (source instanceof THREE.InstancedMesh &&
+          ((!this.uploadedInstanceAttributes.has(source.instanceMatrix) && !scheduledInstances.has(source.instanceMatrix)) ||
+            (source.instanceColor && !this.uploadedInstanceAttributes.has(source.instanceColor) && !scheduledInstances.has(source.instanceColor))));
       let needsProgram = false;
       const copies = materials.map(material => {
         const key = material.uuid + ':' + feature;
@@ -302,6 +307,10 @@ export class CultivationPreparationQueue {
         this.retained.push(copy); return copy;
       });
       proxy.material = Array.isArray(source.material) ? copies : copies[0];
+      if (source instanceof THREE.InstancedMesh && source.morphTexture && !this.textures.has(source.morphTexture)) {
+        const texture = source.morphTexture; this.textures.add(texture);
+        yield {label:'morph-texture', run: () => this.layer.renderer.initTexture(texture)};
+      }
       for (const material of materials) for (const value of Object.values(material)) if (value instanceof THREE.Texture && !this.textures.has(value)) {
         this.textures.add(value);
         // PMREM and other render-target textures are allocated and typed by
@@ -314,7 +323,7 @@ export class CultivationPreparationQueue {
         programs.push(proxy);
         for (const copy of copies) if ((source.userData.cameraFadeEye || source.name.startsWith('Bob-Eye')) && !copy.transparent) {
           const faded = copyPrewarmMaterial(copy); faded.transparent = true; this.retained.push(faded);
-          const fadeProxy = proxy.clone(false) as Drawable; fadeProxy.material = faded;
+          const fadeProxy = clonePrewarmDrawable(proxy, this.instanceDisposers) as Drawable; fadeProxy.material = faded;
           programs.push(fadeProxy); primes.push(fadeProxy);
         }
         // Three's two-pass transparent preparation waits on the last side only.
@@ -322,8 +331,7 @@ export class CultivationPreparationQueue {
         for (const copy of copies) if (copy.transparent && copy.side === THREE.DoubleSide && !copy.forceSinglePass) {
           const back = copy.clone(); back.onBeforeCompile = copy.onBeforeCompile; back.customProgramCacheKey = copy.customProgramCacheKey;
           back.side = THREE.BackSide; back.forceSinglePass = true; this.retained.push(back);
-          const backProxy = proxy.clone(false) as Drawable; backProxy.material = back;
-          if (backProxy instanceof THREE.InstancedMesh) this.temporaryInstances.push(backProxy);
+          const backProxy = clonePrewarmDrawable(proxy, this.instanceDisposers) as Drawable; backProxy.material = back;
           programs.push(backProxy);
         }
       }
@@ -333,11 +341,29 @@ export class CultivationPreparationQueue {
       // Compile the visible pass, upload through the depth pass, and let the
       // retained live camera own the single gameplay transmission target.
       const transmissive = copies.some(m => m instanceof THREE.MeshPhysicalMaterial && m.transmission > 0);
-      if ((needsProgram || needsBuffer) && !transmissive) { primes.push(proxy); this.uploaded.add(geometry); }
+      if ((needsProgram || needsBuffer) && !transmissive) {
+        primes.push(proxy); scheduledGeometry.add(geometry);
+        if (source instanceof THREE.InstancedMesh) {
+          scheduledInstances.add(source.instanceMatrix);
+          if (source.instanceColor) scheduledInstances.add(source.instanceColor);
+        }
+      }
+      // The captive gel does not cast shadows. Upload its authored geometry
+      // and morph textures through its depth material without allocating a
+      // temporary transmission target or changing the live caster policy.
+      if (transmissive && needsBuffer && source instanceof THREE.Mesh && source.customDepthMaterial &&
+          !source.castShadow && !source.userData.characterShadowCaster) {
+        const depth = createShadowPrewarmMaterial(source, materials[0]!, false);
+        this.retained.push(depth);
+        const primer = source.clone(false); primer.material = depth;
+        primer.visible = true; primer.frustumCulled = false; primer.castShadow = false;
+        source.updateWorldMatrix(true, false); primer.matrix.copy(source.matrixWorld); primer.matrixAutoUpdate = false;
+        shadows.push(primer);
+      }
       if (++collected % 8 === 0) yield {label:'collect', run: () => {}};
       // Shadow programs also encode light counts. Compile their real depth/distance
       // configurations asynchronously, without rendering nine whole-room shadow passes.
-      if (source instanceof THREE.Mesh && source.castShadow) for (const material of materials) {
+      if (source instanceof THREE.Mesh && (source.castShadow || source.userData.characterShadowCaster)) for (const material of materials) {
         if (!material.visible) continue;
         for (const distance of [false, true]) {
           // Ordinary rooms have no shadowed point source and never use distance programs.
@@ -353,8 +379,7 @@ export class CultivationPreparationQueue {
           if (seen.has(key)) continue; seen.add(key);
           const shadow = createShadowPrewarmMaterial(source, material, distance);
           this.retained.push(shadow);
-          const shadowProxy = source.clone(false) as THREE.Mesh; shadowProxy.material = shadow; shadowProxy.castShadow = false; shadowProxy.frustumCulled = false; shadowProxy.visible = true;
-          if (shadowProxy instanceof THREE.InstancedMesh) this.temporaryInstances.push(shadowProxy);
+          const shadowProxy = clonePrewarmDrawable(source, this.instanceDisposers) as THREE.Mesh; shadowProxy.material = shadow; shadowProxy.castShadow = false; shadowProxy.frustumCulled = false; shadowProxy.visible = true;
           if (distance) (this.layer.renderer.properties.get(shadow) as {light?: THREE.Object3D}).light = scene.children.find(o => o instanceof THREE.PointLight && o.castShadow);
           shadows.push(shadowProxy);
         }
@@ -386,12 +411,30 @@ export class CultivationPreparationQueue {
       yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + batch[0].name, run: () => {
         const start = performance.now();
         targetScene.add(...batch);
-        try { this.withState(true, shadowTarget, () => this.layer.renderer.render(targetScene, this.camera)); }
+        try {
+          this.renderStateRevision++;
+          this.withState(true, shadowTarget, () => this.layer.renderer.render(targetScene, this.camera));
+          for (const proxy of batch) {
+            const source = this.proxySources.get(proxy);
+            this.uploaded.add(source?.geometry ?? proxy.geometry);
+            if (source instanceof THREE.InstancedMesh) {
+              this.uploadedInstanceAttributes.add(source.instanceMatrix);
+              if (source.instanceColor) this.uploadedInstanceAttributes.add(source.instanceColor);
+            }
+          }
+        }
         finally { for (const proxy of batch) proxy.removeFromParent(); }
         this.diagnostics.primeMs += performance.now()-start;
       }};
     }
     } finally {
+      // Filler lights belong to padding, while these tiny targets belong to
+      // the preparation step. Clear borrowed references before either owner
+      // is disposed so no map is released twice.
+      for (const root of [scene, shadowScene]) root.traverse(object => {
+        if ((object instanceof THREE.SpotLight || object instanceof THREE.PointLight || object instanceof THREE.DirectionalLight) &&
+            object.shadow.map && shadowTargets.some(target => target === object.shadow.map)) object.shadow.map = null;
+      });
       for (const target of shadowTargets) {
         target.depthTexture?.dispose(); target.depthTexture = null; target.dispose();
       }
@@ -416,8 +459,8 @@ export class CultivationPreparationQueue {
     if (this.released) return;
     this.released = true;
     for (const m of this.retained) m.dispose();
-    for (const mesh of this.temporaryInstances) mesh.dispose();
-    this.retained.length = 0; this.temporaryInstances.length = 0;
+    for (const dispose of this.instanceDisposers) dispose();
+    this.retained.length = 0; this.instanceDisposers.length = 0;
     this.target.dispose(); this.overlay?.remove();
   }
 }
