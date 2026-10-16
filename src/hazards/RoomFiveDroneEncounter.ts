@@ -3,7 +3,7 @@ import { disposeShadowLight } from '../render/ShadowLightResources.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationPlatformBoosters } from '../render/environment/cultivation/CultivationPlatformBoosters.ts';
 import * as THREE from 'three';
-import { BeamOcclusion } from '../render/hazards/BeamOcclusion.ts';
+import { ScannerBeamPresentation } from '../render/hazards/ScannerBeamPresentation.ts';
 import { RoomFivePatrol } from './RoomFivePatrol.ts';
 import { ROOM_FIVE_JUMPS } from '../levels/RoomFiveParkour.ts';
 import { createRustedSewerDrone } from '../levels/RustedSewerDrone.ts';
@@ -37,11 +37,7 @@ export class RoomFiveDroneEncounter {
   private readonly targets: readonly SecurityDroneTarget[];
   private readonly projectileTargets: readonly DroneProjectileTarget[];
   private readonly beams: THREE.Mesh[] = [];
-  private readonly beamOcclusion = new BeamOcclusion();
-  private readonly beamOrigin = new THREE.Vector3();
-  private presentationStep = 0;
-  private readonly beamLengths: number[] = [];
-  private readonly world: CollisionWorld;
+  private readonly scannerBeams: ScannerBeamPresentation;
   private readonly searchLights: THREE.SpotLight[] = [];
   private readonly sewerLight = new THREE.PointLight(0xff7935, 0, 8);
   private readonly sewerLighting: CultivationSewerLighting;
@@ -61,7 +57,6 @@ export class RoomFiveDroneEncounter {
     surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null }) {
     this.resources = new SecurityDronePresentationResources(surfaceMaps);
     this.room = room;
-    this.world = world;
     this.sewerLighting = new CultivationSewerLighting(room.root, surfaceMaps);
     this.platformBoosters = new CultivationPlatformBoosters(room, surfaceMaps);
     this.sewerDamage = new SewerDroneDamage(room.brokenCore);
@@ -130,7 +125,6 @@ export class RoomFiveDroneEncounter {
         new THREE.MeshBasicMaterial({ color: beamColour, transparent: true, opacity: network === 'blue' ? .09 : .02, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
       beam.geometry.translate(0, -ROOM_FIVE_DRONE_VIEW_RANGE / 2, 0); beam.name = `room-5-${network}-scanner-${index}`;
       beam.position.copy(position); room.root.add(beam); this.beams.push(beam);
-      this.beamLengths.push(-1);
       const search = new THREE.SpotLight(beamColour, network === 'blue' ? 65 : 45, ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_HALF_ANGLE, .2, 2);
       search.name = `${drone.id}-search-light`; search.castShadow = true;
       search.shadow.mapSize.set(512, 512); search.shadow.bias = -.0002; search.shadow.normalBias = .025;
@@ -142,6 +136,10 @@ export class RoomFiveDroneEncounter {
     // Three increasingly elevated paired crossings before Volt's release lever.
     for (const index of [0, 2, 5]) drones.push(makePatrol(ROOM_FIVE_ROUTE_NETWORKS[(index + 1) % 3], index, true));
     this.drones = drones;
+    this.scannerBeams = new ScannerBeamPresentation(world, this.beams.map((mesh, i) => ({
+      mesh, ignoredCollider: drones[i].collider,
+      enabled: () => drones[i].readModel.enabled && this.room.controller.security.isEnabled(this.networks[i]),
+    })));
     this.brokenDrone = create('room-5-damaged-sewer-drone', SEWER_DRONE_POSITION.clone(), new THREE.Vector3(0, 0, -1), true);
     // The authored rusted shell is the visible, acid-targetable collider.
     this.brokenDrone.presentation.root.visible = false;
@@ -163,7 +161,6 @@ export class RoomFiveDroneEncounter {
     this.damage.update(dt);
     this.sewerLighting.update(dt);
     this.platformBoosters.update(dt, this.targets[0].position);
-    this.presentationStep++;
     for (let i = 0; i < this.drones.length; i++) {
       const drone = this.drones[i];
       const network = this.networks[i];
@@ -174,18 +171,7 @@ export class RoomFiveDroneEncounter {
       drone.setEnabled(enabled);
       drone.update(dt, this.targets);
       drone.frontIndicator.material.color.setHex(drone.readModel.enabled ? ROOM_FIVE_NETWORK_COLOURS[network] : 0x20252a);
-      const beam = this.beams[i]; beam.visible = drone.readModel.enabled;
-      beam.position.copy(drone.root.position).addScaledVector(drone.readModel.scanDirection, 1.4);
-      this.direction.copy(drone.readModel.scanDirection).negate();
-      beam.quaternion.setFromUnitVectors(this.up, this.direction);
-      this.direction.negate();
-      beam.getWorldPosition(this.beamOrigin);
-      // Spread collision sampling across ticks instead of casting every cone every tick.
-      if (enabled && (i % 3 === this.presentationStep % 3 || this.beamLengths[i] < 0)) {
-        this.beamOcclusion.clipGeometry(this.world, this.beamOrigin, beam.quaternion, beam.geometry, drone.collider);
-        this.beamLengths[i] = ROOM_FIVE_DRONE_VIEW_RANGE;
-      }
-      beam.visible = enabled;
+      this.direction.copy(drone.readModel.scanDirection);
       this.flyers[i].body.quaternion.setFromUnitVectors(this.sewerForward, this.direction);
       this.flyers[i].eye.material.color.copy(drone.frontIndicator.material.color);
       const search = this.searchLights[i]; search.intensity = enabled ? (network === 'blue' ? 65 : 45) : 0;
@@ -222,6 +208,17 @@ export class RoomFiveDroneEncounter {
     if (sewerState === 'dormant') this.room.sewer.eye.material.color.setHex(0x080b07);
     this.projectiles.update(dt, this.projectileTargets);
   }
+  /** Cosmetic queries run once per presented frame, after room/camera selection. */
+  updatePresentation(deltaSeconds: number, camera: THREE.Camera): void {
+    if (this.disposed) return;
+    for (let i = 0; i < this.drones.length; i++) {
+      const drone = this.drones[i], beam = this.beams[i];
+      beam.position.copy(drone.root.position).addScaledVector(drone.readModel.scanDirection, 1.4);
+      this.direction.copy(drone.readModel.scanDirection).negate();
+      beam.quaternion.setFromUnitVectors(this.up, this.direction);
+    }
+    this.scannerBeams.update(deltaSeconds, camera);
+  }
   private updateSewerLightPosition(): void {
     const shell = this.room.brokenCore;
     this.sewerLight.position.set(0, .2, -1.4).multiply(shell.scale)
@@ -229,8 +226,7 @@ export class RoomFiveDroneEncounter {
   }
   reset(): void {
     this.damage.reset(); this.projectiles.reset(); this.presentation.reset();
-    this.beamLengths.fill(-1); this.presentationStep = 0;
-    for (const beam of this.beams) beam.visible = false;
+    this.scannerBeams.reset();
     for (const search of this.searchLights) {
       search.intensity = 0; search.shadow.autoUpdate = false;
       // Zero-intensity lights retain live PCF sampler slots. Allocate their

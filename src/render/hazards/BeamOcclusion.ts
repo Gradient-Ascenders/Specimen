@@ -1,32 +1,54 @@
 import * as THREE from 'three';
 import { CollisionHit, CollisionLayer, type CollisionWorld } from '../../physics/CollisionWorld.ts';
 
-/** Conservative cone limit: stop the entire beam at the nearest sampled blocker. */
+/** Cosmetic edge clipping; never used for authoritative detection or damage. */
 export class BeamOcclusion {
-  private readonly originals = new WeakMap<THREE.BufferGeometry, Float32Array>();
+  private readonly originals = new WeakMap<THREE.BufferGeometry, {
+    positions: Float32Array; representatives: number[]; fractions: Float64Array;
+  }>();
   private readonly hit = new CollisionHit();
   private readonly right = new THREE.Vector3();
   private readonly up = new THREE.Vector3();
   private readonly ray = new THREE.Vector3();
   /** Clip each cone edge independently, preserving the visible span of clear edges. */
   clipGeometry(world: CollisionWorld, origin: THREE.Vector3, rotation: THREE.Quaternion,
-    geometry: THREE.BufferGeometry, ignored: THREE.Mesh): void {
+    geometry: THREE.BufferGeometry, ignored: THREE.Mesh, worldMatrix?: THREE.Matrix4): void {
     const positions = geometry.getAttribute('position') as THREE.BufferAttribute;
     let original = this.originals.get(geometry);
     if (!original) {
-      original = new Float32Array(positions.array); this.originals.set(geometry, original);
+      const source = new Float32Array(positions.array), representatives: number[] = [];
+      for (let i = 0; i < positions.count; i++) {
+        let representative = i;
+        for (let j = 0; j < i; j++) {
+          // Cone UV seams and apex duplicates share one collision sample.
+          if (Math.abs(source[i * 3] - source[j * 3]) < 1e-6 &&
+              Math.abs(source[i * 3 + 1] - source[j * 3 + 1]) < 1e-6 &&
+              Math.abs(source[i * 3 + 2] - source[j * 3 + 2]) < 1e-6) {
+            representative = j; break;
+          }
+        }
+        representatives.push(representative);
+      }
+      original = { positions: source, representatives, fractions: new Float64Array(positions.count) };
+      this.originals.set(geometry, original);
       positions.setUsage(THREE.DynamicDrawUsage);
     }
     // Every edge samples the same immutable pose. Refresh moving collider and
     // parent matrices once for this cone, rather than again for every vertex.
-    const sourcePositions = original;
+    const { positions: sourcePositions, representatives, fractions } = original;
     world.withStableQueryTransforms(() => {
       for (let i = 0; i < positions.count; i++) {
         const offset = i * 3;
-        this.ray.fromArray(sourcePositions, offset).applyQuaternion(rotation);
-        let fraction = 1;
-        if (this.ray.lengthSq() > .0001 && world.sweepSphere(origin, this.ray, .01, this.hit, CollisionLayer.LineOfSight, ignored))
-          fraction = Math.max(0, this.hit.fraction - .015 / this.ray.length());
+        let fraction = fractions[representatives[i]];
+        if (representatives[i] === i) {
+          this.ray.fromArray(sourcePositions, offset);
+          if (worldMatrix) this.ray.applyMatrix4(worldMatrix).sub(origin);
+          else this.ray.applyQuaternion(rotation);
+          fraction = 1;
+          if (this.ray.lengthSq() > .0001 && world.sweepSphere(origin, this.ray, .01, this.hit, CollisionLayer.LineOfSight, ignored))
+            fraction = Math.max(0, this.hit.fraction - .015 / this.ray.length());
+          fractions[i] = fraction;
+        }
         positions.setXYZ(i, sourcePositions[offset] * fraction, sourcePositions[offset + 1] * fraction, sourcePositions[offset + 2] * fraction);
       }
     });

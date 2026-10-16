@@ -27,7 +27,7 @@ test('conducting highlights follow available devices, respect depth, and clean u
     slimeManager: { activeSlimeId: 'volt', getBody: () => body, canActiveUseAbility: () => true },
     aimRayProvider: { copyAimRay(origin, direction) { origin.set(0,0,0); direction.set(1,0,0); } },
   });
-  const state = { ...system.readModel, aimActive: true };
+  const state = { ...system.readModel, aimActive: true, beamStart: {x: 30, y: 8, z: 0} };
   const originalMaterial = mesh.material;
   const laterMesh = mesh.clone();
   try {
@@ -44,7 +44,9 @@ test('conducting highlights follow available devices, respect depth, and clean u
     assert.equal(helper.material.depthWrite, false);
     assert.equal(helper.material.color.getHex(), 0xffd45c);
     highlights.update({...state, selectedTargetId: 'lamp', selectedTargetValid: true});
-    assert.equal(helper.material.color.getHex(), 0x6dffac);
+    assert.equal(helper.material.color.getHex(), 0xffffb0);
+    highlights.update({...state, selectedTargetId: 'lamp', selectedTargetValid: false});
+    assert.equal(helper.material.color.getHex(), 0xffab45);
     mesh.position.x = 40; mesh.updateMatrixWorld(true);
     highlights.update(state);
     helper.geometry.computeBoundingBox();
@@ -65,6 +67,15 @@ test('conducting highlights follow available devices, respect depth, and clean u
     assert.equal(updates, 1); assert.equal(helper.visible, true);
     helper.geometry.computeBoundingBox();
     assert.equal(helper.geometry.boundingBox!.getCenter(new THREE.Vector3()).x, 45, 're-entering aim refreshes moved targets');
+    mesh.position.x = 45.01; mesh.updateMatrixWorld(true);
+    highlights.update(state);
+    assert.equal(helper.visible, false, 'unrelated targets outside acquisition range stay hidden');
+    assert.equal(updates, 1, 'out-of-range helpers do not rebuild bounds');
+    highlights.update({...state, connectedTargetId: 'lamp'});
+    assert.equal(helper.visible, true, 'established connections survive the acquisition range');
+    assert.equal(helper.material.color.getHex(), 0xffe774);
+    highlights.update({...state, connectedTargetId: 'lamp', connectionUnstable: true});
+    assert.equal(helper.material.color.getHex(), 0xff9e25);
     const removeLater = registry.register(makeTarget('lift', laterMesh));
     assert.equal(highlights.root.children.length, 2);
     withGameplayUiVisibility(camera, false, () => {
