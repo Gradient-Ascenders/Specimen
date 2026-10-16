@@ -1,5 +1,7 @@
 # Shader preparation (#191)
 
+Current integration and PR readiness: [main with #212/#213](shader-preparation-191-main213.md).
+
 Historical pre-integration report. See [the Standard loading and latest-main
 follow-up](shader-preparation-191-follow-up.md) for subsequent measurements,
 integration, validation and the current review candidate.

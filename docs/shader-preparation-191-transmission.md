@@ -1,5 +1,7 @@
 # Issue #191: direct transmission resource switching
 
+Current integration and PR readiness: [main with #212/#213](shader-preparation-191-main213.md).
+
 Follow-up to [Standard attribution and main integration](shader-preparation-191-follow-up.md).
 Work continues on `codex/191-shader-preparation`. The known fresh Standard
 loading regression remains unresolved. This change does not skip shader checks,

@@ -1,5 +1,7 @@
 # Issue #191: Standard loading and latest-main integration
 
+Current integration and PR readiness: [main with #212/#213](shader-preparation-191-main213.md).
+
 Subsequent review follow-up: [direct transmission resource switching](shader-preparation-191-transmission.md).
 
 This follows [the initial implementation report](shader-preparation-191.md).
