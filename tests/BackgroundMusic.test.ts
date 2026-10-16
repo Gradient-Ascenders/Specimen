@@ -75,11 +75,11 @@ test('track switching streams a second element and releases the previous one', a
   music.setScene('intro', true);
   music.unlock();
   music.setScene('containment', true);
-  assert.equal(players[1]?.src, './assets/audio/music/01-containment-thought-loop.ogg');
-  assert.equal(players[1]?.paused, false);
+  assert.equal(players[0]?.src, './assets/audio/music/01-containment-thought-loop.ogg');
+  assert.equal(players[0]?.paused, false);
   await new Promise(resolve => setTimeout(resolve, 455));
-  assert.equal(players[0]?.paused, true);
-  assert.equal(players[1]?.volume, 0.28);
+  assert.equal(players[1]?.paused, true);
+  assert.equal(players[0]?.volume, 0.28);
   music.dispose();
 });
 
