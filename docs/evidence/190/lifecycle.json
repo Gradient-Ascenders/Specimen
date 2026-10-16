@@ -1,0 +1,5971 @@
+{
+  "hashes": {
+    "http://127.0.0.1:4186/assets/three.core-YV7fhFn3.js": "bcca9165dc9e5ad298da78d02215dc926cfea8a2e657ada641b814302a7173e3",
+    "http://127.0.0.1:4186/assets/GelElasticMotion-BdQADHD6.js": "c02c9517f7aa4abb31f18da9bac6d09384472b1316e5edf3751d0df8b2c0b9af",
+    "http://127.0.0.1:4186/assets/index-Bo81zKRg.js": "a2163319b3c8815d1e33c64548c97633c205842bfb66f00c46da925584d41402",
+    "http://127.0.0.1:4186/assets/PerformanceFlightRecorder-D3ApwG_Q.js": "3c761e40a67f3cad8b619ff6e25bcbe126d716eff723ea3784de40e4a35fe8b5",
+    "http://127.0.0.1:4186/assets/VoltCharacterPresentation-D3Jjq3VY.js": "1baff1a53e999b374a3a246564a0ee6dc97a868acacff7dd0202d7ae3352d180",
+    "http://127.0.0.1:4186/assets/LevelProgression-Cm14saoe.js": "6230bedbd6a642dda15de8ba8717d060a5f9ce2b00989271fd18973d9123c0fc",
+    "http://127.0.0.1:4186/assets/DroneProjectilePresentation-DIMG2S7X.js": "46d3fff09ffa49b9828b2f38a587aab7ec8892d2aabe8646cc9675b0a1b46f70",
+    "http://127.0.0.1:4186/assets/CultivationLevelRuntime-UyA9M-mO.js": "38a3d0e0da603694a7418923bf6f53893c9b0f2f8e9ea3a72ba86231cdb665ab",
+    "http://127.0.0.1:4186/assets/CultivationLevelDebug-rUKybCIB.js": "c128ee1a1da199dd9d9f54b5172ed4e3b137e9e6f921e40456f0e612e877a8c1",
+    "http://127.0.0.1:4186/assets/BlackoutLevelRuntime-ComhVs8K.js": "ef27604f6ad6853d625e2a3bb6ce74077b399261600ffce93329125df97e561d"
+  },
+  "rows": [
+    {
+      "phase": "default",
+      "diagnostics": {
+        "viewportWidth": 640,
+        "viewportHeight": 360,
+        "drawingBufferWidth": 480,
+        "drawingBufferHeight": 270,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 68,
+        "programs": 99
+      },
+      "snapshot": {
+        "viewportWidth": 640,
+        "viewportHeight": 360,
+        "drawingBufferWidth": 480,
+        "drawingBufferHeight": 270,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 99,
+        "geometries": 604,
+        "textures": 68
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 757,
+      "mapDisposals": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        480,
+        270
+      ],
+      "css": [
+        640,
+        360
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "standard-resize",
+      "diagnostics": {
+        "viewportWidth": 3840,
+        "viewportHeight": 2160,
+        "drawingBufferWidth": 1920,
+        "drawingBufferHeight": 1080,
+        "pixelRatio": 0.5,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 393,
+        "triangles": 203366,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 3840,
+        "viewportHeight": 2160,
+        "drawingBufferWidth": 1920,
+        "drawingBufferHeight": 1080,
+        "effectiveDpr": 0.5,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 393,
+        "triangles": 203366,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        12,
+        18
+      ],
+      "transmission": [
+        0.28,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 721,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        1920,
+        1080
+      ],
+      "css": [
+        3840,
+        2160
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "standard-resize",
+      "diagnostics": {
+        "viewportWidth": 320,
+        "viewportHeight": 900,
+        "drawingBufferWidth": 320,
+        "drawingBufferHeight": 900,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 277,
+        "triangles": 144428,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 320,
+        "viewportHeight": 900,
+        "drawingBufferWidth": 320,
+        "drawingBufferHeight": 900,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 277,
+        "triangles": 144428,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        12,
+        18
+      ],
+      "transmission": [
+        0.28,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 501,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        320,
+        900
+      ],
+      "css": [
+        320,
+        900
+      ],
+      "aspect": 0.35555555555555557,
+      "level": "Yc"
+    },
+    {
+      "phase": "standard-resize",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 393,
+        "triangles": 203366,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 393,
+        "triangles": 203366,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        12,
+        18
+      ],
+      "transmission": [
+        0.28,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 724,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "minimum-resize",
+      "diagnostics": {
+        "viewportWidth": 3840,
+        "viewportHeight": 2160,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 0.3333333333333333,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 3840,
+        "viewportHeight": 2160,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 0.3333333333333333,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 713,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        3840,
+        2160
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "minimum-resize",
+      "diagnostics": {
+        "viewportWidth": 320,
+        "viewportHeight": 900,
+        "drawingBufferWidth": 240,
+        "drawingBufferHeight": 675,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 199,
+        "triangles": 133294,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 320,
+        "viewportHeight": 900,
+        "drawingBufferWidth": 240,
+        "drawingBufferHeight": 675,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 199,
+        "triangles": 133294,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 545,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "canvas": [
+        240,
+        675
+      ],
+      "css": [
+        320,
+        900
+      ],
+      "aspect": 0.35555555555555557,
+      "level": "Yc"
+    },
+    {
+      "phase": "minimum-resize",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 695,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "dpi-change",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 2,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 2,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 695,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "dpi-change",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1.25,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1.25,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 695,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "dpi-change",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 695,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Yc"
+    },
+    {
+      "phase": "level-1-entry",
+      "diagnostics": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 393,
+        "triangles": 203366,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 393,
+        "triangles": 203366,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        12,
+        18
+      ],
+      "transmission": [
+        0.28,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 757,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0
+      ],
+      "canvas": [
+        632,
+        356
+      ],
+      "css": [
+        632,
+        356
+      ],
+      "aspect": 1.7752808988764044,
+      "level": "Yc"
+    },
+    {
+      "phase": "level-1-minimum",
+      "diagnostics": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 474,
+        "drawingBufferHeight": 267,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 474,
+        "drawingBufferHeight": 267,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 780,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0
+      ],
+      "canvas": [
+        474,
+        267
+      ],
+      "css": [
+        632,
+        356
+      ],
+      "aspect": 1.7752808988764044,
+      "level": "Yc"
+    },
+    {
+      "phase": "level-1-standard",
+      "diagnostics": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 393,
+        "triangles": 203366,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 393,
+        "triangles": 203366,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        12,
+        18
+      ],
+      "transmission": [
+        0.28,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 757,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "canvas": [
+        632,
+        356
+      ],
+      "css": [
+        632,
+        356
+      ],
+      "aspect": 1.7752808988764044,
+      "level": "Yc"
+    },
+    {
+      "phase": "level-1-minimum",
+      "diagnostics": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 474,
+        "drawingBufferHeight": 267,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 259,
+        "triangles": 176274,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 474,
+        "drawingBufferHeight": 267,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 259,
+        "triangles": 176274,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        6,
+        9
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 780,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "canvas": [
+        474,
+        267
+      ],
+      "css": [
+        632,
+        356
+      ],
+      "aspect": 1.7752808988764044,
+      "level": "Yc"
+    },
+    {
+      "phase": "level-1-standard",
+      "diagnostics": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 393,
+        "triangles": 203366,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 393,
+        "triangles": 203366,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        12,
+        18
+      ],
+      "transmission": [
+        0.28,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 757,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "canvas": [
+        632,
+        356
+      ],
+      "css": [
+        632,
+        356
+      ],
+      "aspect": 1.7752808988764044,
+      "level": "Yc"
+    },
+    {
+      "phase": "level-1-restart",
+      "diagnostics": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 479,
+        "triangles": 248990,
+        "sceneObjects": 1596,
+        "sceneLights": 38,
+        "uniqueMaterials": 133,
+        "instancedMeshes": 162,
+        "geometries": 604,
+        "textures": 55,
+        "programs": 101
+      },
+      "snapshot": {
+        "viewportWidth": 632,
+        "viewportHeight": 356,
+        "drawingBufferWidth": 632,
+        "drawingBufferHeight": 356,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 479,
+        "triangles": 248990,
+        "programs": 101,
+        "geometries": 604,
+        "textures": 55
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [
+        12,
+        18
+      ],
+      "transmission": [
+        0.28,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 757,
+      "mapDisposals": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "canvas": [
+        632,
+        356
+      ],
+      "css": [
+        632,
+        356
+      ],
+      "aspect": 1.7752808988764044,
+      "level": "Yc"
+    },
+    {
+      "phase": "level-2-entry",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 640,
+        "drawingBufferHeight": 360,
+        "pixelRatio": 0.5,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 0.5,
+        "graphicsProfile": "custom",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 100,
+        "triangles": 121706,
+        "sceneObjects": 2270,
+        "sceneLights": 66,
+        "uniqueMaterials": 405,
+        "instancedMeshes": 23,
+        "geometries": 545,
+        "textures": 60,
+        "programs": 207
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 640,
+        "drawingBufferHeight": 360,
+        "effectiveDpr": 0.5,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "custom",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 0.5,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 100,
+        "triangles": 121706,
+        "programs": 207,
+        "geometries": 545,
+        "textures": 60
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [],
+      "transmission": [
+        0.55,
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 1019,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "canvas": [
+        640,
+        360
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "authored-cultivation"
+    },
+    {
+      "phase": "level-2-minimum",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 82,
+        "triangles": 108836,
+        "sceneObjects": 2270,
+        "sceneLights": 66,
+        "uniqueMaterials": 405,
+        "instancedMeshes": 23,
+        "geometries": 545,
+        "textures": 62,
+        "programs": 209
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 82,
+        "triangles": 108836,
+        "programs": 209,
+        "geometries": 545,
+        "textures": 62
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [],
+      "transmission": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 994,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "authored-cultivation"
+    },
+    {
+      "phase": "level-2-standard",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 100,
+        "triangles": 121706,
+        "sceneObjects": 2270,
+        "sceneLights": 66,
+        "uniqueMaterials": 405,
+        "instancedMeshes": 23,
+        "geometries": 545,
+        "textures": 62,
+        "programs": 209
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 100,
+        "triangles": 121706,
+        "programs": 209,
+        "geometries": 545,
+        "textures": 62
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [],
+      "transmission": [
+        0.55,
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 1018,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "authored-cultivation"
+    },
+    {
+      "phase": "level-2-minimum",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 82,
+        "triangles": 108836,
+        "sceneObjects": 2270,
+        "sceneLights": 66,
+        "uniqueMaterials": 405,
+        "instancedMeshes": 23,
+        "geometries": 545,
+        "textures": 62,
+        "programs": 209
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 82,
+        "triangles": 108836,
+        "programs": 209,
+        "geometries": 545,
+        "textures": 62
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [],
+      "transmission": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 994,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "authored-cultivation"
+    },
+    {
+      "phase": "level-2-standard",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 100,
+        "triangles": 121706,
+        "sceneObjects": 2270,
+        "sceneLights": 66,
+        "uniqueMaterials": 405,
+        "instancedMeshes": 23,
+        "geometries": 545,
+        "textures": 62,
+        "programs": 209
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 100,
+        "triangles": 121706,
+        "programs": 209,
+        "geometries": 545,
+        "textures": 62
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [],
+      "transmission": [
+        0.55,
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 1018,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "authored-cultivation"
+    },
+    {
+      "phase": "level-2-restart",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 100,
+        "triangles": 121706,
+        "sceneObjects": 2270,
+        "sceneLights": 66,
+        "uniqueMaterials": 405,
+        "instancedMeshes": 23,
+        "geometries": 545,
+        "textures": 62,
+        "programs": 209
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 100,
+        "triangles": 121706,
+        "programs": 209,
+        "geometries": 545,
+        "textures": 62
+      },
+      "shadowSizes": [
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "effectCounts": [],
+      "transmission": [
+        0.55,
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 1018,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "authored-cultivation"
+    },
+    {
+      "phase": "level-3-entry",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 640,
+        "drawingBufferHeight": 360,
+        "pixelRatio": 0.5,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 0.5,
+        "graphicsProfile": "custom",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 290,
+        "triangles": 230952,
+        "sceneObjects": 671,
+        "sceneLights": 22,
+        "uniqueMaterials": 159,
+        "instancedMeshes": 6,
+        "geometries": 349,
+        "textures": 60,
+        "programs": 74
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 640,
+        "drawingBufferHeight": 360,
+        "effectiveDpr": 0.5,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "custom",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 0.5,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 290,
+        "triangles": 230952,
+        "programs": 74,
+        "geometries": 349,
+        "textures": 60
+      },
+      "shadowSizes": [
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "effectCounts": [
+        30,
+        7
+      ],
+      "transmission": [
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 586,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        640,
+        360
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Wr"
+    },
+    {
+      "phase": "level-3-minimum",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 205,
+        "triangles": 212344,
+        "sceneObjects": 671,
+        "sceneLights": 22,
+        "uniqueMaterials": 159,
+        "instancedMeshes": 6,
+        "geometries": 349,
+        "textures": 60,
+        "programs": 77
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 205,
+        "triangles": 212344,
+        "programs": 77,
+        "geometries": 349,
+        "textures": 60
+      },
+      "shadowSizes": [
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "effectCounts": [
+        15,
+        4
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 530,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Wr"
+    },
+    {
+      "phase": "level-3-standard",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 257,
+        "triangles": 230316,
+        "sceneObjects": 671,
+        "sceneLights": 22,
+        "uniqueMaterials": 159,
+        "instancedMeshes": 6,
+        "geometries": 349,
+        "textures": 60,
+        "programs": 77
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 257,
+        "triangles": 230316,
+        "programs": 77,
+        "geometries": 349,
+        "textures": 60
+      },
+      "shadowSizes": [
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "effectCounts": [
+        30,
+        7
+      ],
+      "transmission": [
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 563,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Wr"
+    },
+    {
+      "phase": "level-3-minimum",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "pixelRatio": 0.75,
+        "pixelRatioCap": 1,
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "pixelBudget": 921600,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "drawCalls": 205,
+        "triangles": 212344,
+        "sceneObjects": 671,
+        "sceneLights": 22,
+        "uniqueMaterials": 159,
+        "instancedMeshes": 6,
+        "geometries": 349,
+        "textures": 60,
+        "programs": 77
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 960,
+        "drawingBufferHeight": 540,
+        "effectiveDpr": 0.75,
+        "resolutionTier": 1,
+        "graphicsProfile": "minimum",
+        "graphicsProfileBase": "minimum",
+        "devicePixelRatio": 1,
+        "renderScale": 0.75,
+        "pixelBudget": 921600,
+        "gelRenderingMode": "minimum",
+        "transmissionResolutionScale": 1,
+        "shadowMapSizeCap": 512,
+        "effectsDensity": 0.5,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 205,
+        "triangles": 212344,
+        "programs": 77,
+        "geometries": 349,
+        "textures": 60
+      },
+      "shadowSizes": [
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "effectCounts": [
+        15,
+        4
+      ],
+      "transmission": [
+        0,
+        0,
+        0
+      ],
+      "glError": 0,
+      "distinctColors": 530,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        960,
+        540
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Wr"
+    },
+    {
+      "phase": "level-3-standard",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 257,
+        "triangles": 230316,
+        "sceneObjects": 671,
+        "sceneLights": 22,
+        "uniqueMaterials": 159,
+        "instancedMeshes": 6,
+        "geometries": 349,
+        "textures": 60,
+        "programs": 77
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 257,
+        "triangles": 230316,
+        "programs": 77,
+        "geometries": 349,
+        "textures": 60
+      },
+      "shadowSizes": [
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "effectCounts": [
+        30,
+        7
+      ],
+      "transmission": [
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 563,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Wr"
+    },
+    {
+      "phase": "level-3-restart",
+      "diagnostics": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "pixelRatio": 1,
+        "pixelRatioCap": 1.5,
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "pixelBudget": 2073600,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "antialias": false,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "drawCalls": 248,
+        "triangles": 100704,
+        "sceneObjects": 671,
+        "sceneLights": 22,
+        "uniqueMaterials": 159,
+        "instancedMeshes": 6,
+        "geometries": 349,
+        "textures": 60,
+        "programs": 77
+      },
+      "snapshot": {
+        "viewportWidth": 1280,
+        "viewportHeight": 720,
+        "drawingBufferWidth": 1280,
+        "drawingBufferHeight": 720,
+        "effectiveDpr": 1,
+        "resolutionTier": 1.5,
+        "graphicsProfile": "standard",
+        "graphicsProfileBase": "standard",
+        "devicePixelRatio": 1,
+        "renderScale": 1,
+        "pixelBudget": 2073600,
+        "gelRenderingMode": "reduced-transmission",
+        "transmissionResolutionScale": 0.5,
+        "shadowMapSizeCap": 1024,
+        "effectsDensity": 1,
+        "antialias": false,
+        "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+        "drawCalls": 248,
+        "triangles": 100704,
+        "programs": 77,
+        "geometries": 349,
+        "textures": 60
+      },
+      "shadowSizes": [
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          256,
+          256
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ],
+        [
+          512,
+          512
+        ]
+      ],
+      "effectCounts": [
+        30,
+        7
+      ],
+      "transmission": [
+        0.55,
+        0.28,
+        0.28
+      ],
+      "glError": 0,
+      "distinctColors": 563,
+      "mapDisposals": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0
+      ],
+      "canvas": [
+        1280,
+        720
+      ],
+      "css": [
+        1280,
+        720
+      ],
+      "aspect": 1.7777777777777777,
+      "level": "Wr"
+    }
+  ],
+  "unloaded": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "errors": []
+}

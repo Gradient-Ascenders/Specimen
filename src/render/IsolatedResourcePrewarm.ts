@@ -18,8 +18,15 @@ export function withIsolatedPrewarmState<T>(
   const { calls, triangles, points, lines } = renderer.info.render;
   try {
     if (target) renderer.setRenderTarget(target);
-    renderer.setViewport(target ? 0 : -2, target ? 0 : -2, 1, 1);
-    renderer.setScissor(target ? 0 : -2, target ? 0 : -2, 1, 1);
+    // A one-logical-pixel viewport can become zero physical pixels below DPR 1,
+    // or a zero-sized transmission target at half-resolution refraction.
+    // Keep at least one transmission texel while retaining a tiny offscreen draw.
+    const density = renderer.getPixelRatio?.() ?? 1;
+    const transmissionScale = renderer.transmissionResolutionScale ?? 1;
+    const extent = Math.ceil(Math.ceil(1 / Math.min(1, transmissionScale)) / density);
+    const origin = target ? 0 : -extent - 1;
+    renderer.setViewport(origin, origin, extent, extent);
+    renderer.setScissor(origin, origin, extent, extent);
     renderer.setScissorTest(true);
     return action();
   } finally {

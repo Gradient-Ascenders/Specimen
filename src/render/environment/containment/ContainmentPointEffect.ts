@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { markDecorativeEffect } from '../../GraphicsResourcePolicy.ts';
 
 export interface ContainmentPointEffectOptions {
   readonly name: string;
@@ -39,6 +40,7 @@ export class ContainmentPointEffect {
     const geometry = new THREE.BufferGeometry();
     geometry.name = `${options.name}-geometry`;
     geometry.setAttribute('position', this.positionAttribute);
+    markDecorativeEffect(geometry);
 
     const material = new THREE.PointsMaterial({
       name: `${options.name}-material`,

@@ -5,6 +5,17 @@ export interface PerformanceRenderSnapshot {
   drawingBufferHeight: number;
   effectiveDpr: number;
   resolutionTier: number;
+  graphicsProfile: string;
+  graphicsProfileBase: string;
+  devicePixelRatio: number;
+  renderScale: number;
+  pixelBudget: number;
+  gelRenderingMode: string;
+  transmissionResolutionScale: number;
+  shadowMapSizeCap: number;
+  effectsDensity: number;
+  antialias: boolean;
+  lightingPolicy: string;
   drawCalls: number;
   triangles: number;
   programs: number;

@@ -36,9 +36,11 @@ correct when preparation is skipped or fails.
 Settings → Character gel controls a session-owned `RenderLayer.gelRendering`
 policy independently of canvas resolution. It applies to Bob, Goop and Volt,
 including captive forms, hidden roster members and characters loaded after a
-level transition. A future minimum-hardware preset (#190) should select
-`minimum` through this same policy. Hardware detection and a canvas pixel
-budget are separate work; the default remains the authored physical look.
+level transition. The [bounded graphics profiles](../graphics-profiles.md) select
+`minimum` by default and `reduced-transmission` for Standard through this same
+policy. They also apply an absolute canvas pixel budget, shadow-map cap and
+decorative-effect density. Standalone material policies still default to physical
+until a session configures them; the application defaults to Minimum hardware.
 
 | Setting / policy value | Material path | Transmission target |
 |---|---|---|

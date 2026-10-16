@@ -252,6 +252,9 @@ const FRAME_COLUMNS = [
   'cameraY', 'cameraZ', 'bobX', 'bobY', 'bobZ', 'goopX', 'goopY', 'goopZ',
   'collisionRegistered', 'collisionEligible', 'collisionCandidates',
   'collisionNarrowChecks',
+  'graphicsProfile', 'graphicsProfileBase', 'devicePixelRatio', 'renderScale',
+  'pixelBudget', 'gelRenderingMode', 'transmissionResolutionScale', 'shadowMapSizeCap', 'effectsDensity',
+  'antialias', 'lightingPolicy',
 ] as const;
 
 const FRAME_TIME_HISTOGRAM_UPPER_BOUNDS_MS = [
@@ -265,6 +268,10 @@ const createRenderSnapshot = (): PerformanceRenderSnapshot => ({
   drawingBufferHeight: 0,
   effectiveDpr: 1,
   resolutionTier: 1,
+  graphicsProfile: 'unavailable', graphicsProfileBase: 'unavailable', devicePixelRatio: 1,
+  renderScale: 1, pixelBudget: 0, gelRenderingMode: 'unavailable', transmissionResolutionScale: 1,
+  shadowMapSizeCap: 0, effectsDensity: 1,
+  antialias: false, lightingPolicy: 'unavailable',
   drawCalls: 0,
   triangles: 0,
   programs: 0,
@@ -704,7 +711,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
     return {
       schema: 'specimen-performance-flight-recorder',
-      schemaVersion: 1,
+      schemaVersion: 2,
       session: {
         startedAt: this.sessionStartedAtIso,
         exportedAt: new Date().toISOString(),
@@ -1274,6 +1281,10 @@ const frameToRow = (frame: RecordedFrame): readonly unknown[] => [
   frame.gameplay.collisionEligible,
   frame.gameplay.collisionCandidates,
   frame.gameplay.collisionNarrowChecks,
+  frame.render.graphicsProfile, frame.render.graphicsProfileBase, frame.render.devicePixelRatio,
+  frame.render.renderScale, frame.render.pixelBudget, frame.render.gelRenderingMode,
+  frame.render.transmissionResolutionScale, frame.render.shadowMapSizeCap, frame.render.effectsDensity,
+  frame.render.antialias, frame.render.lightingPolicy,
 ];
 
 const pushBounded = <Value>(

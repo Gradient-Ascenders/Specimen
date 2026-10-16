@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { markDecorativeEffect } from '../GraphicsResourcePolicy.ts';
 
 import type { VoltElectricalReadModel } from '../../abilities/VoltElectricalSystem.ts';
 import type { ElectricalTargetRegistry } from '../../abilities/ElectricalTargetRegistry.ts';
@@ -83,6 +84,7 @@ export class VoltElectricalPresentation {
     this.sparkPositions = new Float32Array(sparkCount * 3);
     this.sparkGeometry = new THREE.BufferGeometry();
     this.sparkGeometry.setAttribute('position', new THREE.BufferAttribute(this.sparkPositions, 3));
+    markDecorativeEffect(this.sparkGeometry);
     this.sparkMaterial = new THREE.PointsMaterial({
       color: 0xffffdc,
       size: 0.075,

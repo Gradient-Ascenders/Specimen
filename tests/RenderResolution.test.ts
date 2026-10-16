@@ -1,12 +1,51 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveRenderPixelRatio } from '../src/render/RenderResolution.ts';
+import { resolveRenderPixelRatio, resolveRenderResolution } from '../src/render/RenderResolution.ts';
+import { GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
 
 test('render tiers cap high-DPI pixel workload at their configured density', () => {
   assert.equal(resolveRenderPixelRatio(3, 2), 2);
   assert.equal(resolveRenderPixelRatio(3, 1.5), 1.5);
   assert.equal(resolveRenderPixelRatio(3, 1), 1);
+});
+
+test('minimum rendering goes below CSS resolution and bounds large high-DPI windows', () => {
+  const options = { ...GRAPHICS_PROFILES.minimum.settings, pixelRatioCap: 1 as const,
+    pixelBudget: GRAPHICS_PROFILES.minimum.pixelBudget };
+  const small = resolveRenderResolution(640, 360, 2, options);
+  assert.deepEqual([small.drawingBufferWidth, small.drawingBufferHeight], [480, 270]);
+  assert.equal(small.effectivePixelRatio, 0.75);
+  const large = resolveRenderResolution(3840, 2160, 3, options);
+  assert.ok(large.drawingBufferWidth * large.drawingBufferHeight <= 1280 * 720);
+  assert.ok(large.effectivePixelRatio < 0.75);
+  assert.equal(large.devicePixelRatio, 3);
+  assert.deepEqual([large.viewportWidth, large.viewportHeight], [3840, 2160]);
+});
+
+test('every profile and custom density/scale obeys the budget across aspect ratios and resizes', () => {
+  for (const profile of Object.values(GRAPHICS_PROFILES)) for (const [width, height] of [
+    [1, 1], [320, 960], [960, 320], [1536, 730], [1920, 1080], [3840, 2160],
+    [7680, 4320], [100000, 1], [1, 100000], [0, 0], [Number.NaN, Number.POSITIVE_INFINITY],
+  ]) for (const dpr of [0.8, 1, 1.25, 2, 3, Number.NaN]) for (const scale of [0.5, 0.75, 1] as const) {
+    const size = resolveRenderResolution(width, height, dpr, {
+      renderScale: scale, pixelRatioCap: 2, pixelBudget: profile.pixelBudget, maximumWidth: 4096, maximumHeight: 2048,
+    });
+    assert.ok(size.drawingBufferWidth >= 1 && size.drawingBufferHeight >= 1);
+    assert.ok(size.drawingBufferWidth <= 4096 && size.drawingBufferHeight <= 2048);
+    assert.ok(size.drawingBufferWidth * size.drawingBufferHeight <= profile.pixelBudget);
+    assert.ok(size.effectivePixelRatio > 0 && size.effectivePixelRatio <= 2 * scale);
+    assert.equal(Math.floor(size.logicalWidth * size.effectivePixelRatio), size.drawingBufferWidth);
+    assert.equal(Math.floor(size.logicalHeight * size.effectivePixelRatio), size.drawingBufferHeight);
+  }
+});
+
+test('pathological narrow windows and tiny budgets never allocate zero or exceed the cap', () => {
+  for (const pixelBudget of [1, 2, 10]) for (const [width, height] of [[100000, 1], [1, 100000], [1920, 1080]]) {
+    const size = resolveRenderResolution(width, height, 3, { pixelRatioCap: 2, renderScale: 1, pixelBudget });
+    assert.ok(size.drawingBufferWidth * size.drawingBufferHeight <= pixelBudget);
+    assert.ok(size.drawingBufferWidth >= 1 && size.drawingBufferHeight >= 1);
+  }
 });
 
 test('render tiers respect device density within the supported DPR range', () => {
