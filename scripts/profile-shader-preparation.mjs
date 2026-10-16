@@ -86,7 +86,7 @@ try {
             try {return draw.apply(this,args);} finally {entry.ms=performance.now()-entry.start;entry.after=this.info.programs.length;capture.draws.push(entry);phase=previous;}
           };
         }
-        for (const method of ['load','prepareLightingPrograms','preparePresentation']) if (r[method]) {
+        for (const method of ['load','prepareLightingPrograms','preparePresentation','prepareGraphics']) if (r[method]) {
           const original=r[method];r[method]=function(...args) {
             owner=name;const entry={owner,method,start:performance.now()};capture.phases.push(entry);
             const result=original.apply(this,args); if(result?.then) return result.finally(()=>entry.ms=performance.now()-entry.start);
@@ -136,8 +136,10 @@ try {
       console.log(values.label,pair,cache,'boot');
       await page.goto(values.url,{waitUntil:'domcontentloaded'});
       await page.locator('[data-flow-panel="title"] [data-action="start"]').waitFor({state:'visible'});
+      row.titleReadyAt=await page.evaluate(()=>performance.now());
       if(values.profile==='standard') {
         await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+        row.settingsRequestedAt=await page.evaluate(()=>performance.now());
         await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
         await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
       }
@@ -146,6 +148,11 @@ try {
       await page.waitForFunction(()=>globalThis.__shaderSession.runtime.state==='running'&&globalThis.__shaderSession.runtime.input.enabled);
       await page.waitForFunction(t=>__shaderCapture.frames.some(f=>f.owner==='one'&&f.state==='running'&&f.drawn&&f.start>=t),row.startAt);
       row.navigationToControlMs=await page.evaluate(()=>performance.now()); row.startToControlMs=row.navigationToControlMs-row.startAt;
+      row.levelOnePreparation=await page.evaluate(()=>{
+        const rt=__shaderSession.runtime;
+        return {profile:rt.lightingPrewarmProfile,verification:rt.levelOnePrewarmVerification,
+          programs:rt.renderLayer.renderer.info.programs.length,resources:{...rt.renderLayer.renderer.info.memory}};
+      });
       row.levelTwoTransitionAt=await page.evaluate(()=>{const t=performance.now();globalThis.__shaderSession.runtime.resources.containmentLevel.completeForDebug();return t;});
       await page.locator('[data-action="enter-level"]').waitFor({state:'visible'});
       row.levelTwoEnterAt=await page.evaluate(()=>performance.now());

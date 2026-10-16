@@ -5,6 +5,7 @@ if(groups.length!==2)throw Error('Supply comma-separated before labels and after
 const median=a=>{a=[...a].filter(Number.isFinite).sort((a,b)=>a-b);const i=Math.floor(a.length/2);return a.length%2?a[i]:(a[i-1]+a[i])/2;};
 const range=a=>[Math.min(...a),Math.max(...a)];
 const comparison={};
+const environments=new Set();
 for(const [index,group] of groups.entries()) {
   const rows=[];
   for(const label of group.split(',')) {
@@ -15,6 +16,14 @@ for(const [index,group] of groups.entries()) {
   for(const cache of ['fresh-browser','warm-browser']) {
     const runs=rows.filter(r=>r.cache===cache),valid=runs.filter(r=>r.gameplay?.valid);
     if(!runs.length||valid.length!==runs.length)throw Error(`${group}: ${cache} has missing or invalid gameplay rows; inspect raw evidence`);
+    for(const run of runs){
+      const e=run.environment,g=e?.graphics;
+      if(!g||e.shaderErrors!==true)throw Error('Missing graphics environment or disabled shader checks');
+      environments.add(JSON.stringify({browser:run.browser,gpu:e.gpu,viewport:e.viewport,dpr:Math.round(e.dpr*1e6)/1e6,
+        buffer:[g.drawingBufferWidth,g.drawingBufferHeight],profile:g.graphicsProfileBase,preset:g.graphicsPreset,
+        gel:g.gelRenderingMode,transmission:g.transmissionResolutionScale,pixelRatio:Math.round(g.pixelRatio*1e6)/1e6,
+        extensions:[...e.extensions].sort()}));
+    }
     if(runs.some(r=>!Number.isFinite(r.submittedCompileObjects)))throw Error('Regenerate summaries with the current summarizer');
     const m=fn=>median(runs.map(fn)), g=fn=>median(valid.map(fn));
     byCache[cache]={runs:runs.length,validGameplayRuns:valid.length,
@@ -43,5 +52,7 @@ for(const [index,group] of groups.entries()) {
   }
   comparison[index?'after':'before']=byCache;
 }
+if(environments.size!==1)throw Error('Compared runs differ in browser, GPU/backend, buffer, settings or extensions');
+comparison.matchedEnvironment=JSON.parse([...environments][0]);
 await writeFile('artifacts/shader-preparation/comparison-'+groups[0].split(',')[0]+'.json',JSON.stringify(comparison,null,2));
 console.log(JSON.stringify(comparison,null,2));

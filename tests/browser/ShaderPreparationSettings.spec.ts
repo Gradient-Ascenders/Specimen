@@ -1,6 +1,49 @@
 import { expect, test } from './fixtures.ts';
 import { writeFile } from 'node:fs/promises';
 
+test('Standard prepares the retained transmission target at the first gameplay capture scale', async ({page}, info) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({width:960,height:600});
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/assets/index-*.js',async route=>{
+    const response=await route.fetch(),body=await response.text();
+    const pattern=/([\w$]+)=new ([\w$]+)\(\{initialRuntime:/;
+    expect(body).toMatch(pattern);
+    await route.fulfill({response,body:body.replace(pattern,'$1=globalThis.__targetSession=new $2({initialRuntime:')});
+  });
+  await page.goto('/',{waitUntil:'domcontentloaded'});
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click({timeout:180_000});
+  await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
+  await expect(page.locator('[data-graphics-preparation]')).toBeHidden({timeout:180_000});
+  await page.evaluate(()=>{
+    const rt=(window as any).__targetSession.runtime,layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
+    const draw=layer.render,originals=new Map<string,any>(),storage:string[]=[];
+    let live=false,inspections=0;
+    for(const method of ['getProgramInfoLog','texImage2D','texStorage2D','renderbufferStorage','renderbufferStorageMultisample']) {
+      const original=gl[method];originals.set(method,original);
+      gl[method]=function(...args:any[]){if(live){if(method==='getProgramInfoLog')inspections++;else storage.push(method);}return original.apply(this,args);};
+    }
+    layer.render=function(...args:any[]){
+      const before=renderer.info.programs.length;live=true;
+      try{return draw.apply(this,args);}
+      finally{
+        live=false;
+        rt.__firstTargetDraw={storage,inspections,newPrograms:renderer.info.programs.length-before,
+          buffer:[gl.drawingBufferWidth,gl.drawingBufferHeight],scale:renderer.transmissionResolutionScale,error:gl.getError()};
+        layer.render=draw;for(const [method,original] of originals)gl[method]=original;
+      }
+    };
+  });
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  await page.locator('[data-flow-panel="title"] [data-action="start"]').click();
+  await page.waitForFunction(()=>(window as any).__targetSession.runtime.__firstTargetDraw);
+  const sample=await page.evaluate(()=>(window as any).__targetSession.runtime.__firstTargetDraw);
+  await info.attach('first-target-draw',{body:JSON.stringify(sample,null,2),contentType:'application/json'});
+  expect(sample).toEqual({storage:[],inspections:0,newPrograms:0,buffer:[960,600],scale:.5,error:0});
+  expect(errors).toEqual([]);
+});
+
 test('all levels retain first-use coverage through graphics cycles, fades, switching and restart', async ({page}, info) => {
   test.setTimeout(900_000);
   const errors:string[]=[];
