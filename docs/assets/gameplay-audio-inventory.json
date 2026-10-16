@@ -1,146 +1,65 @@
 [
   {
-    "id": "bob-bounce-01",
-    "path": "assets/audio/bob/bob-bounce-01.ogg",
-    "durationSeconds": 0.66,
+    "id": "bob-charged-jump-01",
+    "path": "assets/audio/bob/bob-charged-jump-01.ogg",
+    "durationSeconds": 0.42,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.79333,
+    "peak": 0.45782,
     "loop": false
   },
   {
-    "id": "bob-charge-loop-01",
-    "path": "assets/audio/bob/bob-charge-loop-01.ogg",
-    "durationSeconds": 1.2,
+    "id": "bob-contact-01",
+    "path": "assets/audio/bob/bob-contact-01.ogg",
+    "durationSeconds": 0.6065,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.35429,
-    "loop": true
-  },
-  {
-    "id": "bob-charged-jump-01",
-    "path": "assets/audio/bob/bob-charged-jump-01.ogg",
-    "durationSeconds": 0.77,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.78449,
+    "peak": 0.74021,
     "loop": false
   },
   {
     "id": "bob-detach-01",
     "path": "assets/audio/bob/bob-detach-01.ogg",
-    "durationSeconds": 0.41,
+    "durationSeconds": 0.447,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.64906,
+    "peak": 0.75035,
     "loop": false
   },
   {
     "id": "bob-fall-01",
     "path": "assets/audio/bob/bob-fall-01.ogg",
-    "durationSeconds": 0.97,
+    "durationSeconds": 1.0,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.75012,
-    "loop": false
-  },
-  {
-    "id": "bob-impact-01",
-    "path": "assets/audio/bob/bob-impact-01.ogg",
-    "durationSeconds": 0.52,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.7685,
+    "peak": 0.5301,
     "loop": false
   },
   {
     "id": "bob-jump-01",
     "path": "assets/audio/bob/bob-jump-01.ogg",
-    "durationSeconds": 0.43,
+    "durationSeconds": 0.6065,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.72754,
+    "peak": 0.53033,
     "loop": false
   },
   {
     "id": "bob-land-hard-01",
     "path": "assets/audio/bob/bob-land-hard-01.ogg",
-    "durationSeconds": 0.71,
+    "durationSeconds": 0.7,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.75508,
+    "peak": 0.69192,
     "loop": false
   },
   {
     "id": "bob-land-soft-01",
     "path": "assets/audio/bob/bob-land-soft-01.ogg",
-    "durationSeconds": 0.39,
+    "durationSeconds": 0.5415,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.78246,
-    "loop": false
-  },
-  {
-    "id": "bob-movement-loop-01",
-    "path": "assets/audio/bob/bob-movement-loop-01.ogg",
-    "durationSeconds": 1.2,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.44139,
-    "loop": true
-  },
-  {
-    "id": "bob-respawn-01",
-    "path": "assets/audio/bob/bob-respawn-01.ogg",
-    "durationSeconds": 0.78,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.55977,
-    "loop": false
-  },
-  {
-    "id": "bob-slip-01",
-    "path": "assets/audio/bob/bob-slip-01.ogg",
-    "durationSeconds": 0.61,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.65961,
-    "loop": false
-  },
-  {
-    "id": "bob-squish-01",
-    "path": "assets/audio/bob/bob-squish-01.ogg",
-    "durationSeconds": 0.58,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.51285,
-    "loop": false
-  },
-  {
-    "id": "bob-stick-01",
-    "path": "assets/audio/bob/bob-stick-01.ogg",
-    "durationSeconds": 0.41,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.56323,
-    "loop": false
-  },
-  {
-    "id": "bob-wall-crawl-loop-01",
-    "path": "assets/audio/bob/bob-wall-crawl-loop-01.ogg",
-    "durationSeconds": 1.6,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.46543,
-    "loop": true
-  },
-  {
-    "id": "bob-wall-step-01",
-    "path": "assets/audio/bob/bob-wall-step-01.ogg",
-    "durationSeconds": 0.31,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.59176,
+    "peak": 0.67555,
     "loop": false
   },
   {
@@ -303,6 +222,15 @@
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.74486,
+    "loop": false
+  },
+  {
+    "id": "specimen-turret-shot",
+    "path": "assets/audio/turrets/specimen-turret-shot.ogg",
+    "durationSeconds": 0.64,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.87624,
     "loop": false
   },
   {
@@ -474,15 +402,6 @@
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.70445,
-    "loop": false
-  },
-  {
-    "id": "specimen-turret-shot",
-    "path": "assets/audio/turrets/specimen-turret-shot.ogg",
-    "durationSeconds": 0.64,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.87624,
     "loop": false
   }
 ]

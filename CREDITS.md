@@ -58,7 +58,8 @@ texture assets, external code or third-party dependencies were introduced.
 
 | Resource | Author / creator | Source | Licence | Use in Specimen |
 | --- | --- | --- | --- | --- |
-| Bob, Goop and Volt sound packs (53 effects) | Original procedural synthesis with ChatGPT assistance, as described in the supplied manifests | Requester-supplied Specimen character SFX ZIP packs | Created for this project; no separate licence declaration supplied | Gameplay movement, abilities, collisions, power and recovery. Oscillators, filtered noise and envelopes; no imported audio samples. |
+| Bob replacement sound pack (7 effects) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `bob-sounds.tar`, preserved in `assets/audio/bob/` | Requester-supplied; generating account's plan/licence documentation not supplied | Bob contact, jumps, landings, adhesive release and rupture. Prepared as mono OGG with onset trims and level balancing; source archive retained unchanged. |
+| Goop and Volt sound packs (37 effects) | Original procedural synthesis with ChatGPT assistance, as described in the supplied manifests | Requester-supplied Specimen character SFX ZIP packs | Created for this project; no separate licence declaration supplied | Gameplay movement, abilities, collisions, power and recovery. Oscillators, filtered noise and envelopes; no imported audio samples. |
 | Specimen turret shot | Requester-supplied audio; original creator and generation tool not specified | Supplied `specimen-turret-shot.wav`, converted to OGG Vorbis | No separate licence declaration supplied | Accepted turret projectile spawns across the shared drone firing system. |
 
 The complete asset inventory and gameplay mappings are documented in

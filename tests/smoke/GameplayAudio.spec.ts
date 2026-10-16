@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
 
-test('audio banks decode beneath nested base and gameplay owns charge, movement, pause and reset audio', async ({ page }) => {
+test('selected Bob clips decode beneath nested base; contact, silent charge, jumps and recovery follow gameplay', async ({ page }) => {
   const errors: string[] = [], audioRequests: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -40,7 +40,8 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
     if (audio.diagnostics.loaded !== banks.cultivation.length) throw new Error('Cultivation bank missing');
     await audio.preload(banks.blackout);
   }, SOUND_BANKS);
-  expect(new Set(audioRequests).size).toBe(54);
+  expect(new Set(audioRequests).size).toBe(SOUND_BANKS.blackout.length);
+  expect(new Set(audioRequests.filter(url => url.includes('/bob/'))).size).toBe(7);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
@@ -50,27 +51,37 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
     for(let i=0;i<count;i++) runtime.fixedUpdate(1/60);
     return { ...runtime.audio.diagnostics, keys:[...runtime.audio.loops.keys()] };
   },count);
+  const stationary=await step(1);
   await page.keyboard.down('KeyW');
-  const moving=await step(8);
-  expect(moving.keys).toContain('character:movement');
+  const moving=await step(30);
+  expect(moving.keys).not.toContain('character:movement');
+  expect(moving.played).toBeGreaterThan(stationary.played);
+  const bobVoices = await page.evaluate(() => [...(window as any).__audioRuntime.audio.voices]
+    .map((voice: any) => ({sound:voice.sound,loop:voice.source.loop,channels:voice.source.buffer.numberOfChannels})));
+  expect(bobVoices.some(voice => voice.sound === 'bob-contact-01')).toBe(true);
+  expect(bobVoices.every(voice => !voice.loop && voice.channels === 1)).toBe(true);
   await page.keyboard.up('KeyW'); await step(40);
+  const beforeCharge=await step(1);
   await page.keyboard.down('Space');
   const charging=await step(12);
-  expect(charging.keys).toContain('character:charge');
+  expect(charging.keys).not.toContain('character:charge');
+  expect(charging.played).toBe(beforeCharge.played);
+  expect(await page.evaluate(() => (window as any).__audioRuntime.resources.body.chargingJump)).toBe(true);
   await page.keyboard.up('Space');
   const jumped=await step(1);
   expect(jumped.keys).not.toContain('character:charge');
   expect(jumped.played).toBeGreaterThan(charging.played);
   await step(150);
   await page.keyboard.down('Space'); await step(8);
-  // Goop is unavailable until rescue. A rejected switch must leave Bob charging;
-  // stage availability explicitly before testing a successful switch's cleanup.
+  // Goop is unavailable until rescue. A rejected switch leaves Bob charging,
+  // even though the rejected charge sound is no longer part of his palette.
   expect(await page.evaluate(() =>
     (window as any).__audioRuntime.resources.slimeManager.isAvailable('goop'),
   )).toBe(false);
   await page.keyboard.press('Tab');
   const locked = await step(1);
-  expect(locked.keys).toContain('character:charge');
+  expect(locked.keys).not.toContain('character:charge');
+  expect(await page.evaluate(() => (window as any).__audioRuntime.resources.body.chargingJump)).toBe(true);
   expect(await page.evaluate(() =>
     (window as any).__audioRuntime.resources.slimeManager.activeSlimeId,
   )).toBe('bob');
@@ -99,6 +110,14 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   const reset=await step(1);
   expect(reset.keys).not.toContain('character:charge');
   expect(reset.keys.some(key=>key.startsWith('acid:') || key.startsWith('dissolve:'))).toBe(false);
+  expect(await page.evaluate(() => (window as any).__audioRuntime.resources.containmentLevel.requestFailure('bob-audio-review'))).toBe(true);
+  const dying=await step(1);
+  expect(dying.played).toBeGreaterThan(reset.played);
+  await step(90);
+  await page.evaluate(() => (window as any).__audioRuntime.retryAfterDeath());
+  await step(1);
+  expect(await page.evaluate(() => [...(window as any).__audioRuntime.audio.voices]
+    .some((voice: any) => voice.sound === 'bob-contact-01'))).toBe(true);
   await page.evaluate(() => (window as any).__audioRuntime.unload());
   const unloaded=await page.evaluate(()=>(window as any).__audioRuntime.audio.diagnostics);
   expect(unloaded.loops).toBe(0); expect(unloaded.voices).toBe(0);

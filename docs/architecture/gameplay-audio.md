@@ -1,24 +1,28 @@
 # Gameplay sound effects
 
-Specimen ships 54 OGG effects: Bob 16, Goop 18, Volt 19, turrets 1. Of these, 51 have current gameplay mappings; three are reserved for absent mechanics. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
+Specimen ships 45 OGG effects: Bob 7, Goop 18, Volt 19, turrets 1. Of these, 42 have current gameplay mappings; three are reserved for absent mechanics. Bob's former 16-effect procedural pack has been replaced with the requester-selected ElevenLabs recordings. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
 
 ## Architecture
 
 `src/audio/SoundCatalog.ts` registers every asset. `AudioManager` owns one application Web Audio context, cached decoded buffers, an effects gain, compressor and master gain. `GameplayAudio` owns each level's event subscriptions, character loops and reset suppression. Typed `gameplayAudioEvents` notifications are presentation-only; gameplay never reads audio state. Each current runtime receives the same manager from `main.ts`. Standalone gameplay fixtures need no browser audio context.
 
-Movement uses authoritative KinematicBody events and resolved grounded velocity, not keyboard detection. Acid shots, collisions, burns, electrical connections, receiver charge thresholds, powered devices and turret projectiles publish notifications only after their gameplay conditions succeed. Loop keys identify the character channel, acid projectile, dissolve target, charge receiver or established tether. Character switching clears only character loops; existing corrosion, projectiles and an inactive Volt tether retain ownership.
+Movement uses authoritative KinematicBody events and resolved grounded velocity, not keyboard detection. Bob has quiet contact one-shots every 1.25 m of grounded tangent locomotion, using `locomotionPosition` to exclude carrier transport and teleports. He has no continuous movement/wall loop and no charging sound. Motion accents are suppressed while charging, airborne, stationary or landing; their accumulated distance clears on interactions, switch, pause and reset. Goop and Volt retain their existing movement and idle loops. Acid shots, collisions, burns, electrical connections, receiver charge thresholds, powered devices and turret projectiles publish notifications only after their gameplay conditions succeed. Loop keys identify the character channel, acid projectile, dissolve target, charge receiver or established tether. Character switching clears only character loops; existing corrosion, projectiles and an inactive Volt tether retain ownership.
 
 ## Assets and provenance
 
-`public/assets/audio/{bob,goop,volt,turrets}/` contains only runtime OGG files (630,222 bytes total). The three nested character ZIPs contain WAV review copies, OGG previews, manifests and readmes; these are not duplicated in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
+`public/assets/audio/{bob,goop,volt,turrets}/` contains only runtime OGG files (536,609 bytes total). Source archives are not shipped in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
 
-The supplied character-pack manifests/review notes describe original procedural synthesis using oscillators, filtered noise and envelopes, with ChatGPT assistance and no imported audio samples. No separate licence declaration was supplied. The turret was provided separately by the requester; its original creator, synthesis tool and separate licence are not specified. `CREDITS.md` records these distinctions and feeds the existing in-game credits screen.
+The requester generated Bob's replacement recordings in ElevenLabs and selected them through listening review. The seven originals (six stereo PCM16 WAVs and one stereo Vorbis file, all 48 kHz) are preserved byte-for-byte in `assets/audio/bob/bob-sounds.tar`. `scripts/import-bob-audio.py` prepares the runtime files using NumPy and SoundFile/libsndfile: average stereo to mono, remove DC offset, balance levels without compression, cap peaks with headroom, apply 2 ms edge fades, and encode Vorbis. The powerful jump starts at source 0.58 s and hard landing at 0.30 s to remove separate preparation sounds before their main hit; soft landing starts at 0.065 s to remove its leading delay. Other clips retain their full timeline. `docs/assets/bob-audio-import.json` records source/archive hashes, trims, gains and resulting RMS. Reimport with `python3 scripts/import-bob-audio.py` after installing NumPy and SoundFile; Python is not a game dependency.
 
-`docs/assets/gameplay-audio-inventory.json` records all 54 decoded durations, sample rates, channel counts and peaks. Character assets are mono 48 kHz; the turret is mono 48 kHz. Every file was fully decoded using libsndfile, and browser validation checks Web Audio decoding separately. Paths use Vite's relative `BASE_URL` (`./`) and remain beneath a nested deployment directory.
+The retained Goop/Volt pack manifests describe original procedural synthesis using oscillators, filtered noise and envelopes, with ChatGPT assistance and no imported audio samples. No separate licence declaration was supplied. The turret was provided separately by the requester; its original creator, synthesis tool and separate licence are not specified. `CREDITS.md` records these distinctions and feeds the existing in-game credits screen.
+
+`docs/assets/gameplay-audio-inventory.json` records all 45 decoded durations, sample rates, channel counts and peaks. All runtime assets are mono 48 kHz. Every file was fully decoded using libsndfile, and browser validation checks Web Audio decoding separately. Paths use Vite's relative `BASE_URL` (`./`) and remain beneath a nested deployment directory.
 
 ## Mix and volume
 
-Master volume defaults to 100%; sound-effects volume defaults to 80%. Both have independent sliders in Settings, are clamped to 0–100%, and persist for the current application session across level changes/restarts. Either can mute all effects. Loops default to 0.13 gain; idle loops 0.045; projectile flight 0.075; one-shots generally 0.5; small grip/squish cues 0.22; turrets 0.65. A compressor at -12 dB/4:1 protects overlapping effects.
+Master volume defaults to 100%; sound-effects volume defaults to 80%. Both have independent sliders in Settings, are clamped to 0–100%, and persist for the current application session across level changes/restarts. Either can mute all effects. Loops default to 0.13 gain; idle loops 0.045; projectile flight 0.075; one-shots generally 0.5; turrets 0.65. A compressor at -12 dB/4:1 protects overlapping effects.
+
+Bob's base gains are contact 0.4, normal jump 0.5, charged jump 0.6, soft landing 0.4, hard landing/death 0.55 and peel 0.42. Contact uses 35% of its base for ground movement, 25% on walls, 55% for corner regrips, 80% for obstacle contact/retry and 100% for initial attachment. Peel uses 65% of its base so wall-jump release does not overwhelm the launch. These playback scales never modify the shared sample or later cues. The archive has no dedicated attachment clip, so soft body contact supplies attachment/regrip feedback. Heavy floor landings already emit their sound before the automatic rebound; that rebound does not add another impact. Bouncy-surface impulses use the same hard-landing source once.
 
 Repeated movement/jump/landing/body cues vary playback rate by up to 4%. Sources use inverse distance attenuation (reference 3 m, rolloff 1.5) from the controlled body, with equal-power panning. The listener uses the controlled body and Web Audio's fixed world orientation; camera-relative panning is not implemented. All sounds are mono.
 
@@ -26,7 +30,7 @@ Voices are bounded at 24 globally and three per one-shot effect. Each standard l
 
 ## Lifecycle
 
-- Boot preloads/decode-caches the 34 Bob/Goop clips while playback stays suspended. The Cultivation factory adds the shared turret and six rescued-Volt movement/recovery clips (41 total); Blackout adds his electrical clips (54 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
+- Boot preloads/decode-caches the 25 Bob/Goop clips while playback stays suspended. The Cultivation factory adds the shared turret and six rescued-Volt movement/recovery clips (32 total); Blackout adds his electrical clips (45 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
 - Pause/menus suspend the context and clear transient character loops. World loops preserve their offsets and resume once. Browser blur/visibility adds an independent suspension gate. Fixed-step state recreates character movement/charge loops only if still valid.
 - Death stops existing voices, plays Bob's accepted-failure cue when applicable, and rejects further world sounds until successful recovery. Retry sounds the restored active identity.
 - Restart/checkpoint/puzzle reset clears voices and suppresses restoration notifications until the next gameplay update. Projectile impact, expiry, reset and disposal immediately stop flight ownership; burn completion/reset/disposal stop corrosion ownership.
@@ -38,22 +42,13 @@ All names below identify `.ogg` files. Loop behavior is explicit; other sounds a
 
 | Asset | Gameplay mapping / reason unavailable |
 | --- | --- |
-| `bob-bounce-01` | Applied bouncy-surface impulse; excludes generic impact for that step. |
-| `bob-charge-loop-01` | Authoritative Bob jump charging state; stops on launch/cancel/switch/pause/reset. |
+| `bob-contact-01` | Quiet grounded motion accents, initial attachment, corner regrip, non-floor obstacle contact and retry. Gains vary by context; no idle/charge playback. |
 | `bob-charged-jump-01` | Accepted launch with charge fraction at least 0.8. |
-| `bob-detach-01` | Intentional surface release or sticky-wall-to-floor handoff. |
+| `bob-detach-01` | Intentional surface release, loss of sticky support or sticky-wall-to-floor handoff. |
 | `bob-fall-01` | Accepted Bob death sequence, including hazard/out-of-bounds failure. |
-| `bob-impact-01` | Non-floor obstacle contact at least 4 m/s, excluding landing/bounce. |
 | `bob-jump-01` | Accepted launch with charge fraction below 0.8. |
-| `bob-land-hard-01` | Stable landing at least 8 m/s. |
+| `bob-land-hard-01` | Stable landing at least 8 m/s, or an authored bouncy-surface impulse. A hard landing's passive reaction hop does not duplicate its impact. |
 | `bob-land-soft-01` | Stable airborne-to-ground landing below 8 m/s. |
-| `bob-movement-loop-01` | Grounded tangent speed above 0.2 m/s; stops in air or at rest. |
-| `bob-respawn-01` | Successful checkpoint retry after recovery restores active Bob. |
-| `bob-slip-01` | Loss of adhesive support after support/edge probes fail. |
-| `bob-squish-01` | Onset of real jump-charge compression; once until charge ends. |
-| `bob-stick-01` | First successful authored adhesive attachment. |
-| `bob-wall-crawl-loop-01` | Same resolved motion while attached; replaces the ground loop. |
-| `bob-wall-step-01` | Successful convex sticky-face regrip; no frame-based footsteps. |
 | `goop-acid-puddle-loop-01` | UNWIRED: Goop does not spawn persistent acidic puddles. Authored level acid is not a Goop puddle. |
 | `goop-aim-enter-01` | Acid aiming changes inactive to active. |
 | `goop-aim-exit-01` | Acid aiming changes active to inactive during gameplay. |
