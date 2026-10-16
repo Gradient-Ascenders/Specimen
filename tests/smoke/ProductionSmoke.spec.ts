@@ -11,7 +11,14 @@ const watchProductionRequests = (page: Page, baseURL: string): Set<string> => {
       failures.add(`Console: ${message.text()}`);
     }
   });
-  page.on('requestfailed', (request) => failures.add(`Failed request: ${request.url()}`));
+  page.on('requestfailed', (request) => {
+    // Pausing a streamed track on menu/level transition intentionally cancels
+    // its pending HTTP range request. Keep every other network error visible.
+    const url = new URL(request.url());
+    if (/\/assets\/audio\/music\/[^/]+\.ogg$/.test(url.pathname) &&
+        request.failure()?.errorText === 'net::ERR_ABORTED') return;
+    failures.add(`Failed request: ${request.url()}`);
+  });
   page.on('response', (response) => {
     if (response.status() >= 400) failures.add(`HTTP ${response.status()}: ${response.url()}`);
   });
