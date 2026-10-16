@@ -134,7 +134,9 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   page.on('response', response => {
     if (/\/volt-[^/]+\.glb$/.test(new URL(response.url()).pathname) && response.ok()) voltAssets.add(response.url());
     if (/\/authored-assets-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) cultivationAssets.add(response.url());
-    if (/\/assets\/audio\/.*\.ogg$/.test(new URL(response.url()).pathname) && response.ok()) audioAssets.add(response.url());
+    // Only sound-effects bank requests count toward the 34/41/54 clip budgets.
+    // The independently streamed level music is not part of those banks.
+    if (/\/assets\/audio\/(?:bob|goop|volt|turrets)\/.*\.ogg$/.test(new URL(response.url()).pathname) && response.ok()) audioAssets.add(response.url());
     if (/\/(goop|volt)-lod-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) detailAssets.add(response.url());
   });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
