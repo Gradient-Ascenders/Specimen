@@ -56,7 +56,10 @@ for (const query of ['', '?debug=1']) {
       await expect(page.locator('[data-graphics-preparation]')).toBeHidden({ timeout: 240_000 });
       return page.evaluate(() => {
       const r = (window as any).__graphicsRuntime, layer = r.renderLayer, renderer = layer.renderer;
-      layer.render();
+      // Synchronize authoritative render interpolation before the reference too;
+      // waiting for an incidental RAF can leave the first sample at the old pose.
+      r.render(1,{fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,
+        stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60});
       const gl = renderer.getContext(), pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
       gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       const reference: Uint8Array = r.__graphicsPixels ??= pixels;
@@ -74,7 +77,10 @@ for (const query of ['', '?debug=1']) {
           materials[m.uuid] = [m.transmission, m.opacity, m.transparent, m.roughness];
         }
       });
-      return { difference, lit, range: maximum - minimum, materials, scale: renderer.transmissionResolutionScale,
+      const pose={camera:layer.cameraRig.camera.matrixWorld.toArray(),
+        body:r.resources.body.position,rendered:r.resources.renderedProbePosition.toArray(),
+        presentation:r.resources.testScene.bob.root.getObjectByName('player-slime-bob-character').matrixWorld.toArray()};
+      return { difference, lit, range: maximum - minimum, materials, pose, scale: renderer.transmissionResolutionScale,
         buffer: [gl.drawingBufferWidth, gl.drawingBufferHeight], programs: renderer.info.programs.length, error: gl.getError() };
       });
     };
@@ -102,6 +108,8 @@ for (const query of ['', '?debug=1']) {
     const restored = await sample();
     expect(restored.buffer).toEqual(normal.buffer);
     expect(restored.programs).toBe(normal.programs);
+    expect(restored.pose).toEqual(normal.pose);
+    expect(restored.materials).toEqual(normal.materials);
     expect(restored.difference, 'Normal output after restoring the preset').toBeLessThanOrEqual(1);
     expect([normal.error, performance.error, restored.error]).toEqual([0, 0, 0]);
     await page.evaluate(() => (window as any).__graphicsRuntime.__restorePixelFixture());

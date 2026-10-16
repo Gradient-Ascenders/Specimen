@@ -37,6 +37,13 @@ async function draw(page: Page): Promise<any> {
   // Shader-affecting settings now complete behind the production readiness gate.
   // Inspect the requested profile only after its material mutation is applied.
   await expect(page.locator('[data-graphics-preparation]')).toBeHidden({ timeout: 240_000 });
+  // CSS layout updates before ResizeObserver delivers the matching bounded
+  // framebuffer resize. Require that real browser lifecycle before sampling.
+  await page.waitForFunction(() => {
+    const layer=(window as any).__graphicsSession.runtime.renderLayer,d=layer.getGraphicsDiagnostics();
+    return d.viewportWidth>0 && d.viewportHeight>0 &&
+      d.viewportWidth===layer.canvas.clientWidth && d.viewportHeight===layer.canvas.clientHeight;
+  }, null, {timeout:10_000});
   return page.evaluate(() => {
     const rt = (window as any).__graphicsSession.runtime, layer = rt.renderLayer;
     rt.render(1, { fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 0, frameDeltaSeconds: 0,

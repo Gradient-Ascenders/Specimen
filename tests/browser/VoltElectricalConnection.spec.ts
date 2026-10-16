@@ -3,13 +3,17 @@ import { expect, test } from './fixtures.ts';
 
 test.use({ launchOptions: {
   executablePath: process.env.SPECIMEN_PROFILE_BROWSER,
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--disable-dev-shm-usage'],
+  // Keep the CI software renderer, while allowing explicit native-channel QA.
+  args: process.env.SPECIMEN_BROWSER_CHANNEL ? [] :
+    ['--use-gl=angle', '--use-angle=swiftshader', '--disable-dev-shm-usage'],
 } });
 
-test('Volt connection VFX stay bounded through power, instability, disconnect and recovery', async ({ page }) => {
+for (const profile of ['minimum','standard'] as const) {
+test(`Volt connection VFX stay bounded through power, instability, disconnect and recovery (${profile})`, async ({ page }) => {
   test.setTimeout(600_000);
   page.setDefaultTimeout(180_000);
-  const directory = 'artifacts/evidence/issue-131';
+  const backend = process.env.SPECIMEN_BROWSER_CHANNEL ? 'native-channel' : 'swiftshader';
+  const directory = `artifacts/evidence/issue-131/${backend}/${profile}`;
   await mkdir(directory, { recursive: true });
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -23,7 +27,7 @@ test('Volt connection VFX stay bounded through power, instability, disconnect an
   });
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
   await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
-  await page.locator('[data-setting="graphics-profile"]').selectOption('minimum');
+  await page.locator('[data-setting="graphics-profile"]').selectOption(profile);
   await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
@@ -37,6 +41,16 @@ test('Volt connection VFX stay bounded through power, instability, disconnect an
   await page.evaluate(() => {
     const rt = (window as any).__electricalRuntime, r = rt.resources;
     rt.stop(); rt.renderLayer.setAnimationLoop(null);
+    const layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
+    const draw=layer.render,inspect=gl.getProgramInfoLog;
+    rt.__electricalCold=[];rt.__electricalInspections=0;
+    let live=false;
+    gl.getProgramInfoLog=function(...args:any[]){if(live)rt.__electricalInspections++;return inspect.apply(this,args);};
+    layer.render=function(...args:any[]){
+      const before=renderer.info.programs.length;live=true;
+      try{return draw.apply(this,args);}
+      finally{live=false;if(renderer.info.programs.length!==before)rt.__electricalCold.push({before,after:renderer.info.programs.length});}
+    };
     r.manager.activate('volt');
     r.group.voltBody.teleport({x: -9, y: 0.46, z: 48});
     rt.syncVisuals(r);
@@ -83,7 +97,9 @@ test('Volt connection VFX stay bounded through power, instability, disconnect an
     rt.renderLayer.scene.traverse((object: any) => { if (object.isLight) lights.push([object.uuid, object.visible, object.intensity]); });
     return {
       state, beamMode: model.beamMode, unstable: model.connectionUnstable, connected: model.connectedTargetId,
-      visible: effects.visible, impactVisible: impacts.visible, particles: impacts.geometry.drawRange.count,
+      visible: effects.visible, impactVisible: impacts.visible,
+      particles: Math.min(impacts.geometry.drawRange.count, impacts.geometry.attributes.position.count),
+      particlePool: impacts.geometry.attributes.position.count,
       contact: Array.from(contacts.geometry.attributes.position.array).slice(3), end: {...model.beamEnd},
       tint: beam.material.uniforms.tint.value.getHex(), forceSinglePass: beam.material.forceSinglePass,
       geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
@@ -97,7 +113,8 @@ test('Volt connection VFX stay bounded through power, instability, disconnect an
   expect(connected.connected).toBe('maintenance-bay-circuit');
   expect(connected.visible).toBe(true);
   expect(connected.forceSinglePass).toBe(true);
-  expect(connected.particles).toBe(12);
+  expect(connected.particles).toBe(profile === 'minimum' ? 12 : 24);
+  expect(connected.particlePool).toBe(24);
   expect(connected.contact).toEqual([connected.end.x, connected.end.y, connected.end.z].map(Math.fround));
   expect(connected.calls - idle.calls).toBe(5);
   await page.screenshot({ path: `${directory}/connected-performance.png` });
@@ -128,6 +145,11 @@ test('Volt connection VFX stay bounded through power, instability, disconnect an
   expect(recovered.visible).toBe(false);
   expect(recovered.impactVisible).toBe(false);
   expect(recovered.connected).toBeUndefined();
-  await writeFile(`${directory}/samples.json`, JSON.stringify({ samples, recovered, errors }, null, 2));
+  const firstUse=await page.evaluate(()=>{
+    const rt=(window as any).__electricalRuntime;return {cold:rt.__electricalCold,inspections:rt.__electricalInspections};
+  });
+  expect(firstUse).toEqual({cold:[],inspections:0});
+  await writeFile(`${directory}/samples.json`, JSON.stringify({ samples, recovered, firstUse, errors }, null, 2));
   expect(errors).toEqual([]);
 });
+}
