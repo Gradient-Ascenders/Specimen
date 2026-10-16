@@ -58,7 +58,8 @@ export class OpeningRoomOne {
     // Preserve exact authored geometry, positions and materials while merging
     // static dressing by material. One room-sized cell, not dozens of draws.
     this.batching = consolidateContainmentRoomStaticVisuals(this.root, { cellSize: 32 });
-    this.root.traverse(object => { if (object instanceof THREE.InstancedMesh) this.instances.add(object); });
+    // New batch instances belong to batching.dispose(); source instances were
+    // captured above, including detached sources that still need disposal.
   }
 
   dispose(): void {

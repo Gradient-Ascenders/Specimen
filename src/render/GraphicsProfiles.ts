@@ -1,6 +1,7 @@
 import type { GelRenderingMode } from './slime/GelRendering.ts';
 import type { RenderPixelRatioCap, RenderScale } from './RenderResolution.ts';
 import type { GraphicsPreset } from './GraphicsQuality.ts';
+import { resolveGraphicsQuality } from './GraphicsQuality.ts';
 
 export const GRAPHICS_PROFILE_IDS = ['minimum', 'standard'] as const;
 export type GraphicsProfileId = (typeof GRAPHICS_PROFILE_IDS)[number];
@@ -12,6 +13,29 @@ export interface GraphicsSettings {
   readonly renderPixelRatioCap: RenderPixelRatioCap;
   readonly renderScale: RenderScale;
   readonly gelRenderingMode: GelRenderingMode;
+}
+
+/** Current profiles change shader source only when transmission crosses zero.
+ * Capture scale, canvas scale, shadow-map dimensions and point draw counts are
+ * resource/uniform changes. Physical and reduced transmission share programs. */
+export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRenderingMode'>): string {
+  return settings.gelRenderingMode === 'minimum' ? 'opaque-gel' : 'transmissive-gel';
+}
+
+/** Full preparation also owns shadow targets. A cap change disposes their
+ * storage even when shader source is unchanged, so retain the full loading
+ * path for that change. Transmission-scale-only changes keep the lighter path. */
+export function graphicsPreparationKey(settings: GraphicsSettings): string {
+  return `${graphicsShaderKey(settings)}:shadow-cap:${GRAPHICS_PROFILES[settings.graphicsProfile].shadowMapSizeCap}`;
+}
+
+/** Target storage can change without shader source changing. Include requested
+ * capture dimensions as well as scale; harmless input/audio settings stay free. */
+export function graphicsTransmissionResourceKey(settings: GraphicsSettings): string {
+  if (settings.gelRenderingMode === 'minimum') return 'no-transmission';
+  const quality = resolveGraphicsQuality(settings.graphicsPreset, settings.renderPixelRatioCap);
+  const scale = Math.min(quality.transmissionResolutionScale, settings.gelRenderingMode === 'reduced-transmission' ? .5 : 1);
+  return [scale, quality.pixelRatioCap, settings.renderScale, GRAPHICS_PROFILES[settings.graphicsProfile].pixelBudget].join(':');
 }
 
 export const GRAPHICS_PROFILES = {

@@ -295,7 +295,48 @@ export class CultivationLevelRuntime {
   private lightLayout: CultivationLightLayout | undefined;
   private lightLayoutKey = '';
   private constructionMs = 0;
+  private preparingRenderResources = false;
   private cameraShadowCulling: CameraShadowCulling | undefined;
+  private isDarkRoom(resources: CultivationRuntimeResources,
+    lightingRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position)): boolean {
+    return lightingRoom === 5 || (lightingRoom === 4
+      && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
+  }
+  async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
+    const resources = this.requireResources(), queue = this.preparationQueue;
+    while (this.resources === resources && this.preparationQueue === queue) {
+      // The real render establishes visibility, bounded lights and demand
+      // readiness. It can return before drawing at a newly entered doorway.
+      this.preparingRenderResources = true;
+      try { this.renderLayer.prepareRenderResources(() => this.render(alpha, stats)); }
+      finally { this.preparingRenderResources = false; }
+      if (!queue?.diagnostics.pending) return;
+      this.lightLayout?.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
+      let ready: Promise<void>;
+      try { ready = queue.prepareCurrent(this.isDarkRoom(resources)); }
+      finally { this.lightLayout?.restore(); }
+      await ready;
+    }
+  }
+
+  async prepareGraphics(): Promise<void> {
+    const resources = this.requireResources(), previous = this.preparationQueue;
+    this.preparationQueue = undefined;
+    resources.authoredPreview?.workload.clearPreparation();
+    this.presentationPreparation = undefined;
+    try {
+      await this.preparePresentation();
+      if (this.resources !== resources || !this.preparationQueue || !this.lightLayout) return;
+      // Startup keeps its entry/maintenance guarantees; settings must also
+      // cover the current doorway before the session allows another live draw.
+      this.lightLayout.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
+      let preparation: Promise<void>;
+      try { preparation = (this.preparationQueue as CultivationPreparationQueue).prepareCurrent(this.isDarkRoom(resources)); }
+      finally { this.lightLayout.restore(); }
+      await preparation;
+    } finally { previous?.dispose(); }
+  }
+
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
     return this.presentationPreparation ??= Promise.all([
@@ -703,8 +744,7 @@ export class CultivationLevelRuntime {
     if (lightingRoom === 4 || (lightingRoom === 3 && resources.authoredPreview?.roomFourGeometry.visible)) {
       this.preparationQueue?.anticipateLiftExit();
     }
-    const darkRoom = lightingRoom === 5 || (lightingRoom === 4
-      && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
+    const darkRoom = this.isDarkRoom(resources, lightingRoom);
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
@@ -828,7 +868,7 @@ export class CultivationLevelRuntime {
     // lower sector, speculative upper-room work is not needed for this view
     // and competes with its searchlights. Demand preparation above still
     // guards every draw, and background work resumes if ownership returns.
-    if (lightingRoom !== 5) this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
+    if (lightingRoom !== 5 && !this.preparingRenderResources) this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
 
     this.debugElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (this.debugVisible && resources.debugPanel && this.debugElapsedSeconds >= 0.25) {

@@ -18,6 +18,8 @@ import { TitleScreenScene } from './ui/TitleScreenScene.ts';
 import { OpeningGameScene } from './cinematics/OpeningGameScene.ts';
 import { OpeningGamePresentation } from './cinematics/OpeningGamePresentation.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
+import { GraphicsPreparationOverlay } from './ui/GraphicsPreparationOverlay.ts';
+import { graphicsPreparationKey, graphicsTransmissionResourceKey } from './render/GraphicsProfiles.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -146,7 +148,7 @@ function startGame(): void {
           reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
           prepareLevel: () => {
             gameSession.load();
-            return levelOneRuntime.prepareLightingPrograms().then(() => {
+            return gameSession.prepareInitialGraphics().then(() => {
               if (shuttingDown) return;
               const verification = levelOneRuntime.levelOnePrewarmVerification;
               if (verification) app.dataset.levelOnePrewarm = JSON.stringify(verification);
@@ -198,7 +200,8 @@ function startGame(): void {
           levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
           performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
         }
-        renderLayer.setGraphicsSettings(nextSettings);
+        gameSession.applyGraphicsSettings(graphicsPreparationKey(nextSettings), () => renderLayer.setGraphicsSettings(nextSettings),
+          graphicsTransmissionResourceKey(nextSettings));
         titlePresentation?.setReducedMotion(nextSettings.reduceMenuMotion);
       },
       getGraphicsDiagnostics: () => renderLayer.getGraphicsDiagnostics(),
@@ -245,6 +248,9 @@ function startGame(): void {
   );
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);
+  const graphicsPreparationOverlay = new GraphicsPreparationOverlay(app);
+  const unsubscribeGraphicsPreparation = gameSession.events.on('graphicsPreparationChanged',
+    ({pending, failed}) => graphicsPreparationOverlay.update(pending, failed));
   titlePresentation = new TitleScreenPresentation({ renderLayer, host: app,
     scene: titleRoom, reduceMotion: settings.value.reduceMenuMotion });
 
@@ -337,6 +343,7 @@ function startGame(): void {
     window.removeEventListener('focus', focusAudio);
     document.removeEventListener('visibilitychange', focusAudio);
     unsubscribeObjectiveChanged();
+    unsubscribeGraphicsPreparation(); graphicsPreparationOverlay.dispose();
     unsubscribeTransitionStarted();
     unsubscribeTransitionCompleted();
     unsubscribeTransitionFailed();

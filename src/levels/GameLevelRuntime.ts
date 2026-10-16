@@ -17,6 +17,10 @@ export interface GameLevelRuntime {
   load(): void;
   /** Optional GPU preparation while the transition UI keeps gameplay stopped. */
   preparePresentation?(): Promise<void>;
+  /** Re-establish first-use coverage after a shader-affecting settings change. */
+  prepareGraphics?(): Promise<void>;
+  /** Prime current camera storage without rebuilding shader preparation. */
+  prepareRenderResources?(interpolationAlpha: number, stats: Readonly<LoopStats>): Promise<void>;
   start(): void;
   stop(): void;
   restartLevel(): void;

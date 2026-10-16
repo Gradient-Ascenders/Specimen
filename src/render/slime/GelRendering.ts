@@ -20,6 +20,7 @@ export class GelRendering {
 
   get value(): GelRenderingMode { return this.mode; }
   get materialCount(): number { return this.bodies.size; }
+  owns(material: THREE.MeshPhysicalMaterial): boolean { return this.bodies.has(material); }
 
   register(body: THREE.MeshPhysicalMaterial): void {
     if (this.bodies.has(body)) return;

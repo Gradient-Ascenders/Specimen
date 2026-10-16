@@ -453,7 +453,11 @@ test('startup construction and each isolated GPU submission yield before playbac
     render: (_root: THREE.Scene, camera: THREE.PerspectiveCamera) => {
       draws++;
       jobs.push(turn);
-      assert.ok(viewport.x + viewport.z < 0 && scissorTest, 'The primer cannot overwrite the title/blackout frame.');
+      assert.ok(scissor.x + scissor.z < 0 && scissorTest, 'The primer cannot overwrite the title/blackout frame.');
+      if (draws === 1) {
+        assert.deepEqual(viewport.toArray(), [0, 0, 640, 360], 'Prime the eventual camera-owned transmission dimensions.');
+        assert.equal(renderer.transmissionResolutionScale, 0.5);
+      }
       if (draws === 2) {
         assert.equal(camera.position.z, L.backZ + 12);
         assert.equal(scene.laboratory.root.visible, true);

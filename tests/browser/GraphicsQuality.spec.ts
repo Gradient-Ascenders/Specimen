@@ -16,10 +16,10 @@ for (const query of ['', '?debug=1']) {
     });
     await page.route('**/assets/index-*.js', async route => {
       const response = await route.fetch(), source = await response.text();
-      const pattern = /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
+      const pattern = /\{initialRuntime:([A-Za-z_$][\w$]*)/;
       expect(source).toMatch(pattern);
       await route.fulfill({ response, body: source.replace(pattern,
-        '(globalThis.__graphicsRuntime=$1,$1.prepareLightingPrograms()).then(') });
+        '{initialRuntime:globalThis.__graphicsRuntime=$1') });
     });
     await page.goto(`/${query}`, { waitUntil: 'domcontentloaded' });
     const title = page.locator('[data-flow-panel="title"]');
@@ -35,14 +35,32 @@ for (const query of ['', '?debug=1']) {
     await expect(preset).toHaveValue('normal');
     await expect(gel).toHaveValue('physical');
     await resolution.selectOption('1.5');
+    await expect(page.locator('[data-graphics-preparation]')).toBeHidden({ timeout: 240_000 });
+    // The title deliberately uses a separate bounded 1x presentation. Test
+    // gameplay density from paused gameplay, then freeze presentation time and
+    // camera for the exact Normal→Performance→Normal pixel comparison.
     await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     await title.locator('[data-action="start"]').click();
     await finishOpening(page);
     await page.keyboard.press('KeyP');
     await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
-    const sample = () => page.evaluate(() => {
+    await page.evaluate(() => {
+      const rt = (window as any).__graphicsRuntime, rig = rt.renderLayer.cameraRig;
+      const render = rt.render, update = rig.update;
+      rig.update(1, 0); rig.update = () => {};
+      rt.render = function(_alpha: number, stats: any) {
+        return render.call(this, 1, { ...stats, frameDeltaSeconds: 0, rawFrameDeltaSeconds: 0 });
+      };
+      rt.__restorePixelFixture = () => { rt.render = render; rig.update = update; };
+    });
+    const sample = async () => {
+      await expect(page.locator('[data-graphics-preparation]')).toBeHidden({ timeout: 240_000 });
+      return page.evaluate(() => {
       const r = (window as any).__graphicsRuntime, layer = r.renderLayer, renderer = layer.renderer;
-      layer.render();
+      // Synchronize authoritative render interpolation before the reference too;
+      // waiting for an incidental RAF can leave the first sample at the old pose.
+      r.render(1,{fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,
+        stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60});
       const gl = renderer.getContext(), pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
       gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       const reference: Uint8Array = r.__graphicsPixels ??= pixels;
@@ -60,9 +78,13 @@ for (const query of ['', '?debug=1']) {
           materials[m.uuid] = [m.transmission, m.opacity, m.transparent, m.roughness];
         }
       });
-      return { difference, lit, range: maximum - minimum, materials, scale: renderer.transmissionResolutionScale,
+      const pose={camera:layer.cameraRig.camera.matrixWorld.toArray(),
+        body:r.resources.body.position,rendered:r.resources.renderedProbePosition.toArray(),
+        presentation:r.resources.testScene.bob.root.getObjectByName('player-slime-bob-character').matrixWorld.toArray()};
+      return { difference, lit, range: maximum - minimum, materials, pose, scale: renderer.transmissionResolutionScale,
         buffer: [gl.drawingBufferWidth, gl.drawingBufferHeight], programs: renderer.info.programs.length, error: gl.getError() };
-    });
+      });
+    };
     const normal = await sample();
     expect(normal.buffer).toEqual([1200, 750]);
     expect(normal.scale).toBe(1);
@@ -87,8 +109,11 @@ for (const query of ['', '?debug=1']) {
     const restored = await sample();
     expect(restored.buffer).toEqual(normal.buffer);
     expect(restored.programs).toBe(normal.programs);
+    expect(restored.pose).toEqual(normal.pose);
+    expect(restored.materials).toEqual(normal.materials);
     expect(restored.difference, 'Normal output after restoring the preset').toBeLessThanOrEqual(1);
     expect([normal.error, performance.error, restored.error]).toEqual([0, 0, 0]);
+    await page.evaluate(() => (window as any).__graphicsRuntime.__restorePixelFixture());
     await preset.selectOption('performance');
     await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();

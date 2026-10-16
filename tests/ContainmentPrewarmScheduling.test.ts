@@ -42,7 +42,8 @@ function fixture(parallel: boolean, cancelAt = Infinity) {
     compile: record, compileAsync: async () => record(), render: record,
   };
   const policy = new RenderShadowPolicy(renderer.shadowMap);
-  const layer = { scene, cameraRig: { camera }, renderer, withShadowPreparation: policy.withPreparation.bind(policy) };
+  const layer = { scene, cameraRig: { camera }, renderer, withShadowPreparation: policy.withPreparation.bind(policy),
+    getGameplayPrewarmViewport: (out: THREE.Vector4) => out.set(0, 0, 640, 360) };
   const snapshot = () => ({ viewport: viewport.toArray(), scissor: scissor.toArray(), scissorTest, target,
     transmission: renderer.transmissionResolutionScale, shadow: { ...renderer.shadowMap } });
   const before = snapshot(), cameraPosition = camera.position.clone(), cameraRotation = camera.quaternion.clone();

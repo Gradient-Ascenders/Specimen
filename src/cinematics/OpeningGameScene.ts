@@ -160,7 +160,13 @@ export class OpeningGameScene {
     await yieldFrame();
     if (this.disposed) return;
     // Upload the real later-visible shell/hero/depth resources without overwriting the title frame.
+    const transmissionViewport = renderLayer.renderer.getViewport(new THREE.Vector4());
+    const transmissionScale = renderLayer.renderer.transmissionResolutionScale;
     withIsolatedPrewarmState(renderLayer.renderer, () => renderLayer.withShadowPreparation(true, () => {
+      // The same cinematic camera owns the eventual transmission target. Tiny
+      // isolation defaults would leave its first visible hero draw to resize it.
+      renderLayer.renderer.setViewport(transmissionViewport);
+      renderLayer.renderer.transmissionResolutionScale = transmissionScale;
       renderLayer.renderer.shadowMap.needsUpdate = true;
       renderLayer.renderer.render(this.room.scene, this.room.camera);
     }));

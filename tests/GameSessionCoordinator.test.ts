@@ -59,6 +59,92 @@ const progression: LevelProgressionSnapshot = {
   activeSlimeId: 'goop',
 };
 
+test('graphics changes gate simulation/draws, honor pause intent and release late work on unload', async () => {
+  const runtime = new MockRuntime('level-1', progression);
+  let finish!:()=>void, updates=0, draws=0;
+  runtime.fixedUpdate=()=>updates++;runtime.render=()=>draws++;
+  (runtime as GameLevelRuntime).prepareGraphics=()=>new Promise<void>(resolve=>{finish=resolve;});
+  const session=new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('opaque',()=>{});session.load();session.start();
+  session.applyGraphicsSettings('transmission',()=>{});
+  session.fixedUpdate(1/60);session.render(1,{} as any);
+  assert.equal(updates,0);assert.equal(draws,0);assert.equal(runtime.state,'stopped');
+  session.stop();finish();await Promise.resolve();await Promise.resolve();
+  assert.equal(runtime.state,'stopped','completion must not undo a pause request');
+  session.start();session.applyGraphicsSettings('opaque',()=>{});session.unload();
+  finish();await Promise.resolve();await Promise.resolve();
+  assert.equal(runtime.state,'unloaded','late compiler completion must not restart unloaded resources');session.dispose();
+});
+
+for(const intent of ['resume','pause','restart','unload'] as const) test(`resource-only preparation preserves ${intent} intent`,async()=>{
+  const runtime=new MockRuntime('level-1',progression) as MockRuntime & {
+    prepareRenderResources(alpha:number,stats:Readonly<import('../src/core/Loop.ts').LoopStats>):Promise<void>;
+    prepareGraphics():Promise<void>;
+  };
+  let finish!:()=>void,draws=0,updates=0;
+  runtime.render=()=>draws++;runtime.fixedUpdate=()=>updates++;
+  runtime.prepareGraphics=async()=>{throw Error('must retain shader preparation');};
+  runtime.prepareRenderResources=(_alpha,stats)=>{
+    assert.equal(stats.rawFrameDeltaSeconds,0);assert.equal(stats.frameDeltaSeconds,0);
+    return new Promise<void>(r=>{finish=r;});
+  };
+  const session=new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('transmission',()=>{},'half');session.load();session.start();
+  session.applyGraphicsSettings('transmission',()=>{},'full');
+  session.render(1,{} as any);session.fixedUpdate(1/60);
+  assert.equal(runtime.state,'stopped');assert.equal(draws,0);assert.equal(updates,0);
+  if(intent==='pause')session.stop();if(intent==='restart')session.restartLevel();if(intent==='unload')session.unload();
+  finish();await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  assert.equal(runtime.state,intent==='unload'?'unloaded':intent==='pause'?'stopped':'running');
+  assert.equal(runtime.calls.includes('restart'),intent==='restart');session.dispose();
+});
+
+test('title settings precede level construction and are prepared by the opening', async () => {
+  const runtime = new MockRuntime('level-1', progression);
+  let preparations = 0;
+  (runtime as GameLevelRuntime).prepareGraphics = async () => {
+    assert.equal(runtime.state, 'stopped'); preparations++;
+  };
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  const applied:string[]=[];
+  session.applyGraphicsSettings('opaque',()=>applied.push('minimum'),'no-transmission');
+  session.applyGraphicsSettings('transmission',()=>applied.push('standard'),'half');
+  await Promise.resolve(); await Promise.resolve();
+  session.applyGraphicsSettings('transmission',()=>applied.push('physical'),'full');
+  await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(applied,['minimum','standard','physical']);
+  assert.equal(runtime.state,'unloaded'); assert.equal(preparations,0);
+  session.load(); await session.prepareInitialGraphics();
+  assert.equal(preparations,1);
+  session.applyGraphicsSettings('transmission',()=>applied.push('same'),'full');
+  await Promise.resolve(); assert.equal(preparations,1);
+  session.dispose();
+});
+
+test('settings cannot mutate materials during normal startup preparation', async () => {
+  const runtime=new MockRuntime('level-1',progression); let finish!:()=>void;
+  let preparations=0;const applied:string[]=[];
+  (runtime as GameLevelRuntime).prepareGraphics=()=>{preparations++;return preparations===1?new Promise<void>(r=>{finish=r;}):Promise.resolve();};
+  const session=new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('opaque',()=>applied.push('opaque'));session.load();
+  const boot=session.prepareInitialGraphics();session.applyGraphicsSettings('transmission',()=>applied.push('transmission'));
+  assert.deepEqual(applied,['opaque']);finish();await boot;await Promise.resolve();
+  assert.deepEqual(applied,['opaque','transmission']);assert.equal(preparations,2);session.dispose();
+});
+
+test('restart waits for material preparation and cancellation drops the deferred restart', async () => {
+  for (const cancel of [false,true]) {
+    const runtime=new MockRuntime('level-1',progression);let finish!:()=>void;
+    (runtime as GameLevelRuntime).prepareGraphics=()=>new Promise<void>(r=>{finish=r;});
+    const session=new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+    session.applyGraphicsSettings('opaque',()=>{});session.load();session.start();
+    session.applyGraphicsSettings('transmission',()=>{});session.restartLevel();
+    assert.equal(runtime.calls.includes('restart'),false);
+    if(cancel)session.unload();finish();await Promise.resolve();await Promise.resolve();await Promise.resolve();
+    assert.equal(runtime.calls.includes('restart'),!cancel);session.dispose();
+  }
+});
+
 test('paused rendering holds the last presentation fraction and resumes live interpolation', () => {
   const runtime = new MockRuntime('level-1', progression);
   const next = new MockRuntime('level-2', progression);

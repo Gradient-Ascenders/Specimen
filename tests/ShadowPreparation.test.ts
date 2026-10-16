@@ -2,7 +2,7 @@ import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { withIsolatedPrewarmState } from '../src/render/IsolatedResourcePrewarm.ts';
+import { renderIsolatedConfiguration, withIsolatedPrewarmState } from '../src/render/IsolatedResourcePrewarm.ts';
 import { copyPrewarmMaterial, createShadowPrewarmMaterial, createDepthPrewarmGroup } from '../src/render/ShadowPrewarmMaterial.ts';
 import { ShadowedDroneBeam } from '../src/render/hazards/ShadowedDroneBeam.ts';
 import { BlackoutPresentationPreparation } from '../src/render/BlackoutPresentationPreparation.ts';
@@ -34,6 +34,27 @@ function fixture() {
   const snapshot = () => ({viewport: viewport.toArray(), scissor: scissor.toArray(), test, target, face, mip, transmissionScale: renderer.transmissionResolutionScale, counters: {...renderer.info.render}, shadows: {...renderer.shadowMap}});
   return {renderer, snapshot, borrowedTarget};
 }
+
+for (const fail of [false,true]) test(`retained-camera transmission primer isolates bounded clones and restores ownership (${fail})`, () => {
+  const live=new THREE.Scene(), prepared=new THREE.Scene(), camera=new THREE.PerspectiveCamera();
+  const geometry=new THREE.BoxGeometry(), material=new THREE.MeshPhysicalMaterial({transmission:.28});
+  const original=new THREE.Mesh(geometry,material), proxy=new THREE.Mesh(geometry,material);
+  original.layers.enable(31);
+  const liveLight=new THREE.PointLight(), selected=new THREE.PointLight(), excluded=new THREE.PointLight();excluded.layers.mask=0;
+  live.add(original,liveLight);prepared.add(selected,excluded);
+  const objects=[original,proxy,liveLight,selected,excluded,camera], masks=objects.map(o=>o.layers.mask);
+  const renderer={render(scene:THREE.Scene,view:THREE.Camera){
+    assert.equal(scene,live);assert.equal(view,camera);
+    assert.equal(camera.layers.test(original.layers),false);assert.equal(camera.layers.test(liveLight.layers),false);
+    assert.equal(camera.layers.test(selected.layers),true);assert.equal(camera.layers.test(excluded.layers),false);
+    assert.equal(camera.layers.test(proxy.layers),true);
+    if(fail) throw Error('driver');
+  }} as THREE.WebGLRenderer;
+  if(fail) assert.throws(()=>renderIsolatedConfiguration(renderer,live,camera,prepared,[proxy]),/driver/);
+  else renderIsolatedConfiguration(renderer,live,camera,prepared,[proxy]);
+  assert.deepEqual(objects.map(o=>o.layers.mask),masks);assert.equal(prepared.parent,null);assert.equal(proxy.parent,null);
+  assert.deepEqual(live.children,[original,liveLight]);geometry.dispose();material.dispose();
+});
 
 test('preparation restores render target face, viewport, counters and shadow state before async settlement and after throws', async () => {
   const {renderer, snapshot, borrowedTarget} = fixture();
