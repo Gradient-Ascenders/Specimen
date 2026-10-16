@@ -40,7 +40,7 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
     if (audio.diagnostics.loaded !== banks.cultivation.length) throw new Error('Cultivation bank missing');
     await audio.preload(banks.blackout);
   }, SOUND_BANKS);
-  expect(new Set(audioRequests).size).toBe(SOUND_BANKS.blackout.length);
+  expect(new Set(audioRequests).size).toBe(54);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
@@ -53,34 +53,6 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   await page.keyboard.down('KeyW');
   const moving=await step(8);
   expect(moving.keys).toContain('character:movement');
-  expect(moving.keys).toContain('containment:score');
-  expect(moving.keys).toContain('containment:air');
-  expect(moving.keys).toContain('containment:machine');
-  const music = await page.evaluate(async () => {
-    const runtime = (window as any).__audioRuntime, audio = runtime.audio;
-    const voice = [...audio.voices].find((v: any) => v.sound === 'containment-score') as any;
-    (window as any).__previewMusicSource = voice.source;
-    const analyser = audio.context.createAnalyser();
-    analyser.fftSize = 2048;
-    audio.music.connect(analyser);
-    const sample = async () => {
-      await new Promise(resolve => setTimeout(resolve, 350));
-      const data = new Float32Array(analyser.fftSize);
-      analyser.getFloatTimeDomainData(data);
-      return Math.sqrt(data.reduce((sum, value) => sum + value * value, 0) / data.length);
-    };
-    audio.setVolumes(1, 0, 1);
-    const audible = await sample();
-    audio.setVolumes(1, 0.8, 0);
-    const muted = await sample();
-    audio.music.disconnect(analyser); analyser.disconnect();
-    audio.setVolumes(1, 0.8, 0.55);
-    return { audible, muted, duration: voice.source.buffer.duration, channels: voice.source.buffer.numberOfChannels };
-  });
-  expect(music.duration).toBeCloseTo(64, 1);
-  expect(music.channels).toBe(2);
-  expect(music.audible).toBeGreaterThan(0.00001);
-  expect(music.muted).toBeLessThan(0.00001);
   await page.keyboard.up('KeyW'); await step(40);
   await page.keyboard.down('Space');
   const charging=await step(12);
@@ -119,36 +91,14 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   await page.locator('[data-setting="volume"]').press('Home');
   await page.locator('[data-setting="effects-volume"]').press('Home');
   for (let i=0;i<7;i++) await page.locator('[data-setting="effects-volume"]').press('ArrowRight');
-  await page.locator('[data-setting="music-volume"]').press('Home');
-  for (let i=0;i<4;i++) await page.locator('[data-setting="music-volume"]').press('ArrowRight');
   const volume=await page.evaluate(()=>(window as any).__audioRuntime.audio.diagnostics);
-  expect(volume.masterVolume).toBe(0); expect(volume.effectsVolume).toBe(0.35); expect(volume.musicVolume).toBe(0.2);
+  expect(volume.masterVolume).toBe(0); expect(volume.effectsVolume).toBe(0.35);
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
   const reset=await step(1);
   expect(reset.keys).not.toContain('character:charge');
-  expect(reset.keys).toContain('containment:score');
-  expect(reset.musicVolume).toBe(0.2);
   expect(reset.keys.some(key=>key.startsWith('acid:') || key.startsWith('dissolve:'))).toBe(false);
-  const sameMusicSource = () => page.evaluate(() => {
-    const audio = (window as any).__audioRuntime.audio;
-    return [...audio.voices].filter((v: any) => v.sound === 'containment-score').length === 1 &&
-      [...audio.voices].some((v: any) => v.source === (window as any).__previewMusicSource);
-  });
-  expect(await sameMusicSource()).toBe(true);
-  expect(await page.evaluate(() => (window as any).__audioRuntime.resources.containmentLevel.requestFailure('audio-retry'))).toBe(true);
-  await step(90);
-  expect(await sameMusicSource()).toBe(true);
-  await page.evaluate(() => (window as any).__audioRuntime.retryAfterDeath());
-  const recovered = await step(1);
-  expect(recovered.keys).toContain('containment:air');
-  expect(await sameMusicSource()).toBe(true);
-  await page.evaluate(() => (window as any).__audioRuntime.resources.testPanel.teleportRoom(4));
-  const outsidePreview = await step(1);
-  expect(outsidePreview.keys).not.toContain('containment:score');
-  await expect.poll(() => page.evaluate(() => [...(window as any).__audioRuntime.audio.voices]
-    .filter((v: any) => v.sound === 'containment-score').length)).toBe(0);
   await page.evaluate(() => (window as any).__audioRuntime.unload());
   const unloaded=await page.evaluate(()=>(window as any).__audioRuntime.audio.diagnostics);
   expect(unloaded.loops).toBe(0); expect(unloaded.voices).toBe(0);

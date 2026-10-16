@@ -193,7 +193,6 @@ test('settings retain session values across flow transitions', () => {
     invertVerticalLook: true,
     masterVolume: 0.35,
     soundEffectsVolume: 0.8,
-    musicVolume: 0.55,
     cameraDistanceMetres: 6.4,
     showFPS: false,
     reduceMenuMotion: false,

@@ -138,8 +138,7 @@ export class GameplayAudio {
     this.dead = false;
     this.resetting = true;
     this.clearCharacter();
-    if (this.audio.stopGameplay) this.audio.stopGameplay();
-    else this.audio.stopAll();
+    this.audio.stopAll();
     const generation = ++this.resetGeneration;
     queueMicrotask(() => {
       if (generation === this.resetGeneration) this.resetting = false;
@@ -149,6 +148,5 @@ export class GameplayAudio {
     this.enabled = false;
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.reset();
-    this.audio.stopAll();
   }
 }

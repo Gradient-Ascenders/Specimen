@@ -66,7 +66,6 @@ export function createSettingsPanelMarkup(): string {
         <fieldset class="settings-section" id="settings-audio"><legend>Audio</legend>
           ${range('master-volume', 'volume', 'Master volume', 0, 100, 5, 'Controls all game audio. 0% mutes the game.')}
           ${range('effects-volume', 'effects-volume', 'Sound effects volume', 0, 100, 5, 'Character, machinery, drone and interaction sounds, relative to master volume.')}
-          ${range('music-volume', 'music-volume', 'Music volume', 0, 100, 5, 'Background score, relative to master volume. 0% leaves sound effects and ambience audible.')}
         </fieldset>
         <fieldset class="settings-section" id="settings-controls"><legend>Controls</legend>
           ${range('mouse-sensitivity', 'sensitivity', 'Mouse sensitivity', 0.5, 2, 0.1, 'Lower values make camera aiming more precise; higher values turn faster.')}

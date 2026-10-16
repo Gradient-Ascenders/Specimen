@@ -1,47 +1,10 @@
-# Gameplay audio
+# Gameplay sound effects
 
-Specimen ships the original 54 OGG effects (Bob 16, Goop 18, Volt 19, turrets 1),
-plus seven original Containment preview assets. Of the original effects, 51 have
-current gameplay mappings; three are reserved for absent mechanics. No new
-gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
-
-## Containment listening preview
-
-Start a new game to hear the preview in Rooms 1–3 (climb, jump, lasers). A
-64-second stereo synth score combines slowly changing D-minor/add9, Bbmaj7,
-Fadd9 and Csus2 pads with a sparse bell motif and muted bass pulses. A separate
-16-second stereo air bed supplies ventilation; a 12-second mono machine loop is
-positioned at the starting containment apparatus and fades out on entering
-Room 2. Checkpoint changes sound a short confirmation, Room 3 lasers sound on
-real enabled-state changes, and accepted character changes sound a quiet click.
-Rooms 4–5 and later levels do not inherit the preview score or ambience.
-
-`ContainmentSoundscape` reads authoritative room, checkpoint, identity and laser
-state after the gameplay audio update. Retry/restart/debug restoration seeds
-those values silently. Sources fade in over 1–2 seconds; leaving the preview
-fades music over 1.5 seconds and ambience over 0.8 seconds. Repeated updates do
-not extend an outgoing fade. Pause and lost focus freeze the same shared audio
-context; recovery clears effects while preserving the score's source and offset.
-Unload/disposal stops everything, including any outgoing fades.
-
-Music has its own Settings slider (55% default); Master affects both channels,
-and Sound Effects controls character/world cues and ambience. These are session
-settings. To audition the score alone, set Sound Effects to 0%; to hear the
-environment without music, set Music to 0% and stand still as Bob.
-
-`scripts/generate-containment-audio.py` renders all seven assets using NumPy and
-SoundFile/libsndfile with fixed seed 1847. It uses no imported samples or remote
-generation service. Note releases and reflections wrap across the musical loop
-boundary. Only generated OGG files ship; Python is not a runtime dependency.
-`docs/assets/containment-audio-inventory.json` records decoded durations, peaks,
-RMS, channels, boundary steps and compressed sizes. The seven files add about
-377 KB on disk and roughly 33 MB of decoded PCM at a 48 kHz browser sample rate.
-This is a listening prototype, not a completed soundtrack or a replacement of
-the original character sound packs.
+Specimen ships 54 OGG effects: Bob 16, Goop 18, Volt 19, turrets 1. Of these, 51 have current gameplay mappings; three are reserved for absent mechanics. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
 
 ## Architecture
 
-`src/audio/SoundCatalog.ts` registers every asset. `AudioManager` owns one application Web Audio context, cached decoded buffers, independent effects/music gains, a shared compressor and master gain. `GameplayAudio` owns each level's event subscriptions, character loops and reset suppression. Typed `gameplayAudioEvents` notifications are presentation-only; gameplay never reads audio state. Each current runtime receives the same manager from `main.ts`. Standalone gameplay fixtures need no browser audio context.
+`src/audio/SoundCatalog.ts` registers every asset. `AudioManager` owns one application Web Audio context, cached decoded buffers, an effects gain, compressor and master gain. `GameplayAudio` owns each level's event subscriptions, character loops and reset suppression. Typed `gameplayAudioEvents` notifications are presentation-only; gameplay never reads audio state. Each current runtime receives the same manager from `main.ts`. Standalone gameplay fixtures need no browser audio context.
 
 Movement uses authoritative KinematicBody events and resolved grounded velocity, not keyboard detection. Acid shots, collisions, burns, electrical connections, receiver charge thresholds, powered devices and turret projectiles publish notifications only after their gameplay conditions succeed. Loop keys identify the character channel, acid projectile, dissolve target, charge receiver or established tether. Character switching clears only character loops; existing corrosion, projectiles and an inactive Volt tether retain ownership.
 
@@ -57,16 +20,16 @@ The supplied character-pack manifests/review notes describe original procedural 
 
 Master volume defaults to 100%; sound-effects volume defaults to 80%. Both have independent sliders in Settings, are clamped to 0–100%, and persist for the current application session across level changes/restarts. Either can mute all effects. Loops default to 0.13 gain; idle loops 0.045; projectile flight 0.075; one-shots generally 0.5; small grip/squish cues 0.22; turrets 0.65. A compressor at -12 dB/4:1 protects overlapping effects.
 
-Repeated movement/jump/landing/body cues vary playback rate by up to 4%. Sources use inverse distance attenuation (reference 3 m, rolloff 1.5) from the controlled body, with equal-power panning. The listener uses the controlled body and Web Audio's fixed world orientation; camera-relative panning is not implemented. Original effects are mono; the preview's score and air bed are nonpositional stereo.
+Repeated movement/jump/landing/body cues vary playback rate by up to 4%. Sources use inverse distance attenuation (reference 3 m, rolloff 1.5) from the controlled body, with equal-power panning. The listener uses the controlled body and Web Audio's fixed world orientation; camera-relative panning is not implemented. All sounds are mono.
 
-Voices are bounded at 24 globally and up to three per one-shot effect. Each standard loop has one voice, acid flight up to four and corrosion up to three. Additional world loops wait quietly for capacity. Per-effect one-shots are throttled to 35 ms; extreme rapid overlapping turret shots may be dropped by this mix limiter without changing projectile spawning. Original loops fade in over 40 ms; their stops remain immediate to respect charge cancellation/destruction. Preview beds have the longer fades described above.
+Voices are bounded at 24 globally and three per one-shot effect. Each standard loop has one voice, acid flight up to four and corrosion up to three. Additional world loops wait quietly for capacity. Per-effect one-shots are throttled to 35 ms; extreme rapid overlapping turret shots may be dropped by this mix limiter without changing projectile spawning. Loops fade in over 40 ms; stops are immediate to respect charge cancellation/destruction.
 
 ## Lifecycle
 
-- Boot preloads/decode-caches the 34 Bob/Goop clips and seven preview assets (41 total) while playback stays suspended. The Cultivation factory adds the shared turret and six rescued-Volt movement/recovery clips (48 total); Blackout adds his electrical clips (61 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
+- Boot preloads/decode-caches the 34 Bob/Goop clips while playback stays suspended. The Cultivation factory adds the shared turret and six rescued-Volt movement/recovery clips (41 total); Blackout adds his electrical clips (54 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
 - Pause/menus suspend the context and clear transient character loops. World loops preserve their offsets and resume once. Browser blur/visibility adds an independent suspension gate. Fixed-step state recreates character movement/charge loops only if still valid.
-- Death stops effect voices, preserves music, plays Bob's accepted-failure cue when applicable, and rejects further world sounds until successful recovery. Retry sounds the restored active identity.
-- Restart/checkpoint/puzzle reset clears effect voices and suppresses restoration notifications until the next gameplay update. Music retains its source and offset. Projectile impact, expiry, reset and disposal immediately stop flight ownership; burn completion/reset/disposal stop corrosion ownership.
+- Death stops existing voices, plays Bob's accepted-failure cue when applicable, and rejects further world sounds until successful recovery. Retry sounds the restored active identity.
+- Restart/checkpoint/puzzle reset clears voices and suppresses restoration notifications until the next gameplay update. Projectile impact, expiry, reset and disposal immediately stop flight ownership; burn completion/reset/disposal stop corrosion ownership.
 - Unload/transition removes level subscriptions and all sources. Shutdown removes browser handlers, disconnects audio graph resources and closes the context. Blackout's terminal completion explicitly clears and suspends audio; its session retains the completed scene. Merging clears original-character loops and the merged Specimen owns listener position without borrowing a slime's movement sounds.
 
 ## Complete mapping
@@ -129,12 +92,6 @@ All names below identify `.ogg` files. Loop behavior is explicit; other sounds a
 | `volt-shoot-01` | Electrical search beam actually enters its emitting state, once per beam start. |
 | `volt-terminal-activate-01` | PoweredDeviceCore terminal/relay/junction false-to-true power transition; custom bay/bridge-lock readiness. |
 | `specimen-turret-shot` | DroneProjectileSystem accepts a real spawn; common seam for fixed, ground, ceiling, lift and transit turrets. |
-| `containment-score` | Stereo 64-second loop in Containment Rooms 1–3; independent music gain. |
-| `lab-air-loop` | Stereo 16-second environmental bed in Rooms 1–3; effects gain. |
-| `lab-machine-loop` | Mono 12-second positional hum at the Room 1 containment apparatus. |
-| `lab-checkpoint` | Authoritative checkpoint ID changes during normal preview gameplay; restoration is silent. |
-| `lab-laser-on` / `lab-laser-off` | Room 3 authoritative beam enabled state changes; no frame-based retriggering. |
-| `lab-switch` | Accepted active-body change during preview gameplay; naturally unavailable before Goop rescue, auditionable with the existing debug unlock. |
 
 ## Validation
 
