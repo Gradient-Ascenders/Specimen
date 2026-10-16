@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
 import { withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
+import { waitForGpuPreparation } from '../render/WaitForGpuPreparation.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import { SPECIMEN_POD_LID_RAISE_METRES } from '../render/environment/containment/ContainmentSpecimenPod.ts';
 import { TrailerEggFracture } from '../trailer/TrailerEggFracture.ts';
@@ -159,26 +160,44 @@ export class OpeningGameScene {
     await renderLayer.withShadowPreparation(true, () => renderLayer.renderer.compileAsync(this.room.scene, this.room.camera));
     await yieldFrame();
     if (this.disposed) return;
-    // Upload the real later-visible shell/hero/depth resources without overwriting the title frame.
-    withIsolatedPrewarmState(renderLayer.renderer, () => renderLayer.withShadowPreparation(true, () => {
-      renderLayer.renderer.shadowMap.needsUpdate = true;
-      renderLayer.renderer.render(this.room.scene, this.room.camera);
-    }));
-    await yieldFrame();
-    if (this.disposed) return;
-    // One wide isolated upload covers all plaques and shared corridor
-    // instance buffers before the real fly-through, not a compile at each door.
-    this.apply(sampleOpeningGame(OPENING_GAME_TIMING.labEstablished), this.room.camera.aspect);
-    this.laboratory.showAllForPreparation();
-    const camera = this.room.camera;
-    camera.position.set(OPENING_LAB_LAYOUT.centreX, OPENING_LAB_LAYOUT.eyeHeight, OPENING_LAB_LAYOUT.backZ + 12);
-    camera.lookAt(OPENING_LAB_LAYOUT.centreX, OPENING_LAB_LAYOUT.eyeHeight, 15);
-    camera.fov = 75; camera.aspect = Math.max(0.3, camera.aspect); camera.updateProjectionMatrix();
-    withIsolatedPrewarmState(renderLayer.renderer, () => renderLayer.withShadowPreparation(true, () => {
-      renderLayer.renderer.shadowMap.needsUpdate = true;
-      renderLayer.renderer.render(this.room.scene, camera);
-    }));
-    this.apply(sampleOpeningGame(0), this.room.camera.aspect);
+    const prewarmTarget = new THREE.WebGLRenderTarget(1, 1);
+    try {
+      // Keep even fully clipped warm-up draws off the default framebuffer:
+      // they can present its discarded backbuffer between 30Hz intro frames.
+      // Nested shadow/transmission passes stay isolated as well.
+      withIsolatedPrewarmState(renderLayer.renderer, () => renderLayer.withShadowPreparation(true, () => {
+        renderLayer.renderer.shadowMap.needsUpdate = true;
+        renderLayer.renderer.render(this.room.scene, this.room.camera);
+      }), prewarmTarget);
+      await yieldFrame();
+      if (this.disposed) return;
+      // One wide isolated upload covers all plaques and shared corridor
+      // instance buffers before the real fly-through, not a compile at each door.
+      this.apply(sampleOpeningGame(OPENING_GAME_TIMING.labEstablished), this.room.camera.aspect);
+      this.laboratory.showAllForPreparation();
+      const camera = this.room.camera;
+      camera.position.set(OPENING_LAB_LAYOUT.centreX, OPENING_LAB_LAYOUT.eyeHeight, OPENING_LAB_LAYOUT.backZ + 12);
+      camera.lookAt(OPENING_LAB_LAYOUT.centreX, OPENING_LAB_LAYOUT.eyeHeight, 15);
+      camera.fov = 75; camera.aspect = Math.max(0.3, camera.aspect); camera.updateProjectionMatrix();
+      withIsolatedPrewarmState(renderLayer.renderer, () => renderLayer.withShadowPreparation(true, () => {
+        renderLayer.renderer.shadowMap.needsUpdate = true;
+        renderLayer.renderer.render(this.room.scene, camera);
+      }), prewarmTarget);
+      await yieldFrame();
+      if (this.disposed) return;
+      // Presentation.prepare is called only after the initial opaque blackout
+      // paints. Warm the real canvas-sized first view here too: a one-pixel
+      // offscreen draw cannot prime its canvas pipeline/full-size output work.
+      // Never use this draw for background preparation during visible playback.
+      this.apply(sampleOpeningGame(OPENING_GAME_TIMING.labReveal), camera.aspect);
+      renderLayer.withShadowPreparation(true, () => {
+        renderLayer.renderer.shadowMap.needsUpdate = true;
+        renderLayer.renderer.render(this.room.scene, camera);
+      });
+      await waitForGpuPreparation(renderLayer.renderer.getContext(), yieldFrame, () => !this.disposed);
+      if (this.disposed) return;
+      this.apply(sampleOpeningGame(0), this.room.camera.aspect);
+    } finally { prewarmTarget.dispose(); }
   }
 
   apply(frame: OpeningGameFrame, aspect: number, reducedMotion = false): void {

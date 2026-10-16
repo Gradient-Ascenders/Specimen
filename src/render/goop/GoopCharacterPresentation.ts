@@ -1,6 +1,7 @@
 import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
+import { GOOP_AUTHORED_ASSET_URL, GOOP_DETAIL_ASSET_URL } from '../slime/CharacterAssetUrls.ts';
 import { CharacterDetail, loadCharacterDetail, type CharacterDetailIndices } from '../slime/CharacterDetail.ts';
 import { moveAngleTowards, shortestAngleDelta } from '../BlobFacing.ts';
 import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
@@ -11,9 +12,7 @@ import { GOOP_MAXIMUM_BASE_OFFSET_METRES, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES, 
 import { GoopPolishMotion, GOOP_CREST_LAG_METRES, GOOP_LANDING_RIPPLE_METRES } from './GoopPolishMotion.ts';
 import { GEL_LAUNCH_SECONDS, GEL_LANDING_SECONDS, gelLandingSquash, gelAirborneStretch } from '../slime/GelElasticMotion.ts';
 
-const ASSET_URL = new URL('../../../assets/characters/goop/goop.glb', import.meta.url).href;
-const DETAIL_URL = new URL('../../assets/characters/goop-lod.bin', import.meta.url).href;
-const defaultLoader = () => loadCharacterAsset(ASSET_URL);
+const defaultLoader = () => loadCharacterAsset(GOOP_AUTHORED_ASSET_URL);
 const LAUNCH_SECONDS = GEL_LAUNCH_SECONDS;
 const LANDING_SECONDS = GEL_LANDING_SECONDS;
 const DAMAGE_SECONDS = 0.22;
@@ -125,7 +124,7 @@ export class GoopCharacterPresentation {
   }
 
   prepare(loader: GoopCharacterLoader = defaultLoader,
-    detailLoader: (() => Promise<readonly CharacterDetailIndices[]>) | undefined = loader === defaultLoader ? () => loadCharacterDetail(DETAIL_URL) : undefined): Promise<void> {
+    detailLoader: (() => Promise<readonly CharacterDetailIndices[]>) | undefined = loader === defaultLoader ? () => loadCharacterDetail(GOOP_DETAIL_ASSET_URL) : undefined): Promise<void> {
     if (this.disposed) return Promise.reject(new Error('Cannot prepare disposed Goop'));
     if (this.ready) return Promise.resolve();
     if (this.preparation) return this.preparation;

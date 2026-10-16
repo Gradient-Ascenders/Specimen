@@ -9,6 +9,9 @@ export interface OpeningGamePresentationOptions {
   readonly scene: OpeningView;
   readonly renderLayer: OpeningRenderer;
   readonly host: HTMLElement;
+  /** Light downloads/idle data only; never construct or render the gameplay scene here. */
+  readonly preloadLevel?: () => Promise<void>;
+  /** Full room/model construction and GPU work, only after a painted blackout. */
   readonly prepareLevel: () => Promise<void>;
   readonly onComplete: (userGesture: boolean) => void;
   readonly onStatus: (message: string, failed: boolean) => void;
@@ -17,7 +20,7 @@ export interface OpeningGamePresentationOptions {
   readonly window?: Window;
 }
 
-/** One loop/renderer: the clip and async Level 1 readiness must both finish. */
+/** Prepare small downloads/data during the clip; finish cold CPU/GPU jobs under black. */
 export class OpeningGamePresentation {
   private readonly options: OpeningGamePresentationOptions;
   private readonly hostWindow: Window;
@@ -34,6 +37,9 @@ export class OpeningGamePresentation {
   private accumulator = 0;
   private loadFrame = 0;
   private preparationScheduled = false;
+  private levelLoadFrame = 0;
+  private levelPreparationScheduled = false;
+  private preloadStarted = false;
   private width = 0;
   private height = 0;
   private lastStage = '';
@@ -51,6 +57,7 @@ export class OpeningGamePresentation {
     this.started = true;
     this.options.scene.begin();
     this.options.renderLayer.setPresentationResolution(1280 * 720);
+    this.options.host.dataset.openingMode = 'live';
     this.options.host.dataset.openingState = 'preparing';
   }
 
@@ -63,9 +70,32 @@ export class OpeningGamePresentation {
       this.loadFrame = this.hostWindow.requestAnimationFrame(() => {
         this.loadFrame = 0;
         this.prepareScene();
-        this.prepareLevel();
       });
     });
+  }
+
+  private scheduleLevelPreparation(): void {
+    if (this.levelPreparationScheduled || this.disposed || this.levelReady) return;
+    this.levelPreparationScheduled = true;
+    // Setting opacity is not a painted frame. Give the compositor a complete
+    // blackout paint before world construction, decoding or driver stalls.
+    this.levelLoadFrame = this.hostWindow.requestAnimationFrame(() => {
+      this.levelLoadFrame = this.hostWindow.requestAnimationFrame(() => {
+        this.levelLoadFrame = 0;
+        // A very early Skip still lets the cinematic's own preparation settle.
+        if (!this.scenePending && (this.sceneReady || this.failed)) this.prepareLevel();
+      });
+    });
+  }
+
+  private preloadLevel(): void {
+    if (this.preloadStarted || this.disposed) return;
+    this.preloadStarted = true;
+    // Failure must not interrupt the film. Real preparation retries required
+    // downloads and reports errors; speculation must never decode models.
+    void Promise.resolve().then(() => {
+      if (!this.disposed) return this.options.preloadLevel?.();
+    }).catch(() => {});
   }
 
   skip(): void {
@@ -74,6 +104,7 @@ export class OpeningGamePresentation {
     this.seconds = OPENING_GAME_TIMING.end;
     this.updateFade(1);
     this.schedulePreparation();
+    this.scheduleLevelPreparation();
     this.renderedEnd = false;
     this.tryComplete(true);
     this.syncStatus();
@@ -83,20 +114,27 @@ export class OpeningGamePresentation {
     if (this.disposed || this.completed || !this.failed) return;
     this.failed = false;
     if (!this.sceneReady) this.prepareScene();
-    if (!this.levelReady) this.prepareLevel();
+    else if (!this.levelReady && this.levelPreparationScheduled) this.prepareLevel();
     this.syncStatus();
   }
 
   render(deltaSeconds: number): void {
     if (!this.started || this.disposed || this.completed || this.options.host.ownerDocument.hidden) return;
     const delta = Number.isFinite(deltaSeconds) ? Math.max(0, Math.min(0.1, deltaSeconds)) : 0;
-    if (!this.sceneReady) {
-      // Fade the retained title frame while assets prepare, then hold black.
-      // Do not spend the experiment tour's time before its shaders are ready.
+    if (!this.sceneReady || (this.levelPreparationScheduled && !this.levelReady &&
+      this.seconds < OPENING_GAME_TIMING.end)) {
+      // Initial preparation (or recovery from a failed clip) holds black. The
+      // normal tour does not wait for Level 1's speculative download bank.
       this.seconds = this.skipRequested ? OPENING_GAME_TIMING.end
         : Math.min(OPENING_GAME_TIMING.blackoutEnd, this.seconds + delta);
       this.updateFade(sampleOpeningGame(this.seconds).fade);
       if (this.seconds >= OPENING_GAME_TIMING.blackoutEnd) this.schedulePreparation();
+      return;
+    }
+    if (this.skipRequested || this.renderedEnd) {
+      // Keep the last framebuffer while black. Even resizing must not redraw a
+      // cinematic/transmission pass alongside final gameplay preparation.
+      this.tryComplete(false);
       return;
     }
     this.seconds = Math.min(OPENING_GAME_TIMING.end, this.seconds + delta);
@@ -104,7 +142,6 @@ export class OpeningGamePresentation {
     const width = Math.max(1, this.options.host.clientWidth), height = Math.max(1, this.options.host.clientHeight);
     const resized = width !== this.width || height !== this.height;
     if (!resized && this.accumulator + 1e-9 < 1 / 30) return;
-    if (!resized && this.renderedEnd) { this.tryComplete(false); return; }
     const frame = sampleOpeningGame(this.seconds);
     this.options.scene.apply(frame, width / height, this.options.reducedMotion);
     this.options.renderLayer.withShadowPreparation(true, () => {
@@ -119,6 +156,7 @@ export class OpeningGamePresentation {
     this.width = width; this.height = height;
     this.accumulator %= 1 / 30;
     this.renderedEnd = frame.stage === 'complete';
+    if (this.renderedEnd) this.scheduleLevelPreparation();
     this.syncStatus();
     this.tryComplete(false);
   }
@@ -133,10 +171,12 @@ export class OpeningGamePresentation {
     if (this.disposed) return;
     this.disposed = true;
     this.hostWindow.cancelAnimationFrame(this.loadFrame);
+    this.hostWindow.cancelAnimationFrame(this.levelLoadFrame);
     this.options.scene.dispose();
     this.options.renderLayer.setPresentationResolution(undefined);
     delete this.options.host.dataset.openingState;
     delete this.options.host.dataset.openingStage;
+    delete this.options.host.dataset.openingMode;
   }
 
   private prepareScene(): void {
@@ -147,12 +187,20 @@ export class OpeningGamePresentation {
       if (this.disposed) return;
       this.scenePending = false;
       this.sceneReady = true;
+      if (this.skipRequested) {
+        // The early Skip's scheduled blackout may already have painted while
+        // the cinematic was preparing. Otherwise its second frame starts L1.
+        if (this.levelLoadFrame === 0) this.prepareLevel();
+      } else if (!this.levelPreparationScheduled) this.preloadLevel();
       this.syncStatus();
       this.tryComplete(false);
     }, () => {
       if (this.disposed) return;
       this.scenePending = false;
       this.failed = true;
+      // The failed clip is still fully black; warm Level 1 so Skip can recover.
+      if (!this.levelPreparationScheduled) this.scheduleLevelPreparation();
+      else if (this.levelLoadFrame === 0) this.prepareLevel();
       this.syncStatus();
       this.tryComplete(false);
     });
@@ -162,7 +210,9 @@ export class OpeningGamePresentation {
     if (this.levelPending || this.levelReady || this.disposed) return;
     this.levelPending = true;
     // Promise.resolve also routes synchronous construction failures to recovery.
-    void Promise.resolve().then(this.options.prepareLevel).then(() => {
+    void Promise.resolve().then(() => {
+      if (!this.disposed) return this.options.prepareLevel();
+    }).then(() => {
       if (this.disposed) return;
       this.levelPending = false;
       this.levelReady = true;
@@ -188,12 +238,15 @@ export class OpeningGamePresentation {
   private syncStatus(): void {
     if (this.disposed || this.completed) return;
     const waiting = this.skipRequested || this.seconds >= OPENING_GAME_TIMING.end;
-    const state = this.failed ? 'failed' : !this.sceneReady ? 'preparing' : waiting ? 'waiting' : 'playing';
+    const state = this.failed ? 'failed' : waiting ? 'waiting'
+      : !this.sceneReady || (this.levelPreparationScheduled && !this.levelReady) ? 'preparing' : 'playing';
     const host = this.options.host;
     if (host.dataset.openingState !== state) host.dataset.openingState = state;
-    if (this.lastStatus === state) return;
-    this.lastStatus = state;
+    const statusKey = `${state}:${this.sceneReady}`;
+    if (this.lastStatus === statusKey) return;
+    this.lastStatus = statusKey;
     this.options.onStatus(this.failed ? 'Preparation could not finish. Retry, or skip if Level 1 is ready.'
-      : !this.sceneReady && !waiting ? 'Preparing the opening…' : waiting ? 'Preparing Level 1…' : '', this.failed);
+      : !this.sceneReady && !waiting ? 'Preparing the opening…'
+      : waiting || (this.levelPreparationScheduled && !this.levelReady) ? 'Preparing Level 1…' : '', this.failed);
   }
 }

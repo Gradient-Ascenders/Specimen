@@ -106,7 +106,13 @@ checks are not measured hardware frame-rate evidence.
 
 Ordinary Start uses the same `src/main.ts` flow in development and production:
 `title → opening → playing`. The original standalone `?trailer=opening` capture
-is still independent. There is no production/debug bypass for the new opening.
+is still independent. The default opening is the live scene in both builds
+(`?opening=live` also explicitly selects it). The committed 1080p/30fps H.264 MP4
+and its native HTML player remain an opt-in `?opening=mp4` backup, not a WebGL
+video texture. Ordinary Start does not download the backup. See
+[opening movie operations](../operations/opening-movie.md) for exporting,
+encoding, playback and loading details. The backup contains its fixed 16:9
+video without cropping on narrower screens. Both paths use the same sequence.
 
 The 54-second `OpeningGameTimeline` first fades the menu to black, reveals a
 sealed 74-metre experiment wing and glides between four labelled specimen doors under
@@ -158,24 +164,40 @@ their existing timing. There are no ejected fluids or replacement
 character spawns. Brief camera cuts, a small impact jolt, letterboxing and a final
 fade provide framing; reduced-motion preference attenuates shaking/jolt.
 
-Only the small menu room blocks initial title readiness. The Start-handler
-constructs only a lightweight deferred opening controller, retaining the warmed
-menu frame. The initial fade reaches opaque black and paints before either
-the hatch/laboratory or Level 1 is constructed. Hatch and laboratory construction
-yield separately; the cinematic's compile and two isolated uploads also yield
-between GPU submissions instead of issuing them back-to-back. This avoids
-placing those startup jobs on the visible fade; it is not an FPS measurement.
-During the opening,
-Level 1 construction, character fetch/decode and the existing complete shader /
-first-use resource preparation run behind the opening. Individual shader, depth,
-resource upload and alternate-view jobs yield between submissions, rather than
-running an entire room's compile/upload/view sequence in one uninterrupted batch.
-Each restores renderer state synchronously before yielding, so the isolated cinematic
-scene can continue drawing. Gameplay simulation, input, HUD and debug controls
-remain disabled throughout. Skip (button, Escape or controller B) skips time, not
-readiness. A slow load holds at the faded ending; failed preparation exposes Retry.
-Gameplay cannot start with missing assets. Automatic completion does not request
-pointer lock without a user gesture; the existing canvas click captures the mouse.
+Only the small menu room blocks initial title readiness. The initial DOM fade
+retains the warmed menu frame. Default live Start constructs hatch/laboratory
+scopes and prepares their own programs behind the initial blackout. The full
+first corridor view is primed under the opaque fade and fenced before reveal.
+
+During the live film, Level 1 performs only allowlisted light work: three
+low-priority character/detail downloads (about 1 MB combined), plus plain index
+data preparation for the 51 KB detail bank when a browser idle callback has at
+least 4 ms available. Data exceeding 64 KiB is deferred, and no timeout forces
+work into busy frames. Unsupported browsers retain raw bytes only. Models remain
+encoded, with no world construction, geometry/textures, shader compilation or GPU
+work. Full gameplay preparation starts after the fully painted final blackout
+(or Skip), avoiding competing live 3D workloads. The bank reuses fetched bytes
+for independent character instances and copies prepared index data per owner,
+with normal-demand retry for failed speculative downloads. Promotion to full
+preparation and disposal cancel pending idle callbacks without waiting for them.
+
+The opt-in native MP4 backup instead releases the menu's CPU/GPU resources after
+black has painted. Once video playback begins, it downloads at high priority,
+constructs the world, parses character assets and performs the existing complete
+shader / first-use preparation during playback. Deferred shader bindings resolve
+separately; uploads use at most eight leaf objects per slice, then retain the
+original mixed transmission/VAO pass. Steps yield for 33ms after cheap jobs and
+80ms after costly ones; Skip/end removes that extra pacing. This experimental
+backup can still contend with decoding/playback; it is not the default. Both
+paths use real isolated framebuffers without clearing a visible cinematic.
+
+Both paths keep gameplay simulation, input, HUD and debug controls disabled.
+Skip (button, Escape or controller B) skips the film, not readiness. A slow load
+holds at the faded ending; failed preparation exposes Retry. Gameplay cannot
+start before full preparation and a nonblocking GPU fence finish. Automatic
+completion does not request pointer lock without a user gesture; the existing
+canvas click captures the mouse. Hidden tabs pause playback and disposal releases
+media resources/callbacks as well as any retained scene.
 
 The opening shares the existing renderer/loop, four menu light slots, one 512px shadow
 map and the bounded 921,600-pixel presentation policy. Readable plaques accompany
@@ -224,12 +246,14 @@ before lid movement, blackout-before-setup scheduling and readiness/skip/hidden-
 sequence with a submission spy for both parallel and synchronous compilation:
 one compile/draw per yield, restored renderer state and cancellation, while all
 23 measured first-use owners retain preparation. This is not a GPU benchmark.
-`tests/smoke/OpeningGame.spec.ts` delays a real Level 1 asset while letting the
-unmodified production cinematic play, then checks the final handoff. Existing
+`tests/smoke/OpeningMovie.spec.ts` exercises real MP4 decoding and full native
+playback, preparation before the movie ends, delayed assets/final blackout,
+media retry, Skip and restart. `tests/smoke/OpeningGame.spec.ts` retains the live
+preview's isolated first reveal and staged-download/final-handoff coverage. Existing
 gameplay browser tests explicitly skip the opening but still await real readiness.
 Browser cases can target dev with `SPECIMEN_PRODUCTION_URL=http://127.0.0.1:5173`
-or the production preview. They have not been executed locally for this change;
-visual quality, overlap latency and hardware performance remain unmeasured.
+or the production preview. These headless cases do not establish assessment-PC
+hardware performance or a guaranteed loading time.
 
 ## Settings and lightweight diagnostics
 

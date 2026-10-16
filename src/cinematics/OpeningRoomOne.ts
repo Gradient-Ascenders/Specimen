@@ -13,7 +13,7 @@ export class OpeningRoomOne {
   readonly root = new THREE.Group();
   private readonly sourceArt: RoomOneArt;
   private readonly batching: ReturnType<typeof consolidateContainmentRoomStaticVisuals>;
-  private readonly instances = new Set<THREE.InstancedMesh>();
+  private readonly sourceInstances = new Set<THREE.InstancedMesh>();
   private disposed = false;
 
   constructor(resources: ContainmentArtResources) {
@@ -22,7 +22,7 @@ export class OpeningRoomOne {
     this.sourceArt = new RoomOneArt(resources);
     // Retain ownership of every source resource, including excluded specimen
     // states. They never enter the renderer or get their own character/model load.
-    this.sourceArt.root.traverse(object => { if (object instanceof THREE.InstancedMesh) this.instances.add(object); });
+    this.sourceArt.root.traverse(object => { if (object instanceof THREE.InstancedMesh) this.sourceInstances.add(object); });
     for (const child of [...this.sourceArt.root.children]) {
       if (child === this.sourceArt.specimenAssembly || child.name === 'room-1-locked-laboratory-door-assembly') continue;
       this.root.add(child);
@@ -57,15 +57,17 @@ export class OpeningRoomOne {
     });
     // Preserve exact authored geometry, positions and materials while merging
     // static dressing by material. One room-sized cell, not dozens of draws.
+    // The batch result owns its generated instance buffers; retain only the
+    // original source instances here, including those removed by batching.
     this.batching = consolidateContainmentRoomStaticVisuals(this.root, { cellSize: 32 });
-    this.root.traverse(object => { if (object instanceof THREE.InstancedMesh) this.instances.add(object); });
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.root.removeFromParent();
-    for (const instance of this.instances) instance.dispose();
+    for (const instance of this.sourceInstances) instance.dispose();
+    this.sourceInstances.clear();
     this.batching.dispose();
     this.sourceArt.dispose();
     this.root.clear();

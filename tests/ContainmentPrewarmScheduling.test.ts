@@ -39,7 +39,10 @@ function fixture(parallel: boolean, cancelAt = Infinity) {
     getScissorTest: () => scissorTest, setScissorTest: (value: boolean) => { scissorTest = value; },
     getRenderTarget: () => target, setRenderTarget: (value: THREE.WebGLRenderTarget | null) => { target = value; },
     getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
-    compile: record, compileAsync: async () => record(), render: record,
+    compile: record, compileAsync: async () => record(), render: () => {
+      assert.ok(target instanceof THREE.WebGLRenderTarget, 'background warm-up must never render into the visible canvas');
+      record();
+    },
   };
   const policy = new RenderShadowPolicy(renderer.shadowMap);
   const layer = { scene, cameraRig: { camera }, renderer, withShadowPreparation: policy.withPreparation.bind(policy) };

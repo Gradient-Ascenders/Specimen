@@ -1,0 +1,14 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "frames": 1597,
+  "durationSeconds": 53.233333333333334,
+  "sourceStartSeconds": 0.8,
+  "sourceEndSeconds": 54,
+  "codec": "h264",
+  "pixelFormat": "yuv420p",
+  "audio": false,
+  "bytes": 16081010,
+  "sha256": "aad3fe942b76006f8654439ebd0ecd7f722fb87c27e490e0ca52e3db0d76607c"
+}

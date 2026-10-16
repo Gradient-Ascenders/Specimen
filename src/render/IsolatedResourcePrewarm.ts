@@ -2,6 +2,24 @@ import * as THREE from 'three';
 
 const ISOLATED_RESOURCE_PREWARM_LAYER = 31;
 
+/** Keep original parents/transforms, deduplicate overlapping owners, and bound
+ * each upload submission by renderable objects rather than arbitrary groups. */
+export function createPrewarmResourceBatches(
+  roots: readonly THREE.Object3D[],
+  limit = 8,
+): THREE.Object3D[][] {
+  if (!Number.isInteger(limit) || limit < 1) throw new Error('Prewarm batch limit must be a positive integer.');
+  const seen = new Set<THREE.Object3D>(), objects: THREE.Object3D[] = [];
+  for (const root of roots) root.traverse(object => {
+    if (seen.has(object) || !(object instanceof THREE.Mesh || object instanceof THREE.Line ||
+      object instanceof THREE.Points || object instanceof THREE.Sprite)) return;
+    seen.add(object); objects.push(object);
+  });
+  const batches: THREE.Object3D[][] = [];
+  for (let index = 0; index < objects.length; index += limit) batches.push(objects.slice(index, index + limit));
+  return batches;
+}
+
 /** Restore synchronously, even when action returns a pending compilation. */
 export function withIsolatedPrewarmState<T>(
   renderer: THREE.WebGLRenderer,
@@ -46,7 +64,7 @@ export function renderIsolatedPrewarmResources(
   scene: THREE.Scene,
   camera: THREE.Camera,
   resourceRoots: readonly THREE.Object3D[],
-  options: { readonly includeHidden?: boolean } = {},
+  options: { readonly includeHidden?: boolean; readonly includeDescendants?: boolean } = {},
 ): void {
   const previousCameraLayers = camera.layers.mask;
   const previousResourceLayers = new Map<THREE.Object3D, number>();
@@ -73,14 +91,16 @@ export function renderIsolatedPrewarmResources(
   };
 
   for (const resourceRoot of resourceRoots) {
-    resourceRoot.traverse((object) => {
+    const select = (object: THREE.Object3D): void => {
       if (object instanceof THREE.Light || previousResourceLayers.has(object)) return;
       previousResourceLayers.set(object, object.layers.mask);
       previousResourceFrustumCulling.set(object, object.frustumCulled);
       object.layers.set(ISOLATED_RESOURCE_PREWARM_LAYER);
       object.frustumCulled = false;
       if (options.includeHidden) expose(object);
-    });
+    };
+    if (options.includeDescendants === false) select(resourceRoot);
+    else resourceRoot.traverse(select);
     if (options.includeHidden) {
       for (let ancestor = resourceRoot.parent; ancestor && ancestor !== scene; ancestor = ancestor.parent) expose(ancestor);
     }
