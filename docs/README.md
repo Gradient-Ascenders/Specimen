@@ -6,6 +6,9 @@ for implementation details and historical evidence.
 
 ## Architecture
 
+- [Collision queries](architecture/collision-queries.md) — spatial candidates,
+  transform boundaries, diagnostics and reproducible CPU benchmarks.
+
 - [Runtime and lifecycle](architecture/runtime.md) — application ownership,
   fixed-step updates, input, transitions, restart, and disposal.
 - [Rendering and assets](architecture/rendering.md) — renderer ownership,
