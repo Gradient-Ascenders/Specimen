@@ -1054,20 +1054,26 @@ export class GameFlowUI {
   }
 
   private readonly onMenuHover = (event: PointerEvent): void => {
-    const button = (event.target as Element | null)?.closest('button, summary');
-    if (!button || button.contains(event.relatedTarget as Node | null)) return;
+    const button = this.elementFromTarget(event.target)?.closest('button, summary');
+    if (!button || (event.relatedTarget instanceof Node && button.contains(event.relatedTarget))) return;
     if (button instanceof HTMLButtonElement && button.disabled) return;
     this.actions.playMenuSound?.('navigate');
   };
 
   private readonly onMenuFocus = (event: FocusEvent): void => {
-    if ((event.target as Element | null)?.matches('button, summary')) {
+    if (this.elementFromTarget(event.target)?.matches('button, summary')) {
       this.actions.playMenuSound?.('navigate');
     }
   };
 
+  private elementFromTarget(target: EventTarget | null): Element | null {
+    // Keyboard events may be dispatched on Window or Document; casts do not
+    // make those targets (or bubbling text nodes) support DOM element methods.
+    return target instanceof Element ? target : null;
+  }
+
   private specimenFromTarget(target: EventTarget | null): TitleSpecimenId | null {
-    const id = (target as Element | null)?.closest?.<HTMLElement>('[data-title-specimen]')?.dataset.titleSpecimen;
+    const id = this.elementFromTarget(target)?.closest<HTMLElement>('[data-title-specimen]')?.dataset.titleSpecimen;
     return isTitleSpecimenId(id) ? id : null;
   }
 
@@ -1117,13 +1123,13 @@ export class GameFlowUI {
       this.previewTitleSpecimen(specimen, true);
       return;
     }
-    const tab = (event.target as Element | null)?.closest<HTMLElement>('[data-settings-tab]');
+    const tab = this.elementFromTarget(event.target)?.closest<HTMLElement>('[data-settings-tab]');
     if (tab && this.state === 'settings') {
       this.actions.playMenuSound?.('confirm');
       this.selectSettingsTab(tab.dataset.settingsTab!);
       return;
     }
-    const target = (event.target as Element | null)?.closest<HTMLButtonElement>(
+    const target = this.elementFromTarget(event.target)?.closest<HTMLButtonElement>(
       'button[data-action]',
     );
     if (!target) return;
@@ -1194,7 +1200,7 @@ export class GameFlowUI {
       if (panel) this.trapFocus(event, panel);
       return;
     }
-    const tab = (event.target as Element | null)?.closest<HTMLElement>('[data-settings-tab]');
+    const tab = this.elementFromTarget(event.target)?.closest<HTMLElement>('[data-settings-tab]');
     if (tab && this.state === 'settings' && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.code)) {
       event.preventDefault();
       const ids = ['controls', 'audio', 'graphics'];

@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+import { confirmRestart, openAdvancedGraphics } from '../helpers/MenuNavigation.ts';
 
 // Observe the shipped composition root. No flags or gameplay implementations
 // are replaced; staging calls existing controller/reset contracts for coverage.
@@ -73,6 +74,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
     await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
     expect(new URL(page.url()).search).toBe('');
     await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+    await openAdvancedGraphics(page);
     await expect(page.locator('[data-setting="graphics-profile"]')).toHaveValue('minimum');
     await expect(page.locator('[data-setting="graphics-preset"]')).toHaveValue('normal');
     await page.locator('[data-setting="graphics-profile"]').selectOption(profile);
@@ -165,6 +167,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
       }
       await page.keyboard.press('KeyP');
       await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
+      await confirmRestart(page);
       await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
       expect((await snapshot(page)).texturedMeshes).toBeGreaterThanOrEqual(20);
       if (level === 1) {

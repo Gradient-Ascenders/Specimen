@@ -22,6 +22,23 @@ test('menus retain readable layouts, keyboard navigation, settings and deliberat
   const title = page.locator('[data-flow-panel="title"]');
   const settings = page.locator('[data-flow-panel="settings"]');
   await expect(title).toBeVisible({ timeout: 120_000 });
+  // Global shortcuts and delegated menu listeners must tolerate non-element
+  // targets, including the Window-dispatched keys used by gameplay controls.
+  await page.evaluate(() => {
+    const flow = document.querySelector('.game-flow')!;
+    const text = document.createTextNode('');
+    flow.append(text);
+    for (const target of [window, document, text]) {
+      target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ', bubbles: true }));
+      target.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }
+    flow.querySelector('[data-action="start"]')!.dispatchEvent(
+      new PointerEvent('pointerover', { bubbles: true, relatedTarget: window }));
+    text.remove();
+  });
+  expect(errors).toEqual([]);
   expect([...titleCharacters].sort()).toEqual(['bob-authored', 'goop', 'volt']);
   const canvasSize = () => page.locator('canvas').evaluate(canvas => [canvas.width, canvas.height]);
   await expect.poll(canvasSize).toEqual([1440, 900]);
