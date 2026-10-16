@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -28,8 +29,9 @@ async function boot(page: Page, url = '/?debug=1'): Promise<void> {
   await observe(page);
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 240_000 });
-  await page.evaluate(() => (window as any).__graphicsSession.runtime.renderLayer.setAnimationLoop(null));
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page, false);
+  await page.evaluate(() => (window as any).__graphicsSession.runtime.renderLayer.setAnimationLoop(null));
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
 }
 

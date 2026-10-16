@@ -42,7 +42,7 @@ export class TitleScreenPresentation {
     await this.renderLayer.withShadowPreparation(true, () => this.renderLayer.renderer.compileAsync(
       this.scene.scene, this.scene.camera));
     if (this.disposed) return;
-    // Level 1's loading primers finish before applying presentation resolution.
+    // Gameplay has its own preparation/readiness boundary after Start.
     this.renderLayer.setPresentationResolution(TITLE_PIXEL_BUDGET);
     this.ready = true;
     this.render(0);
@@ -79,12 +79,16 @@ export class TitleScreenPresentation {
     if (this.host.dataset.titleMotion !== motion) this.host.dataset.titleMotion = motion;
   }
 
-  dispose(): void {
+  dispose(options: { keepScene?: boolean } = {}): void {
     if (this.disposed) return;
     this.disposed = true;
     this.motionPreference.removeEventListener('change', this.onMotionChanged);
-    this.renderLayer.setPresentationResolution(undefined);
-    this.scene.dispose();
+    // A transfer hands the existing presentation cap to the cinematic too;
+    // avoid two drawing-buffer reallocations (gameplay -> opening) on Start.
+    if (!options.keepScene) {
+      this.renderLayer.setPresentationResolution(undefined);
+      this.scene.dispose();
+    }
     delete this.host.dataset.titleBackdrop;
     delete this.host.dataset.titleMotion;
   }

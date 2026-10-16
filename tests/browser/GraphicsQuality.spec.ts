@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from './fixtures.ts';
 
 test.use({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1.25 });
@@ -34,6 +35,11 @@ for (const query of ['', '?debug=1']) {
     await expect(preset).toHaveValue('normal');
     await expect(gel).toHaveValue('physical');
     await resolution.selectOption('1.5');
+    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+    await title.locator('[data-action="start"]').click();
+    await finishOpening(page);
+    await page.keyboard.press('KeyP');
+    await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
     const sample = () => page.evaluate(() => {
       const r = (window as any).__graphicsRuntime, layer = r.renderLayer, renderer = layer.renderer;
       layer.render();
@@ -85,7 +91,7 @@ for (const query of ['', '?debug=1']) {
     expect([normal.error, performance.error, restored.error]).toEqual([0, 0, 0]);
     await preset.selectOption('performance');
     await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
-    await title.locator('[data-action="start"]').click();
+    await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
     await page.locator('canvas').click();
     await page.keyboard.press('KeyW', { delay: 250 });
     await page.keyboard.press('Space', { delay: 150 });

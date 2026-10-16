@@ -15,7 +15,7 @@ const fixture = JSON.parse(
   ),
 ) as readonly ContainmentColliderFingerprint[];
 
-test('Containment collision matches the frozen pre-art route', () => {
+test('Containment collision matches the authored route, round pedestal and solid raised chamber', () => {
   const scene = new ContainmentLevelScene(() => {}, {
     includeDevelopmentHelpers: true,
   });

@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
@@ -24,6 +25,7 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await page.waitForFunction(() => (window as any).__goopMotionRuntime?.state === 'running');
   await page.locator('canvas').click();
   await page.waitForFunction(() => (window as any).__goopMotionRuntime.input.pointerLocked);

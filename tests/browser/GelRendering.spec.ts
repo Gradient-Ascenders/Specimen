@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -31,6 +32,7 @@ test('gel modes bound transmission work and resources at identical production po
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 240_000 });
   console.info('Production startup ready');
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
   await page.keyboard.press('KeyP');
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'paused');
