@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
@@ -881,7 +882,9 @@ test('dark-room graphics preparation awaits the pending configuration when brigh
     await page.waitForFunction(before=>(window as any).__specimenCultivationRuntime.__darkPreparation.live.length>=before+12,before);
   }
   const evidence=await page.evaluate(()=>{const rt=(window as any).__specimenCultivationRuntime;rt.__finishDarkPreparation();return rt.__darkPreparation;});
-  await info.attach('dark-room-preparation',{body:JSON.stringify({evidence,errors},null,2),contentType:'application/json'});
+  const evidencePath=info.outputPath('dark-room-preparation.json');
+  await writeFile(evidencePath,JSON.stringify({evidence,errors},null,2));
+  await info.attach('dark-room-preparation',{path:evidencePath,contentType:'application/json'});
   expect(evidence.brightReady).toBe(true);expect(evidence.darkReady).toBe(true);expect(evidence.pending).toBe(false);
   expect(evidence.arguments.length).toBeGreaterThanOrEqual(3);
   expect(evidence.arguments.every((dark:boolean)=>dark===true)).toBe(true);
