@@ -1,6 +1,7 @@
 import { CultivationLightLayout, cultivationAuthoredLightMask } from './CultivationLightLayout.ts';
 import * as THREE from 'three';
 import type { LevelTwoPreviewScene } from '../levels/LevelTwoPreviewScene.ts';
+import type { LevelTwoAuthoredRoomId } from '../levels/LevelTwoPreviewScene.ts';
 import type { RenderLayer } from './RenderLayer.ts';
 import { copyPrewarmMaterial, createShadowPrewarmMaterial, clonePrewarmDrawable } from './ShadowPrewarmMaterial.ts';
 import { withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
@@ -8,6 +9,7 @@ import { withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
 interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
 interface Step { label?: string; run: () => void | Promise<unknown>; }
+const ROOT_ROOMS: readonly LevelTwoAuthoredRoomId[] = [1, 1, 2, 2, 2, 3, 4, 5];
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
 export class CultivationPreparationQueue {
@@ -55,7 +57,7 @@ export class CultivationPreparationQueue {
       if (!this.configurations.some(c => c.key === key)) this.configurations.push({key, visible, dark, z, ready: false});
     };
     for (let z = 0; z <= 270; z++) for (const offset of [-12, 0, 12]) {
-      preview.updatePresentationVisibility({z:z + offset}, {z}); add(z, z >= 242);
+      preview.updatePresentationVisibility({z:z + offset}, {z}, false); add(z, z >= 242);
       if (this.roots[6].visible) { this.roots[5].visible = false; add(z, z >= 242); }
       if (z >= 230 && this.roots[6].visible) {
         this.roots[7].visible = true; add(z, z >= 242);
@@ -88,6 +90,8 @@ export class CultivationPreparationQueue {
   }
 
   private complete(config: Configuration, elapsedMs: number): void {
+    for (let i = 0; i < config.visible.length; i++) if (config.visible[i]) this.preview.workload.prepared.add(ROOT_ROOMS[i]);
+    if (this.active === config) this.preview.workload.preparing.clear();
     config.ready = true; this.diagnostics.completed++;
     this.diagnostics.configurations.push({z:config.z, dark:config.dark, elapsedMs});
   }
@@ -196,6 +200,8 @@ export class CultivationPreparationQueue {
       if (!this.iterator) {
         this.active = requested ?? this.configurations.find(c => !c.ready);
         if (!this.active) return;
+        this.preview.workload.preparing.clear();
+        for (let i = 0; i < this.active.visible.length; i++) if (this.active.visible[i]) this.preview.workload.preparing.add(ROOT_ROOMS[i]);
         const suspended = this.suspended.get(this.active);
         this.suspended.delete(this.active);
         this.configStarted = performance.now() - (suspended?.elapsedMs ?? 0);
@@ -450,6 +456,9 @@ export class CultivationPreparationQueue {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true; this.iterator?.return(undefined); this.iterator = undefined;
+    this.diagnostics.pending = false;
+    this.priority = this.upcoming = undefined;
+    this.preview.workload.clearPreparation();
     for (const work of this.suspended.values()) work.iterator.return(undefined);
     this.suspended.clear();
     this.overlay?.remove();

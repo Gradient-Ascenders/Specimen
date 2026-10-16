@@ -134,6 +134,11 @@ export class LevelTwoRoomThreeGreybox {
     for (const drop of this.wallDrops) drop.bind(targets);
   }
 
+  get dynamicTransformRoots(): readonly THREE.Object3D[] {
+    return [this.lasers.root, this.laserPresentation.root, ...this.wallTethers,
+      ...this.wallDrops.flatMap(drop => drop.dynamicTransformRoots)];
+  }
+
   update(
     deltaSeconds: number,
     occupants: readonly RadioactiveFloorOccupant[],
