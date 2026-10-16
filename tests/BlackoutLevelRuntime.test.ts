@@ -628,6 +628,10 @@ test('Blackout render consumes pointer movement on a frame with zero fixed steps
     // update. The sample must be queued before endPointerUpdate clears it.
     input.pointerDeltaX = 12;
     input.pointerDeltaY = -7;
+    const electrical = (runtime as any).resources.electricalPresentation;
+    const updateElectrical = electrical.update.bind(electrical);
+    let electricalUpdates = 0;
+    electrical.update = (...args: unknown[]) => { electricalUpdates++; return updateElectrical(...args); };
     runtime.render(
       0,
       {
@@ -641,9 +645,12 @@ test('Blackout render consumes pointer movement on a frame with zero fixed steps
     assert.equal(cameraRig.queuedLookY, 0);
     assert.equal(input.pointerDeltaX, 0);
     assert.equal(input.pointerDeltaY, 0);
+    assert.equal(electricalUpdates, 1, 'one visual update per rendered frame, including zero-step frames');
 
     // A later fixed update cannot consume the already-rendered sample again.
     runtime.fixedUpdate(1 / 60);
+    runtime.fixedUpdate(1 / 60);
+    assert.equal(electricalUpdates, 1, 'catch-up physics steps do not rebuild electrical VFX');
     assert.equal(cameraRig.appliedLookX, 12);
     assert.equal(cameraRig.appliedLookY, -7);
 

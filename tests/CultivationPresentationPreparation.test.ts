@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -10,7 +11,7 @@ import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
 for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
   const fail = mode === 'failure';
-  const preview = new LevelTwoPreviewScene(() => {}), scene = new THREE.Scene(); scene.add(preview.root);
+  const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
   await preview.roomFive.captiveVoltPresentation.prepare(loadVolt);
   const captiveBody = preview.roomFive.captiveVoltPresentation.root.getObjectByName('Volt-Body') as THREE.Mesh;

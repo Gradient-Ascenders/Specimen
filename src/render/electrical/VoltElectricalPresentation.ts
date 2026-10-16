@@ -154,21 +154,23 @@ export class VoltElectricalPresentation {
     if (this.disposed) return;
     this.highlights?.update(readModel, aimAllowed);
 
-    this.crosshair.hidden = !(aimAllowed && readModel.aimActive);
-    this.crosshair.dataset.state =
-      readModel.selectedTargetValid ? 'valid' : 'neutral';
+    const crosshairHidden = !(aimAllowed && readModel.aimActive);
+    if (this.crosshair.hidden !== crosshairHidden) this.crosshair.hidden = crosshairHidden;
+    const crosshairState = readModel.selectedTargetValid ? 'valid' : 'neutral';
+    if (this.crosshair.dataset.state !== crosshairState) this.crosshair.dataset.state = crosshairState;
 
     if (readModel.connectedTargetName) {
-      this.status.hidden = false;
-      this.status.textContent = readModel.connectionUnstable
+      if (this.status.hidden) this.status.hidden = false;
+      const text = readModel.connectionUnstable
         ? `CONNECTED · ${readModel.connectedTargetName} · CONNECTION UNSTABLE`
         : `CONNECTED · ${readModel.connectedTargetName} · HOLD STILL`;
-      this.status.dataset.state =
-        readModel.connectionUnstable ? 'unstable' : 'connected';
+      if (this.status.textContent !== text) this.status.textContent = text;
+      const state = readModel.connectionUnstable ? 'unstable' : 'connected';
+      if (this.status.dataset.state !== state) this.status.dataset.state = state;
     } else {
-      this.status.hidden = true;
-      this.status.textContent = '';
-      delete this.status.dataset.state;
+      if (!this.status.hidden) this.status.hidden = true;
+      if (this.status.textContent) this.status.textContent = '';
+      if (this.status.dataset.state !== undefined) delete this.status.dataset.state;
     }
 
     if (readModel.beamMode === 'none') {

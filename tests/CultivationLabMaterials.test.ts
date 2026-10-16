@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -9,7 +10,7 @@ import { CultivationLabMaterials } from '../src/render/environment/cultivation/C
 
 test('Room 1 material pass preserves collider geometry, transforms, metadata and hazard identity', () => {
   const room = new LevelTwoRoomOneGreybox(() => {});
-  const art = new CultivationLabMaterials();
+  const art = new CultivationLabMaterials(cultivationAssets);
   const snapshots = room.collisionMeshes.map(mesh => ({ mesh, geometry: mesh.geometry,
     positions: Array.from(mesh.geometry.getAttribute('position').array),
     position: mesh.position.toArray(), quaternion: mesh.quaternion.toArray(),
@@ -46,7 +47,7 @@ test('Room 1 material pass preserves collider geometry, transforms, metadata and
 
 test('ceiling presentation leaves the authored entrance vent open and owns instance disposal', () => {
   const root = new THREE.Group();
-  const art = new CultivationLabMaterials();
+  const art = new CultivationLabMaterials(cultivationAssets);
   art.addFixtures(root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
   const strips = root.getObjectByName('cultivation-neutral-ceiling-strips') as THREE.InstancedMesh;
   const matrix = new THREE.Matrix4();
@@ -75,7 +76,7 @@ test('Room 2 and its two exit routes share the palette without changing gameplay
     innerWidthMetres: 2, innerHeightMetres: 2.1, lengthMetres: 28,
   });
   const room = new LevelTwoRoomTwoGreybox(() => {}, passage.entryDoor);
-  const art = new CultivationLabMaterials();
+  const art = new CultivationLabMaterials(cultivationAssets);
   const builders = [room.builder, passage.builder, duct.builder];
   const snapshots = builders.flatMap(builder => builder.collisionMeshes.map(mesh => ({
     mesh, material: mesh.material, geometry: mesh.geometry,

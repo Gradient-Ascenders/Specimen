@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -5,7 +6,7 @@ import { LevelTwoPreviewScene, LEVEL_TWO_ROOM_FOUR_OFFSET_Z, LEVEL_TWO_ROOM_FIVE
 import { CollisionWorld, CollisionHit } from '../src/physics/CollisionWorld.ts';
 
 test('render scope hides distant rooms while keeping authored collision and split-body simulation', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const world = new CollisionWorld(); world.registerAll(scene.collisionMeshes);
   try {
     const floor = scene.roomTwo.radiationHazard.mesh;

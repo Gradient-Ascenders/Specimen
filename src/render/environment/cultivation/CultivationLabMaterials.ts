@@ -1,3 +1,4 @@
+import { CultivationAssetOwner, type CultivationAssetSource } from './CultivationBakedAssets.ts';
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
 import { configureCultivationTraversalLight } from './CultivationShadowCoverage.ts';
 import { disposeShadowLight } from '../../ShadowLightResources.ts';
@@ -7,7 +8,6 @@ import { CultivationPlatformArt } from './CultivationPlatformArt.ts';
 import { createCultivationPlatformWear } from './CultivationPlatformWear.ts';
 import { createCultivationMembraneMaterial, createCultivationMembraneTextures, mapCultivationMembranePanel } from './CultivationMembraneMaterial.ts';
 import * as THREE from 'three';
-import { createContainmentCeramicTextures, createAcidFoundationAlbedo } from '../containment/ContainmentProceduralTextures.ts';
 import { createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 
@@ -21,25 +21,28 @@ interface LabFixtureOptions {
 }
 
 /** Original, deterministic facility finishes shared by the dressed Cultivation rooms. */
-export class CultivationLabMaterials {
+export class CultivationLabMaterials extends CultivationAssetOwner {
   readonly textures: THREE.DataTexture[] = [];
-  private readonly stickyMaps = createCultivationMembraneTextures();
+  private readonly stickyMaps = createCultivationMembraneTextures(this.assets);
   readonly sticky = createCultivationMembraneMaterial(this.stickyMaps);
   readonly wall = this.finish('wall', 0xe2e1d8, 0.76, 0.02);
   readonly floor = this.finish('floor', 0xaeb7b2, 0.84, 0.08);
   readonly ceiling = this.finish('ceiling', 0xcbd0ca, 0.8, 0.06);
   readonly metal = this.finish('metal', 0x465156, 0.68, 0.72);
   readonly duct = this.finish('duct', 0x879391, 0.65, 0.7);
-  private readonly platformMaps = createContainmentCeramicTextures();
+  private readonly platformMaps = (() => {
+    const { ceramicNormal, ceramicRoughness } = this.assets.textures('ceramic');
+    return { ceramicNormal, ceramicRoughness };
+  })();
   readonly platform = createContainmentPlatformMaterial(this.platformMaps);
-  private readonly deckWear = createCultivationPlatformWear('deck');
-  private readonly poleWear = createCultivationPlatformWear('pole');
+  private readonly deckWear = createCultivationPlatformWear(this.assets, 'deck');
+  private readonly poleWear = createCultivationPlatformWear(this.assets, 'pole');
   readonly pole = new THREE.MeshStandardMaterial({ name: 'cultivation-oxidized-platform-pole',
     map: this.poleWear.albedo, roughnessMap: this.poleWear.roughness,
     bumpMap: this.poleWear.roughness, bumpScale: .012, roughness: .95, metalness: .35 });
-  private readonly acidFoundation = createAcidFoundationAlbedo();
+  private readonly acidFoundation = this.assets.textures('acid').albedo;
   readonly acid = new AcidSurfaceMaterial({ foundationMap: this.acidFoundation, microNormalMap: this.platformMaps.ceramicNormal });
-  readonly platformArt = new CultivationPlatformArt(this.platform);
+  readonly platformArt = new CultivationPlatformArt(this.platform, this.assets);
   readonly rope = this.variant(this.metal, 'soluble-rope', 0x744522);
   readonly fixture = new THREE.MeshStandardMaterial({
     name: 'cultivation-lab-neutral-fixture', color: 0xf3f2e9,
@@ -49,7 +52,8 @@ export class CultivationLabMaterials {
   private readonly decorations: THREE.Object3D[] = [];
   private disposed = false;
 
-  constructor() {
+  constructor(assets: CultivationAssetSource) {
+    super(assets);
     this.platform.map = this.deckWear.albedo;
     this.platform.roughnessMap = this.deckWear.roughness;
     this.platform.roughness = .9;
@@ -132,7 +136,7 @@ export class CultivationLabMaterials {
     if (builder.root.name === 'cultivation-room-2-greybox') {
       const panels = builder.collisionMeshes.filter(mesh => /^cultivation-room-2-sticky-route-[a-e]$/.test(mesh.name)) as THREE.Mesh<THREE.BoxGeometry>[];
       if (panels.length) {
-        const skin = new THREE.Mesh(createCultivationStickyRouteGeometry(panels), this.sticky);
+        const skin = new THREE.Mesh(this.assets.geometry('room-2-sticky-route', () => createCultivationStickyRouteGeometry(panels)), this.sticky);
         skin.name = 'cultivation-room-2-continuous-sticky-route';
         skin.userData.presentationOnly = true;
         builder.root.add(skin);
@@ -285,54 +289,11 @@ export class CultivationLabMaterials {
   }
 
   private finish(kind: 'wall' | 'floor' | 'ceiling' | 'metal' | 'duct', colour: number, roughness: number, metalness: number) {
-    const size = kind === 'metal' || kind === 'duct' ? 256 : 512;
-    const albedo = new Uint8Array(size * size * 4);
-    const relief = new Uint8Array(size * size * 4);
-    const rough = new Uint8Array(size * size * 4);
-    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      const u = x / size, v = y / size;
-      const edge = Math.min(u, 1 - u, v, 1 - v);
-      const noise = (((Math.imul(x + 37, 374761393) ^ Math.imul(y + 91, 668265263)) >>> 0) % 997) / 997;
-      const metal = kind === 'metal' || kind === 'duct';
-      const ductRow = (v * 4) % 1;
-      const seam = edge < (metal ? 0.004 : 0.006) ||
-        (kind === 'duct' && Math.min(ductRow, 1 - ductRow) < 0.008);
-      const rim = edge < 0.013;
-      const grime = Math.exp(-edge * 90) * (3 + noise * 5);
-      const scratch = !seam && y % 71 === 19 && x % 113 > 25 && x % 113 < 68 ? 7 : 0;
-      const brush = metal ? Math.sin(v * Math.PI * 128) * 3 : 0;
-      // Ceiling service recess and duct seams are baked, avoiding extra geometry.
-      const service = kind === 'ceiling' && u > 0.82 && u < 0.94;
-      const louvre = service && Math.floor(v * 28) % 2 === 0;
-      const screw = Math.hypot(Math.min(Math.abs(u - 0.035), Math.abs(u - 0.965)),
-        Math.min(Math.abs(v - 0.035), Math.abs(v - 0.965))) < 0.004;
-      const value = screw ? 120 : seam ? 65 : service ? (louvre ? 103 : 143) : (rim ? 222 : 249) - grime + (noise - 0.5) * 3 + brush - scratch;
-      const i = (y * size + x) * 4;
-      for (let channel = 0; channel < 3; channel++) {
-        albedo[i + channel] = value;
-        relief[i + channel] = seam || louvre ? 85 : 180 + (noise - 0.5) * 5 - scratch;
-        rough[i + channel] = seam ? 245 : 215 + noise * 25 + Math.min(grime, 10);
-      }
-      // Tiny warm deposits around exposed metal joints, not widespread rust.
-      if (metal && rim && !seam) albedo[i + 2] -= 5;
-      albedo[i + 3] = relief[i + 3] = rough[i + 3] = 255;
-    }
-    const texture = (suffix: string, pixels: Uint8Array, colourMap = false) => {
-      const map = new THREE.DataTexture(pixels, size, size);
-      map.name = `cultivation-lab-${kind}-${suffix}`;
-      map.colorSpace = colourMap ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-      map.wrapS = map.wrapT = THREE.RepeatWrapping;
-      map.magFilter = THREE.LinearFilter;
-      map.minFilter = THREE.LinearMipmapLinearFilter;
-      map.generateMipmaps = true;
-      map.anisotropy = 4;
-      map.needsUpdate = true;
-      this.textures.push(map);
-      return map;
-    };
+    const { albedo, relief, roughness: rough } = this.assets.textures(`lab-${kind}`);
+    this.textures.push(albedo, relief, rough);
     return new THREE.MeshStandardMaterial({ name: `cultivation-lab-${kind}`, color: colour,
-      roughness, metalness, map: texture('albedo', albedo, true),
-      bumpMap: texture('relief', relief), bumpScale: 0.018,
-      roughnessMap: texture('roughness', rough) });
+      roughness, metalness, map: albedo,
+      bumpMap: relief, bumpScale: 0.018,
+      roughnessMap: rough });
   }
 }

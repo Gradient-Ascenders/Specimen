@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -30,7 +31,7 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { CULTIVATION_ROOM_THREE_DRONE_AUTHORING } from '../src/levels/CultivationRoomThreeAuthoring.ts';
 
 const createScene = (): LevelTwoPreviewScene =>
-  new LevelTwoPreviewScene(() => {});
+  new LevelTwoPreviewScene(() => {}, cultivationAssets);
 
 test('Bob Room 3 vent checkpoint is behind every hanging drone acquisition arc', () => {
   const scene = createScene();
@@ -976,7 +977,7 @@ test('Room 2 and Room 3 lasers report the struck persistent slime', () => {
     readonly hazardId: string;
     readonly slimeId?: 'bob' | 'goop';
   }> = [];
-  const scene = new LevelTwoPreviewScene((failure) => failures.push(failure));
+  const scene = new LevelTwoPreviewScene((failure) => failures.push(failure), cultivationAssets);
 
   const roomTwoLaser = scene.roomTwo.lasers.hazards[0];
   const roomTwoContact = new THREE.Vector3(
@@ -1040,7 +1041,7 @@ test('Room 2 and Room 3 lasers report the struck persistent slime', () => {
 });
 
 test('split occupants keep Room 2 and Room 3 simulation active together', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const cleanupWalls = releaseRoomThreeWalls(scene);
   const roomTwoLaser = scene.roomTwo.lasers.hazards[0];
   const roomThreeLaser = scene.roomThree.lasers.hazards[0];
@@ -1087,7 +1088,7 @@ test('radioactive floors kill Bob, latch contact, and leave Goop immune', () => 
     readonly hazardId: string;
     readonly slimeId?: 'bob' | 'goop';
   }> = [];
-  const scene = new LevelTwoPreviewScene((failure) => failures.push(failure));
+  const scene = new LevelTwoPreviewScene((failure) => failures.push(failure), cultivationAssets);
   // The 4 cm clearance mirrors the controller's skin width while grounded.
   const acidContact = new THREE.Vector3(0, 0.49, 20);
   scene.roomOne.root.localToWorld(acidContact);
@@ -1135,7 +1136,7 @@ function assertLaserAgainstPanel(laser: LaserHazard, panel: THREE.Mesh): void {
 
 test('Rooms 1–3 acid basins sample both slimes in world space without changing hazards or colliders', () => {
   const failures: unknown[] = [];
-  const scene = new LevelTwoPreviewScene(failure => failures.push(failure));
+  const scene = new LevelTwoPreviewScene(failure => failures.push(failure), cultivationAssets);
   const floors = [scene.roomOne, scene.roomTwo, scene.roomThree].flatMap(room =>
     room.collisionMeshes.filter(mesh => mesh.userData.textureRole === 'acid-floor'));
   assert.deepEqual(floors.map(mesh => mesh.name), [1, 2, 3].map(id => `cultivation-room-${id}-radioactive-floor`));

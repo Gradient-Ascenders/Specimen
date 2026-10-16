@@ -1,3 +1,4 @@
+import type { CultivationAssetSource } from './CultivationBakedAssets.ts';
 import * as THREE from 'three';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
@@ -10,14 +11,10 @@ export class CultivationChamberMaterials {
   private readonly decorations: THREE.Mesh[] = [];
   private disposed = false;
 
-  constructor() {
-    const stripes = new Uint8Array(128 * 128 * 4);
-    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
-      const yellow = (x + y) % 64 < 32;
-      const i = (y * 128 + x) * 4;
-      stripes.set(yellow ? [198, 153, 39, 255] : [34, 39, 37, 255], i);
-    }
-    this.warning = new THREE.MeshStandardMaterial({ name: 'cultivation-hazard-boundary', map: this.texture('warning-stripes', stripes, 128, true), roughness: 0.8, metalness: 0.12 });
+  constructor(assets: CultivationAssetSource) {
+    const stripes = assets.textures('warning').albedo;
+    this.textures.push(stripes);
+    this.warning = new THREE.MeshStandardMaterial({ name: 'cultivation-hazard-boundary', map: stripes, roughness: 0.8, metalness: 0.12 });
   }
 
   overrides(builder: GreyboxRoomBuilder, lab: CultivationLabMaterials): ReadonlyMap<string, THREE.MeshStandardMaterial> {
@@ -56,17 +53,5 @@ export class CultivationChamberMaterials {
     for (const texture of this.textures) texture.dispose();
   }
 
-  private texture(name: string, data: Uint8Array, size: number, colour = false): THREE.DataTexture {
-    const texture = new THREE.DataTexture(data, size, size);
-    texture.name = `cultivation-${name}`;
-    texture.colorSpace = colour ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.magFilter = THREE.LinearFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.generateMipmaps = true;
-    texture.anisotropy = 4;
-    texture.needsUpdate = true;
-    this.textures.push(texture);
-    return texture;
-  }
+
 }

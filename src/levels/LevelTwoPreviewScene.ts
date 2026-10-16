@@ -1,5 +1,6 @@
 import type { GelRendering } from '../render/slime/GelRendering.ts';
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
+import { CultivationAssetOwner, type CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../render/environment/cultivation/CultivationMaintenanceArt.ts';
@@ -102,13 +103,13 @@ const ROOM_SPAWNS: Readonly<
 };
 
 /** Development-only composition of the three currently authored Cultivation rooms. */
-export class LevelTwoPreviewScene {
+export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly root = new THREE.Group();
   readonly acidInteractions: readonly AcidLiquidInteractions[];
-  readonly labArt = new CultivationLabMaterials();
+  readonly labArt = new CultivationLabMaterials(this.assets);
   readonly contaminationArt = new CultivationContaminationArt(this.labArt);
-  readonly coverArt = new CultivationCoverEquipmentArt(this.labArt.platform);
-  readonly chamberArt = new CultivationChamberMaterials();
+  readonly coverArt = new CultivationCoverEquipmentArt(this.assets, this.labArt.platform);
+  readonly chamberArt = new CultivationChamberMaterials(this.assets);
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
@@ -156,8 +157,10 @@ export class LevelTwoPreviewScene {
 
   constructor(
     requestFailure: (failure: LevelTwoPreviewHazardFailure) => void,
+    assets: CultivationAssetSource,
     gelRendering?: GelRendering,
   ) {
+    super(assets);
     this.root.name = 'cultivation-level-2-authored-preview';
     this.root.position.x = LEVEL_TWO_PREVIEW_WORLD_OFFSET_X;
     this.root.userData.developmentOnly = true;
@@ -174,7 +177,7 @@ export class LevelTwoPreviewScene {
         'cultivation-room-3-bob-vent-east-jamb',
       ], new Map([...this.contaminationArt.overrides(builder), ...this.chamberArt.overrides(builder, this.labArt), ...this.coverArt.overrides()]));
       this.coverArt.build(builder);
-    });
+    }, this.assets);
     this.labArt.addFixtures(this.roomThree.root, 48, 30, 72, {
       fillHeightMetres: 16, fillPositionsZ: [18, 54],
       shadowTargets: [[-4, 23, 25.5], [0, 23, 53]],
@@ -233,8 +236,6 @@ export class LevelTwoPreviewScene {
       this.roomFour.root,
       this.roomFive.root,
     );
-    this.surfaceCleanup = new CultivationSurfaceCleanup(this);
-    applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
     // Keep the finite lift lights registered through Room 5 so entering the
     // vent and leaving the lift's render range use the same shader layout.
     // Geometry still has its own culling root; collider visibility is untouched.
@@ -248,6 +249,8 @@ export class LevelTwoPreviewScene {
       if (!lightNodes.has(child)) this.roomFourGeometry.add(child);
     }
     this.roomFour.root.add(this.roomFourGeometry);
+    this.surfaceCleanup = new CultivationSurfaceCleanup(this, this.assets);
+    applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),

@@ -1,3 +1,4 @@
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -8,7 +9,7 @@ import { applyCultivationShadowRoles } from '../src/render/environment/cultivati
 import { disposeShadowLight } from '../src/render/ShadowLightResources.ts';
 
 test('ordinary Cultivation coverage uses seven bounded sources and preserves Room 5 point baseline', () => {
-  const scene = new LevelTwoPreviewScene(() => {});
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   try {
     for (const [room, expected] of [[scene.roomOne, 2], [scene.roomTwo, 2], [scene.roomThree, 2], [scene.roomFour, 1]] as const) {
       const spots: THREE.SpotLight[] = [];

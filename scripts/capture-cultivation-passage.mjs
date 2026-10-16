@@ -21,12 +21,14 @@ try {
 <html><body style="margin:0"><script type="module">
 import * as THREE from 'three';
 import { LevelTwoPreviewScene } from '/src/levels/LevelTwoPreviewScene.ts';
+import { loadCultivationBakedAssets } from '/src/render/environment/cultivation/CultivationBakedAssets.ts';
 import { CultivationLevelScene } from '/src/levels/CultivationLevelScene.ts';
 import { CULTIVATION_FOUNDATION_MANIFEST } from '/src/levels/CultivationFoundationManifest.ts';
 import { CameraRig } from '/src/render/CameraRig.ts';
 import { CollisionWorld } from '/src/physics/CollisionWorld.ts';
 import { RENDER_EXPOSURE } from '/src/render/RenderLayer.ts';
-const preview = new LevelTwoPreviewScene(() => {});
+const assets = await loadCultivationBakedAssets(new URL('/src/assets/cultivation/authored-assets.bin', location.origin));
+const preview = new LevelTwoPreviewScene(() => {}, assets);
 const passage = ${filtration ? 'preview.roomTwoToThreeGoopPassage' : 'preview.roomOneToTwoPassage'};
 const art = ${filtration ? 'preview.filtrationArt' : 'preview.passageArt'};
 for (const child of preview.root.children) child.visible = child === passage.root;

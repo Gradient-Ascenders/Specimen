@@ -8,6 +8,7 @@ third-party resources that may need to appear in the final in-game credits.
 | Resource | Author / creator | Source | Licence | Use in Specimen |
 | --- | --- | --- | --- | --- |
 | Three.js 0.185.1 | mrdoob | [npm package](https://www.npmjs.com/package/three/v/0.185.1) | MIT | 3D rendering framework used by the browser game. |
+| meshoptimizer 1.1 (bundled Three.js add-on) | Arseny Kapoulkine | [meshoptimizer](https://github.com/zeux/meshoptimizer) | MIT | Offline, attribute-aware character LOD index generation; no runtime simplifier. |
 | Vite 8.2.1 | Evan You | [npm package](https://www.npmjs.com/package/vite/v/8.2.1) | MIT | Development server and production build tool. |
 | TypeScript 7.0.2 | Microsoft Corp. | [npm package](https://www.npmjs.com/package/typescript/v/7.0.2) | Apache-2.0 | Type checking and compilation. |
 | @types/three 0.185.4 | DefinitelyTyped contributors | [npm package](https://www.npmjs.com/package/@types/three/v/0.185.4) | MIT | Type declarations for Three.js during type checking. |
@@ -74,7 +75,7 @@ The complete asset inventory and gameplay mappings are documented in
 
 | Resource | Author / creator | Source | Licence | Use in Specimen |
 | --- | --- | --- | --- | --- |
-| Hash without Sine (`hash13`) | David Hoskins | [Original Shadertoy](https://www.shadertoy.com/view/4djSRW) | MIT, copyright © 2014 David Hoskins | Adapted with renamed variables as the lattice hash in the soluble-geometry value-noise mask. |
+| Hash without Sine (`hash13`) | David Hoskins | [Original Shadertoy](https://www.shadertoy.com/view/4djSRW) | MIT, copyright © 2014 David Hoskins | Adapted with renamed variables as the lattice hash in the soluble-geometry value-noise mask and the baked acid-flow field. |
 
 The dissolve value-noise interpolation, octave composition, gameplay
 threshold, corrosion edge, standard-material integration, and matching shadow
