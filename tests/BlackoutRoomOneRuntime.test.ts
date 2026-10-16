@@ -137,7 +137,7 @@ function mutableRoomOneBodies(runtime: BlackoutLevelRuntime): Readonly<Record<'b
   return roomOneInternals(runtime).bodies;
 }
 
-function createFixture() {
+function createFixture(debugAvailable = true) {
   const document = new TestDocument();
   const previousDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', { configurable: true, value: document });
@@ -151,6 +151,7 @@ function createFixture() {
     renderLayer: { scene, canvas: document.createElement(), cameraRig, render: () => {} } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt' },
     authoredRoomOne: true,
+    debugAvailable,
     maintenanceMaps,
   });
   runtime.load();
@@ -817,4 +818,16 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
     f.runtime.start();f.runtime.restartLevel();assert.equal(resources().scene.maintenanceBay.surfaceMaterials.get('wallPanel').map,second);
     f.runtime.dispose();assert.equal((f.runtime as unknown as {maintenanceMaps:unknown}).maintenanceMaps,undefined);
   } finally {f.cleanup();}
+});
+
+
+test('ordinary production ignores authored room teleport keys', () => {
+  const f = createFixture(false);
+  try {
+    assert.equal(f.runtime.roomState.roomId, 'room-1');
+    for (const action of ['debugTeleportRoomTwo', 'debugTeleportRoomThree'] as const) {
+      f.input.press(action); f.tick(); f.input.release(action); f.tick();
+      assert.equal(f.runtime.roomState.roomId, 'room-1');
+    }
+  } finally { f.cleanup(); }
 });

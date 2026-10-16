@@ -1,0 +1,4 @@
+# Approved generator provenance hashes use the committed LF bytes on all hosts.
+assets/characters/bob/*.py text eol=lf
+assets/characters/volt/*.py text eol=lf
+src/render/environment/containment/acidNoise.generated.ts text eol=lf

@@ -151,6 +151,7 @@ const BLACKOUT_TRANSIT_VOLT_RANGES = Object.freeze({
 export interface BlackoutLevelRuntimeOptions {
   readonly audio?: AudioPlayback;
   readonly authoredRoomOne?: boolean;
+  readonly debugAvailable?: boolean;
   readonly maintenanceMaps?: BlackoutMaintenanceMapData;
   readonly host: HTMLElement;
   readonly input: Input;
@@ -252,6 +253,7 @@ export class BlackoutLevelRuntime {
   private programPreparation: BlackoutPresentationPreparation | undefined;
   private readonly preparationCamera = new THREE.PerspectiveCamera();
   private readonly authoredRoomOne: boolean;
+  private readonly debugAvailable: boolean;
   private maintenanceMaps: BlackoutMaintenanceMapData | undefined;
   private bayComplete = false;
   private roomTwoInitialized = false;
@@ -260,6 +262,7 @@ export class BlackoutLevelRuntime {
 
   constructor(options: BlackoutLevelRuntimeOptions) {
     this.authoredRoomOne = options.authoredRoomOne ?? false;
+    this.debugAvailable = options.debugAvailable ?? import.meta.env?.DEV ?? false;
     if (this.authoredRoomOne && !options.maintenanceMaps) throw new Error('Room 1 texture maps must be prepared before runtime construction.');
     this.maintenanceMaps = options.maintenanceMaps;
     validateLevelThreeProgressionSnapshot(options.progression);
@@ -815,7 +818,7 @@ export class BlackoutLevelRuntime {
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
     resources.scene.transitRoom?.update(deltaSeconds);
-    if (this.authoredRoomOne && this.debugInteractionEnabled && this.input.enabled) {
+    if (this.debugAvailable && this.authoredRoomOne && this.debugInteractionEnabled && this.input.enabled) {
       const room = this.input.wasPressed('debugTeleportRoomOne') ? 1
         : this.input.wasPressed('debugTeleportRoomTwo') ? 2
           : this.input.wasPressed('debugTeleportRoomThree') ? 3 : undefined;

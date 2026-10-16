@@ -67,9 +67,7 @@ const gameSession = new GameSessionCoordinator({
       debugAvailable
         ? import('./debug/CultivationLevelDebug.ts')
         : Promise.resolve(undefined),
-      debugAvailable
-        ? loadCultivationBakedAssets(new URL('./assets/cultivation/authored-assets.bin', import.meta.url))
-        : Promise.resolve(undefined),
+      loadCultivationBakedAssets(new URL('./assets/cultivation/authored-assets.bin', import.meta.url)),
     ]);
     return new runtimeModule.CultivationLevelRuntime({
       host: app,
@@ -95,6 +93,7 @@ const gameSession = new GameSessionCoordinator({
       renderLayer,
       progression,
       authoredRoomOne: true,
+      debugAvailable,
       maintenanceMaps,
     });
   },
