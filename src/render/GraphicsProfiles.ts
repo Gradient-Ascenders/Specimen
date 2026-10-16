@@ -14,6 +14,13 @@ export interface GraphicsSettings {
   readonly gelRenderingMode: GelRenderingMode;
 }
 
+/** Current profiles change shader source only when transmission crosses zero.
+ * Capture scale, canvas scale, shadow-map dimensions and point draw counts are
+ * resource/uniform changes. Physical and reduced transmission share programs. */
+export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRenderingMode'>): string {
+  return settings.gelRenderingMode === 'minimum' ? 'opaque-gel' : 'transmissive-gel';
+}
+
 export const GRAPHICS_PROFILES = {
   minimum: {
     label: 'Minimum hardware',

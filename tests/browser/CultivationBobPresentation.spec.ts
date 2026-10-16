@@ -79,7 +79,8 @@ const exposeCultivationRuntime = async (page: Page): Promise<() => void> => {
       body: body.replace(
         construction,
         'return globalThis.__specimenCultivationRuntime=new $1.CultivationLevelRuntime(',
-      ),
+      ).replace(/([\w$]+)=new ([\w$]+)\(\{initialRuntime:/,
+        '$1=globalThis.__specimenSession=new $2({initialRuntime:'),
     });
   });
 
@@ -88,6 +89,16 @@ const exposeCultivationRuntime = async (page: Page): Promise<() => void> => {
     'The Cultivation runtime was not exposed exactly once',
   ).toBe(1);
 };
+
+const prepareGraphics = (page: Page, preset: 'normal' | 'performance') => page.evaluate(async preset => {
+  const r=(window as any).__specimenCultivationRuntime, session=(window as any).__specimenSession;
+  session.applyGraphicsSettings('transmissive-gel',()=>r.renderLayer.setGraphicsSettings({
+    graphicsProfile:'standard',graphicsPreset:preset,renderPixelRatioCap:preset==='performance'?0.75:2,
+    renderScale:1,gelRenderingMode:'physical',
+  }));
+  await session.graphicsPreparation.settled;
+  if (session.graphicsPreparation.pending) throw session.graphicsPreparation.failure ?? new Error('Graphics preparation did not finish');
+},preset);
 
 const enterCultivation = async (page: Page): Promise<void> => {
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
@@ -102,6 +113,29 @@ const enterCultivation = async (page: Page): Promise<void> => {
   await enterLevel.click();
   await expect(page.locator('.cultivation-test-panel')).toBeAttached();
 };
+
+test('changing gel features through Settings prepares before the next live Cultivation draw', async ({page}) => {
+  test.setTimeout(600_000);
+  await exposeCultivationRuntime(page); await enterCultivation(page);
+  await page.evaluate(() => {
+    const rt=(window as any).__specimenCultivationRuntime, layer=rt.renderLayer;
+    rt.__graphicsColdDraws=[]; rt.__graphicsColdInspections=[];
+    const gl=layer.renderer.getContext(), inspect=gl.getProgramInfoLog.bind(gl);let live=false;
+    gl.getProgramInfoLog=(program:any)=>{if(live) rt.__graphicsColdInspections.push(layer.renderer.info.programs.find((p:any)=>p.program===program)?.cacheKey);return inspect(program);};
+    const render=layer.render.bind(layer);
+    layer.render=()=>{const before=layer.renderer.info.programs.length;live=true;try{render();}finally{live=false;}
+      if(layer.renderer.info.programs.length>before) rt.__graphicsColdDraws.push(layer.renderer.info.programs.slice(before).map((p:any)=>p.cacheKey));};
+  });
+  await page.keyboard.press('KeyP');
+  await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
+  await page.waitForFunction(()=>!(window as any).__specimenCultivationRuntime.preparationQueue.diagnostics.pending);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(()=>(window as any).__specimenCultivationRuntime.__graphicsColdDraws)).toEqual([]);
+  expect(await page.evaluate(()=>(window as any).__specimenCultivationRuntime.__graphicsColdInspections)).toEqual([]);
+});
 
 test('Cultivation mounts the prepared shared Bob character presentation', async ({
   page,
@@ -424,9 +458,7 @@ test(`Cultivation draws prepared room and fade shadow variants without creating 
   test.setTimeout(600_000);
   const assertExposed = await exposeCultivationRuntime(page);
   await enterCultivation(page); assertExposed();
-  await page.evaluate(preset => {
-    (window as any).__specimenCultivationRuntime.renderLayer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
-  }, preset);
+  await prepareGraphics(page,preset);
   await page.evaluate(() => {
     const r = (window as any).__specimenCultivationRuntime;
     r.stop();
@@ -574,10 +606,10 @@ test(`Cultivation background compilation and primers preserve active lighting an
   page.on('pageerror', error => errors.push(error.message));
   const assertExposed = await exposeCultivationRuntime(page);
   await enterCultivation(page); assertExposed();
+  await prepareGraphics(page,preset);
   const result = await page.evaluate(async preset => {
     const r = (window as any).__specimenCultivationRuntime;
     r.stop();
-    r.renderLayer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
     const renderer = r.renderLayer.renderer;
     renderer.setAnimationLoop(null);
     const queue = r.preparationQueue;
@@ -632,8 +664,11 @@ test(`Cultivation background compilation and primers preserve active lighting an
       return JSON.stringify(entries);
     };
     const beforeLights = lights();
+    // Exercise the retained-camera primer even when entry already covered the
+    // characters under this same bounded lighting signature.
+    queue.preparedVisibleFeatures.clear();
     const iterator = queue.steps(config);
-    let compiles=0, primers=0, maxPixelDifference=difference(baseline,repeat);
+    let compiles=0, primers=0, transmissivePrimer=false, maxPixelDifference=difference(baseline,repeat);
     const stateChanges: string[] = [], glErrors: number[] = [];
     try {
       for(let count=0;count<5000;count++) {
@@ -651,7 +686,8 @@ test(`Cultivation background compilation and primers preserve active lighting an
         }
         if((step.value.label ?? '').includes('compile')) compiles++;
         if((step.value.label ?? '').includes('prime')) primers++;
-        if(primers>=2) break;
+        if(step.value.label === 'transmissive-screen-prime') transmissivePrimer=true;
+        if(primers>=2 && transmissivePrimer) break;
       }
     } finally {
       iterator.return();
@@ -661,11 +697,12 @@ test(`Cultivation background compilation and primers preserve active lighting an
         const error=gl.getError(); if(error!==gl.NO_ERROR) glErrors.push(error);
       } finally { queue.tick=tick; r.renderLayer.render=liveDraw; }
     }
-    return {compiles,primers,maxPixelDifference,livePrograms,stateChanges,glErrors};
+    return {compiles,primers,transmissivePrimer,maxPixelDifference,livePrograms,stateChanges,glErrors};
   }, preset);
   console.log("preparation isolation", result);
   expect(result.compiles).toBeGreaterThan(0);
-  expect(result.primers).toBe(2);
+  expect(result.primers).toBeGreaterThan(2);
+  expect(result.transmissivePrimer).toBe(true);
   expect(result.stateChanges).toEqual([]);
   expect(result.glErrors).toEqual([]);
   expect(result.livePrograms).toBe(0);

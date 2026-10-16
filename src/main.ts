@@ -15,6 +15,8 @@ import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
 import { TitleScreenPresentation } from './ui/TitleScreenPresentation.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
+import { GraphicsPreparationOverlay } from './ui/GraphicsPreparationOverlay.ts';
+import { graphicsShaderKey } from './render/GraphicsProfiles.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -158,7 +160,7 @@ function startGame(): void {
           levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
           performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
         }
-        renderLayer.setGraphicsSettings(nextSettings);
+        gameSession.applyGraphicsSettings(graphicsShaderKey(nextSettings), () => renderLayer.setGraphicsSettings(nextSettings));
         titlePresentation?.setReducedMotion(nextSettings.reduceMenuMotion);
       },
       getGraphicsDiagnostics: () => renderLayer.getGraphicsDiagnostics(),
@@ -205,6 +207,9 @@ function startGame(): void {
   );
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);
+  const graphicsPreparationOverlay = new GraphicsPreparationOverlay(app);
+  const unsubscribeGraphicsPreparation = gameSession.events.on('graphicsPreparationChanged',
+    ({pending, failed}) => graphicsPreparationOverlay.update(pending, failed));
   gameSession.load();
   titlePresentation = new TitleScreenPresentation({ renderLayer, host: app,
     reduceMotion: settings.value.reduceMenuMotion });
@@ -282,7 +287,7 @@ function startGame(): void {
   // Let the loading state paint once, then compile every Level 1 light signature
   // before normal rendering or gameplay can begin.
   bootFrame = requestAnimationFrame(() => {
-    void levelOneRuntime.prepareLightingPrograms().then(
+    void gameSession.prepareInitialGraphics().then(
       () => {
         if (shuttingDown) return;
         const verification = levelOneRuntime.levelOnePrewarmVerification;
@@ -309,6 +314,7 @@ function startGame(): void {
     window.removeEventListener('focus', focusAudio);
     document.removeEventListener('visibilitychange', focusAudio);
     unsubscribeObjectiveChanged();
+    unsubscribeGraphicsPreparation(); graphicsPreparationOverlay.dispose();
     unsubscribeTransitionStarted();
     unsubscribeTransitionCompleted();
     unsubscribeTransitionFailed();

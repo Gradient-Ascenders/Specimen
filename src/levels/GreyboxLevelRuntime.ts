@@ -45,6 +45,7 @@ import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { prepareCharacterCameraFades } from '../render/slime/PrepareCharacterCameraFades.ts';
+import { requiresTransmissionPreparation } from '../render/TransmissionPreparation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
 import { ContainmentLightLayout } from '../render/ContainmentLightLayout.ts';
@@ -409,6 +410,19 @@ export class GreyboxLevelRuntime {
   }
 
   /** Precompile Containment signatures and prime known cold resources while loading. */
+  async prepareGraphics(): Promise<void> {
+    const previous = new Set(this.depthPrewarmGroups);
+    this.lightingPrewarmPromise = undefined;
+    try { await this.prepareLightingPrograms(); }
+    finally {
+      for (const batch of previous) if (!this.compilingDepthGroups.has(batch)) {
+        batch.dispose();
+        const index = this.depthPrewarmGroups.indexOf(batch);
+        if (index !== -1) this.depthPrewarmGroups.splice(index, 1);
+      }
+    }
+  }
+
   prepareLightingPrograms(): Promise<void> {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
@@ -1877,7 +1891,7 @@ export class GreyboxLevelRuntime {
             // target without canvas tone mapping. Warm that program variant
             // too, even when a surface misses the hidden boot camera frustum.
             const opaqueSubset = new THREE.Group();
-            for (const source of compileSubset.children) {
+            for (const source of requiresTransmissionPreparation(this.renderLayer.scene) ? compileSubset.children : []) {
               if (!isRenderableObject(source)) continue;
               const materials = (
                 Array.isArray(source.material)

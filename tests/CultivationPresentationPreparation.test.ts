@@ -9,7 +9,8 @@ import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
-for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
+for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
+  const mode = variant === 'startup-minimum' ? 'startup' : variant;
   const fail = mode === 'failure';
   const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
@@ -99,12 +100,13 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     compile() {},
     render(preparedScene: THREE.Scene, camera: THREE.Camera) {
       preparedScene.traverseVisible(object => {
-        if (object instanceof THREE.Mesh && object.geometry === captiveBody.geometry && object.material instanceof THREE.MeshDepthMaterial) {
+        if (object instanceof THREE.Mesh && object.geometry === captiveBody.geometry &&
+          (object.material instanceof THREE.MeshDepthMaterial || variant === 'startup-minimum' && object.material instanceof THREE.MeshPhysicalMaterial)) {
           captiveUploaded = true;
           assert.deepEqual(object.morphTargetDictionary, expectedMorphs.get(captiveBody.geometry)!.dictionary);
           assert.deepEqual(object.morphTargetInfluences, expectedMorphs.get(captiveBody.geometry)!.influences);
         }
-        if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
+        if (preparedScene !== scene && object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
           assert.equal(object.material.transmission, 0, 'temporary scenes must not allocate Bob transmission targets');
         }
       });
@@ -154,6 +156,11 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   };
   const policy = new RenderShadowPolicy(renderer.shadowMap);
   const layer = { scene, renderer, withShadowPreparation: policy.withPreparation.bind(policy), cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
+  if (variant === 'startup-minimum') scene.traverse(object => {
+    if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      if (material instanceof THREE.MeshPhysicalMaterial) material.transmission = 0;
+    }
+  });
   const queue = new CultivationPreparationQueue(layer, preview);
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
@@ -260,6 +267,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.deepEqual(mapsInShadow, new Set([true, false]), 'mapped and unmapped shadows are both prepared');
     }
     if (mode === 'startup') {
+      assert.equal(queue.diagnostics.batches.some(batch => batch.label === 'linear'), variant !== 'startup-minimum');
+      if (variant === 'startup-minimum') assert.ok(queue.diagnostics.skippedTransmissionObjects > 0);
       assert.ok(queue.diagnostics.startupMs >= queue.diagnostics.initialMs, 'report entry and full startup separately');
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));

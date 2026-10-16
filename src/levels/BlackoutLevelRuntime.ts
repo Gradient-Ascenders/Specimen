@@ -400,6 +400,13 @@ export class BlackoutLevelRuntime {
     }
     this.lifecycle.load();
   }
+  async prepareGraphics(): Promise<void> {
+    const previous = this.programPreparation;
+    this.presentationPreparation = undefined;
+    try { await this.preparePresentation(); }
+    finally { previous?.dispose(); }
+  }
+
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
     resources.bobReflectionEnvironment ??= new BobReflectionEnvironment(

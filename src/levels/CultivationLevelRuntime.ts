@@ -295,6 +295,23 @@ export class CultivationLevelRuntime {
   private lightLayoutKey = '';
   private constructionMs = 0;
   private cameraShadowCulling: CameraShadowCulling | undefined;
+  async prepareGraphics(): Promise<void> {
+    const resources = this.requireResources(), previous = this.preparationQueue;
+    this.preparationQueue = undefined;
+    this.presentationPreparation = undefined;
+    try {
+      await this.preparePresentation();
+      if (this.resources !== resources || !this.preparationQueue || !this.lightLayout) return;
+      // Startup keeps its entry/maintenance guarantees; settings must also
+      // cover the current doorway before the session allows another live draw.
+      this.lightLayout.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
+      let preparation: Promise<void>;
+      try { preparation = (this.preparationQueue as CultivationPreparationQueue).prepareCurrent(); }
+      finally { this.lightLayout.restore(); }
+      await preparation;
+    } finally { previous?.dispose(); }
+  }
+
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
     return this.presentationPreparation ??= Promise.all([
