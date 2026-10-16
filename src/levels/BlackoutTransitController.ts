@@ -318,14 +318,19 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
 
       const bridgeStart = this.room.bridgeStart.clone();
       const bridgeEnd = this.room.bridgeEnd.clone();
-      bridgeStart.y = 2.25;
-      bridgeEnd.y = 0.25;
       const bridgeDirection = bridgeEnd.clone().sub(bridgeStart);
-      bridgeDirection.y = -2;
+      // Keep the width horizontal so both top corners meet each flat anchor.
+      const bridgeAlong = bridgeDirection.clone().normalize();
+      const bridgeAcross = new THREE.Vector3(-bridgeAlong.z, 0, bridgeAlong.x).normalize();
+      const bridgeUp = new THREE.Vector3().crossVectors(bridgeAcross, bridgeAlong);
+      // Anchors describe top-edge midpoints; move the slab centre below them
+      // along its normal, including the horizontal offset caused by the slope.
+      bridgeStart.addScaledVector(bridgeUp, -0.225);
+      bridgeEnd.addScaledVector(bridgeUp, -0.225);
       const bridgeCentre = bridgeStart.clone().add(bridgeEnd).multiplyScalar(0.5);
       this.bridge = new THREE.Mesh(new THREE.BoxGeometry(bridgeDirection.length(), 0.45, 3.6), new THREE.MeshStandardMaterial({ color: 0x353e41, roughness: 0.72, metalness: 0.7 }));
       this.bridge.name = 'transit-deployable-bridge-deck'; this.bridge.position.copy(bridgeCentre);
-      this.bridge.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), bridgeDirection.normalize());
+      this.bridge.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(bridgeAlong, bridgeUp, bridgeAcross));
       this.bridge.visible = false; this.bridge.userData.surfaceTag = 'default'; this.root.add(this.bridge);
       this.bridgeStartPosition.copy(bridgeStart);
       this.bridgeEndPosition.copy(bridgeEnd);
@@ -407,8 +412,14 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       if (laser.intersects(this.voltLaserTarget)) return 'volt';
     }
 
-    if (this.room.acidAt(bodies.bob.position)) return 'bob';
-    if (this.room.acidAt(bodies.volt.position)) return 'volt';
+    if (this.room.acidAt(bodies.bob.position)) {
+      this.room.acidInteractions.fallPulse(bodies.bob);
+      return 'bob';
+    }
+    if (this.room.acidAt(bodies.volt.position)) {
+      this.room.acidInteractions.fallPulse(bodies.volt);
+      return 'volt';
+    }
     if (this.room.exitAt(bodies.bob.position) && this.room.exitAt(bodies.goop.position) && this.room.exitAt(bodies.volt.position) && this.bridgeLocked) this.complete = true;
     const bobOnPad = (mesh: THREE.Mesh, tolerance: number) => bodies.bob.isSupportedBy(mesh) && Math.abs(bodies.bob.position.z - mesh.position.z) <= tolerance;
     if (this.covers[0]?.deployed && bobOnPad(this.room.bobRoutePlatforms[1]!, 1.5)) this.checkpointTutorialReached = true;

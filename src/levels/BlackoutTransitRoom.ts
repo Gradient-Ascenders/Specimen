@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { AcidSurfaceMaterial } from '../render/environment/containment/AcidSurfaceMaterial.ts';
+import { AcidLiquidInteractions } from '../render/environment/containment/AcidLiquidInteractions.ts';
 import type { BlackoutMaintenanceMaterials } from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import { mapBlackoutBoxUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
 import { borrowBlackoutMaps } from '../render/environment/blackout/BlackoutTransitMaterials.ts';
@@ -102,6 +104,7 @@ type BoxPosition = readonly [number, number, number];
 export class BlackoutTransitRoom {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
+  readonly acidInteractions: AcidLiquidInteractions;
   readonly bobRoutePlatforms: THREE.Mesh[] = [];
   readonly stickyWalls: THREE.Mesh[] = [];
   readonly liftSlots = BLACKOUT_TRANSIT_LIFT_SLOTS.map((slot) => ({
@@ -116,8 +119,8 @@ export class BlackoutTransitRoom {
   ] as const;
   readonly switchPosition = new THREE.Vector3(7.12, 8.55, 142.5);
   readonly switchBodyPosition = new THREE.Vector3(7.4, 8.06, 142.5);
-  readonly bridgeStart = new THREE.Vector3(-16, 2.9, 136);
-  readonly bridgeEnd = new THREE.Vector3(0, 0.55, 144);
+  readonly bridgeStart = new THREE.Vector3(-16, 2.5, 136);
+  readonly bridgeEnd = new THREE.Vector3(0, 0.4, 144);
   readonly exitPosition = new THREE.Vector3(0, 0.86, 151);
   readonly switchButton: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
   readonly catwalk: THREE.Mesh;
@@ -134,6 +137,7 @@ export class BlackoutTransitRoom {
   });
 
   private readonly materials: THREE.Material[] = [];
+  private readonly acidMaterial = new AcidSurfaceMaterial();
   private readonly hallwayLights: THREE.PointLight[] = [];
   private readonly hallwayBulbs: THREE.MeshStandardMaterial[] = [];
   private hallwayElapsed = 0;
@@ -157,7 +161,8 @@ export class BlackoutTransitRoom {
     const trim = this.material(0x42504c, 0.72, 0.58);
     const warning = this.material(0x665020, 0.86, 0.2);
     const sticky = this.material(0x183a35, 0.48, 0.08, 0x061511, 0.16);
-    const acid = this.material(0x292d13, 0.58, 0.04, 0x181b07, 0.09);
+    const acid = this.acidMaterial;
+    this.materials.push(acid);
     const glass = this.material(0x263c3d, 0.52, 0.55, 0x061011, 0.12);
 
     this.buildShell(darkSteel, platformSteel, trim, warning, acid);
@@ -203,6 +208,8 @@ export class BlackoutTransitRoom {
           object.userData.textureRole !== 'acid-floor' && !object.name.includes('hallway-bulb')) immutable.push(object);
     });
     this.staticVisuals = consolidateStaticRoomVisuals(this.root, immutable);
+    this.acidInteractions = new AcidLiquidInteractions(this.acidMaterial,
+      this.root.getObjectByName('transit-acid-surface') as THREE.Mesh, 3);
   }
 
   acidAt(position: TransitPosition): boolean {
@@ -221,6 +228,7 @@ export class BlackoutTransitRoom {
 
   update(deltaSeconds: number): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0) return;
+    this.acidMaterial.update(deltaSeconds);
     this.hallwayElapsed += deltaSeconds;
     for (let index = 0; index < this.hallwayLights.length; index += 1) {
       // Separate phases and dropouts prevent the whole corridor flashing in
@@ -237,6 +245,7 @@ export class BlackoutTransitRoom {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.acidInteractions.reset();
     this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries = new Set<THREE.BufferGeometry>();
@@ -307,7 +316,9 @@ export class BlackoutTransitRoom {
     for (const sign of [-1, 1]) {
       this.box(`transit-exit-wall-${sign}`, [flankWidth, 22, 0.5], [sign * (exitWidth + flankWidth) / 2, 11, 156], darkSteel);
     }
-    this.box('transit-exit-wall-header', [exitWidth, 16.2, 0.5], [0, 13.9, 156], darkSteel);
+    // The trim lintel fills y=5.8..6.1; begin the shell above it so their
+    // undersides do not submit the same plane beneath the raised shutter.
+    this.box('transit-exit-wall-header', [exitWidth, 15.9, 0.5], [0, 14.05, 156], darkSteel);
     this.box('transit-ceiling', [width, 0.5, length], [0, 22.25, 118], darkSteel);
 
     // Subtle non-emissive stripes separate raised entry/exit aprons from the
@@ -414,9 +425,9 @@ export class BlackoutTransitRoom {
     // Anchoring pads are fixed, collision-safe endpoints. The controller owns
     // the retractable bridge deck spanning diagonally between these points.
     this.box('transit-bridge-start-anchor', [3.8, 0.5, 3.5], [-16, 2.25, 136], steel);
-    this.box('transit-bridge-end-anchor', [7, 0.5, 6], [0, 0.55, 144], steel);
+    this.box('transit-bridge-end-anchor', [7, 0.5, 6], [0, 0.15, 144], steel);
     this.visualBox('transit-bridge-start-marking', [3.1, 0.025, 0.13], [-16, 2.512, 136], warning);
-    this.visualBox('transit-bridge-end-marking', [3.5, 0.025, 0.13], [0, 0.512, 144], warning);
+    this.visualBox('transit-bridge-end-marking', [3.5, 0.025, 0.13], [0, 0.414, 144], warning);
   }
 
   private buildExit(
@@ -430,15 +441,18 @@ export class BlackoutTransitRoom {
 
     // Goop's continuous lower route climbs a broad, shallow ramp; the bridge
     // reaches the same shared deck from Volt's isolated catwalk.
-    const rampRise = 1.63;
+    const rampRise = BLACKOUT_TRANSIT_EXIT_HALLWAY.floorTopY - BLACKOUT_TRANSIT_LAYOUT.acidSurfaceY;
     const rampAngle = Math.atan2(rampRise, 10);
-    const ramp = this.box('goop-acid-exit-ramp', [10, 0.22, Math.hypot(10, rampRise)], [9, -0.165 - 0.11 / Math.cos(rampAngle), 145], liftSteel);
+    const ramp = this.box('goop-acid-exit-ramp', [7, 0.22, Math.hypot(10, rampRise)], [10.5, (BLACKOUT_TRANSIT_EXIT_HALLWAY.floorTopY + BLACKOUT_TRANSIT_LAYOUT.acidSurfaceY) / 2, 145], liftSteel);
+    // Rotate around the top face: its endpoints are exactly z=140/150.
+    ramp.geometry.translate(0, -0.11, 0);
     ramp.rotation.x = -rampAngle;
     ramp.userData.preciseMovementCorners = true;
     ramp.userData.textureRole = 'blackout-transit-ramp';
-    // Dry landing joins the left-hand route and ramp to the central exit.
-    // Its top is just below the ramp tip, avoiding another raised-box lip.
-    this.box('transit-exit-left-apron', [10, 0.5, 5], [9, 0.3, 152.5], platformSteel);
+    // Butt joints at x=7 and z=150 avoid duplicate visible top surfaces.
+    const apron = this.box('transit-exit-left-apron', [7, 0.5, 5], [10.5, 0.15, 152.5], platformSteel);
+    apron.userData.preciseMovementCorners = true;
+    exit.userData.preciseMovementCorners = true;
   }
 
   private buildExitHallway(
@@ -457,12 +471,12 @@ export class BlackoutTransitRoom {
     // coplanar duplicate floor or open seam interrupts the walk-through route.
     this.box('transit-exit-hallway-floor', [width + 0.8, 0.8, length + 1], [0, 0, centreZ - 0.5], platformSteel);
     for (const sign of [-1, 1]) {
-      this.box(`transit-exit-hallway-wall-${sign}`, [0.4, wallHeight, length + 0.5], [sign * (width / 2 + 0.2), (floorTopY + ceilingY) / 2, centreZ], darkSteel);
-      this.box(`transit-exit-door-jamb-${sign}`, [0.3, wallHeight, 0.85], [sign * (width / 2 + 0.15), (floorTopY + ceilingY) / 2, startZ], trim);
-      this.visualBox(`transit-exit-door-guide-${sign}`, [0.12, 8.6, 0.28], [sign * (width / 2 + 0.38), 4.7, startZ - 0.33], steel);
+      this.box(`transit-exit-hallway-wall-${sign}`, [0.4, wallHeight, length - 0.425], [sign * (width / 2 + 0.2), (floorTopY + ceilingY) / 2, centreZ + 0.2125], darkSteel);
+      this.box(`transit-exit-door-jamb-${sign}`, [0.3, wallHeight, 0.85], [sign * width / 2, (floorTopY + ceilingY) / 2, startZ], trim);
+      this.visualBox(`transit-exit-door-guide-${sign}`, [0.12, 8.6, 0.28], [sign * (width / 2 + 0.38), 4.7, startZ - 0.60], steel);
       this.visualBox(`transit-exit-hallway-service-rail-${sign}`, [0.08, 0.12, length - 0.5], [sign * (width / 2 - 0.045), 1.25, centreZ], trim);
     }
-    this.box('transit-exit-hallway-ceiling', [width + 0.8, 0.35, length + 0.5], [0, ceilingY + 0.175, centreZ], darkSteel);
+    this.box('transit-exit-hallway-ceiling', [width + 0.8, 0.35, length - 0.425], [0, ceilingY + 0.175, centreZ + 0.2125], darkSteel);
     this.box('transit-exit-door-lintel', [width + 0.6, 0.3, 0.85], [0, ceilingY + 0.15, startZ], trim);
 
     // A jammed shutter, physically resting on the shipping crate. The other
@@ -488,15 +502,20 @@ export class BlackoutTransitRoom {
     const crateY = (doorBottomY + floorTopY) / 2;
     const crateZ = startZ + 0.15;
     this.box('transit-exit-door-prop-crate', [2.2, crateHeight, 1.8], [crateX, crateY, crateZ], crateMaterial);
-    for (const x of [crateX - 1.04, crateX + 1.04]) {
-      this.visualBox(`transit-exit-crate-corner-${x}`, [0.12, crateHeight, 1.84], [x, crateY, crateZ], trim);
+    // Face-mounted straps have no coplanar caps with the wooden support.
+    // Split the uprights at each band so the metal details do not intersect.
+    for (const sign of [-1, 1]) {
+      const z = crateZ + sign * 0.93;
+      for (const y of [floorTopY + 0.1, doorBottomY - 0.1]) {
+        this.visualBox(`transit-exit-crate-band-${sign}-${y}`, [2.2, 0.16, 0.04], [crateX, y, z], steel);
+      }
+      for (const x of [crateX - 1.04, crateX + 1.04]) {
+        this.visualBox(`transit-exit-crate-corner-${sign}-${x}`, [0.12, crateHeight - 0.36, 0.04], [x, crateY, z], trim);
+      }
     }
-    for (const y of [floorTopY + 0.1, doorBottomY - 0.1]) {
-      this.visualBox(`transit-exit-crate-band-${y}`, [2.24, 0.16, 1.84], [crateX, y, crateZ], steel);
-    }
-    const brace = this.visualBox('transit-exit-crate-diagonal-brace', [0.14, Math.hypot(1.8, crateHeight - 0.4), 0.08], [crateX, crateY, crateZ - 0.95], trim);
+    const brace = this.visualBox('transit-exit-crate-diagonal-brace', [0.14, Math.hypot(1.8, crateHeight - 0.4), 0.04], [crateX, crateY, crateZ - 0.98], trim);
     brace.rotation.z = -Math.atan2(1.8, crateHeight - 0.4);
-    this.visualBox('transit-exit-crate-shipping-label', [0.42, 0.28, 0.025], [crateX + 0.45, crateY + 0.35, crateZ - 0.92], warning);
+    this.visualBox('transit-exit-crate-shipping-label', [0.42, 0.28, 0.025], [crateX + 0.45, crateY + 0.35, crateZ - 0.925], warning);
 
     for (const [index, z] of [startZ + 3, centreZ, endZ - 3].entries()) {
       this.visualBox(`transit-exit-hallway-fixture-${index + 1}`, [1.2, 0.18, 0.65], [0, ceilingY - 0.09, z], steel);

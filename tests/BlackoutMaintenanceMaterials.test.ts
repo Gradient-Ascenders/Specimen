@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
+import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
 import { BlackoutMaintenanceMaterials, type BlackoutMaterialFamily } from '../src/render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import { mapBlackoutBoxUVs } from '../src/render/environment/blackout/BlackoutMaintenanceUVs.ts';
 import { consolidateStaticRoomVisuals } from '../src/render/StaticRoomVisuals.ts';
@@ -130,15 +131,15 @@ test('all 63 authored mesh fingerprints match the untextured main baseline', () 
   } finally { bay.dispose(); }
 });
 
-test('bay acid retains its authored material and pulse; hallway and duct use non-emissive textures', () => {
+test('bay acid uses the shared animated material; hallway and duct use non-emissive textures', () => {
   const bay = new BlackoutMaintenanceBay(maintenanceMaps);
   try {
-    const acid = (bay.root.getObjectByName('animated-acid-surface') as THREE.Mesh).material as THREE.MeshStandardMaterial;
-    assert.equal(acid.color.getHex(), 0x30391c); assert.equal(acid.emissive.getHex(), 0x101606);
-    assert.equal(acid.emissiveIntensity, .055); assert.equal(acid.map, null);
+    const acid = (bay.root.getObjectByName('animated-acid-surface') as THREE.Mesh).material as AcidSurfaceMaterial;
+    assert.ok(acid instanceof AcidSurfaceMaterial);
+    assert.equal(acid.map, null);
     for (let i = 1; i <= 30; i++) {
-      bay.update(.1, false); const expected = .035 + (.5 + .5 * Math.sin(i * .1 * 3.7)) * .02;
-      assert.ok(Math.abs(acid.emissiveIntensity - expected) < 1e-12);
+      bay.update(.1, false);
+      assert.ok(Math.abs(acid.diagnostics.timeSeconds - i * .1) < 1e-12);
     }
     for (const name of ['hallway-floor', 'hallway-ramp', 'vent-interior-floor', 'volt-rising-duct-floor']) {
       const m = (bay.root.getObjectByName(name) as THREE.Mesh).material as THREE.MeshStandardMaterial;

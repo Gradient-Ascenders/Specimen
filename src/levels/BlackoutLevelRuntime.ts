@@ -835,6 +835,7 @@ export class BlackoutLevelRuntime {
       return;
     }
     if (!resources.deathSequence.isPlaying) {
+      resources.scene.maintenanceBay?.advanceAcid(deltaSeconds);
       if (resources.bobDeathActive) {
         resources.bobPresentation.updateDeath(deltaSeconds);
       }
@@ -1106,6 +1107,11 @@ export class BlackoutLevelRuntime {
     }
 
     this.updateBobPresentation(deltaSeconds, resources);
+    if (!specimenGameplay) {
+      // The group owns a stable Bob/Goop/Volt array, including inactive bodies.
+      resources.scene.maintenanceBay?.acidInteractions.update(deltaSeconds, resources.group.bodies);
+      resources.scene.transitRoom?.acidInteractions.update(deltaSeconds, resources.group.bodies);
+    }
 
     resources.maintenanceDrone.updateMountAvailability(
       resources.group.activeSlimeId,
@@ -1213,6 +1219,7 @@ export class BlackoutLevelRuntime {
       const lostDrone = bay.bay.acidAt(dronePosition);
       const lostRider = lostDrone && resources.maintenanceDrone.voltMounted;
       if (lostDrone) resources.maintenanceDrone.requestRecovery('acid');
+      if (lostRider) bay.bay.acidInteractions.fallPulse(bodies.volt);
       const failed = lostRider ? 'volt' : bay.update(deltaSeconds, bodies);
       resources.dronePresentation?.update(
         deltaSeconds,
@@ -1953,6 +1960,8 @@ export class BlackoutLevelRuntime {
   private readonly restartResources = (): void => {
     this.gameplayAudio?.reset();
     const resources = this.requireResources();
+    resources.scene.maintenanceBay?.acidInteractions.reset();
+    resources.scene.transitRoom?.acidInteractions.reset();
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
@@ -2162,6 +2171,8 @@ export class BlackoutLevelRuntime {
     resources: BlackoutRuntimeResources,
     resumeInput: boolean,
   ): void {
+    resources.scene.maintenanceBay?.acidInteractions.reset();
+    resources.scene.transitRoom?.acidInteractions.reset();
     this.input.setEnabled(false);
     this.input.resetState();
     resources.maintenanceBay?.reset();

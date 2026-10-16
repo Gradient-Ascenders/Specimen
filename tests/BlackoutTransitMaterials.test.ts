@@ -21,7 +21,29 @@ function fixture() {
 }
 const material = (mesh: THREE.Mesh) => mesh.material as THREE.MeshStandardMaterial;
 
-test('textured static and interactive geometry preserves the authoritative main baseline', () => {
+test('deployed bridge top corners meet both anchors across its full width', () => {
+  const f = fixture();
+  try {
+    const bridge = f.controller.root.getObjectByName('transit-deployable-bridge-deck') as THREE.Mesh<THREE.BoxGeometry>;
+    const state = f.controller.capture() as any;
+    state.bridgeProgress = 1; state.bridgeDeployed = true;
+    f.controller.restore(state);
+    f.room.root.updateMatrixWorld(true);
+    const { width, height, depth } = bridge.geometry.parameters;
+    const crossBridge = new THREE.Vector3().subVectors(f.room.bridgeEnd, f.room.bridgeStart);
+    crossBridge.set(-crossBridge.z, 0, crossBridge.x).normalize();
+    for (const [end, anchor] of [[-1, f.room.bridgeStart], [1, f.room.bridgeEnd]] as const) {
+      for (const side of [-1, 1]) {
+        const corner = bridge.localToWorld(new THREE.Vector3(end * width / 2, height / 2, side * depth / 2));
+        const expected = anchor.clone().addScaledVector(crossBridge, side * depth / 2);
+        assert.ok(corner.distanceTo(expected) < 1e-8,
+          `end ${end}, side ${side}: ${corner.toArray()} must meet ${expected.toArray()}`);
+      }
+    }
+  } finally { f.dispose(); }
+});
+
+test('textured static and interactive geometry preserves the reviewed transit baseline', () => {
   const f = fixture();
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-transit-authored-surfaces.json', import.meta.url), 'utf8'));
   const meshes: THREE.Mesh[] = [];
@@ -33,7 +55,8 @@ test('textured static and interactive geometry preserves the authoritative main 
       assert.equal(mesh.name, saved.name);
       assert.equal(mesh.geometry.type, saved.geometry);
       assert.deepEqual(mesh.position.toArray(), saved.position, mesh.name);
-      assert.deepEqual(mesh.rotation.toArray(), saved.rotation, mesh.name);
+      // JSON snapshots cannot retain the signed zero produced by basis rotations.
+      assert.deepEqual(mesh.rotation.toArray().map(value => value === 0 ? 0 : value), saved.rotation, mesh.name);
       assert.deepEqual(mesh.scale.toArray(), saved.scale, mesh.name);
       assert.deepEqual(mesh.userData, saved.userData, mesh.name);
       assert.equal(f.room.collisionMeshes.includes(mesh), saved.collider);

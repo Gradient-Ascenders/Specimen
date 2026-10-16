@@ -1,5 +1,7 @@
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
+import { AcidSurfaceMaterial } from '../render/environment/containment/AcidSurfaceMaterial.ts';
+import { AcidLiquidInteractions } from '../render/environment/containment/AcidLiquidInteractions.ts';
 import { disposeShadowLight } from '../render/ShadowLightResources.ts';
 import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
 import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
@@ -21,8 +23,9 @@ export const BLACKOUT_BAY_LAYOUT = Object.freeze({
 export class BlackoutMaintenanceBay {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
+  readonly acidInteractions: AcidLiquidInteractions;
 
-  private readonly acidMaterial: THREE.MeshStandardMaterial;
+  private readonly acidMaterial: AcidSurfaceMaterial;
   private readonly arcPositions = new Float32Array(3 * 8 * 2 * 3);
   private readonly arcGeometry = new THREE.BufferGeometry();
   private readonly arcMaterial = new THREE.LineBasicMaterial({color:0xafffff,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -50,10 +53,7 @@ export class BlackoutMaintenanceBay {
     const submergedSteel = new THREE.MeshStandardMaterial({color:0x30391c,roughness:.55,metalness:.18});
     const warning = new THREE.MeshStandardMaterial({ color: 0x8b6b21, roughness: 0.85, metalness: 0.18 });
     const trim = new THREE.MeshStandardMaterial({ color: 0x515956, roughness: 0.72, metalness: 0.58 });
-    this.acidMaterial = new THREE.MeshStandardMaterial({
-      color: 0x30391c, emissive: 0x101606, emissiveIntensity: 0.055,
-      roughness: 0.52, metalness: 0.02,
-    });
+    this.acidMaterial = new AcidSurfaceMaterial();
 
     const { chamberWidth, rearZ, hallwayWidth, hallwayLength, acidStartZ, acidEndZ } = BLACKOUT_BAY_LAYOUT;
     const halfWidth = chamberWidth / 2;
@@ -208,6 +208,7 @@ export class BlackoutMaintenanceBay {
       object.receiveShadow = solid;
     });
     this.staticVisuals = consolidateStaticRoomVisuals(this.root, this.collisionMeshes.filter(mesh => mesh.material !== this.acidMaterial));
+    this.acidInteractions = new AcidLiquidInteractions(this.acidMaterial, acid, 3);
   }
 
   acidAt(position: Readonly<{ readonly x: number; readonly y: number; readonly z: number }>): boolean {
@@ -235,8 +236,7 @@ export class BlackoutMaintenanceBay {
 
   update(dt: number, powered: boolean): void {
     this.elapsed += Math.max(0, dt);
-    const pulse = 0.5 + 0.5 * Math.sin(this.elapsed * 3.7);
-    this.acidMaterial.emissiveIntensity = 0.035 + pulse * 0.02;
+    this.advanceAcid(Math.max(0, dt));
     // Fixed buffers: three jagged discharges bridge the vent's grounded edges.
     // Endpoints stay attached to its metal rim while interior nodes crackle.
     const phase=Math.floor(this.elapsed*24);
@@ -266,9 +266,15 @@ export class BlackoutMaintenanceBay {
     });
   }
 
+  /** Continue the visible liquid during a death, without advancing machinery. */
+  advanceAcid(deltaSeconds: number): void {
+    this.acidMaterial.update(deltaSeconds);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.acidInteractions.reset();
     this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries=new Set<THREE.BufferGeometry>();

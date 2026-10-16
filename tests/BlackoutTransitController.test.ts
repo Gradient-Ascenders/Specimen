@@ -15,6 +15,7 @@ function fakeBody(position: THREE.Vector3, partial: Partial<{ attached: boolean;
   const previousPosition = position.clone();
   const body = {
     position,
+    velocity: new THREE.Vector3(),
     previousPosition,
     radiusMetres: 0.45,
     grounded: partial.grounded ?? true,
