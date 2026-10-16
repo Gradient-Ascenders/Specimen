@@ -18,6 +18,15 @@ Repository rules should require both checks, an up-to-date branch, one approval,
 and resolved review threads. Verify the live ruleset before relying on this
 document because repository settings can change independently of source.
 
+## Production integration
+
+`.github/workflows/production-integration.yml` runs the longer Chromium journeys
+and a Firefox production-startup check after pushes to `main`, nightly, and on
+manual dispatch. It covers graphics-profile parity across all levels, clean
+gameplay mode, real browser audio, optional character-detail failures, and basic
+cross-browser startup. It never runs for pull requests and is diagnostic
+coverage rather than a required merge check.
+
 ## Submission builds
 
 `.github/workflows/submission-build.yml` runs on `main` and by manual dispatch.
@@ -39,6 +48,13 @@ npm run validate:production
 npm run test:smoke
 ```
 
+Run the longer software-rendered integration journeys when changing their
+coverage or investigating renderer, level, audio, or lifecycle behavior:
+
+```bash
+npm run test:integration
+```
+
 To test the exact archive:
 
 ```bash
@@ -46,7 +62,7 @@ npm run archive
 SPECIMEN_SMOKE_ARCHIVE=artifacts/specimen-production.zip npm run test:smoke
 ```
 
-Use `npm run test:browser` for the full browser suite when the affected area
-requires it. Automation checks boot, menus, later-level loading, restart,
+Use `npm run test:browser` for the separate full browser suite when the affected
+area requires it. Automation checks boot, menus, later-level loading, restart,
 network/console errors, and renderer invariants; it does not prove visual
 quality, real-GPU performance, accessibility, or complete puzzle traversal.
