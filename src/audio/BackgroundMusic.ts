@@ -21,7 +21,7 @@ export function musicForFlow(
   if (state === 'playing') return { track: level, play: true };
   if (state === 'paused' || state === 'restarting' || state === 'settings' || state === 'credits')
     return { track: level, play: false };
-  return { track: null, play: false };
+  return { track: null, play: state === 'opening' || state === 'transitioning' };
 }
 
 type MusicElement = Pick<HTMLAudioElement,
