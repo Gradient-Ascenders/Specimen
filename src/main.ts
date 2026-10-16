@@ -19,7 +19,7 @@ import { OpeningGameScene } from './cinematics/OpeningGameScene.ts';
 import { OpeningGamePresentation } from './cinematics/OpeningGamePresentation.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import { GraphicsPreparationOverlay } from './ui/GraphicsPreparationOverlay.ts';
-import { graphicsShaderKey, graphicsTransmissionResourceKey } from './render/GraphicsProfiles.ts';
+import { graphicsPreparationKey, graphicsTransmissionResourceKey } from './render/GraphicsProfiles.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -200,7 +200,7 @@ function startGame(): void {
           levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
           performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
         }
-        gameSession.applyGraphicsSettings(graphicsShaderKey(nextSettings), () => renderLayer.setGraphicsSettings(nextSettings),
+        gameSession.applyGraphicsSettings(graphicsPreparationKey(nextSettings), () => renderLayer.setGraphicsSettings(nextSettings),
           graphicsTransmissionResourceKey(nextSettings));
         titlePresentation?.setReducedMotion(nextSettings.reduceMenuMotion);
       },

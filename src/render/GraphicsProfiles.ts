@@ -22,6 +22,13 @@ export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRendering
   return settings.gelRenderingMode === 'minimum' ? 'opaque-gel' : 'transmissive-gel';
 }
 
+/** Full preparation also owns shadow targets. A cap change disposes their
+ * storage even when shader source is unchanged, so retain the full loading
+ * path for that change. Transmission-scale-only changes keep the lighter path. */
+export function graphicsPreparationKey(settings: GraphicsSettings): string {
+  return `${graphicsShaderKey(settings)}:shadow-cap:${GRAPHICS_PROFILES[settings.graphicsProfile].shadowMapSizeCap}`;
+}
+
 /** Target storage can change without shader source changing. Include requested
  * capture dimensions as well as scale; harmless input/audio settings stay free. */
 export function graphicsTransmissionResourceKey(settings: GraphicsSettings): string {

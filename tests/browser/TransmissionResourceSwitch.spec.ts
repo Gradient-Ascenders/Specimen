@@ -1,3 +1,4 @@
+import { graphicsPreparationKey, GRAPHICS_PROFILES } from '../../src/render/GraphicsProfiles.ts';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from './fixtures.ts';
 import { writeFile } from 'node:fs/promises';
@@ -23,8 +24,8 @@ test('active levels prepare direct transmission-scale switches before the resume
   for(const level of [1,2,3]) {
     await expect(page.locator('.game-flow')).toHaveAttribute('data-state','playing',{timeout:240_000});
     await page.waitForFunction(()=>(window as any).__transmissionSession.runtime.input.enabled);
-    for(const [index,mode] of ['physical','reduced-transmission','physical','reduced-transmission'].entries()) {
-      await page.evaluate(async ({mode,hidden})=>{
+    for(const [index,mode] of (['physical','reduced-transmission','physical','reduced-transmission'] as const).entries()) {
+      await page.evaluate(async ({mode,hidden,key})=>{
         const session=(window as any).__transmissionSession,rt=session.runtime,layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
         const rows:any[]=[],storage:any[]=[],inspections:any[]=[],gates:any[]=[],preparedDraws:any[]=[],shadowChecks:any[]=[],originals=new Map<string,any>();
         const originalDraw=layer.render,compile=renderer.compileAsync,prepare=rt.prepareGraphics;
@@ -87,9 +88,9 @@ test('active levels prepare direct transmission-scale switches before the resume
         requestedAt=performance.now();
         // Use the same session boundary as the settings UI, while actually
         // running. No paused/menu draw can consume the allocation first.
-        session.applyGraphicsSettings('transmissive-gel',()=>layer.setGraphicsSettings({...layer.graphicsSettings,gelRenderingMode:mode}),
+        session.applyGraphicsSettings(key,()=>layer.setGraphicsSettings({...layer.graphicsSettings,gelRenderingMode:mode}),
           `transmission:${mode==='physical'?1:.5}`);
-      },{mode,hidden:index>=2});
+      },{mode,hidden:index>=2,key:graphicsPreparationKey({...GRAPHICS_PROFILES.standard.settings,gelRenderingMode:mode})});
       await page.waitForFunction(()=>(window as any).__transmissionSession.runtime.__transmissionProbe.rows.length>=12,null,{timeout:240_000});
       if(index>=2){
         await page.evaluate(()=>(window as any).__transmissionSession.runtime.__transmissionProbe.hideTransmission=false);

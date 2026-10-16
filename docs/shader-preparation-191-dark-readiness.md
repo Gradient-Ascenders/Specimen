@@ -126,3 +126,47 @@ The expected assessment machine is the photographed ASUS NUC12WSK-B with
 It remains untested. These Windows UHD 620 / native Edge correctness checks
 cannot establish performance on that machine. Keep #191 open; do not merge
 without independent PR review.
+
+## Subsequent shadow-cap review correction (2026-10-17)
+
+A second review found that Minimum + Physical to Standard retains its shader
+class while changing the shadow-map cap from 512 to 1024. The resource policy
+disposes affected maps, and the transmission-only primer deliberately suppresses
+shadow updates. The failing-first native Edge regression reproduced two storage
+calls on ordinary draws and no full preparation pass on the prior PR build.
+
+The production settings boundary now uses `graphicsPreparationKey()`, combining
+the unchanged shader class with the shadow-map cap. Cap changes use the existing
+full runtime preparation path, including its restoration and ownership rules.
+Capture-scale-only changes still use resource preparation without a full pass.
+This deliberately pays the full preparation cost behind the gate on a profile
+cap change; it makes no claim that this extra loading work is free. No shader
+variants, error checks, lifecycle assertions or preparation coverage were removed.
+Direct browser fixtures now use the production key rather than legacy literals.
+
+Focused verification passes: 22 tests across `GraphicsPreparation.test.ts`,
+`GraphicsProfiles.test.ts` and `RenderShadowPolicy.test.ts`; type-check;
+production build and 90-file production-layout validation; and three native
+Edge browser cases. The new real-settings regression covers all three levels:
+one full preparation pass per cap change and zero storage/inspection calls,
+program growth or GL errors across 165 subsequent ordinary draws, including
+at least 12 resumed gameplay draws per level. The existing transmission-only
+regression covers 12 switches / 226 resumed draws, with zero full preparation
+passes or live storage/inspection/program growth. The updated dark-room
+regression also passes. This pass intentionally uses focused coverage rather
+than repeating the complete unit/browser suites or loading benchmarks.
+
+The first corrected browser attempt had no cold storage calls, but exposed a
+probe error: multiple lights referenced a shared fallback map and registered
+multiple disposal listeners on it. The probe now observes each unique target
+once; the disposal assertion remains strict. Failed runs remain preserved.
+Independent source review found no verified production blocker.
+
+Reproduction/evidence: `artifacts/191-shadow-before*` retains the failing-first
+run; `artifacts/191-shadow-after*` retains the probe failure;
+`artifacts/191-shadow-final*` and `artifacts/191-shadow-dark*` retain final browser
+results and JSON. Targeted unit, type-check, build and production-layout logs
+use the same `191-shadow-` prefix. Earlier production ZIPs and benchmark tables
+above belong to their recorded revisions, not this correction. No new loading
+benchmark was run. Standard loading, warm frame tails and Wits qualification
+remain unresolved under #191.

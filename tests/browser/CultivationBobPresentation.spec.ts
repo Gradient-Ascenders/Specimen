@@ -1,3 +1,4 @@
+import { graphicsPreparationKey, GRAPHICS_PROFILES } from '../../src/render/GraphicsProfiles.ts';
 import { writeFile } from 'node:fs/promises';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import type { Page } from '@playwright/test';
@@ -92,15 +93,15 @@ const exposeCultivationRuntime = async (page: Page): Promise<() => void> => {
   ).toBe(1);
 };
 
-const prepareGraphics = (page: Page, preset: 'normal' | 'performance') => page.evaluate(async preset => {
+const prepareGraphics = (page: Page, preset: 'normal' | 'performance') => page.evaluate(async ({preset,key}) => {
   const r=(window as any).__specimenCultivationRuntime, session=(window as any).__specimenSession;
-  session.applyGraphicsSettings('transmissive-gel',()=>r.renderLayer.setGraphicsSettings({
+  session.applyGraphicsSettings(key,()=>r.renderLayer.setGraphicsSettings({
     graphicsProfile:'standard',graphicsPreset:preset,renderPixelRatioCap:preset==='performance'?0.75:2,
     renderScale:1,gelRenderingMode:'physical',
   }));
   await session.graphicsPreparation.settled;
   if (session.graphicsPreparation.pending) throw session.graphicsPreparation.failure ?? new Error('Graphics preparation did not finish');
-},preset);
+},{preset,key:graphicsPreparationKey({...GRAPHICS_PROFILES.standard.settings,gelRenderingMode:'physical'})});
 
 const enterCultivation = async (page: Page): Promise<void> => {
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
@@ -813,7 +814,7 @@ test('dark-room graphics preparation awaits the pending configuration when brigh
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error'||/GL_INVALID_|CONTEXT_LOST_WEBGL/.test(message.text()))errors.push(message.text());});
   await exposeCultivationRuntime(page); await enterCultivation(page); await prepareGraphics(page,'normal');
-  await page.evaluate(async()=>{
+  await page.evaluate(async(key)=>{
     const rt=(window as any).__specimenCultivationRuntime,session=(window as any).__specimenSession,queue=rt.preparationQueue;
     const layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
     rt.stop(); rt.teleportToAuthoredPreviewRoom(5);
@@ -863,14 +864,15 @@ test('dark-room graphics preparation awaits the pending configuration when brigh
       for(const [method,original]of originals)gl[method]=original;
     };
     rt.start();
-    session.applyGraphicsSettings('transmissive-gel',()=>layer.setGraphicsSettings({...layer.graphicsSettings,gelRenderingMode:'reduced-transmission'}),'review-dark-half');
+    session.applyGraphicsSettings(key,()=>layer.setGraphicsSettings({...layer.graphicsSettings,gelRenderingMode:'reduced-transmission'}),'review-dark-half');
     await session.graphicsPreparation.settled;
     if(session.graphicsPreparation.pending)throw session.graphicsPreparation.failure??Error('Preparation remained pending');
     evidence.queueRetained=rt.preparationQueue===queue;
     evidence.darkReady=dark.ready;evidence.brightReady=bright.ready;evidence.pending=queue.diagnostics.pending;
-  });
+  },graphicsPreparationKey({...GRAPHICS_PROFILES.standard.settings,gelRenderingMode:'physical'}));
   await page.waitForFunction(()=>(window as any).__specimenCultivationRuntime.__darkPreparation.live.length>=12);
-  for(const [key,mode]of [['opaque-gel','minimum'],['transmissive-gel','physical']]){
+  for(const mode of ['minimum','physical'] as const){
+    const key=graphicsPreparationKey({...GRAPHICS_PROFILES.standard.settings,gelRenderingMode:mode});
     const before=await page.evaluate(async({key,mode})=>{
       const rt=(window as any).__specimenCultivationRuntime,session=(window as any).__specimenSession,layer=rt.renderLayer;
       const before=rt.__darkPreparation.live.length;

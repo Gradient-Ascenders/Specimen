@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GraphicsPreparation } from '../src/render/GraphicsPreparation.ts';
-import { graphicsShaderKey, graphicsTransmissionResourceKey, GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
+import { graphicsPreparationKey, graphicsShaderKey, graphicsTransmissionResourceKey, GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
 
 test('resolution, shadow size and capture scale do not change shader features; transmission does', () => {
   const minimum = GRAPHICS_PROFILES.minimum.settings, standard = GRAPHICS_PROFILES.standard.settings;
@@ -97,4 +97,19 @@ test('cancellation invalidates readiness even when switching back to the old key
   const old=gate.settled; gate.cancel();finish();await old;
   gate.update('opaque',()=>{},async()=>{prepared++;});await gate.settled;
   assert.equal(prepared,1);
+});
+
+test('same-shader shadow-cap changes require full preparation, while capture-only changes do not', async()=>{
+  const minimumPhysical={...GRAPHICS_PROFILES.minimum.settings,gelRenderingMode:'physical'} as const;
+  const standard=GRAPHICS_PROFILES.standard.settings;
+  assert.equal(graphicsShaderKey(minimumPhysical),graphicsShaderKey(standard));
+  assert.notEqual(graphicsPreparationKey(minimumPhysical),graphicsPreparationKey(standard));
+  assert.equal(graphicsPreparationKey(standard),graphicsPreparationKey({...standard,gelRenderingMode:'physical',renderScale:.5}));
+  const gate=new GraphicsPreparation(()=>{});let full=0,resources=0;
+  const update=(settings:typeof standard|typeof minimumPhysical)=>gate.update(graphicsPreparationKey(settings),()=>{},async()=>{full++;},
+    {key:graphicsTransmissionResourceKey(settings),prepare:async()=>{resources++;}});
+  update(minimumPhysical);update(standard);await gate.settled;
+  assert.equal(full,1);assert.equal(resources,0);
+  update(minimumPhysical);await gate.settled;
+  assert.equal(full,2);assert.equal(resources,0);
 });
