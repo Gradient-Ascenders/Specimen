@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { resolveRenderPixelRatio, resolveRenderResolution } from '../src/render/RenderResolution.ts';
 import { GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
+import { RenderLayer } from '../src/render/RenderLayer.ts';
 
 test('render tiers cap high-DPI pixel workload at their configured density', () => {
   assert.equal(resolveRenderPixelRatio(3, 2), 2);
@@ -100,4 +101,52 @@ test('render tiers respect device density within the supported DPR range', () =>
   assert.equal(resolveRenderPixelRatio(1.25, 0.75), 0.75);
   assert.equal(resolveRenderPixelRatio(0.8, 2), 1);
   assert.equal(resolveRenderPixelRatio(Number.NaN, 2), 1);
+});
+
+test('temporary title budgets preserve current profile settings and transmission-safe allocation', () => {
+  const titleBudget = 1280 * 720;
+  for (const profile of Object.values(GRAPHICS_PROFILES)) {
+    const layer = Object.create(RenderLayer.prototype) as RenderLayer;
+    let resizes = 0;
+    // Exercise the real budget policy without constructing a WebGL context.
+    Object.assign(layer, { graphicsSettings: { ...profile.settings },
+      effectivePixelRatioCap: profile.settings.renderPixelRatioCap, resize: () => resizes++ });
+    const settings = { ...profile.settings };
+    for (const [width, height] of [[320, 900], [916, 960], [960, 540], [3840, 2160], [1, 1000000], [1000000, 1]]) {
+      for (const transmissionScale of [1, 0.5, 0.25]) {
+        const minimumDrawingBufferDimension = Math.ceil(1 / transmissionScale);
+        const options = { pixelRatioCap: settings.renderPixelRatioCap, renderScale: settings.renderScale,
+          maximumWidth: 4096, maximumHeight: 2048, minimumDrawingBufferDimension };
+        const before = resolveRenderResolution(width, height, 3, { ...options, pixelBudget: layer.pixelBudget });
+        layer.setPresentationResolution(titleBudget);
+        assert.equal(layer.pixelBudget, Math.min(titleBudget, profile.pixelBudget));
+        const title = resolveRenderResolution(width, height, 3, { ...options, pixelBudget: layer.pixelBudget,
+          pixelRatioCap: layer.activePixelRatioCap, renderScale: layer.activeRenderScale });
+        assert.equal(layer.activeRenderScale, 1);
+        if (width * height <= titleBudget && width >= minimumDrawingBufferDimension && height >= minimumDrawingBufferDimension) {
+          assert.deepEqual([title.drawingBufferWidth, title.drawingBufferHeight], [width, height],
+            'Menus/trailers must not inherit the default 0.75 gameplay upscale when native CSS pixels fit.');
+        }
+        assert.ok(title.drawingBufferWidth * title.drawingBufferHeight <= titleBudget);
+        assert.ok(title.drawingBufferWidth <= 4096 && title.drawingBufferHeight <= 2048);
+        assert.ok(Math.floor(title.drawingBufferWidth * transmissionScale) >= 1);
+        assert.ok(Math.floor(title.drawingBufferHeight * transmissionScale) >= 1);
+        layer.setPresentationResolution(undefined);
+        assert.equal(layer.pixelBudget, profile.pixelBudget);
+        assert.equal(layer.activeRenderScale, settings.renderScale);
+        assert.equal(layer.activePixelRatioCap, settings.renderPixelRatioCap);
+        assert.deepEqual(resolveRenderResolution(width, height, 3, { ...options, pixelBudget: layer.pixelBudget }), before);
+      }
+    }
+    layer.setPresentationResolution(titleBudget);
+    // A profile selected while the title is visible is the one restored on Start.
+    Object.assign(layer, { graphicsSettings: { ...GRAPHICS_PROFILES.standard.settings } });
+    assert.equal(layer.pixelBudget, titleBudget);
+    layer.setPresentationResolution(undefined);
+    assert.equal(layer.pixelBudget, GRAPHICS_PROFILES.standard.pixelBudget);
+    for (const invalid of [0, -1, NaN, Infinity]) {
+      assert.throws(() => layer.setPresentationResolution(invalid), RangeError);
+    }
+    assert.ok(resizes > 0);
+  }
 });

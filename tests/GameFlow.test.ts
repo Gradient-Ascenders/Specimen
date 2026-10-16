@@ -7,6 +7,7 @@ import {
   GameFlowStateModel,
   getGameFlowKeyboardAction,
   parseCreditsInlineParts,
+  type GameFlowState,
 } from '../src/ui/GameFlowUI.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 
@@ -115,6 +116,20 @@ test('pause requires unmodified P while Escape remains a nested-menu cancel', ()
   assert.equal(getGameFlowKeyboardAction('Escape', 'playing'), null);
 });
 
+test('game flow leaves F1 exclusively to the clean-gameplay controller', () => {
+  const states: readonly GameFlowState[] = [
+    'loading', 'title', 'playing', 'paused', 'settings', 'credits',
+    'restarting', 'transitioning', 'transitionFailed',
+  ];
+  for (const state of states) {
+    assert.equal(getGameFlowKeyboardAction('F1', state), null);
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
+      assert.equal(getGameFlowKeyboardAction('F1', state, { [modifier]: true }), null);
+    }
+  }
+  assert.equal(getGameFlowKeyboardAction('F2', 'playing'), null);
+});
+
 test('flow state subscriptions emit immediately and clean up explicitly', () => {
   const flow = new GameFlowStateModel();
   const states: string[] = [];
@@ -179,6 +194,8 @@ test('settings retain session values across flow transitions', () => {
     masterVolume: 0.35,
     soundEffectsVolume: 0.8,
     cameraDistanceMetres: 6.4,
+    showFPS: false,
+    reduceMenuMotion: false,
     renderPixelRatioCap: 1.5,
     gelRenderingMode: 'minimum',
     graphicsProfile: 'minimum',

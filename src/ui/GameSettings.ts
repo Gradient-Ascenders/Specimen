@@ -17,6 +17,8 @@ export interface GameSettingsSnapshot extends GraphicsSettings {
   readonly masterVolume: number;
   readonly soundEffectsVolume: number;
   readonly cameraDistanceMetres: number;
+  readonly showFPS: boolean;
+  readonly reduceMenuMotion: boolean;
 }
 
 export type GameSettingsListener = (
@@ -30,15 +32,38 @@ export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
   masterVolume: 1,
   soundEffectsVolume: 0.8,
   cameraDistanceMetres: DEFAULT_CAMERA_RIG_CONFIG.followDistanceMetres,
+  showFPS: false,
+  reduceMenuMotion: false,
 };
+
+export const PRESENTATION_PREFERENCES_KEY = 'specimen.presentation-preferences.v1';
+export type SettingsStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
   Math.min(maximum, Math.max(minimum, value));
 
-/** In-memory application-session settings. Level restart never recreates it. */
+/** Gameplay quality stays session-scoped; lightweight display preferences persist. */
 export class GameSettings {
   private readonly listeners = new Set<GameSettingsListener>();
   private current: GameSettingsSnapshot = { ...DEFAULT_GAME_SETTINGS };
+  private readonly storage: SettingsStorage | undefined;
+
+  constructor(options: { storage?: SettingsStorage | null } = {}) {
+    try {
+      this.storage = options.storage === undefined
+        ? typeof window === 'undefined' ? undefined : window.localStorage
+        : options.storage ?? undefined;
+      const saved: unknown = JSON.parse(this.storage?.getItem(PRESENTATION_PREFERENCES_KEY) ?? 'null');
+      if (saved && typeof saved === 'object') {
+        const preferences = saved as Record<string, unknown>;
+        this.current = { ...this.current,
+          showFPS: typeof preferences.showFPS === 'boolean' ? preferences.showFPS : false,
+          reduceMenuMotion: typeof preferences.reduceMenuMotion === 'boolean' ? preferences.reduceMenuMotion : false };
+      }
+    } catch {
+      // Private browsing, blocked storage and malformed preferences are optional.
+    }
+  }
 
   get value(): Readonly<GameSettingsSnapshot> {
     return this.current;
@@ -91,6 +116,19 @@ export class GameSettings {
     this.update({ graphicsPreset: value });
   }
 
+  setShowFPS(value: boolean): void {
+    this.update({ showFPS: value });
+  }
+
+  setReduceMenuMotion(value: boolean): void {
+    this.update({ reduceMenuMotion: value });
+  }
+
+  resetToDefaults(): void {
+    this.update(DEFAULT_GAME_SETTINGS);
+    try { this.storage?.removeItem(PRESENTATION_PREFERENCES_KEY); } catch { /* Optional storage. */ }
+  }
+
   subscribe(listener: GameSettingsListener): () => void {
     this.listeners.add(listener);
     listener(this.current);
@@ -109,12 +147,19 @@ export class GameSettings {
       next.soundEffectsVolume === this.current.soundEffectsVolume &&
       next.cameraDistanceMetres === this.current.cameraDistanceMetres &&
       next.renderPixelRatioCap === this.current.renderPixelRatioCap &&
+      next.showFPS === this.current.showFPS &&
+      next.reduceMenuMotion === this.current.reduceMenuMotion &&
       next.graphicsPreset === this.current.graphicsPreset
     ) {
       return;
     }
 
+    const persist = next.showFPS !== this.current.showFPS || next.reduceMenuMotion !== this.current.reduceMenuMotion;
     this.current = next;
+    if (persist) try {
+      this.storage?.setItem(PRESENTATION_PREFERENCES_KEY,
+        JSON.stringify({ showFPS: next.showFPS, reduceMenuMotion: next.reduceMenuMotion }));
+    } catch { /* Optional storage never blocks an in-memory setting. */ }
     for (const listener of this.listeners) listener(this.current);
   }
 }
