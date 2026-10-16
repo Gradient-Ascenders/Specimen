@@ -318,10 +318,13 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
 
       const bridgeStart = this.room.bridgeStart.clone();
       const bridgeEnd = this.room.bridgeEnd.clone();
-      bridgeStart.y = 2.25;
-      bridgeEnd.y = 0.25;
       const bridgeDirection = bridgeEnd.clone().sub(bridgeStart);
-      bridgeDirection.y = -2;
+      // Anchors describe walkable top heights. Offset the slab centre along
+      // world Y by its rotated half-thickness, preserving both endpoint tops.
+      const horizontalLength = Math.hypot(bridgeDirection.x, bridgeDirection.z);
+      const topOffset = 0.225 * horizontalLength / bridgeDirection.length();
+      bridgeStart.y -= topOffset;
+      bridgeEnd.y -= topOffset;
       const bridgeCentre = bridgeStart.clone().add(bridgeEnd).multiplyScalar(0.5);
       this.bridge = new THREE.Mesh(new THREE.BoxGeometry(bridgeDirection.length(), 0.45, 3.6), new THREE.MeshStandardMaterial({ color: 0x353e41, roughness: 0.72, metalness: 0.7 }));
       this.bridge.name = 'transit-deployable-bridge-deck'; this.bridge.position.copy(bridgeCentre);

@@ -21,7 +21,7 @@ function fixture() {
 }
 const material = (mesh: THREE.Mesh) => mesh.material as THREE.MeshStandardMaterial;
 
-test('textured static and interactive geometry preserves the authoritative main baseline', () => {
+test('textured static and interactive geometry preserves the reviewed transit baseline', () => {
   const f = fixture();
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-transit-authored-surfaces.json', import.meta.url), 'utf8'));
   const meshes: THREE.Mesh[] = [];
