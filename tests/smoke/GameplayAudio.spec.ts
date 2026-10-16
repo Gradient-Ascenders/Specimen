@@ -135,18 +135,24 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   await step(1);
   expect(await page.evaluate(() => [...(window as any).__audioRuntime.audio.voices]
     .some((voice: any) => voice.sound === 'bob-contact-01'))).toBe(true);
+  await page.evaluate(()=>{
+    const rt=(window as any).__audioRuntime;
+    rt.audio.setVolumes(1,0.8); // Restore the mix after the earlier mute-control check.
+    rt.resources.containmentLevel.teleportToRoomForDebug(3);
+    rt.fixedUpdate(1/60);
+  });
+  // At the normal entry platform the first active red beam is about 3 m away.
+  // Verify an actual audible-level source without changing authored visibility.
+  await page.waitForFunction(()=>[...(window as any).__audioRuntime.audio.voices]
+    .some((v:any)=>v.sound==='world-laser-loop-01' && v.gain.gain.value>0.3));
   const worldSounds=await page.evaluate(()=>{
     const rt=(window as any).__audioRuntime,r=rt.resources,room=r.testScene.roomThree;
-    room.root.visible=true;room.lasers.root.visible=true;
-    const laser=room.lasers.hazards.find((h:any)=>h.enabled);
-    r.body.teleport({x:(laser.start.x+laser.end.x)/2,y:(laser.start.y+laser.end.y)/2+1,z:(laser.start.z+laser.end.z)/2});
-    rt.gameplayAudio.update();
     const humming=[...rt.audio.voices].filter((v:any)=>v.sound==='world-laser-loop-01').map((v:any)=>({channels:v.source.buffer.numberOfChannels,loop:v.source.loop}));
     for(const hazard of room.lasers.hazards)hazard.setCircuitGateEnabled(false);
     rt.gameplayAudio.update();
     const laserStopped=![...rt.audio.voices].some((v:any)=>v.sound==='world-laser-loop-01');
     const platform=r.testScene.roomFour.elevatorPlatform;
-    r.testScene.roomFour.root.visible=true;
+    r.containmentLevel.teleportToRoomForDebug(4);rt.fixedUpdate(1/60);
     r.body.teleport({x:platform.position.x,y:platform.position.y+1,z:platform.position.z});
     platform.setActive(true);platform.update(.1);rt.gameplayAudio.update();
     const moving=[...rt.audio.voices].some((v:any)=>v.sound==='world-machinery-loop-01');
