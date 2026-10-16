@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
@@ -50,12 +51,14 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
   await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
   if (preset === 'performance') await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
-  // Start supplies the trusted pointer-lock gesture. Freeze the loop before
-  // it so a software-rendered frame cannot stall a redundant canvas click.
+  await page.locator('[data-action="start"]').click();
+  await finishOpening(page, false);
+  // Startup now includes the opening/readiness boundary. Freeze only after it,
+  // then acquire pointer lock with a real canvas gesture for manual simulation.
   await page.evaluate(() =>
     (window as any).__cleanSession.runtime.renderLayer.setAnimationLoop(null),
   );
-  await page.locator('[data-action="start"]').click();
+  await page.locator('canvas').click();
   await page.waitForFunction(
     () => (window as any).__cleanSession.runtime.input.pointerLocked,
   );

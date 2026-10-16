@@ -85,9 +85,12 @@ export class GameSessionCoordinator {
     if (this.disposed) return;
     if (this.transitionPending || this.initialPreparationPending) { this.queuedGraphics = {key, apply, resourceKey}; return; }
     const runtime = this.runtime;
-    this.graphicsPreparation.update(key, apply, () => runtime.prepareGraphics?.() ?? Promise.resolve(),
+    // The title now precedes runtime construction. Apply its settings without
+    // constructing a level; the opening's mandatory initial pass prepares them.
+    this.graphicsPreparation.update(key, apply, () => runtime.state === 'unloaded'
+      ? Promise.resolve() : runtime.prepareGraphics?.() ?? Promise.resolve(),
       resourceKey === undefined ? undefined : {key:resourceKey, prepare:() => {
-        if (resourceKey === 'no-transmission') return Promise.resolve();
+        if (runtime.state === 'unloaded' || resourceKey === 'no-transmission') return Promise.resolve();
         return runtime.prepareRenderResources?.(this.renderedInterpolationAlpha, {
           fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,stepsThisFrame:0,
           interpolationAlpha:this.renderedInterpolationAlpha,droppedSimulationTimeSeconds:0,renderFps:0,

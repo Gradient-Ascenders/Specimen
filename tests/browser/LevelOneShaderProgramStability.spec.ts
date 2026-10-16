@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import type { Page } from '@playwright/test';
 import type * as THREE from 'three';
 import { expect, test } from './fixtures.ts';
@@ -439,9 +440,10 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   const assertExposed = await exposeProductionTraversalRuntime(page);
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
   assertExposed();
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
   await expect(page.locator(GUARD_SELECTOR)).toBeVisible({ timeout: 120_000 });
-  // The guard is armed when prepared gameplay takes ownership from the title.
-  await page.locator('[data-action="start"]').click({ timeout: 180_000 });
+  // The guard is armed when prepared gameplay takes ownership from the opening.
   await expect.poll(
     async () => (await page.locator(GUARD_SELECTOR).textContent()) ?? '',
     { timeout: 120_000, message: 'Waiting for Level 1 hidden-boot warm-up' },
@@ -532,6 +534,15 @@ test(`plain production completes prewarm before Level 1 traversal (${profile})`,
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   assertTraversalRuntimeExposed();
+  if (profile === 'standard') {
+    await page.locator('[data-flow-panel="title"] [data-action="settings"]').click({timeout:120_000});
+    await page.locator('[data-setting="graphics-profile"]').selectOption(profile);
+    await expect(page.locator('[data-graphics-preparation]')).toBeHidden({timeout:180_000});
+    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  }
+
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
   const app = page.locator('#app[data-level-one-prewarm]');
   await expect(app).toBeVisible({ timeout: 120_000 });
   const verification = JSON.parse(
@@ -546,19 +557,11 @@ test(`plain production completes prewarm before Level 1 traversal (${profile})`,
     burstGeometryDelta: 0,
     burstProgramDelta: 0,
   });
-  await expect(page.locator('[data-action="start"]')).toBeVisible();
-  if (profile === 'standard') {
-    await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
-    await page.locator('[data-setting="graphics-profile"]').selectOption(profile);
-    await expect(page.locator('[data-graphics-preparation]')).toBeHidden({timeout:180_000});
-    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
-  }
   await waitForRenderedFrames(page, 2);
   const warmedProgramCount = await readCreatedProgramCount(page);
   const warmedInspections = await page.evaluate(() => (window as any).__specimenProgramInspectionCount);
   expect(warmedProgramCount).toBeGreaterThan(0);
 
-  await page.locator('[data-action="start"]').click();
   await waitForRenderedFrames(page, 2);
   await traverseRepresentativeLevelOnePaths(page, async (label) => {
     expect(
@@ -603,6 +606,7 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
   assertExposed();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   await page.evaluate(() => {
     const host = window as Window & {
@@ -754,6 +758,7 @@ test('Room 3 final sticky-wall climb reuses GPU programs and bindings without ch
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
   assertExposed();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   const result = await page.evaluate(() => {
     const host = window as Window & {
@@ -843,6 +848,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
 
   const readReflectionState = async () => page.evaluate(() => {
@@ -1017,6 +1023,7 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
 
   const readBob = async () => page.evaluate(() => {
@@ -1117,6 +1124,7 @@ test('Level 1 damage holds the burst at frame zero through Stress anticipation',
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
 
   const observation = await page.evaluate(() => {
     const runtime = (

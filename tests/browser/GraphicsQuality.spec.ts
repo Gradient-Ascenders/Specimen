@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from './fixtures.ts';
 
 test.use({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1.25 });
@@ -40,7 +41,7 @@ for (const query of ['', '?debug=1']) {
     // camera for the exact Normal→Performance→Normal pixel comparison.
     await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     await title.locator('[data-action="start"]').click();
-    await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
+    await finishOpening(page);
     await page.keyboard.press('KeyP');
     await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
     await page.evaluate(() => {

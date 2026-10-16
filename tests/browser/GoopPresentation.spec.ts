@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
@@ -61,6 +62,7 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await page.waitForFunction(() => (window as any).__goopContainment?.state === 'running', null, { timeout: 180_000 });
   const firstGoopDraw = await page.evaluate(() => {
     const rt = (window as any).__goopContainment, r = rt.resources;

@@ -6,6 +6,7 @@ const median=a=>{a=[...a].filter(Number.isFinite).sort((a,b)=>a-b);const i=Math.
 const range=a=>[Math.min(...a),Math.max(...a)];
 const comparison={};
 const environments=new Set();
+const startupRoutes=new Set();
 for(const [index,group] of groups.entries()) {
   const rows=[];
   for(const label of group.split(',')) {
@@ -17,6 +18,8 @@ for(const [index,group] of groups.entries()) {
     const runs=rows.filter(r=>r.cache===cache),valid=runs.filter(r=>r.gameplay?.valid);
     if(!runs.length||valid.length!==runs.length)throw Error(`${group}: ${cache} has missing or invalid gameplay rows; inspect raw evidence`);
     for(const run of runs){
+      startupRoutes.add(run.startupRoute??'pre-cinematic-v1');
+      if(startupRoutes.size>1)throw Error('Startup routes differ; cinematic and pre-cinematic timings cannot be compared');
       const e=run.environment,g=e?.graphics;
       if(!g||e.shaderErrors!==true)throw Error('Missing graphics environment or disabled shader checks');
       environments.add(JSON.stringify({browser:run.browser,gpu:e.gpu,viewport:e.viewport,dpr:Math.round(e.dpr*1e6)/1e6,

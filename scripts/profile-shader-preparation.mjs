@@ -14,19 +14,22 @@ const { values } = parseArgs({ options: {
   channel: { type:'string', default:'msedge' }, profile:{type:'string',default:'minimum'},
   headed:{type:'boolean',default:false}, url:{type:'string',default:'http://127.0.0.1:4191/'},
   trace:{type:'boolean',default:false},
+  opening:{type:'string',default:'natural'},
   suppressSpeculation:{type:'boolean',default:false},
   backgroundBatch:{type:'string',default:'unchanged'},
   sweep:{type:'boolean',default:false},
   dist:{type:'string',default:'dist'},
 } });
 if (!/^[\w-]+$/.test(values.label) || !['minimum','standard'].includes(values.profile)) throw Error('Invalid label/profile');
+if(!['natural','skip'].includes(values.opening))throw Error('Invalid opening route');
+const startupRoute=`opening-${values.opening}-v1`;
 const runs = Number(values.runs); if (!Number.isInteger(runs) || runs < 1) throw Error('Invalid runs');
 const backgroundBatch=values.backgroundBatch==='unchanged'?undefined:Number(values.backgroundBatch);
 if(backgroundBatch!==undefined&&(!Number.isInteger(backgroundBatch)||backgroundBatch<1||backgroundBatch>8))throw Error('Invalid diagnostic batch size');
 const output = path.resolve('artifacts/shader-preparation', values.label); await mkdir(output,{recursive:true});
 const hashes = {};
 for (const file of await readdir(path.join(values.dist,'assets'))) if (file.endsWith('.js')) hashes[file] = createHash('sha256').update(await readFile(path.join(values.dist,'assets',file))).digest('hex');
-const report = { schema:2, recordedAt:new Date().toISOString(), protocol:{...values, viewport:[960,600],dpr:1,
+const report = { schema:2, recordedAt:new Date().toISOString(), protocol:{...values, startupRoute, viewport:[960,600],dpr:1,
   route:'ordinary production; controller-staged completion/room entries; bounded real input; not full puzzle playthrough',
   cache:'fresh browser per pair; warm navigation in same context; HTTP routing disables HTTP cache; OS/driver cache uncontrolled'}, hashes, runs:[] };
 const server = spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--outDir',values.dist,'--host','127.0.0.1','--port','4191','--strictPort'],{stdio:'ignore',windowsHide:true});
@@ -133,7 +136,7 @@ try {
     for (const cache of ['fresh-browser','warm-browser']) {
       const errors=[]; const onError=e=>errors.push(e.message); const onConsole=m=>{if(m.type()==='error') errors.push(m.text());};
       page.on('pageerror',onError);page.on('console',onConsole);
-      const row={pair,cache,browser:browser.version(),errors};report.runs.push(row);
+      const row={pair,cache,startupRoute,browser:browser.version(),errors};report.runs.push(row);
       console.log(values.label,pair,cache,'boot');
       await page.goto(values.url,{waitUntil:'domcontentloaded'});
       await page.locator('[data-flow-panel="title"] [data-action="start"]').waitFor({state:'visible'});
@@ -144,11 +147,22 @@ try {
         await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
         await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
       }
+      await page.evaluate(()=>{
+        const host=document.querySelector('#app'),flow=document.querySelector('.game-flow');
+        globalThis.__openingTimings=[];
+        new MutationObserver(()=>__openingTimings.push({at:performance.now(),flow:flow.dataset.state,
+          state:host.dataset.openingState,stage:host.dataset.openingStage})).observe(host,{attributes:true,subtree:true,attributeFilter:['data-state','data-opening-state','data-opening-stage']});
+      });
       row.startAt=await page.evaluate(()=>performance.now());
       await page.locator('[data-flow-panel="title"] [data-action="start"]').click();
+      if(values.opening==='skip')await page.locator('[data-action="skip-opening"]').click();
       await page.waitForFunction(()=>globalThis.__shaderSession.runtime.state==='running'&&globalThis.__shaderSession.runtime.input.enabled);
       await page.waitForFunction(t=>__shaderCapture.frames.some(f=>f.owner==='one'&&f.state==='running'&&f.drawn&&f.start>=t),row.startAt);
       row.navigationToControlMs=await page.evaluate(()=>performance.now()); row.startToControlMs=row.navigationToControlMs-row.startAt;
+      row.opening=await page.evaluate(()=>{const timeline=__openingTimings;
+        const start=timeline.find(x=>x.flow==='opening')?.at, handoff=timeline.find(x=>x.flow==='playing')?.at;
+        return {timeline,startAt:start,handoffAt:handoff,elapsedMs:handoff-start,
+          scope:'Opening wall time includes overlapping Level 1 preparation; it is separate from Level 2 waiting.'};});
       row.levelOnePreparation=await page.evaluate(()=>{
         const rt=__shaderSession.runtime;
         return {profile:rt.lightingPrewarmProfile,verification:rt.levelOnePrewarmVerification,

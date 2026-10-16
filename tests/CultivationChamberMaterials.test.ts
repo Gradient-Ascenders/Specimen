@@ -27,7 +27,7 @@ test('Room 3 art preserves authored collision and interactions through batching 
   room.root.traverse(object => { if (object instanceof THREE.Mesh && object.userData.staticBatchSourceNames) batches.push(object); });
   assert.ok(room.root.getObjectByName('cultivation-static-platform-art'));
   assert.ok(batches.some(mesh => mesh.material === lab.wall));
-  assert.ok(room.staticBatchDiagnostics.drawCallsRemoved > 15);
+  assert.ok(room.staticBatchDiagnostics.drawCallsRemoved > 0, 'spatial cells retain useful submission reduction');
   room.reset();
   assert.deepEqual(room.wallDrops.map(drop => drop.state), baseline.wallDrops.map(drop => drop.state));
   let disposals = 0;

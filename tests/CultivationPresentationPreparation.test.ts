@@ -161,7 +161,9 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum'])
       if (material instanceof THREE.MeshPhysicalMaterial) material.transmission = 0;
     }
   });
+  const liveScopes = preview.workload.snapshot();
   const queue = new CultivationPreparationQueue(layer, preview);
+  assert.deepEqual(preview.workload.snapshot(), liveScopes, 'enumerating speculative layouts cannot change live scopes');
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
@@ -321,7 +323,11 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum'])
     if (!fail) assert.equal(captiveUploaded, true, 'non-casting captive gel uploads its geometry and morphs before first use');
   } finally {
     volt.dispose();
-    queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
+    queue.dispose();
+    assert.equal(preview.workload.prepared.size, 0);
+    assert.equal(preview.workload.preparing.size, 0);
+    assert.equal(queue.diagnostics.pending, false);
+    lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
     reflectiveMaterial.dispose(); renderTarget.dispose();
     gel.dispose();
     foundationMaterial.dispose();

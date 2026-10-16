@@ -12,6 +12,8 @@ import type { Vector3State } from '../render/slime/SlimePresentationContract.ts'
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomOneArt } from '../render/environment/containment/RoomOneArt.ts';
 import { RoomTwoArt } from '../render/environment/containment/RoomTwoArt.ts';
+import { SPECIMEN_POD_CROWN_SECTIONS, SPECIMEN_POD_GLASS, SPECIMEN_POD_LID_RAISE_METRES,
+  SPECIMEN_POD_SOLID_SECTIONS } from '../render/environment/containment/ContainmentSpecimenPod.ts';
 
 interface BoxOptions {
   readonly name: string;
@@ -24,6 +26,9 @@ interface BoxOptions {
     | 'sticky-wall-tile'
     | 'sticky-vent-tile';
   readonly rotationX?: number;
+  readonly rotationY?: number;
+  readonly geometry?: THREE.BoxGeometry;
+  readonly preciseMovementCorners?: boolean;
 }
 const ROOM_2_CENTRE_Z = 38;
 const SPAWN_POSITION = new THREE.Vector3(-0.20995, 0.52507, -2.60112);
@@ -72,7 +77,9 @@ export class ContainmentTeachingScene {
       floor: artResources.materials.clinicalFloor,
       wall: artResources.materials.mechanicalBacking,
       ceiling: artResources.materials.mainCeramic,
-      support: artResources.materials.mainCeramic,
+      // The round pod supplies the visible shell; its compound support surfaces
+      // stay collision-only instead of exposing an old square greybox.
+      support: this.collisionOnlyMaterial('containment-room-1-pedestal-collision-only'),
       // Gameplay metadata owns adhesion. This collider-only material emits no
       // render fragments; RoomOneArt supplies the explicit green membrane and
       // dark backing without exposing the collider's coplanar top face.
@@ -207,8 +214,58 @@ export class ContainmentTeachingScene {
     this.addCollider({ name: 'room-1-north-clean-east', size: [6.8, 8, 0.4], position: [3.6, 4, 6], material: materials.wall });
     this.addCollider({ name: 'room-1-north-above-vent', size: [2, 1.2, 0.4], position: [-4.8, 7.4, 6], material: materials.wall });
 
-    this.addCollider({ name: 'room-1-containment-pedestal', size: [2.6, 1.1, 2.6], position: [0, 0.55, -0.5], material: materials.support });
+    this.addPedestalColliders(materials.support);
+    this.addRaisedChamberColliders(materials.support);
 
+  }
+
+  private addPedestalColliders(material: THREE.Material): void {
+    // Eight overlapping inscribed rectangles approximate each 16-sided round
+    // solid within 6% of its radius, with no invisible square corners. Share
+    // four box geometries; the existing static broadphase/box sweep stays intact.
+    for (const section of [...SPECIMEN_POD_SOLID_SECTIONS].reverse()) {
+      const size = [2 * section.radius * Math.cos(Math.PI / 8), section.height,
+        2 * section.radius * Math.sin(Math.PI / 8)] as const;
+      const geometry = new THREE.BoxGeometry(...size);
+      for (let index = 0; index < 8; index++) {
+        this.addCollider({
+          name: section.name === 'lower-gasket' && index === 0 ? 'room-1-containment-pedestal'
+            : `room-1-containment-pedestal-${section.name}-${index}`,
+          size, position: [0, section.y, -0.5], material,
+          rotationY: index * Math.PI / 8, geometry,
+        });
+      }
+    }
+  }
+
+  private addRaisedChamberColliders(material: THREE.Material): void {
+    // Gameplay starts only after the opening raises the chamber, and restart
+    // retains that pose. Keep these boxes static: no per-frame transform/cache
+    // updates and no extra draw calls or duplicate visible glass.
+    const segments = 16, halfAngle = Math.PI / segments;
+    const radius = SPECIMEN_POD_GLASS.radius * Math.cos(halfAngle);
+    const size = [2 * SPECIMEN_POD_GLASS.radius * Math.sin(halfAngle) + 0.01,
+      SPECIMEN_POD_GLASS.height, 0.04] as const;
+    const geometry = new THREE.BoxGeometry(...size);
+    for (let index = 0; index < segments; index++) {
+      const angle = index * Math.PI * 2 / segments;
+      this.addCollider({ name: `room-1-containment-chamber-glass-${index}`, size, geometry, material,
+        position: [Math.sin(angle) * radius, SPECIMEN_POD_GLASS.y + SPECIMEN_POD_LID_RAISE_METRES,
+          -0.5 + Math.cos(angle) * radius], rotationY: angle, preciseMovementCorners: true });
+    }
+    // Only the real top is capped. Filling the entire cylinder would create an
+    // invisible wall below the raised glass and prevent using the pedestal.
+    for (const section of SPECIMEN_POD_CROWN_SECTIONS) {
+      const capSize = [2 * section.radius * Math.cos(Math.PI / 8), section.height,
+        2 * section.radius * Math.sin(Math.PI / 8)] as const;
+      const capGeometry = new THREE.BoxGeometry(...capSize);
+      for (let index = 0; index < 8; index++) {
+        this.addCollider({ name: `room-1-containment-chamber-${section.name}-${index}`,
+          size: capSize, geometry: capGeometry, material,
+          position: [0, section.y + SPECIMEN_POD_LID_RAISE_METRES, -0.5], rotationY: index * Math.PI / 8,
+          preciseMovementCorners: true });
+      }
+    }
   }
 
   private addVentTransition(materials: Record<string, THREE.Material>): void {
@@ -367,7 +424,7 @@ export class ContainmentTeachingScene {
 
 
   private addCollider(options: BoxOptions): void {
-    const geometry = new THREE.BoxGeometry(...options.size);
+    const geometry = options.geometry ?? new THREE.BoxGeometry(...options.size);
     this.ownedGeometries.add(geometry);
     const mesh = new THREE.Mesh(
       geometry,
@@ -376,7 +433,9 @@ export class ContainmentTeachingScene {
     mesh.name = options.name;
     mesh.position.set(...options.position);
     mesh.rotation.x = options.rotationX ?? 0;
+    mesh.rotation.y = options.rotationY ?? 0;
     mesh.userData.surfaceTag = options.surfaceTag ?? 'default';
+    if (options.preciseMovementCorners) mesh.userData.preciseMovementCorners = true;
     if (options.textureRole) mesh.userData.textureRole = options.textureRole;
     mesh.userData.sizeMetres = [...options.size];
     this.root.add(mesh);

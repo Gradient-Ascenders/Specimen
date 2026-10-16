@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
 
@@ -106,6 +107,7 @@ const enterCultivation = async (page: Page): Promise<void> => {
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await page.keyboard.press('F2');
   await page.locator('[data-action="complete-level"]').click();
   const enterLevel = page.locator('[data-action="enter-level"]');

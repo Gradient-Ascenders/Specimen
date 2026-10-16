@@ -29,7 +29,7 @@ for(const label of labels){
     const intervals=frames.map(f=>f.deltaMs),slow=[...intervals].sort((a,b)=>b-a).slice(0,Math.ceil(intervals.length*.01));
     const sources=c.sources.filter(s=>s.owner==='two');
     const duration=intervals.reduce((s,v)=>s+v,0);
-    return {pair:run.pair,cache:run.cache,browser:run.browser,environment:run.environment,
+    return {startupRoute:run.startupRoute??'pre-cinematic-v1',opening:run.opening,pair:run.pair,cache:run.cache,browser:run.browser,environment:run.environment,
       navigationToControlMs:run.navigationToControlMs,startToControlMs:run.startToControlMs,levelTwoLoadMs:run.levelTwoLoadMs,
       stagedRouteToGameplayMs:run.gameplayStartAt,roomRequestWaitMs:run.rooms.reduce((s,r)=>s+r.waitMs,0),
       preparationMs:prep.ms,queueStartupMs:c.queue.startupMs,

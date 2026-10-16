@@ -34,7 +34,7 @@ for(const label of labels){
   const rows=raw.runs.map(r=>{
     const c=r.capture;if(!c)throw Error(`${label}: incomplete capture`);
     const settings=r.settingsRequestedAt??r.titleReadyAt;
-    return {pair:r.pair,cache:r.cache,titleReadyAt:r.titleReadyAt,settingsRequestedAt:r.settingsRequestedAt,
+    return {startupRoute:r.startupRoute??'pre-cinematic-v1',opening:r.opening,pair:r.pair,cache:r.cache,titleReadyAt:r.titleReadyAt,settingsRequestedAt:r.settingsRequestedAt,
       navigationToControlMs:r.navigationToControlMs,startToControlMs:r.startToControlMs,levelTwoLoadMs:r.levelTwoLoadMs,
       stagedRouteToGameplayMs:r.gameplayStartAt,roomRequestWaitMs:sum(r.rooms.map(room=>room.waitMs)),
       boot:partition(c,'one',0,r.titleReadyAt),

@@ -159,7 +159,7 @@ export function authorContainmentShadowRoles(root: THREE.Object3D): void {
       delete object.userData.shadowIntent;
       return;
     }
-    object.castShadow = !RECEIVER_ONLY_DETAILS.has(object.name);
+    object.castShadow = !object.userData.specimenPodShadowlessSupport && !RECEIVER_ONLY_DETAILS.has(object.name);
     object.receiveShadow = true;
     object.userData.shadowIntent = object.castShadow ? 'solid-caster-and-receiver' : 'detail-receiver';
   });

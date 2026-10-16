@@ -149,6 +149,8 @@ const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
   5: ['room-3-acid-surface-material-integration-point'],
 };
 export interface GreyboxLevelRuntimeOptions {
+  /** App startup can interleave individual prewarm jobs with its opening cinematic. */
+  readonly yieldPreparation?: () => Promise<void>;
   readonly audio?: AudioPlayback;
   host: HTMLElement;
   input: Input;
@@ -264,6 +266,8 @@ export class GreyboxLevelRuntime {
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
   private readonly hostWindow: Window;
+  private readonly yieldPreparation: (() => Promise<void>) | undefined;
+  private openingCompleted = false;
   private skipToLevelThreeTriggered = false;
   private readonly debugAvailable: boolean;
   private readonly lifecycle: LevelLifecycle;
@@ -304,6 +308,7 @@ export class GreyboxLevelRuntime {
     this.input = options.input;
     this.renderLayer = options.renderLayer;
     this.hostWindow = options.window ?? window;
+    this.yieldPreparation = options.yieldPreparation;
     this.debugAvailable = options.debugAvailable ?? import.meta.env.DEV;
     this.lifecycle = new LevelLifecycle({
       load: this.loadResources,
@@ -411,6 +416,18 @@ export class GreyboxLevelRuntime {
 
   async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
     this.renderLayer.prepareRenderResources(() => this.render(alpha, stats));
+  }
+
+  /** The app intro owns time/camera; gameplay only retains its visual aftermath. */
+  completeOpening(): void {
+    this.openingCompleted = true;
+    this.applyOpeningAftermath();
+  }
+
+  private applyOpeningAftermath(): void {
+    if (!this.openingCompleted || !this.resources) return;
+    const room = this.resources.testScene.teaching.roomOneArt;
+    room.setOpeningAftermath();
   }
 
   /** Precompile Containment signatures and prime known cold resources while loading. */
@@ -1277,6 +1294,7 @@ export class GreyboxLevelRuntime {
     this.lastDeathSlimeId = undefined;
     resources.containmentLevel.setActiveBody(resources.slimePair.activeBody);
     resources.testScene.resetTeachingPresentation();
+    this.applyOpeningAftermath();
     this.renderLayer.cameraRig.reset();
     this.retargetCameraToActiveSlime(resources);
     this.syncContextualCamera(resources);
@@ -1839,6 +1857,7 @@ export class GreyboxLevelRuntime {
       // viewport initializes first-use fixture buffers without flashing a room.
       await resources.testScene.lighting.prewarmShaderConfigurations(
         async (roomId, coverageRoomIds) => {
+          await this.yieldPreparation?.();
           if (!isCurrent()) return;
           this.lightLayout?.sync();
           const stepProgramsBefore = renderer.info.programs?.length ?? 0;
@@ -1868,6 +1887,7 @@ export class GreyboxLevelRuntime {
                 compileSubset, prewarmCamera, this.renderLayer.scene,
               ));
             }
+            await this.yieldPreparation?.();
             if (!isCurrent()) return;
             // Hidden camera draws cannot see every morph/instanced/dissolve
             // caster. Compile their actual PCF depth materials independently.
@@ -1890,6 +1910,7 @@ export class GreyboxLevelRuntime {
               this.compilingDepthGroups.delete(depthBatch);
               if (!isCurrent()) depthBatch.dispose();
             }
+            await this.yieldPreparation?.();
             if (!isCurrent()) return;
             // Bob's transmission pass renders opaque surfaces into a linear
             // target without canvas tone mapping. Warm that program variant
@@ -1918,6 +1939,7 @@ export class GreyboxLevelRuntime {
               disposeCompileInstances(opaqueSubset);
               opaqueSubset.clear();
             }
+            await this.yieldPreparation?.();
             if (!isCurrent()) return;
             // Camera fades change the existing eyes' opaque/transparent shader
             // variant. Retain both on their live material before gameplay starts.
@@ -1936,6 +1958,7 @@ export class GreyboxLevelRuntime {
           const compileDurationMs =
             this.hostWindow.performance.now() - compileStarted;
           const programsAfterCompile = renderer.info.programs?.length ?? 0;
+          await this.yieldPreparation?.();
           if (!isCurrent()) return;
           const target = LIGHTING_PREWARM_CAMERA_TARGETS[roomId];
           prewarmCamera.position.set(target[0], target[1] + 1.2, target[2] - 5);
@@ -1945,6 +1968,8 @@ export class GreyboxLevelRuntime {
           // Room 1 also needs a hidden draw now: compileAsync does not create
           // the spotlight map or compile its caster depth programs.
           withIsolatedPrewarmState(renderer, () => renderer.render(this.renderLayer.scene, prewarmCamera));
+          await this.yieldPreparation?.();
+          if (!isCurrent()) return;
           // Compilation only prepares one representative of each material.
           // Upload every live geometry/instance buffer and bind its actual VAO
           // now, including resources hidden until an interaction occurs.
@@ -1959,42 +1984,52 @@ export class GreyboxLevelRuntime {
             const views = roomId === 3
               ? [[16, 16, 63], [9, 28, 76.5]]
               : [[9, 31, 85.5], [9, 40, 85.5]];
-            withIsolatedPrewarmState(renderer, () => {
-              renderer.compile(this.preparationLightState, prewarmCamera, this.renderLayer.scene);
-              for (const [x, y, z] of views) {
-                for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-                  prewarmCamera.position.set(x + dx * 5, y + 1.6, z + dz * 5);
-                  prewarmCamera.lookAt(x, y, z);
-                  prewarmCamera.updateMatrixWorld();
-                  renderer.render(this.renderLayer.scene, prewarmCamera);
-                }
+            // Each upload view is a separate job. Keeping the whole view loop
+            // inside one callback starves the opening for up to ten GPU draws.
+            await this.yieldPreparation?.();
+            if (!isCurrent()) return;
+            withIsolatedPrewarmState(renderer, () => renderer.compile(this.preparationLightState, prewarmCamera, this.renderLayer.scene));
+            for (const [x, y, z] of views) {
+              for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                await this.yieldPreparation?.();
+                if (!isCurrent()) return;
+                prewarmCamera.position.set(x + dx * 5, y + 1.6, z + dz * 5);
+                prewarmCamera.lookAt(x, y, z);
+                prewarmCamera.updateMatrixWorld();
+                withIsolatedPrewarmState(renderer, () => renderer.render(this.renderLayer.scene, prewarmCamera));
               }
-              if (roomId === 3) {
-                // The final wall's surface camera drops below Bob and tilts
-                // upward during attachment. Ground-orbit views miss the lift
-                // geometry exposed by that turn. Bind its real VAOs now while
-                // keeping the fully occluded upper laboratory out of the draw.
-                for (const [eye, target] of [
-                  [[7.4, 27.93, 70.35], [7.4, 26.3, 75.3]],
-                  [[7.4, 25.72, 73.81], [7.4, 26.75, 76.17]],
-                ]) {
-                  prewarmCamera.position.set(eye[0], eye[1], eye[2]);
-                  prewarmCamera.lookAt(target[0], target[1], target[2]);
-                  prewarmCamera.updateMatrixWorld();
+            }
+            if (roomId === 3) {
+              // Preserve the measured sticky-wall/lift camera coverage; only
+              // scheduling changes, not which resources get their first draw.
+              for (const [eye, target] of [
+                [[7.4, 27.93, 70.35], [7.4, 26.3, 75.3]],
+                [[7.4, 25.72, 73.81], [7.4, 26.75, 76.17]],
+              ]) {
+                await this.yieldPreparation?.();
+                if (!isCurrent()) return;
+                prewarmCamera.position.set(eye[0], eye[1], eye[2]);
+                prewarmCamera.lookAt(target[0], target[1], target[2]);
+                prewarmCamera.updateMatrixWorld();
+                withIsolatedPrewarmState(renderer, () =>
                   resources.testScene.withEnclosedRoomOcclusion(
                     {x: target[0], y: target[1], z: target[2]}, prewarmCamera.position,
                     () => renderer.render(this.renderLayer.scene, prewarmCamera),
-                  );
-                  withIsolatedPrewarmState(renderer, () =>
-                    resources.testScene.withEnclosedRoomOcclusion(
-                      {x: target[0], y: target[1], z: target[2]}, prewarmCamera.position,
-                      () => renderer.render(this.renderLayer.scene, prewarmCamera),
-                    ), transmissionPrewarmTarget,
-                  );
-                }
+                  ),
+                );
+                await this.yieldPreparation?.();
+                if (!isCurrent()) return;
+                withIsolatedPrewarmState(renderer, () =>
+                  resources.testScene.withEnclosedRoomOcclusion(
+                    {x: target[0], y: target[1], z: target[2]}, prewarmCamera.position,
+                    () => renderer.render(this.renderLayer.scene, prewarmCamera),
+                  ), transmissionPrewarmTarget,
+                );
               }
-            });
+            }
           }
+          await this.yieldPreparation?.();
+          if (!isCurrent()) return;
           await prepareCharacterCameraFades(
               [resources.testScene.bob, resources.testScene.goop, resources.testScene.roomFive.goopPresentation],
               () => {
@@ -2033,6 +2068,8 @@ export class GreyboxLevelRuntime {
         roomOneTarget[2] + 2,
       );
       prewarmCamera.updateMatrixWorld();
+      await this.yieldPreparation?.();
+      if (!isCurrent()) return;
       const measuredFirstUseResourcePrimeGeometriesBefore =
         renderer.info.memory.geometries;
       const measuredFirstUseResourcePrimeProgramsBefore =
@@ -2064,6 +2101,8 @@ export class GreyboxLevelRuntime {
           'Measured first-use geometry prewarm created a new shader program.',
         );
       }
+      await this.yieldPreparation?.();
+      if (!isCurrent()) return;
       const burstResourcePrimeGeometriesBefore =
         renderer.info.memory.geometries;
       const burstResourcePrimeProgramsBefore =
@@ -2077,6 +2116,8 @@ export class GreyboxLevelRuntime {
           ));
         },
       );
+      await this.yieldPreparation?.();
+      if (!isCurrent()) return;
       resources.testScene.goop.primeDeathResources(resources.goopSpawnPosition, burstRoot => {
         withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
           renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, prewarmCamera, [burstRoot])));
@@ -2086,7 +2127,9 @@ export class GreyboxLevelRuntime {
       // Three owns transmission targets per camera ID. Prime the live camera's
       // full-size target too; preparing only the clone still leaves gameplay
       // with a first-frame allocation. Copy/restore its pose synchronously.
-      const gameplayViewport = renderer.getViewport(new THREE.Vector4());
+      await this.yieldPreparation?.();
+      if (!isCurrent()) return;
+      const gameplayViewport = this.renderLayer.getGameplayPrewarmViewport(new THREE.Vector4());
       const gameplayTransmissionScale = renderer.transmissionResolutionScale;
       const savedCamera = camera.clone();
       try {

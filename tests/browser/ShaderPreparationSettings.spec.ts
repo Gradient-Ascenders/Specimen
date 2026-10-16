@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from './fixtures.ts';
 import { writeFile } from 'node:fs/promises';
 
@@ -37,6 +38,7 @@ test('Standard prepares the retained transmission target at the first gameplay c
   });
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-flow-panel="title"] [data-action="start"]').click();
+  await finishOpening(page);
   await page.waitForFunction(()=>(window as any).__targetSession.runtime.__firstTargetDraw);
   const sample=await page.evaluate(()=>(window as any).__targetSession.runtime.__firstTargetDraw);
   await info.attach('first-target-draw',{body:JSON.stringify(sample,null,2),contentType:'application/json'});
@@ -57,6 +59,7 @@ test('all levels retain first-use coverage through graphics cycles, fades, switc
   });
   await page.goto('/',{waitUntil:'domcontentloaded'});
   await page.locator('[data-flow-panel="title"] [data-action="start"]').click({timeout:180_000});
+  await finishOpening(page);
   const evidence:unknown[]=[];
   for(const level of [1,2,3]) {
     await expect(page.locator('.game-flow')).toHaveAttribute('data-state','playing',{timeout:180_000});

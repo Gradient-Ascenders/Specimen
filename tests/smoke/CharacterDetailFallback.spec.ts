@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from '@playwright/test';
 
 test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout preparation', async ({ page }) => {
@@ -36,15 +37,18 @@ test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout pr
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
   const title = page.locator('[data-flow-panel="title"]');
   await expect(title.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
-  expect(detailRequests.goop).toBeGreaterThan(0);
+  expect(detailRequests.goop).toBe(0);
   expect(detailRequests.volt).toBe(0);
-  expect(characterAssets.has('goop')).toBe(true);
+  expect(characterAssets.has('goop')).toBe(false);
   await title.locator('[data-action="settings"]').click();
   await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await title.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await assertPlaying();
+  expect(detailRequests.goop).toBeGreaterThan(0);
+  expect(characterAssets.has('goop')).toBe(true);
   for (const level of [2, 3]) {
     const previous = { ...detailRequests };
     await page.keyboard.press('Digit0', { delay: 100 });

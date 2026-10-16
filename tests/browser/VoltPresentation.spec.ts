@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
@@ -63,6 +64,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
   }
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 180_000 });
   // The containment roster remains locked and does not load Volt.
   expect(await page.evaluate(() => performance.getEntriesByType('resource').some(e => /volt-[^/]+\.glb/.test(e.name)))).toBe(false);

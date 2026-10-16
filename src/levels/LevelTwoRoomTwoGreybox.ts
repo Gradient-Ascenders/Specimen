@@ -151,6 +151,16 @@ export class LevelTwoRoomTwoGreybox {
     for (const drop of this.blockDrops) drop.bind(targets);
   }
 
+  get dynamicTransformRoots(): readonly THREE.Object3D[] {
+    return [this.lasers.root, this.laserPresentation.root, this.wallButtonPresentation.pad,
+      ...this.blockDrops.flatMap(drop => drop.dynamicTransformRoots)];
+  }
+
+  get hasPendingWork(): boolean {
+    return this.wallButtonPresentationPressed || this.wallButtonPressProgress > 0 ||
+      this.blockDrops.some(drop => drop.state === 'falling');
+  }
+
   update(
     deltaSeconds: number,
     occupants: readonly LevelTwoRoomTwoOccupant[],

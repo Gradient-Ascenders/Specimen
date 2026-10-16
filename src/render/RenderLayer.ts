@@ -335,6 +335,20 @@ export class RenderLayer {
     this.resize();
   }
 
+  /** Logical viewport for a retained-camera primer while a bounded cinematic
+   * still owns the canvas. Do not resize/clear its visible framebuffer. */
+  getGameplayPrewarmViewport(out: THREE.Vector4): THREE.Vector4 {
+    const size = resolveRenderResolution(this.host.clientWidth, this.host.clientHeight,
+      this.hostWindow.devicePixelRatio, {
+        pixelRatioCap: this.effectivePixelRatioCap, renderScale: this.graphicsSettings.renderScale,
+        pixelBudget: GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile].pixelBudget,
+        maximumWidth: this.maximumWidth, maximumHeight: this.maximumHeight,
+        minimumDrawingBufferDimension: Math.ceil(1 / this.renderer.transmissionResolutionScale),
+      });
+    const ratio = this.renderer.getPixelRatio();
+    return out.set(0, 0, size.drawingBufferWidth / ratio, size.drawingBufferHeight / ratio);
+  }
+
   /** For a future owner that adds nested lights/effects after attaching its root. */
   refreshGraphicsResources(): void {
     this.graphicsResources.refresh();

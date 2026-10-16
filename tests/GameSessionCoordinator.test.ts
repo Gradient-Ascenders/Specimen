@@ -99,6 +99,28 @@ for(const intent of ['resume','pause','restart','unload'] as const) test(`resour
   assert.equal(runtime.calls.includes('restart'),intent==='restart');session.dispose();
 });
 
+test('title settings precede level construction and are prepared by the opening', async () => {
+  const runtime = new MockRuntime('level-1', progression);
+  let preparations = 0;
+  (runtime as GameLevelRuntime).prepareGraphics = async () => {
+    assert.equal(runtime.state, 'stopped'); preparations++;
+  };
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  const applied:string[]=[];
+  session.applyGraphicsSettings('opaque',()=>applied.push('minimum'),'no-transmission');
+  session.applyGraphicsSettings('transmission',()=>applied.push('standard'),'half');
+  await Promise.resolve(); await Promise.resolve();
+  session.applyGraphicsSettings('transmission',()=>applied.push('physical'),'full');
+  await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(applied,['minimum','standard','physical']);
+  assert.equal(runtime.state,'unloaded'); assert.equal(preparations,0);
+  session.load(); await session.prepareInitialGraphics();
+  assert.equal(preparations,1);
+  session.applyGraphicsSettings('transmission',()=>applied.push('same'),'full');
+  await Promise.resolve(); assert.equal(preparations,1);
+  session.dispose();
+});
+
 test('settings cannot mutate materials during normal startup preparation', async () => {
   const runtime=new MockRuntime('level-1',progression); let finish!:()=>void;
   let preparations=0;const applied:string[]=[];

@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from './fixtures.ts';
 import { writeFile } from 'node:fs/promises';
 
@@ -18,6 +19,7 @@ test('active levels prepare direct transmission-scale switches before the resume
   await expect(page.locator('[data-graphics-preparation]')).toBeHidden({timeout:240_000});
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-flow-panel="title"] [data-action="start"]').click();
+  await finishOpening(page);
   for(const level of [1,2,3]) {
     await expect(page.locator('.game-flow')).toHaveAttribute('data-state','playing',{timeout:240_000});
     await page.waitForFunction(()=>(window as any).__transmissionSession.runtime.input.enabled);

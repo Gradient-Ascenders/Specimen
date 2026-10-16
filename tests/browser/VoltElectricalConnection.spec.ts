@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from './fixtures.ts';
 
@@ -32,6 +33,7 @@ test(`Volt connection VFX stay bounded through power, instability, disconnect an
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 180_000 });
   await page.keyboard.press('Minus');
   await page.locator('[data-action="enter-level"]').click();

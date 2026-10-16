@@ -151,7 +151,7 @@ test('final lever hands off to Level 3 once Volt is released and unlocked, witho
   controller.update(1.5, false, false, false, true);
   const pod = new THREE.Group(); pod.position.set(0, 2.65, 64);
   const resources = {
-    authoredPreview: { roomFive: { controller, pod }, roomFour: { controller: { readModel: { state: 'complete' } } } },
+    authoredPreview: { workload: { simulated: new Set([5]) }, roomFive: { controller, pod }, roomFour: { controller: { readModel: { state: 'complete' } } } },
     deathSequence: { isPlaying: true },
     manager: {
       isAvailable: () => unlocked,

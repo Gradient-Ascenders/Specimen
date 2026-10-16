@@ -57,6 +57,8 @@ export class TrailerEggFracture {
     readonly centre: THREE.Vector3;
     readonly radius: number;
     readonly initialRadius: number;
+    /** Borrow a specific shell silhouette, without taking ownership of it. */
+    readonly surface?: THREE.BufferGeometry;
   }) {
     this.root.name = 'trailer-fractured-egg';
     this.crackMaterial = resources.materials.crack.clone();
@@ -67,7 +69,7 @@ export class TrailerEggFracture {
     this.finalClearanceRadius = clearance.radius;
     // A geodesic mesh gives irregular angled breaks rather than the obvious
     // horizontal/vertical staircase produced by latitude/longitude rings.
-    const sphere = new THREE.IcosahedronGeometry(0.5, 18);
+    const sphere = clearance.surface?.clone() ?? new THREE.IcosahedronGeometry(0.5, 18);
     const positions = sphere.getAttribute('position');
     const normals = sphere.getAttribute('normal');
     const uvs = sphere.getAttribute('uv');
@@ -233,9 +235,14 @@ export class TrailerEggFracture {
     this.apply('intact', 0);
   }
 
-  apply(state: RoomOneEggState, opening: number): void {
+  apply(state: RoomOneEggState, opening: number, crackProgress?: number): void {
     if (this.disposed) return;
     const stage = state === 'intact' ? 0 : state === 'crack-stage-1' ? 1 : state === 'crack-stage-2' ? 2 : 3;
+    // Optional continuous reveal preserves the standalone trailer's staged API.
+    // Whole six-vertex ribbon segments grow from existing shared shell seams;
+    // there are no geometry uploads or new materials during the crack buildup.
+    const amount = THREE.MathUtils.clamp(crackProgress ?? stage / 3, 0, 1) * 3;
+    const completed = Math.min(2, Math.floor(amount)), fraction = amount - completed;
     this.fragments.forEach((fragment, index) => {
       // Front lip yields first; the upper and side pieces follow it apart.
       const delay = index === 2 ? 0 : index < 2 ? 0.045 : 0.12;
@@ -256,8 +263,10 @@ export class TrailerEggFracture {
         this.keepClearAndAboveFloor(fragment, THREE.MathUtils.lerp(this.initialClearanceRadius,
           this.finalClearanceRadius, rollEase));
       }
-      fragment.cracks.geometry.setDrawRange(0, fragment.crackCounts[stage]);
-      fragment.cracks.visible = stage > 0;
+      const from = fragment.crackCounts[completed], to = fragment.crackCounts[completed + 1];
+      const count = from + Math.floor((to - from) * fraction / 6) * 6;
+      fragment.cracks.geometry.setDrawRange(0, count);
+      fragment.cracks.visible = count > 0;
     });
   }
 

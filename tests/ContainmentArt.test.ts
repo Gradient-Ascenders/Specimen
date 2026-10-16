@@ -739,7 +739,7 @@ test('Room 1 hero states are deterministic and independent from gameplay collisi
   scene.dispose();
 });
 
-test('Room 1 signs are upright and specimen controls do not intersect stacked housings', () => {
+test('Room 1 signs are upright and the round specimen pod has clean separated seats', () => {
   const scene = new ContainmentLevelScene(() => {});
   const resources = scene.artResources;
   for (const label of [
@@ -787,42 +787,27 @@ test('Room 1 signs are upright and specimen controls do not intersect stacked ho
 
   const art = scene.teaching.roomOneArt.root;
   const lowerBase = art.getObjectByName('room-1-containment-lower-instrumentation-base');
-  const pedestalGasket = art.getObjectByName('room-1-pedestal-upper-gasket-frame');
+  const pedestalGasket = art.getObjectByName('room-1-pod-lower-gasket');
   const pedestalCollider = scene.collisionMeshes.find(
     (collider) => collider.name === 'room-1-containment-pedestal',
   );
-  const pressureGauge = art.getObjectByName('room-1-containment-pressure-gauge');
-  assert.ok(lowerBase);
-  assert.ok(pedestalGasket instanceof THREE.InstancedMesh);
+  assert.ok(lowerBase instanceof THREE.Mesh);
+  assert.ok(pedestalGasket instanceof THREE.Mesh);
   assert.ok(pedestalCollider);
-  assert.ok(pressureGauge);
+  assert.equal(pedestalCollider.material.visible, false, 'The old square collision box must not render through the round shell.');
+  assert.equal(lowerBase.geometry, resources.geometries.unitCylinder);
+  assert.equal(art.getObjectByName('room-1-containment-pressure-gauge'), undefined);
   assert.equal(art.getObjectByName('room-1-pedestal-top-gasket'), undefined);
-  assert.equal(
-    new THREE.Box3().setFromObject(pedestalGasket).intersectsBox(
-      new THREE.Box3().setFromObject(pedestalCollider),
-    ),
-    false,
-  );
+  assert.ok(Math.abs(new THREE.Box3().setFromObject(pedestalGasket).max.y -
+    new THREE.Box3().setFromObject(pedestalCollider).max.y) < 1e-6,
+  'The physical support must match the new seal height so Bob cannot sink into it.');
   const lowerBaseBounds = new THREE.Box3().setFromObject(lowerBase);
-  const gasketInstanceMatrix = new THREE.Matrix4();
-  const gasketInstanceBounds = new THREE.Box3();
-  const sharedUnitBounds = new THREE.Box3(
-    new THREE.Vector3(-0.5, -0.5, -0.5),
-    new THREE.Vector3(0.5, 0.5, 0.5),
-  );
-  pedestalGasket.updateWorldMatrix(true, false);
-  for (let index = 0; index < pedestalGasket.count; index += 1) {
-    pedestalGasket.getMatrixAt(index, gasketInstanceMatrix);
-    gasketInstanceMatrix.premultiply(pedestalGasket.matrixWorld);
-    gasketInstanceBounds.copy(sharedUnitBounds).applyMatrix4(gasketInstanceMatrix);
-    assert.equal(gasketInstanceBounds.intersectsBox(lowerBaseBounds), false);
-  }
-  assert.equal(
-    new THREE.Box3().setFromObject(pressureGauge).intersectsBox(
-      new THREE.Box3().setFromObject(lowerBase),
-    ),
-    false,
-  );
+  const gasketBounds = new THREE.Box3().setFromObject(pedestalGasket);
+  assert.ok(gasketBounds.min.y >= lowerBaseBounds.max.y - 0.006, 'Only the thin seating lip may overlap the deck.');
+  assert.ok(gasketBounds.max.y > lowerBaseBounds.max.y + 0.07, 'The exposed seal face must sit clearly above the deck.');
+  const label = art.getObjectByName('room-1-pod-specimen-label');
+  assert.ok(label instanceof THREE.Mesh);
+  assert.deepEqual(label.material.map.userData.labelLines, ['SPECIMEN: BOB', 'DANGER THREAT: UNKNOWN']);
   scene.dispose();
 });
 
@@ -913,7 +898,7 @@ test('Level 1 consolidates only room-local static art batches', () => {
     assert.ok(diagnostics.sourceMeshCount > diagnostics.batchCount);
   }
   assert.ok(
-    scene.teaching.roomOneArt.containmentBoxRoot.getObjectByName(
+    scene.teaching.roomOneArt.pedestalDressing.getObjectByName(
       'room-1-containment-lower-instrumentation-base',
     ),
   );
