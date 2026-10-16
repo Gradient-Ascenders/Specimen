@@ -16,6 +16,8 @@ export interface PerformanceRenderSnapshot {
   effectsDensity: number;
   antialias: boolean;
   lightingPolicy: string;
+  graphicsPreset: string;
+  requestedPixelRatioCap: number;
   drawCalls: number;
   triangles: number;
   programs: number;

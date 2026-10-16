@@ -78,6 +78,7 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   const priorRaf = globalThis.requestAnimationFrame;
   globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
   const renderer = {
+    getPixelRatio: () => 1,
     extensions: {has: () => mode !== 'lift'},
     shadowMap: { enabled: false, autoUpdate: true, needsUpdate: false, type: THREE.BasicShadowMap as THREE.ShadowMapType },
     getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},

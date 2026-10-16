@@ -41,6 +41,14 @@ overrides in one notification, without changing sound, camera or input settings.
 Full physical refraction remains available as a custom gel choice. None of these
 options can bypass the drawing-buffer budget.
 
+Main's independent Normal/Performance preset is retained as **Additional
+performance cap**: Off (`normal`) leaves the selected profile/custom settings
+alone; On (`performance`) further caps density at 1× and refraction capture scale
+at 0.5. It does not overwrite the saved density or gel mode, and an explicit
+0.75× density still works in either state. Its refraction cap composes with gel
+quality using the smaller scale. Selecting a whole profile resets this override
+alongside scale, density and gel; the application still starts in Minimum.
+
 The settings diagnostics show actual buffer dimensions, display/effective DPR,
 requested scale, profile/custom base, pixel budget, gel, shadow cap, effects and
 lighting/MSAA policy. They update on host resize, settings and display-DPR changes.
@@ -88,11 +96,12 @@ removed. Geometry/position pools and simulation remain unchanged; draw ranges
 reduce decorative GPU vertices/overdraw, not their CPU update loops. Standard
 restores the authored range; policy teardown does not dispose borrowed geometry.
 
-Loading primers also account for effective density and transmission scale. A
-one-logical-pixel primer can otherwise become a zero-sized refraction target at
-sub-native/half-capture settings. The primer stays tiny and offscreen while
-retaining at least one physical transmission texel, and restores target, viewport,
-scissor and counters synchronously.
+Loading primers account for effective density. A one-logical-pixel primer can
+otherwise become a zero-sized refraction target at sub-native/half-capture
+settings. Main's primer policy is preserved: temporarily use transmission scale
+1 and a viewport spanning at least one physical pixel, then synchronously restore
+the transmission scale, target, viewport, scissor and counters. The draw stays
+tiny and offscreen, without changing subsequent gameplay quality.
 
 ## Reproduce and review
 
@@ -164,11 +173,12 @@ and no GL errors. All 59 sampled live shadow targets were disposed exactly once
 by final unload. This is sampled ownership evidence, not a maximum GPU-memory
 measurement or complete puzzle/combat playthrough.
 
-The raw hashes identify the browser-tested candidate. The only subsequent
-runtime change immediately releases stale catalog references on root changes;
-its regression test and the final repository checks passed, but native browser
-and GPU tests were not rerun for that cleanup. Do not describe these captures as
-measurements of the final rebuilt bundle.
+The raw hashes identify the original browser-tested candidate. Subsequent work
+released stale catalog references on root changes and merged main `e53d27d` (PR
+#201), including its independent Performance cap and safe primer-scale policy.
+Those integrations have repository regression coverage; native browser/GPU tests
+were not rerun after the user stopped computer testing. Do not describe these
+captures as measurements of the merged or final rebuilt bundle.
 
 Final repository validation:
 
@@ -188,3 +198,22 @@ The authored Level 2 journey still uses production `?debug=1`; #197 owns content
 parity. #198's exact assessment GPU/browser and numeric budgets, plus Kevin's
 independent normal-play visual/implementation review, remain outstanding. Issue
 #190 is not ready for final hardware sign-off or automatic closure.
+
+## Main integration
+
+The conflict resolution merges main `e53d27d` (PR #201). Its pause/movement and
+Volt runtime changes remain unchanged. The independent Performance cap now
+composes with the bounded profiles; diagnostics record both the saved density
+choice and effective cap. A new renderer-policy integration test covers physical
+and Balanced gel, cap toggles, 0.75× density and the unchanged absolute budget.
+
+Main's safe primer-scale override is kept and checked alongside the sub-native
+physical-texel regression. The legacy graphics browser test now explicitly selects
+Standard/full refraction before comparing Normal/Performance, because the app
+defaults to Minimum. Playwright discovery lists all four cases in the two graphics
+files, but no browser/GPU execution was performed for this merge. Existing raw
+captures remain evidence for their original recorded build, not this integration.
+
+Merge verification: all 141 unit test-file groups passed with bounded concurrency,
+along with type-checking, the production build and production asset validation
+(83 files). The six focused graphics/settings/primer groups also passed.

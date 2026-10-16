@@ -377,6 +377,7 @@ export class GameFlowUI {
   private readonly cameraDistanceInput: HTMLInputElement;
   private readonly cameraDistanceOutput: HTMLOutputElement;
   private readonly renderResolutionInput: HTMLSelectElement;
+  private readonly graphicsPresetInput: HTMLSelectElement;
   private readonly gelRenderingInput: HTMLSelectElement;
   private readonly graphicsProfileInput: HTMLSelectElement;
   private readonly renderScaleInput: HTMLSelectElement;
@@ -438,6 +439,9 @@ export class GameFlowUI {
     this.graphicsDiagnostics = this.requireElement('[data-graphics-diagnostics]');
     this.renderResolutionInput = this.requireElement<HTMLSelectElement>(
       '[data-setting="render-resolution"]',
+    );
+    this.graphicsPresetInput = this.requireElement<HTMLSelectElement>(
+      '[data-setting="graphics-preset"]',
     );
     this.slimeRoster = this.requireElement('[data-slime-roster]');
     this.passiveStatus = this.requireElement('[data-passive-status]');
@@ -701,9 +705,20 @@ export class GameFlowUI {
           </div>
           <div class="setting-row">
             <div class="setting-heading">
+              <label for="graphics-preset">Additional performance cap</label>
+            </div>
+            <select id="graphics-preset" data-setting="graphics-preset">
+              <option value="normal">Off — profile settings</option>
+              <option value="performance">On — cap density and refraction</option>
+            </select>
+            <p class="setting-note">Optional extra limit: caps density at 1× before render scaling and refraction at half resolution. Keeps your selected density/gel choices for when it is switched off. The profile's pixel budget always applies.</p>
+          </div>
+          <div class="setting-row">
+            <div class="setting-heading">
               <label for="render-resolution">Render resolution</label>
             </div>
             <select id="render-resolution" data-setting="render-resolution">
+              <option value="0.75">Display density cap — 0.75×</option>
               <option value="1">Display density cap — 1.0×</option>
               <option value="1.5">Display density cap — 1.5×</option>
               <option value="2">Display density cap — 2.0×</option>
@@ -831,6 +846,7 @@ export class GameFlowUI {
       this.onRenderResolutionChange,
       { signal },
     );
+    this.graphicsPresetInput.addEventListener('change', this.onGraphicsPresetChange, { signal });
     this.hostWindow.addEventListener('keydown', this.onKeyDown, { signal });
     this.hostWindow.addEventListener('blur', this.onWindowBlur, { signal });
     this.hostWindow.addEventListener('resize', this.syncGraphicsDiagnostics, { signal });
@@ -1035,6 +1051,11 @@ export class GameFlowUI {
     }
   };
 
+  private readonly onGraphicsPresetChange = (): void => {
+    const value = this.graphicsPresetInput.value;
+    if (value === 'normal' || value === 'performance') this.settings.setGraphicsPreset(value);
+  };
+
   private readonly onSettingsChanged = (
     settings: Readonly<GameSettingsSnapshot>,
   ): void => {
@@ -1066,7 +1087,12 @@ export class GameFlowUI {
     );
     this.cameraDistanceOutput.value =
       `${settings.cameraDistanceMetres.toFixed(1)} m`;
-    this.renderResolutionInput.value = String(settings.renderPixelRatioCap);
+    const performance = settings.graphicsPreset === 'performance';
+    this.graphicsPresetInput.value = settings.graphicsPreset;
+    this.renderResolutionInput.value = String(performance ? Math.min(1, settings.renderPixelRatioCap) : settings.renderPixelRatioCap);
+    for (const option of this.renderResolutionInput.options) {
+      option.disabled = performance && Number(option.value) > 1;
+    }
     this.gelRenderingInput.value = settings.gelRenderingMode;
     this.graphicsProfileInput.value = graphicsProfileName(settings);
     this.renderScaleInput.value = String(settings.renderScale);
@@ -1083,6 +1109,7 @@ export class GameFlowUI {
       `≤ ${(profile.pixelBudget / 1_000_000).toFixed(2)} million pixels`,
       diagnostics ? `display DPR ${diagnostics.devicePixelRatio.toFixed(2)}, effective ${diagnostics.pixelRatio.toFixed(2)}×` : '',
       `${Math.round(settings.renderScale * 100)}% scale`,
+      `extra performance cap: ${settings.graphicsPreset === 'performance' ? 'on' : 'off'}`,
       `gel: ${settings.gelRenderingMode}`,
       `shadows ≤ ${profile.shadowMapSizeCap}px/face`,
       `decorative particles ${profile.effectsDensity * 100}%`,

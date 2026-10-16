@@ -3,6 +3,7 @@ import { GelRendering, type GelRenderingMode } from './slime/GelRendering.ts';
 
 import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
 import { CameraRig } from './CameraRig.ts';
+import { resolveGraphicsQuality } from './GraphicsQuality.ts';
 import { GAMEPLAY_UI_LAYER, withGameplayUiVisibility } from './GameplayUiLayer.ts';
 import { DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_LIGHTING_POLICY, GRAPHICS_PROFILES, graphicsProfileName,
   type GraphicsSettings } from './GraphicsProfiles.ts';
@@ -107,6 +108,8 @@ export interface GraphicsDiagnostics {
   readonly drawingBufferHeight: number;
   readonly pixelRatio: number;
   readonly pixelRatioCap: RenderPixelRatioCap;
+  readonly requestedPixelRatioCap: RenderPixelRatioCap;
+  readonly graphicsPreset: string;
   readonly devicePixelRatio: number;
   readonly renderScale: RenderScale;
   readonly graphicsProfile: string;
@@ -159,6 +162,7 @@ export class RenderLayer {
   private readonly resizeObserver: ResizeObserver | undefined;
 
   private graphicsSettings: GraphicsSettings;
+  private effectivePixelRatioCap: RenderPixelRatioCap = 1;
   private readonly maximumWidth: number;
   private readonly maximumHeight: number;
   private readonly antialias: boolean;
@@ -263,6 +267,9 @@ export class RenderLayer {
     if (this.disposed) return;
     this.graphicsSettings = { ...settings };
     const profile = GRAPHICS_PROFILES[settings.graphicsProfile];
+    const quality = resolveGraphicsQuality(settings.graphicsPreset, settings.renderPixelRatioCap);
+    this.effectivePixelRatioCap = quality.pixelRatioCap;
+    this.gelRendering.setTransmissionResolutionScaleCap(quality.transmissionResolutionScale);
     this.gelRendering.setMode(settings.gelRenderingMode);
     this.graphicsResources.setQuality(profile.shadowMapSizeCap, profile.effectsDensity);
     this.resize();
@@ -285,7 +292,8 @@ export class RenderLayer {
     return {
       viewportWidth: this.viewportWidth, viewportHeight: this.viewportHeight,
       drawingBufferWidth: this.drawingBufferSize.x, drawingBufferHeight: this.drawingBufferSize.y,
-      pixelRatio: this.renderer.getPixelRatio(), pixelRatioCap: settings.renderPixelRatioCap,
+      pixelRatio: this.renderer.getPixelRatio(), pixelRatioCap: this.effectivePixelRatioCap,
+      requestedPixelRatioCap: settings.renderPixelRatioCap, graphicsPreset: settings.graphicsPreset,
       devicePixelRatio: this.hostWindow.devicePixelRatio, renderScale: settings.renderScale,
       graphicsProfile: graphicsProfileName(settings, this.gelRendering.value), graphicsProfileBase: settings.graphicsProfile,
       pixelBudget: profile.pixelBudget, shadowMapSizeCap: profile.shadowMapSizeCap,
@@ -337,7 +345,9 @@ export class RenderLayer {
     target.drawingBufferWidth = drawingBufferSize.x;
     target.drawingBufferHeight = drawingBufferSize.y;
     target.effectiveDpr = this.renderer.getPixelRatio();
-    target.resolutionTier = this.graphicsSettings.renderPixelRatioCap;
+    target.resolutionTier = this.effectivePixelRatioCap;
+    target.requestedPixelRatioCap = this.graphicsSettings.renderPixelRatioCap;
+    target.graphicsPreset = this.graphicsSettings.graphicsPreset;
     target.graphicsProfile = graphicsProfileName(this.graphicsSettings, this.gelRendering.value);
     target.graphicsProfileBase = this.graphicsSettings.graphicsProfile;
     target.devicePixelRatio = this.hostWindow.devicePixelRatio;
@@ -377,7 +387,7 @@ export class RenderLayer {
 
     const size = resolveRenderResolution(this.host.clientWidth, this.host.clientHeight,
       this.hostWindow.devicePixelRatio, {
-        pixelRatioCap: this.graphicsSettings.renderPixelRatioCap,
+        pixelRatioCap: this.effectivePixelRatioCap,
         renderScale: this.graphicsSettings.renderScale,
         pixelBudget: GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile].pixelBudget,
         maximumWidth: this.maximumWidth, maximumHeight: this.maximumHeight,

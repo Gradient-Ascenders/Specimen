@@ -9,6 +9,7 @@ import {
   type RenderPixelRatioCap,
   type RenderScale,
 } from '../render/RenderResolution.ts';
+import type { GraphicsPreset } from '../render/GraphicsQuality.ts';
 
 export interface GameSettingsSnapshot extends GraphicsSettings {
   readonly mouseSensitivity: number;
@@ -86,6 +87,10 @@ export class GameSettings {
     this.update({ renderPixelRatioCap: value });
   }
 
+  setGraphicsPreset(value: GraphicsPreset): void {
+    this.update({ graphicsPreset: value });
+  }
+
   subscribe(listener: GameSettingsListener): () => void {
     this.listeners.add(listener);
     listener(this.current);
@@ -103,7 +108,8 @@ export class GameSettings {
       next.masterVolume === this.current.masterVolume &&
       next.soundEffectsVolume === this.current.soundEffectsVolume &&
       next.cameraDistanceMetres === this.current.cameraDistanceMetres &&
-      next.renderPixelRatioCap === this.current.renderPixelRatioCap
+      next.renderPixelRatioCap === this.current.renderPixelRatioCap &&
+      next.graphicsPreset === this.current.graphicsPreset
     ) {
       return;
     }

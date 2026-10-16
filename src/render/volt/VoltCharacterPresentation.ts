@@ -313,7 +313,9 @@ export class VoltCharacterPresentation {
       0, -shear, spread, -shear * this.radiusMetres,
       0, 0, 0, 1);
     this.shape.matrixWorldNeedsUpdate = true;
-    this.headroom.present(this.placement.position, this.shape.matrix, this.weights);
+    // Locked Volt still advances animation, but has no visible surface or shadows.
+    // Query the current ceiling again on the first visible pose after unlocking.
+    if (this.requestedVisible) this.headroom.present(this.placement.position, this.shape.matrix, this.weights);
     this.presentedBaseOffsetWorld.lerpVectors(this.previousBaseOffsetWorld, this.baseOffsetWorld, blend);
     this.materials?.setMotion(this.presentedBaseOffsetWorld, this.character.rotation.y,
       THREE.MathUtils.lerp(this.previousCrestLag, this.crestLag, blend), this.rippleStrength,

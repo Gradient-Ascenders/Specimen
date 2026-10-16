@@ -2,6 +2,8 @@
 
 Follow-up work for #189 is documented in [Cultivation render-scope light budgets](cultivation-light-budget.md), including bounded arrays, matched local Radeon captures and outstanding assessment-hardware/independent-review requirements. The measurements below remain historical.
 
+For the opt-in graphics presets and latest-main Intel UHD 620 gameplay measurements, see [the beta smoothness report](beta-gameplay-smoothness.md). The historical measurements below use their original build and graphics settings.
+
 **Latest retained state:** see [Level 2 startup regression resolution](level2-startup-regression.md). The Level 2 early-zero opt-in from the later investigation is reverted; Level 1 startup and Level 3 shader improvements remain. Level 2 gameplay rows in this older report were subsequently found to contain stationary body positions and must not be used as interactive gameplay evidence. The current report uses newly validated moving recordings and reports the loading/GPU trade-off explicitly.
 
 The subsequent Level 2 investigation, retained zero-radiance change, new hardware captures and architectural review boundary are documented in [Level 2 performance investigation](level2-performance-investigation.md). The tables below preserve the earlier reviewed delivery. Subsequent raw position/state checks exposed death-contaminated and stationary room captures in that earlier protocol; those FPS tables must not be treated as verified continuous gameplay. Frozen shader/pixel comparisons remain valid. See the linked report for corrected capture validation and new evidence.

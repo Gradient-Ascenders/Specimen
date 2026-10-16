@@ -255,6 +255,7 @@ const FRAME_COLUMNS = [
   'graphicsProfile', 'graphicsProfileBase', 'devicePixelRatio', 'renderScale',
   'pixelBudget', 'gelRenderingMode', 'transmissionResolutionScale', 'shadowMapSizeCap', 'effectsDensity',
   'antialias', 'lightingPolicy',
+  'graphicsPreset', 'requestedPixelRatioCap',
 ] as const;
 
 const FRAME_TIME_HISTOGRAM_UPPER_BOUNDS_MS = [
@@ -272,6 +273,7 @@ const createRenderSnapshot = (): PerformanceRenderSnapshot => ({
   renderScale: 1, pixelBudget: 0, gelRenderingMode: 'unavailable', transmissionResolutionScale: 1,
   shadowMapSizeCap: 0, effectsDensity: 1,
   antialias: false, lightingPolicy: 'unavailable',
+  graphicsPreset: 'normal', requestedPixelRatioCap: 1,
   drawCalls: 0,
   triangles: 0,
   programs: 0,
@@ -1285,6 +1287,7 @@ const frameToRow = (frame: RecordedFrame): readonly unknown[] => [
   frame.render.renderScale, frame.render.pixelBudget, frame.render.gelRenderingMode,
   frame.render.transmissionResolutionScale, frame.render.shadowMapSizeCap, frame.render.effectsDensity,
   frame.render.antialias, frame.render.lightingPolicy,
+  frame.render.graphicsPreset, frame.render.requestedPixelRatioCap,
 ];
 
 const pushBounded = <Value>(

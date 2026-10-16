@@ -144,6 +144,19 @@ test('profiles bound high-DPI/resize work, retain native HUD and survive all lev
     await expect(page.locator('[data-graphics-diagnostics]')).toContainText(`display DPR ${deviceScaleFactor.toFixed(2)}`);
   }
   await cdp.send('Emulation.clearDeviceMetricsOverride'); await cdp.detach();
+  await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
+  await page.locator('[data-setting="gel-rendering"]').selectOption('physical');
+  await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
+  const capped = await draw(page); assertBudget(capped);
+  expect(capped.diagnostics.graphicsPreset).toBe('performance');
+  expect(capped.diagnostics.pixelRatioCap).toBe(1);
+  expect(capped.diagnostics.requestedPixelRatioCap).toBe(1.5);
+  expect(capped.diagnostics.transmissionResolutionScale).toBe(.5);
+  await page.locator('[data-setting="graphics-preset"]').selectOption('normal');
+  const restored = await draw(page); assertBudget(restored);
+  expect(restored.diagnostics.requestedPixelRatioCap).toBe(1.5);
+  expect(restored.diagnostics.transmissionResolutionScale).toBe(1);
+  await page.locator('[data-setting="graphics-profile"]').selectOption('minimum');
   await page.locator('[data-setting="render-resolution"]').selectOption('2');
   await page.locator('[data-setting="render-scale"]').selectOption('0.5');
   const custom = await draw(page); assertBudget(custom);

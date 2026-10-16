@@ -183,6 +183,7 @@ test('settings retain session values across flow transitions', () => {
     gelRenderingMode: 'minimum',
     graphicsProfile: 'minimum',
     renderScale: 0.75,
+    graphicsPreset: 'normal',
   });
   assert.deepEqual(snapshots.slice(0, 2), [1, 1.7]);
 

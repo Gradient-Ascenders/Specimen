@@ -5,6 +5,8 @@ import { DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_PROFILES, graphicsProfileName } fro
 import { GraphicsResourcePolicy, markDecorativeEffect } from '../src/render/GraphicsResourcePolicy.ts';
 import { GameSettings } from '../src/ui/GameSettings.ts';
 import { RenderLayer } from '../src/render/RenderLayer.ts';
+import { GelRendering } from '../src/render/slime/GelRendering.ts';
+import { resolveRenderResolution } from '../src/render/RenderResolution.ts';
 
 test('minimum is the conservative session default; presets notify once and preserve non-graphics settings', () => {
   const settings = new GameSettings();
@@ -26,6 +28,38 @@ test('minimum is the conservative session default; presets notify once and prese
   settings.setGraphicsProfile('minimum');
   assert.equal(graphicsProfileName(settings.value), 'minimum');
   assert.equal(graphicsProfileName(settings.value, 'physical'), 'custom');
+});
+
+test('the extra Performance cap composes with profiles without losing gel or density choices', () => {
+  const settings = new GameSettings(), renderer = { transmissionResolutionScale: 1 };
+  const layer = Object.create(RenderLayer.prototype) as any;
+  layer.gelRendering = new GelRendering(renderer);
+  const qualities: number[][] = [];
+  layer.graphicsResources = { setQuality: (shadow: number, effects: number) => qualities.push([shadow, effects]) };
+  layer.resize = () => {
+    const profile = GRAPHICS_PROFILES[layer.graphicsSettings.graphicsProfile as 'minimum' | 'standard'];
+    const size = resolveRenderResolution(3840, 2160, 2, { pixelRatioCap: layer.effectivePixelRatioCap,
+      renderScale: layer.graphicsSettings.renderScale, pixelBudget: profile.pixelBudget });
+    assert.ok(size.drawingBufferWidth * size.drawingBufferHeight <= profile.pixelBudget);
+  };
+  settings.setGraphicsProfile('standard'); settings.setGelRenderingMode('physical');
+  settings.setGraphicsPreset('performance'); layer.setGraphicsSettings(settings.value);
+  assert.equal(layer.effectivePixelRatioCap, 1);
+  assert.equal(settings.value.renderPixelRatioCap, 1.5);
+  assert.equal(layer.gelRendering.value, 'physical'); assert.equal(renderer.transmissionResolutionScale, .5);
+  assert.equal(graphicsProfileName(settings.value), 'custom');
+  settings.setGraphicsPreset('normal'); layer.setGraphicsSettings(settings.value);
+  assert.equal(layer.effectivePixelRatioCap, 1.5); assert.equal(renderer.transmissionResolutionScale, 1);
+  settings.setGelRenderingMode('reduced-transmission'); layer.setGraphicsSettings(settings.value);
+  assert.equal(renderer.transmissionResolutionScale, .5);
+  for (const preset of ['performance', 'normal'] as const) {
+    settings.setGraphicsPreset(preset); settings.setRenderPixelRatioCap(.75); layer.setGraphicsSettings(settings.value);
+    assert.equal(layer.effectivePixelRatioCap, .75); assert.equal(renderer.transmissionResolutionScale, .5);
+  }
+  settings.setGraphicsProfile('minimum'); layer.setGraphicsSettings(settings.value);
+  assert.equal(layer.gelRendering.value, 'minimum'); assert.equal(settings.value.graphicsPreset, 'normal');
+  assert.equal(graphicsProfileName(settings.value), 'minimum');
+  assert.deepEqual(qualities.at(-1), [512, .5]);
 });
 
 test('map caps restore authored resolution and dispose only replaced targets once', () => {
@@ -107,6 +141,7 @@ test('detaching a room drops strong catalog references without requiring another
 test('cheap frame snapshots record profile/quality and actual drawing buffer without scene traversal', () => {
   const layer = Object.create(RenderLayer.prototype) as any;
   layer.graphicsSettings = { ...GRAPHICS_PROFILES.minimum.settings };
+  layer.effectivePixelRatioCap = 1;
   layer.viewportWidth = 1920; layer.viewportHeight = 1080; layer.hostWindow = { devicePixelRatio: 2 };
   layer.antialias = false; layer.gelRendering = { value: 'minimum' };
   layer.renderer = { getDrawingBufferSize: (v: THREE.Vector2) => v.set(1280, 720), getPixelRatio: () => 2 / 3,
@@ -114,6 +149,7 @@ test('cheap frame snapshots record profile/quality and actual drawing buffer wit
   const snapshot = {} as any;
   layer.writePerformanceSnapshot(snapshot, new THREE.Vector2());
   assert.equal(snapshot.graphicsProfile, 'minimum'); assert.equal(snapshot.graphicsProfileBase, 'minimum');
+  assert.equal(snapshot.graphicsPreset, 'normal'); assert.equal(snapshot.requestedPixelRatioCap, 1);
   assert.equal(snapshot.pixelBudget, 921600); assert.equal(snapshot.renderScale, .75);
   assert.equal(snapshot.devicePixelRatio, 2); assert.equal(snapshot.effectiveDpr, 2 / 3);
   assert.equal(snapshot.gelRenderingMode, 'minimum'); assert.equal(snapshot.shadowMapSizeCap, 512);

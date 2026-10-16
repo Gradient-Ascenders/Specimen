@@ -46,7 +46,17 @@ until a session configures them; the application defaults to Minimum hardware.
 |---|---|---|
 | Minimum hardware / `minimum` | Non-transmissive physical gel with authored tint, roughness, clearcoat, Fresnel specular, reflection map and emission | No character-triggered capture, resolve or mipmaps |
 | Balanced / `reduced-transmission` | Authored physical transmission | Half width and height (25% of capture pixels), using Three's `transmissionResolutionScale = 0.5` |
-| High / `physical` | Authored physical transmission | Full resolution, original renderer defaults |
+| High / `physical` | Authored physical transmission | Full resolution when the additional Performance cap is off |
+
+Main's optional Performance preset is retained as **Additional performance cap**.
+Off (`normal`) is the default for this extra cap; the overall application still
+starts in the Minimum hardware profile. On (`performance`) caps density at 1×
+before render scaling, preserves an explicitly selected 0.75× density, and caps
+transmission scale at 0.5. `GelRendering` combines this with gel quality using the
+smaller scale, so neither setting can overwrite the other. Turning the cap off
+restores the saved density choice and preserves explicitly selected Balanced gel.
+The profile's absolute pixel budget always applies. Selecting Minimum/Standard
+resets graphics overrides, including this additional cap. F1 is independent.
 
 Minimum gel loses background refraction and volume attenuation; its tint is
 more solid. It keeps the authored silhouettes, cyan/green/gold colors, glossy
