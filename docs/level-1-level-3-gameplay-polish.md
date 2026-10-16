@@ -35,7 +35,9 @@ Measured authored world-space top heights, in metres:
 
 The bridge controller previously replaced the authored endpoint heights with
 independent centre heights. It now derives its slab centre from the anchor top
-heights and rotated half-thickness. The anchor, exit deck and hallway meet at
+heights and offsets along the deck normal by its half-thickness. An explicit
+longitudinal direction and horizontal width axis prevent roll, keeping both top
+corners at each endpoint level with their anchor. The anchor, exit deck and hallway meet at
 z=147 and z=155. The ramp and apron occupy x=7..14, beside the deck rather than
 overlapping it. The ramp top runs from y=-0.98 at z=140 to y=0.40 at z=150.
 
@@ -73,77 +75,25 @@ material recompilation. Crate details remain in static batching. The cost is
 primarily additional fragment shading over the visible basin area, so Minimum
 and Performance resolution caps remain relevant on Intel UHD 620.
 
-## Evidence and limits
-
-`tests/browser/GameplayPolish.spec.ts` captures the plain production URL in
-installed Edge, across Standard/Normal, Standard/Performance at 0.75 resolution
-scale, and Minimum/Normal. It observes the production session without enabling
-debug query parameters. Existing controller contracts stage release and level
-handoffs; this is not a full unassisted puzzle playthrough.
-
-Evidence is generated under `artifacts/gameplay-polish/{before,after}/` with one
-folder per profile. It includes fresh Level 1, Room 5 containment, maintenance
-acid, transit acid, and front/side/rear doorway views. Volt's existing gameplay
-light accompanies the Level 3 inspection positions. JSON snapshots include
-graphics settings, draw calls, triangles, shader-program counts and GL errors.
+## Verification
 
 Unit checks cover locked switching/recovery/restart, Cultivation availability,
-real-body traversal and continuous collision support, world-space alignment,
-crate/frame separation, acid identity/animation/disposal, and the existing acid
-hazard identity rules. Browser checks cover fresh-start visibility, locked Tab,
-checkpoint recovery, restart, release/handoff, Level 2 availability and console /
-HTTP errors.
+real-body traversal and continuous collision support, all four bridge endpoint
+top corners, crate/frame separation, acid identity/animation/disposal, and the
+existing acid hazard identity rules.
 
-Edge reported `Intel(R) UHD Graphics 620`, ANGLE / Direct3D11. All three baseline
-and all three after journeys passed without console, HTTP or WebGL errors.
-The after screenshots were inspected at front, side and rear gameplay angles,
-including Minimum and Performance views. They retain the dark room lighting.
+Run the focused transit checks with:
 
-The five Standard/Normal views had the following rendering counts; Performance
-at 0.75 scale had the same draw counts:
+```text
+node --test tests/BlackoutTransitController.test.ts tests/BlackoutTransitTraversal.test.ts tests/BlackoutTransitMaterials.test.ts tests/BlackoutTransitPolish.test.ts
+npm run type-check
+npm run build
+```
 
-| View | Draw calls before / after | Triangles before / after |
-| --- | ---: | ---: |
-| Maintenance basin | 568 / 568 | 131996 / 132092 |
-| Transit pit | 363 / 363 | 83720 / 83816 |
-| Door front | 191 / 189 | 52104 / 52176 |
-| Door side | 175 / 175 | 51912 / 52008 |
-| Door rear | 531 / 531 | 85772 / 85868 |
-
-Minimum calls were 339/339, 233/233, 147/146, 139/139 and 321/321 respectively.
-Prepared program count changed from 74 to 76 and texture count from 60 to 62.
-Each added noise texture is 256×256, one byte per texel, without mipmaps. These
-counts include the renderer's passes; they are not single-pass mesh counts.
-Reliable frame-time qualification requires a controlled gameplay benchmark;
-these staged checks do not establish an FPS guarantee or replace a complete
-unassisted puzzle playthrough.
-
-[Before / after gallery](../artifacts/gameplay-polish/comparison.html),
-[render-count evidence](../artifacts/gameplay-polish/render-comparison.json).
-
-Type-check, the production build and production-layout validation passed. The
-existing Vite large-chunk advisory remains. The existing archive generator
-produced a validated 12,852,138-byte ZIP with `index.html` at its root:
-`artifacts/specimen-production.zip`. SHA-256:
-`d6aa58e03258838044f08180b36c0ee34a567318e7e411c7117dc9fb9a91d69a`.
-
-Final verification:
-
-- `node --test --test-concurrency=1 tests/*.test.ts`: **929 passed**, zero
-  failures/skips, 183.4 seconds. Run outside the filesystem sandbox because the
-  production-validator test creates a temporary symbolic link.
-- `npm run type-check`, `npm run build`, `npm run validate:production`: passed.
-- `node scripts/create-production-archive.mjs`: passed, including ZIP root and
-  file validation. This is the existing generator invoked by `npm run archive`
-  after its build step.
-- `GameplayPolish.spec.ts`: **3 before + 3 after profile journeys passed** on
-  installed Edge / Intel UHD 620. The gallery contains 42 screenshots.
-- `ProductionSmoke.spec.ts --grep 'plain production boots'` with
-  `SPECIMEN_SMOKE_ARCHIVE=artifacts/specimen-production.zip`: **1 passed**,
-  35.4 seconds. This journey uses the extracted ZIP at `/group-folder/`, no
-  query parameters, no route interception, and no runtime observer. It covers
-  credits, starting, movement input, pause, restart and resume, and checks all
-  asset requests remain inside the nested deployment path.
-
-The three changes are separate local commits. Nothing was pushed and no PR was
-opened. Generated evidence and the ZIP remain ignored build artifacts.
+`tests/browser/GameplayPolish.spec.ts` checks the ordinary game URL across
+Standard/Normal, Standard/Performance at 0.75 resolution scale, and Minimum/Normal.
+It covers fresh-start visibility, locked Tab, checkpoint recovery, restart,
+release/handoff, Level 2 availability and console/HTTP errors. Existing controller
+contracts stage release and level handoffs; this is not a full unassisted puzzle
+playthrough or a controlled FPS benchmark. Level 3 inspection uses the existing
+gameplay lighting.

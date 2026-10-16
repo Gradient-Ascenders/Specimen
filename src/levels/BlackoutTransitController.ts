@@ -319,16 +319,18 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       const bridgeStart = this.room.bridgeStart.clone();
       const bridgeEnd = this.room.bridgeEnd.clone();
       const bridgeDirection = bridgeEnd.clone().sub(bridgeStart);
-      // Anchors describe walkable top heights. Offset the slab centre along
-      // world Y by its rotated half-thickness, preserving both endpoint tops.
-      const horizontalLength = Math.hypot(bridgeDirection.x, bridgeDirection.z);
-      const topOffset = 0.225 * horizontalLength / bridgeDirection.length();
-      bridgeStart.y -= topOffset;
-      bridgeEnd.y -= topOffset;
+      // Keep the width horizontal so both top corners meet each flat anchor.
+      const bridgeAlong = bridgeDirection.clone().normalize();
+      const bridgeAcross = new THREE.Vector3(-bridgeAlong.z, 0, bridgeAlong.x).normalize();
+      const bridgeUp = new THREE.Vector3().crossVectors(bridgeAcross, bridgeAlong);
+      // Anchors describe top-edge midpoints; move the slab centre below them
+      // along its normal, including the horizontal offset caused by the slope.
+      bridgeStart.addScaledVector(bridgeUp, -0.225);
+      bridgeEnd.addScaledVector(bridgeUp, -0.225);
       const bridgeCentre = bridgeStart.clone().add(bridgeEnd).multiplyScalar(0.5);
       this.bridge = new THREE.Mesh(new THREE.BoxGeometry(bridgeDirection.length(), 0.45, 3.6), new THREE.MeshStandardMaterial({ color: 0x353e41, roughness: 0.72, metalness: 0.7 }));
       this.bridge.name = 'transit-deployable-bridge-deck'; this.bridge.position.copy(bridgeCentre);
-      this.bridge.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), bridgeDirection.normalize());
+      this.bridge.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(bridgeAlong, bridgeUp, bridgeAcross));
       this.bridge.visible = false; this.bridge.userData.surfaceTag = 'default'; this.root.add(this.bridge);
       this.bridgeStartPosition.copy(bridgeStart);
       this.bridgeEndPosition.copy(bridgeEnd);

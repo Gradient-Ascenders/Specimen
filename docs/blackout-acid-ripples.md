@@ -60,10 +60,6 @@ graphics profiles, Level 1 rescue progression and Room 2 geometry remain intact.
 Active rings execute the shader's existing analytic wave math, so visible
 interactions still have a bounded fragment cost; no FPS improvement is claimed.
 
-The earlier uncommitted environment-repair files were present at task start and
-are intentionally excluded from the ripple commit. Their Vite entry restriction
-was retained while testing development. No dependency/lockfile change was needed.
-
 ## Verification
 
 Focused regressions cover:
@@ -90,36 +86,15 @@ down through its existing look-input API. Volt remains on the dry entry platform
 and contributes his existing gameplay light. No lighting, exposure or effect
 intensity is increased for the captures.
 
-Development checks passed Standard/Normal, Standard/Performance at 0.75 scale,
-and Minimum/Normal in installed Edge on Intel UHD Graphics 620 / ANGLE D3D11.
-Evidence is under `artifacts/blackout-ripples/{development,production}/` with one
-folder per profile. Each contains Goop wake/landing and Bob impact screenshots
-for both rooms, plus JSON evidence for both Bob and Volt deaths.
+Run the focused unit regressions with:
 
-These are staged interaction checks, not a complete unassisted puzzle playthrough
-or a controlled FPS benchmark. Visual intensity remains that of the existing
-acid effect and the deliberately dark Level 3 lighting.
+```text
+node --test tests/AcidLiquidInteractions.test.ts tests/BlackoutAcidLifecycle.test.ts
+npm run type-check
+npm run build
+```
 
-Final results:
-
-- Full current-worktree unit suite: **937 passed**, no failures/skips, 171.5 s,
-  using `node --test --test-concurrency=1 tests/*.test.ts`. This includes the
-  preceding environment-repair regression, which remains outside this commit.
-- `npm run type-check` and `npm run build`: passed. The existing Vite chunk-size
-  advisory remains; no shader source or dependencies changed.
-- Installed Edge / Intel UHD 620 browser journeys: **3 development + 3 production
-  profiles passed**, covering both pools, Goop entry/wakes/jumping, Bob and Volt
-  impacts, exactly-once death behavior, and checkpoint clearing. No console,
-  HTTP or WebGL errors were observed.
-- [36 gameplay screenshots](../artifacts/blackout-ripples/gallery.html),
-  [browser summary](../artifacts/blackout-ripples/browser-summary.json), and
-  [full unit log](../artifacts/blackout-ripples/unit-tests.txt).
-- The unchanged archive generator validated the ZIP root and all files. Output:
-  `artifacts/specimen-production.zip`, 12,852,519 bytes, SHA-256
-  `0b0e9f91e240f66ec3c25c400ed95dc3ec692645afe1fe3cf087d1553b89ae4c`.
-- The plain production startup/credits/play/pause/restart smoke test passed
-  against the extracted ZIP at `/group-folder/` in 34.8 s, without query flags
-  or a runtime observer.
-
-No push or PR was performed. Temporary development/preview servers are stopped
-after verification so they do not retain the Windows Rolldown file lock.
+The browser interaction checks are in
+`tests/browser/BlackoutAcidRipples.spec.ts`. They stage interactions rather than
+provide a complete unassisted puzzle playthrough or controlled FPS benchmark.
+Visual intensity remains that of the existing acid effect and Level 3 lighting.
