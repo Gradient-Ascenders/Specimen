@@ -9,6 +9,9 @@ The application starts in **Minimum hardware** on every device. This is a
 conservative engineering default, not GPU detection or a claim that the unknown
 assessment PC meets a performance budget. Settings are session-owned and survive
 level transitions and restarts, not browser reloads.
+The separate Show FPS and Reduce menu motion preferences are saved on the device;
+they do not persist a more expensive gameplay profile. Reset to defaults clears
+those preferences and restores the safe session defaults in one update.
 
 | Policy | Minimum hardware (default) | Standard |
 | --- | --- | --- |
@@ -70,6 +73,12 @@ rounding never increases area beyond the budget. These are area limits, not a
 mandatory 16:9 render target; camera framing always uses the CSS aspect ratio.
 
 CSS canvas size and DOM/text/aim controls stay at native browser resolution.
+The title and standalone trailers temporarily target 1× CSS-pixel density at
+100% render scale, independently of gameplay's 75% default. Their 921,600-pixel
+presentation cap composes with the profile budget and device limits, so smaller
+windows are not needlessly upscaled and larger windows remain bounded. Leaving
+the title restores the selected gameplay profile/scale; diagnostics report the
+active presentation resolution while it is visible.
 `setDrawingBufferSize` applies the bounded size/density in one allocation, avoiding
 an intermediate old-large-window × new-DPR allocation. A `ResizeObserver`, window
 resize and renewed resolution media query cover layout and display/zoom changes.

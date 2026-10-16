@@ -223,7 +223,7 @@ function presentationFixture(reducedMotion = false) {
     render: () => { draws++; shadowRefreshes.push(shadowMap.needsUpdate); } };
   const canvas = { width: 1280, height: 720 };
   const renderLayer = { renderer, canvas, withShadowPreparation: policy.withPreparation.bind(policy),
-    setPresentationPixelBudget: (budget: number | undefined) => budgets.push(budget) };
+    setPresentationResolution: (budget: number | undefined) => budgets.push(budget) };
   const presentation = new TitleScreenPresentation({ host: host as unknown as HTMLElement,
     window: hostWindow as unknown as Window, renderLayer: renderLayer as unknown as RenderLayer, scene });
   return { presentation, host, hostWindow, canvas, motion, listener, shadowMap, budgets, shadowRefreshes,
@@ -272,4 +272,21 @@ test('disposing while shader preparation is pending cannot restart the title or 
   assert.equal(fixture.draws(), 0);
   assert.deepEqual(fixture.budgets, [undefined]);
   assert.deepEqual(fixture.host.dataset, {});
+});
+
+test('saved menu-motion preference updates the title without overriding system reduced motion', async () => {
+  const fixture = presentationFixture(), { presentation } = fixture;
+  const prepared = presentation.prepare(); fixture.resolveCompile(); await prepared;
+  presentation.setReducedMotion(true); presentation.render(0);
+  const draws = fixture.draws();
+  for (let frame = 0; frame < 120; frame++) presentation.render(1 / 60);
+  assert.equal(fixture.draws(), draws);
+  assert.equal(fixture.host.dataset.titleMotion, 'still');
+  presentation.setReducedMotion(false); presentation.render(0);
+  assert.equal(fixture.host.dataset.titleMotion, 'orbiting');
+  fixture.motion.matches = true;
+  for (const listener of fixture.listener) listener();
+  presentation.setReducedMotion(false); presentation.render(0);
+  assert.equal(fixture.host.dataset.titleMotion, 'still');
+  presentation.dispose();
 });

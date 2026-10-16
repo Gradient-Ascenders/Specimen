@@ -229,6 +229,14 @@ export class RenderLayer {
     return Math.min(profileBudget, this.presentationPixelBudget ?? profileBudget);
   }
 
+  get activePixelRatioCap(): RenderPixelRatioCap {
+    return this.presentationPixelBudget === undefined ? this.effectivePixelRatioCap : 1;
+  }
+
+  get activeRenderScale(): RenderScale {
+    return this.presentationPixelBudget === undefined ? this.graphicsSettings.renderScale : 1;
+  }
+
   render(): void {
     // A numeric check is also needed when display emulation/browser changes
     // update DPR without delivering a resolution media-query event.
@@ -282,8 +290,8 @@ export class RenderLayer {
     this.resize();
   }
 
-  /** Menu-only override; clearing it restores the current gameplay profile. */
-  setPresentationPixelBudget(pixelBudget: number | undefined): void {
+  /** Bounded 1:1 CSS-pixel presentation, independent of gameplay's render scale. */
+  setPresentationResolution(pixelBudget: number | undefined): void {
     if (this.disposed) return;
     if (pixelBudget !== undefined && (!Number.isFinite(pixelBudget) || pixelBudget < 1)) {
       throw new RangeError('Pixel budget must be positive.');
@@ -309,9 +317,9 @@ export class RenderLayer {
     return {
       viewportWidth: this.viewportWidth, viewportHeight: this.viewportHeight,
       drawingBufferWidth: this.drawingBufferSize.x, drawingBufferHeight: this.drawingBufferSize.y,
-      pixelRatio: this.renderer.getPixelRatio(), pixelRatioCap: this.effectivePixelRatioCap,
+      pixelRatio: this.renderer.getPixelRatio(), pixelRatioCap: this.activePixelRatioCap,
       requestedPixelRatioCap: settings.renderPixelRatioCap, graphicsPreset: settings.graphicsPreset,
-      devicePixelRatio: this.hostWindow.devicePixelRatio, renderScale: settings.renderScale,
+      devicePixelRatio: this.hostWindow.devicePixelRatio, renderScale: this.activeRenderScale,
       graphicsProfile: graphicsProfileName(settings, this.gelRendering.value), graphicsProfileBase: settings.graphicsProfile,
       pixelBudget: this.pixelBudget, shadowMapSizeCap: profile.shadowMapSizeCap,
       effectsDensity: profile.effectsDensity, lightingPolicy: GRAPHICS_LIGHTING_POLICY,
@@ -362,13 +370,13 @@ export class RenderLayer {
     target.drawingBufferWidth = drawingBufferSize.x;
     target.drawingBufferHeight = drawingBufferSize.y;
     target.effectiveDpr = this.renderer.getPixelRatio();
-    target.resolutionTier = this.effectivePixelRatioCap;
+    target.resolutionTier = this.activePixelRatioCap;
     target.requestedPixelRatioCap = this.graphicsSettings.renderPixelRatioCap;
     target.graphicsPreset = this.graphicsSettings.graphicsPreset;
     target.graphicsProfile = graphicsProfileName(this.graphicsSettings, this.gelRendering.value);
     target.graphicsProfileBase = this.graphicsSettings.graphicsProfile;
     target.devicePixelRatio = this.hostWindow.devicePixelRatio;
-    target.renderScale = this.graphicsSettings.renderScale;
+    target.renderScale = this.activeRenderScale;
     const profile = GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile];
     target.pixelBudget = this.pixelBudget;
     target.gelRenderingMode = this.gelRendering.value;
@@ -404,8 +412,8 @@ export class RenderLayer {
 
     const size = resolveRenderResolution(this.host.clientWidth, this.host.clientHeight,
       this.hostWindow.devicePixelRatio, {
-        pixelRatioCap: this.effectivePixelRatioCap,
-        renderScale: this.graphicsSettings.renderScale,
+        pixelRatioCap: this.activePixelRatioCap,
+        renderScale: this.activeRenderScale,
         pixelBudget: this.pixelBudget,
         maximumWidth: this.maximumWidth, maximumHeight: this.maximumHeight,
         minimumDrawingBufferDimension: Math.ceil(1 / this.renderer.transmissionResolutionScale),

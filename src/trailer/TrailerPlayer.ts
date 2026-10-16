@@ -31,6 +31,7 @@ export interface TrailerPlayerOptions<Frame extends TrailerFrame> {
 export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement, options: TrailerPlayerOptions<Frame>): () => void {
   const { durationSeconds } = options;
   const render = new RenderLayer({ host, pixelRatioCap: 1 });
+  render.setPresentationResolution(1280 * 720);
   render.scene.background = new THREE.Color(0x010305);
   const scene = options.createScene();
   render.scene.add(scene.root);

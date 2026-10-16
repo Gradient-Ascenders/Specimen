@@ -23,10 +23,14 @@ for (const query of ['', '?debug=1']) {
     await expect(page.locator('canvas')).toHaveCount(1);
     for (const viewport of [{ width: 3840, height: 2160 }, { width: 1366, height: 768 },
       { width: 320, height: 900 }, { width: 320, height: 568 }, { width: 844, height: 390 },
-      { width: 960, height: 540 }]) {
+      { width: 916, height: 960 }, { width: 960, height: 540 }]) {
       await page.setViewportSize(viewport);
       await expect.poll(() => page.locator('canvas').evaluate((canvas: HTMLCanvasElement) =>
         canvas.width * canvas.height)).toBeLessThanOrEqual(TITLE_PIXEL_BUDGET);
+      if (viewport.width * viewport.height <= TITLE_PIXEL_BUDGET) {
+        await expect.poll(() => page.locator('canvas').evaluate((canvas: HTMLCanvasElement) =>
+          [canvas.width, canvas.height])).toEqual([viewport.width, viewport.height]);
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await expect(title.getByRole('heading', { name: 'Specimen', exact: true })).toBeInViewport({ ratio: 1 });
       for (const action of ['start', 'settings', 'credits']) {

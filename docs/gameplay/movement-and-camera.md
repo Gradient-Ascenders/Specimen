@@ -52,3 +52,7 @@ debug/recorder text. Aiming overlays remain visible while aiming. Gameplay
 continues normally. Pause, loading, and death screens remain available. The
 toggle persists across slime switches, level transitions, and restarts within
 the current session.
+
+F1 is owned by the clean-gameplay controller and is ignored while editing text
+or settings fields. The Settings Display section includes a saved Show FPS
+toggle; the counter follows the same clean-mode visibility rules.

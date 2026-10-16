@@ -159,6 +159,7 @@ function startGame(): void {
           performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
         }
         renderLayer.setGraphicsSettings(nextSettings);
+        titlePresentation?.setReducedMotion(nextSettings.reduceMenuMotion);
       },
       getGraphicsDiagnostics: () => renderLayer.getGraphicsDiagnostics(),
       subscribeGraphicsDiagnostics: listener => renderLayer.subscribeGraphicsDiagnostics(listener),
@@ -205,13 +206,15 @@ function startGame(): void {
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);
   gameSession.load();
-  titlePresentation = new TitleScreenPresentation({ renderLayer, host: app });
+  titlePresentation = new TitleScreenPresentation({ renderLayer, host: app,
+    reduceMotion: settings.value.reduceMenuMotion });
 
   const loop = new Loop({
     fixedUpdate: (deltaSeconds) => {
       if (!titlePresentation) gameSession.fixedUpdate(deltaSeconds);
     },
     render: (interpolationAlpha, stats) => {
+      gameFlow.updateFrame(stats.rawFrameDeltaSeconds);
       if (titlePresentation) {
         titlePresentation.render(stats.frameDeltaSeconds);
         return;

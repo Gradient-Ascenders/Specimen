@@ -26,6 +26,7 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
         export { GameFlowUI } from '/src/ui/GameFlowUI.ts';
         export { GameSettings } from '/src/ui/GameSettings.ts';
         export { DeathScreen } from '/src/ui/DeathScreen.ts';
+        export { CleanGameplayMode } from '/src/ui/CleanGameplayMode.ts';
         import '/src/style.css';
         import '/src/ui/ui-theme.css';
       ` : undefined,
@@ -53,7 +54,7 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await page.goto('./__hud-fixture');
   await page.evaluate(async () => {
     const fixtureUrl = new URL('./__hud-fixture.js', location.href).href;
-    const { GameFlowUI, GameSettings, DeathScreen } = await import(fixtureUrl);
+    const { GameFlowUI, GameSettings, DeathScreen, CleanGameplayMode } = await import(fixtureUrl);
     let inputEnabled = false;
     const app = document.querySelector<HTMLElement>('#app')!;
     const flow: GameFlowUI = new GameFlowUI({
@@ -73,6 +74,8 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
       },
     });
     flow.subscribe(state => { app.dataset.gameState = state; });
+    app.querySelector('canvas')!.dataset.gameplayCanvas = 'true';
+    new CleanGameplayMode({ host: app, flow, prepareGameplay: () => {}, present: () => {} });
     flow.setObjective('Test objective');
     app.append(flow.element);
     const death = new DeathScreen({ onRetry: () => {}, backgroundElements: [] });
@@ -81,9 +84,10 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
     flow.completeBoot();
   });
   const flow = page.locator('.game-flow');
+  const app = page.locator('#app');
   const title = page.locator('[data-flow-panel="title"]');
   await expect(title).toBeVisible();
-  await expect(flow).toHaveAttribute('data-hud-hidden', 'false');
+  await expect(app).not.toHaveAttribute('data-clean-gameplay');
   await page.keyboard.press('F1');
   await expect(title).toBeVisible();
   await page.keyboard.press('F1');
@@ -98,7 +102,7 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await page.screenshot({ path: testInfo.outputPath('hud-visible.png') });
 
   await page.keyboard.press('F1');
-  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+  await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
   await expect(hud).toBeHidden();
   await expect(flow).toHaveAttribute('data-state', 'playing');
   await expect(page.locator('#app')).toHaveAttribute('data-game-state', 'playing');
@@ -113,9 +117,9 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
     window.dispatchEvent(event);
     return event.defaultPrevented;
   })).toBe(true);
-  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+  await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
   await page.keyboard.press('Shift+F1');
-  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+  await expect(app).toHaveAttribute('data-clean-gameplay', 'true');
 
   // Level-owned overlays are appended later and can update their own display
   // while capture mode is active. Probe those classes without loading a level.
@@ -130,7 +134,10 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
     for (const className of [...overlayClasses, ...aimClasses]) {
       const overlay = document.createElement('div');
       overlay.className = className;
-      if (aimClasses.includes(className)) overlay.dataset.aimProbe = className;
+      if (aimClasses.includes(className)) {
+        overlay.dataset.aimProbe = className;
+        overlay.dataset.cleanGameplayAiming = 'true';
+      }
       else overlay.dataset.hudProbe = className;
       overlay.textContent = 'HUD overlay';
       overlay.style.display = 'block';
@@ -156,7 +163,7 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await probes.first().evaluate(overlay => { overlay.hidden = true; });
   await aimProbes.first().evaluate(overlay => { overlay.hidden = true; });
   await page.keyboard.press('F1');
-  await expect(flow).toHaveAttribute('data-hud-hidden', 'false');
+  await expect(app).not.toHaveAttribute('data-clean-gameplay');
   await expect(hud).toBeVisible();
   await expect(probes.first()).toBeHidden();
   for (const probe of (await probes.all()).slice(1)) await expect(probe).toBeVisible();
@@ -177,7 +184,7 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
 
   await page.evaluate(() => window.__hudTest.flow.beginLevelTransition('Entering next level'));
   await expect(page.locator('[data-flow-panel="transitioning"]')).toBeVisible();
-  await expect(flow).toHaveAttribute('data-hud-hidden', 'true');
+  await expect(app).not.toHaveAttribute('data-clean-gameplay');
   await page.evaluate(() => window.__hudTest.flow.finishLevelTransition());
   await page.locator('[data-action="enter-level"]').click();
   await expect(flow).toHaveAttribute('data-state', 'playing');

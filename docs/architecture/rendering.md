@@ -44,8 +44,13 @@ with the selected graphics profile's budget using the tighter limit. It uses the
 shared bounded-resolution resolver, including device limits and transmission-safe
 minimum dimensions, never overwrites the player's profile/density/scale settings,
 and is removed on Start. Diagnostics report the active budget while it applies.
-The room has four
-fixed light slots, only one shadowed (512×512). That map is reused at rest and
+`RenderLayer.setPresentationResolution` targets one rendered pixel per CSS pixel
+at 100% scale while the cap is active, instead of inheriting Minimum's 75% gameplay
+scale. Windows within budget (including 916×960) therefore do not upscale a smaller
+image; larger windows still respect the tighter profile/presentation and device
+limits. Trailer playback uses the same bounded presentation override. Start
+restores the currently selected gameplay density and scale.
+The room has four fixed light slots, only one shadowed (512×512). That map is reused at rest and
 updated during wobble/settling. A 32-point dust pool moves as one object; there
 are no per-frame geometry, material or particle-buffer allocations.
 
@@ -54,6 +59,8 @@ shadow, textures and instance buffers, restores gameplay resolution and records
 the shader guard baseline without title-only programs. HMR cleanup also
 handles preparation still in flight. Reduced-motion users get a still view that
 only redraws on resize, DPI or preference changes.
+The saved Reduce menu motion setting also requests this still view; disabling it
+never overrides a system reduced-motion preference.
 
 The title menu uses an oversized pale wordmark, a compact logo/tagline signature,
 a fine cyan divider, two-line atmospheric copy and unnumbered text actions.
@@ -73,6 +80,32 @@ against a development server with `SPECIMEN_PRODUCTION_URL=http://127.0.0.1:5173
 or against the built preview using the default Playwright configuration. Browser
 and GPU playtesting have not been performed for this change; caps and unit
 checks are not measured hardware frame-rate evidence.
+
+## Settings and lightweight diagnostics
+
+Settings are grouped into Graphics, Display, Audio, Controls and Accessibility,
+with section shortcuts, descriptions, live current values and a reset-to-defaults
+action. The body scrolls independently of its header/footer. Only Show FPS and
+Reduce menu motion persist in `specimen.presentation-preferences.v1`; graphics,
+audio and controls still start at safe session defaults. Blocked/malformed storage
+is ignored, and resetting clears the saved display preferences atomically.
+
+Settings and Credits share the dark laboratory panel, pale cyan accents and fixed
+header/footer layout. Credits retains the canonical `CREDITS.md` ledger and source
+links in an independently scrolling body; this styling adds no rendering effects.
+
+Show FPS uses the existing application loop and a half-second frame average;
+it creates no second timer/profiler and updates DOM text at most twice a second.
+It is visible only during gameplay and is hidden by F1 clean mode. `CleanGameplayMode`
+is the sole F1 owner, including editable-target guards; GameFlowUI must not install
+a competing legacy HUD toggle.
+
+Tab/Shift+Tab wrap within the active menu. Up/Down navigate buttons and sliders;
+native select controls retain their option-selection keys. Left/Right adjust
+values, Enter/Space activate, and Escape backs out. Standard-mapped gamepads use
+D-pad/stick, A and B, polled only in menus with a connected pad through the existing
+loop. A dead zone, bounded directional repeat and release-to-arm prevent drift and
+held buttons activating the next screen. Gameplay controls are unchanged.
 
 ## Materials, lighting, and shadows
 

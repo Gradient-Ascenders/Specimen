@@ -5,6 +5,9 @@ import type {
   GameSettings,
   GameSettingsSnapshot,
 } from './GameSettings.ts';
+import { createSettingsPanelMarkup } from './SettingsPanelMarkup.ts';
+import { FrameRateCounter } from './FrameRateCounter.ts';
+import { MenuGamepadNavigation, nextMenuFocusIndex, type MenuAction } from './MenuNavigation.ts';
 import {
   MAX_FOLLOW_DISTANCE_METRES,
   MIN_FOLLOW_DISTANCE_METRES,
@@ -43,7 +46,7 @@ export const gameFlowCanPause = (
   gameplayInputEnabled: boolean,
 ): boolean => state === 'playing' && gameplayInputEnabled;
 
-export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back' | 'toggleHUD';
+export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
 export interface GameFlowKeyboardModifiers {
   readonly altKey?: boolean;
@@ -59,7 +62,6 @@ export const getGameFlowKeyboardAction = (
 ): GameFlowKeyboardAction | null => {
   const hasModifier = modifiers.altKey || modifiers.ctrlKey ||
     modifiers.metaKey || modifiers.shiftKey;
-  if (!hasModifier && code === 'F1') return 'toggleHUD';
   if (!hasModifier && code === 'KeyP' && state === 'playing') return 'pause';
   if (!hasModifier && code === 'KeyP' && state === 'paused') return 'resume';
   if (code === 'Escape' && (state === 'settings' || state === 'credits')) {
@@ -354,6 +356,8 @@ const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'transitionFailed',
 ]);
 
+const MENU_NAVIGATION_STATES = new Set<GameFlowState>(['title', 'paused', 'settings', 'credits']);
+
 export class GameFlowUI {
   readonly element: HTMLElement;
 
@@ -383,6 +387,13 @@ export class GameFlowUI {
   private readonly graphicsProfileInput: HTMLSelectElement;
   private readonly renderScaleInput: HTMLSelectElement;
   private readonly graphicsDiagnostics: HTMLElement;
+  private readonly showFPSInput: HTMLInputElement;
+  private readonly reduceMenuMotionInput: HTMLInputElement;
+  private readonly settingsFeedback: HTMLElement;
+  private readonly fpsOutput: HTMLElement;
+  private readonly frameRate = new FrameRateCounter();
+  private readonly gamepadNavigation = new MenuGamepadNavigation();
+  private hasGamepad = false;
   private readonly slimeRoster: HTMLElement;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
@@ -438,6 +449,10 @@ export class GameFlowUI {
     this.graphicsProfileInput = this.requireElement<HTMLSelectElement>('[data-setting="graphics-profile"]');
     this.renderScaleInput = this.requireElement<HTMLSelectElement>('[data-setting="render-scale"]');
     this.graphicsDiagnostics = this.requireElement('[data-graphics-diagnostics]');
+    this.showFPSInput = this.requireElement<HTMLInputElement>('[data-setting="show-fps"]');
+    this.reduceMenuMotionInput = this.requireElement<HTMLInputElement>('[data-setting="reduce-menu-motion"]');
+    this.settingsFeedback = this.requireElement('[data-settings-feedback]');
+    this.fpsOutput = this.requireElement('[data-fps-counter]');
     this.renderResolutionInput = this.requireElement<HTMLSelectElement>(
       '[data-setting="render-resolution"]',
     );
@@ -467,6 +482,7 @@ export class GameFlowUI {
     }
 
     this.bindActions();
+    this.hasGamepad = this.readGamepads().some(pad => pad?.connected && pad.mapping === 'standard');
     this.unsubscribeSettings = this.settings.subscribe(
       this.onSettingsChanged,
     );
@@ -482,6 +498,22 @@ export class GameFlowUI {
 
   get gameplayActive(): boolean {
     return this.model.state === 'playing';
+  }
+
+  /** Reuse the existing application loop; FPS DOM writes are limited to twice/second. */
+  updateFrame(deltaSeconds: number): void {
+    if (this.disposed) return;
+    if (this.hasGamepad && this.menuNavigable) {
+      const pad = this.readGamepads().find(candidate => candidate?.connected && candidate.mapping === 'standard');
+      const action = this.gamepadNavigation.sample(pad ?? undefined, deltaSeconds);
+      if (action) this.navigateMenu(action);
+    }
+    if (this.model.state !== 'playing' || !this.settings.value.showFPS) return;
+    const fps = this.frameRate.sample(deltaSeconds);
+    if (fps !== undefined) {
+      const text = `${fps} FPS`;
+      if (this.fpsOutput.textContent !== text) this.fpsOutput.textContent = text;
+    }
   }
 
   completeBoot(): void {
@@ -552,7 +584,6 @@ export class GameFlowUI {
   private createElement(creditsMarkdown: string): HTMLElement {
     const root = this.hostDocument.createElement('div');
     root.className = 'game-flow';
-    root.dataset.hudHidden = 'false';
     root.innerHTML = `
       <section class="flow-screen loading-screen" data-flow-panel="loading" aria-labelledby="loading-title">
         <div class="system-state">
@@ -592,6 +623,7 @@ export class GameFlowUI {
         </div>
       </section>
 
+      <output class="game-fps" data-fps-counter aria-label="Frames per second" aria-live="off" hidden>— FPS</output>
       <aside class="game-hud" data-flow-panel="playing" aria-label="Gameplay guidance" hidden>
         <section class="hud-objective-module" aria-labelledby="hud-objective-heading">
           <p class="system-label" id="hud-objective-heading">Current objective</p>
@@ -646,123 +678,25 @@ export class GameFlowUI {
         </div>
       </section>
 
-      <section class="flow-screen submenu-screen settings-screen" data-flow-panel="settings" aria-labelledby="settings-heading" hidden>
-        <div class="system-panel settings-panel">
-          <header class="system-panel-header">
-            <span class="signal-bar" aria-hidden="true"></span>
-            <div>
-              <p class="system-label">Session configuration</p>
-              <h1 id="settings-heading">Settings</h1>
-            </div>
-          </header>
-          <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <div class="setting-row">
-            <div class="setting-heading">
-              <label for="mouse-sensitivity">Mouse sensitivity</label>
-              <output for="mouse-sensitivity" data-setting-output="sensitivity"></output>
-            </div>
-            <input id="mouse-sensitivity" data-setting="sensitivity" type="range" min="0.5" max="2" step="0.1">
-          </div>
-          <label class="setting-row setting-toggle-row" for="invert-vertical">
-            <span class="setting-heading">
-              <span>Invert vertical look</span>
-              <output data-setting-output="invert-vertical"></output>
-            </span>
-            <input id="invert-vertical" data-setting="invert-vertical" type="checkbox">
-          </label>
-          <div class="setting-row">
-            <div class="setting-heading">
-              <label for="camera-distance">Camera distance</label>
-              <output for="camera-distance" data-setting-output="camera-distance"></output>
-            </div>
-            <input id="camera-distance" data-setting="camera-distance" type="range" min="${MIN_FOLLOW_DISTANCE_METRES}" max="${MAX_FOLLOW_DISTANCE_METRES}" step="0.1">
-          </div>
-          <div class="setting-row">
-            <div class="setting-heading">
-              <label for="master-volume">Master volume</label>
-              <output for="master-volume" data-setting-output="volume"></output>
-            </div>
-            <input id="master-volume" data-setting="volume" type="range" min="0" max="100" step="5">
-            <p class="setting-note">Stored for this session. Controls all game audio.</p>
-          </div>
-          <div class="setting-row">
-            <div class="setting-heading">
-              <label for="effects-volume">Sound effects volume</label>
-              <output for="effects-volume" data-setting-output="effects-volume"></output>
-            </div>
-            <input id="effects-volume" data-setting="effects-volume" type="range" min="0" max="100" step="5">
-          </div>
-          <div class="setting-row">
-            <div class="setting-heading"><label for="graphics-profile">Graphics profile</label></div>
-            <select id="graphics-profile" data-setting="graphics-profile" aria-describedby="graphics-profile-note">
-              <option value="minimum">Minimum hardware — recommended starting point</option>
-              <option value="standard">Standard — sharper image and refraction</option>
-              <option value="custom" disabled>Custom — choose a profile to reset</option>
-            </select>
-            <p class="setting-note" id="graphics-profile-note">Sets resolution, gel, shadow detail and decorative effects together. Gameplay, hazard lights and beams are unchanged. Changes last for this session.</p>
-            <p class="setting-note" data-graphics-diagnostics></p>
-          </div>
-          <div class="setting-row">
-            <div class="setting-heading">
-              <label for="graphics-preset">Additional performance cap</label>
-            </div>
-            <select id="graphics-preset" data-setting="graphics-preset">
-              <option value="normal">Off — profile settings</option>
-              <option value="performance">On — cap density and refraction</option>
-            </select>
-            <p class="setting-note">Optional extra limit: caps density at 1× before render scaling and refraction at half resolution. Keeps your selected density/gel choices for when it is switched off. The profile's pixel budget always applies.</p>
-          </div>
-          <div class="setting-row">
-            <div class="setting-heading">
-              <label for="render-resolution">Render resolution</label>
-            </div>
-            <select id="render-resolution" data-setting="render-resolution">
-              <option value="0.75">Display density cap — 0.75×</option>
-              <option value="1">Display density cap — 1.0×</option>
-              <option value="1.5">Display density cap — 1.5×</option>
-              <option value="2">Display density cap — 2.0×</option>
-            </select>
-            <p class="setting-note">Density before render scaling. The profile's absolute pixel limit always applies; interface resolution is unchanged.</p>
-          </div>
-          <div class="setting-row">
-            <div class="setting-heading"><label for="render-scale">3D render scale</label></div>
-            <select id="render-scale" data-setting="render-scale">
-              <option value="0.5">50% — fastest, softest</option>
-              <option value="0.75">75% — reduced detail</option>
-              <option value="1">100% — full selected density</option>
-            </select>
-            <p class="setting-note">Scales width and height. Large windows may be scaled further to stay within the pixel budget.</p>
-          </div>
-          <div class="setting-row">
-            <div class="setting-heading"><label for="gel-rendering">Character gel</label></div>
-            <select id="gel-rendering" data-setting="gel-rendering">
-              <option value="minimum">Minimum hardware — glossy gel</option>
-              <option value="reduced-transmission">Balanced — soft refraction</option>
-              <option value="physical">High — full refraction</option>
-            </select>
-            <p class="setting-note">Glossy gel keeps reflections and character glow. Refraction adds background distortion at a higher graphics cost.</p>
-          </div>
-          <button class="system-action system-back" data-action="back" data-autofocus>
-            <span aria-hidden="true">←</span><span>Back</span>
-          </button>
-        </div>
-      </section>
+      ${createSettingsPanelMarkup()}
 
       <section class="flow-screen submenu-screen credits-screen" data-flow-panel="credits" aria-labelledby="credits-heading" hidden>
-        <div class="system-panel credits-panel">
+        <div class="system-panel lab-menu-panel credits-panel">
           <header class="system-panel-header credits-header">
             ${createBrandMarkMarkup('detailed', 'credits-brand-mark')}
             <div>
               <p class="system-label">Project ledger</p>
               <h1 id="credits-heading">Credits</h1>
-              <p class="system-copy">Specimen / Development record</p>
+              <p class="system-copy">The tools, art and resources behind the experiment.</p>
             </div>
           </header>
-          <div class="signal-rule" aria-hidden="true"><span></span></div>
+          <div class="credits-divider" aria-hidden="true"></div>
           <div class="credits-ledger" aria-label="Credits ledger"></div>
-          <button class="system-action system-back" data-action="back" data-autofocus>
-            <span aria-hidden="true">←</span><span>Back</span>
-          </button>
+          <footer class="credits-footer">
+            <button type="button" class="system-action" data-action="back" data-autofocus>
+              <span aria-hidden="true">←</span><span>Back</span>
+            </button>
+          </footer>
         </div>
       </section>
 
@@ -846,6 +780,10 @@ export class GameFlowUI {
       { signal },
     );
     this.graphicsPresetInput.addEventListener('change', this.onGraphicsPresetChange, { signal });
+    this.showFPSInput.addEventListener('change', () => this.settings.setShowFPS(this.showFPSInput.checked), { signal });
+    this.reduceMenuMotionInput.addEventListener('change', () => this.settings.setReduceMenuMotion(this.reduceMenuMotionInput.checked), { signal });
+    this.hostWindow.addEventListener('gamepadconnected', this.onGamepadChanged, { signal });
+    this.hostWindow.addEventListener('gamepaddisconnected', this.onGamepadChanged, { signal });
     this.hostWindow.addEventListener('keydown', this.onKeyDown, { signal });
     this.hostWindow.addEventListener('blur', this.onWindowBlur, { signal });
     this.hostWindow.addEventListener('resize', this.syncGraphicsDiagnostics, { signal });
@@ -861,6 +799,8 @@ export class GameFlowUI {
     const state = this.model.state;
     this.element.dataset.state = state;
     this.element.dataset.menuOrigin = this.model.menuOrigin;
+    this.gamepadNavigation.reset();
+    this.syncFPSVisibility();
     for (const [panelState, panel] of this.panels) {
       panel.hidden = panelState !== state;
     }
@@ -966,10 +906,24 @@ export class GameFlowUI {
         }
         break;
       case 'settings':
+        this.focusTargets.set(this.model.state, target);
+        this.settingsFeedback.textContent = '';
         if (this.model.openSettings()) this.syncState();
         break;
       case 'credits':
+        this.focusTargets.set(this.model.state, target);
         if (this.model.openCredits()) this.syncState();
+        break;
+      case 'settings-section': {
+        if (this.model.state !== 'settings') break;
+        const section = this.element.querySelector<HTMLElement>(`#settings-${target.dataset.section}`);
+        section?.querySelector<HTMLElement>('select, input, button')?.focus();
+        break;
+      }
+      case 'reset-settings':
+        if (this.model.state !== 'settings') break;
+        this.settings.resetToDefaults();
+        this.settingsFeedback.textContent = 'Default settings restored. Saved display preferences cleared.';
         break;
       case 'back':
         if (this.model.back()) this.syncState();
@@ -984,16 +938,7 @@ export class GameFlowUI {
       event,
     );
 
-    if (action === 'toggleHUD') {
-      // Consume held-key repeats too, so F1 never opens the browser's Help.
-      event.preventDefault();
-      if (!event.repeat) {
-        this.element.dataset.hudHidden = String(
-          this.element.dataset.hudHidden !== 'true',
-        );
-      }
-      return;
-    }
+    if (action === null && this.onMenuKeyDown(event)) return;
     if (event.repeat) return;
 
     if (action === 'pause') {
@@ -1106,6 +1051,21 @@ export class GameFlowUI {
     this.gelRenderingInput.value = settings.gelRenderingMode;
     this.graphicsProfileInput.value = graphicsProfileName(settings);
     this.renderScaleInput.value = String(settings.renderScale);
+    this.showFPSInput.checked = settings.showFPS;
+    this.reduceMenuMotionInput.checked = settings.reduceMenuMotion;
+    const outputValues: Record<string, string> = {
+      'graphics-profile': graphicsProfileName(settings) === 'custom' ? 'Custom' : GRAPHICS_PROFILES[settings.graphicsProfile].label,
+      'graphics-preset': performance ? 'On' : 'Off',
+      'render-resolution': `${Number(this.renderResolutionInput.value).toFixed(2)}×`,
+      'render-scale': `${Math.round(settings.renderScale * 100)}%`,
+      'gel-rendering': settings.gelRenderingMode === 'minimum' ? 'Glossy' : settings.gelRenderingMode === 'physical' ? 'High' : 'Balanced',
+      'show-fps': settings.showFPS ? 'On' : 'Off',
+      'reduce-menu-motion': settings.reduceMenuMotion ? 'On' : 'Off',
+    };
+    for (const [key, value] of Object.entries(outputValues)) {
+      this.requireElement<HTMLOutputElement>(`[data-setting-output="${key}"]`).value = value;
+    }
+    this.syncFPSVisibility();
     this.actions.applySettings(settings);
     this.syncGraphicsDiagnostics();
   };
@@ -1116,9 +1076,9 @@ export class GameFlowUI {
     this.graphicsDiagnostics.textContent = [
       `${graphicsProfileName(settings) === 'custom' ? 'Custom, based on ' : ''}${profile.label}`,
       diagnostics ? `${diagnostics.drawingBufferWidth} × ${diagnostics.drawingBufferHeight} px` : '',
-      `≤ ${(profile.pixelBudget / 1_000_000).toFixed(2)} million pixels`,
+      `≤ ${((diagnostics?.pixelBudget ?? profile.pixelBudget) / 1_000_000).toFixed(2)} million pixels`,
       diagnostics ? `display DPR ${diagnostics.devicePixelRatio.toFixed(2)}, effective ${diagnostics.pixelRatio.toFixed(2)}×` : '',
-      `${Math.round(settings.renderScale * 100)}% scale`,
+      `${Math.round((diagnostics?.renderScale ?? settings.renderScale) * 100)}% active scale`,
       `extra performance cap: ${settings.graphicsPreset === 'performance' ? 'on' : 'off'}`,
       `gel: ${settings.gelRenderingMode}`,
       `shadows ≤ ${profile.shadowMapSizeCap}px/face`,
@@ -1126,6 +1086,102 @@ export class GameFlowUI {
       'room-scoped lighting; canvas MSAA off',
     ].filter(Boolean).join(' · ');
   };
+
+  private syncFPSVisibility(): void {
+    this.fpsOutput.hidden = this.model.state !== 'playing' || !this.settings.value.showFPS;
+    this.frameRate.reset();
+    this.fpsOutput.textContent = '— FPS';
+  }
+
+  private get menuNavigable(): boolean {
+    return MENU_NAVIGATION_STATES.has(this.model.state);
+  }
+
+  private readGamepads(): (Gamepad | null)[] {
+    try { return this.hostWindow.navigator.getGamepads?.() ?? []; }
+    catch { return []; }
+  }
+
+  private readonly onGamepadChanged = (): void => {
+    this.hasGamepad = this.readGamepads().some(pad => pad?.connected && pad.mapping === 'standard');
+    this.gamepadNavigation.reset();
+  };
+
+  private menuControls(): HTMLElement[] {
+    const panel = this.panels.get(this.model.state);
+    return Array.from(panel?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href]') ?? [])
+      .filter(control => !control.closest('[hidden]'));
+  }
+
+  private focusMenuControl(control: HTMLElement | undefined): void {
+    control?.focus({ preventScroll: true });
+    control?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  private navigateMenu(action: MenuAction): void {
+    if (!this.menuNavigable) return;
+    if (action === 'back') {
+      if (this.model.state === 'paused') this.resume();
+      else if (this.model.back()) this.syncState();
+      return;
+    }
+    const controls = this.menuControls();
+    const current = controls.indexOf(this.hostDocument.activeElement as HTMLElement);
+    if (action === 'previous' || action === 'next') {
+      this.focusMenuControl(controls[nextMenuFocusIndex(current, controls.length, action === 'next' ? 1 : -1)]);
+      return;
+    }
+    const control = controls[current] ?? controls[0];
+    if (!control) return;
+    if (action === 'activate') {
+      if (control.tagName !== 'SELECT' && !(control.tagName === 'INPUT' && (control as HTMLInputElement).type === 'range')) control.click();
+      return;
+    }
+    const direction = action === 'increase' ? 1 : -1;
+    if (control.tagName === 'SELECT') {
+      const select = control as HTMLSelectElement;
+      const options = Array.from(select.options).filter(option => !option.disabled);
+      const index = options.indexOf(select.selectedOptions[0]);
+      const option = options[Math.min(options.length - 1, Math.max(0, index + direction))];
+      if (option && select.value !== option.value) {
+        select.value = option.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    } else if (control.tagName === 'INPUT' && (control as HTMLInputElement).type === 'range') {
+      const range = control as HTMLInputElement;
+      const value = Math.min(Number(range.max), Math.max(Number(range.min), range.valueAsNumber + direction * Number(range.step || 1)));
+      if (value !== range.valueAsNumber) {
+        range.valueAsNumber = value;
+        range.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  }
+
+  private onMenuKeyDown(event: KeyboardEvent): boolean {
+    if (!this.menuNavigable || event.altKey || event.ctrlKey || event.metaKey) return false;
+    const controls = this.menuControls(), active = this.hostDocument.activeElement as HTMLElement | null;
+    const current = controls.indexOf(active!);
+    if (event.code === 'Tab') {
+      if ((event.shiftKey && current <= 0) || (!event.shiftKey && current === controls.length - 1)) {
+        event.preventDefault();
+        this.focusMenuControl(controls[event.shiftKey ? controls.length - 1 : 0]);
+        return true;
+      }
+    } else if ((event.code === 'ArrowUp' || event.code === 'ArrowDown') && active?.tagName !== 'SELECT') {
+      event.preventDefault();
+      this.navigateMenu(event.code === 'ArrowDown' ? 'next' : 'previous');
+      return true;
+    } else if ((event.code === 'Home' || event.code === 'End') && (active?.tagName === 'BUTTON' || active?.tagName === 'A')) {
+      event.preventDefault();
+      this.focusMenuControl(controls[event.code === 'Home' ? 0 : controls.length - 1]);
+      return true;
+    } else if (event.code === 'Enter' && active?.tagName === 'INPUT' && (active as HTMLInputElement).type === 'checkbox') {
+      event.preventDefault();
+      if (!event.repeat) active.click();
+      return true;
+    }
+    return false;
+  }
 
   private readonly onSlimeHUDChanged = (snapshot: SlimeHUDSnapshot): void => {
     this.switchFeedback.textContent = this.switchFeedbackModel.update(snapshot);

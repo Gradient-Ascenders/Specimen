@@ -116,13 +116,13 @@ test('pause requires unmodified P while Escape remains a nested-menu cancel', ()
   assert.equal(getGameFlowKeyboardAction('Escape', 'playing'), null);
 });
 
-test('unmodified F1 toggles the HUD independently of game flow state', () => {
+test('game flow leaves F1 exclusively to the clean-gameplay controller', () => {
   const states: readonly GameFlowState[] = [
     'loading', 'title', 'playing', 'paused', 'settings', 'credits',
     'restarting', 'transitioning', 'transitionFailed',
   ];
   for (const state of states) {
-    assert.equal(getGameFlowKeyboardAction('F1', state), 'toggleHUD');
+    assert.equal(getGameFlowKeyboardAction('F1', state), null);
     for (const modifier of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
       assert.equal(getGameFlowKeyboardAction('F1', state, { [modifier]: true }), null);
     }
@@ -194,6 +194,8 @@ test('settings retain session values across flow transitions', () => {
     masterVolume: 0.35,
     soundEffectsVolume: 0.8,
     cameraDistanceMetres: 6.4,
+    showFPS: false,
+    reduceMenuMotion: false,
     renderPixelRatioCap: 1.5,
     gelRenderingMode: 'minimum',
     graphicsProfile: 'minimum',

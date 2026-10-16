@@ -15,6 +15,8 @@ test('Goop introduction is capture-ready, replayable and independent of gameplay
   await page.goto('./?trailer=goop');
   const play = page.locator('[data-trailer-action="play"]');
   await expect(play).toBeEnabled({ timeout: 120_000 });
+  expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) =>
+    [canvas.width, canvas.height])).toEqual([960, 540]);
   await expect(page.locator('#app')).toHaveAttribute('data-trailer-shot', 'goop');
   await expect(page.locator('.game-flow, .game-hud, .performance-recorder')).toHaveCount(0);
   await expect(page.locator('.trailer-shot-links a[href="?trailer=opening"]')).toBeVisible();

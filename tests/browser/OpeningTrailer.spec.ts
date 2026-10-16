@@ -16,6 +16,8 @@ test('opening trailer is capture-ready, scrubbable and replayable without gamepl
   await page.goto('./?trailer=opening');
   const play = page.locator('[data-trailer-action="play"]');
   await expect(play).toBeEnabled({ timeout: 120_000 });
+  expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) =>
+    [canvas.width, canvas.height])).toEqual([640, 360]);
   await expect(page.locator('.game-flow, .game-hud, .performance-recorder')).toHaveCount(0);
   await play.click();
   await expect(page.locator('.opening-trailer-controls')).toBeHidden();

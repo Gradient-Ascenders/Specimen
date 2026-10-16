@@ -23,12 +23,14 @@ export class TitleScreenPresentation {
   private bufferHeight = 0;
   private lastWobbling = false;
   private needsRender = true;
+  private reduceMenuMotion: boolean;
 
-  constructor(options: { renderLayer: RenderLayer; host: HTMLElement; window?: Window; scene?: TitleSceneView }) {
+  constructor(options: { renderLayer: RenderLayer; host: HTMLElement; window?: Window; scene?: TitleSceneView; reduceMotion?: boolean }) {
     this.renderLayer = options.renderLayer;
     this.host = options.host;
     this.hostWindow = options.window ?? window;
     this.scene = options.scene ?? new TitleScreenScene();
+    this.reduceMenuMotion = options.reduceMotion ?? false;
     this.motionPreference = this.hostWindow.matchMedia('(prefers-reduced-motion: reduce)');
     this.motionPreference.addEventListener('change', this.onMotionChanged);
     this.host.dataset.titleBackdrop = 'preparing';
@@ -36,12 +38,12 @@ export class TitleScreenPresentation {
 
   async prepare(): Promise<void> {
     if (this.disposed) return;
-    this.scene.update(0, this.host.clientWidth / Math.max(1, this.host.clientHeight), this.motionPreference.matches);
+    this.scene.update(0, this.host.clientWidth / Math.max(1, this.host.clientHeight), this.reducedMotion);
     await this.renderLayer.withShadowPreparation(true, () => this.renderLayer.renderer.compileAsync(
       this.scene.scene, this.scene.camera));
     if (this.disposed) return;
-    // Level 1's loading primers have finished before this sub-native cap applies.
-    this.renderLayer.setPresentationPixelBudget(TITLE_PIXEL_BUDGET);
+    // Level 1's loading primers finish before applying presentation resolution.
+    this.renderLayer.setPresentationResolution(TITLE_PIXEL_BUDGET);
     this.ready = true;
     this.render(0);
     this.host.dataset.titleBackdrop = 'ready';
@@ -57,10 +59,10 @@ export class TitleScreenPresentation {
     const canvas = this.renderLayer.canvas;
     // Changing the density setting clears the buffer even at unchanged CSS/DPR.
     const bufferChanged = canvas.width !== this.bufferWidth || canvas.height !== this.bufferHeight;
-    if (!this.needsRender && !resized && !bufferChanged && (this.motionPreference.matches ||
+    if (!this.needsRender && !resized && !bufferChanged && (this.reducedMotion ||
       this.accumulator + 1e-10 < TITLE_FRAME_INTERVAL_SECONDS)) return;
-    if (resized) this.renderLayer.setPresentationPixelBudget(TITLE_PIXEL_BUDGET);
-    const wobbling = this.scene.update(this.seconds, width / height, this.motionPreference.matches);
+    if (resized) this.renderLayer.setPresentationResolution(TITLE_PIXEL_BUDGET);
+    const wobbling = this.scene.update(this.seconds, width / height, this.reducedMotion);
     const refreshShadow = this.needsRender || wobbling || this.lastWobbling;
     this.renderLayer.withShadowPreparation(true, () => {
       // Only the egg moves. Reuse the room's one 512px shadow map at rest;
@@ -73,7 +75,7 @@ export class TitleScreenPresentation {
     this.width = width; this.height = height; this.dpr = this.hostWindow.devicePixelRatio;
     this.bufferWidth = canvas.width; this.bufferHeight = canvas.height;
     this.needsRender = false;
-    const motion = this.motionPreference.matches ? 'still' : 'orbiting';
+    const motion = this.reducedMotion ? 'still' : 'orbiting';
     if (this.host.dataset.titleMotion !== motion) this.host.dataset.titleMotion = motion;
   }
 
@@ -81,10 +83,20 @@ export class TitleScreenPresentation {
     if (this.disposed) return;
     this.disposed = true;
     this.motionPreference.removeEventListener('change', this.onMotionChanged);
-    this.renderLayer.setPresentationPixelBudget(undefined);
+    this.renderLayer.setPresentationResolution(undefined);
     this.scene.dispose();
     delete this.host.dataset.titleBackdrop;
     delete this.host.dataset.titleMotion;
+  }
+
+  setReducedMotion(enabled: boolean): void {
+    if (this.disposed || this.reduceMenuMotion === enabled) return;
+    this.reduceMenuMotion = enabled;
+    this.needsRender = true;
+  }
+
+  private get reducedMotion(): boolean {
+    return this.reduceMenuMotion || this.motionPreference.matches;
   }
 
   private readonly onMotionChanged = (): void => { this.needsRender = true; };
