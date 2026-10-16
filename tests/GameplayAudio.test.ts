@@ -3,6 +3,8 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import * as THREE from 'three';
 import { AudioManager, type AudioPlayback } from '../src/audio/AudioManager.ts';
+import { WorldAudio } from '../src/audio/WorldAudio.ts';
+import { LaserHazard } from '../src/hazards/LaserHazard.ts';
 import { GameplayAudio, type AcidPoolBounds } from '../src/audio/GameplayAudio.ts';
 import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
 import { SOUND_BANKS, SOUND_DEFINITIONS, soundUrl, type SoundId } from '../src/audio/SoundCatalog.ts';
@@ -667,4 +669,29 @@ test('remote world controls are culled and paused, dead or restoring levels reje
     bodies.bob.position.x=100;director.update();
     gameplayAudioEvents.emit('cue',{sound:'world-activation-01',position:{x:100,y:1,z:0},maxDistance:16});assert.equal(audio.cues.length,restored+1);
   } finally {director.dispose();}
+});
+
+
+test('all nearby laser sources share one continuing Web Audio voice instead of restarting per beam',async()=>{
+  const originalFetch=globalThis.fetch, context=new Context();
+  globalThis.fetch=async()=>new Response(new Uint8Array([1]));
+  const audio=new AudioManager('./',()=>context as unknown as AudioContext);
+  const root=new THREE.Group(),world=new WorldAudio(audio,root);
+  const lasers=Array.from({length:64},(_,i)=>new LaserHazard({id:`laser-audio-${i}`,start:{x:-10,y:1,z:i*.1},end:{x:10,y:1,z:i*.1}}));
+  for(const laser of lasers)root.add(laser.root);
+  try {
+    await audio.preload(['world-laser-loop-01']);audio.setPaused(false);audio.unlock();await Promise.resolve();
+    for(let i=0;i<lasers.length;i++) {
+      world.update({x:0,y:2,z:i*.1});
+      assert.equal(audio.diagnostics.voices,1);assert.equal(audio.diagnostics.loops,1);
+      assert.ok(Math.abs(context.panners[0].positionZ.value-i*.1)<1e-9,`beam ${i} must be audible at its nearest point`);
+    }
+    assert.equal(context.sources.length,1,'changing nearest beams must not restart the buffer or allocate another voice');
+    audio.setPaused(true);await Promise.resolve();audio.setPaused(false);await Promise.resolve();
+    world.update({x:0,y:2,z:0});assert.equal(context.sources.length,1);
+    for(const laser of lasers)laser.setCircuitGateEnabled(false);
+    world.update({x:0,y:1,z:0});assert.equal(audio.diagnostics.voices,0);assert.equal(audio.diagnostics.loops,0);
+    lasers[0].setCircuitGateEnabled(true);world.update({x:0,y:1,z:0});assert.equal(audio.diagnostics.voices,1);
+    world.dispose();assert.equal(audio.diagnostics.voices,0);
+  } finally {world.dispose();for(const laser of lasers)laser.dispose();audio.dispose();globalThis.fetch=originalFetch;}
 });

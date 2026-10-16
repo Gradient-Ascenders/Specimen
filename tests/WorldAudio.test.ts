@@ -15,6 +15,8 @@ import { WallButton } from '../src/puzzle/WallButton.ts';
 import { LaserHazard } from '../src/hazards/LaserHazard.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
+import { SentinelSweepLaserAttack, SentinelRotatingLaserAttack } from '../src/boss/attacks/SentinelLaserAttacks.ts';
+import type { SentinelAttackContext } from '../src/boss/SentinelBossTypes.ts';
 import { LevelTwoRoomFourGreybox } from '../src/levels/LevelTwoRoomFourGreybox.ts';
 
 class Playback implements AudioPlayback {
@@ -147,4 +149,44 @@ test('Cultivation scrolling-shaft elevator sounds its authoritative descent',()=
     room.reset();audio.update(listener);assert.equal(playback.loops.size,0);
     room.controller.restoreArrival();audio.update(listener);assert.equal(playback.loops.size,0);
   } finally {audio.dispose();room.dispose();}
+});
+
+
+test('timed sweeping beams sound only during their enabled phase and follow their moving endpoints',()=>{
+  const {root,playback,audio}=fixture();
+  const laser=new LaserHazard({id:'timed-sweep-audio',start:{x:0,y:1,z:0},end:{x:8,y:1,z:0},timeline:{axisWorld:{x:0,y:1,z:0},repeat:true,steps:[
+    {kind:'hold',durationSeconds:.2,enabled:false,angleRadians:0},
+    {kind:'sweep',durationSeconds:1,enabled:true,fromAngleRadians:0,toAngleRadians:Math.PI/2},
+    {kind:'hold',durationSeconds:.2,enabled:false,angleRadians:Math.PI/2},
+  ]}});root.add(laser.root);
+  try {
+    audio.update({x:4,y:2,z:-1});assert.equal(playback.loops.size,0);
+    laser.update(.2);audio.update({x:4,y:2,z:-1});assert.equal(playback.loops.size,1);
+    const before={...playback.loops.get('world:laser')!.position!};
+    laser.update(.5);audio.update({x:4,y:2,z:-1});assert.notDeepEqual(playback.loops.get('world:laser')!.position,before);
+    laser.update(.5);audio.update({x:4,y:2,z:-1});assert.equal(playback.loops.size,0);
+    laser.setCircuitGateEnabled(false);laser.update(.4);audio.update(origin);assert.equal(playback.loops.size,0);
+    laser.setCircuitGateEnabled(true);audio.update(origin);assert.equal(playback.loops.size,1);
+    laser.dispose();audio.update(origin);assert.equal(playback.loops.size,0);
+  } finally {audio.dispose();laser.dispose();}
+});
+
+for(const type of ['sweep','rotating'] as const) test(`Sentinel ${type} laser audio follows active attack, recovery, cancellation and disposal`,()=>{
+  const {root,playback,audio}=fixture();
+  const durations={telegraphSeconds:.1,activeSeconds:.5,recoverySeconds:.1};
+  const attack=type==='sweep'
+    ?new SentinelSweepLaserAttack({id:'sweep-audio',start:new THREE.Vector3(-4,1,0),end:new THREE.Vector3(4,1,0),axisWorld:new THREE.Vector3(0,1,0),fromAngleRadians:0,toAngleRadians:.5,durations})
+    :new SentinelRotatingLaserAttack({id:'rotating-audio',origin:new THREE.Vector3(0,1,0),beamLengthMetres:8,beamCount:6,rotationRadians:Math.PI,durations});
+  root.add(attack.root);
+  const context:SentinelAttackContext={specimen:{position:{x:0,y:5,z:0},previousPosition:{x:0,y:5,z:0},radiusMetres:.675},requestFailure:()=>true};
+  try {
+    attack.start(context);audio.update(origin);assert.equal(playback.loops.size,0);
+    attack.update(.1,context);audio.update(origin);assert.equal(playback.loops.size,1);
+    assert.equal(playback.loops.get('world:laser')!.sound,'world-laser-loop-01');
+    attack.update(.5,context);audio.update(origin);assert.equal(playback.loops.size,0);
+    attack.reset();attack.start(context);attack.update(.1,context);audio.update(origin);assert.equal(playback.loops.size,1);
+    attack.cancel('death');audio.update(origin);assert.equal(playback.loops.size,0);
+    attack.start(context);attack.update(.1,context);audio.update(origin);assert.equal(playback.loops.size,1);
+    attack.dispose();audio.update(origin);assert.equal(playback.loops.size,0);
+  } finally {audio.dispose();attack.dispose();}
 });

@@ -64,7 +64,8 @@ export class WorldAudio {
       if (options.kind === 'door' && moved && settled)
         this.audio.play('world-door-stop-01', this.point, true);
       if (laser || (moved && !settled)) candidates.push({
-        key: source.key, distance, position: this.point.clone(), laser,
+        // Keep the laser voice running when a different beam becomes nearest.
+        key: laser ? 'world:laser' : source.key, distance, position: this.point.clone(), laser,
         sound: laser ? 'world-laser-loop-01' : options.kind === 'door' ? 'world-door-movement-loop-01' : 'world-machinery-loop-01',
       });
     }
