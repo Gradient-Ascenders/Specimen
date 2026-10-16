@@ -39,7 +39,9 @@ test('hover and keyboard focus demonstrate each title ability and update its spe
       (window as any).__titlePreview.render((window as any).__titlePreviewLayer, 0.1);
     }
   }, frames);
-  const capture = (name: string) => page.screenshot({ path: resolve(directory, `${name}.png`), animations: 'disabled' });
+  // Software rendering can still be draining the explicitly stepped GPU frames.
+  const capture = (name: string) => page.screenshot({ path: resolve(directory, `${name}.png`),
+    animations: 'disabled', timeout: 60_000 });
   const baseline = await snapshot();
   const caption = page.locator('.title-specimen-caption');
 
