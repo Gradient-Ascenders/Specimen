@@ -143,6 +143,7 @@ function startGame(): void {
     creditsMarkdown,
     slimeHUD: gameSession,
     actions: {
+      enableMusic: unlockAudio,
       playOpening: () => {
         if (!titleRoom) return;
         titlePresentation?.dispose({ keepScene: true });
@@ -215,6 +216,7 @@ function startGame(): void {
       subscribeGraphicsDiagnostics: listener => renderLayer.subscribeGraphicsDiagnostics(listener),
     },
   });
+  music.setAutoplayBlockedListener(blocked => gameFlow.setMusicUnlockRequired(blocked));
   const cleanGameplayMode = new CleanGameplayMode({
     host: app,
     flow: gameFlow,
