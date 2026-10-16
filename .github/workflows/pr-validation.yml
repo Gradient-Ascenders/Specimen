@@ -42,7 +42,9 @@ jobs:
   production-build:
     name: Production smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Six serial SwiftShader journeys exceed the old 15-minute job budget.
+    # Leave setup/diagnostic-upload time outside the smoke step's own deadline.
+    timeout-minutes: 30
     steps:
       - name: Check out proposed merge
         uses: actions/checkout@v7
@@ -70,6 +72,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Smoke-test production at a nested path
+        timeout-minutes: 25
         run: npm run test:smoke
 
       - name: Upload browser diagnostics on failure

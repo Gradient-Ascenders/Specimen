@@ -215,6 +215,14 @@ paths. Native asynchronous gzip decompression prepares lossless CPU buffers;
 version, alignment, ranges, geometry bounds and repair targets are validated.
 There is no runtime fallback to texture generation or triangle repair.
 
+Cultivation and Blackout share `readGzipResponse`: finish the compressed HTTP
+body before passing an owned byte view to native gzip decoding. Piping a live
+fetch body directly into the decoder intermittently reports `net::ERR_ABORTED`
+in Chromium despite a complete decoded asset. This uses one temporary compressed
+buffer per active load (7.42 MB for Cultivation, 1.18 MB for Blackout), without a
+second Blob copy. Transport/decode errors still reject, and abort checks before
+and after each phase prevent a cancelled transition from installing assets.
+
 `CultivationAssetSource` is an explicit construction dependency. The runtime
 borrows decoded CPU inputs; each existing art owner receives its own textures
 and mutable geometry arrays and retains responsibility for disposing them.
@@ -271,3 +279,8 @@ production build. Check narrow and wide viewports, restart/unload cycles,
 console and network output, WebGL errors, shader-program counts, and stable warm
 geometry/texture counts. CPU/SwiftShader browser checks are correctness smoke
 tests, not hardware performance measurements.
+
+PR CI budgets 30 minutes for the six serial SwiftShader smoke journeys and
+setup. The smoke step has a separate 25-minute deadline so a timeout leaves
+time to upload diagnostics. Per-test deadlines, zero retries and strict request/
+console/WebGL error assertions remain unchanged.

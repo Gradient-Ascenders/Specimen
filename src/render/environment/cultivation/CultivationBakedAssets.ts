@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { readGzipResponse } from '../ReadGzipResponse.ts';
 import type { LevelTwoPreviewScene } from '../../../levels/LevelTwoPreviewScene.ts';
 
 export interface SurfaceRepairStep {
@@ -195,8 +196,6 @@ export function readCultivationBakedAssets(buffer: ArrayBuffer): CultivationBake
 export async function loadCultivationBakedAssets(url: URL, signal?: AbortSignal): Promise<CultivationBakedAssets> {
   const response = await fetch(url, { signal });
   if (!response.ok || !response.body) throw new Error(`Could not load Cultivation assets: HTTP ${response.status}`);
-  const stream = response.body.pipeThrough(new DecompressionStream('gzip'), { signal });
-  const buffer = await new Response(stream).arrayBuffer();
-  signal?.throwIfAborted();
+  const buffer = await readGzipResponse(response, signal);
   return readCultivationBakedAssets(buffer);
 }
