@@ -23,6 +23,65 @@ test('immediate opening Skip completes full preparation once without duplicate G
   expect(errors).toEqual([]);
 });
 
+test('one Retry recovers after a shared asset outage fails both the opening and Level 1', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  let unavailable = true, failedDownloads = 0, recoveredDownloads = 0;
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => {
+    // HTTP 503 diagnostics are expected while the test deliberately fails Bob.
+    if (/GL_INVALID_|CONTEXT_LOST_WEBGL/.test(message.text())) errors.push(message.text());
+  });
+  // Expose the existing coordinator only in this test's served bundle so the
+  // retry cannot race ahead of the second rejection. No production test hook.
+  await page.route('**/assets/index-*.js', async route => {
+    const response = await route.fetch(), source = await response.text();
+    const session = /([\w$]+)=new ([\w$]+)\(\{initialRuntime:/;
+    expect(source).toMatch(session);
+    await route.fulfill({ response, body: source.replace(session,
+      '$1=globalThis.__openingRecoverySession=new $2({initialRuntime:') });
+  });
+  await page.route(/\/bob-authored-[^/]+\.glb$/, async route => {
+    if (unavailable) {
+      failedDownloads++;
+      await route.fulfill({ status: 503, body: 'Temporarily unavailable' });
+    } else {
+      recoveredDownloads++;
+      await route.continue();
+    }
+  });
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  const host = page.locator('#app'), flow = page.locator('.game-flow');
+  const retry = page.locator('[data-action="retry-opening"]');
+  await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
+  await page.locator('[data-action="start"]').click();
+  await expect.poll(() => failedDownloads, { timeout: 120_000 }).toBeGreaterThanOrEqual(3);
+  // The opening's Bob request and Level 1's preload/required attempts have
+  // all failed. Wait for mandatory level preparation to settle, not just for
+  // the first error to make Retry visible.
+  await page.waitForFunction(() => (window as any).__openingRecoverySession.initialPreparationPending === false);
+  await expect(host).toHaveAttribute('data-opening-state', 'failed');
+  await expect(host).not.toHaveAttribute('data-level-one-prewarm');
+  await expect(retry).toBeVisible();
+  await expect(page.locator('.opening-fade')).toHaveCSS('opacity', '1');
+
+  unavailable = false;
+  await retry.click();
+  await expect(host).toHaveAttribute('data-opening-stage', 'experiments', { timeout: 180_000 });
+  await expect(host).toHaveAttribute('data-opening-state', 'playing');
+  await expect(host).toHaveAttribute('data-level-one-prewarm', /roomStepsCompleted/);
+  await expect(flow).toHaveAttribute('data-state', 'opening');
+  await expect(retry).toBeHidden();
+  await expect(page.locator('.opening-fade')).toHaveCSS('opacity', '0');
+  expect(recoveredDownloads).toBeGreaterThanOrEqual(2, 'Both prerequisites retry their own Bob load.');
+  await page.locator('[data-action="skip-opening"]').click();
+  await expect(flow).toHaveAttribute('data-state', 'playing', { timeout: 120_000 });
+  await expect(host).not.toHaveAttribute('data-opening-state');
+  await expect(host).not.toHaveAttribute('data-opening-mode');
+  await expect(page.locator('canvas')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
 test('default live opening does only light asset preparation and cannot run Level 1 GPU warm-up', async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];

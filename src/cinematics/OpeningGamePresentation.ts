@@ -114,7 +114,9 @@ export class OpeningGamePresentation {
     if (this.disposed || this.completed || !this.failed) return;
     this.failed = false;
     if (!this.sceneReady) this.prepareScene();
-    else if (!this.levelReady && this.levelPreparationScheduled) this.prepareLevel();
+    // Failure recovery already holds black. Retry both unready prerequisites;
+    // neither one can rely on the other's success to schedule it again.
+    if (!this.levelReady && this.levelPreparationScheduled) this.prepareLevel();
     this.syncStatus();
   }
 

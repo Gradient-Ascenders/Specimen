@@ -499,6 +499,47 @@ test('retrying a failed clip cannot reveal it while recovery GPU preparation is 
   f.player.dispose();
 });
 
+test('Retry restarts both failed prerequisites and recovers once in either completion order', async () => {
+  for (const skip of [false, true]) for (const first of ['scene', 'level'] as const) {
+    const f = playerFixture(); f.player.start(); f.blackout(); f.flushFrames(); f.flushFrames();
+    if (skip) f.player.skip();
+    f.sceneReady.reject(new Error('opening asset unavailable')); await flushPromises();
+    f.flushFrames(); f.flushFrames(); await flushPromises();
+    assert.equal(f.counts().levelLoads, 1);
+    f.levelReady.reject(new Error('level asset unavailable')); await flushPromises();
+    assert.equal(f.host.dataset.openingState, 'failed');
+    assert.equal(f.statuses.at(-1)?.failed, true);
+
+    const sceneRetry = deferred(), levelRetry = deferred();
+    f.setScenePromise(sceneRetry.promise); f.setLevelPromise(levelRetry.promise);
+    f.player.retry(); f.player.retry(); await flushPromises();
+    assert.equal(f.counts().sceneLoads, 2);
+    assert.equal(f.counts().levelLoads, 2, 'Retry must restart Level 1 even while the opening is unready.');
+    assert.equal(f.statuses.at(-1)?.failed, false);
+
+    (first === 'scene' ? sceneRetry : levelRetry).resolve(); await flushPromises();
+    for (let i = 0; i < 55; i++) f.player.render(.1);
+    assert.equal(f.counts().draws, 0, 'Do not reveal either recovered scene before both prerequisites settle.');
+    assert.equal(f.fades.at(-1), 1);
+    assert.equal(f.counts().completions, 0);
+
+    (first === 'scene' ? levelRetry : sceneRetry).resolve(); await flushPromises();
+    if (!skip) {
+      for (let i = 0; i < 55; i++) f.player.render(.1);
+      assert.equal(f.host.dataset.openingStage, 'experiments', 'Recovery must resume the film, not stall on black.');
+      assert.equal(f.host.dataset.openingState, 'playing');
+      assert.equal(f.statuses.at(-1)?.message, '');
+      for (let i = 0; i < Math.ceil(T.end * 10) + 1; i++) f.player.render(.1);
+    }
+    assert.equal(f.counts().completions, 1);
+    assert.equal(f.counts().preloads, 0, 'Recovery reuses mandatory preparation, not speculative downloads.');
+    f.player.retry(); f.player.skip(); await flushPromises();
+    assert.equal(f.counts().sceneLoads, 2); assert.equal(f.counts().levelLoads, 2);
+    assert.equal(f.counts().completions, 1, 'Repeated Retry/Skip cannot hand off twice.');
+    f.player.dispose();
+  }
+});
+
 test('playback shares the existing loop with a 30Hz cap and stops redrawing while final preparation waits', async () => {
   const f = playerFixture(); f.player.start();
   f.blackout(); f.flushFrames(); f.flushFrames(); f.sceneReady.resolve(); await flushPromises();
