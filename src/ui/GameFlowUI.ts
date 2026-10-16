@@ -328,6 +328,7 @@ export class GameFlowStateModel {
 
 export interface GameFlowActions {
   playOpening?(): void;
+  enableMusic?(): void;
   skipOpening?(): void;
   retryOpening?(): void;
   startGameplay(): void;
@@ -534,6 +535,12 @@ export class GameFlowUI {
     this.syncState();
   }
 
+  /** Show a small opt-in button only when the browser denies audible autoplay. */
+  setMusicUnlockRequired(required: boolean): void {
+    if (this.disposed) return;
+    this.requireElement<HTMLElement>('[data-title-music-prompt]').hidden = !required;
+  }
+
   finishOpening(userGesture = false): void {
     if (this.model.state !== 'opening') return;
     this.actions.startGameplay();
@@ -652,6 +659,10 @@ export class GameFlowUI {
               <span class="menu-arrow" aria-hidden="true">→</span>
             </button>
           </nav>
+          <p class="title-music-prompt" data-title-music-prompt hidden>
+            Browser audio requires a click.
+            <button type="button" data-action="enable-music">Enable music</button>
+          </p>
         </div>
       </section>
 
@@ -925,6 +936,9 @@ export class GameFlowUI {
     if (!target) return;
 
     switch (target.dataset.action) {
+      case 'enable-music':
+        if (this.model.state === 'title') this.actions.enableMusic?.();
+        break;
       case 'start':
         if (this.actions.playOpening && this.model.beginOpening()) {
           this.syncState();
