@@ -1,6 +1,6 @@
 # Issue #191: integration with Cultivation workloads and the opening cinematic
 
-This is the current integration record. Earlier [implementation](shader-preparation-191.md),
+For the subsequent PR-review correction, see the [dark-room readiness report](shader-preparation-191-dark-readiness.md). The measurements below describe the earlier integration revision. Earlier [implementation](shader-preparation-191.md),
 [Standard regression](shader-preparation-191-follow-up.md) and
 [transmission switching](shader-preparation-191-transmission.md) reports are historical
 measurements under their explicitly recorded revisions and startup routes.
