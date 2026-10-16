@@ -1,5 +1,6 @@
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
+import { AcidSurfaceMaterial } from '../render/environment/containment/AcidSurfaceMaterial.ts';
 import { disposeShadowLight } from '../render/ShadowLightResources.ts';
 import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
 import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
@@ -22,7 +23,7 @@ export class BlackoutMaintenanceBay {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
 
-  private readonly acidMaterial: THREE.MeshStandardMaterial;
+  private readonly acidMaterial: AcidSurfaceMaterial;
   private readonly arcPositions = new Float32Array(3 * 8 * 2 * 3);
   private readonly arcGeometry = new THREE.BufferGeometry();
   private readonly arcMaterial = new THREE.LineBasicMaterial({color:0xafffff,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -50,10 +51,7 @@ export class BlackoutMaintenanceBay {
     const submergedSteel = new THREE.MeshStandardMaterial({color:0x30391c,roughness:.55,metalness:.18});
     const warning = new THREE.MeshStandardMaterial({ color: 0x8b6b21, roughness: 0.85, metalness: 0.18 });
     const trim = new THREE.MeshStandardMaterial({ color: 0x515956, roughness: 0.72, metalness: 0.58 });
-    this.acidMaterial = new THREE.MeshStandardMaterial({
-      color: 0x30391c, emissive: 0x101606, emissiveIntensity: 0.055,
-      roughness: 0.52, metalness: 0.02,
-    });
+    this.acidMaterial = new AcidSurfaceMaterial();
 
     const { chamberWidth, rearZ, hallwayWidth, hallwayLength, acidStartZ, acidEndZ } = BLACKOUT_BAY_LAYOUT;
     const halfWidth = chamberWidth / 2;
@@ -235,8 +233,7 @@ export class BlackoutMaintenanceBay {
 
   update(dt: number, powered: boolean): void {
     this.elapsed += Math.max(0, dt);
-    const pulse = 0.5 + 0.5 * Math.sin(this.elapsed * 3.7);
-    this.acidMaterial.emissiveIntensity = 0.035 + pulse * 0.02;
+    this.acidMaterial.update(Math.max(0, dt));
     // Fixed buffers: three jagged discharges bridge the vent's grounded edges.
     // Endpoints stay attached to its metal rim while interior nodes crackle.
     const phase=Math.floor(this.elapsed*24);

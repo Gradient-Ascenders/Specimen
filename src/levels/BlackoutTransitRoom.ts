@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { AcidSurfaceMaterial } from '../render/environment/containment/AcidSurfaceMaterial.ts';
 import type { BlackoutMaintenanceMaterials } from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import { mapBlackoutBoxUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
 import { borrowBlackoutMaps } from '../render/environment/blackout/BlackoutTransitMaterials.ts';
@@ -134,6 +135,7 @@ export class BlackoutTransitRoom {
   });
 
   private readonly materials: THREE.Material[] = [];
+  private readonly acidMaterial = new AcidSurfaceMaterial();
   private readonly hallwayLights: THREE.PointLight[] = [];
   private readonly hallwayBulbs: THREE.MeshStandardMaterial[] = [];
   private hallwayElapsed = 0;
@@ -157,7 +159,8 @@ export class BlackoutTransitRoom {
     const trim = this.material(0x42504c, 0.72, 0.58);
     const warning = this.material(0x665020, 0.86, 0.2);
     const sticky = this.material(0x183a35, 0.48, 0.08, 0x061511, 0.16);
-    const acid = this.material(0x292d13, 0.58, 0.04, 0x181b07, 0.09);
+    const acid = this.acidMaterial;
+    this.materials.push(acid);
     const glass = this.material(0x263c3d, 0.52, 0.55, 0x061011, 0.12);
 
     this.buildShell(darkSteel, platformSteel, trim, warning, acid);
@@ -221,6 +224,7 @@ export class BlackoutTransitRoom {
 
   update(deltaSeconds: number): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0) return;
+    this.acidMaterial.update(deltaSeconds);
     this.hallwayElapsed += deltaSeconds;
     for (let index = 0; index < this.hallwayLights.length; index += 1) {
       // Separate phases and dropouts prevent the whole corridor flashing in
