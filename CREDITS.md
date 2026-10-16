@@ -60,9 +60,11 @@ texture assets, external code or third-party dependencies were introduced.
 | --- | --- | --- | --- | --- |
 | Bob, Goop and Volt sound packs (53 effects) | Original procedural synthesis with ChatGPT assistance, as described in the supplied manifests | Requester-supplied Specimen character SFX ZIP packs | Created for this project; no separate licence declaration supplied | Gameplay movement, abilities, collisions, power and recovery. Oscillators, filtered noise and envelopes; no imported audio samples. |
 | Specimen turret shot | Requester-supplied audio; original creator and generation tool not specified | Supplied `specimen-turret-shot.wav`, converted to OGG Vorbis | No separate licence declaration supplied | Accepted turret projectile spawns across the shared drone firing system. |
+| Containment listening preview (one music loop, two ambience loops, four cues) | Original project-authored synthesis with Codex assistance | `scripts/generate-containment-audio.py` | Created for this project; no imported samples or third-party compositions | Containment Rooms 1–3: ambient score, ventilation, localized machinery, checkpoint confirmation, laser on/off and character-switch cues. |
 
 The complete asset inventory and gameplay mappings are documented in
-`docs/architecture/gameplay-audio.md`. No music has been introduced.
+`docs/architecture/gameplay-audio.md`. The Containment score is a prototype for
+listening review; later rooms and levels have no new soundtrack in this pass.
 
 ## Fonts
 

@@ -379,6 +379,8 @@ export class GameFlowUI {
   private readonly volumeOutput: HTMLOutputElement;
   private readonly effectsInput: HTMLInputElement;
   private readonly effectsOutput: HTMLOutputElement;
+  private readonly musicInput: HTMLInputElement;
+  private readonly musicOutput: HTMLOutputElement;
   private readonly cameraDistanceInput: HTMLInputElement;
   private readonly cameraDistanceOutput: HTMLOutputElement;
   private readonly renderResolutionInput: HTMLSelectElement;
@@ -439,6 +441,8 @@ export class GameFlowUI {
     );
     this.effectsInput = this.requireElement<HTMLInputElement>('[data-setting="effects-volume"]');
     this.effectsOutput = this.requireElement<HTMLOutputElement>('[data-setting-output="effects-volume"]');
+    this.musicInput = this.requireElement<HTMLInputElement>('[data-setting="music-volume"]');
+    this.musicOutput = this.requireElement<HTMLOutputElement>('[data-setting-output="music-volume"]');
     this.cameraDistanceInput = this.requireElement<HTMLInputElement>(
       '[data-setting="camera-distance"]',
     );
@@ -757,6 +761,7 @@ export class GameFlowUI {
     );
     this.volumeInput.addEventListener('input', this.onVolumeInput, { signal });
     this.effectsInput.addEventListener('input', this.onEffectsInput, { signal });
+    this.musicInput.addEventListener('input', this.onMusicInput, { signal });
     this.cameraDistanceInput.addEventListener(
       'input',
       this.onCameraDistanceInput,
@@ -989,6 +994,10 @@ export class GameFlowUI {
     this.settings.setSoundEffectsVolume(this.effectsInput.valueAsNumber / 100);
   };
 
+  private readonly onMusicInput = (): void => {
+    this.settings.setMusicVolume(this.musicInput.valueAsNumber / 100);
+  };
+
   private readonly onVolumeInput = (): void => {
     this.settings.setMasterVolume(this.volumeInput.valueAsNumber / 100);
   };
@@ -1031,6 +1040,9 @@ export class GameFlowUI {
     this.effectsInput.value = String(Math.round(settings.soundEffectsVolume * 100));
     this.effectsInput.style.setProperty('--range-progress', `${settings.soundEffectsVolume * 100}%`);
     this.effectsOutput.value = `${Math.round(settings.soundEffectsVolume * 100)}%`;
+    this.musicInput.value = String(Math.round(settings.musicVolume * 100));
+    this.musicInput.style.setProperty('--range-progress', `${settings.musicVolume * 100}%`);
+    this.musicOutput.value = `${Math.round(settings.musicVolume * 100)}%`;
     this.cameraDistanceInput.value = settings.cameraDistanceMetres.toFixed(1);
     this.cameraDistanceInput.style.setProperty(
       '--range-progress',

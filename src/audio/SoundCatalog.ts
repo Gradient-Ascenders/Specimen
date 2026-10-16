@@ -1,4 +1,4 @@
-/** Supplied mono OGG assets; URLs stay relative to the deployed document. */
+/** OGG assets; URLs stay relative to the deployed document. */
 export const SOUND_DEFINITIONS = {
   'bob-bounce-01': { path: 'assets/audio/bob/bob-bounce-01.ogg', loop: false, volume: 0.5, maxVoices: 3 },
   'bob-charge-loop-01': { path: 'assets/audio/bob/bob-charge-loop-01.ogg', loop: true, volume: 0.13, maxVoices: 1 },
@@ -54,6 +54,13 @@ export const SOUND_DEFINITIONS = {
   'volt-shoot-01': { path: 'assets/audio/volt/volt-shoot-01.ogg', loop: false, volume: 0.5, maxVoices: 3 },
   'volt-terminal-activate-01': { path: 'assets/audio/volt/volt-terminal-activate-01.ogg', loop: false, volume: 0.5, maxVoices: 3 },
   'specimen-turret-shot': { path: 'assets/audio/turrets/specimen-turret-shot.ogg', loop: false, volume: 0.65, maxVoices: 3 },
+  'containment-score': { path: 'assets/audio/containment/containment-score.ogg', loop: true, volume: 0.38, maxVoices: 1, bus: 'music', fadeInSeconds: 2 },
+  'lab-air-loop': { path: 'assets/audio/containment/lab-air-loop.ogg', loop: true, volume: 0.18, maxVoices: 1, bus: 'ambience', fadeInSeconds: 1.5 },
+  'lab-machine-loop': { path: 'assets/audio/containment/lab-machine-loop.ogg', loop: true, volume: 0.24, maxVoices: 2, bus: 'ambience', fadeInSeconds: 1 },
+  'lab-checkpoint': { path: 'assets/audio/containment/lab-checkpoint.ogg', loop: false, volume: 0.36, maxVoices: 2 },
+  'lab-laser-on': { path: 'assets/audio/containment/lab-laser-on.ogg', loop: false, volume: 0.32, maxVoices: 2 },
+  'lab-laser-off': { path: 'assets/audio/containment/lab-laser-off.ogg', loop: false, volume: 0.22, maxVoices: 2 },
+  'lab-switch': { path: 'assets/audio/containment/lab-switch.ogg', loop: false, volume: 0.2, maxVoices: 1 },
 } as const;
 export type SoundId = keyof typeof SOUND_DEFINITIONS;
 const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
@@ -65,9 +72,16 @@ const CULTIVATION_VOLT_SOUNDS: readonly SoundId[] = [
 ];
 /** Cumulative banks start warming ahead of each level's visual preparation. */
 export const SOUND_BANKS = {
-  containment: ALL_SOUND_IDS.filter(id => id.startsWith('bob-') || id.startsWith('goop-')),
+  containment: ALL_SOUND_IDS.filter(id => id.startsWith('bob-') || id.startsWith('goop-') || id.startsWith('lab-') || id === 'containment-score'),
   cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-') || CULTIVATION_VOLT_SOUNDS.includes(id)),
   blackout: ALL_SOUND_IDS,
 } as const;
-export interface SoundDefinition { readonly path: string; readonly loop: boolean; readonly volume: number; readonly maxVoices: number }
+export interface SoundDefinition {
+  readonly path: string;
+  readonly loop: boolean;
+  readonly volume: number;
+  readonly maxVoices: number;
+  readonly bus?: 'music' | 'ambience';
+  readonly fadeInSeconds?: number;
+}
 export const soundUrl = (id: SoundId, base = "./"): string => `${base}${SOUND_DEFINITIONS[id].path}`;

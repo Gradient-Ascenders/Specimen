@@ -16,6 +16,7 @@ export interface GameSettingsSnapshot extends GraphicsSettings {
   readonly invertVerticalLook: boolean;
   readonly masterVolume: number;
   readonly soundEffectsVolume: number;
+  readonly musicVolume: number;
   readonly cameraDistanceMetres: number;
   readonly showFPS: boolean;
   readonly reduceMenuMotion: boolean;
@@ -31,6 +32,7 @@ export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
   invertVerticalLook: false,
   masterVolume: 1,
   soundEffectsVolume: 0.8,
+  musicVolume: 0.55,
   cameraDistanceMetres: DEFAULT_CAMERA_RIG_CONFIG.followDistanceMetres,
   showFPS: false,
   reduceMenuMotion: false,
@@ -83,6 +85,10 @@ export class GameSettings {
 
   setSoundEffectsVolume(value: number): void {
     this.update({ soundEffectsVolume: clamp(value, 0, 1) });
+  }
+
+  setMusicVolume(value: number): void {
+    this.update({ musicVolume: Number.isFinite(value) ? clamp(value, 0, 1) : 0 });
   }
 
   setCameraDistanceMetres(value: number): void {
@@ -145,6 +151,7 @@ export class GameSettings {
       next.invertVerticalLook === this.current.invertVerticalLook &&
       next.masterVolume === this.current.masterVolume &&
       next.soundEffectsVolume === this.current.soundEffectsVolume &&
+      next.musicVolume === this.current.musicVolume &&
       next.cameraDistanceMetres === this.current.cameraDistanceMetres &&
       next.renderPixelRatioCap === this.current.renderPixelRatioCap &&
       next.showFPS === this.current.showFPS &&

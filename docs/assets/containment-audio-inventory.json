@@ -1,0 +1,86 @@
+[
+  {
+    "id": "containment-score",
+    "path": "assets/audio/containment/containment-score.ogg",
+    "durationSeconds": 64.0,
+    "sampleRate": 32000,
+    "channels": 2,
+    "peak": 0.19904,
+    "rms": 0.05116,
+    "loop": true,
+    "bytes": 222369,
+    "boundaryStep": 0.006
+  },
+  {
+    "id": "lab-air-loop",
+    "path": "assets/audio/containment/lab-air-loop.ogg",
+    "durationSeconds": 16.0,
+    "sampleRate": 32000,
+    "channels": 2,
+    "peak": 0.39751,
+    "rms": 0.0842,
+    "loop": true,
+    "bytes": 101398,
+    "boundaryStep": 0.0128
+  },
+  {
+    "id": "lab-machine-loop",
+    "path": "assets/audio/containment/lab-machine-loop.ogg",
+    "durationSeconds": 12.0,
+    "sampleRate": 32000,
+    "channels": 1,
+    "peak": 0.22674,
+    "rms": 0.07794,
+    "loop": true,
+    "bytes": 30523,
+    "boundaryStep": 6e-05
+  },
+  {
+    "id": "lab-checkpoint",
+    "path": "assets/audio/containment/lab-checkpoint.ogg",
+    "durationSeconds": 1.6,
+    "sampleRate": 32000,
+    "channels": 1,
+    "peak": 0.29566,
+    "rms": 0.06122,
+    "loop": false,
+    "bytes": 7415,
+    "boundaryStep": 0.0012
+  },
+  {
+    "id": "lab-laser-on",
+    "path": "assets/audio/containment/lab-laser-on.ogg",
+    "durationSeconds": 0.42,
+    "sampleRate": 32000,
+    "channels": 1,
+    "peak": 0.34096,
+    "rms": 0.06157,
+    "loop": false,
+    "bytes": 5066,
+    "boundaryStep": 0.00168
+  },
+  {
+    "id": "lab-laser-off",
+    "path": "assets/audio/containment/lab-laser-off.ogg",
+    "durationSeconds": 0.3,
+    "sampleRate": 32000,
+    "channels": 1,
+    "peak": 0.36973,
+    "rms": 0.06924,
+    "loop": false,
+    "bytes": 4991,
+    "boundaryStep": 0.00108
+  },
+  {
+    "id": "lab-switch",
+    "path": "assets/audio/containment/lab-switch.ogg",
+    "durationSeconds": 0.18,
+    "sampleRate": 32000,
+    "channels": 1,
+    "peak": 0.21701,
+    "rms": 0.02599,
+    "loop": false,
+    "bytes": 4917,
+    "boundaryStep": 0.00152
+  }
+]

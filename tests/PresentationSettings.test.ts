@@ -24,6 +24,7 @@ test('reset restores every default atomically and clears saved presentation pref
   const storage = memoryStorage(), settings = new GameSettings({ storage });
   settings.setShowFPS(true); settings.setReduceMenuMotion(true); settings.setGraphicsProfile('standard');
   settings.setMouseSensitivity(1.9); settings.setInvertVerticalLook(true); settings.setSoundEffectsVolume(0.1);
+  settings.setMusicVolume(0.2);
   settings.setCameraDistanceMetres(7); settings.setMasterVolume(0.15); settings.setGraphicsPreset('performance');
   settings.setRenderScale(0.5); settings.setRenderPixelRatioCap(2);
   let notifications = 0;
@@ -104,7 +105,7 @@ test('settings expose five labelled sections, current values, descriptions and r
   }
   const controls = [...markup.matchAll(/<(?:input|select)\b([^>]*)>/g)].map(match => match[1]);
   const keys = controls.map(control => control.match(/data-setting="([^"]+)"/)![1]);
-  assert.equal(keys.length, 12); assert.equal(new Set(keys).size, keys.length);
+  assert.equal(keys.length, 13); assert.equal(new Set(keys).size, keys.length);
   for (const attributes of controls) {
     const key = attributes.match(/data-setting="([^"]+)"/)![1];
     const description = attributes.match(/aria-describedby="([^"]+)"/)![1];

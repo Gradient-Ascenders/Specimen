@@ -139,7 +139,7 @@ function startGame(): void {
       isGameplayInputEnabled: () => input.enabled,
       restartLevel: () => lifecycleCoordinator.restartLevel(),
       applySettings: (nextSettings) => {
-        audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);
+        audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume, nextSettings.musicVolume);
         renderLayer.cameraRig.setLookSettings({
           horizontalSensitivityRadiansPerPixel:
             DEFAULT_CAMERA_RIG_CONFIG.horizontalSensitivityRadiansPerPixel *

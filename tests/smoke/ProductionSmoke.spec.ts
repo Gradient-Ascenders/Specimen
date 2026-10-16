@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
 
 // No route interception or runtime injection: these are the shipped files.
 const watchProductionRequests = (page: Page, baseURL: string): Set<string> => {
@@ -146,7 +147,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   await assertPlaying(page);
   expect([...voltAssets], 'Containment must not load Volt').toEqual([]);
   expect(cultivationAssets.size, 'Containment must not load the Cultivation bake').toBe(0);
-  await expect.poll(() => audioAssets.size).toBe(34);
+  await expect.poll(() => audioAssets.size).toBe(SOUND_BANKS.containment.length);
   expect([...audioAssets].some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
   expect(detailAssets.size).toBe(1);
   expect([...detailAssets][0]).toContain('/group-folder/assets/goop-lod-');
@@ -160,7 +161,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
     await expect(enterLevel).toContainText(`Enter Level ${level}`);
     await enterLevel.click();
     await assertPlaying(page);
-    await expect.poll(() => audioAssets.size).toBe(level === 2 ? 41 : 54);
+    await expect.poll(() => audioAssets.size).toBe(level === 2 ? SOUND_BANKS.cultivation.length : SOUND_BANKS.blackout.length);
     expect(detailAssets.size).toBe(2);
     if (level === 2) {
       expect(cultivationAssets.size, 'Cultivation must load its baked assets before playing').toBe(1);

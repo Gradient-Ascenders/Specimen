@@ -1,4 +1,5 @@
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import { ContainmentSoundscape } from '../audio/ContainmentSoundscape.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
 import {
@@ -259,6 +260,7 @@ export class GreyboxLevelRuntime {
   private readonly host: HTMLElement;
   private readonly audio: AudioPlayback | undefined;
   private gameplayAudio: GameplayAudio | undefined;
+  private containmentSoundscape: ContainmentSoundscape | undefined;
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
@@ -530,7 +532,7 @@ export class GreyboxLevelRuntime {
       slimeVisualState.movementIntentWorld = resources.noMovement;
       testScene.bob.update(deltaSeconds, slimeVisualState);
       testScene.update(deltaSeconds, body.position);
-      this.gameplayAudio?.update();
+      this.updateGameplayAudio();
       this.input.endFixedUpdate();
       return;
     }
@@ -545,7 +547,7 @@ export class GreyboxLevelRuntime {
       this.input.wasPressed('debugCompleteLevel')
     ) {
       testPanel.completeLevel();
-      this.gameplayAudio?.update();
+      this.updateGameplayAudio();
       this.input.endFixedUpdate();
       return;
     }
@@ -556,7 +558,7 @@ export class GreyboxLevelRuntime {
         : undefined;
     if (requestedDebugRoom !== undefined && testPanel) {
       testPanel.teleportRoom(requestedDebugRoom);
-      this.gameplayAudio?.update();
+      this.updateGameplayAudio();
       this.input.endFixedUpdate();
       return;
     }
@@ -683,7 +685,7 @@ export class GreyboxLevelRuntime {
       grounded: goopBody.grounded,
     });
     testScene.update(deltaSeconds, body.position, slimePair.activeBody.position);
-    this.gameplayAudio?.update();
+    this.updateGameplayAudio();
     this.input.endFixedUpdate();
   }
 
@@ -1087,6 +1089,7 @@ export class GreyboxLevelRuntime {
           onTeleportRoom: (roomId) => {
             containmentLevel.setActiveBody(slimePair.activeBody);
             containmentLevel.teleportToRoomForDebug(roomId);
+            this.containmentSoundscape?.reset();
             testScene.bob.reset();
             testScene.goop.reset();
             testScene.bob.setPosition(body.position);
@@ -1206,7 +1209,16 @@ export class GreyboxLevelRuntime {
       unsubscribeLevelCompleted,
       testPanel,
     };
-    if (this.audio) this.gameplayAudio = new GameplayAudio(this.audio, slimeManager, acidProjectileSystem);
+    if (this.audio) {
+      this.gameplayAudio = new GameplayAudio(this.audio, slimeManager, acidProjectileSystem);
+      this.containmentSoundscape = new ContainmentSoundscape(this.audio, () => ({
+        roomId: containmentLevel.activeRoomId,
+        checkpointId: containmentLevel.activeCheckpointId,
+        activeSlimeId: slimeManager.activeSlimeId,
+        playing: deathSequence.isPlaying && containmentLevel.state === 'playing',
+        lasers: testScene.roomThree.lasers.hazards,
+      }));
+    }
 
     const resources = this.resources;
     resources.unsubscribeSlimeRoster = [
@@ -1280,9 +1292,12 @@ export class GreyboxLevelRuntime {
       this.setDebugVisible(this.debugVisible, resources.testPanel);
     }
     this.notifySlimeHUD(undefined, true);
+    this.containmentSoundscape?.reset();
   };
 
   private readonly unloadResources = (): void => {
+    this.containmentSoundscape?.dispose();
+    this.containmentSoundscape = undefined;
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
@@ -1361,6 +1376,7 @@ export class GreyboxLevelRuntime {
     resources.slimePair.captureCurrentRecoveryState();
     resources.slimePair.restoreRecoveryState();
     if (this.lastDeathSlimeId !== 'goop') resources.testScene.goop.reset();
+    this.containmentSoundscape?.reset();
   }
 
   /**
@@ -1453,6 +1469,7 @@ export class GreyboxLevelRuntime {
     if (!resources.deathSequence.canRetry) return;
     if (!resources.deathSequence.completeRetry()) return;
     this.gameplayAudio?.respawn();
+    this.containmentSoundscape?.reset();
 
     // completeRetry() executes the retained two-body recovery action, which can
     // restore a different active slime than the one that died. Camera ownership
@@ -1477,6 +1494,11 @@ export class GreyboxLevelRuntime {
     }
   };
 
+  private updateGameplayAudio(): void {
+    this.gameplayAudio?.update();
+    this.containmentSoundscape?.update();
+  }
+
   private updateDeathState(
     deltaSeconds: number,
     resources: GreyboxRuntimeResources,
@@ -1487,7 +1509,7 @@ export class GreyboxLevelRuntime {
       resources.deathScreen.show();
     }
     this.host.dataset.gameState = resources.deathSequence.state;
-    this.gameplayAudio?.update();
+    this.updateGameplayAudio();
     this.input.endFixedUpdate();
   }
 

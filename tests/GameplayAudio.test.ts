@@ -29,6 +29,7 @@ class Parameter {
   value = 0;
   setTargetAtTime(value: number) { this.value = value; }
   linearRampToValueAtTime(value: number) { this.value = value; }
+  cancelAndHoldAtTime() {}
 }
 class Node {
   gain = new Parameter();
@@ -37,8 +38,10 @@ class Node {
   threshold = new Parameter(); ratio = new Parameter();
   loop = false; buffer: unknown; onended: (() => void) | null = null;
   starts = 0; stopped = false; disconnected = false;
+  stopAt: number | undefined;
   connect() {} disconnect() { this.disconnected = true; }
-  start() { this.starts++; } stop() { this.stopped = true; this.onended?.(); }
+  start() { this.starts++; }
+  stop(when?: number) { this.stopped = true; this.stopAt = when; if (when === undefined) this.onended?.(); }
 }
 class Context {
   state = 'suspended'; currentTime = 0;
@@ -64,9 +67,9 @@ const useLegacySpatialApi = (node: Node): number[] => {
   return position;
 };
 
-test('all 54 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 54);
+  assert.equal(ids.length, 61);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
@@ -84,7 +87,7 @@ test('cached loading, autoplay, keyed loops, pause, position, limits, volume and
   const audio = new AudioManager('./', () => context as unknown as AudioContext);
   try {
     await audio.preload(); await audio.preload();
-    assert.equal(requests,54); assert.equal(audio.diagnostics.loaded,54);
+    assert.equal(requests,SOUND_BANKS.blackout.length); assert.equal(audio.diagnostics.loaded,SOUND_BANKS.blackout.length);
     audio.setPaused(false);
     audio.play('bob-jump-01'); assert.equal(context.sources.length,0);
     audio.startLoop('move','bob-movement-loop-01', { x: 1,y: 2,z: 3 });
@@ -117,6 +120,45 @@ test('cached loading, autoplay, keyed loops, pause, position, limits, volume and
     audio.stopLoop('flight:0');
     assert.equal(audio.diagnostics.voices,4); // fifth loop acquires released capacity
     audio.dispose(); assert.equal(context.state,'closed');
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('music routes independently, survives world recovery, and fades without duplicate ownership', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    await audio.preload(SOUND_BANKS.containment);
+    audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    audio.startLoop('score', 'containment-score');
+    audio.startLoop('air', 'lab-air-loop');
+    audio.startLoop('move', 'bob-movement-loop-01');
+    const score = context.sources[0];
+    audio.setVolumes(0.7, 0, 0.4);
+    assert.equal((audio as any).effects.gain.value, 0);
+    assert.equal((audio as any).music.gain.value, 0.4);
+    assert.equal((audio as any).master.gain.value, 0.7);
+    audio.stopGameplay();
+    assert.equal(audio.diagnostics.voices, 1);
+    assert.equal(audio.diagnostics.loops, 1);
+    assert.equal(score.stopped, false, 'Retry must preserve the musical timeline');
+    audio.setPaused(true); await Promise.resolve();
+    audio.setPaused(false); await Promise.resolve();
+    assert.equal(context.sources.length, 3, 'resume must retain the original music source');
+    audio.stopLoop('score', 1.5);
+    audio.stopLoop('score', 1.5);
+    assert.equal(score.stopAt, 1.5);
+    assert.equal(audio.diagnostics.loops, 0);
+    audio.startLoop('score', 'containment-score');
+    assert.equal(context.sources.length, 3, 'reentry waits for the outgoing fade');
+    score.onended?.();
+    assert.equal(context.sources.length, 4, 'a still-requested score starts after the outgoing voice ends');
+    audio.setVolumes(1, 0.8, 0);
+    assert.equal((audio as any).music.gain.value, 0);
+    assert.equal((audio as any).effects.gain.value, 0.8);
+    audio.stopAll();
+    assert.equal(audio.diagnostics.voices, 0);
+    assert.equal(audio.diagnostics.loops, 0);
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
@@ -154,16 +196,16 @@ test('progression banks deduplicate overlapping loads and unlock, with at most f
     for (let i = 0; i < 100; i++) audio.unlock();
     assert.equal(gesturePreloads, 1, 'key auto-repeat must not rebuild bank promises');
     await Promise.all([initial, audio.preload(SOUND_BANKS.containment)]);
-    assert.equal(requests.length, 34); assert.equal(contexts, 1);
+    assert.equal(requests.length, SOUND_BANKS.containment.length); assert.equal(contexts, 1);
     assert.ok(requests.every(url => !url.includes('/volt/') && !url.includes('/turrets/')));
     assert.equal(peak, 4); assert.equal(audio.diagnostics.pending, 0);
     await Promise.all([audio.preload(SOUND_BANKS.cultivation), audio.preload(SOUND_BANKS.containment)]);
-    assert.equal(requests.length, 41); assert.equal(audio.diagnostics.loaded, 41);
+    assert.equal(requests.length, SOUND_BANKS.cultivation.length); assert.equal(audio.diagnostics.loaded, SOUND_BANKS.cultivation.length);
     assert.ok(requests.some(url => url.includes('/turrets/')), 'Cultivation combat already has turrets');
     assert.ok(SOUND_BANKS.cultivation.includes('volt-jump-01'));
     assert.ok(!SOUND_BANKS.cultivation.includes('volt-aim-enter-01'), 'electrical cues wait for Blackout');
     await audio.preload(SOUND_BANKS.blackout);
-    assert.equal(requests.length, 54); assert.equal(new Set(requests).size, 54);
+    assert.equal(requests.length, SOUND_BANKS.blackout.length); assert.equal(new Set(requests).size, SOUND_BANKS.blackout.length);
     assert.equal(contexts, 1); assert.equal(peak, 4);
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
