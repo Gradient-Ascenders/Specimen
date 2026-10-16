@@ -780,6 +780,7 @@ export class CultivationLevelRuntime {
       resources.droneProjectilePresentation?.update(interpolationAlpha);
       resources.roomFourProjectiles?.update(interpolationAlpha);
       resources.roomFiveEncounter?.presentation.update(interpolationAlpha);
+      resources.roomFiveEncounter?.updatePresentation(stats.frameDeltaSeconds, this.renderLayer.cameraRig.camera);
       if (resources.authoredPreview) resources.roomFiveView?.update(resources.authoredPreview.roomFive.controller, this.authoredPreviewRoomId === 5);
       const inRoomFour = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position) === 4;
       if (resources.authoredPreview) resources.roomFourView?.update(resources.authoredPreview.roomFour.controller, inRoomFour);
