@@ -93,7 +93,7 @@ export class PressurePlate {
     this.top.position.y = this.topRestY - (pressed ? 0.09 : 0);
     this.top.material.color.setHex(pressed ? 0x88e6a1 : 0xd8b34a);
     this.top.material.emissive.setHex(pressed ? 0x12552a : 0x4a3003);
-    if (pressed && this.trigger.occupants.has('goop')) gameplayAudioEvents.emit('cue', { sound: 'goop-interact-01', position: this.root.getWorldPosition(new THREE.Vector3()) });
+    if (pressed && this.trigger.occupants.has('goop')) gameplayAudioEvents.emit('cue', { sound: 'bob-contact-01', position: this.root.getWorldPosition(new THREE.Vector3()) });
     this.events.emit('changed', { plate: this, pressed });
   }
 

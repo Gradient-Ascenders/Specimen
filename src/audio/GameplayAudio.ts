@@ -1,9 +1,11 @@
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { SlimeManager } from '../slimes/SlimeManager.ts';
-import type { AcidProjectileSystem } from '../abilities/AcidProjectileSystem.ts';
 import type { AudioPlayback } from './AudioManager.ts';
+import type { AudioPosition } from './GameplayAudioEvents.ts';
 import { gameplayAudioEvents } from './GameplayAudioEvents.ts';
 import type { SoundId } from './SoundCatalog.ts';
+
+export interface AcidPoolBounds { readonly min: AudioPosition; readonly max: AudioPosition }
 
 /** A level's subscriptions and transient character loops. No gameplay authority. */
 export class GameplayAudio {
@@ -13,23 +15,24 @@ export class GameplayAudio {
   private resetGeneration = 0;
   private readonly unsubscribers: (() => void)[] = [];
   private readonly characterLoops = ['character:movement', 'character:idle'];
-  private readonly bobMotion = { x: 0, y: 0, z: 0 };
-  private bobMotionTracked = false;
-  private bobContactMetres = 0;
+  private readonly bodyMotion = { x: 0, y: 0, z: 0 };
+  private bodyMotionTracked = false;
+  private bodyContactMetres = 0;
   private readonly audio: AudioPlayback;
   private readonly manager: SlimeManager<KinematicBody>;
-  private readonly acid: AcidProjectileSystem<KinematicBody>;
+  private readonly acidPools: readonly AcidPoolBounds[];
+  private readonly poolPosition = { x: 0, y: 0, z: 0 };
   private readonly controlledBody: () => KinematicBody | undefined;
 
   constructor(
     audio: AudioPlayback,
     manager: SlimeManager<KinematicBody>,
-    acid: AcidProjectileSystem<KinematicBody>,
+    acidPools: readonly AcidPoolBounds[] = [],
     controlledBody: () => KinematicBody | undefined = () => manager.activeBody,
   ) {
     this.audio = audio;
     this.manager = manager;
-    this.acid = acid;
+    this.acidPools = acidPools;
     this.controlledBody = controlledBody;
     this.unsubscribers.push(
       gameplayAudioEvents.on('cue', ({ sound, position }) => {
@@ -51,27 +54,26 @@ export class GameplayAudio {
       };
       this.unsubscribers.push(
         body.events.on('jumped', ({ chargeFraction }) => {
-          if (id === 'bob') this.clearBobTravel();
-          cue(id === 'bob' && chargeFraction >= 0.8 ? 'bob-charged-jump-01' : `${id}-jump-01`, true);
+          if (id !== 'volt') this.clearBodyTravel();
+          cue(id === 'volt' ? 'volt-jump-01' : id === 'bob' && chargeFraction >= 0.8 ? 'bob-charged-jump-01' : 'bob-jump-01', true);
         }),
         body.events.on('landed', ({ impactSpeedMetresPerSecond: speed }) => {
-          if (id === 'bob') this.clearBobTravel();
-          cue(speed >= 8 ? `${id}-land-hard-01` : id === 'volt' ? 'volt-land-01' : `${id}-land-soft-01`, true);
+          if (id !== 'volt') this.clearBodyTravel();
+          cue(id === 'volt' ? speed >= 8 ? 'volt-land-hard-01' : 'volt-land-01' : speed >= 8 ? 'bob-land-hard-01' : 'bob-land-soft-01', true);
         }),
         body.events.on('obstacleImpact', () => {
-          if (id === 'bob') { this.clearBobTravel(); cue('bob-contact-01', true, 0.8); }
-          else if (id === 'goop') cue('goop-impact-01', true);
+          if (id !== 'volt') { this.clearBodyTravel(); cue('bob-contact-01', true, 0.8); }
         }),
       );
       if (id === 'bob') this.unsubscribers.push(
-        body.events.on('attached', () => { this.clearBobTravel(); cue('bob-contact-01'); }),
-        body.events.on('detached', () => { this.clearBobTravel(); cue('bob-detach-01', true, 0.65); }),
+        body.events.on('attached', () => { this.clearBodyTravel(); cue('bob-contact-01'); }),
+        body.events.on('detached', () => { this.clearBodyTravel(); cue('bob-detach-01', true, 0.65); }),
         body.events.on('bounced', () => {
-          this.clearBobTravel();
+          this.clearBodyTravel();
           // A hard floor landing already sounded before its passive rebound.
           if (!body.landedThisStep) cue('bob-land-hard-01', true);
         }),
-        body.events.on('regripped', () => { this.clearBobTravel(); cue('bob-contact-01', true, 0.55); }),
+        body.events.on('regripped', () => { this.clearBodyTravel(); cue('bob-contact-01', true, 0.55); }),
       );
     };
     for (const id of ['bob', 'goop', 'volt'] as const) bindBody(id);
@@ -94,58 +96,70 @@ export class GameplayAudio {
     const body = this.manager.activeBody;
     const controlled = this.controlledBody();
     if (controlled) this.audio.setListener(controlled.position);
-    if (controlled !== body) { this.clearCharacter(); this.updateProjectiles(); return; }
+    this.updateAcidPools(controlled?.position);
+    if (controlled !== body) { this.clearCharacter(); return; }
     if (!body || (id !== 'bob' && id !== 'goop' && id !== 'volt')) { this.clearCharacter(); return; }
     const v = body.velocity, n = body.groundNormal;
     const normalSpeed = v.x * n.x + v.y * n.y + v.z * n.z;
     const tangentSpeedSquared = Math.max(0, v.x*v.x + v.y*v.y + v.z*v.z - normalSpeed*normalSpeed);
     const moving = body.grounded && tangentSpeedSquared > 0.04;
-    if (moving && id !== 'bob') this.audio.startLoop('character:movement', `${id}-movement-loop-01`, body.position);
+    if (moving && id === 'volt') this.audio.startLoop('character:movement', 'volt-movement-loop-01', body.position);
     else this.audio.stopLoop('character:movement');
-    if (id === 'bob') this.updateBobMovement(body, moving);
-    if (!moving && body.grounded && (id === 'goop' || id === 'volt'))
-      this.audio.startLoop('character:idle', id === 'goop' ? 'goop-idle-bubbles-loop-01' : 'volt-idle-sparks-loop-01', body.position);
+    if (id !== 'volt') this.updateBodyMovement(body, moving);
+    if (!moving && body.grounded && id === 'volt')
+      this.audio.startLoop('character:idle', 'volt-idle-sparks-loop-01', body.position);
     else this.audio.stopLoop('character:idle');
-    this.updateProjectiles();
   }
 
-  private updateBobMovement(body: KinematicBody, moving: boolean): void {
+  private updateBodyMovement(body: KinematicBody, moving: boolean): void {
     // This position excludes carrier transport and teleports. Velocity alone
     // must not make a blocked body or an elevator passenger sound like walking.
     const position = body.locomotionPosition;
-    const dx = position.x - this.bobMotion.x, dy = position.y - this.bobMotion.y, dz = position.z - this.bobMotion.z;
-    const tracked = this.bobMotionTracked;
-    this.bobMotion.x = position.x; this.bobMotion.y = position.y; this.bobMotion.z = position.z;
-    this.bobMotionTracked = true;
+    const dx = position.x - this.bodyMotion.x, dy = position.y - this.bodyMotion.y, dz = position.z - this.bodyMotion.z;
+    const tracked = this.bodyMotionTracked;
+    this.bodyMotion.x = position.x; this.bodyMotion.y = position.y; this.bodyMotion.z = position.z;
+    this.bodyMotionTracked = true;
     if (!tracked || !moving || body.chargingJump || body.landedThisStep) {
-      this.bobContactMetres = 0;
+      this.bodyContactMetres = 0;
       return;
     }
     const normal = body.groundNormal;
     const normalDistance = dx * normal.x + dy * normal.y + dz * normal.z;
     const tangentDistance = Math.sqrt(Math.max(0, dx * dx + dy * dy + dz * dz - normalDistance * normalDistance));
-    this.bobContactMetres += tangentDistance;
-    if (this.bobContactMetres >= 1.25) {
-      this.bobContactMetres %= 1.25;
+    this.bodyContactMetres += tangentDistance;
+    if (this.bodyContactMetres >= 1.25) {
+      this.bodyContactMetres %= 1.25;
       this.audio.play('bob-contact-01', body.position, true, body.attached ? 0.25 : 0.35);
     }
   }
 
-  private clearBobTravel(): void {
-    this.bobMotionTracked = false;
-    this.bobContactMetres = 0;
+  private clearBodyTravel(): void {
+    this.bodyMotionTracked = false;
+    this.bodyContactMetres = 0;
   }
 
-  private updateProjectiles(): void {
-    for (const projectile of this.acid.projectileStates) {
-      const key = `acid:${projectile.id}`;
-      if (projectile.active) this.audio.startLoop(key, 'goop-projectile-flight-loop-01', projectile.position);
+  private updateAcidPools(listener: AudioPosition | undefined): void {
+    // One nearby basin voice, placed at its nearest surface point rather than
+    // its centre: the authored pools can be wider than the hearing range.
+    let nearest = 18 * 18;
+    let found = false;
+    if (listener) for (const pool of this.acidPools) {
+      const x = Math.max(pool.min.x, Math.min(pool.max.x, listener.x));
+      const y = pool.max.y;
+      const z = Math.max(pool.min.z, Math.min(pool.max.z, listener.z));
+      const distance = (x-listener.x)**2 + (y-listener.y)**2 + (z-listener.z)**2;
+      if (distance < nearest) {
+        nearest = distance; found = true;
+        this.poolPosition.x = x; this.poolPosition.y = y; this.poolPosition.z = z;
+      }
     }
+    if (found) this.audio.startLoop('environment:acid', 'goop-acid-puddle-loop-01', this.poolPosition);
+    else this.audio.stopLoop('environment:acid');
   }
 
   died(id: string | undefined): void {
     this.reset();
-    if (id === 'bob' && this.enabled) this.audio.play('bob-fall-01', this.manager.getBody('bob')?.position);
+    if ((id === 'bob' || id === 'goop') && this.enabled) this.audio.play('bob-fall-01', this.manager.getBody(id)?.position);
     // Allow the death one-shot to finish; reject further world events.
     this.dead = true;
   }
@@ -155,12 +169,12 @@ export class GameplayAudio {
     this.resetting = false;
     this.setEnabled(true);
     const id = this.manager.activeSlimeId;
-    if (id === 'bob') this.audio.play('bob-contact-01', this.manager.activeBody?.position, false, 0.8);
-    else if (id === 'goop' || id === 'volt') this.audio.play(`${id}-respawn-01`, this.manager.activeBody?.position);
+    if (id === 'bob' || id === 'goop') this.audio.play('bob-contact-01', this.manager.activeBody?.position, false, 0.8);
+    else if (id === 'volt') this.audio.play('volt-respawn-01', this.manager.activeBody?.position);
   }
   private clearCharacter(): void {
     for (const key of this.characterLoops) this.audio.stopLoop(key);
-    this.clearBobTravel();
+    this.clearBodyTravel();
   }
   reset(): void {
     this.dead = false;

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
 
-test('selected Bob clips decode beneath nested base; contact, silent charge, jumps and recovery follow gameplay', async ({ page }) => {
+test('selected Bob and Goop clips decode beneath nested base and follow gameplay and recovery', async ({ page }) => {
   const errors: string[] = [], audioRequests: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -42,6 +42,7 @@ test('selected Bob clips decode beneath nested base; contact, silent charge, jum
   }, SOUND_BANKS);
   expect(new Set(audioRequests).size).toBe(SOUND_BANKS.blackout.length);
   expect(new Set(audioRequests.filter(url => url.includes('/bob/'))).size).toBe(7);
+  expect(new Set(audioRequests.filter(url => url.includes('/goop/'))).size).toBe(5);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
@@ -95,6 +96,20 @@ test('selected Bob clips decode beneath nested base; contact, silent charge, jum
   )).toBe('goop');
   expect(switched.keys).not.toContain('character:charge');
   await page.keyboard.up('Space');
+  await page.evaluate(() => (window as any).__audioRuntime.resources.goopBody.teleport({x:3,y:0.46,z:0}));
+  const goopRest=await step(1);
+  await page.keyboard.down('KeyW'); const goopMoving=await step(30); await page.keyboard.up('KeyW');
+  expect(goopMoving.played).toBeGreaterThan(goopRest.played);
+  expect(goopMoving.keys).not.toContain('character:movement');
+  await page.keyboard.down('Space'); await step(1); await page.keyboard.up('Space'); await step(1);
+  expect(await page.evaluate(() => [...(window as any).__audioRuntime.audio.voices]
+    .some((voice: any) => voice.sound === 'bob-jump-01'))).toBe(true);
+  // Use the real Room 3 entry platform above the authored acid basin.
+  await page.evaluate(() => (window as any).__audioRuntime.resources.goopBody.teleport({x:0,y:10.9,z:51.5}));
+  const nearAcid=await step(1);
+  expect(nearAcid.keys).toContain('environment:acid');
+  expect(await page.evaluate(() => [...(window as any).__audioRuntime.audio.voices]
+    .some((voice: any) => voice.sound === 'goop-acid-puddle-loop-01' && voice.source.loop && voice.source.buffer.numberOfChannels === 1))).toBe(true);
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'suspended');
@@ -109,6 +124,7 @@ test('selected Bob clips decode beneath nested base; contact, silent charge, jum
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
   const reset=await step(1);
   expect(reset.keys).not.toContain('character:charge');
+  expect(reset.keys).not.toContain('environment:acid');
   expect(reset.keys.some(key=>key.startsWith('acid:') || key.startsWith('dissolve:'))).toBe(false);
   expect(await page.evaluate(() => (window as any).__audioRuntime.resources.containmentLevel.requestFailure('bob-audio-review'))).toBe(true);
   const dying=await step(1);

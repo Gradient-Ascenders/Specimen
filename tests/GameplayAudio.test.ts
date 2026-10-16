@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import * as THREE from 'three';
 import { AudioManager, type AudioPlayback } from '../src/audio/AudioManager.ts';
-import { GameplayAudio } from '../src/audio/GameplayAudio.ts';
+import { GameplayAudio, type AcidPoolBounds } from '../src/audio/GameplayAudio.ts';
 import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
 import { SOUND_BANKS, SOUND_DEFINITIONS, soundUrl, type SoundId } from '../src/audio/SoundCatalog.ts';
 import { EventBus } from '../src/core/EventBus.ts';
@@ -64,9 +64,9 @@ const useLegacySpatialApi = (node: Node): number[] => {
   return position;
 };
 
-test('all 45 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 32 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 45);
+  assert.equal(ids.length, 32);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
@@ -87,10 +87,10 @@ test('cached loading, autoplay, keyed loops, pause, position, limits, volume and
     assert.equal(requests,SOUND_BANKS.blackout.length); assert.equal(audio.diagnostics.loaded,SOUND_BANKS.blackout.length);
     audio.setPaused(false);
     audio.play('bob-jump-01'); assert.equal(context.sources.length,0);
-    audio.startLoop('move','goop-movement-loop-01', { x: 1,y: 2,z: 3 });
+    audio.startLoop('move','volt-movement-loop-01', { x: 1,y: 2,z: 3 });
     audio.unlock(); await Promise.resolve();
     assert.equal(context.sources.length,1);
-    for (let i=0;i<10;i++) audio.startLoop('move','goop-movement-loop-01',{ x: 4,y: 2,z: 3 });
+    for (let i=0;i<10;i++) audio.startLoop('move','volt-movement-loop-01',{ x: 4,y: 2,z: 3 });
     assert.equal(context.sources.length,1); assert.equal(context.panners[0].positionX.value,4);
     audio.setPaused(true); await Promise.resolve();
     audio.play('bob-jump-01'); assert.equal(context.sources.length,1);
@@ -112,10 +112,10 @@ test('cached loading, autoplay, keyed loops, pause, position, limits, volume and
     assert.equal(audio.diagnostics.voices,24);
     audio.stopAll(); assert.equal(audio.diagnostics.voices,0);
     assert.ok(context.sources.every(s => s.disconnected));
-    for(let i=0;i<5;i++) audio.startLoop(`flight:${i}`,'goop-projectile-flight-loop-01');
-    assert.equal(audio.diagnostics.voices,4);
-    audio.stopLoop('flight:0');
-    assert.equal(audio.diagnostics.voices,4); // fifth loop acquires released capacity
+    for(let i=0;i<4;i++) audio.startLoop(`dissolve:${i}`,'goop-dissolve-loop-01');
+    assert.equal(audio.diagnostics.voices,3);
+    audio.stopLoop('dissolve:0');
+    assert.equal(audio.diagnostics.voices,3); // fourth loop acquires released capacity
     audio.dispose(); assert.equal(context.state,'closed');
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
@@ -126,11 +126,11 @@ test('one failed decode does not prevent other assets playing; stale one-shots a
   const audio = new AudioManager('./', () => context as unknown as AudioContext);
   try {
     await audio.preload();
-    audio.play('goop-jump-01');
+    audio.play('bob-contact-01');
     audio.setPaused(false); audio.unlock(); await Promise.resolve();
     assert.equal(context.sources.length,0);
     assert.deepEqual(audio.diagnostics.failed,['bob-jump-01']);
-    audio.play('bob-jump-01'); audio.play('goop-jump-01');
+    audio.play('bob-jump-01'); audio.play('bob-contact-01');
     assert.equal(context.sources.length,1);
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
@@ -245,15 +245,16 @@ test('legacy Web Audio positioning and callback decoding cannot stop gameplay', 
 class Playback implements AudioPlayback {
   cues: SoundId[] = []; loops = new Map<string, SoundId>(); paused = true;
   levels: number[] = [];
+  loopPositions = new Map<string, {x:number;y:number;z:number}>();
   play(sound: SoundId, _position?: unknown, _varyPitch?: boolean, volumeScale = 1) { this.cues.push(sound); this.levels.push(volumeScale); }
-  startLoop(key: string, sound: SoundId) { this.loops.set(key,sound); }
+  startLoop(key: string, sound: SoundId, position?: {x:number;y:number;z:number}) { this.loops.set(key,sound); if(position) this.loopPositions.set(key,{...position}); }
   stopLoop(key: string) { this.loops.delete(key); }
   stopAll() { this.loops.clear(); }
   setPaused(paused: boolean) { this.paused = paused; }
   listener = {x:0,y:0,z:0};
   setListener(position: {x:number;y:number;z:number}) { this.listener={...position}; }
 }
-function directorFixture(initialIds = ['bob', 'goop', 'volt']) {
+function directorFixture(initialIds = ['bob', 'goop', 'volt'], pools: readonly AcidPoolBounds[] = []) {
   const audio = new Playback();
   const bodies = Object.fromEntries(['bob','goop','volt'].map(id => [id, {
     position: { x: 0,y: 1,z: 0 }, locomotionPosition: { x: 0,y: 0,z: 0 }, landedThisStep: false, velocity: { x: 1,y: 0,z: 0 },
@@ -265,9 +266,8 @@ function directorFixture(initialIds = ['bob', 'goop', 'volt']) {
     activeSlimeId: 'bob', get activeBody() { return bodies[this.activeSlimeId]; },
     getBody: (id: string) => registered.has(id) ? bodies[id] : undefined, events: new EventBus<any>(),
   };
-  const acid = { projectileStates: [] as any[] };
-  const director = new GameplayAudio(audio, manager as unknown as SlimeManager<KinematicBody>, acid as unknown as AcidProjectileSystem<KinematicBody>);
-  return { audio,bodies,manager,acid,director,registered };
+  const director = new GameplayAudio(audio, manager as unknown as SlimeManager<KinematicBody>, pools);
+  return { audio,bodies,manager,director,registered };
 }
 
 test('Volt unlocked later in Cultivation acquires jump and landing audio exactly once', () => {
@@ -308,18 +308,21 @@ test('Bob movement uses quiet resolved-distance contacts, stays silent while cha
     director.update(); director.update();
     assert.equal(audio.cues.length,2); assert.equal(audio.loops.size,0);
     bodies.goop.events.emit('jumped',{chargeFraction:0,speedMetresPerSecond:4,directionWorld:{x:0,y:1,z:0}});
-    assert.equal(audio.cues.at(-1),'goop-jump-01');
+    assert.equal(audio.cues.at(-1),'bob-jump-01');
     bodies.bob.chargingJump=false; director.update();
     manager.activeSlimeId='goop'; manager.events.emit('activeChanged',{});
     assert.equal(audio.loops.size,0); director.update();
-    assert.equal(audio.loops.get('character:movement'),'goop-movement-loop-01');
+    assert.equal(audio.loops.size,0);
+    const before=audio.cues.length;
+    bodies.goop.locomotionPosition.x+=1.3; director.update();
+    assert.equal(audio.cues.length,before+1); assert.equal(audio.cues.at(-1),'bob-contact-01');
     bodies.goop.velocity.x=0; director.update();
-    assert.equal(audio.loops.get('character:idle'),'goop-idle-bubbles-loop-01');
+    assert.equal(audio.loops.size,0);
   } finally { director.dispose(); }
 });
 
-test('pause, world loops, projectile destruction, reset, respawn and unload clear state', () => {
-  const {audio,manager,acid,director} = directorFixture();
+test('pause, world corrosion, reset, respawn and unload clear state', () => {
+  const {audio,manager,director} = directorFixture();
   director.setEnabled(true);
   gameplayAudioEvents.emit('loop',{key:'volt:circuit',sound:'volt-circuit-hold-loop-01',position:{x:0,y:0,z:0}});
   manager.activeSlimeId='goop'; manager.events.emit('activeChanged',{}); director.update();
@@ -327,13 +330,12 @@ test('pause, world loops, projectile destruction, reset, respawn and unload clea
   director.setEnabled(false); director.setEnabled(false);
   assert.ok(audio.paused); assert.ok(audio.loops.has('volt:circuit'));
   director.setEnabled(true); assert.equal(audio.loops.size,1);
-  acid.projectileStates.push({id:42,active:true,position:{x:0,y:0,z:0}});
-  director.update(); assert.ok(audio.loops.has('acid:42'));
-  acid.projectileStates[0].active=false;
-  gameplayAudioEvents.emit('stop',{key:'acid:42'}); assert.ok(!audio.loops.has('acid:42'));
+  gameplayAudioEvents.emit('loop',{key:'dissolve:barrier',sound:'goop-dissolve-loop-01',position:{x:0,y:0,z:0}});
+  director.update(); assert.ok(audio.loops.has('dissolve:barrier'));
+  gameplayAudioEvents.emit('stop',{key:'dissolve:barrier'}); assert.ok(!audio.loops.has('dissolve:barrier'));
   director.reset(); assert.equal(audio.loops.size,0);
   director.died('goop'); director.respawn();
-  assert.equal(audio.cues.at(-1),'goop-respawn-01');
+  assert.equal(audio.cues.at(-1),'bob-contact-01');
   director.dispose(); assert.equal(audio.loops.size,0);
   const before=audio.cues.length;
   gameplayAudioEvents.emit('cue',{sound:'specimen-turret-shot'});
@@ -379,7 +381,7 @@ test('a real heavy Bob landing and its passive rebound produce one hard-landing 
   const body=new KinematicBody({world,surfaces,initialPosition:new THREE.Vector3(0,6,0)});
   const manager={activeSlimeId:'bob',activeBody:body,getBody:(id:string)=>id==='bob'?body:undefined,events:new EventBus<any>()};
   const audio=new Playback();
-  const director=new GameplayAudio(audio,manager as unknown as SlimeManager<KinematicBody>,{projectileStates:[]} as unknown as AcidProjectileSystem<KinematicBody>);
+  const director=new GameplayAudio(audio,manager as unknown as SlimeManager<KinematicBody>);
   try {
     director.setEnabled(true);
     for(let i=0;i<120;i++) {
@@ -395,7 +397,7 @@ test('a real heavy Bob landing and its passive rebound produce one hard-landing 
 test('merged control clears original-character loops and follows the actual controlled body', () => {
   const {audio,director,manager}=directorFixture();
   try {
-    manager.activeSlimeId='goop';
+    manager.activeSlimeId='volt';
     director.setEnabled(true); director.update();
     assert.ok(audio.loops.has('character:movement'));
     (director as any).controlledBody=()=>({position:{x:50,y:2,z:20}});
@@ -460,12 +462,13 @@ test('successful acid shots, real collisions, burn completion and expiry own aud
     assert.equal(cues.filter(s=>s==='goop-shoot-01').length,1);
     for(let i=0;i<30;i++) { acid.update(1/60,{...controls,firePressed:false}); dissolve.update(1/60); }
     assert.equal(cues.filter(s=>s==='goop-projectile-impact-01').length,1);
-    assert.equal(cues.filter(s=>s==='goop-dissolve-start-01').length,1);
+    assert.deepEqual(cues,['goop-shoot-01','goop-projectile-impact-01','goop-dissolve-complete-01']);
     assert.equal(cues.filter(s=>s==='goop-dissolve-complete-01').length,1);
-    assert.deepEqual(loops,['dissolve:barrier']); assert.ok(stops.includes('dissolve:barrier')); assert.ok(stops.includes('acid:1'));
+    assert.deepEqual(loops,['dissolve:barrier']); assert.ok(stops.includes('dissolve:barrier'));
     acid.update(0.5,controls);
     acid.update(5,{...controls,firePressed:false});
-    assert.ok(stops.includes('acid:2'));
+    assert.equal(acid.projectileStates.filter(p=>p.active).length,0);
+    assert.deepEqual(stops,['dissolve:barrier']);
     dissolve.reset(); target.reset(); dissolve.startBurn(target); dissolve.dispose();
     assert.equal(stops.filter(k=>k==='dissolve:barrier').length,2);
   } finally { for(const off of offs)off(); acid.dispose(); dissolve.dispose(); target.dispose(); world.clear(); mesh.geometry.dispose(); }
@@ -505,7 +508,7 @@ test('real jump and floor landing select single cues without duplicate obstacle 
   const body=new KinematicBody({world,surfaces,initialPosition:new THREE.Vector3(0,0.46,0)});
   const manager={activeSlimeId:'bob',activeBody:body,getBody:(id:string)=>id==='bob'?body:undefined,events:new EventBus<any>()};
   const playback=new Playback();
-  const director=new GameplayAudio(playback,manager as unknown as SlimeManager<KinematicBody>,{projectileStates:[]} as unknown as AcidProjectileSystem<KinematicBody>);
+  const director=new GameplayAudio(playback,manager as unknown as SlimeManager<KinematicBody>);
   try {
     director.setEnabled(true);
     body.update(1/60,new THREE.Vector3(),{pressed:true,held:true,released:false}); director.update();
@@ -541,4 +544,47 @@ test('authored timed light receivers start charging, become ready once and cance
     controller.reset(); receiver.target.setConnectionState(true); controller.reset();
     assert.equal(stops.filter(k=>k===`charge:${receiver.target.id}`).length,3);
   } finally { for(const off of offs)off(); controller.dispose(); registry.dispose(); room.dispose(); world.clear(); surfaces.clear(); }
+});
+
+
+test('Goop shares selected body cues without borrowing Bob adhesion or charged jump', () => {
+  const {audio,bodies,manager,director}=directorFixture();
+  try {
+    manager.activeSlimeId='goop'; director.setEnabled(true);
+    bodies.goop.events.emit('jumped',{chargeFraction:1,speedMetresPerSecond:8,directionWorld:{x:0,y:1,z:0}});
+    bodies.goop.events.emit('landed',{impactSpeedMetresPerSecond:3});
+    bodies.goop.events.emit('landed',{impactSpeedMetresPerSecond:9});
+    bodies.goop.events.emit('obstacleImpact',{speedMetresPerSecond:4});
+    bodies.goop.events.emit('attached',{}); bodies.goop.events.emit('detached',{lostSupport:false});
+    director.died('goop'); director.update(); director.respawn();
+    assert.deepEqual(audio.cues,['bob-jump-01','bob-land-soft-01','bob-land-hard-01','bob-contact-01','bob-fall-01','bob-contact-01']);
+    assert.equal(audio.levels.at(-1),0.8);
+  } finally { director.dispose(); }
+});
+
+test('acid pool ambience follows the nearest surface, survives switching and clears on death, reset and unload', () => {
+  const pools=[{min:{x:50,y:0,z:-50},max:{x:150,y:0,z:50}}, {min:{x:60,y:0,z:-50},max:{x:160,y:0,z:50}}];
+  const {audio,bodies,manager,director}=directorFixture(undefined,pools);
+  try {
+    director.setEnabled(true); director.update(); assert.equal(audio.loops.size,0);
+    bodies.bob.position.x=51; director.update();
+    assert.deepEqual([...audio.loops.values()],['goop-acid-puddle-loop-01']);
+    assert.deepEqual(audio.loopPositions.get('environment:acid'),{x:51,y:0,z:0});
+    // The basin centre is 49 m away; distance must use the surface itself.
+    manager.activeSlimeId='goop'; bodies.goop.position.x=52; manager.events.emit('activeChanged',{}); director.update();
+    assert.equal(audio.loops.size,1);
+    director.setEnabled(false); assert.equal(audio.paused,true); assert.equal(audio.loops.size,1);
+    director.setEnabled(true); director.update(); assert.equal(audio.loops.size,1);
+    // Merged control keeps environmental sound but never character motion.
+    (director as any).controlledBody=()=>({position:{x:55,y:1,z:0}}); director.update();
+    assert.deepEqual(audio.listener,{x:55,y:1,z:0}); assert.equal(audio.loops.size,1);
+    (director as any).controlledBody=()=>undefined; director.update(); assert.equal(audio.loops.size,0);
+    (director as any).controlledBody=()=>manager.activeBody;
+    director.update(); director.died('goop'); director.update(); assert.equal(audio.loops.size,0);
+    director.respawn(); director.update(); assert.equal(audio.loops.size,1);
+    director.reset(); assert.equal(audio.loops.size,0);
+    director.update(); assert.equal(audio.loops.size,1);
+    bodies.goop.position.x=0; director.update(); assert.equal(audio.loops.size,0);
+    bodies.goop.position.x=52; director.update(); director.dispose(); assert.equal(audio.loops.size,0);
+  } finally { director.dispose(); }
 });

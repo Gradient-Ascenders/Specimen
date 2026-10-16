@@ -65,163 +65,46 @@
   {
     "id": "goop-acid-puddle-loop-01",
     "path": "assets/audio/goop/goop-acid-puddle-loop-01.ogg",
-    "durationSeconds": 1.3,
+    "durationSeconds": 3.72,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.42214,
+    "peak": 0.68146,
     "loop": true
-  },
-  {
-    "id": "goop-aim-enter-01",
-    "path": "assets/audio/goop/goop-aim-enter-01.ogg",
-    "durationSeconds": 0.49,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.6967,
-    "loop": false
-  },
-  {
-    "id": "goop-aim-exit-01",
-    "path": "assets/audio/goop/goop-aim-exit-01.ogg",
-    "durationSeconds": 0.42,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.67161,
-    "loop": false
   },
   {
     "id": "goop-dissolve-complete-01",
     "path": "assets/audio/goop/goop-dissolve-complete-01.ogg",
-    "durationSeconds": 0.67,
+    "durationSeconds": 1.0,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.78189,
-    "loop": false
-  },
-  {
-    "id": "goop-dissolve-invalid-01",
-    "path": "assets/audio/goop/goop-dissolve-invalid-01.ogg",
-    "durationSeconds": 0.4,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72736,
+    "peak": 0.60086,
     "loop": false
   },
   {
     "id": "goop-dissolve-loop-01",
     "path": "assets/audio/goop/goop-dissolve-loop-01.ogg",
-    "durationSeconds": 1.4,
+    "durationSeconds": 3.0,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.41937,
-    "loop": true
-  },
-  {
-    "id": "goop-dissolve-start-01",
-    "path": "assets/audio/goop/goop-dissolve-start-01.ogg",
-    "durationSeconds": 0.76,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72691,
-    "loop": false
-  },
-  {
-    "id": "goop-idle-bubbles-loop-01",
-    "path": "assets/audio/goop/goop-idle-bubbles-loop-01.ogg",
-    "durationSeconds": 1.85,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.57329,
-    "loop": true
-  },
-  {
-    "id": "goop-impact-01",
-    "path": "assets/audio/goop/goop-impact-01.ogg",
-    "durationSeconds": 0.61,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.73717,
-    "loop": false
-  },
-  {
-    "id": "goop-interact-01",
-    "path": "assets/audio/goop/goop-interact-01.ogg",
-    "durationSeconds": 0.36,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.6957,
-    "loop": false
-  },
-  {
-    "id": "goop-jump-01",
-    "path": "assets/audio/goop/goop-jump-01.ogg",
-    "durationSeconds": 0.47,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.7542,
-    "loop": false
-  },
-  {
-    "id": "goop-land-hard-01",
-    "path": "assets/audio/goop/goop-land-hard-01.ogg",
-    "durationSeconds": 0.75,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.73077,
-    "loop": false
-  },
-  {
-    "id": "goop-land-soft-01",
-    "path": "assets/audio/goop/goop-land-soft-01.ogg",
-    "durationSeconds": 0.43,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.77308,
-    "loop": false
-  },
-  {
-    "id": "goop-movement-loop-01",
-    "path": "assets/audio/goop/goop-movement-loop-01.ogg",
-    "durationSeconds": 1.35,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.44984,
-    "loop": true
-  },
-  {
-    "id": "goop-projectile-flight-loop-01",
-    "path": "assets/audio/goop/goop-projectile-flight-loop-01.ogg",
-    "durationSeconds": 1.05,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.35646,
+    "peak": 0.64032,
     "loop": true
   },
   {
     "id": "goop-projectile-impact-01",
     "path": "assets/audio/goop/goop-projectile-impact-01.ogg",
-    "durationSeconds": 0.74,
+    "durationSeconds": 0.5865,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.74469,
-    "loop": false
-  },
-  {
-    "id": "goop-respawn-01",
-    "path": "assets/audio/goop/goop-respawn-01.ogg",
-    "durationSeconds": 0.8,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72901,
+    "peak": 0.61587,
     "loop": false
   },
   {
     "id": "goop-shoot-01",
     "path": "assets/audio/goop/goop-shoot-01.ogg",
-    "durationSeconds": 0.6,
+    "durationSeconds": 0.6065,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.74486,
+    "peak": 0.53439,
     "loop": false
   },
   {

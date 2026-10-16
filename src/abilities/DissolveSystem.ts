@@ -79,7 +79,6 @@ export class DissolveSystem {
 
     this.burningTargets.add(target);
     const position = target.mesh.getWorldPosition(new THREE.Vector3());
-    gameplayAudioEvents.emit('cue', { sound: 'goop-dissolve-start-01', position });
     gameplayAudioEvents.emit('loop', { key: `dissolve:${target.id}`, sound: 'goop-dissolve-loop-01', position });
     this.events.emit('burnStarted', { target });
     return 'started';
