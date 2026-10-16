@@ -112,7 +112,12 @@ export class BlackoutMaintenanceBayController {
     this.bay.update(dt,this.charge>=1);
     for(const id of ['bob','goop','volt'] as const){
       const p=bodies[id].position;
-      if(p.y < -5 || (id!=='goop' && this.bay.acidAt(p)) || (id!=='volt' && this.bay.ventAt(p))) return id;
+      if(p.y < -5) return id;
+      if(id!=='goop' && this.bay.acidAt(p)) {
+        this.bay.acidInteractions.fallPulse(bodies[id]);
+        return id;
+      }
+      if(id!=='volt' && this.bay.ventAt(p)) return id;
     }
     this.updateVentTraversal(bodies.volt.position);
     const mainRouteReady = (body:KinematicBody) => this.bay.vestibuleAt(body.position) || this.bay.transitAt(body.position);

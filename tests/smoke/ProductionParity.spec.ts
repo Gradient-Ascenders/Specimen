@@ -113,7 +113,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
         expect(s.names).toContain('blackout-room-3-boss-staging-not-final-arena');
       }
       await page.waitForFunction(() => (window as any).__paritySession.runtime.input.enabled);
-      const roster = level === 3 ? ['bob', 'goop', 'volt'] : ['goop', 'bob'];
+      const roster = level === 3 ? ['bob', 'goop', 'volt'] : level === 2 ? ['goop', 'bob'] : [];
       for (const active of roster) {
         await page.keyboard.press('Tab', { delay: 80 });
         await page.waitForFunction(active =>

@@ -192,6 +192,11 @@ export class RoomFiveGreybox {
     return this.endingStateValue === 'released';
   }
 
+  /** Scripted world position; the presentation root itself stays at the origin. */
+  get goopReleasePosition(): THREE.Vector3 {
+    return this.containedGoopPosition.clone();
+  }
+
   updatePresentation(deltaSeconds: number): void {
     // Release translation belongs to the ending sequence, not locomotion.
     this.goopPresentation.update(deltaSeconds, this.goopPresentationState);

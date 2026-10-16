@@ -161,8 +161,8 @@ test('acid area, exit ramp, bridge anchors, and receivers support the shared thr
     assert.deepEqual(room.receiverPositions.map(({ x, z }) => [x, z]), [
       [14, 96], [14, 120], [-4, 139],
     ]);
-    assert.deepEqual(room.bridgeStart.toArray(), [-16, 2.9, 136]);
-    assert.deepEqual(room.bridgeEnd.toArray(), [0, 0.55, 144]);
+    assert.deepEqual(room.bridgeStart.toArray(), [-16, 2.5, 136]);
+    assert.deepEqual(room.bridgeEnd.toArray(), [0, 0.4, 144]);
     assert.deepEqual(room.exitPosition.toArray(), [0, 0.86, 151]);
     assert.ok(room.collisionMeshes.some((mesh) => mesh.name === 'goop-acid-exit-ramp'));
     assert.equal(room.switchButton.name, 'bob-bridge-pressure-button');

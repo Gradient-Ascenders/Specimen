@@ -25,6 +25,8 @@ export interface PersistentSlimePairOptions<Body extends PersistentSlimeBody> {
   readonly bobSpawnPosition: THREE.Vector3;
   readonly goopSpawnPosition: THREE.Vector3;
   readonly initialActiveSlimeId?: 'bob' | 'goop';
+  /** Containment keeps the registered body locked until the authored rescue. */
+  readonly unlockGoopInitially?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export class PersistentSlimePair<Body extends PersistentSlimeBody> {
   private readonly recoveryGoopPosition = new THREE.Vector3();
   private recoveryActiveSlimeId: 'bob' | 'goop';
   private switchCountValue = 0;
+  private readonly unlockGoopInitially: boolean;
 
   constructor(options: PersistentSlimePairOptions<Body>) {
     this.manager = options.manager;
@@ -51,8 +54,9 @@ export class PersistentSlimePair<Body extends PersistentSlimeBody> {
     this.goopBody = options.goopBody;
 
     const initialActive = options.initialActiveSlimeId ?? 'bob';
+    this.unlockGoopInitially = options.unlockGoopInitially ?? true;
 
-    if (!this.manager.isUnlocked('goop')) {
+    if (this.unlockGoopInitially && !this.manager.isUnlocked('goop')) {
       if (!this.manager.unlock('goop')) {
         throw new Error('Goop must be Beta-playable before two-body switching.');
       }
@@ -148,6 +152,10 @@ export class PersistentSlimePair<Body extends PersistentSlimeBody> {
 
   /** Full level restart returns to the authored initial two-body state. */
   restoreInitialState(): void {
+    if (!this.unlockGoopInitially) {
+      this.manager.lock('goop');
+      this.registerExactBody('goop', this.goopBody);
+    }
     this.setRecoveryState(this.initialRecoveryState);
     this.restoreRecoveryState();
     this.switchCountValue = 0;

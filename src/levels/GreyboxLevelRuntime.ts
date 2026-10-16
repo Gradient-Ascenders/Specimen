@@ -795,12 +795,14 @@ export class GreyboxLevelRuntime {
         : 1,
     );
     const reveal = testScene.roomFive.goopPresentation;
+    const goopAvailable = resources.slimeManager.isAvailable('goop');
+    slimePairPresentation.root.visible = goopAvailable;
     testScene.goop.updateDetail(this.renderLayer.cameraRig.camera);
     reveal.updateDetail(this.renderLayer.cameraRig.camera);
     const showReveal = testScene.lightingDiagnostics.visibleRoomIds.includes(5) &&
       !testScene.roomFive.releaseComplete && slimePair.activeSlimeId !== 'goop';
     reveal.setVisible(showReveal);
-    testScene.goop.setVisible(!showReveal);
+    testScene.goop.setVisible(goopAvailable && !showReveal);
     testScene.goop.setOpacity(slimePair.activeSlimeId === 'goop'
       ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
         cameraDistanceMetres, CAMERA_FADE_START_DISTANCE_METRES, CAMERA_FADE_END_DISTANCE_METRES, CAMERA_MINIMUM_TARGET_OPACITY)) : 1);
@@ -971,6 +973,7 @@ export class GreyboxLevelRuntime {
       goopBody,
       bobSpawnPosition: spawnPosition,
       goopSpawnPosition,
+      unlockGoopInitially: false,
     });
     const persistentBodies = [body, goopBody] as const;
     const dissolveSystem = new DissolveSystem(dissolveTargets);
@@ -1138,6 +1141,10 @@ export class GreyboxLevelRuntime {
     const unsubscribeLevelCompleted = containmentLevel.events.on(
       'completed',
       (event) => {
+        // The release completes before the handoff snapshot is captured.
+        // Keep the live body at the authored chute endpoint, never at Bob's spawn.
+        goopBody.recoverAt(testScene.roomFive.goopReleasePosition);
+        slimeManager.unlock('goop');
         this.host.dataset.gameState = 'level-complete';
         this.events.emit('completed', event);
       },

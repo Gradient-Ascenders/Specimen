@@ -63,8 +63,25 @@ test('audio banks decode beneath nested base and gameplay owns charge, movement,
   expect(jumped.played).toBeGreaterThan(charging.played);
   await step(150);
   await page.keyboard.down('Space'); await step(8);
+  // Goop is unavailable until rescue. A rejected switch must leave Bob charging;
+  // stage availability explicitly before testing a successful switch's cleanup.
+  expect(await page.evaluate(() =>
+    (window as any).__audioRuntime.resources.slimeManager.isAvailable('goop'),
+  )).toBe(false);
+  await page.keyboard.press('Tab');
+  const locked = await step(1);
+  expect(locked.keys).toContain('character:charge');
+  expect(await page.evaluate(() =>
+    (window as any).__audioRuntime.resources.slimeManager.activeSlimeId,
+  )).toBe('bob');
+  expect(await page.evaluate(() =>
+    (window as any).__audioRuntime.resources.slimeManager.unlock('goop'),
+  )).toBe(true);
   await page.keyboard.press('Tab');
   const switched=await step(1);
+  expect(await page.evaluate(() =>
+    (window as any).__audioRuntime.resources.slimeManager.activeSlimeId,
+  )).toBe('goop');
   expect(switched.keys).not.toContain('character:charge');
   await page.keyboard.up('Space');
   await page.keyboard.press('KeyP');

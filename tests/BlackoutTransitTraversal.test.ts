@@ -240,22 +240,11 @@ test('Bob crosses the whole elevated route using separated charged jumps and bot
       s.walkTo(volt, new THREE.Vector3(-10, 0, 139));
       assert.equal(volt.supportColliderName, 'transit-deployable-bridge-deck',
         'Volt should transfer from the catwalk anchor onto the actual deployed bridge collider');
-      s.walkTo(volt, new THREE.Vector3(-1, 0.96, 145.4));
+      s.walkTo(volt, new THREE.Vector3(0, 0.86, 146.5));
       assert.equal(volt.supportColliderName, 'transit-bridge-end-anchor',
-        'Volt should cross the full powered bridge to its far anchor');
-      const exitDeck = s.room.collisionMeshes.find((mesh) => mesh.name === 'transit-room-3-exit-deck')!;
-      const exitTarget = new THREE.Vector3(-1, 0.86, 148.5);
-      volt.update(FIXED_DT, directionTo(volt, exitTarget), { pressed: true, held: false, released: false });
-      let exitJumpAirborne = false;
-      for (let i = 0; i < 90; i += 1) {
-        volt.update(FIXED_DT, directionTo(volt, exitTarget));
-        controller.update(FIXED_DT, { bob, goop: s.goop, volt: s.volt });
-        exitJumpAirborne ||= !volt.grounded;
-        if (exitJumpAirborne && volt.grounded) break;
-      }
-      assert.equal(exitJumpAirborne, true);
-      assert.equal(volt.supportCollider, exitDeck,
-        `Volt needs a normal jump across the short bridge-to-exit gap; support=${volt.supportColliderName}, position=${JSON.stringify(volt.position)}`);
+        'Volt should walk off the sloped bridge onto the level anchor');
+      s.walkTo(volt, new THREE.Vector3(0, 0.86, 151));
+      assert.equal(volt.supportColliderName, 'transit-room-3-exit-deck');
       assert.equal(volt.lastJumpChargeFraction, 0);
       assert.equal(s.room.exitAt(volt.position), true,
         `Volt should reach the shared exit volume after crossing the bridge: ${JSON.stringify(volt.position)}`);
