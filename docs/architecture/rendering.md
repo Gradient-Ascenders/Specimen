@@ -36,22 +36,27 @@ correct when preparation is skipped or fails.
 Settings → Character gel controls a session-owned `RenderLayer.gelRendering`
 policy independently of canvas resolution. It applies to Bob, Goop and Volt,
 including captive forms, hidden roster members and characters loaded after a
-level transition. A future minimum-hardware preset (#190) should select
-`minimum` through this same policy. Hardware detection and a canvas pixel
-budget are separate work; the default remains the authored physical look.
+level transition. The [bounded graphics profiles](../graphics-profiles.md) select
+`minimum` by default and `reduced-transmission` for Standard through this same
+policy. They also apply an absolute canvas pixel budget, shadow-map cap and
+decorative-effect density. Standalone material policies still default to physical
+until a session configures them; the application defaults to Minimum hardware.
 
 | Setting / policy value | Material path | Transmission target |
 |---|---|---|
 | Minimum hardware / `minimum` | Non-transmissive physical gel with authored tint, roughness, clearcoat, Fresnel specular, reflection map and emission | No character-triggered capture, resolve or mipmaps |
 | Balanced / `reduced-transmission` | Authored physical transmission | Half width and height (25% of capture pixels), using Three's `transmissionResolutionScale = 0.5` |
-| High / `physical` | Authored physical transmission | Full resolution with Normal graphics |
+| High / `physical` | Authored physical transmission | Full resolution when the additional Performance cap is off |
 
-Graphics preset remains independent of gel material quality. Normal is the
-default; Performance caps canvas DPR at 1 (with an explicit 0.75 choice) and
-caps transmission scale at 0.5. `GelRendering` combines that cap with the gel
-setting using the smaller scale, so changing either setting cannot overwrite
-the other. Returning to Normal preserves an explicitly selected Balanced gel
-setting. F1 filters HUD presentation independently of both quality settings.
+Main's optional Performance preset is retained as **Additional performance cap**.
+Off (`normal`) is the default for this extra cap; the overall application still
+starts in the Minimum hardware profile. On (`performance`) caps density at 1×
+before render scaling, preserves an explicitly selected 0.75× density, and caps
+transmission scale at 0.5. `GelRendering` combines this with gel quality using the
+smaller scale, so neither setting can overwrite the other. Turning the cap off
+restores the saved density choice and preserves explicitly selected Balanced gel.
+The profile's absolute pixel budget always applies. Selecting Minimum/Standard
+resets graphics overrides, including this additional cap. F1 is independent.
 
 Minimum gel loses background refraction and volume attenuation; its tint is
 more solid. It keeps the authored silhouettes, cyan/green/gold colors, glossy

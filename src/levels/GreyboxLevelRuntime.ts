@@ -1712,6 +1712,8 @@ export class GreyboxLevelRuntime {
         `two-body switching regression: ${this.twoBodySwitchingRegressionStatus}`,
         `viewport: ${renderStats.viewportWidth} × ${renderStats.viewportHeight} CSS px`,
         `drawing buffer: ${renderStats.drawingBufferWidth} × ${renderStats.drawingBufferHeight} px (${renderStats.pixelRatio.toFixed(2)}× DPR, ${renderStats.pixelRatioCap.toFixed(1)}× cap)`,
+        `graphics: ${renderStats.graphicsProfile} (${renderStats.graphicsProfileBase} base), display DPR ${renderStats.devicePixelRatio.toFixed(2)}, ${renderStats.renderScale * 100}% scale, ${renderStats.pixelBudget} px budget`,
+        `gel / transmission scale / shadow cap / decorative density / MSAA: ${renderStats.gelRenderingMode} / ${renderStats.transmissionResolutionScale} / ${renderStats.shadowMapSizeCap} / ${renderStats.effectsDensity} / ${renderStats.antialias}`,
         `draw calls / triangles: ${renderStats.drawCalls} / ${renderStats.triangles}`,
         `scene objects / lights: ${renderStats.sceneObjects} / ${renderStats.sceneLights}`,
         `authored lights active / total / shadow: ${testScene.lightingDiagnostics.visibleAuthoredLightCount} / ${testScene.lightingDiagnostics.authoredLightCount} / ${testScene.lightingDiagnostics.shadowCastingLightCount}`,

@@ -89,13 +89,14 @@ test('late loads inherit the current mode, disposal releases registrations, sess
 
 test('gel quality is a session setting independent of render resolution', () => {
   const settings = new GameSettings();
+  settings.setGraphicsProfile('standard');
   const modes: string[] = [];
   settings.subscribe(value => modes.push(value.gelRenderingMode));
   settings.setGelRenderingMode('minimum');
   settings.setGelRenderingMode('minimum');
-  assert.equal(settings.value.renderPixelRatioCap, 2);
+  assert.equal(settings.value.renderPixelRatioCap, 1.5);
   settings.setRenderPixelRatioCap(1);
   assert.equal(settings.value.gelRenderingMode, 'minimum');
   settings.setGelRenderingMode('physical');
-  assert.deepEqual(modes, ['physical', 'minimum', 'minimum', 'physical']);
+  assert.deepEqual(modes, ['reduced-transmission', 'minimum', 'minimum', 'physical']);
 });

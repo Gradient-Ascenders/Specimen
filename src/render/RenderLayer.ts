@@ -3,12 +3,15 @@ import { GelRendering, type GelRenderingMode } from './slime/GelRendering.ts';
 
 import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
 import { CameraRig } from './CameraRig.ts';
-import { type GraphicsPreset, resolveGraphicsQuality } from './GraphicsQuality.ts';
+import { resolveGraphicsQuality } from './GraphicsQuality.ts';
 import { GAMEPLAY_UI_LAYER, withGameplayUiVisibility } from './GameplayUiLayer.ts';
+import { DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_LIGHTING_POLICY, GRAPHICS_PROFILES, graphicsProfileName,
+  type GraphicsSettings } from './GraphicsProfiles.ts';
+import { GraphicsResourcePolicy } from './GraphicsResourcePolicy.ts';
 import {
-  DEFAULT_RENDER_PIXEL_RATIO_CAP,
   type RenderPixelRatioCap,
-  resolveRenderPixelRatio,
+  type RenderScale,
+  resolveRenderResolution,
 } from './RenderResolution.ts';
 
 export const RENDER_EXPOSURE = 1;
@@ -98,15 +101,29 @@ export class RenderShadowPolicy {
   }
 }
 
-export interface RenderDiagnostics {
+export interface GraphicsDiagnostics {
   readonly viewportWidth: number;
   readonly viewportHeight: number;
   readonly drawingBufferWidth: number;
   readonly drawingBufferHeight: number;
   readonly pixelRatio: number;
   readonly pixelRatioCap: RenderPixelRatioCap;
+  readonly requestedPixelRatioCap: RenderPixelRatioCap;
+  readonly graphicsPreset: string;
+  readonly devicePixelRatio: number;
+  readonly renderScale: RenderScale;
+  readonly graphicsProfile: string;
+  readonly graphicsProfileBase: string;
+  readonly pixelBudget: number;
+  readonly shadowMapSizeCap: number;
+  readonly effectsDensity: number;
+  readonly lightingPolicy: string;
+  readonly antialias: boolean;
   readonly gelRenderingMode: GelRenderingMode;
   readonly transmissionResolutionScale: number;
+}
+
+export interface RenderDiagnostics extends GraphicsDiagnostics {
   readonly drawCalls: number;
   readonly triangles: number;
   readonly sceneObjects: number;
@@ -122,6 +139,7 @@ export interface RenderLayerOptions {
   host: HTMLElement;
   window?: Window;
   pixelRatioCap?: RenderPixelRatioCap;
+  graphics?: GraphicsSettings;
 }
 
 /**
@@ -136,15 +154,21 @@ export class RenderLayer {
   readonly renderer: THREE.WebGLRenderer;
   readonly gelRendering: GelRendering;
   private readonly shadowPolicy: RenderShadowPolicy;
+  private readonly graphicsResources: GraphicsResourcePolicy;
 
   private readonly host: HTMLElement;
   private readonly hostWindow: Window;
   private readonly drawingBufferSize = new THREE.Vector2();
   private readonly resizeObserver: ResizeObserver | undefined;
 
-  private pixelRatioCap: RenderPixelRatioCap;
-  private effectivePixelRatioCap: RenderPixelRatioCap;
-  private graphicsPreset: GraphicsPreset = 'normal';
+  private graphicsSettings: GraphicsSettings;
+  private effectivePixelRatioCap: RenderPixelRatioCap = 1;
+  private readonly maximumWidth: number;
+  private readonly maximumHeight: number;
+  private readonly antialias: boolean;
+  private dprQuery: MediaQueryList | undefined;
+  private lastDevicePixelRatio = 0;
+  private readonly graphicsListeners = new Set<() => void>();
   private viewportWidth = 0;
   private viewportHeight = 0;
   private disposed = false;
@@ -153,9 +177,8 @@ export class RenderLayer {
   constructor(options: RenderLayerOptions) {
     this.host = options.host;
     this.hostWindow = options.window ?? window;
-    this.pixelRatioCap =
-      options.pixelRatioCap ?? DEFAULT_RENDER_PIXEL_RATIO_CAP;
-    this.effectivePixelRatioCap = this.pixelRatioCap;
+    this.graphicsSettings = { ...(options.graphics ?? DEFAULT_GRAPHICS_SETTINGS),
+      ...(options.pixelRatioCap === undefined ? {} : { renderPixelRatioCap: options.pixelRatioCap }) };
 
     this.scene.name = 'game-scene';
     this.cameraRig.camera.layers.enable(GAMEPLAY_UI_LAYER);
@@ -163,10 +186,20 @@ export class RenderLayer {
 
     this.renderer = new THREE.WebGLRenderer({
       alpha: false,
-      antialias: true,
+      // Context MSAA cannot be changed without replacing the renderer/context.
+      // Both bounded profiles use the same conservative, non-MSAA canvas.
+      antialias: false,
       powerPreference: 'high-performance',
     });
     this.gelRendering = new GelRendering(this.renderer);
+    this.graphicsResources = new GraphicsResourcePolicy(this.scene);
+    const gl = this.renderer.getContext();
+    this.antialias = gl.getContextAttributes()?.antialias ?? false;
+    const viewportLimits = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
+    const maximumDimension = Math.min(this.renderer.capabilities.maxTextureSize,
+      gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number);
+    this.maximumWidth = Math.min(maximumDimension, viewportLimits[0]);
+    this.maximumHeight = Math.min(maximumDimension, viewportLimits[1]);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = RENDER_EXPOSURE;
@@ -181,7 +214,8 @@ export class RenderLayer {
       this.resizeObserver = resizeObserver;
     }
 
-    this.resize();
+    this.setGraphicsSettings(this.graphicsSettings);
+    this.watchDevicePixelRatio();
   }
 
   get canvas(): HTMLCanvasElement {
@@ -189,6 +223,12 @@ export class RenderLayer {
   }
 
   render(): void {
+    // A numeric check is also needed when display emulation/browser changes
+    // update DPR without delivering a resolution media-query event.
+    if (this.lastDevicePixelRatio !== this.hostWindow.devicePixelRatio) {
+      this.resize(); this.watchDevicePixelRatio();
+    }
+    this.graphicsResources.sync();
     withGameplayUiVisibility(this.cameraRig.camera, !this.cleanGameplay, () => {
       this.renderer.render(this.scene, this.cameraRig.camera);
     });
@@ -211,6 +251,7 @@ export class RenderLayer {
   }
 
   withShadowPreparation<T>(enabled: boolean, action: () => T): T {
+    this.graphicsResources.sync();
     return this.shadowPolicy.withPreparation(enabled, action);
   }
 
@@ -219,21 +260,50 @@ export class RenderLayer {
   }
 
   setPixelRatioCap(cap: RenderPixelRatioCap): void {
-    this.setGraphicsSettings(this.graphicsPreset, cap);
+    this.setGraphicsSettings({ ...this.graphicsSettings, renderPixelRatioCap: cap });
   }
 
-  setGraphicsSettings(preset: GraphicsPreset, cap: RenderPixelRatioCap): void {
-    if (this.disposed || (cap === this.pixelRatioCap && preset === this.graphicsPreset)) return;
-    this.pixelRatioCap = cap;
-    this.graphicsPreset = preset;
-    const quality = resolveGraphicsQuality(preset, cap);
+  setGraphicsSettings(settings: GraphicsSettings): void {
+    if (this.disposed) return;
+    this.graphicsSettings = { ...settings };
+    const profile = GRAPHICS_PROFILES[settings.graphicsProfile];
+    const quality = resolveGraphicsQuality(settings.graphicsPreset, settings.renderPixelRatioCap);
     this.effectivePixelRatioCap = quality.pixelRatioCap;
     this.gelRendering.setTransmissionResolutionScaleCap(quality.transmissionResolutionScale);
+    this.gelRendering.setMode(settings.gelRenderingMode);
+    this.graphicsResources.setQuality(profile.shadowMapSizeCap, profile.effectsDensity);
     this.resize();
   }
 
-  getDiagnostics(): RenderDiagnostics {
+  /** For a future owner that adds nested lights/effects after attaching its root. */
+  refreshGraphicsResources(): void {
+    this.graphicsResources.refresh();
+  }
+
+  subscribeGraphicsDiagnostics(listener: () => void): () => void {
+    this.graphicsListeners.add(listener);
+    listener();
+    return () => this.graphicsListeners.delete(listener);
+  }
+
+  getGraphicsDiagnostics(): GraphicsDiagnostics {
     this.renderer.getDrawingBufferSize(this.drawingBufferSize);
+    const settings = this.graphicsSettings, profile = GRAPHICS_PROFILES[settings.graphicsProfile];
+    return {
+      viewportWidth: this.viewportWidth, viewportHeight: this.viewportHeight,
+      drawingBufferWidth: this.drawingBufferSize.x, drawingBufferHeight: this.drawingBufferSize.y,
+      pixelRatio: this.renderer.getPixelRatio(), pixelRatioCap: this.effectivePixelRatioCap,
+      requestedPixelRatioCap: settings.renderPixelRatioCap, graphicsPreset: settings.graphicsPreset,
+      devicePixelRatio: this.hostWindow.devicePixelRatio, renderScale: settings.renderScale,
+      graphicsProfile: graphicsProfileName(settings, this.gelRendering.value), graphicsProfileBase: settings.graphicsProfile,
+      pixelBudget: profile.pixelBudget, shadowMapSizeCap: profile.shadowMapSizeCap,
+      effectsDensity: profile.effectsDensity, lightingPolicy: GRAPHICS_LIGHTING_POLICY,
+      antialias: this.antialias,
+      gelRenderingMode: this.gelRendering.value, transmissionResolutionScale: this.renderer.transmissionResolutionScale,
+    };
+  }
+
+  getDiagnostics(): RenderDiagnostics {
     let sceneObjects = 0;
     let sceneLights = 0;
     let instancedMeshes = 0;
@@ -251,14 +321,7 @@ export class RenderLayer {
     });
 
     return {
-      viewportWidth: this.viewportWidth,
-      viewportHeight: this.viewportHeight,
-      drawingBufferWidth: this.drawingBufferSize.x,
-      drawingBufferHeight: this.drawingBufferSize.y,
-      pixelRatio: this.renderer.getPixelRatio(),
-      pixelRatioCap: this.effectivePixelRatioCap,
-      gelRenderingMode: this.gelRendering.value,
-      transmissionResolutionScale: this.renderer.transmissionResolutionScale,
+      ...this.getGraphicsDiagnostics(),
       drawCalls: this.renderer.info.render.calls,
       triangles: this.renderer.info.render.triangles,
       sceneObjects,
@@ -283,6 +346,20 @@ export class RenderLayer {
     target.drawingBufferHeight = drawingBufferSize.y;
     target.effectiveDpr = this.renderer.getPixelRatio();
     target.resolutionTier = this.effectivePixelRatioCap;
+    target.requestedPixelRatioCap = this.graphicsSettings.renderPixelRatioCap;
+    target.graphicsPreset = this.graphicsSettings.graphicsPreset;
+    target.graphicsProfile = graphicsProfileName(this.graphicsSettings, this.gelRendering.value);
+    target.graphicsProfileBase = this.graphicsSettings.graphicsProfile;
+    target.devicePixelRatio = this.hostWindow.devicePixelRatio;
+    target.renderScale = this.graphicsSettings.renderScale;
+    const profile = GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile];
+    target.pixelBudget = profile.pixelBudget;
+    target.gelRenderingMode = this.gelRendering.value;
+    target.transmissionResolutionScale = this.renderer.transmissionResolutionScale;
+    target.shadowMapSizeCap = profile.shadowMapSizeCap;
+    target.effectsDensity = profile.effectsDensity;
+    target.antialias = this.antialias;
+    target.lightingPolicy = GRAPHICS_LIGHTING_POLICY;
     target.drawCalls = this.renderer.info.render.calls;
     target.triangles = this.renderer.info.render.triangles;
     target.programs = this.renderer.info.programs?.length ?? 0;
@@ -297,32 +374,60 @@ export class RenderLayer {
     this.renderer.setAnimationLoop(null);
     this.hostWindow.removeEventListener('resize', this.resize);
     this.resizeObserver?.disconnect();
+    this.dprQuery?.removeEventListener('change', this.onDevicePixelRatioChange);
+    this.graphicsResources.dispose();
+    this.graphicsListeners.clear();
     this.shadowPolicy.dispose();
     this.renderer.dispose();
   }
 
   private readonly resize = (): void => {
     if (this.disposed) return;
+    this.lastDevicePixelRatio = this.hostWindow.devicePixelRatio;
 
-    const width = Math.max(1, Math.floor(this.host.clientWidth));
-    const height = Math.max(1, Math.floor(this.host.clientHeight));
-    const pixelRatio = resolveRenderPixelRatio(
-      this.hostWindow.devicePixelRatio,
-      this.effectivePixelRatioCap,
-    );
+    const size = resolveRenderResolution(this.host.clientWidth, this.host.clientHeight,
+      this.hostWindow.devicePixelRatio, {
+        pixelRatioCap: this.effectivePixelRatioCap,
+        renderScale: this.graphicsSettings.renderScale,
+        pixelBudget: GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile].pixelBudget,
+        maximumWidth: this.maximumWidth, maximumHeight: this.maximumHeight,
+        minimumDrawingBufferDimension: Math.ceil(1 / this.renderer.transmissionResolutionScale),
+      });
+    const { viewportWidth: width, viewportHeight: height, effectivePixelRatio: pixelRatio } = size;
+    // Refraction quality can change the physical minimum at unchanged CSS/DPR.
+    this.renderer.getDrawingBufferSize(this.drawingBufferSize);
 
     if (
       width === this.viewportWidth &&
       height === this.viewportHeight &&
-      pixelRatio === this.renderer.getPixelRatio()
+      pixelRatio === this.renderer.getPixelRatio() &&
+      size.drawingBufferWidth === this.drawingBufferSize.x &&
+      size.drawingBufferHeight === this.drawingBufferSize.y
     ) {
+      this.notifyGraphicsDiagnostics();
       return;
     }
 
     this.viewportWidth = width;
     this.viewportHeight = height;
-    this.renderer.setPixelRatio(pixelRatio);
-    this.renderer.setSize(width, height, false);
+    // One bounded allocation: setPixelRatio + setSize would briefly resize the
+    // old large viewport with the new density before applying its pixel cap.
+    this.renderer.setDrawingBufferSize(size.logicalWidth, size.logicalHeight, pixelRatio);
     this.cameraRig.resize(width, height);
+    this.notifyGraphicsDiagnostics();
   };
+
+  private readonly onDevicePixelRatioChange = (): void => {
+    this.resize(); this.watchDevicePixelRatio();
+  };
+
+  private watchDevicePixelRatio(): void {
+    this.dprQuery?.removeEventListener('change', this.onDevicePixelRatioChange);
+    this.dprQuery = this.hostWindow.matchMedia(`(resolution: ${this.hostWindow.devicePixelRatio}dppx)`);
+    this.dprQuery.addEventListener('change', this.onDevicePixelRatioChange);
+  }
+
+  private notifyGraphicsDiagnostics(): void {
+    for (const listener of this.graphicsListeners) listener();
+  }
 }

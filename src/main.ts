@@ -37,7 +37,7 @@ window.addEventListener('focus', focusAudio);
 document.addEventListener('visibilitychange', focusAudio);
 const renderLayer = new RenderLayer({
   host: app,
-  pixelRatioCap: settings.value.renderPixelRatioCap,
+  graphics: settings.value,
 });
 const input = new Input({ pointerLockElement: renderLayer.canvas });
 renderLayer.canvas.dataset.gameplayCanvas = 'true';
@@ -134,15 +134,16 @@ const gameFlow = new GameFlowUI({
       renderLayer.cameraRig.setFollowDistanceMetres(
         nextSettings.cameraDistanceMetres,
       );
-      renderLayer.setGraphicsSettings(nextSettings.graphicsPreset, nextSettings.renderPixelRatioCap);
       if (renderLayer.gelRendering.value !== nextSettings.gelRenderingMode) {
         levelOneShaderProgramGuardActive = false;
         sampleLevelOneShaderPrograms = undefined;
         levelOneShaderProgramGuardInvalidation = 'Character gel quality changed';
         performanceRecorder?.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
       }
-      renderLayer.gelRendering.setMode(nextSettings.gelRenderingMode);
+      renderLayer.setGraphicsSettings(nextSettings);
     },
+    getGraphicsDiagnostics: () => renderLayer.getGraphicsDiagnostics(),
+    subscribeGraphicsDiagnostics: listener => renderLayer.subscribeGraphicsDiagnostics(listener),
   },
 });
 const cleanGameplayMode = new CleanGameplayMode({
