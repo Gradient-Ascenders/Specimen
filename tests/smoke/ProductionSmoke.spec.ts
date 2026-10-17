@@ -12,7 +12,14 @@ const watchProductionRequests = (page: Page, baseURL: string): Set<string> => {
       failures.add(`Console: ${message.text()}`);
     }
   });
-  page.on('requestfailed', (request) => failures.add(`Failed request: ${request.url()}`));
+  page.on('requestfailed', (request) => {
+    // Pausing a streamed track on menu/level transition intentionally cancels
+    // its pending HTTP range request. Keep every other network error visible.
+    const url = new URL(request.url());
+    if (/\/assets\/audio\/music\/[^/]+\.ogg$/.test(url.pathname) &&
+        request.failure()?.errorText === 'net::ERR_ABORTED') return;
+    failures.add(`Failed request: ${request.url()}`);
+  });
   page.on('response', (response) => {
     if (response.status() >= 400) failures.add(`HTTP ${response.status()}: ${response.url()}`);
   });
@@ -109,6 +116,9 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   const credits = page.locator('[data-flow-panel="credits"]');
   await expect(credits).toBeVisible();
   await expect(credits.locator('.credits-ledger')).toContainText('Three.js');
+  // Music must render as structured credit entries, not raw Markdown paragraphs.
+  await expect(credits.locator('.credits-ledger .credits-entry h3').filter({ hasText: /^(Osmotic Memory|Thought Loop|Unsolved Investigation|Searching)$/ })).toHaveCount(4);
+  await expect(credits.locator('.credits-ledger .credits-entry').filter({ hasText: 'GloryToTheMachine' })).toHaveCount(1);
   await expect(credits.locator('.lab-menu-panel')).toBeVisible();
   await expect(credits.locator('.credits-footer [data-action="back"]')).toBeInViewport();
   await expect(credits.locator('.credits-ledger a').first()).toHaveAttribute('href', /^https?:\/\//);
@@ -135,7 +145,9 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   page.on('response', response => {
     if (/\/volt-[^/]+\.glb$/.test(new URL(response.url()).pathname) && response.ok()) voltAssets.add(response.url());
     if (/\/authored-assets-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) cultivationAssets.add(response.url());
-    if (/\/assets\/audio\/.*\.ogg$/.test(new URL(response.url()).pathname) && response.ok()) audioAssets.add(response.url());
+    // Only sound-effects bank requests count toward the 34/41/54 clip budgets.
+    // The independently streamed level music is not part of those banks.
+    if (/\/assets\/audio\/(?:bob|goop|volt|turrets)\/.*\.ogg$/.test(new URL(response.url()).pathname) && response.ok()) audioAssets.add(response.url());
     if (/\/(goop|volt)-lod-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) detailAssets.add(response.url());
   });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
