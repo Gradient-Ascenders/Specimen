@@ -49,7 +49,7 @@ const setSpatialPosition = (target: SpatialAudioTarget, position: AudioPosition)
 };
 
 export interface AudioPlayback {
-  play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean): void;
+  play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number): void;
   startLoop(key: string, sound: SoundId, position?: AudioPosition): void;
   stopLoop(key: string): void;
   stopAll(): void;
@@ -195,12 +195,14 @@ export class AudioManager implements AudioPlayback {
     void operation.then(() => { if (shouldRun) this.reconcileLoops(); }).catch(() => {});
   }
 
-  play(sound: SoundId, position?: AudioPosition, varyPitch = false): void {
+  play(sound: SoundId, position?: AudioPosition, varyPitch = false, volumeScale = 1): void {
     if (!this.canPlay()) return;
+    const scale = Number.isFinite(volumeScale) ? Math.max(0, Math.min(1, volumeScale)) : 0;
+    if (scale === 0) return;
     const now = this.context!.currentTime;
     // Per-effect limiter also bounds rapid turrets distributed across the level.
     if (now - (this.recent.get(sound) ?? -Infinity) < 0.035) return;
-    if (this.createVoice(sound, position, undefined, varyPitch)) this.recent.set(sound, now);
+    if (this.createVoice(sound, position, undefined, varyPitch, scale)) this.recent.set(sound, now);
   }
 
   startLoop(key: string, sound: SoundId, position?: AudioPosition): void {
@@ -271,7 +273,7 @@ export class AudioManager implements AudioPlayback {
     if (!this.canPlay()) return;
     for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position);
   }
-  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false): boolean {
+  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1): boolean {
     const buffer = this.buffers.get(sound), context = this.context, effects = this.effects;
     if (!buffer || !context || !effects) return false;
     const definition = SOUND_DEFINITIONS[sound];
@@ -280,7 +282,7 @@ export class AudioManager implements AudioPlayback {
     source.buffer = buffer;
     source.loop = key !== undefined;
     source.playbackRate.value = varyPitch ? 0.96 + Math.random() * 0.08 : 1;
-    gain.gain.value = key ? 0 : definition.volume;
+    gain.gain.value = key ? 0 : definition.volume * volumeScale;
     if (key) gain.gain.linearRampToValueAtTime(definition.volume, context.currentTime + 0.04);
     const panner = position ? context.createPanner() : undefined;
     if (panner) {

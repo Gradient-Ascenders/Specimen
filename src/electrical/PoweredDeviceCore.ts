@@ -343,7 +343,8 @@ export class PoweredDeviceCore implements ElectricalConnectionTarget {
     this.poweredValue = nextPowered;
     this.readModelValue.powered = nextPowered;
     if (nextPowered) gameplayAudioEvents.emit('cue', {
-      sound: this.audioKind === 'light' ? 'volt-light-activate-01' : this.audioKind === 'platform' ? 'volt-platform-power-on-01' : 'volt-terminal-activate-01',
+      sound: 'volt-charge-ready-01',
+      volumeScale: this.audioKind === 'light' ? 0.45 : 0.6,
       position: this.copySocketWorldPosition(new THREE.Vector3()),
     });
     this.events.emit('powerChanged', {

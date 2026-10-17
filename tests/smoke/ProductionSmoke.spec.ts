@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { SOUND_BANKS, SOUND_DEFINITIONS } from '../../src/audio/SoundCatalog.ts';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
 
 // No route interception or runtime injection: these are the shipped files.
@@ -140,13 +141,14 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   const voltAssets = new Set<string>();
   const cultivationAssets = new Set<string>();
   const audioAssets = new Set<string>();
+  const soundEffectUrls = new Set(SOUND_BANKS.blackout.map(id =>
+    new URL(SOUND_DEFINITIONS[id].path, baseURL!).href));
   const detailAssets = new Set<string>();
   page.on('response', response => {
     if (/\/volt-[^/]+\.glb$/.test(new URL(response.url()).pathname) && response.ok()) voltAssets.add(response.url());
     if (/\/authored-assets-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) cultivationAssets.add(response.url());
-    // Only sound-effects bank requests count toward the 34/41/54 clip budgets.
-    // The independently streamed level music is not part of those banks.
-    if (/\/assets\/audio\/(?:bob|goop|volt|turrets)\/.*\.ogg$/.test(new URL(response.url()).pathname) && response.ok()) audioAssets.add(response.url());
+    // Use the catalog so every effects folder counts, while streamed music does not.
+    if (soundEffectUrls.has(response.url()) && response.ok()) audioAssets.add(response.url());
     if (/\/(goop|volt)-lod-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) detailAssets.add(response.url());
   });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
@@ -161,7 +163,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   await assertPlaying(page);
   expect([...voltAssets], 'Containment must not load Volt').toEqual([]);
   expect(cultivationAssets.size, 'Containment must not load the Cultivation bake').toBe(0);
-  await expect.poll(() => audioAssets.size).toBe(34);
+  await expect.poll(() => audioAssets.size).toBe(SOUND_BANKS.containment.length);
   expect([...audioAssets].some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
   expect(detailAssets.size).toBe(1);
   expect([...detailAssets][0]).toContain('/group-folder/assets/goop-lod-');
@@ -175,7 +177,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
     await expect(enterLevel).toContainText(`Enter Level ${level}`);
     await enterLevel.click();
     await assertPlaying(page);
-    await expect.poll(() => audioAssets.size).toBe(level === 2 ? 41 : 54);
+    await expect.poll(() => audioAssets.size).toBe(level === 2 ? SOUND_BANKS.cultivation.length : SOUND_BANKS.blackout.length);
     expect(detailAssets.size).toBe(2);
     if (level === 2) {
       expect(cultivationAssets.size, 'Cultivation must load its baked assets before playing').toBe(1);

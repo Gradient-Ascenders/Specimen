@@ -1,3 +1,4 @@
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -24,6 +25,7 @@ export interface DoorOptions {
 /** A hinge-door puzzle object with deterministic, authored opening motion. */
 export class Door {
   readonly root = new THREE.Group();
+  private readonly worldAudio: WorldAudioSource;
   readonly events = new EventBus<DoorEvents>();
 
   private readonly hinge = new THREE.Group();
@@ -81,6 +83,7 @@ export class Door {
     panel.name = `${options.id}-door-panel`;
     panel.position.set(width * 0.5, height * 0.5, 0);
     this.hinge.add(panel);
+    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'door', progress: () => this.openAmount, settled: () => this.openAmount === 0 || this.openAmount === 1 });
   }
 
   get doorState(): DoorState {
@@ -119,9 +122,11 @@ export class Door {
     this.openAmount = 0;
     this.hinge.rotation.y = 0;
     this.setState('closed');
+    this.worldAudio.reset();
   }
 
   dispose(): void {
+    this.worldAudio.dispose();
     this.events.clear();
     this.root.removeFromParent();
     this.root.traverse((object) => {

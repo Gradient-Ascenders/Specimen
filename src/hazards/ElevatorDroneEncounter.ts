@@ -64,6 +64,7 @@ export class ElevatorDroneEncounter {
     this.slots = room.droneRoots.map((root, i) => {
       const target = targets.find(t => t.mesh === room.solubleTargetMeshes[i]);
       if (!target) throw new Error(`Missing elevator drone target ${i + 1}`);
+      this.unsubscribers.push(dissolve.setCompletionSound(target, () => 'world-drone-dissolve-01'));
       const drone = new SecurityDrone({ id: `room-4-drone-${i + 1}`, type: 'ceiling',
         initialPosition: new THREE.Vector3(), colliderSize: new THREE.Vector3(1.2, .7, 1.2),
         forward: new THREE.Vector3(0, -1, 0), scanAxis: new THREE.Vector3(0, 0, 1),

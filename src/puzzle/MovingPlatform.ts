@@ -1,3 +1,4 @@
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -49,6 +50,7 @@ export interface MovingPlatformOptions {
  */
 export class MovingPlatform {
   readonly root = new THREE.Group();
+  private readonly worldAudio: WorldAudioSource;
   readonly events = new EventBus<MovingPlatformEvents>();
   readonly displacement = new THREE.Vector3();
   readonly collisionMesh: THREE.Mesh<
@@ -130,6 +132,7 @@ export class MovingPlatform {
     );
     this.previousPositionValue.copy(this.root.position);
     this.state = this.resolveState();
+    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue, settled: () => this.isAtStart || this.isAtEnd });
   }
 
   get platformState(): MovingPlatformState {
@@ -212,6 +215,7 @@ export class MovingPlatform {
     this.previousPositionValue.copy(this.root.position);
     this.displacement.set(0, 0, 0);
     this.setState(this.resolveState());
+    this.worldAudio.reset();
   }
 
   /**
@@ -297,9 +301,11 @@ export class MovingPlatform {
     this.previousPositionValue.copy(this.root.position);
     this.displacement.set(0, 0, 0);
     this.setState(this.resolveState());
+    this.worldAudio.reset();
   }
 
   dispose(): void {
+    this.worldAudio.dispose();
     this.events.clear();
     this.root.removeFromParent();
     this.root.traverse((object) => {

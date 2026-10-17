@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 
@@ -99,6 +100,7 @@ export class GreyboxDropPreview {
       this.stateValue = 'falling';
       this.elapsedSeconds = 0;
       this.mesh.userData.previewState = 'falling';
+      gameplayAudioEvents.emit('cue', { sound: 'world-platform-fall-01', position: this.mesh.getWorldPosition(new THREE.Vector3()), maxDistance: 22 });
     });
   }
 
@@ -125,6 +127,7 @@ export class GreyboxDropPreview {
     this.syncTether();
     this.stateValue = 'landed';
     this.mesh.userData.previewState = 'landed';
+    gameplayAudioEvents.emit('cue', { sound: 'world-platform-land-01', position: this.mesh.getWorldPosition(new THREE.Vector3()), maxDistance: 26 });
   }
 
   reset(): void {

@@ -1,479 +1,110 @@
 [
   {
-    "id": "bob-bounce-01",
-    "path": "assets/audio/bob/bob-bounce-01.ogg",
-    "durationSeconds": 0.66,
+    "id": "bob-charged-jump-01",
+    "path": "assets/audio/bob/bob-charged-jump-01.ogg",
+    "durationSeconds": 0.42,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.79333,
+    "peak": 0.45782,
     "loop": false
   },
   {
-    "id": "bob-charge-loop-01",
-    "path": "assets/audio/bob/bob-charge-loop-01.ogg",
-    "durationSeconds": 1.2,
+    "id": "bob-contact-01",
+    "path": "assets/audio/bob/bob-contact-01.ogg",
+    "durationSeconds": 0.6065,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.35429,
-    "loop": true
-  },
-  {
-    "id": "bob-charged-jump-01",
-    "path": "assets/audio/bob/bob-charged-jump-01.ogg",
-    "durationSeconds": 0.77,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.78449,
+    "peak": 0.74021,
     "loop": false
   },
   {
     "id": "bob-detach-01",
     "path": "assets/audio/bob/bob-detach-01.ogg",
-    "durationSeconds": 0.41,
+    "durationSeconds": 0.447,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.64906,
+    "peak": 0.75035,
     "loop": false
   },
   {
     "id": "bob-fall-01",
     "path": "assets/audio/bob/bob-fall-01.ogg",
-    "durationSeconds": 0.97,
+    "durationSeconds": 1.0,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.75012,
-    "loop": false
-  },
-  {
-    "id": "bob-impact-01",
-    "path": "assets/audio/bob/bob-impact-01.ogg",
-    "durationSeconds": 0.52,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.7685,
+    "peak": 0.5301,
     "loop": false
   },
   {
     "id": "bob-jump-01",
     "path": "assets/audio/bob/bob-jump-01.ogg",
-    "durationSeconds": 0.43,
+    "durationSeconds": 0.6065,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.72754,
+    "peak": 0.53033,
     "loop": false
   },
   {
     "id": "bob-land-hard-01",
     "path": "assets/audio/bob/bob-land-hard-01.ogg",
-    "durationSeconds": 0.71,
+    "durationSeconds": 0.7,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.75508,
+    "peak": 0.69192,
     "loop": false
   },
   {
     "id": "bob-land-soft-01",
     "path": "assets/audio/bob/bob-land-soft-01.ogg",
-    "durationSeconds": 0.39,
+    "durationSeconds": 0.5415,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.78246,
-    "loop": false
-  },
-  {
-    "id": "bob-movement-loop-01",
-    "path": "assets/audio/bob/bob-movement-loop-01.ogg",
-    "durationSeconds": 1.2,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.44139,
-    "loop": true
-  },
-  {
-    "id": "bob-respawn-01",
-    "path": "assets/audio/bob/bob-respawn-01.ogg",
-    "durationSeconds": 0.78,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.55977,
-    "loop": false
-  },
-  {
-    "id": "bob-slip-01",
-    "path": "assets/audio/bob/bob-slip-01.ogg",
-    "durationSeconds": 0.61,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.65961,
-    "loop": false
-  },
-  {
-    "id": "bob-squish-01",
-    "path": "assets/audio/bob/bob-squish-01.ogg",
-    "durationSeconds": 0.58,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.51285,
-    "loop": false
-  },
-  {
-    "id": "bob-stick-01",
-    "path": "assets/audio/bob/bob-stick-01.ogg",
-    "durationSeconds": 0.41,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.56323,
-    "loop": false
-  },
-  {
-    "id": "bob-wall-crawl-loop-01",
-    "path": "assets/audio/bob/bob-wall-crawl-loop-01.ogg",
-    "durationSeconds": 1.6,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.46543,
-    "loop": true
-  },
-  {
-    "id": "bob-wall-step-01",
-    "path": "assets/audio/bob/bob-wall-step-01.ogg",
-    "durationSeconds": 0.31,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.59176,
+    "peak": 0.67555,
     "loop": false
   },
   {
     "id": "goop-acid-puddle-loop-01",
     "path": "assets/audio/goop/goop-acid-puddle-loop-01.ogg",
-    "durationSeconds": 1.3,
+    "durationSeconds": 3.72,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.42214,
+    "peak": 0.68146,
     "loop": true
-  },
-  {
-    "id": "goop-aim-enter-01",
-    "path": "assets/audio/goop/goop-aim-enter-01.ogg",
-    "durationSeconds": 0.49,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.6967,
-    "loop": false
-  },
-  {
-    "id": "goop-aim-exit-01",
-    "path": "assets/audio/goop/goop-aim-exit-01.ogg",
-    "durationSeconds": 0.42,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.67161,
-    "loop": false
   },
   {
     "id": "goop-dissolve-complete-01",
     "path": "assets/audio/goop/goop-dissolve-complete-01.ogg",
-    "durationSeconds": 0.67,
+    "durationSeconds": 1.0,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.78189,
-    "loop": false
-  },
-  {
-    "id": "goop-dissolve-invalid-01",
-    "path": "assets/audio/goop/goop-dissolve-invalid-01.ogg",
-    "durationSeconds": 0.4,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72736,
+    "peak": 0.60086,
     "loop": false
   },
   {
     "id": "goop-dissolve-loop-01",
     "path": "assets/audio/goop/goop-dissolve-loop-01.ogg",
-    "durationSeconds": 1.4,
+    "durationSeconds": 3.0,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.41937,
-    "loop": true
-  },
-  {
-    "id": "goop-dissolve-start-01",
-    "path": "assets/audio/goop/goop-dissolve-start-01.ogg",
-    "durationSeconds": 0.76,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72691,
-    "loop": false
-  },
-  {
-    "id": "goop-idle-bubbles-loop-01",
-    "path": "assets/audio/goop/goop-idle-bubbles-loop-01.ogg",
-    "durationSeconds": 1.85,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.57329,
-    "loop": true
-  },
-  {
-    "id": "goop-impact-01",
-    "path": "assets/audio/goop/goop-impact-01.ogg",
-    "durationSeconds": 0.61,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.73717,
-    "loop": false
-  },
-  {
-    "id": "goop-interact-01",
-    "path": "assets/audio/goop/goop-interact-01.ogg",
-    "durationSeconds": 0.36,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.6957,
-    "loop": false
-  },
-  {
-    "id": "goop-jump-01",
-    "path": "assets/audio/goop/goop-jump-01.ogg",
-    "durationSeconds": 0.47,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.7542,
-    "loop": false
-  },
-  {
-    "id": "goop-land-hard-01",
-    "path": "assets/audio/goop/goop-land-hard-01.ogg",
-    "durationSeconds": 0.75,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.73077,
-    "loop": false
-  },
-  {
-    "id": "goop-land-soft-01",
-    "path": "assets/audio/goop/goop-land-soft-01.ogg",
-    "durationSeconds": 0.43,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.77308,
-    "loop": false
-  },
-  {
-    "id": "goop-movement-loop-01",
-    "path": "assets/audio/goop/goop-movement-loop-01.ogg",
-    "durationSeconds": 1.35,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.44984,
-    "loop": true
-  },
-  {
-    "id": "goop-projectile-flight-loop-01",
-    "path": "assets/audio/goop/goop-projectile-flight-loop-01.ogg",
-    "durationSeconds": 1.05,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.35646,
+    "peak": 0.64032,
     "loop": true
   },
   {
     "id": "goop-projectile-impact-01",
     "path": "assets/audio/goop/goop-projectile-impact-01.ogg",
-    "durationSeconds": 0.74,
+    "durationSeconds": 0.5865,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.74469,
-    "loop": false
-  },
-  {
-    "id": "goop-respawn-01",
-    "path": "assets/audio/goop/goop-respawn-01.ogg",
-    "durationSeconds": 0.8,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72901,
+    "peak": 0.61587,
     "loop": false
   },
   {
     "id": "goop-shoot-01",
     "path": "assets/audio/goop/goop-shoot-01.ogg",
-    "durationSeconds": 0.6,
+    "durationSeconds": 0.6065,
     "sampleRate": 48000,
     "channels": 1,
-    "peak": 0.74486,
-    "loop": false
-  },
-  {
-    "id": "volt-aim-enter-01",
-    "path": "assets/audio/volt/volt-aim-enter-01.ogg",
-    "durationSeconds": 0.52,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.59896,
-    "loop": false
-  },
-  {
-    "id": "volt-aim-exit-01",
-    "path": "assets/audio/volt/volt-aim-exit-01.ogg",
-    "durationSeconds": 0.43,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.6292,
-    "loop": false
-  },
-  {
-    "id": "volt-charge-loop-01",
-    "path": "assets/audio/volt/volt-charge-loop-01.ogg",
-    "durationSeconds": 1.3,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.34302,
-    "loop": true
-  },
-  {
-    "id": "volt-charge-ready-01",
-    "path": "assets/audio/volt/volt-charge-ready-01.ogg",
-    "durationSeconds": 0.52,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.74432,
-    "loop": false
-  },
-  {
-    "id": "volt-circuit-connect-01",
-    "path": "assets/audio/volt/volt-circuit-connect-01.ogg",
-    "durationSeconds": 0.68,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72009,
-    "loop": false
-  },
-  {
-    "id": "volt-circuit-hold-loop-01",
-    "path": "assets/audio/volt/volt-circuit-hold-loop-01.ogg",
-    "durationSeconds": 1.4,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.29554,
-    "loop": true
-  },
-  {
-    "id": "volt-circuit-release-01",
-    "path": "assets/audio/volt/volt-circuit-release-01.ogg",
-    "durationSeconds": 0.6,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.59414,
-    "loop": false
-  },
-  {
-    "id": "volt-electric-impact-01",
-    "path": "assets/audio/volt/volt-electric-impact-01.ogg",
-    "durationSeconds": 0.7,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72659,
-    "loop": false
-  },
-  {
-    "id": "volt-energy-pulse-01",
-    "path": "assets/audio/volt/volt-energy-pulse-01.ogg",
-    "durationSeconds": 0.7,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.74553,
-    "loop": false
-  },
-  {
-    "id": "volt-idle-sparks-loop-01",
-    "path": "assets/audio/volt/volt-idle-sparks-loop-01.ogg",
-    "durationSeconds": 1.45,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.60764,
-    "loop": true
-  },
-  {
-    "id": "volt-jump-01",
-    "path": "assets/audio/volt/volt-jump-01.ogg",
-    "durationSeconds": 0.41,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.74645,
-    "loop": false
-  },
-  {
-    "id": "volt-land-01",
-    "path": "assets/audio/volt/volt-land-01.ogg",
-    "durationSeconds": 0.43,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.64992,
-    "loop": false
-  },
-  {
-    "id": "volt-land-hard-01",
-    "path": "assets/audio/volt/volt-land-hard-01.ogg",
-    "durationSeconds": 0.63,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.51319,
-    "loop": false
-  },
-  {
-    "id": "volt-light-activate-01",
-    "path": "assets/audio/volt/volt-light-activate-01.ogg",
-    "durationSeconds": 0.73,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72469,
-    "loop": false
-  },
-  {
-    "id": "volt-movement-loop-01",
-    "path": "assets/audio/volt/volt-movement-loop-01.ogg",
-    "durationSeconds": 1.3,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.61706,
-    "loop": true
-  },
-  {
-    "id": "volt-platform-power-on-01",
-    "path": "assets/audio/volt/volt-platform-power-on-01.ogg",
-    "durationSeconds": 0.92,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.55572,
-    "loop": false
-  },
-  {
-    "id": "volt-respawn-01",
-    "path": "assets/audio/volt/volt-respawn-01.ogg",
-    "durationSeconds": 0.93,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.72974,
-    "loop": false
-  },
-  {
-    "id": "volt-shoot-01",
-    "path": "assets/audio/volt/volt-shoot-01.ogg",
-    "durationSeconds": 0.72,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.68432,
-    "loop": false
-  },
-  {
-    "id": "volt-terminal-activate-01",
-    "path": "assets/audio/volt/volt-terminal-activate-01.ogg",
-    "durationSeconds": 0.79,
-    "sampleRate": 48000,
-    "channels": 1,
-    "peak": 0.70445,
+    "peak": 0.53439,
     "loop": false
   },
   {
@@ -483,6 +114,159 @@
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.87624,
+    "loop": false
+  },
+  {
+    "id": "volt-charge-ready-01",
+    "path": "assets/audio/volt/volt-charge-ready-01.ogg",
+    "durationSeconds": 0.7,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.5999,
+    "loop": false
+  },
+  {
+    "id": "volt-circuit-connect-01",
+    "path": "assets/audio/volt/volt-circuit-connect-01.ogg",
+    "durationSeconds": 0.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.61699,
+    "loop": false
+  },
+  {
+    "id": "volt-circuit-hold-loop-01",
+    "path": "assets/audio/volt/volt-circuit-hold-loop-01.ogg",
+    "durationSeconds": 3.9,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.16617,
+    "loop": true
+  },
+  {
+    "id": "volt-circuit-release-01",
+    "path": "assets/audio/volt/volt-circuit-release-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.42289,
+    "loop": false
+  },
+  {
+    "id": "volt-shoot-01",
+    "path": "assets/audio/volt/volt-shoot-01.ogg",
+    "durationSeconds": 0.85,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.72509,
+    "loop": false
+  },
+  {
+    "id": "world-activation-01",
+    "path": "assets/audio/world/world-activation-01.ogg",
+    "durationSeconds": 0.27,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.42868,
+    "loop": false
+  },
+  {
+    "id": "world-door-movement-loop-01",
+    "path": "assets/audio/world/world-door-movement-loop-01.ogg",
+    "durationSeconds": 0.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.12755,
+    "loop": true
+  },
+  {
+    "id": "world-door-stop-01",
+    "path": "assets/audio/world/world-door-stop-01.ogg",
+    "durationSeconds": 1.1,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.61441,
+    "loop": false
+  },
+  {
+    "id": "world-drone-dissolve-01",
+    "path": "assets/audio/environment/world-drone-dissolve-01.ogg",
+    "durationSeconds": 1.31,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.70443,
+    "loop": false
+  },
+  {
+    "id": "world-drone-flight-loop-01",
+    "path": "assets/audio/environment/world-drone-flight-loop-01.ogg",
+    "durationSeconds": 3.88,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.18357,
+    "loop": true
+  },
+  {
+    "id": "world-laser-loop-01",
+    "path": "assets/audio/world/world-laser-loop-01.ogg",
+    "durationSeconds": 3.88,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.10009,
+    "loop": true
+  },
+  {
+    "id": "world-machinery-loop-01",
+    "path": "assets/audio/world/world-machinery-loop-01.ogg",
+    "durationSeconds": 3.88,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.21094,
+    "loop": true
+  },
+  {
+    "id": "world-platform-fall-01",
+    "path": "assets/audio/environment/world-platform-fall-01.ogg",
+    "durationSeconds": 0.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.38688,
+    "loop": false
+  },
+  {
+    "id": "world-platform-hover-loop-01",
+    "path": "assets/audio/environment/world-platform-hover-loop-01.ogg",
+    "durationSeconds": 3.84,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.10158,
+    "loop": true
+  },
+  {
+    "id": "world-platform-land-01",
+    "path": "assets/audio/environment/world-platform-land-01.ogg",
+    "durationSeconds": 0.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.62272,
+    "loop": false
+  },
+  {
+    "id": "world-release-01",
+    "path": "assets/audio/world/world-release-01.ogg",
+    "durationSeconds": 0.32,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.48068,
+    "loop": false
+  },
+  {
+    "id": "world-sign-tick-01",
+    "path": "assets/audio/environment/world-sign-tick-01.ogg",
+    "durationSeconds": 0.042,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.46331,
     "loop": false
   }
 ]

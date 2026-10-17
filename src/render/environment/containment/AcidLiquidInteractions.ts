@@ -24,6 +24,9 @@ export class AcidLiquidInteractions {
     surface.geometry.computeBoundingBox();
     this.bounds = surface.geometry.boundingBox!.clone().applyMatrix4(surface.matrixWorld);
   }
+  /** Cached authored surface bounds, shared with positional pool ambience. */
+  get surfaceBounds(): Readonly<THREE.Box3> { return this.bounds; }
+
   private readonly material: AcidSurfaceMaterial;
 
   update(deltaSeconds: number, bodies: readonly AcidContactBody[]): void {

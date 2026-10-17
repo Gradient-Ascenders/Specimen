@@ -1,0 +1,77 @@
+{
+  "archive": "assets/audio/bob/bob-sounds.tar",
+  "archiveSha256": "3265f7d0b749c9a239a09f292a6d7d01eec0b2b3ac97dbaeee897b5275266cb1",
+  "processing": "Stereo average to mono, documented onset trims, gain only, 2 ms edge fades, OGG Vorbis.",
+  "clips": [
+    {
+      "id": "bob-contact-01",
+      "source": "1-soft-body-contact.wav",
+      "sourceSha256": "26601c564cafda1515cfc752d346d79e7811924328da363c7589236df8c5b113",
+      "sourceDurationSeconds": 0.6065,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.0,
+      "gain": 2.928896,
+      "rms": 0.029167
+    },
+    {
+      "id": "bob-jump-01",
+      "source": "2-normal-jump.wav",
+      "sourceSha256": "1eb1e9e5ebbfaa8000947719effed43a311bc58dd72341b8192f215db9ac719a",
+      "sourceDurationSeconds": 0.6065,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.0,
+      "gain": 1.181899,
+      "rms": 0.065124
+    },
+    {
+      "id": "bob-charged-jump-01",
+      "source": "3-powerful-jump.wav",
+      "sourceSha256": "9e410cd0f779266e6e6e5050a7eded7459d6f7db8562e217230cd69b9cc49b99",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.58,
+      "gain": 0.414223,
+      "rms": 0.063626
+    },
+    {
+      "id": "bob-land-soft-01",
+      "source": "soft-landing.wav",
+      "sourceSha256": "a749250ab54f62effb3384b3cb9d2d1225510c95ebc6e8bd7d494e08728917ed",
+      "sourceDurationSeconds": 0.6065,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.065,
+      "gain": 0.767835,
+      "rms": 0.064485
+    },
+    {
+      "id": "bob-land-hard-01",
+      "source": "hard-fall.wav",
+      "sourceSha256": "582fc45259536a3db636310b90d275bb5623db5fb2ae4c8a434fc1f8dfd87b9d",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.3,
+      "gain": 0.586424,
+      "rms": 0.061862
+    },
+    {
+      "id": "bob-detach-01",
+      "source": "detach.ogg",
+      "sourceSha256": "faba3ad2ff623c28edba98e40f92511adae39d42a705e8af5dd21d38a89f923c",
+      "sourceDurationSeconds": 0.447,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.0,
+      "gain": 1.131023,
+      "rms": 0.051504
+    },
+    {
+      "id": "bob-fall-01",
+      "source": "death.wav",
+      "sourceSha256": "7531028a388d541e0c8c37349ff5dae5e9f85c05d55f8d99b4db7ecaed83c2a6",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.0,
+      "gain": 0.449865,
+      "rms": 0.061997
+    }
+  ]
+}

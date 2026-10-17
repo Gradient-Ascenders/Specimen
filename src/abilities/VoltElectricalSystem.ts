@@ -187,7 +187,6 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
   private selectedRegistration: ElectricalTargetRegistration | undefined;
   private readonly connectionAnchor = new THREE.Vector3();
   private fireRequiresRelease = false;
-  private searchHitsWorld = false;
   private disposed = false;
 
   constructor(options: VoltElectricalSystemOptions<Body>) {
@@ -512,7 +511,6 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     this.searchBeamDirection.subVectors(this.aimRangePoint, this.voltPosition);
     const distance = this.searchBeamDirection.length();
     if (distance <= DISTANCE_EPSILON) {
-      this.searchHitsWorld = false;
       this.searchBeamEnd.copy(this.voltPosition);
       return;
     }
@@ -525,7 +523,6 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
       this.searchBeamHit,
       CollisionLayer.LineOfSight,
     );
-    this.searchHitsWorld = blocked;
     if (
       blocked &&
       this.searchBeamHit.distance + DISTANCE_EPSILON < distance
@@ -589,7 +586,6 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     writeVectorState(this.readModelValue.beamEnd, this.socketPosition);
     this.setSearching(false);
     this.clearSelection();
-    gameplayAudioEvents.emit('cue', { sound: 'volt-electric-impact-01', position: this.socketPosition });
     gameplayAudioEvents.emit('cue', { sound: 'volt-circuit-connect-01', position: this.voltPosition });
     gameplayAudioEvents.emit('loop', { key: 'volt:circuit', sound: 'volt-circuit-hold-loop-01', position: this.voltPosition });
     this.events.emit('connected', {
@@ -608,7 +604,6 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
   private setAimActive(active: boolean): void {
     if (this.readModelValue.aimActive === active) return;
     this.readModelValue.aimActive = active;
-    gameplayAudioEvents.emit('cue', { sound: active ? 'volt-aim-enter-01' : 'volt-aim-exit-01' });
     this.events.emit(active ? 'aimStarted' : 'aimStopped', {});
   }
 
@@ -617,7 +612,6 @@ export class VoltElectricalSystem<Body extends VoltElectricalBody> {
     this.readModelValue.searching = searching;
     if (searching) {
       gameplayAudioEvents.emit('cue', { sound: 'volt-shoot-01', position: this.slimeManager.getBody('volt')?.position });
-      if (this.searchHitsWorld && !this.readModelValue.selectedTargetValid) gameplayAudioEvents.emit('cue', { sound: 'volt-electric-impact-01', position: this.searchBeamEnd });
     }
     this.events.emit(searching ? 'searchStarted' : 'searchStopped', {});
   }

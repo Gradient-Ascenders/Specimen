@@ -1,3 +1,4 @@
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
 import { configureCultivationTraversalLight } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
@@ -13,6 +14,7 @@ export class LevelTwoRoomFourGreybox {
   readonly builder = new GreyboxRoomBuilder('cultivation-room-4');
   readonly root = this.builder.root;
   readonly collisionMeshes = this.builder.collisionMeshes;
+  private worldAudio?: WorldAudioSource;
   readonly controller = new CultivationRoomFourController();
   readonly entrance = new ProximityShutterDoor({ id: 'room-4-boarding', widthMetres: 4,
     heightMetres: 4.6, proximityDepthMetres: 12 });
@@ -102,6 +104,8 @@ export class LevelTwoRoomFourGreybox {
     b.root.add(liftLight, liftLight.target);
     b.addLight('room-4-boarding-light', [0, 4, 2], 0xc8eaff, 22, 10);
     this.reset();
+    this.worldAudio = new WorldAudioSource({ root: this.root.getObjectByName('room-4-lift-floor')!, kind: 'machinery',
+      progress: () => this.controller.progress, settled: () => !this.controller.running });
   }
 
   get dynamicTransformRoots(): readonly THREE.Object3D[] {
@@ -144,6 +148,7 @@ export class LevelTwoRoomFourGreybox {
   }
   reset(): void {
     this.controller.reset(); this.entrance.reset();
+    this.worldAudio?.reset();
     this.entrance.root.position.y = 0;
     for (const piece of this.entrancePieces) piece.mesh.position.y = piece.y;
     this.boardingWall.position.y = -100;
@@ -153,5 +158,5 @@ export class LevelTwoRoomFourGreybox {
     for (let i = 0; i < this.modules.length; i++) this.modules[i].position.y = i * 8 - 8;
     for (const root of this.droneRoots) { root.visible = false; root.position.y = 30; }
   }
-  dispose(): void { this.entrance.dispose(); this.builder.dispose(); }
+  dispose(): void { this.worldAudio?.dispose(); this.entrance.dispose(); this.builder.dispose(); }
 }

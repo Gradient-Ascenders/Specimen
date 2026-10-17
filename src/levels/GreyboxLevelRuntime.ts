@@ -1246,7 +1246,7 @@ export class GreyboxLevelRuntime {
       unsubscribeLevelCompleted,
       testPanel,
     };
-    if (this.audio) this.gameplayAudio = new GameplayAudio(this.audio, slimeManager, acidProjectileSystem);
+    if (this.audio) this.gameplayAudio = new GameplayAudio(this.audio, slimeManager, [testScene.roomThree.art.acidInteractions.surfaceBounds], undefined, this.renderLayer.scene);
 
     const resources = this.resources;
     resources.unsubscribeSlimeRoster = [

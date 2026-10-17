@@ -1,3 +1,4 @@
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -253,6 +254,10 @@ export class WallButton<Body extends WallButtonBody = WallButtonBody> {
     this.pad.material.color.setHex(nextPressed ? 0x74db8d : 0xd66b36);
     this.pad.material.emissive.setHex(nextPressed ? 0x124b25 : 0x4b1608);
 
+    if (this.enabledValue) gameplayAudioEvents.emit('cue', {
+      sound: nextPressed ? 'world-activation-01' : 'world-release-01',
+      position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 16,
+    });
     this.events.emit('changed', {
       button: this,
       pressed: nextPressed,
