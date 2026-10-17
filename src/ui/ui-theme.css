@@ -611,6 +611,35 @@
   font-size: 1.35em;
 }
 
+/* Optional, unobtrusive explanation when the browser denies title autoplay. */
+.title-music-prompt {
+  margin: var(--ui-space-3) 0 0;
+  color: #aabbb7;
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+
+.title-music-prompt button {
+  margin-left: var(--ui-space-2);
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  padding: 0;
+  color: #b4dacf;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.title-music-prompt button:hover,
+.title-music-prompt button:focus-visible {
+  color: #edf9f3;
+}
+
+.title-music-prompt button:focus-visible {
+  outline: 1px solid #a3cbc2;
+  outline-offset: 3px;
+}
+
 /* In-game opening: DOM framing only, no extra render target/postprocess. */
 .opening-screen {
   padding: 0;

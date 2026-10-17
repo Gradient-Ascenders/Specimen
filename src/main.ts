@@ -1,4 +1,5 @@
 import { AudioManager } from './audio/AudioManager.ts';
+import { BackgroundMusic, musicForFlow, type MusicLevel } from './audio/BackgroundMusic.ts';
 import { SOUND_BANKS } from './audio/SoundCatalog.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import { loadCultivationBakedAssets } from './render/environment/cultivation/CultivationBakedAssets.ts';
@@ -56,14 +57,21 @@ function startGame(): void {
 
   const settings = new GameSettings();
   const audio = new AudioManager(import.meta.env.BASE_URL);
+  const music = new BackgroundMusic(import.meta.env.BASE_URL);
   void audio.preload(SOUND_BANKS.containment);
-  const unlockAudio = (): void => audio.unlock();
-  const focusAudio = (): void => audio.setFocused(!document.hidden && document.hasFocus());
+  const unlockAudio = (): void => { audio.unlock(); music.unlock(); };
+  const focusAudio = (): void => {
+    const focused = !document.hidden && document.hasFocus();
+    audio.setFocused(focused);
+    music.setFocused(focused);
+  };
   window.addEventListener('pointerdown', unlockAudio);
   window.addEventListener('keydown', unlockAudio);
   window.addEventListener('blur', focusAudio);
   window.addEventListener('focus', focusAudio);
   document.addEventListener('visibilitychange', focusAudio);
+  // Initialize once: a page may boot already hidden or unfocused, with no event yet.
+  focusAudio();
   const renderLayer = new RenderLayer({
     host: app,
     graphics: settings.value,
@@ -146,6 +154,7 @@ function startGame(): void {
     creditsMarkdown,
     slimeHUD: gameSession,
     actions: {
+      enableMusic: unlockAudio,
       playOpening: () => {
         if (!titleRoom) return;
         titlePresentation?.dispose({ keepScene: true });
@@ -222,6 +231,7 @@ function startGame(): void {
       restartLevel: () => lifecycleCoordinator.restartLevel(),
       applySettings: (nextSettings) => {
         audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);
+        music.setMasterVolume(nextSettings.masterVolume);
         renderLayer.cameraRig.setLookSettings({
           horizontalSensitivityRadiansPerPixel:
             DEFAULT_CAMERA_RIG_CONFIG.horizontalSensitivityRadiansPerPixel *
@@ -248,11 +258,25 @@ function startGame(): void {
       subscribeGraphicsDiagnostics: listener => renderLayer.subscribeGraphicsDiagnostics(listener),
     },
   });
+  music.setAutoplayBlockedListener(blocked => gameFlow.setMusicUnlockRequired(blocked));
   const cleanGameplayMode = new CleanGameplayMode({
     host: app,
     flow: gameFlow,
     prepareGameplay: () => gameSession.prepareCleanGameplay(),
     present: (clean) => renderLayer.setCleanGameplayMode(clean),
+  });
+  let musicLevel: MusicLevel = 'containment';
+  let menuOrigin: 'title' | 'paused' = 'title';
+  let gameCompleted = false;
+  const unsubscribeMusic = gameFlow.subscribe((state) => {
+    if (state === 'title' || state === 'paused') menuOrigin = state;
+    if (gameCompleted) return;
+    const scene = musicForFlow(state, menuOrigin, musicLevel);
+    music.setScene(scene.track, scene.play);
+  });
+  const unsubscribeGameCompleted = gameSession.events.on('gameCompleted', () => {
+    gameCompleted = true;
+    music.setScene(null, true);
   });
   const unsubscribeTitlePresentation = gameFlow.subscribe((state) => {
     if (state !== 'playing' || warmedLevelOneProgramBaseline !== undefined) return;
@@ -272,6 +296,7 @@ function startGame(): void {
   const unsubscribeTransitionStarted = gameSession.events.on(
     'transitionStarted',
     ({ levelId, message }) => {
+      musicLevel = levelId === 'level-2' ? 'cultivation' : 'blackout';
       levelOneShaderProgramGuardActive = false;
       sampleLevelOneShaderPrograms = undefined;
       performanceRecorder?.completeLevelOneShaderProgramGuard();
@@ -388,6 +413,8 @@ function startGame(): void {
     unsubscribeTransitionCompleted();
     unsubscribeTransitionFailed();
     unsubscribeTitlePresentation();
+    unsubscribeMusic();
+    unsubscribeGameCompleted();
     titlePresentation?.dispose();
     openingPresentation?.dispose();
     titleRoom?.dispose();
@@ -396,6 +423,7 @@ function startGame(): void {
     cleanGameplayMode.dispose();
     gameFlow.dispose();
     gameSession.dispose();
+    music.dispose();
     audio.dispose();
     input.dispose();
     renderLayer.dispose();
