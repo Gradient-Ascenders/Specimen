@@ -1,12 +1,14 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from '@playwright/test';
-import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
+import { SOUND_BANKS, SOUND_DEFINITIONS } from '../../src/audio/SoundCatalog.ts';
 
-test('selected Bob and Goop clips decode beneath nested base and follow gameplay and recovery', async ({ page }) => {
+test('selected Bob and Goop clips decode beneath nested base and follow gameplay and recovery', async ({ page, baseURL }) => {
   const errors: string[] = [], audioRequests: string[] = [];
+  const soundEffectUrls = new Set(SOUND_BANKS.blackout.map(id =>
+    new URL(SOUND_DEFINITIONS[id].path, baseURL!).href));
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  page.on('request', request => { if (request.url().endsWith('.ogg')) audioRequests.push(request.url()); });
+  page.on('request', request => { if (soundEffectUrls.has(request.url())) audioRequests.push(request.url()); });
   // Expose the existing runtime to observe actual Web Audio resources, without
   // replacing gameplay or audio code. Plain production smoke remains separate.
   await page.route('**/assets/index-*.js', async route => {
