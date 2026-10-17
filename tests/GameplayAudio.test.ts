@@ -66,16 +66,16 @@ const useLegacySpatialApi = (node: Node): number[] => {
   return position;
 };
 
-test('all 24 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 30 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 24);
+  assert.equal(ids.length, 30);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
     assert.equal(new URL(soundUrl(id), 'https://example.test/group-folder/').pathname, `/group-folder/${path}`);
     assert.equal(soundUrl(id, '/group-folder/'), `/group-folder/${path}`);
   }
-  for (const folder of ['bob','goop','volt','world','turrets'])
+  for (const folder of ['bob','goop','volt','world','environment','turrets'])
     assert.ok(readdirSync(new URL(`../public/assets/audio/${folder}/`, import.meta.url)).every(f => f.endsWith('.ogg')));
 });
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { gameplayAudioEvents } from '../../../audio/GameplayAudioEvents.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
@@ -17,6 +18,7 @@ export class RoomOneMonitor {
   readonly screen: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   private readonly geometries: THREE.BufferGeometry[] = [];
   private disposed = false;
+  private tickCooldown = 0;
 
   constructor(resources: ContainmentArtResources) {
     this.root.name = 'room-1-observation-monitor';
@@ -64,14 +66,24 @@ export class RoomOneMonitor {
   }
 
   update(deltaSeconds: number): void {
-    if (this.disposed || !this.dialogue.update(deltaSeconds)) return;
-    const { text, typing } = this.dialogue.readModel;
+    if (this.disposed) return;
+    const previousText = this.dialogue.readModel.text;
+    const previousPage = this.dialogue.readModel.pageIndex;
+    this.tickCooldown = Math.max(0, this.tickCooldown - deltaSeconds);
+    if (!this.dialogue.update(deltaSeconds)) return;
+    const { text, typing, pageIndex } = this.dialogue.readModel;
     paintContainmentMonitorTexture(this.texture, text, typing);
+    const added = text.slice(pageIndex === previousPage ? previousText.length : 0);
+    if (/\S/.test(added) && this.tickCooldown === 0) {
+      gameplayAudioEvents.emit('cue', { sound: 'world-sign-tick-01', position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 14 });
+      this.tickCooldown = .12;
+    }
   }
 
   reset(): void {
     if (this.disposed) return;
     this.dialogue.reset();
+    this.tickCooldown = 0;
     paintContainmentMonitorTexture(this.texture, '', false);
   }
 

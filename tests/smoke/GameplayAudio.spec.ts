@@ -47,6 +47,7 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   expect(new Set(audioRequests.filter(url => url.includes('/bob/'))).size).toBe(7);
   expect(new Set(audioRequests.filter(url => url.includes('/goop/'))).size).toBe(5);
   expect(new Set(audioRequests.filter(url => url.includes('/world/'))).size).toBe(6);
+  expect(new Set(audioRequests.filter(url => url.includes('/environment/'))).size).toBe(6);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
@@ -164,6 +165,17 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
     return {humming,laserStopped,moving,heldSilent};
   });
   expect(worldSounds).toEqual({humming:[{channels:1,loop:true}],laserStopped:true,moving:true,heldSilent:true});
+  const sign = await page.evaluate(() => {
+    const rt=(window as any).__audioRuntime;
+    rt.resources.containmentLevel.teleportToRoomForDebug(1); rt.fixedUpdate(1/60);
+    rt.audio.stopAll();
+    const monitor=rt.resources.testScene.roomOneMonitor;
+    monitor.reset(); monitor.update(6);
+    const voice=[...rt.audio.voices].find((v:any)=>v.sound==='world-sign-tick-01') as any;
+    return voice ? {channels:voice.source.buffer.numberOfChannels,duration:voice.source.buffer.duration,loop:voice.source.loop} : null;
+  });
+  expect(sign).toEqual({channels:1,duration:expect.any(Number),loop:false});
+  expect(sign!.duration).toBeLessThan(.06);
   await page.evaluate(() => (window as any).__audioRuntime.unload());
   const unloaded=await page.evaluate(()=>(window as any).__audioRuntime.audio.diagnostics);
   expect(unloaded.loops).toBe(0); expect(unloaded.voices).toBe(0);
@@ -176,8 +188,7 @@ test('Volt uses selected electrical clips, one quiet power loop and clean discon
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.route('**/assets/*.js',async route=>{
     const response=await route.fetch(); let source=await response.text();
-    source=source.replace(/([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/,
-      '(globalThis.__voltInitial=$1,$1.prepareLightingPrograms()).then(');
+    source=source.replace(/\{initialRuntime:/, '{initialRuntime:globalThis.__voltInitial=');
     source=source.replace(/export\{([A-Za-z_$][\w$]*) as BlackoutLevelRuntime\};/,
       'class AudioBlackout extends $1{constructor(...args){super(...args);globalThis.__voltAudio=this}}export{AudioBlackout as BlackoutLevelRuntime};');
     await route.fulfill({response,body:source});
@@ -188,8 +199,9 @@ test('Volt uses selected electrical clips, one quiet power loop and clean discon
   await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
-  await page.evaluate(()=>(window as any).__voltInitial.renderLayer.setAnimationLoop(null));
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page, false);
+  await page.evaluate(()=>(window as any).__voltInitial.renderLayer.setAnimationLoop(null));
   await page.keyboard.press('Minus');
   await expect(page.locator('[data-action="enter-level"]')).toContainText('Enter Level 3',{timeout:180_000});
   await page.locator('[data-action="enter-level"]').click();

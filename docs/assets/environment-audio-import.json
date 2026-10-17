@@ -1,0 +1,80 @@
+{
+  "archive": "assets/audio/environment/environment-sounds.tar",
+  "archiveSha256": "d207411f6c67a21174b492374db5f9666a7657986a1c4e6aa1b2cf516be5db00",
+  "processing": "Stereo average to mono, DC removal, source edits, circular overlaps for loops; gain only, 2 ms one-shot edge fades, OGG Vorbis. Drone dissolution reuses original Goop WAVs with a 40 ms crossfade.",
+  "clips": [
+    {
+      "id": "world-platform-fall-01",
+      "source": "platform-falling.wav",
+      "sourceSha256": "a65c8bbbd148627ccb1e91f86b8c86976a9936202f4051034676b42780b524e5",
+      "startSeconds": 0,
+      "endSeconds": 0.8,
+      "circularOverlapSeconds": 0,
+      "gain": 0.38998,
+      "rms": 0.065224
+    },
+    {
+      "id": "world-platform-land-01",
+      "source": "platform-landing.wav",
+      "sourceSha256": "d92d393a1b85c3f518f9ae30218fc3920ff1eeae51da147a045ceca59786fa05",
+      "startSeconds": 0,
+      "endSeconds": 0.8,
+      "circularOverlapSeconds": 0,
+      "gain": 1.858535,
+      "rms": 0.099665
+    },
+    {
+      "id": "world-drone-flight-loop-01",
+      "source": "drone-flight-loop.wav",
+      "sourceSha256": "7f4e785e9a4122f44be3d8797fc3e4d1398d7791ddac6809c005f31fed061680",
+      "startSeconds": 0,
+      "endSeconds": 4,
+      "circularOverlapSeconds": 0.12,
+      "gain": 0.434911,
+      "rms": 0.044552
+    },
+    {
+      "id": "world-platform-hover-loop-01",
+      "source": "platform-hover-loop.wav",
+      "sourceSha256": "60520da7de9d33a9f3b596fe3bd2c9472337129d14cefe530b15dbe29911c159",
+      "startSeconds": 0,
+      "endSeconds": 4,
+      "circularOverlapSeconds": 0.16,
+      "gain": 0.09892,
+      "rms": 0.035124
+    },
+    {
+      "id": "world-sign-tick-01",
+      "source": "sign-text-tick.wav",
+      "sourceSha256": "e1dd1c5f6ac7a98a78d8fb9498d0458e9edd6f93c766da19c728be22dced645d",
+      "startSeconds": 0.043,
+      "endSeconds": 0.085,
+      "circularOverlapSeconds": 0,
+      "gain": 1.714485,
+      "rms": 0.042663
+    },
+    {
+      "id": "world-drone-dissolve-01",
+      "archive": "assets/audio/goop/goop-sounds.tar",
+      "archiveSha256": "2df65e1fb9c7bb30057f5da96c35737035aa128dd0b4992e2c296378b4e18617",
+      "sources": [
+        {
+          "source": "active-dissoloution.wav",
+          "sourceSha256": "b72a2d81345ca6e14b8546e4adbae433338e99f5e079582123ae0bd938d4abfc",
+          "startSeconds": 0,
+          "endSeconds": 0.55,
+          "gain": 1.886176
+        },
+        {
+          "source": "dissolution-completed.wav",
+          "sourceSha256": "ac19cb606e9d5637bbb0ff5fffdc8faa5589e10b84e6dd9c706b19f6fe017968",
+          "startSeconds": 0,
+          "endSeconds": 0.8,
+          "gain": 1.555648
+        }
+      ],
+      "crossfadeSeconds": 0.04,
+      "rms": 0.058727
+    }
+  ]
+}

@@ -81,10 +81,8 @@ def main():
         print(f'{name} -> {sound}.ogg: {len(decoded)/rate:.3f}s, peak {peak:.3f}')
     inventory_path = ROOT / 'docs/assets/gameplay-audio-inventory.json'
     previous = json.loads(inventory_path.read_text())
-    for row in previous:
-        if row['id'].startswith('world-') and row['id'] not in CLIPS:
-            (OUTPUT / f"{row['id']}.ogg").unlink(missing_ok=True)
-    others = [row for row in previous if not row['id'].startswith('world-')]
+    # Environment effects also use world- IDs; this importer owns only CLIPS.
+    others = [row for row in previous if row['id'] not in CLIPS]
     inventory_path.write_text(json.dumps(sorted(others+inventory, key=lambda row: row['id']), indent=2)+'\n')
     (ROOT / 'docs/assets/world-audio-import.json').write_text(json.dumps({
         'archive': str(SOURCE.relative_to(ROOT)), 'archiveSha256': hashlib.sha256(SOURCE.read_bytes()).hexdigest(),

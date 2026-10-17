@@ -189,6 +189,24 @@
     "loop": false
   },
   {
+    "id": "world-drone-dissolve-01",
+    "path": "assets/audio/environment/world-drone-dissolve-01.ogg",
+    "durationSeconds": 1.31,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.70443,
+    "loop": false
+  },
+  {
+    "id": "world-drone-flight-loop-01",
+    "path": "assets/audio/environment/world-drone-flight-loop-01.ogg",
+    "durationSeconds": 3.88,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.18357,
+    "loop": true
+  },
+  {
     "id": "world-laser-loop-01",
     "path": "assets/audio/world/world-laser-loop-01.ogg",
     "durationSeconds": 3.88,
@@ -207,12 +225,48 @@
     "loop": true
   },
   {
+    "id": "world-platform-fall-01",
+    "path": "assets/audio/environment/world-platform-fall-01.ogg",
+    "durationSeconds": 0.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.38688,
+    "loop": false
+  },
+  {
+    "id": "world-platform-hover-loop-01",
+    "path": "assets/audio/environment/world-platform-hover-loop-01.ogg",
+    "durationSeconds": 3.84,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.10158,
+    "loop": true
+  },
+  {
+    "id": "world-platform-land-01",
+    "path": "assets/audio/environment/world-platform-land-01.ogg",
+    "durationSeconds": 0.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.62272,
+    "loop": false
+  },
+  {
     "id": "world-release-01",
     "path": "assets/audio/world/world-release-01.ogg",
     "durationSeconds": 0.32,
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.48068,
+    "loop": false
+  },
+  {
+    "id": "world-sign-tick-01",
+    "path": "assets/audio/environment/world-sign-tick-01.ogg",
+    "durationSeconds": 0.042,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.46331,
     "loop": false
   }
 ]

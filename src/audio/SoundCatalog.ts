@@ -23,6 +23,12 @@ export const SOUND_DEFINITIONS = {
   'world-laser-loop-01': { path: 'assets/audio/world/world-laser-loop-01.ogg', loop: true, volume: 0.32, maxVoices: 1 },
   'world-activation-01': { path: 'assets/audio/world/world-activation-01.ogg', loop: false, volume: 0.45, maxVoices: 3 },
   'world-release-01': { path: 'assets/audio/world/world-release-01.ogg', loop: false, volume: 0.27, maxVoices: 3 },
+  'world-platform-fall-01': { path: 'assets/audio/environment/world-platform-fall-01.ogg', loop: false, volume: 0.48, maxVoices: 3 },
+  'world-platform-land-01': { path: 'assets/audio/environment/world-platform-land-01.ogg', loop: false, volume: 0.85, maxVoices: 3 },
+  'world-drone-flight-loop-01': { path: 'assets/audio/environment/world-drone-flight-loop-01.ogg', loop: true, volume: 0.24, maxVoices: 2 },
+  'world-platform-hover-loop-01': { path: 'assets/audio/environment/world-platform-hover-loop-01.ogg', loop: true, volume: 0.22, maxVoices: 1 },
+  'world-sign-tick-01': { path: 'assets/audio/environment/world-sign-tick-01.ogg', loop: false, volume: 0.26, maxVoices: 2 },
+  'world-drone-dissolve-01': { path: 'assets/audio/environment/world-drone-dissolve-01.ogg', loop: false, volume: 0.7, maxVoices: 3 },
   'specimen-turret-shot': { path: 'assets/audio/turrets/specimen-turret-shot.ogg', loop: false, volume: 0.65, maxVoices: 3 },
 } as const;
 export type SoundId = keyof typeof SOUND_DEFINITIONS;

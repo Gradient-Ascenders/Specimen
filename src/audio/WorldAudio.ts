@@ -5,7 +5,7 @@ import type { SoundId } from './SoundCatalog.ts';
 
 interface SourceOptions {
   readonly root: THREE.Object3D;
-  readonly kind: 'door' | 'machinery' | 'laser';
+  readonly kind: 'door' | 'machinery' | 'laser' | 'drone' | 'hover';
   readonly progress?: () => number;
   readonly settled?: () => boolean;
   readonly enabled?: () => boolean;
@@ -30,7 +30,7 @@ export class WorldAudioSource {
   dispose(): void { sources.delete(this); }
 }
 
-/** At most two nearby motors and one nearby active laser, owned by a level. */
+/** Bounded nearby voices: two motors, one laser, two flying drones, one hover engine. */
 export class WorldAudio {
   private readonly audio: AudioPlayback;
   private readonly root: THREE.Object3D;
@@ -41,11 +41,11 @@ export class WorldAudio {
   constructor(audio: AudioPlayback, root: THREE.Object3D) { this.audio = audio; this.root = root; }
 
   update(listener: AudioPosition | undefined): void {
-    const candidates: { key: string; sound: SoundId; distance: number; position: THREE.Vector3; laser: boolean }[] = [];
+    const candidates: { key: string; sound: SoundId; distance: number; position: THREE.Vector3; group: 'motor' | 'laser' | 'drone' | 'hover' }[] = [];
     for (const source of sources) {
       const options = source.options;
       let ancestor: THREE.Object3D | null = options.root;
-      let visible = true;
+      let visible = this.root.visible;
       while (ancestor && ancestor !== this.root) { visible &&= ancestor.visible; ancestor = ancestor.parent; }
       if (!ancestor) continue;
       const sample = this.samples.get(source) ?? { progress: source.baseline, generation: source.generation };
@@ -59,24 +59,31 @@ export class WorldAudio {
       else options.root.getWorldPosition(this.point);
       const distance = (this.point.x-listener.x)**2 + (this.point.y-listener.y)**2 + (this.point.z-listener.z)**2;
       const laser = options.kind === 'laser';
-      if (distance > (laser ? 10 : 16)**2) continue;
+      const continuous = laser || options.kind === 'drone' || options.kind === 'hover';
+      if (distance > (laser ? 10 : options.kind === 'drone' ? 20 : 16)**2) continue;
       const settled = options.settled?.() ?? false;
       if (options.kind === 'door' && moved && settled)
         this.audio.play('world-door-stop-01', this.point, true);
-      if (laser || (moved && !settled)) candidates.push({
+      if (continuous || (moved && !settled)) candidates.push({
         // Keep the laser voice running when a different beam becomes nearest.
-        key: laser ? 'world:laser' : source.key, distance, position: this.point.clone(), laser,
-        sound: laser ? 'world-laser-loop-01' : options.kind === 'door' ? 'world-door-movement-loop-01' : 'world-machinery-loop-01',
+        key: laser ? 'world:laser' : source.key, distance, position: this.point.clone(),
+        group: laser ? 'laser' : options.kind === 'drone' ? 'drone' : options.kind === 'hover' ? 'hover' : 'motor',
+        sound: laser ? 'world-laser-loop-01' : options.kind === 'drone' ? 'world-drone-flight-loop-01' : options.kind === 'hover' ? 'world-platform-hover-loop-01' : options.kind === 'door' ? 'world-door-movement-loop-01' : 'world-machinery-loop-01',
       });
     }
     for (const source of this.samples.keys()) if (!sources.has(source)) this.samples.delete(source);
     candidates.sort((a,b) => a.distance-b.distance);
     const keep = new Set<string>();
-    let motors = 0, lasers = 0;
+    const counts = { motor: 0, laser: 0, drone: 0, hover: 0 };
+    const limits = { motor: 2, laser: 1, drone: 2, hover: 1 };
     for (const candidate of candidates) {
-      if (candidate.laser ? lasers++ >= 1 : motors++ >= 2) continue;
-      keep.add(candidate.key);
-      this.audio.startLoop(candidate.key, candidate.sound, candidate.position);
+      if (counts[candidate.group] >= limits[candidate.group]) continue;
+      const slot = counts[candidate.group]++;
+      // Ambient selection can move to a nearer engine without restarting audio.
+      const key = candidate.group === 'drone' || candidate.group === 'hover'
+        ? `world:${candidate.group}:${slot}` : candidate.key;
+      keep.add(key);
+      this.audio.startLoop(key, candidate.sound, candidate.position);
     }
     for (const key of this.playing) if (!keep.has(key)) this.audio.stopLoop(key);
     this.playing.clear();

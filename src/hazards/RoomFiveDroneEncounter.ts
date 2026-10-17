@@ -1,4 +1,5 @@
 import { batchMaintenanceScout } from '../render/hazards/BatchMaintenanceScout.ts';
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import { disposeShadowLight } from '../render/ShadowLightResources.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationPlatformBoosters } from '../render/environment/cultivation/CultivationPlatformBoosters.ts';
@@ -31,6 +32,7 @@ export class RoomFiveDroneEncounter {
   readonly drones: readonly SecurityDrone[];
   readonly brokenDrone: SecurityDrone;
   readonly patrols: RoomFivePatrol[] = [];
+  private readonly flightAudio: WorldAudioSource[] = [];
   private readonly networks: SecurityNetwork[] = [];
   private readonly flyers: ReturnType<typeof createRustedSewerDrone>[] = [];
   private readonly resources: SecurityDronePresentationResources;
@@ -118,6 +120,8 @@ export class RoomFiveDroneEncounter {
       batchMaintenanceScout(flyer.body, flyer.eye, surfaceMaps);
       flyer.body.scale.setScalar(.75);
       flyer.body.name = `${drone.id}-flying-shell`;
+      // Network switches disable weapons; these patrols still hover in place.
+      this.flightAudio.push(new WorldAudioSource({ root: drone.root, kind: 'drone' }));
       drone.presentation.root.visible = false; drone.root.add(flyer.body); this.flyers.push(flyer);
       // Saturated blue, with stronger opacity so it stays readable without whitening it.
       const beamColour = network === 'blue' ? 0x165dff : ROOM_FIVE_NETWORK_COLOURS[network];
@@ -144,6 +148,8 @@ export class RoomFiveDroneEncounter {
     // The authored rusted shell is the visible, acid-targetable collider.
     this.brokenDrone.presentation.root.visible = false;
     this.brokenDrone.setCollisionEnabled(false);
+    this.flightAudio.push(new WorldAudioSource({ root: room.brokenCore, kind: 'drone', enabled: () =>
+      (room.controller.brokenDroneState === 'rebooting' || room.controller.brokenDroneState === 'active') && room.controller.brokenDroneHits < 3 }));
     this.unsubscribe = this.damage.events.on('died', ({ slimeId }) => requestDeath(slimeId));
     // Encounter geometry is attached after room dressing. Preserve its explicit
     // exclusions and the platform hull/receiver split on this final assignment.
@@ -255,6 +261,7 @@ export class RoomFiveDroneEncounter {
     this.room.sewer.eye.material.color.setHex(0x080b07);
   }
   dispose(): void {
+    for (const source of this.flightAudio) source.dispose();
     if (this.disposed) return; this.disposed = true;
     this.unsubscribe();
     for (const drone of this.drones) drone.dispose();
