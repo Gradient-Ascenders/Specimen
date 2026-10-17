@@ -9,9 +9,35 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { MaintenanceDroneController } from '../src/vehicles/MaintenanceDroneController.ts';
 import { MaintenanceDroneDevelopmentFixture } from '../src/vehicles/MaintenanceDroneDevelopmentFixture.ts';
 import { MaintenanceDroneFlightBody } from '../src/vehicles/MaintenanceDroneFlightBody.ts';
+import { WorldAudio } from '../src/audio/WorldAudio.ts';
+import type { SoundId } from '../src/audio/SoundCatalog.ts';
 
 const DT = 1 / 60;
 const STILL = new THREE.Vector3();
+
+test('maintenance flight audio follows real power through mount, dismount, reset and disposal', () => {
+  const f = createControllerFixture(), root = new THREE.Group(), loops = new Map<string,SoundId>();
+  root.add(f.authoring.authoring.root);
+  const audio = new WorldAudio({ play() {}, startLoop(key,sound) { loops.set(key,sound); }, stopLoop(key) { loops.delete(key); }, stopAll() { loops.clear(); }, setPaused() {}, setListener() {} }, root);
+  const listen = () => audio.update(f.authoring.authoring.root.getWorldPosition(new THREE.Vector3()));
+  try {
+    listen(); assert.equal(loops.size,0);
+    f.controller.updateMountAvailability('volt',f.volt.position,true);
+    assert.equal(f.controller.requestMount('volt',f.volt.position),true);
+    listen(); assert.deepEqual([...loops.values()],['world-drone-flight-loop-01']);
+    for(let i=0;i<90;i++) {
+      f.controller.update(DT,{horizontalDirection:STILL,ascendHeld:false,descendHeld:false,aimHeld:false,controllingVolt:true});
+      f.controller.syncMountedVolt(f.volt);
+    }
+    assert.equal(f.controller.requestDismount(f.volt),true);
+    listen(); assert.equal(loops.size,0);
+    f.controller.reset(); listen(); assert.equal(loops.size,0);
+    f.volt.teleport({x:3,y:.46,z:2});
+    f.controller.updateMountAvailability('volt',f.volt.position,true);
+    f.controller.requestMount('volt',f.volt.position); listen(); assert.equal(loops.size,1);
+    f.controller.dispose(); listen(); assert.equal(loops.size,0);
+  } finally { audio.dispose(); f.dispose(); }
+});
 
 function createFloor(world: CollisionWorld): THREE.Mesh {
   const floor = new THREE.Mesh(new THREE.BoxGeometry(30, 0.2, 30));

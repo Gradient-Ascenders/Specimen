@@ -1,0 +1,67 @@
+{
+  "archive": "assets/audio/goop/goop-sounds.tar",
+  "archiveSha256": "2df65e1fb9c7bb30057f5da96c35737035aa128dd0b4992e2c296378b4e18617",
+  "processing": "Stereo average to mono, DC removal, documented trims, circular overlaps for loops; gain only, 2 ms one-shot edge fades, OGG Vorbis.",
+  "clips": [
+    {
+      "id": "goop-shoot-01",
+      "source": "acid-shot.wav",
+      "sourceSha256": "ec4ef822389eaec8e02ac65bf0c2b641b1e725ab95ecef371beba918343fb540",
+      "sourceDurationSeconds": 0.6065,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 0.53928,
+      "rms": 0.062305
+    },
+    {
+      "id": "goop-projectile-impact-01",
+      "source": "projectile-hitting-surface.wav",
+      "sourceSha256": "1876ee365be803bc0f3a9eb1f33a5b2cbab924d24b2febda7a0e10ff7a409c88",
+      "sourceDurationSeconds": 0.6065,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.02,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 0.581371,
+      "rms": 0.063841
+    },
+    {
+      "id": "goop-dissolve-loop-01",
+      "source": "active-dissoloution.wav",
+      "sourceSha256": "b72a2d81345ca6e14b8546e4adbae433338e99f5e079582123ae0bd938d4abfc",
+      "sourceDurationSeconds": 3.08,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0.08,
+      "gain": 1.693009,
+      "rms": 0.042955
+    },
+    {
+      "id": "goop-dissolve-complete-01",
+      "source": "dissolution-completed.wav",
+      "sourceSha256": "ac19cb606e9d5637bbb0ff5fffdc8faa5589e10b84e6dd9c706b19f6fe017968",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 1.509819,
+      "rms": 0.06248
+    },
+    {
+      "id": "goop-acid-puddle-loop-01",
+      "source": "acid-puddle.wav",
+      "sourceSha256": "338f4951168b60ec265bb572a6b831962d3ea7c3db68a6ada2a0a8b9dda2b424",
+      "sourceDurationSeconds": 4.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.08,
+      "trimEndSeconds": 0.08,
+      "circularOverlapSeconds": 0.12,
+      "gain": 1.724417,
+      "rms": 0.045103
+    }
+  ]
+}

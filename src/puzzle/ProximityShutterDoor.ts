@@ -1,3 +1,4 @@
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -43,6 +44,7 @@ export interface ProximityShutterDoorOptions {
  */
 export class ProximityShutterDoor {
   readonly root = new THREE.Group();
+  private readonly worldAudio: WorldAudioSource;
   readonly events = new EventBus<ProximityShutterDoorEvents>();
   readonly proximityTrigger: Trigger;
   readonly collisionMesh: THREE.Mesh<
@@ -219,6 +221,7 @@ export class ProximityShutterDoor {
     );
     this.applyIndicator();
     this.applyPanelPose();
+    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'door', progress: () => this.openProgressValue, settled: () => this.openProgressValue === 0 || this.openProgressValue === 1 });
   }
 
   get state(): ProximityShutterDoorState {
@@ -278,9 +281,11 @@ export class ProximityShutterDoor {
     this.applyIndicator();
     this.applyPanelPose();
     this.setState('closed');
+    this.worldAudio.reset();
   }
 
   dispose(): void {
+    this.worldAudio.dispose();
     this.unsubscribeOccupancy();
     this.proximityTrigger.dispose();
     this.events.clear();

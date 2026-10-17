@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WorldAudioSource } from '../../audio/WorldAudio.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { DissolveTarget } from '../../abilities/DissolveTarget.ts';
 import type { SecurityDronePresentation, SecurityDronePresentationResources } from './SecurityDronePresentation.ts';
@@ -14,6 +15,7 @@ export class LiftDroneFlightPresentation {
   private readonly phase: number;
   private elapsed = 0;
   private disposed = false;
+  private readonly flightAudio: WorldAudioSource;
 
   constructor(presentation: SecurityDronePresentation,
     resources: SecurityDronePresentationResources, flameMaterial: THREE.MeshBasicMaterial,
@@ -75,6 +77,7 @@ export class LiftDroneFlightPresentation {
     this.flames.position.y = -.225;
     this.hardware.add(this.flames);
     this.reset();
+    this.flightAudio = new WorldAudioSource({ root: presentation.root, kind: 'drone', enabled: () => this.flames.visible });
   }
 
   update(dt: number, powered: boolean, descending: boolean): void {
@@ -94,6 +97,7 @@ export class LiftDroneFlightPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.flightAudio.dispose();
     for (const binding of this.bindings) binding.mesh.material = binding.material;
     for (const material of this.highlights.values()) material.dispose();
     this.highlights.clear(); this.bindings.length = 0;

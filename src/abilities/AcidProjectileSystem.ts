@@ -661,7 +661,6 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   }
 
   private deactivateProjectile(projectile: AcidProjectileSlot): void {
-    gameplayAudioEvents.emit('stop', { key: `acid:${projectile.state.id}` });
     projectile.state.active = false;
     projectile.ageSeconds = 0;
     projectile.distanceTravelledMetres = 0;
@@ -679,7 +678,6 @@ export class AcidProjectileSystem<Body extends AcidProjectileBody> {
   private setAimActive(active: boolean): void {
     if (this.aimReadModelValue.active === active) return;
     this.aimReadModelValue.active = active;
-    gameplayAudioEvents.emit('cue', { sound: active ? 'goop-aim-enter-01' : 'goop-aim-exit-01' });
     this.events.emit(active ? 'aimEntered' : 'aimExited', {});
   }
 

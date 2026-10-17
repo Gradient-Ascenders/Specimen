@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WorldAudioSource } from '../../../audio/WorldAudio.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { LevelTwoRoomFiveGreybox } from '../../../levels/LevelTwoRoomFiveGreybox.ts';
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
@@ -13,6 +14,7 @@ export class CultivationPlatformBoosters {
   private readonly clock = { value: 0 };
   private readonly observer = new THREE.Vector3();
   private disposed = false;
+  private readonly hoverAudio: WorldAudioSource;
 
   constructor(room: LevelTwoRoomFiveGreybox, maps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null }) {
     this.root.name = 'room-5-platform-boosters'; this.root.userData.presentationOnly = true;
@@ -96,6 +98,16 @@ export class CultivationPlatformBoosters {
       this.root.add(light); this.lamps.push({light, jet: -1});
     }
     room.root.add(this.root); this.reset();
+    const point = new THREE.Vector3();
+    this.hoverAudio = new WorldAudioSource({ root: this.root, kind: 'hover', enabled: () => this.jets.length > 0,
+      closestPoint: (listener, out) => {
+        let nearest = Infinity;
+        for (const jet of this.jets) {
+          this.root.localToWorld(point.copy(jet.position));
+          const distance = (point.x-listener.x)**2 + (point.y-listener.y)**2 + (point.z-listener.z)**2;
+          if (distance < nearest) { nearest = distance; out.copy(point); }
+        }
+      } });
   }
 
   update(dt: number, bobWorldPosition?: { readonly x: number; readonly y: number; readonly z: number }): void {
@@ -128,6 +140,7 @@ export class CultivationPlatformBoosters {
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
+    this.hoverAudio.dispose();
     this.root.removeFromParent();
     for (const mesh of this.meshes) { mesh.geometry.dispose(); if (mesh instanceof THREE.InstancedMesh) mesh.dispose(); }
     for (const material of this.materials) material.dispose();

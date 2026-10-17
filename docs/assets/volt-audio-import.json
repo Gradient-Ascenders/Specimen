@@ -1,0 +1,67 @@
+{
+  "archive": "assets/audio/volt/volt-sounds.tar",
+  "archiveSha256": "7dbf322cb35e2b883c33c08a0e2b719bf2ffb9b8d6e640fc3c66fa36325031b9",
+  "processing": "Stereo average to mono, DC removal, documented trims, circular overlaps for loops; gain only, 2 ms one-shot edge fades, OGG Vorbis.",
+  "clips": [
+    {
+      "id": "volt-shoot-01",
+      "source": "electrical-discharge.wav",
+      "sourceSha256": "d8139891d7300c19b4eef5eeb2e8fa8deee8ea0b3b9beba44b0a57ec9921ac87",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0.15,
+      "circularOverlapSeconds": 0,
+      "gain": 0.750015,
+      "rms": 0.041245
+    },
+    {
+      "id": "volt-circuit-connect-01",
+      "source": "electrical-connection.wav",
+      "sourceSha256": "e595d465673059858c7680107d2a8aa2e4814c7da2976555587e39ba63e69815",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0.2,
+      "circularOverlapSeconds": 0,
+      "gain": 1.211583,
+      "rms": 0.061906
+    },
+    {
+      "id": "volt-circuit-hold-loop-01",
+      "source": "sustained-power.wav",
+      "sourceSha256": "de00719a8e2d91cd7b8dc267ec4abcc11bace6faf5fd76b437a8100d2ad3c6b5",
+      "sourceDurationSeconds": 4.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0.1,
+      "gain": 0.297523,
+      "rms": 0.033554
+    },
+    {
+      "id": "volt-charge-ready-01",
+      "source": "charge-complete.wav",
+      "sourceSha256": "7fc0fe126af0310740d1f3bf3cfcd6abef8ef5579c361f15638bba48482bf2a8",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0.3,
+      "circularOverlapSeconds": 0,
+      "gain": 1.243665,
+      "rms": 0.061394
+    },
+    {
+      "id": "volt-circuit-release-01",
+      "source": "electrical-disconnect.wav",
+      "sourceSha256": "b836b4c9cff1b8f2e900012117039448a31db41915a35b78fadce5dc7e56dc7e",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 0.547867,
+      "rms": 0.061698
+    }
+  ]
+}

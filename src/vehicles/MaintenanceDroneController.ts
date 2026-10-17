@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 
 import { EventBus } from '../core/EventBus.ts';
 import type { BlackoutCheckpointParticipant } from '../levels/BlackoutCheckpointManager.ts';
@@ -120,6 +121,7 @@ implements BlackoutCheckpointParticipant {
   private pendingMountedRestore = false;
   private fallingSupportStepPending = false;
   private disposed = false;
+  private readonly flightAudio: WorldAudioSource;
 
   constructor(options: MaintenanceDroneControllerOptions) {
     this.world = options.world;
@@ -173,6 +175,7 @@ implements BlackoutCheckpointParticipant {
     };
     this.readModel = this.model;
     this.syncModel();
+    this.flightAudio = new WorldAudioSource({ root: this.authoring.root, kind: 'drone', enabled: () => this.model.powered });
   }
 
   get voltMounted(): boolean {
@@ -609,6 +612,7 @@ implements BlackoutCheckpointParticipant {
 
   dispose(): void {
     if (this.disposed) return;
+    this.flightAudio.dispose();
     this.flight.park();
     this.voltMountedValue = false;
     this.pendingMountedRestore = false;

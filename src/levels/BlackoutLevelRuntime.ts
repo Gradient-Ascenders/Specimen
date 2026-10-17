@@ -1893,9 +1893,9 @@ export class BlackoutLevelRuntime {
         safetyDisplacement,
       };
       if (this.audio) {
-        const gameplayAudio = new GameplayAudio(this.audio, manager, acidProjectileSystem, () =>
+        const gameplayAudio = new GameplayAudio(this.audio, manager, [scene.maintenanceBay?.acidInteractions, scene.transitRoom?.acidInteractions].flatMap(pool => pool ? [pool.surfaceBounds] : []), () =>
           specimenForm.readModel.controlledForm === 'specimen' ? specimenBody :
-            phase.phase === 'merging' ? undefined : manager.activeBody);
+            phase.phase === 'merging' ? undefined : manager.activeBody, this.renderLayer.scene);
         this.gameplayAudio = gameplayAudio;
         rollback(() => {
           gameplayAudio.dispose();

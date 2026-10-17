@@ -1,3 +1,4 @@
+import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -63,6 +64,7 @@ export interface VerticalBlastDoorOptions {
 /** Fixed-step vertically translating door with body-safe closing and reopening. */
 export class VerticalBlastDoor {
   readonly root = new THREE.Group();
+  private readonly worldAudio: WorldAudioSource;
   readonly events = new EventBus<VerticalBlastDoorEvents>();
   readonly collisionMesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
   readonly id: string;
@@ -145,6 +147,7 @@ export class VerticalBlastDoor {
       this.collisionWorld.unregister(this.collisionMesh);
       throw error;
     }
+    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'door', progress: () => this.progressValue, settled: () => this.progressValue <= 1e-10 || this.progressValue >= 1-1e-10 });
   }
 
   get state(): VerticalBlastDoorState {
@@ -198,6 +201,7 @@ export class VerticalBlastDoor {
     this.scratchObstructingIds.clear();
     this.applyProgress();
     this.setState(this.resolveRestoredState());
+    this.worldAudio.reset();
   }
 
   setOpen(open: boolean): void {
@@ -270,6 +274,7 @@ export class VerticalBlastDoor {
   }
 
   dispose(): void {
+    this.worldAudio.dispose();
     if (this.disposed) return;
     this.disposed = true;
     this.collisionWorld.unregister(this.collisionMesh);

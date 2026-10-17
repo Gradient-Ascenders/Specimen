@@ -1,3 +1,4 @@
+import { registerLaserAudio, type WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
 
 const BEAM_EPSILON_SQ = 1e-12;
@@ -70,6 +71,7 @@ export interface LaserHazardOptions {
  */
 export class LaserHazard {
   readonly root = new THREE.Group();
+  private readonly worldAudio: WorldAudioSource;
   readonly id: string;
   readonly beamRadiusMetres: number;
 
@@ -223,6 +225,7 @@ export class LaserHazard {
     );
 
     this.reset();
+    this.worldAudio = registerLaserAudio(this.root, this.startValue, this.endValue, () => this.enabled);
   }
 
   get start(): ReadonlyLaserVector3 {
@@ -434,6 +437,7 @@ export class LaserHazard {
   }
 
   dispose(): void {
+    this.worldAudio.dispose();
     this.root.removeFromParent();
     this.root.clear();
     this.beamGeometry.dispose();

@@ -199,6 +199,9 @@ export class LevelTwoRoomFiveGreybox {
     this.targets = targets.filter(target => target.mesh.userData.roomId === 5);
   }
   bindBurns(system: DissolveSystem): void {
+    const core = system.registeredTargets.find(target => target.mesh === this.brokenCore);
+    if (core) this.subscriptions.push(system.setCompletionSound(core, () =>
+      this.controller.brokenDroneHits >= 3 ? 'world-drone-dissolve-01' : 'goop-dissolve-complete-01'));
     this.subscriptions.push(system.events.on('burnStarted', ({ target }) => {
       if (target.mesh === this.brokenCore) this.controller.hitBrokenDrone();
       for (const mesh of this.controls.values()) if (mesh === target.mesh) {

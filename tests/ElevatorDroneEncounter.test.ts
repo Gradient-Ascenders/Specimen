@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { WorldAudio } from '../src/audio/WorldAudio.ts';
+import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
+import type { SoundId } from '../src/audio/SoundCatalog.ts';
 import test from 'node:test';
 import * as THREE from 'three';
 import { CultivationRoomFourController, ROOM_FOUR_SPAWNS } from '../src/levels/CultivationRoomFourController.ts';
@@ -10,6 +13,26 @@ import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { createAuthoredDissolveTarget } from '../src/abilities/DissolveTarget.ts';
 import { DissolveSystem } from '../src/abilities/DissolveSystem.ts';
 import { AcidProjectileSystem } from '../src/abilities/AcidProjectileSystem.ts';
+
+test('lift drone flight follows visible powered engines and a completed acid kill replaces the generic completion cue', () => {
+  const f=fixture(), root=new THREE.Group(), loops=new Map<string,SoundId>(), cues:SoundId[]=[];
+  root.add(f.room.root);
+  const audio=new WorldAudio({play() {},startLoop(key,sound) {loops.set(key,sound);},stopLoop(key) {loops.delete(key);},stopAll() {loops.clear();},setPaused() {},setListener() {}},root);
+  const off=gameplayAudioEvents.on('cue',e=>cues.push(e.sound));
+  const listen=()=>audio.update(f.targets[0].mesh.getWorldPosition(new THREE.Vector3()));
+  try {
+    listen(); assert.equal(loops.size,0);
+    for(let i=0;i<1000;i++) f.step();
+    listen(); assert.ok([...loops.values()].includes('world-drone-flight-loop-01'));
+    f.dissolve.startBurn(f.targets[0]);
+    for(let i=0;i<60;i++) f.step();
+    assert.equal(cues.filter(s=>s==='world-drone-dissolve-01').length,1);
+    assert.equal(cues.filter(s=>s==='goop-dissolve-complete-01').length,0);
+    f.reset(); listen(); assert.equal(loops.size,0);
+    assert.equal(cues.filter(s=>s==='world-drone-dissolve-01').length,1);
+    f.encounter.dispose(); listen(); assert.equal(loops.size,0);
+  } finally {off();audio.dispose();f.dispose();}
+});
 import { createLevelTwoPreviewProgression, advanceLevelTwoPreviewProgression } from '../src/levels/LevelTwoPreviewProgression.ts';
 import { LevelTwoRoomFiveGreybox } from '../src/levels/LevelTwoRoomFiveGreybox.ts';
 
