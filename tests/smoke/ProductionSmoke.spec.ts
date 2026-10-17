@@ -115,6 +115,9 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   const credits = page.locator('[data-flow-panel="credits"]');
   await expect(credits).toBeVisible();
   await expect(credits.locator('.credits-ledger')).toContainText('Three.js');
+  // Music must render as structured credit entries, not raw Markdown paragraphs.
+  await expect(credits.locator('.credits-ledger .credits-entry h3').filter({ hasText: /^(Osmotic Memory|Thought Loop|Unsolved Investigation|Searching)$/ })).toHaveCount(4);
+  await expect(credits.locator('.credits-ledger .credits-entry').filter({ hasText: 'GloryToTheMachine' })).toHaveCount(1);
   await expect(credits.locator('.lab-menu-panel')).toBeVisible();
   await expect(credits.locator('.credits-footer [data-action="back"]')).toBeInViewport();
   await expect(credits.locator('.credits-ledger a').first()).toHaveAttribute('href', /^https?:\/\//);
