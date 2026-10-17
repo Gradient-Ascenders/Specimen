@@ -60,7 +60,6 @@ texture assets, external code or third-party dependencies were introduced.
 | --- | --- | --- | --- | --- |
 | Bob, Goop and Volt sound packs (53 effects) | Original procedural synthesis with ChatGPT assistance, as described in the supplied manifests | Requester-supplied Specimen character SFX ZIP packs | Created for this project; no separate licence declaration supplied | Gameplay movement, abilities, collisions, power and recovery. Oscillators, filtered noise and envelopes; no imported audio samples. |
 | Specimen turret shot | Requester-supplied audio; original creator and generation tool not specified | Supplied `specimen-turret-shot.wav`, converted to OGG Vorbis | No separate licence declaration supplied | Accepted turret projectile spawns across the shared drone firing system. |
-
 | Osmotic Memory | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/osmotic-memory) | CC0 | Intro/title screen music; edited for looping and loudness. |
 | Thought Loop | GloryToTheMachine | [OpenGameArt](https://opengameart.org/content/thought-loop-glorytothemachine-ambientdeepnostalgic-loop) | CC BY 4.0 | Containment music; edited for loudness. Attribution: Music by GloryToTheMachine. |
 | Unsolved Investigation | isaiah658 | [OpenGameArt](https://opengameart.org/content/unsolved-investigation) | CC0 | Cultivation music; lossless WAV source converted to OGG. |
