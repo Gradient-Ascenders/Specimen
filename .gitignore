@@ -1,6 +1,7 @@
 node_modules/
 dist/
 artifacts/
+src/assets/cinematics/*.partial.mp4
 coverage/
 .nyc_output/
 .vite/

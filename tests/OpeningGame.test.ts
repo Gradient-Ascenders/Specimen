@@ -311,56 +311,84 @@ function deferred() {
 }
 
 function playerFixture() {
-  let sceneLoads = 0, levelLoads = 0, completions = 0, disposals = 0, draws = 0;
-  const sceneReady = deferred(), levelReady = deferred(), frames = new Map<number, FrameRequestCallback>();
+  let sceneLoads = 0, preloads = 0, levelLoads = 0, completions = 0, disposals = 0, draws = 0, nextFrame = 0;
+  const sceneReady = deferred(), preloadReady = deferred(), levelReady = deferred(), frames = new Map<number, FrameRequestCallback>();
+  let scenePromise = sceneReady.promise;
   let levelPromise = levelReady.promise;
   const host = { dataset: {} as Record<string, string>, clientWidth: 640, clientHeight: 360, ownerDocument: { hidden: false } };
   const fades: number[] = [];
   const scene = { room: { scene: {}, camera: {} }, needsShadowUpdate: true, begin() {}, apply() {},
-    prepare: () => { sceneLoads++; return sceneReady.promise; }, dispose: () => { disposals++; } };
+    prepare: () => { sceneLoads++; return scenePromise; }, dispose: () => { disposals++; } };
   const layer = { setPresentationResolution() {}, withShadowPreparation: (_: boolean, action: () => unknown) => action(),
     renderer: { shadowMap: {}, render: () => { draws++; } } };
   const statuses: { message: string; failed: boolean }[] = [];
   const options = { scene, renderLayer: layer, host, window: {
-    requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(frames.size + 1, callback); return frames.size; },
+    requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++nextFrame, callback); return nextFrame; },
     cancelAnimationFrame: (id: number) => frames.delete(id),
-  }, prepareLevel: () => { levelLoads++; return levelPromise; },
+  }, preloadLevel: () => { preloads++; return preloadReady.promise; },
+  prepareLevel: () => {
+    assert.equal(fades.at(-1), 1, 'Full world/model/GPU preparation must stay behind a blackout.');
+    levelLoads++; return levelPromise;
+  },
   onComplete: () => { completions++; }, onStatus: (message: string, failed: boolean) => statuses.push({ message, failed }),
   onFade: (opacity: number) => fades.push(opacity) };
   const player = new OpeningGamePresentation(options as unknown as OpeningGamePresentationOptions);
   const flushFrames = () => { const pending = [...frames.values()]; frames.clear(); for (const callback of pending) callback(0); };
   const blackout = () => { for (let frame = 0; frame < 9; frame++) player.render(0.1); };
-  return { player, host, frames, sceneReady, levelReady, statuses, fades, flushFrames, blackout,
+  return { player, host, frames, sceneReady, preloadReady, levelReady, statuses, fades, flushFrames, blackout,
+    setScenePromise: (promise: Promise<void>) => { scenePromise = promise; },
     setLevelPromise: (promise: Promise<void>) => { levelPromise = promise; },
-    counts: () => ({ sceneLoads, levelLoads, completions, disposals, draws }) };
+    counts: () => ({ sceneLoads, preloads, levelLoads, completions, disposals, draws }) };
 }
 const flushPromises = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 
-test('Level 1 prepares during playback; neither early readiness nor Skip bypasses the readiness gate', async () => {
+test('only light assets prepare during the film; Skip paints black before full Level 1 preparation', async () => {
   const f = playerFixture(); f.player.start(); f.player.start();
+  assert.equal(f.host.dataset.openingMode, 'live');
   assert.equal(f.counts().sceneLoads, 0); assert.equal(f.counts().levelLoads, 0);
   f.blackout(); f.flushFrames(); f.flushFrames(); await flushPromises();
   assert.equal(f.counts().sceneLoads, 1);
-  assert.equal(f.counts().levelLoads, 1);
+  assert.equal(f.counts().levelLoads, 0, 'do not contend with the opening startup jobs');
   f.sceneReady.resolve(); await flushPromises();
-  f.player.render(0.1); assert.equal(f.host.dataset.openingStage, 'blackout');
+  assert.equal(f.counts().preloads, 1);
+  assert.equal(f.counts().levelLoads, 0);
+  for (let i = 0; i < 55; i++) f.player.render(.1);
+  assert.equal(f.host.dataset.openingStage, 'experiments');
+  assert.equal(f.fades.at(-1), 0, 'The film cannot wait for speculative network requests.');
+  assert.equal(f.statuses.at(-1)?.message, '');
+  f.preloadReady.resolve(); await flushPromises();
+  assert.equal(f.counts().levelLoads, 0, 'A completed download must not trigger parsing or GPU work during playback.');
   f.player.skip(); assert.equal(f.counts().completions, 0);
   assert.equal(f.host.dataset.openingState, 'waiting');
+  assert.equal(f.fades.at(-1), 1);
+  assert.equal(f.counts().levelLoads, 0);
+  f.flushFrames(); assert.equal(f.counts().levelLoads, 0, 'Allow a full blackout paint.');
+  f.flushFrames(); await flushPromises(); assert.equal(f.counts().levelLoads, 1);
   f.levelReady.resolve(); await flushPromises();
   assert.equal(f.counts().completions, 1);
   f.player.skip(); assert.equal(f.counts().completions, 1);
   f.player.dispose();
 });
 
-test('automatic finish waits for both the complete cinematic and Level 1; hidden tabs do not advance it', async () => {
+test('automatic finish starts full preparation after the final fade; hidden tabs do not spend film time', async () => {
   const f = playerFixture(); f.player.start();
-  f.blackout(); f.flushFrames(); f.flushFrames(); f.sceneReady.resolve(); f.levelReady.resolve(); await flushPromises();
+  f.blackout(); f.flushFrames(); f.flushFrames(); f.sceneReady.resolve(); await flushPromises();
   assert.equal(f.counts().completions, 0);
   f.host.ownerDocument.hidden = true;
   for (let i = 0; i < 200; i++) f.player.render(0.1);
   assert.equal(f.counts().draws, 0);
   f.host.ownerDocument.hidden = false;
   for (let i = 0; i < Math.ceil(T.end * 10) + 1; i++) f.player.render(0.1);
+  assert.equal(f.host.dataset.openingStage, 'complete');
+  assert.equal(f.counts().levelLoads, 0);
+  assert.equal(f.fades.at(-1), 1);
+  assert.equal(f.host.dataset.openingState, 'waiting');
+  f.flushFrames(); assert.equal(f.counts().levelLoads, 0);
+  f.flushFrames(); await flushPromises(); assert.equal(f.counts().levelLoads, 1);
+  const endDraws = f.counts().draws;
+  for (let i = 0; i < 100; i++) f.player.render(.1);
+  assert.equal(f.counts().draws, endDraws, 'No cinematic draws compete with final GPU preparation.');
+  f.levelReady.resolve(); await flushPromises();
   assert.equal(f.counts().completions, 1);
   f.player.dispose();
 });
@@ -377,6 +405,9 @@ test('preparation fades the retained title to black without spending the laborat
   f.flushFrames();
   assert.equal(f.counts().sceneLoads, 1);
   f.sceneReady.resolve(); await flushPromises();
+  assert.equal(f.counts().levelLoads, 0);
+  assert.equal(f.counts().preloads, 1);
+  assert.equal(f.fades.at(-1), 1);
   f.player.render(0.1);
   assert.equal(f.host.dataset.openingStage, 'blackout');
   for (let i = 0; i < 12; i++) f.player.render(0.1);
@@ -385,18 +416,53 @@ test('preparation fades the retained title to black without spending the laborat
   f.player.dispose();
 });
 
+test('no Level 1 construction or speculative work competes with the cinematic startup jobs', async () => {
+  const f = playerFixture(); f.player.start(); f.blackout(); f.flushFrames(); f.flushFrames();
+  await flushPromises();
+  for (let i = 0; i < 20; i++) f.player.render(.1);
+  assert.equal(f.counts().levelLoads, 0, 'heavy construction must not overlap the cinematic shader/geometry jobs');
+  assert.equal(f.counts().preloads, 0);
+  assert.equal(f.fades.at(-1), 1);
+  f.sceneReady.resolve(); await flushPromises();
+  assert.equal(f.counts().levelLoads, 0);
+  assert.equal(f.counts().preloads, 1);
+  f.player.render(.1);
+  assert.equal(f.host.dataset.openingStage, 'blackout');
+  f.player.dispose();
+});
+
+test('a failed opening still prepares Level 1 so Skip can recover without a retry', async () => {
+  const f = playerFixture(); f.player.start(); f.blackout(); f.flushFrames(); f.flushFrames();
+  f.sceneReady.reject(new Error('opening shader failed')); await flushPromises();
+  assert.equal(f.counts().levelLoads, 0);
+  f.flushFrames(); f.flushFrames(); await flushPromises();
+  assert.equal(f.counts().levelLoads, 1);
+  f.levelReady.resolve(); await flushPromises();
+  f.player.skip(); assert.equal(f.counts().completions, 1);
+  f.player.dispose();
+});
+
 test('Skip cannot release cinematic materials while their shader compilation is pending', async () => {
   const f = playerFixture(); f.player.start();
   f.blackout(); f.flushFrames(); f.flushFrames(); f.levelReady.resolve(); await flushPromises();
   f.player.skip(); assert.equal(f.counts().completions, 0);
+  f.flushFrames(); f.flushFrames(); await flushPromises();
+  assert.equal(f.counts().levelLoads, 0, 'Even a painted Skip cannot overlap the pending cinematic compilation.');
   f.sceneReady.resolve(); await flushPromises();
   assert.equal(f.counts().completions, 1);
   f.player.dispose();
 });
 
-test('failed preparation exposes recovery, and disposal cancels queued loads/late callbacks', async () => {
+test('speculative failure cannot interrupt the clip; final preparation failure exposes retry without duplicate jobs', async () => {
   const f = playerFixture(); f.player.start(); f.blackout(); f.flushFrames(); f.flushFrames(); await flushPromises();
-  f.sceneReady.resolve(); f.levelReady.reject(new Error('network')); await flushPromises();
+  f.sceneReady.resolve(); await flushPromises();
+  f.preloadReady.reject(new Error('speculative network failure')); await flushPromises();
+  for (let i = 0; i < 55; i++) f.player.render(.1);
+  assert.equal(f.host.dataset.openingState, 'playing');
+  assert.equal(f.host.dataset.openingStage, 'experiments');
+  assert.equal(f.counts().levelLoads, 0);
+  f.player.skip(); f.flushFrames(); f.flushFrames(); await flushPromises();
+  f.levelReady.reject(new Error('network')); await flushPromises();
   assert.equal(f.host.dataset.openingState, 'failed');
   assert.equal(f.statuses.at(-1)?.failed, true);
   assert.equal(f.counts().completions, 0);
@@ -404,6 +470,7 @@ test('failed preparation exposes recovery, and disposal cancels queued loads/lat
   f.player.retry(); f.player.retry();
   await flushPromises();
   assert.equal(f.counts().levelLoads, 2, 'Retry cannot duplicate the pending preparation.');
+  assert.equal(f.counts().preloads, 1);
   f.player.skip(); assert.equal(f.counts().completions, 1);
   f.player.dispose(); f.player.dispose();
   assert.equal(f.counts().disposals, 1);
@@ -411,9 +478,69 @@ test('failed preparation exposes recovery, and disposal cancels queued loads/lat
   g.flushFrames(); g.sceneReady.resolve(); await flushPromises();
   assert.equal(g.counts().levelLoads, 0); assert.equal(g.counts().completions, 0);
   assert.deepEqual(g.host.dataset, {});
+  const h = playerFixture(); h.player.start(); h.blackout(); h.flushFrames(); h.flushFrames();
+  h.sceneReady.resolve(); await flushPromises(); h.player.skip(); h.player.dispose();
+  h.flushFrames(); h.flushFrames(); h.preloadReady.resolve(); await flushPromises();
+  assert.equal(h.counts().levelLoads, 0, 'Disposal cancels the queued post-fade construction.');
+  assert.equal(h.counts().completions, 0);
 });
 
-test('rendering shares the existing loop with a 30Hz cap and stops redrawing a waiting end pose', async () => {
+test('retrying a failed clip cannot reveal it while recovery GPU preparation is still running', async () => {
+  const f = playerFixture(); f.player.start(); f.blackout(); f.flushFrames(); f.flushFrames();
+  f.sceneReady.reject(new Error('opening failure')); await flushPromises();
+  f.flushFrames(); f.flushFrames(); await flushPromises();
+  f.setScenePromise(Promise.resolve()); f.player.retry(); await flushPromises();
+  for (let i = 0; i < 55; i++) f.player.render(.1);
+  assert.equal(f.counts().draws, 0); assert.equal(f.fades.at(-1), 1);
+  assert.equal(f.counts().preloads, 0, 'The recovering level already owns its real downloads.');
+  f.levelReady.resolve(); await flushPromises();
+  for (let i = 0; i < 55; i++) f.player.render(.1);
+  assert.equal(f.host.dataset.openingStage, 'experiments');
+  f.player.dispose();
+});
+
+test('Retry restarts both failed prerequisites and recovers once in either completion order', async () => {
+  for (const skip of [false, true]) for (const first of ['scene', 'level'] as const) {
+    const f = playerFixture(); f.player.start(); f.blackout(); f.flushFrames(); f.flushFrames();
+    if (skip) f.player.skip();
+    f.sceneReady.reject(new Error('opening asset unavailable')); await flushPromises();
+    f.flushFrames(); f.flushFrames(); await flushPromises();
+    assert.equal(f.counts().levelLoads, 1);
+    f.levelReady.reject(new Error('level asset unavailable')); await flushPromises();
+    assert.equal(f.host.dataset.openingState, 'failed');
+    assert.equal(f.statuses.at(-1)?.failed, true);
+
+    const sceneRetry = deferred(), levelRetry = deferred();
+    f.setScenePromise(sceneRetry.promise); f.setLevelPromise(levelRetry.promise);
+    f.player.retry(); f.player.retry(); await flushPromises();
+    assert.equal(f.counts().sceneLoads, 2);
+    assert.equal(f.counts().levelLoads, 2, 'Retry must restart Level 1 even while the opening is unready.');
+    assert.equal(f.statuses.at(-1)?.failed, false);
+
+    (first === 'scene' ? sceneRetry : levelRetry).resolve(); await flushPromises();
+    for (let i = 0; i < 55; i++) f.player.render(.1);
+    assert.equal(f.counts().draws, 0, 'Do not reveal either recovered scene before both prerequisites settle.');
+    assert.equal(f.fades.at(-1), 1);
+    assert.equal(f.counts().completions, 0);
+
+    (first === 'scene' ? levelRetry : sceneRetry).resolve(); await flushPromises();
+    if (!skip) {
+      for (let i = 0; i < 55; i++) f.player.render(.1);
+      assert.equal(f.host.dataset.openingStage, 'experiments', 'Recovery must resume the film, not stall on black.');
+      assert.equal(f.host.dataset.openingState, 'playing');
+      assert.equal(f.statuses.at(-1)?.message, '');
+      for (let i = 0; i < Math.ceil(T.end * 10) + 1; i++) f.player.render(.1);
+    }
+    assert.equal(f.counts().completions, 1);
+    assert.equal(f.counts().preloads, 0, 'Recovery reuses mandatory preparation, not speculative downloads.');
+    f.player.retry(); f.player.skip(); await flushPromises();
+    assert.equal(f.counts().sceneLoads, 2); assert.equal(f.counts().levelLoads, 2);
+    assert.equal(f.counts().completions, 1, 'Repeated Retry/Skip cannot hand off twice.');
+    f.player.dispose();
+  }
+});
+
+test('playback shares the existing loop with a 30Hz cap and stops redrawing while final preparation waits', async () => {
   const f = playerFixture(); f.player.start();
   f.blackout(); f.flushFrames(); f.flushFrames(); f.sceneReady.resolve(); await flushPromises();
   for (let frame = 0; frame < 60; frame++) f.player.render(1 / 60);

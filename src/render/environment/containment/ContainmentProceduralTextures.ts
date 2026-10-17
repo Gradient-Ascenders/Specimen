@@ -256,6 +256,7 @@ function dataTexture(
 
 const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   ' ': [],
+  '.': [[0.5, 0.86, 0.5, 0.9]],
   '-': [[0.15, 0.52, 0.85, 0.52]],
   ':': [[0.5, 0.3, 0.5, 0.34], [0.5, 0.7, 0.5, 0.74]],
   '0': [[0.2, 0.08, 0.8, 0.08], [0.8, 0.08, 0.92, 0.2], [0.92, 0.2, 0.92, 0.8], [0.92, 0.8, 0.8, 0.92], [0.8, 0.92, 0.2, 0.92], [0.2, 0.92, 0.08, 0.8], [0.08, 0.8, 0.08, 0.2], [0.08, 0.2, 0.2, 0.08], [0.2, 0.82, 0.8, 0.18]],
@@ -442,6 +443,41 @@ export function createContainmentExperimentDirectoryTexture(
   texture.userData.directoryLines = lines;
   texture.userData.rowHeight = rowHeight;
   return texture;
+}
+
+/** One reusable, unlit screen; no canvas, font requests or per-letter textures. */
+export function createContainmentMonitorTexture(): THREE.DataTexture {
+  const texture = dataTexture('room-1-observation-monitor-screen', new Uint8Array(512 * 256 * 4),
+    512, 256, false, THREE.SRGBColorSpace);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  paintContainmentMonitorTexture(texture, '', false);
+  return texture;
+}
+
+export function paintContainmentMonitorTexture(texture: THREE.DataTexture, text: string, typing: boolean): void {
+  const pixels = texture.image.data as Uint8Array;
+  const background: Rgba = [7, 17, 23, 255], accent: Rgba = [101, 166, 182, 255];
+  fillRect(pixels, 0, 0, 512, 256, background);
+  // Restrained baked scanlines and a recessed border, not a fullscreen effect.
+  for (let y = 2; y < 256; y += 4) fillRect(pixels, 0, y, 512, 1, [8, 20, 27, 255]);
+  fillRect(pixels, 12, 12, 488, 2, [28, 58, 69, 255]);
+  fillRect(pixels, 12, 242, 488, 2, [28, 58, 69, 255]);
+  fillRect(pixels, 12, 14, 2, 228, [28, 58, 69, 255]);
+  fillRect(pixels, 498, 14, 2, 228, [28, 58, 69, 255]);
+  drawVectorTextFit(pixels, 'OBSERVATION : SP-01', 28, 25, 430, 15, accent, 1.7);
+  fillRect(pixels, 28, 55, 456, 1, [34, 64, 75, 255]);
+  fillRect(pixels, 475, 28, 6, 6, [111, 194, 165, 255]);
+  const lines = text.split('\n');
+  lines.forEach((line, index) => {
+    drawVectorTextFit(pixels, line, 28, 84 + index * 42, 446, 30, [183, 221, 230, 255], 2.4);
+  });
+  if (typing) {
+    const last = lines.length - 1;
+    fillRect(pixels, Math.round(28 + lines[last].length * 30 * .76), 112 + last * 42, 15, 3, accent);
+  }
+  drawVectorTextFit(pixels, 'CONTAINMENT LINK', 28, 221, 360, 10, [70, 112, 125, 255], 1.1);
+  texture.needsUpdate = true;
 }
 
 function drawVectorTextFit(

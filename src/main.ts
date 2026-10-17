@@ -9,8 +9,10 @@ import { Input } from './core/Input.ts';
 import { Loop, type LoopStats } from './core/Loop.ts';
 import { GameSessionCoordinator } from './levels/GameSessionCoordinator.ts';
 import { GreyboxLevelRuntime } from './levels/GreyboxLevelRuntime.ts';
+import { ContainmentAssetPreload } from './levels/ContainmentAssetPreload.ts';
 import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
 import { RenderLayer } from './render/RenderLayer.ts';
+import { waitForGpuPreparation } from './render/WaitForGpuPreparation.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
 import { GameFlowUI } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
@@ -18,6 +20,9 @@ import { TitleScreenPresentation } from './ui/TitleScreenPresentation.ts';
 import { TitleScreenScene } from './ui/TitleScreenScene.ts';
 import { OpeningGameScene } from './cinematics/OpeningGameScene.ts';
 import { OpeningGamePresentation } from './cinematics/OpeningGamePresentation.ts';
+import { OpeningMoviePresentation } from './cinematics/OpeningMoviePresentation.ts';
+import { getOpeningPlaybackMode } from './cinematics/OpeningPlaybackMode.ts';
+import { OPENING_GAME_TIMING } from './cinematics/OpeningGameTimeline.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import { GraphicsPreparationOverlay } from './ui/GraphicsPreparationOverlay.ts';
 import { graphicsPreparationKey, graphicsTransmissionResourceKey } from './render/GraphicsProfiles.ts';
@@ -74,13 +79,17 @@ function startGame(): void {
   const debugAvailable =
     import.meta.env.DEV ||
     new URLSearchParams(window.location.search).get('debug') === '1';
+  const levelOneAssets = new ContainmentAssetPreload();
   const levelOneRuntime = new GreyboxLevelRuntime({
     host: app,
     audio,
     input,
     renderLayer,
     debugAvailable,
-    yieldPreparation: () => new Promise(resolve => requestAnimationFrame(() => resolve())),
+    yieldPreparation: () => openingPresentation instanceof OpeningMoviePresentation
+      ? openingPresentation.yieldPreparation()
+      : new Promise(resolve => requestAnimationFrame(() => resolve())),
+    characterLoaders: levelOneAssets.loaders,
   });
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
@@ -128,7 +137,7 @@ function startGame(): void {
   });
   const lifecycleCoordinator = new GameFlowLifecycleCoordinator(gameSession);
   let titlePresentation: TitleScreenPresentation | undefined;
-  let openingPresentation: OpeningGamePresentation | undefined;
+  let openingPresentation: OpeningGamePresentation | OpeningMoviePresentation | undefined;
   let lastFrameStats: Readonly<LoopStats> | undefined;
   let titleRoom: TitleScreenScene | undefined = new TitleScreenScene();
   let warmedLevelOneProgramBaseline: number | undefined;
@@ -148,20 +157,25 @@ function startGame(): void {
         if (!titleRoom) return;
         titlePresentation?.dispose({ keepScene: true });
         titlePresentation = undefined;
-        const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
-        titleRoom = undefined; // The opening now owns all room CPU/GPU resources.
-        openingPresentation = new OpeningGamePresentation({
-          scene, renderLayer, host: app,
-          reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        const shared = {
+          host: app,
           prepareLevel: () => {
+            // Early Skip/retry may have no speculative bank. Start missing
+            // transfers at high priority, but retain any existing downloads.
+            void levelOneAssets.preload('high');
             gameSession.load();
-            return gameSession.prepareInitialGraphics().then(() => {
+            return gameSession.prepareInitialGraphics().finally(() => levelOneAssets.clear()).then(async () => {
+              // Submission finishing is not GPU completion. Drain the hidden
+              // warm-up queue before marking gameplay ready for the handoff.
+              await waitForGpuPreparation(renderLayer.renderer.getContext(),
+                () => new Promise(resolve => requestAnimationFrame(() => resolve())),
+                () => !shuttingDown);
               if (shuttingDown) return;
               const verification = levelOneRuntime.levelOnePrewarmVerification;
               if (verification) app.dataset.levelOnePrewarm = JSON.stringify(verification);
             });
           },
-          onComplete: (userGesture) => {
+          onComplete: (userGesture: boolean) => {
             levelOneRuntime.completeOpening();
             openingPresentation?.dispose();
             openingPresentation = undefined;
@@ -170,9 +184,35 @@ function startGame(): void {
             // the black cinematic fade; never flash the final intro camera.
             if (lastFrameStats) gameSession.render(0, lastFrameStats);
           },
-          onStatus: (message, failed) => gameFlow.setOpeningStatus(message, failed),
-          onFade: opacity => gameFlow.setOpeningFade(opacity),
-        });
+          onStatus: (message: string, failed: boolean) => gameFlow.setOpeningStatus(message, failed),
+          onFade: (opacity: number) => gameFlow.setOpeningFade(opacity),
+        };
+        // Ordinary Start uses live 3D with low-priority downloads/idle data prep.
+        // Preserve the existing MP4 player/export as an explicit backup.
+        if (getOpeningPlaybackMode(window.location.search) === 'live') {
+          const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
+          titleRoom = undefined;
+          openingPresentation = new OpeningGamePresentation({
+            ...shared, scene, renderLayer,
+            reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+            preloadLevel: () => levelOneAssets.prepareLight(),
+          });
+        } else {
+          const videoHost = app.querySelector<HTMLElement>('[data-flow-panel="opening"]');
+          if (!videoHost) throw new Error('Missing opening video panel.');
+          openingPresentation = new OpeningMoviePresentation({
+            ...shared, videoHost,
+            source: new URL('./assets/cinematics/opening.mp4', import.meta.url).href,
+            sourceStartSeconds: OPENING_GAME_TIMING.blackoutEnd,
+            onBlackout: () => {
+              // No live cinematic scene, duplicate WebGL context or video
+              // texture. Release menu GPU resources behind the painted fade.
+              titleRoom?.dispose();
+              titleRoom = undefined;
+              renderLayer.setPresentationResolution(undefined);
+            },
+          });
+        }
         openingPresentation.start();
       },
       skipOpening: () => openingPresentation?.skip(),
@@ -350,8 +390,8 @@ function startGame(): void {
     });
   };
 
-  // Only the small observation chamber blocks the title. Level 1 construction,
-  // asset preparation and shader priming overlap the opening after Start.
+  // Only the observation chamber blocks the title. Default live playback
+  // streams bytes only; world construction/GPU work waits for the final fade.
   bootFrame = requestAnimationFrame(() => {
     void startRenderLoop();
   });
@@ -375,6 +415,8 @@ function startGame(): void {
     unsubscribeGameCompleted();
     titlePresentation?.dispose();
     openingPresentation?.dispose();
+    titleRoom?.dispose();
+    levelOneAssets.clear();
     performanceRecorder?.dispose();
     cleanGameplayMode.dispose();
     gameFlow.dispose();

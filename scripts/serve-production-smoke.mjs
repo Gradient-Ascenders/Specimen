@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { validateProductionBuild } from './lib/production-build.mjs';
 import { windowsZip } from './lib/windows-zip.mjs';
+import { parseByteRange } from './lib/http-byte-range.mjs';
 
 const namespace = '/group-folder/';
 const contentTypes = {
@@ -14,7 +15,7 @@ const contentTypes = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2',
   '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
-  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.mp4': 'video/mp4',
 };
 let temporaryRoot;
 let root = resolve('dist');
@@ -53,13 +54,20 @@ try {
         response.writeHead(404).end();
         return;
       }
-      response.writeHead(200, {
+      const range = request.method === 'GET' ? parseByteRange(request.headers.range, file.size) : undefined;
+      if (range === null) {
+        response.writeHead(416, { 'Content-Range': `bytes */${file.size}` }).end();
+        return;
+      }
+      response.writeHead(range ? 206 : 200, {
         'Content-Type': contentTypes[extname(path)] ?? 'application/octet-stream',
-        'Content-Length': file.size,
+        'Content-Length': range ? range.end - range.start + 1 : file.size,
+        'Accept-Ranges': 'bytes',
+        ...(range ? { 'Content-Range': `bytes ${range.start}-${range.end}/${file.size}` } : {}),
         'Cache-Control': 'no-store',
       });
       if (request.method === 'HEAD') response.end();
-      else createReadStream(path).on('error', () => response.destroy()).pipe(response);
+      else createReadStream(path, range).on('error', () => response.destroy()).pipe(response);
     } catch {
       response.writeHead(404).end();
     }
@@ -69,8 +77,9 @@ try {
     if (temporaryRoot) await rm(temporaryRoot, { recursive: true, force: true });
     process.exit(1);
   });
-  server.listen(4173, '127.0.0.1', () => {
-    console.log(`Serving ${process.env.SPECIMEN_SMOKE_ARCHIVE ?? 'dist/'} at http://127.0.0.1:4173${namespace}`);
+  const port = Number(process.env.SPECIMEN_SMOKE_PORT ?? 4173);
+  server.listen(port, '127.0.0.1', () => {
+    console.log(`Serving ${process.env.SPECIMEN_SMOKE_ARCHIVE ?? 'dist/'} at http://127.0.0.1:${port}${namespace}`);
   });
   const shutdown = async () => {
     server.close();
