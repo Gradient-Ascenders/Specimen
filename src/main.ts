@@ -70,6 +70,8 @@ function startGame(): void {
   window.addEventListener('blur', focusAudio);
   window.addEventListener('focus', focusAudio);
   document.addEventListener('visibilitychange', focusAudio);
+  // Initialize once: a page may boot already hidden or unfocused, with no event yet.
+  focusAudio();
   const renderLayer = new RenderLayer({
     host: app,
     graphics: settings.value,
