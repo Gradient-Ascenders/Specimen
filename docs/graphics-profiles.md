@@ -73,11 +73,11 @@ rounding never increases area beyond the budget. These are area limits, not a
 mandatory 16:9 render target; camera framing always uses the CSS aspect ratio.
 
 CSS canvas size and DOM/text/aim controls stay at native browser resolution.
-The title and standalone trailers temporarily target 1× CSS-pixel density at
+The title, in-game opening and standalone trailers temporarily target 1× CSS-pixel density at
 100% render scale, independently of gameplay's 75% default. Their 921,600-pixel
 presentation cap composes with the profile budget and device limits, so smaller
 windows are not needlessly upscaled and larger windows remain bounded. Leaving
-the title restores the selected gameplay profile/scale; diagnostics report the
+the opening restores the selected gameplay profile/scale; diagnostics report the
 active presentation resolution while it is visible.
 `setDrawingBufferSize` applies the bounded size/density in one allocation, avoiding
 an intermediate old-large-window × new-DPR allocation. A `ResizeObserver`, window

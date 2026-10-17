@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "export:opening-movie": "node scripts/export-opening-movie.mjs",
     "generate:blackout-maps": "node scripts/generate-blackout-maintenance-maps.ts",
     "generate:cultivation-assets": "node scripts/generate-cultivation-assets.ts",
     "generate:character-lods": "node scripts/generate-character-lods.ts",

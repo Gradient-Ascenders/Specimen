@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { RenderLayer } from './RenderLayer.ts';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 import { copyPrewarmMaterial, createShadowPrewarmMaterial, clonePrewarmDrawable } from './ShadowPrewarmMaterial.ts';
+import { requiresTransmissionPreparation } from './TransmissionPreparation.ts';
 
 /** Blackout has one retained light signature through power, switching and merge.
  * Prepare hidden forms and caster passes without advancing encounter authority. */
@@ -61,6 +62,16 @@ export class BlackoutPresentationPreparation {
     });
     this.diagnostics.visibleVariants = visible.children.length;
     this.diagnostics.shadowVariants = shadows.children.length;
+    const liveCamera = layer.cameraRig?.camera ?? camera;
+    const transmission = requiresTransmissionPreparation(layer.scene);
+    const primeVisible = (action: () => void): void => {
+      const viewport = layer.renderer.getViewport(new THREE.Vector4());
+      const scale = layer.renderer.transmissionResolutionScale;
+      withIsolatedPrewarmState(layer.renderer, () => {
+        if (transmission) { layer.renderer.setViewport(viewport); layer.renderer.transmissionResolutionScale = scale; }
+        action();
+      });
+    };
     this.busy = true;
     try {
       for (const [group, scene, target] of [[visible, layer.scene, undefined], [shadows, shadowScene, this.target]] as const) {
@@ -69,9 +80,16 @@ export class BlackoutPresentationPreparation {
           () => layer.renderer.compileAsync(group, camera, scene)), target);
         if (this.disposed) return;
         // Compile the transmission target's linear-output variants separately.
-        if (group === visible) {
-          await withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
-            () => layer.renderer.compileAsync(group, camera, scene)), this.target);
+        if (group === visible && transmission) {
+          const opaque = new THREE.Group();
+          for (const object of group.children) {
+            const mesh = object as THREE.Mesh;
+            if (!(mesh.material as THREE.Material).transparent) opaque.add(clonePrewarmDrawable(mesh, this.instanceDisposers));
+          }
+          try {
+            await withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
+              () => layer.renderer.compileAsync(opaque, camera, scene)), this.target);
+          } finally { opaque.clear(); }
           if (this.disposed) return;
         }
         if (group === visible) {
@@ -79,11 +97,13 @@ export class BlackoutPresentationPreparation {
           // shadow updates, so allocate the level-owned maps with a live draw
           // before submitting receiver proxies; null fallback textures cannot
           // satisfy those samplers on SwiftShader.
-          withIsolatedPrewarmState(layer.renderer, () => layer.renderer.render(layer.scene, camera));
+          primeVisible(() => layer.renderer.render(layer.scene, liveCamera));
         }
         scene.add(group);
         try {
-          withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
+          if (group === visible) primeVisible(() => layer.withShadowPreparation(true,
+            () => renderIsolatedPrewarmResources(layer.renderer, scene, liveCamera, [group])));
+          else withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
             () => renderIsolatedPrewarmResources(layer.renderer, scene, camera, [group])), target);
         } finally { group.removeFromParent(); }
       }

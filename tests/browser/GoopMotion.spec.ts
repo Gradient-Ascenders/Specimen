@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
@@ -16,14 +17,15 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
   page.on('requestfailed', request => failedRequests.push(request.url()));
   await page.route('**/assets/index-*.js', async route => {
     const response = await route.fetch(), source = await response.text();
-    const pattern = /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
+    const pattern = /\{initialRuntime:([A-Za-z_$][\w$]*)/;
     expect(source).toMatch(pattern);
     await route.fulfill({ response, body: source.replace(pattern,
-      '(globalThis.__goopMotionRuntime=$1,$1.prepareLightingPrograms()).then(') });
+      '{initialRuntime:globalThis.__goopMotionRuntime=$1') });
   });
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await page.waitForFunction(() => (window as any).__goopMotionRuntime?.state === 'running');
   await page.locator('canvas').click();
   await page.waitForFunction(() => (window as any).__goopMotionRuntime.input.pointerLocked);
@@ -34,7 +36,11 @@ test('Goop elastically leans, reverses, jumps and lands through production contr
     // rendering cannot skip over a short landing or reversal pose.
     rt.renderLayer.setAnimationLoop(null);
     rt.input.endPointerUpdate();
-    rt.switchActiveSlime(r);
+    // This isolated motion fixture needs the post-rescue roster. Production
+    // correctly starts with Goop locked; the authored release is smoke-tested.
+    if (r.slimeManager.isAvailable('goop')) throw new Error('Goop must start locked');
+    r.slimeManager.unlock('goop');
+    if (!rt.switchActiveSlime(r)) throw new Error('Released Goop must be selectable');
     r.goopBody.teleport({ x: 3, y: 0.46, z: 0 });
     r.testScene.goop.reset();
     rt.renderLayer.cameraRig.reset(); rt.retargetCameraToActiveSlime(r);

@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -82,6 +83,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
     }
     await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
     await page.locator('[data-action="start"]').click();
+    await finishOpening(page);
     const evidence: unknown[] = [];
     for (const level of [1, 2, 3]) {
       await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
@@ -104,7 +106,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
         expect(s.rooms).toEqual([true, true, true, true, true]);
         expect(s.encounters).toEqual([true, true, true]);
         expect(s.preparation).toBeTruthy();
-        expect(s.baked).toEqual({ version: 1, repairs: 137, expectedRepairs: 137 });
+        expect(s.baked).toEqual({ version: 1, repairs: 138, expectedRepairs: 138 });
       }
       if (level === 3) {
         expect(s.electrical).toBe(true);

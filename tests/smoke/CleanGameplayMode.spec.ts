@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
@@ -50,12 +51,14 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
   await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
   if (preset === 'performance') await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
-  // Start supplies the trusted pointer-lock gesture. Freeze the loop before
-  // it so a software-rendered frame cannot stall a redundant canvas click.
+  await page.locator('[data-action="start"]').click();
+  await finishOpening(page, false);
+  // Startup now includes the opening/readiness boundary. Freeze only after it,
+  // then acquire pointer lock with a real canvas gesture for manual simulation.
   await page.evaluate(() =>
     (window as any).__cleanSession.runtime.renderLayer.setAnimationLoop(null),
   );
-  await page.locator('[data-action="start"]').click();
+  await page.locator('canvas').click();
   await page.waitForFunction(
     () => (window as any).__cleanSession.runtime.input.pointerLocked,
   );
@@ -87,17 +90,7 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
             id: program.id,
             signature: String(program.cacheKey ?? '').slice(0, 400),
           }));
-        // Current Level 2 entry prepares visible shader variants, but the
-        // first HUD-restored draw still exposes exactly three depth/shadow
-        // variants after the render-scope light-budget integration (#200).
-        // Permit only that measured one-time gap, and verify the next draw is
-        // fully warm. Keep every other gameplay draw's zero-growth contract.
-        const knownLevelTwoShadowGap = stage === 'Level 2 restored' &&
-          liveProgramGrowth === 3 && additions.length === 3 &&
-          additions.every((program: { signature: string }) => program.signature.startsWith('depth,'));
-        if (!knownLevelTwoShadowGap) {
-          throw new Error(`F1 ${stage} live draw created ${liveProgramGrowth} shader programs: ${JSON.stringify(additions)}`);
-        }
+        throw new Error(`F1 ${stage} live draw created ${liveProgramGrowth} shader programs: ${JSON.stringify(additions)}`);
       }
       const error = rt.renderLayer.renderer.getContext().getError();
       if (error) throw new Error(`WebGL error ${error} during F1 rendering`);
@@ -202,7 +195,13 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
         return render(scene, camera);
       };
       try {
-        layer.render();
+        const before = layer.renderer.info.programs.length;
+        // Use the owning runtime: a direct layer draw submits every authored
+        // light and poisons Three's prior-light state used by shadow draws.
+        rt.render(1, {fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,
+          frameDeltaSeconds:0,stepsThisFrame:0,interpolationAlpha:1,
+          droppedSimulationTimeSeconds:0,renderFps:60});
+        if (layer.renderer.info.programs.length !== before) throw new Error('F1 layer probe created cold programs');
       } finally {
         layer.renderer.render = render;
       }

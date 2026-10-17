@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { LARGE_STATIC_BATCH_CELL_SIZE } from './StaticBatchPolicy.ts';
 
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -9,7 +10,7 @@ import {
 export function consolidateStaticRoomVisuals(
   room: THREE.Group,
   sources: readonly THREE.Mesh[],
-  cellSize = 16,
+  cellSize = LARGE_STATIC_BATCH_CELL_SIZE,
 ): ContainmentStaticBatchResult {
   room.updateWorldMatrix(true, true);
   const inverse = room.matrixWorld.clone().invert();
@@ -65,7 +66,6 @@ export function consolidateStaticRoomVisuals(
       if (disposed) return;
       disposed = true;
       // Instance buffers belong to the new batch; its source geometry does not.
-      for (const object of root.children) if (object instanceof THREE.InstancedMesh) object.dispose();
       result.dispose();
       root.removeFromParent(); root.clear();
       for (const { mesh, material } of originals) mesh.material = material;

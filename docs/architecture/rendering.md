@@ -32,31 +32,52 @@ the tapered shell smooth across UV seams and poles. The pod's slim supports
 remain visible but do not cast stripes onto the egg; other shadows are retained.
 A curved identification plate replaces the four-light status panel on the front
 of the pedestal: `SPECIMEN: BOB` above `DANGER THREAT: UNKNOWN`.
-Its pale lettering, amber threat status and cyan accent
+Its pale lettering and blue UNKNOWN threat status/accent
 use one static 512×192 texture generated with the existing vector-sign font.
 It stays fixed to the container during shaking and is disposed with the title room.
+
+`ContainmentSpecimenPod` supplies the same round pedestal, curved glass, seals,
+crown, stanchions and identification plate to the title, opening and playable
+Level 1 Room 1. Each scene owns its pod's few unique geometries and static label;
+room materials and cylinder geometry remain borrowed. A fixed ceiling flange,
+motor sleeve and telescoping piston support the crown throughout its lift.
+The gameplay pedestal uses collision-only compound boxes matched to the four
+visible round sections, sharing four geometries; the top is at 1.65 metres,
+not the old 1.1-metre greybox height. The raised chamber also has 16 thin,
+overlapping collision-only glass panels and two compound round crown sections,
+using three shared box geometries and the existing precise movement-corner mode.
+They match the final post-hatch pose, block
+both sides of the glass and its solid top, and leave its bottom/interior open
+so the pedestal remains usable. These colliders stay static across restart and
+add no transparent draw calls, shadow passes or per-frame transform updates.
+The rest of the route is unchanged. The obsolete SP-01 plaque and its backing
+are removed in favour of the curved Bob identification plate.
+After the opening, Room 1 retains the same raised chamber pose and
+an empty pedestal rather than respawning the egg or reverting to the old square
+container. Restart reapplies that state without new objects or resources.
 
 `TitleScreenPresentation` uses the existing application loop but submits at most
 30 animated frames/second, skips gameplay updates/rendering while the title owns
 the screen, and pauses with the existing focus/visibility lifecycle. Its temporary
-921,600-pixel budget applies after Level 1's lighting primers and is combined
+921,600-pixel budget applies to the observation chamber and is combined
 with the selected graphics profile's budget using the tighter limit. It uses the
 shared bounded-resolution resolver, including device limits and transmission-safe
 minimum dimensions, never overwrites the player's profile/density/scale settings,
-and is removed on Start. Diagnostics report the active budget while it applies.
+and is retained for the opening cinematic. Diagnostics report the active budget while it applies.
 `RenderLayer.setPresentationResolution` targets one rendered pixel per CSS pixel
 at 100% scale while the cap is active, instead of inheriting Minimum's 75% gameplay
 scale. Windows within budget (including 916×960) therefore do not upscale a smaller
 image; larger windows still respect the tighter profile/presentation and device
-limits. Trailer playback uses the same bounded presentation override. Start
-restores the currently selected gameplay density and scale.
+limits. Trailer playback uses the same bounded presentation override. The opening
+handoff restores the currently selected gameplay density and scale.
 The room has four fixed light slots, only one shadowed (512×512). That map is reused at rest and
 updated during wobble/settling. A 32-point dust pool moves as one object; there
 are no per-frame geometry, material or particle-buffer allocations.
 
-Title-origin settings/credits retain the backdrop. Start disposes the room,
-shadow, textures and instance buffers, restores gameplay resolution and records
-the shader guard baseline without title-only programs. HMR cleanup also
+Title-origin settings/credits retain the backdrop. Start transfers the actual room
+and container to the opening; its final handoff disposes the room, shadow, textures
+and instance buffers, restores gameplay resolution and records the shader guard
+baseline without cinematic-only programs. HMR cleanup also
 handles preparation still in flight. Reduced-motion users get a still view that
 only redraws on resize, DPI or preference changes.
 The saved Reduce menu motion setting also requests this still view; disabling it
@@ -80,6 +101,159 @@ against a development server with `SPECIMEN_PRODUCTION_URL=http://127.0.0.1:5173
 or against the built preview using the default Playwright configuration. Browser
 and GPU playtesting have not been performed for this change; caps and unit
 checks are not measured hardware frame-rate evidence.
+
+## In-game opening
+
+Ordinary Start uses the same `src/main.ts` flow in development and production:
+`title → opening → playing`. The original standalone `?trailer=opening` capture
+is still independent. The default opening is the live scene in both builds
+(`?opening=live` also explicitly selects it). The committed 1080p/30fps H.264 MP4
+and its native HTML player remain an opt-in `?opening=mp4` backup, not a WebGL
+video texture. Ordinary Start does not download the backup. See
+[opening movie operations](../operations/opening-movie.md) for exporting,
+encoding, playback and loading details. The backup contains its fixed 16:9
+video without cropping on narrower screens. Both paths use the same sequence.
+
+The 54-second `OpeningGameTimeline` first fades the menu to black, reveals a
+sealed 74-metre experiment wing and glides between four labelled specimen doors under
+scanning surveillance cameras. Doors are staggered 13 metres apart (26 metres
+between neighbours on the same wall) to suggest large chambers beyond them.
+Each plaque uses one row of a single static
+512×1024 atlas and shows an experiment name plus colour-coded danger status.
+The first experiment is PLUTO. LOW threat is green; Bob's UNKNOWN status is
+blue on both the doorway directory and shared menu/cutscene/gameplay pod label.
+The retired ECHO/NULL doors are absent; Bob's room is 26 metres closer and the
+tour is 10.4 seconds shorter without speeding up the remaining pans.
+The camera advances at constant height and forward speed throughout the wing,
+including while reading labels. Separate eased yaw and pitch controls produce
+slow horizontal pans, followed by a small upward label tilt; they never blend
+opposite world-space look-at targets through the roof. Portrait framing widens
+the lens rather than changing this path. At
+Bob's `SP-01 / EXPERIMENT: BOB / DANGER: UNKNOWN` door, the leaves open before the
+camera crosses a real opening aligned with the authored Room 1 door and close behind it.
+After the blackout, `OpeningRoomOne` uses Room 1's actual `RoomOneArt` wall
+panels, service dressing, sticky route, vent and mounted ceiling fixtures inside
+the same 14×12×8 metre rectangular shell. It excludes the duplicate specimen
+assembly and static locked door; the original menu pod/egg and animated door
+remain the heroes. A short sealed vent continuation prevents void views. The
+separate circular menu environment is hidden, not superimposed on this room.
+The pod's fixed suspension adapts to the authored 7.85m ceiling underside.
+The facade has a full-width transom joining the corridor roof, sealing the old
+gaps above the door. Menu light strips also have housings anchored into the wall,
+rather than floating between its panels.
+The doorway transom replaces the final redundant hallway crossbeam, keeping the
+entire Bob plaque unobstructed during approach, including its upper text rows.
+The leaves slide through hollow, front/back-covered side pockets instead of
+solid jambs. Guide, threshold and wall-trim clearances cover the full stroke;
+the fixed casing pieces share three material instance batches.
+The final 21.6 seconds stage progressive cracks and increasingly
+aggressive rocking. Crack ribbons grow in small, complete seam segments over five
+seconds rather than appearing in three instant groups. Three close-ups face the
+actual seam waves (including the first wave's path down the back), so growing
+cracks remain in view rather than forming only on the hidden side. The shot
+widens for the physical glass lift. The fully cracked egg
+holds briefly before the menu container's crown/glass retracts, then the egg
+tips off its pedestal. The matching fracture pieces separate only on floor
+impact. `OpeningGameScene` borrows the exact menu shell silhouette for those
+pieces. Gravity, support-height bounds and separating planes keep settled shell
+pieces above the floor and clear of Bob. The same authored Bob is posed inside from
+the beginning; continuous scale/pose changes spread him into a squashed gel shape
+and gather him into the normal model. The fully gooey pose holds for 0.25 seconds,
+then reforms over one eased second; egg cracking, falling and the final fade keep
+their existing timing. There are no ejected fluids or replacement
+character spawns. Brief camera cuts, a small impact jolt, letterboxing and a final
+fade provide framing; reduced-motion preference attenuates shaking/jolt.
+
+Only the small menu room blocks initial title readiness. The initial DOM fade
+retains the warmed menu frame. Default live Start constructs hatch/laboratory
+scopes and prepares their own programs behind the initial blackout. The full
+first corridor view is primed under the opaque fade and fenced before reveal.
+
+During the live film, Level 1 performs only allowlisted light work: three
+low-priority character/detail downloads (about 1 MB combined), plus plain index
+data preparation for the 51 KB detail bank when a browser idle callback has at
+least 4 ms available. Data exceeding 64 KiB is deferred, and no timeout forces
+work into busy frames. Unsupported browsers retain raw bytes only. Models remain
+encoded, with no world construction, geometry/textures, shader compilation or GPU
+work. Full gameplay preparation starts after the fully painted final blackout
+(or Skip), avoiding competing live 3D workloads. The bank reuses fetched bytes
+for independent character instances and copies prepared index data per owner,
+with normal-demand retry for failed speculative downloads. Promotion to full
+preparation and disposal cancel pending idle callbacks without waiting for them.
+
+The opt-in native MP4 backup instead releases the menu's CPU/GPU resources after
+black has painted. Once video playback begins, it downloads at high priority,
+constructs the world, parses character assets and performs the existing complete
+shader / first-use preparation during playback. Deferred shader bindings resolve
+separately; uploads use at most eight leaf objects per slice, then retain the
+original mixed transmission/VAO pass. Steps yield for 33ms after cheap jobs and
+80ms after costly ones; Skip/end removes that extra pacing. This experimental
+backup can still contend with decoding/playback; it is not the default. Both
+paths use real isolated framebuffers without clearing a visible cinematic.
+
+Both paths keep gameplay simulation, input, HUD and debug controls disabled.
+Skip (button, Escape or controller B) skips the film, not readiness. A slow load
+holds at the faded ending; failed preparation exposes Retry. Gameplay cannot
+start before full preparation and a nonblocking GPU fence finish. Automatic
+completion does not request pointer lock without a user gesture; the existing
+canvas click captures the mouse. Hidden tabs pause playback and disposal releases
+media resources/callbacks as well as any retained scene.
+
+The opening shares the existing renderer/loop, four menu light slots, one 512px shadow
+map and the bounded 921,600-pixel presentation policy. Readable plaques accompany
+restrained hemisphere fill and a 165-intensity hatch key (previously 340), with a
+weaker neutral cool rim instead of purple spill. No additional lights or shadow
+passes are used. The opening's DOM surface explicitly removes the generic
+menu's 88%-opaque purple/black scrim; only the authored fade darkens the cinematic.
+The wing uses ten static material/geometry instance batches. Security cameras
+have a wall bracket, painted sunshade/housing, lens barrel, optic and hinge details
+on scanning yaw/tilt joints, with a roughly 2.5-times-faster sweep than the first
+version (and stationary joints for reduced motion). Each retains three shadowless draw objects (two
+coloured instance batches and a recording LED), with no render-to-texture video
+feeds. Only the corridor is visible before Bob's door opens, both scopes
+overlap during entry, and the corridor is hidden for the hatch. Static corridor
+depth is reused while only the camera/recording heads move; fracture/support-height
+work is not repeated for the hidden static egg. The uncracked egg uses the exact
+single menu shell, not six multi-material fragments. Bob remains in his authored
+pose but is not submitted while fully enclosed, avoiding his full-scene physical
+transmission capture until the first opening on impact. Settled fragments reuse
+their final transform instead of repeating support/clearance vertex scans.
+The shorter corridor and pooled doorway casing reduce its visible mesh-object
+budget from the original 46 to 35. Crack growth changes draw ranges only, with
+no per-frame geometry allocations or vertex-buffer uploads.
+The real Room 1 dressing is consolidated into static material/cell batches,
+without loading another gameplay simulation or increasing the four-light budget.
+One compilation exposes both scopes, followed by two isolated resource-upload
+views before playback.
+It submits at most 30Hz,
+does not advance in hidden tabs, and allocates no per-frame geometries/materials.
+Its final handoff paints a warmed gameplay frame before the browser can present,
+retains Room 1's raised-container aftermath on restart, and disposes cinematic resources
+once. Shutdown cancels scheduled startup work and ignores late async callbacks.
+
+`tests/OpeningLaboratory.test.ts` checks continuous forward travel, room spacing,
+bounded pan speed/tilt, desktop/portrait framing and unobstructed plaques,
+the open portal crossing, sealed overhead transom, authored room dressing,
+full-stroke leaf/casing/wall clearance and pocket
+occlusion, security camera sweep speed, light/draw-object
+bounds, cached depth, separate yielded construction/GPU jobs, cancellation before
+or during construction, offscreen preparation and ownership/disposal.
+`tests/OpeningGame.test.ts` checks timing, menu-object reuse, actual authored Bob,
+grounded fragments, clearance, hidden transmission suppression, settled-debris
+reuse, progressive crack growth and desktop/portrait ray-tested seam visibility
+before lid movement, blackout-before-setup scheduling and readiness/skip/hidden-tab/disposal boundaries.
+`tests/ContainmentPrewarmScheduling.test.ts` exercises the real Level 1 resource
+sequence with a submission spy for both parallel and synchronous compilation:
+one compile/draw per yield, restored renderer state and cancellation, while all
+23 measured first-use owners retain preparation. This is not a GPU benchmark.
+`tests/smoke/OpeningMovie.spec.ts` exercises real MP4 decoding and full native
+playback, preparation before the movie ends, delayed assets/final blackout,
+media retry, Skip and restart. `tests/smoke/OpeningGame.spec.ts` retains the live
+preview's isolated first reveal and staged-download/final-handoff coverage. Existing
+gameplay browser tests explicitly skip the opening but still await real readiness.
+Browser cases can target dev with `SPECIMEN_PRODUCTION_URL=http://127.0.0.1:5173`
+or the production preview. These headless cases do not establish assessment-PC
+hardware performance or a guaranteed loading time.
 
 ## Settings and lightweight diagnostics
 

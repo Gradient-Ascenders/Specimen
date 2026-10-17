@@ -79,6 +79,10 @@ export class GreyboxDropPreview {
     return this.stateValue;
   }
 
+  get dynamicTransformRoots(): readonly THREE.Object3D[] {
+    return this.tetherMesh ? [this.mesh, this.tetherMesh] : [this.mesh];
+  }
+
   bind(targets: readonly DissolveTarget[]): void {
     this.unsubscribeCompleted?.();
     const target = targets.find(

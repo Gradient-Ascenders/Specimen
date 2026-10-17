@@ -230,6 +230,7 @@ export class CultivationLevelRuntime {
     bob: 1 as LevelTwoAuthoredRoomId,
     goop: 1 as LevelTwoAuthoredRoomId,
   };
+  private readonly roomWorkloadContinuations = new Set<LevelTwoAuthoredRoomId>();
   private readonly roomThreeSlimeEligibility = { bob: false, goop: false };
   private lastRoomFourObjective = '';
   private roomFiveCheckpoint: RoomFiveCheckpoint = 'split';
@@ -294,7 +295,48 @@ export class CultivationLevelRuntime {
   private lightLayout: CultivationLightLayout | undefined;
   private lightLayoutKey = '';
   private constructionMs = 0;
+  private preparingRenderResources = false;
   private cameraShadowCulling: CameraShadowCulling | undefined;
+  private isDarkRoom(resources: CultivationRuntimeResources,
+    lightingRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position)): boolean {
+    return lightingRoom === 5 || (lightingRoom === 4
+      && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
+  }
+  async prepareRenderResources(alpha: number, stats: Readonly<LoopStats>): Promise<void> {
+    const resources = this.requireResources(), queue = this.preparationQueue;
+    while (this.resources === resources && this.preparationQueue === queue) {
+      // The real render establishes visibility, bounded lights and demand
+      // readiness. It can return before drawing at a newly entered doorway.
+      this.preparingRenderResources = true;
+      try { this.renderLayer.prepareRenderResources(() => this.render(alpha, stats)); }
+      finally { this.preparingRenderResources = false; }
+      if (!queue?.diagnostics.pending) return;
+      this.lightLayout?.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
+      let ready: Promise<void>;
+      try { ready = queue.prepareCurrent(this.isDarkRoom(resources)); }
+      finally { this.lightLayout?.restore(); }
+      await ready;
+    }
+  }
+
+  async prepareGraphics(): Promise<void> {
+    const resources = this.requireResources(), previous = this.preparationQueue;
+    this.preparationQueue = undefined;
+    resources.authoredPreview?.workload.clearPreparation();
+    this.presentationPreparation = undefined;
+    try {
+      await this.preparePresentation();
+      if (this.resources !== resources || !this.preparationQueue || !this.lightLayout) return;
+      // Startup keeps its entry/maintenance guarantees; settings must also
+      // cover the current doorway before the session allows another live draw.
+      this.lightLayout.sync(this.renderLayer.scene, this.renderLayer.cameraRig.camera, resources.pair.activeBody.position);
+      let preparation: Promise<void>;
+      try { preparation = (this.preparationQueue as CultivationPreparationQueue).prepareCurrent(this.isDarkRoom(resources)); }
+      finally { this.lightLayout.restore(); }
+      await preparation;
+    } finally { previous?.dispose(); }
+  }
+
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
     return this.presentationPreparation ??= Promise.all([
@@ -371,7 +413,7 @@ export class CultivationLevelRuntime {
   start(): void { this.lifecycle.start(); }
   stop(): void { this.lifecycle.stop(); }
   restartLevel(): void { this.lifecycle.restartLevel(); }
-  unload(): void { this.lifecycle.unload(); }
+  unload(): void { this.roomWorkloadContinuations.clear(); this.lifecycle.unload(); }
 
   dispose(): void {
     this.lightLayout?.dispose(); this.lightLayout = undefined;
@@ -573,10 +615,15 @@ export class CultivationLevelRuntime {
         resources.pair.goopBody.position,
       );
       const roomThreeEligibility = this.roomThreeSlimeEligibility;
+      const continuingRooms = this.roomWorkloadContinuations;
+      continuingRooms.clear();
+      if (resources.roomThreeEncounter?.projectiles.liveCount) continuingRooms.add(3);
+      if (resources.roomFourEncounter?.projectiles.liveCount) continuingRooms.add(4);
+      if (resources.roomFiveEncounter?.projectiles.liveCount) continuingRooms.add(5);
       roomThreeEligibility.bob = resolvedRooms.bob === 3;
       roomThreeEligibility.goop = resolvedRooms.goop === 3;
       if (
-        (roomThreeEligibility.bob || roomThreeEligibility.goop) &&
+        (roomThreeEligibility.bob || roomThreeEligibility.goop || continuingRooms.has(3)) &&
         resources.roomThreeEncounter &&
         resources.roomThreeController
       ) {
@@ -599,6 +646,7 @@ export class CultivationLevelRuntime {
         authoredProgression.roomId,
         resources.previewOccupants,
         resources.pair.goopBody,
+        continuingRooms,
       );
       const roomFour = authoredPreview.roomFour;
       resources.roomFourEncounter?.update(deltaSeconds, resources.manager.activeSlimeId === 'goop' ? 'goop' : 'bob');
@@ -674,7 +722,6 @@ export class CultivationLevelRuntime {
     resources.voltPresentation.setPosition(resources.renderedVoltPosition);
     resources.voltPresentation.setVisible(resources.manager.isAvailable('volt'));
     resources.voltPresentation.present(interpolationAlpha);
-    resources.authoredPreview?.roomFive.captiveVoltPresentation.present(interpolationAlpha);
     // A render frame can occur without a fixed update. Preserve the same
     // pointer-sampling behaviour as Level 1 so those frames apply mouse input
     // instead of discarding it and making Level 2 sensitivity frame-rate
@@ -697,8 +744,7 @@ export class CultivationLevelRuntime {
     if (lightingRoom === 4 || (lightingRoom === 3 && resources.authoredPreview?.roomFourGeometry.visible)) {
       this.preparationQueue?.anticipateLiftExit();
     }
-    const darkRoom = lightingRoom === 5 || (lightingRoom === 4
-      && resources.authoredPreview?.roomFour.controller.readModel.state === 'complete');
+    const darkRoom = this.isDarkRoom(resources, lightingRoom);
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
@@ -736,12 +782,15 @@ export class CultivationLevelRuntime {
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
     resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
-    captive?.updateDetail(this.renderLayer.cameraRig.camera);
     resources.authoredPreview?.updatePresentationVisibility(
       this.renderLayer.cameraRig.camera.position, resources.pair.activeBody.position,
     );
     if (resources.authoredPreview) {
       const p = resources.authoredPreview;
+      if (p.workload.rendered.has(5)) {
+        captive?.present(interpolationAlpha);
+        captive?.updateDetail(this.renderLayer.cameraRig.camera);
+      }
       if (resources.droneProjectilePresentation) resources.droneProjectilePresentation.mesh.visible = p.roomThree.root.visible;
       if (resources.roomFourProjectiles) resources.roomFourProjectiles.mesh.visible = p.roomFour.root.visible && p.roomFourGeometry.visible;
       if (resources.roomFiveEncounter) resources.roomFiveEncounter.presentation.mesh.visible = p.roomFive.root.visible;
@@ -777,10 +826,12 @@ export class CultivationLevelRuntime {
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
       resources.voltPresentation.setOpacity(resources.manager.activeSlimeId === 'volt'
         ? resolveCameraTargetOpacity(this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25) : 1);
-      resources.droneProjectilePresentation?.update(interpolationAlpha);
-      resources.roomFourProjectiles?.update(interpolationAlpha);
-      resources.roomFiveEncounter?.presentation.update(interpolationAlpha);
-      resources.roomFiveEncounter?.updatePresentation(stats.frameDeltaSeconds, this.renderLayer.cameraRig.camera);
+      if (resources.droneProjectilePresentation?.mesh.visible) resources.droneProjectilePresentation.update(interpolationAlpha);
+      if (resources.roomFourProjectiles?.mesh.visible) resources.roomFourProjectiles.update(interpolationAlpha);
+      if (resources.roomFiveEncounter?.presentation.mesh.visible) {
+        resources.roomFiveEncounter.presentation.update(interpolationAlpha);
+        resources.roomFiveEncounter.updatePresentation(stats.frameDeltaSeconds, this.renderLayer.cameraRig.camera);
+      }
       if (resources.authoredPreview) resources.roomFiveView?.update(resources.authoredPreview.roomFive.controller, this.authoredPreviewRoomId === 5);
       const inRoomFour = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position) === 4;
       if (resources.authoredPreview) resources.roomFourView?.update(resources.authoredPreview.roomFour.controller, inRoomFour);
@@ -817,7 +868,7 @@ export class CultivationLevelRuntime {
     // lower sector, speculative upper-room work is not needed for this view
     // and competes with its searchlights. Demand preparation above still
     // guards every draw, and background work resumes if ownership returns.
-    if (lightingRoom !== 5) this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
+    if (lightingRoom !== 5 && !this.preparingRenderResources) this.preparationQueue?.tick(stats.rawFrameDeltaSeconds * 1000);
 
     this.debugElapsedSeconds += stats.rawFrameDeltaSeconds;
     if (this.debugVisible && resources.debugPanel && this.debugElapsedSeconds >= 0.25) {
@@ -830,8 +881,15 @@ export class CultivationLevelRuntime {
         return `${diagnostics.id} / ${diagnostics.supportTargetId}: ${diagnostics.state} p=${diagnostics.supportProgress.toFixed(2)}/${diagnostics.travelProgress.toFixed(2)} pos=${diagnostics.position.map((value) => value.toFixed(2)).join(',')} collision=${diagnostics.collisionEnabled ? 'on' : 'off'} transitions=${diagnostics.transitionCount}`;
       });
       const doorObstructions = [...resources.blastDoor.obstructionIds];
+      const workload = resources.authoredPreview?.getWorkloadDiagnostics();
       resources.debugPanel.setRuntimeDiagnostics([
         `active level: cultivation-level-2`,
+        ...(workload ? [
+          `rooms resident / simulated / rendered: ${workload.resident} / ${workload.simulated} / ${workload.rendered}`,
+          `rooms prepared / preparing: ${workload.prepared} / ${workload.preparing} (current ready: ${!this.preparationQueue?.diagnostics.pending})`,
+          `room / cosmetic updates: ${workload.roomUpdates} / ${workload.cosmeticUpdates}; objects visible / total: ${workload.renderedObjects} / ${workload.objects}`,
+          `local matrices automatic / frozen: ${workload.automaticMatrices} / ${workload.frozenTransforms}; batches: ${workload.batches}; materials: ${workload.materials}; programs: ${this.renderLayer.renderer.info.programs?.length ?? 0}`,
+        ] : []),
         `geometry mode: ${this.authoredPreviewRoomId === undefined ? 'backend foundation' : `authored Room ${this.authoredPreviewRoomId}`}`,
         `authored recovery B/G: ${this.authoredPreviewProgression?.recoveryRoomIds.bob ?? '-'} / ${this.authoredPreviewProgression?.recoveryRoomIds.goop ?? '-'}`,
         `lifecycle / gameplay: ${this.state} / ${readModel.state}`,
@@ -1458,6 +1516,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.roomWorkloadContinuations.clear();
     this.gameplayAudio?.reset();
     const resources = this.requireResources();
     this.input.resetState();
@@ -1718,8 +1777,8 @@ export class CultivationLevelRuntime {
       this.captureAuthoredPreviewCheckpoint(resources);
       this.emitAuthoredPreviewObjective();
     }
+    if (preview.workload.simulated.has(5)) resources.roomFiveEncounter?.update(dt);
     if (this.authoredPreviewRoomId !== 5) return;
-    resources.roomFiveEncounter?.update(dt);
     if (!resources.deathSequence.isPlaying) return;
     if (c.checkpoint !== this.roomFiveCheckpoint) {
       this.roomFiveCheckpoint = c.checkpoint;

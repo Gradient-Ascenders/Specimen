@@ -588,6 +588,22 @@ test('broadphase matches exhaustive sweeps across transformed static and dynamic
       broadphaseHit.normal.distanceTo(exhaustiveHit.normal) <= 1e-10,
       `normal differs for query ${queryIndex}`,
     );
+    const rayResult = world.raycast(origin, displacement, displacement.length(), broadphaseHit, queryMask, ignoredCollider);
+    const expectedRayResult = exhaustiveWorld.raycast(origin, displacement, displacement.length(), exhaustiveHit, queryMask, ignoredCollider);
+    assert.equal(rayResult, expectedRayResult, `query ${queryIndex}`);
+    assert.equal(broadphaseHit.object, exhaustiveHit.object, `query ${queryIndex}`);
+    assert.ok(
+      Math.abs(broadphaseHit.fraction - exhaustiveHit.fraction) <= 1e-12,
+      `fraction differs for query ${queryIndex}`,
+    );
+    assert.ok(
+      broadphaseHit.point.distanceTo(exhaustiveHit.point) <= 1e-10,
+      `point differs for query ${queryIndex}`,
+    );
+    assert.ok(
+      broadphaseHit.normal.distanceTo(exhaustiveHit.normal) <= 1e-10,
+      `normal differs for query ${queryIndex}`,
+    );
   }
 
   for (const collider of colliders) collider.geometry.dispose();
@@ -739,4 +755,212 @@ test('raycast reports a zero-distance hit when the origin starts inside a collid
   assert.equal(hit.fraction, 0);
 
   collider.geometry.dispose();
+});
+
+test('local sweeps and rays visit the same candidates after adding distant static colliders', () => {
+  const world = new CollisionWorld();
+  const geometry = new THREE.BoxGeometry(2, 2, 2);
+  const local = new THREE.Mesh(geometry);
+  const moving = new THREE.Mesh(geometry);
+  moving.position.x = 100;
+  world.register(local, undefined, ColliderTransformMode.Static);
+  world.register(moving);
+  const hit = new CollisionHit();
+  const origin = new THREE.Vector3(-4, 0, 0), delta = new THREE.Vector3(8, 0, 0);
+  const query = (ray: boolean) => ray
+    ? world.raycast(origin, delta, 8, hit)
+    : world.sweepSphere(origin, delta, .45, hit);
+  try {
+    for (const ray of [false, true]) {
+      assert.equal(query(ray), true);
+      const before = world.getLastQueryDiagnostics();
+      for (let i = 0; i < 2000; i++) {
+        const mesh = new THREE.Mesh(geometry);
+        mesh.position.set(1000 + i * 20, 0, 0);
+        world.register(mesh, undefined, ColliderTransformMode.Static);
+      }
+      // First query rebuilds the dirty index; subsequent queries reuse storage.
+      query(ray);
+      assert.equal(query(ray), true);
+      assert.equal(hit.object, local);
+      const after = world.getLastQueryDiagnostics();
+      assert.equal(after.staticEntriesVisited, before.staticEntriesVisited);
+      assert.equal(after.dynamicCollidersVisited, 1);
+      assert.equal(after.candidates, 1);
+      assert.equal(after.narrowPhaseChecks, 1);
+      assert.equal(after.candidateBufferGrowth, 0);
+      // Reject any hidden registry traversal in the steady-state query path,
+      // independently of the work counters above.
+      const internals = world as unknown as { colliders: unknown[] };
+      const registry = internals.colliders;
+      internals.colliders = new Proxy(registry, {
+        get(target, key, receiver) {
+          if (key === Symbol.iterator || (typeof key === 'string' && /^\d+$/.test(key))) {
+            assert.fail('local query traversed the full registry');
+          }
+          return Reflect.get(target, key, receiver);
+        },
+      });
+      try { assert.equal(query(ray), true); }
+      finally { internals.colliders = registry; }
+
+    }
+  } finally { world.clear(); geometry.dispose(); }
+});
+
+test('mixed candidate sources retain registry ties through mode changes, removal and clear', () => {
+  const world = new CollisionWorld();
+  const reference = new CollisionWorld({ broadphaseEnabled: false });
+  const geometry = new THREE.BoxGeometry(2, 2, 2);
+  const first = new THREE.Mesh(geometry), second = new THREE.Mesh(geometry);
+  const wide = new THREE.Mesh(geometry);
+  first.position.x = second.position.x = 4;
+  wide.position.x = 4; wide.scale.set(1, 2000, 2000); // same front face, global static list
+  const hit = new CollisionHit(), expected = new CollisionHit();
+  const origin = new THREE.Vector3(), delta = new THREE.Vector3(8, 0, 0);
+  const compare = (winner: THREE.Mesh) => {
+    for (const ray of [false, true]) {
+      for (const w of [world, reference]) {
+        const result = w === world ? hit : expected;
+        assert.equal(ray ? w.raycast(origin, delta, 8, result)
+          : w.sweepSphere(origin, delta, .25, result), true);
+      }
+      assert.equal(hit.object, winner);
+      assert.equal(hit.object, expected.object);
+      assert.equal(hit.fraction, expected.fraction);
+    }
+  };
+  try {
+    for (const w of [world, reference]) {
+      w.register(first); // collected after static candidates, wins equal hits
+      w.register(second, undefined, ColliderTransformMode.Static);
+      w.register(wide, undefined, ColliderTransformMode.Static);
+    }
+    compare(first);
+    for (const w of [world, reference]) {
+      w.setTransformMode(first, ColliderTransformMode.Static);
+      w.setTransformMode(second, ColliderTransformMode.Dynamic);
+      w.setTransformMode(second, ColliderTransformMode.Dynamic); // no duplicate
+    }
+    compare(first);
+    for (const w of [world, reference]) {
+      w.unregister(first);
+      w.register(first);
+    }
+    compare(second);
+    for (const w of [world, reference]) w.setLayerMask(second, CollisionLayer.ElectricalTarget);
+    compare(wide);
+    second.visible = false;
+    for (const w of [world, reference]) w.setLayerMask(second, DEFAULT_SOLID_COLLISION_LAYERS);
+    compare(wide);
+    second.visible = true;
+    compare(second);
+    for (const w of [world, reference]) {
+      w.clear(); w.register(first); w.register(first);
+    }
+    compare(first);
+    assert.equal(world.colliderCount, 1);
+    assert.equal(world.getLastQueryDiagnostics().dynamicCollidersVisited, 1);
+  } finally { world.clear(); reference.clear(); geometry.dispose(); }
+});
+
+test('long queries, multi-cell boxes and global statics match exhaustive rays and sweeps', () => {
+  const world = new CollisionWorld(), reference = new CollisionWorld({ broadphaseEnabled: false });
+  const geometry = new THREE.BoxGeometry(2, 2, 2);
+  const meshes = Array.from({ length: 35 }, (_, i) => {
+    const mesh = new THREE.Mesh(geometry);
+    mesh.position.set((35 - i) * 20, 0, (35 - i) * 20);
+    mesh.scale.set(i === 0 ? 300 : 2, i === 0 ? 300 : .5, i === 0 ? 300 : 2);
+    for (const w of [world, reference]) w.register(mesh, undefined, ColliderTransformMode.Static);
+    return mesh;
+  });
+  const hit = new CollisionHit(), expected = new CollisionHit();
+  try {
+    for (const delta of [new THREE.Vector3(1000, 1000, 1000), new THREE.Vector3(1000, 0, 1000)]) {
+      for (const ray of [false, true]) {
+        const origin = new THREE.Vector3(-10, 0, -10);
+        for (const w of [world, reference]) {
+          const result = w === world ? hit : expected;
+          if (ray) w.raycast(origin, delta, delta.length(), result);
+          else w.sweepSphere(origin, delta, .45, result);
+        }
+        assert.equal(hit.object, expected.object);
+        assert.equal(hit.fraction, expected.fraction);
+        assert.ok(hit.normal.distanceTo(expected.normal) < 1e-10);
+        assert.ok(world.getLastQueryDiagnostics().candidates <= meshes.length);
+      }
+    }
+  } finally { world.clear(); reference.clear(); geometry.dispose(); }
+});
+
+test('explicit invalidation refreshes transforms inside nested stable scopes', () => {
+  const world = new CollisionWorld();
+  const parent = new THREE.Group();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
+  parent.add(mesh);
+  world.register(mesh, undefined, ColliderTransformMode.Static);
+  const hit = new CollisionHit(), origin = new THREE.Vector3(-4, 0, 0), delta = new THREE.Vector3(8, 0, 0);
+  try {
+    world.withStableQueryTransforms(() => {
+      assert.equal(world.sweepSphere(origin, delta, .45, hit), true);
+      parent.position.x = 50;
+      world.invalidateTransform(mesh);
+      world.withStableQueryTransforms(() => {
+        assert.equal(world.raycast(origin, delta, 8, hit), false);
+      });
+      parent.position.x = 0;
+      world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
+      assert.equal(world.sweepSphere(origin, delta, .45, hit), true);
+    });
+  } finally { world.clear(); mesh.geometry.dispose(); }
+});
+
+test('static ray candidates preserve local-box contact tolerance at cell boundaries', () => {
+  const world = new CollisionWorld(), reference = new CollisionWorld({ broadphaseEnabled: false });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2));
+  mesh.position.set(1, 0, 2);
+  mesh.scale.set(2, 1, .5);
+  const origin = new THREE.Vector3(-1 - 1e-8, 0, 2), direction = new THREE.Vector3(-1, 0, 0);
+  const hit = new CollisionHit(), expected = new CollisionHit();
+  try {
+    for (const w of [world, reference]) w.register(mesh, undefined, ColliderTransformMode.Static);
+    assert.equal(world.raycast(origin, direction, 1, hit), reference.raycast(origin, direction, 1, expected));
+    assert.equal(hit.object, mesh);
+    assert.equal(hit.fraction, expected.fraction);
+  } finally { world.clear(); reference.clear(); mesh.geometry.dispose(); }
+});
+
+test('dense multi-cell candidate sorting preserves ties and reuses scratch storage', () => {
+  const world = new CollisionWorld(), reference = new CollisionWorld({ broadphaseEnabled: false });
+  // Registration history may exceed 32 bits even with a modest live registry.
+  for (const w of [world, reference]) {
+    (w as unknown as { nextRegistryOrder: number }).nextRegistryOrder = 2 ** 32 - 100;
+  }
+  const geometry = new THREE.BoxGeometry(2, 2, 2);
+  const meshes = Array.from({ length: 300 }, (_, i) => {
+    const mesh = new THREE.Mesh(geometry);
+    mesh.position.set(4, 0, 0);
+    for (const w of [world, reference]) w.register(mesh, undefined,
+      i % 5 === 0 ? ColliderTransformMode.Dynamic : ColliderTransformMode.Static);
+    return mesh;
+  });
+  const origin = new THREE.Vector3(), delta = new THREE.Vector3(8, 0, 0);
+  const hit = new CollisionHit(), expected = new CollisionHit();
+  try {
+    for (const ray of [false, true]) {
+      for (const ignored of [undefined, meshes[0]]) {
+        for (let repeat = 0; repeat < 2; repeat++) {
+          for (const w of [world, reference]) {
+            const result = w === world ? hit : expected;
+            if (ray) w.raycast(origin, delta, 8, result, CollisionLayer.Movement, ignored);
+            else w.sweepSphere(origin, delta, .25, result, CollisionLayer.Movement, ignored);
+          }
+          assert.equal(hit.object, expected.object);
+          assert.equal(hit.object, ignored ? meshes[1] : meshes[0]);
+          assert.equal(hit.fraction, expected.fraction);
+          if (repeat === 1) assert.equal(world.getLastQueryDiagnostics().candidateBufferGrowth, 0);
+        }
+      }
+    }
+  } finally { world.clear(); reference.clear(); geometry.dispose(); }
 });

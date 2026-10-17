@@ -2,14 +2,13 @@ import * as THREE from 'three';
 
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
 import {
-  createBorrowedBox,
   createBorrowedCylinder,
   createChamferedBox,
-  createInstancedBoxes,
   createInstancedChamferedBoxes,
   createSignagePanel,
   markVisualOnly,
 } from './ContainmentModularComponents.ts';
+import { ContainmentSpecimenPod, SPECIMEN_POD_LID_RAISE_METRES } from './ContainmentSpecimenPod.ts';
 
 export type RoomOneEggState =
   | 'intact'
@@ -17,7 +16,7 @@ export type RoomOneEggState =
   | 'crack-stage-2'
   | 'crack-stage-3'
   | 'half-broken';
-export type RoomOneContainmentBoxState = 'intact' | 'shattered';
+export type RoomOneContainmentBoxState = 'intact' | 'shattered' | 'open';
 
 const EGG_STATES: readonly RoomOneEggState[] = [
   'intact',
@@ -39,11 +38,18 @@ export class RoomOneArt {
   readonly eggStates: Readonly<Record<RoomOneEggState, THREE.Group>>;
 
   private readonly uniqueGeometries = new Set<THREE.BufferGeometry>();
+  private readonly specimenPod: ContainmentSpecimenPod;
   private readonly resources: ContainmentArtResources;
   private disposed = false;
 
   constructor(resources: ContainmentArtResources) {
     this.resources = resources;
+    this.specimenPod = new ContainmentSpecimenPod(resources, 'room-1-pod', {
+      'pedestal-shell': 'room-1-pedestal-clean-shell',
+      'instrument-deck': 'room-1-containment-lower-instrumentation-base',
+      'upper-gasket': 'room-1-containment-upper-gasket-seat',
+      'overhead-feed-neck': 'room-1-containment-overhead-service-coupler',
+    }, 7.85);
     this.root.name = 'room-1-production-art';
     this.specimenAssembly.name = 'room-1-specimen-assembly';
     this.pedestalDressing.name = 'room-1-pedestal-dressing';
@@ -62,8 +68,7 @@ export class RoomOneArt {
     ]) markVisualOnly(object);
 
     this.buildArchitecture();
-    this.buildPedestal();
-    this.buildContainmentMachine();
+    this.buildSpecimenPod();
     this.eggStates = this.buildEggStates();
     this.buildDoor();
     this.buildStickyRoute();
@@ -88,14 +93,23 @@ export class RoomOneArt {
   }
 
   setContainmentBoxState(state: RoomOneContainmentBoxState): void {
-    this.intactFrameAndPanes.visible = state === 'intact';
+    this.intactFrameAndPanes.visible = state !== 'shattered';
+    this.intactFrameAndPanes.position.y = state === 'open' ? SPECIMEN_POD_LID_RAISE_METRES : 0;
+    this.specimenPod.setLidLift(this.intactFrameAndPanes.position.y);
     this.shatteredFrameAndDebris.visible = state === 'shattered';
+  }
+
+  /** The egg has already fallen and hatched: do not respawn it on the pedestal. */
+  setOpeningAftermath(): void {
+    this.setContainmentBoxState('open');
+    this.eggRoot.visible = false;
   }
 
   reset(): void {
     this.containmentBoxRoot.position.set(0, 1.1, -0.5);
     this.containmentBoxRoot.rotation.set(0, 0, 0);
     this.containmentBoxRoot.scale.set(1, 1, 1);
+    this.eggRoot.visible = true;
     this.setContainmentBoxState('intact');
     this.setEggState('intact');
   }
@@ -104,6 +118,7 @@ export class RoomOneArt {
     if (this.disposed) return;
     this.disposed = true;
     this.root.removeFromParent();
+    this.specimenPod.dispose();
     for (const geometry of this.uniqueGeometries) geometry.dispose();
     this.uniqueGeometries.clear();
     this.root.clear();
@@ -203,224 +218,22 @@ export class RoomOneArt {
     }
   }
 
-  private buildPedestal(): void {
-    const { mainCeramic, secondaryCeramic, graphite, gasket, serviceMetal, staticCyanEmissive, warningStatus } =
-      this.resources.materials;
+  private buildSpecimenPod(): void {
     this.pedestalDressing.position.set(0, 0, -0.5);
-    this.pedestalDressing.add(
-      createChamferedBox(this.resources, {
-        name: 'room-1-pedestal-floor-mount',
-        size: [2.78, 0.16, 2.78],
-        radius: 0.055,
-        position: [0, 0.09, 0],
-        material: graphite,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-pedestal-clean-shell',
-        size: [2.66, 0.82, 2.66],
-        radius: 0.07,
-        position: [0, 0.55, 0],
-        material: mainCeramic,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-pedestal-secondary-front-panel',
-        size: [1.58, 0.5, 0.08],
-        radius: 0.035,
-        position: [0, 0.55, -1.305],
-        material: secondaryCeramic,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-pedestal-instrument-recess',
-        size: [0.82, 0.24, 0.045],
-        radius: 0.018,
-        position: [0.28, 0.58, -1.354],
-        material: gasket,
-      }),
-      createInstancedBoxes(
-        this.resources,
-        'room-1-pedestal-upper-gasket-frame',
-        gasket,
-        [
-          { position: [-1.28, 1.15, 0], size: [0.06, 0.06, 2.32] },
-          { position: [1.28, 1.15, 0], size: [0.06, 0.06, 2.32] },
-          { position: [0, 1.15, -1.19], size: [2.5, 0.06, 0.06] },
-          { position: [0, 1.15, 1.19], size: [2.5, 0.06, 0.06] },
-        ],
-      ),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-pedestal-cyan-instrument',
-        size: [0.035, 0.018, 0.035],
-        position: [0.08, 0.59, -1.39],
-        rotation: [Math.PI / 2, 0, 0],
-        material: staticCyanEmissive,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-pedestal-amber-instrument',
-        size: [0.035, 0.018, 0.035],
-        position: [0.31, 0.59, -1.39],
-        rotation: [Math.PI / 2, 0, 0],
-        material: warningStatus,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-pedestal-instrument-dial',
-        size: [0.075, 0.025, 0.075],
-        position: [0.57, 0.59, -1.39],
-        rotation: [Math.PI / 2, 0, 0],
-        material: serviceMetal,
-      }),
-    );
-  }
-
-  private buildContainmentMachine(): void {
-    const { mainCeramic, secondaryCeramic, graphite, serviceMetal, gasket, containmentGlass, warningStatus } =
-      this.resources.materials;
-    this.containmentBoxRoot.add(
-      createChamferedBox(this.resources, {
-        name: 'room-1-containment-lower-instrumentation-base',
-        size: [2.46, 0.39, 2.26],
-        radius: 0.075,
-        // Seat on, rather than occupy, the pedestal gasket volume. The former
-        // overlap put near-identical black and white side faces into depth
-        // competition at shallow gameplay-camera angles.
-        position: [0, 0.215, 0],
-        material: mainCeramic,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-containment-lower-gasket-seat',
-        size: [2.18, 0.15, 2.0],
-        radius: 0.04,
-        position: [0, 0.48, 0],
-        material: gasket,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-containment-upper-service-housing',
-        size: [2.2, 0.32, 2.0],
-        radius: 0.07,
-        position: [0, 1.92, 0],
-        material: secondaryCeramic,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-containment-upper-gasket-seat',
-        size: [2.12, 0.13, 1.92],
-        radius: 0.035,
-        position: [0, 1.69, 0],
-        material: gasket,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-containment-asymmetric-control-block',
-        size: [0.48, 0.82, 1.2],
-        radius: 0.055,
-        position: [1.43, 0.23, 0.22],
-        material: serviceMetal,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-containment-control-face',
-        size: [0.31, 0.44, 0.055],
-        radius: 0.022,
-        position: [1.43, 0.26, -0.405],
-        material: graphite,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-containment-pressure-gauge',
-        size: [0.1, 0.035, 0.1],
-        position: [1.43, 0.32, -0.455],
-        rotation: [Math.PI / 2, 0, 0],
-        material: warningStatus,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-containment-feed-neck',
-        size: [0.19, 0.35, 0.19],
-        position: [-0.42, 2.24, 0.15],
-        material: serviceMetal,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-containment-feed-flange',
-        size: [0.31, 0.08, 0.31],
-        position: [-0.42, 2.06, 0.15],
-        material: graphite,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-containment-side-pressure-line',
-        size: [0.065, 0.62, 0.065],
-        position: [1.24, 1.22, 0.67],
-        material: serviceMetal,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-containment-pressure-line-lower-coupling',
-        size: [0.12, 0.045, 0.12],
-        position: [1.24, 0.64, 0.67],
-        material: graphite,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-containment-pressure-line-upper-coupling',
-        size: [0.12, 0.045, 0.12],
-        position: [1.24, 1.8, 0.67],
-        material: graphite,
-      }),
-      createChamferedBox(this.resources, {
-        name: 'room-1-containment-overhead-service-coupler',
-        size: [0.9, 0.32, 0.62],
-        radius: 0.055,
-        position: [-0.18, 2.48, 0.15],
-        material: secondaryCeramic,
-      }),
-      this.intactFrameAndPanes,
-      this.shatteredFrameAndDebris,
-    );
-
-    const supports = [
-      [-1.02, 1.08, -0.88], [1.02, 1.08, -0.88],
-      [-1.02, 1.08, 0.88], [1.02, 1.08, 0.88],
-    ] as const;
-    this.intactFrameAndPanes.add(
-      createInstancedChamferedBoxes(this.resources, {
-        name: 'room-1-containment-four-structural-supports',
-        size: [0.15, 1.24, 0.18],
-        radius: 0.025,
-        material: serviceMetal,
-        transforms: supports.map((position) => ({ position })),
-      }),
-      ...this.createGlassPanes(containmentGlass),
-    );
-
-    this.shatteredFrameAndDebris.add(
-      createInstancedChamferedBoxes(this.resources, {
-        name: 'room-1-containment-damaged-structural-supports',
-        size: [0.15, 1.24, 0.18],
-        radius: 0.025,
-        material: serviceMetal,
-        transforms: supports.map((position, index) => ({
-          position,
-          rotation: index === 1 ? [0.05, 0, -0.2] : undefined,
-        })),
-      }),
-      ...this.createGlassPanes(containmentGlass, true),
-      this.createGlassDebris(),
-    );
-  }
-
-  private createGlassPanes(
-    material: THREE.Material,
-    shattered = false,
-  ): THREE.Mesh[] {
-    const definitions: readonly {
-      name: string;
-      size: readonly [number, number, number];
-      position: readonly [number, number, number];
-    }[] = [
-      { name: 'front', size: [1.82, 1.22, 0.045], position: [0, 1.08, -0.9] },
-      { name: 'back', size: [1.82, 1.22, 0.045], position: [0, 1.08, 0.9] },
-      { name: 'left', size: [0.045, 1.22, 1.68], position: [-0.96, 1.08, 0] },
-      { name: 'right', size: [0.045, 1.22, 1.68], position: [0.96, 1.08, 0] },
-    ];
-    return definitions
-      .filter((definition) => !(shattered && definition.name === 'front'))
-      .map((definition) => createBorrowedBox(this.resources, {
-        name: `room-1-containment-${shattered ? 'shattered' : 'intact'}-${definition.name}-reinforced-pane`,
-        size: definition.size,
-        position: definition.position,
-        material,
-      }));
+    this.pedestalDressing.add(...this.specimenPod.pedestal.children);
+    this.specimenPod.ceilingMount.position.z = -0.5;
+    this.specimenAssembly.add(this.specimenPod.ceilingMount);
+    // Keep the established animation origin without changing shared dimensions.
+    for (const part of [...this.specimenPod.chamber.children]) {
+      part.position.y -= 1.1;
+      this.intactFrameAndPanes.add(part);
+      if (part.name.endsWith('curved-glass')) continue;
+      const damagedPart = part.clone();
+      damagedPart.name = `${part.name}-damaged`;
+      this.shatteredFrameAndDebris.add(damagedPart);
+    }
+    this.shatteredFrameAndDebris.add(this.createGlassDebris());
+    this.containmentBoxRoot.add(this.intactFrameAndPanes, this.shatteredFrameAndDebris);
   }
 
   private createGlassDebris(): THREE.InstancedMesh {
@@ -455,8 +268,8 @@ export class RoomOneArt {
   }
 
   private buildEggStates(): Readonly<Record<RoomOneEggState, THREE.Group>> {
-    this.eggRoot.position.set(0, 1.85, -0.5);
-    this.eggRoot.scale.set(0.82, 1.18, 0.82);
+    this.eggRoot.position.set(0, 2.22, -0.5);
+    this.eggRoot.scale.set(0.9, 1.12, 0.9);
     const states = {} as Record<RoomOneEggState, THREE.Group>;
     EGG_STATES.forEach((state, stateIndex) => {
       const group = new THREE.Group();
@@ -697,7 +510,6 @@ export class RoomOneArt {
   private buildSignage(): void {
     this.root.add(
       this.createSign('room-1-containment-bay-identifier', 'bay', [2.65, 0.76], [-1.65, 6.58, 5.61]),
-      this.createSign('room-1-specimen-identifier', 'specimen', [1.0, 0.3], [0, 0.67, -1.87]),
       this.createSign('room-1-vent-route-identifier', 'vent', [1.68, 0.46], [-4.8, 7.25, 5.58]),
     );
   }

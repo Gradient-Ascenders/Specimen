@@ -9,7 +9,8 @@ import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
-for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading preparation preserves scene and renderer ownership (${mode})`, async context => {
+for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
+  const mode = variant === 'startup-minimum' || variant.startsWith('current-dark') ? 'startup' : variant;
   const fail = mode === 'failure';
   const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
@@ -99,12 +100,13 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     compile() {},
     render(preparedScene: THREE.Scene, camera: THREE.Camera) {
       preparedScene.traverseVisible(object => {
-        if (object instanceof THREE.Mesh && object.geometry === captiveBody.geometry && object.material instanceof THREE.MeshDepthMaterial) {
+        if (object instanceof THREE.Mesh && object.geometry === captiveBody.geometry &&
+          (object.material instanceof THREE.MeshDepthMaterial || variant === 'startup-minimum' && object.material instanceof THREE.MeshPhysicalMaterial)) {
           captiveUploaded = true;
           assert.deepEqual(object.morphTargetDictionary, expectedMorphs.get(captiveBody.geometry)!.dictionary);
           assert.deepEqual(object.morphTargetInfluences, expectedMorphs.get(captiveBody.geometry)!.influences);
         }
-        if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
+        if (preparedScene !== scene && object instanceof THREE.Mesh && object.material instanceof THREE.MeshPhysicalMaterial) {
           assert.equal(object.material.transmission, 0, 'temporary scenes must not allocate Bob transmission targets');
         }
       });
@@ -154,7 +156,14 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
   };
   const policy = new RenderShadowPolicy(renderer.shadowMap);
   const layer = { scene, renderer, withShadowPreparation: policy.withPreparation.bind(policy), cameraRig: { camera: new THREE.PerspectiveCamera() } } as unknown as RenderLayer;
+  if (variant === 'startup-minimum') scene.traverse(object => {
+    if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      if (material instanceof THREE.MeshPhysicalMaterial) material.transmission = 0;
+    }
+  });
+  const liveScopes = preview.workload.snapshot();
   const queue = new CultivationPreparationQueue(layer, preview);
+  assert.deepEqual(preview.workload.snapshot(), liveScopes, 'enumerating speculative layouts cannot change live scopes');
   try {
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
@@ -260,6 +269,8 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
       assert.deepEqual(mapsInShadow, new Set([true, false]), 'mapped and unmapped shadows are both prepared');
     }
     if (mode === 'startup') {
+      assert.equal(queue.diagnostics.batches.some(batch => batch.label === 'linear'), variant !== 'startup-minimum');
+      if (variant === 'startup-minimum') assert.ok(queue.diagnostics.skippedTransmissionObjects > 0);
       assert.ok(queue.diagnostics.startupMs >= queue.diagnostics.initialMs, 'report entry and full startup separately');
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
@@ -310,9 +321,66 @@ for (const mode of ['jump', 'lift', 'failure', 'startup']) test(`loading prepara
     for (const old of snapshots) { assert.equal(old.object.parent, old.parent); assert.equal(old.object.visible, old.visible); assert.deepEqual(old.object.position.toArray(), old.position); assert.deepEqual(old.object.quaternion.toArray(), old.quaternion); }
     assert.equal(destroyed, 0, 'loading must not dispose borrowed geometry');
     if (!fail) assert.equal(captiveUploaded, true, 'non-casting captive gel uploads its geometry and morphs before first use');
+    if (variant.startsWith('current-dark')) {
+      preview.updatePresentationVisibility({z:4}, {z:4}); lighting.sync(scene);
+      assert.equal(queue.requireCurrent(false), true, 'the matching bright configuration is already prepared');
+      const extra = new THREE.SpotLight(); scene.add(extra);
+      // A different visible light signature prevents legitimate bright/dark
+      // subset reuse, so the dark demand really needs asynchronous preparation.
+      assert.equal(queue.requireCurrent(true), false);
+      const rendererState = () => ({viewport:viewport.toArray(),scissor:scissor.toArray(),scissorTest,
+        transmission:(renderer as any).transmissionResolutionScale,shadow:{...renderer.shadowMap}});
+      const savedState = rendererState(), before = compiles;
+      holdNextCompile = true; releaseCompile = undefined;
+      let settled = false;
+      const ready = queue.prepareCurrent(true).then(() => {settled=true;});
+      try {
+        const deadline = performance.now()+5000;
+        while (!releaseCompile && !settled && performance.now()<deadline) await new Promise(resolve=>setTimeout(resolve,0));
+        assert.ok(releaseCompile, 'dark preparation must reach a real asynchronous compiler step instead of returning bright readiness');
+        assert.equal(settled,false); assert.equal(queue.diagnostics.pending,true);
+        assert.deepEqual(rendererState(),savedState,'restore renderer/light state before awaiting the driver');
+        // A timer must run while compilation is held: no synchronous retry or
+        // microtask-only resource-preparation loop may starve the driver.
+        await new Promise(resolve=>setTimeout(resolve,0));
+        assert.equal(settled,false);
+        if (variant === 'current-dark-cancel') queue.dispose();
+        releaseCompile!(); await ready;
+        if (variant === 'current-dark-cancel') {
+          assert.equal(queue.diagnostics.pending,false,'late completion cannot re-arm a disposed queue');
+          assert.equal(preview.workload.prepared.size,0); assert.equal(preview.workload.preparing.size,0);
+        } else {
+          assert.equal(queue.requireCurrent(true),true,'prepare the actual dark demand');
+          assert.equal(queue.diagnostics.pending,false); assert.ok(compiles>before);
+          const completed = compiles;
+          await queue.prepareCurrent(true);
+          assert.equal(compiles,completed,'ready dark configuration does not repeat shader work');
+        }
+        assert.deepEqual(rendererState(),savedState);
+      } finally {
+        releaseCompile?.(); await ready;
+        extra.removeFromParent(); lighting.restore();
+      }
+    }
+    if (variant === 'startup') {
+      preview.workload.clearPreparation();
+      const replacement = new CultivationPreparationQueue(layer, preview);
+      try {
+        await replacement.prepareInitial();
+        const readyScopes = preview.workload.snapshot();
+        assert.ok(readyScopes.prepared.length > 0);
+        queue.dispose();
+        assert.deepEqual(preview.workload.snapshot(), readyScopes,
+          'retiring the old settings queue cannot clear its replacement readiness scopes');
+      } finally { replacement.dispose(); }
+    }
   } finally {
     volt.dispose();
-    queue.dispose(); lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
+    queue.dispose();
+    assert.equal(preview.workload.prepared.size, 0);
+    assert.equal(preview.workload.preparing.size, 0);
+    assert.equal(queue.diagnostics.pending, false);
+    lighting.dispose(); preview.dispose(); shape.dispose(); shared.dispose(); depth.dispose(); distance.dispose();
     reflectiveMaterial.dispose(); renderTarget.dispose();
     gel.dispose();
     foundationMaterial.dispose();

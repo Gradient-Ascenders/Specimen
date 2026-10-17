@@ -6,10 +6,15 @@ for implementation details and historical evidence.
 
 ## Architecture
 
+- [Collision queries](architecture/collision-queries.md) — spatial candidates,
+  transform boundaries, diagnostics and reproducible CPU benchmarks.
+
 - [Runtime and lifecycle](architecture/runtime.md) — application ownership,
   fixed-step updates, input, transitions, restart, and disposal.
 - [Rendering and assets](architecture/rendering.md) — renderer ownership,
   lighting, shadows, preparation, and asset boundaries.
+- [Cultivation room workload](architecture/room-workload.md) — room scope ownership,
+  static transforms, spatial batching, diagnostics and measurement limits.
 - [Goop model integration](architecture/goop-model-integration.md) — implementation
   specification for the authored Goop model and shared gel presentation.
 - [Volt model integration](architecture/volt-model-integration.md) — implementation

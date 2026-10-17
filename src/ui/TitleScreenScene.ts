@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
-import { createBorrowedBox, createBorrowedCylinder, createInstancedBoxes,
+import { createBorrowedBox, createInstancedBoxes,
   createInstancedChamferedBoxes } from '../render/environment/containment/ContainmentModularComponents.ts';
-import { createContainmentSpecimenLabelTexture } from '../render/environment/containment/ContainmentProceduralTextures.ts';
+import { ContainmentSpecimenPod } from '../render/environment/containment/ContainmentSpecimenPod.ts';
 
 export const TITLE_ORBIT_SECONDS = 72;
 export const TITLE_WOBBLE_INTERVAL_SECONDS = 5.5;
@@ -18,16 +18,15 @@ export class TitleScreenScene {
   readonly camera = new THREE.PerspectiveCamera(50, 1, 0.1, 24);
   readonly resources = new ContainmentArtResources();
   readonly pod = new THREE.Group();
+  private readonly specimenPod = new ContainmentSpecimenPod(this.resources, 'title-pod');
   readonly eggRoot = new THREE.Group();
   readonly shell: THREE.Mesh;
   readonly keyLight = new THREE.SpotLight(0xd9f8f2, 205, 17, 0.85, 0.65, 2);
 
   private readonly target = new THREE.Vector3(TITLE_EGG_CENTRE.x, TITLE_EGG_CENTRE.y, TITLE_EGG_CENTRE.z);
   private readonly rockRotation = new THREE.Matrix4();
-  private readonly ringGeometry = new THREE.TorusGeometry(1, 0.018, 8, 64);
-  private readonly uniqueGeometries = new Set<THREE.BufferGeometry>([this.ringGeometry]);
+  private readonly uniqueGeometries = new Set<THREE.BufferGeometry>();
   private readonly uniqueMaterials = new Set<THREE.Material>();
-  private readonly uniqueTextures = new Set<THREE.Texture>();
   private readonly dustGeometry = new THREE.BufferGeometry();
   private readonly dustMaterial = new THREE.PointsMaterial({ color: 0xa4d9d5, size: 0.017,
     transparent: true, opacity: 0.32, depthWrite: false });
@@ -79,7 +78,7 @@ export class TitleScreenScene {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       object.receiveShadow = true;
-      object.castShadow = !object.userData.titleShadowlessSupport && materials.every(material => !material.transparent &&
+      object.castShadow = !object.userData.specimenPodShadowlessSupport && materials.every(material => !material.transparent &&
         material !== this.resources.materials.neutralFixture);
     });
     this.scene.getObjectByName('title-observatory-wall')!.castShadow = false;
@@ -135,13 +134,22 @@ export class TitleScreenScene {
     return wobbling;
   }
 
+  /** Opening owns the moving crown; its suspension stays attached to the roof. */
+  setPodSuspensionLift(metres: number): void {
+    this.specimenPod.setLidLift(metres);
+  }
+
+  setPodCeilingHeight(metres: number): void {
+    this.specimenPod.setCeilingHeight(metres);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.scene.traverse(object => { if (object instanceof THREE.InstancedMesh) object.dispose(); });
     for (const geometry of this.uniqueGeometries) geometry.dispose();
     for (const material of this.uniqueMaterials) material.dispose();
-    for (const texture of this.uniqueTextures) texture.dispose();
+    this.specimenPod.dispose();
     this.dustGeometry.dispose();
     this.dustMaterial.dispose();
     for (const light of this.lights) light.dispose();
@@ -168,68 +176,37 @@ export class TitleScreenScene {
     this.uniqueGeometries.add(wallGeometry); this.uniqueMaterials.add(wallMaterial);
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     wall.name = 'title-observatory-wall'; wall.position.set(0, 3.5, -0.5); this.scene.add(wall);
-    const panels = [], strips = [], ceilingLights = [];
+    const panels = [], strips = [], ceilingLights = [], lightMounts = [];
     for (let index = 0; index < 12; index++) {
       const angle = index / 12 * Math.PI * 2;
       panels.push({ position: [Math.sin(angle) * 5.86, 3.25, -0.5 + Math.cos(angle) * 5.86] as const,
         rotation: [0, angle, 0] as const });
       const between = angle + Math.PI / 12;
-      if (index % 2 === 0) strips.push({
-        position: [Math.sin(between) * 5.6, 3.35, -0.5 + Math.cos(between) * 5.6] as const,
-        rotation: [0, between, 0] as const, size: [0.025, 2.6, 0.035] as const,
-      });
+      if (index % 2 === 0) {
+        lightMounts.push({
+          position: [Math.sin(between) * 5.95, 3.35, -0.5 + Math.cos(between) * 5.95] as const,
+          rotation: [0, between, 0] as const, size: [0.14, 2.84, 0.36] as const,
+        });
+        strips.push({
+          position: [Math.sin(between) * 5.755, 3.35, -0.5 + Math.cos(between) * 5.755] as const,
+          rotation: [0, between, 0] as const, size: [0.025, 2.6, 0.035] as const,
+        });
+      }
       ceilingLights.push({ position: [Math.sin(angle) * 3.7, 6.84, -0.5 + Math.cos(angle) * 3.7] as const,
         rotation: [0, angle, 0] as const, size: [1.35, 0.035, 0.3] as const });
     }
     this.scene.add(createInstancedChamferedBoxes(this.resources, { name: 'title-observatory-ceramic-panels',
       size: [2.6, 5.5, 0.14], radius: 0.045, material: mainCeramic, transforms: panels }),
     createInstancedBoxes(this.resources, 'title-recessed-wall-lights', neutralFixture, strips),
+    createInstancedBoxes(this.resources, 'title-wall-light-mounts', graphite, lightMounts),
     createInstancedBoxes(this.resources, 'title-ceiling-light-panels', neutralFixture, ceilingLights));
   }
 
   private buildPod(): THREE.Mesh {
-    const { mainCeramic, graphite, serviceMetal, structuralSteel, gasket,
-      staticCyanEmissive, containmentGlass, specimenShell } = this.resources.materials;
     this.pod.name = 'title-custom-containment-pod';
     this.pod.position.z = TITLE_EGG_CENTRE.z;
-    for (const [name, radius, height, y, material] of [
-      ['floor-mount', 1.5, 0.16, 0.09, graphite],
-      ['pedestal-shell', 1.22, 1.24, 0.79, mainCeramic],
-      ['pedestal-service-belt', 1.235, 0.19, 0.61, structuralSteel],
-      ['instrument-deck', 1.35, 0.17, 1.49, serviceMetal],
-      ['lower-gasket', 1.12, 0.08, 1.61, gasket],
-      ['upper-gasket', 1.12, 0.08, 3.3, gasket],
-      ['upper-crown', 1.25, 0.18, 3.42, mainCeramic],
-      ['overhead-feed-neck', 0.18, 0.34, 3.68, structuralSteel],
-    ] as const) {
-      this.pod.add(createBorrowedCylinder(this.resources, { name: `title-pod-${name}`,
-        size: [radius, height, radius], position: [0, y, 0], material }));
-    }
-    const glassGeometry = new THREE.CylinderGeometry(1.08, 1.08, 1.61, 64, 1, true);
-    this.uniqueGeometries.add(glassGeometry);
-    const glass = new THREE.Mesh(glassGeometry, containmentGlass);
-    glass.name = 'title-pod-curved-glass'; glass.position.y = 2.455; this.pod.add(glass);
-    for (const [name, radius, y, material] of [
-      ['lower-seal-light', 1.09, 1.655, staticCyanEmissive],
-      ['upper-seal-light', 1.09, 3.26, staticCyanEmissive],
-      ['deck-edge', 1.34, 1.52, graphite],
-      ['crown-edge', 1.24, 3.48, graphite],
-    ] as const) {
-      const ring = new THREE.Mesh(this.ringGeometry, material);
-      ring.name = `title-pod-${name}`; ring.rotation.x = Math.PI / 2;
-      ring.scale.setScalar(radius); ring.position.y = y; this.pod.add(ring);
-    }
-    for (let index = 0; index < 4; index++) {
-      const angle = Math.PI / 4 + index * Math.PI / 2;
-      const support = createBorrowedCylinder(this.resources, { name: `title-pod-stanchion-${index}`,
-        size: [0.026, 1.62, 0.026], position: [Math.sin(angle) * 1.085, 2.46, Math.cos(angle) * 1.085],
-        material: structuralSteel });
-      // These hairline casters produce a distracting stripe across the egg.
-      // Keep their visible geometry and all other room/egg shadows intact.
-      support.userData.titleShadowlessSupport = true;
-      this.pod.add(support);
-    }
-    this.buildSpecimenLabel();
+    this.pod.add(...this.specimenPod.pedestal.children, ...this.specimenPod.chamber.children);
+    this.pod.add(this.specimenPod.ceilingMount);
     this.scene.add(this.pod);
 
     // A closed, slightly tapered shell, not a hatch or a character placeholder.
@@ -249,35 +226,10 @@ export class TitleScreenScene {
     }
     positions.needsUpdate = true; normals.needsUpdate = true;
     eggGeometry.computeBoundingBox(); eggGeometry.computeBoundingSphere();
-    const shell = new THREE.Mesh(eggGeometry, specimenShell);
+    const shell = new THREE.Mesh(eggGeometry, this.resources.materials.specimenShell);
     shell.name = 'title-intact-egg'; this.eggRoot.name = 'title-egg-root';
     this.eggRoot.position.copy(this.target); this.eggRoot.scale.set(0.9, 1.12, 0.9);
     this.eggRoot.add(shell); this.scene.add(this.eggRoot);
     return shell;
-  }
-
-  private buildSpecimenLabel(): void {
-    const texture = createContainmentSpecimenLabelTexture('Bob', 'Unknown');
-    this.uniqueTextures.add(texture);
-    const material = new THREE.MeshStandardMaterial({ name: 'title-specimen-label-material',
-      map: texture, emissiveMap: texture, emissive: 0xffffff, emissiveIntensity: 0.28,
-      roughness: 0.5, metalness: 0.08 });
-    this.uniqueMaterials.add(material);
-    // Replace the front indicator panel with a fixed plaque, flush with the pedestal.
-    // No billboard rotation, DOM/canvas work, font fetch or texture updates.
-    for (const [name, radius, height, arc, surface] of [
-      ['frame', 1.25, 0.49, 1.08, this.resources.materials.graphite],
-      ['label', 1.265, 0.45, 1, material],
-    ] as const) {
-      const geometry = new THREE.CylinderGeometry(radius, radius, height, 32, 1, true, -arc / 2, arc);
-      this.uniqueGeometries.add(geometry);
-      const uv = geometry.getAttribute('uv');
-      for (let index = 0; index < uv.count; index++) uv.setY(index, 1 - uv.getY(index));
-      uv.needsUpdate = true;
-      const plate = new THREE.Mesh(geometry, surface);
-      plate.name = `title-pod-specimen-${name}`;
-      plate.position.y = 1.05;
-      this.pod.add(plate);
-    }
   }
 }

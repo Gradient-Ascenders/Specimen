@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from './fixtures.ts';
 import { TITLE_PIXEL_BUDGET } from '../../src/ui/TitleScreenPresentation.ts';
 
@@ -51,6 +52,7 @@ for (const query of ['', '?debug=1']) {
       .toBeLessThanOrEqual(TITLE_PIXEL_BUDGET);
     await settings.locator('[data-action="back"]').click();
     await title.locator('[data-action="start"]').click();
+    await finishOpening(page);
     await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
     await expect(host).not.toHaveAttribute('data-title-backdrop', /.+/);
     await expect.poll(() => page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height]))

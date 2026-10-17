@@ -1,6 +1,7 @@
 import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
+import { BOB_AUTHORED_ASSET_URL } from '../slime/CharacterAssetUrls.ts';
 
 import {
   moveAngleTowards,
@@ -33,10 +34,6 @@ import {
   type BobGateTwoMaterialDiagnostics,
 } from './BobGateTwoMaterials.ts';
 
-const BOB_AUTHORED_ASSET_URL = new URL(
-  '../../../assets/characters/bob/bob-authored.glb',
-  import.meta.url,
-).href;
 const DEATH_RUPTURE_SECONDS = 0.075;
 const DEATH_TIMING_EPSILON_SECONDS = 1e-9;
 const LAUNCH_SECONDS = 0.18;

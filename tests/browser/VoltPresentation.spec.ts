@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
@@ -63,6 +64,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
   }
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 180_000 });
   // The containment roster remains locked and does not load Volt.
   expect(await page.evaluate(() => performance.getEntriesByType('resource').some(e => /volt-[^/]+\.glb/.test(e.name)))).toBe(false);
@@ -270,7 +272,10 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
     const rt = (window as any).__voltBlackout, layer = rt.renderLayer, renderer = layer.renderer;
     rt.stop(); renderer.setAnimationLoop(null);
     const light = rt.resources.voltLight, gl = renderer.getContext();
-    const saved = { preset: layer.graphicsPreset, cap: layer.pixelRatioCap, visible: light.visible, intensity: light.intensity };
+    const graphics = layer.getGraphicsDiagnostics();
+    const saved = { settings: {graphicsProfile:graphics.graphicsProfileBase, graphicsPreset:graphics.graphicsPreset,
+      renderPixelRatioCap:graphics.requestedPixelRatioCap, renderScale:graphics.renderScale, gelRenderingMode:graphics.gelRenderingMode},
+      visible: light.visible, intensity: light.intensity };
     const check = (stage: string) => {
       const error = gl.getError();
       if (error) throw new Error(`GL error ${error} at ${stage}`);
@@ -298,7 +303,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
     const result = [];
     try {
       for (const preset of ['normal','performance']) {
-        layer.setGraphicsSettings(preset, preset === 'performance' ? 0.75 : 2);
+        layer.setGraphicsSettings({...saved.settings,graphicsPreset:preset,renderPixelRatioCap:preset === 'performance' ? 0.75 : 2});
         // Match menu application: resize first, then render on the next browser frame.
         await new Promise(requestAnimationFrame);
         check(`${preset} resize`);
@@ -312,7 +317,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
         result.push({preset,buffer:[gl.drawingBufferWidth,gl.drawingBufferHeight],
           original:difference(reference,original),restored:difference(reference,restored),error:gl.getError()});
       }
-    } finally {light.visible=saved.visible;light.intensity=saved.intensity;layer.setGraphicsSettings(saved.preset,saved.cap);}
+    } finally {light.visible=saved.visible;light.intensity=saved.intensity;layer.setGraphicsSettings(saved.settings);}
     return result;
   });
   console.info('zero-radiance light equivalence', lightEquivalence);

@@ -1,3 +1,4 @@
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import type { Page } from '@playwright/test';
 import type * as THREE from 'three';
 import { expect, test } from './fixtures.ts';
@@ -47,7 +48,12 @@ interface ProductionTraversalRuntime {
     };
     readonly slimePair: {
       readonly activeBody: unknown;
+      readonly activeSlimeId: 'bob' | 'goop';
       switchActive(): boolean;
+    };
+    readonly slimeManager: {
+      isAvailable(id: 'goop'): boolean;
+      unlock(id: 'goop'): boolean;
     };
     readonly containmentLevel: {
       setActiveBody(body: unknown): void;
@@ -168,7 +174,7 @@ const exposeProductionTraversalRuntime = async (
     const response = await route.fetch();
     const body = await response.text();
     const prewarmCall =
-      /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
+      /\{initialRuntime:([A-Za-z_$][\w$]*)/;
     const match = body.match(prewarmCall);
     if (!match?.[1]) {
       await route.fulfill({ response, body });
@@ -178,7 +184,7 @@ const exposeProductionTraversalRuntime = async (
     const runtimeIdentifier = match[1];
     const instrumentedBody = body.replace(
       prewarmCall,
-      `(globalThis.__specimenProductionTraversalRuntime=${runtimeIdentifier},${runtimeIdentifier}.prepareLightingPrograms()).then(`,
+      `{initialRuntime:globalThis.__specimenProductionTraversalRuntime=${runtimeIdentifier}`,
     );
     injectedBundleCount += 1;
     await route.fulfill({ response, body: instrumentedBody });
@@ -249,7 +255,8 @@ const sweepCamera = async (page: Page): Promise<void> => {
   );
   if (!pointerLocked) {
     await canvas.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
-    await page.waitForFunction(() => document.pointerLockElement?.tagName === 'CANVAS');
+    await page.waitForFunction(() => document.pointerLockElement?.tagName === 'CANVAS',
+      null, { timeout: 10_000 });
   }
   await page.evaluate(() => {
     for (const [movementX, movementY] of [[180, -80], [-360, 160], [180, -80]]) {
@@ -353,6 +360,8 @@ const traverseRepresentativeLevelOnePaths = async (
   page: Page,
   assertProgramsStable: AssertProgramsStable,
 ): Promise<void> => {
+  expect(await page.evaluate(() => (window as any).__specimenProductionTraversalRuntime
+    .resources.slimeManager.isAvailable('goop'))).toBe(false);
   await visitRoom(page, 1);
   await sweepCamera(page);
   await page.keyboard.down('w');
@@ -366,8 +375,16 @@ const traverseRepresentativeLevelOnePaths = async (
   await visitRoom(page, 2);
   await sweepCamera(page);
   await assertProgramsStable('Room 2 camera sweep');
+  // This shader fixture stages a post-rescue roster before testing Goop's
+  // otherwise locked acid variants. Authored rescue is covered by smoke.
+  await page.evaluate(() => (window as any).__specimenProductionTraversalRuntime
+    .resources.slimeManager.unlock('goop'));
   await page.keyboard.press('Tab');
-  await waitForRenderedFrames(page);
+  await page.waitForFunction(() => (window as any).__specimenProductionTraversalRuntime
+    .resources.slimePair.activeSlimeId === 'goop', null, { timeout: 10_000 });
+  // Room teleports move only the authoritative active body. Place Goop at the
+  // Room 2 checkpoint too, rather than firing from his separate initial body.
+  await visitRoom(page, 2);
   await assertProgramsStable('Room 2 Goop switch');
   const acidBefore = await readAcidPresentationSample(page);
   await sweepCamera(page);
@@ -420,8 +437,13 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   page,
 }) => {
   test.setTimeout(600_000);
+  const assertExposed = await exposeProductionTraversalRuntime(page);
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
+  assertExposed();
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
   await expect(page.locator(GUARD_SELECTOR)).toBeVisible({ timeout: 120_000 });
+  // The guard is armed when prepared gameplay takes ownership from the opening.
   await expect.poll(
     async () => (await page.locator(GUARD_SELECTOR).textContent()) ?? '',
     { timeout: 120_000, message: 'Waiting for Level 1 hidden-boot warm-up' },
@@ -439,7 +461,6 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
     baseline,
   );
 
-  await page.locator('[data-action="start"]').click();
   await waitForRenderedFrames(page);
   await readStableGuard(page, 'gameplay start', baseline);
 
@@ -480,7 +501,8 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   );
 });
 
-test('plain production completes prewarm before Level 1 traversal', async ({
+for (const profile of ['minimum','standard'] as const) {
+test(`plain production completes prewarm before Level 1 traversal (${profile})`, async ({
   page,
 }) => {
   test.setTimeout(600_000);
@@ -492,6 +514,13 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     await exposeProductionTraversalRuntime(page);
   await page.addInitScript(() => {
     let createdPrograms = 0;
+    let programInspections = 0;
+    const inspect = WebGL2RenderingContext.prototype.getProgramInfoLog;
+    WebGL2RenderingContext.prototype.getProgramInfoLog = function(program) {
+      programInspections++;
+      return inspect.call(this, program);
+    };
+    Object.defineProperty(window, '__specimenProgramInspectionCount', { get: () => programInspections });
     const originalCreateProgram = WebGL2RenderingContext.prototype.createProgram;
     WebGL2RenderingContext.prototype.createProgram = function () {
       createdPrograms += 1;
@@ -505,6 +534,15 @@ test('plain production completes prewarm before Level 1 traversal', async ({
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   assertTraversalRuntimeExposed();
+  if (profile === 'standard') {
+    await page.locator('[data-flow-panel="title"] [data-action="settings"]').click({timeout:120_000});
+    await page.locator('[data-setting="graphics-profile"]').selectOption(profile);
+    await expect(page.locator('[data-graphics-preparation]')).toBeHidden({timeout:180_000});
+    await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  }
+
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
   const app = page.locator('#app[data-level-one-prewarm]');
   await expect(app).toBeVisible({ timeout: 120_000 });
   const verification = JSON.parse(
@@ -519,18 +557,19 @@ test('plain production completes prewarm before Level 1 traversal', async ({
     burstGeometryDelta: 0,
     burstProgramDelta: 0,
   });
-  await expect(page.locator('[data-action="start"]')).toBeVisible();
   await waitForRenderedFrames(page, 2);
   const warmedProgramCount = await readCreatedProgramCount(page);
+  const warmedInspections = await page.evaluate(() => (window as any).__specimenProgramInspectionCount);
   expect(warmedProgramCount).toBeGreaterThan(0);
 
-  await page.locator('[data-action="start"]').click();
   await waitForRenderedFrames(page, 2);
   await traverseRepresentativeLevelOnePaths(page, async (label) => {
     expect(
       await readCreatedProgramCount(page),
       `${label}: plain-production WebGL program count changed`,
     ).toBe(warmedProgramCount);
+    expect(await page.evaluate(() => (window as any).__specimenProgramInspectionCount),
+      `${label}: lazy program inspection after preparation`).toBe(warmedInspections);
   });
 
   expect(await readCreatedProgramCount(page)).toBe(warmedProgramCount);
@@ -539,6 +578,7 @@ test('plain production completes prewarm before Level 1 traversal', async ({
       message.includes('Containment lighting prewarm failed')),
   ).toBe(false);
 });
+}
 
 test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async ({ page }) => {
   test.setTimeout(240_000);
@@ -566,6 +606,7 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
   assertExposed();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   await page.evaluate(() => {
     const host = window as Window & {
@@ -717,6 +758,7 @@ test('Room 3 final sticky-wall climb reuses GPU programs and bindings without ch
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 120_000 });
   assertExposed();
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   const result = await page.evaluate(() => {
     const host = window as Window & {
@@ -806,6 +848,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
 
   const readReflectionState = async () => page.evaluate(() => {
@@ -980,6 +1023,7 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await waitForRenderedFrames(page, 2);
 
   const readBob = async () => page.evaluate(() => {
@@ -1080,6 +1124,7 @@ test('Level 1 damage holds the burst at frame zero through Stress anticipation',
     timeout: 120_000,
   });
   await page.locator('[data-action="start"]').click();
+  await finishOpening(page);
 
   const observation = await page.evaluate(() => {
     const runtime = (

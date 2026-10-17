@@ -256,6 +256,7 @@ function dataTexture(
 
 const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   ' ': [],
+  '.': [[0.5, 0.86, 0.5, 0.9]],
   '-': [[0.15, 0.52, 0.85, 0.52]],
   ':': [[0.5, 0.3, 0.5, 0.34], [0.5, 0.7, 0.5, 0.74]],
   '0': [[0.2, 0.08, 0.8, 0.08], [0.8, 0.08, 0.92, 0.2], [0.92, 0.2, 0.92, 0.8], [0.92, 0.8, 0.8, 0.92], [0.8, 0.92, 0.2, 0.92], [0.2, 0.92, 0.08, 0.8], [0.08, 0.8, 0.08, 0.2], [0.08, 0.2, 0.2, 0.08], [0.2, 0.82, 0.8, 0.18]],
@@ -264,6 +265,7 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   '3': [[0.12, 0.2, 0.28, 0.08], [0.28, 0.08, 0.72, 0.08], [0.72, 0.08, 0.9, 0.24], [0.9, 0.24, 0.72, 0.5], [0.72, 0.5, 0.9, 0.7], [0.9, 0.7, 0.72, 0.92], [0.72, 0.92, 0.24, 0.92], [0.24, 0.92, 0.1, 0.8], [0.32, 0.5, 0.72, 0.5]],
   '4': [[0.72, 0.92, 0.72, 0.08], [0.72, 0.08, 0.08, 0.68], [0.08, 0.68, 0.92, 0.68]],
   '5': [[0.88, 0.08, 0.14, 0.08], [0.14, 0.08, 0.14, 0.48], [0.14, 0.48, 0.72, 0.48], [0.72, 0.48, 0.9, 0.66], [0.9, 0.66, 0.72, 0.92], [0.72, 0.92, 0.18, 0.92], [0.18, 0.92, 0.08, 0.82]],
+  '6': [[0.86, 0.18, 0.7, 0.08], [0.7, 0.08, 0.28, 0.08], [0.28, 0.08, 0.1, 0.28], [0.1, 0.28, 0.1, 0.76], [0.1, 0.76, 0.28, 0.92], [0.28, 0.92, 0.72, 0.92], [0.72, 0.92, 0.9, 0.76], [0.9, 0.76, 0.9, 0.6], [0.9, 0.6, 0.72, 0.46], [0.72, 0.46, 0.1, 0.46]],
   '8': [[0.24, 0.08, 0.76, 0.08], [0.76, 0.08, 0.9, 0.22], [0.9, 0.22, 0.76, 0.5], [0.76, 0.5, 0.24, 0.5], [0.24, 0.5, 0.1, 0.22], [0.1, 0.22, 0.24, 0.08], [0.24, 0.5, 0.08, 0.72], [0.08, 0.72, 0.24, 0.92], [0.24, 0.92, 0.76, 0.92], [0.76, 0.92, 0.92, 0.72], [0.92, 0.72, 0.76, 0.5]],
   '9': [[0.88, 0.76, 0.72, 0.92], [0.72, 0.92, 0.28, 0.92], [0.28, 0.92, 0.1, 0.75], [0.1, 0.75, 0.1, 0.55], [0.1, 0.55, 0.28, 0.4], [0.28, 0.4, 0.8, 0.4], [0.8, 0.4, 0.9, 0.25], [0.9, 0.25, 0.72, 0.08], [0.72, 0.08, 0.28, 0.08]],
   A: [[0.08, 0.92, 0.5, 0.08], [0.5, 0.08, 0.92, 0.92], [0.25, 0.6, 0.75, 0.6]],
@@ -287,6 +289,7 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   U: [[0.08, 0.08, 0.08, 0.74], [0.08, 0.74, 0.26, 0.92], [0.26, 0.92, 0.74, 0.92], [0.74, 0.92, 0.92, 0.74], [0.92, 0.74, 0.92, 0.08]],
   V: [[0.08, 0.08, 0.5, 0.92], [0.5, 0.92, 0.92, 0.08]],
   W: [[0.06, 0.08, 0.22, 0.92], [0.22, 0.92, 0.5, 0.5], [0.5, 0.5, 0.78, 0.92], [0.78, 0.92, 0.94, 0.08]],
+  X: [[0.08, 0.08, 0.92, 0.92], [0.92, 0.08, 0.08, 0.92]],
   Y: [[0.08, 0.08, 0.5, 0.5], [0.92, 0.08, 0.5, 0.5], [0.5, 0.5, 0.5, 0.92]],
   Z: [[0.08, 0.08, 0.92, 0.08], [0.92, 0.08, 0.08, 0.92], [0.08, 0.92, 0.92, 0.92]],
 };
@@ -382,6 +385,8 @@ function createSignageAtlas(): {
   return { texture, regions };
 }
 
+export const CONTAINMENT_IDENTIFICATION_COLOURS = Object.freeze({ unknown: 0x70b9f1, low: 0x75d595 });
+
 /** Small, static identification plate using the same vector lettering as room signs. */
 export function createContainmentSpecimenLabelTexture(specimen: string, threat: string): THREE.DataTexture {
   const width = SIGN_ATLAS_WIDTH, height = 192;
@@ -391,19 +396,88 @@ export function createContainmentSpecimenLabelTexture(specimen: string, threat: 
   }
   const pixels = new Uint8Array(width * height * 4);
   const border: Rgba = [57, 88, 94, 255], background: Rgba = [12, 24, 29, 255];
-  const cyan: Rgba = [118, 203, 195, 255], primary: Rgba = [222, 239, 235, 255];
-  const amber: Rgba = [227, 181, 102, 255];
+  const primary: Rgba = [222, 239, 235, 255];
+  const hex = threat.toUpperCase() === 'UNKNOWN' ? CONTAINMENT_IDENTIFICATION_COLOURS.unknown
+    : threat.toUpperCase() === 'LOW' ? CONTAINMENT_IDENTIFICATION_COLOURS.low : 0xe3b566;
+  const accent: Rgba = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255, 255];
   fillRect(pixels, 0, 0, width, height, border);
   fillRect(pixels, 3, 3, width - 6, height - 6, background);
-  fillRect(pixels, 14, 20, 4, height - 40, cyan);
+  fillRect(pixels, 14, 20, 4, height - 40, accent);
   fillRect(pixels, 36, 99, 440, 1, border);
-  fillRect(pixels, 476, 30, 7, 7, amber);
+  fillRect(pixels, 476, 30, 7, 7, accent);
   drawVectorTextFit(pixels, lines[0], 36, 30, 430, 44, primary, 4.2);
-  drawVectorTextFit(pixels, lines[1], 36, 124, 444, 25, amber, 2.5);
+  drawVectorTextFit(pixels, lines[1], 36, 124, 444, 25, accent, 2.5);
   const texture = dataTexture('containment-specimen-identification-plate', pixels, width, height,
     false, THREE.SRGBColorSpace);
   texture.userData.labelLines = lines;
+  texture.userData.statusColour = hex;
   return texture;
+}
+
+/** One static atlas for the opening's experiment doors, using our vector font. */
+export function createContainmentExperimentDirectoryTexture(
+  entries: readonly { readonly code: string; readonly specimen: string; readonly threat: string; readonly colour: number }[],
+): THREE.DataTexture {
+  if (entries.length < 1 || entries.length > 8) throw new RangeError('The experiment directory supports one to eight entries.');
+  const width = SIGN_ATLAS_WIDTH, rowHeight = 128;
+  const height = 2 ** Math.ceil(Math.log2(entries.length * rowHeight));
+  const pixels = new Uint8Array(width * height * 4);
+  const background: Rgba = [10, 20, 25, 255], border: Rgba = [47, 72, 80, 255];
+  const primary: Rgba = [224, 237, 236, 255], secondary: Rgba = [126, 157, 166, 255];
+  const lines = entries.map(entry => [entry.code.toUpperCase(), `EXPERIMENT: ${entry.specimen.toUpperCase()}`,
+    `DANGER: ${entry.threat.toUpperCase()}`]);
+  lines.forEach((row, index) => {
+    for (const character of row.join('')) {
+      if (!VECTOR_GLYPHS[character]) throw new Error(`Unsupported experiment label character: ${character}`);
+    }
+    const y = index * rowHeight, hex = entries[index].colour;
+    const accent: Rgba = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255, 255];
+    fillRect(pixels, 0, y, width, rowHeight, border);
+    fillRect(pixels, 3, y + 3, width - 6, rowHeight - 6, background);
+    fillRect(pixels, 13, y + 14, 4, rowHeight - 28, accent);
+    drawVectorTextFit(pixels, row[0], 32, y + 13, 440, 15, secondary, 1.9);
+    drawVectorTextFit(pixels, row[1], 32, y + 40, 452, 27, primary, 3.1);
+    drawVectorTextFit(pixels, row[2], 32, y + 89, 452, 21, accent, 2.3);
+  });
+  const texture = dataTexture('opening-experiment-directory-atlas', pixels, width, height, false, THREE.SRGBColorSpace);
+  texture.userData.directoryLines = lines;
+  texture.userData.rowHeight = rowHeight;
+  return texture;
+}
+
+/** One reusable, unlit screen; no canvas, font requests or per-letter textures. */
+export function createContainmentMonitorTexture(): THREE.DataTexture {
+  const texture = dataTexture('room-1-observation-monitor-screen', new Uint8Array(512 * 256 * 4),
+    512, 256, false, THREE.SRGBColorSpace);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  paintContainmentMonitorTexture(texture, '', false);
+  return texture;
+}
+
+export function paintContainmentMonitorTexture(texture: THREE.DataTexture, text: string, typing: boolean): void {
+  const pixels = texture.image.data as Uint8Array;
+  const background: Rgba = [7, 17, 23, 255], accent: Rgba = [101, 166, 182, 255];
+  fillRect(pixels, 0, 0, 512, 256, background);
+  // Restrained baked scanlines and a recessed border, not a fullscreen effect.
+  for (let y = 2; y < 256; y += 4) fillRect(pixels, 0, y, 512, 1, [8, 20, 27, 255]);
+  fillRect(pixels, 12, 12, 488, 2, [28, 58, 69, 255]);
+  fillRect(pixels, 12, 242, 488, 2, [28, 58, 69, 255]);
+  fillRect(pixels, 12, 14, 2, 228, [28, 58, 69, 255]);
+  fillRect(pixels, 498, 14, 2, 228, [28, 58, 69, 255]);
+  drawVectorTextFit(pixels, 'OBSERVATION : SP-01', 28, 25, 430, 15, accent, 1.7);
+  fillRect(pixels, 28, 55, 456, 1, [34, 64, 75, 255]);
+  fillRect(pixels, 475, 28, 6, 6, [111, 194, 165, 255]);
+  const lines = text.split('\n');
+  lines.forEach((line, index) => {
+    drawVectorTextFit(pixels, line, 28, 84 + index * 42, 446, 30, [183, 221, 230, 255], 2.4);
+  });
+  if (typing) {
+    const last = lines.length - 1;
+    fillRect(pixels, Math.round(28 + lines[last].length * 30 * .76), 112 + last * 42, 15, 3, accent);
+  }
+  drawVectorTextFit(pixels, 'CONTAINMENT LINK', 28, 221, 360, 10, [70, 112, 125, 255], 1.1);
+  texture.needsUpdate = true;
 }
 
 function drawVectorTextFit(

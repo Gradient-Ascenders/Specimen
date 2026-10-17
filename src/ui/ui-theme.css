@@ -611,6 +611,80 @@
   font-size: 1.35em;
 }
 
+/* In-game opening: DOM framing only, no extra render target/postprocess. */
+.opening-screen {
+  padding: 0;
+  /* Do not inherit the menu's 88%-opaque purple/black scrim. Only the
+     authored opening-fade below should darken the actual cinematic. */
+  background: transparent;
+  pointer-events: none;
+}
+
+.opening-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #020608;
+  pointer-events: none;
+}
+
+#app[data-opening-state] > .performance-recorder,
+#app[data-opening-state] > .test-panel {
+  display: none;
+}
+
+.opening-fade,
+.opening-letterbox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #020608;
+  pointer-events: none;
+}
+
+.opening-fade {
+  inset: 0;
+  opacity: var(--opening-fade, 0);
+}
+
+.opening-letterbox {
+  height: clamp(1.25rem, 6vh, 4rem);
+}
+
+.opening-letterbox-top { top: 0; }
+.opening-letterbox-bottom { bottom: 0; }
+
+.opening-controls {
+  position: absolute;
+  right: clamp(1rem, 3vw, 2.5rem);
+  bottom: clamp(0.5rem, 1.5vh, 1rem);
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  flex-wrap: wrap;
+  gap: var(--ui-space-4);
+  max-width: calc(100% - 2rem);
+  pointer-events: auto;
+}
+
+.opening-controls .system-status {
+  color: #b8cdc9;
+  max-width: 42ch;
+  font-size: 0.75rem;
+}
+
+.opening-controls .system-action {
+  min-height: 2rem;
+  min-width: 0;
+  padding: var(--ui-space-2);
+  border-bottom-color: rgb(163 203 194 / 35%);
+  color: #d1e5df;
+  font-size: 0.55rem;
+  background: #020608;
+}
+
 /* Pause */
 .pause-screen {
   align-items: center;

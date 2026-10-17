@@ -1,4 +1,6 @@
 import type { GelRendering } from '../render/slime/GelRendering.ts';
+import { CultivationRoomWorkload, CULTIVATION_ROOM_IDS } from './CultivationRoomWorkload.ts';
+import { freezeStaticTransforms } from '../render/StaticTransforms.ts';
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
 import { CultivationAssetOwner, type CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
@@ -105,6 +107,8 @@ const ROOM_SPAWNS: Readonly<
 /** Released composition of all five authored Cultivation rooms. */
 export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly root = new THREE.Group();
+  readonly workload = new CultivationRoomWorkload();
+  readonly frozenTransformCount: number;
   readonly acidInteractions: readonly AcidLiquidInteractions[];
   readonly labArt = new CultivationLabMaterials(this.assets);
   readonly contaminationArt = new CultivationContaminationArt(this.labArt);
@@ -254,6 +258,18 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),
     );
+    const dynamic = new Set<THREE.Object3D>([
+      ...this.roomOne.platformDrops.flatMap(drop => drop.dynamicTransformRoots),
+      ...this.roomTwo.dynamicTransformRoots, ...this.roomThree.dynamicTransformRoots,
+      ...this.roomOne.solubleTargetMeshes, ...this.roomTwo.solubleTargetMeshes, ...this.roomThree.solubleTargetMeshes,
+      ...this.roomOneToTwoPassage.doors.map(door => door.root),
+      ...this.roomTwoToThreeGoopPassage.doors.map(door => door.root), this.filtrationArt.fan,
+      ...this.roomFour.dynamicTransformRoots, ...this.roomFive.dynamicTransformRoots,
+    ]);
+    this.frozenTransformCount = [this.roomOne.root, this.roomOneToTwoPassage.root, this.roomTwo.root,
+      this.roomTwoToThreeGoopPassage.root, this.roomTwoToThreeBobAirDuct.root, this.roomThree.root,
+      this.roomFour.root, this.roomFive.root]
+      .reduce((count, root) => count + freezeStaticTransforms(root, dynamic), 0);
   }
 
   get collisionMeshes(): readonly THREE.Mesh[] {
@@ -348,36 +364,43 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     roomId: LevelTwoAuthoredRoomId,
     occupants: readonly LevelTwoRoomTwoOccupant[],
     goopBody?: KinematicBody,
+    continuingRooms?: ReadonlySet<LevelTwoAuthoredRoomId>,
   ): void {
-    this.labArt.acid.update(deltaSeconds);
+    const simulated = this.workload.simulated;
+    simulated.clear(); simulated.add(roomId);
+    if (continuingRooms) for (const room of continuingRooms) simulated.add(room);
+    for (const occupant of occupants) simulated.add(this.resolveRoomId(occupant.position));
+    if (this.roomOne.platformDrops.some(drop => drop.state === 'falling')) simulated.add(1);
+    if (this.roomTwo.hasPendingWork) simulated.add(2);
+    if (this.roomThree.wallDrops.some(drop => drop.state === 'falling')) simulated.add(3);
+    if (this.roomFour.hasPendingWork) simulated.add(4);
+    if (this.roomFive.hasPendingWork) simulated.add(5);
+    this.workload.roomUpdates = simulated.size;
     this.roomOne.updateRadiation(occupants);
     this.roomTwo.updateRadiation(occupants);
     this.roomThree.updateRadiation(occupants);
 
-    this.roomOne.update(deltaSeconds, goopBody);
-    let roomTwoOccupied = roomId === 2;
-    let roomThreeOccupied = roomId === 3;
-    for (const occupant of occupants) {
-      const occupiedRoomId = this.resolveRoomId(occupant.position);
-      roomTwoOccupied ||= occupiedRoomId === 2;
-      roomThreeOccupied ||= occupiedRoomId === 3;
-    }
-    if (roomTwoOccupied) {
+    if (simulated.has(1)) this.roomOne.update(deltaSeconds, goopBody);
+    if (simulated.has(2)) {
       this.roomTwo.update(deltaSeconds, occupants);
     }
-    if (roomThreeOccupied) {
+    if (simulated.has(3)) {
       this.roomThree.update(deltaSeconds, occupants);
     }
 
     this.roomOneToTwoPassage.update(deltaSeconds, occupants);
     this.roomTwoToThreeGoopPassage.update(deltaSeconds, occupants);
-    this.filtrationArt.update(deltaSeconds);
-    this.roomFour.update(deltaSeconds, occupants);
-    this.roomFive.update(deltaSeconds, occupants);
+    if (simulated.has(4)) this.roomFour.update(deltaSeconds, occupants);
+    else this.roomFour.entrance.update(deltaSeconds, occupants);
+    if (simulated.has(5)) this.roomFive.update(deltaSeconds, occupants, false);
+    this.workload.cosmeticUpdates = 0;
+    if (this.workload.rendered.size > 0) { this.labArt.acid.update(deltaSeconds); this.workload.cosmeticUpdates++; }
+    if (this.roomTwoToThreeGoopPassage.root.visible) { this.filtrationArt.update(deltaSeconds); this.workload.cosmeticUpdates++; }
+    if (this.workload.rendered.has(5)) { this.roomFive.updateCosmetics(deltaSeconds); this.workload.cosmeticUpdates++; }
   }
 
   /** Render scope only: collider mesh visibility and all simulation ownership stay intact. */
-  updatePresentationVisibility(cameraPosition: { readonly z: number }, activePosition: { readonly z: number }): void {
+  updatePresentationVisibility(cameraPosition: { readonly z: number }, activePosition: { readonly z: number }, recordScope = true): void {
     const cameraZ = cameraPosition.z - this.root.position.z;
     const bodyZ = activePosition.z - this.root.position.z;
     const nearZ = Math.min(cameraZ, bodyZ), farZ = Math.max(cameraZ, bodyZ);
@@ -399,6 +422,27 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomFive.root.visible = bodyZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z || cameraZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z ||
       (this.roomFour.controller.readModel.state === 'complete' && farZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 12);
     this.roomFour.root.visible = this.roomFourGeometry.visible || this.roomFive.root.visible;
+    if (recordScope) {
+      this.workload.rendered.clear();
+      const roots = [this.roomOne.root, this.roomTwo.root, this.roomThree.root, this.roomFourGeometry, this.roomFive.root];
+      for (const id of CULTIVATION_ROOM_IDS) if (roots[id - 1].visible) this.workload.rendered.add(id);
+    }
+  }
+
+  /** On-demand diagnostics; never traverse/count the hierarchy in the fixed update. */
+  getWorkloadDiagnostics() {
+    let objects = 0, automaticMatrices = 0, renderedObjects = 0, batches = 0;
+    const materials = new Set<THREE.Material>();
+    this.root.traverse(object => { objects++; if (object.matrixAutoUpdate) automaticMatrices++; });
+    this.root.traverseVisible(object => {
+      renderedObjects++;
+      if (!(object instanceof THREE.Mesh)) return;
+      const list = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of list) if (material.visible) materials.add(material);
+      if (object.userData.staticBatchSourceNames || object.userData.staticBatchCell) batches++;
+    });
+    return { ...this.workload.snapshot(), objects, automaticMatrices, frozenTransforms: this.frozenTransformCount,
+      renderedObjects, batches, materials: materials.size };
   }
 
   updateAcidInteractions(deltaSeconds: number, bodies: readonly AcidContactBody[]): void {
@@ -406,6 +450,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   }
 
   reset(): void {
+    this.workload.reset();
     for (const interactions of this.acidInteractions) interactions.reset();
     this.roomOne.reset();
     this.roomOneToTwoPassage.reset();
@@ -415,9 +460,11 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomThree.reset();
     this.roomFour.reset();
     this.roomFive.reset();
+    this.updatePresentationVisibility({ z: 4 }, { z: 8 });
   }
 
   dispose(): void {
+    this.workload.dispose();
     this.surfaceCleanup.dispose();
     this.passageArt.dispose();
     this.filtrationArt.dispose();

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SOUND_BANKS } from '../../src/audio/SoundCatalog.ts';
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
 
 // No route interception or runtime injection: these are the shipped files.
 const watchProductionRequests = (page: Page, baseURL: string): Set<string> => {
@@ -113,6 +114,7 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   await expect(credits.locator('.credits-ledger a').first()).toHaveAttribute('href', /^https?:\/\//);
   await credits.locator('[data-action="back"]').click();
   await title.locator('[data-action="start"]').click();
+  await finishOpening(page);
   await assertPlaying(page);
   await expect(page.locator('[data-fps-counter]')).toBeVisible();
   await expect(page.locator('[data-fps-counter]')).toHaveText(/^\d+ FPS$/);
@@ -144,6 +146,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await start.click();
+  await finishOpening(page);
   await assertPlaying(page);
   expect([...voltAssets], 'Containment must not load Volt').toEqual([]);
   expect(cultivationAssets.size, 'Containment must not load the Cultivation bake').toBe(0);

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+import { STATIC_BATCH_CELL_SIZE, staticBatchKey } from '../../StaticBatchPolicy.ts';
+
 import { markVisualOnly } from './ContainmentModularComponents.ts';
 
 export interface ContainmentStaticBatchDiagnostics {
@@ -10,7 +12,6 @@ export interface ContainmentStaticBatchDiagnostics {
   readonly drawCallsRemoved: number;
   readonly mergedGeometryCount: number;
 }
-
 export interface ContainmentStaticBatchResult {
   readonly diagnostics: ContainmentStaticBatchDiagnostics;
   dispose(): void;
@@ -24,9 +25,6 @@ interface StaticBatchGroup {
   readonly layersMask: number;
   readonly candidates: THREE.Mesh[];
 }
-
-const materialIds = new WeakMap<THREE.Material, number>();
-let nextMaterialId = 1;
 
 /**
  * Consolidate compatible opaque visuals inside one room-local static root.
@@ -46,7 +44,8 @@ export function consolidateContainmentRoomStaticVisuals(
   roomRoot.updateWorldMatrix(true, true);
   const excludedRoots = new Set(options.excludedRoots ?? []);
   const preservedNames = options.preservedNames ?? new Set<string>();
-  const cellSize = options.cellSize ?? 8;
+  const cellSize = options.cellSize ?? STATIC_BATCH_CELL_SIZE;
+  const inverseRoot = roomRoot.matrixWorld.clone().invert();
   const groups = new Map<string, StaticBatchGroup>();
   collectCandidates(
     roomRoot,
@@ -55,6 +54,7 @@ export function consolidateContainmentRoomStaticVisuals(
     preservedNames,
     cellSize,
     groups,
+    inverseRoot,
   );
 
   const inverseRoomMatrix = new THREE.Matrix4()
@@ -132,7 +132,10 @@ export function consolidateContainmentRoomStaticVisuals(
     dispose: () => {
       if (disposed) return;
       disposed = true;
-      for (const batch of batches) batch.removeFromParent();
+      for (const batch of batches) {
+        if (batch instanceof THREE.InstancedMesh) batch.dispose();
+        batch.removeFromParent();
+      }
       for (const geometry of ownedGeometries) geometry.dispose();
       batches.length = 0;
       ownedGeometries.length = 0;
@@ -223,6 +226,7 @@ function collectCandidates(
   preservedNames: ReadonlySet<string>,
   cellSize: number,
   groups: Map<string, StaticBatchGroup>,
+  inverseRoot: THREE.Matrix4,
 ): void {
   if (object !== roomRoot && excludedRoots.has(object)) return;
   if (object !== roomRoot && object.userData.staticBatchExcluded) return;
@@ -234,7 +238,7 @@ function collectCandidates(
   ) {
     const material = object.material;
     if (!Array.isArray(material)) {
-      const key = batchKey(object, material, cellSize);
+      const key = staticBatchKey(object, material, inverseRoot, cellSize);
       let group = groups.get(key);
       if (!group) {
         group = {
@@ -259,6 +263,7 @@ function collectCandidates(
       preservedNames,
       cellSize,
       groups,
+      inverseRoot,
     );
   }
 }
@@ -276,49 +281,4 @@ function isStaticBatchCandidate(
   if (mesh instanceof THREE.SkinnedMesh) return false;
   if (Object.keys(mesh.geometry.morphAttributes).length > 0) return false;
   return true;
-}
-
-function batchKey(
-  mesh: THREE.Mesh,
-  material: THREE.Material,
-  cellSize: number,
-): string {
-  const centre = new THREE.Box3()
-    .setFromObject(mesh)
-    .getCenter(new THREE.Vector3());
-  return [
-    materialId(material),
-    geometryAttributeSignature(mesh.geometry),
-    mesh.geometry.index === null ? 'non-indexed' : 'indexed',
-    mesh.castShadow ? 1 : 0,
-    mesh.receiveShadow ? 1 : 0,
-    mesh.renderOrder,
-    mesh.layers.mask,
-    mesh.userData.staticBatchPartition ?? '',
-    Math.round(centre.x / cellSize),
-    Math.round(centre.y / cellSize),
-    Math.round(centre.z / cellSize),
-  ].join(':');
-}
-
-function materialId(material: THREE.Material): number {
-  const existing = materialIds.get(material);
-  if (existing !== undefined) return existing;
-  const id = nextMaterialId++;
-  materialIds.set(material, id);
-  return id;
-}
-
-function geometryAttributeSignature(geometry: THREE.BufferGeometry): string {
-  return Object.entries(geometry.attributes)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([name, attribute]) =>
-      [
-        name,
-        attribute.itemSize,
-        attribute.normalized ? 1 : 0,
-        attribute.array.constructor.name,
-      ].join(','),
-    )
-    .join('|');
 }
