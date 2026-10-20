@@ -1,4 +1,5 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -61,7 +62,9 @@ for (const { profile, preset, expectedDpr } of scenarios) {
     const failures: string[] = [], requests: string[] = [];
     page.on('pageerror', e => failures.push(e.message));
     page.on('console', m => { if (m.type() === 'error' || /GL_INVALID_|CONTEXT_LOST_WEBGL/.test(m.text())) failures.push(m.text()); });
-    page.on('requestfailed', r => failures.push(`${r.failure()?.errorText}: ${r.url()}`));
+    page.on('requestfailed', r => {
+      if (!isExpectedMusicCancellation(r, baseURL!)) failures.push(`${r.failure()?.errorText}: ${r.url()}`);
+    });
     page.on('response', r => { if (r.status() >= 400) failures.push(`${r.status()}: ${r.url()}`); });
     page.on('request', r => {
       const u = new URL(r.url());

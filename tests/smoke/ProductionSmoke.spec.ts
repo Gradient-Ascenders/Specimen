@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SOUND_BANKS, SOUND_DEFINITIONS } from '../../src/audio/SoundCatalog.ts';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 
 // No route interception or runtime injection: these are the shipped files.
 const watchProductionRequests = (page: Page, baseURL: string): Set<string> => {
@@ -13,11 +14,7 @@ const watchProductionRequests = (page: Page, baseURL: string): Set<string> => {
     }
   });
   page.on('requestfailed', (request) => {
-    // Pausing a streamed track on menu/level transition intentionally cancels
-    // its pending HTTP range request. Keep every other network error visible.
-    const url = new URL(request.url());
-    if (/\/assets\/audio\/music\/[^/]+\.ogg$/.test(url.pathname) &&
-        request.failure()?.errorText === 'net::ERR_ABORTED') return;
+    if (isExpectedMusicCancellation(request, baseURL)) return;
     failures.add(`Failed request: ${request.url()}`);
   });
   page.on('response', (response) => {

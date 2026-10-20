@@ -1,4 +1,5 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
@@ -6,6 +7,7 @@ import { expect, test } from '@playwright/test';
 for (const preset of ['normal', 'performance'] as const) {
 test(`F1 preserves ${preset} gameplay across three levels and captures normal, clean and restored views`, async ({
   page,
+  baseURL,
 }) => {
   test.setTimeout(600_000);
   await page.setViewportSize({ width: 960, height: 600 });
@@ -13,11 +15,12 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
   await mkdir(directory, { recursive: true });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('requestfailed', (request) =>
+  page.on('requestfailed', (request) => {
+    if (isExpectedMusicCancellation(request, baseURL!)) return;
     errors.push(
       `Failed request: ${request.failure()?.errorText} ${request.url()}`,
-    ),
-  );
+    );
+  });
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text());
   });

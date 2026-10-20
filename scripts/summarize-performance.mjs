@@ -42,6 +42,12 @@ for (const label of labels) {
             webgl: flight.webgl,
             rawFrameCoverage: rows.size,
             totalFrames: flight.summary.totalFrames,
+            simulationTime: flight.summary.simulationTime ?? {
+                source: 'legacy raw rows; no lifecycle eligibility or custom fixed delta available',
+                elapsedMs: [...rows.values()].reduce((sum, row) => sum + row[columns.deltaMs], 0),
+                droppedMs: [...rows.values()].reduce((sum, row) => sum + row[columns.droppedSimulationMs], 0),
+                fixedStepMs: [...rows.values()].reduce((sum, row) => sum + row[columns.fixedSteps] * 1000 / 60, 0),
+            },
             cadence: stats([...rows.values()].map(row => row[columns.deltaMs])),
             updateCpu: stats([...rows.values()].map(row => row[columns.updateCpuMs])),
             renderCpu: stats([...rows.values()].map(row => row[columns.renderCpuMs])),

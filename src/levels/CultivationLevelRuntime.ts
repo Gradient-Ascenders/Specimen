@@ -449,9 +449,11 @@ export class CultivationLevelRuntime {
         ? resources.controller.state
         : resources.deathSequence.state
       : this.lifecycle.state;
-    target.cutsceneState = resources?.roomFiveFinale?.active ? 'volt-escape-finale' : resources?.roomThreeClearance?.active ? 'room-three-clearance' : this.ventArrival.active ? 'vent-arrival' : resources?.roomThreeController?.readModel.complete
-      ? 'room-three-complete'
-      : 'none';
+    target.cutsceneState = resources?.roomFiveFinale?.active ? 'volt-escape-finale'
+      : resources?.authoredPreview?.roomFive.controller.releasing ? 'volt-release'
+      : resources?.roomThreeClearance?.active ? 'room-three-clearance'
+      : this.ventArrival.active ? 'vent-arrival'
+      : resources?.roomThreeController?.readModel.complete ? 'room-three-complete' : 'none';
     target.activeSlime = resources?.manager.activeSlimeId ?? 'none';
     writePerformancePosition(
       target.cameraPosition,
