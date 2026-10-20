@@ -93,6 +93,17 @@ test('stabilized resource increases and loading overruns fail rather than using 
   const result=evaluateQualification(f.intake,f.budgets,f.captures);
   assert.equal(result.status,'fail');assert.ok(result.checks.some(c=>c.name.endsWith('programsGrowth')&&!c.passed));
 });
+test('initial loading budgets include navigation and title boot before the Start request',()=>{
+  const f=fixture();
+  for(const capture of f.captures) {
+    const event=capture.flight.qualification.lifecycle.find(e=>e.kind==='initial')!;
+    event.requestedAtMs=2000;event.readyAtMs=2010;event.controlAtMs=2020;
+    event.resourceSample!.timestampMs=4100;
+  }
+  const result=evaluateQualification(f.intake,f.budgets,f.captures);
+  assert.equal(result.status,'fail');
+  assert.ok(result.checks.some(c=>c.name.includes('/initial/') && c.value===2020 && !c.passed));
+});
 test('quantiles, strict hitches and 1% low ignore unavailable data',()=>{
   assert.equal(distribution([null,undefined,NaN]),null);
   const d=distribution([10,20,30,40]);assert.equal(d.p95,40);assert.equal(d.fps,40);assert.equal(d.onePercentLow,25);

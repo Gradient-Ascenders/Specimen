@@ -237,7 +237,8 @@ export function evaluateQualification(intake, budgets, captures) {
         require(Number.isFinite(event.readyAtMs) && event.readyAtMs>=event.requestedAtMs &&
           Number.isFinite(event.controlAtMs) && event.controlAtMs>=event.readyAtMs,
           `Incomplete ${cache}/${phase} control/ready timings.`);
-        threshold(`${cache}/${phase}/${index}/controlMs`, event.controlAtMs-event.requestedAtMs,
+        // Initial startup includes navigation/boot before Start was clicked.
+        threshold(`${cache}/${phase}/${index}/controlMs`, event.kind==='initial' ? event.controlAtMs : event.controlAtMs-event.requestedAtMs,
           budgets?.loading?.[cache]?.[phase]);
       }
     }

@@ -5,7 +5,7 @@ import path from 'node:path';
 
 export function createBuildMetadata() {
   return {sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
-    dirty:execFileSync('git',['status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim()!=='',
+    dirty:execFileSync('git',['status','--porcelain','--untracked-files=normal'],{encoding:'utf8'}).trim()!=='',
     builtAt:new Date().toISOString()};
 }
 export function buildManifestPlugin(build) {

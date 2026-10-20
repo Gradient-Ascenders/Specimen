@@ -383,8 +383,8 @@ try {
 			await page.locator("canvas").click();
             await page.waitForFunction(name => globalThis[name].input.enabled && globalThis[name].input.pointerLocked, name, {timeout:10000});
             if (name === "__three") {
-                // Room 1 starts with Volt, whose position is not exported by the recorder.
-                // Select a recorded body through normal input before measuring movement.
+                // Keep the historical Bob/Goop staged route comparable. The native
+                // seven-scenario lab protocol separately exercises recorded Volt motion.
                 const target = room === 2 ? "goop" : "bob";
                 for (let attempt = 0; attempt < 3; attempt++) {
                     const active = await page.evaluate(() => __three.resources.manager.activeSlimeId);
