@@ -65,7 +65,8 @@ test('title music attempts immediate playback and obeys volume and focus', () =>
   assert.equal(players[1]?.src, '');
 });
 
-test('track switching streams a second element and releases the previous one', async () => {
+test('track switching streams a second element and releases the previous one', context => {
+  context.mock.timers.enable({ apis: ['setInterval'] });
   const players: FakeAudio[] = [];
   const music = new BackgroundMusic('./', () => {
     const player = new FakeAudio();
@@ -77,7 +78,7 @@ test('track switching streams a second element and releases the previous one', a
   music.setScene('containment', true);
   assert.equal(players[0]?.src, './assets/audio/music/01-containment-thought-loop.ogg');
   assert.equal(players[0]?.paused, false);
-  await new Promise(resolve => setTimeout(resolve, 455));
+  context.mock.timers.tick(400);
   assert.equal(players[1]?.paused, true);
   assert.equal(players[0]?.volume, 0.28);
   music.dispose();

@@ -18,7 +18,7 @@
     "check:generated-assets": "node scripts/generate-blackout-maintenance-maps.ts --check && node scripts/generate-cultivation-assets.ts --check && node scripts/generate-character-lods.ts --check && node scripts/generate-acid-noise.ts --check",
     "test": "node --test tests/*.test.ts",
     "test:browser": "npm run build && playwright test",
-    "test:smoke": "playwright test tests/smoke/ProductionSmoke.spec.ts --config playwright.smoke.config.ts",
+    "test:smoke": "playwright test tests/smoke/ProductionSmoke.spec.ts tests/smoke/OpeningGraphics.spec.ts --config playwright.smoke.config.ts",
     "test:integration": "playwright test tests/smoke/CharacterDetailFallback.spec.ts tests/smoke/CleanGameplayMode.spec.ts tests/smoke/GameplayAudio.spec.ts tests/smoke/ProductionParity.spec.ts --config playwright.smoke.config.ts",
     "build": "tsc && vite build",
     "archive": "npm run build && node scripts/create-production-archive.mjs",

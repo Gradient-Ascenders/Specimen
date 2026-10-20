@@ -30,6 +30,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     launchOptions: {
+      // GPU-less Firefox runners otherwise reject WebGL2 before the title UI
+      // can be constructed. Opt in only for the software-rendering CI job.
+      firefoxUserPrefs: browserName === 'firefox' && process.env.SPECIMEN_FIREFOX_SOFTWARE_WEBGL === '1'
+        ? {'webgl.force-enabled': true, 'webgl.disabled': false}
+        : undefined,
       args: [
         // Exercise a consistent CPU renderer on local and GPU-less CI runners.
         ...(browserName === 'chromium' && !browserChannel
