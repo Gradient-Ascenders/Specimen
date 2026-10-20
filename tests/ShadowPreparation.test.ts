@@ -11,6 +11,8 @@ import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+import { OpeningGameScene } from '../src/cinematics/OpeningGameScene.ts';
+import { TitleScreenScene } from '../src/ui/TitleScreenScene.ts';
 
 function fixture() {
   let viewport = new THREE.Vector4(4, 5, 960, 600), scissor = viewport.clone(), test = false;
@@ -96,6 +98,39 @@ test('tiny preparation viewports retain a physical transmission texel below nati
     assert.deepEqual(snapshot(), before);
     target.dispose(); borrowedTarget.dispose();
   }
+});
+
+for (const scale of [.5, 1]) test(`opening primers retain live transmission dimensions and restore scale ${scale}`, async () => {
+  const {renderer, borrowedTarget} = fixture();
+  renderer.transmissionResolutionScale = scale;
+  const policy = new RenderShadowPolicy(renderer.shadowMap);
+  const room = new TitleScreenScene();
+  const opening = new OpeningGameScene(room, undefined, {yieldFrame: async () => {}});
+  const previousViewport = new THREE.Vector4(0, 0, 12, 12);
+  room.camera.viewport = previousViewport;
+  // Model/resource loading is tested separately; inspect the real opening's
+  // preparation calls without requiring a GPU in the Node test runner.
+  opening.bob.prepare = async () => {};
+  const tinyScales: number[] = [], liveScales: number[] = [];
+  renderer.render = (_scene, camera) => {
+    const target = renderer.getRenderTarget();
+    if (tinyScales.length === 0) assert.deepEqual(camera.viewport?.toArray(), [3, 3, 720, 450],
+      'Use physical live dimensions, not the shadow pass\'s one-pixel target viewport.');
+    else assert.equal(camera.viewport, previousViewport);
+    (target?.width === 1 ? tinyScales : liveScales).push(renderer.transmissionResolutionScale);
+  };
+  const context = {SYNC_GPU_COMMANDS_COMPLETE:1, ALREADY_SIGNALED:2, CONDITION_SATISFIED:3, WAIT_FAILED:4,
+    fenceSync: () => ({}), clientWaitSync: () => 2, deleteSync: () => {}, flush: () => {}, isContextLost: () => false};
+  Object.assign(renderer, {getContext: () => context});
+  try {
+    await opening.prepare({renderer: renderer as unknown as THREE.WebGLRenderer,
+      withShadowPreparation: (paused, draw) => policy.withPreparation(paused, draw)});
+    assert.deepEqual(tinyScales, [scale, 1], 'only the camera-sized transmission primer restores fractional quality');
+    assert.deepEqual(liveScales, [scale], 'the first visible-size prime retains the requested quality');
+    assert.equal(room.camera.viewport, previousViewport);
+    assert.equal(renderer.transmissionResolutionScale, scale);
+    assert.ok(renderer.getRenderTarget() === borrowedTarget);
+  } finally { opening.dispose(); borrowedTarget.dispose(); }
 });
 
 test('cancelled Cultivation compile releases owned maps once and cannot overwrite the next shadow owner', async () => {

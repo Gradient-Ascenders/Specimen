@@ -1,7 +1,8 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 import { expect, test } from '@playwright/test';
 
-test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout preparation', async ({ page }) => {
+test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout preparation', async ({ page, baseURL }) => {
   const failures: string[] = [];
   const detailRequests = { goop: 0, volt: 0 };
   const characterAssets = new Set<string>();
@@ -12,7 +13,9 @@ test('optional LOD failures preserve Level 1 startup and Cultivation/Blackout pr
     if (isDetail(message.location().url) && message.text().startsWith('Failed to load resource:')) return;
     if (message.type() === 'error' || /GL_INVALID_|CONTEXT_LOST_WEBGL/.test(message.text())) failures.push(message.text());
   });
-  page.on('requestfailed', request => failures.push(`Failed request: ${request.url()}`));
+  page.on('requestfailed', request => {
+    if (!isExpectedMusicCancellation(request, baseURL!)) failures.push(`Failed request: ${request.url()}`);
+  });
   page.on('response', response => {
     if (response.status() >= 400 && !isDetail(response.url())) failures.push(`HTTP ${response.status()}: ${response.url()}`);
     const character = /\/(goop|volt)-[^/]+\.glb$/.exec(new URL(response.url()).pathname)?.[1];

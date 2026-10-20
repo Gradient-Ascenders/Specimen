@@ -70,6 +70,23 @@ playthrough. `ProductionSmoke` also retains the unmodified plain startup journey
 and explicit debug shortcut journey. Screenshots/traces/results are generated
 under `test-results/` and the Playwright report.
 
+`npm run test:smoke` also exercises live opening preparation with both Standard
+presets, retaining the console and WebGL error checks. These cases run in the
+pre-merge smoke gate; post-merge integration retains the deeper three-level
+parity journeys.
+Network checks ignore only browser cancellation/cache-handoff statuses for
+same-deployment streamed music; HTTP errors, failed SFX and other asset failures
+remain fatal.
+
+The Firefox integration job explicitly enables software WebGL on GPU-less Linux
+runners with `SPECIMEN_FIREFOX_SOFTWARE_WEBGL=1` and `LIBGL_ALWAYS_SOFTWARE=1`,
+installs Mesa's software OpenGL drivers, and runs headed Firefox under Xvfb.
+The virtual display is needed for Firefox's native GL context on these runners;
+enabling the WebGL preference alone is insufficient without a usable driver.
+The preference override is opt-in and does not alter the shipped game or normal
+local Firefox launches. Keep Playwright's installed browser revision matched to
+the locked dependency version when reproducing these checks.
+
 ## Publish and verify
 
 The assessment deployment link currently leads to Tiny File Manager. Upload or
