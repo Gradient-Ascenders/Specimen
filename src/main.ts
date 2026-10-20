@@ -14,7 +14,7 @@ import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
 import { RenderLayer } from './render/RenderLayer.ts';
 import { waitForGpuPreparation } from './render/WaitForGpuPreparation.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
-import { GameFlowUI } from './ui/GameFlowUI.ts';
+import { GameFlowUI, gameFlowCinematicCanPause } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
 import { TitleScreenPresentation } from './ui/TitleScreenPresentation.ts';
 import { TitleScreenScene } from './ui/TitleScreenScene.ts';
@@ -228,8 +228,7 @@ function startGame(): void {
       releasePointerLock: () => input.releasePointerLock(),
       isPointerLocked: () => input.pointerLocked,
       isGameplayInputEnabled: () => input.enabled,
-      isCinematicPlaying: () => app.dataset.cinematic === 'cultivation-finale' ||
-        app.dataset.cinematic === 'containment-finale' && app.dataset.gameState === 'level-completing',
+      isCinematicPlaying: () => gameFlowCinematicCanPause(app.dataset.cinematic, app.dataset.gameState),
       restartLevel: () => lifecycleCoordinator.restartLevel(),
       applySettings: (nextSettings) => {
         audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);

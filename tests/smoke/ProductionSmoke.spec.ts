@@ -138,8 +138,9 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   const voltAssets = new Set<string>();
   const cultivationAssets = new Set<string>();
   const audioAssets = new Set<string>();
-  const soundEffectUrls = new Set(SOUND_BANKS.blackout.map(id =>
-    new URL(SOUND_DEFINITIONS[id].path, baseURL!).href));
+  const effectUrlsFor = (bank: readonly (keyof typeof SOUND_DEFINITIONS)[]) => bank
+    .map(id => new URL(SOUND_DEFINITIONS[id].path, baseURL!).href).sort();
+  const soundEffectUrls = new Set(effectUrlsFor(SOUND_BANKS.blackout));
   const detailAssets = new Set<string>();
   page.on('response', response => {
     if (/\/volt-[^/]+\.glb$/.test(new URL(response.url()).pathname) && response.ok()) voltAssets.add(response.url());
@@ -160,8 +161,12 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   await assertPlaying(page);
   expect([...voltAssets], 'Containment must not load Volt').toEqual([]);
   expect(cultivationAssets.size, 'Containment must not load the Cultivation bake').toBe(0);
-  await expect.poll(() => audioAssets.size).toBe(SOUND_BANKS.containment.length);
-  expect([...audioAssets].some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
+  await expect.poll(() => [...audioAssets].sort(), {
+    message: 'Containment must preload exactly its declared effects bank',
+  }).toEqual(effectUrlsFor(SOUND_BANKS.containment));
+  // The Level 1 finale needs drone gunfire, but no Volt recordings or later
+  // character/geometry assets may be pulled into the first level.
+  expect([...audioAssets].some(url => url.includes('/volt/'))).toBe(false);
   expect(detailAssets.size).toBe(1);
   expect([...detailAssets][0]).toContain('/group-folder/assets/goop-lod-');
 
@@ -174,7 +179,9 @@ test('Performance production loads Cultivation and Blackout and restarts each at
     await expect(enterLevel).toContainText(`Enter Level ${level}`);
     await enterLevel.click();
     await assertPlaying(page);
-    await expect.poll(() => audioAssets.size).toBe(level === 2 ? SOUND_BANKS.cultivation.length : SOUND_BANKS.blackout.length);
+    await expect.poll(() => [...audioAssets].sort(), {
+      message: `Level ${level} must preload exactly its declared effects bank`,
+    }).toEqual(effectUrlsFor(level === 2 ? SOUND_BANKS.cultivation : SOUND_BANKS.blackout));
     expect(detailAssets.size).toBe(2);
     if (level === 2) {
       expect(cultivationAssets.size, 'Cultivation must load its baked assets before playing').toBe(1);

@@ -48,6 +48,13 @@ export const gameFlowCanPause = (
   cinematicPlaying = false,
 ): boolean => state === 'playing' && (gameplayInputEnabled || cinematicPlaying);
 
+/** Story sequences may lock character controls without giving up native pause. */
+export const gameFlowCinematicCanPause = (
+  cinematic: string | undefined,
+  gameState: string | undefined,
+): boolean => cinematic === 'cultivation-finale' || cinematic === 'cultivation-clearance' ||
+  cinematic === 'blackout-arrival' || cinematic === 'containment-finale' && gameState === 'level-completing';
+
 export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
 export interface GameFlowKeyboardModifiers {
