@@ -91,6 +91,7 @@ export class GroundSecurityDrone {
   private pushProgress = 0;
   private stateElapsed = 0;
   private radiationContactPending = false;
+  private cinematicClearance = false;
   private disposed = false;
 
   constructor(
@@ -149,7 +150,13 @@ export class GroundSecurityDrone {
       const t = Math.min(1, this.stateElapsed / this.config.tippingDurationSeconds);
       const eased = smoothStep(t);
       this.drone.root.position.lerpVectors(this.tippingStartPosition, this.finalPosition, eased);
-      this.drone.root.quaternion.slerpQuaternions(this.tippingStartQuaternion, this.finalQuaternion, eased);
+      const tip=this.cinematicClearance?smoothStep(THREE.MathUtils.clamp((t-.6)/.4,0,1)):eased;
+      if(this.cinematicClearance){
+        const travel=smoothStep(Math.min(1,t/.7));
+        this.drone.root.position.lerpVectors(this.tippingStartPosition,this.finalPosition,travel);
+        this.drone.root.position.y=THREE.MathUtils.lerp(this.tippingStartPosition.y,this.finalPosition.y,tip);
+      }
+      this.drone.root.quaternion.slerpQuaternions(this.tippingStartQuaternion, this.finalQuaternion, tip);
       if (this.radiationContactPending && t >= 1 - EPSILON) this.disablePermanently();
     }
     this.syncRadiationPosition();
@@ -164,6 +171,27 @@ export class GroundSecurityDrone {
     }
   }
 
+  /** Scripted Bob contact uses the same tipping/acid-disable authority as play. */
+  beginCinematicPush(extraTravelMetres=0):void{
+    if(this.disposed||this.state==='tipping'||this.state==='permanentlyDisabled')return;
+    if(!Number.isFinite(extraTravelMetres)||extraTravelMetres<0)throw new RangeError('Invalid cinematic push distance.');
+    this.cinematicClearance=extraTravelMetres>0;
+    this.finalPosition.copy(this.config.radioactiveFinalPosition).addScaledVector(this.authoredForward,extraTravelMetres);
+    this.pushProgress=1;
+    this.tippingStartPosition.copy(this.drone.root.position);
+    this.tippingStartQuaternion.copy(this.drone.root.quaternion);
+    this.drone.setEnabled(false);this.transition('tipping');this.syncReadModel();
+    this.events.emit('tipping',{droneId:this.drone.id});
+  }
+
+  /** Disabled hulls may sink; never move an active collider or enemy this way. */
+  submergeDisabled(depth:number):void{
+    if(this.disposed||this.state!=='permanentlyDisabled')return;
+    this.drone.setCollisionEnabled(false);
+    this.drone.root.position.y=this.finalPosition.y-Math.max(0,depth);
+    this.drone.setPresentationVisible(depth<2.4);this.syncRadiationPosition();
+  }
+
   cancelTransientState(): void {
     if (this.disposed) return;
     this.drone.cancelTransientState();
@@ -175,6 +203,8 @@ export class GroundSecurityDrone {
     this.pushProgress = 0;
     this.stateElapsed = 0;
     this.radiationContactPending = false;
+    this.cinematicClearance = false;
+    this.finalPosition.copy(this.config.radioactiveFinalPosition);
     this.drone.reset();
     this.tippingStartPosition.copy(this.initialPosition);
     this.tippingStartQuaternion.copy(this.initialQuaternion);

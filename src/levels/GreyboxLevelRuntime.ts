@@ -1,4 +1,9 @@
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import { IdleCinematicPreparation, type CinematicPreparationJob } from '../cinematics/IdleCinematicPreparation.ts';
+import { ContainmentFinaleOverlay } from '../cinematics/ContainmentFinaleOverlay.ts';
+import type { ContainmentFinalePresentation } from '../cinematics/ContainmentFinalePresentation.ts';
+import { sampleContainmentFinale, CONTAINMENT_FINALE_TIMING } from '../cinematics/ContainmentFinaleTimeline.ts';
+import { prepareCinematicProgram } from '../cinematics/CinematicProgramPreparation.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
 import {
@@ -44,6 +49,7 @@ import { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
+import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { prepareCharacterCameraFades } from '../render/slime/PrepareCharacterCameraFades.ts';
 import { requiresTransmissionPreparation } from '../render/TransmissionPreparation.ts';
@@ -275,9 +281,20 @@ export class GreyboxLevelRuntime {
   private openingCompleted = false;
   private skipToLevelThreeTriggered = false;
   private readonly debugAvailable: boolean;
+  // Unlike opt-in production diagnostics, this authoring shortcut is dev-build only.
+  private readonly finaleShortcutAvailable = import.meta.env?.DEV === true;
   private readonly lifecycle: LevelLifecycle;
 
   private resources: GreyboxRuntimeResources | undefined;
+  private finale: ContainmentFinalePresentation | undefined;
+  private finaleOverlay: ContainmentFinaleOverlay | undefined;
+  private finalePreparation: IdleCinematicPreparation | undefined;
+  private finaleGeneration = 0;
+  private finaleAbort: AbortController | undefined;
+  private recentFrameSeconds = 1;
+  private readonly finaleAudioForward = new THREE.Vector3();
+  private readonly finaleAudioUp = new THREE.Vector3();
+  private readonly finaleDrawingBuffer = new THREE.Vector2();
   private landingEventCount = 0;
   private lastLandingImpactSpeedMetresPerSecond = 0;
   private debugSampleElapsedSeconds = 0;
@@ -564,17 +581,20 @@ export class GreyboxLevelRuntime {
     }
 
     if (containmentLevel.state !== 'playing') {
-      containmentLevel.update(deltaSeconds);
+      // Never advance the film clock while preparation is incomplete. Every
+      // fallback job runs on a rendered frame behind an opaque screen instead.
+      if (this.finale?.active && this.finalePreparation?.ready) {
+        this.finale.fixedUpdate(Math.min(CONTAINMENT_FINALE_TIMING.end, testScene.roomFive.endingSeconds + deltaSeconds));
+        resources.dissolveSystem.update(deltaSeconds);
+        containmentLevel.update(deltaSeconds);
+        testScene.lighting.update(deltaSeconds);
+      }
       this.input.setEnabled(false);
       this.input.releasePointerLock();
       this.host.dataset.gameState =
         containmentLevel.state === 'complete'
           ? 'level-complete'
           : 'level-completing';
-      slimeVisualState.movementIntentWorld = resources.noMovement;
-      testScene.bob.update(deltaSeconds, slimeVisualState);
-      testScene.update(deltaSeconds, body.position);
-      this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
     }
@@ -738,6 +758,14 @@ export class GreyboxLevelRuntime {
       return;
     }
 
+    this.recentFrameSeconds = stats.rawFrameDeltaSeconds;
+    this.finalePreparation?.schedule();
+    if (resources.containmentLevel.state !== 'playing') {
+      this.renderFinale(resources);
+      this.input.endPointerUpdate();
+      return;
+    }
+
     if (this.pendingLightingTransitionProfile) {
       this.pendingLightingTransitionProfile.nextFrameIntervalMs =
         stats.rawFrameDeltaSeconds * 1000;
@@ -816,6 +844,7 @@ export class GreyboxLevelRuntime {
       interpolationAlpha,
       stats.frameDeltaSeconds,
     );
+    this.gameplayAudio?.updateListener();
     if (deathSequence.isPlaying) {
       slimePairPresentation.update(
         renderedProbePosition,
@@ -864,17 +893,7 @@ export class GreyboxLevelRuntime {
       transitionRenderStarted = this.hostWindow.performance.now();
     }
 
-    const shadowLayoutKey = testScene.lightingDiagnostics.visibleRoomIds.join(',');
-    if (shadowLayoutKey !== this.lastShadowLayoutKey) {
-      this.lightLayout?.sync();
-      // Three draws shadows before refreshing the visible pass's light state.
-      // An empty compile updates that state without compiling any materials,
-      // avoiding a cold previous-room shader binding on the first handoff frame.
-      this.renderLayer.renderer.compile(this.preparationLightState,
-        this.renderLayer.cameraRig.camera, this.renderLayer.scene);
-      this.lastShadowLayoutKey = shadowLayoutKey;
-    }
-    testScene.lighting.prepareShadowFrame([body.position, goopBody.position]);
+    this.prepareContainmentShadows(testScene, [body.position, goopBody.position]);
     testScene.withEnclosedRoomOcclusion(
       slimePair.activeBody.position,
       this.renderLayer.cameraRig.camera.position,
@@ -1188,6 +1207,7 @@ export class GreyboxLevelRuntime {
         // The release completes before the handoff snapshot is captured.
         // Keep the live body at the authored chute endpoint, never at Bob's spawn.
         goopBody.recoverAt(testScene.roomFive.goopReleasePosition);
+        body.recoverAt(new THREE.Vector3().fromArray(sampleContainmentFinale(CONTAINMENT_FINALE_TIMING.end).bob));
         slimeManager.unlock('goop');
         this.host.dataset.gameState = 'level-complete';
         this.events.emit('completed', event);
@@ -1205,6 +1225,7 @@ export class GreyboxLevelRuntime {
     }
     this.host.append(deathScreen.element);
     this.hostWindow.addEventListener('keydown', this.onSkipToLevelThree);
+    if (this.finaleShortcutAvailable) this.hostWindow.addEventListener('keydown', this.onPreviewFinale);
     this.host.dataset.gameState = deathSequence.state;
 
     this.resources = {
@@ -1250,7 +1271,7 @@ export class GreyboxLevelRuntime {
       unsubscribeLevelCompleted,
       testPanel,
     };
-    if (this.audio) this.gameplayAudio = new GameplayAudio(this.audio, slimeManager, [testScene.roomThree.art.acidInteractions.surfaceBounds], undefined, this.renderLayer.scene);
+    if (this.audio) this.gameplayAudio = new GameplayAudio(this.audio, slimeManager, [testScene.roomThree.art.acidInteractions.surfaceBounds], undefined, this.renderLayer.scene, this.renderLayer.cameraRig.camera);
 
     const resources = this.resources;
     resources.unsubscribeSlimeRoster = [
@@ -1267,8 +1288,10 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly startResources = (): void => {
-    this.gameplayAudio?.setEnabled(true);
     const resources = this.requireResources();
+    this.gameplayAudio?.setEnabled(resources.containmentLevel.state === 'playing');
+    if (this.finale?.active) this.audio?.setPaused(false);
+    this.startFinalePreparation(resources);
     resources.goopAcidPresentation.resume();
     this.input.setEnabled(
       !this.debugVisible &&
@@ -1280,6 +1303,7 @@ export class GreyboxLevelRuntime {
 
   private readonly stopResources = (): void => {
     this.gameplayAudio?.setEnabled(false);
+    if (this.finale?.active) this.audio?.setPaused(true);
     const resources = this.requireResources();
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
@@ -1287,6 +1311,11 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.finale?.reset();
+    this.finaleOverlay?.hide();
+    this.renderLayer.setPresentationResolution(undefined);
+    delete this.host.dataset.cinematic;
+    delete this.host.dataset.finaleCoverPainted;
     this.gameplayAudio?.reset();
     this.skipToLevelThreeTriggered = false;
     const resources = this.requireResources();
@@ -1328,6 +1357,15 @@ export class GreyboxLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.finaleGeneration++;
+    this.finaleAbort?.abort(); this.finaleAbort = undefined;
+    this.finalePreparation?.dispose(); this.finalePreparation = undefined;
+    this.finale?.dispose(); this.finale = undefined;
+    this.finaleOverlay?.dispose(); this.finaleOverlay = undefined;
+    this.hostWindow.removeEventListener('keydown', this.onSkipFinale);
+    this.renderLayer.setPresentationResolution(undefined);
+    delete this.host.dataset.cinematic;
+    delete this.host.dataset.finaleCoverPainted;
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
@@ -1339,6 +1377,7 @@ export class GreyboxLevelRuntime {
     this.lightingPrewarmProfile = undefined;
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
     this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree);
+    this.hostWindow.removeEventListener('keydown', this.onPreviewFinale);
     this.skipToLevelThreeTriggered = false;
     resources.deathSequence.reset();
     resources.deathScreen.dispose();
@@ -1384,6 +1423,147 @@ export class GreyboxLevelRuntime {
     this.lastShadowLayoutKey = undefined;
     this.pendingLightingTransitionProfile = undefined;
     this.notifySlimeHUD();
+  };
+
+  private startFinalePreparation(resources: GreyboxRuntimeResources): void {
+    if (this.finalePreparation) return;
+    const generation = ++this.finaleGeneration;
+    this.finaleAbort = new AbortController();
+    this.hostWindow.addEventListener('keydown', this.onSkipFinale);
+    const jobs = this.finalePreparationJobs(resources, generation);
+    this.finalePreparation = new IdleCinematicPreparation(jobs, {
+      requestIdleCallback: this.hostWindow.requestIdleCallback?.bind(this.hostWindow),
+      cancelIdleCallback: this.hostWindow.cancelIdleCallback?.bind(this.hostWindow),
+    }, gpu => this.resources === resources && generation === this.finaleGeneration &&
+      this.lifecycle.state === 'running' && !this.host.ownerDocument.hidden &&
+      resources.containmentLevel.state === 'playing' && this.recentFrameSeconds < .022 &&
+      (!gpu || (resources.containmentLevel.activeRoomId === 5 &&
+        this.renderLayer.renderer.extensions.has('KHR_parallel_shader_compile'))));
+    this.finalePreparation.schedule();
+  }
+
+  private *finalePreparationJobs(resources: GreyboxRuntimeResources, generation: number): Generator<CinematicPreparationJob> {
+    yield { label: 'finale module', run: async () => {
+      const { ContainmentFinalePresentation } = await import('../cinematics/ContainmentFinalePresentation.ts');
+      if (this.resources !== resources || generation !== this.finaleGeneration) return;
+      this.finaleOverlay ??= new ContainmentFinaleOverlay(this.host, this.skipFinale);
+      this.finale = new ContainmentFinalePresentation({
+        scene: this.renderLayer.scene, world: resources.testScene, camera: this.renderLayer.cameraRig.camera,
+        overlay: this.finaleOverlay,
+        cue: (sound, position) => this.audio?.play(sound, position, true, .8),
+        openDoor: () => {
+          const target = resources.dissolveSystem.getTargetForMesh(resources.testScene.roomFive.goopWoodenDoor);
+          if (target) resources.dissolveSystem.startBurn(target);
+        },
+      });
+    } };
+    if (!this.finale || generation !== this.finaleGeneration) return;
+    yield* this.finale.preparationJobs();
+    // Same live room lights, no temporary light-layout changes. One drawable
+    // per job bounds uploads; parallel compilation never changes live parents.
+    const renderer = this.renderLayer.renderer, scene = this.renderLayer.scene, camera = this.renderLayer.cameraRig.camera;
+    const seen = new Set<string>();
+    for (const [object] of createPrewarmResourceBatches([this.finale.visuals.root], 1)) {
+      if (!(object instanceof THREE.Mesh)) continue;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      const key = `${object.geometry.uuid}:${materials.map(material => material.uuid).join(',')}:${object instanceof THREE.InstancedMesh ? !!object.instanceColor : 'mesh'}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      yield { label: `finale compile ${object.name || object.type}`, gpu: true, run: () => {
+        const visible = object.visible; object.visible = true;
+        try { return this.renderLayer.withShadowPreparation(renderer.shadowMap.enabled, () =>
+          prepareCinematicProgram(renderer, object, camera, scene, this.hostWindow, this.finaleAbort!.signal)); }
+        finally { object.visible = visible; }
+      } };
+      yield { label: `finale upload ${object.name || object.type}`, gpu: true, run: () => {
+        this.renderLayer.withShadowPreparation(renderer.shadowMap.enabled, () => withIsolatedPrewarmState(renderer, () =>
+          renderIsolatedPrewarmResources(renderer, scene, camera, [object], { includeHidden: true, includeDescendants: false })));
+      } };
+    }
+  }
+
+  private renderFinale(resources: GreyboxRuntimeResources): void {
+    this.gameplayAudio?.setEnabled(false);
+    this.host.dataset.cinematic = 'containment-finale';
+    this.finaleOverlay ??= new ContainmentFinaleOverlay(this.host, this.skipFinale);
+    if (resources.containmentLevel.state === 'complete') { this.finaleOverlay.preparing(); return; }
+    if (!this.finalePreparation?.ready || !this.finale) {
+      this.finaleOverlay.preparing(this.finalePreparation?.diagnostics.failed);
+      // Paint the opaque cover before submitting the first remaining job.
+      if (this.host.dataset.finaleCoverPainted === 'true' && this.lifecycle.state === 'running') this.finalePreparation?.finishOneJobUnderBlack();
+      this.host.dataset.finaleCoverPainted = 'true';
+      return;
+    }
+    delete this.host.dataset.finaleCoverPainted;
+    if (!this.finale.active) {
+      this.audio?.setPaused(this.lifecycle.state !== 'running');
+      resources.goopAcidPresentation.suspend(); resources.slimePairPresentation.root.visible = false;
+      this.renderLayer.renderer.getDrawingBufferSize(this.finaleDrawingBuffer);
+      this.renderLayer.setPresentationResolution(Math.min(1280 * 720, Math.max(1,
+        this.finaleDrawingBuffer.x * this.finaleDrawingBuffer.y)));
+      this.finale.begin(new THREE.Vector3().copy(resources.body.position));
+    }
+    this.finale.render(resources.testScene.roomFive.endingSeconds);
+    const camera = this.renderLayer.cameraRig.camera;
+    camera.getWorldDirection(this.finaleAudioForward);
+    this.finaleAudioUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    this.audio?.setListener(camera.position, this.finaleAudioForward, this.finaleAudioUp);
+    const t = resources.testScene.roomFive.endingSeconds;
+    const timing = CONTAINMENT_FINALE_TIMING;
+    if (this.lifecycle.state === 'running' && ((t >= timing.droneReveal && t < timing.droneHit) || (t >= timing.reinforcements && t < timing.blackout))) {
+      const drone = this.finale.visuals.drones[t < timing.droneHit ? 0 : 1];
+      this.audio?.startLoop('containment-finale-flight', 'world-drone-flight-loop-01', drone.root.position);
+    } else this.audio?.stopLoop('containment-finale-flight');
+    if (this.lifecycle.state === 'running' && t >= timing.doorHit && t < timing.doorOpen) {
+      this.audio?.startLoop('containment-finale-door', 'goop-dissolve-loop-01', resources.testScene.roomFive.goopWoodenDoor.position);
+    } else this.audio?.stopLoop('containment-finale-door');
+    this.prepareContainmentShadows(resources.testScene, this.lifecycle.state === 'running' ? this.finale.shadowParticipants : []);
+    resources.testScene.withRoomFiveCinematicScope(() => this.renderLayer.render());
+  }
+
+  private prepareContainmentShadows(testScene: ContainmentLevelScene, participants: readonly Vector3State[]): void {
+    const key = testScene.lightingDiagnostics.visibleRoomIds.join(',');
+    if (key !== this.lastShadowLayoutKey) {
+      this.lightLayout?.sync();
+      // Refresh Three's light state before its shadow pass, without compiling
+      // any material or drawing. Gameplay and film use the same bounded rig.
+      this.renderLayer.renderer.compile(this.preparationLightState, this.renderLayer.cameraRig.camera, this.renderLayer.scene);
+      this.lastShadowLayoutKey = key;
+    }
+    testScene.lighting.prepareShadowFrame(participants);
+  }
+
+  private readonly skipFinale = (): void => {
+    const resources = this.resources;
+    if (!resources || resources.containmentLevel.state !== 'completing' || this.lifecycle.state !== 'running') return;
+    this.finaleOverlay?.preparing();
+    this.finale?.render(CONTAINMENT_FINALE_TIMING.end);
+    resources.containmentLevel.skipEnding();
+  };
+
+  private readonly onSkipFinale = (event: KeyboardEvent): void => {
+    if (event.code !== 'Enter' || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+      this.lifecycle.state !== 'running' || this.resources?.containmentLevel.state !== 'completing') return;
+    event.preventDefault(); this.skipFinale();
+  };
+
+  private readonly onPreviewFinale = (event: KeyboardEvent): void => {
+    const resources = this.resources;
+    if (!this.finaleShortcutAvailable || !this.debugAvailable ||
+      (event.code !== 'Digit9' && event.code !== 'Numpad9') || event.repeat ||
+      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+      this.lifecycle.state !== 'running' || !this.input.enabled || !this.debugInteractionEnabled ||
+      !resources?.deathSequence.isPlaying || resources.containmentLevel.state !== 'playing') return;
+    if (typeof Element !== 'undefined' && event.target instanceof Element &&
+      event.target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+    if (!resources.containmentLevel.beginEndingForDebug()) return;
+    // Warm remaining GPU jobs with Room 5's real signature, not the room we left.
+    this.lightLayout?.sync();
+    event.preventDefault();
+    resources.acidProjectileSystem.cancelAim();
+    this.input.setEnabled(false);
+    this.input.releasePointerLock();
+    this.host.dataset.gameState = 'level-completing';
   };
 
   /**

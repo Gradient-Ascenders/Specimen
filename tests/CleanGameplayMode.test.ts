@@ -226,7 +226,7 @@ test('actual inactive-body locators and debug collision lines use the UI layer e
   }
 });
 
-test('development spawn and recovery rings are UI rather than retained world geometry', () => {
+test('only the development Room 2 recovery ring remains, on the UI layer', () => {
   const target = {
     root: new THREE.Group(),
     ownedGeometries: new Set<THREE.BufferGeometry>(),
@@ -238,7 +238,9 @@ test('development spawn and recovery rings are UI rather than retained world geo
       target,
       material,
     );
-    assert.equal(target.root.children.length, 2);
+    assert.equal(target.root.children.length, 1);
+    assert.equal(target.root.children[0].name, 'room-2-safe-recovery-marker');
+    assert.equal(target.root.getObjectByName('room-1-safe-spawn-marker'), undefined);
     for (const marker of target.root.children)
       assert.equal(marker.layers.mask, 1 << GAMEPLAY_UI_LAYER);
   } finally {

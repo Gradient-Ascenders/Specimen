@@ -88,6 +88,38 @@ test('Room 3 acid failure starts at liquid contact, not metres above the surface
   } finally { scene.dispose(); }
 });
 
+test('Room 2 remains safe when walking against the wall shared with Room 3 acid', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
+  world.registerAll(scene.collisionMeshes); surfaces.registerAll(scene.collisionMeshes);
+  const body = new KinematicBody({ world, surfaces, initialPosition: new THREE.Vector3(-9, .46, 31) });
+  let deaths = 0;
+  const controller = new ContainmentLevelController({
+    scene, body, collisionWorld: world, requestDeath: () => { deaths++; return true; },
+  });
+  try {
+    controller.teleportToRoomForDebug(2);
+    const towardWall = new THREE.Vector3(0, 0, 1);
+    for (const x of [-13.6, -6, 0, 6, 13.6]) {
+      body.recoverAt(new THREE.Vector3(x, .46, 46));
+      for (let step = 0; step < 120; step++) {
+        body.update(1 / 60, towardWall); controller.update(1 / 60);
+        assert.equal(scene.roomThree.failureVolume.occupied, false, `Room 3 acid reaches Room 2 at x=${x}.`);
+      }
+      assert.ok(body.position.z > 48.3 && body.position.z < 48.4, 'The shared wall must still be solid.');
+      assert.equal(controller.activeRoomId, 2);
+    }
+    assert.equal(deaths, 0, 'The safe tutorial floor must not request recovery.');
+    controller.teleportToRoomForDebug(3);
+    body.recoverAt(new THREE.Vector3(-12, 8, 63));
+    for (let step = 0; step < 120 && deaths === 0; step++) {
+      body.update(1 / 60, new THREE.Vector3()); controller.update(1 / 60);
+    }
+    assert.equal(deaths, 1, 'Acid contact inside Room 3 must remain lethal.');
+    assert.equal(controller.lastFailureId, 'room-3:fall');
+  } finally { controller.dispose(); world.clear(); surfaces.clear(); scene.dispose(); }
+});
+
 test('a physical fall reaches the visible Room 3 acid before its failure trigger activates', () => {
   const scene = new ContainmentLevelScene(() => {});
   const world = new CollisionWorld();
@@ -153,7 +185,7 @@ test('complete Containment scene exposes unique, consistently tagged colliders',
   assert.ok(names.includes('room-4-shaft-ceiling'));
   assert.ok(names.includes('room-5-containment-glass'));
   assert.ok(names.includes('room-5-goop-wooden-door'));
-  assert.ok(names.includes('room-5-observation-sticky-lever-handle'));
+  assert.ok(names.includes('room-5-observation-release-button'));
 
   const containmentGlass = scene.collisionMeshes.find(
     (mesh) => mesh.name === 'room-5-containment-glass',
@@ -171,10 +203,10 @@ test('complete Containment scene exposes unique, consistently tagged colliders',
   assert.equal(goopDoor.userData.textureRole, 'wooden-door');
   assert.equal(goopDoor.userData.soluble, true);
   assert.ok(scene.solubleTargetMeshes.includes(goopDoor));
-  assert.deepEqual(goopDoor.userData.sizeMetres, [3, 4.5, 0.3]);
-  assert.ok(goopDoor.position.equals(new THREE.Vector3(0, 77, 125.25)));
+  assert.deepEqual(goopDoor.userData.sizeMetres,[2.35,1.8,.9]);
+  assert.ok(goopDoor.position.equals(new THREE.Vector3(0,75.65,124.72)));
   assert.ok(goopDoor.material instanceof THREE.MeshStandardMaterial);
-  assert.equal(goopDoor.material.color.getHex(), 0x686047);
+  assert.equal(goopDoor.material.color.getHex(),0x96714f);
 
   const stickyMeshes = scene.collisionMeshes.filter(
     (mesh) => mesh.userData.surfaceTag === 'sticky',
@@ -238,7 +270,7 @@ test('Room 5 Blender layout drives deterministic platforms and translated lasers
   const roomFiveStickyWalls = room.collisionMeshes.filter(
     (mesh) =>
       mesh.name.startsWith('room-5-') &&
-      mesh.name !== room.leverHandleName &&
+      mesh.name !== room.releaseButtonName &&
       mesh.userData.textureRole === 'sticky-wall-tile',
   );
   assert.equal(roomFiveStickyWalls.length, 5);
@@ -795,7 +827,7 @@ test('debug room teleports activate and recover through real entry checkpoints',
   scene.dispose();
 });
 
-test('Containment completion is gated by observation lever adhesion and emits once', () => {
+test('Containment completion is gated by contact with the observation release button and emits once', () => {
   let controller: ContainmentLevelController;
   const scene = new ContainmentLevelScene(
     (failure: ContainmentHazardFailure) => {
@@ -821,17 +853,22 @@ test('Containment completion is gated by observation lever adhesion and emits on
   });
 
   controller.teleportToRoomForDebug(5);
-  fakeBody.position.set(-10, 99.3, 128.8);
-  fakeBody.attached = true;
-  fakeBody.attachmentSurfaceName = scene.roomFive.leverHandleName;
+  fakeBody.position.set(-10, 97.95, 129.5);
   controller.update(0.2);
   assert.equal(controller.state, 'playing');
-  controller.update(0.2);
+  fakeBody.position.set(-10,97.95,130.55);
+  assert.equal(fakeBody.attached,false,'A button does not require adhesion.');
+  controller.update(0.04);
+  assert.equal(controller.state,'playing');
+  controller.update(0.04);
   assert.equal(controller.state, 'completing');
 
   controller.update(1);
   assert.equal(controller.state, 'completing');
   controller.update(1.5);
+  assert.equal(controller.state, 'completing');
+  assert.equal(completions, 0, 'Freeing the cell must not skip the fight and escape.');
+  controller.update(84.3);
   assert.equal(controller.state, 'complete');
   assert.equal(completions, 1);
   assert.deepEqual(payload, {

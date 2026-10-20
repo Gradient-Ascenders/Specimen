@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import type { LaserHazard } from '../../../hazards/LaserHazard.ts';
 import type { MovingPlatform } from '../../../puzzle/MovingPlatform.ts';
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
+import { RoomFiveContainmentSecurity } from './RoomFiveContainmentSecurity.ts';
+import { ROOM_FIVE_ESCAPE } from '../../../levels/RoomFiveEscapeLayout.ts';
 import {
   createBorrowedBox,
   createBorrowedCylinder,
@@ -46,8 +48,8 @@ const CLOSED_PANEL_ROTATION = new THREE.Euler(0, 0, 0);
  * Room 5-only presentation layer around the frozen finale route.
  *
  * Every object here is visual-only. The chamber panels are independent static
- * pivots prepared for later cutscene work; production never animates them.
- * Collision, moving-platform pose, lasers, lever state, dissolve state and the
+ * pivots shared by art inspection and the live release cutscene.
+ * Collision, moving-platform pose, lasers, release-button state, dissolve state and the
  * contained specimen release remain owned by RoomFiveGreybox and its systems.
  */
 export class RoomFiveArt {
@@ -55,6 +57,7 @@ export class RoomFiveArt {
   readonly containmentAssembly = new THREE.Group();
   readonly containmentPanelRoot = new THREE.Group();
   readonly panelPivots: RoomFivePanelPivots;
+  readonly security: RoomFiveContainmentSecurity;
 
   private readonly resources: ContainmentArtResources;
   private readonly signGeometries = new Set<THREE.BufferGeometry>();
@@ -89,6 +92,8 @@ export class RoomFiveArt {
     this.buildObservationConnection();
     this.buildSolubleDoorSurround();
     this.buildSignage();
+    this.security = new RoomFiveContainmentSecurity(resources);
+    this.containmentAssembly.add(this.security.root);
     this.root.add(this.containmentAssembly);
 
     this.movingPlatformDressings = movingPlatforms.map((platform, index) =>
@@ -97,11 +102,17 @@ export class RoomFiveArt {
     this.reset();
   }
 
-  /** Art-preview hook only. Production code does not call this method. */
+  /** Shared hinge pose for art inspection and the authored release cinematic. */
   setPanelPreview(panel: RoomFiveContainmentPanel, angleRadians: number): void {
     const pivot = this.panelPivots[panel];
     pivot.rotation.copy(CLOSED_PANEL_ROTATION);
-    pivot.rotation.y = angleRadians;
+    if (panel === 'front') pivot.rotation.x = angleRadians;
+    else pivot.rotation.y = angleRadians;
+  }
+
+  /** The front hatch lifts outward above Goop, never across the cell or exit. */
+  setReleaseProgress(progress: number): void {
+    this.setPanelPreview('front', THREE.MathUtils.clamp(progress, 0, 1) * 1.65);
   }
 
   reset(): void {
@@ -114,6 +125,7 @@ export class RoomFiveArt {
     if (this.disposed) return;
     this.disposed = true;
     this.root.removeFromParent();
+    this.security.dispose();
     for (const dressing of this.movingPlatformDressings) {
       dressing.removeFromParent();
       dressing.clear();
@@ -191,9 +203,9 @@ export class RoomFiveArt {
       { name: 'front-east', size: [9.2, 25.7, 0.12] as const, position: [15.25, 87.75, 91.71] as const, material: secondaryCeramic },
       { name: 'front-entry-header', size: [2.72, 21.7, 0.12] as const, position: [9, 89.75, 91.71] as const, material: mainCeramic },
       { name: 'rear-west', size: [7.72, 25.7, 0.12] as const, position: [-16, 87.75, 125.29] as const, rotation: [0, Math.PI, 0] as const, material: secondaryCeramic },
-      { name: 'rear-left-of-door', size: [6.22, 25.7, 0.12] as const, position: [-4.75, 87.75, 125.29] as const, rotation: [0, Math.PI, 0] as const, material: mainCeramic },
-      { name: 'rear-right-of-door', size: [18.22, 25.7, 0.12] as const, position: [10.75, 87.75, 125.29] as const, rotation: [0, Math.PI, 0] as const, material: secondaryCeramic },
-      { name: 'rear-door-header', size: [2.72, 21.2, 0.12] as const, position: [0, 90, 125.29] as const, rotation: [0, Math.PI, 0] as const, material: mainCeramic },
+      { name: 'rear-left-of-door', size: [6.82, 25.7, 0.12] as const, position: [-4.45, 87.75, 125.29] as const, rotation: [0, Math.PI, 0] as const, material: mainCeramic },
+      { name: 'rear-right-of-door', size: [18.82, 25.7, 0.12] as const, position: [10.45, 87.75, 125.29] as const, rotation: [0, Math.PI, 0] as const, material: secondaryCeramic },
+      { name: 'rear-door-header', size: [1.8, 24.15, 0.12] as const, position: [0,88.575,125.29] as const, rotation: [0, Math.PI, 0] as const, material: mainCeramic },
       { name: 'rear-observation-sill', size: [3.72, 21.9, 0.12] as const, position: [-10, 85.85, 125.29] as const, rotation: [0, Math.PI, 0] as const, material: mainCeramic },
     ];
     for (const panel of frontRearSkins) {
@@ -252,7 +264,7 @@ export class RoomFiveArt {
   }
 
   private buildContainmentPanels(): RoomFivePanelPivots {
-    const front = this.createContainmentPanel('front', [-2.45, 77.08, 107.74], 'x-positive');
+    const front = this.createContainmentPanel('front', [0, 78.5, 107.74], 'x-positive');
     const rear = this.createContainmentPanel('rear', [2.45, 77.08, 112.26], 'x-negative');
     const left = this.createContainmentPanel('left', [-2.56, 77.08, 112.12], 'z-negative');
     const right = this.createContainmentPanel('right', [2.56, 77.08, 107.88], 'z-positive');
@@ -281,7 +293,8 @@ export class RoomFiveArt {
     const alongX = direction.startsWith('x');
     const sign = direction.endsWith('positive') ? 1 : -1;
     const leafOffset = sign * (alongX ? 2.45 : 2.12);
-    if (alongX) leaf.position.x = leafOffset;
+    if (panel === 'front') leaf.position.y = -1.42;
+    else if (alongX) leaf.position.x = leafOffset;
     else leaf.position.z = leafOffset;
 
     leaf.add(
@@ -311,11 +324,14 @@ export class RoomFiveArt {
         this.resources,
         `room-5-containment-panel-${panel}-hinge-knuckles`,
         serviceMetal,
-        [-0.86, 0, 0.86].map((y) => ({
-          position: alongX
-            ? [-sign * 2.47, y, 0] as const
-            : [0, y, -sign * 2.14] as const,
-          size: alongX ? [0.18, 0.3, 0.25] as const : [0.25, 0.3, 0.18] as const,
+        [-1, 0, 1].map((step) => ({
+          position: panel === 'front'
+            ? [step * 1.7, 1.42, 0] as const
+            : alongX
+            ? [-sign * 2.47, step * .86, 0] as const
+            : [0, step * .86, -sign * 2.14] as const,
+          size: panel === 'front' ? [0.3, 0.18, 0.25] as const
+            : alongX ? [0.18, 0.3, 0.25] as const : [0.25, 0.3, 0.18] as const,
         })),
       ),
     );
@@ -331,7 +347,6 @@ export class RoomFiveArt {
       structuralSteel,
       gasket,
       warningStatus,
-      staticCyanEmissive,
       containmentGlass,
     } = this.resources.materials;
     const base = new THREE.Group();
@@ -398,21 +413,6 @@ export class RoomFiveArt {
         position: [0, 75.32, 107.06],
         material: graphite,
       }),
-      createInstancedBoxes(
-        this.resources,
-        'room-5-containment-front-status-array',
-        staticCyanEmissive,
-        [-1.05, -0.52, 0, 0.52].map((x) => ({
-          position: [x, 75.35, 106.925] as const,
-          size: [0.26, 0.08, 0.03] as const,
-        })),
-      ),
-      createBorrowedBox(this.resources, {
-        name: 'room-5-containment-overpressure-status',
-        size: [0.32, 0.1, 0.03],
-        position: [1.12, 75.35, 106.925],
-        material: warningStatus,
-      }),
     );
 
     lowerRing.add(
@@ -420,7 +420,7 @@ export class RoomFiveArt {
         name: 'room-5-lower-ring-primary-load-beams',
         size: [5.45, 0.3, 0.34],
         radius: 0.07,
-        material: secondaryCeramic,
+        material: structuralSteel,
         transforms: [107.62, 112.38].map((z) => ({ position: [0, 75.78, z] })),
       }),
       createInstancedChamferedBoxes(this.resources, {
@@ -451,7 +451,7 @@ export class RoomFiveArt {
         name: 'room-5-upper-ring-longitudinal-housing',
         size: [5.0, 0.28, 0.3],
         radius: 0.06,
-        material: secondaryCeramic,
+        material: structuralSteel,
         transforms: [107.78, 112.22].map((z) => ({ position: [0, 78.48, z] })),
       }),
       createInstancedChamferedBoxes(this.resources, {
@@ -479,7 +479,7 @@ export class RoomFiveArt {
 
   private buildContainmentClamps(): void {
     const {
-      secondaryCeramic,
+      structuralSteel,
       graphite,
       serviceMetal,
       gasket,
@@ -489,8 +489,9 @@ export class RoomFiveArt {
     clamps.name = 'room-5-structural-clamps';
     markVisualOnly(clamps);
     const definitions = [
-      { name: 'front', position: [0, 77.12, 107.42] as const, alongX: true },
-      { name: 'rear', position: [0, 77.12, 112.58] as const, alongX: true },
+      // Offset the heavy clamps so the captive specimen remains visible head-on.
+      { name: 'front', position: [1.85, 77.12, 107.42] as const, alongX: true },
+      { name: 'rear', position: [-1.85, 77.12, 112.58] as const, alongX: true },
       { name: 'left', position: [-2.8, 77.12, 110] as const, alongX: false },
       { name: 'right', position: [2.8, 77.12, 110] as const, alongX: false },
     ];
@@ -504,11 +505,11 @@ export class RoomFiveArt {
           size: definition.alongX ? [1.25, 2.45, 0.42] : [0.42, 2.45, 1.25],
           radius: 0.1,
           position: definition.position,
-          material: secondaryCeramic,
+          material: structuralSteel,
         }),
         createInstancedChamferedBoxes(this.resources, {
           name: `${root.name}-load-jaws`,
-          size: definition.alongX ? [1.65, 0.28, 0.58] : [0.58, 0.28, 1.65],
+          size: definition.alongX ? [1.65, 0.28, 0.58] : [0.42, 0.28, 1.65],
           radius: 0.065,
           material: graphite,
           transforms: [76.0, 78.25].map((y) => ({
@@ -619,7 +620,6 @@ export class RoomFiveArt {
       serviceMetal,
       gasket,
       warningStatus,
-      lockedStatus,
       staticCyanEmissive,
       solubleComposite,
     } = this.resources.materials;
@@ -670,12 +670,6 @@ export class RoomFiveArt {
         position: [-1.75, 75.605, 112.22],
         rotation: [0, 0.16, 0],
         material: solubleComposite,
-      }),
-      createBorrowedBox(this.resources, {
-        name: 'room-5-containment-pressure-warning-slot',
-        size: [0.5, 0.1, 0.035],
-        position: [0, 77.42, 107.20],
-        material: lockedStatus,
       }),
     );
 
@@ -1067,17 +1061,23 @@ export class RoomFiveArt {
         rotation: [-0.24, 0, 0],
         material: warningStatus,
       }),
+      createChamferedBox(this.resources, {
+        name: 'room-5-observation-release-button-housing',
+        size: [1.35, 1.35, .4], radius: .08,
+        position: [-10, 98.45, 131.38],
+        material: graphite,
+      }),
       createBorrowedCylinder(this.resources, {
-        name: 'room-5-observation-mechanical-lever-socket',
-        size: [0.52, 0.18, 0.52],
-        position: [-10, 98.96, 131.4],
+        name: 'room-5-observation-release-button-bezel',
+        size: [1.14, 0.16, 1.14],
+        position: [-10, 98.45, 131.2],
         rotation: [Math.PI / 2, 0, 0],
         material: serviceMetal,
       }),
       createBorrowedCylinder(this.resources, {
-        name: 'room-5-observation-lever-socket-dark-gasket',
-        size: [0.36, 0.19, 0.36],
-        position: [-10, 98.93, 131.28],
+        name: 'room-5-observation-release-button-dark-gasket',
+        size: [1.03, .03, 1.03],
+        position: [-10, 98.45, 131.11],
         rotation: [Math.PI / 2, 0, 0],
         material: gasket,
       }),
@@ -1165,33 +1165,33 @@ export class RoomFiveArt {
   }
 
   private buildSolubleDoorSurround(): void {
-    const { graphite, serviceMetal, warningStatus } = this.resources.materials;
+    const { graphite, serviceMetal } = this.resources.materials;
     this.root.add(
       createRectangularFrame(this.resources, {
-        name: 'room-5-soluble-composite-door-structural-frame',
-        width: 3.45,
-        height: 4.95,
-        barWidth: 0.28,
+        name: 'room-5-escape-vent-structural-frame',
+        width: ROOM_FIVE_ESCAPE.ventWidth+.28,
+        height: ROOM_FIVE_ESCAPE.ventHeight+.28,
+        barWidth: .14,
         depth: 0.22,
-        position: [0, 77, 125.12],
+        position: [0,75.575,125.17],
         material: graphite,
       }),
       createInstancedChamferedBoxes(this.resources, {
-        name: 'room-5-soluble-composite-door-pressure-latches',
-        size: [0.28, 0.52, 0.3],
+        name: 'room-5-escape-vent-frame-fasteners',
+        size: [.09,.09,.07],
         radius: 0.055,
         material: serviceMetal,
-        transforms: [75.7, 78.3].flatMap((y) => [
-          { position: [-1.65, y, 125.02] as const },
-          { position: [1.65, y, 125.02] as const },
+        transforms: [74.83,76.32].flatMap((y) => [
+          { position: [-.97,y,125.02] as const },
+          { position: [.97,y,125.02] as const },
         ]),
       }),
-      createBorrowedBox(this.resources, {
-        name: 'room-5-soluble-composite-door-corrosion-marker',
-        size: [1.25, 0.18, 0.025],
-        position: [0, 77.1, 125.075],
-        material: warningStatus,
-      }),
+      createInstancedBoxes(this.resources,'room-5-escape-vent-neck',serviceMetal,[
+        {position:[-1,75.575,126.75],size:[.2,1.85,2.5]},
+        {position:[1,75.575,126.75],size:[.2,1.85,2.5]},
+        {position:[0,74.65,126.75],size:[2.2,.2,2.5]},
+        {position:[0,76.5,126.75],size:[2.2,.2,2.5]},
+      ]),
     );
   }
 
@@ -1200,7 +1200,7 @@ export class RoomFiveArt {
       { name: 'room-5-entry-primary-containment-sign', label: 'roomFive' as const, size: [5.0, 1.2] as const, position: [5.0, 80.2, 91.62] as const },
       { name: 'room-5-pressure-array-sign', label: 'pressureArray' as const, size: [3.7, 0.9] as const, position: [-19.62, 84.0, 110] as const, rotation: [0, Math.PI / 2, 0] as const },
       { name: 'room-5-observation-control-sign', label: 'observationControl' as const, size: [3.8, 0.92] as const, position: [-10, 103.15, 125.10] as const },
-      { name: 'room-5-soluble-access-sign', label: 'compositeAccess' as const, size: [2.65, 0.65] as const, position: [0, 80.05, 125.10] as const },
+      { name: 'room-5-soluble-access-sign', label: 'vent' as const, size: [1.75,.42] as const, position: [0,77.1,125.10] as const, rotation:[0,Math.PI,0] as const },
     ];
     for (const sign of signs) this.root.add(this.makeSign(sign));
   }

@@ -17,6 +17,22 @@ class CountingCollisionWorld extends CollisionWorld {
   }
 }
 
+test('cinematics hide both locators without occlusion work and restore them for gameplay',()=>{
+  const presentation=new SlimePairPresentation(.45),world=new CountingCollisionWorld(),camera=new THREE.PerspectiveCamera();
+  const bob=new THREE.Vector3(0,.45,0),goop=new THREE.Vector3(2,.45,0);camera.position.set(0,2,5);
+  try{
+    presentation.update(bob,goop,'bob',camera,world);
+    assert.equal(presentation.locatorDiagnostics.goopVisible,true);
+    const queries=world.queryCount;
+    presentation.update(bob,goop,'bob',camera,world,false,true);
+    assert.equal(presentation.locatorDiagnostics.goopVisible,false);assert.equal(presentation.locatorDiagnostics.bobVisible,false);
+    assert.equal(world.queryCount,queries);
+    assert.ok(presentation.root.children.every(sprite=>!sprite.visible));
+    presentation.update(bob,goop,'bob',camera,world);
+    assert.equal(presentation.locatorDiagnostics.goopVisible,true);
+  }finally{presentation.dispose();}
+});
+
 test('inactive-body locators identify the correct body and survive occlusion', () => {
   const presentation = new SlimePairPresentation(0.45);
   const camera = new THREE.PerspectiveCamera();

@@ -71,11 +71,12 @@ export class SlimePairPresentation {
     camera: THREE.Camera,
     collisionWorld: CollisionWorld,
     _firstPersonAimActive = false,
+    cinematic = false,
   ): void {
     this.updateLocator(
       this.bobLocator,
       bobPosition,
-      activeSlimeId !== 'bob',
+      !cinematic && activeSlimeId !== 'bob',
       camera,
       collisionWorld,
       'bob',
@@ -83,7 +84,7 @@ export class SlimePairPresentation {
     this.updateLocator(
       this.goopLocator,
       goopPosition,
-      activeSlimeId !== 'goop',
+      !cinematic && activeSlimeId !== 'goop',
       camera,
       collisionWorld,
       'goop',

@@ -11,6 +11,7 @@ import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import { CultivationRoomFiveController, type RoomFiveCheckpoint } from './CultivationRoomFiveController.ts';
 import { RoomFiveSewer, SEWER_CONTROL_SPAWN, SEWER_FLOOR_Y } from './RoomFiveSewer.ts';
 import type { SecurityNetwork } from '../puzzle/SecurityNetworkController.ts';
+import {VOLT_FINALE_VENT,VOLT_FINALE_CELL} from '../cinematics/CultivationFinaleLayout.ts';
 
 export const ROOM_FIVE_NETWORK_COLOURS = { red: 0xff475c, blue: 0x245bff, green: 0x61db65 } as const;
 export const ROOM_FIVE_SAFE_STATIONS = [
@@ -32,11 +33,12 @@ export class LevelTwoRoomFiveGreybox {
   readonly dynamicCollisionMeshes: THREE.Mesh[] = [];
   private readonly acidVentPatches: RoomFiveVentWaste[] = [];
   readonly controls = new Map<SecurityNetwork, THREE.Mesh>();
-  readonly lever: THREE.Mesh;
+  readonly releaseButton: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
+  readonly podFeeds: THREE.Mesh[] = [];
   private readonly reunionFloors: THREE.Mesh[] = [];
-  readonly terminal: THREE.Mesh;
   readonly reunionDoor: THREE.Mesh;
-  readonly exitDoor: THREE.Mesh;
+  readonly releaseCover: THREE.Mesh;
+  readonly releaseCoverCollider: THREE.Mesh;
   readonly shortcut: THREE.Mesh;
   private readonly shortcutEntry: THREE.Mesh;
   readonly pod = new THREE.Group();
@@ -47,8 +49,9 @@ export class LevelTwoRoomFiveGreybox {
   private readonly captiveState = { locomotionPositionWorld: new THREE.Vector3(), velocityWorld: new THREE.Vector3(),
     movementIntentWorld: new THREE.Vector3(), grounded: true, maximumLocomotionSpeedMetresPerSecond: 5.5 };
   private readonly local = new THREE.Vector3();
-  private readonly bobLocal = new THREE.Vector3();
   private readonly goopLocal = new THREE.Vector3();
+  private readonly feedDirection = new THREE.Vector3();
+  private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly subscriptions: Array<() => void> = [];
   private targets: readonly DissolveTarget[] = [];
   private readonly resetControls: DissolveTarget[] = [];
@@ -122,7 +125,13 @@ export class LevelTwoRoomFiveGreybox {
     box('chamber-roof', [41, .5, 64], [0, 38.25, 48], m.support);
     box('chamber-west', [.5, 38, 64], [-20.25, 19, 48]);
     box('chamber-east', [.5, 38, 42], [20.25, 19, 37]);
-    box('chamber-east-upper', [.5, 31.5, 22], [20.25, 22.25, 69]);
+    // A genuine upper service opening, not a vent drawn on an intact wall.
+    // Leave the sewer return below untouched; the escape happens near the cell.
+    const ventY=VOLT_FINALE_VENT.y;
+    box('chamber-east-upper-below-vent', [.5, ventY-6.5, 22], [20.25, (ventY+6.5)/2, 69]);
+    box('chamber-east-upper-above-vent', [.5, 38-ventY-2.98, 22], [20.25, (38+ventY+2.98)/2, 69]);
+    box('chamber-east-upper-vent-front', [.5, 2.98, 1.82], [20.25, ventY+1.49, 58.91]);
+    box('chamber-east-upper-vent-back', [.5, 2.98, 16.82], [20.25, ventY+1.49, 71.59]);
     box('chamber-back', [40, 38, .5], [0, 19, 80]);
     box('chamber-front-upper', [40, 24.5, .5], [0, 25.75, 18]);
     box('chamber-front-east', [30, 13.5, .5], [5, 6.75, 18]);
@@ -146,17 +155,19 @@ export class LevelTwoRoomFiveGreybox {
       if (i === ROOM_FIVE_SAFE_STATIONS.length - 1) break;
     }
     addRoomFiveParkour(b);
+    this.releaseCover = this.root.getObjectByName('room-5-safe-6-network-5-baffle') as THREE.Mesh;
+    this.releaseCoverCollider = this.root.getObjectByName(`${this.releaseCover.name}-collision`) as THREE.Mesh;
+    this.dynamicCollisionMeshes.push(this.releaseCoverCollider);
     // Leave the final safe platform away from the cage and patrol arena.
     box('release-quiet-walk', [3, .5, 8], [0, 28.75, 30.5], m.support);
     b.addLight('room-5-release-wayfinding', [0, 32, 27], 0xffe3a0, 40, 8);
-    this.lever = box('manual-release-lever', [.16, 1, .16], [0, 30, 27.35], m.cable);
-    this.lever.geometry.translate(0, .5, 0);
-    const grip = b.addVisualBox({ name: 'room-5-release-lever-grip', size: [.85, .22, .25],
-      position: [0, 1, 0], material: m.platform });
-    this.lever.add(grip);
+    const releaseSignal = new THREE.MeshStandardMaterial({ name: 'room-5-volt-release-status',
+      color: 0xffc754, emissive: 0xffb52c, emissiveIntensity: .65, roughness: .38, metalness: .25 });
+    this.releaseButton = box('manual-release-button', [.72, .72, .28], [0, 30.05, 27.24], releaseSignal) as typeof this.releaseButton;
+    this.releaseButton.userData.authoringRole = 'volt-containment-release-button';
     box('release-pedestal', [1.3, 1.7, .35], [0, 30, 26.95], m.support);
-    this.dynamicCollisionMeshes.push(this.lever);
-    this.pod.name = 'room-5-volt-containment'; this.pod.position.set(0, 25, 49); this.root.add(this.pod);
+    this.dynamicCollisionMeshes.push(this.releaseButton);
+    this.pod.name = 'room-5-volt-containment'; this.pod.position.set(0, VOLT_FINALE_CELL.y, 49); this.root.add(this.pod);
     const podBox = (name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material) => {
       const mesh = box(name, size, position, material); this.pod.add(mesh); this.dynamicCollisionMeshes.push(mesh); return mesh;
     };
@@ -165,7 +176,9 @@ export class LevelTwoRoomFiveGreybox {
     for (const side of [-1, 1]) {
       this.glassPanels.push(podBox(`pod-glass-x-${side}`, [.12, 4, 6], [side * 3, 0, 0], m.glass));
       this.glassPanels.push(podBox(`pod-glass-z-${side}`, [6, 4, .12], [0, 0, side * 3], m.glass));
-      b.addVisualBox({ name: `room-5-pod-cable-${side}`, size: [.2, 11, .2], position: [side * 2.5, 32.5, 49], material: m.cable });
+      const feed = b.addVisualBox({ name: `room-5-pod-cable-${side}`, size: [.2, 1, .2],
+        position: [side * 2.5, 32.5, 49], material: m.cable });
+      this.podFeeds.push(feed);
     }
     this.captiveVolt.name = 'room-5-captive-volt';
     this.captiveVolt.add(this.captiveVoltPresentation.root); this.pod.add(this.captiveVolt);
@@ -181,19 +194,13 @@ export class LevelTwoRoomFiveGreybox {
     this.reunionFloors.push(box('reunion-east-landing', [8, .5, 5], [24, -4, 61.5], m.floor));
     for (const floor of this.reunionFloors) floor.visible = false;
     this.dynamicCollisionMeshes.push(...this.reunionFloors);
-    box('reunion-east', [.4, 7, 14], [28, 3.5, 65], m.wall);
-    box('reunion-roof', [8, .4, 12], [24, 6.5, 65], m.wall);
-    this.exitDoor = box('unpowered-exit-door', [5, 5, .35], [16, 2.5, 71], m.containment);
-    box('exit-wall-left', [25.5, 7, .4], [.75, 3.5, 71], m.wall);
-    box('exit-wall-right', [9.5, 7, .4], [23.25, 3.5, 71], m.wall);
-    box('exit-header', [5, 2, .4], [16, 6, 71], m.wall);
-    box('exit-floor', [8, .5, 8], [16, -.25, 75], m.floor);
-    this.terminal = box('volt-conductive-terminal', [2, .35, 2], [16, .175, 68], m.etch);
-    this.terminal.userData.authoringRole = 'volt-electrical-terminal';
+    // The old ground-level exit bay is obsolete. Keep the acid bed open below
+    // the parkour instead of leaving a freestanding wall/door across the room.
     this.shortcut = box('rescue-shortcut-catwalk', [2, .3, 33], [-4.5, 40, 46.5], m.support);
     this.shortcutEntry = box('rescue-shortcut-entry', [2, .3, 2], [-2.5, 40, 31], m.support);
     this.dynamicCollisionMeshes.push(this.shortcut, this.shortcutEntry);
-    this.dynamicCollisionMeshes.push(this.reunionDoor, this.exitDoor);
+    this.syncPresentation(0);
+    this.dynamicCollisionMeshes.push(this.reunionDoor);
   }
   bindDissolveTargets(targets: readonly DissolveTarget[]): void {
     this.targets = targets.filter(target => target.mesh.userData.roomId === 5);
@@ -227,8 +234,8 @@ export class LevelTwoRoomFiveGreybox {
   get hasPendingWork(): boolean { return this.resetControls.length > 0 || this.controller.releasing; }
 
   get dynamicTransformRoots(): readonly THREE.Object3D[] {
-    return [this.pod, this.captiveVolt, this.captiveVoltPresentation.root, this.brokenCore, this.lever,
-      this.reunionDoor, this.exitDoor, this.shortcut, this.shortcutEntry, ...this.reunionFloors,
+    return [this.pod, this.captiveVolt, this.captiveVoltPresentation.root, this.brokenCore, this.releaseButton, ...this.podFeeds,
+      this.releaseCover, this.releaseCoverCollider, this.reunionDoor, this.shortcut, this.shortcutEntry, ...this.reunionFloors,
       ...this.glassPanels, ...this.solubleTargetMeshes,
       ...[...this.controls.values()].map(control => control.parent!)];
   }
@@ -240,31 +247,26 @@ export class LevelTwoRoomFiveGreybox {
   update(dt: number, occupants: readonly LevelTwoRoomTwoOccupant[], present = true): void {
     if (present) this.updateCosmetics(dt);
     for (const target of this.resetControls) target.reset(); this.resetControls.length = 0;
-    let usingLever = false;
+    let usingButton = false, bobOnRoute = false, goopPastDrone = false, nearDrone = false;
     for (const occupant of occupants) {
       this.local.set(occupant.position.x, occupant.position.y, occupant.position.z); this.root.worldToLocal(this.local);
       if (occupant.id === 'bob') {
-        this.bobLocal.copy(this.local);
-        usingLever = Math.abs(this.local.x) < .9 && Math.abs(this.local.y - 29.66) < .8
+        usingButton = Math.abs(this.local.x) < .9 && Math.abs(this.local.y - 29.66) < .8
           && this.local.z > 27.4 && this.local.z < 28.7;
+        bobOnRoute = Math.abs(this.local.x) < 20 && this.local.y >= 9 && this.local.y < 38
+          && this.local.z >= 18 && this.local.z < 80;
         if (this.isAcidAt(occupant.position)) this.requestFailure({ roomId: 5, slimeId: 'bob', reason: 'radiation' });
-      } else this.goopLocal.copy(this.local);
+      } else {
+        this.goopLocal.copy(this.local);
+        nearDrone = this.goopLocal.distanceToSquared(this.brokenCore.position) < 9 * 9;
+        // Full width of both banks and the channel, including a jumping Goop.
+        // No tiny sphere at the far end of the sewer, and no simultaneous pose.
+        goopPastDrone = this.local.x > 30 && this.local.x < 50 && this.local.y >= SEWER_FLOOR_Y - .8
+          && this.local.y < -2 && this.local.z >= this.brokenCore.position.z + 1.5 && this.local.z < 140;
+      }
     }
-    this.controller.update(dt,
-      this.goopLocal.distanceToSquared(this.brokenCore.position) < 9 * 9,
-      this.bobLocal.distanceToSquared(ROOM_FIVE_BOB_START) < 5 * 5,
-      this.goopLocal.distanceToSquared(ROOM_FIVE_GOOP_CONTROLS) < 5 * 5, usingLever);
+    this.controller.update(dt, nearDrone, bobOnRoute, goopPastDrone, usingButton);
     this.syncPresentation(dt);
-  }
-  isAtVoltTerminal(position: { readonly x: number; readonly y: number; readonly z: number }): boolean {
-    this.local.set(position.x, position.y, position.z); this.root.worldToLocal(this.local);
-    const p = this.local;
-    return p.x > 14.5 && p.x < 17.5 && p.y >= 0 && p.y < 1.8 && p.z > 66.5 && p.z < 69.5;
-  }
-  isAtFinalExit(position: { readonly x: number; readonly y: number; readonly z: number }): boolean {
-    this.local.set(position.x, position.y, position.z); this.root.worldToLocal(this.local);
-    const p = this.local;
-    return p.x > 12 && p.x < 20 && p.y >= 0 && p.y < 3 && p.z > 72 && p.z < 79;
   }
   isAcidAt(position: { readonly x: number; readonly y: number; readonly z: number }): boolean {
     this.local.set(position.x, position.y, position.z); this.root.worldToLocal(this.local);
@@ -272,21 +274,30 @@ export class LevelTwoRoomFiveGreybox {
     const acidDuct = p.x > 37 && p.x < 43 && p.z > 16 && p.z < 140 && p.y < SEWER_FLOOR_Y + .6;
     const dryReunion = (this.controller.releasing || this.controller.rescued)
       && p.x > -12 && p.x < 28 && p.y >= 0 && p.y < 3 && p.z >= 59 && p.z <= 71;
-    const dryExit = p.x >= 12 && p.x <= 20 && p.y >= 0 && p.y < 3 && p.z > 71 && p.z < 79;
     const contaminatedVent = p.y < .7 && p.y > -.5 && this.acidVentPatches.some(patch => patch.contains(p.x, p.z));
-    return contaminatedVent || acidDuct || (Math.abs(p.x) < 20 && p.z > 18 && p.z < 80 && p.y < .6 && !dryReunion && !dryExit);
+    return contaminatedVent || acidDuct || (Math.abs(p.x) < 20 && p.z > 18 && p.z < 80 && p.y < .6 && !dryReunion);
   }
   syncPresentation(dt = 1): void {
     const c = this.controller;
-    this.lever.rotation.x = .3 + c.leverProgress * 1.5;
+    this.releaseButton.position.z = 27.24 - c.buttonProgress * .13;
+    this.releaseButton.material.color.setHex(c.security.shutdown ? 0x75e5bd : 0xffc754);
+    this.releaseButton.material.emissive.setHex(c.security.shutdown ? 0x38bd94 : 0xffb52c);
     for (const floor of this.reunionFloors) {
       floor.visible = c.releasing || c.rescued;
       floor.position.y = floor.visible ? -.25 : -4;
     }
     this.sewer.sync(c.security, dt);
     const t = Math.min(1, c.releaseElapsed / 4);
-    this.pod.position.set(0, 25 - 22.35 * t, 49 + 15 * t);
+    this.pod.position.set(0, VOLT_FINALE_CELL.y - (VOLT_FINALE_CELL.y - 2.65) * t, 49 + 15 * t);
+    for (const feed of this.podFeeds) {
+      const bottomY = this.pod.position.y + 2.2, bottomZ = this.pod.position.z;
+      this.feedDirection.set(0, 38 - bottomY, 49 - bottomZ);
+      feed.position.set(feed.position.x, (38 + bottomY) / 2, (49 + bottomZ) / 2);
+      feed.scale.y = this.feedDirection.length();
+      feed.quaternion.setFromUnitVectors(this.up, this.feedDirection.normalize());
+    }
     for (const panel of this.glassPanels) {
+      panel.position.y = 0; panel.scale.y = 1;
       const side = panel.name.endsWith('-1') && !panel.name.endsWith('--1') ? 1 : -1;
       if (panel.name.includes('-x-')) panel.position.x = side * (3 + Math.max(0, t - .6) * 8);
       else panel.position.z = side * (3 + Math.max(0, t - .6) * 8);
@@ -294,9 +305,27 @@ export class LevelTwoRoomFiveGreybox {
     this.captiveVolt.visible = !c.rescued;
     this.captiveVoltPresentation.setVisible(!c.rescued);
     this.reunionDoor.position.y = -8.7 + 5.5 * Math.max(0, (t - .75) / .25);
-    this.exitDoor.position.y = 2.5 + (c.exitPowered ? 5.5 : 0);
     this.shortcut.position.y = c.rescued ? 28.75 : 40;
     this.shortcutEntry.position.y = this.shortcut.position.y;
+  }
+  /** The finale opens the suspended cell in place; it no longer lowers Volt
+   * into the unused exit bay before the escape can happen. */
+  presentCinematicCell(open: number): void {
+    this.pod.position.set(0, VOLT_FINALE_CELL.y, 49);
+    for (const panel of this.glassPanels) {
+      const side = panel.name.endsWith('--1') ? -1 : 1;
+      if (panel.name.includes('-x-')) panel.position.x = side * 3;
+      else panel.position.z = side * 3;
+      // The front shutter telescopes into its upper collar. The other panes
+      // stay attached: no four free-floating glass walls around the escape.
+      if (panel.name === 'room-5-pod-glass-z--1') {
+        panel.position.y = open * 1.96; panel.scale.y = 1 - open * .98;
+      }
+    }
+    for (const feed of this.podFeeds) {
+      const bottom=VOLT_FINALE_CELL.y+2.2;
+      feed.position.set(feed.position.x, (38+bottom)/2, 49); feed.scale.y = 38-bottom; feed.quaternion.identity();
+    }
   }
   copyCheckpointSpawn(slimeId: 'bob' | 'goop' | 'volt', target: THREE.Vector3): THREE.Vector3 {
     if (this.controller.checkpoint === 'rescued') {

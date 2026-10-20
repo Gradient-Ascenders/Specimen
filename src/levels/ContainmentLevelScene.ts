@@ -5,6 +5,10 @@ import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresent
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomOneMonitor } from '../render/environment/containment/RoomOneMonitor.ts';
+import { RoomTwoMonitor } from '../render/environment/containment/RoomTwoMonitor.ts';
+import { RoomThreeMonitor } from '../render/environment/containment/RoomThreeMonitor.ts';
+import { RoomFiveMonitor } from '../render/environment/containment/RoomFiveMonitor.ts';
+import { ContainmentSurveillanceCameras } from '../render/environment/containment/ContainmentSurveillanceCameras.ts';
 import { fitContainmentShadowCullingBounds } from '../render/environment/containment/ContainmentShadowCoverage.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -135,7 +139,7 @@ const PRESERVED_STATIC_ART_NAMES = {
     'room-5-observation-control-room',
     'room-5-observation-angled-control-console',
     'room-5-observation-connection',
-    'room-5-soluble-composite-door-structural-frame',
+    'room-5-escape-vent-structural-frame',
     'room-5-east-ascent-adhesion-membrane',
     'room-5-east-ascent-extension-adhesion-membrane',
     'room-5-east-front-clinical-wall-zone',
@@ -154,6 +158,10 @@ export class ContainmentLevelScene {
   readonly roomFive: RoomFiveGreybox;
   readonly lighting: ContainmentLightingRig;
   readonly roomOneMonitor: RoomOneMonitor;
+  readonly roomTwoMonitor: RoomTwoMonitor;
+  readonly roomThreeMonitor: RoomThreeMonitor;
+  readonly roomFiveMonitor: RoomFiveMonitor;
+  readonly surveillanceCameras: ContainmentSurveillanceCameras;
   readonly staticBatchDiagnostics: readonly ContainmentStaticBatchDiagnostics[];
   private readonly staticBatches: readonly ContainmentStaticBatchResult[];
   private readonly measuredFirstUseGeometryResources: readonly THREE.Mesh[];
@@ -161,6 +169,7 @@ export class ContainmentLevelScene {
   private measuredFirstUseGeometryResourcePrimeCount = 0;
   private readonly roomOneOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly roomThreeOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly finaleOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
 
   get goop() { return this.teaching.goop; }
 
@@ -222,6 +231,18 @@ export class ContainmentLevelScene {
     // screen must not alter first-use batch identities or gameplay collision.
     this.roomOneMonitor = new RoomOneMonitor(this.artResources);
     this.teaching.roomOneArt.root.add(this.roomOneMonitor.root);
+    this.roomTwoMonitor = new RoomTwoMonitor(this.artResources);
+    this.teaching.roomTwoArt.root.add(this.roomTwoMonitor.root);
+    this.roomThreeMonitor = new RoomThreeMonitor(this.artResources);
+    this.roomThree.art.root.add(this.roomThreeMonitor.root);
+    this.roomFiveMonitor = new RoomFiveMonitor(this.artResources);
+    this.roomFive.art.root.add(this.roomFiveMonitor.root);
+    // Dynamic gimbals must not enter the frozen room-local static batches.
+    this.surveillanceCameras = new ContainmentSurveillanceCameras({
+      1: this.teaching.roomOneArt.root, 2: this.teaching.roomTwoArt.root,
+      3: this.roomThree.art.root, 5: this.roomFive.art.root,
+    });
+    this.surveillanceCameras.reset(this.teaching.copySpawnPosition(new THREE.Vector3()));
     this.measuredFirstUseGeometryResources =
       resolveMeasuredFirstUseGeometryResources(this.root);
     // Preserve light-bearing ancestry (including the elevator warning lamps):
@@ -230,6 +251,10 @@ export class ContainmentLevelScene {
       this.roomThree.root, this.roomFour.root, this.roomFive.root,
     ]);
     this.roomThreeOccludedBranches = collectLightlessBranches([this.roomFive.root]);
+    this.finaleOccludedBranches = collectLightlessBranches([
+      this.teaching.roomOneArt.root, this.teaching.roomTwoArt.root,
+      this.roomThree.root, this.roomFour.root,
+    ]);
   }
 
   /** Small #38-facing API; callers never need individual fixture objects. */
@@ -352,8 +377,22 @@ export class ContainmentLevelScene {
     }
   }
 
+  /** The finale cannot see earlier chambers. Keep their lights' ancestry and
+   * borrowed character roots intact, but don't submit their enclosed geometry. */
+  withRoomFiveCinematicScope<T>(draw: () => T): T {
+    for (const branch of this.finaleOccludedBranches) {
+      branch.visible = branch.root.visible; branch.root.visible = false;
+    }
+    try { return draw(); }
+    finally { for (const branch of this.finaleOccludedBranches) branch.root.visible = branch.visible; }
+  }
+
   update(deltaSeconds: number, bobPosition?: Vector3State, activePosition = bobPosition): void {
+    this.surveillanceCameras.update(deltaSeconds, bobPosition);
     this.roomOneMonitor.update(deltaSeconds);
+    this.roomTwoMonitor.update(deltaSeconds, activePosition);
+    this.roomThreeMonitor.update(deltaSeconds, activePosition);
+    this.roomFiveMonitor.update(deltaSeconds, activePosition);
     if (activePosition) this.lighting.setTraversalPosition(activePosition);
     if (bobPosition) {
       this.lighting.setBobInDarkDuct(
@@ -361,16 +400,22 @@ export class ContainmentLevelScene {
       );
     }
     this.roomThree.updatePresentation(deltaSeconds);
-    this.roomFive.updatePresentation(deltaSeconds);
+    this.roomFive.updatePresentation(deltaSeconds, activePosition);
     this.lighting.update(deltaSeconds);
   }
 
   resetPresentation(): void {
     this.lighting.reset();
     this.roomOneMonitor.reset();
+    this.roomTwoMonitor.reset();
+    this.roomThreeMonitor.reset();
+    this.roomFiveMonitor.reset();
+    this.roomFive.goopSpeech.reset();
+    this.surveillanceCameras.reset();
   }
 
   reconcilePresentationAfterRecovery(bobPosition: Vector3State): void {
+    this.surveillanceCameras.reset(bobPosition);
     this.lighting.setTraversalPosition(bobPosition);
     this.lighting.setBobInDarkDuct(
       this.isInsideCameraTightVent(bobPosition),
@@ -387,7 +432,11 @@ export class ContainmentLevelScene {
   }
 
   dispose(): void {
+    this.surveillanceCameras.dispose();
     this.roomOneMonitor.dispose();
+    this.roomTwoMonitor.dispose();
+    this.roomThreeMonitor.dispose();
+    this.roomFiveMonitor.dispose();
     this.lighting.dispose();
     for (const staticBatch of this.staticBatches) staticBatch.dispose();
     this.roomFive.dispose();

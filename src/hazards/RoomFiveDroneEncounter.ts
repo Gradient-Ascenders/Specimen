@@ -53,6 +53,7 @@ export class RoomFiveDroneEncounter {
   private sewerTime = 0;
   private readonly sewerDamage: SewerDroneDamage;
   private disposed = false;
+  private cinematic = false;
   readonly room: LevelTwoRoomFiveGreybox;
   constructor(room: LevelTwoRoomFiveGreybox, world: CollisionWorld, surfaces: SurfaceRegistry,
     bob: KinematicBody, goop: KinematicBody, requestDeath: (id: 'bob' | 'goop') => boolean,
@@ -121,7 +122,7 @@ export class RoomFiveDroneEncounter {
       flyer.body.scale.setScalar(.75);
       flyer.body.name = `${drone.id}-flying-shell`;
       // Network switches disable weapons; these patrols still hover in place.
-      this.flightAudio.push(new WorldAudioSource({ root: drone.root, kind: 'drone' }));
+      this.flightAudio.push(new WorldAudioSource({ root: drone.root, kind: 'drone', enabled: () => !this.cinematic }));
       drone.presentation.root.visible = false; drone.root.add(flyer.body); this.flyers.push(flyer);
       // Saturated blue, with stronger opacity so it stays readable without whitening it.
       const beamColour = network === 'blue' ? 0x165dff : ROOM_FIVE_NETWORK_COLOURS[network];
@@ -163,7 +164,7 @@ export class RoomFiveDroneEncounter {
     this.reset();
   }
   update(dt: number): void {
-    if (this.disposed) return;
+    if (this.disposed || this.cinematic) return;
     this.damage.update(dt);
     this.sewerLighting.update(dt);
     this.platformBoosters.update(dt, this.targets[0].position);
@@ -230,7 +231,15 @@ export class RoomFiveDroneEncounter {
     this.sewerLight.position.set(0, .2, -1.4).multiply(shell.scale)
       .applyQuaternion(shell.quaternion).add(shell.position);
   }
+  beginCinematic(): void {
+    this.cinematic = true; this.projectiles.reset(); this.presentation.mesh.visible = false;
+    for (const drone of this.drones) drone.setEnabled(false);
+    for (const beam of this.beams) beam.visible = false;
+    for (const light of this.searchLights) light.intensity = 0;
+  }
+  endCinematic(): void { this.cinematic = false; }
   reset(): void {
+    this.cinematic = false;
     this.damage.reset(); this.projectiles.reset(); this.presentation.reset();
     this.scannerBeams.reset();
     for (const search of this.searchLights) {

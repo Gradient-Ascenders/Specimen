@@ -231,6 +231,78 @@ Its final handoff paints a warmed gameplay frame before the browser can present,
 retains Room 1's raised-container aftermath on restart, and disposes cinematic resources
 once. Shutdown cancels scheduled startup work and ignores late async callbacks.
 
+The Room 5 contact button runs an 82.52-second live finale in the shared Level 1 runtime
+(development and production). `IdleCinematicPreparation` submits at most one
+small job per idle callback, requires at least 8 ms of genuine spare time, and
+does not force work with a timeout. CPU preparation is spread across Level 1;
+new GPU resources are compiled/uploaded one drawable at a time only with Room 5's
+live lighting and parallel shader support. Busy frames and pause defer work.
+Browsers without idle/parallel support finish remaining jobs one per rendered
+frame behind an opaque, skippable preparation screen; the story clock waits.
+Shader-status polling is cancelled before disposal, including in-flight work.
+
+The finale borrows the already-prepared Bob/contained-Goop models and retained
+gameplay camera. It adds no lights or character downloads: four pooled drones,
+bounded instanced projectiles/wreck, and a two-draw straight escape airduct with
+a real floor-drop opening. Earlier room art is excluded from the cinematic draw without
+changing light ancestry or hiding the borrowed actors. Its canvas is capped at
+1280×720 pixels (or the current gameplay buffer if smaller), with DOM scan optics
+and letterboxing. The authoritative button gates the actual lasers and freezes
+carriers; the real soluble door burns before the escape. Fixed-step time owns
+pause, Enter/button skip, and the exactly-once Level 2 handoff after the vent dive.
+Restart restores borrowed model parents, camera settings, and gameplay resolution.
+Development builds additionally bind `9` (or numpad `9`) during live Level 1
+gameplay to preview this same finale from its authored button pose, then perform
+the normal Level 2 handoff. The shortcut is absent in production, even with
+opt-in diagnostics, and ignores pause, text inputs, death, and repeated keys.
+Bob's route uses timed gravity arcs, continuous ground travel, and the gameplay
+model's charge, launch and landing responses. Bob takes the short platform hop,
+walks to its clear edge and jumps directly onto the drone; he no longer detours
+onto or attaches to the sticky wall. Acting advances on
+the movie clock in bounded substeps; repeated/paused renders do not advance it.
+The platform/drone establishing shot precedes Bob's decision, and his dismount has a
+dedicated falling shot before the two animated landings. Completed drone scans
+reveal a large threat rating; Goop's CRITICAL rating precedes MUST TERMINATE.
+MUST TERMINATE is centred at large size for 2.7 seconds and pulses at about
+1.4 Hz on the movie clock (so pause freezes it); reduced-motion displays retain
+steady text. The shared timing map shifts subsequent action/audio/escape cues
+by the same 1.8 seconds; it does not consume any of the fight. Goop uses five
+charged ballistic dodges with his real gel launch/landing responses, while the
+drone makes broad banking passes before settling for Bob's mount. Each missed
+acid shot is traced to actual room art/collision during its own idle job; playback
+uses one fixed 39-instance pool for rounded, wet contact lobes, connected
+gravity-driven runs/beads and short-lived splash droplets,
+with positional impact audio and no live raycasts or additional lights. The
+quiet beat displays a green "Thanks". The duct's shaft/rim use non-overlapping
+butt joints rather than coincident faces around the floor opening. The
+platform-approach/launch cameras stay above the unobstructed side of the bounce platform.
+The reinforcements appear single-file behind Room 4's real doorway, turn
+side-on to clear it, then split into three C1-continuous pursuit lanes. A short
+entrance return shares the existing annex shell draw rather than submitting
+the whole previous room. The doorway establishing camera clears the cell.
+Bounded banking and pre-authored close calls are checked against both moving heroes. Each
+close call is prepared in its own idle job; the projectile/drone pools do not grow.
+Goop turns to inspect the escape cover before firing. The old door identity is
+retained for dissolve/checkpoint compatibility, but its actual geometry is now
+a single-mesh wooden crate with a solid top, sides and core in Level 1 Room 5.
+Its frame and wall opening form a real 1.8 m-wide service vent. The 2.64 m drone
+rotor span cannot enter: pursuers brake outside and fire at the surround while
+the slimes run single-file through the metal duct and take staggered dives.
+The duct section runs at 60% of its former duration, without Bob's waiting
+beat. One final authored round passes through the actual vent opening just
+above diving Bob, then reaches the duct end; the craft stays outside.
+Bob presses the release button by physical contact, not sticky adhesion.
+Only its round cap depresses; the registered button collider stays static.
+Bob uses authored facial morphs; Goop uses subtle per-instance, centre-pivoted
+eye transforms, without editing meshes, adding shaders or changing neutral play.
+The cell's stationary dressing is cloned and batched in separate idle jobs using
+the existing static-batch helper; the actual opening panels stay independently
+animated. Originals retain their names, geometry, material ownership and collision.
+The front release hatch pivots outward/upward from its top header, with matching
+horizontal hinge knuckles. Simulation, rendering and skip share its clamped
+release pose; the hatch clears the authored Goop model and his route underneath
+without adding geometry, lights or live collision work.
+
 `tests/OpeningLaboratory.test.ts` checks continuous forward travel, room spacing,
 bounded pan speed/tilt, desktop/portrait framing and unobstructed plaques,
 the open portal crossing, sealed overhead transom, authored room dressing,
@@ -254,6 +326,170 @@ gameplay browser tests explicitly skip the opening but still await real readines
 Browser cases can target dev with `SPECIMEN_PRODUCTION_URL=http://127.0.0.1:5173`
 or the production preview. These headless cases do not establish assessment-PC
 hardware performance or a guaranteed loading time.
+
+## Observation monitors
+
+Level 1's monitors share a three-mesh, visual-only wall terminal and a bounded
+uppercase typewriter timeline. Room 1 retains its six-gameplay-second delay and
+uses green dialogue. Room 2 sits on the clean east-wall panel left of the sticky
+installation, with its centre at the sticky membrane's 7.738m height. Its
+red/green/red sections begin only when the active slime enters a 3m sphere around
+the side-jump platform (4.2, 4.56, 31.0999). The floor below and upper return
+route are outside that sphere. Activation is latched: leaving does not pause or
+restart the script; restarting the level clears the trigger and text.
+Room 2's final red response is `WE WILL OBSERVE`.
+
+Cultivation Room 1 reuses this terminal to the right of its exit door, with one
+Bob-tracking camera to the left when viewed from the room. A 6m approach sphere
+centred at (0, 1, 45.5) starts the red/green/green retrieval exchange. Its three
+terminal draws borrow Cultivation's existing metal finishes; the camera uses the
+shared three-mesh design. Both are visual-only, add no lights or shadow casters,
+use the normal room preparation/culling and fixed-step pause/reset lifecycle,
+and are present in development and production. Proximity transforms from world
+space into the room; the positional typing source remains at the world screen.
+
+Cultivation Room 2 adds a Bob-tracking camera on the blank west-wall panel,
+screen-left of the upper sticky control, and a terminal centred above Goop's
+locked exit. Its four shield-system sections are green/red/green/green, with
+20-column wrapping and normal type/reading pauses. A 7.5m door-approach sphere
+starts the terminal; culled rooms do not update it. The hold button retains its
+exact static sticky collider, press travel and Bob-only door authority. New
+rounded armour, captive fasteners, an unlettered face and linked red/green
+status bars are presentation-only and add no lights or shadow casters.
+
+Cultivation Room 3 mounts a tracking camera above the elevator approach. Its
+red/green/green observation terminal sits inside the lift's boarding alcove,
+on the left wall facing the lift, entirely before the elevator deck. It follows
+the boarding scenery as the lift descends, rather than riding on the platform.
+Completed terminals retain their final page on checkpoint retry; unfinished
+ones restart, and a full level restart clears their completion memory.
+
+Room 3's seven resistant drone bodies flash a pooled cyan field, lattice and
+impact ripple when hit by Goop's actual swept acid projectiles. Their soluble
+support cables remain vulnerable. The effect adds no colliders or lights and
+uses at most three instanced draws; empty slots participate in room prewarming.
+
+Landing Bob on either of the final two upper platforms starts the live clearance
+sequence. Bob walks to the lip, charges and leaps straight to the safe floor,
+with a squash and small elastic rebound on landing. No extra descent platforms
+are added. Flight timing adapts to the starting height. The same one-shot
+sequence also covers skipping those platforms and landing on a ground
+drone or the final safe bank. This entrance keeps his actual pose, hops clear
+of the row if needed, then walks behind it to the push starting point without
+teleporting upstairs. It uses the existing Bob model, interpolated kinematic
+body poses, normal launch/landing
+acting, and the real ground-drone tipping and acid-disable authority. Four
+staggered pushes carry the drones fully clear of the bank before lowering and
+tipping them into the acid. Their submersion uses liquid
+ripples and one 48-instance displacement pool. Resources are constructed before
+room preparation, not at the trigger. Ordinary gameplay and hostile fire are
+suspended, while native pause remains available. Fixed time freezes during
+pause/preparation; camera tracking and DOM letterboxing return smoothly to play.
+The completed sequence leaves all four ground drones disabled and Bob grounded
+on the safe floor. Checkpoint/puzzle resets restore its one-shot trigger.
+
+`CultivationGoopSpeech` follows the real Goop with one reusable typed billboard
+and positional voice accents. Player-directed horizontal movement of either
+slime starts Room 1's introduction, not load time, gravity or camera movement.
+The name question has a 3.5s pause before the ellipsis. Both Bob and Goop must
+be in Room 2 before its entry gives
+the actionable hold-button instructions priority. Speech pauses out of earshot
+or in hidden rooms. Once the elevator enters its stopped arrival state, Goop
+explains that they need Volt and that Volt previously blacked out the facility;
+this conversation continues seamlessly from the lift into Room 5. As elsewhere,
+completed conversations survive checkpoint recovery, while
+unfinished conversations can retry and a full restart clears their memory.
+Goop's speech planes are now 3.6×1.8m in both levels (25% smaller). While Goop
+is controlled, only the existing visual mesh moves into a screen-safe
+inset: both screen axes bound its scale for narrow windows, close walls and
+first-person ability aim. Switching to Bob restores the normal depth-tested
+world balloon, except the elevator-to-vent conversation, which keeps the
+screen-safe inset for either listener so the low vent roof cannot hide it.
+Its root/voice stay at Goop throughout; no second display or
+audio source is created. Landscape framing clears the roster; compact
+square views use the upper-left and portrait views use the clear lower area.
+
+On fresh Level 2 entry (and full Room 1 restart), both real bodies drop from
+above the existing ceiling vent onto the safe entry floor. Ordinary physics,
+airborne/landing animation and positional landing audio handle the staggered
+fall. A short camera track stays below the ceiling and before the suspended
+platform, then blends back to the continuously updated player-follow rig.
+Movement, look, jumping, switching and abilities wait for both landings and the camera return;
+native input remains available for pointer capture and pause/resume.
+Preparation and pause do not advance this entrance. Recovery checkpoints remain
+at floor level, so death/retry and development room teleports do not replay it.
+This entrance adds no scene assets, lights, colliders or per-frame resources.
+
+Room 1's platform landings displace the acid with four perimeter ripple pulses
+and a fixed two-draw splash pool: up to 36 prebuilt curved crown sheets and 72
+ballistic droplets across the three platforms. No geometry/material is created
+on impact, no additional lights/shadows are added, and dormant/culled pools do
+not upload instance transforms. Existing room preparation primes one harmless
+offscreen instance from each empty pool, avoiding first-impact buffer uploads.
+All these features share the normal development/production runtime.
+
+Room 3 uses the same proximity behaviour, with green/red/red dialogue about the
+acid leak and Goop. Its screen sits low on the east-entry panel, left of the first
+sticky wall, at (16.65, 12.85, 53.2). A 3.5m sphere around the wider gap platform
+(11.2583, 12.1429, 59) activates it, excluding the entrance and upper route.
+
+Room 5's monitor faces the central rest platform from the rear wall above the
+Goop door. Its 3.5m trigger is centred at (-0.68, 81.542, 115.652). The red/green/red
+observer exchange uses overflow pages for the longer green response, rather than
+reducing the lettering size. Only the overflow pause before `CAPABILITIES` is
+shortened from 2s to 1s; the green response retains the normal 0.09s character
+interval and its following section pause stays at 3s. Goop has a separate 8m
+proximity conversation around his containment cell. A single depth-tested, camera-facing speech balloon types
+four pleas, pauses while the player is out of range, holds the final hint for 4s,
+then fades out. The release sequence hides it immediately. Checkpoint recovery
+restarts unfinished dialogue, but retains completion as soon as the final hint
+is fully typed, even during its reading hold or fade. Completed warnings do not
+repeat after death; a full level restart clears that memory. Its one 512×256
+texture, plane and unlit material are
+allocated up front, with only glyph changes uploading pixels. It is diegetic
+content, like the wall monitors, not part of the F1-hidden guidance HUD.
+
+All retain the 0.09s character interval and 3s section pause. Overflow pages hold
+for 2s except the 1s pause before Room 5's `CAPABILITIES`. Each owns a single 512×256 texture (0.5 MiB), repainted
+only when text changes, with no new lights, shadow casters, physics geometry or
+per-frame GPU allocations. They are attached after static batching to preserve
+the measured first-use owner names and frozen collision layout. Unit tests cover
+timing, colour, punctuation, trigger boundaries, ownership and reset; the shared
+browser test exercises rendered playback and restart in dev and production.
+
+Goop's cell has a static high-security dressing: dark armoured headers/corners,
+amber/black caution tape and front-only corrosive/biological warning plaques and
+a GOOP / CRITICAL identification plate. Only the text is red: decorative red
+bars/status marks are omitted, including those around the lower release label.
+The critical red matches the opening's experiment directory. Three draws (two
+borrowed-geometry instance batches and one merged marking mesh) share one owned
+512×512 atlas (1 MiB,
+no mipmaps), with no additional lights or shadow casters. An isolation grate
+supports Goop's authored resting sole. The front/rear clamps are offset to keep
+him visible; the joined header clears all labels and stays below the original
+traversable roof. Collision, laser routes, release and checkpoint logic are
+unchanged. RoomFiveArt owns and idempotently disposes the security dressing;
+shared materials and primitive geometry stay borrowed.
+
+## Level 1 surveillance
+
+Six wall-mounted cameras track Bob with smoothly damped, mechanically bounded
+pan/tilt joints, even while another slime is controlled. Room 1 has one left of
+its monitor; Room 2 has one right of its monitor and one above its exit doorway;
+Room 3 has one right of its monitor and one on the blank rear-wall panel beside
+the final sticky strip; Room 5 has one above its monitor. They use the normal
+scene update, so pause/death cannot advance an independent animation clock.
+Recovery reconciles their headings with Bob; restart restores their initial pose.
+
+All six share three small merged geometries and two materials, with three draws
+per visible fixture, no texture downloads, lights, shadow passes or colliders.
+Tracking changes only parent transforms, not geometry or GPU buffers. They are
+attached beneath the appropriate room roots after static batching, retaining
+room occlusion, frustum culling and the measured first-use owner identities.
+The Room 1 debug spawn ring is no longer created. Room 3's sticky-wall trim has
+separated depth layers and non-overlapping corner joints rather than coplanar
+rails/backing. Tests cover placement in dev/production, Bob-only tracking,
+smoothing, limits, reset, shared ownership and the trim's geometric separation.
 
 ## Settings and lightweight diagnostics
 
@@ -504,6 +740,89 @@ and mutable geometry arrays and retains responsibility for disposing them.
 Sampler settings can change independently between owners. Texture pixels are
 borrowed immutable views of the decoded bundle. Restart reuses the scene's
 resources, and unloading releases the same resources as the authored path.
+
+Room 5's Volt enclosure reads as a bioelectric extraction cell: copper induction
+stacks, ceramic insulators, collector rings, armoured glass and a critical power-cell
+plate. A guarded push button replaces the lever; its signal conduit follows a
+supported ceiling tray into the cell's power bus. The button, battery meter and
+feed accents share one live status material. The two suspension feeds stay connected
+to the cell; its front glass shutter retracts into the upper collar for the escape. Detail
+geometry is baked and merged by finish, with no new lights or textures.
+
+`CultivationFinale` takes fixed-step authority when the release button completes.
+The 129-second live sequence borrows the three loaded slime presentations, nine
+patrol hulls and final cover panel. It stages Volt's critical scan, the cover strike,
+Bob's catastrophic reclassification, Volt's hijack/dogfight, Goop's intervention,
+the dialogue, the shared-drone escape and the abandoned carrier's power-down.
+The captured craft follows a fast circuit around the cell, its feeds and suspended
+platforms. Interceptors pursue on a separate arc-length flight circuit; all seven
+flying opponents have scheduled visible destruction before pickup. The crushed
+acid wreck remains, but it never fires a last shot at the escaping heroes.
+The panel clears the full hull and antenna during the
+strike/plunge, then is explicitly hidden at the first acid cut, never reappearing
+in later exterior or POV shots. No dead interceptors fire after pickup.
+The captured craft's positional hum stops as it powers down and falls into the acid.
+The cell-opening/alert coverage is deliberately slower on one shared remapped clock;
+the room keeps a gentle 2.4-second emergency pulse throughout the escape. Patrol
+drift/turning continues during reaction shots and dialogue. Nine precomputed
+curved alert paths climb around the cell instead of interpolating through it;
+their envelopes are checked from multiple live patrol states. Bob anticipates his
+forward shoulder hop, with dedicated topple/impact/fall cuts, a brief camera kick
+and pooled debris. The falling panel and victim share one trajectory, and riders
+use the hull's bank/yaw frame with sole contact on its actual deck. The extraction
+cell sits at 31 m: Bob's scanner is approximately eye-level and Volt boards from
+its nearby front lip. Carrier headroom queries use Volt's transformed world position,
+not the borrowed presentation's local origin. Ordinary rendering never writes
+world positions into these borrowed local poses. The boarding flight uses a
+single eased arc-length curve with analytic heading and broad curvature banking,
+avoiding low-speed finite-difference steering jitter and settling upright beside Goop. It climbs
+through a clear central lane before crossing toward the upper vent,
+avoiding the suspended platforms and their cables.
+Goop waits in a real east-wall opening at cell height (floor 27.8 m), not in the
+sewer return. The baked annex has panel seams, pressed floor trays, service pipes,
+fasteners, practical strips and shaft ribs. Bob and Volt make short animated
+dismount jumps into the vent beside Goop; no explosion propels them through it.
+After a short landing pause, Goop says "Follow me, I know the way out" and
+leads an ordinary grounded walk. The duct starts shaking and shedding dust; its
+normal pressed-metal floor buckles, they brake, then the centre joint fails and drops them down
+the shaft. Its two prebuilt hinge roots are excluded from static freezing and
+have independent surface-repair motion domains; buckling/breaking/open states are audited too.
+A distinct damp side tunnel establishes Goop's approach. The collapse is roughly
+22 m from the entrance, with the inspection grille 6 m ahead of it. After the deep drop,
+the lens peeks under a partly lifted grille into a tiled lab service room with
+benches, equipment and observation windows. Small wall-mounted wayfinding lives
+in that room only: EXIT points right and BASEMENT points diagonally down-left.
+BASEMENT lettering is enlarged to 24 cm for readability.
+Inactive-body locators and gameplay camera fading are suppressed while the movie
+owns the actors.
+Level 3 and Volt's unlock wait for completion (or the supported Enter/skip action).
+The Level 2 dev-only `8`/numpad `8` shortcut stages the same sequence; it is absent
+from other level runtimes and rejects pause, repeat and editable-field input.
+
+The existing Room 5 preparation queue visits the baked duct and fixed-capacity
+projectile/debris meshes while hidden. Playback does not construct a second scene,
+load models, allocate effects or add lights. The alarm changes existing lamp uniforms;
+the cinematic's temporary ambient/material visibility lift is restored on reset.
+The real cover's fittings travel with it, outside static batches. Normal combat,
+movement, switching and abilities freeze under movie authority, while native pause
+controls remain enabled. Pause and GPU preparation do not advance the movie clock.
+Once inside the vent, offscreen exterior meshes are hidden without deregistering
+their lights; the original sewer cannot draw across the new vertical airduct.
+Restart/unload restore borrowed actors, geometry ownership, camera parameters and UI.
+
+Level 3 begins with a seven-second arrival through a sloped wall vent. Bob,
+Goop and Volt use their existing bodies and models, stagger their launches and
+landings onto the safe checkpoint apron, then return control through a smooth
+camera blend. After all three clear the outlet, a damaged panel falls across
+the passage and enables a real collision blocker. It remains sealed after
+death, checkpoint recovery and full restart so Volt cannot fly back up the chute.
+The vent borrows the maintenance bay's existing finishes, adds no lights, and
+shares the level's preparation, pause, disposal and resource ownership.
+
+The sewer checkpoint latches Bob's upper-route arrival and Goop's passage beyond
+the destroyed rusted drone independently. Goop can cross either bank or jump through
+the full-width clearance zone; neither character has to remain at a tiny trigger.
+The existing controls checkpoint still supplies the same safe retry positions.
 
 The bake includes the lab, weather, membrane, platform, equipment, glass and
 warning textures; shared ceramic/acid inputs; equipment and deck geometry;

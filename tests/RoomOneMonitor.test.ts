@@ -137,11 +137,12 @@ test('typing reuses one small texture and all geometry, uploading only for visib
     monitor.update(.01); assert.equal(texture.version, initial + 1);
     const bodyHasText = () => {
       for (let y = 80; y < 210; y++) for (let x = 24; x < 480; x++) {
-        if ((texture.image.data as Uint8Array)[(y * 512 + x) * 4] > 150) return true;
+        const pixels = texture.image.data as Uint8Array, index = (y * 512 + x) * 4;
+        if (pixels[index + 1] > pixels[index] + 50 && pixels[index + 1] > pixels[index + 2] + 40) return true;
       }
       return false;
     };
-    assert.equal(bodyHasText(), true, 'typed characters must change the uploaded pixels');
+    assert.equal(bodyHasText(), true, 'typed characters must change the uploaded pixels to green');
     monitor.update(50);
     const completeVersion = texture.version;
     for (let i = 0; i < 120; i++) monitor.update(1 / 60);

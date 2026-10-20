@@ -38,6 +38,47 @@ test('patrol drone detailing fits its envelope and retains its live eye with bat
   }
 });
 
+test('Volt power cell has baked extraction machinery, a connected button circuit and attached feeds throughout release', () => {
+  const room = new LevelTwoRoomFiveGreybox(() => {});
+  const lab = new CultivationLabMaterials(cultivationAssets), contamination = new CultivationContaminationArt(lab);
+  const art = new CultivationMaintenanceArt(room, lab, contamination);
+  const countLights = () => { let count = 0; room.root.traverse(o => { if (o instanceof THREE.Light) count++; }); return count; };
+  const lights = countLights();
+  try {
+    const machinery = room.pod.getObjectByName('room-5-volt-battery-extraction-array')!;
+    assert.ok(machinery);
+    assert.ok(machinery.getObjectByName(`${machinery.name}-copper`), 'induction stacks and collection rings');
+    assert.ok(machinery.getObjectByName(`${machinery.name}-ink`), 'Volt power-cell and critical containment signage');
+    const tray = room.root.getObjectByName('room-5-volt-release-connected-power-tray')!;
+    assert.ok(tray, 'a physical ceiling tray connects the console and suspended cell');
+    assert.equal((tray.getObjectByName(`${tray.name}-signal`) as THREE.Mesh).material, room.releaseButton.material);
+    const lamp = machinery.getObjectByName(`${machinery.name}-signal`) as THREE.Mesh;
+    assert.equal(lamp.material, room.releaseButton.material, 'battery meter and button share live release status');
+    const snapshots = [machinery, tray].map(root => root.children.map(o => (o as THREE.Mesh).geometry));
+    room.root.position.set(64, 0, 249);
+    for (const elapsed of [0, 1, 2.6, 4, 0]) {
+      room.controller.reset(elapsed ? 'rescued' : 'split');
+      room.controller.releaseElapsed = elapsed; room.syncPresentation(); room.root.updateMatrixWorld(true);
+      for (const feed of room.podFeeds) {
+        const lower = feed.localToWorld(new THREE.Vector3(0, -.5, 0));
+        const upper = feed.localToWorld(new THREE.Vector3(0, .5, 0));
+        const expectedLower = room.pod.localToWorld(new THREE.Vector3(feed.position.x, 2.2, 0));
+        const expectedUpper = room.root.localToWorld(new THREE.Vector3(feed.position.x, 38, 49));
+        assert.ok(lower.distanceTo(expectedLower) < 1e-8, `feed stays attached at release ${elapsed}`);
+        assert.ok(upper.distanceTo(expectedUpper) < 1e-8);
+        assert.ok(room.dynamicTransformRoots.includes(feed));
+      }
+      [machinery, tray].forEach((root, i) => assert.deepEqual(root.children.map(o => (o as THREE.Mesh).geometry), snapshots[i], 'no geometry allocation during release'));
+      assert.equal(countLights(), lights);
+    }
+    const meshes: THREE.Mesh[] = [];
+    for (const root of [machinery, tray]) root.traverse(o => { if (o instanceof THREE.Mesh) meshes.push(o); });
+    assert.equal(meshes.length, 11, 'hundreds of fittings remain eleven shared-material batches');
+    room.reset(); assert.equal(room.releaseButton.position.z, 27.24);
+    assert.equal(room.releaseButton.material.color.getHex(), 0xffc754);
+  } finally { art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); }
+});
+
 test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and checkpoint/reset transforms', () => {
   const before = new LevelTwoRoomFiveGreybox(() => {}), room = new LevelTwoRoomFiveGreybox(() => {});
   const lab = new CultivationLabMaterials(cultivationAssets), contamination = new CultivationContaminationArt(lab);

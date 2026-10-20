@@ -6,6 +6,25 @@ import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 
+test('Room 2 upper duct keeps its frame and ceiling fixtures but has no floating guide bars',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),duct=scene.roomTwoToThreeBobAirDuct;
+  try{
+    assert.equal(scene.root.getObjectByName('cultivation-room-2-cultivation-vent-guide-batch'),undefined);
+    for(let i=1;i<=3;i++)assert.ok(duct.root.getObjectByName(`${duct.root.name}-ceiling-light-${i}`));
+    assert.ok(scene.root.getObjectByName('cultivation-room-2-bob-vent-west-jamb'));
+    scene.root.updateMatrixWorld(true);
+    for(const dx of [-.7,0,.7]){
+      const ray=new THREE.Raycaster(new THREE.Vector3(72+dx,20.2,122.4),new THREE.Vector3(0,0,1),0,.6);
+      const visible=ray.intersectObject(scene.root,true).filter(hit=>{
+        const mesh=hit.object as THREE.Mesh;
+        const material=Array.isArray(mesh.material)?mesh.material[hit.face!.materialIndex]:mesh.material;
+        return material.visible;
+      });
+      assert.equal(visible.length,0,'No decorative geometry crosses the former guide positions.');
+    }
+  }finally{scene.dispose();}
+});
+
 test('dressing releases original geometry without disposing borrowed replacements or proxies', () => {
   const lab = new CultivationLabMaterials(cultivationAssets), art = new CultivationContaminationArt(lab);
   const root = new THREE.Group(), warning = new THREE.MeshStandardMaterial();

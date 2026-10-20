@@ -85,7 +85,7 @@ export class CultivationDroneChamberArt {
     if (/^room-5-chamber-(west|east|back|front)/.test(mesh.name)) return this.wall;
     if (mesh.name === 'room-5-chamber-roof') return this.ceiling;
     if (/^room-5-safe-\d+-network-\d+-baffle$/.test(mesh.name) || mesh.name === 'room-5-release-pedestal') return this.enamel;
-    if (/^room-5-pod-cable-|^room-5-manual-release-lever$/.test(mesh.name)) return this.iron;
+    if (/^room-5-pod-cable-/.test(mesh.name)) return this.iron;
     return undefined;
   }
 
@@ -134,18 +134,32 @@ export class CultivationDroneChamberArt {
       const width = (collider.geometry as THREE.BoxGeometry).parameters.width;
       if (width < .65) continue;
       collider.updateMatrix();
+      const moving = collider === room.releaseCoverCollider;
+      const movingParts = new Map<THREE.Material, THREE.BufferGeometry[]>();
+      room.releaseCover.updateMatrix();
+      const transform = moving ? room.releaseCover.matrix.clone().invert().multiply(collider.matrix) : collider.matrix;
+      const emit = (geometry: THREE.BufferGeometry, material: THREE.Material) => {
+        geometry.applyMatrix4(transform);
+        if (!moving) { add(geometry, material); return; }
+        const list = movingParts.get(material) ?? []; list.push(geometry); movingParts.set(material, list);
+      };
       const detail = (size: [number, number, number], at: [number, number, number], m: THREE.Material) =>
-        add(box(size, at).applyMatrix4(collider.matrix), m);
+        emit(box(size, at), m);
       for (const face of [-1, 1]) {
         for (const y of [-1.46, 1.46]) detail([width - .3, .12, .07], [0, y, face * .17], this.iron);
         for (const x of [-width / 2 + .22, width / 2 - .22]) {
           detail([.12, 2.76, .07], [x, 0, face * .17], this.iron);
-          for (const y of [-1.25, 0, 1.25]) add(new THREE.CylinderGeometry(.045, .045, .04, 6)
-            .rotateX(Math.PI / 2).translate(x, y, face * .225).applyMatrix4(collider.matrix), this.enamel);
+          for (const y of [-1.25, 0, 1.25]) emit(new THREE.CylinderGeometry(.045, .045, .04, 6)
+            .rotateX(Math.PI / 2).translate(x, y, face * .225), this.enamel);
         }
         // Short raised wear guards break up broad plate faces without masking exits.
         for (const x of [-.27, .27]) if (width > 1.6)
           detail([.065, 1.5, .055], [x, -.2, face * .163], this.iron);
+      }
+      for (const [material, pieces] of movingParts) {
+        const geometry = mergeGeometries(pieces)!; pieces.forEach(g => g.dispose());
+        const mesh = new THREE.Mesh(geometry, material); mesh.name = 'room-5-release-cover-moving-fittings';
+        mesh.userData.presentationOnly = true; room.releaseCover.add(mesh); this.meshes.push(mesh);
       }
     }
     for (const [key, part] of parts) {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FINALE_BOB_START } from '../cinematics/ContainmentFinaleTimeline.ts';
 
 import { EventBus } from '../core/EventBus.ts';
 import { CollisionHit, CollisionWorld } from '../physics/CollisionWorld.ts';
@@ -28,7 +29,7 @@ const INITIAL_GROUP_ID = 'containment-room-1';
 const ROOM_2_GROUP_ID = 'containment-room-2';
 const INITIAL_CHECKPOINT_ID = 'containment-room-1-spawn';
 const ROOM_2_CHECKPOINT_ID = 'containment-room-2-safe-floor';
-const LEVER_ADHESION_SECONDS = 0.35;
+const BUTTON_CONTACT_SECONDS = 0.08;
 
 export type ContainmentLevelState = 'playing' | 'completing' | 'complete';
 export const CONTAINMENT_ROOM_OBJECTIVES = {
@@ -100,7 +101,7 @@ export class ContainmentLevelController {
   private readonly unsubscribeCallbacks: Array<() => void> = [];
   private stateValue: ContainmentLevelState = 'playing';
   private activeRoomIdValue: ContainmentRoomId = 1;
-  private leverAdhesionSeconds = 0;
+  private buttonContactSeconds = 0;
   private lastFailureIdValue = 'none';
   private completionCountValue = 0;
 
@@ -215,6 +216,12 @@ export class ContainmentLevelController {
     return this.requestFailure(`${failure.roomId}:${failure.hazardId}`);
   }
 
+  skipEnding(): void {
+    if (this.stateValue !== 'completing') return;
+    this.scene.roomFive.finishEnding();
+    this.completeLevel();
+  }
+
   requestOutOfBoundsFailure(): boolean {
     return this.requestFailure('containment:out-of-bounds');
   }
@@ -231,13 +238,24 @@ export class ContainmentLevelController {
     this.stateValue = 'playing';
     this.setActiveRoom(roomId);
     this.reconcileBobPresentationAfterRecovery();
-    this.leverAdhesionSeconds = 0;
+    this.buttonContactSeconds = 0;
   }
 
   /** Development-only shortcut that exercises the normal level handoff event. */
   completeForDebug(): boolean {
     if (this.stateValue !== 'playing') return false;
     this.completeLevel();
+    return true;
+  }
+
+  /** Preview the real finale, including power shutdown and the normal Level 2 handoff. */
+  beginEndingForDebug(): boolean {
+    if (this.stateValue !== 'playing') return false;
+    this.teleportToRoomForDebug(5);
+    this.bobBody.recoverAt(new THREE.Vector3().fromArray(FINALE_BOB_START));
+    this.scene.lighting.setTraversalPosition(this.bobBody.position);
+    if (!this.scene.roomFive.beginEnding()) return false;
+    this.stateValue = 'completing';
     return true;
   }
 
@@ -248,7 +266,7 @@ export class ContainmentLevelController {
     this.roomTwoCheckpointTrigger.reset();
     this.stateValue = 'playing';
     this.setActiveRoom(1, true);
-    this.leverAdhesionSeconds = 0;
+    this.buttonContactSeconds = 0;
     this.lastFailureIdValue = 'none';
     this.completionCountValue = 0;
     this.scene.resetPresentation();
@@ -327,18 +345,18 @@ export class ContainmentLevelController {
 
     if (
       this.scene.roomFive.observationTrigger.occupied &&
-      this.body.attached &&
-      this.body.attachmentSurfaceName === this.scene.roomFive.leverHandleName
+      this.body === this.bobBody &&
+      this.scene.roomFive.isReleaseButtonPressed(this.body)
     ) {
-      this.leverAdhesionSeconds += deltaSeconds;
+      this.buttonContactSeconds += deltaSeconds;
       if (
-        this.leverAdhesionSeconds >= LEVER_ADHESION_SECONDS &&
+        this.buttonContactSeconds >= BUTTON_CONTACT_SECONDS &&
         this.scene.roomFive.beginEnding()
       ) {
         this.stateValue = 'completing';
       }
     } else {
-      this.leverAdhesionSeconds = 0;
+      this.buttonContactSeconds = 0;
     }
   }
 
