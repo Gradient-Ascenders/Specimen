@@ -501,16 +501,23 @@ test('startup yields between isolated submissions, primes the actual first view 
           current.addEventListener('dispose', () => targetDisposals.set(current, targetDisposals.get(current)! + 1));
         }
         assert.ok(viewport.x === 0 && scissorTest);
+        assert.deepEqual(viewport.toArray(), [0, 0, 1, 1]);
+        if (draws === 1) {
+          assert.deepEqual(camera.viewport?.toArray(), [0, 0, 640, 360],
+            'Size the camera-owned transmission attachment independently of shadow viewport restores.');
+          assert.equal(renderer.transmissionResolutionScale, 0.5);
+        } else {
+          assert.equal(camera.viewport, undefined, 'Restore the camera after the transmission primer.');
+          assert.equal(renderer.transmissionResolutionScale, 1);
+        }
       } else {
         assert.equal(target, null, 'One real canvas view is primed under the initial painted blackout.');
         assert.deepEqual(viewport.toArray(), [0, 0, 640, 360]);
+        assert.equal(renderer.transmissionResolutionScale, 0.5,
+          'Restore the requested quality before the actual canvas-sized draw.');
         assert.equal(scissorTest, false);
         assert.equal(scene.laboratory.root.visible, true);
         assert.equal(scene.laboratory.observatory.visible, false);
-      }
-      if (draws === 1) {
-        assert.deepEqual(viewport.toArray(), [0, 0, 640, 360], 'Prime the eventual camera-owned transmission dimensions.');
-        assert.equal(renderer.transmissionResolutionScale, 0.5);
       }
       if (draws === 2) {
         assert.equal(camera.position.z, L.backZ + 12);

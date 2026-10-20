@@ -160,7 +160,8 @@ export class OpeningGameScene {
     await renderLayer.withShadowPreparation(true, () => renderLayer.renderer.compileAsync(this.room.scene, this.room.camera));
     await yieldFrame();
     if (this.disposed) return;
-    const transmissionViewport = renderLayer.renderer.getViewport(new THREE.Vector4());
+    const transmissionViewport = renderLayer.renderer.getViewport(new THREE.Vector4())
+      .multiplyScalar(renderLayer.renderer.getPixelRatio?.() ?? 1).floor();
     const transmissionScale = renderLayer.renderer.transmissionResolutionScale;
     const prewarmTarget = new THREE.WebGLRenderTarget(1, 1);
     try {
@@ -168,12 +169,17 @@ export class OpeningGameScene {
       // they can present its discarded backbuffer between 30Hz intro frames.
       // Nested shadow/transmission passes stay isolated as well.
       withIsolatedPrewarmState(renderLayer.renderer, () => renderLayer.withShadowPreparation(true, () => {
-        // Retain main's camera-owned transmission sizing without allowing
-        // hidden resource draws to touch the default framebuffer.
-        renderLayer.renderer.setViewport(transmissionViewport);
-        renderLayer.renderer.transmissionResolutionScale = transmissionScale;
-        renderLayer.renderer.shadowMap.needsUpdate = true;
-        renderLayer.renderer.render(this.room.scene, this.room.camera);
+        // Shadow passes restore the target's one-pixel renderer viewport.
+        // Three sizes transmission from camera.viewport first, so supply the
+        // physical live dimensions there instead of creating a zero-sized
+        // attachment at fractional quality. Keep the actual output isolated.
+        const camera = this.room.camera, previousViewport = camera.viewport;
+        try {
+          camera.viewport = transmissionViewport;
+          renderLayer.renderer.transmissionResolutionScale = transmissionScale;
+          renderLayer.renderer.shadowMap.needsUpdate = true;
+          renderLayer.renderer.render(this.room.scene, camera);
+        } finally { camera.viewport = previousViewport; }
       }), prewarmTarget);
       await yieldFrame();
       if (this.disposed) return;
