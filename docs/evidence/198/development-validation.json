@@ -1,0 +1,1578 @@
+{
+  "purpose": "development infrastructure validation only; not assessment qualification",
+  "status": "unqualified",
+  "limitations": [
+    "Windows development hardware, not the Ubuntu/Chrome assessment PC.",
+    "Short staged routes, not the seven-scenario 21-capture native lab protocol.",
+    "Instrumented HTTP routing is uncached; not a controlled browser-cold/warm pair.",
+    "No approved hardware budgets or independent target/behaviour review.",
+    "Rejected pause-contaminated attempt retained; no invalid recording counted as playing evidence.",
+    "Driver version, power policy and AC/battery state not independently observed."
+  ],
+  "attempts": [
+    {
+      "label": "198-development",
+      "recordedAt": "2026-10-20T22:04:22.152Z",
+      "sourceSha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+      "browserVersion": "155.0.4283.62",
+      "os": {
+        "platform": "win32",
+        "release": "10.0.26200",
+        "version": "Windows 11 Pro"
+      },
+      "hardware": {
+        "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+        "logicalCpus": 8,
+        "totalMemoryBytes": 17031426048,
+        "powerState": "not observed; record manually",
+        "driver": "record chrome://gpu separately"
+      },
+      "protocol": {
+        "width": 1280,
+        "height": 720,
+        "deviceScaleFactor": 1,
+        "flightRecorder": true,
+        "headless": false,
+        "keyMs": 2000
+      },
+      "cacheProtocol": "Instrumented module routing disables HTTP cache. Repeated runs share a browser/driver cache of uncontrolled temperature; these are NOT browser-cold/warm qualification pairs.",
+      "errors": [],
+      "failure": "Error: Invalid qualification capture: Non-playing/death/cutscene/transition contamination. Input disabled, pointer unlocked, hidden/unfocused or missing draw.",
+      "runs": [
+        {
+          "run": 0,
+          "environment": {
+            "visible": "visible",
+            "focused": true,
+            "drawingBuffer": [
+              960,
+              540
+            ],
+            "effectiveDpr": 0.75,
+            "gpu": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "maxTextureImageUnits": 16,
+            "timer": true,
+            "viewport": [
+              1280,
+              720
+            ],
+            "dpr": 1.0000000149011612
+          },
+          "bootMs": 51096.0704,
+          "readyMs": 1647.4375,
+          "playToControlMs": 48996.8028,
+          "twoTransitionMs": 21493.47649999999
+        }
+      ],
+      "captures": [
+        {
+          "file": "development-raw/198-development-run0-__one-1-flight.json.gz",
+          "sha256": "8c115e6e331c0d62387d12fac743e0493388c8d33b11283d0ca4af4b12d71c88",
+          "uncompressedSha256": "7fc987b32a73458cd105fea791187a00be7e917434ebef31a22c04515c5145f4",
+          "compressedBytes": 40514,
+          "report": {
+            "valid": true,
+            "reasons": [],
+            "rawFrames": 522,
+            "eligibleFrames": 521,
+            "levels": [
+              "containment-teaching-level-1"
+            ],
+            "rooms": [
+              1
+            ],
+            "identities": [
+              "bob"
+            ],
+            "movingIdentities": [
+              "bob"
+            ],
+            "elapsedMs": 8681.200000000013,
+            "sessionDurationMs": 8698.100000023842,
+            "simulation": {
+              "droppedMs": 0,
+              "lostPercent": 0,
+              "fixedStepMs": 8683.333333333376,
+              "session": {
+                "eligibleElapsedMs": 8681.200000000004,
+                "droppedActiveSimulationMs": 0,
+                "lostPercent": 0,
+                "eligibleFixedStepMs": 8683.333333333376,
+                "totalLoopDroppedMs": 0,
+                "unobservedGapMs": 0,
+                "states": {
+                  "loading": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "playing": {
+                    "frames": 521,
+                    "elapsedMs": 8681.200000000004,
+                    "fixedStepMs": 8683.333333333376,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "cutscene": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "paused": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "recovery": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "boundary": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "inactive": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  }
+                }
+              }
+            },
+            "frame": {
+              "n": 521,
+              "mean": 16.662571976967218,
+              "p50": 16.7,
+              "p95": 16.8,
+              "p99": 16.9,
+              "max": 18.3,
+              "fps": 60.01474450536847,
+              "onePercentLow": 58.36575875486381
+            },
+            "hitches": {
+              "50": 0,
+              "100": 0,
+              "150": 0
+            },
+            "updateCpu": {
+              "n": 521,
+              "mean": 0.604798464491362,
+              "p50": 0.5,
+              "p95": 1.1,
+              "p99": 3.2,
+              "max": 4.2,
+              "fps": 1653.4433513170443,
+              "onePercentLow": 283.0188679245283
+            },
+            "renderCpu": {
+              "n": 521,
+              "mean": 5.833589251439541,
+              "p50": 5.6,
+              "p95": 7.8,
+              "p99": 9.5,
+              "max": 10.3,
+              "fps": 171.4210508998782,
+              "onePercentLow": 101.86757215619693
+            },
+            "gpu": {
+              "n": 520,
+              "mean": 7.091148076923086,
+              "p50": 7.024,
+              "p95": 8.637,
+              "p99": 9.097,
+              "max": 9.476,
+              "fps": 141.02088817667297,
+              "onePercentLow": 107.84190376907455
+            },
+            "gpuStatus": "supported",
+            "resources": {
+              "drawCalls": {
+                "n": 521,
+                "mean": 214.552783109405,
+                "p50": 212,
+                "p95": 231,
+                "p99": 239,
+                "max": 239,
+                "fps": 4.660857740960083,
+                "onePercentLow": 4.184100418410042
+              },
+              "triangles": {
+                "n": 521,
+                "mean": 44433.80422264875,
+                "p50": 43334,
+                "p95": 48908,
+                "p99": 49824,
+                "max": 49824,
+                "fps": 0.022505387902174736,
+                "onePercentLow": 0.020070648683365448
+              },
+              "programs": {
+                "n": 521,
+                "mean": 131,
+                "p50": 131,
+                "p95": 131,
+                "p99": 131,
+                "max": 131,
+                "fps": 7.633587786259542,
+                "onePercentLow": 7.633587786259542
+              },
+              "geometries": {
+                "n": 521,
+                "mean": 603,
+                "p50": 603,
+                "p95": 603,
+                "p99": 603,
+                "max": 603,
+                "fps": 1.658374792703151,
+                "onePercentLow": 1.658374792703151
+              },
+              "textures": {
+                "n": 521,
+                "mean": 71,
+                "p50": 71,
+                "p95": 71,
+                "p99": 71,
+                "max": 71,
+                "fps": 14.084507042253522,
+                "onePercentLow": 14.084507042253522
+              }
+            },
+            "memory": {
+              "n": 2,
+              "mean": 49530728,
+              "p50": 54497069,
+              "p95": 54497069,
+              "p99": 54497069,
+              "max": 54497069,
+              "fps": 0.000020189487220942925,
+              "onePercentLow": 0.00001834961069190712
+            },
+            "graphics": {
+              "viewportWidth": 1280,
+              "viewportHeight": 720,
+              "drawingBufferWidth": 960,
+              "drawingBufferHeight": 540,
+              "effectiveDpr": 0.75,
+              "resolutionTier": 1,
+              "graphicsProfile": "minimum",
+              "graphicsProfileBase": "minimum",
+              "devicePixelRatio": 1.0000000149011612,
+              "renderScale": 0.75,
+              "pixelBudget": 921600,
+              "gelRenderingMode": "minimum",
+              "transmissionResolutionScale": 1,
+              "shadowMapSizeCap": 512,
+              "effectsDensity": 0.5,
+              "antialias": false,
+              "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+              "graphicsPreset": "normal",
+              "requestedPixelRatioCap": 1,
+              "drawCalls": 210,
+              "triangles": 43118,
+              "programs": 131,
+              "geometries": 603,
+              "textures": 71
+            },
+            "build": {
+              "sha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+              "dirty": false,
+              "builtAt": "2026-10-20T22:01:01.259Z"
+            }
+          },
+          "webgl": {
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+            "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+            "vendor": "WebKit",
+            "renderer": "WebKit WebGL",
+            "unmaskedVendor": "Google Inc. (Intel)",
+            "unmaskedRenderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "gpuTimerQuerySupported": true,
+            "gpuTimerQueryStatus": "supported",
+            "gpuDisjointCount": 0
+          }
+        },
+        {
+          "file": "development-raw/198-development-run0-__two-5-flight.json.gz",
+          "sha256": "0203bc75b918804703daea6f7c35fa23b595d3e49ed9a0868b83a210d0651aa1",
+          "uncompressedSha256": "3c0f88e46c575e6a4b281c649d483cda8d398de1c9ff49eb1586dc1160c452cc",
+          "compressedBytes": 33554,
+          "report": {
+            "valid": false,
+            "reasons": [
+              "Non-playing/death/cutscene/transition contamination.",
+              "Input disabled, pointer unlocked, hidden/unfocused or missing draw."
+            ],
+            "rawFrames": 528,
+            "eligibleFrames": 527,
+            "levels": [
+              "cultivation-level-2"
+            ],
+            "rooms": [
+              5
+            ],
+            "identities": [
+              "bob"
+            ],
+            "movingIdentities": [
+              "bob"
+            ],
+            "elapsedMs": 8897.800000000021,
+            "sessionDurationMs": 8907.600000023842,
+            "simulation": {
+              "droppedMs": 0,
+              "lostPercent": 0,
+              "fixedStepMs": 8900.000000000033,
+              "session": {
+                "eligibleElapsedMs": 4165.599999999991,
+                "droppedActiveSimulationMs": 0,
+                "lostPercent": 0,
+                "eligibleFixedStepMs": 4166.666666666653,
+                "totalLoopDroppedMs": 0,
+                "unobservedGapMs": 1.7763568394002505e-15,
+                "states": {
+                  "loading": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "playing": {
+                    "frames": 248,
+                    "elapsedMs": 4165.599999999991,
+                    "fixedStepMs": 4166.666666666653,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "cutscene": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "paused": {
+                    "frames": 278,
+                    "elapsedMs": 4715.5,
+                    "fixedStepMs": 4716.666666666663,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "recovery": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "boundary": {
+                    "frames": 1,
+                    "elapsedMs": 16.70000000001164,
+                    "fixedStepMs": 16.666666666666668,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "inactive": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  }
+                }
+              }
+            },
+            "frame": {
+              "n": 527,
+              "mean": 16.883870967741792,
+              "p50": 16.7,
+              "p95": 16.8,
+              "p99": 16.9,
+              "max": 100,
+              "fps": 59.228123805885105,
+              "onePercentLow": 27.44739249771272
+            },
+            "hitches": {
+              "50": 2,
+              "100": 0,
+              "150": 0
+            },
+            "updateCpu": {
+              "n": 527,
+              "mean": 0.8390891840607204,
+              "p50": 0.1,
+              "p95": 2.5,
+              "p99": 4.3,
+              "max": 8.5,
+              "fps": 1191.7684305744017,
+              "onePercentLow": 179.64071856287427
+            },
+            "renderCpu": {
+              "n": 527,
+              "mean": 7.08880455407971,
+              "p50": 6.8,
+              "p95": 10.2,
+              "p99": 11.4,
+              "max": 43.9,
+              "fps": 141.0675089672892,
+              "onePercentLow": 58.139534883720934
+            },
+            "gpu": {
+              "n": 524,
+              "mean": 9.186328244274803,
+              "p50": 9.006,
+              "p95": 11.959,
+              "p99": 13.427,
+              "max": 15.383,
+              "fps": 108.85742087685907,
+              "onePercentLow": 72.26564852397412
+            },
+            "gpuStatus": "supported",
+            "resources": {
+              "drawCalls": {
+                "n": 527,
+                "mean": 111.73434535104364,
+                "p50": 116,
+                "p95": 116,
+                "p99": 116,
+                "max": 116,
+                "fps": 8.949799606005026,
+                "onePercentLow": 8.620689655172415
+              },
+              "triangles": {
+                "n": 527,
+                "mean": 46096.083491461104,
+                "p50": 48490,
+                "p95": 48490,
+                "p99": 48490,
+                "max": 48490,
+                "fps": 0.021693817006931647,
+                "onePercentLow": 0.02062280882656218
+              },
+              "programs": {
+                "n": 527,
+                "mean": 144,
+                "p50": 144,
+                "p95": 144,
+                "p99": 144,
+                "max": 144,
+                "fps": 6.944444444444445,
+                "onePercentLow": 6.944444444444445
+              },
+              "geometries": {
+                "n": 527,
+                "mean": 561,
+                "p50": 561,
+                "p95": 561,
+                "p99": 561,
+                "max": 561,
+                "fps": 1.7825311942959001,
+                "onePercentLow": 1.7825311942959001
+              },
+              "textures": {
+                "n": 527,
+                "mean": 67,
+                "p50": 67,
+                "p95": 67,
+                "p99": 67,
+                "max": 67,
+                "fps": 14.925373134328359,
+                "onePercentLow": 14.925373134328359
+              }
+            },
+            "memory": {
+              "n": 2,
+              "mean": 161069440.5,
+              "p50": 161815446,
+              "p95": 161815446,
+              "p99": 161815446,
+              "max": 161815446,
+              "fps": 0.000006208502350885114,
+              "onePercentLow": 0.000006179879762528974
+            },
+            "graphics": {
+              "viewportWidth": 1280,
+              "viewportHeight": 720,
+              "drawingBufferWidth": 960,
+              "drawingBufferHeight": 540,
+              "effectiveDpr": 0.75,
+              "resolutionTier": 1,
+              "graphicsProfile": "minimum",
+              "graphicsProfileBase": "minimum",
+              "devicePixelRatio": 1.0000000149011612,
+              "renderScale": 0.75,
+              "pixelBudget": 921600,
+              "gelRenderingMode": "minimum",
+              "transmissionResolutionScale": 1,
+              "shadowMapSizeCap": 512,
+              "effectsDensity": 0.5,
+              "antialias": false,
+              "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+              "graphicsPreset": "normal",
+              "requestedPixelRatioCap": 1,
+              "drawCalls": 116,
+              "triangles": 48490,
+              "programs": 144,
+              "geometries": 561,
+              "textures": 67
+            },
+            "build": {
+              "sha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+              "dirty": false,
+              "builtAt": "2026-10-20T22:01:01.259Z"
+            }
+          },
+          "webgl": {
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+            "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+            "vendor": "WebKit",
+            "renderer": "WebKit WebGL",
+            "unmaskedVendor": "Google Inc. (Intel)",
+            "unmaskedRenderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "gpuTimerQuerySupported": true,
+            "gpuTimerQueryStatus": "supported",
+            "gpuDisjointCount": 0
+          }
+        }
+      ]
+    },
+    {
+      "label": "198-development-retry",
+      "recordedAt": "2026-10-20T22:06:48.118Z",
+      "sourceSha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+      "browserVersion": "155.0.4283.62",
+      "os": {
+        "platform": "win32",
+        "release": "10.0.26200",
+        "version": "Windows 11 Pro"
+      },
+      "hardware": {
+        "cpu": "Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz",
+        "logicalCpus": 8,
+        "totalMemoryBytes": 17031426048,
+        "powerState": "not observed; record manually",
+        "driver": "record chrome://gpu separately"
+      },
+      "protocol": {
+        "width": 1280,
+        "height": 720,
+        "deviceScaleFactor": 1,
+        "flightRecorder": true,
+        "headless": false,
+        "keyMs": 2000
+      },
+      "cacheProtocol": "Instrumented module routing disables HTTP cache. Repeated runs share a browser/driver cache of uncontrolled temperature; these are NOT browser-cold/warm qualification pairs.",
+      "errors": [],
+      "failure": null,
+      "runs": [
+        {
+          "run": 0,
+          "environment": {
+            "visible": "visible",
+            "focused": true,
+            "drawingBuffer": [
+              960,
+              540
+            ],
+            "effectiveDpr": 0.75,
+            "gpu": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "maxTextureImageUnits": 16,
+            "timer": true,
+            "viewport": [
+              1280,
+              720
+            ],
+            "dpr": 1.0000000149011612
+          },
+          "bootMs": 54172.4739,
+          "readyMs": 1809.8330999999998,
+          "playToControlMs": 51938.8272,
+          "twoTransitionMs": 19046.37659999999,
+          "threeTransitionMs": 9633.01999999999
+        }
+      ],
+      "captures": [
+        {
+          "file": "development-raw/198-development-retry-run0-__one-1-flight.json.gz",
+          "sha256": "e7db7f579ace32a32dae2c5de91705a099be4ede9c415f8420702a1d811515d9",
+          "uncompressedSha256": "eb10fffed69134bd6115710937c55add7974573a77216178551021ee47001180",
+          "compressedBytes": 40954,
+          "report": {
+            "valid": true,
+            "reasons": [],
+            "rawFrames": 523,
+            "eligibleFrames": 522,
+            "levels": [
+              "containment-teaching-level-1"
+            ],
+            "rooms": [
+              1
+            ],
+            "identities": [
+              "bob"
+            ],
+            "movingIdentities": [
+              "bob"
+            ],
+            "elapsedMs": 8698.100000000002,
+            "sessionDurationMs": 8716.099999964237,
+            "simulation": {
+              "droppedMs": 0,
+              "lostPercent": 0,
+              "fixedStepMs": 8700.000000000042,
+              "session": {
+                "eligibleElapsedMs": 8698.099999999999,
+                "droppedActiveSimulationMs": 0,
+                "lostPercent": 0,
+                "eligibleFixedStepMs": 8700.000000000042,
+                "totalLoopDroppedMs": 0,
+                "unobservedGapMs": 0,
+                "states": {
+                  "loading": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "playing": {
+                    "frames": 522,
+                    "elapsedMs": 8698.099999999999,
+                    "fixedStepMs": 8700.000000000042,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "cutscene": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "paused": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "recovery": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "boundary": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "inactive": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  }
+                }
+              }
+            },
+            "frame": {
+              "n": 522,
+              "mean": 16.663026819923232,
+              "p50": 16.7,
+              "p95": 16.8,
+              "p99": 16.9,
+              "max": 17,
+              "fps": 60.013106310574074,
+              "onePercentLow": 59.11330049261083
+            },
+            "hitches": {
+              "50": 0,
+              "100": 0,
+              "150": 0
+            },
+            "updateCpu": {
+              "n": 522,
+              "mean": 0.8001915708812236,
+              "p50": 0.7,
+              "p95": 1.3,
+              "p99": 4.1,
+              "max": 5,
+              "fps": 1249.7007421594483,
+              "onePercentLow": 220.5882352941177
+            },
+            "renderCpu": {
+              "n": 522,
+              "mean": 5.893678160919538,
+              "p50": 5.6,
+              "p95": 8.4,
+              "p99": 9.5,
+              "max": 10.3,
+              "fps": 169.67333008288648,
+              "onePercentLow": 101.18043844856662
+            },
+            "gpu": {
+              "n": 521,
+              "mean": 7.750316698656421,
+              "p50": 7.742,
+              "p95": 9.196,
+              "p99": 9.834,
+              "max": 10.044,
+              "fps": 129.02698546155642,
+              "onePercentLow": 100.68127663858779
+            },
+            "gpuStatus": "supported",
+            "resources": {
+              "drawCalls": {
+                "n": 522,
+                "mean": 216.07471264367817,
+                "p50": 213,
+                "p95": 231,
+                "p99": 239,
+                "max": 239,
+                "fps": 4.628028832087667,
+                "onePercentLow": 4.184100418410042
+              },
+              "triangles": {
+                "n": 522,
+                "mean": 45189.16858237548,
+                "p50": 43526,
+                "p95": 49036,
+                "p99": 49824,
+                "max": 49824,
+                "fps": 0.022129196694050626,
+                "onePercentLow": 0.020070648683365448
+              },
+              "programs": {
+                "n": 522,
+                "mean": 131,
+                "p50": 131,
+                "p95": 131,
+                "p99": 131,
+                "max": 131,
+                "fps": 7.633587786259542,
+                "onePercentLow": 7.633587786259542
+              },
+              "geometries": {
+                "n": 522,
+                "mean": 603,
+                "p50": 603,
+                "p95": 603,
+                "p99": 603,
+                "max": 603,
+                "fps": 1.658374792703151,
+                "onePercentLow": 1.658374792703151
+              },
+              "textures": {
+                "n": 522,
+                "mean": 71,
+                "p50": 71,
+                "p95": 71,
+                "p99": 71,
+                "max": 71,
+                "fps": 14.084507042253522,
+                "onePercentLow": 14.084507042253522
+              }
+            },
+            "memory": {
+              "n": 2,
+              "mean": 43935820,
+              "p50": 45883494,
+              "p95": 45883494,
+              "p99": 45883494,
+              "max": 45883494,
+              "fps": 0.00002276047197935534,
+              "onePercentLow": 0.00002179432978665487
+            },
+            "graphics": {
+              "viewportWidth": 1280,
+              "viewportHeight": 720,
+              "drawingBufferWidth": 960,
+              "drawingBufferHeight": 540,
+              "effectiveDpr": 0.75,
+              "resolutionTier": 1,
+              "graphicsProfile": "minimum",
+              "graphicsProfileBase": "minimum",
+              "devicePixelRatio": 1.0000000149011612,
+              "renderScale": 0.75,
+              "pixelBudget": 921600,
+              "gelRenderingMode": "minimum",
+              "transmissionResolutionScale": 1,
+              "shadowMapSizeCap": 512,
+              "effectsDensity": 0.5,
+              "antialias": false,
+              "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+              "graphicsPreset": "normal",
+              "requestedPixelRatioCap": 1,
+              "drawCalls": 212,
+              "triangles": 43184,
+              "programs": 131,
+              "geometries": 603,
+              "textures": 71
+            },
+            "build": {
+              "sha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+              "dirty": false,
+              "builtAt": "2026-10-20T22:01:01.259Z"
+            }
+          },
+          "webgl": {
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+            "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+            "vendor": "WebKit",
+            "renderer": "WebKit WebGL",
+            "unmaskedVendor": "Google Inc. (Intel)",
+            "unmaskedRenderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "gpuTimerQuerySupported": true,
+            "gpuTimerQueryStatus": "supported",
+            "gpuDisjointCount": 0
+          }
+        },
+        {
+          "file": "development-raw/198-development-retry-run0-__three-1-flight.json.gz",
+          "sha256": "085e63a2251d3ed5a1f6fbcc64948cb0d733910dcb18fc9eb4a2149afe20d1bc",
+          "uncompressedSha256": "3acb246d392f17605a44c571ed802c7e1cda8feb25a351e57c26a7a17f7adf99",
+          "compressedBytes": 42081,
+          "report": {
+            "valid": true,
+            "reasons": [],
+            "rawFrames": 519,
+            "eligibleFrames": 518,
+            "levels": [
+              "blackout-level-3"
+            ],
+            "rooms": [
+              "room-1"
+            ],
+            "identities": [
+              "bob"
+            ],
+            "movingIdentities": [
+              "bob"
+            ],
+            "elapsedMs": 8631.400000000007,
+            "sessionDurationMs": 8643.300000011921,
+            "simulation": {
+              "droppedMs": 0,
+              "lostPercent": 0,
+              "fixedStepMs": 8633.333333333378,
+              "session": {
+                "eligibleElapsedMs": 8631.399999999994,
+                "droppedActiveSimulationMs": 0,
+                "lostPercent": 0,
+                "eligibleFixedStepMs": 8633.333333333378,
+                "totalLoopDroppedMs": 0,
+                "unobservedGapMs": 0,
+                "states": {
+                  "loading": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "playing": {
+                    "frames": 518,
+                    "elapsedMs": 8631.399999999994,
+                    "fixedStepMs": 8633.333333333378,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "cutscene": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "paused": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "recovery": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "boundary": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "inactive": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  }
+                }
+              }
+            },
+            "frame": {
+              "n": 518,
+              "mean": 16.66293436293423,
+              "p50": 16.7,
+              "p95": 16.8,
+              "p99": 16.9,
+              "max": 17.7,
+              "fps": 60.01343930301042,
+              "onePercentLow": 58.70841487279843
+            },
+            "hitches": {
+              "50": 0,
+              "100": 0,
+              "150": 0
+            },
+            "updateCpu": {
+              "n": 518,
+              "mean": 0.7445945945945924,
+              "p50": 0.7,
+              "p95": 1.2,
+              "p99": 2,
+              "max": 2.6,
+              "fps": 1343.0127041742326,
+              "onePercentLow": 441.1764705882353
+            },
+            "renderCpu": {
+              "n": 518,
+              "mean": 4.331853281853282,
+              "p50": 4.2,
+              "p95": 6.1,
+              "p99": 6.9,
+              "max": 7.9,
+              "fps": 230.84807700877937,
+              "onePercentLow": 134.2281879194631
+            },
+            "gpu": {
+              "n": 517,
+              "mean": 8.231284332688578,
+              "p50": 8.43,
+              "p95": 10.478,
+              "p99": 11.558,
+              "max": 12.514,
+              "fps": 121.48772410020379,
+              "onePercentLow": 84.09014463504879
+            },
+            "gpuStatus": "supported",
+            "resources": {
+              "drawCalls": {
+                "n": 518,
+                "mean": 140.51737451737452,
+                "p50": 134,
+                "p95": 162,
+                "p99": 162,
+                "max": 163,
+                "fps": 7.116557674341925,
+                "onePercentLow": 6.153846153846154
+              },
+              "triangles": {
+                "n": 518,
+                "mean": 79551.96911196911,
+                "p50": 79216,
+                "p95": 82096,
+                "p99": 82096,
+                "max": 82096,
+                "fps": 0.012570399088330592,
+                "onePercentLow": 0.012180861430520367
+              },
+              "programs": {
+                "n": 518,
+                "mean": 54,
+                "p50": 54,
+                "p95": 54,
+                "p99": 54,
+                "max": 54,
+                "fps": 18.51851851851852,
+                "onePercentLow": 18.51851851851852
+              },
+              "geometries": {
+                "n": 518,
+                "mean": 445,
+                "p50": 445,
+                "p95": 445,
+                "p99": 445,
+                "max": 445,
+                "fps": 2.247191011235955,
+                "onePercentLow": 2.247191011235955
+              },
+              "textures": {
+                "n": 518,
+                "mean": 60,
+                "p50": 60,
+                "p95": 60,
+                "p99": 60,
+                "max": 60,
+                "fps": 16.666666666666668,
+                "onePercentLow": 16.666666666666668
+              }
+            },
+            "memory": {
+              "n": 2,
+              "mean": 115621539.5,
+              "p50": 117429714,
+              "p95": 117429714,
+              "p99": 117429714,
+              "max": 117429714,
+              "fps": 0.000008648907498762373,
+              "onePercentLow": 0.000008515732227705161
+            },
+            "graphics": {
+              "viewportWidth": 1280,
+              "viewportHeight": 720,
+              "drawingBufferWidth": 960,
+              "drawingBufferHeight": 540,
+              "effectiveDpr": 0.75,
+              "resolutionTier": 1,
+              "graphicsProfile": "minimum",
+              "graphicsProfileBase": "minimum",
+              "devicePixelRatio": 1.0000000149011612,
+              "renderScale": 0.75,
+              "pixelBudget": 921600,
+              "gelRenderingMode": "minimum",
+              "transmissionResolutionScale": 1,
+              "shadowMapSizeCap": 512,
+              "effectsDensity": 0.5,
+              "antialias": false,
+              "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+              "graphicsPreset": "normal",
+              "requestedPixelRatioCap": 1,
+              "drawCalls": 162,
+              "triangles": 82096,
+              "programs": 54,
+              "geometries": 445,
+              "textures": 60
+            },
+            "build": {
+              "sha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+              "dirty": false,
+              "builtAt": "2026-10-20T22:01:01.259Z"
+            }
+          },
+          "webgl": {
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+            "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+            "vendor": "WebKit",
+            "renderer": "WebKit WebGL",
+            "unmaskedVendor": "Google Inc. (Intel)",
+            "unmaskedRenderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "gpuTimerQuerySupported": true,
+            "gpuTimerQueryStatus": "supported",
+            "gpuDisjointCount": 0
+          }
+        },
+        {
+          "file": "development-raw/198-development-retry-run0-__two-5-flight.json.gz",
+          "sha256": "cd82f26ea683e167bb3ab954587f66f02f98dd5a2e6f6c68691a89848aa3c2bc",
+          "uncompressedSha256": "5dc58fa0891b70887ca9f3d342f77feecbe3386dfdb62f08897956d54b14e3f6",
+          "compressedBytes": 39142,
+          "report": {
+            "valid": true,
+            "reasons": [],
+            "rawFrames": 520,
+            "eligibleFrames": 519,
+            "levels": [
+              "cultivation-level-2"
+            ],
+            "rooms": [
+              5
+            ],
+            "identities": [
+              "bob"
+            ],
+            "movingIdentities": [
+              "bob"
+            ],
+            "elapsedMs": 8647.900000000016,
+            "sessionDurationMs": 8670.5,
+            "simulation": {
+              "droppedMs": 0,
+              "lostPercent": 0,
+              "fixedStepMs": 8650.000000000044,
+              "session": {
+                "eligibleElapsedMs": 8647.900000000009,
+                "droppedActiveSimulationMs": 0,
+                "lostPercent": 0,
+                "eligibleFixedStepMs": 8650.000000000044,
+                "totalLoopDroppedMs": 0,
+                "unobservedGapMs": 0,
+                "states": {
+                  "loading": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "playing": {
+                    "frames": 519,
+                    "elapsedMs": 8647.900000000009,
+                    "fixedStepMs": 8650.000000000044,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "cutscene": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "paused": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "recovery": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "boundary": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "inactive": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  }
+                }
+              }
+            },
+            "frame": {
+              "n": 519,
+              "mean": 16.662620423892005,
+              "p50": 16.7,
+              "p95": 16.8,
+              "p99": 16.9,
+              "max": 17.4,
+              "fps": 60.01457001121694,
+              "onePercentLow": 58.765915768854065
+            },
+            "hitches": {
+              "50": 0,
+              "100": 0,
+              "150": 0
+            },
+            "updateCpu": {
+              "n": 519,
+              "mean": 1.1894026974951835,
+              "p50": 1.1,
+              "p95": 1.7,
+              "p99": 3.9,
+              "max": 4.9,
+              "fps": 840.7581402883523,
+              "onePercentLow": 223.04832713754647
+            },
+            "renderCpu": {
+              "n": 519,
+              "mean": 4.555876685934493,
+              "p50": 4.3,
+              "p95": 6.2,
+              "p99": 8.6,
+              "max": 12.2,
+              "fps": 219.49672235144834,
+              "onePercentLow": 98.36065573770492
+            },
+            "gpu": {
+              "n": 518,
+              "mean": 7.198928571428575,
+              "p50": 6.793,
+              "p95": 10.522,
+              "p99": 11.311,
+              "max": 12.584,
+              "fps": 138.90955995435823,
+              "onePercentLow": 83.91843128479118
+            },
+            "gpuStatus": "supported",
+            "resources": {
+              "drawCalls": {
+                "n": 519,
+                "mean": 110.97109826589596,
+                "p50": 112,
+                "p95": 112,
+                "p99": 112,
+                "max": 112,
+                "fps": 9.011355349515574,
+                "onePercentLow": 8.928571428571429
+              },
+              "triangles": {
+                "n": 519,
+                "mean": 45371.62620423892,
+                "p50": 48322,
+                "p95": 48322,
+                "p99": 48322,
+                "max": 48322,
+                "fps": 0.022040206262357274,
+                "onePercentLow": 0.020694507677662347
+              },
+              "programs": {
+                "n": 519,
+                "mean": 145,
+                "p50": 145,
+                "p95": 145,
+                "p99": 145,
+                "max": 145,
+                "fps": 6.896551724137931,
+                "onePercentLow": 6.896551724137931
+              },
+              "geometries": {
+                "n": 519,
+                "mean": 561,
+                "p50": 561,
+                "p95": 561,
+                "p99": 561,
+                "max": 561,
+                "fps": 1.7825311942959001,
+                "onePercentLow": 1.7825311942959001
+              },
+              "textures": {
+                "n": 519,
+                "mean": 67,
+                "p50": 67,
+                "p95": 67,
+                "p99": 67,
+                "max": 67,
+                "fps": 14.925373134328359,
+                "onePercentLow": 14.925373134328359
+              }
+            },
+            "memory": {
+              "n": 2,
+              "mean": 200591080,
+              "p50": 202734620,
+              "p95": 202734620,
+              "p99": 202734620,
+              "max": 202734620,
+              "fps": 0.000004985266543258055,
+              "onePercentLow": 0.000004932556659538464
+            },
+            "graphics": {
+              "viewportWidth": 1280,
+              "viewportHeight": 720,
+              "drawingBufferWidth": 960,
+              "drawingBufferHeight": 540,
+              "effectiveDpr": 0.75,
+              "resolutionTier": 1,
+              "graphicsProfile": "minimum",
+              "graphicsProfileBase": "minimum",
+              "devicePixelRatio": 1.0000000149011612,
+              "renderScale": 0.75,
+              "pixelBudget": 921600,
+              "gelRenderingMode": "minimum",
+              "transmissionResolutionScale": 1,
+              "shadowMapSizeCap": 512,
+              "effectsDensity": 0.5,
+              "antialias": false,
+              "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+              "graphicsPreset": "normal",
+              "requestedPixelRatioCap": 1,
+              "drawCalls": 109,
+              "triangles": 41408,
+              "programs": 145,
+              "geometries": 561,
+              "textures": 67
+            },
+            "build": {
+              "sha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+              "dirty": false,
+              "builtAt": "2026-10-20T22:01:01.259Z"
+            }
+          },
+          "webgl": {
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+            "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+            "vendor": "WebKit",
+            "renderer": "WebKit WebGL",
+            "unmaskedVendor": "Google Inc. (Intel)",
+            "unmaskedRenderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "gpuTimerQuerySupported": true,
+            "gpuTimerQueryStatus": "supported",
+            "gpuDisjointCount": 0
+          }
+        },
+        {
+          "file": "development-raw/198-development-retry-run0-__two-5-goop-flight.json.gz",
+          "sha256": "d854a8e040d535aee742832b830ed002f808bdd9ceebcc5a7f45f293cf10852c",
+          "uncompressedSha256": "c7bdf897a5a499b8a0bb7da248abb78b2f3a3c12693009b15928c637e222a881",
+          "compressedBytes": 39623,
+          "report": {
+            "valid": true,
+            "reasons": [],
+            "rawFrames": 521,
+            "eligibleFrames": 520,
+            "levels": [
+              "cultivation-level-2"
+            ],
+            "rooms": [
+              5
+            ],
+            "identities": [
+              "goop"
+            ],
+            "movingIdentities": [
+              "goop"
+            ],
+            "elapsedMs": 8664.60000000002,
+            "sessionDurationMs": 8685.400000035763,
+            "simulation": {
+              "droppedMs": 0,
+              "lostPercent": 0,
+              "fixedStepMs": 8650.000000000035,
+              "session": {
+                "eligibleElapsedMs": 8664.599999999991,
+                "droppedActiveSimulationMs": 0,
+                "lostPercent": 0,
+                "eligibleFixedStepMs": 8650.000000000035,
+                "totalLoopDroppedMs": 0,
+                "unobservedGapMs": 0,
+                "states": {
+                  "loading": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "playing": {
+                    "frames": 520,
+                    "elapsedMs": 8664.599999999991,
+                    "fixedStepMs": 8650.000000000035,
+                    "droppedMs": 0,
+                    "lostPercent": 0
+                  },
+                  "cutscene": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "paused": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "recovery": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "boundary": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  },
+                  "inactive": {
+                    "frames": 0,
+                    "elapsedMs": 0,
+                    "fixedStepMs": 0,
+                    "droppedMs": 0,
+                    "lostPercent": null
+                  }
+                }
+              }
+            },
+            "frame": {
+              "n": 520,
+              "mean": 16.662692307692172,
+              "p50": 16.7,
+              "p95": 16.8,
+              "p99": 16.8,
+              "max": 16.9,
+              "fps": 60.014311104956285,
+              "onePercentLow": 59.40594059405941
+            },
+            "hitches": {
+              "50": 0,
+              "100": 0,
+              "150": 0
+            },
+            "updateCpu": {
+              "n": 520,
+              "mean": 1.0526923076923094,
+              "p50": 1,
+              "p95": 1.6,
+              "p99": 2,
+              "max": 2.9,
+              "fps": 949.9451954694906,
+              "onePercentLow": 405.4054054054055
+            },
+            "renderCpu": {
+              "n": 520,
+              "mean": 4.2507692307692375,
+              "p50": 4.3,
+              "p95": 5.4,
+              "p99": 6.1,
+              "max": 9.2,
+              "fps": 235.2515381831339,
+              "onePercentLow": 146.34146341463415
+            },
+            "gpu": {
+              "n": 519,
+              "mean": 8.960776493256255,
+              "p50": 8.758,
+              "p95": 11.448,
+              "p99": 12.519,
+              "max": 12.894,
+              "fps": 111.597471575436,
+              "onePercentLow": 78.53711533175387
+            },
+            "gpuStatus": "supported",
+            "resources": {
+              "drawCalls": {
+                "n": 520,
+                "mean": 102.75769230769231,
+                "p50": 103,
+                "p95": 106,
+                "p99": 107,
+                "max": 108,
+                "fps": 9.731631545457947,
+                "onePercentLow": 9.287925696594426
+              },
+              "triangles": {
+                "n": 520,
+                "mean": 41879.623076923075,
+                "p50": 40286,
+                "p95": 47018,
+                "p99": 47162,
+                "max": 47414,
+                "fps": 0.023877960844185104,
+                "onePercentLow": 0.021120216271014614
+              },
+              "programs": {
+                "n": 520,
+                "mean": 145,
+                "p50": 145,
+                "p95": 145,
+                "p99": 145,
+                "max": 145,
+                "fps": 6.896551724137931,
+                "onePercentLow": 6.896551724137931
+              },
+              "geometries": {
+                "n": 520,
+                "mean": 561.8346153846154,
+                "p50": 562,
+                "p95": 562,
+                "p99": 562,
+                "max": 562,
+                "fps": 1.7798832122784558,
+                "onePercentLow": 1.7793594306049823
+              },
+              "textures": {
+                "n": 520,
+                "mean": 67,
+                "p50": 67,
+                "p95": 67,
+                "p99": 67,
+                "max": 67,
+                "fps": 14.925373134328359,
+                "onePercentLow": 14.925373134328359
+              }
+            },
+            "memory": {
+              "n": 2,
+              "mean": 166863521.5,
+              "p50": 171392989,
+              "p95": 171392989,
+              "p99": 171392989,
+              "max": 171392989,
+              "fps": 0.000005992921586519436,
+              "onePercentLow": 0.00000583454437567455
+            },
+            "graphics": {
+              "viewportWidth": 1280,
+              "viewportHeight": 720,
+              "drawingBufferWidth": 960,
+              "drawingBufferHeight": 540,
+              "effectiveDpr": 0.75,
+              "resolutionTier": 1,
+              "graphicsProfile": "minimum",
+              "graphicsProfileBase": "minimum",
+              "devicePixelRatio": 1.0000000149011612,
+              "renderScale": 0.75,
+              "pixelBudget": 921600,
+              "gelRenderingMode": "minimum",
+              "transmissionResolutionScale": 1,
+              "shadowMapSizeCap": 512,
+              "effectsDensity": 0.5,
+              "antialias": false,
+              "lightingPolicy": "authored-room-scopes; Cultivation 4 point/3 spot maximum",
+              "graphicsPreset": "normal",
+              "requestedPixelRatioCap": 1,
+              "drawCalls": 101,
+              "triangles": 36818,
+              "programs": 145,
+              "geometries": 562,
+              "textures": 67
+            },
+            "build": {
+              "sha": "1524675aaf0b0b55685e642345c66fe5f3d57e68",
+              "dirty": false,
+              "builtAt": "2026-10-20T22:01:01.259Z"
+            }
+          },
+          "webgl": {
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+            "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+            "vendor": "WebKit",
+            "renderer": "WebKit WebGL",
+            "unmaskedVendor": "Google Inc. (Intel)",
+            "unmaskedRenderer": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "gpuTimerQuerySupported": true,
+            "gpuTimerQueryStatus": "supported",
+            "gpuDisjointCount": 0
+          }
+        }
+      ]
+    }
+  ],
+  "package": {
+    "file": "specimen-production.zip (ignored artifacts/; request package from maintainer)",
+    "sha256": "e78b339fd522122b18f3515c2aa7d1a81a82efbf30b9f6e66460b59ad574c011",
+    "manifestFile": "development-build-manifest.json",
+    "manifestSha256": "5fa80e748ef5a6b427dd841212a2ac82afd7be218748b48465059133b9167186"
+  }
+}
