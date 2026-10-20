@@ -36,7 +36,10 @@ ordinary production content are preserved.
   death/cutscene/room-transition contamination, reset/focus gaps, disabled input,
   missing pointer lock/draws, stationary actor/camera, changed graphics, incomplete
   rows and browser/GL errors. Switching checks movement within identities.
-  The required scenario level/room/roles must match the named route.
+  The required scenario level/room/roles must match the named route, including
+  numeric Room 1 for L1 traversal and L2 switching. Exactly three distinct page
+  passes are required (one cold, two warm), each containing exactly one recording
+  of all seven scenarios; duplicate or uneven page-level coverage is rejected.
 - GPU statistics use valid timer-query results with at least 80% coverage when
   supported, no disjoint/error scope. Unsupported GPU and heap values are null,
   not zero. `requireGpuTiming` can make GPU timing mandatory in an approved copy.
@@ -162,6 +165,13 @@ suite results above precede that one-test addition. Provenance was also checked
 with untracked evidence present: it correctly reports `dirty: true`.
 Ubuntu execution, assessment interactions, complete 21-capture passes and
 independent minimum-hardware review are pending.
+
+PR #220 protocol/room review follow-up (21 October 2026):
+`node --test tests/PerformanceQualification.test.ts` passed all 62 tests using
+21-capture synthetic fixtures. After preserving the remote branch's integration
+fixes, `npm test` passed all 1224 tests. Type-check, build,
+production validation (72 files) and diff checks passed. No gameplay, graphics,
+measurement calculations or hardware evidence changed.
 
 ### Actual development capture — unqualified
 

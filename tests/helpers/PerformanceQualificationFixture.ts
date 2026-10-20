@@ -13,7 +13,7 @@ export const fixture = () => {
     browserReview:{consoleErrors:0,networkErrors:0,webglErrors:0},
     behaviour:{switching:true,electrical:true,movingPlatform:true,combat:true,recovery:true,transitions:true,restart:true},
     buildManifest:{...build,assetHashes:{'assets/game.js':'b'.repeat(64)}}};
-  const budgets={schemaVersion:1,approval:{...approval},requiredScenarios:Object.keys(SCENARIOS),samplesPerScenario:1,
+  const budgets={schemaVersion:1,approval:{...approval},requiredScenarios:Object.keys(SCENARIOS),samplesPerScenario:3,
     minimumActiveSeconds:1,requireGpuTiming:false,
     graphicsPolicy:{graphicsProfile:'minimum',graphicsPreset:'normal'},
     gameplay:{p95Ms:33.34,p99Ms:50,minimumAverageFps:30,minimumOnePercentLowFps:20,
@@ -28,8 +28,9 @@ export const fixture = () => {
     level,requestedAtMs:100,readyAtMs:110,controlAtMs:120,
     resourceSample:{programs:1,geometries:2,textures:3,usedJsHeapBytes:null,timestampMs:2200,stableForMs:2000},
   });
-  const captures=Object.entries(SCENARIOS).map(([scenarioId,route],index)=>{
-    const cache=index<3?'browser-cold':'browser-warm';
+  const captures=['browser-cold','browser-warm','browser-warm'].flatMap((cache,pass)=>
+    Object.entries(SCENARIOS).map(([scenarioId,route],scenarioIndex)=>{
+    const index=pass*Object.keys(SCENARIOS).length+scenarioIndex;
     const frames=Array.from({length:101},(_,i)=>({
       sequence:i+1,level:route.level,room:route.room ?? 1,deltaMs:1000/60,fixedSteps:1,fixedDeltaMs:1000/60,
       droppedSimulationMs:0,simulationState:i?'playing':'boundary',gameplayState:'playing',cutsceneState:'none',
@@ -45,10 +46,10 @@ export const fixture = () => {
       webgl:{unmaskedRenderer:'fixture hardware GPU',gpuTimerQuerySupported:false,gpuDisjointCount:0},
       summary:{totalFrames:frames.length,simulationTime:{unobservedGapMs:0}},
       qualification:{observation:'window-errors+resource-status+export-gl',errors:[],glError:0,contextLost:false,
-        pageId:cache,bootReadyMs:50,lifecycle:structuredClone(lifecycle)},
+        pageId:`pass-${pass+1}`,bootReadyMs:50,lifecycle:structuredClone(lifecycle)},
       frameColumns,retainedFrames:frames.map(f=>frameColumns.map(k=>f[k]))};
-    return {scenarioId,cache,file:`${scenarioId}.json`,actionsVerified:true,evidenceFiles:['review.txt'],
-      sha256:(index+1).toString().repeat(64),flight};
-  });
+    return {scenarioId,cache,file:`pass-${pass+1}-${scenarioId}.json`,actionsVerified:true,evidenceFiles:['review.txt'],
+      sha256:(index+1).toString(16).padStart(64,'0'),flight};
+  }));
   return {intake,budgets,captures};
 };

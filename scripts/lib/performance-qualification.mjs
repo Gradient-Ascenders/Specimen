@@ -11,8 +11,8 @@ export function distribution(values) {
 }
 
 export const SCENARIOS = {
-  'l1-traversal':{level:'containment-teaching-level-1',forms:['bob']},
-  'l2-switching':{level:'cultivation-level-2',forms:['bob','goop']},
+  'l1-traversal':{level:'containment-teaching-level-1',room:1,forms:['bob']},
+  'l2-switching':{level:'cultivation-level-2',room:1,forms:['bob','goop']},
   'l2-room5-bob':{level:'cultivation-level-2',room:5,forms:['bob']},
   'l2-room5-goop':{level:'cultivation-level-2',room:5,forms:['goop']},
   'l3-electrical':{level:'blackout-level-3',room:'room-1',forms:['volt']},
@@ -153,7 +153,7 @@ export function evaluateQualification(intake, budgets, captures) {
   require(Array.isArray(budgets?.requiredScenarios) && budgets.requiredScenarios.length > 0, 'Missing scenario requirements.');
   require(Object.keys(SCENARIOS).every(id=>budgets?.requiredScenarios?.includes(id)), 'Budgets must cover all seven shipped routes.');
   require(Number.isFinite(budgets?.minimumActiveSeconds) && budgets.minimumActiveSeconds>0,'Missing positive active-duration requirement.');
-  require(Number.isInteger(budgets?.samplesPerScenario) && budgets.samplesPerScenario >= 1, 'Invalid repetition requirement.');
+  require(budgets?.samplesPerScenario === 3, 'Require three recordings per scenario across the three browser passes.');
   require(Number.isInteger(budgets?.resources?.restartCycles) && budgets.resources.restartCycles>=3,'Require at least three stabilized restart cycles.');
   require(new Set(captures.map(x=>x.sha256)).size===captures.length &&
     captures.every(x=>/^[a-f0-9]{64}$/.test(x.sha256 ?? '')), 'Duplicate/missing raw capture hashes.');
@@ -205,11 +205,22 @@ export function evaluateQualification(intake, budgets, captures) {
     require(analyzed.filter(x=>x.scenarioId===id && x.valid).length >= budgets.samplesPerScenario, `Missing valid repetitions: ${id}.`);
   // One export per page suffices for shared page-level loading/lifecycle history.
   const pages = new Map();
-  for (const capture of captures) if (capture.flight?.qualification?.pageId) {
-    require(!pages.has(capture.flight.qualification.pageId) || pages.get(capture.flight.qualification.pageId).cache===capture.cache,
+  for (const capture of captures) {
+    const pageId=capture.flight?.qualification?.pageId;
+    require(present(pageId), `${capture.file ?? capture.scenarioId}: missing browser-pass page identity.`);
+    if (!present(pageId)) continue;
+    require(!pages.has(pageId) || pages.get(pageId).cache===capture.cache,
       'A single page cannot be both browser-cold and browser-warm.');
-    pages.set(capture.flight.qualification.pageId,{cache:capture.cache, data:capture.flight.qualification});
+    const scenarios=pages.get(pageId)?.scenarios ?? new Map();
+    scenarios.set(capture.scenarioId,(scenarios.get(capture.scenarioId) ?? 0)+1);
+    pages.set(pageId,{cache:capture.cache, data:capture.flight.qualification,scenarios});
   }
+  require(pages.size===3, 'Require exactly three distinct browser-pass pages.');
+  require([...pages.values()].filter(page=>page.cache==='browser-cold').length===1 &&
+    [...pages.values()].filter(page=>page.cache==='browser-warm').length===2,
+    'Require one browser-cold and two browser-warm passes.');
+  for (const [pageId,page] of pages) for (const id of Object.keys(SCENARIOS))
+    require(page.scenarios.get(id)===1, `${pageId}: require exactly one recording of ${id} in each browser pass.`);
   const loading=[];
   for (const [pageId,page] of pages) {
     require(Number.isFinite(page.data.bootReadyMs) && page.data.bootReadyMs>=0,`${pageId}: missing navigation-to-title timing.`);

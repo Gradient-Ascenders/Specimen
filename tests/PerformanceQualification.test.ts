@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fixture} from './helpers/PerformanceQualificationFixture.ts';
-import {analyzeRecording,evaluateQualification,distribution} from '../scripts/lib/performance-qualification.mjs';
+import {analyzeRecording,evaluateQualification,distribution,SCENARIOS} from '../scripts/lib/performance-qualification.mjs';
 import {buildManifestPlugin} from '../scripts/lib/build-provenance.mjs';
 
 const setColumn=(f:any,key:string,value:any)=>{const index=f.frameColumns.indexOf(key);for(const row of f.retainedFrames)row[index]=value;};
@@ -16,6 +16,64 @@ test('approved synthetic fixtures pass; proposed budgets and missing evidence ne
   f.budgets.approval.status='approved';f.captures.pop();
   assert.equal(evaluateQualification(f.intake,f.budgets,f.captures).status,'unqualified');
 });
+
+for(const {name,mutate,reason} of [
+  {name:'all three recordings of a scenario on the cold page',reason:'exactly one recording',mutate:(f:any)=>{
+    for(const c of f.captures.filter(c=>c.scenarioId==='l1-traversal')) {
+      c.cache='browser-cold';c.flight.qualification.pageId='pass-1';
+    }
+  }},
+  {name:'uneven scenario coverage across two warm pages',reason:'exactly one recording',mutate:(f:any)=>{
+    f.captures.find(c=>c.scenarioId==='l1-traversal'&&c.flight.qualification.pageId==='pass-2').flight.qualification.pageId='pass-3';
+    f.captures.find(c=>c.scenarioId==='l2-switching'&&c.flight.qualification.pageId==='pass-3').flight.qualification.pageId='pass-2';
+  }},
+  {name:'two cold passes and one warm pass',reason:'one browser-cold and two browser-warm',mutate:(f:any)=>{
+    for(const c of f.captures.filter(c=>c.flight.qualification.pageId==='pass-2'))c.cache='browser-cold';
+  }},
+  {name:'both warm passes sharing a page',reason:'exactly three distinct',mutate:(f:any)=>{
+    for(const c of f.captures.filter(c=>c.flight.qualification.pageId==='pass-3'))c.flight.qualification.pageId='pass-2';
+  }},
+  {name:'a scenario split into a fourth page',reason:'exactly three distinct',mutate:(f:any)=>{
+    f.captures[20].flight.qualification.pageId='pass-4';
+  }},
+  {name:'an additional distinct recording of a page scenario',reason:'exactly one recording',mutate:(f:any)=>{
+    const c=structuredClone(f.captures[0]);c.file='extra.json';c.sha256='f'.repeat(64);
+    c.flight.session.startedAt='2026-10-20T11:00:00Z';f.captures.push(c);
+  }},
+  {name:'a missing page identity',reason:'missing browser-pass page identity',mutate:(f:any)=>{
+    delete f.captures[0].flight.qualification.pageId;
+  }},
+  {name:'a blank page identity',reason:'missing browser-pass page identity',mutate:(f:any)=>{
+    f.captures[0].flight.qualification.pageId=' ';
+  }},
+  {name:'a repetition budget reduced below the required protocol',reason:'Require three recordings',mutate:(f:any)=>{
+    f.budgets.samplesPerScenario=1;
+  }},
+]) test(`three-pass protocol rejects ${name}`,()=>{
+  const f=fixture();mutate(f);
+  // Every recording remains individually valid; rejection must concern the intake protocol.
+  assert.ok(f.captures.every(c=>analyzeRecording(c.flight).valid));
+  const result=evaluateQualification(f.intake,f.budgets,f.captures);
+  assert.equal(result.status,'unqualified');
+  assert.ok(result.reasons.some(message=>message.includes(reason)),result.reasons.join('\n'));
+});
+
+test('the complete three-pass protocol is independent of intake ordering',()=>{
+  const f=fixture();f.captures.reverse();
+  assert.equal(evaluateQualification(f.intake,f.budgets,f.captures).status,'pass');
+});
+
+for(const scenarioId of ['l1-traversal','l2-switching'])
+  for(const room of [2,'room-1','mixed']) test(`${scenarioId} rejects wrong room ${room}`,()=>{
+    assert.equal(SCENARIOS[scenarioId].room,1);
+    const f=fixture(),flight=f.captures.find(c=>c.scenarioId===scenarioId)!.flight;
+    if(room==='mixed')flight.retainedFrames[2][flight.frameColumns.indexOf('room')]=2;
+    else setColumn(flight,'room',room);
+    assert.equal(analyzeRecording(flight).valid,true);
+    const result=evaluateQualification(f.intake,f.budgets,f.captures);
+    assert.equal(result.status,'unqualified');
+    assert.ok(result.reasons.some(message=>message.includes('scenario level/room/controlled movement')));
+  });
 test('missing GPU/memory are null, not zero; supported GPU coverage and budgets are enforced',()=>{
   const f=fixture(),flight=f.captures[0]!.flight;
   let report=analyzeRecording(flight);assert.equal(report.valid,true);assert.equal(report.gpu,null);assert.equal(report.memory,null);
@@ -123,7 +181,7 @@ test('CLI intake hashes evidence, fails closed on missing files, and manifest ha
     await writeFile(path.join(root,'intake.json'),JSON.stringify(intake));await writeFile(path.join(root,'budgets.json'),JSON.stringify(f.budgets));
     const run=()=>spawnSync(process.execPath,['scripts/qualify-performance.mjs',path.join(root,'intake.json'),path.join(root,'budgets.json'),path.join(root,'result.json')],{encoding:'utf8'});
     const first=run();assert.equal(first.status,0,first.stdout+first.stderr);let result=JSON.parse(await readFile(path.join(root,'result.json'),'utf8'));
-    assert.equal(result.status,'pass');assert.equal(Object.keys(result.captureHashes).length,7);
+    assert.equal(result.status,'pass');assert.equal(Object.keys(result.captureHashes).length,21);
     intake.captures[0].file='missing.json';await writeFile(path.join(root,'intake.json'),JSON.stringify(intake));
     assert.equal(run().status,2);result=JSON.parse(await readFile(path.join(root,'result.json'),'utf8'));assert.equal(result.status,'unqualified');
   } finally {

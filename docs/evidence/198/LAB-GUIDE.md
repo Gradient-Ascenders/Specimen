@@ -177,8 +177,11 @@ sample means wait longer/repeat, not a zero resource increase.
 The first post-warm restart is the resource baseline, not the cold peak. Finish
 all scenarios on a page and export the last capture **after** these cycles, so
 that export contains the page's full lifecycle history. If you perform extra
-late cycles, make a new short export and ask the maintainer to include its
-lifecycle history; don't edit old exports. Lifecycle evidence is bounded to 32
+late cycles, repeat the last scenario for the full 35 seconds afterward and
+select its new export in the intake. Keep the earlier export separately as
+unused evidence; don't edit it. Submit exactly seven selected scenario exports
+per page, rather than adding a short lifecycle-only capture. Lifecycle evidence
+is bounded to 32
 events per page; the prescribed three restarts per level stays below that cap.
 
 Outside a timed capture, verify a real hazard death → Retry, pause/resume, slime
