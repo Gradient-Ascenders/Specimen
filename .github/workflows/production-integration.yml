@@ -98,6 +98,9 @@ jobs:
       - name: Install Firefox
         run: npx playwright install --with-deps firefox
 
+      - name: Install Mesa software OpenGL
+        run: sudo apt-get install --yes --no-install-recommends libgl1-mesa-dri libglx-mesa0 libegl-mesa0
+
       - name: Smoke-test production startup
         timeout-minutes: 5
         env:
@@ -105,9 +108,9 @@ jobs:
           SPECIMEN_FIREFOX_SOFTWARE_WEBGL: '1'
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: >-
-          npx playwright test tests/smoke/ProductionSmoke.spec.ts
+          xvfb-run --auto-servernum npx playwright test tests/smoke/ProductionSmoke.spec.ts
           --grep "plain production boots"
-          --config playwright.smoke.config.ts
+          --config playwright.smoke.config.ts --headed
 
       - name: Upload Firefox diagnostics on failure
         if: failure()
