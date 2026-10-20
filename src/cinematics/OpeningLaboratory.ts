@@ -9,9 +9,9 @@ import { OpeningRoomOne, OPENING_ROOM_ONE_LAYOUT as R } from './OpeningRoomOne.t
 
 export const OPENING_EXPERIMENTS = [
   { code: 'SP-08', specimen: 'PLUTO', threat: 'LOW', colour: CONTAINMENT_IDENTIFICATION_COLOURS.low, side: -1, z: 60 },
-  { code: 'SP-12', specimen: 'MIMIC', threat: 'CRITICAL', colour: 0xee706b, side: 1, z: 47 },
-  { code: 'SP-02', specimen: 'GOOP', threat: 'HIGH', colour: 0xe9b05a, side: -1, z: 34 },
-  { code: 'SP-03', specimen: 'VOLT', threat: 'HIGH', colour: 0xe9b05a, side: 1, z: 21 },
+  { code: 'SP-12', specimen: 'MIMIC', threat: 'HIGH', colour: 0xe9b05a, side: 1, z: 47 },
+  { code: 'SP-02', specimen: 'GOOP', threat: 'CRITICAL', colour: CONTAINMENT_IDENTIFICATION_COLOURS.critical, side: -1, z: 34 },
+  { code: 'SP-03', specimen: 'VOLT', threat: 'CRITICAL', colour: CONTAINMENT_IDENTIFICATION_COLOURS.critical, side: 1, z: 21 },
   { code: 'SP-01', specimen: 'BOB', threat: 'UNKNOWN', colour: CONTAINMENT_IDENTIFICATION_COLOURS.unknown, side: 0, z: R.doorwayZ },
 ] as const;
 

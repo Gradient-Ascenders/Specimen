@@ -68,6 +68,73 @@ canvas {
   scrollbar-width: thin;
 }
 
+/* The finale owns only the view; pause/settings keep the normal game-flow layer. */
+#app[data-cinematic="containment-finale"] > :not([data-gameplay-canvas]):not(.game-flow):not(.containment-finale),
+#app[data-cinematic="containment-finale"] > .game-flow[data-state="playing"] { visibility: hidden !important; }
+.containment-finale { position: absolute; inset: 0; z-index: 7; pointer-events: none; color: #dcf6ff; }
+#app[data-cinematic="cultivation-finale"] > :not([data-gameplay-canvas]):not(.game-flow):not(.cultivation-finale),
+#app[data-cinematic="cultivation-finale"] > .game-flow[data-state="playing"] { visibility: hidden !important; }
+.cultivation-finale .finale-scan[data-target="volt"],
+.cultivation-finale .finale-scan[data-target="bob"] { color: #ff6d74; border-color: #ff6d7470; }
+.cultivation-finale .finale-scan[data-target="wreck"] { color: #b7cc79; border-color: #869347; box-shadow: inset 0 -3rem 4rem #53632488; }
+.cultivation-finale .finale-threat { max-width: 85%; }
+.cultivation-finale .finale-threat-level { font-size: clamp(1.1rem, 4.7vw, 4rem); }
+.cultivation-finale .finale-subtitle { font: 600 clamp(.9rem, 1.9vw, 1.35rem) / 1.4 monospace; }
+.cultivation-finale .finale-subtitle[data-speaker="volt"] { color: #ffdb6b; }
+.finale-alarm-wash { position: absolute; inset: 8% 0; background: #ff101a; pointer-events: none; }
+.finale-bar { position: absolute; left: 0; right: 0; height: 8%; background: #010305; z-index: 2; }
+.finale-bar.top { top: 0; } .finale-bar.bottom { bottom: 0; }
+/* The live Room 3 sequence uses DOM letterboxing, without a postprocess or
+ * render target. Pause/settings retain the same accessible game-flow layer. */
+#app[data-cinematic="cultivation-clearance"] > :not([data-gameplay-canvas]):not(.game-flow),
+#app[data-cinematic="cultivation-clearance"] > .game-flow[data-state="playing"],
+#app[data-cinematic="blackout-arrival"] > :not([data-gameplay-canvas]):not(.game-flow),
+#app[data-cinematic="blackout-arrival"] > .game-flow[data-state="playing"] { visibility: hidden !important; }
+#app[data-cinematic="cultivation-clearance"]::before,
+#app[data-cinematic="cultivation-clearance"]::after,
+#app[data-cinematic="blackout-arrival"]::before,
+#app[data-cinematic="blackout-arrival"]::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 8%;
+  background: #010305; z-index: 7; pointer-events: none;
+}
+#app[data-cinematic="cultivation-clearance"]::before,
+#app[data-cinematic="blackout-arrival"]::before { top: 0; }
+#app[data-cinematic="cultivation-clearance"]::after,
+#app[data-cinematic="blackout-arrival"]::after { bottom: 0; }
+.finale-fade { position: absolute; inset: 0; background: #010305; z-index: 3; }
+.finale-skip { pointer-events: auto; position: absolute; bottom: 2.4%; right: 3%; z-index: 4;
+  background: transparent; border: 1px solid #a1c3ce60; color: #bbced3; padding: .4rem .8rem; font: .75rem monospace; cursor: pointer; }
+.finale-skip:focus-visible { outline: 2px solid #a4e4ef; }
+.finale-status { position: absolute; inset: 48% 5% auto; text-align: center; z-index: 4; font: .8rem monospace; }
+.finale-subtitle { position: absolute; bottom: 12%; width: 100%; text-align: center; font-size: clamp(1rem, 2.3vw, 1.6rem);
+  color: #a4ed73; text-shadow: 0 2px 6px black; letter-spacing: .06em; }
+.finale-scan { position: absolute; inset: 11% 5%; border: 1px solid #9bd5e45c; color: #a4e7ff;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, #03232e22 4px); font-family: monospace; }
+.finale-scan[data-target="goop"] { color: #ff6976; border-color: #ff697670; }
+.finale-scan-heading { position: absolute; top: 3%; left: 3%; font-size: clamp(.6rem, 1.4vw, .95rem); letter-spacing: .16em; }
+.finale-scan-details { position: absolute; bottom: 8%; left: 3%; font-size: clamp(.65rem, 1.55vw, 1.05rem);
+  line-height: 1.8; white-space: pre-line; padding: .6rem .9rem; background: #02090fd9; border-left: 2px solid currentColor; }
+.finale-reticle { position: absolute; width: 19%; aspect-ratio: 1; left: 40.5%; top: 28%;
+  border: 1px solid currentColor; border-radius: 3%; box-shadow: 0 0 0 8px #0002; }
+.finale-reticle::after { content: '+'; position: absolute; top: 42%; left: 45%; opacity: .7; }
+.finale-scan-progress { position: absolute; bottom: 4%; left: 3%; width: 35%; height: 2px; background: currentColor; transform-origin: left; }
+.finale-threat { position: absolute; right: 4%; top: 26%; max-width: 48%; padding: 1rem 1.4rem;
+  text-align: right; border-right: 4px solid currentColor; background: linear-gradient(90deg, #02090f90, #02090fed); }
+.finale-threat-caption { font-size: clamp(.65rem, 1.4vw, 1rem); letter-spacing: .28em; }
+.finale-threat-level { font-size: clamp(1.6rem, 5.8vw, 4.8rem); font-weight: 800; line-height: 1.35; letter-spacing: .07em; }
+.finale-termination { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:92%;
+  padding:1rem .3rem;text-align:center;color:#ff596c;background:#12060be8;border-block:2px solid #ff596c;
+  font:900 clamp(1.6rem,6.8vw,6rem)/1.15 monospace;letter-spacing:.08em;
+  opacity:var(--termination-flash-opacity,1);text-shadow:0 0 18px #a80b2b80; }
+.finale-scan[data-stage="terminate"] .finale-threat { top:3%;padding:.4rem .8rem; }
+.finale-scan[data-stage="terminate"] .finale-threat-level { font-size:clamp(1.2rem,2.7vw,2.5rem); }
+.finale-scan[data-stage="terminate"] .finale-reticle { border-width: 3px; }
+@media (prefers-reduced-motion: reduce) { .finale-termination { opacity:1; } }
+@media (max-width: 600px) {
+  .finale-threat { top: 17%; right: 3%; padding: .5rem .7rem; max-width: 65%; }
+  .finale-scan-details { bottom: 9%; font-size: .6rem; padding: .3rem .5rem; }
+}
+
 .test-panel.is-collapsed {
   width: auto;
   max-height: none;

@@ -40,7 +40,9 @@ export class RoomThreeGreybox {
   readonly failureVolume = new LevelTriggerVolume({
     id: 'room-3-fall-failure',
     centre: new THREE.Vector3(0, (ROOM_THREE_ACID_SURFACE_Y_METRES - 2) / 2, 63),
-    size: new THREE.Vector3(38, ROOM_THREE_ACID_SURFACE_Y_METRES + 2, 32),
+    // Match the basin's room-shell footprint. The former two-metre padding
+    // extended through the shared entry wall and killed players in Room 2.
+    size: new THREE.Vector3(34, ROOM_THREE_ACID_SURFACE_Y_METRES + 2, 28),
   });
   readonly lasers: LaserHazardSystem;
   readonly art: RoomThreeArt;

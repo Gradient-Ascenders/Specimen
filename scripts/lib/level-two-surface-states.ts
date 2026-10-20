@@ -9,6 +9,7 @@ import type { LevelTwoPreviewScene } from '../../src/levels/LevelTwoPreviewScene
 import { CollisionWorld } from '../../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../../src/physics/SurfaceRegistry.ts';
 import { createAuthoredDissolveTarget } from '../../src/abilities/DissolveTarget.ts';
+import {VOLT_FINALE} from '../../src/cinematics/CultivationFinaleTimeline.ts';
 
 /** Deterministic authored poses; every state is scanned after updating world matrices. */
 export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (name: string) => void): void {
@@ -44,6 +45,11 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     scene.roomFour.update(1.5, occupants);
     for (const dt of [1, 15, 17, 27, 1.5]) {scene.roomFour.update(dt, occupants); roomFour.update(dt, 'goop'); sample(`lift-${scene.roomFour.controller.readModel.elapsed}-${scene.roomFour.controller.readModel.arrivalElapsed}`);}
     scene.roomFive.restoreCheckpoint('rescued'); sample('volt-rescued');
+    scene.voltFinaleSet.annex.visible=true;
+    for(const [name,time] of [['closed',VOLT_FINALE.ductRun],['buckling',VOLT_FINALE.brake],['breaking',VOLT_FINALE.grateBreak+.3],['open',VOLT_FINALE.ductSilence]] as const){
+      scene.voltFinaleSet.present(time);sample(`volt-escape-duct-${name}`);
+    }
+    scene.voltFinaleSet.reset();
     for (const target of targets) target.reset();
     scene.reset(); roomThree.reset(); roomFour.reset(); roomFive.reset(); sample('reset');
   } finally { roomFive.dispose(); roomFour.dispose(); roomThree.dispose(); dissolve.dispose(); for (const target of targets) target.dispose(); }

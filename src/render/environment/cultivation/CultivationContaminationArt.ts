@@ -19,7 +19,6 @@ export class CultivationContaminationArt {
   private readonly growth = new THREE.MeshStandardMaterial({ name: 'cultivation-dry-root-growth', color: 0x535a3c, roughness: .96, side: THREE.DoubleSide });
   private readonly mineral = new THREE.MeshStandardMaterial({ name: 'cultivation-mineral-deposit', color: 0xaca596, roughness: .65, metalness: .16 });
   private readonly amber = new THREE.MeshStandardMaterial({ name: 'cultivation-service-amber', color: 0xb98948, emissive: 0xffad59, emissiveIntensity: .5, roughness: .7 });
-  private readonly cool = new THREE.MeshStandardMaterial({ name: 'cultivation-vent-guide', color: 0xa8c4d3, emissive: 0xb2d8ef, emissiveIntensity: .65, roughness: .5 });
   private disposed = false;
   private readonly assets: CultivationAssetSource;
 
@@ -35,7 +34,7 @@ export class CultivationContaminationArt {
       map: this.glassAtlas(), transparent: true, opacity: .76,
       side: THREE.DoubleSide, forceSinglePass: true, depthWrite: false, depthTest: true,
       roughness: .24, metalness: .08 });
-    for (const material of [this.dark, this.growth, this.mineral, this.glass, this.amber, this.cool]) optimizeFiniteLightEvaluation(material);
+    for (const material of [this.dark, this.growth, this.mineral, this.glass, this.amber]) optimizeFiniteLightEvaluation(material);
   }
 
   overrides(builder: GreyboxRoomBuilder): ReadonlyMap<string, THREE.MeshStandardMaterial> {
@@ -167,8 +166,8 @@ export class CultivationContaminationArt {
       add(warning, stripe.translate(0, .207, z));
     }
     if (room === 2) {
-      // Upper vent: three short bars. Lower door: two vertical mechanical jambs.
-      for (const dx of [-.7, 0, .7]) box(this.cool, 8 + dx, 20.2, 44.72, .4, .12, .03);
+      // Only the lower door needs illuminated mechanical jambs. Leave the
+      // upper duct aperture clear instead of floating guide bars across it.
       for (const x of [-2.3, 2.3]) box(this.amber, x, 2.5, 44.74, .13, 3.6, .04);
     }
     if (room === 3) {
@@ -328,7 +327,7 @@ export class CultivationContaminationArt {
     }
     for (const geometry of this.geometries) geometry.dispose();
     this.geometries.clear();
-    for(const material of [...Object.values(this.finishes),this.glass,this.dark,this.growth,this.mineral,this.amber,this.cool]) material.dispose();
+    for(const material of [...Object.values(this.finishes),this.glass,this.dark,this.growth,this.mineral,this.amber]) material.dispose();
     for(const texture of this.textures)texture.dispose();
   }
 }

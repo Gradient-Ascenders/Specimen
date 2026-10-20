@@ -45,6 +45,7 @@ export class VoltCharacterPresentation {
   private readonly targetBaseOffsetWorld = new THREE.Vector3();
   private readonly impactNormal = new THREE.Vector3(0, 1, 0);
   private readonly impactPoint = new THREE.Vector3();
+  private readonly headroomPositionWorld = new THREE.Vector3();
   private asset: VoltAsset | undefined;
   private materials: VoltMaterialSet | undefined;
   private preparation: Promise<void> | undefined;
@@ -333,7 +334,12 @@ export class VoltCharacterPresentation {
     this.shape.matrixWorldNeedsUpdate = true;
     // Locked Volt still advances animation, but has no visible surface or shadows.
     // Query the current ceiling again on the first visible pose after unlocking.
-    if (this.requestedVisible) this.headroom.present(this.placement.position, this.shape.matrix, this.weights);
+    if (this.requestedVisible) {
+      // Cutscenes borrow this presentation under a moving carrier. Placement
+      // is then local (often zero), not the location of Volt in the facility.
+      this.placement.getWorldPosition(this.headroomPositionWorld);
+      this.headroom.present(this.headroomPositionWorld, this.shape.matrix, this.weights);
+    }
     this.presentedBaseOffsetWorld.lerpVectors(this.previousBaseOffsetWorld, this.baseOffsetWorld, blend);
     this.materials?.setMotion(this.presentedBaseOffsetWorld, this.character.rotation.y,
       THREE.MathUtils.lerp(this.previousCrestLag, this.crestLag, blend), this.rippleStrength,

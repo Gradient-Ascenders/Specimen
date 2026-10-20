@@ -223,6 +223,7 @@ export class BobCharacterPresentation {
   private currentFacingYawRadians = 0;
   private targetFacingYawRadians = 0;
   private hasTravelHeading = false;
+  private aimFacingRequested = false;
   private reversing = false;
   private readonly poseWeights: Record<BobBodyPose, number> = {
     'move-forward': 0, 'move-reverse': 0, squash: 0, flatten: 0,
@@ -353,6 +354,17 @@ export class BobCharacterPresentation {
     this.currentFrame.setFromAxisAngle(LOCAL_UP, yawRadians);
     this.previousFrame.copy(this.currentFrame);
     this.mesh.quaternion.copy(this.currentFrame);
+  }
+
+  /** Turn a stationary character smoothly without resetting its support/jump frame. */
+  setAimDirection(direction: Vector3State): void {
+    if (this.disposed || this.deathActive || this.attachedToWall ||
+      !Number.isFinite(direction.x) || !Number.isFinite(direction.z) ||
+      direction.x * direction.x + direction.z * direction.z < 1e-8) return;
+    this.targetFacingYawRadians = Math.atan2(-direction.x, -direction.z);
+    this.hasTravelHeading = true;
+    this.reversing = false; this.reversalHoldRemaining = 0;
+    this.aimFacingRequested = true;
   }
 
   setOpacity(opacity: number): void {
@@ -799,6 +811,7 @@ export class BobCharacterPresentation {
   }
 
   reset(): void {
+    this.aimFacingRequested = false;
     this.deathActive = false;
     this.deathElapsedSeconds = 0;
     this.deathBurst.reset();
@@ -946,7 +959,8 @@ export class BobCharacterPresentation {
   }
 
   private updateFacing(deltaSeconds: number): void {
-    if (!this.locomotionMoving && !this.reversing) return;
+    if (!this.locomotionMoving && !this.reversing && !this.aimFacingRequested) return;
+    this.aimFacingRequested = false;
     if (this.reversing && this.reversalHoldRemaining > 0) {
       this.reversalHoldRemaining = Math.max(0,
         this.reversalHoldRemaining - deltaSeconds);

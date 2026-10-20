@@ -113,12 +113,14 @@ test('textured batches preserve UVs, shadow roles and collider identities, resto
   kit.dispose();
 });
 
-test('all 63 authored mesh fingerprints match the untextured main baseline', () => {
+test('untouched authored mesh fingerprints still match the baseline around the new wall arrival', () => {
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-maintenance-authored-surfaces.json', import.meta.url), 'utf8'));
   const bay = new BlackoutMaintenanceBay(maintenanceMaps);
   try {
-    assert.equal(bay.collisionMeshes.length, 55);
+    assert.equal(bay.collisionMeshes.length,89,'the wall chute and one fixed return-route blocker add colliders');
+    const replaced=new Set(['front-perimeter-wall','ceiling-entry-vent-frame','ceiling-entry-vent-grille']);
     for (const saved of baseline.surfaces) {
+      if(replaced.has(saved.name))continue;
       const mesh = bay.root.getObjectByName(saved.name) as THREE.Mesh;
       assert.ok(mesh, saved.name); assert.equal(bay.collisionMeshes.includes(mesh), saved.collider);
       assert.deepEqual(mesh.position.toArray(), saved.position); assert.deepEqual(mesh.rotation.toArray(), saved.rotation);
@@ -128,6 +130,8 @@ test('all 63 authored mesh fingerprints match the untextured main baseline', () 
       assert.equal(hash(mesh.geometry.index!.array), saved.indexHash, saved.name);
       assert.equal(mesh.castShadow, saved.castShadow); assert.equal(mesh.receiveShadow, saved.receiveShadow);
     }
+    assert.equal(bay.root.getObjectByName('ceiling-entry-vent-frame'),undefined);
+    assert.equal(bay.root.getObjectByName('ceiling-entry-vent-grille'),undefined);
   } finally { bay.dispose(); }
 });
 
@@ -155,7 +159,7 @@ test('scene teardown releases each shared kit map and visible material exactly o
   scene.maintenanceBay!.root.traverse(o => {
     if (!(o instanceof THREE.Mesh)) return;
     for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-      if (!m.visible || !m.name.startsWith('blackout-')) continue;
+      if (!m.visible || !m.name.startsWith('blackout-') || !(m instanceof THREE.MeshStandardMaterial)) continue;
       materials.add(m); maps(m as THREE.MeshStandardMaterial).forEach(t => textures.add(t));
     }
   });

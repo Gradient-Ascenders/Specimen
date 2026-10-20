@@ -82,7 +82,10 @@ export function clonePrewarmDrawable<Drawable extends THREE.Mesh | THREE.Points 
   proxy.instanceMatrix = source.instanceMatrix;
   proxy.instanceColor = source.instanceColor;
   proxy.morphTexture = source.morphTexture;
-  proxy.count = source.count;
+  // Dormant fixed effect pools can request one harmless instance so their
+  // full borrowed instance buffers upload before the first visible impact.
+  const minimum=source.userData.prewarmInstanceCount;
+  proxy.count = Math.min(source.instanceMatrix.count,Math.max(source.count,Number.isInteger(minimum)&&minimum>0?minimum:0));
   proxy.name = source.name;
   proxy.renderOrder = source.renderOrder;
   proxy.layers.mask = source.layers.mask;

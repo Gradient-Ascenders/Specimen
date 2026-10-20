@@ -228,6 +228,8 @@ function startGame(): void {
       releasePointerLock: () => input.releasePointerLock(),
       isPointerLocked: () => input.pointerLocked,
       isGameplayInputEnabled: () => input.enabled,
+      isCinematicPlaying: () => app.dataset.cinematic === 'cultivation-finale' ||
+        app.dataset.cinematic === 'containment-finale' && app.dataset.gameState === 'level-completing',
       restartLevel: () => lifecycleCoordinator.restartLevel(),
       applySettings: (nextSettings) => {
         audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);

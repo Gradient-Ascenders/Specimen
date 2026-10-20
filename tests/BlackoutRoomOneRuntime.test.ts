@@ -15,6 +15,8 @@ import type { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem
 import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
+import type {BobCharacterPresentation} from '../src/render/bob/BobCharacterPresentation.ts';
+import type {GoopCharacterPresentation} from '../src/render/goop/GoopCharacterPresentation.ts';
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
 
@@ -138,7 +140,7 @@ function mutableRoomOneBodies(runtime: BlackoutLevelRuntime): Readonly<Record<'b
   return roomOneInternals(runtime).bodies;
 }
 
-function createFixture(debugAvailable = true) {
+function createFixture(debugAvailable = true,playArrival=false) {
   const document = new TestDocument();
   const previousDocument = globalThis.document;
   Object.defineProperty(globalThis, 'document', { configurable: true, value: document });
@@ -152,6 +154,7 @@ function createFixture(debugAvailable = true) {
     renderLayer: { scene, canvas: document.createElement(), cameraRig, render: () => {} } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt' },
     authoredRoomOne: true,
+    playArrival,
     debugAvailable,
     maintenanceMaps,
   });
@@ -179,6 +182,40 @@ function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
     electricalTargets: ElectricalTargetRegistry;
   } }).resources;
 }
+
+test('authored Level 3 starts with the wall-vent arrival, pauses cleanly, then restores Volt control and CP1 recovery',()=>{
+  const f=createFixture(true,true);try{
+    const r=(f.runtime as unknown as {resources:{ventArrival:import('../src/cinematics/BlackoutVentArrival.ts').BlackoutVentArrival;scene:{maintenanceBay:{entryVentCollapse:{sealed:boolean}}};group:{activeSlimeId:string};voltPresentation:VoltCharacterPresentation}}).resources;
+    assert.equal(r.ventArrival.active,true);assert.equal(f.input.enabled,false);assert.equal(r.group.activeSlimeId,'volt');
+    assert.equal(r.scene.maintenanceBay.entryVentCollapse.sealed,false);
+    f.input.press('switchSlime');f.input.press('moveBackward');f.tick(60);
+    assert.equal(r.group.activeSlimeId,'volt','switch/movement input cannot take over scripted slide poses');
+    f.runtime.stop();const paused=r.ventArrival.seconds;f.tick(30);f.render();f.render();assert.equal(r.ventArrival.seconds,paused);
+    f.runtime.setDebugInteractionEnabled(true);assert.equal(f.input.enabled,false);
+    f.runtime.start();assert.equal(f.input.enabled,false,'resuming cannot enable movement before the arrival finishes');
+    for(let frame=0;frame<420&&r.ventArrival.active;frame++)f.tick();
+    assert.equal(r.ventArrival.active,false);assert.equal(f.input.enabled,true);assert.equal(r.group.activeSlimeId,'volt');
+    assert.equal(r.scene.maintenanceBay.entryVentCollapse.sealed,true);
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp1');
+    assert.deepEqual(Object.values(f.runtime.getSlimePositions()!).map(p=>p.toArray()),[[-2,.46,2],[0,.46,2],[2,.46,2]]);
+    f.runtime.recoverActiveCheckpoint();assert.equal(r.ventArrival.active,false);
+    assert.equal(r.scene.maintenanceBay.entryVentCollapse.sealed,true,'death recovery keeps the return route blocked');
+    f.runtime.stop();f.runtime.start();assert.equal(r.ventArrival.active,false,'ordinary resume/recovery does not repeat the arrival');
+    f.runtime.restartLevel();assert.equal(r.scene.maintenanceBay.entryVentCollapse.sealed,true,'restart does not open the spent arrival');
+  }finally{f.cleanup();}
+});
+
+test('recovering or restarting during the arrival cancels camera/model ownership safely',()=>{
+  for(const action of ['recoverActiveCheckpoint','restartLevel'] as const){
+    const f=createFixture(true,true);try{
+      f.tick(50);f.runtime[action]();
+      const r=(f.runtime as unknown as {resources:{ventArrival:{active:boolean};bobPresentation:BobCharacterPresentation;goopPresentation:GoopCharacterPresentation;voltPresentation:VoltCharacterPresentation}}).resources;
+      assert.equal(r.ventArrival.active,false);assert.equal(f.input.enabled,true);
+      assert.ok([r.bobPresentation,r.goopPresentation,r.voltPresentation].every(p=>p.root.parent===f.scene));
+      assert.deepEqual(Object.values(f.runtime.getSlimePositions()!).map(p=>p.toArray()),[[-2,.46,2],[0,.46,2],[2,.46,2]]);
+    }finally{f.cleanup();}
+  }
+});
 
 function assertVoltBelowCeiling(body: THREE.Mesh, ceiling: THREE.Mesh): number {
   body.updateWorldMatrix(true, false); ceiling.updateWorldMatrix(true, false);

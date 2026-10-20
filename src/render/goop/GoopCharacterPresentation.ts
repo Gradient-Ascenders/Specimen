@@ -6,7 +6,7 @@ import { CharacterDetail, loadCharacterDetail, type CharacterDetailIndices } fro
 import { moveAngleTowards, shortestAngleDelta } from '../BlobFacing.ts';
 import { SlimeBurstPresentation } from '../slime/SlimeBurstPresentation.ts';
 import type { Vector3State, SlimePresentationLaunch } from '../slime/SlimePresentationContract.ts';
-import { disposeGoopAsset, disposeGoopMaterials, validateGoopAsset, type GoopAsset } from './GoopAsset.ts';
+import { disposeGoopAsset, disposeGoopMaterials, validateGoopAsset, GOOP_EYE_BOUNDS, type GoopAsset } from './GoopAsset.ts';
 import { GOOP_BASE_COLOR, GoopMaterialSet } from './GoopMaterials.ts';
 import { GOOP_MAXIMUM_BASE_OFFSET_METRES, GOOP_MAXIMUM_JUMP_BASE_OFFSET_METRES, GOOP_MAXIMUM_BASE_DISPLACEMENT_METRES } from './GoopBaseMotion.ts';
 import { GoopPolishMotion, GOOP_CREST_LAG_METRES, GOOP_LANDING_RIPPLE_METRES } from './GoopPolishMotion.ts';
@@ -29,6 +29,7 @@ const REVERSAL_ANGLE = THREE.MathUtils.degToRad(120);
 const REVERSAL_HOLD_SECONDS = 0.16;
 const TURN_SPEED = THREE.MathUtils.degToRad(540);
 export type GoopCharacterLoader = () => Promise<THREE.Group>;
+export type GoopExpression = 'alert' | 'determined' | 'relieved' | 'blink';
 export interface GoopCharacterPresentationState {
   readonly locomotionPositionWorld: Vector3State;
   readonly velocityWorld: Vector3State;
@@ -92,6 +93,7 @@ export class GoopCharacterPresentation {
   private squash = 0;
   private deathActive = false;
   private deathElapsed = 0;
+  private readonly expressions: Record<GoopExpression, number> = { alert: 0, determined: 0, relieved: 0, blink: 0 };
 
   constructor(radiusMetres = 0.45, gelRendering?: GelRendering) {
     if (Math.abs(radiusMetres - 0.45) > 1e-6) throw new Error('Goop requires the approved 0.45 m radius');
@@ -119,6 +121,7 @@ export class GoopCharacterPresentation {
       squash: Math.max(0, this.squash), stretch: Math.max(0, -this.squash),
       shadowCasting: this.shadows && this.character.visible,
       deathActive: this.deathActive, deathBurst: this.burst.diagnostics,
+      expressions: { ...this.expressions },
       materials: this.materials?.diagnostics,
       asset: this.asset ? { bodyTriangles: 26804, eyeTriangles: 6912, drawCalls: 3, geometries: 3, materials: 2 } : undefined };
   }
@@ -198,6 +201,11 @@ export class GoopCharacterPresentation {
       this.targetYaw = Math.atan2(-direction.x, -direction.z);
       this.reversing = false; this.reversalRemaining = 0;
     }
+  }
+  /** Subtle seated-eye acting, without changing the authored geometry or shaders. */
+  setExpression(expression: GoopExpression, weight: number): void {
+    if (this.disposed || this.deathActive) return;
+    this.expressions[expression] = Number.isFinite(weight) ? THREE.MathUtils.clamp(weight, 0, 1) : 0;
   }
   setVisible(visible: boolean): void { this.requestedVisible = visible; this.applyVisibility(); }
   setOpacity(opacity: number): void { this.opacity = THREE.MathUtils.clamp(opacity, 0, 1); this.materials?.setOpacity(this.opacity); this.applyVisibility(); }
@@ -328,6 +336,16 @@ export class GoopCharacterPresentation {
       0, 0, 0, 1,
     );
     this.shape.matrixWorldNeedsUpdate = true;
+    if (this.asset) {
+      const e = this.expressions;
+      const height = (1 + .14 * e.alert - .22 * e.determined - .1 * e.relieved) * (1 - .84 * e.blink);
+      for (let i = 0; i < this.asset.eyes.length; i++) {
+        const eye = this.asset.eyes[i], bounds = GOOP_EYE_BOUNDS[i];
+        // Scale around each eye's own centre; no translation away from the gel surface.
+        eye.scale.y = height;
+        eye.position.y = height === 1 ? 0 : (bounds.min.y + bounds.max.y) * .5 * (1 - height);
+      }
+    }
     if (this.impactPending && this.asset && this.materials) {
       this.impactPoint.copy(this.impactNormal).multiplyScalar(-this.radiusMetres).add(this.position);
       this.asset.body.worldToLocal(this.impactPoint);
@@ -379,6 +397,7 @@ export class GoopCharacterPresentation {
   finishDeath(position: Vector3State): void { this.setPosition(position); this.reset(); }
   reset(): void {
     this.polish.reset();
+    this.expressions.alert = this.expressions.determined = this.expressions.relieved = this.expressions.blink = 0;
     this.deathActive = false; this.deathElapsed = 0; this.burst.reset();
     this.launchRemaining = this.landingRemaining = this.squash = this.previousSquash = this.speed = 0;
     this.launchStrength = this.landingStrength = this.damageRemaining = this.damageStrength = 0;

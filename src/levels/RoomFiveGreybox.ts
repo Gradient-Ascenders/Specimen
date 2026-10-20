@@ -1,16 +1,21 @@
 import type { GelRendering } from '../render/slime/GelRendering.ts';
 import { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import * as THREE from 'three';
+import { CONTAINMENT_FINALE_TIMING, sampleContainmentFinale } from '../cinematics/ContainmentFinaleTimeline.ts';
 
 import { LaserHazard } from '../hazards/LaserHazard.ts';
 import { LaserHazardSystem } from '../hazards/LaserHazardSystem.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomFiveArt } from '../render/environment/containment/RoomFiveArt.ts';
+import { RoomFiveGoopSpeech } from '../render/environment/containment/RoomFiveGoopSpeech.ts';
+import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { MovingPlatform } from '../puzzle/MovingPlatform.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import { LevelTriggerVolume } from './LevelTriggerVolume.ts';
+import { ROOM_FIVE_ESCAPE } from './RoomFiveEscapeLayout.ts';
+import { createWoodenVentCoverGeometry } from '../render/environment/containment/WoodenVentCover.ts';
 
 export const ROOM_5_ENTRY_CHECKPOINT_POSITION = new THREE.Vector3(9, 75.21, 94);
 export const ROOM_5_ENTRY_CHECKPOINT_ID = 'containment-room-5-entry';
@@ -18,8 +23,9 @@ export const ROOM_5_PUZZLE_GROUP_ID = 'containment-room-5';
 
 export type RoomFiveEndingState =
   | 'traversal'
-  | 'leverPull'
+  | 'buttonPress'
   | 'containmentFailure'
+  | 'finale'
   | 'released';
 
 export interface RoomFiveHazardFailure {
@@ -27,8 +33,13 @@ export interface RoomFiveHazardFailure {
   readonly hazardId: string;
 }
 
-const LEVER_PULL_SECONDS = 1;
-const CONTAINMENT_FAILURE_SECONDS = 1.5;
+const BUTTON_PRESS_SECONDS = 1;
+export const ROOM_FIVE_RELEASE_BUTTON = Object.freeze({
+  position: [-10, 98.45, 131.14] as const,
+  size: [1.05, 1.05, .24] as const,
+  travel: .085,
+});
+const CONTAINMENT_FAILURE_SECONDS = 4.5;
 const STICKY_WALL_THICKNESS_METRES = 0.022;
 const MODERATE_LASER_PERIOD_SECONDS = 5;
 const MOVING_PLATFORM_TRAVEL_DURATION_SECONDS = 3.2;
@@ -73,7 +84,7 @@ const ROOM_FIVE_LASER_MOTIONS: readonly RoomFiveLaserMotionDefinition[] = [
   { id: 'room-5-laser-8', axis: [0, 1, 0], amplitudeMetres: 3.25, centreOffsetMetres: 0, phaseRadians: 0, periodSeconds: MODERATE_LASER_PERIOD_SECONDS },
 ];
 
-/** Room 5's mastery route and deterministic, non-playable Etch release beat. */
+/** Room 5's mastery route and authoritative, fixed-clock Goop rescue finale. */
 export class RoomFiveGreybox {
   readonly builder = new GreyboxRoomBuilder('containment-room-5-greybox');
   readonly root = this.builder.root;
@@ -96,7 +107,8 @@ export class RoomFiveGreybox {
     initialTarget: 'end',
   });
   readonly goopWoodenDoor: THREE.Mesh;
-  readonly leverHandleName = 'room-5-observation-sticky-lever-handle';
+  readonly releaseButtonName = 'room-5-observation-release-button';
+  readonly releaseButton: THREE.Mesh;
   readonly entryCheckpointTrigger = new LevelTriggerVolume({
     id: 'room-5-entry-checkpoint-trigger',
     centre: new THREE.Vector3(9, 76, 93.5),
@@ -122,8 +134,10 @@ export class RoomFiveGreybox {
   ] as const;
   private readonly laserMotions: readonly RoomFiveLaserMotion[];
   private readonly laserTranslationOffset = new THREE.Vector3();
-  private readonly leverHandle: THREE.Mesh;
+  private readonly releaseButtonCap: THREE.Mesh;
+  private readonly buttonContactPoint = new THREE.Vector3();
   readonly goopPresentation: GoopCharacterPresentation;
+  readonly goopSpeech = new RoomFiveGoopSpeech();
   private readonly containedGoopPosition = new THREE.Vector3(0, 76.546, 110);
   private readonly goopPresentationState = {
     locomotionPositionWorld: new THREE.Vector3(),
@@ -146,7 +160,7 @@ export class RoomFiveGreybox {
     this.goopWoodenDoor = this.buildShell();
     const solubleDoorMaterial = artResources.materials.solubleComposite.clone();
     solubleDoorMaterial.name = 'room-5-soluble-biological-composite-source';
-    solubleDoorMaterial.color.setHex(0x686047);
+    solubleDoorMaterial.color.setHex(0x96714f);
     solubleDoorMaterial.emissive.setHex(0x121408);
     solubleDoorMaterial.emissiveIntensity = 0.1;
     solubleDoorMaterial.roughness = 0.82;
@@ -154,11 +168,15 @@ export class RoomFiveGreybox {
     this.goopWoodenDoor.material = solubleDoorMaterial;
     this.buildTraversal();
     const endingObjects = this.buildContainmentAndObservationRoom();
-    this.leverHandle = endingObjects.leverHandle;
-    this.root.add(this.goopPresentation.root);
-    const leverMaterial = artResources.materials.stickyMembrane.clone();
-    leverMaterial.name = 'room-5-authoritative-sticky-lever-handle';
-    this.leverHandle.material = leverMaterial;
+    this.releaseButton = endingObjects.button;
+    this.releaseButtonCap = endingObjects.cap;
+    this.root.add(this.goopPresentation.root, this.goopSpeech.root);
+    const buttonMaterial = artResources.materials.warningStatus.clone();
+    buttonMaterial.name = 'room-5-release-button-cap';
+    buttonMaterial.color.setHex(0x4ccee1);
+    buttonMaterial.emissive.setHex(0x126477);
+    buttonMaterial.emissiveIntensity = .4;
+    this.releaseButtonCap.material = buttonMaterial;
     const hazards = this.createHazards();
     this.laserMotions = ROOM_FIVE_LASER_MOTIONS.map((definition) => {
       const hazard = hazards.find((candidate) => candidate.id === definition.id);
@@ -192,34 +210,40 @@ export class RoomFiveGreybox {
     return this.endingStateValue === 'released';
   }
 
+  get endingSeconds(): number { return this.endingElapsedSeconds; }
+
+  /** Keep the legacy dissolve/checkpoint identity; this is now a wooden vent cover. */
+  get goopVentCover(): THREE.Mesh { return this.goopWoodenDoor; }
+
   /** Scripted world position; the presentation root itself stays at the origin. */
   get goopReleasePosition(): THREE.Vector3 {
     return this.containedGoopPosition.clone();
   }
 
-  updatePresentation(deltaSeconds: number): void {
+  updatePresentation(deltaSeconds: number, activePosition?: Vector3State): void {
     // Release translation belongs to the ending sequence, not locomotion.
     this.goopPresentation.update(deltaSeconds, this.goopPresentationState);
     this.goopPresentation.present();
+    this.goopSpeech.update(deltaSeconds, activePosition, this.endingStateValue === 'traversal');
   }
 
   /** Normalized progress inside the current authoritative ending phase. */
   get endingProgress(): number {
-    if (this.endingStateValue === 'leverPull') {
+    if (this.endingStateValue === 'buttonPress') {
       return THREE.MathUtils.clamp(
-        this.endingElapsedSeconds / LEVER_PULL_SECONDS,
+        this.endingElapsedSeconds / BUTTON_PRESS_SECONDS,
         0,
         1,
       );
     }
     if (this.endingStateValue === 'containmentFailure') {
       return THREE.MathUtils.clamp(
-        this.endingElapsedSeconds / CONTAINMENT_FAILURE_SECONDS,
+        (this.endingElapsedSeconds - BUTTON_PRESS_SECONDS) / CONTAINMENT_FAILURE_SECONDS,
         0,
         1,
       );
     }
-    return this.endingStateValue === 'released' ? 1 : 0;
+    return this.endingStateValue === 'released' || this.endingStateValue === 'finale' ? 1 : 0;
   }
 
   updateEntryTrigger(body: KinematicBody): void {
@@ -230,11 +254,29 @@ export class RoomFiveGreybox {
     this.failureVolume.update(body);
   }
 
+  /** A normal contact button: no sticky attachment or extra key is needed. */
+  isReleaseButtonPressed(body: Pick<KinematicBody, 'position' | 'radiusMetres'>): boolean {
+    const { position: p, size } = ROOM_FIVE_RELEASE_BUTTON;
+    if (body.position.z > p[2] || !(body.radiusMetres > 0)) return false;
+    this.buttonContactPoint.set(
+      THREE.MathUtils.clamp(body.position.x, p[0]-size[0]/2, p[0]+size[0]/2),
+      THREE.MathUtils.clamp(body.position.y, p[1]-size[1]/2, p[1]+size[1]/2),
+      THREE.MathUtils.clamp(body.position.z, p[2]-size[2]/2, p[2]+size[2]/2),
+    );
+    return this.buttonContactPoint.distanceToSquared(body.position) <= (body.radiusMetres + .04) ** 2;
+  }
+
+  setReleaseButtonProgress(progress: number): void {
+    // Move only the visual cap. The registered static collider never changes.
+    this.releaseButtonCap.position.z = 131.035 + ROOM_FIVE_RELEASE_BUTTON.travel * THREE.MathUtils.clamp(progress,0,1);
+  }
+
   updateTraversal(
     deltaSeconds: number,
     body: KinematicBody,
     persistentBodies: readonly KinematicBody[],
   ): void {
+    if (this.endingStateValue !== 'traversal') return;
     this.updateMovingPlatforms(deltaSeconds, persistentBodies);
     this.updateLaserMotions(deltaSeconds);
     this.lasers.update(deltaSeconds, body);
@@ -244,47 +286,41 @@ export class RoomFiveGreybox {
 
   beginEnding(): boolean {
     if (this.endingStateValue !== 'traversal') return false;
-    this.endingStateValue = 'leverPull';
+    this.endingStateValue = 'buttonPress';
     this.endingElapsedSeconds = 0;
+    for (const hazard of this.lasers.hazards) hazard.setCircuitGateEnabled(false);
+    this.laserPresentation.sync();
+    this.goopSpeech.root.visible = false;
     return true;
   }
 
-  /** Returns true only on the fixed step that Etch's release completes. */
+  /** The fixed simulation clock owns the whole finale, including pause/skip. */
   updateEnding(deltaSeconds: number): boolean {
     if (this.endingStateValue === 'traversal' || this.endingStateValue === 'released') {
       return false;
     }
 
-    this.endingElapsedSeconds += deltaSeconds;
-    if (this.endingStateValue === 'leverPull') {
-      const progress = THREE.MathUtils.clamp(
-        this.endingElapsedSeconds / LEVER_PULL_SECONDS,
-        0,
-        1,
-      );
-      this.leverHandle.rotation.x = -progress * Math.PI * 0.42;
-      if (progress < 1) return false;
-
-      this.endingStateValue = 'containmentFailure';
-      this.endingElapsedSeconds = 0;
-      return false;
-    }
-
-    const progress = THREE.MathUtils.clamp(
-      this.endingElapsedSeconds / CONTAINMENT_FAILURE_SECONDS,
-      0,
-      1,
-    );
-    const eased = THREE.MathUtils.smoothstep(progress, 0, 1);
-    this.containedGoopPosition.y = 76.546 - eased * 8.8;
-    this.containedGoopPosition.z = 110 + eased * 2;
-
-    this.goopPresentation.setPosition(this.containedGoopPosition);
-    if (progress < 1) return false;
-    this.endingStateValue = 'released';
-    this.goopPresentation.setVisible(false);
-    this.endingElapsedSeconds = 0;
+    this.endingElapsedSeconds = Math.min(CONTAINMENT_FINALE_TIMING.end,
+      this.endingElapsedSeconds + Math.max(0, deltaSeconds));
+    this.setReleaseButtonProgress(Math.min(1,this.endingElapsedSeconds / .25));
+    this.endingStateValue = this.endingElapsedSeconds < BUTTON_PRESS_SECONDS ? 'buttonPress'
+      : this.endingElapsedSeconds < 5.5 ? 'containmentFailure' : 'finale';
+    const frame = sampleContainmentFinale(this.endingElapsedSeconds);
+    this.containedGoopPosition.fromArray(frame.goop);
+    this.art.setReleaseProgress(frame.panelOpen);
+    if (this.endingElapsedSeconds < CONTAINMENT_FINALE_TIMING.end) return false;
+    this.finishEnding();
     return true;
+  }
+
+  /** Same endpoint for normal playback and a user-requested skip. */
+  finishEnding(): void {
+    this.endingElapsedSeconds = CONTAINMENT_FINALE_TIMING.end;
+    this.endingStateValue = 'released';
+    this.setReleaseButtonProgress(1);
+    this.containedGoopPosition.fromArray(sampleContainmentFinale(CONTAINMENT_FINALE_TIMING.end).goop);
+    this.art.setReleaseProgress(1);
+    this.goopPresentation.setVisible(false);
   }
 
   reset(): void {
@@ -298,6 +334,8 @@ export class RoomFiveGreybox {
     this.laserPresentation.sync();
     this.art.reset();
     this.resetEndingPresentation();
+    // Room resets are checkpoint-local; the full scene restart clears speech memory.
+    this.goopSpeech.resetForCheckpointRecovery();
   }
 
   dispose(): void {
@@ -309,6 +347,7 @@ export class RoomFiveGreybox {
     this.lasers.dispose();
     for (const platform of this.movingPlatforms) platform.dispose();
     this.goopPresentation.dispose();
+    this.goopSpeech.dispose();
     this.builder.dispose();
   }
 
@@ -373,22 +412,25 @@ export class RoomFiveGreybox {
     this.builder.addCollider({ name: 'room-5-front-wall-above-entry', size: [3, 22, 0.4], position: [9, 89.75, 91.5], material: wall });
 
     // Rear wall is split around the high observation-room opening and the
-    // floor-level Goop route. The door shares the sticky-panel wall plane and
+    // floor-level Goop route. The small duct shares the sticky-panel wall plane and
     // uses the containment glass centre as its horizontal reference (x = 0).
     this.builder.addCollider({ name: 'room-5-rear-wall-west', size: [8, 26, 0.4], position: [-16, 87.75, 125.5], material: wall });
-    this.builder.addCollider({ name: 'room-5-rear-wall-east-left-of-goop-door', size: [6.5, 26, 0.4], position: [-4.75, 87.75, 125.5], material: wall });
-    this.builder.addCollider({ name: 'room-5-rear-wall-east-right-of-goop-door', size: [18.5, 26, 0.4], position: [10.75, 87.75, 125.5], material: wall });
-    this.builder.addCollider({ name: 'room-5-rear-wall-above-goop-door', size: [3, 21.5, 0.4], position: [0, 90, 125.5], material: wall });
+    this.builder.addCollider({ name: 'room-5-rear-wall-east-left-of-goop-door', size: [7.1, 26, 0.4], position: [-4.45, 87.75, 125.5], material: wall });
+    this.builder.addCollider({ name: 'room-5-rear-wall-east-right-of-goop-door', size: [19.1, 26, 0.4], position: [10.45, 87.75, 125.5], material: wall });
+    this.builder.addCollider({ name: 'room-5-rear-wall-above-goop-door', size: [ROOM_FIVE_ESCAPE.ventWidth,24.35,.4], position: [0,88.575,125.5], material: wall });
     this.builder.addCollider({ name: 'room-5-rear-wall-below-observation', size: [4, 22.2, 0.4], position: [-10, 85.85, 125.5], material: wall });
 
     const goopWoodenDoor = this.builder.addCollider({
       name: 'room-5-goop-wooden-door',
-      size: [3, 4.5, 0.3],
-      position: [0, 77, 125.25],
+      size: ROOM_FIVE_ESCAPE.coverSize,
+      position: ROOM_FIVE_ESCAPE.coverPosition,
       material: wood,
       interactionRole: 'goop-dissolvable',
       textureRole: 'wooden-door',
     });
+    goopWoodenDoor.geometry.dispose();
+    goopWoodenDoor.geometry=createWoodenVentCoverGeometry();
+    goopWoodenDoor.userData.presentationRole='solid-wooden-vent-cover';
     goopWoodenDoor.userData.soluble = true;
     goopWoodenDoor.userData.solubleId = goopWoodenDoor.name;
     goopWoodenDoor.userData.dissolveDurationSeconds = 1.8;
@@ -463,9 +505,9 @@ export class RoomFiveGreybox {
   }
 
   private buildContainmentAndObservationRoom(): {
-    readonly leverHandle: THREE.Mesh;
+    readonly button: THREE.Mesh; readonly cap: THREE.Mesh;
   } {
-    const { containment, glass, floor, wall, sticky } = this.builder.materials;
+    const { glass, floor, wall } = this.builder.materials;
 
     // Latest Blender scene keeps the containment glass and Etch but removes
     // the old frame and sliding-door meshes.
@@ -482,17 +524,19 @@ export class RoomFiveGreybox {
     this.builder.addVisualBox({ name: 'room-5-observation-window-left', size: [1.7, 3, 0.12], position: [-13.05, 99.2, 125.32], material: glass });
     this.builder.addVisualBox({ name: 'room-5-observation-window-right', size: [1.7, 3, 0.12], position: [-6.95, 99.2, 125.32], material: glass });
 
-    this.builder.addVisualBox({ name: 'room-5-lever-base', size: [1.3, 1.3, 0.45], position: [-10, 100.2, 132.05], material: containment });
-    const leverHandle = this.builder.addCollider({
-      name: this.leverHandleName,
-      size: [0.42, 2.6, 0.42],
-      position: [-10, 100.2, 131.75],
-      material: sticky,
-      surfaceTag: 'sticky',
-      textureRole: 'sticky-wall-tile',
+    const button = this.builder.addCollider({
+      name: this.releaseButtonName,
+      size: ROOM_FIVE_RELEASE_BUTTON.size,
+      position: ROOM_FIVE_RELEASE_BUTTON.position,
+      material: wall,
     });
-
-    return { leverHandle };
+    button.userData.interactionRole = 'goop-release-button';
+    const cap = this.builder.addVisualBox({name:'room-5-observation-release-button-cap',
+      size:[.92,.92,.16],position:[-10,98.45,131.035],material:wall});
+    cap.geometry.dispose();cap.geometry = new THREE.CylinderGeometry(.46,.46,.16,24);
+    cap.rotation.x = Math.PI / 2;
+    cap.userData.presentationOwnedBy = 'room-5-release-button';
+    return { button, cap };
   }
 
   private hideGameplayColliders(): void {
@@ -501,7 +545,6 @@ export class RoomFiveGreybox {
       material.visible = false;
     }
     (this.goopWoodenDoor.material as THREE.Material).visible = true;
-    (this.leverHandle.material as THREE.Material).visible = true;
     for (const platform of this.movingPlatforms) {
       platform.collisionMesh.material.name =
         `${platform.collisionMesh.name}-collision-only`;
@@ -513,10 +556,11 @@ export class RoomFiveGreybox {
   private resetEndingPresentation(): void {
     this.endingStateValue = 'traversal';
     this.endingElapsedSeconds = 0;
-    this.leverHandle.rotation.set(0, 0, 0);
+    this.setReleaseButtonProgress(0);
     this.containedGoopPosition.set(0, 76.546, 110);
     this.goopPresentation.reset();
     this.goopPresentation.setPosition(this.containedGoopPosition);
+    this.goopSpeech.root.visible = true;
   }
 
   private createHazards(): readonly LaserHazard[] {

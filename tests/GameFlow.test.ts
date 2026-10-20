@@ -85,6 +85,8 @@ test('pause ownership defers to a death flow that disabled gameplay input', () =
   assert.equal(gameFlowCanPause('playing', true), true);
   assert.equal(gameFlowCanPause('playing', false), false);
   assert.equal(gameFlowCanPause('paused', true), false);
+  assert.equal(gameFlowCanPause('playing', false, true), true, 'A cinematic is pausable without enabling character controls.');
+  assert.equal(gameFlowCanPause('paused', false, true), false);
 });
 
 test('pause requires unmodified P while Escape remains a nested-menu cancel', () => {

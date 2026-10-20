@@ -5179,7 +5179,7 @@
   {
     "name": "room-5-rear-wall-east-left-of-goop-door",
     "worldPosition": [
-      -4.75,
+      -4.45,
       87.75,
       125.5
     ],
@@ -5195,7 +5195,7 @@
       1
     ],
     "localDimensions": [
-      6.5,
+      7.1,
       26,
       0.4
     ],
@@ -5210,7 +5210,7 @@
   {
     "name": "room-5-rear-wall-east-right-of-goop-door",
     "worldPosition": [
-      10.75,
+      10.45,
       87.75,
       125.5
     ],
@@ -5226,7 +5226,7 @@
       1
     ],
     "localDimensions": [
-      18.5,
+      19.1,
       26,
       0.4
     ],
@@ -5242,7 +5242,7 @@
     "name": "room-5-rear-wall-above-goop-door",
     "worldPosition": [
       0,
-      90,
+      88.575,
       125.5
     ],
     "worldQuaternion": [
@@ -5257,8 +5257,8 @@
       1
     ],
     "localDimensions": [
-      3,
-      21.5,
+      1.8,
+      24.35,
       0.4
     ],
     "surfaceTag": "default",
@@ -5304,8 +5304,8 @@
     "name": "room-5-goop-wooden-door",
     "worldPosition": [
       0,
-      77,
-      125.25
+      75.65,
+      124.72
     ],
     "worldQuaternion": [
       0,
@@ -5319,9 +5319,9 @@
       1
     ],
     "localDimensions": [
-      3,
-      4.5,
-      0.3
+      2.35,
+      1.8,
+      0.9
     ],
     "surfaceTag": "default",
     "movementFaceMode": "all",
@@ -5983,11 +5983,11 @@
     "developmentOnly": false
   },
   {
-    "name": "room-5-observation-sticky-lever-handle",
+    "name": "room-5-observation-release-button",
     "worldPosition": [
       -10,
-      100.2,
-      131.75
+      98.45,
+      131.14
     ],
     "worldQuaternion": [
       0,
@@ -6001,14 +6001,14 @@
       1
     ],
     "localDimensions": [
-      0.42,
-      2.6,
-      0.42
+      1.05,
+      1.05,
+      0.24
     ],
-    "surfaceTag": "sticky",
+    "surfaceTag": "default",
     "movementFaceMode": "all",
-    "interactionRole": null,
-    "textureRole": "sticky-wall-tile",
+    "interactionRole": "goop-release-button",
+    "textureRole": null,
     "soluble": false,
     "parentPath": "containment-level-greybox/containment-room-5-greybox",
     "developmentOnly": false

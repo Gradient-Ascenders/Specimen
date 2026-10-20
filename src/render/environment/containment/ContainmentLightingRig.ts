@@ -328,7 +328,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       RELEASE_GREEN_COLOUR,
     );
     this.roomFiveObservationLight = this.spot(
-      'room-5-observation-lever-key',
+      'room-5-observation-button-key',
       [-10, 103.5, 128],
       [-10, 99, 131.25],
       78,
@@ -863,7 +863,9 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     for (const [panelName, pivot] of Object.entries(this.roomFive.art.panelPivots)) {
       const fixture = this.fixture(
         `room-5-containment-${panelName}-lock-status`,
-        [0, 0.9, 0],
+        // Preserve the front indicator's closed world pose after moving the
+        // hatch pivot to its top edge; an old positive-Y offset swings inward.
+        panelName === 'front' ? [-2.45, -0.52, 0] : [0, 0.9, 0],
         [0.34, 0.18, 0.2],
         this.lockEmitterMaterial,
       );
@@ -1037,8 +1039,8 @@ function mapRoomFiveEndingState(
   progress: number,
 ): GoopReleaseLightingState {
   if (state === 'traversal') return 'normal';
-  if (state === 'leverPull') return 'warning';
-  if (state === 'released') return 'released';
+  if (state === 'buttonPress') return 'warning';
+  if (state === 'released' || state === 'finale') return 'released';
   if (progress < 0.25) return 'locks-disengaging';
   if (progress < 0.78) return 'opening';
   return 'reveal';

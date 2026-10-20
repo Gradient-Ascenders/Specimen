@@ -15,6 +15,8 @@ export function generateCultivationSurfaceRepairs(scene: LevelTwoPreviewScene, i
     }
     for (const child of scene.roomFourGeometry.children) if (child.name.startsWith('room-4-shaft-module-')) moving.set(child, child);
     moving.set(scene.roomFive.brokenCore, scene.roomFive.brokenCore);
+    moving.set(scene.roomFive.releaseCover, scene.roomFive.releaseCoverCollider);
+    for(const hinge of scene.voltFinaleSet.dynamicTransformRoots)moving.set(hinge,hinge);
     moving.set(scene.filtrationArt.fan, scene.filtrationArt.fan);
     const domain = (mesh: THREE.Mesh): object => {
       let motion: object | undefined;
@@ -55,7 +57,13 @@ export function generateCultivationSurfaceRepairs(scene: LevelTwoPreviewScene, i
       insets.set(object, geometry);
     });
     install(insets);
-    const repairs = createCoplanarSurfaceRepairs(scene.root, domain);
-    install(repairs);
-    return insets.size + repairs.size;
+    const annexVisible = scene.voltFinaleSet.annex.visible;
+    // This escape scenery is hidden in gameplay but still needs its static
+    // seams/arrow joins repaired offline, not on the first cinematic frame.
+    scene.voltFinaleSet.annex.visible = true;
+    try {
+      const repairs = createCoplanarSurfaceRepairs(scene.root, domain);
+      install(repairs);
+      return insets.size + repairs.size;
+    } finally { scene.voltFinaleSet.annex.visible = annexVisible; }
 }

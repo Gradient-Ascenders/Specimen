@@ -146,18 +146,20 @@ test('red guards have sustained clear sightlines onto their authored jumping pla
   } finally { s.dispose(); }
 });
 
-test('release control is a lever and the dry reunion floor stays absent until release', () => {
+test('release control is a guarded push button and the dry reunion floor stays absent until release', () => {
   const s = setup();
   try {
-    assert.equal(s.room.lever.name, 'room-5-manual-release-lever');
-    assert.notEqual(s.room.lever.userData.surfaceTag, 'sticky');
+    assert.equal(s.room.releaseButton.name, 'room-5-manual-release-button');
+    assert.notEqual(s.room.releaseButton.userData.surfaceTag, 'sticky');
+    assert.equal(s.room.root.getObjectByName('room-5-manual-release-lever'), undefined);
+    const restingZ = s.room.releaseButton.position.z;
     const floor = s.room.root.getObjectByName('room-5-reunion-floor')!;
     assert.equal(floor.visible, false);
     assert.equal(s.room.isAcidAt(s.room.root.localToWorld(new THREE.Vector3(4, .4, 65))), true);
     const position = s.room.root.localToWorld(new THREE.Vector3(0, 29.66, 28));
     s.room.update(3, [{ id: 'bob', position }]);
-    assert.equal(s.room.controller.releasing, false, 'early lever use cannot bypass cooperation');
-    assert.equal(s.room.controller.leverProgress, 0);
+    assert.equal(s.room.controller.releasing, false, 'early button use cannot bypass cooperation');
+    assert.equal(s.room.controller.buttonProgress, 0);
     s.room.controller.destroyBrokenDrone();
     s.room.update(3, [{ id: 'bob', position }]);
     assert.equal(s.room.controller.releasing, false, 'destroying the drone alone is insufficient');
@@ -165,27 +167,22 @@ test('release control is a lever and the dry reunion floor stays absent until re
     assert.equal(s.room.controller.checkpoint, 'controls');
     s.room.update(1.5, [{ id: 'bob', position }]);
     assert.equal(s.room.controller.releasing, true);
-    assert.ok(s.room.lever.rotation.x > 1);
+    assert.ok(s.room.releaseButton.position.z < restingZ, 'cap depresses into the guarded console');
+    assert.equal(s.room.releaseButton.rotation.x, 0, 'a button does not swing like the old lever');
+    assert.equal(s.room.releaseButton.material.color.getHex(), 0x75e5bd, 'release also updates the connected status circuit');
     assert.equal(floor.visible, true);
     assert.equal(s.room.isAcidAt(s.room.root.localToWorld(new THREE.Vector3(4, .4, 65))), false);
   } finally { s.dispose(); }
 });
 
-test('terminal, exit and dry-floor exceptions reject below-floor and out-of-bounds bodies', () => {
+test('unused lower exit walls, door and terminal are removed while the acid bed stays continuous', () => {
   const s = setup();
   try {
     s.room.restoreCheckpoint('rescued');
     const world = (x: number, y: number, z: number) => s.room.root.localToWorld(new THREE.Vector3(x, y, z));
-    assert.equal(s.room.isAtVoltTerminal(world(16, .66, 68)), true);
-    assert.equal(s.room.isAtFinalExit(world(16, .66, 75)), true);
-    for (const y of [-17, -.01, 3, 10]) {
-      assert.equal(s.room.isAtVoltTerminal(world(16, y, 68)), false);
-      assert.equal(s.room.isAtFinalExit(world(16, y, 75)), false);
-    }
-    for (const x of [11, 21]) assert.equal(s.room.isAtFinalExit(world(x, .66, 75)), false);
-    for (const z of [71, 79, 100]) assert.equal(s.room.isAtFinalExit(world(16, .66, z)), false);
-    for (const [x, z] of [[14, 68], [18, 68], [16, 66], [16, 70]])
-      assert.equal(s.room.isAtVoltTerminal(world(x, .66, z)), false);
+    for (const name of ['exit-wall-left','exit-wall-right','exit-header','exit-floor','unpowered-exit-door','volt-conductive-terminal'])
+      assert.equal(s.room.root.getObjectByName(`room-5-${name}`), undefined);
+    assert.equal(s.room.isAcidAt(world(16, .4, 75)), true);
     assert.equal(s.room.isAcidAt(world(16, -.01, 75)), true);
     assert.equal(s.room.isAcidAt(world(4, -.01, 65)), true);
     assert.equal(s.room.isAcidAt(world(16, .4, 79.5)), true);
@@ -268,7 +265,7 @@ test('first draw after reset uses the reset drone pose even without a fixed upda
   } finally { s.dispose(); }
 });
 
-test('sewer reboot, paired checkpoints and rescue retries preserve the right state', () => {
+test('sewer reboot, shared checkpoints and rescue retries preserve the right state', () => {
   const c = new CultivationRoomFiveController();
   c.update(1, true, false, false, false); assert.equal(c.brokenDroneState, 'rebooting');
   c.update(.5, false, false, false, false); assert.equal(c.brokenDroneState, 'active');
@@ -277,12 +274,56 @@ test('sewer reboot, paired checkpoints and rescue retries preserve the right sta
   c.security.select('green'); c.reset('controls');
   assert.equal(c.brokenDroneState, 'destroyed'); assert.equal(c.security.disabledNetwork, undefined);
   c.update(1, false, false, false, true); c.update(.1, false, false, false, false);
-  assert.equal(c.leverProgress, 0, 'leaving lever interrupts the pull');
+  assert.equal(c.buttonProgress, 0, 'leaving the button interrupts its press');
   c.update(1.5, false, false, false, true); assert.equal(c.releasing, true);
   c.update(4, false, false, false, false); assert.equal(c.rescued, true);
   c.powerExit(); c.finish(); assert.equal(c.complete, true);
   c.reset('rescued'); assert.equal(c.rescued, true); assert.equal(c.exitPowered, false);
   c.reset(); assert.equal(c.rescued, false); assert.equal(c.brokenDroneState, 'dormant');
+});
+
+test('sewer checkpoint remembers either partners progress without requiring simultaneous trigger poses', () => {
+  for (const goopFirst of [false, true]) {
+    const c = new CultivationRoomFiveController();
+    c.destroyBrokenDrone();
+    c.update(.1, false, !goopFirst, goopFirst, false);
+    assert.equal(c.checkpoint, 'split');
+    c.update(.1, false, false, false, false);
+    c.update(.1, false, goopFirst, !goopFirst, false);
+    assert.equal(c.checkpoint, 'controls', `Goop first: ${goopFirst}`);
+    c.reset(); c.destroyBrokenDrone();
+    c.update(.1, false, false, false, false);
+    assert.equal(c.checkpoint, 'split', 'a full restart clears both milestones');
+  }
+  const c = new CultivationRoomFiveController();
+  c.update(.1, false, true, true, false);
+  assert.equal(c.checkpoint, 'split', 'passing the live drone cannot save its destruction');
+  c.destroyBrokenDrone(); c.update(.1, false, false, false, false);
+  assert.equal(c.checkpoint, 'split', 'Goop must actually clear the destroyed drone');
+  c.update(.1, false, false, true, false);
+  assert.equal(c.checkpoint, 'controls');
+});
+
+test('passing the destroyed rusted drone saves across both banks, the channel and jumping heights', () => {
+  const room = new LevelTwoRoomFiveGreybox(() => {});
+  room.root.position.set(64, 0, 249); room.root.rotation.y = .23; room.root.updateMatrixWorld(true);
+  const world = (p: readonly number[]) => room.root.localToWorld(new THREE.Vector3(...p));
+  try {
+    for (const position of [[31, -10.54, 71.6], [40, -11.54, 72], [48.9, -8.2, 73], [44, -10.54, 122]]) {
+      room.reset();
+      room.update(.1, [{ id: 'bob', position: world([11, 23.66, 60]) }]);
+      room.controller.destroyBrokenDrone();
+      room.update(.1, [{ id: 'goop', position: world(position) }]);
+      assert.equal(room.controller.checkpoint, 'controls', position.toString());
+      room.restoreCheckpoint(room.controller.checkpoint);
+      assert.equal(room.controller.brokenDroneState, 'destroyed', 'retry never brings back the cleared drone');
+    }
+    for (const position of [[40, -11.54, 70], [0, -10, 73], [40, 0, 73], [40, -14, 73]]) {
+      room.reset(); room.controller.destroyBrokenDrone();
+      room.update(.1, [{ id: 'bob', position: world([-12, 10.66, 23]) }, { id: 'goop', position: world(position) }]);
+      assert.equal(room.controller.checkpoint, 'split', `outside clearance zone: ${position}`);
+    }
+  } finally { room.dispose(); }
 });
 
 function setup() {
@@ -516,7 +557,7 @@ test('flying models do not overlap even with independently shifted patrol clocks
   } finally { s.dispose(); }
 });
 
-test('final walkway leads around the cover to the lever without another jump', () => {
+test('final walkway leads around the cover to the button without another jump', () => {
   const s = setup();
   try {
     s.bob.recoverAt(s.room.root.localToWorld(new THREE.Vector3(0, 29.46, 37)));
@@ -530,7 +571,7 @@ test('final walkway leads around the cover to the lever without another jump', (
       }
       assert.ok(arrived && local.y > 29, `walk to ${x},${z}: ${local.toArray()}`);
       for (let frame = 0; frame < 720; frame++) s.encounter.update(1 / 60);
-      assert.equal(s.encounter.damage.health[0].health, 100, 'quiet lever approach stays out of fire');
+      assert.equal(s.encounter.damage.health[0].health, 100, 'quiet button approach stays out of fire');
     }
   } finally { s.dispose(); }
 });

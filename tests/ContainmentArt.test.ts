@@ -528,7 +528,7 @@ test('Room 5 art builds a reset-safe hero chamber around frozen gameplay', () =>
   assert.ok(art.root.getObjectByName('room-5-observation-control-room'));
   assert.ok(art.root.getObjectByName('room-5-observation-angled-control-console'));
   assert.ok(art.root.getObjectByName('room-5-observation-connection'));
-  assert.ok(art.root.getObjectByName('room-5-soluble-composite-door-structural-frame'));
+  assert.ok(art.root.getObjectByName('room-5-escape-vent-structural-frame'));
 
   scene.root.updateMatrixWorld(true);
   const ascentMembrane = art.root.getObjectByName(
@@ -616,7 +616,8 @@ test('Room 5 art builds a reset-safe hero chamber around frozen gameplay', () =>
 
   art.setPanelPreview('front', 0.5);
   art.setPanelPreview('left', -0.35);
-  assert.equal(art.panelPivots.front.rotation.y, 0.5);
+  assert.equal(art.panelPivots.front.rotation.x, 0.5);
+  assert.equal(art.panelPivots.front.rotation.y, 0);
   assert.equal(art.panelPivots.left.rotation.y, -0.35);
   assert.equal(art.panelPivots.rear.rotation.y, 0);
   assert.equal(art.panelPivots.right.rotation.y, 0);

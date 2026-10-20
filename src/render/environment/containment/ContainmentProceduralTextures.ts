@@ -257,6 +257,13 @@ function dataTexture(
 const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   ' ': [],
   '.': [[0.5, 0.86, 0.5, 0.9]],
+  ',': [[0.55, 0.82, 0.54, 0.92], [0.54, 0.92, 0.4, 1.03]],
+  '!': [[0.5, 0.08, 0.5, 0.67], [0.5, 0.85, 0.5, 0.91]],
+  "'": [[0.56, 0.06, 0.56, 0.26]],
+  '’': [[0.6, 0.06, 0.57, 0.18], [0.57, 0.18, 0.43, 0.28]],
+  '?': [[0.16, 0.24, 0.16, 0.17], [0.16, 0.17, 0.28, 0.08], [0.28, 0.08, 0.74, 0.08],
+    [0.74, 0.08, 0.86, 0.2], [0.86, 0.2, 0.86, 0.34], [0.86, 0.34, 0.5, 0.58],
+    [0.5, 0.58, 0.5, 0.67], [0.5, 0.85, 0.5, 0.91]],
   '-': [[0.15, 0.52, 0.85, 0.52]],
   ':': [[0.5, 0.3, 0.5, 0.34], [0.5, 0.7, 0.5, 0.74]],
   '0': [[0.2, 0.08, 0.8, 0.08], [0.8, 0.08, 0.92, 0.2], [0.92, 0.2, 0.92, 0.8], [0.92, 0.8, 0.8, 0.92], [0.8, 0.92, 0.2, 0.92], [0.2, 0.92, 0.08, 0.8], [0.08, 0.8, 0.08, 0.2], [0.08, 0.2, 0.2, 0.08], [0.2, 0.82, 0.8, 0.18]],
@@ -277,12 +284,15 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   G: [[0.88, 0.18, 0.72, 0.08], [0.72, 0.08, 0.24, 0.08], [0.24, 0.08, 0.08, 0.24], [0.08, 0.24, 0.08, 0.76], [0.08, 0.76, 0.24, 0.92], [0.24, 0.92, 0.76, 0.92], [0.76, 0.92, 0.9, 0.78], [0.9, 0.78, 0.9, 0.55], [0.9, 0.55, 0.55, 0.55]],
   H: [[0.1, 0.08, 0.1, 0.92], [0.9, 0.08, 0.9, 0.92], [0.1, 0.5, 0.9, 0.5]],
   I: [[0.18, 0.08, 0.82, 0.08], [0.5, 0.08, 0.5, 0.92], [0.18, 0.92, 0.82, 0.92]],
+  J: [[0.24, 0.08, 0.9, 0.08], [0.72, 0.08, 0.72, 0.74], [0.72, 0.74, 0.54, 0.92],
+    [0.54, 0.92, 0.24, 0.92], [0.24, 0.92, 0.08, 0.76], [0.08, 0.76, 0.08, 0.65]],
   K: [[0.1, 0.08, 0.1, 0.92], [0.9, 0.08, 0.1, 0.58], [0.35, 0.46, 0.92, 0.92]],
   L: [[0.1, 0.08, 0.1, 0.92], [0.1, 0.92, 0.88, 0.92]],
   M: [[0.08, 0.92, 0.08, 0.08], [0.08, 0.08, 0.5, 0.5], [0.5, 0.5, 0.92, 0.08], [0.92, 0.08, 0.92, 0.92]],
   N: [[0.1, 0.92, 0.1, 0.08], [0.1, 0.08, 0.9, 0.92], [0.9, 0.92, 0.9, 0.08]],
   O: [[0.24, 0.08, 0.76, 0.08], [0.76, 0.08, 0.92, 0.24], [0.92, 0.24, 0.92, 0.76], [0.92, 0.76, 0.76, 0.92], [0.76, 0.92, 0.24, 0.92], [0.24, 0.92, 0.08, 0.76], [0.08, 0.76, 0.08, 0.24], [0.08, 0.24, 0.24, 0.08]],
   P: [[0.1, 0.92, 0.1, 0.08], [0.1, 0.08, 0.72, 0.08], [0.72, 0.08, 0.9, 0.25], [0.9, 0.25, 0.72, 0.5], [0.72, 0.5, 0.1, 0.5]],
+  Q: [[0.24, 0.08, 0.76, 0.08], [0.76, 0.08, 0.92, 0.24], [0.92, 0.24, 0.92, 0.76], [0.92, 0.76, 0.76, 0.92], [0.76, 0.92, 0.24, 0.92], [0.24, 0.92, 0.08, 0.76], [0.08, 0.76, 0.08, 0.24], [0.08, 0.24, 0.24, 0.08], [0.58, 0.64, 0.96, 1]],
   R: [[0.1, 0.92, 0.1, 0.08], [0.1, 0.08, 0.72, 0.08], [0.72, 0.08, 0.9, 0.25], [0.9, 0.25, 0.72, 0.5], [0.72, 0.5, 0.1, 0.5], [0.58, 0.5, 0.92, 0.92]],
   S: [[0.88, 0.18, 0.72, 0.08], [0.72, 0.08, 0.24, 0.08], [0.24, 0.08, 0.08, 0.28], [0.08, 0.28, 0.24, 0.5], [0.24, 0.5, 0.74, 0.5], [0.74, 0.5, 0.92, 0.7], [0.92, 0.7, 0.76, 0.92], [0.76, 0.92, 0.2, 0.92], [0.2, 0.92, 0.08, 0.82]],
   T: [[0.06, 0.08, 0.94, 0.08], [0.5, 0.08, 0.5, 0.92]],
@@ -385,32 +395,84 @@ function createSignageAtlas(): {
   return { texture, regions };
 }
 
-export const CONTAINMENT_IDENTIFICATION_COLOURS = Object.freeze({ unknown: 0x70b9f1, low: 0x75d595 });
+export const CONTAINMENT_IDENTIFICATION_COLOURS = Object.freeze({
+  unknown: 0x70b9f1, low: 0x75d595, critical: 0xee706b,
+});
 
 /** Small, static identification plate using the same vector lettering as room signs. */
 export function createContainmentSpecimenLabelTexture(specimen: string, threat: string): THREE.DataTexture {
+  const width = SIGN_ATLAS_WIDTH, height = 192;
+  const pixels = new Uint8Array(width * height * 4);
+  const { lines, hex } = paintSpecimenIdentification(pixels, specimen, threat);
+  const texture = dataTexture('containment-specimen-identification-plate', pixels, width, height,
+    false, THREE.SRGBColorSpace);
+  texture.userData.labelLines = lines;
+  texture.userData.statusColour = hex;
+  return texture;
+}
+
+function paintSpecimenIdentification(pixels: Uint8Array, specimen: string, threat: string, showStatusMarks = true) {
   const width = SIGN_ATLAS_WIDTH, height = 192;
   const lines = [`SPECIMEN: ${specimen.toUpperCase()}`, `DANGER THREAT: ${threat.toUpperCase()}`];
   for (const character of lines.join('')) {
     if (!VECTOR_GLYPHS[character]) throw new Error(`Unsupported specimen label character: ${character}`);
   }
-  const pixels = new Uint8Array(width * height * 4);
   const border: Rgba = [57, 88, 94, 255], background: Rgba = [12, 24, 29, 255];
   const primary: Rgba = [222, 239, 235, 255];
   const hex = threat.toUpperCase() === 'UNKNOWN' ? CONTAINMENT_IDENTIFICATION_COLOURS.unknown
-    : threat.toUpperCase() === 'LOW' ? CONTAINMENT_IDENTIFICATION_COLOURS.low : 0xe3b566;
+    : threat.toUpperCase() === 'LOW' ? CONTAINMENT_IDENTIFICATION_COLOURS.low
+    : threat.toUpperCase() === 'CRITICAL' ? CONTAINMENT_IDENTIFICATION_COLOURS.critical : 0xe3b566;
   const accent: Rgba = [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255, 255];
   fillRect(pixels, 0, 0, width, height, border);
   fillRect(pixels, 3, 3, width - 6, height - 6, background);
-  fillRect(pixels, 14, 20, 4, height - 40, accent);
+  if (showStatusMarks) fillRect(pixels, 14, 20, 4, height - 40, accent);
   fillRect(pixels, 36, 99, 440, 1, border);
-  fillRect(pixels, 476, 30, 7, 7, accent);
+  if (showStatusMarks) fillRect(pixels, 476, 30, 7, 7, accent);
   drawVectorTextFit(pixels, lines[0], 36, 30, 430, 44, primary, 4.2);
   drawVectorTextFit(pixels, lines[1], 36, 124, 444, 25, accent, 2.5);
-  const texture = dataTexture('containment-specimen-identification-plate', pixels, width, height,
+  return { lines, hex };
+}
+
+/** Pixel rectangles in the small, Room 5-owned security atlas (top-down rows). */
+export const CONTAINMENT_SECURITY_REGIONS = Object.freeze({
+  identification: [0, 0, 512, 192],
+  hazard: [0, 192, 512, 192],
+  warningIcon: [0, 192, 128, 128],
+  release: [0, 384, 512, 64],
+  caution: [0, 448, 512, 64],
+} as const);
+
+/** Static identification, hazard pictogram and caution tape share one 1 MiB texture. */
+export function createContainmentSecurityAtlas(specimen: string): THREE.DataTexture {
+  const pixels = new Uint8Array(512 * 512 * 4);
+  const { lines, hex } = paintSpecimenIdentification(pixels, specimen, 'CRITICAL', false);
+  const dark: Rgba = [14, 20, 23, 255], amber: Rgba = [235, 178, 68, 255];
+  const red: Rgba = [238, 112, 107, 255], white: Rgba = [224, 233, 231, 255];
+  fillRect(pixels, 0, 192, 512, 256, dark);
+  // Recognisable, high-contrast warning triangle. No external font/image request.
+  for (const [x1, y1, x2, y2] of [[64, 206, 12, 302], [12, 302, 116, 302], [116, 302, 64, 206]]) {
+    drawAntialiasedSegment(pixels, x1, y1, x2, y2, 7, amber);
+  }
+  drawAntialiasedSegment(pixels, 64, 241, 64, 269, 8, amber);
+  fillRect(pixels, 60, 281, 8, 8, amber);
+  const hazardLines = ['CORROSIVE', 'BIOLOGICAL HAZARD', 'DO NOT OPEN'];
+  drawVectorTextFit(pixels, hazardLines[0], 144, 212, 346, 31, amber, 3);
+  drawVectorTextFit(pixels, hazardLines[1], 144, 263, 346, 22, white, 2);
+  drawVectorTextFit(pixels, hazardLines[2], 37, 337, 438, 23, red, 2.5);
+  drawVectorTextFit(pixels, 'REMOTE RELEASE ONLY', 35, 407, 450, 23, white, 2.4);
+  for (let y = 448; y < 512; y++) for (let x = 0; x < 512; x++) {
+    const colour = (Math.floor((x + y - 448) / 36) % 2 === 0) ? amber : dark;
+    const offset = (y * 512 + x) * 4;
+    pixels.set(colour, offset);
+  }
+  const texture = dataTexture('room-5-goop-critical-security-atlas', pixels, 512, 512,
     false, THREE.SRGBColorSpace);
+  // Independent atlas tiles must not blend together in generated lower mip levels.
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
   texture.userData.labelLines = lines;
   texture.userData.statusColour = hex;
+  texture.userData.hazardLines = hazardLines;
   return texture;
 }
 
@@ -455,7 +517,13 @@ export function createContainmentMonitorTexture(): THREE.DataTexture {
   return texture;
 }
 
-export function paintContainmentMonitorTexture(texture: THREE.DataTexture, text: string, typing: boolean): void {
+export const MONITOR_TEXT_COLOURS = Object.freeze({
+  green: [112, 232, 151, 255], red: [245, 112, 112, 255],
+} as const);
+export type MonitorTextColour = keyof typeof MONITOR_TEXT_COLOURS;
+
+export function paintContainmentMonitorTexture(texture: THREE.DataTexture, text: string, typing: boolean,
+  colour: MonitorTextColour = 'green'): void {
   const pixels = texture.image.data as Uint8Array;
   const background: Rgba = [7, 17, 23, 255], accent: Rgba = [101, 166, 182, 255];
   fillRect(pixels, 0, 0, 512, 256, background);
@@ -468,15 +536,71 @@ export function paintContainmentMonitorTexture(texture: THREE.DataTexture, text:
   drawVectorTextFit(pixels, 'OBSERVATION : SP-01', 28, 25, 430, 15, accent, 1.7);
   fillRect(pixels, 28, 55, 456, 1, [34, 64, 75, 255]);
   fillRect(pixels, 475, 28, 6, 6, [111, 194, 165, 255]);
-  const lines = text.split('\n');
+  const lines = text.split('\n'), textColour = MONITOR_TEXT_COLOURS[colour];
   lines.forEach((line, index) => {
-    drawVectorTextFit(pixels, line, 28, 84 + index * 42, 446, 30, [183, 221, 230, 255], 2.4);
+    drawVectorTextFit(pixels, line, 28, 84 + index * 42, 446, 30, textColour, 2.4);
   });
   if (typing) {
     const last = lines.length - 1;
-    fillRect(pixels, Math.round(28 + lines[last].length * 30 * .76), 112 + last * 42, 15, 3, accent);
+    fillRect(pixels, Math.round(28 + lines[last].length * 30 * .76), 112 + last * 42, 15, 3, textColour);
   }
   drawVectorTextFit(pixels, 'CONTAINMENT LINK', 28, 221, 360, 10, [70, 112, 125, 255], 1.1);
+  texture.needsUpdate = true;
+}
+
+/** Small transparent control label, using the same font without another download. */
+export function createFacilityLabelTexture(text:string):THREE.DataTexture{
+  const pixels=new Uint8Array(256*64*4),height=40;
+  const natural=Math.max(1,text.length*.76-.14)*height;
+  drawVectorTextFit(pixels,text,Math.max(8,(256-natural)/2),12,240,height,[255,255,255,255],2.4,256);
+  const texture=dataTexture('facility-control-label',pixels,256,64,false,THREE.SRGBColorSpace);
+  texture.generateMipmaps=false;texture.minFilter=THREE.LinearFilter;return texture;
+}
+
+/** Compact world-space speech balloon, sharing the monitor's vector lettering. */
+export function createContainmentSpeechTexture(): THREE.DataTexture {
+  const texture = dataTexture('room-5-goop-speech', new Uint8Array(512 * 256 * 4),
+    512, 256, false, THREE.SRGBColorSpace);
+  texture.generateMipmaps = false; texture.minFilter = THREE.LinearFilter;
+  paintContainmentSpeechTexture(texture, '', false, 0);
+  return texture;
+}
+
+export function paintContainmentSpeechTexture(texture: THREE.DataTexture, text: string,
+  typing: boolean, sectionIndex: number, sectionCount = 4): void {
+  const pixels = texture.image.data as Uint8Array;
+  const accent: Rgba = [179, 230, 116, 255], border: Rgba = [74, 125, 86, 255];
+  const background: Rgba = [8, 23, 24, 248], primary: Rgba = [231, 245, 225, 255];
+  pixels.fill(0);
+  // Tail and chamfered outline are pixels in the same texture, not extra draws.
+  for (let y = 205; y < 247; y++) {
+    const half = Math.ceil((247 - y) * .5);
+    fillRect(pixels, 256 - half, y, half * 2, 1, border);
+    if (half > 3) fillRect(pixels, 259 - half, y, half * 2 - 6, 1, background);
+  }
+  for (let y = 12; y < 210; y++) {
+    const cut = Math.max(0, 27 - y, y - 194);
+    fillRect(pixels, 12 + cut, y, 488 - cut * 2, 1, border);
+    if (y >= 15 && y < 207) {
+      const innerCut = Math.max(0, 30 - y, y - 191);
+      fillRect(pixels, 15 + innerCut, y, 482 - innerCut * 2, 1, background);
+    }
+  }
+  fillRect(pixels, 242, 204, 28, 9, background);
+  fillRect(pixels, 28, 29, 4, 28, accent);
+  drawVectorTextFit(pixels, 'GOOP', 44, 29, 220, 23, accent, 2.2);
+  drawVectorTextFit(pixels, 'SP-02', 376, 34, 100, 13, [117, 155, 136, 255], 1.5);
+  fillRect(pixels, 28, 69, 456, 1, border);
+  const lines = text.split('\n');
+  lines.forEach((line, index) => drawVectorTextFit(pixels, line, 30, 89 + index * 43, 448, 31, primary, 2.5));
+  if (typing) {
+    const last = lines.length - 1;
+    fillRect(pixels, Math.round(30 + lines[last].length * 31 * .76), 120 + last * 43, 13, 3, accent);
+  }
+  const count=Math.max(1,Math.min(8,sectionCount));
+  for (let index = 0; index < count; index++) {
+    fillRect(pixels, 398 - (count-4)*21 + index * 21, 187, 14, 4, index <= sectionIndex ? accent : border);
+  }
   texture.needsUpdate = true;
 }
 
@@ -489,6 +613,7 @@ function drawVectorTextFit(
   requestedHeight: number,
   colour: Rgba,
   requestedStroke: number,
+  pixelWidth = SIGN_ATLAS_WIDTH,
 ): void {
   const naturalWidth = Math.max(1, text.length * 0.76 - 0.14);
   const height = Math.min(requestedHeight, maxWidth / naturalWidth);
@@ -506,6 +631,7 @@ function drawVectorTextFit(
         startY + y2 * height,
         strokeWidth,
         colour,
+        pixelWidth,
       );
     }
   });
@@ -519,8 +645,9 @@ function drawAntialiasedSegment(
   y2: number,
   width: number,
   colour: Rgba,
+  pixelWidth = SIGN_ATLAS_WIDTH,
 ): void {
-  const pixelHeight = pixels.length / (SIGN_ATLAS_WIDTH * 4);
+  const pixelHeight = pixels.length / (pixelWidth * 4);
   const radius = width * 0.5;
   const minX = Math.floor(Math.min(x1, x2) - radius - 1);
   const maxX = Math.ceil(Math.max(x1, x2) + radius + 1);
@@ -531,7 +658,7 @@ function drawAntialiasedSegment(
   const lengthSquared = dx * dx + dy * dy;
   for (let y = minY; y <= maxY; y += 1) {
     for (let x = minX; x <= maxX; x += 1) {
-      if (x < 0 || x >= SIGN_ATLAS_WIDTH || y < 0 || y >= pixelHeight) continue;
+      if (x < 0 || x >= pixelWidth || y < 0 || y >= pixelHeight) continue;
       const projection = lengthSquared === 0
         ? 0
         : THREE.MathUtils.clamp(((x - x1) * dx + (y - y1) * dy) / lengthSquared, 0, 1);
@@ -540,7 +667,7 @@ function drawAntialiasedSegment(
       const distance = Math.hypot(x + 0.5 - nearestX, y + 0.5 - nearestY);
       const coverage = THREE.MathUtils.clamp(radius + 0.8 - distance, 0, 1);
       if (coverage <= 0) continue;
-      const offset = (y * SIGN_ATLAS_WIDTH + x) * 4;
+      const offset = (y * pixelWidth + x) * 4;
       for (let channel = 0; channel < 3; channel += 1) {
         pixels[offset + channel] = Math.round(
           THREE.MathUtils.lerp(pixels[offset + channel], colour[channel], coverage),

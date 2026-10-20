@@ -34,21 +34,43 @@ Shared body sample base gains are contact 0.4, normal jump 0.5, charged jump 0.6
 
 Environment landing gain is 0.85 (deliberately heavier than body landings), falling motion 0.48, drone flight 0.24, platform hover 0.22, sign tick 0.26 and drone dissolution 0.70. Flight has at most two nearby voices within 20 m; hover engines share one nearby voice within 16 m. Nearest-source changes move these continuing voices without restarting their buffers. Lift drones follow powered engine flames, the maintenance drone follows its authoritative powered state (including startup and parked hover), and the sewer drone follows reboot/active state until destroyed. Room 5 patrols remain audibly hovering when their network disables weapons/motion; mounted ceiling sentries have no flight loop. Stationary platform booster engines use the nearest actual jet, with room transforms applied. Rail-driven platforms retain the existing machinery sound.
 
-Falling platforms, blocks and walls in the authored Cultivation rooms sound once on release and once at landing. The reusable drop assembly also follows actual falling/landing transitions; rope catches reuse the landing at 55% scale when the rope becomes taut. Resets and checkpoint restores produce no falling/impact cues. The Room 1 observation monitor uses a 42 ms click only when new non-whitespace text becomes visible, throttled to one per 120 ms (normally every other 90 ms letter); holding text and clearing it are silent, and frame catch-up never replays a backlog. Its source is positional within 14 m.
+Falling platforms, blocks and walls in the authored Cultivation rooms sound once on release and once at landing. The reusable drop assembly also follows actual falling/landing transitions; rope catches reuse the landing at 55% scale when the rope becomes taut. Resets and checkpoint restores produce no falling/impact cues. All four Containment observation monitors share `TypewriterAudio`: a 42 ms click only when new non-whitespace text becomes visible, throttled to one per 120 ms (normally every other 90 ms letter), positional within 14 m. Later rooms retain their proximity activation gates. Goop’s Room 5 speech uses the same no-backlog logic with the shared slime-contact recording at 35% playback scale and a 320 ms minimum interval. Its source is at Goop inside the cell, not the balloon above him, and hidden, out-of-range or released speech cannot emit new blips. Holds, clearing and resets are silent; frame catch-up produces at most one accent per update. Existing sound-effects/master settings, pause/death gating and voice limits apply to both, with no new loops or assets.
 
 Lift-drone burn completion and the sewer drone’s final (third) accepted burn replace the ordinary completion with the Goop-derived destruction edit; stopping the active burn loop happens first. Earlier sewer hits use normal dissolution. This avoids duplicate completion sounds and leaves support-rope dissolution unchanged.
+
+Cultivation Rooms 1 and 2 reuse the same positional terminal ticks and proximity
+gates. Goop's Cultivation conversations, including the stopped-elevator exchange
+about Volt on the way into Room 5, use the same throttled speech blips,
+but follow his current world position (18m range). No elapsed loading time,
+camera motion, section hold or reset produces a voice cue. Completed speech
+survives checkpoint recovery; a full level restart clears it. Room 1's platform
+impact adds one positional wet-impact accent from the existing Goop projectile
+sample at 65% scale and 28m range, alongside the normal platform landing sound.
+No additional recordings, loops or downloads are needed; pause/death and room
+visibility gating remain in the shared gameplay lifecycle.
 
 World door travel uses 0.14 gain and settling 0.38; platform/lift/bridge machinery 0.30; laser hum 0.32; physical press 0.45 and release 0.27. At most two nearby door/machinery loops and one nearby active laser loop play at once. Motors are audible within 16 m; laser distance uses the nearest point on its actual beam segment, including room transforms, within 10 m. Hidden/inactive rooms and disabled or circuit-gated beams are silent. All hazard laser variants register automatically through `LaserHazard`: static, timed/sweeping, circuit-controlled and Sentinel sweep/rotating attacks. They share one continuing positional hum; selecting a different nearest beam moves that voice without restarting its buffer. Inactive boss telegraphs/recovery and disabled beams stay silent. Loop selection follows distance and updates source positions. Controls are culled beyond 16 m from the controlled body.
 
 Door travel follows actual progress changes, including reversals; issuing an unchanged open request does not create sound. Endpoint arrival plays the settling edit once; blocked doors stop their motor without a false arrival. Held, unpowered or obstructed platforms have no movement sound. The shared MovingPlatform covers the Containment elevator and parkour platforms and Blackout powered carriers. Rotating bridges, the transit deployable bridge and Cultivation's scrolling-shaft descent register their own authoritative progress. Press/release sounds follow actual pressure-plate, wall-button and transit bridge-switch changes; resets/disabled controls stay silent. Goop plate contact can also retain its existing body-contact cue.
 
-Repeated movement/jump/landing/body cues vary playback rate by up to 4%. Sources use inverse distance attenuation (reference 3 m, rolloff 1.5) from the controlled body, with equal-power panning. The listener uses the controlled body and Web Audio's fixed world orientation; camera-relative panning is not implemented. All sounds are mono.
+Repeated movement/jump/landing/body cues vary playback rate by up to 4%. Sources use inverse distance attenuation (reference 3 m, rolloff 1.5) from the controlled body, with equal-power panning. Listener position stays on the controlled body so zoom and camera obstruction do not change hearing distance, while forward/up follow the actual camera world orientation, including wall-climbing roll. Every level refreshes it after camera interpolation as well as during fixed updates, so existing voices pan when the player only looks around. Modern listener AudioParams and the legacy orientation setter are supported. All sounds are mono.
 
 Voices are bounded at 24 globally and three per one-shot effect. Each standard loop has one voice and corrosion up to three. Authored acid pools in Containment, Cultivation and Blackout share one environmental voice: it plays within 18 m of the nearest surface point, follows the controlled body across wide basins, and stops outside that range. The clip does not create persistent projectile puddles or imply that ordinary impacts corrode surfaces. Additional world loops wait quietly for capacity. Per-effect one-shots are throttled to 35 ms; extreme rapid overlapping turret shots may be dropped by this mix limiter without changing projectile spawning. Loops fade in over 40 ms; stops are immediate to respect charge cancellation/destruction.
 
 ## Lifecycle
 
-- Boot preloads/decode-caches the 12 Bob/Goop and twelve world/environment clips (24 total) while playback stays suspended. The Cultivation factory adds the shared turret (25 total); rescued Volt already has the shared body samples. Blackout adds his five electrical clips (30 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
+- Boot preloads/decode-caches the 12 Bob/Goop and twelve world/environment clips (24 total) while playback stays suspended. The Cultivation bank adds the shared turret plus Volt's connection and ready accents for his live escape (27 total); he already has the shared body samples. Blackout adds the three remaining electrical clips (30 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
+
+Cultivation's Volt-release finale schedules existing alarm/activation beeps, body
+launch/landing accents, positional gunfire, acid impacts and drone destruction at
+fixed story events. A single positional flight source follows the hijacked craft;
+ordinary encounter sources are suppressed. Goop's typed “Now we're even” originates
+at the high escape vent beside Volt's cell; Volt's “Get on” has a positional response accent.
+Goop's "Follow me, I know the way out" uses the same positional blips after the
+entrance landing. Existing metal/body cues cover the shoulder strike, duct
+shudder and floor failure; shaking/failure sounds originate at the breaking panel.
+The opening alarm beeps are spaced 2.4 seconds apart, matching the slow room pulse.
+These events stop advancing with pause, and skipped shots are not replayed in bulk.
 - Pause/menus suspend the context and clear body travel accumulation. World loops preserve their offsets and resume once. Browser blur/visibility adds an independent suspension gate. Fixed-step state resumes body contact sampling and re-evaluates nearby basins, motors and active beams. Mechanism progress snapshots prevent resume from replaying an arrival.
 - Death stops existing voices, plays the shared rupture cue for Bob/Goop/Volt when applicable, and rejects further world sounds until successful recovery. Retry sounds the restored active identity.
 - Restart/checkpoint/puzzle reset clears voices and suppresses restoration notifications until the next gameplay update. Burn completion/reset/disposal stop corrosion ownership. Basin and world-interaction ambience is re-evaluated from the controlled position on the next enabled gameplay update. Mechanism restores update their presentation baseline so teleports do not sound like motion or arrival.
@@ -75,7 +97,7 @@ All names below identify `.ogg` files. Loop behavior is explicit; other sounds a
 
 | Asset | Gameplay mapping / reason unavailable |
 | --- | --- |
-| `bob-contact-01` | Bob/Goop/Volt quiet grounded motion, obstacle contact and retry; Goop plate contact; Bob attachment and regrip. Gains vary by context; no idle/charge playback. |
+| `bob-contact-01` | Bob/Goop/Volt quiet grounded motion, obstacle contact and retry; Goop plate contact; Bob attachment and regrip. Goop’s Room 5 pleas reuse it at 35% playback scale for soft speech blips, at most once per 0.32 s while new text is visible. Gains vary by context; no idle/charge playback. |
 | `bob-charged-jump-01` | Accepted Bob launch with charge fraction at least 0.8. |
 | `bob-detach-01` | Intentional surface release, loss of sticky support or sticky-wall-to-floor handoff. |
 | `bob-fall-01` | Accepted Bob/Goop/Volt death sequence, including hazard/out-of-bounds failure. |
@@ -102,7 +124,7 @@ All names below identify `.ogg` files. Loop behavior is explicit; other sounds a
 | `world-platform-land-01` | Actual ground arrival; a quieter reuse for the rope catching its platform. |
 | `world-drone-flight-loop-01` | Nearby powered lift drones, flying patrols, rebooted sewer drone and Volt’s maintenance drone; at most two voices. |
 | `world-platform-hover-loop-01` | Nearest stationary Room 5 platform booster engine; one voice. |
-| `world-sign-tick-01` | New visible characters on the Room 1 observation monitor, throttled. |
+| `world-sign-tick-01` | Newly revealed characters on the Room 1, 2, 3 and 5 observation monitors; at most once per 0.12 s, within 14 m of the screen. Proximity-triggered screens remain silent until activated. |
 | `world-drone-dissolve-01` | Goop-derived edit replacing normal completion for destroyed lift drones and the third sewer-drone burn. |
 | `specimen-turret-shot` | DroneProjectileSystem accepts a real spawn; common seam for fixed, ground, ceiling, lift and transit turrets. |
 

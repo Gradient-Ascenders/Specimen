@@ -44,6 +44,12 @@ test('five different experiment/danger plaques share one deterministic, upright 
     assert.equal(atlas.image.data.byteLength, 2_097_152);
     assert.deepEqual(atlas.image.data, copy.image.data);
     assert.deepEqual(atlas.userData.directoryLines.at(-1), ['SP-01', 'EXPERIMENT: BOB', 'DANGER: UNKNOWN']);
+    const goop = OPENING_EXPERIMENTS.find(entry => entry.specimen === 'GOOP')!;
+    const mimic = OPENING_EXPERIMENTS.find(entry => entry.specimen === 'MIMIC')!;
+    const volt = OPENING_EXPERIMENTS.find(entry => entry.specimen === 'VOLT')!;
+    assert.equal(goop.threat, 'CRITICAL');assert.equal(volt.threat,'CRITICAL');assert.equal(mimic.threat,'HIGH');
+    assert.equal(goop.colour,volt.colour);assert.equal(mimic.colour,0xe9b05a);
+    assert.deepEqual(atlas.userData.directoryLines[2], ['SP-02', 'EXPERIMENT: GOOP', 'DANGER: CRITICAL']);
     scene.laboratory.labels.forEach((label, index) => {
       assert.deepEqual(label.userData.labelLines, atlas.userData.directoryLines[index]);
       const positions = label.geometry.getAttribute('position'), uv = label.geometry.getAttribute('uv');
@@ -54,7 +60,8 @@ test('five different experiment/danger plaques share one deterministic, upright 
     });
     assert.equal(new Set(atlas.userData.directoryLines.map((row: string[]) => row[1])).size, 5);
     // Check the actual uploaded pixels, not only the label metadata.
-    for (const [index, expected] of [[0, [117, 213, 149, 255]], [4, [112, 185, 241, 255]]] as const) {
+    for (const [index, expected] of [[0, [117, 213, 149, 255]], [1, [233, 176, 90, 255]],
+      [2, [238, 112, 107, 255]], [3,[238,112,107,255]], [4, [112, 185, 241, 255]]] as const) {
       const pixel = ((index * 128 + 20) * 512 + 14) * 4;
       assert.deepEqual(Array.from(atlas.image.data.slice(pixel, pixel + 4)), expected);
     }

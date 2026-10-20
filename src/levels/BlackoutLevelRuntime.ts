@@ -13,6 +13,7 @@ import { BlackoutTransitController } from './BlackoutTransitController.ts';
 import { BLACKOUT_TRANSIT_CHECKPOINTS } from './BlackoutTransitRoom.ts';
 import { BLACKOUT_BOSS_STAGING_CHECKPOINT } from './BlackoutBossStaging.ts';
 import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
+import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
 
 import {
   SentinelBossDevelopmentRig,
@@ -151,6 +152,8 @@ const BLACKOUT_TRANSIT_VOLT_RANGES = Object.freeze({
 export interface BlackoutLevelRuntimeOptions {
   readonly audio?: AudioPlayback;
   readonly authoredRoomOne?: boolean;
+  /** Story arrival defaults on for the authored bay; deterministic tools may opt out. */
+  readonly playArrival?:boolean;
   readonly debugAvailable?: boolean;
   readonly maintenanceMaps?: BlackoutMaintenanceMapData;
   readonly host: HTMLElement;
@@ -160,6 +163,7 @@ export interface BlackoutLevelRuntimeOptions {
 }
 
 interface BlackoutRuntimeResources {
+  readonly ventArrival?:BlackoutVentArrival;
   readonly dissolveSystem: DissolveSystem;
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly goopAcidPresentation: GoopAcidPresentation;
@@ -253,6 +257,7 @@ export class BlackoutLevelRuntime {
   private programPreparation: BlackoutPresentationPreparation | undefined;
   private readonly preparationCamera = new THREE.PerspectiveCamera();
   private readonly authoredRoomOne: boolean;
+  private readonly playArrival:boolean;
   private readonly debugAvailable: boolean;
   private maintenanceMaps: BlackoutMaintenanceMapData | undefined;
   private bayComplete = false;
@@ -262,6 +267,7 @@ export class BlackoutLevelRuntime {
 
   constructor(options: BlackoutLevelRuntimeOptions) {
     this.authoredRoomOne = options.authoredRoomOne ?? false;
+    this.playArrival=options.playArrival??this.authoredRoomOne;
     this.debugAvailable = options.debugAvailable ?? import.meta.env?.DEV ?? false;
     if (this.authoredRoomOne && !options.maintenanceMaps) throw new Error('Room 1 texture maps must be prepared before runtime construction.');
     this.maintenanceMaps = options.maintenanceMaps;
@@ -475,6 +481,7 @@ export class BlackoutLevelRuntime {
     if (this.lifecycle.state === 'running' && this.resources) {
       this.input.setEnabled(
         enabled &&
+        !this.resources.ventArrival?.active &&
         !this.resources.phase.terminal &&
         this.resources.deathSequence.isPlaying,
       );
@@ -828,6 +835,14 @@ export class BlackoutLevelRuntime {
   fixedUpdate(deltaSeconds: number): void {
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
+    if(resources.ventArrival?.active){
+      resources.scene.maintenanceBay?.advanceAcid(deltaSeconds);
+      if(resources.ventArrival.update(deltaSeconds)){
+        this.clearArrivalUi();this.input.resetState();
+        this.input.setEnabled(this.debugInteractionEnabled&&!resources.phase.terminal&&resources.deathSequence.isPlaying);
+      }
+      this.syncVisuals(resources);this.gameplayAudio?.update();this.input.endFixedUpdate();return;
+    }
     resources.scene.transitRoom?.update(deltaSeconds);
     if (this.debugAvailable && this.authoredRoomOne && this.debugInteractionEnabled && this.input.enabled) {
       const room = this.input.wasPressed('debugTeleportRoomOne') ? 1
@@ -1329,14 +1344,13 @@ export class BlackoutLevelRuntime {
         interpolationAlpha,
         resources.renderedBobPosition,
       );
-      resources.bobPresentation.setPosition(resources.renderedBobPosition);
-      resources.bobPresentation.present(interpolationAlpha);
       interpolateBodyPosition(resources.group.goopBody, interpolationAlpha, resources.renderedGoopPosition);
-      resources.goopPresentation.setPosition(resources.renderedGoopPosition);
-      resources.goopPresentation.present(interpolationAlpha);
       interpolateBodyPosition(resources.group.voltBody, interpolationAlpha, resources.renderedVoltPosition);
-      resources.voltPresentation.setPosition(resources.renderedVoltPosition);
-      resources.voltPresentation.present(interpolationAlpha);
+      if(!resources.ventArrival?.active){
+        resources.bobPresentation.setPosition(resources.renderedBobPosition);resources.bobPresentation.present(interpolationAlpha);
+        resources.goopPresentation.setPosition(resources.renderedGoopPosition);resources.goopPresentation.present(interpolationAlpha);
+        resources.voltPresentation.setPosition(resources.renderedVoltPosition);resources.voltPresentation.present(interpolationAlpha);
+      }
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
         this.lifecycle.state === 'running' && resources.deathSequence.isPlaying ? stats.frameDeltaSeconds : 0,
@@ -1351,6 +1365,7 @@ export class BlackoutLevelRuntime {
         this.lifecycle.state === 'running' &&
         resources.deathSequence.isPlaying &&
         resources.phase.phase === 'three-slime' &&
+        !resources.ventArrival?.active &&
         this.input.enabled;
       resources.goopAcidPresentation.update(
         interpolationAlpha,
@@ -1392,16 +1407,18 @@ export class BlackoutLevelRuntime {
     }
     this.input.endPointerUpdate();
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    resources?.ventArrival?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
+    this.gameplayAudio?.updateListener();
     if (resources) {
       resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
-      resources.goopPresentation.setOpacity(resources.group.activeSlimeId === 'goop'
+      resources.goopPresentation.setOpacity(!resources.ventArrival?.active&&resources.group.activeSlimeId === 'goop'
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
       // PMREM is shared with Bob. Dark rooms receive no permanent reflection fill.
       const reflectionWeight = resources.goopReflectionLighting.weightAt(resources.renderedGoopPosition);
       resources.goopPresentation.setReflectionIntensity(0.12 * reflectionWeight, 0.28 * reflectionWeight);
-      resources.voltPresentation.setOpacity(resources.group.activeSlimeId === 'volt'
+      resources.voltPresentation.setOpacity(!resources.ventArrival?.active&&resources.group.activeSlimeId === 'volt'
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
       const voltReflection = resources.goopReflectionLighting.weightAt(resources.renderedVoltPosition);
@@ -1416,7 +1433,7 @@ export class BlackoutLevelRuntime {
     target.level = 'blackout-level-3';
     target.room = this.currentRoom.roomId;
     target.gameplayState = resources?.phase.phase ?? this.lifecycle.state;
-    target.cutsceneState = 'none';
+    target.cutsceneState = resources?.ventArrival?.active?'blackout-vent-arrival':'none';
     target.activeSlime =
       resources?.specimenForm.readModel.controlledForm === 'specimen'
         ? 'specimen'
@@ -1828,7 +1845,14 @@ export class BlackoutLevelRuntime {
       });
       rollback(() => goopAcidPresentation.dispose());
 
+      const ventArrival=this.playArrival&&scene.maintenanceBay?new BlackoutVentArrival({root:scene.root,
+        ventCollapse:scene.maintenanceBay.entryVentCollapse,
+        bodies:{bob:group.bobBody,goop:group.goopBody,volt:group.voltBody},
+        presentations:{bob:bobPresentation,goop:goopPresentation,volt:voltPresentation}}):undefined;
+      if(ventArrival)rollback(()=>ventArrival.dispose());
+
       this.resources = {
+        ventArrival,
         transit,
         unregisterTransitCheckpointParticipant,
         dissolveSystem,
@@ -1895,7 +1919,7 @@ export class BlackoutLevelRuntime {
       if (this.audio) {
         const gameplayAudio = new GameplayAudio(this.audio, manager, [scene.maintenanceBay?.acidInteractions, scene.transitRoom?.acidInteractions].flatMap(pool => pool ? [pool.surfaceBounds] : []), () =>
           specimenForm.readModel.controlledForm === 'specimen' ? specimenBody :
-            phase.phase === 'merging' ? undefined : manager.activeBody, this.renderLayer.scene);
+            phase.phase === 'merging' ? undefined : manager.activeBody, this.renderLayer.scene, this.renderLayer.cameraRig.camera);
         this.gameplayAudio = gameplayAudio;
         rollback(() => {
           gameplayAudio.dispose();
@@ -1945,8 +1969,12 @@ export class BlackoutLevelRuntime {
     const resources = this.requireResources();
     resources.goopAcidPresentation.resume();
     this.input.resetState();
+    if(this.currentRoom.roomId==='room-1'&&resources.checkpoints.activeCheckpoint.checkpointId==='cp1'&&resources.ventArrival?.begin(this.renderLayer.cameraRig.camera)){
+      this.host.dataset.cinematic='blackout-arrival';
+    }
     this.input.setEnabled(
       this.debugInteractionEnabled &&
+      !resources.ventArrival?.active &&
       !resources.phase.terminal &&
       resources.deathSequence.isPlaying,
     );
@@ -1971,6 +1999,7 @@ export class BlackoutLevelRuntime {
   private readonly restartResources = (): void => {
     this.gameplayAudio?.reset();
     const resources = this.requireResources();
+    resources.ventArrival?.cancel();this.clearArrivalUi();
     resources.scene.maintenanceBay?.acidInteractions.reset();
     resources.scene.transitRoom?.acidInteractions.reset();
     this.input.resetState();
@@ -2041,6 +2070,7 @@ export class BlackoutLevelRuntime {
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
+    resources.ventArrival?.dispose();this.clearArrivalUi();
     this.programPreparation?.dispose(); this.programPreparation = undefined;
     this.input.setEnabled(false);
     this.input.resetState();
@@ -2182,6 +2212,7 @@ export class BlackoutLevelRuntime {
     resources: BlackoutRuntimeResources,
     resumeInput: boolean,
   ): void {
+    resources.ventArrival?.cancel();this.clearArrivalUi();
     resources.scene.maintenanceBay?.acidInteractions.reset();
     resources.scene.transitRoom?.acidInteractions.reset();
     this.input.setEnabled(false);
@@ -2346,9 +2377,13 @@ export class BlackoutLevelRuntime {
   }
 
   private syncVisuals(resources: BlackoutRuntimeResources): void {
-    resources.bobPresentation.setPosition(resources.group.bobBody.position);
-    resources.goopPresentation.setPosition(resources.group.goopBody.position);
-    resources.voltPresentation.setPosition(resources.group.voltBody.position);
+    // The arrival borrows the models beneath local slide poses. Writing world
+    // body coordinates here would double-transform them and query false ceilings.
+    if(!resources.ventArrival?.active){
+      resources.bobPresentation.setPosition(resources.group.bobBody.position);
+      resources.goopPresentation.setPosition(resources.group.goopBody.position);
+      resources.voltPresentation.setPosition(resources.group.voltBody.position);
+    }
     resources.specimenVisual.position.copy(resources.specimenBody.position);
 
     const specimenControlled =
@@ -2389,6 +2424,10 @@ export class BlackoutLevelRuntime {
         !(specimenControlled && resources.specimenAttack.readModel.aimActive);
     }
     resources.specimenPresentation.update(specimenControlled);
+  }
+
+  private clearArrivalUi():void{
+    if(this.host.dataset?.cinematic==='blackout-arrival')delete this.host.dataset.cinematic;
   }
 
   private isSpawnSafe(

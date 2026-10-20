@@ -25,7 +25,7 @@ export const CONTAINMENT_SHADOW_SOURCES = {
   'room-5-upper-traversal-received-light': { size: 1024, near: 0.35 },
   'room-5-containment-state-light': { size: 512, near: 0.2 },
   'room-5-goop-reveal-rim-light': { size: 512, near: 0.2 },
-  'room-5-observation-lever-key': { size: 512, near: 0.2 },
+  'room-5-observation-button-key': { size: 512, near: 0.2 },
 } as const;
 
 export const CONTAINMENT_FIXTURE_AIMS: Readonly<Record<string, readonly [number, number, number]>> = {
@@ -119,7 +119,7 @@ const SOLID_MATERIALS = new Set([
   'containment-soluble-composite', 'containment-specimen-shell',
   'containment-specimen-shell-interior',
   'room-5-soluble-biological-composite-source',
-  'room-5-authoritative-sticky-lever-handle',
+  'room-5-release-button-cap',
 ]);
 
 const ELEVATOR_SOLIDS = new Set([
@@ -134,6 +134,8 @@ const ELEVATOR_SOLIDS = new Set([
 // Unbatched instrument/track details receive the major assembly's shadow but
 // do not need independent silhouettes. Keep measured batch membership intact.
 const RECEIVER_ONLY_DETAILS = new Set([
+  'room-5-critical-armoured-headers-and-corners',
+  'room-5-critical-captive-fasteners',
   'room-1-pedestal-instrument-dial',
   'room-1-containment-control-face',
   'room-1-containment-feed-flange',

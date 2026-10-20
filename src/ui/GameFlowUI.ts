@@ -45,7 +45,8 @@ export type GameFlowStateListener = (state: GameFlowState) => void;
 export const gameFlowCanPause = (
   state: GameFlowState,
   gameplayInputEnabled: boolean,
-): boolean => state === 'playing' && gameplayInputEnabled;
+  cinematicPlaying = false,
+): boolean => state === 'playing' && (gameplayInputEnabled || cinematicPlaying);
 
 export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
@@ -339,6 +340,7 @@ export interface GameFlowActions {
   releasePointerLock(): void;
   isPointerLocked(): boolean;
   isGameplayInputEnabled(): boolean;
+  isCinematicPlaying?(): boolean;
   restartLevel(): void;
   applySettings(settings: Readonly<GameSettingsSnapshot>): void;
   getGraphicsDiagnostics?(): GraphicsDiagnostics;
@@ -879,6 +881,7 @@ export class GameFlowUI {
       !gameFlowCanPause(
         this.model.state,
         this.actions.isGameplayInputEnabled(),
+        this.actions.isCinematicPlaying?.(),
       )
     ) {
       return;
@@ -1016,7 +1019,7 @@ export class GameFlowUI {
     if (event.repeat) return;
 
     if (action === 'pause') {
-      if (!this.actions.isGameplayInputEnabled()) return;
+      if (!gameFlowCanPause(this.model.state, this.actions.isGameplayInputEnabled(), this.actions.isCinematicPlaying?.())) return;
       event.preventDefault();
       this.pause();
       return;

@@ -1,4 +1,7 @@
 import { CULTIVATION_LEVEL_GAMEPLAY_SUPPORT as gameplay } from './CultivationLevelGameplay.ts';
+import { CultivationVentArrival } from '../cinematics/CultivationVentArrival.ts';
+import { CultivationRoomThreeClearance } from '../cinematics/CultivationRoomThreeClearance.ts';
+import { CultivationFinale } from '../cinematics/CultivationFinale.ts';
 import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
 import type { CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
@@ -125,6 +128,7 @@ export interface CultivationLevelRuntimeOptions {
 }
 
 interface CultivationRuntimeResources {
+  readonly roomFiveFinale: CultivationFinale | undefined;
   readonly roomFiveEncounter: RoomFiveDroneEncounter | undefined;
   readonly roomFiveDamage: SlimeDamageVignette | undefined;
   readonly roomFiveView: SecurityNetworkView | undefined;
@@ -143,6 +147,7 @@ interface CultivationRuntimeResources {
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly goopAcidPresentation: GoopAcidPresentation;
   readonly roomThreeEncounter: RoomThreeDroneEncounter | undefined;
+  readonly roomThreeClearance: CultivationRoomThreeClearance | undefined;
   readonly roomFourEncounter: ElevatorDroneEncounter | undefined;
   readonly roomFourView: ElevatorEncounterView | undefined;
   readonly roomFourProjectiles: DroneProjectilePresentation | undefined;
@@ -199,6 +204,7 @@ interface CultivationRuntimeResources {
 }
 
 export class CultivationLevelRuntime {
+  private readonly ventArrival = new CultivationVentArrival();
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
@@ -443,7 +449,7 @@ export class CultivationLevelRuntime {
         ? resources.controller.state
         : resources.deathSequence.state
       : this.lifecycle.state;
-    target.cutsceneState = resources?.roomThreeController?.readModel.complete
+    target.cutsceneState = resources?.roomFiveFinale?.active ? 'volt-escape-finale' : resources?.roomThreeClearance?.active ? 'room-three-clearance' : this.ventArrival.active ? 'vent-arrival' : resources?.roomThreeController?.readModel.complete
       ? 'room-three-complete'
       : 'none';
     target.activeSlime = resources?.manager.activeSlimeId ?? 'none';
@@ -540,12 +546,25 @@ export class CultivationLevelRuntime {
       this.restartLevel();
       return;
     }
+    if (resources.roomFiveFinale?.active) {
+      if (resources.roomFiveFinale.update(deltaSeconds)) this.completeVoltFinale(resources);
+      this.gameplayAudio?.update(); this.input.endFixedUpdate(); return;
+    }
     const debugRoomId = this.consumeAuthoredPreviewTeleport();
     if (debugRoomId !== undefined) {
       this.teleportToAuthoredPreviewRoom(debugRoomId);
       this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
+    }
+    const clearance=resources.roomThreeClearance;
+    if(!this.ventArrival.active&&clearance?.tryBegin(this.renderLayer.cameraRig.camera)){
+      resources.acidProjectileSystem.reset();this.input.resetState();this.host.dataset.cinematic='cultivation-clearance';
+    }
+    if(clearance?.active){
+      if(clearance.update(deltaSeconds)){this.input.resetState();this.clearRoomThreeCinematicUi();}
+      resources.authoredPreview?.roomThreeObservation.updateCamera(deltaSeconds,resources.pair.bobBody.position);
+      this.gameplayAudio?.update();this.input.endFixedUpdate();return;
     }
     if (resources.authoredPreview?.roomFive.controller.complete) {
       this.gameplayAudio?.update();
@@ -554,10 +573,13 @@ export class CultivationLevelRuntime {
 
     let switched = false;
     const releasingVolt = resources.authoredPreview?.roomFive.controller.releasing === true;
-    if (!releasingVolt && this.input.wasPressed('switchSlime')) switched = this.switchActive(resources);
+    // Keep native input available for pointer capture/pause. The entrance gates
+    // locomotion, look, switching and abilities where they are consumed, even
+    // if the flow UI enables Input after Enter Level or a pause/resume.
+    if (!releasingVolt && !this.ventArrival.active && this.input.wasPressed('switchSlime')) switched = this.switchActive(resources);
     const moveX = (this.input.isDown('moveRight') ? 1 : 0) - (this.input.isDown('moveLeft') ? 1 : 0);
     const moveZ = (this.input.isDown('moveBackward') ? 1 : 0) - (this.input.isDown('moveForward') ? 1 : 0);
-    if (!switched && !releasingVolt) {
+    if (!switched && !releasingVolt && !this.ventArrival.active) {
       this.renderLayer.cameraRig.queueLookInput(this.input.pointerDeltaX, this.input.pointerDeltaY);
       this.renderLayer.cameraRig.applyQueuedLookInput();
       const activeBody = resources.pair.activeBody;
@@ -585,7 +607,7 @@ export class CultivationLevelRuntime {
     }
 
     const activeBody = resources.pair.activeBody;
-    if (releasingVolt) { resources.movement.set(0, 0, 0); this.clearJumpInput(resources.jumpInputState, true); }
+    if (releasingVolt || this.ventArrival.active) { resources.movement.set(0, 0, 0); this.clearJumpInput(resources.jumpInputState, true); }
     if (this.authoredPreviewRoomId === undefined) {
       this.updateStructuralAssemblies(deltaSeconds, resources);
     }
@@ -602,6 +624,10 @@ export class CultivationLevelRuntime {
     if (resources.manager.isAvailable('volt')) {
       resources.voltBody.update(deltaSeconds, !switched && activeBody === resources.voltBody ? resources.movement : resources.noMovement,
         activeBody === resources.voltBody ? resources.jumpInputState : undefined);
+    }
+    if (this.ventArrival.update(deltaSeconds, resources.pair.bobBody, resources.pair.goopBody)) {
+      this.input.resetState();
+      this.input.setEnabled(!this.debugVisible && resources.deathSequence.isPlaying && resources.controller.readModel.state === 'playing');
     }
 
     const authoredPreview = resources.authoredPreview;
@@ -647,10 +673,15 @@ export class CultivationLevelRuntime {
         resources.previewOccupants,
         resources.pair.goopBody,
         continuingRooms,
+        activeBody.position,
+        !switched && resources.movement.lengthSq() > .001 && Math.hypot(activeBody.velocity.x,activeBody.velocity.z) > .05,
       );
       const roomFour = authoredPreview.roomFour;
       resources.roomFourEncounter?.update(deltaSeconds, resources.manager.activeSlimeId === 'goop' ? 'goop' : 'bob');
       this.updateRoomFive(deltaSeconds, resources);
+      if (resources.roomFiveFinale?.active) {
+        this.gameplayAudio?.update(); this.input.endFixedUpdate(); return;
+      }
       if (authoredProgression.roomId === 4 && this.lastRoomFourObjective !== roomFour.controller.objective) {
         this.lastRoomFourObjective = roomFour.controller.objective;
         this.emitAuthoredPreviewObjective();
@@ -689,7 +720,7 @@ export class CultivationLevelRuntime {
     resources.acidProjectileSystem.update(deltaSeconds, {
       aimHeld: this.input.isDown('aimAbility'),
       firePressed: this.input.wasPressed('fireAbility'),
-      gameplayInputEnabled: this.input.enabled && resources.deathSequence.isPlaying && !releasingVolt,
+      gameplayInputEnabled: this.input.enabled && resources.deathSequence.isPlaying && !releasingVolt && !this.ventArrival.active,
       pointerLocked: this.input.pointerLocked,
     });
     resources.dissolveSystem.update(deltaSeconds);
@@ -714,14 +745,19 @@ export class CultivationLevelRuntime {
     }
     this.interpolate(resources.pair.bobBody, interpolationAlpha, resources.renderedBobPosition);
     this.interpolate(resources.pair.goopBody, interpolationAlpha, resources.renderedGoopPosition);
-    resources.bobPresentation.setPosition(resources.renderedBobPosition);
-    resources.bobPresentation.present(interpolationAlpha);
-    resources.goopPresentation.setPosition(resources.renderedGoopPosition);
-    resources.goopPresentation.present(interpolationAlpha);
     this.interpolate(resources.voltBody, interpolationAlpha, resources.renderedVoltPosition);
-    resources.voltPresentation.setPosition(resources.renderedVoltPosition);
-    resources.voltPresentation.setVisible(resources.manager.isAvailable('volt'));
-    resources.voltPresentation.present(interpolationAlpha);
+    if (!resources.roomFiveFinale?.active) {
+      // Borrowed finale actors live under local carrier poses. Writing their
+      // normal world placement here briefly doubles the transform and runs
+      // Volt's headroom deformation against the wrong ceiling.
+      resources.bobPresentation.setPosition(resources.renderedBobPosition);
+      resources.bobPresentation.present(interpolationAlpha);
+      resources.goopPresentation.setPosition(resources.renderedGoopPosition);
+      resources.goopPresentation.present(interpolationAlpha);
+      resources.voltPresentation.setPosition(resources.renderedVoltPosition);
+      resources.voltPresentation.setVisible(resources.manager.isAvailable('volt'));
+      resources.voltPresentation.present(interpolationAlpha);
+    }
     // A render frame can occur without a fixed update. Preserve the same
     // pointer-sampling behaviour as Level 1 so those frames apply mouse input
     // instead of discarding it and making Level 2 sensitivity frame-rate
@@ -732,6 +768,9 @@ export class CultivationLevelRuntime {
       resources.deathSequence.isPlaying &&
       resources.controller.readModel.state === 'playing' &&
       !resources.authoredPreview?.roomFive.controller.releasing &&
+      !this.ventArrival.active &&
+      !resources.roomThreeClearance?.active &&
+      !resources.roomFiveFinale?.active &&
       this.input.enabled
     ) {
       this.renderLayer.cameraRig.queueLookInput(
@@ -762,6 +801,9 @@ export class CultivationLevelRuntime {
       this.lifecycle.state === 'running' &&
       resources.deathSequence.isPlaying &&
       resources.controller.readModel.state === 'playing' &&
+      !this.ventArrival.active &&
+      !resources.roomThreeClearance?.active &&
+      !resources.roomFiveFinale?.active &&
       this.input.enabled;
     resources.goopAcidPresentation.update(
       interpolationAlpha,
@@ -770,7 +812,9 @@ export class CultivationLevelRuntime {
       this.lifecycle.state === 'running' && resources.deathSequence.isPlaying,
     );
     const elevatorController = resources.authoredPreview?.roomFour.controller;
-    if (resources.authoredPreview?.roomFive.controller.releasing) {
+    if (resources.roomFiveFinale?.active) {
+      this.renderLayer.cameraRig.setContextualCamera(undefined);
+    } else if (resources.authoredPreview?.roomFive.controller.releasing) {
       this.rescueCamera.anchor.previousPosition.copy(this.rescueCamera.anchor.position);
       resources.authoredPreview.roomFive.pod.getWorldPosition(this.rescueCamera.anchor.position);
       this.renderLayer.cameraRig.setContextualCamera(this.rescueCamera);
@@ -779,7 +823,13 @@ export class CultivationLevelRuntime {
       this.roomFourCamera.anchor.previousPosition.copy(resources.pair.activeBody.previousPosition);
       this.renderLayer.cameraRig.setContextualCamera(this.roomFourCamera);
     } else this.renderLayer.cameraRig.setContextualCamera(undefined);
-    this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    if (!resources.roomFiveFinale?.active) this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    this.ventArrival.present(this.renderLayer.cameraRig.camera, interpolationAlpha,
+      resources.renderedBobPosition, resources.renderedGoopPosition);
+    resources.roomThreeClearance?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
+    resources.roomFiveFinale?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
+    resources.authoredPreview?.goopSpeech.setPlayerControlled(resources.manager.activeSlimeId === 'goop');
+    this.gameplayAudio?.updateListener();
     resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
     resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
     resources.authoredPreview?.updatePresentationVisibility(
@@ -820,11 +870,12 @@ export class CultivationLevelRuntime {
         this.renderLayer.cameraRig.camera,
         resources.collisionWorld,
         this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
+        !!resources.roomFiveFinale?.active,
       );
-      resources.goopPresentation.setOpacity(resources.manager.activeSlimeId === 'goop'
+      resources.goopPresentation.setOpacity(!resources.roomFiveFinale?.active && resources.manager.activeSlimeId === 'goop'
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
-      resources.voltPresentation.setOpacity(resources.manager.activeSlimeId === 'volt'
+      resources.voltPresentation.setOpacity(!resources.roomFiveFinale?.active && resources.manager.activeSlimeId === 'volt'
         ? resolveCameraTargetOpacity(this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25) : 1);
       if (resources.droneProjectilePresentation?.mesh.visible) resources.droneProjectilePresentation.update(interpolationAlpha);
       if (resources.roomFourProjectiles?.mesh.visible) resources.roomFourProjectiles.update(interpolationAlpha);
@@ -1356,6 +1407,8 @@ export class CultivationLevelRuntime {
       rollback(() => { this.cameraShadowCulling = undefined; });
       this.hostWindow.addEventListener('keydown', this.onSkipToLevelThree);
       rollback(() => this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree));
+      this.hostWindow.addEventListener('keydown', this.onVoltFinaleKeyDown);
+      rollback(() => this.hostWindow.removeEventListener('keydown', this.onVoltFinaleKeyDown));
       const deathScreen = new DeathScreen({
         onRetry: this.retryAfterDeath,
         backgroundElements: [
@@ -1369,7 +1422,18 @@ export class CultivationLevelRuntime {
       const goopPresentationState = this.createBobPresentationState(goopBody);
       const voltPresentationState = this.createBobPresentationState(voltBody);
       const bobPresentationState = this.createBobPresentationState(bobBody);
+      const roomThreeClearance=roomThreeEncounter&&authoredPreview?new CultivationRoomThreeClearance({
+        room:authoredPreview.roomThree,encounter:roomThreeEncounter,bob:bobBody,presentation:bobPresentation,acid:authoredPreview.labArt.acid,
+      }):undefined;
+      if(roomThreeClearance)rollback(()=>roomThreeClearance.dispose());
+      const roomFiveFinale=roomFiveEncounter&&authoredPreview?new CultivationFinale({
+        room:authoredPreview.roomFive,encounter:roomFiveEncounter,bob:bobBody,goop:goopBody,volt:voltBody,
+        bobPresentation,goopPresentation,voltPresentation,set:authoredPreview.voltFinaleSet,
+        acid:authoredPreview.labArt.acid,scene:this.renderLayer.scene,host:this.host,speech:authoredPreview.goopSpeech.mesh,
+      }):undefined;
+      if(roomFiveFinale)rollback(()=>roomFiveFinale.dispose());
       const unsubscribeBobPresentationEvents = [
+        acidProjectileSystem.events.on('worldImpact',hit=>roomThreeEncounter?.shields.impact(hit.objectName,hit.point)),
         voltMovementEvents.on('landed', event => voltPresentation.onLanding(voltBody.groundNormal, event.impactSpeedMetresPerSecond)),
         voltMovementEvents.on('jumped', event => voltPresentation.onLaunch(event)),
         goopMovementEvents.on('landed', event => goopPresentation.onLanding(goopBody.groundNormal, event.impactSpeedMetresPerSecond)),
@@ -1433,11 +1497,12 @@ export class CultivationLevelRuntime {
       });
 
       this.resources = {
+        roomFiveFinale,
         roomFiveEncounter, roomFiveDamage, roomFiveView, voltBody, voltPresentation, voltPresentationState, voltMovementEvents, renderedVoltPosition: new THREE.Vector3(),
         scene, authoredPreview, collisionWorld, surfaceRegistry,
         dissolveTargets, previewDissolveTargets,
         dissolveSystem, acidProjectileSystem, goopAcidPresentation,
-        roomThreeEncounter, roomThreeController, droneProjectilePresentation,
+        roomThreeEncounter, roomThreeController, roomThreeClearance, droneProjectilePresentation,
         roomFourEncounter, roomFourView, roomFourProjectiles, roomFourDamage,
         damageVignette,
         structuralAssemblies, wallButton, blastDoor, buttonDoorCoordinator,
@@ -1464,7 +1529,7 @@ export class CultivationLevelRuntime {
         unsubscribeManager,
       };
       if (this.audio) {
-        const gameplayAudio = new GameplayAudio(this.audio, manager, authoredPreview?.acidInteractions.map(pool => pool.surfaceBounds) ?? [], undefined, this.renderLayer.scene);
+        const gameplayAudio = new GameplayAudio(this.audio, manager, authoredPreview?.acidInteractions.map(pool => pool.surfaceBounds) ?? [], undefined, this.renderLayer.scene, this.renderLayer.cameraRig.camera);
         this.gameplayAudio = gameplayAudio;
         rollback(() => {
           gameplayAudio.dispose();
@@ -1476,6 +1541,7 @@ export class CultivationLevelRuntime {
         if (!this.teleportToAuthoredPreviewRoom(1)) {
           throw new Error('Could not enter authored Cultivation Room 1.');
         }
+        this.beginVentArrival(this.resources);
       } else {
         this.resetRecoveryCamera(this.resources);
         this.retargetCamera(this.resources);
@@ -1489,6 +1555,7 @@ export class CultivationLevelRuntime {
       this.applyDebugPresentation();
       rollbackActions.length = 0;
     } catch (error) {
+      this.ventArrival.cancel();
       this.resources = undefined;
       this.rollbackFailedLoad(rollbackActions);
       throw error;
@@ -1516,9 +1583,12 @@ export class CultivationLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.clearRoomThreeCinematicUi();
+    this.ventArrival.cancel();
     this.roomWorkloadContinuations.clear();
     this.gameplayAudio?.reset();
     const resources = this.requireResources();
+    resources.roomFiveFinale?.reset(); this.clearVoltFinaleUi();
     this.input.resetState();
     resources.deathSequence.reset();
     resources.deathScreen.hide();
@@ -1527,6 +1597,7 @@ export class CultivationLevelRuntime {
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
     resources.authoredPreview?.reset();
+    resources.roomThreeClearance?.reset();
     for (const target of resources.previewDissolveTargets) target.reset();
     resources.roomThreeEncounter?.reset();
     resources.roomThreeController?.reset();
@@ -1552,10 +1623,14 @@ export class CultivationLevelRuntime {
     this.retargetCamera(resources);
     this.lastDeathSlimeId = undefined;
     this.skipToLevelThreeTriggered = false;
+    if (this.authoredPreviewRoomId === 1) this.beginVentArrival(resources);
     this.notifyHUD(undefined, true);
   };
 
   private readonly unloadResources = (): void => {
+    this.clearVoltFinaleUi();
+    this.clearRoomThreeCinematicUi();
+    this.ventArrival.cancel();
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
@@ -1566,6 +1641,7 @@ export class CultivationLevelRuntime {
     this.lastPreparationRenderStateRevision = -1;
     this.hostWindow.removeEventListener('keydown', this.onDebugToggle);
     this.hostWindow.removeEventListener('keydown', this.onSkipToLevelThree);
+    this.hostWindow.removeEventListener('keydown', this.onVoltFinaleKeyDown);
     resources.unsubscribeControllerObjective();
     resources.unsubscribeControllerProgress();
     for (const unsubscribe of resources.unsubscribeBobPresentationEvents) {
@@ -1577,6 +1653,8 @@ export class CultivationLevelRuntime {
     resources.controller.dispose();
     resources.radiation.dispose();
     resources.roomThreeController?.dispose();
+    resources.roomThreeClearance?.dispose();
+    resources.roomFiveFinale?.dispose();
     resources.roomFourView?.dispose();
     resources.roomFourDamage?.dispose();
     resources.roomFourProjectiles?.dispose();
@@ -1676,6 +1754,11 @@ export class CultivationLevelRuntime {
   ): boolean {
     const resources = this.resources;
     if (!resources?.authoredPreview) return false;
+    resources.roomFiveFinale?.reset(); this.clearVoltFinaleUi();
+    this.clearRoomThreeCinematicUi();
+    const wasArriving = this.ventArrival.active;
+    this.ventArrival.cancel();
+    if (wasArriving && this.lifecycle.state === 'running') this.input.setEnabled(!this.debugVisible);
     resources.manager.activate(resources.manager.activeSlimeId === 'goop' ? 'goop' : 'bob');
     this.roomFiveCheckpoint = 'split';
 
@@ -1686,6 +1769,7 @@ export class CultivationLevelRuntime {
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
     resources.authoredPreview.reset();
+    resources.roomThreeClearance?.reset();
     for (const target of resources.previewDissolveTargets) target.reset();
     resources.roomThreeEncounter?.reset();
     resources.roomThreeController?.reset();
@@ -1744,9 +1828,12 @@ export class CultivationLevelRuntime {
   private resetAndRecoverAuthoredPreviewRoom(
     resources: CultivationRuntimeResources,
   ): void {
+    resources.roomFiveFinale?.reset(); this.clearVoltFinaleUi();
+    this.clearRoomThreeCinematicUi();
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
-    resources.authoredPreview?.reset();
+    resources.authoredPreview?.reset({preserveCompletedDialogue:true});
+    resources.roomThreeClearance?.reset();
     for (const target of resources.previewDissolveTargets) target.reset();
     resources.roomThreeEncounter?.reset();
     resources.roomThreeController?.reset();
@@ -1784,9 +1871,13 @@ export class CultivationLevelRuntime {
       this.roomFiveCheckpoint = c.checkpoint;
       this.captureAuthoredPreviewCheckpoint(resources);
     }
+    if (c.security.shutdown && resources.roomFiveFinale && !resources.roomFiveFinale.complete) {
+      if (!resources.roomFiveFinale.active) this.beginVoltFinale(resources);
+      return;
+    }
     if (c.rescued && !resources.manager.isAvailable('volt')) this.registerRescuedVolt(resources);
     if (c.rescued && !c.complete) {
-      // The lever ends Cultivation after its release sequence. Register Volt
+      // The release button ends Cultivation after its sequence. Register Volt
       // before emitting so the session carries all three slimes into Blackout.
       c.finish(); this.input.setEnabled(false); this.input.releasePointerLock();
       this.host.dataset.gameState = 'complete';
@@ -1800,6 +1891,29 @@ export class CultivationLevelRuntime {
     if (this.lastRoomFiveObjective !== c.objective) {
       this.lastRoomFiveObjective = c.objective; this.emitAuthoredPreviewObjective();
     }
+  }
+
+  private beginVoltFinale(resources: CultivationRuntimeResources, force = false): boolean {
+    if (!resources.roomFiveFinale?.begin(this.renderLayer.cameraRig.camera, force)) return false;
+    resources.acidProjectileSystem.reset();
+    this.ventArrival.cancel(); this.input.resetState();
+    this.host.dataset.cinematic = 'cultivation-finale';
+    return true;
+  }
+
+  private completeVoltFinale(resources: CultivationRuntimeResources): void {
+    const room = resources.authoredPreview?.roomFive;
+    if (!room || room.controller.complete) return;
+    room.controller.releaseElapsed = 4; room.controller.checkpoint = 'rescued';
+    this.registerRescuedVolt(resources);
+    room.controller.finish();
+    this.input.setEnabled(false); this.input.releasePointerLock();
+    this.host.dataset.gameState = 'complete';
+    this.events.emit('completed', { levelId: 'level-2', nextLevelId: 'level-3' });
+  }
+
+  private clearVoltFinaleUi(): void {
+    if (this.host.dataset?.cinematic === 'cultivation-finale') delete this.host.dataset.cinematic;
   }
 
   private registerRescuedVolt(resources: CultivationRuntimeResources): void {
@@ -1969,6 +2083,7 @@ export class CultivationLevelRuntime {
   ): boolean {
     const resources = this.requireResources();
     if (!resources.deathSequence.requestDeath(recovery)) return false;
+    this.ventArrival.cancel();
     const dyingBody = dyingSlimeId === 'volt' ? resources.voltBody : dyingSlimeId === 'bob' ? resources.pair.bobBody : resources.pair.goopBody;
     const presentationStarted = dyingSlimeId === 'bob'
       ? resources.bobPresentation.startDeath(dyingBody.position)
@@ -2005,6 +2120,19 @@ export class CultivationLevelRuntime {
     if (this.input.enabled) this.input.requestPointerLock();
     this.notifyHUD(undefined, true);
   };
+
+  private beginVentArrival(resources: CultivationRuntimeResources): void {
+    if (!resources.authoredPreview) return;
+    this.ventArrival.begin(resources.authoredPreview.roomOne.root, resources.pair.bobBody, resources.pair.goopBody);
+    resources.bobPresentation.setPosition(resources.pair.bobBody.position);
+    resources.goopPresentation.setPosition(resources.pair.goopBody.position);
+    this.input.resetState(); this.input.setEnabled(false);
+    this.resetRecoveryCamera(resources);
+  }
+
+  private clearRoomThreeCinematicUi():void{
+    if(this.host.dataset?.cinematic==='cultivation-clearance')delete this.host.dataset.cinematic;
+  }
 
   private resetRecoveryCamera(resources: CultivationRuntimeResources): void {
     this.renderLayer.cameraRig.reset();
@@ -2183,6 +2311,21 @@ export class CultivationLevelRuntime {
     this.debugInspectionState = beginDebugPanelInspection(this.input);
     this.debugVisible = true;
     this.applyDebugPresentation();
+  };
+
+  private readonly onVoltFinaleKeyDown = (event: KeyboardEvent): void => {
+    const resources = this.resources, finale = resources?.roomFiveFinale;
+    if (!resources?.authoredPreview || !finale || event.repeat || this.lifecycle.state !== 'running' ||
+      !this.input.enabled || !this.debugInteractionEnabled || !this.isGameplayKeyboardTarget(event.target) ||
+      !resources.deathSequence.isPlaying || resources.controller.readModel.state !== 'playing') return;
+    if (event.code === 'Enter' && finale.active) {
+      event.preventDefault(); finale.requestSkip(); return;
+    }
+    if (!this.debugAvailable || (event.code !== 'Digit8' && event.code !== 'Numpad8') || finale.active || finale.complete) return;
+    event.preventDefault();
+    if (!this.teleportToAuthoredPreviewRoom(5)) return;
+    resources.manager.activate('bob');
+    this.beginVoltFinale(resources, true);
   };
 
   private readonly onSkipToLevelThree = (event: KeyboardEvent): void => {
