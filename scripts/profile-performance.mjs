@@ -7,6 +7,8 @@ import { chromium } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 const root = path.resolve(process.env.PROFILE_ROOT ?? process.cwd());
 const label = process.env.PROFILE_LABEL ?? "candidate";
 if (!/^[a-zA-Z0-9_-]+$/.test(label)) throw new Error("PROFILE_LABEL must be a simple directory name");
@@ -52,6 +54,8 @@ const server = spawn(process.execPath, [
 });
 const report = {
 	label,
+	gitSha: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
+	os: {platform: os.platform(), release: os.release(), version: os.version()},
 	protocol: {width,height,deviceScaleFactor,flightRecorder,headless:process.env.PROFILE_HEADLESS !== "0",keyMs},
 	requestedGraphics: {preset, resolutionCap, transmissionScale},
 	recordedAt: new Date().toISOString(),
@@ -60,6 +64,7 @@ const report = {
 	errors: []
 };
 let browser;
+let activePage;
 try {
 	for (let i = 0; i < 100; i++) {
 		try {
@@ -88,6 +93,7 @@ try {
 			deviceScaleFactor
 		});
 		const page = await context.newPage();
+		activePage = page;
 		page.setDefaultTimeout(24e4);
 		page.on("pageerror", (e) => report.errors.push(e.message));
 		page.on("console", (m) => {
@@ -282,7 +288,7 @@ try {
 			const response = await route.fetch();
 			let body = await response.text();
 			// Expose the composition roots before load; preserve all production code.
-			body = body.replace(/([\w$]+)=new ([\w$]+)\((\{host:[^{}]*?input:[\w$]+,renderLayer:[\w$]+,debugAvailable:[\w$]+\})\)/, '$1=globalThis.__attach(new $2($3),"__one")');
+			body = body.replace(/\{initialRuntime:([\w$]+)/, '{initialRuntime:globalThis.__attach($1,"__one")');
 			body = body.replace(/return new ([\w$]+)\.CultivationLevelRuntime\((\{[^;]*?\})\)/, "return globalThis.__attach(new $1.CultivationLevelRuntime($2),\"__two\")");
 			body = body.replace(/return new ([\w$]+)\.BlackoutLevelRuntime\((\{[^;]*?\})\)/, "return globalThis.__attach(new $1.BlackoutLevelRuntime($2),\"__three\")");
 			await route.fulfill({
@@ -313,6 +319,10 @@ try {
 		}
 		const clicked = performance.now();
 		await page.locator("[data-action=\"start\"]").click();
+		await page.waitForFunction(() => ['opening','playing'].includes(document.querySelector('.game-flow')?.dataset.state));
+		if (await page.locator('.game-flow').getAttribute('data-state') === 'opening') {
+			await page.locator('[data-action="skip-opening"]').click();
+		}
 		await page.waitForFunction(() => globalThis.__one?.state === "running");
 		await page.waitForFunction(() => __one.input.enabled && __one.__profile.frames.some((f) => f.drawn));
 		data.playToControlMs = performance.now() - clicked;
@@ -530,11 +540,15 @@ try {
 			await context.close();
 			continue;
 		}
-		await page.evaluate(() => __one.events.emit("completed", {
-			levelId: "level-1",
-			nextLevelId: "level-2"
-		}));
+		// Use the controller boundary: the runtime's completion handler unlocks
+		// Goop before the session captures progression for Level 2.
+		await page.evaluate(() => __one.resources.containmentLevel.completeForDebug());
 		const transition = performance.now();
+		await page.waitForFunction(() => document.querySelector('.game-flow')?.dataset.state === 'transitionFailed' ||
+			document.querySelector('[data-action="enter-level"]')?.hidden === false);
+		if (await page.locator('.game-flow').getAttribute('data-state') === 'transitionFailed') {
+			throw new Error(await page.locator('[data-transition-failure-message]').textContent());
+		}
 		await page.locator("[data-action=\"enter-level\"]").click();
 		await page.waitForFunction(() => globalThis.__two?.state === "running");
 		data.twoTransitionMs = performance.now() - transition;
@@ -574,6 +588,16 @@ try {
 	}
 } catch (e) {
 	report.failure = e.stack;
+	try {
+		report.failureContext = await activePage?.evaluate(() => ({
+			flow: document.querySelector('.game-flow')?.dataset.state,
+			transitionFailure: document.querySelector('[data-transition-failure-message]')?.textContent,
+			focused: document.hasFocus(), visibility: document.visibilityState,
+			runtimes: ['__one','__two','__three'].map(name => ({name,
+				state: globalThis[name]?.state,
+				preparation: globalThis[name]?.preparationQueue?.diagnostics})),
+		}));
+	} catch {}
 	process.exitCode = 1;
 	console.error(e);
 } finally {
