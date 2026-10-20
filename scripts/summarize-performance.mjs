@@ -1,24 +1,9 @@
 import path from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
+import {distribution as stats,analyzeRecording} from './lib/performance-qualification.mjs';
 const labels = process.argv.slice(2);
 if (!labels.length || labels.some((l) => !/^[a-zA-Z0-9_-]+$/.test(l))) throw new Error("Supply profiling directory labels");
 const root = path.resolve(process.env.PROFILE_ROOT ?? process.cwd(), "artifacts/performance-overhaul");
-const stats = (values) => {
-	const a = values.filter(Number.isFinite).sort((a, b) => a - b);
-	if (!a.length) return null;
-	const mean = a.reduce((a, b) => a + b, 0) / a.length;
-	const tail = a.slice(-Math.max(1, Math.ceil(a.length * .01)));
-	return {
-		n: a.length,
-		p50: a[Math.floor(a.length * .5)],
-		p95: a[Math.min(a.length - 1, Math.floor(a.length * .95))],
-		p99: a[Math.min(a.length - 1, Math.floor(a.length * .99))],
-		max: a.at(-1),
-		mean,
-		fps: 1e3 / mean,
-		onePercentLow: 1e3 / (tail.reduce((a, b) => a + b, 0) / tail.length)
-	};
-};
 const all = [];
 for (const label of labels) {
 	const r = JSON.parse(await readFile(path.join(root, label, "raw.json"), "utf8"));
@@ -33,11 +18,12 @@ for (const label of labels) {
         }
         const columns = Object.fromEntries(flight.frameColumns.map((name,index) => [name,index]));
         const rows = new Map();
-        for (const window of flight.hitchWindows) for (const frame of window.frames) {
+        for (const frame of flight.retainedFrames ?? flight.hitchWindows.flatMap(window=>window.frames)) {
             if (!rows.has(frame[columns.sequence]) || frame[columns.gpuStatus] === "valid") rows.set(frame[columns.sequence], frame);
         }
         flightRecordings.set(`${run.run}:${room.name}:${room.room}:${room.variant ?? ""}`, {
             summary: flight.summary,
+            qualification:analyzeRecording(flight),
             viewport: flight.viewport,
             webgl: flight.webgl,
             rawFrameCoverage: rows.size,
@@ -57,6 +43,8 @@ for (const label of labels) {
     }
 	all.push({
 		label,
+		provenance:{gitSha:r.gitSha,browserVersion:r.browserVersion,os:r.os,hardware:r.hardware,protocol:r.protocol,
+          cacheProtocol:r.cacheProtocol,buildManifest:r.buildManifest},
 		errors: r.errors,
 		failure: r.failure,
 		assetHashes: r.assetHashes,

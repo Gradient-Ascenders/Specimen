@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { buildInfo } from '../core/BuildInfo.ts';
+import { QualificationTimeline } from './QualificationTimeline.ts';
 import { SimulationTimeSummary, simulationTimeState, type SimulationTimeState } from './SimulationTimeSummary.ts';
 
 import type { LoopProfiler, LoopStats } from '../core/Loop.ts';
@@ -70,6 +72,9 @@ type GpuStatus =
   | 'error';
 
 interface RecordedFrame {
+  focused: boolean;
+  visible: boolean;
+  drawn: boolean;
   sequence: number;
   timestampMs: number;
   deltaMs: number;
@@ -260,6 +265,7 @@ const FRAME_COLUMNS = [
   'antialias', 'lightingPolicy',
   'graphicsPreset', 'requestedPixelRatioCap',
   'fixedDeltaMs', 'simulationState',
+  'activeX','activeY','activeZ','inputEnabled','pointerLocked','inputActive','focused','visible','drawn',
 ] as const;
 
 const FRAME_TIME_HISTOGRAM_UPPER_BOUNDS_MS = [
@@ -286,6 +292,7 @@ const createRenderSnapshot = (): PerformanceRenderSnapshot => ({
 });
 
 export const createPerformanceGameplaySnapshot = (): PerformanceGameplaySnapshot => ({
+  activePosition:[0,0,0], inputEnabled:false, pointerLocked:false, inputActive:false,
   level: 'unavailable',
   room: 'unavailable',
   gameplayState: 'unavailable',
@@ -301,6 +308,7 @@ export const createPerformanceGameplaySnapshot = (): PerformanceGameplaySnapshot
 });
 
 const createRecordedFrame = (): RecordedFrame => ({
+  focused:false,visible:false,drawn:false,
   sequence: 0,
   timestampMs: 0,
   deltaMs: 0,
@@ -329,6 +337,11 @@ const copyTuple = (
 
 const copyFrame = (source: RecordedFrame): RecordedFrame => {
   const target = createRecordedFrame();
+  target.focused=source.focused;target.visible=source.visible;target.drawn=source.drawn;
+  copyTuple(target.gameplay.activePosition,source.gameplay.activePosition);
+  target.gameplay.inputEnabled=source.gameplay.inputEnabled;
+  target.gameplay.pointerLocked=source.gameplay.pointerLocked;
+  target.gameplay.inputActive=source.gameplay.inputActive;
   target.sequence = source.sequence;
   target.timestampMs = source.timestampMs;
   target.deltaMs = source.deltaMs;
@@ -367,6 +380,17 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private readonly hostDocument: Document;
   private readonly config: PerformanceRecorderConfig;
   private readonly detector: HitchDetector;
+  private readonly benchmarkMode: boolean;
+  private readonly getBootReadyMs: () => number | undefined;
+  private readonly qualificationTimeline = new QualificationTimeline();
+  private readonly qualificationGameplay = createPerformanceGameplaySnapshot();
+  private readonly qualificationRender = createRenderSnapshot();
+  private readonly diagnosticErrors: string[] = [];
+  private readonly pageId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  private readonly qualificationUnsubscribe: (()=>void)[] = [];
+  private frameStartFocused = false;
+  private frameStartVisible = false;
+  private renderFrameBefore = 0;
   private readonly simulationTime = new SimulationTimeSummary();
   private readonly frameStartGameplay = createPerformanceGameplaySnapshot();
   private readonly previousGameplay = createPerformanceGameplaySnapshot();
@@ -437,18 +461,33 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     readonly window?: Window;
     readonly document?: Document;
     readonly config?: Partial<PerformanceRecorderConfig>;
+    readonly benchmarkMode?: boolean;
+    readonly getBootReadyMs?: () => number | undefined;
   }) {
     this.renderLayer = options.renderLayer;
     this.gameSession = options.gameSession;
     this.hostWindow = options.window ?? window;
     this.hostDocument = options.document ?? document;
-    this.config = { ...DEFAULT_PERFORMANCE_RECORDER_CONFIG, ...options.config };
+    this.benchmarkMode = options.benchmarkMode ?? false;
+    this.getBootReadyMs = options.getBootReadyMs ?? (()=>undefined);
+    this.config = { ...DEFAULT_PERFORMANCE_RECORDER_CONFIG,
+      ...(this.benchmarkMode ? {historyCapacityFrames:8192} : {}), ...options.config };
     this.detector = new HitchDetector(this.config);
     this.history = Array.from(
       { length: this.config.historyCapacityFrames },
       createRecordedFrame,
     );
     this.drawingBufferSize = new THREE.Vector2();
+    this.hostWindow.addEventListener('error',this.onDiagnosticError);
+    this.hostWindow.addEventListener('unhandledrejection',this.onDiagnosticRejection);
+    this.renderLayer.canvas?.addEventListener('webglcontextlost',this.onContextLost);
+    if (this.benchmarkMode) {
+      this.qualificationUnsubscribe.push(
+        this.gameSession.events.on('transitionStarted',({levelId})=>
+          this.qualificationTimeline.request('transition',levelId,levelId,this.hostWindow.performance.now())),
+        this.gameSession.events.on('transitionCompleted',()=>this.qualificationTimeline.ready(this.hostWindow.performance.now())),
+      );
+    }
 
     this.element = this.hostDocument.createElement('aside');
     this.element.className = 'performance-recorder';
@@ -553,6 +592,59 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     this.shaderProgramGuardStatus.textContent = `Level 1 shader guard invalidated · ${reason}`;
   }
 
+  recordFlowState(state: string): void {
+    if (!this.benchmarkMode) return;
+    const now=this.hostWindow.performance.now();
+    if (state==='opening') this.qualificationTimeline.request('initial','initial','containment',now);
+    if (state==='restarting') this.qualificationTimeline.request('restart','restart','pending',now);
+    if (state==='playing') this.qualificationTimeline.ready(now);
+  }
+
+  /** Called only by the debug composition owner, including while recording is off. */
+  observeQualificationFrame(): void {
+    if (!this.benchmarkMode || !this.qualificationTimeline.needsFrame) return;
+    const gameplay=this.qualificationGameplay, render=this.qualificationRender;
+    this.gameSession.writePerformanceSnapshot(gameplay);
+    this.renderLayer.writePerformanceSnapshot(render,this.drawingBufferSize);
+    const memory=(this.hostWindow.performance as PerformanceWithMemory).memory;
+    this.qualificationTimeline.observe(this.hostWindow.performance.now(),gameplay.level,
+      this.hostDocument.hasFocus() && !this.hostDocument.hidden && gameplay.inputEnabled &&
+      gameplay.pointerLocked && render.drawCalls>0 && simulationTimeState(gameplay.gameplayState,gameplay.cutsceneState)==='playing',
+      render.programs,render.geometries,render.textures,memory?.usedJSHeapSize ?? null);
+  }
+
+  private retainedFrameRows(): readonly unknown[][] {
+    const rows: unknown[][]=[];
+    this.forEachHistoryFrame(frame=>rows.push([...frameToRow(frame)]));
+    return rows;
+  }
+
+  private buildQualificationExport(): Record<string,unknown> {
+    const context=this.renderLayer.renderer.getContext();
+    const glError=context.getError?.() ?? null;
+    if (glError) pushBounded(this.diagnosticErrors,`WebGL error: ${glError}`,64);
+    const failures=(this.hostWindow.performance.getEntriesByType?.('resource') ?? [])
+      .filter(entry=>(entry as PerformanceResourceTiming & {responseStatus?:number}).responseStatus! >= 400)
+      .slice(-32).map(entry=>`HTTP resource failure: ${entry.name}`);
+    return {enabled:this.benchmarkMode,pageId:this.pageId,
+      observation:'window-errors+resource-status+export-gl',
+      errors:[...this.diagnosticErrors,...failures].slice(-64),
+      glError,contextLost:context.isContextLost?.() ?? false,
+      bootReadyMs:this.getBootReadyMs() ?? null,
+      lifecycle:this.qualificationTimeline.events.map(event=>({...event,
+        resourceSample:event.resourceSample ? {...event.resourceSample} : null})),
+      limitations:['Console messages and network failures require independent browser review.',
+        'Resource counters are counts, not GPU allocation bytes; JS heap is browser-dependent.']};
+  }
+
+  private readonly onDiagnosticError = (event: Event): void => {
+    pushBounded(this.diagnosticErrors,(event as ErrorEvent).message || 'Window/resource error',64);
+  };
+  private readonly onContextLost = (): void => {pushBounded(this.diagnosticErrors,'WebGL context lost',64);};
+  private readonly onDiagnosticRejection = (event: Event): void => {
+    pushBounded(this.diagnosticErrors,String((event as PromiseRejectionEvent).reason ?? 'Unhandled rejection'),64);
+  };
+
   start(): void {
     if (this.disposed || this.enabledValue) return;
     this.resetSession();
@@ -585,6 +677,8 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   beginFrame(timestampMs: number): void {
     const startedMs = this.hostWindow.performance.now();
+    this.frameStartFocused=this.hostDocument.hasFocus?.() === true;
+    this.frameStartVisible=this.hostDocument.visibilityState === 'visible';
     this.gameSession.writePerformanceSnapshot(this.frameStartGameplay);
     this.sequence += 1;
     this.currentTimestampMs = timestampMs;
@@ -595,6 +689,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   beginRender(): void {
     const startedMs = this.hostWindow.performance.now();
+    this.renderFrameBefore=this.renderLayer.renderer.info?.render?.frame ?? 0;
     this.gpuQueryForCurrentFrame = null;
     this.gpuStatusForCurrentFrame = this.gpuExtension ? 'pending' : 'unsupported';
     if (
@@ -740,7 +835,9 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
     return {
       schema: 'specimen-performance-flight-recorder',
-      schemaVersion: 3,
+      schemaVersion: 4,
+      build: buildInfo,
+      qualification: this.buildQualificationExport(),
       session: {
         startedAt: this.sessionStartedAtIso,
         exportedAt: new Date().toISOString(),
@@ -758,6 +855,8 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       configuration: this.config,
       frameColumns: FRAME_COLUMNS,
       hitchWindows: windows.map((window) => this.serializeWindow(window)),
+      // Existing bounded ring, not another per-frame allocation/recording path.
+      retainedFrames: this.retainedFrameRows(),
       manualMarkers: this.manualMarkers,
       browserPerformance: {
         supportedEntryTypes: [...(PerformanceObserver.supportedEntryTypes ?? [])],
@@ -780,6 +879,10 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     this.markerButton.removeEventListener('click', this.markManualHitch);
     this.exportButton.removeEventListener('click', this.downloadExport);
     this.hostWindow.removeEventListener('keydown', this.onKeyDown);
+    this.hostWindow.removeEventListener('error',this.onDiagnosticError);
+    this.hostWindow.removeEventListener('unhandledrejection',this.onDiagnosticRejection);
+    this.renderLayer.canvas?.removeEventListener('webglcontextlost',this.onContextLost);
+    for (const unsubscribe of this.qualificationUnsubscribe) unsubscribe();
     this.element.remove();
   }
 
@@ -838,6 +941,9 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     frame.gpuStatus = this.gpuStatusForCurrentFrame;
     frame.fixedSteps = stats.stepsThisFrame;
     frame.droppedSimulationMs = stats.droppedSimulationTimeSeconds * 1_000;
+    frame.focused=this.frameStartFocused && this.hostDocument.hasFocus?.() === true;
+    frame.visible=this.frameStartVisible && this.hostDocument.visibilityState === 'visible';
+    frame.drawn=(this.renderLayer.renderer.info?.render?.frame ?? 0)>this.renderFrameBefore;
     frame.fixedDeltaMs = stats.fixedDeltaSeconds * 1_000;
     this.renderLayer.writePerformanceSnapshot(frame.render, this.drawingBufferSize);
     this.gameSession.writePerformanceSnapshot(frame.gameplay);
@@ -1251,6 +1357,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private updateStatus(message: string): void {
     this.status.textContent = [
       `Flight recorder ${message}`,
+      this.benchmarkMode ? `benchmark mode · ${this.config.historyCapacityFrames} raw frames` : 'hitch mode',
       `${this.totalFrames} frames`,
       `${this.hitchWindows.length + (this.activeWindow ? 1 : 0)} windows`,
       this.gpuExtension ? 'GPU timing on' : 'GPU timing unavailable',
@@ -1320,6 +1427,8 @@ const frameToRow = (frame: RecordedFrame): readonly unknown[] => [
   frame.render.antialias, frame.render.lightingPolicy,
   frame.render.graphicsPreset, frame.render.requestedPixelRatioCap,
   frame.fixedDeltaMs, frame.simulationState,
+  ...frame.gameplay.activePosition.map(round),frame.gameplay.inputEnabled,frame.gameplay.pointerLocked,
+  frame.gameplay.inputActive,frame.focused,frame.visible,frame.drawn,
 ];
 
 const pushBounded = <Value>(
