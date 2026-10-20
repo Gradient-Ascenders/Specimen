@@ -9,6 +9,7 @@ import { mkdir, writeFile, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
+import {analyzeRecording} from './lib/performance-qualification.mjs';
 const root = path.resolve(process.env.PROFILE_ROOT ?? process.cwd());
 const label = process.env.PROFILE_LABEL ?? "candidate";
 if (!/^[a-zA-Z0-9_-]+$/.test(label)) throw new Error("PROFILE_LABEL must be a simple directory name");
@@ -22,6 +23,9 @@ const betaScope = process.env.PROFILE_SCOPE === "beta";
 const preset = process.env.PROFILE_PRESET;
 const resolutionCap = process.env.PROFILE_RESOLUTION_CAP;
 const transmissionScale = process.env.PROFILE_TRANSMISSION_SCALE;
+const requestedAngle=process.env.PROFILE_ANGLE;
+if (requestedAngle && !['d3d11','gl','vulkan','swiftshader'].includes(requestedAngle)) throw new Error('Unknown PROFILE_ANGLE');
+if (requestedAngle==='d3d11' && process.platform!=='win32') throw new Error('D3D11 is Windows-only; omit PROFILE_ANGLE for the actual platform default.');
 if (preset && !["normal", "performance"].includes(preset)) throw new Error("Unknown PROFILE_PRESET");
 if (resolutionCap && !["0.75", "1", "1.5", "2"].includes(resolutionCap)) throw new Error("Unknown PROFILE_RESOLUTION_CAP");
 if (preset === "performance" && Number(resolutionCap) > 1) throw new Error("Performance preset supports resolution caps up to 1");
@@ -38,6 +42,9 @@ if (occupied) throw new Error("Profiling port 4190 is already in use");
 const assets = path.join(root, process.env.PROFILE_DIST ?? "dist", "assets");
 const assetHashes = {};
 for (const name of await readdir(assets)) if (name.endsWith(".js")) assetHashes[name] = createHash("sha256").update(await readFile(path.join(assets, name))).digest("hex");
+const buildManifest=JSON.parse(await readFile(path.join(root,process.env.PROFILE_DIST ?? 'dist','build-manifest.json'),'utf8'));
+if (buildManifest.dirty || buildManifest.sha!==execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim())
+  throw new Error('Build committed source at the current HEAD before collecting benchmark evidence.');
 const server = spawn(process.execPath, [
 	path.join(root, "node_modules/vite/bin/vite.js"),
 	"preview",
@@ -56,10 +63,14 @@ const report = {
 	label,
 	gitSha: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
 	os: {platform: os.platform(), release: os.release(), version: os.version()},
+    hardware:{cpu:os.cpus()[0]?.model ?? 'unavailable',logicalCpus:os.cpus().length,
+      totalMemoryBytes:os.totalmem(),powerState:'not observed; record manually',driver:'record chrome://gpu separately'},
+	cacheProtocol:'Instrumented module routing disables HTTP cache. Repeated runs share a browser/driver cache of uncontrolled temperature; these are NOT browser-cold/warm qualification pairs.',
 	protocol: {width,height,deviceScaleFactor,flightRecorder,headless:process.env.PROFILE_HEADLESS !== "0",keyMs},
 	requestedGraphics: {preset, resolutionCap, transmissionScale},
 	recordedAt: new Date().toISOString(),
 	assetHashes,
+    buildManifest,
 	runs: [],
 	errors: []
 };
@@ -73,11 +84,11 @@ try {
 		await new Promise((r) => setTimeout(r, 100));
 	}
 	browser = await chromium.launch({
-		channel: process.env.PROFILE_BROWSER ?? "msedge",
+		channel: process.env.PROFILE_BROWSER ?? (process.platform==='win32' ? 'msedge' : 'chrome'),
 		headless: process.env.PROFILE_HEADLESS !== "0",
 		args: [
-			"--use-angle=d3d11",
-			"--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,msEfficiencyMode",
+			...(requestedAngle ? [`--use-angle=${requestedAngle}`] : []),
+			...(process.platform==='win32' ? ["--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,msEfficiencyMode"] : []),
 			"--disable-background-timer-throttling",
 			"--disable-backgrounding-occluded-windows",
 			"--disable-renderer-backgrounding"
@@ -304,7 +315,7 @@ try {
 		report.runs.push(data);
 		console.log(label, "run", run, "boot");
 		const t = performance.now();
-		await page.goto("http://127.0.0.1:4190/?debug=1", { waitUntil: "domcontentloaded" });
+		await page.goto("http://127.0.0.1:4190/?debug=1&benchmark=1", { waitUntil: "domcontentloaded" });
 		console.log("early GPU", await page.evaluate(() => {
 			const gl = __one.renderLayer.renderer.getContext(), e = gl.getExtension("WEBGL_debug_renderer_info");
 			return gl.getParameter(e ? e.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
@@ -477,7 +488,9 @@ try {
             if (flightRecorder) {
                 const recording = JSON.parse(await readFile(path.join(out, captureId+"-flight.json"),"utf8"));
                 const columns = Object.fromEntries(recording.frameColumns.map((key,index)=>[key,index]));
-                const frames = [...new Map(recording.hitchWindows.flatMap(window=>window.frames).map(row=>[row[columns.sequence],row])).values()];
+                const frames = [...new Map((recording.retainedFrames ?? recording.hitchWindows.flatMap(window=>window.frames)).map(row=>[row[columns.sequence],row])).values()];
+                const qualification=analyzeRecording(recording);
+                if (!qualification.valid) throw new Error('Invalid qualification capture: '+qualification.reasons.join(' '));
                 const range = key => {const values=frames.map(row=>row[columns[key]]);return Math.max(...values)-Math.min(...values);};
                 const active = [...new Set(frames.map(row=>row[columns.activeSlime]))];
                 const states = [...new Set(frames.map(row=>row[columns.gameplayState]))];

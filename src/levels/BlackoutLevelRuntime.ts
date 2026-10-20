@@ -54,6 +54,7 @@ import type { Input } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import {
   writePerformancePosition,
+  writePerformanceInput,
   type PerformanceGameplaySnapshot,
 } from '../core/PerformanceSnapshot.ts';
 import {
@@ -1413,6 +1414,10 @@ export class BlackoutLevelRuntime {
 
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
     const resources = this.resources;
+    writePerformanceInput(target,this.input);
+    if (resources) writePerformancePosition(target.activePosition,
+      resources.specimenForm.readModel.controlledForm === 'specimen' ? resources.specimenBody.position : resources.group.activeBody.position);
+    else target.activePosition.fill(0);
     target.level = 'blackout-level-3';
     target.room = this.currentRoom.roomId;
     target.gameplayState = resources && !resources.deathSequence.isPlaying

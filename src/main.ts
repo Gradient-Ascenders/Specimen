@@ -149,6 +149,7 @@ function startGame(): void {
   let performanceRecorder:
     | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
     | undefined;
+  let bootReadyMs: number | undefined;
   const gameFlow = new GameFlowUI({
     settings,
     creditsMarkdown,
@@ -259,6 +260,7 @@ function startGame(): void {
     },
   });
   music.setAutoplayBlockedListener(blocked => gameFlow.setMusicUnlockRequired(blocked));
+  const unsubscribeQualificationFlow=gameFlow.subscribe(state=>performanceRecorder?.recordFlowState(state));
   const cleanGameplayMode = new CleanGameplayMode({
     host: app,
     flow: gameFlow,
@@ -335,6 +337,7 @@ function startGame(): void {
         return;
       }
       gameSession.render(interpolationAlpha, stats);
+      performanceRecorder?.observeQualificationFrame();
       sampleLevelOneShaderPrograms?.();
     },
   });
@@ -352,8 +355,11 @@ function startGame(): void {
           host: app,
           renderLayer,
           gameSession,
+          benchmarkMode:new URLSearchParams(window.location.search).get('benchmark')==='1',
+          getBootReadyMs:()=>bootReadyMs,
         });
         performanceRecorder = recorder;
+        recorder.recordFlowState(gameFlow.state);
         loop.setProfiler(recorder);
         if (levelOneShaderProgramGuardInvalidation) {
           recorder.invalidateLevelOneShaderProgramGuard(levelOneShaderProgramGuardInvalidation);
@@ -387,6 +393,7 @@ function startGame(): void {
     // Present the same title room in dev and production before enabling Start.
     bootFrame = requestAnimationFrame(() => {
       bootFrame = requestAnimationFrame(() => {
+        bootReadyMs=performance.now();
         gameFlow.completeBoot();
       });
     });
@@ -414,6 +421,7 @@ function startGame(): void {
     unsubscribeTransitionFailed();
     unsubscribeTitlePresentation();
     unsubscribeMusic();
+    unsubscribeQualificationFlow();
     unsubscribeGameCompleted();
     titlePresentation?.dispose();
     openingPresentation?.dispose();

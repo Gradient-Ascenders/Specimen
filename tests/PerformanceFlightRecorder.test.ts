@@ -356,7 +356,7 @@ test('simulation totals survive history eviction, preserve schema columns, and r
     now+=1000;frame();
     recorder.stop();
     const exported = recorder.buildExport() as any;
-    assert.equal(exported.schemaVersion,3);
+    assert.equal(exported.schemaVersion,4);
     assert.equal(exported.summary.simulationTime.droppedActiveSimulationMs,9000);
     assert.equal(exported.summary.simulationTime.states.boundary.droppedMs,900);
     assert.equal(exported.summary.simulationTime.states.paused.droppedMs,900);

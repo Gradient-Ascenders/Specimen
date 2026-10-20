@@ -1,3 +1,5 @@
+import type { Input } from './Input.ts';
+
 export interface PerformanceRenderSnapshot {
   viewportWidth: number;
   viewportHeight: number;
@@ -26,6 +28,10 @@ export interface PerformanceRenderSnapshot {
 }
 
 export interface PerformanceGameplaySnapshot {
+  readonly activePosition: [number,number,number];
+  inputEnabled: boolean;
+  pointerLocked: boolean;
+  inputActive: boolean;
   level: string;
   room: string | number;
   gameplayState: string;
@@ -38,6 +44,14 @@ export interface PerformanceGameplaySnapshot {
   collisionEligible: number;
   collisionCandidates: number;
   collisionNarrowChecks: number;
+}
+
+export function writePerformanceInput(target: PerformanceGameplaySnapshot, input: Input): void {
+  target.inputEnabled = input.enabled;
+  target.pointerLocked = input.pointerLocked;
+  target.inputActive = input.isDown('moveForward') || input.isDown('moveBackward') ||
+    input.isDown('moveLeft') || input.isDown('moveRight') || input.isDown('jump') ||
+    input.isDown('fireAbility') || input.isDown('aimAbility') || input.isDown('mountDrone');
 }
 
 /** Copy a vector-like value into reusable recorder storage without allocating. */

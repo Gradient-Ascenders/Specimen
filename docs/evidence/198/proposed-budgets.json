@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "approval": {"status": "proposed", "by": null, "date": null},
+  "description": "Planning hypotheses only. Review real Ubuntu/Chrome assessment evidence before approving a versioned copy. 30 FPS floor / 60 FPS target is not an agreed requirement.",
+  "requiredScenarios": ["l1-traversal", "l2-switching", "l2-room5-bob", "l2-room5-goop", "l3-electrical", "l3-platform", "l3-combat"],
+  "samplesPerScenario": 3,
+  "minimumActiveSeconds": 30,
+  "requireGpuTiming": false,
+  "graphicsPolicy": {"graphicsProfile": "minimum", "graphicsPreset": "normal"},
+  "gameplay": {
+    "p95Ms": 33.34,
+    "p99Ms": 50,
+    "minimumAverageFps": 30,
+    "minimumOnePercentLowFps": 20,
+    "maximumSevereHitchesPerMinute": 0,
+    "maximumSimulationLossPercent": 0.1,
+    "gpuP95Ms": 33.34
+  },
+  "loading": {
+    "browser-cold": {"initial": 120000, "level-2": 90000, "level-3": 90000},
+    "browser-warm": {"initial": 60000, "level-2": 45000, "level-3": 45000}
+  },
+  "resources": {"restartCycles": 3, "maximumGrowth": {"programs": 0, "geometries": 2, "textures": 2}}
+}

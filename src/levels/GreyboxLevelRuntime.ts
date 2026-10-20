@@ -13,6 +13,7 @@ import type { Input, InputAction } from '../core/Input.ts';
 import type { LoopStats } from '../core/Loop.ts';
 import {
   writePerformancePosition,
+  writePerformanceInput,
   type PerformanceGameplaySnapshot,
 } from '../core/PerformanceSnapshot.ts';
 import {
@@ -358,6 +359,9 @@ export class GreyboxLevelRuntime {
 
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
     const resources = this.resources;
+    writePerformanceInput(target,this.input);
+    if (resources) writePerformancePosition(target.activePosition,resources.slimePair.activeBody.position);
+    else target.activePosition.fill(0);
     target.level = LEVEL_ID;
     target.room = resources?.containmentLevel.activeRoomId ?? 'unloaded';
     target.gameplayState = resources
