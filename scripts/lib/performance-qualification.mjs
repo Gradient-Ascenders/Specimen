@@ -128,9 +128,14 @@ export function analyzeRecording(flight) {
 const approved = value => value?.status === 'approved' && typeof value.by === 'string' && value.by.trim() &&
   typeof value.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.date);
 const present = value => typeof value === 'string' && value.trim().length > 0 && !/^(unknown|pending|todo|unavailable|n\/a)$/i.test(value);
+const lifecycleSnapshotKey = data => JSON.stringify({bootReadyMs:data?.bootReadyMs,lifecycle:data?.lifecycle},
+  (_key,value)=>value && typeof value==='object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,value[key]])) : value);
 
 /** Missing evidence always yields unqualified, even if every available number is fast. */
 export function evaluateQualification(intake, budgets, captures) {
+  // Stable report ordering without mutating intake; page history is selected by export time below.
+  captures=[...captures].sort((a,b)=>String(a.sha256).localeCompare(String(b.sha256)));
   const reasons = [], checks = [];
   const require = (ok,message) => { if (!ok) reasons.push(message); };
   require(intake?.schema==='specimen-assessment-intake' && intake.schemaVersion===1,'Unsupported intake schema.');
@@ -203,7 +208,7 @@ export function evaluateQualification(intake, budgets, captures) {
   });
   for (const id of budgets?.requiredScenarios ?? [])
     require(analyzed.filter(x=>x.scenarioId===id && x.valid).length >= budgets.samplesPerScenario, `Missing valid repetitions: ${id}.`);
-  // One export per page suffices for shared page-level loading/lifecycle history.
+  // Keep scenario coverage separate from selection of each page's accumulated history.
   const pages = new Map();
   for (const capture of captures) {
     const pageId=capture.flight?.qualification?.pageId;
@@ -211,9 +216,38 @@ export function evaluateQualification(intake, budgets, captures) {
     if (!present(pageId)) continue;
     require(!pages.has(pageId) || pages.get(pageId).cache===capture.cache,
       'A single page cannot be both browser-cold and browser-warm.');
-    const scenarios=pages.get(pageId)?.scenarios ?? new Map();
-    scenarios.set(capture.scenarioId,(scenarios.get(capture.scenarioId) ?? 0)+1);
-    pages.set(pageId,{cache:capture.cache, data:capture.flight.qualification,scenarios});
+    const page=pages.get(pageId) ?? {cache:capture.cache,scenarios:new Map(),exports:[],data:{}};
+    page.scenarios.set(capture.scenarioId,(page.scenarios.get(capture.scenarioId) ?? 0)+1);
+    page.exports.push(capture);
+    pages.set(pageId,page);
+  }
+  for (const [pageId,page] of pages) {
+    const snapshots=new Map();
+    let invalid=false, latest;
+    for (const capture of page.exports) {
+      const exportedAt=capture.flight?.session?.exportedAt;
+      const time=typeof exportedAt==='string' ? Date.parse(exportedAt) : NaN;
+      const iso=Number.isFinite(time) ? new Date(time).toISOString() : null;
+      // Recorder exports UTC ISO instants. Reject coercion, local dates and calendar rollover.
+      if (!iso || (exportedAt!==iso && exportedAt!==iso.replace('.000Z','Z')) ||
+        time<Date.parse(capture.flight?.session?.startedAt)) {
+        require(false,`${capture.file ?? pageId}: missing/invalid session.exportedAt; require a UTC ISO timestamp at or after recording start.`);
+        invalid=true; continue;
+      }
+      const key=lifecycleSnapshotKey(capture.flight.qualification);
+      if (snapshots.has(time) && snapshots.get(time)!==key) {
+        require(false,`${pageId}: conflicting lifecycle snapshots share session.exportedAt ${iso}; latest history is ambiguous.`);
+        invalid=true;
+      }
+      snapshots.set(time,key);
+      if (!latest || time>latest.time) latest={time,capture};
+    }
+    // Never merge histories or fall back to an older complete snapshot.
+    if (!invalid && latest) {
+      page.data=latest.capture.flight.qualification;
+      page.exportedAt=new Date(latest.time).toISOString();
+      page.file=latest.capture.file;
+    }
   }
   require(pages.size===3, 'Require exactly three distinct browser-pass pages.');
   require([...pages.values()].filter(page=>page.cache==='browser-cold').length===1 &&
@@ -267,6 +301,7 @@ export function evaluateQualification(intake, budgets, captures) {
   return {schema:'specimen-performance-qualification',schemaVersion:1,
     status:reasons.length ? 'unqualified' : checks.some(x=>!x.passed) ? 'fail' : 'pass',
     reasons:[...new Set(reasons)], checks, captures:analyzed, loading,
-    lifecycle:[...pages].map(([pageId,page])=>({pageId,cache:page.cache,events:page.data.lifecycle})),
+    lifecycle:[...pages].map(([pageId,page])=>({pageId,cache:page.cache,
+      file:page.file ?? null,exportedAt:page.exportedAt ?? null,events:page.data.lifecycle ?? []})),
     budgetApproval:budgets?.approval ?? null, machine:intake?.machine ?? null};
 }

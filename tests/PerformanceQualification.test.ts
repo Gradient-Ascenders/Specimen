@@ -10,6 +10,17 @@ import {analyzeRecording,evaluateQualification,distribution,SCENARIOS} from '../
 import {buildManifestPlugin} from '../scripts/lib/build-provenance.mjs';
 
 const setColumn=(f:any,key:string,value:any)=>{const index=f.frameColumns.indexOf(key);for(const row of f.retainedFrames)row[index]=value;};
+const shuffled = <T>(values:T[]) => {
+  const copy=[...values];
+  for(let i=copy.length-1;i>0;i--) {const j=(i*17+3)%(i+1);[copy[i],copy[j]]=[copy[j],copy[i]];}
+  return copy;
+};
+const assertOrderIndependent = (f:ReturnType<typeof fixture>) => {
+  const result=evaluateQualification(f.intake,f.budgets,f.captures);
+  for(const captures of [[...f.captures].reverse(),shuffled(f.captures)])
+    assert.deepEqual(evaluateQualification(f.intake,f.budgets,captures),result);
+  return result;
+};
 test('approved synthetic fixtures pass; proposed budgets and missing evidence never qualify',()=>{
   const f=fixture();assert.equal(evaluateQualification(f.intake,f.budgets,f.captures).status,'pass');
   f.budgets.approval.status='proposed';assert.equal(evaluateQualification(f.intake,f.budgets,f.captures).status,'unqualified');
@@ -38,7 +49,8 @@ for(const {name,mutate,reason} of [
   }},
   {name:'an additional distinct recording of a page scenario',reason:'exactly one recording',mutate:(f:any)=>{
     const c=structuredClone(f.captures[0]);c.file='extra.json';c.sha256='f'.repeat(64);
-    c.flight.session.startedAt='2026-10-20T11:00:00Z';f.captures.push(c);
+    c.flight.session.startedAt='2026-10-20T11:00:00Z';
+    c.flight.session.exportedAt='2026-10-20T11:00:02.000Z';f.captures.push(c);
   }},
   {name:'a missing page identity',reason:'missing browser-pass page identity',mutate:(f:any)=>{
     delete f.captures[0].flight.qualification.pageId;
@@ -58,9 +70,77 @@ for(const {name,mutate,reason} of [
   assert.ok(result.reasons.some(message=>message.includes(reason)),result.reasons.join('\n'));
 });
 
-test('the complete three-pass protocol is independent of intake ordering',()=>{
-  const f=fixture();f.captures.reverse();
-  assert.equal(evaluateQualification(f.intake,f.budgets,f.captures).status,'pass');
+test('growing page histories qualify identically in chronological, reversed and shuffled intake order',()=>{
+  const f=fixture(),original=[...f.captures];
+  for(const pass of ['pass-1','pass-2','pass-3']) {
+    const captures=f.captures.filter(c=>c.flight.qualification.pageId===pass);
+    assert.deepEqual(captures.map(c=>c.flight.qualification.lifecycle.length),[4,8,8,8,12,12,12]);
+    assert.ok(captures.every((c,i)=>!i || Date.parse(c.flight.session.exportedAt)>Date.parse(captures[i-1].flight.session.exportedAt)));
+  }
+  const result=assertOrderIndependent(f);assert.equal(result.status,'pass');
+  assert.deepEqual(f.captures,original,'evaluation must not reorder the caller\'s captures');
+  assert.equal(result.loading.length,9);
+  for(const page of result.lifecycle) {
+    const latest=f.captures.filter(c=>c.flight.qualification.pageId===page.pageId).at(-1)!;
+    assert.equal(page.file,latest.file);assert.equal(page.exportedAt,latest.flight.session.exportedAt);
+    assert.deepEqual(page.events,latest.flight.qualification.lifecycle);
+  }
+});
+
+for(const [name,value] of Object.entries({missing:undefined,null:null,invalid:'not a date',numeric:123,
+  dateOnly:'2026-10-20',localTime:'2026-10-20T11:00:00',rollover:'2026-02-30T11:00:00.000Z',
+  beforeRecording:'2026-10-20T09:00:00.000Z'})) test(`export timestamp is rejected safely: ${name}`,()=>{
+  const f=fixture();(f.captures[0].flight.session as any).exportedAt=value;
+  const result=assertOrderIndependent(f);assert.equal(result.status,'unqualified');
+  assert.ok(result.reasons.some(reason=>reason.includes(f.captures[0].file)&&reason.includes('session.exportedAt')));
+  const page=result.lifecycle.find(p=>p.pageId==='pass-1')!;
+  assert.equal(page.file,null);assert.deepEqual(page.events,[]);
+});
+
+for(const conflict of ['latest lifecycle','latest boot timing','earlier lifecycle'])
+  test(`conflicting equal export timestamps are unqualified: ${conflict}`,()=>{
+    const f=fixture(),earlier=f.captures[conflict==='earlier lifecycle'?1:5],
+      later=f.captures[conflict==='earlier lifecycle'?2:6];
+    earlier.flight.session.exportedAt=later.flight.session.exportedAt;
+    if(conflict==='latest boot timing')later.flight.qualification.bootReadyMs=75;
+    else later.flight.qualification.lifecycle=later.flight.qualification.lifecycle.slice(0,4);
+    const result=assertOrderIndependent(f);assert.equal(result.status,'unqualified');
+    assert.ok(result.reasons.some(reason=>reason.includes('pass-1: conflicting lifecycle snapshots')));
+    const page=result.lifecycle.find(p=>p.pageId==='pass-1')!;
+    assert.equal(page.file,null);assert.deepEqual(page.events,[]);
+  });
+
+test('equal export times with equivalent lifecycle snapshots are unambiguous, regardless of object key order',()=>{
+  const f=fixture(),earlier=f.captures[5],later=f.captures[6];
+  earlier.flight.session.exportedAt=later.flight.session.exportedAt;
+  earlier.flight.qualification.lifecycle=earlier.flight.qualification.lifecycle.map(event=>
+    Object.fromEntries(Object.entries(event).reverse()) as typeof event);
+  const result=assertOrderIndependent(f);assert.equal(result.status,'pass');
+  assert.deepEqual(result.lifecycle.find(p=>p.pageId==='pass-1')!.events,later.flight.qualification.lifecycle);
+});
+
+test('the newest incomplete history is not replaced by older complete history or merged events',()=>{
+  const f=fixture(),latest=f.captures[6];
+  latest.flight.qualification.lifecycle=latest.flight.qualification.lifecycle.slice(0,4);
+  const result=assertOrderIndependent(f);assert.equal(result.status,'unqualified');
+  assert.ok(result.reasons.includes('Missing browser-cold/level-2 loading evidence.'));
+  assert.ok(result.reasons.includes('Missing browser-cold/level-3 loading evidence.'));
+  assert.ok(result.reasons.includes('Missing stabilized restart cycles: blackout-level-3.'));
+  const page=result.lifecycle.find(p=>p.pageId==='pass-1')!;
+  assert.equal(page.file,latest.file);assert.deepEqual(page.events,latest.flight.qualification.lifecycle);
+});
+
+test('loading and resource checks both use the latest snapshot, even when an older one would pass',()=>{
+  const f=fixture(),latest=f.captures[6];
+  const transition=latest.flight.qualification.lifecycle[8];
+  transition.controlAtMs=transition.requestedAtMs+1100;
+  transition.resourceSample.timestampMs=transition.controlAtMs+2100;
+  latest.flight.qualification.lifecycle[11].resourceSample.programs=5;
+  const result=assertOrderIndependent(f);assert.equal(result.status,'fail');
+  assert.ok(result.checks.some(c=>c.name==='browser-cold/level-3/0/controlMs'&&c.value===1100&&!c.passed));
+  assert.ok(result.checks.some(c=>c.name==='pass-1/blackout-level-3/programsGrowth'&&c.value===4&&!c.passed));
+  assert.equal(result.loading.find(l=>l.pageId==='pass-1'&&l.phase==='level-3')!.requestToControlMs,1100);
+  assert.deepEqual(result.lifecycle.find(p=>p.pageId==='pass-1')!.events,latest.flight.qualification.lifecycle);
 });
 
 for(const scenarioId of ['l1-traversal','l2-switching'])

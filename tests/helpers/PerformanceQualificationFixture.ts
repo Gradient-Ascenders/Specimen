@@ -25,12 +25,16 @@ export const fixture = () => {
   const levels=['containment-teaching-level-1','cultivation-level-2','blackout-level-3'];
   for (const [index,level] of levels.entries()) for (let cycle=0;cycle<4;cycle++) lifecycle.push({
     kind:cycle?'restart':index?'transition':'initial',phase:cycle?'restart':['initial','level-2','level-3'][index],
-    level,requestedAtMs:100,readyAtMs:110,controlAtMs:120,
-    resourceSample:{programs:1,geometries:2,textures:3,usedJsHeapBytes:null,timestampMs:2200,stableForMs:2000},
+    level,requestedAtMs:(index*4+cycle)*3000+100,
+    readyAtMs:(index*4+cycle)*3000+110,controlAtMs:(index*4+cycle)*3000+120,
+    resourceSample:{programs:1,geometries:2,textures:3,usedJsHeapBytes:null,
+      timestampMs:(index*4+cycle)*3000+2200,stableForMs:2000},
   });
   const captures=['browser-cold','browser-warm','browser-warm'].flatMap((cache,pass)=>
     Object.entries(SCENARIOS).map(([scenarioId,route],scenarioIndex)=>{
     const index=pass*Object.keys(SCENARIOS).length+scenarioIndex;
+    const levelIndex=levels.indexOf(route.level);
+    const startedAt=Date.UTC(2026,9,20,10,pass*5)+(levelIndex+1)*12000+scenarioIndex*3000;
     const frames=Array.from({length:101},(_,i)=>({
       sequence:i+1,level:route.level,room:route.room ?? 1,deltaMs:1000/60,fixedSteps:1,fixedDeltaMs:1000/60,
       droppedSimulationMs:0,simulationState:i?'playing':'boundary',gameplayState:'playing',cutsceneState:'none',
@@ -42,14 +46,16 @@ export const fixture = () => {
     }));
     const frameColumns=Object.keys(frames[0]);
     const flight={schema:'specimen-performance-flight-recorder',schemaVersion:4,build:{...build},
-      session:{startedAt:new Date(Date.UTC(2026,9,20,10,0,index*3)).toISOString(),durationMs:2000,recordingActive:false,userAgent:'fixture UA'},viewport:{...graphics},
+      session:{startedAt:new Date(startedAt).toISOString(),exportedAt:new Date(startedAt+2000).toISOString(),
+        durationMs:2000,recordingActive:false,userAgent:'fixture UA'},viewport:{...graphics},
       webgl:{unmaskedRenderer:'fixture hardware GPU',gpuTimerQuerySupported:false,gpuDisjointCount:0},
       summary:{totalFrames:frames.length,simulationTime:{unobservedGapMs:0}},
       qualification:{observation:'window-errors+resource-status+export-gl',errors:[],glError:0,contextLost:false,
-        pageId:`pass-${pass+1}`,bootReadyMs:50,lifecycle:structuredClone(lifecycle)},
+        pageId:`pass-${pass+1}`,bootReadyMs:50,lifecycle:structuredClone(lifecycle.slice(0,(levelIndex+1)*4))},
       frameColumns,retainedFrames:frames.map(f=>frameColumns.map(k=>f[k]))};
     return {scenarioId,cache,file:`pass-${pass+1}-${scenarioId}.json`,actionsVerified:true,evidenceFiles:['review.txt'],
-      sha256:(index+1).toString(16).padStart(64,'0'),flight};
+      // Deliberately oppose export chronology: hashes/filenames cannot identify latest history.
+      sha256:(100-index).toString(16).padStart(64,'0'),flight};
   }));
   return {intake,budgets,captures};
 };

@@ -40,6 +40,11 @@ ordinary production content are preserved.
   numeric Room 1 for L1 traversal and L2 switching. Exactly three distinct page
   passes are required (one cold, two warm), each containing exactly one recording
   of all seven scenarios; duplicate or uneven page-level coverage is rejected.
+- Page-level loading/restart evidence uses the latest validated UTC ISO
+  `session.exportedAt`, independent of intake ordering. Missing/invalid times
+  and conflicting snapshots at equal times remain unqualified. Histories are
+  never merged or replaced with older complete evidence to fill missing events.
+  Returned lifecycle evidence identifies the selected source file and export time.
 - GPU statistics use valid timer-query results with at least 80% coverage when
   supported, no disjoint/error scope. Unsupported GPU and heap values are null,
   not zero. `requireGpuTiming` can make GPU timing mandatory in an approved copy.
@@ -172,6 +177,15 @@ PR #220 protocol/room review follow-up (21 October 2026):
 fixes, `npm test` passed all 1224 tests. Type-check, build,
 production validation (72 files) and diff checks passed. No gameplay, graphics,
 measurement calculations or hardware evidence changed.
+
+Lifecycle-history review follow-up (21 October 2026): the 21-capture synthetic
+fixture now grows from initial/L1 history through L2 to complete L3 history,
+with increasing export times. All 76 focused qualification tests and all 1419
+`npm test` tests passed, including identical full reports for chronological,
+reversed and shuffled inputs, invalid/conflicting timestamps and an incomplete
+newest snapshot. Type-check, build, production validation (77 files) and diff
+checks passed. Recorder/browser behavior is unchanged; no browser rerun or new
+hardware measurements were needed for this offline evaluator correction.
 
 ### Actual development capture — unqualified
 
