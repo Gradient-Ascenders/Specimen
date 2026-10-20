@@ -1,4 +1,4 @@
-import type { Object3D } from 'three';
+import { Vector3, type Object3D } from 'three';
 import { WorldAudio } from './WorldAudio.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { SlimeManager } from '../slimes/SlimeManager.ts';
@@ -25,6 +25,9 @@ export class GameplayAudio {
   private readonly acidPools: readonly AcidPoolBounds[];
   private readonly poolPosition = { x: 0, y: 0, z: 0 };
   private readonly controlledBody: () => KinematicBody | undefined;
+  private readonly listenerCamera: Object3D | undefined;
+  private readonly listenerForward = new Vector3(0, 0, -1);
+  private readonly listenerUp = new Vector3(0, 1, 0);
 
   constructor(
     audio: AudioPlayback,
@@ -32,11 +35,13 @@ export class GameplayAudio {
     acidPools: readonly AcidPoolBounds[] = [],
     controlledBody: () => KinematicBody | undefined = () => manager.activeBody,
     worldRoot?: Object3D,
+    listenerCamera?: Object3D,
   ) {
     this.audio = audio;
     this.manager = manager;
     this.acidPools = acidPools;
     this.controlledBody = controlledBody;
+    this.listenerCamera = listenerCamera;
     this.worldAudio = worldRoot ? new WorldAudio(audio, worldRoot) : undefined;
     this.unsubscribers.push(
       gameplayAudioEvents.on('cue', ({ sound, position, volumeScale, maxDistance }) => {
@@ -102,7 +107,7 @@ export class GameplayAudio {
     const id = this.manager.activeSlimeId;
     const body = this.manager.activeBody;
     const controlled = this.controlledBody();
-    if (controlled) this.audio.setListener(controlled.position);
+    this.updateListener();
     this.updateAcidPools(controlled?.position);
     this.worldAudio?.update(controlled?.position);
     if (controlled !== body) { this.clearCharacter(); return; }
@@ -112,6 +117,20 @@ export class GameplayAudio {
     const tangentSpeedSquared = Math.max(0, v.x*v.x + v.y*v.y + v.z*v.z - normalSpeed*normalSpeed);
     const moving = body.grounded && tangentSpeedSquared > 0.04;
     this.updateBodyMovement(body, moving);
+  }
+
+  /** Called after camera interpolation too: looking around must pan ongoing sounds. */
+  updateListener(): void {
+    if (!this.enabled || this.dead) return;
+    const controlled = this.controlledBody();
+    if (!controlled) return;
+    if (this.listenerCamera) {
+      this.listenerCamera.updateWorldMatrix(true, false);
+      this.listenerForward.setFromMatrixColumn(this.listenerCamera.matrixWorld, 2).negate().normalize();
+      this.listenerUp.setFromMatrixColumn(this.listenerCamera.matrixWorld, 1).normalize();
+      // Body position keeps distance/culling stable; the actual view owns left/right and roll.
+      this.audio.setListener(controlled.position, this.listenerForward, this.listenerUp);
+    } else this.audio.setListener(controlled.position);
   }
 
   private updateBodyMovement(body: KinematicBody, moving: boolean): void {

@@ -176,13 +176,15 @@ test('progression banks deduplicate overlapping loads and unlock, with at most f
     assert.equal(gesturePreloads, 1, 'key auto-repeat must not rebuild bank promises');
     await Promise.all([initial, audio.preload(SOUND_BANKS.containment)]);
     assert.equal(requests.length, SOUND_BANKS.containment.length); assert.equal(contexts, 1);
-    assert.ok(requests.every(url => !url.includes('/volt/') && !url.includes('/turrets/')));
+    assert.ok(requests.every(url => !url.includes('/volt/')));
+    assert.ok(requests.some(url => url.includes('/turrets/')), 'The Level 1 finale preloads its drone shots before playback.');
     assert.equal(peak, 4); assert.equal(audio.diagnostics.pending, 0);
     await Promise.all([audio.preload(SOUND_BANKS.cultivation), audio.preload(SOUND_BANKS.containment)]);
     assert.equal(requests.length, SOUND_BANKS.cultivation.length); assert.equal(audio.diagnostics.loaded, SOUND_BANKS.cultivation.length);
     assert.ok(requests.some(url => url.includes('/turrets/')), 'Cultivation combat already has turrets');
     assert.ok(SOUND_BANKS.cultivation.includes('bob-jump-01'), 'rescued Volt shares body cues');
-    assert.ok(!SOUND_BANKS.cultivation.some(id=>id.startsWith('volt-')), 'electrical cues wait for Blackout');
+    assert.deepEqual(SOUND_BANKS.cultivation.filter(id=>id.startsWith('volt-')),
+      ['volt-charge-ready-01','volt-circuit-connect-01'], 'the two Volt-finale accents warm with Level 2; gameplay electrical loops still wait for Blackout');
     await audio.preload(SOUND_BANKS.blackout);
     assert.equal(requests.length, SOUND_BANKS.blackout.length); assert.equal(new Set(requests).size, SOUND_BANKS.blackout.length);
     assert.equal(contexts, 1); assert.equal(peak, 4);

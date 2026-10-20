@@ -15,6 +15,15 @@ type SpatialAudioTarget = {
   readonly positionZ?: AudioParam;
   setPosition?: (x: number, y: number, z: number) => void;
 };
+type ListenerOrientationTarget = {
+  readonly forwardX?: AudioParam;
+  readonly forwardY?: AudioParam;
+  readonly forwardZ?: AudioParam;
+  readonly upX?: AudioParam;
+  readonly upY?: AudioParam;
+  readonly upZ?: AudioParam;
+  setOrientation?: (x: number, y: number, z: number, upX: number, upY: number, upZ: number) => void;
+};
 type AudioContextConstructor = new () => AudioContext;
 type AudioContextGlobal = typeof globalThis & {
   readonly webkitAudioContext?: AudioContextConstructor;
@@ -48,13 +57,31 @@ const setSpatialPosition = (target: SpatialAudioTarget, position: AudioPosition)
   }
 };
 
+const setListenerOrientation = (target: ListenerOrientationTarget, forward: AudioPosition, up: AudioPosition): void => {
+  try {
+    const { forwardX, forwardY, forwardZ, upX, upY, upZ } = target;
+    if (forwardX && forwardY && forwardZ && upX && upY && upZ) {
+      forwardX.value = forward.x; forwardY.value = forward.y; forwardZ.value = forward.z;
+      upX.value = up.x; upY.value = up.y; upZ.value = up.z;
+      return;
+    }
+  } catch {
+    // Partial Web Audio implementations may still support the legacy setter.
+  }
+  try {
+    target.setOrientation?.(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+  } catch {
+    // Optional spatial audio must not interrupt camera rendering or gameplay.
+  }
+};
+
 export interface AudioPlayback {
   play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number): void;
   startLoop(key: string, sound: SoundId, position?: AudioPosition): void;
   stopLoop(key: string): void;
   stopAll(): void;
   setPaused(paused: boolean): void;
-  setListener(position: AudioPosition): void;
+  setListener(position: AudioPosition, forward?: AudioPosition, up?: AudioPosition): void;
 }
 
 /** One application context, cached buffers, bounded voices and keyed loops. */
@@ -231,10 +258,11 @@ export class AudioManager implements AudioPlayback {
     for (const voice of this.voices) this.stopVoice(voice);
   }
 
-  setListener(position: AudioPosition): void {
+  setListener(position: AudioPosition, forward?: AudioPosition, up?: AudioPosition): void {
     const listener = this.context?.listener;
     if (!listener) return;
     setSpatialPosition(listener, position);
+    if (forward && up) setListenerOrientation(listener, forward, up);
   }
 
   private decodeAudioData(bytes: ArrayBuffer): Promise<AudioBuffer> {

@@ -37,6 +37,18 @@ test('hidden Volt avoids ceiling queries and resolves the current ceiling before
   p.dispose(); world.clear(); roof.geometry.dispose(); (roof.material as THREE.Material).dispose();
 });
 
+test('a borrowed Volt queries headroom at his carrier position, not the local origin', async () => {
+  const p=new VoltCharacterPresentation(),world=new CollisionWorld(),carrier=new THREE.Group();
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(4,.1,4),new THREE.MeshBasicMaterial());
+  roof.position.y=1.25;roof.updateMatrixWorld(true);world.register(roof);
+  p.setCollisionWorld(world);carrier.position.set(64,30,303);carrier.add(p.root);
+  await p.prepare(loadVolt);p.setPosition(new THREE.Vector3());p.present();
+  assert.equal(p.diagnostics.headroom.compression,0,'an unrelated low ceiling at (0,0,0) must not squash a rider');
+  carrier.position.set(0,.46,0);p.present();
+  assert.ok(p.diagnostics.headroom.compression>0,'real clearance at the transformed position is still respected');
+  p.dispose();world.clear();roof.geometry.dispose();(roof.material as THREE.Material).dispose();
+});
+
 test('real GLB validates sparse morphs, connected manifold geometry and exact Volt metadata', async () => {
   const root = await loadVolt(), asset = validateVoltAsset(root);
   assert.equal(asset.body.geometry.index!.count, 96192);

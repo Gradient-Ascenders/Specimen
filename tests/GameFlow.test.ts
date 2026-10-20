@@ -4,6 +4,7 @@ import test from 'node:test';
 import { Input } from '../src/core/Input.ts';
 import {
   gameFlowCanPause,
+  gameFlowCinematicCanPause,
   GameFlowStateModel,
   getGameFlowKeyboardAction,
   parseCreditsInlineParts,
@@ -85,6 +86,22 @@ test('pause ownership defers to a death flow that disabled gameplay input', () =
   assert.equal(gameFlowCanPause('playing', true), true);
   assert.equal(gameFlowCanPause('playing', false), false);
   assert.equal(gameFlowCanPause('paused', true), false);
+  assert.equal(gameFlowCanPause('playing', false, true), true, 'A cinematic is pausable without enabling character controls.');
+  assert.equal(gameFlowCanPause('paused', false, true), false);
+});
+
+test('all active story sequences keep native pause when character controls are locked', () => {
+  for (const cinematic of ['cultivation-finale', 'cultivation-clearance', 'blackout-arrival']) {
+    const pausable = gameFlowCinematicCanPause(cinematic, 'playing');
+    assert.equal(pausable, true, cinematic);
+    assert.equal(gameFlowCanPause('playing', false, pausable), true, cinematic);
+    assert.equal(gameFlowCanPause('paused', false, pausable), false, cinematic);
+  }
+  assert.equal(gameFlowCinematicCanPause('containment-finale', 'level-completing'), true);
+  for (const state of ['playing', 'level-complete', undefined])
+    assert.equal(gameFlowCinematicCanPause('containment-finale', state), false);
+  assert.equal(gameFlowCinematicCanPause(undefined, 'playing'), false);
+  assert.equal(gameFlowCinematicCanPause('unknown', 'playing'), false);
 });
 
 test('pause requires unmodified P while Escape remains a nested-menu cancel', () => {

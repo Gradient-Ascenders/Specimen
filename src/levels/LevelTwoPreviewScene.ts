@@ -1,4 +1,5 @@
 import type { GelRendering } from '../render/slime/GelRendering.ts';
+import { CultivationFinaleSet } from '../cinematics/CultivationFinaleSet.ts';
 import { CultivationRoomWorkload, CULTIVATION_ROOM_IDS } from './CultivationRoomWorkload.ts';
 import { freezeStaticTransforms } from '../render/StaticTransforms.ts';
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
@@ -13,6 +14,13 @@ import { AcidLiquidInteractions, type AcidContactBody } from '../render/environm
 import { CultivationCoverEquipmentArt } from '../render/environment/cultivation/CultivationCoverEquipmentArt.ts';
 import { CultivationChamberMaterials } from '../render/environment/cultivation/CultivationChamberMaterials.ts';
 import * as THREE from 'three';
+import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
+import { CultivationRoomOneObservation } from '../render/environment/cultivation/CultivationRoomOneObservation.ts';
+import { CultivationRoomTwoObservation } from '../render/environment/cultivation/CultivationRoomTwoObservation.ts';
+import { CultivationRoomThreeObservation } from '../render/environment/cultivation/CultivationRoomThreeObservation.ts';
+import { CultivationRoomTwoButtonArt } from '../render/environment/cultivation/CultivationRoomTwoButtonArt.ts';
+import { CultivationGoopSpeech } from '../render/environment/cultivation/CultivationGoopSpeech.ts';
+import { CultivationPlatformSplashes } from '../render/environment/cultivation/CultivationPlatformSplashes.ts';
 import { CultivationLabMaterials } from '../render/environment/cultivation/CultivationLabMaterials.ts';
 import { LevelTwoRoomFourGreybox } from './LevelTwoRoomFourGreybox.ts';
 import { LevelTwoRoomFiveGreybox } from './LevelTwoRoomFiveGreybox.ts';
@@ -106,6 +114,7 @@ const ROOM_SPAWNS: Readonly<
 
 /** Released composition of all five authored Cultivation rooms. */
 export class LevelTwoPreviewScene extends CultivationAssetOwner {
+  readonly voltFinaleSet: CultivationFinaleSet;
   readonly root = new THREE.Group();
   readonly workload = new CultivationRoomWorkload();
   readonly frozenTransformCount: number;
@@ -125,6 +134,12 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly filtrationArt: CultivationFiltrationPassageArt;
   readonly elevatorArt: CultivationElevatorArt;
   readonly surfaceCleanup: CultivationSurfaceCleanup;
+  readonly roomOneObservation: CultivationRoomOneObservation;
+  readonly roomTwoObservation: CultivationRoomTwoObservation;
+  readonly roomThreeObservation: CultivationRoomThreeObservation;
+  readonly roomTwoButtonArt: CultivationRoomTwoButtonArt;
+  readonly goopSpeech: CultivationGoopSpeech;
+  readonly platformSplashes: CultivationPlatformSplashes;
   readonly roomOneToTwoPassage = new LevelTwoLabPassageGreybox({
     id: 'cultivation-room-1-to-2-lab-passage',
     fromRoomId: 1,
@@ -252,8 +267,33 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       if (!lightNodes.has(child)) this.roomFourGeometry.add(child);
     }
     this.roomFour.root.add(this.roomFourGeometry);
+    this.voltFinaleSet = new CultivationFinaleSet(this.roomFive.root, this.labArt);
     this.surfaceCleanup = new CultivationSurfaceCleanup(this, this.assets);
     applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
+    // Add diegetic observation after shadow authoring: the small camera and
+    // terminal need no extra shadow casters or another set of room textures.
+    this.roomOneObservation=new CultivationRoomOneObservation({materials:{
+      graphite:this.labArt.metal,serviceMetal:this.labArt.duct,
+    }});
+    this.roomOne.root.add(this.roomOneObservation.root);
+    const observationResources={materials:{graphite:this.labArt.metal,serviceMetal:this.labArt.duct}};
+    this.roomTwoObservation=new CultivationRoomTwoObservation(observationResources);
+    this.roomTwo.root.add(this.roomTwoObservation.root);
+    this.roomThreeObservation=new CultivationRoomThreeObservation(observationResources);
+    this.roomThree.root.add(this.roomThreeObservation.root);
+    // The boarding scenery scrolls upward once the lift descends; the terminal
+    // belongs to that alcove, never to the moving elevator deck.
+    const boardingFloor=this.roomFour.root.getObjectByName('room-4-boarding-floor')!;
+    // Terminal authoring uses room coordinates; cancel the floor's initial
+    // centre offset while inheriting its later upward scenery travel.
+    this.roomThreeObservation.elevatorRoot.position.copy(boardingFloor.position).negate();
+    boardingFloor.add(this.roomThreeObservation.elevatorRoot);
+    this.roomTwoButtonArt=new CultivationRoomTwoButtonArt(
+      this.roomTwo.root.getObjectByName('cultivation-room-2-wall-button-pad') as THREE.Mesh,observationResources);
+    this.roomTwo.root.add(this.roomTwoButtonArt.root);
+    this.goopSpeech=new CultivationGoopSpeech();this.root.add(this.goopSpeech.root);
+    this.platformSplashes=new CultivationPlatformSplashes(this.roomOne.platformDrops,this.labArt.acid,this.roomOne.radiationHazard.mesh);
+    this.roomOne.root.add(this.platformSplashes.root);
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),
@@ -265,6 +305,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       ...this.roomOneToTwoPassage.doors.map(door => door.root),
       ...this.roomTwoToThreeGoopPassage.doors.map(door => door.root), this.filtrationArt.fan,
       ...this.roomFour.dynamicTransformRoots, ...this.roomFive.dynamicTransformRoots,
+      ...this.voltFinaleSet.dynamicTransformRoots,
     ]);
     this.frozenTransformCount = [this.roomOne.root, this.roomOneToTwoPassage.root, this.roomTwo.root,
       this.roomTwoToThreeGoopPassage.root, this.roomTwoToThreeBobAirDuct.root, this.roomThree.root,
@@ -365,6 +406,8 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     occupants: readonly LevelTwoRoomTwoOccupant[],
     goopBody?: KinematicBody,
     continuingRooms?: ReadonlySet<LevelTwoAuthoredRoomId>,
+    activePosition?: Vector3State,
+    playerMoved = false,
   ): void {
     const simulated = this.workload.simulated;
     simulated.clear(); simulated.add(roomId);
@@ -394,6 +437,30 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     else this.roomFour.entrance.update(deltaSeconds, occupants);
     if (simulated.has(5)) this.roomFive.update(deltaSeconds, occupants, false);
     this.workload.cosmeticUpdates = 0;
+    if(this.workload.rendered.has(1)){
+      this.roomOneObservation.update(deltaSeconds,occupants.find(occupant=>occupant.id==='bob')?.position,activePosition);
+      this.workload.cosmeticUpdates++;
+    }
+    const bob=occupants.find(occupant=>occupant.id==='bob'),goop=occupants.find(occupant=>occupant.id==='goop');
+    if(this.workload.rendered.has(2)){
+      this.roomTwoObservation.update(deltaSeconds,bob?.position,activePosition);this.workload.cosmeticUpdates++;
+    }
+    if(this.workload.rendered.has(3)){
+      this.roomThreeObservation.updateCamera(deltaSeconds,bob?.position);this.workload.cosmeticUpdates++;
+    }
+    if(this.workload.rendered.has(4)){
+      this.roomThreeObservation.updateMonitor(deltaSeconds,activePosition);this.workload.cosmeticUpdates++;
+    }
+    this.platformSplashes.update(deltaSeconds,this.workload.rendered.has(1));
+    if(this.platformSplashes.active&&this.workload.rendered.has(1))this.workload.cosmeticUpdates++;
+    this.goopSpeech.root.visible=!!goop;
+    if(goop){
+      const bothInRoomTwo=!!bob&&this.resolveRoomId(bob.position)===2&&this.resolveRoomId(goop.position)===2;
+      const liftState=this.roomFour.controller.readModel.state;
+      this.goopSpeech.update(deltaSeconds,activePosition?this.resolveRoomId(activePosition):roomId,goop.position,activePosition,
+        playerMoved,this.workload.rendered.has(this.resolveRoomId(goop.position)),bothInRoomTwo,liftState==='arrival'||liftState==='complete');
+      if(this.goopSpeech.mesh.material.opacity>0)this.workload.cosmeticUpdates++;
+    }
     if (this.workload.rendered.size > 0) { this.labArt.acid.update(deltaSeconds); this.workload.cosmeticUpdates++; }
     if (this.roomTwoToThreeGoopPassage.root.visible) { this.filtrationArt.update(deltaSeconds); this.workload.cosmeticUpdates++; }
     if (this.workload.rendered.has(5)) { this.roomFive.updateCosmetics(deltaSeconds); this.workload.cosmeticUpdates++; }
@@ -449,10 +516,15 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     for (const interactions of this.acidInteractions) interactions.update(deltaSeconds, bodies);
   }
 
-  reset(): void {
+  reset(options: { readonly preserveCompletedDialogue?: boolean } = {}): void {
     this.workload.reset();
+    this.roomOneObservation.reset(options.preserveCompletedDialogue);
+    this.roomTwoObservation.reset(options.preserveCompletedDialogue);
+    this.roomThreeObservation.reset(options.preserveCompletedDialogue);
+    this.goopSpeech.reset(options.preserveCompletedDialogue);
     for (const interactions of this.acidInteractions) interactions.reset();
     this.roomOne.reset();
+    this.platformSplashes.reset();
     this.roomOneToTwoPassage.reset();
     this.roomTwo.reset();
     this.roomTwoToThreeGoopPassage.reset();
@@ -460,12 +532,20 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomThree.reset();
     this.roomFour.reset();
     this.roomFive.reset();
+    this.voltFinaleSet.reset();
     this.updatePresentationVisibility({ z: 4 }, { z: 8 });
   }
 
   dispose(): void {
     this.workload.dispose();
+    this.roomOneObservation.dispose();
+    this.roomTwoObservation.dispose();
+    this.roomThreeObservation.dispose();
+    this.roomTwoButtonArt.dispose();
+    this.goopSpeech.dispose();
+    this.platformSplashes.dispose();
     this.surfaceCleanup.dispose();
+    this.voltFinaleSet.dispose();
     this.passageArt.dispose();
     this.filtrationArt.dispose();
     this.maintenanceArt.dispose();

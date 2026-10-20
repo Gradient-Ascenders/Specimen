@@ -173,7 +173,9 @@ export class RoomTwoArt {
       { name: 'east-mid-south', position: [14.85, 8.15, 31.7], size: [8.7, 7.55, 0.11], rotation: [0, -Math.PI / 2, 0] },
       { name: 'east-mid-sticky-shoulder', position: [14.85, 8.15, 47.45], size: [2.45, 7.55, 0.11], rotation: [0, -Math.PI / 2, 0], secondary: true },
       { name: 'east-upper-south', position: [14.85, 14.7, 33.4], size: [12.1, 5.35, 0.11], rotation: [0, -Math.PI / 2, 0], secondary: true },
-      { name: 'east-upper-north', position: [14.85, 14.7, 45.6], size: [11.75, 5.35, 0.11], rotation: [0, -Math.PI / 2, 0] },
+      // Stop at the rear wall (z=48.85): the old panel overhung into Room 3,
+      // appearing as a floating white slab beside its observation monitor.
+      { name: 'east-upper-north', position: [14.85, 14.7, 44.2875], size: [9.125, 5.35, 0.11], rotation: [0, -Math.PI / 2, 0] },
     ];
     for (const panel of sidePanels) {
       this.root.add(

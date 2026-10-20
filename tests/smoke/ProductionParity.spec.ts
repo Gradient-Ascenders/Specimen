@@ -176,7 +176,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
         // Stage the existing completion boundary; do not enable debug UI/input.
         await page.evaluate(() => (window as any).__paritySession.runtime.resources.containmentLevel.completeForDebug());
       } else if (level === 2) {
-        // Exercise actual final-lever release, Volt registration and handoff.
+        // Exercise the release movie boundary, then its supported skip/handoff.
         await page.evaluate(() => {
           const rt = (window as any).__paritySession.runtime;
           rt.teleportToAuthoredPreviewRoom(5);
@@ -184,6 +184,8 @@ for (const { profile, preset, expectedDpr } of scenarios) {
           c.reset('controls'); c.update(1.5, false, false, false, true);
           c.update(4, false, false, false, false);
           rt.updateRoomFive(1 / 60, r);
+          if (!r.roomFiveFinale.active) throw new Error('Volt release did not start its finale');
+          r.roomFiveFinale.requestSkip(); rt.fixedUpdate(1 / 60);
         });
       }
       if (level < 3) {

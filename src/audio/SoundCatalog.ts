@@ -33,11 +33,12 @@ export const SOUND_DEFINITIONS = {
 } as const;
 export type SoundId = keyof typeof SOUND_DEFINITIONS;
 const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-// Rescued Volt uses shared body cues in Cultivation; electrical effects wait for L3.
+// The live Cultivation escape includes Volt taking over a security drone.
 /** Cumulative banks start warming ahead of each level's visual preparation. */
 export const SOUND_BANKS = {
-  containment: ALL_SOUND_IDS.filter(id => id.startsWith('bob-') || id.startsWith('goop-') || id.startsWith('world-')),
-  cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-')),
+  containment: ALL_SOUND_IDS.filter(id => id.startsWith('bob-') || id.startsWith('goop-') || id.startsWith('world-') || id === 'specimen-turret-shot'),
+  cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-') ||
+    id === 'volt-circuit-connect-01' || id === 'volt-charge-ready-01'),
   blackout: ALL_SOUND_IDS,
 } as const;
 export interface SoundDefinition { readonly path: string; readonly loop: boolean; readonly volume: number; readonly maxVoices: number }

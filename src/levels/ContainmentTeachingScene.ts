@@ -294,23 +294,29 @@ export class ContainmentTeachingScene {
     // Blender Boolean notch converted to three ordinary box colliders.
     // This preserves the rectangular cut-out while remaining compatible with
     // the game's box-based collision behaviour.
+    // At the uphill join, an expanded-box sweep invents a vertical curb one
+    // player radius before the landing. Use the existing rounded sphere/box
+    // edge sweep for these three slabs; keep the real notch and solid floor.
     this.addCollider({
       name: 'duct-segment-c-floor-main',
       size: [7.2, 0.25, 1.37071],
       position: [-5.7, 10.36, 24.32464],
       material: materials.duct,
+      preciseMovementCorners: true,
     });
     this.addCollider({
       name: 'duct-segment-c-floor-front-left',
       size: [3.54316, 0.25, 0.62929],
       position: [-7.52842, 10.36, 23.32464],
       material: materials.duct,
+      preciseMovementCorners: true,
     });
     this.addCollider({
       name: 'duct-segment-c-floor-front-right',
       size: [1.65684, 0.25, 0.62929],
       position: [-2.92842, 10.36, 23.32464],
       material: materials.duct,
+      preciseMovementCorners: true,
     });
     this.addCollider({ name: 'duct-segment-c-roof', size: [7.2, 0.18, 2], position: [-5.7, 12.56, 24], material: materials.duct });
     // Enclose the turning bay, leaving only the ramp entry and the final-run
@@ -378,20 +384,6 @@ export class ContainmentTeachingScene {
   }
 
   private addReferenceMarkers(exitMaterial: THREE.Material): void {
-    const roomOneMarkerGeometry = new THREE.TorusGeometry(0.72, 0.055, 10, 40);
-    const roomOneMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0x54e8e0 });
-    this.ownedGeometries.add(roomOneMarkerGeometry);
-    this.ownedMaterials.add(roomOneMarkerMaterial);
-    const roomOneMarker = new THREE.Mesh(
-      roomOneMarkerGeometry,
-      roomOneMarkerMaterial,
-    );
-    roomOneMarker.name = 'room-1-safe-spawn-marker';
-    roomOneMarker.layers.set(GAMEPLAY_UI_LAYER);
-    roomOneMarker.position.set(SPAWN_POSITION.x, SPAWN_POSITION.y - 0.46, SPAWN_POSITION.z);
-    roomOneMarker.rotation.x = Math.PI / 2;
-    this.root.add(roomOneMarker);
-
     const roomTwoMarkerGeometry = new THREE.TorusGeometry(0.72, 0.055, 10, 40);
     this.ownedGeometries.add(roomTwoMarkerGeometry);
     const roomTwoMarker = new THREE.Mesh(roomTwoMarkerGeometry, exitMaterial);

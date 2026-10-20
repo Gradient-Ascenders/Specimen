@@ -28,6 +28,7 @@ import {
 } from './GroundSecurityDrone.ts';
 import type { RadiationContactTarget } from './RadioactiveHazardSystem.ts';
 import type { SecurityDroneTarget } from './SecurityDrone.ts';
+import { RoomThreeDroneShields } from '../render/hazards/RoomThreeDroneShields.ts';
 
 export interface RoomThreeDroneEncounterConfig {
   readonly ceilingDrones: readonly CeilingSecurityDroneConfig[];
@@ -93,6 +94,7 @@ export class RoomThreeDroneEncounter {
   readonly projectiles: DroneProjectileSystem;
   readonly ceilingDrones: readonly CeilingSecurityDrone[];
   readonly groundDrones: readonly GroundSecurityDrone[];
+  readonly shields: RoomThreeDroneShields;
   readonly radiationTargets: readonly RadiationContactTarget[];
   readonly readModel: RoomThreeDroneEncounterReadModel;
   readonly presentationResourceDiagnostics: SecurityDronePresentationResourceDiagnostics;
@@ -204,6 +206,8 @@ export class RoomThreeDroneEncounter {
       this.root.add(lifecycle.drone.root);
       return lifecycle;
     });
+    this.shields=new RoomThreeDroneShields([...this.ceilingDrones,...this.groundDrones].map(lifecycle=>lifecycle.drone));
+    this.root.add(this.shields.root);
     this.radiationTargets = [
       ...this.ceilingDrones.map((drone) => drone.radiationTarget),
       ...this.groundDrones.map((drone) => drone.radiationTarget),
@@ -234,6 +238,7 @@ export class RoomThreeDroneEncounter {
     this.slimeEligibility.bob = slimeEligibility.bob;
     this.slimeEligibility.goop = slimeEligibility.goop;
     this.damage.update(deltaSeconds);
+    this.shields.update(deltaSeconds);
     for (const drone of this.ceilingDrones) {
       drone.update(deltaSeconds, this.targets);
       this.signalRadiationContact(drone);
@@ -262,6 +267,7 @@ export class RoomThreeDroneEncounter {
     if (this.disposed) return;
     this.projectiles.reset();
     this.damage.reset();
+    this.shields.reset();
     for (const drone of this.ceilingDrones) drone.reset();
     for (const drone of this.groundDrones) drone.reset();
     this.disabledCount = 0;
@@ -273,6 +279,7 @@ export class RoomThreeDroneEncounter {
   dispose(): void {
     if (this.disposed) return;
     this.unsubscribeDamageDeath();
+    this.shields.dispose();
     for (const drone of this.ceilingDrones) drone.dispose();
     for (const drone of this.groundDrones) drone.dispose();
     this.projectiles.dispose();

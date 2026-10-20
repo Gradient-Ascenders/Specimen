@@ -8,8 +8,19 @@ type Triple = [number, number, number];
 
 /** Room 3 sentry parts, merged by finish and shared by drones of the same size. */
 export function createIndustrialDroneGeometry(config: SecurityDroneConfig, role: Role): THREE.BufferGeometry {
+  const preparation = prepareIndustrialDroneGeometry(config, role);
+  try {
+    for (const step of preparation.steps) step();
+    return preparation.finish();
+  } finally { preparation.dispose(); }
+}
+
+/** Identical geometry, with individually bounded construction steps for idle
+ * preparation. The synchronous factory above remains the gameplay API. */
+export function prepareIndustrialDroneGeometry(config: SecurityDroneConfig, role: Role) {
   const { x: w, y: h, z: d } = config.colliderSize;
   const s = Math.min(w, h, d), parts: THREE.BufferGeometry[] = [];
+  const steps: (() => void)[] = [];
   const add = (geometry: THREE.BufferGeometry, at: Triple, rotate: Triple = [0, 0, 0]) => {
     geometry.rotateX(rotate[0]); geometry.rotateY(rotate[1]); geometry.rotateZ(rotate[2]);
     geometry.translate(...at);
@@ -17,12 +28,12 @@ export function createIndustrialDroneGeometry(config: SecurityDroneConfig, role:
     else parts.push(geometry);
   };
   const box = (size: Triple, at: Triple, radius = s * .035, rotate?: Triple) =>
-    add(new RoundedBoxGeometry(...size, 1, Math.min(radius, ...size.map(v => v / 3))), at, rotate);
+    steps.push(() => add(new RoundedBoxGeometry(...size, 1, Math.min(radius, ...size.map(v => v / 3))), at, rotate));
   const cylinder = (radius: number, length: number, at: Triple, axis: 'x' | 'y' | 'z' = 'y', open = false) =>
-    add(new THREE.CylinderGeometry(radius, radius, length, 12, 1, open), at,
-      axis === 'x' ? [0, 0, Math.PI / 2] : axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0]);
+    steps.push(() => add(new THREE.CylinderGeometry(radius, radius, length, 12, 1, open), at,
+      axis === 'x' ? [0, 0, Math.PI / 2] : axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0]));
   const ring = (radius: number, thickness: number, at: Triple, axis: 'x' | 'z' = 'z') =>
-    add(new THREE.TorusGeometry(radius, thickness, 5, 16), at, axis === 'x' ? [0, Math.PI / 2, 0] : [0, 0, 0]);
+    steps.push(() => add(new THREE.TorusGeometry(radius, thickness, 5, 16), at, axis === 'x' ? [0, Math.PI / 2, 0] : [0, 0, 0]));
 
   switch (role) {
     case 'armour':
@@ -86,12 +97,14 @@ export function createIndustrialDroneGeometry(config: SecurityDroneConfig, role:
       for (let n = 0; n < 3; n++) cylinder(s * .12, h * .035, [0, direction * h * ((ground ? .21 : .28) + n * .045), d * .07]);
       if (ground) {
         for (const [x, z] of [[-.30, .25], [.30, .25], [0, -.29]]) {
-          const start = new THREE.Vector3(0, -h * .33, d * .07);
-          const end = new THREE.Vector3(x * w, -h * .42, z * d);
-          const delta = end.clone().sub(start);
-          const rod = new THREE.CylinderGeometry(s * .045, s * .055, delta.length(), 8);
-          rod.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize()));
-          add(rod, start.add(end).multiplyScalar(.5).toArray() as Triple);
+          steps.push(() => {
+            const start = new THREE.Vector3(0, -h * .33, d * .07);
+            const end = new THREE.Vector3(x * w, -h * .42, z * d);
+            const delta = end.clone().sub(start);
+            const rod = new THREE.CylinderGeometry(s * .045, s * .055, delta.length(), 8);
+            rod.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize()));
+            add(rod, start.add(end).multiplyScalar(.5).toArray() as Triple);
+          });
         }
       } else {
         cylinder(s * .13, w * .42, [0, h * .34, d * .07], 'x');
@@ -100,9 +113,12 @@ export function createIndustrialDroneGeometry(config: SecurityDroneConfig, role:
       break;
     }
   }
-  const geometry = mergeGeometries(parts);
-  parts.forEach(part => part.dispose());
-  if (!geometry) throw new Error(`Unable to build industrial drone ${role}`);
-  geometry.computeBoundingBox(); geometry.computeBoundingSphere();
-  return geometry;
+  const dispose = () => { parts.forEach(part => part.dispose()); parts.length = 0; };
+  return { steps, dispose, finish(): THREE.BufferGeometry {
+    const geometry = mergeGeometries(parts);
+    dispose();
+    if (!geometry) throw new Error(`Unable to build industrial drone ${role}`);
+    geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+    return geometry;
+  } };
 }

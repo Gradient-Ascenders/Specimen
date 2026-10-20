@@ -243,13 +243,15 @@ export class RoomThreeArt {
     this.root.add(
       createChamferedBox(this.resources, { name: 'room-3-main-adhesion-test-backing', size: [0.18, 10.1, 8.6], radius: 0.055, position: [16.76, 17.25, 63], material: gasket }),
       createChamferedBox(this.resources, { name: 'room-3-main-adhesion-replaceable-membrane', size: [0.12, 9.28, 7.78], radius: 0.08, position: [16.69, 17.25, 63], material: stickyMembrane }),
-      createInstancedChamferedBoxes(this.resources, { name: 'room-3-main-adhesion-cartridge-frame-verticals', size: [0.24, 10.0, 0.28], radius: 0.04, material: serviceMetal, transforms: [59, 67].map((z) => ({ position: [16.79, 17.25, z] })) }),
-      createInstancedChamferedBoxes(this.resources, { name: 'room-3-main-adhesion-cartridge-frame-horizontals', size: [0.24, 0.28, 8.0], radius: 0.04, material: graphite, transforms: [12.5, 22].map((y) => ({ position: [16.79, y, 63] })) }),
-      createInstancedBoxes(this.resources, 'room-3-main-adhesion-measurement-ticks', staticCyanEmissive, [13.4, 15.1, 16.8, 18.5, 20.2].map((y) => ({ position: [16.62, y, 58.88], size: [0.035, 0.06, 0.38] }))),
+      // Pull the trim proud of the backing/membrane and butt the horizontal
+      // rails between the uprights. Coplanar, overlapping corner faces flicker.
+      createInstancedChamferedBoxes(this.resources, { name: 'room-3-main-adhesion-cartridge-frame-verticals', size: [0.24, 10.0, 0.28], radius: 0.04, material: serviceMetal, transforms: [59, 67].map((z) => ({ position: [16.72, 17.25, z] })) }),
+      createInstancedChamferedBoxes(this.resources, { name: 'room-3-main-adhesion-cartridge-frame-horizontals', size: [0.24, 0.28, 7.72], radius: 0.04, material: graphite, transforms: [12.5, 22].map((y) => ({ position: [16.72, y, 63] })) }),
+      createInstancedBoxes(this.resources, 'room-3-main-adhesion-measurement-ticks', staticCyanEmissive, [13.4, 15.1, 16.8, 18.5, 20.2].map((y) => ({ position: [16.595, y, 58.88], size: [0.035, 0.06, 0.38] }))),
       createChamferedBox(this.resources, { name: 'room-3-final-adhesion-test-backing', size: [4.6, 7.9, 0.18], radius: 0.055, position: [9, 27.68, 76.78], material: gasket }),
       createChamferedBox(this.resources, { name: 'room-3-final-adhesion-replaceable-membrane', size: [3.82, 7.14, 0.12], radius: 0.08, position: [9, 27.68, 76.69], material: stickyMembrane }),
       createInstancedChamferedBoxes(this.resources, { name: 'room-3-final-adhesion-cartridge-frame-verticals', size: [0.26, 7.72, 0.28], radius: 0.04, material: serviceMetal, transforms: [7, 11].map((x) => ({ position: [x, 27.68, 76.79] })) }),
-      createInstancedChamferedBoxes(this.resources, { name: 'room-3-final-adhesion-cartridge-frame-horizontals', size: [4.0, 0.26, 0.28], radius: 0.04, material: graphite, transforms: [24, 31.36].map((y) => ({ position: [9, y, 76.79] })) }),
+      createInstancedChamferedBoxes(this.resources, { name: 'room-3-final-adhesion-cartridge-frame-horizontals', size: [3.74, 0.26, 0.28], radius: 0.04, material: graphite, transforms: [24, 31.36].map((y) => ({ position: [9, y, 76.79] })) }),
     );
   }
 

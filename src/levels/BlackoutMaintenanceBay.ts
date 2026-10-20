@@ -7,6 +7,9 @@ import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
 import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
 import { BlackoutMaintenanceMaterials, type BlackoutMaterialFamily } from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import { mapBlackoutBoxUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
+import {buildBlackoutEntryVent} from '../render/environment/blackout/BlackoutEntryVent.ts';
+import {BlackoutEntryVentCollapse} from '../render/environment/blackout/BlackoutEntryVentCollapse.ts';
+import {BLACKOUT_ENTRY_VENT as ENTRY} from '../cinematics/BlackoutVentArrivalLayout.ts';
 
 export const BLACKOUT_BAY_LAYOUT = Object.freeze({
   chamberWidth: 34,
@@ -24,6 +27,7 @@ export class BlackoutMaintenanceBay {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
   readonly acidInteractions: AcidLiquidInteractions;
+  readonly entryVentCollapse:BlackoutEntryVentCollapse;
 
   private readonly acidMaterial: AcidSurfaceMaterial;
   private readonly arcPositions = new Float32Array(3 * 8 * 2 * 3);
@@ -63,7 +67,14 @@ export class BlackoutMaintenanceBay {
     // Main chamber bounds: x +/-17, z -2..54, y 0..12. The broad basin is
     // sealed beneath the entrance apron as well as under the stepping route.
     this.box('entry-safe-platform', [chamberWidth, 1.05, 11], [0, -0.525, 3.5], platform);
-    this.box('front-perimeter-wall', [chamberWidth, 12, 0.45], [0, 6, -2], darkSteel);
+    // A real open wall vent replaces the old decorative ceiling grille.
+    const shoulder=halfWidth-ENTRY.halfWidth;
+    this.box('front-perimeter-wall', [shoulder,12,.45],[-ENTRY.halfWidth-shoulder/2,6,-2],darkSteel);
+    this.box('front-perimeter-wall-east', [shoulder,12,.45],[ENTRY.halfWidth+shoulder/2,6,-2],darkSteel);
+    this.box('entry-vent-wall-below',[ENTRY.halfWidth*2,ENTRY.floorY,.45],[0,ENTRY.floorY/2,-2],darkSteel);
+    const upper=12-ENTRY.floorY-ENTRY.height;
+    this.box('entry-vent-wall-above',[ENTRY.halfWidth*2,upper,.45],[0,12-upper/2,-2],darkSteel);
+    const entryVentDetails=buildBlackoutEntryVent(this.root,this.collisionMeshes,this.surfaceMaterials);
     this.box('acid-basin-bed', [chamberWidth - 0.8, 0.5, acidEndZ - acidStartZ], [0, -1.25, (acidEndZ + acidStartZ) / 2], darkSteel);
     const acid = this.box('animated-acid-surface', [chamberWidth - 1, 0.08, acidEndZ - acidStartZ - 0.2], [0, -0.99, (acidEndZ + acidStartZ) / 2], this.acidMaterial);
     acid.userData.textureRole = 'acid-floor';
@@ -167,8 +178,6 @@ export class BlackoutMaintenanceBay {
     // Visible but non-emissive hazard markings, conduit, and the ceiling entry grille.
     for (const z of [-1.5, acidStartZ - 0.7]) this.warningStrip(`entry-warning-${z}`, chamberWidth - 2, [0, 0.012, z], warning);
     for (const z of [acidEndZ + 0.4, rearZ - 1.2]) this.warningStrip(`exit-warning-${z}`, chamberWidth - 2, [0, 0.012, z], warning);
-    this.box('ceiling-entry-vent-frame', [3.2, 0.18, 2.4], [-2, 11.9, 2], trim);
-    this.box('ceiling-entry-vent-grille', [2.5, 0.06, 1.8], [-2, 11.78, 2], darkSteel);
 
     this.arcGeometry.setAttribute('position',new THREE.BufferAttribute(this.arcPositions,3));
     const arcs=new THREE.LineSegments(this.arcGeometry,this.arcMaterial);
@@ -207,7 +216,11 @@ export class BlackoutMaintenanceBay {
       object.castShadow = solid && !object.name.startsWith('hallway-flicker-bulb-');
       object.receiveShadow = solid;
     });
-    this.staticVisuals = consolidateStaticRoomVisuals(this.root, this.collisionMeshes.filter(mesh => mesh.material !== this.acidMaterial));
+    this.staticVisuals = consolidateStaticRoomVisuals(this.root, [...this.collisionMeshes.filter(mesh => mesh.material !== this.acidMaterial),...entryVentDetails]);
+    // Keep the moving debris out of the bay's immutable visual batches. Only
+    // its separate fixed blocker joins the normal static collision registry.
+    this.entryVentCollapse=new BlackoutEntryVentCollapse(this.root,this.surfaceMaterials);
+    this.collisionMeshes.push(this.entryVentCollapse.collisionMesh);
     this.acidInteractions = new AcidLiquidInteractions(this.acidMaterial, acid, 3);
   }
 
@@ -275,6 +288,7 @@ export class BlackoutMaintenanceBay {
     if (this.disposed) return;
     this.disposed = true;
     this.acidInteractions.reset();
+    this.entryVentCollapse.dispose();
     this.staticVisuals.dispose();
     this.root.removeFromParent();
     const geometries=new Set<THREE.BufferGeometry>();
@@ -296,6 +310,9 @@ export class BlackoutMaintenanceBay {
   private applySurfaceMaterials(): void {
     const surfaces: Record<string, BlackoutMaterialFamily> = {
       'front-perimeter-wall': 'wallPanel',
+      'front-perimeter-wall-east':'wallPanel',
+      'entry-vent-wall-below':'wallPanel',
+      'entry-vent-wall-above':'wallPanel',
       'west-perimeter-wall': 'wallPanel',
       'east-perimeter-wall': 'wallPanel',
       'rear-wall-west': 'wallPanel',
@@ -304,8 +321,6 @@ export class BlackoutMaintenanceBay {
       'door-header': 'wallPanel',
       'vent-mouth-upper-wall': 'wallPanel',
       'main-ceiling': 'ceilingPanel',
-      'ceiling-entry-vent-frame': 'ceilingPanel',
-      'ceiling-entry-vent-grille': 'ceilingPanel',
       'entry-safe-platform': 'floorDeck',
       'exit-safe-platform': 'floorDeck',
       'acid-exit-ramp': 'floorDeck',
