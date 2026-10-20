@@ -69,8 +69,13 @@ test('graphics changes gate simulation/draws, honor pause intent and release lat
   session.applyGraphicsSettings('transmission',()=>{});
   session.fixedUpdate(1/60);session.render(1,{} as any);
   assert.equal(updates,0);assert.equal(draws,0);assert.equal(runtime.state,'stopped');
+  const snapshot = {} as PerformanceGameplaySnapshot;
+  session.writePerformanceSnapshot(snapshot);
+  assert.equal(snapshot.gameplayState,'loading','preparation is not active gameplay loss');
   session.stop();finish();await Promise.resolve();await Promise.resolve();
   assert.equal(runtime.state,'stopped','completion must not undo a pause request');
+  session.writePerformanceSnapshot(snapshot);
+  assert.equal(snapshot.gameplayState,'paused','retained resources do not imply running simulation');
   session.start();session.applyGraphicsSettings('opaque',()=>{});session.unload();
   finish();await Promise.resolve();await Promise.resolve();
   assert.equal(runtime.state,'unloaded','late compiler completion must not restart unloaded resources');session.dispose();

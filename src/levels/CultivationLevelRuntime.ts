@@ -443,9 +443,9 @@ export class CultivationLevelRuntime {
         ? resources.controller.state
         : resources.deathSequence.state
       : this.lifecycle.state;
-    target.cutsceneState = resources?.roomThreeController?.readModel.complete
-      ? 'room-three-complete'
-      : 'none';
+    target.cutsceneState = resources?.authoredPreview?.roomFive.controller.releasing
+      ? 'volt-release'
+      : resources?.roomThreeController?.readModel.complete ? 'room-three-complete' : 'none';
     target.activeSlime = resources?.manager.activeSlimeId ?? 'none';
     writePerformancePosition(
       target.cameraPosition,

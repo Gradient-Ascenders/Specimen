@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SimulationTimeSummary, simulationTimeState, type SimulationTimeState } from './SimulationTimeSummary.ts';
 
 import type { LoopProfiler, LoopStats } from '../core/Loop.ts';
 import type {
@@ -80,6 +81,8 @@ interface RecordedFrame {
   gpuStatus: GpuStatus;
   fixedSteps: number;
   droppedSimulationMs: number;
+  fixedDeltaMs: number;
+  simulationState: SimulationTimeState;
   readonly render: PerformanceRenderSnapshot;
   readonly gameplay: PerformanceGameplaySnapshot;
 }
@@ -256,6 +259,7 @@ const FRAME_COLUMNS = [
   'pixelBudget', 'gelRenderingMode', 'transmissionResolutionScale', 'shadowMapSizeCap', 'effectsDensity',
   'antialias', 'lightingPolicy',
   'graphicsPreset', 'requestedPixelRatioCap',
+  'fixedDeltaMs', 'simulationState',
 ] as const;
 
 const FRAME_TIME_HISTOGRAM_UPPER_BOUNDS_MS = [
@@ -308,6 +312,8 @@ const createRecordedFrame = (): RecordedFrame => ({
   gpuStatus: 'unsupported',
   fixedSteps: 0,
   droppedSimulationMs: 0,
+  fixedDeltaMs: 0,
+  simulationState: 'inactive',
   render: createRenderSnapshot(),
   gameplay: createPerformanceGameplaySnapshot(),
 });
@@ -334,6 +340,8 @@ const copyFrame = (source: RecordedFrame): RecordedFrame => {
   target.gpuStatus = source.gpuStatus;
   target.fixedSteps = source.fixedSteps;
   target.droppedSimulationMs = source.droppedSimulationMs;
+  target.fixedDeltaMs = source.fixedDeltaMs;
+  target.simulationState = source.simulationState;
   Object.assign(target.render, source.render);
   target.gameplay.level = source.gameplay.level;
   target.gameplay.room = source.gameplay.room;
@@ -359,6 +367,10 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private readonly hostDocument: Document;
   private readonly config: PerformanceRecorderConfig;
   private readonly detector: HitchDetector;
+  private readonly simulationTime = new SimulationTimeSummary();
+  private readonly frameStartGameplay = createPerformanceGameplaySnapshot();
+  private readonly previousGameplay = createPerformanceGameplaySnapshot();
+  private sessionStoppedAtMs: number | undefined;
   private readonly history: RecordedFrame[];
   private readonly frameTimeHistogram = new Array<number>(
     FRAME_TIME_HISTOGRAM_UPPER_BOUNDS_MS.length + 1,
@@ -559,6 +571,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   stop(): void {
     if (!this.enabledValue) return;
+    this.sessionStoppedAtMs = this.hostWindow.performance.now();
     this.enabledValue = false;
     this.finalizeActiveWindow();
     this.disconnectPerformanceObservers();
@@ -572,6 +585,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   beginFrame(timestampMs: number): void {
     const startedMs = this.hostWindow.performance.now();
+    this.gameSession.writePerformanceSnapshot(this.frameStartGameplay);
     this.sequence += 1;
     this.currentTimestampMs = timestampMs;
     this.currentOverheadMs = 0;
@@ -632,6 +646,19 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       updateCpuDurationMs,
       renderCpuDurationMs,
     );
+    const before = this.frameStartGameplay;
+    const after = frame.gameplay;
+    const previous = this.previousGameplay;
+    frame.simulationState = previous.gameplayState === before.gameplayState &&
+      previous.cutsceneState === before.cutsceneState && previous.level === before.level && previous.room === before.room &&
+      before.gameplayState === after.gameplayState &&
+      before.cutsceneState === after.cutsceneState && before.level === after.level && before.room === after.room
+      ? simulationTimeState(after.gameplayState, after.cutsceneState) : 'boundary';
+    this.simulationTime.sample(this.currentTimestampMs, stats, frame.simulationState);
+    previous.gameplayState = after.gameplayState;
+    previous.cutsceneState = after.cutsceneState;
+    previous.level = after.level;
+    previous.room = after.room;
     this.updateSummary(frame);
     this.sampleMemoryIfDue();
 
@@ -713,11 +740,11 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
     return {
       schema: 'specimen-performance-flight-recorder',
-      schemaVersion: 2,
+      schemaVersion: 3,
       session: {
         startedAt: this.sessionStartedAtIso,
         exportedAt: new Date().toISOString(),
-        durationMs: Math.max(0, exportTimestampMs - this.sessionStartedAtMs),
+        durationMs: Math.max(0, (this.sessionStoppedAtMs ?? exportTimestampMs) - this.sessionStartedAtMs),
         recordingActive: this.enabledValue,
         userAgent: this.hostWindow.navigator.userAgent,
         platform: this.hostWindow.navigator.platform,
@@ -757,6 +784,8 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   }
 
   private resetSession(): void {
+    this.simulationTime.reset();
+    this.sessionStoppedAtMs = undefined;
     this.disconnectPerformanceObservers();
     this.clearGpuQueries();
     this.detector.reset();
@@ -809,6 +838,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     frame.gpuStatus = this.gpuStatusForCurrentFrame;
     frame.fixedSteps = stats.stepsThisFrame;
     frame.droppedSimulationMs = stats.droppedSimulationTimeSeconds * 1_000;
+    frame.fixedDeltaMs = stats.fixedDeltaSeconds * 1_000;
     this.renderLayer.writePerformanceSnapshot(frame.render, this.drawingBufferSize);
     this.gameSession.writePerformanceSnapshot(frame.gameplay);
     this.historyWriteIndex = (this.historyWriteIndex + 1) % this.history.length;
@@ -1131,6 +1161,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
   private buildSummary(windows: readonly HitchWindow[]): Record<string, unknown> {
     return {
+      simulationTime: this.simulationTime.snapshot(),
       totalFrames: this.totalFrames,
       capturedHitchWindows: windows.length,
       manualMarkers: this.manualMarkers.length,
@@ -1288,6 +1319,7 @@ const frameToRow = (frame: RecordedFrame): readonly unknown[] => [
   frame.render.transmissionResolutionScale, frame.render.shadowMapSizeCap, frame.render.effectsDensity,
   frame.render.antialias, frame.render.lightingPolicy,
   frame.render.graphicsPreset, frame.render.requestedPixelRatioCap,
+  frame.fixedDeltaMs, frame.simulationState,
 ];
 
 const pushBounded = <Value>(

@@ -1,0 +1,366 @@
+{
+  "environments": [
+    {
+      "label": "196-baseline-final",
+      "gitSha": "ffa6bd6a541239fb57a9155c2d56bf3e5b1f4605",
+      "os": {
+        "platform": "win32",
+        "release": "10.0.26200",
+        "version": "Windows 11 Pro"
+      },
+      "browserVersion": "155.0.4283.62",
+      "protocol": {
+        "width": 1280,
+        "height": 720,
+        "deviceScaleFactor": 1,
+        "flightRecorder": true,
+        "headless": false,
+        "keyMs": 2000
+      },
+      "requestedGraphics": {
+        "preset": "performance",
+        "resolutionCap": "1"
+      },
+      "recordedAt": "2026-10-20T17:17:20.787Z",
+      "assetHashes": {
+        "BlackoutLevelRuntime-DOU6r8tk.js": "289ab3b6f7e29c0d60efe0a3508b2789d4a103b99db3ae10068f80d0ab343f8d",
+        "BobCharacterPresentation-DQK3-Mrj.js": "5880a1a6bdee93ec163a755ef7158b08398a605dc57f59519c0e8fc0a10d11bd",
+        "CultivationLevelDebug-wc9e7QRQ.js": "5c4b1ee01cf6e655fda2391441b57533a844d6f653951bd591c77f76731da673",
+        "CultivationLevelRuntime-DamWR3zj.js": "2b10a0d46125949462d9bec182f662edc15f372310868572fd94eb3fe1acc31c",
+        "defineProperty-BbfpZ9Tg.js": "c2ae68c1ad7462e777ccd4e1e3f84b3bc07ab81458f0dd0ea042a9e1b4d23afb",
+        "GoopIntroTrailer-D6TLVzLb.js": "1603d976dd30e5488f50816c88368ddaa427094a54a8c2248f83582adf3497a5",
+        "index-Ctr4bJhD.js": "eeb3b895261c75258fe848d2adf554ed9f056a3385a77fa360cce2546b0a10d6",
+        "LevelProgression-BzcfAY3X.js": "ea819d492f87d57b84151ed7ab1d5db779b18f4ba60bfd0745501caf546e7036",
+        "OpeningTrailer-DK0ko7xj.js": "1d00922a8ff555be5aed3e6dc22bbbd2a4716e1713768a1bf3b05a5824d2225c",
+        "PerformanceFlightRecorder-7yKAbheY.js": "60224933a0c2e396907321785bcdfaeade9e59250e22c03b652d45abc154b98c",
+        "SecurityDronePresentation-DFmd0EfG.js": "5ba454b7daeba36aa278f538cd5ea32382776798d0d75a1dfa620bb1413227b8",
+        "three.core-B9xsIvIE.js": "b769289edac7c417f8bcc52030b6ec81723be544be2812a54d65c771982044ea",
+        "TrailerPlayer-a_q39gZP.js": "7b699e965aab320becbe5983a5a56416714ca39b5d79373bfb9bc038e6b31d33"
+      },
+      "errors": [],
+      "failure": null,
+      "environment": {
+        "visible": "visible",
+        "focused": true,
+        "drawingBuffer": [
+          960,
+          540
+        ],
+        "effectiveDpr": 0.75,
+        "gpu": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "maxTextureImageUnits": 16,
+        "timer": true,
+        "viewport": [
+          1280,
+          720
+        ],
+        "dpr": 1.0000000149011612
+      },
+      "bootMs": 189074.1054,
+      "twoTransitionMs": 184580.39669999998,
+      "threeTransitionMs": 46412.83189999999
+    },
+    {
+      "label": "196-candidate",
+      "gitSha": "91fcc16995921fa4153bac0e8033da6458c0fcde",
+      "os": {
+        "platform": "win32",
+        "release": "10.0.26200",
+        "version": "Windows 11 Pro"
+      },
+      "browserVersion": "155.0.4283.62",
+      "protocol": {
+        "width": 1280,
+        "height": 720,
+        "deviceScaleFactor": 1,
+        "flightRecorder": true,
+        "headless": false,
+        "keyMs": 2000
+      },
+      "requestedGraphics": {
+        "preset": "performance",
+        "resolutionCap": "1"
+      },
+      "recordedAt": "2026-10-20T20:15:41.714Z",
+      "assetHashes": {
+        "BlackoutLevelRuntime-88mS1d6a.js": "bedde73124a9c6e7064f993fc303f2c072204bb5802b529e3654b70e6bb8b761",
+        "BobCharacterPresentation-DQK3-Mrj.js": "5880a1a6bdee93ec163a755ef7158b08398a605dc57f59519c0e8fc0a10d11bd",
+        "CultivationLevelDebug-wc9e7QRQ.js": "5c4b1ee01cf6e655fda2391441b57533a844d6f653951bd591c77f76731da673",
+        "CultivationLevelRuntime-C4cN5Ged.js": "94cbeffa51a70fecc44f654c7a79c7dac4bc19c8261c5ddfce40a88b230d849a",
+        "defineProperty-BbfpZ9Tg.js": "c2ae68c1ad7462e777ccd4e1e3f84b3bc07ab81458f0dd0ea042a9e1b4d23afb",
+        "GoopIntroTrailer-5HLt-DX3.js": "8e5d89071f6cd415234c1fdc47ab00a15cc01d090ccf2f09025775f9ded9887b",
+        "index-CNfhh5gH.js": "a7baddadd0d34ccae136dc1a6ab26f6fee1dd949ff3ec584604924779fe85841",
+        "LevelProgression-cHYajK-T.js": "cfa0f3a148684cb47105bb9e88ee8998ca323821c319e8ca4abddf4d0567dfdd",
+        "OpeningTrailer-D1RGa_kP.js": "353fb9415b1be6b255b9c77910b853da96128ef49857ff4e2082740659c2aafc",
+        "PerformanceFlightRecorder-BX2HM8mA.js": "8c776100f1c30907afbd6172410a7bedfb3133d38f263281035ee535c96d387a",
+        "SecurityDronePresentation-DFmd0EfG.js": "5ba454b7daeba36aa278f538cd5ea32382776798d0d75a1dfa620bb1413227b8",
+        "three.core-B9xsIvIE.js": "b769289edac7c417f8bcc52030b6ec81723be544be2812a54d65c771982044ea",
+        "TrailerPlayer-vNuJlbg-.js": "a60deed6a5440108969c3b449529b15b8779ef12aefb3553ff261ee9f9b97c64"
+      },
+      "errors": [],
+      "failure": null,
+      "environment": {
+        "visible": "visible",
+        "focused": true,
+        "drawingBuffer": [
+          960,
+          540
+        ],
+        "effectiveDpr": 0.75,
+        "gpu": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "maxTextureImageUnits": 16,
+        "timer": true,
+        "viewport": [
+          1280,
+          720
+        ],
+        "dpr": 1.0000000149011612
+      },
+      "bootMs": 50299.937,
+      "twoTransitionMs": 19523.393500000006,
+      "threeTransitionMs": 9762.585299999992
+    }
+  ],
+  "captures": [
+    {
+      "label": "baseline",
+      "room": "__one/1",
+      "file": "baseline-run0-__one-1-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "bob"
+        ],
+        "states": [
+          "playing"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 514,
+        "totalFrames": 514,
+        "bodyRange": [
+          4.59,
+          0.9550000000000001,
+          2.9939999999999998
+        ],
+        "cameraRange": [
+          4.512,
+          1.858,
+          0.8870000000000005
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    },
+    {
+      "label": "baseline",
+      "room": "__two/5",
+      "file": "baseline-run0-__two-5-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "bob"
+        ],
+        "states": [
+          "playing"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 522,
+        "totalFrames": 522,
+        "bodyRange": [
+          3.6169999999999973,
+          0.955,
+          3.7990000000000066
+        ],
+        "cameraRange": [
+          3.568000000000005,
+          1.0909999999999997,
+          0.9029999999999916
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    },
+    {
+      "label": "baseline",
+      "room": "__two/5/goop",
+      "file": "baseline-run0-__two-5-goop-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "goop"
+        ],
+        "states": [
+          "playing"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 508,
+        "totalFrames": 508,
+        "bodyRange": [
+          5.337000000000003,
+          0.757,
+          1.2800000000000011
+        ],
+        "cameraRange": [
+          5.259999999999991,
+          0.9469999999999998,
+          0.6159999999999854
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    },
+    {
+      "label": "baseline",
+      "room": "__three/1",
+      "file": "baseline-run0-__three-1-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "bob"
+        ],
+        "states": [
+          "three-slime"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 442,
+        "totalFrames": 442,
+        "bodyRange": [
+          4.522,
+          0.927,
+          3.315
+        ],
+        "cameraRange": [
+          4.401,
+          0.9000000000000004,
+          3.205
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    },
+    {
+      "label": "candidate",
+      "room": "__one/1",
+      "file": "candidate-run0-__one-1-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "bob"
+        ],
+        "states": [
+          "playing"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 522,
+        "totalFrames": 522,
+        "bodyRange": [
+          4.8839999999999995,
+          0.9550000000000001,
+          3.303
+        ],
+        "cameraRange": [
+          4.791,
+          1.72,
+          0.891
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    },
+    {
+      "label": "candidate",
+      "room": "__two/5",
+      "file": "candidate-run0-__two-5-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "bob"
+        ],
+        "states": [
+          "playing"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 523,
+        "totalFrames": 523,
+        "bodyRange": [
+          3.503000000000007,
+          0.9269999999999999,
+          3.5640000000000214
+        ],
+        "cameraRange": [
+          3.430000000000007,
+          1.0919999999999999,
+          0.9050000000000011
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    },
+    {
+      "label": "candidate",
+      "room": "__two/5/goop",
+      "file": "candidate-run0-__two-5-goop-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "goop"
+        ],
+        "states": [
+          "playing"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 520,
+        "totalFrames": 520,
+        "bodyRange": [
+          5.393000000000001,
+          0.757,
+          1.2800000000000011
+        ],
+        "cameraRange": [
+          5.316999999999993,
+          0.9509999999999998,
+          0.6159999999999854
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    },
+    {
+      "label": "candidate",
+      "room": "__three/1",
+      "file": "candidate-run0-__three-1-flight.json.gz",
+      "captureValidation": {
+        "active": [
+          "bob"
+        ],
+        "states": [
+          "three-slime"
+        ],
+        "cutscenes": [
+          "none"
+        ],
+        "rawFrames": 522,
+        "totalFrames": 522,
+        "bodyRange": [
+          4.587999999999999,
+          0.9550000000000001,
+          3.315
+        ],
+        "cameraRange": [
+          4.468,
+          0.927,
+          3.216
+        ]
+      },
+      "pacingTrusted": true,
+      "glError": 0
+    }
+  ]
+}

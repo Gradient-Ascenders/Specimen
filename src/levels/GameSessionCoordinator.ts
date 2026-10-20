@@ -171,6 +171,16 @@ export class GameSessionCoordinator {
 
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
     this.runtime.writePerformanceSnapshot(target);
+    // Resources can retain a playing phase while their lifecycle is stopped.
+    if (this.transitionPending || this.initialPreparationPending || this.graphicsPreparation.pending) {
+      target.gameplayState = 'loading';
+      target.cutsceneState = 'none';
+    } else if (this.runtime.state !== 'running' || this.transitionFailed) {
+      target.gameplayState = this.runtime.state === 'unloaded' ? 'loading'
+        : this.runtime.state === 'disposed' ? 'disposed'
+          : this.runtime.state === 'restarting' ? 'restarting' : 'paused';
+      target.cutsceneState = 'none';
+    }
   }
 
   dispose(): void {

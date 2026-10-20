@@ -1415,7 +1415,8 @@ export class BlackoutLevelRuntime {
     const resources = this.resources;
     target.level = 'blackout-level-3';
     target.room = this.currentRoom.roomId;
-    target.gameplayState = resources?.phase.phase ?? this.lifecycle.state;
+    target.gameplayState = resources && !resources.deathSequence.isPlaying
+      ? resources.deathSequence.state : resources?.phase.phase ?? this.lifecycle.state;
     target.cutsceneState = 'none';
     target.activeSlime =
       resources?.specimenForm.readModel.controlledForm === 'specimen'

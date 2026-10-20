@@ -321,3 +321,54 @@ function restoreGlobal(
   if (descriptor) Object.defineProperty(globalThis, name, descriptor);
   else Reflect.deleteProperty(globalThis, name);
 }
+
+test('simulation totals survive history eviction, preserve schema columns, and reset on a new session', () => {
+  const originalObserver = Object.getOwnPropertyDescriptor(globalThis, 'PerformanceObserver');
+  Object.defineProperty(globalThis, 'PerformanceObserver', {configurable:true,
+    value: class { static supportedEntryTypes: string[] = []; }});
+  let now = 0, state = 'playing';
+  const element = new FakeRecorderElement();
+  const recorder = new PerformanceFlightRecorder({
+    host: {append: () => {}} as unknown as HTMLElement,
+    document: {createElement: () => element} as unknown as Document,
+    window: Object.assign(new EventTarget(), {
+      performance: {now: () => now}, navigator:{userAgent:'test',platform:'test',hardwareConcurrency:1},
+      location:{href:'http://test/'},
+    }) as unknown as Window,
+    renderLayer: {renderer:{getContext: () => ({getExtension: () => null, getParameter: () => 'test'})},
+      writePerformanceSnapshot: () => {}} as never,
+    gameSession: {writePerformanceSnapshot: (s: any) => {
+      s.level='level-1';s.room=1;s.gameplayState=state;s.cutsceneState='none';
+    }} as never,
+    config:{historyCapacityFrames:2,maximumWindowFrames:2,maximumHitchWindows:1},
+  });
+  const frame = () => {
+    recorder.beginFrame(now);recorder.beginRender();
+    recorder.endFrame({fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:1,
+      frameDeltaSeconds:.1,stepsThisFrame:6,interpolationAlpha:0,
+      droppedSimulationTimeSeconds:.9,renderFps:1},.1,.2);
+  };
+  try {
+    recorder.start();
+    frame();
+    for (let i=0;i<10;i++) {now+=1000;frame();}
+    state='paused';now+=1000;frame(); // mixed boundary excluded
+    now+=1000;frame();
+    recorder.stop();
+    const exported = recorder.buildExport() as any;
+    assert.equal(exported.schemaVersion,3);
+    assert.equal(exported.summary.simulationTime.droppedActiveSimulationMs,9000);
+    assert.equal(exported.summary.simulationTime.states.boundary.droppedMs,900);
+    assert.equal(exported.summary.simulationTime.states.paused.droppedMs,900);
+    assert.ok(exported.hitchWindows.every((w:any) => w.frames.length<=2));
+    for (const w of exported.hitchWindows) for (const row of w.frames) {
+      assert.equal(row.length,exported.frameColumns.length);
+      assert.equal(row[exported.frameColumns.indexOf('fixedDeltaMs')],1000/60);
+      assert.ok(['boundary','playing','paused'].includes(row[exported.frameColumns.indexOf('simulationState')]));
+    }
+    const duration=exported.session.durationMs;now+=10000;
+    assert.equal((recorder.buildExport() as any).session.durationMs,duration);
+    recorder.start();
+    assert.equal((recorder.buildExport() as any).summary.simulationTime.eligibleElapsedMs,0);
+  } finally {recorder.dispose();restoreGlobal('PerformanceObserver',originalObserver);}
+});
