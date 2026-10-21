@@ -310,7 +310,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function playerFixture() {
+function playerFixture(scheduler?: {yield(): Promise<void>}) {
   let sceneLoads = 0, preloads = 0, levelLoads = 0, completions = 0, disposals = 0, draws = 0, nextFrame = 0;
   const sceneReady = deferred(), preloadReady = deferred(), levelReady = deferred(), frames = new Map<number, FrameRequestCallback>();
   const tasks: (() => void)[] = [];
@@ -324,6 +324,7 @@ function playerFixture() {
     renderer: { shadowMap: {}, render: () => { draws++; } } };
   const statuses: { message: string; failed: boolean }[] = [];
   const options = { scene, renderLayer: layer, host, window: {
+    scheduler,
     requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++nextFrame, callback); return nextFrame; },
     cancelAnimationFrame: (id: number) => frames.delete(id),
     setTimeout: (callback: () => void) => { tasks.push(callback); return tasks.length; },
@@ -359,6 +360,21 @@ test('full preparation yields browser tasks only after the live opening paints i
   f.tasks.shift()!(); await hidden;
   f.player.dispose(); await f.player.yieldPreparation();
   assert.equal(f.tasks.length, 0);
+});
+
+test('the task scheduler also yields asynchronously under the painted blackout', async () => {
+  const task = deferred(); let calls = 0;
+  const f = playerFixture({yield: () => { calls++; return task.promise; }});
+  f.player.start();
+  const visible = f.player.yieldPreparation();
+  assert.equal(calls, 0, 'visible playback keeps frame pacing');
+  f.flushFrames(); await visible;
+  f.player.skip(); f.flushFrames(); f.flushFrames();
+  f.sceneReady.resolve(); await flushPromises();
+  let settled = false;
+  const hidden = f.player.yieldPreparation().then(() => { settled = true; });
+  assert.equal(calls, 1); await flushPromises(); assert.equal(settled, false);
+  task.resolve(); await hidden; f.player.dispose();
 });
 
 test('only light assets prepare during the film; Skip paints black before full Level 1 preparation', async () => {

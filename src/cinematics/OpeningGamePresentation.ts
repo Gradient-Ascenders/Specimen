@@ -65,6 +65,12 @@ export class OpeningGamePresentation {
    * every job once full Level 1 preparation holds the painted blackout. */
   yieldPreparation(): Promise<void> {
     if (this.disposed) return Promise.resolve();
+    if (this.levelPending && this.lastFade === 1) {
+      const scheduler = (this.hostWindow as Window & {scheduler?: {yield(): Promise<void>}}).scheduler;
+      // Supported browsers can yield without the nested-timer delay. Both
+      // paths return to the browser between jobs; neither drains microtasks.
+      if (scheduler?.yield) return scheduler.yield();
+    }
     return new Promise(resolve => {
       if (this.levelPending && this.lastFade === 1) this.hostWindow.setTimeout(resolve, 0);
       else this.hostWindow.requestAnimationFrame(() => resolve());
