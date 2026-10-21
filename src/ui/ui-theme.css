@@ -1120,15 +1120,8 @@
   gap: var(--ui-space-3);
 }
 
+.settings-footer .system-action,
 .credits-footer .system-action {
-  justify-content: start;
-  min-width: 0;
-  min-height: 2.5rem;
-  padding: var(--ui-space-2);
-  font-size: var(--ui-text-size);
-}
-
-.settings-footer .system-action {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1189,11 +1182,11 @@
 }
 
 .credits-footer .system-action {
-  width: min(12rem, 100%);
+  width: auto;
 }
 
-.credits-header {
-  align-items: center;
+.credits-header h1 {
+  margin: 0;
 }
 
 .credits-panel .credits-ledger {
@@ -1213,20 +1206,19 @@
   scrollbar-width: thin;
 }
 
-.credits-ledger > p {
-  max-width: 58ch;
-  margin: 0 0 var(--ui-space-5);
-  color: var(--ui-text-muted);
+.credits-panel .credits-ledger:focus-visible {
+  outline: 1px solid var(--ui-lavender);
+  outline-offset: -1px;
 }
 
 .credits-ledger h2 {
   display: flex;
   align-items: center;
-  gap: var(--ui-space-3);
+  gap: var(--ui-space-2);
   margin: var(--ui-space-6) 0 var(--ui-space-3);
   color: var(--ui-lavender);
   font-family: var(--ui-font-body);
-  font-size: 1.125rem;
+  font-size: var(--ui-text-size);
   font-weight: var(--ui-weight-semibold);
   letter-spacing: var(--ui-track-body);
   line-height: 1.5;
@@ -1237,32 +1229,37 @@
   margin-top: 0;
 }
 
-.credits-ledger h2::before {
-  flex: 0 0 auto;
-  width: 0.18rem;
-  height: 0.75rem;
-  border-radius: var(--ui-radius-xs);
-  background: var(--ui-violet);
-  box-shadow: var(--ui-shadow-signal);
-  content: '';
-}
-
 .credits-entries {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
   gap: var(--ui-space-2);
 }
 
+.credits-developers {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credits-ledger > p {
+  margin: var(--ui-space-3) 0 0;
+  color: var(--ui-text-muted);
+}
+
 .credits-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
   padding: var(--ui-space-3) var(--ui-space-4);
   border: 1px solid var(--ui-line-soft);
-  border-left-color: #6eaba8;
   border-radius: var(--ui-radius-md);
   background: rgb(5 12 20 / 45%);
   overflow-wrap: anywhere;
 }
 
 .credits-entry h3 {
-  margin: 0 0 var(--ui-space-2);
+  margin: 0;
   color: var(--ui-text);
   font-family: var(--ui-font-body);
   font-size: var(--ui-text-size);
@@ -1270,40 +1267,49 @@
   letter-spacing: var(--ui-track-body);
 }
 
-.credits-entry dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ui-space-2) var(--ui-space-5);
-  margin: 0;
-}
-
-.credits-entry dl > div:last-child {
-  grid-column: 1 / -1;
-}
-
-.credits-entry dt {
-  color: var(--ui-text-dim);
-  font-family: var(--ui-font-body);
-  font-size: var(--ui-note-size);
-  letter-spacing: var(--ui-track-body);
-  text-transform: none;
-}
-
-.credits-entry dd {
+.credits-entry p {
   margin: var(--ui-space-1) 0 0;
   color: var(--ui-text-muted);
   font-size: var(--ui-note-size);
-  line-height: 1.4;
+  line-height: 1.5;
+}
+
+.credits-entry .credits-use {
+  margin-bottom: var(--ui-space-3);
+}
+
+.credits-licence {
+  margin-top: auto;
+  padding: 0 var(--ui-space-2);
+  border: 1px solid var(--ui-line-soft);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-note-size);
 }
 
 .credits-entry a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--ui-space-2);
   color: var(--ui-lavender);
+  border-radius: var(--ui-radius-xs);
   text-underline-offset: 0.16em;
+}
+
+.credits-entry a .ui-icon {
+  align-self: center;
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .credits-entry a:hover,
 .credits-entry a:focus-visible {
   color: var(--ui-lavender-pale);
+}
+
+.credits-entry a:focus-visible {
+  outline: 0;
+  box-shadow: var(--ui-focus);
 }
 
 .system-panel::-webkit-scrollbar,
@@ -1330,8 +1336,8 @@
   background: #5d8f90;
 }
 
-@media (max-width: 700px) {
-  .credits-entry dl { grid-template-columns: minmax(0, 1fr); }
+@media (max-height: 500px) {
+  .credits-panel { gap: var(--ui-space-2); }
 }
 
 /* Shared preparation and encounter surfaces */

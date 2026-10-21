@@ -501,8 +501,13 @@ audio and controls still start at safe session defaults. Blocked/malformed stora
 is ignored, and resetting clears the saved display preferences atomically.
 
 Settings and Credits share the dark laboratory panel, pale cyan accents and fixed
-header/footer layout. Credits retains the canonical `CREDITS.md` ledger and source
-links in an independently scrolling body; this styling adds no rendering effects.
+header/footer layout. Credits starts with the game developers and a note that its
+3D models were created independently. It then reads the short entries in
+`CREDITS.md`, ordered as Music, Sound effects, Tools, Fonts and Code. Each entry
+shows its creator, use and licence; linked titles open the source in a new tab.
+Full resource notes stay below the ledger's maintenance heading and do not appear
+in the game. The body scrolls
+independently, with a fixed Back button; this styling adds no rendering effects.
 
 Show FPS uses the existing application loop and a half-second frame average;
 it creates no second timer/profiler and updates DOM text at most twice a second.

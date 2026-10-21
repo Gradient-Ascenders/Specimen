@@ -167,8 +167,27 @@ const appendCreditsLedger = (
 
     if (line.startsWith('## ')) {
       const heading = ledger.ownerDocument.createElement('h2');
-      heading.textContent = line.slice(3);
+      const label = line.slice(3);
+      const symbols = { 'Game developers': 'Code', Music: 'Music2', 'Sound effects': 'Volume2', Tools: 'Cpu', Fonts: 'Type', Code: 'Code' } as const;
+      const symbol = symbols[label as keyof typeof symbols];
+      if (symbol) heading.innerHTML = icon(symbol);
+      heading.append(ledger.ownerDocument.createTextNode(label));
       ledger.append(heading);
+      continue;
+    }
+
+    if (line.startsWith('- ')) {
+      const list = ledger.ownerDocument.createElement('ul');
+      list.className = 'credits-entries credits-developers';
+      while (index < lines.length && lines[index]?.trim().startsWith('- ')) {
+        const item = ledger.ownerDocument.createElement('li');
+        item.className = 'credits-entry';
+        appendCreditsInlineContent(item, lines[index]!.trim().slice(2));
+        list.append(item);
+        index += 1;
+      }
+      ledger.append(list);
+      index -= 1;
       continue;
     }
 
@@ -176,10 +195,6 @@ const appendCreditsLedger = (
       line.startsWith('|') &&
       /^\|(?:\s*:?-+:?\s*\|)+$/.test(lines[index + 1]?.trim() ?? '')
     ) {
-      const headers = line
-        .slice(1, -1)
-        .split('|')
-        .map((cell) => cell.trim());
       index += 2;
 
       const entries = ledger.ownerDocument.createElement('div');
@@ -194,20 +209,31 @@ const appendCreditsLedger = (
         entry.className = 'credits-entry';
 
         const title = ledger.ownerDocument.createElement('h3');
-        appendCreditsInlineContent(title, values[0] ?? '');
+        const source = parseCreditsInlineParts(values[2] ?? '').find(part => part.href);
+        if (source?.href) {
+          const link = ledger.ownerDocument.createElement('a');
+          appendCreditsInlineContent(link, values[0] ?? '');
+          link.href = source.href;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.setAttribute('aria-label', `${link.textContent} (opens in a new tab)`);
+          link.insertAdjacentHTML('beforeend', icon('ExternalLink'));
+          title.append(link);
+        } else {
+          appendCreditsInlineContent(title, values[0] ?? '');
+        }
         entry.append(title);
 
-        const details = ledger.ownerDocument.createElement('dl');
-        for (let cellIndex = 1; cellIndex < headers.length; cellIndex += 1) {
-          const detail = ledger.ownerDocument.createElement('div');
-          const term = ledger.ownerDocument.createElement('dt');
-          const description = ledger.ownerDocument.createElement('dd');
-          term.textContent = headers[cellIndex] ?? '';
-          appendCreditsInlineContent(description, values[cellIndex] ?? '');
-          detail.append(term, description);
-          details.append(detail);
-        }
-        entry.append(details);
+        const creator = ledger.ownerDocument.createElement('p');
+        creator.className = 'credits-creator';
+        appendCreditsInlineContent(creator, values[1] ?? '');
+        const use = ledger.ownerDocument.createElement('p');
+        use.className = 'credits-use';
+        appendCreditsInlineContent(use, values[4] ?? '');
+        const licence = ledger.ownerDocument.createElement('span');
+        licence.className = 'credits-licence';
+        appendCreditsInlineContent(licence, values[3] ?? '');
+        entry.append(creator, use, licence);
         entries.append(entry);
         index += 1;
       }
@@ -779,7 +805,7 @@ export class GameFlowUI {
             <span class="signal-bar" aria-hidden="true"></span>
             <h1 id="credits-heading">Credits</h1>
           </header>
-          <div class="credits-ledger" aria-label="Credits ledger" tabindex="-1"></div>
+          <div class="credits-ledger" role="region" aria-label="Credits" tabindex="-1"></div>
           <footer class="credits-footer">
             <button type="button" class="system-action" data-action="back" data-autofocus>
               ${icon('ArrowLeft')}<span>Back</span>
