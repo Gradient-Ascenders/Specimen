@@ -13,6 +13,7 @@ import { ContainmentAssetPreload } from './levels/ContainmentAssetPreload.ts';
 import { DEFAULT_CAMERA_RIG_CONFIG } from './render/CameraRig.ts';
 import { RenderLayer } from './render/RenderLayer.ts';
 import { waitForGpuPreparation } from './render/WaitForGpuPreparation.ts';
+import { GraphicsPreparationYield } from './render/GraphicsPreparationYield.ts';
 import { GameFlowLifecycleCoordinator } from './ui/GameFlowLifecycleCoordinator.ts';
 import { GameFlowUI, gameFlowCinematicCanPause } from './ui/GameFlowUI.ts';
 import { GameSettings } from './ui/GameSettings.ts';
@@ -82,6 +83,9 @@ function startGame(): void {
     import.meta.env.DEV ||
     new URLSearchParams(window.location.search).get('debug') === '1';
   const levelOneAssets = new ContainmentAssetPreload();
+  const graphicsPreparationYield = new GraphicsPreparationYield(
+    (window as Window & {scheduler?: {yield(): Promise<void>}}).scheduler,
+  );
   const levelOneRuntime = new GreyboxLevelRuntime({
     host: app,
     audio,
@@ -92,7 +96,7 @@ function startGame(): void {
       ? openingPresentation.yieldPreparation()
       : openingPresentation instanceof OpeningGamePresentation
       ? openingPresentation.yieldPreparation()
-      : new Promise(resolve => requestAnimationFrame(() => resolve())),
+      : graphicsPreparationYield.yield(),
     characterLoaders: levelOneAssets.loaders,
   });
   const gameSession = new GameSessionCoordinator({
@@ -432,6 +436,7 @@ function startGame(): void {
     unsubscribeGameCompleted();
     titlePresentation?.dispose();
     openingPresentation?.dispose();
+    graphicsPreparationYield.dispose();
     titleRoom?.dispose();
     levelOneAssets.clear();
     performanceRecorder?.dispose();

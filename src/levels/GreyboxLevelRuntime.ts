@@ -4,6 +4,7 @@ import { ContainmentFinaleOverlay } from '../cinematics/ContainmentFinaleOverlay
 import type { ContainmentFinalePresentation } from '../cinematics/ContainmentFinalePresentation.ts';
 import { sampleContainmentFinale, CONTAINMENT_FINALE_TIMING } from '../cinematics/ContainmentFinaleTimeline.ts';
 import { prepareCinematicProgram } from '../cinematics/CinematicProgramPreparation.ts';
+import { waitForGpuPreparation } from '../render/WaitForGpuPreparation.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
 import {
@@ -464,9 +465,17 @@ export class GreyboxLevelRuntime {
 
   /** Precompile Containment signatures and prime known cold resources while loading. */
   async prepareGraphics(): Promise<void> {
+    const resources = this.requireResources();
     const previous = new Set(this.depthPrewarmGroups);
     this.lightingPrewarmPromise = undefined;
-    try { await this.prepareLightingPrograms(); }
+    try {
+      await this.prepareLightingPrograms();
+      // Task yields can submit work faster than the GPU completes it. Keep the
+      // settings cover until the final uploads/draws finish, without blocking.
+      await waitForGpuPreparation(this.renderLayer.renderer.getContext(),
+        () => new Promise(resolve => this.hostWindow.setTimeout(resolve, 0)),
+        () => this.resources === resources);
+    }
     finally {
       for (const batch of previous) if (!this.compilingDepthGroups.has(batch)) {
         batch.dispose();
