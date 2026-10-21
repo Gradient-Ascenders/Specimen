@@ -61,6 +61,16 @@ export class OpeningGamePresentation {
     this.options.host.dataset.openingState = 'preparing';
   }
 
+  /** Keep one GPU job per browser task without paying a display frame for
+   * every job once full Level 1 preparation holds the painted blackout. */
+  yieldPreparation(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    return new Promise(resolve => {
+      if (this.levelPending && this.lastFade === 1) this.hostWindow.setTimeout(resolve, 0);
+      else this.hostWindow.requestAnimationFrame(() => resolve());
+    });
+  }
+
   private schedulePreparation(): void {
     if (this.preparationScheduled || this.disposed) return;
     this.preparationScheduled = true;

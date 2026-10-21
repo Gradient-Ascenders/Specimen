@@ -90,6 +90,8 @@ function startGame(): void {
     debugAvailable,
     yieldPreparation: () => openingPresentation instanceof OpeningMoviePresentation
       ? openingPresentation.yieldPreparation()
+      : openingPresentation instanceof OpeningGamePresentation
+      ? openingPresentation.yieldPreparation()
       : new Promise(resolve => requestAnimationFrame(() => resolve())),
     characterLoaders: levelOneAssets.loaders,
   });
