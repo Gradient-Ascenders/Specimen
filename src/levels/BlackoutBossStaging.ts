@@ -26,7 +26,7 @@ export class BlackoutBossStaging {
   private readonly steel = new THREE.MeshStandardMaterial({color:0x26302d,roughness:.85,metalness:.25});
   private readonly amber = new THREE.MeshStandardMaterial({color:0xf8be58,emissive:0xffb73d,emissiveIntensity:.7});
 
-  constructor() {
+  constructor(openToArena = false) {
     this.root.name = 'blackout-room-3-boss-staging-not-final-arena';
     this.box('boss-staging-floor',[18,.8,16],[0,0,CENTRE_Z]);
     this.box('boss-staging-west-wall',[.4,7,16],[-9,3.9,CENTRE_Z]);
@@ -38,7 +38,7 @@ export class BlackoutBossStaging {
     }
     const headerHeight = 7.4 - BLACKOUT_TRANSIT_EXIT_HALLWAY.ceilingY;
     this.box('boss-staging-entry-header',[portalWidth,headerHeight,.4],[0,7.4 - headerHeight / 2,ENTRY_Z]);
-    this.box('boss-staging-arena-bulkhead',[18,7,.4],[0,3.9,END_Z]);
+    if (!openToArena) this.box('boss-staging-arena-bulkhead',[18,7,.4],[0,3.9,END_Z]);
     this.box('boss-staging-ceiling',[18,.4,16],[0,7.4,CENTRE_Z]);
     const warning = new THREE.Mesh(this.geometry,this.amber);
     warning.name = 'boss-staging-closed-bulkhead-indicator';

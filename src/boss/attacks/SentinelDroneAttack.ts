@@ -495,6 +495,7 @@ export class SentinelDroneSquad {
     readonly droneHealthUnits?: number;
     readonly fireIntervalSeconds?: number;
     readonly projectileCapacity?: number;
+    readonly idPrefix?: string;
   }) {
     this.world = options.collisionWorld;
     const maximumDrones = options.maximumDrones ?? 4;
@@ -521,7 +522,7 @@ export class SentinelDroneSquad {
     try {
       for (let index = 0; index < maximumDrones; index += 1) {
         const drone = new SentinelBossDrone({
-          id: `sentinel-drone-${index + 1}`,
+          id: `${options.idPrefix ?? 'sentinel-drone'}-${index + 1}`,
           world: this.world,
           projectiles: this.projectiles,
           healthUnits: options.droneHealthUnits ?? 2,

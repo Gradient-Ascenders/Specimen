@@ -33,6 +33,8 @@ export interface SpecimenAttackConfig {
   readonly maximumDamageUnits: number;
   readonly maximumSplashRadiusMetres: number;
   readonly launchClearanceMetres: number;
+  /** Production merged form reserves area damage for a complete charge. */
+  readonly splashRequiresFullCharge?: boolean;
 }
 
 export const DEFAULT_SPECIMEN_ATTACK_CONFIG: Readonly<SpecimenAttackConfig> = {
@@ -517,7 +519,8 @@ export class SpecimenProjectileSystem {
       chargeAmount,
     );
     const splashRadiusMetres =
-      this.config.maximumSplashRadiusMetres * chargeAmount;
+      this.config.splashRequiresFullCharge && !fullyCharged ? 0 :
+        this.config.maximumSplashRadiusMetres * chargeAmount;
 
     this.activateProjectile(
       slot,
