@@ -1198,7 +1198,6 @@ export class RoomFiveArt {
   private buildSignage(): void {
     const signs = [
       { name: 'room-5-entry-primary-containment-sign', label: 'roomFive' as const, size: [5.0, 1.2] as const, position: [5.0, 80.2, 91.62] as const },
-      { name: 'room-5-pressure-array-sign', label: 'pressureArray' as const, size: [3.7, 0.9] as const, position: [-19.62, 84.0, 110] as const, rotation: [0, Math.PI / 2, 0] as const },
       { name: 'room-5-observation-control-sign', label: 'observationControl' as const, size: [3.8, 0.92] as const, position: [-10, 103.15, 125.10] as const },
       { name: 'room-5-soluble-access-sign', label: 'vent' as const, size: [1.75,.42] as const, position: [0,77.1,125.10] as const, rotation:[0,Math.PI,0] as const },
     ];

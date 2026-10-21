@@ -24,16 +24,25 @@ test('shared facility signs render across all five rooms at front and oblique an
     rt.stop(); rt.render = () => {};
     document.querySelector<HTMLElement>('.game-flow')!.style.display = 'none';
     const atlas = rt.resources.testScene.artResources.textures.signageAtlas;
-    return { width: atlas.image.width, height: atlas.image.height, anisotropy: atlas.anisotropy };
+    const removedSignParts: string[] = [];
+    rt.resources.testScene.root.traverse((object: any) => {
+      if (object.name.startsWith('room-5-pressure-array-sign')) removedSignParts.push(object.name);
+    });
+    const remainingRoomFiveSigns = ['entry-primary-containment', 'observation-control', 'soluble-access']
+      .filter(name => rt.resources.testScene.root.getObjectByName(`room-5-${name}-sign-mounted-assembly`));
+    return { width: atlas.image.width, height: atlas.image.height, anisotropy: atlas.anisotropy,
+      removedSignParts, remainingRoomFiveSigns };
   });
-  expect(diagnostics).toEqual({ width: 1024, height: 2560, anisotropy: 8 });
+  expect(diagnostics).toEqual({ width: 1024, height: 2560, anisotropy: 8,
+    removedSignParts: [], remainingRoomFiveSigns: ['entry-primary-containment', 'observation-control', 'soluble-access'] });
   const views = [
     { name: 'room-1-bay', target: [-1.65, 6.58, 5.61], camera: [-1.65, 6.58, 1.2] },
     { name: 'room-2-chamber', target: [-4.35, 14.65, 48.665], camera: [-4.35, 14.65, 43.5] },
     { name: 'room-3-sector', target: [4.5, 15.8, 49.24], camera: [4.5, 15.8, 56] },
     { name: 'room-3-oblique', target: [4.5, 15.8, 49.24], camera: [9.5, 15.8, 54] },
     { name: 'room-4-core', target: [9, 34.65, 79.965], camera: [9, 34.65, 86] },
-    { name: 'room-5-pressure-array', target: [-19.62, 84, 110], camera: [-14.5, 84, 110] },
+    { name: 'room-5-pressure-array-cleared-wall', target: [-19.62, 84, 110], camera: [-14.5, 84, 110] },
+    { name: 'room-5-observation-control', target: [-10, 103.15, 125.10], camera: [-10, 103.15, 129.5] },
   ];
   for (const view of views) {
     const glError = await page.evaluate(view => {
