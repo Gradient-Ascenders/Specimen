@@ -208,7 +208,8 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
 
   try {
     const element = new FakeRecorderElement();
-    const programs: unknown[] = Array.from({ length: 86 }, () => ({}));
+    const programs: object[] = Array.from({ length: 86 }, () => ({}));
+    const planned = new WeakSet<object>();
     const errors: unknown[][] = [];
     const hostWindow = Object.assign(new EventTarget(), {
       performance,
@@ -223,6 +224,7 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
     });
     const recorder = new PerformanceFlightRecorder({
       host: { append: () => undefined } as unknown as HTMLElement,
+      isPlannedLevelOneProgram: program => planned.has(program),
       document: {
         createElement: () => element,
       } as unknown as Document,
@@ -256,6 +258,9 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
 
     recorder.armLevelOneShaderProgramGuard(86);
     recorder.sampleLevelOneShaderPrograms();
+    const cinematic = {}; programs.push(cinematic); planned.add(cinematic);
+    recorder.sampleLevelOneShaderPrograms();
+    assert.equal(errors.length, 0, 'an explicitly submitted cinematic program is attributed without raising the baseline');
     programs.push({});
     recorder.sampleLevelOneShaderPrograms();
     recorder.sampleLevelOneShaderPrograms();
@@ -267,6 +272,7 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
       baselineProgramCount: 86,
       highestProgramCount: 88,
       growthEventCount: 2,
+      plannedPreparationProgramCount: 1,
     });
     assert.equal(errors.length, 2);
     assert.match(element.shaderProgramGuardStatus.textContent, /87 → 88/);
@@ -282,6 +288,13 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
       'goop',
     );
 
+    const retained = programs.length;
+    programs.shift(); programs.push({name: 'missed-live-variant'});
+    recorder.sampleLevelOneShaderPrograms();
+    assert.equal(programs.length, retained);
+    assert.equal(errors.length, 3, 'disposal must not hide a new unexpected program');
+    assert.equal(recorder.getShaderProgramGuardSnapshot().baselineProgramCount, 86);
+    assert.equal(recorder.getShaderProgramGuardSnapshot().highestProgramCount, 89);
     recorder.completeLevelOneShaderProgramGuard();
     // Simulate legitimate Level 2 program creation after transitionStarted
     // disarms the Level 1-only guard.
@@ -290,10 +303,11 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
     assert.deepEqual(recorder.getShaderProgramGuardSnapshot(), {
       armed: false,
       baselineProgramCount: 86,
-      highestProgramCount: 88,
-      growthEventCount: 2,
+      highestProgramCount: 89,
+      growthEventCount: 3,
+      plannedPreparationProgramCount: 1,
     });
-    assert.equal(errors.length, 2);
+    assert.equal(errors.length, 3);
     assert.match(
       element.shaderProgramGuardStatus.textContent,
       /Level 1 shader guard complete/,
@@ -305,7 +319,7 @@ test('shader guard records Level 1 highs and ignores Level 2 growth after comple
     assert.equal(recorder.getShaderProgramGuardSnapshot().armed, false);
     assert.equal(recorder.getShaderProgramGuardSnapshot().invalidatedBy, 'Character gel quality changed');
     assert.match(element.shaderProgramGuardStatus.textContent, /guard invalidated/);
-    assert.equal(errors.length, 2);
+    assert.equal(errors.length, 3);
     assert.equal((recorder.buildExport() as { shaderProgramGuard: ShaderProgramGuardSnapshot })
       .shaderProgramGuard.invalidatedBy, 'Character gel quality changed');
     recorder.dispose();

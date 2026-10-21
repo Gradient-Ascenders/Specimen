@@ -149,6 +149,8 @@ export interface ShaderProgramGrowthEvent {
   readonly baselineProgramCount: number;
   readonly previousHighestProgramCount: number;
   readonly newProgramCount: number;
+  readonly retainedProgramCount: number;
+  readonly programs: readonly { readonly name: string; readonly cacheKey?: string }[];
   readonly gameplay: PerformanceGameplaySnapshot;
 }
 
@@ -157,6 +159,7 @@ export interface ShaderProgramGuardSnapshot {
   readonly baselineProgramCount: number | null;
   readonly highestProgramCount: number | null;
   readonly growthEventCount: number;
+  readonly plannedPreparationProgramCount?: number;
   readonly invalidatedBy?: string;
 }
 
@@ -453,6 +456,9 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   private shaderProgramGuardInvalidation: string | undefined;
   private shaderProgramBaseline: number | null = null;
   private highestShaderProgramCount: number | null = null;
+  private readonly observedShaderPrograms = new WeakSet<object>();
+  private plannedPreparationProgramCount = 0;
+  private readonly isPlannedLevelOneProgram: (program: object) => boolean;
 
   constructor(options: {
     readonly host: HTMLElement;
@@ -463,6 +469,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     readonly config?: Partial<PerformanceRecorderConfig>;
     readonly benchmarkMode?: boolean;
     readonly getBootReadyMs?: () => number | undefined;
+    readonly isPlannedLevelOneProgram?: (program: object) => boolean;
   }) {
     this.renderLayer = options.renderLayer;
     this.gameSession = options.gameSession;
@@ -470,6 +477,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     this.hostDocument = options.document ?? document;
     this.benchmarkMode = options.benchmarkMode ?? false;
     this.getBootReadyMs = options.getBootReadyMs ?? (()=>undefined);
+    this.isPlannedLevelOneProgram = options.isPlannedLevelOneProgram ?? (() => false);
     this.config = { ...DEFAULT_PERFORMANCE_RECORDER_CONFIG,
       ...(this.benchmarkMode ? {historyCapacityFrames:8192} : {}), ...options.config };
     this.detector = new HitchDetector(this.config);
@@ -528,17 +536,18 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   }
 
   /** Arm after prewarm and the hidden boot renders establish Level 1's baseline. */
-  armLevelOneShaderProgramGuard(baselineProgramCount: number): void {
+  armLevelOneShaderProgramGuard(baselineProgramCount: number, baselinePrograms: readonly object[] = this.renderLayer.renderer.info.programs ?? []): void {
     if (this.disposed || this.shaderProgramBaseline !== null || this.shaderProgramGuardInvalidation) return;
     this.shaderProgramGuardArmed = true;
     this.shaderProgramBaseline = baselineProgramCount;
     this.highestShaderProgramCount = baselineProgramCount;
+    for (const program of baselinePrograms) this.observedShaderPrograms.add(program);
     this.updateShaderProgramGuardStatus();
   }
 
   /**
-   * Cheap debug-only sample. Gameplay context is captured only when a new high
-   * proves that a program was compiled after Level 1's warm boundary.
+   * Track identities rather than retained totals: disposal can hide a cold
+   * program. Only exact submissions from the gated cinematic queue are planned.
    */
   sampleLevelOneShaderPrograms(): void {
     const previousHighest = this.highestShaderProgramCount;
@@ -546,9 +555,21 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       this.disposed || !this.shaderProgramGuardArmed ||
       previousHighest === null
     ) return;
-    const currentProgramCount =
-      this.renderLayer.renderer.info.programs?.length ?? 0;
-    if (currentProgramCount <= previousHighest) return;
+    const retained = this.renderLayer.renderer.info.programs ?? [];
+    const unexpected: {name: string; cacheKey?: string}[] = [];
+    let additions = 0;
+    for (const program of retained) {
+      if (this.observedShaderPrograms.has(program)) continue;
+      this.observedShaderPrograms.add(program);
+      if (this.isPlannedLevelOneProgram(program)) { this.plannedPreparationProgramCount++; continue; }
+      additions++;
+      if (unexpected.length < 16) {
+        const details = program as unknown as {name?: string; cacheKey?: string};
+        unexpected.push({name: details.name ?? '', ...(details.cacheKey ? {cacheKey: details.cacheKey.slice(0, 2048)} : {})});
+      }
+    }
+    if (additions === 0) return;
+    const currentProgramCount = previousHighest + additions;
 
     this.highestShaderProgramCount = currentProgramCount;
     const gameplay = createPerformanceGameplaySnapshot();
@@ -558,6 +579,8 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       baselineProgramCount: this.shaderProgramBaseline ?? previousHighest,
       previousHighestProgramCount: previousHighest,
       newProgramCount: currentProgramCount,
+      retainedProgramCount: retained.length,
+      programs: unexpected,
       gameplay,
     };
     pushBounded(this.shaderProgramGrowthEvents, event, 32);
@@ -574,6 +597,7 @@ export class PerformanceFlightRecorder implements LoopProfiler {
       baselineProgramCount: this.shaderProgramBaseline,
       highestProgramCount: this.highestShaderProgramCount,
       growthEventCount: this.shaderProgramGrowthEvents.length,
+      ...(this.plannedPreparationProgramCount ? {plannedPreparationProgramCount: this.plannedPreparationProgramCount} : {}),
       ...(this.shaderProgramGuardInvalidation ? { invalidatedBy: this.shaderProgramGuardInvalidation } : {}),
     };
   }

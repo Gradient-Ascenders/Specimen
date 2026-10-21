@@ -291,6 +291,7 @@ export class GreyboxLevelRuntime {
   private finalePreparation: IdleCinematicPreparation | undefined;
   private finaleGeneration = 0;
   private finaleAbort: AbortController | undefined;
+  private cinematicShaderPrograms = new WeakSet<object>();
   private recentFrameSeconds = 1;
   private readonly finaleAudioForward = new THREE.Vector3();
   private readonly finaleAudioUp = new THREE.Vector3();
@@ -344,6 +345,11 @@ export class GreyboxLevelRuntime {
 
   get state(): LevelLifecycleState {
     return this.lifecycle.state;
+  }
+
+  /** Exact program identities submitted by the explicitly gated finale queue. */
+  isPlannedShaderProgram(program: object): boolean {
+    return this.cinematicShaderPrograms.has(program);
   }
 
   get restartCount(): number {
@@ -1359,6 +1365,7 @@ export class GreyboxLevelRuntime {
   private readonly unloadResources = (): void => {
     this.finaleGeneration++;
     this.finaleAbort?.abort(); this.finaleAbort = undefined;
+    this.cinematicShaderPrograms = new WeakSet<object>();
     this.finalePreparation?.dispose(); this.finalePreparation = undefined;
     this.finale?.dispose(); this.finale = undefined;
     this.finaleOverlay?.dispose(); this.finaleOverlay = undefined;
@@ -1472,7 +1479,8 @@ export class GreyboxLevelRuntime {
       yield { label: `finale compile ${object.name || object.type}`, gpu: true, run: () => {
         const visible = object.visible; object.visible = true;
         try { return this.renderLayer.withShadowPreparation(renderer.shadowMap.enabled, () =>
-          prepareCinematicProgram(renderer, object, camera, scene, this.hostWindow, this.finaleAbort!.signal)); }
+          prepareCinematicProgram(renderer, object, camera, scene, this.hostWindow, this.finaleAbort!.signal,
+            programs => { for (const program of programs) this.cinematicShaderPrograms.add(program); })); }
         finally { object.visible = visible; }
       } };
       yield { label: `finale upload ${object.name || object.type}`, gpu: true, run: () => {

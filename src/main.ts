@@ -145,6 +145,7 @@ function startGame(): void {
   let lastFrameStats: Readonly<LoopStats> | undefined;
   let titleRoom: TitleScreenScene | undefined = new TitleScreenScene();
   let warmedLevelOneProgramBaseline: number | undefined;
+  let warmedLevelOnePrograms: readonly object[] | undefined;
   let levelOneShaderProgramGuardActive = true;
   let levelOneShaderProgramGuardInvalidation: string | undefined;
   let sampleLevelOneShaderPrograms: (() => void) | undefined;
@@ -289,8 +290,9 @@ function startGame(): void {
     titlePresentation = undefined;
     // Title-only programs must not inflate the gameplay shader guard baseline.
     warmedLevelOneProgramBaseline = renderLayer.renderer.info.programs?.length ?? 0;
+    warmedLevelOnePrograms = [...(renderLayer.renderer.info.programs ?? [])];
     if (levelOneShaderProgramGuardActive && performanceRecorder) {
-      performanceRecorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline);
+      performanceRecorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline, warmedLevelOnePrograms);
       sampleLevelOneShaderPrograms = () => performanceRecorder?.sampleLevelOneShaderPrograms();
     }
   });
@@ -360,6 +362,7 @@ function startGame(): void {
           gameSession,
           benchmarkMode:new URLSearchParams(window.location.search).get('benchmark')==='1',
           getBootReadyMs:()=>bootReadyMs,
+          isPlannedLevelOneProgram: program => levelOneRuntime.isPlannedShaderProgram(program),
         });
         performanceRecorder = recorder;
         recorder.recordFlowState(gameFlow.state);
@@ -371,7 +374,7 @@ function startGame(): void {
           levelOneShaderProgramGuardActive &&
           warmedLevelOneProgramBaseline !== undefined
         ) {
-          recorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline);
+          recorder.armLevelOneShaderProgramGuard(warmedLevelOneProgramBaseline, warmedLevelOnePrograms);
           recorder.sampleLevelOneShaderPrograms();
           sampleLevelOneShaderPrograms = () =>
             recorder.sampleLevelOneShaderPrograms();

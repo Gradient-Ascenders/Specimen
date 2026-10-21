@@ -11,11 +11,13 @@ interface FrameHost {
 export function prepareCinematicProgram(
   renderer: THREE.WebGLRenderer, object: THREE.Object3D, camera: THREE.Camera,
   scene: THREE.Scene, host: FrameHost, signal: AbortSignal,
+  onSubmitted?: (programs: readonly object[]) => void,
 ): Promise<void> {
   if (signal.aborted) return Promise.resolve();
   const prior = new Set(renderer.info.programs ?? []);
   renderer.compile(object, camera, scene);
   const programs = (renderer.info.programs ?? []).filter(program => !prior.has(program));
+  onSubmitted?.(programs);
   const gl = renderer.getContext();
   const extension = gl.getExtension('KHR_parallel_shader_compile');
   if (!extension || programs.length === 0) return Promise.resolve();
