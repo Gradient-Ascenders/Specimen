@@ -147,6 +147,8 @@ test('arena covers really stop rays, reset keeps essential routes and clears eve
     assert.equal(f.arena.collisionMeshes.length,count);assert.equal(f.arena.armourFragments.some(m=>m.visible),false);
     assert.ok(f.arena.sectors.every(m=>m.material.uniforms.uActive!.value===0));
     assert.equal(f.arena.exitDoor.position.y,5.4);
+    assert.equal(f.world.sweepSphere(new THREE.Vector3(0,11,200),new THREE.Vector3(0,0,-20),FINAL_SPECIMEN_RADIUS,hit),true);
+    assert.equal(hit.object?.name,'arena-entry-header','the upgraded jump cannot vault the locked door into the previous room');
   } finally {f.dispose();}
 });
 

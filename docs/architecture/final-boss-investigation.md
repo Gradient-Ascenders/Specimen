@@ -48,8 +48,8 @@ RoomFiveGreybox files remain untouched. Nothing is pushed.
 1. A circular authored Room 4 attached after the staging corridor: broad main
    floor, wide raised ring, multiple access routes, three cover assemblies,
    overhead deployment machinery, observation deck, and an escape portal.
-2. A production two-phase controller using the existing attack interface and
-   weak-point adapter. Keep legacy Sentinel fixtures intact. Centralize health,
+2. A production two-phase controller using the existing weak-point adapter.
+   Keep legacy Sentinel fixtures intact. Centralize health,
    timing, damage, movement, drone caps, and arena dimensions.
 3. Authored targeted-strike, floor-sector, and devastation attacks alongside
    reusable sweep/shockwave/drone mechanisms. Both collision and visuals must
@@ -99,3 +99,17 @@ counts. Run the full Node suite, type-check/build, generated-asset checks,
 production validation, and a real production-browser fight/retry/ending pass.
 Inspect visual captures at key states and record draw/triangle/resource counts
 and timing observations separately from lab-hardware qualification.
+
+## Follow-up findings
+
+The completed controller uses its own pure fixed-step stage timeline, rather
+than forcing the three-phase fixture into a two-phase shape. Shared physics,
+weapons, target adapters, drone pool, audio, camera profiles and checkpoint/macro
+owners remain reused. Actual traversal tests caught and fixed overlapping deck
+lips at the ramps. Browser testing caught the zoom-in-only camera scale API and
+reversed cinematic handback; authored contextual framing now handles both.
+
+The old completion event only stopped music; it did not open credits. Its
+existing application listener now opens the existing ledger once. Final credits
+return to a fresh title, not a terminal paused runtime. See `final-boss.md` for
+the completed design, controls, validation and hardware limitation.

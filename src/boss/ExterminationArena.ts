@@ -57,7 +57,9 @@ export class ExterminationArena {
       for(let n=0;n<3;n++) this.box(`cover-vent-${i}-${n}`, [1.2,.06,.08], [x!-1.7+n*1.7,3.8,z+dz!-1.25],this.dark);
     }
     this.entryDoor = this.box('arena-entry-blast-door', [13,8,.65], [0,12,190], this.steel, true);
+    this.box('arena-entry-header',[14,17,.7],[0,16.9,190],this.steel,true);
     this.exitDoor = this.box('arena-escape-blast-door', [13,10,.8], [0,5.4,242], this.steel, true);
+    this.box('arena-exit-header',[14,15,.8],[0,18,242],this.steel,true);
     this.box('arena-escape-floor',[14,.8,16],[0,0,249],this.concrete,true);
     for(const side of [-1,1]) this.box(`escape-corridor-${side}`,[.6,12,16],[side*7,6,249],this.steel,true);
     this.box('arena-ceiling',[53,.6,53],[0,25.4,z],this.dark,true);
