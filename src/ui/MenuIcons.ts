@@ -1,6 +1,6 @@
-import { Activity, Accessibility, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Circle, Cpu, Crosshair, Download, EyeOff, Flag, Info, Keyboard, LoaderCircle, Monitor, Mouse, Pause, Play, RotateCcw, Settings, SkipForward, Square, Triangle, Volume2 } from 'lucide';
+import { Activity, Accessibility, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Circle, Code, Cpu, Crosshair, Download, ExternalLink, EyeOff, Flag, Info, Keyboard, LoaderCircle, Monitor, Mouse, Music2, Pause, Play, RotateCcw, Settings, SkipForward, Square, Triangle, Type, Volume2 } from 'lucide';
 
-const icons = { Activity, Accessibility, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Circle, Cpu, Crosshair, Download, EyeOff, Flag, Info, Keyboard, LoaderCircle, Monitor, Mouse, Pause, Play, RotateCcw, Settings, SkipForward, Square, Triangle, Volume2 };
+const icons = { Activity, Accessibility, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Circle, Code, Cpu, Crosshair, Download, ExternalLink, EyeOff, Flag, Info, Keyboard, LoaderCircle, Monitor, Mouse, Music2, Pause, Play, RotateCcw, Settings, SkipForward, Square, Triangle, Type, Volume2 };
 export type MenuIconName = keyof typeof icons;
 
 /** Serialize only trusted Lucide nodes, without depending on a global document. */
