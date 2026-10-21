@@ -53,6 +53,7 @@ export class FinalBossEncounter {
   private skipRequested=false;
   private savedFov:number|undefined;
   private disposed=false;
+  private explosionPlayed=false;
 
   constructor(options:FinalBossEncounter['options']) {
     this.options=options;
@@ -71,12 +72,12 @@ export class FinalBossEncounter {
     this.unregister.push(()=>world.unregister(this.presentation.core),targets.register(weakPoint));
     const armour:CombatTarget={id:'extermination-armour',hitMeshes:[this.presentation.armour],isCombatActive:()=>true,
       copySplashWorldPosition:p=>this.presentation.machine.getWorldPosition(p),
-      applyImpact:impact=>{this.controller.readModel.rejectedFlash=.3;this.presentation.burst(new THREE.Vector3().copy(impact.point),5);return {accepted:false,destroyed:false,rejectionReason:'armour'};}};
+      applyImpact:impact=>{this.controller.deflect();this.presentation.burst(new THREE.Vector3().copy(impact.point),5);return {accepted:false,destroyed:false,rejectionReason:'armour'};}};
     world.register(this.presentation.armour,CollisionLayer.Projectile,ColliderTransformMode.Dynamic);
     this.unregister.push(()=>world.unregister(this.presentation.armour),targets.register(armour));
     this.squad=new SentinelDroneSquad({collisionWorld:world,targetRegistry:targets,
-      anchors:[-3,-1,1,3].map(x=>new THREE.Vector3(x,6,FINAL_ARENA.centreZ-4)),
-      maximumDrones:4,droneHealthUnits:3,fireIntervalSeconds:2.3,projectileCapacity:16,idPrefix:'extermination-minion'});
+      anchors:[-3,-1,1,3].map(x=>new THREE.Vector3(x,7,FINAL_ARENA.centreZ+2)),
+      maximumDrones:4,droneHealthUnits:3,fireIntervalSeconds:2.3,projectileCapacity:16,idPrefix:'extermination-minion',colliderSize:new THREE.Vector3(1.5,.8,1.3)});
     arena.root.add(this.squad.root);
     this.squad.root.children.forEach((root,index)=>{
       const collider=root.children[0] as THREE.Mesh; (collider.material as THREE.Material).visible=false;
@@ -108,6 +109,11 @@ export class FinalBossEncounter {
   }
 
   get cinematic():boolean {return this.controller.cinematic;}
+  presentMerge(progress:number):void {
+    this.element.hidden=false;this.element.dataset.state='merging';this.options.host.dataset.bossEncounter='true';
+    this.bossHealth.hidden=true;this.playerHealth.hidden=true;this.phaseLabel.hidden=true;this.message.hidden=true;this.skip.hidden=true;
+    this.cinematicText.hidden=false;this.cinematicText.textContent=progress<.6?'BOB. GOOP. VOLT.':'ONE SPECIMEN.';
+  }
   start(shortIntro=false):boolean {
     const accepted=this.controller.start(shortIntro);if(!accepted)return false;
     this.options.arena.setPowered(true);this.options.arena.setDoors(true);this.options.audio?.startLoop('final-boss-engine','world-machinery-loop-01',this.presentation.machine.position);
@@ -124,10 +130,17 @@ export class FinalBossEncounter {
       this.shake=m.state==='transition'?.08:m.state==='defeated'?.18:0;
       if(m.state==='transition')this.options.audio?.play('world-activation-01',this.presentation.machine.position,false,1);
       if(m.state==='defeated')this.options.audio?.play('world-drone-dissolve-01',this.presentation.machine.position,false,1);
+      if(m.state==='defeated')this.options.body.recoverAt(this.closest.set(0,FINAL_MERGE_ANCHOR.y,202));
       if(m.state==='escape')this.options.audio?.play('world-platform-land-01',this.options.arena.exitDoor.position,false,1);
+      if(m.state==='escape'||m.state==='complete')this.options.audio?.stopLoop('final-boss-engine');
       this.oldState=m.state;
     }
     this.sync(dt);
+    if(m.state==='defeated'&&m.progress>.55&&!this.explosionPlayed) {
+      this.explosionPlayed=true;this.presentation.burst(this.presentation.coreWorld,32);
+      this.presentation.burst(this.options.arena.exitDoor.position,32);this.shake=.22;
+      this.options.audio?.play('world-platform-land-01',this.presentation.coreWorld,false,1);
+    }
     if(!this.controller.combatActive)return;
     const stageKey=`${m.attackSerial}:${m.stage}`;
     if(stageKey!==this.oldStage) {
@@ -147,7 +160,10 @@ export class FinalBossEncounter {
     arena.deployment(m.state==='intro'?m.progress:1);arena.setDamaged(m.phase===2||['defeated','escape','complete'].includes(m.state));
     this.element.hidden=m.state==='idle'||m.state==='suspended'||m.state==='complete';
     this.element.dataset.state=m.state;this.element.dataset.phase=String(m.phase);this.element.dataset.hit=m.invulnerability>0?'true':'false';
+    if(m.state!=='idle'&&m.state!=='suspended')this.options.host.dataset.bossEncounter='true';
+    else delete this.options.host.dataset.bossEncounter;
     this.bossHealth.value=m.health;this.playerHealth.value=m.playerHealth;
+    this.bossHealth.hidden=false;this.playerHealth.hidden=false;this.phaseLabel.hidden=false;this.message.hidden=false;
     this.phaseLabel.textContent=`EXTERMINATOR / ${m.phase===1?'CONTAINMENT':'EXTERMINATION'} · ${Math.ceil(m.health/180*100)}%`;
     this.message.textContent=m.state==='exposed'?`${m.staggered?'SYSTEM STAGGER':'CORE EXPOSED'} · ${m.vulnerabilityRemaining.toFixed(1)}s · HOLD FIRE, THEN RELEASE`
       :m.state==='combat'?CAPTION[m.attack]:'';
@@ -158,8 +174,10 @@ export class FinalBossEncounter {
         :m.state==='defeated'?(m.progress<.55?'DEFENCE CORE DESTROYED':'EMERGENCY EGRESS BREACHED'):'TOGETHER. FREE.';
     if(m.state==='escape') {
       const p=THREE.MathUtils.smoothstep(m.progress,0,.85);
-      body.recoverAt(this.closest.set(0,FINAL_MERGE_ANCHOR.y,THREE.MathUtils.lerp(230,251,p)));
+      // A broad authored curve clears all three covers and centres at the exit.
+      body.recoverAt(this.closest.set(24*p*(1-p),FINAL_MERGE_ANCHOR.y+.1*Math.abs(Math.sin(p*50)),THREE.MathUtils.lerp(202,251,p)));
       this.presentation.specimen.position.copy(body.position);
+      this.presentation.specimen.rotation.y=Math.atan2(-24*(1-2*p),-49);
     }
     this.shake=Math.max(0,this.shake-.002);
   }
@@ -218,8 +236,9 @@ export class FinalBossEncounter {
     this.squad.root.children.forEach((root,i)=>{
       if(!root.visible)return;
       const age=t-this.droneDeployTimes[i]!;
-      const spread=THREE.MathUtils.smoothstep(age,0,3);
-      root.position.set((i-1.5)*2.2+Math.sin(t*.6+i)*spread*5,6+Math.sin(t*1.2+i)*.8,FINAL_ARENA.centreZ-4-spread*4+Math.cos(t*.5+i)*spread*3);
+      const spread=THREE.MathUtils.smoothstep(age,0,2.6);
+      this.closest.set((i-1.5)*2.2+Math.sin(t*.6+i)*spread*5,6+Math.sin(t*1.2+i)*.8,FINAL_ARENA.centreZ-4-spread*4+Math.cos(t*.5+i)*spread*3);
+      root.position.set((i-1.5)*.85,-2,1.8).applyMatrix4(this.presentation.machine.matrixWorld).lerp(this.closest,spread);
       this.direction.subVectors(body.position,root.position);this.drones[i]!.setAimDirection(this.direction);root.updateMatrixWorld(true);
     });
     this.squad.update(dt,body,()=>{
@@ -250,7 +269,9 @@ export class FinalBossEncounter {
     } else if(m.state==='transition') {
       camera.position.set(14-p*4,7+p*2,z-17);this.closest.copy(this.presentation.coreWorld);
     } else if(m.state==='defeated') {
-      camera.position.set(-12+p*3,6,z-12);this.closest.set(0,Math.max(3,9-p*8),z+3);
+      if(p>.25&&p<.55) {
+        camera.position.copy(this.options.body.position).add(this.direction.set(-6,3,-5));this.closest.copy(this.presentation.coreWorld);
+      } else {camera.position.set(-9+p*3,9,z-14);this.closest.set(0,Math.max(3,9-p*8),z+3);}
     } else {camera.position.set(-8,5,239+p*10);this.closest.copy(this.options.body.position).add(this.direction.set(0,1,2));}
     camera.fov=m.state==='escape'?58:52;camera.lookAt(this.closest);
     if(this.shake>0)camera.position.x+=Math.sin(this.controller.time*83)*this.shake;
@@ -262,17 +283,19 @@ export class FinalBossEncounter {
   clearAttacks():void {
     this.squad.clear();this.hostileShots.count=0;this.presentation.beam.visible=false;this.presentation.shockwave.visible=false;this.presentation.targetMarker.visible=false;
     for(let i=0;i<6;i++)this.options.arena.setSector(i,'inactive');this.oldStage='';
+    this.options.audio?.stopLoop('final-boss-beam');
   }
   suspend():void {this.controller.suspend();this.clearAttacks();this.options.audio?.stopLoop('final-boss-engine');this.element.hidden=true;}
   reset():void {
     this.clearAttacks();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.element.hidden=true;
-    this.summonSerial=-1;this.oldState='idle';this.skipRequested=false;this.options.audio?.stopLoop('final-boss-engine');
+    this.summonSerial=-1;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');
+    delete this.options.host.dataset.bossEncounter;
   }
   dispose():void {
     if(this.disposed)return;this.reset();for(const unregister of this.unregister)unregister();
     // Borrowed presentation meshes must detach before the squad's owned proxy traversal.
     for(const drone of this.drones)drone.dispose();this.droneResources.dispose();this.squad.dispose();
-    this.hostileShots.removeFromParent();this.shotGeometry.dispose();this.shotMaterial.dispose();
+    this.hostileShots.removeFromParent();this.hostileShots.dispose();this.shotGeometry.dispose();this.shotMaterial.dispose();
     this.presentation.dispose();this.controller.dispose();this.element.remove();this.disposed=true;
   }
 }

@@ -2294,7 +2294,9 @@ kbd {
 .final-boss-skip {position:absolute;right:3%;bottom:4%;pointer-events:auto;color:#b2d3cb;background:#09141ccc;border:1px solid #67bca466;padding:.6rem;font:inherit;font-size:.7rem;}
 .final-boss-hud[data-hit='true'] {box-shadow:inset 0 0 70px #ef354733;}
 .final-boss-hud[data-state='transition'] .final-boss-cinematic {color:#ff7b71;}
-.final-boss-hud[data-state='intro']::before,.final-boss-hud[data-state='transition']::before,.final-boss-hud[data-state='defeated']::before,.final-boss-hud[data-state='escape']::before {content:'';position:absolute;inset:0;border-top:5vh solid #000;border-bottom:5vh solid #000;}
+#app[data-boss-encounter='true'] .hud-roster, #app[data-boss-encounter='true'] .hud-objective-module {display:none;}
+.final-boss-hud::after {content:'SPECIMEN INTEGRITY / WASD · SPACE · RMB AIM · LMB TAP OR HOLD';position:absolute;bottom:2.5%;left:4%;font-size:clamp(.5rem,1.1vw,.75rem);text-shadow:0 2px 4px #000;}
+.final-boss-hud[data-state='intro']::before,.final-boss-hud[data-state='merging']::before,.final-boss-hud[data-state='transition']::before,.final-boss-hud[data-state='defeated']::before,.final-boss-hud[data-state='escape']::before {content:'';position:absolute;inset:0;border-top:5vh solid #000;border-bottom:5vh solid #000;}
 .specimen-combat-overlay {
   position: absolute;
   inset: 0;

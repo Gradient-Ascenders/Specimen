@@ -2,10 +2,16 @@ import * as THREE from 'three';
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../physics/KinematicBody.ts';
 import type { SpecimenAttackConfig } from '../combat/SpecimenProjectileSystem.ts';
 import type { BlackoutCheckpointDefinition } from '../levels/BlackoutCheckpointManager.ts';
+import type { ContextualCameraProfile } from '../render/CameraProfile.ts';
 
 export const FINAL_ARENA = Object.freeze({ centreZ: 216, radius: 26, floorY: .4, walkwayY: 3.4, ceilingY: 25 });
 export const FINAL_SPECIMEN_RADIUS = 1.65;
-export const FINAL_MERGE_ANCHOR = new THREE.Vector3(0, 2.07, 197);
+export const FINAL_SPECIMEN_CAMERA:ContextualCameraProfile=Object.freeze({
+  id:'extermination-specimen',playerControlledPitch:true,distanceMetres:12,targetHeightMetres:1.1,
+  pitchRadians:Math.PI/10,transitionDurationSeconds:.65,
+  framingDeadZoneHalfWidthMetres:.65,framingDeadZoneHalfHeightMetres:.35,framingDampingPerSecond:9,
+});
+export const FINAL_MERGE_ANCHOR = new THREE.Vector3(0, 2.07, 200);
 export const FINAL_SPLIT_ANCHORS = {
   bob: new THREE.Vector3(-2, .87, 236), goop: new THREE.Vector3(0, .87, 236), volt: new THREE.Vector3(2, .87, 236),
 };

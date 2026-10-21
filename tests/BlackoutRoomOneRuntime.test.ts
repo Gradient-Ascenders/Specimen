@@ -20,6 +20,8 @@ import type {BobCharacterPresentation} from '../src/render/bob/BobCharacterPrese
 import type {GoopCharacterPresentation} from '../src/render/goop/GoopCharacterPresentation.ts';
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
+import type { FinalBossEncounter } from '../src/boss/FinalBossEncounter.ts';
+import { FINAL_SPECIMEN_RADIUS } from '../src/boss/FinalBossConfig.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -172,6 +174,53 @@ function createFixture(debugAvailable = true,playArrival=false) {
     },
   };
 }
+
+function finalBossInternals(runtime:BlackoutLevelRuntime) {
+  return (runtime as unknown as {resources:{finalBoss:FinalBossEncounter;specimenBody:KinematicBody;combatTargets:{size:number}}}).resources;
+}
+
+test('natural boss entry gathers the three real bodies, merges, saves CP8 and preserves earlier room recovery',()=>{
+  const f=createFixture();try {
+    f.runtime.activateCheckpoint('cp6');
+    const bodies=electricalRoomInternals(f.runtime).group;
+    for(const [i,id] of (['bob','goop','volt'] as const).entries())bodies[`${id}Body`].recoverAt(new THREE.Vector3((i-1)*2,.86,185));
+    f.tick();assert.equal(f.runtime.roomState.phase,'merging');f.tick(361);
+    assert.equal(f.runtime.roomState.phase,'boss');assert.equal(f.runtime.finalBossReadModel?.state,'intro');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');assert.equal(finalBossInternals(f.runtime).specimenBody.radiusMetres,FINAL_SPECIMEN_RADIUS);
+    assert.equal(f.runtime.requestFailure(),false,'cinematics suspend all damage');
+    f.runtime.stop();const elapsed=f.runtime.finalBossReadModel!.elapsed;f.tick(100);assert.equal(f.runtime.finalBossReadModel!.elapsed,elapsed);f.runtime.start();
+    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(f.runtime.finalBossReadModel!.state,'combat');
+    const targetCount=finalBossInternals(f.runtime).combatTargets.size;
+    for(let retry=0;retry<3;retry++) {
+      f.runtime.recoverActiveCheckpoint();assert.equal(f.runtime.finalBossReadModel!.health,180);assert.equal(f.runtime.finalBossReadModel!.phase,1);
+      assert.equal(finalBossInternals(f.runtime).finalBoss.squad.activeCount,0);
+      assert.equal(finalBossInternals(f.runtime).combatTargets.size,targetCount);
+    }
+    f.runtime.restartLevel();assert.equal(f.runtime.roomState.roomId,'room-1');assert.equal(f.runtime.finalBossReadModel!.state,'idle');
+    assert.equal(bodies.bobBody.radiusMetres,.45);assert.equal(bodies.voltBody.radiusMetres,.45);
+  }finally{f.cleanup();}
+});
+
+test('Room 4 debug shortcut is gated, ending uses the legal macro flow and completion fires once',()=>{
+  for(const available of [false,true]) {
+    const f=createFixture(available);try {
+      let completions=0;f.runtime.events.on('completed',()=>completions++);
+      f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+      if(!available){assert.equal(f.runtime.roomState.roomId,'room-1');continue;}
+      const b=finalBossInternals(f.runtime).finalBoss;
+      f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+      const expose=()=>{for(let i=0;i<1500&&!b.controller.readModel.weakPointOpen;i++)f.tick();assert.equal(b.controller.readModel.weakPointOpen,true);};
+      const hit={projectileId:1,targetId:'core',kind:'direct' as const,chargeAmount:1,fullyCharged:true,damageUnits:999,point:new THREE.Vector3(),direction:new THREE.Vector3()};
+      expose();b.controller.applyImpact(hit);f.tick();assert.equal(b.controller.readModel.state,'transition');
+      f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(b.controller.readModel.phase,2);
+      expose();b.controller.applyImpact(hit);f.tick();assert.equal(f.runtime.roomState.phase,'boss-defeated');
+      assert.equal(b.squad.activeCount,0);assert.equal(b.squad.liveProjectileCount,0);
+      f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(b.controller.readModel.state,'escape');
+      f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(f.runtime.roomState.phase,'complete');
+      f.tick(100);assert.equal(completions,1);f.runtime.transitionPhase('complete');assert.equal(completions,1);
+    }finally{f.cleanup();}
+  }
+});
 
 function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
   return (runtime as unknown as { resources: {

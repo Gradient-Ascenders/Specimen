@@ -48,6 +48,12 @@ test('restart is single-entry and returns directly to gameplay', () => {
   assert.equal(flow.finishRestart(), false);
 });
 
+test('final completion opens the existing credits once and returns to the title, not a dead paused level',()=>{
+  const flow=new GameFlowStateModel();assert.equal(flow.completeGame(),false);flow.completeBoot();flow.start();
+  assert.equal(flow.completeGame(),true);assert.equal(flow.state,'credits');assert.equal(flow.menuOrigin,'title');
+  assert.equal(flow.completeGame(),false);assert.equal(flow.resume(),false);assert.equal(flow.back(),true);assert.equal(flow.state,'title');
+});
+
 test('level transition owns a visible non-interactive state and resumes gameplay', () => {
   const model = new GameFlowStateModel();
   model.completeBoot();

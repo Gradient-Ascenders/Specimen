@@ -16,7 +16,7 @@ import { MaintenanceDronePresentation } from '../render/environment/blackout/Mai
 import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
 import { FinalBossEncounter } from '../boss/FinalBossEncounter.ts';
 import { FinalBossPresentation } from '../boss/FinalBossPresentation.ts';
-import { FINAL_BOSS_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_WEAPON, FINAL_SPLIT_ANCHORS } from '../boss/FinalBossConfig.ts';
+import { FINAL_BOSS_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_WEAPON, FINAL_SPLIT_ANCHORS, FINAL_SPECIMEN_CAMERA } from '../boss/FinalBossConfig.ts';
 
 import {
   SentinelBossDevelopmentRig,
@@ -604,6 +604,7 @@ export class BlackoutLevelRuntime {
   /** Shared failure hook for hazards authored by later Blackout room issues. */
   requestFailure(): boolean {
     const resources = this.requireResources();
+    if(resources.finalBoss?.cinematic)return false;
     if (this.lifecycle.state !== 'running' || resources.phase.terminal) return false;
     if (!resources.deathSequence.requestDeath(
       () => {
@@ -902,12 +903,18 @@ export class BlackoutLevelRuntime {
       if(resources.finalBoss.controller.readModel.state==='complete') {
         if(this.beginSplit()&&this.completeSplit())this.transitionPhase('complete');
       } else if(!resources.finalBoss.cinematic) {
-        this.input.resetState();this.renderLayer.cameraRig.reset();this.retargetCamera(resources);
+        this.input.resetState();resources.finalBoss.restoreCamera(this.renderLayer.cameraRig.camera);this.retargetCamera(resources);
       }
       this.syncVisuals(resources);this.gameplayAudio?.update();this.input.endFixedUpdate();return;
     }
 
     if (resources.phase.phase === 'merging') {
+      if(resources.finalBoss) {
+        resources.bobMovementIntent.set(-resources.group.bobBody.position.x,0,1).normalize();
+        resources.goopMovementIntent.set(-resources.group.goopBody.position.x,0,1).normalize();
+        resources.voltMovementIntent.set(-resources.group.voltBody.position.x,0,1).normalize();
+        this.updateBobPresentation(deltaSeconds,resources);
+      }
       const form = resources.specimenForm.readModel;
       const willComplete =
         form.mergeProgress +
@@ -952,6 +959,8 @@ export class BlackoutLevelRuntime {
         this.retargetCamera(resources);
         this.notifyHUD(undefined, true);
         if(resources.finalBoss) {
+          this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
+          this.renderLayer.cameraRig.setGroundOrbitPitchRadians?.(-.08);
           resources.checkpoints.activate('cp8','bob');
           this.transitionPhase('boss');
         }
@@ -1384,6 +1393,8 @@ export class BlackoutLevelRuntime {
     const resources = this.resources;
     if (resources) {
       this.syncVisuals(resources);
+      const mergePresentation=!!resources.finalBoss&&resources.phase.phase==='merging';
+      if(!mergePresentation) {
       interpolateBodyPosition(
         resources.group.bobBody,
         interpolationAlpha,
@@ -1391,10 +1402,14 @@ export class BlackoutLevelRuntime {
       );
       interpolateBodyPosition(resources.group.goopBody, interpolationAlpha, resources.renderedGoopPosition);
       interpolateBodyPosition(resources.group.voltBody, interpolationAlpha, resources.renderedVoltPosition);
+      }
       if(!resources.ventArrival?.active){
-        resources.bobPresentation.setPosition(resources.renderedBobPosition);resources.bobPresentation.present(interpolationAlpha);
-        resources.goopPresentation.setPosition(resources.renderedGoopPosition);resources.goopPresentation.present(interpolationAlpha);
-        resources.voltPresentation.setPosition(resources.renderedVoltPosition);resources.voltPresentation.present(interpolationAlpha);
+        if(!mergePresentation) {
+          resources.bobPresentation.setPosition(resources.renderedBobPosition);
+          resources.goopPresentation.setPosition(resources.renderedGoopPosition);
+          resources.voltPresentation.setPosition(resources.renderedVoltPosition);
+        }
+        resources.bobPresentation.present(interpolationAlpha);resources.goopPresentation.present(interpolationAlpha);resources.voltPresentation.present(interpolationAlpha);
       }
       resources.electricalPresentation.update(
         resources.electricalSystem.readModel,
@@ -1441,6 +1456,7 @@ export class BlackoutLevelRuntime {
       if (
         this.lifecycle.state === 'running' &&
         resources.deathSequence.isPlaying &&
+        !resources.finalBoss?.cinematic &&
         lookInputActive &&
         this.input.enabled
       ) {
@@ -1454,17 +1470,21 @@ export class BlackoutLevelRuntime {
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     resources?.ventArrival?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
     resources?.finalBoss?.presentCamera(this.renderLayer.cameraRig.camera);
+    if(resources?.finalBoss&&resources.phase.phase==='merging') {
+      const camera=this.renderLayer.cameraRig.camera;
+      camera.position.set(-7,4.5,191);camera.lookAt(FINAL_MERGE_ANCHOR);camera.updateMatrixWorld(true);
+    }
     this.gameplayAudio?.updateListener();
     if (resources) {
       resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
-      resources.goopPresentation.setOpacity(!resources.ventArrival?.active&&resources.group.activeSlimeId === 'goop'
+      resources.goopPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&resources.group.activeSlimeId === 'goop'
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
       // PMREM is shared with Bob. Dark rooms receive no permanent reflection fill.
       const reflectionWeight = resources.goopReflectionLighting.weightAt(resources.renderedGoopPosition);
       resources.goopPresentation.setReflectionIntensity(0.12 * reflectionWeight, 0.28 * reflectionWeight);
-      resources.voltPresentation.setOpacity(!resources.ventArrival?.active&&resources.group.activeSlimeId === 'volt'
+      resources.voltPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&resources.group.activeSlimeId === 'volt'
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
       const voltReflection = resources.goopReflectionLighting.weightAt(resources.renderedVoltPosition);
@@ -1849,6 +1869,7 @@ export class BlackoutLevelRuntime {
         scene: this.renderLayer.scene,
         host: this.host,
         source: specimenAttack,
+        electricGoop: this.authoredRoomOne,
       });
       rollback(() => specimenPresentation.dispose());
 
@@ -2348,9 +2369,10 @@ export class BlackoutLevelRuntime {
     }
     clearJump(resources.jump, true);
     this.renderLayer.cameraRig.reset();
-    if (snapshot.room.roomId === 'room-2' || snapshot.room.local.bossStaging) {
+    if (snapshot.room.roomId === 'room-2' || snapshot.room.local.bossStaging || snapshot.room.local.finalBoss) {
       this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
     }
+    if(snapshot.room.local.finalBoss)this.renderLayer.cameraRig.setGroundOrbitPitchRadians?.(-.08);
     this.retargetCamera(resources);
     this.syncVisuals(resources);
     this.notifyHUD(undefined, true);
@@ -2452,7 +2474,8 @@ export class BlackoutLevelRuntime {
       target,
       resources.collisionWorld,
     );
-    this.renderLayer.cameraRig.setFollowDistanceScale?.(this.authoredRoomOne&&resources.specimenForm.readModel.controlledForm==='specimen'?2.2:1);
+    this.renderLayer.cameraRig.setContextualCamera?.(this.authoredRoomOne&&resources.specimenForm.readModel.controlledForm==='specimen'
+      ?{profile:FINAL_SPECIMEN_CAMERA,anchor:target}:undefined);
   }
 
   private syncVisuals(resources: BlackoutRuntimeResources): void {
@@ -2464,6 +2487,7 @@ export class BlackoutLevelRuntime {
       resources.voltPresentation.setPosition(resources.group.voltBody.position);
     }
     resources.specimenVisual.position.copy(resources.specimenBody.position);
+    if(resources.finalBoss)resources.specimenVisual.position.y+=Number(resources.specimenVisual.userData.floorOffset??0);
 
     const specimenControlled =
       resources.specimenForm.readModel.controlledForm === 'specimen';
@@ -2474,6 +2498,20 @@ export class BlackoutLevelRuntime {
     }
     resources.voltPresentation.setVisible(groupVisible);
     resources.specimenVisual.visible = specimenControlled;
+    if(merging&&resources.finalBoss) {
+      const progress=resources.specimenForm.readModel.mergeProgress;
+      const t=THREE.MathUtils.smoothstep(progress,.05,.95);
+      const pose=(id:'bob'|'goop'|'volt',target:THREE.Vector3)=>{
+        target.copy(resources.group[`${id}Body`].position).lerp(FINAL_MERGE_ANCHOR,t);
+        target.y+=Math.sin(t*Math.PI)*.7;return target;
+      };
+      resources.bobPresentation.setPosition(pose('bob',resources.renderedBobPosition));
+      resources.goopPresentation.setPosition(pose('goop',resources.renderedGoopPosition));
+      resources.voltPresentation.setPosition(pose('volt',resources.renderedVoltPosition));
+      resources.specimenVisual.visible=progress>.6;
+      const size=THREE.MathUtils.smoothstep(progress,.6,1);resources.specimenVisual.scale.setScalar(size);
+      resources.finalBoss.presentMerge(progress);
+    }
     // Removing the light on death changes NUM_POINT_LIGHTS and cold-compiles
     // receivers. Keep its warmed slot with zero radiance; specimen mode still
     // replaces that slot with specimenLight as before.

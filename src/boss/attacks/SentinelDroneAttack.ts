@@ -299,6 +299,7 @@ class SentinelBossDrone implements CombatTarget {
     readonly world: CollisionWorld;
     readonly projectiles: SentinelDroneProjectilePool;
     readonly healthUnits: number;
+    readonly colliderSize?: THREE.Vector3Like;
     readonly fireIntervalSeconds: number;
     readonly onDestroyed: (drone: SentinelBossDrone) => void;
   }) {
@@ -320,7 +321,7 @@ class SentinelBossDrone implements CombatTarget {
 
     this.root.name = `${this.id}-sentinel-drone`;
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.8, 0.55, 0.8),
+      new THREE.BoxGeometry(options.colliderSize?.x ?? .8, options.colliderSize?.y ?? .55, options.colliderSize?.z ?? .8),
       new THREE.MeshStandardMaterial({
         color: 0x59636b,
         emissive: 0x5b1016,
@@ -496,6 +497,7 @@ export class SentinelDroneSquad {
     readonly fireIntervalSeconds?: number;
     readonly projectileCapacity?: number;
     readonly idPrefix?: string;
+    readonly colliderSize?: THREE.Vector3Like;
   }) {
     this.world = options.collisionWorld;
     const maximumDrones = options.maximumDrones ?? 4;
@@ -526,6 +528,7 @@ export class SentinelDroneSquad {
           world: this.world,
           projectiles: this.projectiles,
           healthUnits: options.droneHealthUnits ?? 2,
+          colliderSize: options.colliderSize,
           fireIntervalSeconds: options.fireIntervalSeconds ?? 1.25,
           onDestroyed: (destroyed) => {
             this.events.emit('destroyed', {

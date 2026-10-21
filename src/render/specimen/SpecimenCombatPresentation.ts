@@ -23,7 +23,7 @@ export class SpecimenCombatPresentation {
 
   private readonly source: SpecimenCombatPresentationSource;
   private readonly projectileGeometry: THREE.SphereGeometry;
-  private readonly projectileMaterial: THREE.MeshStandardMaterial;
+  private readonly projectileMaterial: THREE.Material;
   private readonly projectiles: THREE.InstancedMesh;
   private readonly dummy = new THREE.Object3D();
   private readonly crosshair: HTMLElement;
@@ -36,12 +36,25 @@ export class SpecimenCombatPresentation {
     readonly host: HTMLElement;
     readonly source: SpecimenCombatPresentationSource;
     readonly document?: Document;
+    readonly electricGoop?: boolean;
   }) {
     this.source = options.source;
     this.root.name = 'specimen-combat-presentation';
 
     this.projectileGeometry = new THREE.SphereGeometry(1, 10, 7);
-    this.projectileMaterial = new THREE.MeshStandardMaterial({
+    this.projectileMaterial = options.electricGoop ? new THREE.ShaderMaterial({
+      uniforms:{uTime:{value:0}},
+      vertexShader:`varying vec3 vP; varying vec3 vN; void main(){
+        vP=position;vN=normal;vec4 p=vec4(position,1.);
+        #ifdef USE_INSTANCING
+          p=instanceMatrix*p;
+        #endif
+        gl_Position=projectionMatrix*modelViewMatrix*p;}`,
+      fragmentShader:`varying vec3 vP,vN;uniform float uTime;void main(){
+        float arc=pow(abs(sin(vP.y*15.+sin(vP.x*11.+uTime*9.)+vP.z*8.)),20.);
+        float rim=pow(1.-abs(vN.z),2.);vec3 col=vec3(.08,.65,.12)+arc*vec3(.7,1.,1.)+rim*vec3(.05,.6,.8);
+        gl_FragColor=vec4(col,1.);}`,
+    }) : new THREE.MeshStandardMaterial({
       color: 0xd6ff4a,
       emissive: 0xff4d2f,
       emissiveIntensity: 1.5,
@@ -98,6 +111,7 @@ export class SpecimenCombatPresentation {
   update(activeForm: boolean): void {
     if (this.disposed) return;
     const model = this.source.readModel;
+    if(this.projectileMaterial instanceof THREE.ShaderMaterial)this.projectileMaterial.uniforms.uTime!.value=performance.now()/1000;
     this.label.hidden = !activeForm;
     this.crosshair.hidden = !activeForm || !model.aimActive;
     this.charge.hidden = !activeForm || !model.aimActive;
@@ -148,6 +162,7 @@ export class SpecimenCombatPresentation {
     this.disposed = true;
     this.root.removeFromParent();
     this.element.remove();
+    this.projectiles.dispose();
     this.projectileGeometry.dispose();
     this.projectileMaterial.dispose();
   }

@@ -101,6 +101,7 @@ export class ExterminationArena {
       const debris=this.box(`authored-armour-fragment-${i}`,[1.3,.2,1.5],[Math.cos(i)*9,.6,z+Math.sin(i)*9],this.steel);
       debris.visible=false;debris.rotation.set(i,.3*i,i*.1);this.armourFragments.push(debris);
     }
+    this.batchStaticBoxes();
     this.root.updateMatrixWorld(true);
   }
 
@@ -126,12 +127,32 @@ export class ExterminationArena {
     for(let i=0;i<6;i++)this.setSector(i,'inactive');
   }
   dispose():void {
+    for(const child of this.root.children)if(child instanceof THREE.InstancedMesh)child.dispose();
     this.root.removeFromParent();this.root.clear();
     for(const geometry of this.geometries)geometry.dispose();
     for(const material of this.materials)material.dispose();
     for(const material of this.signs)material.map?.dispose();
   }
   private geometry<T extends THREE.BufferGeometry>(g:T):T { this.geometries.add(g);return g; }
+  /** Keep visible=true for physics; isolate source draw layers from the camera. */
+  private batchStaticBoxes():void {
+    const groups=new Map<THREE.Material,THREE.Mesh<THREE.BoxGeometry>[]>();
+    for(const object of this.root.children) {
+      if(!(object instanceof THREE.Mesh)||!(object.geometry instanceof THREE.BoxGeometry)||Array.isArray(object.material))continue;
+      if(object===this.entryDoor||object===this.exitDoor||object===this.hatch||this.armourFragments.includes(object))continue;
+      const group=groups.get(object.material)??[];group.push(object);groups.set(object.material,group);
+    }
+    const geometry=this.geometry(new THREE.BoxGeometry(1,1,1)),matrix=new THREE.Matrix4(),scale=new THREE.Vector3();
+    for(const [material,sources] of groups) {
+      const batch=new THREE.InstancedMesh(geometry,material,sources.length);batch.name=`arena-static-${material.uuid}`;
+      sources.forEach((source,index)=>{
+        const size=source.geometry.parameters;scale.set(size.width,size.height,size.depth);
+        matrix.compose(source.position,source.quaternion,scale);batch.setMatrixAt(index,matrix);
+        source.layers.set(31);
+      });
+      batch.computeBoundingSphere();this.root.add(batch);
+    }
+  }
   private material(color:number,roughness:number,metalness:number,emissive=0):THREE.MeshStandardMaterial {
     const m=new THREE.MeshStandardMaterial({color,roughness,metalness,emissive,emissiveIntensity:1.5});this.materials.add(m);return m;
   }

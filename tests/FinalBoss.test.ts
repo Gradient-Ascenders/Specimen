@@ -3,7 +3,8 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { FinalBossController } from '../src/boss/FinalBossController.ts';
 import { ExterminationArena } from '../src/boss/ExterminationArena.ts';
-import { FINAL_BOSS_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_RADIUS, FINAL_SPECIMEN_WEAPON } from '../src/boss/FinalBossConfig.ts';
+import { FINAL_BOSS_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_RADIUS, FINAL_SPECIMEN_WEAPON, FINAL_SPECIMEN_CAMERA } from '../src/boss/FinalBossConfig.ts';
+import { CameraRig } from '../src/render/CameraRig.ts';
 import { CollisionWorld, CollisionHit } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody, DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
@@ -120,6 +121,21 @@ test('both perimeter ramps can be ascended with actual large-form sphere collisi
       assert.ok(f.body.position.y-FINAL_SPECIMEN_RADIUS>3,`${side}: ${JSON.stringify(f.body.position)}`);
     }finally{f.dispose();}
   }
+});
+
+test('the real camera supports wide fused framing without using its zoom-in-only scale API',()=>{
+  const f=arenaFixture();try {
+    f.body.recoverAt(new THREE.Vector3(0,2.07,216));
+    const rig=new CameraRig();rig.setFollowTarget(f.body,f.world);rig.setGroundOrbitYawRadians(Math.PI);
+    rig.setGroundOrbitPitchRadians(-.08);
+    rig.setContextualCamera({profile:FINAL_SPECIMEN_CAMERA,anchor:f.body});
+    for(let i=0;i<120;i++)rig.update(1,1/60);
+    assert.ok(rig.getDiagnostics().currentDistanceMetres>9);assert.equal(rig.getDiagnostics().profileId,'extermination-specimen');
+    assert.equal(rig.getDiagnostics().pitchRadians,-.08);
+    rig.setAimPresentationActive(true);for(let i=0;i<30;i++)rig.update(1,1/60);
+    const origin=new THREE.Vector3(),direction=new THREE.Vector3();rig.copyAimRay(origin,direction);
+    assert.ok(Number.isFinite(origin.y));assert.ok(Math.abs(direction.length()-1)<1e-9);
+  }finally{f.dispose();}
 });
 
 test('arena covers really stop rays, reset keeps essential routes and clears every sector',()=>{

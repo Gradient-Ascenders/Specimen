@@ -20,12 +20,13 @@ const TIMING:Record<FinalBossAttack,readonly[number,number,number]>={
 };
 /** Pure fixed-step encounter authority. Rendering/collision never choose phases. */
 export class FinalBossController {
-  readonly readModel:FinalBossReadModel={
+  private readonly model:FinalBossReadModel={
     state:'idle',phase:1,health:180,maximumHealth:180,playerHealth:100,maximumPlayerHealth:100,
     invulnerability:0,attack:'sweep',stage:'telegraph',progress:0,elapsed:0,attackSerial:0,
     vulnerabilityRemaining:0,weakPointOpen:false,lockedTarget:new THREE.Vector3(),
     selectedSectors:[0,2,4],hitFlash:0,rejectedFlash:0,staggered:false,
   };
+  readonly readModel:Readonly<FinalBossReadModel>=this.model;
   private patternIndex=0;
   private totalTime=0;
   private lastDamageAttack=-1;
@@ -42,11 +43,13 @@ export class FinalBossController {
   get time():number { return this.totalTime; }
   start(skipIntro=false):boolean {
     if(this.disposed||this.readModel.state!=='idle')return false;
-    this.readModel.state=skipIntro?'combat':'intro';this.readModel.elapsed=0;return true;
+    this.model.state='intro';this.model.elapsed=0;
+    if(skipIntro)this.finishCinematic(this.readModel.lockedTarget);
+    return true;
   }
   update(dt:number, target:THREE.Vector3Like):void {
     if(this.disposed||!Number.isFinite(dt)||dt<=0)throw new Error('Final boss requires a positive finite step.');
-    const m=this.readModel;
+    const m=this.model;
     if(m.state==='idle'||m.state==='suspended'||m.state==='complete')return;
     this.totalTime+=dt;m.hitFlash=Math.max(0,m.hitFlash-dt);m.rejectedFlash=Math.max(0,m.rejectedFlash-dt);
     m.invulnerability=Math.max(0,m.invulnerability-dt);this.chainWindow=Math.max(0,this.chainWindow-dt);
@@ -91,7 +94,7 @@ export class FinalBossController {
     this.finishCinematic(target);return true;
   }
   applyImpact(impact:CombatImpact):CombatImpactResult {
-    const m=this.readModel;
+    const m=this.model;
     if(!this.combatActive||!m.weakPointOpen||this.transitionPending||this.defeatPending) {
       m.rejectedFlash=.3;return {accepted:false,destroyed:false,rejectionReason:'weak-point-closed'};
     }
@@ -103,7 +106,7 @@ export class FinalBossController {
     return {accepted:true,destroyed:m.health===0};
   }
   damagePlayer(amount:number, attackSerial=this.readModel.attackSerial):boolean {
-    const m=this.readModel;
+    const m=this.model;
     if(!this.combatActive||this.transitionPending||this.defeatPending||m.invulnerability>0||this.lastDamageAttack===attackSerial||!Number.isFinite(amount)||amount<=0)return false;
     this.lastDamageAttack=attackSerial;m.playerHealth=Math.max(0,m.playerHealth-amount);m.invulnerability=1.1;
     return true;
@@ -121,9 +124,10 @@ export class FinalBossController {
     if(this.transitionDelivered||this.readModel.phase!==2)return false;
     this.transitionDelivered=true;return true;
   }
-  suspend():void { this.readModel.state='suspended';this.readModel.weakPointOpen=false; }
+  deflect():void {this.model.rejectedFlash=.3;}
+  suspend():void { this.model.state='suspended';this.model.weakPointOpen=false; }
   reset():void {
-    const m=this.readModel;
+    const m=this.model;
     m.state='idle';m.phase=1;m.health=m.maximumHealth;m.playerHealth=100;m.invulnerability=0;
     m.attack='sweep';m.stage='telegraph';m.progress=0;m.elapsed=0;m.attackSerial=0;
     m.vulnerabilityRemaining=0;m.weakPointOpen=false;m.hitFlash=0;m.rejectedFlash=0;m.staggered=false;
@@ -134,17 +138,17 @@ export class FinalBossController {
   }
   dispose():void { if(this.disposed)return;this.reset();this.disposed=true; }
   private expose(seconds:number,staggered:boolean):void {
-    const m=this.readModel;m.state='exposed';m.weakPointOpen=true;m.vulnerabilityRemaining=seconds;m.staggered=staggered;
+    const m=this.model;m.state='exposed';m.weakPointOpen=true;m.vulnerabilityRemaining=seconds;m.staggered=staggered;
   }
   private nextAttack(target:THREE.Vector3Like):void {
-    const m=this.readModel;const pattern=m.phase===1?PHASE_ONE:PHASE_TWO;
+    const m=this.model;const pattern=m.phase===1?PHASE_ONE:PHASE_TWO;
     m.attack=pattern[this.patternIndex++%pattern.length]!;m.attackSerial++;m.state='combat';m.stage='telegraph';
     m.elapsed=0;m.progress=0;m.weakPointOpen=false;m.staggered=false;m.lockedTarget.copy(target);
     // Alternate patterns always leave three wide safe sectors, including perimeter.
     const parity=m.attackSerial%2;(m.selectedSectors as number[]).splice(0,6,parity,parity+2,parity+4);
   }
   private finishCinematic(target:THREE.Vector3Like):void {
-    const m=this.readModel;
+    const m=this.model;
     if(m.state==='defeated') {m.state='escape';m.elapsed=0;m.progress=0;return;}
     if(m.state==='escape') {m.state='complete';m.elapsed=0;return;}
     if(m.state==='transition') {m.phase=2;this.patternIndex=0;}
