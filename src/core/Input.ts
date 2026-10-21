@@ -98,6 +98,7 @@ export class Input {
     this.hostWindow.addEventListener('mouseup', this.onMouseUp);
     this.hostWindow.addEventListener('mousemove', this.onMouseMove);
     this.hostWindow.addEventListener('blur', this.onBlur);
+    this.hostDocument.addEventListener('pointerlockchange', this.onPointerLockChange);
     this.hostDocument.addEventListener(
       'visibilitychange',
       this.onVisibilityChange,
@@ -211,6 +212,7 @@ export class Input {
     this.hostWindow.removeEventListener('mouseup', this.onMouseUp);
     this.hostWindow.removeEventListener('mousemove', this.onMouseMove);
     this.hostWindow.removeEventListener('blur', this.onBlur);
+    this.hostDocument.removeEventListener('pointerlockchange', this.onPointerLockChange);
     this.hostDocument.removeEventListener(
       'visibilitychange',
       this.onVisibilityChange,
@@ -360,6 +362,13 @@ export class Input {
 
   private readonly onBlur = (): void => {
     this.clearState();
+  };
+
+  private readonly onPointerLockChange = (): void => {
+    if (!this.pointerLocked) this.clearState(true);
+    // A request can finish after a menu or cinematic has suspended input.
+    // Do not leave the browser capturing the pointer over that UI.
+    else if (!this.enabledValue) this.releasePointerLock();
   };
 
   private readonly onVisibilityChange = (): void => {
