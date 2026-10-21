@@ -11,10 +11,12 @@ type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
 interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
 interface Step { label?: string; run: () => void | Promise<unknown>; }
 const ROOT_ROOMS: readonly LevelTwoAuthoredRoomId[] = [1, 1, 2, 2, 2, 3, 4, 5];
+const DIAGNOSTIC_HISTORY_LIMIT = 128;
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
 export class CultivationPreparationQueue {
   readonly diagnostics = { constructionMs: 0, initialMs: 0, startupMs: 0, workMs: 0, textureMs: 0, compileWaitMs: 0, compileSubmissionMs: 0, compileAsyncWaitMs: 0, compileSubmissions: 0, skippedTransmissionObjects: 0, primeMs: 0, collectionMs: 0, maxStepMs: 0,
+    intent: 'idle' as 'idle' | 'current' | 'handoff' | 'speculative', deferredTicks: 0, outstandingBatches: 0,
     batches: [] as {label: string; objects: number; submissionMs: number; elapsedMs: number}[],
     reusedProgramObjects: 0, retainedMaterialCopies: 0,
     slowSteps: [] as {label: string; ms: number; z: number; dark: boolean}[], completed: 0, reused: 0, total: 0, pending: false, configurations: [] as {z: number; dark: boolean; elapsedMs: number}[] };
@@ -42,6 +44,8 @@ export class CultivationPreparationQueue {
   private failure: unknown;
   private priority: Configuration | undefined;
   private upcoming: Configuration | undefined;
+  private startupComplete = false;
+  private startupMaintenance: Configuration | undefined;
   private configStarted = 0;
   private lastTick = -1;
   private readonly overlay: HTMLDivElement | undefined;
@@ -109,7 +113,7 @@ export class CultivationPreparationQueue {
     // Room 5's searchlights enter its render scope. Prepare that smaller layout
     // first rather than leaving it behind unrelated earlier-room work.
     this.upcoming = this.configurations.find(config => !config.ready && !config.dark &&
-      config.visible.every((visible, i) => visible === (i === 6))) ?? this.liftExitConfiguration();
+      config.visible.every((visible, i) => visible === (i === 6))) ?? this.startupMaintenance ?? this.liftExitConfiguration();
   }
 
   private liftExitConfiguration(): Configuration | undefined {
@@ -172,11 +176,29 @@ export class CultivationPreparationQueue {
    * before a debug jump or lift arrival can expose the in-game loading overlay. */
   async prepareStartup(): Promise<void> {
     const started = performance.now();
-    await this.prepareInitial();
-    // Both entry and maintenance first draws stay behind the loading screen.
-    this.upcoming = this.liftExitConfiguration();
-    if (this.upcoming) await this.prepareConfiguration(this.upcoming);
+    // All ordinary rooms use the same bounded light layout. Prepare their
+    // union once, rather than submitting the overlapping doorway layouts
+    // speculatively during the first controllable frames. requireCurrent still
+    // verifies the actual light signature before reusing this coverage.
+    const visible = this.roots.map((_, i) => i !== 7);
+    const key = this.key(visible, false);
+    let ordinary = this.configurations.find(config => config.key === key);
+    if (!ordinary) {
+      ordinary = {key, visible, dark: false, z: 0, ready: false};
+      this.configurations.push(ordinary); this.diagnostics.total++;
+    }
+    await this.prepareConfiguration(ordinary);
+    this.diagnostics.initialMs = performance.now() - started;
+    // The maintenance layout can overlap Room 3 at the lift entrance. Include
+    // that room in its coverage, then prepare the distinct lift-only layout.
+    this.startupMaintenance = this.configurations.find(config => config.dark &&
+      config.visible.every((included, i) => included === (i >= 5)));
+    if (this.startupMaintenance) await this.prepareConfiguration(this.startupMaintenance);
+    const lift = this.configurations.find(config => !config.dark &&
+      config.visible.every((included, i) => included === (i === 6)));
+    if (lift) await this.prepareConfiguration(lift);
     this.priority = undefined;
+    this.startupComplete = true;
     this.diagnostics.startupMs = performance.now() - started;
   }
 
@@ -192,6 +214,16 @@ export class CultivationPreparationQueue {
 
   tick(frameMs: number, foreground = false): void {
     if (this.disposed || this.busy || this.failure) return;
+    // A CPU submission budget cannot bound asynchronous driver stalls. Once
+    // shared startup coverage is ready, admit only actual drawing/handoff
+    // demands; unseen light variants retain the mandatory preparation path.
+    const current = !!this.priority && !this.priority.ready;
+    const handoff = !!this.upcoming && !this.upcoming.ready;
+    this.diagnostics.intent = current ? 'current' : handoff ? 'handoff' : this.startupComplete ? 'idle' : 'speculative';
+    if (!foreground && this.startupComplete && !current && !handoff) {
+      this.diagnostics.deferredTicks++;
+      return;
+    }
     const now = performance.now();
     const approaching = !!this.upcoming && !this.upcoming.ready;
     // Slow machines still need preparation to advance before the next doorway.
@@ -213,7 +245,7 @@ export class CultivationPreparationQueue {
         this.iterator = undefined;
       }
       if (!this.iterator) {
-        this.active = requested ?? this.configurations.find(c => !c.ready);
+        this.active = requested ?? (this.startupComplete && !foreground ? undefined : this.configurations.find(c => !c.ready));
         if (!this.active) return;
         if (this.preview.root.userData.preparation === this.diagnostics) {
           this.preview.workload.preparing.clear();
@@ -237,11 +269,15 @@ export class CultivationPreparationQueue {
         const result = step.value.run();
         if (result instanceof Promise) {
           this.busy = true;
-          void result.then(() => { this.busy = false; if (this.disposed) this.releaseResources(); }, error => { this.failure = error; this.busy = false; if (this.disposed) this.releaseResources(); });
+          this.diagnostics.outstandingBatches = 1;
+          void result.then(() => { this.busy = false; this.diagnostics.outstandingBatches = 0; if (this.disposed) this.releaseResources(); }, error => { this.failure = error; this.busy = false; this.diagnostics.outstandingBatches = 0; if (this.disposed) this.releaseResources(); });
         }
       } catch (error) { this.failure = error; return; }
       const elapsed = performance.now() - started;
-      if (elapsed > 20) this.diagnostics.slowSteps.push({label,ms:elapsed,z:this.active!.z,dark:this.active!.dark});
+      if (elapsed > 20) {
+        this.diagnostics.slowSteps.push({label,ms:elapsed,z:this.active!.z,dark:this.active!.dark});
+        if (this.diagnostics.slowSteps.length > DIAGNOSTIC_HISTORY_LIMIT) this.diagnostics.slowSteps.shift();
+      }
       this.diagnostics.workMs += elapsed; this.diagnostics.maxStepMs = Math.max(this.diagnostics.maxStepMs, elapsed);
     }
   }
@@ -451,6 +487,7 @@ export class CultivationPreparationQueue {
             this.diagnostics.compileWaitMs += elapsedMs;
             this.diagnostics.compileAsyncWaitMs += Math.max(0, elapsedMs - submissionMs);
             this.diagnostics.batches.push({label:targetScene === shadowScene ? 'shadow' : shadowTarget ? 'linear' : 'screen', objects:batch.length, submissionMs, elapsedMs});
+            if (this.diagnostics.batches.length > DIAGNOSTIC_HISTORY_LIMIT) this.diagnostics.batches.shift();
             group.clear();
           });
         }};
