@@ -373,7 +373,11 @@ export class Input {
   };
 
   private readonly onPointerLockChange = (): void => {
-    if (!this.pointerLocked) this.clearState(true);
+    if (!this.pointerLocked) {
+      // Preserve held-key releases before the later pause listener disables input.
+      for (const code of this.activeKeys) this.suppressedKeys.add(code);
+      this.clearState(true);
+    }
     // A request can finish after a menu or cinematic has suspended input.
     // Do not leave the browser capturing the pointer over that UI.
     else if (!this.enabledValue) this.releasePointerLock();

@@ -332,6 +332,53 @@ test('a gameplay Space release cannot activate the focused pause control', () =>
   input.dispose();
 });
 
+test('pointer-lock loss preserves held Space suppression through pause and resume', () => {
+  const hostWindow = new EventTarget();
+  const hostDocument = new FakeDocument();
+  const pointerElement = new FakePointerElement();
+  const input = new Input({
+    window: hostWindow as unknown as Window,
+    document: hostDocument as unknown as Document,
+    pointerLockElement: pointerElement as unknown as HTMLElement,
+  });
+  // GameFlowUI listens after Input and disables gameplay when pointer lock exits.
+  hostDocument.addEventListener('pointerlockchange', () => {
+    if (!hostDocument.pointerLockElement) input.setEnabled(false);
+  });
+  hostDocument.pointerLockElement = pointerElement as unknown as Element;
+  hostWindow.dispatchEvent(keyboardEvent('keydown', 'Space'));
+  assert.equal(input.isDown('jump'), true);
+
+  hostDocument.exitPointerLock();
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(input.enabled, false);
+  assert.equal(input.isDown('jump'), false);
+  assert.equal(input.wasReleased('jump'), false);
+
+  const heldRelease = keyboardEvent('keyup', 'Space');
+  hostWindow.dispatchEvent(heldRelease);
+  assert.equal(heldRelease.defaultPrevented, true, 'The gameplay release must not activate a pause-menu button.');
+
+  const menuPress = keyboardEvent('keydown', 'Space');
+  const menuRelease = keyboardEvent('keyup', 'Space');
+  hostWindow.dispatchEvent(menuPress);
+  hostWindow.dispatchEvent(menuRelease);
+  assert.equal(menuPress.defaultPrevented, false);
+  assert.equal(menuRelease.defaultPrevented, false, 'New menu input remains native after the held key is released.');
+
+  input.setEnabled(true);
+  hostDocument.pointerLockElement = pointerElement as unknown as Element;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  hostWindow.dispatchEvent(keyboardEvent('keydown', 'Space'));
+  assert.equal(input.isDown('jump'), true);
+  assert.equal(input.wasPressed('jump'), true);
+  input.endFixedUpdate();
+  hostWindow.dispatchEvent(keyboardEvent('keyup', 'Space'));
+  assert.equal(input.isDown('jump'), false);
+  assert.equal(input.wasReleased('jump'), true);
+  input.dispose();
+});
+
 test('orphan key repeats after focus loss cannot reactivate movement', () => {
   const hostWindow = new EventTarget();
   const hostDocument = new FakeDocument();
