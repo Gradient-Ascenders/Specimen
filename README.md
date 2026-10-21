@@ -2,97 +2,87 @@
   <img
     src="public/brand/specimen-lockup-full.png"
     alt="Specimen — Explore, Adapt, Transcend"
-    width="420"
+    width="360"
   />
 </h1>
 
-**Specimen** is a single-player 3D puzzle-platformer set in an abandoned biological research facility. The player positions and switches between three slime bodies whose incompatible abilities must be combined to escape.
+<p align="center">
+  <strong>Escape was never part of the experiment.</strong>
+</p>
 
-- **Bob** sticks, climbs, and performs powerful charged bounces.
-- **Goop** dissolves specifically marked geometry.
-- **Volt** emits light and powers electrical machinery.
+<p align="center">
+  <a href="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/production-integration.yml"><img src="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/production-integration.yml/badge.svg?branch=main" alt="Production integration status" /></a>
+  <a href="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/submission-build.yml"><img src="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/submission-build.yml/badge.svg?branch=main" alt="Submission build status" /></a>
+  <a href=".nvmrc"><img src="https://img.shields.io/badge/Node.js-24.x-74aca9?logo=nodedotjs&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Node.js 24.x" /></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/TypeScript-bddbd5?logo=typescript&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Built with TypeScript" /></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/Three.js-74aca9?logo=threedotjs&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Rendered with Three.js" /></a>
+</p>
 
-Inactive slimes remain in the level, so they can hold pressure plates, complete circuits, or illuminate spaces while another slime is controlled.
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#build-and-check">Build and check</a> ·
+  <a href="docs/README.md">Documentation</a>
+</p>
 
-## Technology
+**Specimen** is a single-player 3D puzzle-platformer set in an abandoned biological
+research facility. Switch between three slime bodies and combine their abilities
+to escape through **Containment**, **Cultivation** and **Blackout**.
 
-The game is built with TypeScript, Three.js, Vite, DOM/CSS UI, handwritten GLSL shaders, and Blender/GLB assets.
+| Specimen | Ability |
+| --- | --- |
+| **Bob** | Stick, climb and launch powerful charged bounces. |
+| **Goop** | Dissolve marked geometry to open new routes. |
+| **Volt** | Illuminate dark spaces and power electrical machinery. |
 
-The project is intentionally short and authored, with predictable kinematic gameplay collision kept separate from the deforming visual slime mesh.
+Inactive bodies stay where you leave them: hold a pressure plate, complete a
+circuit or light a route while controlling another slime.
 
-## Development
+Built with **TypeScript, Three.js and Vite**, with custom GLSL shaders and
+Blender/GLB assets.
 
-The supported toolchain is Node.js 24.x (24.14.1 is pinned in `.nvmrc`) and npm
-11.x (11.18.0 is recorded in `package.json`). After selecting the pinned Node.js
-version, install the locked dependencies:
+## Quick start
+
+Use **Node.js 24.14.1** and **npm 11.18.0**. The commands below use nvm; if Node.js
+is already installed at the required version, skip `nvm use`.
 
 ```bash
+git clone https://github.com/Gradient-Ascenders/Specimen.git
+cd Specimen
 nvm use
+npm install --global npm@11.18.0
 npm ci
-```
-
-Start the Vite development server:
-
-```bash
 npm run dev
 ```
 
-Create the production build in `dist/` or preview that output locally:
+Open the local URL printed by Vite in a browser with WebGL 2 support.
 
-```bash
-npm run build
-npm run preview
-```
+**Default controls:** WASD to move, mouse to look, Space to jump, Tab to switch
+specimens and P to pause. Change bindings in Settings. Press **F1** to toggle the
+[HUD](docs/architecture/clean-gameplay-mode.md) while keeping aiming overlays.
 
-Vite is configured with a relative base, so the contents of `dist/` can be served
-from a domain root, a nested route, or an extracted archive directory without
-rewriting asset URLs.
+## Build and check
 
-Create and validate the assessment-ready ZIP archive with:
+| Command | Purpose |
+| --- | --- |
+| `npm test` | Run unit tests. |
+| `npm run build` | Type-check and build the static site into `dist/`. |
+| `npm run preview` | Serve the production build locally. |
+| `npm run validate:production` | Check the built layout and asset references. |
+| `npm run test:smoke` | Check startup, menus, restarts and level loading at a nested URL. |
+| `npm run archive` | Build and validate `artifacts/specimen-production.zip`. |
 
-```bash
-npm run archive
-```
+Before running smoke tests, build the game and install Chromium once with
+`npx playwright install chromium`. See the [CI guide](docs/operations/continuous-integration.md)
+for deeper browser checks and required PR checks.
 
-The generated `artifacts/specimen-production.zip` contains the contents of
-`dist/` at its root and is intentionally ignored by Git. See
-[`docs/operations/deployment.md`](docs/operations/deployment.md) for archive
-inspection, external nested-path testing, publication, verification, and retry
-steps.
-
-## Continuous integration
-
-Three primary workflows separate fast merge checks, deep browser coverage, and
-submission packaging:
-
-- **PR validation** runs on new and updated PRs targeting `main`. Unit tests and
-  Chromium production smoke checks run in parallel. Production verification
-  builds, validates static files, and exercises both release smoke journeys from
-  a nested HTTP path. New commits cancel obsolete runs.
-- **Production integration** runs the longer software-rendered gameplay journeys
-  and Firefox startup after merges to `main`, nightly, and on demand.
-- **Submission build** runs on pushes to `main` and can be started manually on
-  `main`. It builds the exact event revision, verifies the extracted archive,
-  and publishes `specimen-<12-character-commit>.zip` with a checksum and Tiny
-  File Manager handoff instructions. Manual runs can enable the full shader and
-  lifecycle browser suite.
-
-Require the **Unit tests** and **Production smoke** PR checks plus a teammate's
-approval before merging. See
-[`docs/operations/continuous-integration.md`](docs/operations/continuous-integration.md)
-for local commands, required-check activation, and the limits of automation.
-Upload the finished files through the Moodle-linked Tiny File Manager; a ZIP
-upload alone does not publish the game.
+To publish, upload the **contents of `dist/`** to the static host, with `index.html`
+at the site root. Relative asset paths also support hosting under a subdirectory.
+A ZIP upload alone does not publish the game; follow the
+[deployment guide](docs/operations/deployment.md) for packaging and verification.
 
 ## Documentation
 
-[`docs/README.md`](docs/README.md) indexes the current architecture, gameplay,
-level, operations, and decision records. Historical screenshots, videos, logs,
-and issue-closure reports are kept with their issue, pull request, or CI run
-rather than in the source tree.
-
-Gameplay sound-effects architecture, asset provenance and the complete event mapping: [Gameplay audio](docs/architecture/gameplay-audio.md).
-
-Press **F1** during gameplay to hide the HUD while keeping aiming overlays
-visible; press it again to restore the current UI. See [Clean gameplay mode](docs/architecture/clean-gameplay-mode.md)
-for menu behavior, lifecycle policy and screenshots.
+- [Project docs](docs/README.md) — architecture, levels and design decisions.
+- [Slimes and abilities](docs/gameplay/slimes-and-abilities.md) — switching and gameplay mechanics.
+- [Playtesting](docs/operations/playtesting.md) — checks for a complete playthrough.
+- [Gameplay audio](docs/architecture/gameplay-audio.md) — sound mapping and asset provenance.

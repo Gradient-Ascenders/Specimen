@@ -102,7 +102,7 @@ test('death screen disables background interaction and restores it on hide', () 
       ],
     });
 
-    assert.match(dialog.innerHTML, /brand\/specimen-mark-simple\.svg/);
+    assert.match(dialog.innerHTML, /brand\/specimen-app-icon\.png/);
     assert.match(dialog.innerHTML, /alt=""/);
 
     screen.show();

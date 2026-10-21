@@ -1,4 +1,5 @@
 import { AdditionalSettingsControls } from './AdditionalSettingsControls.ts';
+import { chooseTitleScreenLine } from './TitleScreenLines.ts';
 import { keyLabel } from '../core/KeyBindings.ts';
 import { SettingHelp } from './SettingHelp.ts';
 import { isGelRenderingMode } from '../render/slime/GelRendering.ts';
@@ -484,6 +485,7 @@ export class GameFlowUI {
     this.hostWindow = options.window ?? window;
     this.element = this.createElement(options.creditsMarkdown);
 
+    this.requireElement('.title-description').textContent = chooseTitleScreenLine(this.hostWindow);
     this.restartStatus = this.requireElement('[data-restart-status]');
     this.objective = this.requireElement('[data-current-objective]');
     this.sensitivityInput = this.requireElement<HTMLInputElement>(
@@ -711,7 +713,7 @@ export class GameFlowUI {
             <h1 id="title-heading">Specimen</h1>
           </header>
           <div class="title-divider" aria-hidden="true"></div>
-          <p class="title-description">Escape was never part of the experiment.</p>
+          <p class="title-description"></p>
           <nav class="flow-actions game-menu title-actions" aria-label="Main menu">
             <button class="primary-action menu-action" data-action="start" data-autofocus>
               ${icon('Play')}<span>Start trial</span>
