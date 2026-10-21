@@ -36,6 +36,16 @@ export class GraphicsPreparation {
     if (this.blocked) { this.blocked = false; this.notify(false); }
   }
 
+  /** Initial loading owns the full warm-up after an optional preset selection. */
+  stageInitial(key: string, apply: () => void, resourceKey?: string): void {
+    if (this.blocked) throw new Error('Cannot stage settings during graphics preparation.');
+    apply();
+    this.firstUpdate = false;
+    this.appliedKey = key;
+    this.appliedResourceKey = resourceKey;
+    this.key = this.resourceKey = undefined;
+  }
+
   /** A new runtime's normal loading path has prepared the applied features. */
   adoptPrepared(): void { this.key = this.appliedKey; this.resourceKey = this.appliedResourceKey; }
 

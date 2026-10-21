@@ -1,11 +1,18 @@
+import { AdditionalSettingsControls } from './AdditionalSettingsControls.ts';
+import { keyLabel } from '../core/KeyBindings.ts';
+import { SettingHelp } from './SettingHelp.ts';
 import { isGelRenderingMode } from '../render/slime/GelRendering.ts';
-import { GRAPHICS_PROFILES, graphicsProfileName, isGraphicsProfileId } from '../render/GraphicsProfiles.ts';
+import { GRAPHICS_PROFILES, graphicsProfileName, isGraphicsProfileId, GRAPHICS_PIXEL_BUDGETS, SHADOW_MAP_CAPS, EFFECTS_DENSITIES } from '../render/GraphicsProfiles.ts';
 import type { GraphicsDiagnostics } from '../render/RenderLayer.ts';
 import type {
   GameSettings,
   GameSettingsSnapshot,
 } from './GameSettings.ts';
 import { createSettingsPanelMarkup } from './SettingsPanelMarkup.ts';
+import { menuIconMarkup as icon } from './MenuIcons.ts';
+import { SLIME_PORTRAITS } from './SlimePortraits.ts';
+import { SlimeRosterPresentation } from './SlimeRosterPresentation.ts';
+import { HudPanelPresentation } from './HudPanelPresentation.ts';
 import { FrameRateCounter } from './FrameRateCounter.ts';
 import { MenuGamepadNavigation, nextMenuFocusIndex, type MenuAction } from './MenuNavigation.ts';
 import {
@@ -68,11 +75,12 @@ export const getGameFlowKeyboardAction = (
   code: string,
   state: GameFlowState,
   modifiers: GameFlowKeyboardModifiers = {},
+  pauseCode = 'KeyP',
 ): GameFlowKeyboardAction | null => {
   const hasModifier = modifiers.altKey || modifiers.ctrlKey ||
-    modifiers.metaKey || modifiers.shiftKey;
-  if (!hasModifier && code === 'KeyP' && state === 'playing') return 'pause';
-  if (!hasModifier && code === 'KeyP' && state === 'paused') return 'resume';
+    modifiers.metaKey || (modifiers.shiftKey && code !== 'ShiftLeft' && code !== 'ShiftRight');
+  if (!hasModifier && code === pauseCode && state === 'playing') return 'pause';
+  if (!hasModifier && code === pauseCode && state === 'paused') return 'resume';
   if (code === 'Escape' && (state === 'settings' || state === 'credits')) {
     return 'back';
   }
@@ -149,7 +157,9 @@ const appendCreditsLedger = (
   ledger: HTMLElement,
   creditsMarkdown: string,
 ): void => {
-  const lines = creditsMarkdown.trim().split(/\r?\n/);
+  const start = creditsMarkdown.indexOf('## ');
+  const sections = start < 0 ? '' : creditsMarkdown.slice(start).split('## Maintaining this ledger')[0];
+  const lines = sections.trim().split(/\r?\n/);
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]?.trim() ?? '';
@@ -349,6 +359,7 @@ export interface GameFlowActions {
   isGameplayInputEnabled(): boolean;
   isCinematicPlaying?(): boolean;
   restartLevel(): void;
+  recalibrateGraphics?(): Promise<void>;
   applySettings(settings: Readonly<GameSettingsSnapshot>): void;
   getGraphicsDiagnostics?(): GraphicsDiagnostics;
   subscribeGraphicsDiagnostics?(listener: () => void): () => void;
@@ -409,15 +420,22 @@ export class GameFlowUI {
   private readonly gelRenderingInput: HTMLSelectElement;
   private readonly graphicsProfileInput: HTMLSelectElement;
   private readonly renderScaleInput: HTMLSelectElement;
+  private readonly pixelBudgetInput: HTMLSelectElement;
+  private readonly shadowQualityInput: HTMLSelectElement;
+  private readonly effectsDensityInput: HTMLSelectElement;
   private readonly graphicsDiagnostics: HTMLElement;
   private readonly showFPSInput: HTMLInputElement;
   private readonly reduceMenuMotionInput: HTMLInputElement;
   private readonly settingsFeedback: HTMLElement;
+  private readonly settingHelp: SettingHelp;
+  private readonly additionalControls: AdditionalSettingsControls;
   private readonly fpsOutput: HTMLElement;
   private readonly frameRate = new FrameRateCounter();
   private readonly gamepadNavigation = new MenuGamepadNavigation();
   private hasGamepad = false;
   private readonly slimeRoster: HTMLElement;
+  private readonly rosterPresentation: SlimeRosterPresentation;
+  private readonly controlHints: HudPanelPresentation;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
   private readonly transitionRuntimeLabel: HTMLElement;
@@ -471,6 +489,9 @@ export class GameFlowUI {
     this.gelRenderingInput = this.requireElement<HTMLSelectElement>('[data-setting="gel-rendering"]');
     this.graphicsProfileInput = this.requireElement<HTMLSelectElement>('[data-setting="graphics-profile"]');
     this.renderScaleInput = this.requireElement<HTMLSelectElement>('[data-setting="render-scale"]');
+    this.pixelBudgetInput = this.requireElement<HTMLSelectElement>('[data-setting="pixel-budget"]');
+    this.shadowQualityInput = this.requireElement<HTMLSelectElement>('[data-setting="shadow-quality"]');
+    this.effectsDensityInput = this.requireElement<HTMLSelectElement>('[data-setting="effects-density"]');
     this.graphicsDiagnostics = this.requireElement('[data-graphics-diagnostics]');
     this.showFPSInput = this.requireElement<HTMLInputElement>('[data-setting="show-fps"]');
     this.reduceMenuMotionInput = this.requireElement<HTMLInputElement>('[data-setting="reduce-menu-motion"]');
@@ -485,6 +506,9 @@ export class GameFlowUI {
     this.slimeRoster = this.requireElement('[data-slime-roster]');
     this.passiveStatus = this.requireElement('[data-passive-status]');
     this.switchFeedback = this.requireElement('[data-switch-feedback]');
+    this.rosterPresentation = new SlimeRosterPresentation(this.requireElement('.hud-roster'), this.hostWindow);
+    this.controlHints = new HudPanelPresentation(this.requireElement('.hud-controls'),
+      this.requireElement('.hud-hint'), this.requireElement('.hud-controls-summary'), this.hostWindow, 'Y');
     this.transitionRuntimeLabel = this.requireElement('[data-transition-runtime-label]');
     this.transitionMessage = this.requireElement('[data-transition-message]');
     this.transitionCopy = this.requireElement('[data-transition-copy]');
@@ -504,6 +528,9 @@ export class GameFlowUI {
       if (focusTarget) this.focusTargets.set(state, focusTarget);
     }
 
+    this.settingHelp = new SettingHelp(this.requireElement('[data-flow-panel="settings"]'), this.hostWindow);
+    this.additionalControls = new AdditionalSettingsControls(this.requireElement('[data-flow-panel="settings"]'),
+      this.settings, this.hostWindow, () => this.settingHelp.dismiss());
     this.bindActions();
     this.hasGamepad = this.readGamepads().some(pad => pad?.connected && pad.mapping === 'standard');
     this.unsubscribeSettings = this.settings.subscribe(
@@ -530,6 +557,10 @@ export class GameFlowUI {
       const pad = this.readGamepads().find(candidate => candidate?.connected && candidate.mapping === 'standard');
       const action = this.gamepadNavigation.sample(pad ?? undefined, deltaSeconds);
       if (action) this.navigateMenu(action);
+    }
+    if (this.model.state === 'playing' && this.actions.isGameplayInputEnabled()) {
+      this.rosterPresentation.update(deltaSeconds);
+      this.controlHints.update(deltaSeconds);
     }
     if (this.model.state !== 'playing' || !this.settings.value.showFPS) return;
     const fps = this.frameRate.sample(deltaSeconds);
@@ -586,12 +617,10 @@ export class GameFlowUI {
     if (!this.model.beginLevelTransition()) return;
     const levelTwo = levelId === 'level-2';
     this.transitionRuntimeLabel.textContent = levelTwo
-      ? 'Cultivation runtime · 02'
-      : 'Blackout runtime · 03';
+      ? 'Cultivation'
+      : 'Blackout';
     this.transitionMessage.textContent = message;
-    this.transitionCopy.textContent = levelTwo
-      ? 'Transferring the specimen pair.'
-      : 'Transferring the three-specimen roster.';
+    this.transitionCopy.textContent = 'Preparing the next level.';
     this.transitionContinueButton.hidden = true;
     this.switchFeedbackModel.clear();
     this.switchFeedback.textContent = '';
@@ -621,6 +650,10 @@ export class GameFlowUI {
     this.unsubscribeSettings();
     this.unsubscribeGraphicsDiagnostics();
     this.unsubscribeSlimeHUD();
+    this.rosterPresentation.dispose();
+    this.controlHints.dispose();
+    this.additionalControls.dispose();
+    this.settingHelp.dispose();
     this.model.dispose();
     if (this.gameplayActive) this.actions.stopGameplay();
     this.actions.setGameplayInputEnabled(false);
@@ -636,10 +669,9 @@ export class GameFlowUI {
       <section class="flow-screen loading-screen" data-flow-panel="loading" aria-labelledby="loading-title">
         <div class="system-state">
           ${createBrandedScannerMarkup()}
-          <p class="system-label">Containment runtime · 01</p>
-          <h1 id="loading-title">Calibrating specimen</h1>
+          <h1 id="loading-title">Preparing game</h1>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <p class="system-copy" role="status" aria-live="polite">Preparing the containment environment.</p>
+          <p class="system-copy" role="status" aria-live="polite">Loading Containment.</p>
         </div>
       </section>
 
@@ -653,24 +685,20 @@ export class GameFlowUI {
             <h1 id="title-heading">Specimen</h1>
           </header>
           <div class="title-divider" aria-hidden="true"></div>
-          <p class="title-description">Something is waking.<br><span>Escape was never part of the experiment.</span></p>
+          <p class="title-description">Escape was never part of the experiment.</p>
           <nav class="flow-actions game-menu title-actions" aria-label="Main menu">
             <button class="primary-action menu-action" data-action="start" data-autofocus>
-              <span>Start trial</span>
-              <span class="menu-arrow" aria-hidden="true">→</span>
+              ${icon('Play')}<span>Start trial</span>
             </button>
             <button class="menu-action" data-action="settings">
-              <span>Settings</span>
-              <span class="menu-arrow" aria-hidden="true">→</span>
+              ${icon('Settings')}<span>Settings</span>
             </button>
             <button class="menu-action" data-action="credits">
-              <span>Credits</span>
-              <span class="menu-arrow" aria-hidden="true">→</span>
+              ${icon('Info')}<span>Credits</span>
             </button>
           </nav>
           <p class="title-music-prompt" data-title-music-prompt hidden>
-            Browser audio requires a click.
-            <button type="button" data-action="enable-music">Enable music</button>
+            <button type="button" class="system-action" data-action="enable-music">${icon('Volume2')}<span>Enable music</span></button>
           </p>
         </div>
       </section>
@@ -681,31 +709,39 @@ export class GameFlowUI {
         <div class="opening-letterbox opening-letterbox-bottom" aria-hidden="true"></div>
         <div class="opening-controls">
           <p class="system-status" data-opening-status role="status" aria-live="polite"></p>
-          <button type="button" class="system-action" data-action="retry-opening" hidden>Retry preparation</button>
-          <button type="button" class="system-action" data-action="skip-opening" data-autofocus><span>Skip intro</span><span aria-hidden="true">Esc →</span></button>
+          <button type="button" class="system-action" data-action="retry-opening" hidden>${icon('RotateCcw')}<span>Retry</span></button>
+          <button type="button" class="system-action" data-action="skip-opening" data-autofocus>${icon('SkipForward')}<span>Skip intro</span><kbd>Esc</kbd></button>
         </div>
       </section>
 
       <output class="game-fps" data-fps-counter aria-label="Frames per second" aria-live="off" hidden>— FPS</output>
       <aside class="game-hud" data-flow-panel="playing" aria-label="Gameplay guidance" hidden>
         <section class="hud-objective-module" aria-labelledby="hud-objective-heading">
-          <p class="system-label" id="hud-objective-heading">Current objective</p>
+          <p class="system-label" id="hud-objective-heading">Objective</p>
           <div class="hud-objective-line">
-            <span aria-hidden="true">01</span>
+            ${icon('Flag')}
             <p class="hud-objective" data-current-objective role="status" aria-live="polite">Climb through the vent</p>
           </div>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
         </section>
-        <section class="hud-roster" aria-labelledby="hud-roster-heading">
+        <section class="hud-roster" data-collapsed="false" aria-labelledby="hud-roster-heading">
+          <div class="hud-roster-summary" role="note" aria-label="Press Tab to view specimens" aria-hidden="true">
+            <img class="hud-slime-portrait" data-roster-active-portrait alt="" width="44" height="44" draggable="false" hidden>
+            <kbd data-control-hint="switchSlime">Tab</kbd>
+          </div>
+          <div class="hud-roster-content">
           <header class="hud-roster-header">
-            <p class="system-label" id="hud-roster-heading">Specimen array</p>
-            <span aria-hidden="true">LINK / STABLE</span>
+            <p class="system-label" id="hud-roster-heading">Specimens</p>
           </header>
           <ul class="hud-roster-list" data-slime-roster aria-label="Unlocked playable slimes"></ul>
           <p class="system-status hud-passive-status" data-passive-status role="status" aria-live="polite" hidden></p>
           <p class="system-status hud-switch-feedback" data-switch-feedback role="status" aria-live="polite"></p>
+          </div>
         </section>
-        <p class="hud-hint"><span><kbd>WASD</kbd> Move</span><span><kbd>Space</kbd> Jump</span><span><kbd>Tab</kbd> Switch</span><span><kbd>P</kbd> Pause</span></p>
+        <div class="hud-controls" data-collapsed="false">
+          <p class="hud-hint"><span><kbd data-control-hint="movement">WASD</kbd> Move</span><span><kbd data-control-hint="jump">Space</kbd> Jump</span><span><kbd data-control-hint="switchSlime">Tab</kbd> Switch</span><span><kbd data-control-hint="pause">P</kbd> Pause</span></p>
+          <div class="hud-controls-summary" role="note" aria-label="Press H to show controls" aria-hidden="true">${icon('Keyboard')}<span>Controls</span><kbd>H</kbd></div>
+        </div>
       </aside>
 
       <section class="flow-screen pause-screen" data-flow-panel="paused" aria-labelledby="pause-heading" hidden>
@@ -713,31 +749,25 @@ export class GameFlowUI {
           <header class="pause-heading">
             ${createBrandMarkMarkup('simple', 'pause-brand-mark')}
             <div>
-              <p class="flow-eyebrow">Trial suspended</p>
               <h1 id="pause-heading">Paused</h1>
             </div>
           </header>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
           <div class="flow-actions game-menu pause-actions">
             <button class="primary-action menu-action" data-action="resume" data-autofocus>
-              <span>Resume</span>
-              <span class="menu-arrow" aria-hidden="true">→</span>
+              ${icon('Play')}<span>Resume</span>
             </button>
             <button class="menu-action pause-restart" data-action="restart">
-              <span>Restart trial</span>
-              <span class="menu-arrow" aria-hidden="true">↻</span>
+              ${icon('RotateCcw')}<span>Restart trial</span>
             </button>
             <button class="menu-action" data-action="settings">
-              <span>Settings</span>
-              <span class="menu-arrow" aria-hidden="true">→</span>
+              ${icon('Settings')}<span>Settings</span>
             </button>
             <button class="menu-action" data-action="credits">
-              <span>Credits</span>
-              <span class="menu-arrow" aria-hidden="true">→</span>
+              ${icon('Info')}<span>Credits</span>
             </button>
           </div>
           <p class="system-status" data-restart-status role="status" aria-live="polite"></p>
-          <p class="pause-hint" aria-hidden="true"><kbd>P</kbd> Resume</p>
         </div>
       </section>
 
@@ -746,18 +776,13 @@ export class GameFlowUI {
       <section class="flow-screen submenu-screen credits-screen" data-flow-panel="credits" aria-labelledby="credits-heading" hidden>
         <div class="system-panel lab-menu-panel credits-panel">
           <header class="system-panel-header credits-header">
-            ${createBrandMarkMarkup('detailed', 'credits-brand-mark')}
-            <div>
-              <p class="system-label">Project ledger</p>
-              <h1 id="credits-heading">Credits</h1>
-              <p class="system-copy">The tools, art and resources behind the experiment.</p>
-            </div>
+            <span class="signal-bar" aria-hidden="true"></span>
+            <h1 id="credits-heading">Credits</h1>
           </header>
-          <div class="credits-divider" aria-hidden="true"></div>
-          <div class="credits-ledger" aria-label="Credits ledger"></div>
+          <div class="credits-ledger" aria-label="Credits ledger" tabindex="-1"></div>
           <footer class="credits-footer">
             <button type="button" class="system-action" data-action="back" data-autofocus>
-              <span aria-hidden="true">←</span><span>Back</span>
+              ${icon('ArrowLeft')}<span>Back</span>
             </button>
           </footer>
         </div>
@@ -766,22 +791,21 @@ export class GameFlowUI {
       <section class="flow-screen" data-flow-panel="restarting" aria-labelledby="restarting-heading" hidden>
         <div class="system-state">
           ${createBrandedScannerMarkup()}
-          <p class="system-label">Containment runtime · 01</p>
-          <h1 id="restarting-heading">Reconstituting specimen</h1>
+          <h1 id="restarting-heading">Restarting</h1>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <p class="system-copy" role="status" aria-live="polite">Restoring the trial state.</p>
+          <p class="system-copy" role="status" aria-live="polite">Restoring the level.</p>
         </div>
       </section>
 
       <section class="flow-screen" data-flow-panel="transitioning" aria-labelledby="transition-heading" hidden>
         <div class="system-state">
           ${createBrandedScannerMarkup()}
-          <p class="system-label" data-transition-runtime-label>Cultivation runtime · 02</p>
+          <p class="system-label" data-transition-runtime-label>Cultivation</p>
           <h1 id="transition-heading" data-transition-message>Entering Level 2…</h1>
           <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <p class="system-copy" data-transition-copy role="status" aria-live="polite">Transferring the specimen pair.</p>
+          <p class="system-copy" data-transition-copy role="status" aria-live="polite">Preparing the next level.</p>
           <button class="system-action primary-action transition-action" type="button" data-action="enter-level" hidden>
-            <span>Enter Level 2</span><span aria-hidden="true">→</span>
+            ${icon('ArrowRight')}<span>Enter Level 2</span>
           </button>
         </div>
       </section>
@@ -789,7 +813,6 @@ export class GameFlowUI {
       <section class="flow-screen transition-failed-screen" data-flow-panel="transitionFailed" aria-labelledby="transition-failed-heading" hidden>
         <div class="system-state system-state--failure">
           ${createBrandMarkMarkup('simple', 'failure-brand-mark')}
-          <p class="system-label">Runtime signal interrupted</p>
           <h1 id="transition-failed-heading">Transition failed</h1>
           <div class="signal-rule signal-rule--warning" aria-hidden="true"><span></span></div>
           <p class="system-status" data-transition-failure-message role="alert">The next containment sector could not be initialized.</p>
@@ -831,11 +854,23 @@ export class GameFlowUI {
     }, { signal });
     this.graphicsProfileInput.addEventListener('change', () => {
       const profile = this.graphicsProfileInput.value;
-      if (isGraphicsProfileId(profile)) this.settings.setGraphicsProfile(profile);
+      if (profile === 'custom' || isGraphicsProfileId(profile)) this.settings.setGraphicsProfile(profile);
     }, { signal });
     this.renderScaleInput.addEventListener('change', () => {
       const scale = Number(this.renderScaleInput.value);
       if (isRenderScale(scale)) this.settings.setRenderScale(scale);
+    }, { signal });
+    this.pixelBudgetInput.addEventListener('change', () => {
+      const budget = GRAPHICS_PIXEL_BUDGETS.find(value => value === Number(this.pixelBudgetInput.value));
+      if (budget !== undefined) this.settings.setPixelBudget(budget);
+    }, { signal });
+    this.shadowQualityInput.addEventListener('change', () => {
+      const cap = SHADOW_MAP_CAPS.find(value => value === Number(this.shadowQualityInput.value));
+      if (cap !== undefined) this.settings.setShadowMapSizeCap(cap);
+    }, { signal });
+    this.effectsDensityInput.addEventListener('change', () => {
+      const density = EFFECTS_DENSITIES.find(value => value === Number(this.effectsDensityInput.value));
+      if (density !== undefined) this.settings.setEffectsDensity(density);
     }, { signal });
     this.renderResolutionInput.addEventListener(
       'change',
@@ -849,6 +884,9 @@ export class GameFlowUI {
     this.hostWindow.addEventListener('gamepaddisconnected', this.onGamepadChanged, { signal });
     this.hostWindow.addEventListener('keydown', this.onKeyDown, { signal });
     this.hostWindow.addEventListener('blur', this.onWindowBlur, { signal });
+    this.hostDocument.addEventListener('visibilitychange', () => {
+      if (this.hostDocument.hidden) this.onWindowBlur();
+    }, { signal });
     this.hostWindow.addEventListener('resize', this.syncGraphicsDiagnostics, { signal });
     this.hostDocument.addEventListener(
       'pointerlockchange',
@@ -858,6 +896,8 @@ export class GameFlowUI {
   }
 
   private syncState(): void {
+    this.settingHelp.dismiss();
+    this.additionalControls.dismiss();
     this.syncGraphicsDiagnostics();
     const state = this.model.state;
     this.element.dataset.state = state;
@@ -869,6 +909,10 @@ export class GameFlowUI {
     }
 
     const gameplayActive = state === 'playing';
+    if (gameplayActive) {
+      this.rosterPresentation.reset();
+      this.controlHints.reset();
+    }
     // Menus may always suspend input. Re-enabling belongs to runtime.start(),
     // which can intentionally keep input disabled during the death sequence.
     if (!gameplayActive) this.actions.setGameplayInputEnabled(false);
@@ -986,6 +1030,7 @@ export class GameFlowUI {
       case 'settings':
         this.focusTargets.set(this.model.state, target);
         this.settingsFeedback.textContent = '';
+        this.selectSettingsSection(this.requireElement<HTMLButtonElement>('#settings-tab-graphics'));
         if (this.model.openSettings()) this.syncState();
         break;
       case 'credits':
@@ -994,14 +1039,24 @@ export class GameFlowUI {
         break;
       case 'settings-section': {
         if (this.model.state !== 'settings') break;
-        const section = this.element.querySelector<HTMLElement>(`#settings-${target.dataset.section}`);
-        section?.querySelector<HTMLElement>('select, input, button')?.focus();
+        this.selectSettingsSection(target);
         break;
       }
+      case 'calibrate-graphics':
+        if (!this.actions.recalibrateGraphics || target.disabled) break;
+        target.disabled = true;
+        this.settingHelp.dismiss();
+        this.settingsFeedback.textContent = 'Checking graphics…';
+        void this.actions.recalibrateGraphics().then(() => {
+          if (!this.disposed) this.settingsFeedback.textContent = 'Graphics adjusted.';
+        }, () => {
+          if (!this.disposed) this.settingsFeedback.textContent = 'Could not check graphics. Your settings are kept.';
+        }).finally(() => { if (!this.disposed) target.disabled = false; });
+        break;
       case 'reset-settings':
         if (this.model.state !== 'settings') break;
         this.settings.resetToDefaults();
-        this.settingsFeedback.textContent = 'Default settings restored. Saved display preferences cleared.';
+        this.settingsFeedback.textContent = 'Default settings restored.';
         break;
       case 'back':
         if (this.model.back()) this.syncState();
@@ -1010,6 +1065,19 @@ export class GameFlowUI {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (this.model.state === 'playing' && event.code === 'KeyH' && !event.repeat &&
+      !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && this.actions.isGameplayInputEnabled()) {
+      const target = event.target as HTMLElement | null;
+      if (!target?.isContentEditable && !['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) {
+        event.preventDefault();
+        this.controlHints.toggle();
+        return;
+      }
+    }
+    if (this.model.state === 'playing' && event.code === this.settings.value.keyBindings.switchSlime && !event.repeat &&
+      !event.altKey && !event.ctrlKey && !event.metaKey && this.actions.isGameplayInputEnabled()) {
+      this.rosterPresentation.reveal();
+    }
     if (this.model.state === 'opening' && event.code === 'Escape' &&
       !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
       event.preventDefault();
@@ -1020,6 +1088,7 @@ export class GameFlowUI {
       event.code,
       this.model.state,
       event,
+      this.settings.value.keyBindings.pause,
     );
 
     if (action === null && this.onMenuKeyDown(event)) return;
@@ -1048,10 +1117,11 @@ export class GameFlowUI {
   };
 
   private readonly onWindowBlur = (): void => {
-    this.pause();
+    if (this.settings.value.pauseInBackground) this.pause();
   };
 
   private readonly onPointerLockChange = (): void => {
+    if (!this.settings.value.pauseInBackground && (this.hostDocument.hidden || !this.hostDocument.hasFocus())) return;
     if (
       this.model.state === 'playing' &&
       this.actions.isGameplayInputEnabled() &&
@@ -1135,10 +1205,16 @@ export class GameFlowUI {
     this.gelRenderingInput.value = settings.gelRenderingMode;
     this.graphicsProfileInput.value = graphicsProfileName(settings);
     this.renderScaleInput.value = String(settings.renderScale);
+    this.pixelBudgetInput.value = String(settings.pixelBudget);
+    this.shadowQualityInput.value = String(settings.shadowMapSizeCap);
+    this.effectsDensityInput.value = String(settings.effectsDensity);
     this.showFPSInput.checked = settings.showFPS;
     this.reduceMenuMotionInput.checked = settings.reduceMenuMotion;
     const outputValues: Record<string, string> = {
       'graphics-profile': graphicsProfileName(settings) === 'custom' ? 'Custom' : GRAPHICS_PROFILES[settings.graphicsProfile].label,
+      'pixel-budget': this.pixelBudgetInput.selectedOptions[0]?.textContent ?? '',
+      'shadow-quality': this.shadowQualityInput.selectedOptions[0]?.textContent ?? '',
+      'effects-density': `${Math.round(settings.effectsDensity * 100)}%`,
       'graphics-preset': performance ? 'On' : 'Off',
       'render-resolution': `${Number(this.renderResolutionInput.value).toFixed(2)}×`,
       'render-scale': `${Math.round(settings.renderScale * 100)}%`,
@@ -1149,26 +1225,30 @@ export class GameFlowUI {
     for (const [key, value] of Object.entries(outputValues)) {
       this.requireElement<HTMLOutputElement>(`[data-setting-output="${key}"]`).value = value;
     }
+    this.additionalControls.sync(settings);
+    this.rosterPresentation.setVisibilityMode(settings.hudVisibility);
+    this.controlHints.setVisibilityMode(settings.hudVisibility);
+    this.rosterPresentation.setSwitchKeyLabel(keyLabel(settings.keyBindings.switchSlime));
+    for (const hint of this.element.querySelectorAll<HTMLElement>('[data-control-hint]')) {
+      const action = hint.dataset.controlHint!;
+      hint.textContent = action === 'movement'
+        ? ['moveForward', 'moveLeft', 'moveBackward', 'moveRight'].map(id => keyLabel(settings.keyBindings[id as keyof typeof settings.keyBindings])).join(' ')
+        : keyLabel(settings.keyBindings[action as keyof typeof settings.keyBindings]);
+    }
+    for (const item of this.slimeRoster.querySelectorAll<HTMLElement>('[data-state="switchable"]')) {
+      const label = keyLabel(settings.keyBindings.switchSlime);
+      item.querySelector<HTMLElement>('.hud-slime-control')!.textContent = `${label} to switch`;
+      item.setAttribute('aria-label', `${item.querySelector('.hud-slime-identity')!.textContent}: inactive, available with ${label}`);
+    }
     this.syncFPSVisibility();
     this.actions.applySettings(settings);
     this.syncGraphicsDiagnostics();
   };
 
   private readonly syncGraphicsDiagnostics = (): void => {
-    const settings = this.settings.value, profile = GRAPHICS_PROFILES[settings.graphicsProfile];
     const diagnostics = this.actions.getGraphicsDiagnostics?.();
-    this.graphicsDiagnostics.textContent = [
-      `${graphicsProfileName(settings) === 'custom' ? 'Custom, based on ' : ''}${profile.label}`,
-      diagnostics ? `${diagnostics.drawingBufferWidth} × ${diagnostics.drawingBufferHeight} px` : '',
-      `≤ ${((diagnostics?.pixelBudget ?? profile.pixelBudget) / 1_000_000).toFixed(2)} million pixels`,
-      diagnostics ? `display DPR ${diagnostics.devicePixelRatio.toFixed(2)}, effective ${diagnostics.pixelRatio.toFixed(2)}×` : '',
-      `${Math.round((diagnostics?.renderScale ?? settings.renderScale) * 100)}% active scale`,
-      `extra performance cap: ${settings.graphicsPreset === 'performance' ? 'on' : 'off'}`,
-      `gel: ${settings.gelRenderingMode}`,
-      `shadows ≤ ${profile.shadowMapSizeCap}px/face`,
-      `decorative particles ${profile.effectsDensity * 100}%`,
-      'room-scoped lighting; canvas MSAA off',
-    ].filter(Boolean).join(' · ');
+    this.graphicsDiagnostics.textContent = diagnostics
+      ? `${diagnostics.drawingBufferWidth} × ${diagnostics.drawingBufferHeight} px` : '';
   };
 
   private syncFPSVisibility(): void {
@@ -1194,7 +1274,21 @@ export class GameFlowUI {
   private menuControls(): HTMLElement[] {
     const panel = this.panels.get(this.model.state);
     return Array.from(panel?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href]') ?? [])
-      .filter(control => !control.closest('[hidden]'));
+      .filter(control => !control.closest('[hidden]') &&
+        (control.getAttribute('role') !== 'tab' || control.getAttribute('aria-selected') === 'true'));
+  }
+
+  private selectSettingsSection(target: HTMLButtonElement): void {
+    this.settingHelp.dismiss();
+    this.additionalControls.dismiss();
+    for (const tab of this.element.querySelectorAll<HTMLButtonElement>('[data-action="settings-section"]')) {
+      const selected = tab === target;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      this.requireElement<HTMLElement>(`#settings-${tab.dataset.section}`).hidden = !selected;
+    }
+    this.focusTargets.set('settings', target);
+    this.requireElement<HTMLElement>('.settings-sections').scrollTop = 0;
   }
 
   private focusMenuControl(control: HTMLElement | undefined): void {
@@ -1223,7 +1317,12 @@ export class GameFlowUI {
       return;
     }
     const direction = action === 'increase' ? 1 : -1;
-    if (control.tagName === 'SELECT') {
+    if (control.getAttribute('role') === 'tab') {
+      const tabs = Array.from(this.element.querySelectorAll<HTMLButtonElement>('[data-action="settings-section"]'));
+      const next = tabs[nextMenuFocusIndex(tabs.indexOf(control as HTMLButtonElement), tabs.length, direction)];
+      this.selectSettingsSection(next);
+      this.focusMenuControl(next);
+    } else if (control.tagName === 'SELECT') {
       const select = control as HTMLSelectElement;
       const options = Array.from(select.options).filter(option => !option.disabled);
       const index = options.indexOf(select.selectedOptions[0]);
@@ -1246,6 +1345,19 @@ export class GameFlowUI {
     if (!this.menuNavigable || event.altKey || event.ctrlKey || event.metaKey) return false;
     const controls = this.menuControls(), active = this.hostDocument.activeElement as HTMLElement | null;
     const current = controls.indexOf(active!);
+    if (active?.getAttribute('role') === 'tab') {
+      const tabs = Array.from(this.element.querySelectorAll<HTMLButtonElement>('[data-action="settings-section"]'));
+      const index = tabs.indexOf(active as HTMLButtonElement);
+      const next = event.code === 'ArrowRight' ? (index + 1) % tabs.length
+        : event.code === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length
+        : event.code === 'Home' ? 0 : event.code === 'End' ? tabs.length - 1 : -1;
+      if (next >= 0) {
+        event.preventDefault();
+        this.selectSettingsSection(tabs[next]);
+        this.focusMenuControl(tabs[next]);
+        return true;
+      }
+    }
     if (event.code === 'Tab') {
       if ((event.shiftKey && current <= 0) || (!event.shiftKey && current === controls.length - 1)) {
         event.preventDefault();
@@ -1271,11 +1383,9 @@ export class GameFlowUI {
   private readonly onSlimeHUDChanged = (snapshot: SlimeHUDSnapshot): void => {
     this.switchFeedback.textContent = this.switchFeedbackModel.update(snapshot);
 
-    let visibleIndex = 0;
     const entries = snapshot.roster.flatMap((entry) => {
-      const view = getSlimeRosterEntryView(entry);
+      const view = getSlimeRosterEntryView(entry, keyLabel(this.settings.value.keyBindings.switchSlime));
       if (!view) return [];
-      visibleIndex += 1;
 
       const item = this.hostDocument.createElement('li');
       item.className = 'hud-slime-entry';
@@ -1286,11 +1396,15 @@ export class GameFlowUI {
       const badge = this.hostDocument.createElement('span');
       badge.className = 'hud-slime-badge';
       badge.setAttribute('aria-hidden', 'true');
-      const badgeGlyph = this.hostDocument.createElement('span');
-      badgeGlyph.textContent = entry.displayName.slice(0, 1);
-      const badgeIndex = this.hostDocument.createElement('small');
-      badgeIndex.textContent = String(visibleIndex).padStart(2, '0');
-      badge.append(badgeGlyph, badgeIndex);
+      const portrait = this.hostDocument.createElement('img');
+      portrait.className = 'hud-slime-portrait';
+      portrait.src = SLIME_PORTRAITS[entry.id];
+      portrait.alt = '';
+      portrait.width = 44;
+      portrait.height = 44;
+      portrait.draggable = false;
+      portrait.decoding = 'async';
+      badge.append(portrait);
 
       const identity = this.hostDocument.createElement('span');
       identity.className = 'hud-slime-identity';
@@ -1303,6 +1417,7 @@ export class GameFlowUI {
       const control = this.hostDocument.createElement('span');
       control.className = 'hud-slime-control';
       control.textContent = view.controlLabel;
+      control.hidden = !view.controlLabel;
 
       item.append(badge, identity, state, control);
       return [item];
@@ -1311,5 +1426,6 @@ export class GameFlowUI {
     const passiveStatus = formatPassiveInteractionStatus(snapshot);
     this.passiveStatus.textContent = passiveStatus ?? '';
     this.passiveStatus.hidden = passiveStatus === undefined;
+    this.rosterPresentation.observe(snapshot, passiveStatus);
   };
 }

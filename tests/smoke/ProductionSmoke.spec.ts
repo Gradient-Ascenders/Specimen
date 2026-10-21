@@ -68,17 +68,19 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   await title.locator('[data-action="settings"]').click();
   const settings = page.locator('[data-flow-panel="settings"]');
   expect(await settings.locator('legend').allTextContents()).toEqual(['Graphics', 'Display', 'Audio', 'Controls', 'Accessibility']);
-  await expect(settings.locator('[data-setting="graphics-profile"]')).toBeFocused();
+  await expect(settings.locator('[data-section="graphics"]')).toBeFocused();
   await settings.locator('[data-section="accessibility"]').click();
   await settings.locator('[data-setting="reduce-menu-motion"]').check();
   await expect(page.locator('#app')).toHaveAttribute('data-title-motion', 'still');
   await settings.locator('[data-section="audio"]').click();
+  await page.keyboard.press('Tab');
   await expect(settings.locator('[data-setting="volume"]')).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(settings.locator('[data-setting-output="volume"]')).toHaveText('95%');
   await page.keyboard.press('ArrowDown');
   await expect(settings.locator('[data-setting="effects-volume"]')).toBeFocused();
   await settings.locator('[data-section="controls"]').click();
+  await page.keyboard.press('Tab');
   // Supply a standard virtual controller; the shipped UI still reads and handles it.
   await page.evaluate(() => {
     const pad = { connected: true, mapping: 'standard', axes: [0, 0],
@@ -100,6 +102,7 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
     delete (window as any).__settingsPad;
     window.dispatchEvent(new Event('gamepaddisconnected'));
   });
+  await settings.locator('[data-section="display"]').click();
   await settings.locator('[data-setting="show-fps"]').check();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('specimen.presentation-preferences.v1')!).showFPS)).toBe(true);
   await settings.locator('[data-action="reset-settings"]').click();
@@ -154,6 +157,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   await expect(start).toBeVisible({ timeout: 120_000 });
   await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
   await page.locator('[data-setting="graphics-preset"]').selectOption('performance');
+  await page.locator('[data-section="graphics"]').click();
   await page.locator('[data-setting="render-resolution"]').selectOption('0.75');
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await start.click();

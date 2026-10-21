@@ -96,7 +96,7 @@ const exposeCultivationRuntime = async (page: Page): Promise<() => void> => {
 const prepareGraphics = (page: Page, preset: 'normal' | 'performance') => page.evaluate(async ({preset,key}) => {
   const r=(window as any).__specimenCultivationRuntime, session=(window as any).__specimenSession;
   session.applyGraphicsSettings(key,()=>r.renderLayer.setGraphicsSettings({
-    graphicsProfile:'standard',graphicsPreset:preset,renderPixelRatioCap:preset==='performance'?0.75:2,
+    graphicsProfile:'standard',customGraphicsProfile:true,pixelBudget:2073600,shadowMapSizeCap:1024,effectsDensity:1,graphicsPreset:preset,renderPixelRatioCap:preset==='performance'?0.75:2,
     renderScale:1,gelRenderingMode:'physical',
   }));
   await session.graphicsPreparation.settled;

@@ -1,4 +1,5 @@
 import { createBrandMarkMarkup } from './Branding.ts';
+import { menuIconMarkup as icon } from './MenuIcons.ts';
 
 export interface DeathScreenOptions {
   readonly onRetry: () => void;
@@ -38,14 +39,13 @@ export class DeathScreen {
           <span class="death-signal-line death-signal-line--one"></span>
           <span class="death-signal-line death-signal-line--two"></span>
         </div>
-        <p class="system-label death-eyebrow">Specimen signal lost</p>
-        <h1 id="death-screen-title">Signal terminated</h1>
+        <h1 id="death-screen-title">Signal lost</h1>
         <div class="signal-rule signal-rule--warning" aria-hidden="true"><span></span></div>
         <p class="death-message">
-          Reconstitute the specimen at the last stable checkpoint.
+          Return to the last checkpoint.
         </p>
         <button class="system-action primary-action death-retry" type="button">
-          <span>Retry</span><span aria-hidden="true">↻</span>
+          ${icon('RotateCcw')}<span>Retry</span>
         </button>
       </div>
     `;

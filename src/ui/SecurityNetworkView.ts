@@ -1,3 +1,4 @@
+import { menuIconMarkup as icon } from './MenuIcons.ts';
 import type { CultivationRoomFiveController } from '../levels/CultivationRoomFiveController.ts';
 
 /** Persistent read-only network display; never owns switch or unlock state. */
@@ -6,7 +7,6 @@ export class SecurityNetworkView {
   private lastState = '';
   constructor() {
     this.element.className = 'security-network-status';
-    this.element.style.cssText = 'position:absolute;left:12px;top:100px;white-space:pre-line;padding:10px 12px;background:#101b22d9;color:#d3f5ff;border:1px solid #67858b;pointer-events:none;font:12px monospace;max-width:min(250px,calc(100vw - 48px));';
     this.element.hidden = true;
   }
   update(controller: CultivationRoomFiveController, visible: boolean): void {
@@ -16,9 +16,14 @@ export class SecurityNetworkView {
     const state = controller.complete ? 'complete' : controller.rescued ? 'rescued' : controller.security.disabledNetwork ?? 'none';
     if (state === this.lastState) return;
     this.lastState = state;
-    this.element.textContent = state === 'complete' ? 'CULTIVATION COMPLETE\nBob + Goop + Volt rescued'
-      : state === 'rescued' ? 'SECURITY SHUT DOWN\nVolt available — switch with Tab'
-      : `SECURITY NETWORKS\n△ RED    ${state === 'red' ? 'OFFLINE' : 'ONLINE'}\n○ BLUE   ${state === 'blue' ? 'OFFLINE' : 'ONLINE'}\n□ GREEN  ${state === 'green' ? 'OFFLINE' : 'ONLINE'}\nShoot the switch handle to toggle\nOne bypass available`;
+    this.element.dataset.state = state;
+    if (state === 'complete' || state === 'rescued') {
+      this.element.textContent = state === 'complete' ? 'Cultivation complete\nBob, Goop and Volt rescued' : 'Security disabled\nSwitch to Volt';
+    } else {
+      this.element.innerHTML = `<p class="encounter-heading">Security networks</p>
+        ${(['red', 'blue', 'green'] as const).map((network, index) => `<div class="network-row" data-network="${network}">${icon(index === 0 ? 'Triangle' : index === 1 ? 'Circle' : 'Square')}<span>${network[0].toUpperCase()}${network.slice(1)}</span><span>${state === network ? 'Offline' : 'Online'}</span></div>`).join('')}
+        <p class="encounter-note">Shoot a switch to bypass one network.</p>`;
+    }
   }
   dispose(): void { this.element.remove(); }
 }

@@ -1,3 +1,5 @@
+import { calibrateGraphics, chooseAutomaticGraphicsProfile, GRAPHICS_CALIBRATION_BUDGET_MS, type CalibrationView, type GraphicsCalibrationResult } from '../render/GraphicsCalibration.ts';
+import { GRAPHICS_PROFILES } from '../render/GraphicsProfiles.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
 import { IdleCinematicPreparation, type CinematicPreparationJob } from '../cinematics/IdleCinematicPreparation.ts';
 import { ContainmentFinaleOverlay } from '../cinematics/ContainmentFinaleOverlay.ts';
@@ -463,6 +465,88 @@ export class GreyboxLevelRuntime {
     room.setOpeningAftermath();
   }
 
+  /** Two real Containment views, sharing the context/materials with normal warm-up. */
+  async calibrateInitialGraphics(isCurrent: () => boolean): Promise<GraphicsCalibrationResult> {
+    const resources = this.requireResources(), layer = this.renderLayer, renderer = layer.renderer;
+    const previous = layer.graphicsConfiguration;
+    const camera = layer.cameraRig.camera, savedCamera = camera.clone();
+    const target = new THREE.WebGLRenderTarget(1, 1);
+    const now = () => this.hostWindow.performance.now();
+    try {
+      layer.setGraphicsSettings(GRAPHICS_PROFILES.standard.settings);
+      await this.prepareCharacterModels(resources);
+      if (!isCurrent()) return { profile: 'minimum', sampleCount: 0, frameMs: 0, timedOut: true };
+      const viewport = layer.getGameplayPrewarmViewport(new THREE.Vector4());
+      const ratio = renderer.getPixelRatio();
+      target.setSize(Math.max(1, Math.round(viewport.z * ratio)), Math.max(1, Math.round(viewport.w * ratio)));
+      const draw = (): void => withIsolatedPrewarmState(renderer, () => {
+        renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
+        renderer.setScissorTest(false);
+        renderer.transmissionResolutionScale = 0.5;
+        layer.withShadowPreparation(true, () => {
+          this.prepareContainmentShadows(resources.testScene, [resources.body.position, resources.goopBody.position]);
+          renderer.render(layer.scene, camera);
+        });
+      }, target);
+      let result: GraphicsCalibrationResult = { profile: 'minimum', sampleCount: 0, frameMs: 0, timedOut: true };
+      // The lighting owner restores all visibility/reflection state even on failure.
+      await resources.testScene.lighting.prewarmShaderConfigurations(async (roomId, coverage) => {
+        if ((roomId !== 1 && roomId !== 3) || coverage.length !== 1 || !isCurrent() || (roomId === 3 && result.timedOut)) return;
+        this.lightLayout?.sync();
+        const at = LIGHTING_PREWARM_CAMERA_TARGETS[roomId];
+        if (roomId === 1) {
+          // Vent-like gel screen coverage without moving authoritative bodies.
+          const bob = resources.testScene.bob.root.getWorldPosition(new THREE.Vector3());
+          camera.position.set(bob.x, bob.y + 1.1, bob.z - 2);
+          camera.lookAt(bob.x, bob.y + 0.4, bob.z);
+        } else {
+          camera.position.set(at[0], at[1] + 1.2, at[2] - 5);
+          camera.lookAt(at[0], at[1] + 0.5, at[2] + 2);
+        }
+        camera.updateMatrixWorld();
+        // Each view is sampled while its authored lighting configuration is active.
+        const view: CalibrationView = {
+          warm: async () => {
+            const subset = createRoomCompileSubset(resources, roomId);
+            try {
+              await withIsolatedPrewarmState(renderer, () => renderer.compileAsync(subset, camera, layer.scene), target);
+            } finally { disposeCompileInstances(subset); subset.clear(); }
+            draw();
+          }, draw,
+        };
+        const measured = await calibrateGraphics({ context: renderer.getContext() as WebGL2RenderingContext,
+          views: [view], now, budgetMs: GRAPHICS_CALIBRATION_BUDGET_MS / 2, yieldTask: () => new Promise(resolve => this.hostWindow.setTimeout(resolve, 0)), isCurrent });
+        // Combine the slower view with the close-up before assigning a tier.
+        if (roomId === 1) result = measured;
+        else result = { ...measured, sampleCount: result.sampleCount + measured.sampleCount,
+          frameMs: Math.max(result.frameMs, measured.frameMs), timedOut: result.timedOut || measured.timedOut };
+      });
+      return { ...result, profile: result.timedOut ? 'minimum' :
+        chooseAutomaticGraphicsProfile(Array.from({ length: result.sampleCount }, () => result.frameMs)) };
+    } finally {
+      target.dispose();
+      // Reuse the live camera's capture; proxy cameras retain orphan GPU targets.
+      camera.copy(savedCamera);
+      layer.setGraphicsSettings(previous);
+    }
+  }
+
+  private async prepareCharacterModels(resources: GreyboxRuntimeResources): Promise<void> {
+    await Promise.all([
+      resources.testScene.bob.prepare(this.characterLoaders?.bob),
+      resources.testScene.goop.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
+      resources.testScene.roomFive.goopPresentation.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
+    ]);
+    if (this.resources !== resources) return;
+    resources.testScene.root.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material, true);
+      }
+    });
+    this.lightLayout ??= new ContainmentLightLayout(this.renderLayer.scene);
+  }
+
   /** Precompile Containment signatures and prime known cold resources while loading. */
   async prepareGraphics(): Promise<void> {
     const resources = this.requireResources();
@@ -489,20 +573,9 @@ export class GreyboxLevelRuntime {
     if (this.lightingPrewarmPromise) return this.lightingPrewarmPromise;
     const resources = this.requireResources();
     const generation = ++this.lightingPrewarmGeneration;
-    const promise = Promise.all([
-      resources.testScene.bob.prepare(this.characterLoaders?.bob),
-      resources.testScene.goop.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
-      resources.testScene.roomFive.goopPresentation.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
-    ])
+    const promise = this.prepareCharacterModels(resources)
       .then(() => {
         if (this.resources !== resources || this.lightingPrewarmGeneration !== generation) return;
-        resources.testScene.root.traverse(object => {
-          if (!(object instanceof THREE.Mesh)) return;
-          for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-            if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material, true);
-          }
-        });
-        this.lightLayout ??= new ContainmentLightLayout(this.renderLayer.scene);
         return this.runLightingPrewarm(resources, generation);
       })
       .catch((error) => {

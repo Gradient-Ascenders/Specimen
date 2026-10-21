@@ -1,3 +1,4 @@
+import { gameplayBindings } from './core/KeyBindings.ts';
 import { AudioManager } from './audio/AudioManager.ts';
 import { BackgroundMusic, musicForFlow, type MusicLevel } from './audio/BackgroundMusic.ts';
 import { SOUND_BANKS } from './audio/SoundCatalog.ts';
@@ -57,12 +58,14 @@ function startGame(): void {
   }
 
   const settings = new GameSettings();
+  let appliedKeyBindings = settings.value.keyBindings;
+  let activeLoop: Loop | undefined;
   const audio = new AudioManager(import.meta.env.BASE_URL);
   const music = new BackgroundMusic(import.meta.env.BASE_URL);
   void audio.preload(SOUND_BANKS.containment);
   const unlockAudio = (): void => { audio.unlock(); music.unlock(); };
   const focusAudio = (): void => {
-    const focused = !document.hidden && document.hasFocus();
+    const focused = !settings.value.muteInBackground || (!document.hidden && document.hasFocus());
     audio.setFocused(focused);
     music.setFocused(focused);
   };
@@ -77,7 +80,7 @@ function startGame(): void {
     host: app,
     graphics: settings.value,
   });
-  const input = new Input({ pointerLockElement: renderLayer.canvas });
+  const input = new Input({ pointerLockElement: renderLayer.canvas, bindings: gameplayBindings(appliedKeyBindings) });
   renderLayer.canvas.dataset.gameplayCanvas = 'true';
   const debugAvailable =
     import.meta.env.DEV ||
@@ -157,6 +160,36 @@ function startGame(): void {
     | import('./debug/PerformanceFlightRecorder.ts').PerformanceFlightRecorder
     | undefined;
   let bootReadyMs: number | undefined;
+  let autoDetecting = false;
+  let initialGraphicsTask: Promise<void> | undefined;
+  let preparedInitialGraphicsKey: string | undefined;
+  const initialGraphicsKey = () => `${graphicsPreparationKey(settings.value)}:${graphicsTransmissionResourceKey(settings.value)}`;
+  const selectInitialGraphics = async (): Promise<void> => {
+    if (!settings.needsGraphicsCalibration) return;
+    const revision = settings.graphicsRevision;
+    const isCurrent = () => !shuttingDown && settings.needsGraphicsCalibration &&
+      settings.graphicsRevision === revision && !document.hidden && document.hasFocus();
+    let profile: import('./render/GraphicsProfiles.ts').GraphicsProfileId = 'minimum';
+    try {
+      if (isCurrent()) profile = (await (levelOneRuntime.state === 'unloaded'
+        ? renderLayer.calibrateCurrentView(isCurrent) : levelOneRuntime.calibrateInitialGraphics(isCurrent))).profile;
+    } catch {
+      // Optional calibration must never prevent normal level preparation.
+    }
+    if (!shuttingDown) settings.applyAutomaticGraphicsProfile(profile, revision);
+  };
+  const prepareFirstGraphics = (): Promise<void> => {
+    if (initialGraphicsTask) return initialGraphicsTask;
+    if (!settings.needsGraphicsCalibration && preparedInitialGraphicsKey === initialGraphicsKey()) return Promise.resolve();
+    if (levelOneRuntime.state === 'unloaded') {
+      void levelOneAssets.preload('high');
+      gameSession.load();
+    }
+    initialGraphicsTask = gameSession.prepareInitialGraphics(selectInitialGraphics).then(() => {
+      preparedInitialGraphicsKey = initialGraphicsKey();
+    }).finally(() => { initialGraphicsTask = undefined; levelOneAssets.clear(); });
+    return initialGraphicsTask;
+  };
   const gameFlow = new GameFlowUI({
     settings,
     creditsMarkdown,
@@ -170,11 +203,7 @@ function startGame(): void {
         const shared = {
           host: app,
           prepareLevel: () => {
-            // Early Skip/retry may have no speculative bank. Start missing
-            // transfers at high priority, but retain any existing downloads.
-            void levelOneAssets.preload('high');
-            gameSession.load();
-            return gameSession.prepareInitialGraphics().finally(() => levelOneAssets.clear()).then(async () => {
+            return prepareFirstGraphics().then(async () => {
               // Submission finishing is not GPU completion. Drain the hidden
               // warm-up queue before marking gameplay ready for the handoff.
               await waitForGpuPreparation(renderLayer.renderer.getContext(),
@@ -238,9 +267,29 @@ function startGame(): void {
       isGameplayInputEnabled: () => input.enabled,
       isCinematicPlaying: () => gameFlowCinematicCanPause(app.dataset.cinematic, app.dataset.gameState),
       restartLevel: () => lifecycleCoordinator.restartLevel(),
+      recalibrateGraphics: async () => {
+        settings.requestGraphicsCalibration();
+        autoDetecting = true;
+        try {
+          if (titlePresentation || levelOneRuntime.state !== 'unloaded') await prepareFirstGraphics();
+          else await gameSession.prepareInitialGraphics(selectInitialGraphics);
+        } finally { autoDetecting = false; }
+      },
       applySettings: (nextSettings) => {
         audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);
         music.setMasterVolume(nextSettings.masterVolume);
+        music.setMusicVolume(nextSettings.musicVolume);
+        focusAudio();
+        activeLoop?.setFrameRateLimit(nextSettings.frameRateLimit);
+        activeLoop?.setPauseWhenUnfocused(nextSettings.pauseInBackground);
+        renderLayer.setBrightness(nextSettings.brightness);
+        renderLayer.cameraShakeScale = nextSettings.cameraShake;
+        renderLayer.keyBindings = nextSettings.keyBindings;
+        renderLayer.cameraRig.setFieldOfViewDegrees(nextSettings.fieldOfViewDegrees);
+        if (appliedKeyBindings !== nextSettings.keyBindings) {
+          appliedKeyBindings = nextSettings.keyBindings;
+          input.setBindings(gameplayBindings(appliedKeyBindings));
+        }
         renderLayer.cameraRig.setLookSettings({
           horizontalSensitivityRadiansPerPixel:
             DEFAULT_CAMERA_RIG_CONFIG.horizontalSensitivityRadiansPerPixel *
@@ -339,6 +388,7 @@ function startGame(): void {
       lastFrameStats = stats;
       gameFlow.updateFrame(stats.rawFrameDeltaSeconds);
       if (titlePresentation) {
+        if (autoDetecting) return;
         titlePresentation.render(stats.frameDeltaSeconds);
         return;
       }
@@ -351,6 +401,10 @@ function startGame(): void {
       sampleLevelOneShaderPrograms?.();
     },
   });
+
+  activeLoop = loop;
+  loop.setFrameRateLimit(settings.value.frameRateLimit);
+  loop.setPauseWhenUnfocused(settings.value.pauseInBackground);
 
   let bootFrame = 0;
   let shuttingDown = false;

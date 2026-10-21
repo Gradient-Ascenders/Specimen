@@ -1,3 +1,4 @@
+import { menuIconMarkup as icon } from '../ui/MenuIcons.ts';
 import {VOLT_FINALE as T,finaleSmooth,voltFinaleShot} from './CultivationFinaleTimeline.ts';
 import {voltFinaleTime as at} from './CultivationFinaleTiming.ts';
 
@@ -40,7 +41,7 @@ export class CultivationFinaleOverlay {
     this.threat=child('threat',this.scan);child('threat-caption',this.threat).textContent='THREAT LEVEL';
     this.threatLevel=child('threat-level',this.threat);this.directive=child('termination');this.directive.textContent='TERMINATE';
     this.subtitle=child('subtitle');this.alarm=child('alarm-wash');this.fade=child('fade');
-    const skip=doc.createElement('button');skip.className='finale-skip';skip.type='button';skip.textContent='Skip ↵';
+    const skip=doc.createElement('button');skip.className='finale-skip';skip.type='button';skip.innerHTML=`${icon('SkipForward')}<span>Skip cutscene</span><kbd>Enter</kbd>`;
     skip.addEventListener('click',onSkip);root.append(skip);host.append(root);
   }
   present(t:number):void{

@@ -1,3 +1,4 @@
+import { menuIconMarkup as icon } from '../ui/MenuIcons.ts';
 import type { ContainmentFinaleFrame } from './ContainmentFinaleTimeline.ts';
 import { CONTAINMENT_FINALE_TIMING as T } from './ContainmentFinaleTiming.ts';
 
@@ -38,7 +39,7 @@ export class ContainmentFinaleOverlay {
     this.fade = child('fade'); this.status = child('status');
     this.status.textContent = 'Preparing escape sequence…'; this.status.setAttribute('role', 'status');
     this.skip = doc.createElement('button'); this.skip.type = 'button'; this.skip.className = 'finale-skip';
-    this.skip.textContent = 'Skip  ↵'; this.skip.addEventListener('click', onSkip); this.element.append(this.skip);
+    this.skip.innerHTML = `${icon('SkipForward')}<span>Skip cutscene</span><kbd>Enter</kbd>`; this.skip.addEventListener('click', onSkip); this.element.append(this.skip);
     host.append(this.element);
   }
   preparing(failed = false): void {

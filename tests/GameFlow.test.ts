@@ -10,7 +10,7 @@ import {
   parseCreditsInlineParts,
   type GameFlowState,
 } from '../src/ui/GameFlowUI.ts';
-import { GameSettings } from '../src/ui/GameSettings.ts';
+import { GameSettings, DEFAULT_GAME_SETTINGS } from '../src/ui/GameSettings.ts';
 
 test('game flow permits only explicit menu transitions', () => {
   const flow = new GameFlowStateModel();
@@ -206,6 +206,7 @@ test('settings retain session values across flow transitions', () => {
   flow.finishRestart();
 
   assert.deepEqual(settings.value, {
+    ...DEFAULT_GAME_SETTINGS,
     mouseSensitivity: 1.7,
     invertVerticalLook: true,
     masterVolume: 0.35,
@@ -216,6 +217,10 @@ test('settings retain session values across flow transitions', () => {
     renderPixelRatioCap: 1.5,
     gelRenderingMode: 'minimum',
     graphicsProfile: 'minimum',
+    customGraphicsProfile: true,
+    pixelBudget: 921600,
+    shadowMapSizeCap: 512,
+    effectsDensity: 0.5,
     renderScale: 0.75,
     graphicsPreset: 'normal',
   });

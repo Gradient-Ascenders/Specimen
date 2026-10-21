@@ -62,6 +62,44 @@ test('the extra Performance cap composes with profiles without losing gel or den
   assert.deepEqual(qualities.at(-1), [512, .5]);
 });
 
+test('Custom retains values, exposes resource controls and presets restore all quality settings atomically', () => {
+  const settings = new GameSettings({ storage: null });
+  settings.setGraphicsProfile('standard');
+  const medium = { ...settings.value };
+  settings.setGraphicsProfile('custom');
+  assert.equal(graphicsProfileName(settings.value), 'custom');
+  assert.deepEqual(settings.value, { ...medium, customGraphicsProfile: true });
+  settings.setShadowMapSizeCap(2048);
+  settings.setPixelBudget(3686400);
+  settings.setEffectsDensity(0.75);
+  const layer = Object.create(RenderLayer.prototype) as any;
+  layer.gelRendering = new GelRendering({ transmissionResolutionScale: 1 });
+  let quality: number[] = [];
+  layer.graphicsResources = { setQuality: (...values: number[]) => { quality = values; } };
+  layer.resize = () => {};
+  layer.setGraphicsSettings(settings.value);
+  assert.deepEqual(quality, [2048, 0.75]);
+  assert.equal(layer.pixelBudget, 3686400);
+  for (const id of ['minimum', 'standard', 'high'] as const) {
+    let notifications = 0;
+    const unsubscribe = settings.subscribe(() => notifications++);
+    settings.setGraphicsProfile(id);
+    assert.equal(notifications, 2);
+    for (const [key, value] of Object.entries(GRAPHICS_PROFILES[id].settings)) {
+      assert.equal(settings.value[key as keyof typeof settings.value], value);
+    }
+    assert.equal(graphicsProfileName(settings.value), id);
+    unsubscribe();
+  }
+  // Non-graphics preferences and a no-op control change keep the preset.
+  settings.setShowFPS(true); settings.setMasterVolume(0.2); settings.setEffectsDensity(1);
+  assert.equal(graphicsProfileName(settings.value), 'high');
+  settings.setEffectsDensity(0.5);
+  assert.equal(graphicsProfileName(settings.value), 'custom');
+  settings.setEffectsDensity(1);
+  assert.equal(graphicsProfileName(settings.value), 'custom', 'Custom stays selected until a preset is chosen');
+});
+
 test('map caps restore authored resolution and dispose only replaced targets once', () => {
   const scene = new THREE.Scene(), light = new THREE.SpotLight(0xff0000, 100);
   light.castShadow = true; light.shadow.mapSize.set(1024, 768); scene.add(light);

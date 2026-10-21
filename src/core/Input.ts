@@ -186,6 +186,14 @@ export class Input {
     }
   }
 
+  setBindings(bindings: ActionBindings): void {
+    if (this.disposed) return;
+    this.clearState(true);
+    this.keyBindings.clear();
+    this.mouseBindings.clear();
+    this.buildBindingLookup(bindings);
+  }
+
   /** Clear held and transient gameplay input during lifecycle transitions. */
   resetState(): void {
     if (this.disposed) return;

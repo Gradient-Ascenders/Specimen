@@ -273,7 +273,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
     rt.stop(); renderer.setAnimationLoop(null);
     const light = rt.resources.voltLight, gl = renderer.getContext();
     const graphics = layer.getGraphicsDiagnostics();
-    const saved = { settings: {graphicsProfile:graphics.graphicsProfileBase, graphicsPreset:graphics.graphicsPreset,
+    const saved = { settings: {...layer.graphicsSettings,graphicsProfile:graphics.graphicsProfileBase, graphicsPreset:graphics.graphicsPreset,
       renderPixelRatioCap:graphics.requestedPixelRatioCap, renderScale:graphics.renderScale, gelRenderingMode:graphics.gelRenderingMode},
       visible: light.visible, intensity: light.intensity };
     const check = (stage: string) => {

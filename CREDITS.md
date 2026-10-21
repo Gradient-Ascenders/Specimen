@@ -7,6 +7,8 @@ third-party resources that may need to appear in the final in-game credits.
 
 | Resource | Author / creator | Source | Licence | Use in Specimen |
 | --- | --- | --- | --- | --- |
+| Motion 14.5.0 | Motion contributors | [Motion](https://motion.dev) | MIT | HUD slide and fade animations using motion/mini. |
+| Lucide 1.61.0 | Lucide contributors | [Lucide](https://lucide.dev) | ISC | SVG icons for menus and playback controls. |
 | Three.js 0.185.1 | mrdoob | [npm package](https://www.npmjs.com/package/three/v/0.185.1) | MIT | 3D rendering framework used by the browser game. |
 | meshoptimizer 1.1 (bundled Three.js add-on) | Arseny Kapoulkine | [meshoptimizer](https://github.com/zeux/meshoptimizer) | MIT | Offline, attribute-aware character LOD index generation; no runtime simplifier. |
 | Vite 8.2.1 | Evan You | [npm package](https://www.npmjs.com/package/vite/v/8.2.1) | MIT | Development server and production build tool. |

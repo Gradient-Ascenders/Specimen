@@ -43,6 +43,7 @@ export class BackgroundMusic {
   private focused = true;
   private disposed = false;
   private master = 1;
+  private volume = 1;
   private fadeTimer: ReturnType<typeof setInterval> | undefined;
   private readonly musicGain = 0.28;
 
@@ -113,7 +114,13 @@ export class BackgroundMusic {
     if (!this.fadeTimer) this.players[this.active].volume = this.targetVolume;
   }
 
-  private get targetVolume(): number { return this.master * this.musicGain; }
+  setMusicVolume(value: number): void {
+    if (this.disposed) return;
+    this.volume = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+    if (!this.fadeTimer) this.players[this.active].volume = this.targetVolume;
+  }
+
+  private get targetVolume(): number { return this.master * this.volume * this.musicGain; }
   private get current(): MusicElement { return this.players[this.active]; }
   private canPlay(): boolean { return !this.disposed && this.focused && this.enabled; }
   private url(track: MusicTrack): string { return this.base + MUSIC_PATHS[track]; }
@@ -152,11 +159,11 @@ export class BackgroundMusic {
   }
 
   private fade(previous: MusicElement, next: MusicElement | null): void {
-    const initial = previous.volume;
+    const initialGain = this.targetVolume > 0 ? Math.min(1, previous.volume / this.targetVolume) : 0;
     let tick = 0;
     this.fadeTimer = setInterval(() => {
       const fraction = Math.min(1, ++tick / 16); // 400 ms, only during transitions
-      previous.volume = initial * (1 - fraction);
+      previous.volume = this.targetVolume * initialGain * (1 - fraction);
       if (next) next.volume = this.targetVolume * fraction;
       if (fraction === 1) {
         this.cancelFade();

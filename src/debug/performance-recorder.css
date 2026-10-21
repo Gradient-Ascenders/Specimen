@@ -1,35 +1,67 @@
 .performance-recorder {
-  z-index: 6;
   position: absolute;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
-  max-width: calc(100vw - 1.5rem);
-  padding: 0.45rem 0.55rem;
-  border: 1px solid rgb(191 167 255 / 24%);
-  border-radius: 0.4rem;
-  color: #d9d1e8;
-  background: rgb(9 6 15 / 86%);
-  font-size: 0.72rem;
+  z-index: 25;
+  left: var(--ui-space-3);
+  bottom: var(--ui-space-3);
+  max-width: calc(100% - var(--ui-space-6));
+  color: var(--ui-text-muted);
+  font: var(--ui-note-size)/1.5 var(--ui-font-body);
 }
 
-.performance-recorder button {
-  padding: 0.28rem 0.45rem;
-  border: 1px solid rgb(191 167 255 / 35%);
-  border-radius: 0.3rem;
-  color: #f4f0ff;
-  background: rgb(81 60 112 / 72%);
+/* The tools remain clickable after Escape releases the mouse into pause. */
+#app[data-game-state]:not([data-game-state='playing']) > .performance-recorder,
+#app[data-cinematic] > .performance-recorder { display: none; }
+
+.recorder-panel {
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid var(--ui-line-soft);
+  border-radius: var(--ui-radius-md);
+  background: rgb(10 21 28 / 94%);
+}
+
+.recorder-panel summary {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-height: var(--ui-control-height);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-radius: var(--ui-radius-md);
+  list-style: none;
   cursor: pointer;
 }
+.recorder-panel summary::-webkit-details-marker { display: none; }
+.recorder-panel summary:hover { color: var(--ui-text); background: var(--ui-hover); }
+.recorder-panel summary:focus-visible,
+.performance-recorder button:focus-visible { outline: 0; box-shadow: var(--ui-focus); }
+.recorder-panel summary .ui-icon { width: 1rem; height: 1rem; }
+.recorder-live { display: none; }
+.is-recording .recorder-live { display: inline; color: var(--ui-lavender-pale); }
+.is-recording .recorder-label { display: none; }
+.is-recording summary .ui-icon { color: #a3d99a; }
 
-.performance-recorder button:disabled {
-  cursor: default;
-  opacity: 0.45;
+.recorder-content {
+  display: grid;
+  gap: var(--ui-space-3);
+  width: min(28rem, calc(100vw - 1.5rem));
+  padding: var(--ui-space-3);
+  border-top: 1px solid var(--ui-line-soft);
+  overflow-wrap: anywhere;
 }
-
-.performance-recorder [data-shader-program-guard] {
-  flex-basis: 100%;
+.recorder-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
+.performance-recorder button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  min-height: var(--ui-control-height);
+  padding: var(--ui-space-2);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+  font: inherit;
+  cursor: pointer;
 }
+.performance-recorder button:hover { background: var(--ui-selected); }
+.performance-recorder button:disabled { cursor: default; opacity: 0.45; }

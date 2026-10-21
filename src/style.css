@@ -1,6 +1,6 @@
 :root {
-  color: #f4f0ff;
-  background: #09060f;
+  color: var(--ui-text);
+  background: var(--ui-bg);
   font-family: 'Space Grotesk Variable', 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -48,8 +48,9 @@ canvas {
   display: none !important;
 }
 
-/* Development diagnostics remain deliberately utilitarian. */
+/* Development diagnostics use the shared control palette and type scale. */
 .test-panel {
+  font: var(--ui-text-size)/1.5 var(--ui-font-body);
   z-index: 5;
   position: absolute;
   top: clamp(1rem, 3vw, 2rem);
@@ -59,10 +60,10 @@ canvas {
   padding: 1.1rem 1.2rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid rgb(191 167 255 / 24%);
+  border: 1px solid rgb(163 203 194 / 24%);
   border-radius: 0.5rem;
   color: #f4f0ff;
-  background: rgb(9 6 15 / 88%);
+  background: rgb(9 13 24 / 88%);
   box-shadow: 0 1rem 3rem rgb(0 0 0 / 30%);
   backdrop-filter: blur(0.6rem);
   scrollbar-width: thin;
@@ -79,7 +80,7 @@ canvas {
 .cultivation-finale .finale-scan[data-target="wreck"] { color: #b7cc79; border-color: #869347; box-shadow: inset 0 -3rem 4rem #53632488; }
 .cultivation-finale .finale-threat { max-width: 85%; }
 .cultivation-finale .finale-threat-level { font-size: clamp(1.1rem, 4.7vw, 4rem); }
-.cultivation-finale .finale-subtitle { font: 600 clamp(.9rem, 1.9vw, 1.35rem) / 1.4 monospace; }
+.cultivation-finale .finale-subtitle { font: 600 clamp(1rem, 1.9vw, 1.35rem) / 1.5 var(--ui-font-body); }
 .cultivation-finale .finale-subtitle[data-speaker="volt"] { color: #ffdb6b; }
 .finale-alarm-wash { position: absolute; inset: 8% 0; background: #ff101a; pointer-events: none; }
 .finale-bar { position: absolute; left: 0; right: 0; height: 8%; background: #010305; z-index: 2; }
@@ -103,28 +104,28 @@ canvas {
 #app[data-cinematic="blackout-arrival"]::after { bottom: 0; }
 .finale-fade { position: absolute; inset: 0; background: #010305; z-index: 3; }
 .finale-skip { pointer-events: auto; position: absolute; bottom: 2.4%; right: 3%; z-index: 4;
-  background: transparent; border: 1px solid #a1c3ce60; color: #bbced3; padding: .4rem .8rem; font: .75rem monospace; cursor: pointer; }
+  background: transparent; border: 1px solid #a1c3ce60; color: #bbced3; padding: .4rem .8rem; font: var(--ui-text-size)/1.5 var(--ui-font-body); cursor: pointer; }
 .finale-skip:focus-visible { outline: 2px solid #a4e4ef; }
-.finale-status { position: absolute; inset: 48% 5% auto; text-align: center; z-index: 4; font: .8rem monospace; }
+.finale-status { position: absolute; inset: 48% 5% auto; text-align: center; z-index: 4; font: var(--ui-text-size)/1.5 var(--ui-font-body); }
 .finale-subtitle { position: absolute; bottom: 12%; width: 100%; text-align: center; font-size: clamp(1rem, 2.3vw, 1.6rem);
   color: #a4ed73; text-shadow: 0 2px 6px black; letter-spacing: .06em; }
 .finale-scan { position: absolute; inset: 11% 5%; border: 1px solid #9bd5e45c; color: #a4e7ff;
-  background: repeating-linear-gradient(0deg, transparent, transparent 3px, #03232e22 4px); font-family: monospace; }
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, #03232e22 4px); font-family: var(--ui-font-body); }
 .finale-scan[data-target="goop"] { color: #ff6976; border-color: #ff697670; }
-.finale-scan-heading { position: absolute; top: 3%; left: 3%; font-size: clamp(.6rem, 1.4vw, .95rem); letter-spacing: .16em; }
-.finale-scan-details { position: absolute; bottom: 8%; left: 3%; font-size: clamp(.65rem, 1.55vw, 1.05rem);
+.finale-scan-heading { position: absolute; top: 3%; left: 3%; font-size: var(--ui-note-size); letter-spacing: var(--ui-track-body); }
+.finale-scan-details { position: absolute; bottom: 8%; left: 3%; font-size: var(--ui-text-size);
   line-height: 1.8; white-space: pre-line; padding: .6rem .9rem; background: #02090fd9; border-left: 2px solid currentColor; }
 .finale-reticle { position: absolute; width: 19%; aspect-ratio: 1; left: 40.5%; top: 28%;
   border: 1px solid currentColor; border-radius: 3%; box-shadow: 0 0 0 8px #0002; }
-.finale-reticle::after { content: '+'; position: absolute; top: 42%; left: 45%; opacity: .7; }
+.finale-reticle::after { content: ''; position: absolute; inset: 42%; border: 1px solid currentColor; border-radius: 50%; opacity: .7; }
 .finale-scan-progress { position: absolute; bottom: 4%; left: 3%; width: 35%; height: 2px; background: currentColor; transform-origin: left; }
 .finale-threat { position: absolute; right: 4%; top: 26%; max-width: 48%; padding: 1rem 1.4rem;
   text-align: right; border-right: 4px solid currentColor; background: linear-gradient(90deg, #02090f90, #02090fed); }
-.finale-threat-caption { font-size: clamp(.65rem, 1.4vw, 1rem); letter-spacing: .28em; }
+.finale-threat-caption { font-size: var(--ui-note-size); letter-spacing: var(--ui-track-body); }
 .finale-threat-level { font-size: clamp(1.6rem, 5.8vw, 4.8rem); font-weight: 800; line-height: 1.35; letter-spacing: .07em; }
 .finale-termination { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:92%;
   padding:1rem .3rem;text-align:center;color:#ff596c;background:#12060be8;border-block:2px solid #ff596c;
-  font:900 clamp(1.6rem,6.8vw,6rem)/1.15 monospace;letter-spacing:.08em;
+  font: 800 clamp(1.6rem,6.8vw,6rem)/1.15 var(--ui-font-display);letter-spacing:.08em;
   opacity:var(--termination-flash-opacity,1);text-shadow:0 0 18px #a80b2b80; }
 .finale-scan[data-stage="terminate"] .finale-threat { top:3%;padding:.4rem .8rem; }
 .finale-scan[data-stage="terminate"] .finale-threat-level { font-size:clamp(1.2rem,2.7vw,2.5rem); }
@@ -132,7 +133,7 @@ canvas {
 @media (prefers-reduced-motion: reduce) { .finale-termination { opacity:1; } }
 @media (max-width: 600px) {
   .finale-threat { top: 17%; right: 3%; padding: .5rem .7rem; max-width: 65%; }
-  .finale-scan-details { bottom: 9%; font-size: .6rem; padding: .3rem .5rem; }
+  .finale-scan-details { bottom: 9%; font-size: var(--ui-note-size); padding: .3rem .5rem; }
 }
 
 .test-panel.is-collapsed {
@@ -140,7 +141,7 @@ canvas {
   max-height: none;
   padding: 0.45rem;
   overflow: visible;
-  background: rgb(9 6 15 / 76%);
+  background: rgb(9 13 24 / 76%);
 }
 
 .test-panel.is-collapsed .test-panel-content {
@@ -152,8 +153,10 @@ canvas {
   z-index: 2;
   top: 0;
   float: right;
-  width: 2rem;
-  height: 2rem;
+  display: grid;
+  place-items: center;
+  width: var(--ui-control-height);
+  height: var(--ui-control-height);
   margin: -0.35rem -0.35rem 0.45rem 0.7rem;
   padding: 0;
   border-radius: 999px;
@@ -169,14 +172,14 @@ canvas {
 
 .test-panel h1 {
   margin: 0.2rem 0 0;
-  font-size: clamp(1.6rem, 5vw, 2.35rem);
+  font-size: var(--ui-heading-size);
   line-height: 1;
 }
 
 .eyebrow {
   margin: 0;
-  color: #bfa7ff;
-  font-size: 0.68rem;
+  color: var(--ui-lavender);
+  font-size: var(--ui-note-size);
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -190,7 +193,7 @@ canvas {
 .probe-status {
   margin: 0.75rem 0;
   color: #aaa2b8;
-  font-size: 0.85rem;
+  font-size: var(--ui-note-size);
   line-height: 1.5;
 }
 
@@ -201,7 +204,7 @@ canvas {
   margin: 0.9rem 0;
   padding: 0;
   color: #f4f0ff;
-  font-size: 0.78rem;
+  font-size: var(--ui-note-size);
   list-style: none;
 }
 
@@ -225,7 +228,7 @@ canvas {
   gap: 0.9rem;
   margin: 0.8rem 0;
   color: #d8d2e2;
-  font-size: 0.78rem;
+  font-size: var(--ui-note-size);
 }
 
 .surface-key span::before {
@@ -252,26 +255,27 @@ canvas {
 }
 
 .test-panel button {
+  min-height: var(--ui-control-height);
   padding: 0.62rem 0.8rem;
-  border: 1px solid rgb(191 167 255 / 28%);
+  border: 1px solid rgb(163 203 194 / 28%);
   border-radius: 0.3rem;
   color: #f4f0ff;
-  background: #24153a;
+  background: var(--ui-surface-raised);
   font: inherit;
   cursor: pointer;
 }
 
 .test-panel button:hover,
 .test-panel button:focus-visible {
-  border-color: #bfa7ff;
-  background: #34204f;
+  border-color: var(--ui-lavender);
+  background: var(--ui-hover);
 }
 
 .runtime-status {
   margin: 0.65rem 0 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: var(--ui-note-size)/1.5 var(--ui-font-body);
 }
 
 @media (max-width: 600px) {
