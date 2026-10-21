@@ -1,6 +1,6 @@
 # Lab performance optimisation specification
 
-Status: proposed implementation targets. Baseline: 21 October 2026, commit
+Status: implementation in progress; hardware validation is partial. Baseline: 21 October 2026, commit
 `74af50d911c84ac26797c812b5a5384f7dd1b4ad`.
 
 Tracking: [parent #222](https://github.com/Gradient-Ascenders/Specimen/issues/222); preparation [#223](https://github.com/Gradient-Ascenders/Specimen/issues/223), shader coverage [#224](https://github.com/Gradient-Ascenders/Specimen/issues/224), startup [#225](https://github.com/Gradient-Ascenders/Specimen/issues/225), validation [#226](https://github.com/Gradient-Ascenders/Specimen/issues/226).
