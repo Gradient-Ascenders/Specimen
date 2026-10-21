@@ -1,6 +1,6 @@
 export const BRAND_ASSETS = {
-  detailedMark: './brand/specimen-mark.svg',
-  simpleMark: './brand/specimen-mark-simple.svg',
+  detailedMark: './brand/specimen-app-icon.png',
+  simpleMark: './brand/specimen-app-icon.png',
 } as const;
 
 type BrandMarkVariant = 'detailed' | 'simple';

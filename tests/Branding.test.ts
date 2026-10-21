@@ -15,7 +15,6 @@ test('canonical brand assets and external lockups are checked in', async () => {
     ...Object.values(BRAND_ASSETS).map((asset) => `public/${asset.slice(2)}`),
     'public/brand/specimen-lockup-full.png',
     'public/brand/specimen-app-icon.png',
-    'public/brand/specimen-favicon.svg',
   ];
 
   await Promise.all(canonicalFiles.map((path) => access(new URL(path, repositoryRoot))));
@@ -63,17 +62,13 @@ test('every live game-flow loader uses the shared branded scanner', async () => 
 });
 
 test('document metadata and README use deployment-safe brand paths', async () => {
-  const [indexHtml, readme, favicon] = await Promise.all([
+  const [indexHtml, readme] = await Promise.all([
     readFile(new URL('index.html', repositoryRoot), 'utf8'),
     readFile(new URL('README.md', repositoryRoot), 'utf8'),
-    readFile(new URL('public/brand/specimen-favicon.svg', repositoryRoot), 'utf8'),
   ]);
 
-  assert.match(indexHtml, /href="\.\/brand\/specimen-favicon\.svg"/);
+  assert.match(indexHtml, /rel="icon" type="image\/png" href="\.\/brand\/specimen-app-icon\.png"/);
   assert.match(indexHtml, /href="\.\/brand\/specimen-app-icon\.png"/);
   assert.doesNotMatch(indexHtml, /data:image\/svg\+xml/);
   assert.match(readme, /src="public\/brand\/specimen-lockup-full\.png"/);
-  assert.match(favicon, /viewBox="346 329 550 550"/);
-  assert.match(favicon, /<rect[^>]+rx="119"[^>]+fill="#120b21"/);
-  assert.match(favicon, /fill="#b99cf6"/);
 });
