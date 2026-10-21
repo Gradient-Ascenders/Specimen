@@ -274,8 +274,7 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
       assert.ok(queue.diagnostics.startupMs >= queue.diagnostics.initialMs, 'report entry and full startup separately');
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
-      assert.equal(queue.diagnostics.completed, 3, 'startup prepares shared ordinary, maintenance and lift layouts');
-      assert.equal(queue.diagnostics.configurations[2].dark, false);
+      assert.equal(queue.diagnostics.completed, 1, 'one shared shader layout prepares all room resources');
       const preparedCompiles = compiles;
       const preparedWork = queue.diagnostics.workMs;
       for (let i = 0; i < 120; i++) { queue.anticipateLiftExit(); queue.tick(16.7); }

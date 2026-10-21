@@ -45,7 +45,7 @@ export class CultivationPreparationQueue {
   private priority: Configuration | undefined;
   private upcoming: Configuration | undefined;
   private startupComplete = false;
-  private startupMaintenance: Configuration | undefined;
+  private startupCoverage: Configuration | undefined;
   private configStarted = 0;
   private lastTick = -1;
   private readonly overlay: HTMLDivElement | undefined;
@@ -109,11 +109,12 @@ export class CultivationPreparationQueue {
 
   /** Prepare the destination during the lift ride, while its shutter is closed. */
   anticipateLiftExit(): void {
+    if (this.startupCoverage?.ready) { this.upcoming = this.startupCoverage; return; }
     // The camera returns to the ordinary lift layout while braking, before
     // Room 5's searchlights enter its render scope. Prepare that smaller layout
     // first rather than leaving it behind unrelated earlier-room work.
     this.upcoming = this.configurations.find(config => !config.ready && !config.dark &&
-      config.visible.every((visible, i) => visible === (i === 6))) ?? this.startupMaintenance ?? this.liftExitConfiguration();
+      config.visible.every((visible, i) => visible === (i === 6))) ?? this.liftExitConfiguration();
   }
 
   private liftExitConfiguration(): Configuration | undefined {
@@ -176,27 +177,20 @@ export class CultivationPreparationQueue {
    * before a debug jump or lift arrival can expose the in-game loading overlay. */
   async prepareStartup(): Promise<void> {
     const started = performance.now();
-    // All ordinary rooms use the same bounded light layout. Prepare their
-    // union once, rather than submitting the overlapping doorway layouts
+    // All rooms share shader slots while retaining their authored source caps.
+    // Prepare their union once, rather than submitting overlapping layouts
     // speculatively during the first controllable frames. requireCurrent still
     // verifies the actual light signature before reusing this coverage.
-    const visible = this.roots.map((_, i) => i !== 7);
+    const visible = this.roots.map(() => true);
     const key = this.key(visible, false);
-    let ordinary = this.configurations.find(config => config.key === key);
-    if (!ordinary) {
-      ordinary = {key, visible, dark: false, z: 0, ready: false};
-      this.configurations.push(ordinary); this.diagnostics.total++;
+    let shared = this.configurations.find(config => config.key === key);
+    if (!shared) {
+      shared = {key, visible, dark: false, z: 0, ready: false};
+      this.configurations.push(shared); this.diagnostics.total++;
     }
-    await this.prepareConfiguration(ordinary);
+    await this.prepareConfiguration(shared);
+    this.startupCoverage = shared;
     this.diagnostics.initialMs = performance.now() - started;
-    // The maintenance layout can overlap Room 3 at the lift entrance. Include
-    // that room in its coverage, then prepare the distinct lift-only layout.
-    this.startupMaintenance = this.configurations.find(config => config.dark &&
-      config.visible.every((included, i) => included === (i >= 5)));
-    if (this.startupMaintenance) await this.prepareConfiguration(this.startupMaintenance);
-    const lift = this.configurations.find(config => !config.dark &&
-      config.visible.every((included, i) => included === (i === 6)));
-    if (lift) await this.prepareConfiguration(lift);
     this.priority = undefined;
     this.startupComplete = true;
     this.diagnostics.startupMs = performance.now() - started;
