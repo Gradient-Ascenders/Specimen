@@ -899,12 +899,23 @@ export class GreyboxLevelRuntime {
       transitionRenderStarted = this.hostWindow.performance.now();
     }
 
-    this.prepareContainmentShadows(testScene, [body.position, goopBody.position]);
-    testScene.withEnclosedRoomOcclusion(
-      slimePair.activeBody.position,
-      this.renderLayer.cameraRig.camera.position,
-      () => this.renderLayer.render(),
-    );
+    const draw = () => {
+      this.prepareContainmentShadows(testScene, [body.position, goopBody.position]);
+      testScene.withEnclosedRoomOcclusion(
+        slimePair.activeBody.position,
+        this.renderLayer.cameraRig.camera.position,
+        () => this.renderLayer.render(),
+      );
+    };
+    const activePosition = slimePair.activeBody.position;
+    const camera = this.renderLayer.cameraRig.camera;
+    // Limit the smaller light layout to the enclosed final run of the first
+    // duct. Other rooms and the lift vent retain their established policy.
+    if (this.lightLayout && activePosition.z >= 24 && camera.position.z >= 24 &&
+      testScene.teaching.isInsideCameraTightVent(activePosition) &&
+      testScene.teaching.isInsideCameraTightVent(camera.position)) {
+      this.lightLayout.withCameraCulling(camera, draw);
+    } else draw();
 
     if (profileLightingTransition) {
       const visit = (this.lightingRoomVisits.get(lightingRoomId) ?? 0) + 1;
@@ -1538,7 +1549,7 @@ export class GreyboxLevelRuntime {
   }
 
   private prepareContainmentShadows(testScene: ContainmentLevelScene, participants: readonly Vector3State[]): void {
-    const key = testScene.lightingDiagnostics.visibleRoomIds.join(',');
+    const key = `${testScene.lightingDiagnostics.visibleRoomIds.join(',')}:${this.lightLayout?.cameraCullKey ?? ''}`;
     if (key !== this.lastShadowLayoutKey) {
       this.lightLayout?.sync();
       // Refresh Three's light state before its shadow pass, without compiling
