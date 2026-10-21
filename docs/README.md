@@ -13,6 +13,9 @@ for implementation details and historical evidence.
   fixed-step updates, input, transitions, restart, and disposal.
 - [Rendering and assets](architecture/rendering.md) — renderer ownership,
   lighting, shadows, preparation, and asset boundaries.
+- [Lab performance optimisation specification](architecture/lab-performance-optimisation.md) —
+  Level 2 preparation pacing, Level 1 startup and shader coverage, with hardware
+  acceptance targets and resource stability requirements.
 - [Cultivation room workload](architecture/room-workload.md) — room scope ownership,
   static transforms, spatial batching, diagnostics and measurement limits.
 - [Goop model integration](architecture/goop-model-integration.md) — implementation

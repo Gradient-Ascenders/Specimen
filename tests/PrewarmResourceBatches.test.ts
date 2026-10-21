@@ -34,3 +34,12 @@ test('an isolated leaf batch cannot accidentally upload its unselected mesh desc
   assert.equal(parent.visible, false); assert.equal(selected.visible, false); assert.equal(child.visible, true);
   geometry.dispose(); material.dispose();
 });
+
+test('batches omit invisible materials while retaining dormant art, mixed materials and visible children', () => {
+  const geometry = new THREE.BoxGeometry(), visible = new THREE.MeshBasicMaterial(), hidden = new THREE.MeshBasicMaterial({visible: false});
+  const collider = new THREE.Mesh(geometry, hidden), child = new THREE.Mesh(geometry, visible);
+  const dormant = new THREE.Mesh(geometry, visible), mixed = new THREE.Mesh(geometry, [hidden, visible]);
+  dormant.visible = false; collider.add(child);
+  assert.deepEqual(createPrewarmResourceBatches([collider, dormant, mixed]).flat(), [child, dormant, mixed]);
+  geometry.dispose(); visible.dispose(); hidden.dispose();
+});

@@ -33,13 +33,13 @@ function fixture() {
   return { scene, camera, focus, points, spots, volt, layout };
 }
 
-test('maintenance receivers use four point slots and three spotlight/shadow slots, not seventeen plus nine', () => {
+test('maintenance preserves its source caps with shared shader slots', () => {
   const f = fixture();
   const authored = [...f.points, ...f.spots, f.volt];
   const before = authored.map(l => [l.parent, l.visible, l.layers.mask, l.intensity, l.color.getHex(), l.distance, l.castShadow]);
   try {
     f.layout.withLayout(f.scene, f.camera, f.focus, () => {
-      assert.deepEqual(counts(f.scene, f.camera), {points:4, spots:3, pointShadows:1, spotShadows:3});
+      assert.deepEqual(counts(f.scene, f.camera), {points:5, spots:3, pointShadows:1, spotShadows:3});
       assert.equal(f.layout.diagnostics.profile, 'maintenance');
       assert.ok(f.layout.diagnostics.selectedPoints > 0 && f.layout.diagnostics.selectedSpots > 0);
       assert.ok(f.layout.diagnostics.scheduledShadowPasses <= 9, 'three spot maps plus at most six point faces');
@@ -56,8 +56,8 @@ test('source changes and repeated power toggles keep one maintenance signature a
       f.points.forEach((light, index) => light.intensity = i % 2 && index % 2 ? 0 : 20);
       f.volt.intensity = i % 2 ? 0 : 50;
       f.layout.withLayout(f.scene, f.camera, f.focus, () => {
-        assert.deepEqual(counts(f.scene, f.camera), {points:4, spots:3, pointShadows:1, spotShadows:3});
-        assert.equal(f.layout.signature, '4:1:3:3');
+        assert.deepEqual(counts(f.scene, f.camera), {points:5, spots:3, pointShadows:1, spotShadows:3});
+        assert.equal(f.layout.signature, '5:1:3:3');
         for (const light of [...f.points, ...f.spots, f.volt]) {
           if (!light.intensity) assert.equal(light.layers.test(f.camera.layers), false);
         }
@@ -66,17 +66,20 @@ test('source changes and repeated power toggles keep one maintenance signature a
   } finally { f.layout.dispose(); }
 });
 
-test('ordinary rooms and the lift retain smaller bounded signatures through visibility handoffs', () => {
+test('ordinary rooms and lift share shaders without expanding selected light caps', () => {
   const f = fixture();
   try {
     f.spots.forEach(light => light.userData.cultivationTraversalShadowLight = true);
     f.volt.visible = false;
-    for (const [points, spots, expected] of [[2,1,'2:0:1:1'], [8,2,'4:0:2:2'], [17,4,'4:0:2:2'], [2,1,'2:0:1:1']] as const) {
+    for (const [points, spots] of [[2,1], [8,2], [17,4], [2,1]] as const) {
       f.points.forEach((light, i) => light.visible = i < points);
       f.spots.forEach((light, i) => light.visible = i < spots);
       f.layout.withLayout(f.scene, f.camera, f.focus, () => {
-        assert.equal(f.layout.signature, expected);
-        assert.ok(counts(f.scene, f.camera).points <= 4 && counts(f.scene, f.camera).spots <= 2);
+        assert.equal(f.layout.signature, '5:1:3:3');
+        assert.deepEqual(counts(f.scene, f.camera), {points:5, spots:3, pointShadows:1, spotShadows:3});
+        assert.ok(f.layout.diagnostics.selectedPoints <= (points === 2 ? 2 : 4));
+        assert.ok(f.layout.diagnostics.selectedSpots <= (spots === 1 ? 1 : 2));
+        assert.equal(f.layout.diagnostics.selectedNames.includes('volt'), false);
       });
     }
   } finally { f.layout.dispose(); }

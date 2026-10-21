@@ -13,7 +13,11 @@ export function createPrewarmResourceBatches(
   for (const root of roots) root.traverse(object => {
     if (seen.has(object) || !(object instanceof THREE.Mesh || object instanceof THREE.Line ||
       object instanceof THREE.Points || object instanceof THREE.Sprite)) return;
-    seen.add(object); objects.push(object);
+    seen.add(object);
+    // Dormant visible art still needs an upload. Collider-only materials can
+    // never draw, including when their parent is temporarily made visible.
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    if (materials.some(material => material.visible)) objects.push(object);
   });
   const batches: THREE.Object3D[][] = [];
   for (let index = 0; index < objects.length; index += limit) batches.push(objects.slice(index, index + limit));

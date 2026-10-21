@@ -9,8 +9,8 @@ import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
-for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
-  const mode = variant === 'startup-minimum' || variant.startsWith('current-dark') ? 'startup' : variant;
+for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'startup-no-parallel', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
+  const mode = variant.startsWith('startup') || variant.startsWith('current-dark') ? 'startup' : variant;
   const fail = mode === 'failure';
   const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
@@ -81,7 +81,7 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
   globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
   const renderer = {
     getPixelRatio: () => 1,
-    extensions: {has: () => mode !== 'lift'},
+    extensions: {has: () => mode !== 'lift' && variant !== 'startup-no-parallel'},
     shadowMap: { enabled: false, autoUpdate: true, needsUpdate: false, type: THREE.BasicShadowMap as THREE.ShadowMapType },
     getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},
     getViewport: (out: THREE.Vector4) => out.copy(viewport), getScissor: (out: THREE.Vector4) => out.copy(scissor), getScissorTest: () => scissorTest,
@@ -274,22 +274,15 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
       assert.ok(queue.diagnostics.startupMs >= queue.diagnostics.initialMs, 'report entry and full startup separately');
       assert.deepEqual(shadowLayouts, new Set(['live-layout']));
       assert.deepEqual(mapsInShadow, new Set([true, false]));
-      assert.equal(queue.diagnostics.completed, 2, 'startup prepares initial and the shared lift/encounter layout');
-      // Startup already prepared Room 5. Prioritize the smaller, bright lift
-      // layout during approach/ride instead of waiting for unrelated rooms.
-      let now = performance.now();
-      const clock = context.mock.method(performance, 'now', () => now += .001);
-      try {
-        for (let i = 0; i < 1000 && queue.diagnostics.completed < 3; i++) {
-          now += 51; queue.anticipateLiftExit(); queue.tick(40);
-          assert.equal(queue.diagnostics.pending, false, 'anticipated work stays in background');
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      } finally { clock.mock.restore(); }
-      assert.ifError((queue as unknown as { failure?: unknown }).failure);
-      assert.equal(queue.diagnostics.completed, 3, 'the lift is ready before braking');
-      assert.equal(queue.diagnostics.configurations[2].dark, false);
+      assert.equal(queue.diagnostics.completed, 1, 'one shared shader layout prepares all room resources');
       const preparedCompiles = compiles;
+      const preparedWork = queue.diagnostics.workMs;
+      for (let i = 0; i < 120; i++) { queue.anticipateLiftExit(); queue.tick(16.7); }
+      assert.equal(queue.diagnostics.workMs, preparedWork, 'covered handoffs cannot start speculative GPU work during play');
+      for (let z = 0; z <= 225; z += 3) for (const offset of [-12, 0, 12]) {
+        preview.updatePresentationVisibility({z: z + offset}, {z}); lighting.sync(scene);
+        assert.equal(queue.requireCurrent(false), true, `ordinary crossing/backtracking is ready at ${z} with camera offset ${offset}`);
+      }
       // The orbiting lift camera can expose Room 5 before its dark-room
       // lighting starts. Exercise the real arrival states, not only a debug
       // restore directly into the completed (dark) elevator.

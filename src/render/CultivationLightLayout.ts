@@ -10,6 +10,11 @@ export const CULTIVATION_LIGHT_BUDGETS = {
   maintenance: { points: 4, pointShadows: 1, spots: 3 },
 } as const;
 
+// Shader slots are shared; source selection keeps the authored per-room caps
+// above. Four ordinary points coexist with an unused point-shadow slot, while
+// maintenance uses three ordinary points plus its real point shadow.
+const SHADER_SLOTS = { points: 5, pointShadows: 1, spots: 3 } as const;
+
 type Profile = keyof typeof CULTIVATION_LIGHT_BUDGETS;
 type SourceLight = THREE.PointLight | THREE.SpotLight;
 interface Source {
@@ -154,8 +159,8 @@ export class CultivationLightLayout {
     }
     d.profile = maintenance ? 'maintenance' : d.authoredPoints <= 2 && d.authoredSpots <= 1 ? 'lift' : 'ordinary';
     const budget = CULTIVATION_LIGHT_BUDGETS[d.profile];
-    d.pointSlots = budget.points; d.pointShadowSlots = budget.pointShadows;
-    d.spotSlots = d.spotShadowSlots = budget.spots;
+    d.pointSlots = SHADER_SLOTS.points; d.pointShadowSlots = SHADER_SLOTS.pointShadows;
+    d.spotSlots = d.spotShadowSlots = SHADER_SLOTS.spots;
     const choose = (candidates: Source[], count: number): number => {
       candidates.sort((a, b) => b.score - a.score || a.order - b.order);
       for (let i = 0; i < Math.min(count, candidates.length); i++) {
@@ -181,9 +186,9 @@ export class CultivationLightLayout {
         }
       }
     }
-    this.points.forEach((light, i) => light.visible = i < budget.points - budget.pointShadows - regular);
-    this.pointShadows.forEach((light, i) => light.visible = i < budget.pointShadows - shadowedPoints);
-    this.spots.forEach((light, i) => light.visible = i < budget.spots - spots);
+    this.points.forEach((light, i) => light.visible = i < SHADER_SLOTS.points - SHADER_SLOTS.pointShadows - regular);
+    this.pointShadows.forEach((light, i) => light.visible = i < SHADER_SLOTS.pointShadows - shadowedPoints);
+    this.spots.forEach((light, i) => light.visible = i < SHADER_SLOTS.spots - spots);
     this.root.visible = true;
     this.previous.clear();
     for (const light of this.selected) this.previous.add(light);

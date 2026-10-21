@@ -310,9 +310,10 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function playerFixture() {
+function playerFixture(scheduler?: {yield(): Promise<void>}) {
   let sceneLoads = 0, preloads = 0, levelLoads = 0, completions = 0, disposals = 0, draws = 0, nextFrame = 0;
   const sceneReady = deferred(), preloadReady = deferred(), levelReady = deferred(), frames = new Map<number, FrameRequestCallback>();
+  const tasks: (() => void)[] = [];
   let scenePromise = sceneReady.promise;
   let levelPromise = levelReady.promise;
   const host = { dataset: {} as Record<string, string>, clientWidth: 640, clientHeight: 360, ownerDocument: { hidden: false } };
@@ -323,8 +324,10 @@ function playerFixture() {
     renderer: { shadowMap: {}, render: () => { draws++; } } };
   const statuses: { message: string; failed: boolean }[] = [];
   const options = { scene, renderLayer: layer, host, window: {
+    scheduler,
     requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++nextFrame, callback); return nextFrame; },
     cancelAnimationFrame: (id: number) => frames.delete(id),
+    setTimeout: (callback: () => void) => { tasks.push(callback); return tasks.length; },
   }, preloadLevel: () => { preloads++; return preloadReady.promise; },
   prepareLevel: () => {
     assert.equal(fades.at(-1), 1, 'Full world/model/GPU preparation must stay behind a blackout.');
@@ -335,12 +338,44 @@ function playerFixture() {
   const player = new OpeningGamePresentation(options as unknown as OpeningGamePresentationOptions);
   const flushFrames = () => { const pending = [...frames.values()]; frames.clear(); for (const callback of pending) callback(0); };
   const blackout = () => { for (let frame = 0; frame < 9; frame++) player.render(0.1); };
-  return { player, host, frames, sceneReady, preloadReady, levelReady, statuses, fades, flushFrames, blackout,
+  return { player, host, frames, tasks, sceneReady, preloadReady, levelReady, statuses, fades, flushFrames, blackout,
     setScenePromise: (promise: Promise<void>) => { scenePromise = promise; },
     setLevelPromise: (promise: Promise<void>) => { levelPromise = promise; },
     counts: () => ({ sceneLoads, preloads, levelLoads, completions, disposals, draws }) };
 }
 const flushPromises = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+
+test('full preparation yields browser tasks only after the live opening paints its blackout', async () => {
+  const f = playerFixture(); f.player.start();
+  let settled = false;
+  const visible = f.player.yieldPreparation().then(() => { settled = true; });
+  assert.equal(f.tasks.length, 0); assert.equal(settled, false);
+  f.flushFrames(); await visible;
+  f.player.skip(); f.flushFrames(); f.flushFrames();
+  f.sceneReady.resolve(); await flushPromises();
+  assert.equal(f.counts().levelLoads, 1); assert.equal(f.fades.at(-1), 1);
+  settled = false;
+  const hidden = f.player.yieldPreparation().then(() => { settled = true; });
+  assert.equal(f.tasks.length, 1); assert.equal(settled, false, 'the next GPU job must remain asynchronous');
+  f.tasks.shift()!(); await hidden;
+  f.player.dispose(); await f.player.yieldPreparation();
+  assert.equal(f.tasks.length, 0);
+});
+
+test('the task scheduler also yields asynchronously under the painted blackout', async () => {
+  const task = deferred(); let calls = 0;
+  const f = playerFixture({yield: () => { calls++; return task.promise; }});
+  f.player.start();
+  const visible = f.player.yieldPreparation();
+  assert.equal(calls, 0, 'visible playback keeps frame pacing');
+  f.flushFrames(); await visible;
+  f.player.skip(); f.flushFrames(); f.flushFrames();
+  f.sceneReady.resolve(); await flushPromises();
+  let settled = false;
+  const hidden = f.player.yieldPreparation().then(() => { settled = true; });
+  assert.equal(calls, 1); await flushPromises(); assert.equal(settled, false);
+  task.resolve(); await hidden; f.player.dispose();
+});
 
 test('only light assets prepare during the film; Skip paints black before full Level 1 preparation', async () => {
   const f = playerFixture(); f.player.start(); f.player.start();
