@@ -483,10 +483,10 @@ export class GreyboxLevelRuntime {
         renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
         renderer.setScissorTest(false);
         renderer.transmissionResolutionScale = 0.5;
-        layer.withShadowPreparation(true, () => {
-          this.prepareContainmentShadows(resources.testScene, [resources.body.position, resources.goopBody.position]);
-          renderer.render(layer.scene, camera);
-        });
+        // Calibration draws the live lighting workload. Let Three initialize
+        // shadow maps before receivers sample them, including dormant slots.
+        this.prepareContainmentShadows(resources.testScene, [resources.body.position, resources.goopBody.position]);
+        layer.render();
       }, target);
       let result: GraphicsCalibrationResult = { profile: 'minimum', sampleCount: 0, frameMs: 0, timedOut: true };
       // The lighting owner restores all visibility/reflection state even on failure.

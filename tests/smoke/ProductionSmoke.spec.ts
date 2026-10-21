@@ -78,6 +78,8 @@ test('plain production boots, shows credits, starts, and restarts at a nested pa
   await page.keyboard.press('ArrowLeft');
   await expect(settings.locator('[data-setting-output="volume"]')).toHaveText('95%');
   await page.keyboard.press('ArrowDown');
+  await expect(settings.locator('[data-setting="music-volume"]')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
   await expect(settings.locator('[data-setting="effects-volume"]')).toBeFocused();
   await settings.locator('[data-section="controls"]').click();
   await page.keyboard.press('Tab');
@@ -193,7 +195,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
     }
     await restartFromPause(page);
   }
-  await expect(page.locator('[data-slime-id="volt"]')).toHaveAttribute('data-state', 'active');
+  await expect(page.locator('li[data-slime-id="volt"]')).toHaveAttribute('data-state', 'active');
   expect(voltAssets.size, 'The shipped authored Volt GLB must load').toBe(1);
   expect([...voltAssets][0]).toContain('/group-folder/assets/volt-');
   expect([...failures], 'Production transition console/network errors').toEqual([]);

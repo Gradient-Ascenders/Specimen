@@ -327,7 +327,9 @@ export class RenderLayer {
         renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
         renderer.setScissorTest(false);
         renderer.transmissionResolutionScale = 0.5;
-        this.withShadowPreparation(true, () => renderer.render(this.scene, camera));
+        // Quality changes can release shadow maps. Recreate them with normal
+        // updates before sampling receivers or timing the live workload.
+        this.render();
       }, target);
       let warmed = false;
       const view = { warm: async () => {
