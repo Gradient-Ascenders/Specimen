@@ -157,6 +157,7 @@ export interface ShaderProgramGrowthEvent {
 export interface ShaderProgramGuardSnapshot {
   readonly armed: boolean;
   readonly baselineProgramCount: number | null;
+  /** Baseline plus unexpected identities, independent of later disposal. */
   readonly highestProgramCount: number | null;
   readonly growthEventCount: number;
   readonly plannedPreparationProgramCount?: number;

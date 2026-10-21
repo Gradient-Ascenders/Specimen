@@ -1484,8 +1484,16 @@ export class GreyboxLevelRuntime {
         finally { object.visible = visible; }
       } };
       yield { label: `finale upload ${object.name || object.type}`, gpu: true, run: () => {
-        this.renderLayer.withShadowPreparation(renderer.shadowMap.enabled, () => withIsolatedPrewarmState(renderer, () =>
-          renderIsolatedPrewarmResources(renderer, scene, camera, [object], { includeHidden: true, includeDescendants: false })));
+        const prior = new Set(renderer.info.programs ?? []);
+        try {
+          this.renderLayer.withShadowPreparation(renderer.shadowMap.enabled, () => withIsolatedPrewarmState(renderer, () =>
+            renderIsolatedPrewarmResources(renderer, scene, camera, [object], { includeHidden: true, includeDescendants: false })));
+        } finally {
+          // A real primer can introduce the framebuffer colour-space variant
+          // that compile() did not select. It belongs to this gated job too;
+          // subsequent live draws still have to reuse the finished programs.
+          for (const program of renderer.info.programs ?? []) if (!prior.has(program)) this.cinematicShaderPrograms.add(program);
+        }
       } };
     }
   }

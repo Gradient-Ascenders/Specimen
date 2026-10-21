@@ -67,3 +67,50 @@ test('9 is dev-only, Level-1-running-only, and previews the real ending rather t
   assert.equal(begins,1);assert.equal(completions,0,'Playback must finish before the normal Level 2 handoff.');
   assert.equal(cancelled,1);assert.equal(releases,1);assert.equal(prevented,1);assert.equal(input.enabled,false);
 });
+
+test('only programs introduced by explicit finale compiler and primer jobs are planned', async () => {
+  const THREE = await import('three');
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshBasicMaterial();
+  const mesh = new THREE.Mesh(geometry, material); scene.add(mesh);
+  const existing = {}, compiled = {}, primed = {}, unexpected = {};
+  const programs = [existing];
+  const viewport = new THREE.Vector4(0, 0, 640, 360);
+  const renderer = {
+    info: {programs, render: {calls: 0, triangles: 0, points: 0, lines: 0}},
+    shadowMap: {enabled: false},
+    compile() { programs.push(compiled); },
+    render() { programs.push(primed); },
+    getContext: () => ({getExtension: () => null}),
+    getPixelRatio: () => 1,
+    getRenderTarget: () => null, setRenderTarget() {},
+    getViewport: (out: InstanceType<typeof THREE.Vector4>) => out.copy(viewport), setViewport() {},
+    getScissor: (out: InstanceType<typeof THREE.Vector4>) => out.copy(viewport), setScissor() {},
+    getScissorTest: () => false, setScissorTest() {},
+    getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
+  };
+  const runtime = new GreyboxLevelRuntime({debugAvailable: false, host: {dataset: {}}, window: {}, input: {},
+    renderLayer: {scene, renderer, cameraRig: {camera}, withShadowPreparation: (_: boolean, action: () => unknown) => action()},
+  } as unknown as GreyboxLevelRuntimeOptions);
+  const resources = {};
+  const probe = runtime as unknown as {
+    resources: object; finaleGeneration: number; finaleAbort: AbortController;
+    finale: object;
+    finalePreparationJobs(resources: object, generation: number): Generator<{label: string; run(): unknown}>;
+  };
+  probe.resources = resources; probe.finaleGeneration = 1; probe.finaleAbort = new AbortController();
+  // Supply an already-constructed fixture; the skipped module job owns the real
+  // asset construction, which is covered by the cinematic integration tests.
+  probe.finale = {preparationJobs: function* () {}, visuals: {root: mesh}};
+  const jobs = probe.finalePreparationJobs(resources, 1);
+  assert.equal(jobs.next().value!.label, 'finale module');
+  await jobs.next().value!.run();
+  assert.equal(runtime.isPlannedShaderProgram(compiled), true);
+  assert.equal(runtime.isPlannedShaderProgram(existing), false);
+  jobs.next().value!.run();
+  assert.equal(runtime.isPlannedShaderProgram(primed), true, 'the real primer may create a framebuffer variant');
+  programs.push(unexpected);
+  assert.equal(runtime.isPlannedShaderProgram(unexpected), false, 'subsequent live additions remain checked');
+  assert.equal(mesh.parent, scene); assert.equal(jobs.next().done, true);
+  geometry.dispose(); material.dispose();
+});

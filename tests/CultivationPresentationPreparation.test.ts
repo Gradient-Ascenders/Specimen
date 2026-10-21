@@ -9,8 +9,8 @@ import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
-for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
-  const mode = variant === 'startup-minimum' || variant.startsWith('current-dark') ? 'startup' : variant;
+for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'startup-no-parallel', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
+  const mode = variant.startsWith('startup') || variant.startsWith('current-dark') ? 'startup' : variant;
   const fail = mode === 'failure';
   const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
@@ -81,7 +81,7 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
   globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
   const renderer = {
     getPixelRatio: () => 1,
-    extensions: {has: () => mode !== 'lift'},
+    extensions: {has: () => mode !== 'lift' && variant !== 'startup-no-parallel'},
     shadowMap: { enabled: false, autoUpdate: true, needsUpdate: false, type: THREE.BasicShadowMap as THREE.ShadowMapType },
     getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},
     getViewport: (out: THREE.Vector4) => out.copy(viewport), getScissor: (out: THREE.Vector4) => out.copy(scissor), getScissorTest: () => scissorTest,

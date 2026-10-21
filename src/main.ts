@@ -306,6 +306,7 @@ function startGame(): void {
       musicLevel = levelId === 'level-2' ? 'cultivation' : 'blackout';
       levelOneShaderProgramGuardActive = false;
       sampleLevelOneShaderPrograms = undefined;
+      warmedLevelOnePrograms = undefined;
       performanceRecorder?.completeLevelOneShaderProgramGuard();
       gameFlow.beginLevelTransition(message, levelId);
     },
