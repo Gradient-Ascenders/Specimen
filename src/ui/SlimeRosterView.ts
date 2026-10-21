@@ -15,6 +15,7 @@ export interface SlimeRosterEntryView {
  */
 export function getSlimeRosterEntryView(
   entry: SlimeRosterState,
+  switchKeyLabel = 'Tab',
 ): SlimeRosterEntryView | undefined {
   if (!entry.betaPlayable) return undefined;
 
@@ -22,8 +23,8 @@ export function getSlimeRosterEntryView(
   if (entry.active && usable) {
     return {
       state: 'active',
-      stateLabel: 'ACTIVE — CONTROLLED',
-      controlLabel: 'ACTIVE BODY',
+      stateLabel: 'Active',
+      controlLabel: '',
       ariaLabel: `${entry.displayName}: active, controlled body`,
     };
   }
@@ -31,17 +32,17 @@ export function getSlimeRosterEntryView(
   if (usable) {
     return {
       state: 'switchable',
-      stateLabel: 'INACTIVE — AVAILABLE',
-      controlLabel: 'TAB — SWITCH',
-      ariaLabel: `${entry.displayName}: inactive, available with Tab`,
+      stateLabel: 'Ready',
+      controlLabel: `${switchKeyLabel} to switch`,
+      ariaLabel: `${entry.displayName}: inactive, available with ${switchKeyLabel}`,
     };
   }
 
   const reason = entry.unlocked ? 'unavailable' : 'locked';
   return {
     state: 'unavailable',
-    stateLabel: reason === 'locked' ? 'LOCKED — UNAVAILABLE' : 'UNAVAILABLE',
-    controlLabel: 'UNAVAILABLE',
+    stateLabel: reason === 'locked' ? 'Locked' : 'Unavailable',
+    controlLabel: '',
     ariaLabel: `${entry.displayName}: ${reason}, unavailable`,
   };
 }

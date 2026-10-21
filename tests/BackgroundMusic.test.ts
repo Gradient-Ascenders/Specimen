@@ -51,6 +51,9 @@ test('title music attempts immediate playback and obeys volume and focus', () =>
   assert.equal(players[1]?.volume, 0);
   music.setMasterVolume(0.5);
   assert.equal(players[1]?.volume, 0.14);
+  music.setMusicVolume(0.5); assert.equal(players[1]?.volume, 0.07);
+  music.setMusicVolume(0); assert.equal(players[1]?.volume, 0);
+  music.setMusicVolume(1); assert.equal(players[1]?.volume, 0.14);
   music.setScene('intro', false);
   assert.equal(players[1]?.paused, true);
   music.setScene('intro', true);

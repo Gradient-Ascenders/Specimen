@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { menuIconMarkup as icon } from '../ui/MenuIcons.ts';
 import { buildInfo } from '../core/BuildInfo.ts';
 import { QualificationTimeline } from './QualificationTimeline.ts';
 import { SimulationTimeSummary, simulationTimeState, type SimulationTimeState } from './SimulationTimeSummary.ts';
@@ -500,12 +501,20 @@ export class PerformanceFlightRecorder implements LoopProfiler {
 
     this.element = this.hostDocument.createElement('aside');
     this.element.className = 'performance-recorder';
+    this.element.hidden = true;
     this.element.innerHTML = `
-      <span data-recorder-status>Flight recorder idle</span>
-      <span data-shader-program-guard>Shader guard awaiting Level 1 warm-up</span>
-      <button type="button" data-recorder-action="toggle">Record <kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.toggle}</kbd></button>
-      <button type="button" data-recorder-action="marker" disabled>Mark <kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.marker}</kbd></button>
-      <button type="button" data-recorder-action="export" disabled>Export <kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.export}</kbd></button>
+      <details class="recorder-panel">
+        <summary>${icon('Activity')}<span class="recorder-label">Performance</span><span class="recorder-live">Recording</span></summary>
+        <div class="recorder-content">
+          <span data-recorder-status>Recorder idle</span>
+          <span data-shader-program-guard>Shader guard awaiting Level 1 warm-up</span>
+          <div class="recorder-actions">
+            <button type="button" data-recorder-action="toggle">${icon('Circle')}<span>Record</span><kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.toggle}</kbd></button>
+            <button type="button" data-recorder-action="marker" disabled>${icon('Flag')}<span>Mark</span><kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.marker}</kbd></button>
+            <button type="button" data-recorder-action="export" disabled>${icon('Download')}<span>Export</span><kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.export}</kbd></button>
+          </div>
+        </div>
+      </details>
     `;
     const status = this.element.querySelector<HTMLElement>('[data-recorder-status]');
     const shaderProgramGuardStatus = this.element.querySelector<HTMLElement>(
@@ -618,6 +627,11 @@ export class PerformanceFlightRecorder implements LoopProfiler {
   }
 
   recordFlowState(state: string): void {
+    this.element.hidden = state !== 'playing' && state !== 'paused';
+    if (state === 'playing') {
+      const panel = this.element.querySelector<HTMLDetailsElement>('.recorder-panel');
+      if (panel) panel.open = false;
+    }
     if (!this.benchmarkMode) return;
     const now=this.hostWindow.performance.now();
     if (state==='opening') this.qualificationTimeline.request('initial','initial','containment',now);
@@ -679,8 +693,9 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     this.nextMemorySampleMs = this.sessionStartedAtMs;
     this.setupGpuTiming();
     this.setupPerformanceObservers();
-    this.toggleButton.textContent =
-      `Stop ${PERFORMANCE_RECORDER_SHORTCUT_LABELS.toggle}`;
+    this.element.className = 'performance-recorder is-recording';
+    this.toggleButton.innerHTML =
+      `${icon('Square')}<span>Stop</span><kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.toggle}</kbd>`;
     this.markerButton.disabled = false;
     this.exportButton.disabled = false;
     this.updateStatus('recording');
@@ -693,8 +708,9 @@ export class PerformanceFlightRecorder implements LoopProfiler {
     this.finalizeActiveWindow();
     this.disconnectPerformanceObservers();
     this.clearGpuQueries();
+    this.element.className = 'performance-recorder';
     this.toggleButton.innerHTML =
-      `Record <kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.toggle}</kbd>`;
+      `${icon('Circle')}<span>Record</span><kbd>${PERFORMANCE_RECORDER_SHORTCUT_LABELS.toggle}</kbd>`;
     this.markerButton.disabled = true;
     this.exportButton.disabled = this.totalFrames === 0;
     this.updateStatus('stopped');

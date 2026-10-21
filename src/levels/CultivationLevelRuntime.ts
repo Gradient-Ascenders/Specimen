@@ -1434,7 +1434,7 @@ export class CultivationLevelRuntime {
       if(roomThreeClearance)rollback(()=>roomThreeClearance.dispose());
       const roomFiveFinale=roomFiveEncounter&&authoredPreview?new CultivationFinale({
         room:authoredPreview.roomFive,encounter:roomFiveEncounter,bob:bobBody,goop:goopBody,volt:voltBody,
-        bobPresentation,goopPresentation,voltPresentation,set:authoredPreview.voltFinaleSet,
+        bobPresentation,goopPresentation,voltPresentation,set:authoredPreview.voltFinaleSet,getCameraShakeScale:()=>this.renderLayer.cameraShakeScale,
         acid:authoredPreview.labArt.acid,scene:this.renderLayer.scene,host:this.host,speech:authoredPreview.goopSpeech.mesh,
       }):undefined;
       if(roomFiveFinale)rollback(()=>roomFiveFinale.dispose());

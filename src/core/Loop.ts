@@ -62,6 +62,9 @@ export class Loop {
   private previousTimestampMs: number | undefined;
   private paused = false;
   private disposed = false;
+  private frameIntervalMs = 0;
+  private nextFrameTimestampMs: number | undefined;
+  private pauseWhenUnfocused = true;
 
   constructor(options: LoopOptions) {
     const fixedDeltaSeconds =
@@ -119,6 +122,12 @@ export class Loop {
 
     if (!Number.isFinite(timestampMs)) {
       throw new Error('Loop tick timestamp must be finite.');
+    }
+
+    if (this.frameIntervalMs > 0) {
+      if (this.nextFrameTimestampMs !== undefined && timestampMs + 0.5 < this.nextFrameTimestampMs) return;
+      this.nextFrameTimestampMs = (this.nextFrameTimestampMs ?? timestampMs) + this.frameIntervalMs;
+      if (this.nextFrameTimestampMs < timestampMs) this.nextFrameTimestampMs = timestampMs + this.frameIntervalMs;
     }
 
     const profiling = this.profiler?.enabled === true;
@@ -213,6 +222,20 @@ export class Loop {
     }
   }
 
+  setFrameRateLimit(framesPerSecond: number): void {
+    const interval = framesPerSecond > 0 ? 1000 / framesPerSecond : 0;
+    if (this.frameIntervalMs === interval) return;
+    this.frameIntervalMs = interval;
+    this.nextFrameTimestampMs = undefined;
+  }
+
+  setPauseWhenUnfocused(value: boolean): void {
+    if (this.pauseWhenUnfocused === value) return;
+    this.pauseWhenUnfocused = value;
+    if (value && (this.hostDocument.hidden || !this.hostDocument.hasFocus())) this.pause();
+    else this.resume();
+  }
+
   pause(): void {
     if (this.paused) return;
     this.paused = true;
@@ -245,6 +268,7 @@ export class Loop {
   }
 
   private resetClock(): void {
+    this.nextFrameTimestampMs = undefined;
     this.accumulatorSeconds = 0;
     this.previousTimestampMs = undefined;
     this.resetPerFrameStats();
@@ -260,6 +284,7 @@ export class Loop {
   }
 
   private readonly onVisibilityChange = (): void => {
+    if (!this.pauseWhenUnfocused) return;
     if (this.hostDocument.hidden) {
       this.pause();
     } else if (this.hostDocument.hasFocus()) {
@@ -268,7 +293,7 @@ export class Loop {
   };
 
   private readonly onWindowBlur = (): void => {
-    this.pause();
+    if (this.pauseWhenUnfocused) this.pause();
   };
 
   private readonly onWindowFocus = (): void => {

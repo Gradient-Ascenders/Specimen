@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import { RenderLayer } from '../render/RenderLayer.ts';
+import { menuIconMarkup as icon } from '../ui/MenuIcons.ts';
 import './opening-trailer.css';
 
 export interface TrailerFrame {
@@ -45,29 +46,33 @@ export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement
   ui.dataset.state = 'loading';
   ui.innerHTML = `
     <div class="opening-trailer-start">
-      <p class="eyebrow">Specimen / ${options.label}</p>
+      <p class="system-label">${options.label}</p>
       <h1>${options.title}</h1>
       <p>${options.description}</p>
-      <button type="button" data-trailer-action="play" disabled>Preparing scene…</button>
-      <p class="opening-trailer-hint">Space: pause · R: replay · H: show controls</p>
+      <button type="button" class="system-action primary-action" data-trailer-action="play" disabled>${icon('Play')}<span data-trailer-play-label>Preparing scene…</span></button>
+      <p class="opening-trailer-hint"><kbd>Space</kbd> Pause <kbd>R</kbd> Replay <kbd>H</kbd> Controls</p>
       <nav class="trailer-shot-links" aria-label="Trailer shots">
         <a href="?trailer=opening">01 / Bob wakes</a>
         <a href="?trailer=goop">02 / Goop steps in</a>
       </nav>
     </div>
     <div class="opening-trailer-controls" hidden>
-      <button type="button" data-trailer-action="pause">Pause</button>
-      <button type="button" data-trailer-action="replay">Replay</button>
+      <button type="button" class="system-action" data-trailer-action="pause">${icon('Pause')}${icon('Play', true)}<span data-trailer-pause-label>Pause</span></button>
+      <button type="button" class="system-action" data-trailer-action="replay">${icon('RotateCcw')}<span>Replay</span></button>
       <label>Preview <input type="range" data-trailer-seek min="0" max="${durationSeconds}" value="0" step="0.01" aria-label="${options.label} time"></label>
       <output data-trailer-time>0.0 / ${durationSeconds}s</output>
-      <button type="button" data-trailer-action="hide">Hide controls</button>
-      <a href="./">Back to game</a>
+      <button type="button" class="system-action" data-trailer-action="hide">${icon('EyeOff')}<span>Hide controls</span></button>
+      <a class="system-action" href="./">${icon('ArrowLeft')}<span>Back to game</span></a>
     </div>`;
   host.replaceChildren(render.canvas, ui);
   const startPanel = ui.querySelector<HTMLElement>('.opening-trailer-start')!;
   const controls = ui.querySelector<HTMLElement>('.opening-trailer-controls')!;
   const playButton = ui.querySelector<HTMLButtonElement>('[data-trailer-action="play"]')!;
   const pauseButton = ui.querySelector<HTMLButtonElement>('[data-trailer-action="pause"]')!;
+  const playLabel = ui.querySelector<HTMLElement>('[data-trailer-play-label]')!;
+  const pauseLabel = ui.querySelector<HTMLElement>('[data-trailer-pause-label]')!;
+  const pauseIcon = pauseButton.querySelector('[data-ui-icon=Pause]')!;
+  const resumeIcon = pauseButton.querySelector('[data-ui-icon=Play]')!;
   const seek = ui.querySelector<HTMLInputElement>('[data-trailer-seek]')!;
   const output = ui.querySelector<HTMLOutputElement>('[data-trailer-time]')!;
   let seconds = 0;
@@ -75,6 +80,11 @@ export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement
   let ready = false;
   let disposed = false;
   let previousTimestamp: number | undefined;
+
+  const releaseControlFocus = (): void => {
+    const focused = ui.ownerDocument.activeElement;
+    if (focused instanceof HTMLElement && ui.contains(focused)) focused.blur();
+  };
 
   const present = (): void => {
     const frame = options.sample(seconds);
@@ -86,7 +96,9 @@ export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement
     output.value = `${seconds.toFixed(1)} / ${durationSeconds}s`;
     ui.dataset.state = !ready ? 'loading' : playing ? 'playing'
       : seconds >= durationSeconds ? 'complete' : 'paused';
-    pauseButton.textContent = playing ? 'Pause' : 'Play';
+    pauseLabel.textContent = playing ? 'Pause' : 'Play';
+    pauseIcon.toggleAttribute('hidden', !playing);
+    resumeIcon.toggleAttribute('hidden', playing);
     render.render();
   };
 
@@ -95,8 +107,7 @@ export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement
     if (replay || seconds >= durationSeconds) seconds = 0;
     startPanel.hidden = true;
     controls.hidden = true;
-    playButton.blur();
-    pauseButton.blur();
+    releaseControlFocus();
     previousTimestamp = undefined;
     playing = true;
     present();
@@ -112,12 +123,12 @@ export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement
   };
   const click = (event: Event): void => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (!(target instanceof Element)) return;
     switch (target.closest<HTMLElement>('[data-trailer-action]')?.dataset.trailerAction) {
       case 'play': play(); break;
       case 'pause': togglePause(); break;
       case 'replay': play(true); break;
-      case 'hide': controls.hidden = true; break;
+      case 'hide': controls.hidden = true; releaseControlFocus(); break;
     }
   };
   const scrub = (): void => {
@@ -156,7 +167,7 @@ export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement
     if (disposed) return;
     ready = true;
     playButton.disabled = false;
-    playButton.textContent = options.playLabel;
+    playLabel.textContent = options.playLabel;
     present();
     render.setAnimationLoop((timestamp) => {
       if (playing && previousTimestamp !== undefined) {
@@ -172,7 +183,7 @@ export function startTrailerPlayer<Frame extends TrailerFrame>(host: HTMLElement
     if (disposed) return;
     console.error(`${options.label} preparation failed.`, error);
     ui.dataset.state = 'failed';
-    playButton.textContent = 'Unable to prepare scene. Reload to retry.';
+    playLabel.textContent = 'Unable to prepare scene. Reload to retry.';
   });
 
   const dispose = (): void => {

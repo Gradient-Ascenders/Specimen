@@ -10,7 +10,7 @@ import {
   parseCreditsInlineParts,
   type GameFlowState,
 } from '../src/ui/GameFlowUI.ts';
-import { GameSettings } from '../src/ui/GameSettings.ts';
+import { GameSettings, DEFAULT_GAME_SETTINGS } from '../src/ui/GameSettings.ts';
 
 test('game flow permits only explicit menu transitions', () => {
   const flow = new GameFlowStateModel();
@@ -206,6 +206,7 @@ test('settings retain session values across flow transitions', () => {
   flow.finishRestart();
 
   assert.deepEqual(settings.value, {
+    ...DEFAULT_GAME_SETTINGS,
     mouseSensitivity: 1.7,
     invertVerticalLook: true,
     masterVolume: 0.35,
@@ -216,6 +217,10 @@ test('settings retain session values across flow transitions', () => {
     renderPixelRatioCap: 1.5,
     gelRenderingMode: 'minimum',
     graphicsProfile: 'minimum',
+    customGraphicsProfile: true,
+    pixelBudget: 921600,
+    shadowMapSizeCap: 512,
+    effectsDensity: 0.5,
     renderScale: 0.75,
     graphicsPreset: 'normal',
   });
@@ -324,6 +329,53 @@ test('a gameplay Space release cannot activate the focused pause control', () =>
   assert.equal(menuPress.defaultPrevented, false);
   assert.equal(menuRelease.defaultPrevented, false);
 
+  input.dispose();
+});
+
+test('pointer-lock loss preserves held Space suppression through pause and resume', () => {
+  const hostWindow = new EventTarget();
+  const hostDocument = new FakeDocument();
+  const pointerElement = new FakePointerElement();
+  const input = new Input({
+    window: hostWindow as unknown as Window,
+    document: hostDocument as unknown as Document,
+    pointerLockElement: pointerElement as unknown as HTMLElement,
+  });
+  // GameFlowUI listens after Input and disables gameplay when pointer lock exits.
+  hostDocument.addEventListener('pointerlockchange', () => {
+    if (!hostDocument.pointerLockElement) input.setEnabled(false);
+  });
+  hostDocument.pointerLockElement = pointerElement as unknown as Element;
+  hostWindow.dispatchEvent(keyboardEvent('keydown', 'Space'));
+  assert.equal(input.isDown('jump'), true);
+
+  hostDocument.exitPointerLock();
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(input.enabled, false);
+  assert.equal(input.isDown('jump'), false);
+  assert.equal(input.wasReleased('jump'), false);
+
+  const heldRelease = keyboardEvent('keyup', 'Space');
+  hostWindow.dispatchEvent(heldRelease);
+  assert.equal(heldRelease.defaultPrevented, true, 'The gameplay release must not activate a pause-menu button.');
+
+  const menuPress = keyboardEvent('keydown', 'Space');
+  const menuRelease = keyboardEvent('keyup', 'Space');
+  hostWindow.dispatchEvent(menuPress);
+  hostWindow.dispatchEvent(menuRelease);
+  assert.equal(menuPress.defaultPrevented, false);
+  assert.equal(menuRelease.defaultPrevented, false, 'New menu input remains native after the held key is released.');
+
+  input.setEnabled(true);
+  hostDocument.pointerLockElement = pointerElement as unknown as Element;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  hostWindow.dispatchEvent(keyboardEvent('keydown', 'Space'));
+  assert.equal(input.isDown('jump'), true);
+  assert.equal(input.wasPressed('jump'), true);
+  input.endFixedUpdate();
+  hostWindow.dispatchEvent(keyboardEvent('keyup', 'Space'));
+  assert.equal(input.isDown('jump'), false);
+  assert.equal(input.wasReleased('jump'), true);
   input.dispose();
 });
 

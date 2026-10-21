@@ -145,6 +145,7 @@ export class CameraRig {
   );
 
   private readonly config: CameraRigConfig;
+  private fieldOfViewDegrees = CAMERA_VERTICAL_FOV_DEGREES;
   private followTarget: CameraFollowTarget | undefined;
   private obstructionWorld: CollisionWorld | undefined;
   private savedViewByTarget = new WeakMap<CameraFollowTarget, SavedTargetView>();
@@ -302,6 +303,10 @@ export class CameraRig {
       this.contextualFramingOffset.set(0, 0, 0);
       this.desiredContextualFramingOffset.set(0, 0, 0);
     }
+  }
+
+  setFieldOfViewDegrees(value: number): void {
+    if (Number.isFinite(value)) this.fieldOfViewDegrees = THREE.MathUtils.clamp(value, 40, 75);
   }
 
   setLookSettings(settings: Partial<CameraLookSettings>): void {
@@ -519,6 +524,10 @@ export class CameraRig {
   update(interpolationAlpha: number, deltaSeconds: number): void {
     const target = this.followTarget;
     if (!target) return;
+    if (this.camera.fov !== this.fieldOfViewDegrees) {
+      this.camera.fov = this.fieldOfViewDegrees;
+      this.camera.updateProjectionMatrix();
+    }
 
     const safeAlpha = THREE.MathUtils.clamp(interpolationAlpha, 0, 1);
     const safeDeltaSeconds = Math.max(0, deltaSeconds);

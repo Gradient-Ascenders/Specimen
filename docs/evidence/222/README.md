@@ -105,3 +105,68 @@ loading pairs, Standard correctness/performance, natural opening comparison,
 frozen-pixel equivalence, matched native crossings/combat/electrical/lift routes,
 three complete lifecycle repetitions, and independent teammate review. These
 remain limitations; neither #226 nor the parent is complete.
+
+## Firefox diagnostic (21 October 2026)
+
+The clean `f09156f9eac9` build was measured in native Firefox 158.0 on the
+same machine, using an isolated profile and Minimum / Normal / 75%. The
+viewport was 1920 × 1080 and the drawing buffer 1280 × 720. Firefox reported
+an Intel renderer; its process opened the Intel render device. GPU timer
+queries were unavailable, so these measurements contain no GPU milliseconds.
+
+| Near-spawn movement capture | Average FPS | 1% low FPS | Worst interval |
+| --- | --- | --- | --- |
+| Level 1 Room 1, Bob | 59.89 | 48.73 | 33 ms |
+| Level 2 Room 1, Bob, after arrival | 60.00 | 55.56 | 18 ms |
+| Level 3 Room 1, Volt | 59.95 | 52.04 | 29 ms |
+
+Each usable capture lasted approximately 37 seconds, passed the shared raw-frame
+analyzer, lost no simulation time and contained no frame over 50 ms. No browser
+errors were recorded. The Level 1 shader guard remained at 139 programs with no
+growth events. A separate Level 2 entry capture included the vent-arrival
+cutscene and was rejected in full; it is excluded from the table.
+
+The original distorted-camera capture is also excluded. The benchmark driver's
+uninitialized pointer source emitted a large cursor-origin jump when pointer
+lock began. Initializing that source at the viewport centre before locking
+corrected the automation. A repeated native keyboard/mouse probe confirmed zero
+vertical mouse movement and unchanged camera pitch. No game camera or input code
+was changed for that benchmark.
+
+[The machine-readable summary](firefox-summary.json) records the protocol,
+capture hashes, rejection reasons and startup caveats. Raw exports, screenshots,
+the executed Python/WebDriver harness and camera probes are saved locally under
+`artifacts/firefox-benchmark/`; these new raw files have not been published in
+the earlier evidence archives. The harness serves instrumented production assets
+and disables HTTP caching. Previous probes warmed persistent shader caches, so
+the observed 3.55-second Start-to-input result is not a cold-load comparison.
+Level 2 input enabled before its arrival cutscene ended.
+
+These are short movement samples around the initial rooms, with debug level
+staging. They support smooth Firefox performance at the measured settings but
+do not establish later-room, combat, switching, puzzle, Standard-profile or
+full-session qualification. There is no matched Firefox baseline or matched-input
+comparison with Chrome. No further full test suite was run for this evidence-only
+addition.
+
+## Browser input and movie recovery
+
+Subsequent compatibility work clears held actions and pending camera motion when
+pointer lock is lost, and releases a late pointer-lock grant if gameplay input
+has already been disabled. The optional opening movie now ignores rejected
+playback promises from an earlier pause/resume attempt. Both fixes use the same
+browser-neutral code in Firefox and Chrome; CI configuration is unchanged.
+
+[Focused compatibility results](browser-compatibility.json) record 26 passing
+unit tests, a passing production build including TypeScript checking, and short
+native Firefox 158 and Chrome 156 checks for audio, input recovery, tab return,
+opening playback and slime switching. Acid firing and electrical beam rendering
+were also exercised in both browsers. Chrome passed a Standard-profile draw and
+restart check. The additional Firefox probe stopped when a graphics preparation
+overlay intercepted the settings Back click; Standard and restart are not
+claimed as passing in Firefox. Testing then stopped at the user's request.
+
+Physical Escape and speaker output remain manual checks. Browser-scoped pointer
+release, decoded audio, scheduled Web Audio voices and media playback were
+observed. These checks used a local build containing the uncommitted fixes at the
+time of measurement, and do not qualify a complete puzzle/combat playthrough.

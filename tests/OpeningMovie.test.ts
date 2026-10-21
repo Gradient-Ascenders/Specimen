@@ -144,6 +144,27 @@ test('hidden tabs pause the movie and resume only an unfinished, non-skipped int
   assert.equal(f.video.plays, 2); f.player.dispose();
 });
 
+test('a delayed rejection from the hidden-tab playback cannot fail a successful resume', async () => {
+  const f = fixture();
+  const oldPlayback = deferred();
+  f.video.play = () => { f.video.plays++; return oldPlayback.promise; };
+  f.player.start(); f.blackout();
+  f.doc.hidden = true; f.doc.dispatchEvent(new Event('visibilitychange'));
+  f.video.play = () => { f.video.plays++; return Promise.resolve(); };
+  f.doc.hidden = false; f.doc.dispatchEvent(new Event('visibilitychange'));
+  f.video.emit('playing');
+  f.flushFrames(); f.flushFrames(); await flushPromises();
+  oldPlayback.reject(Object.assign(new Error('Playback interrupted by pause'), { name: 'AbortError' }));
+  await flushPromises();
+  assert.equal(f.video.plays, 2);
+  assert.equal(f.host.dataset.openingState, 'playing');
+  assert.equal(f.statuses.at(-1)?.failed, false);
+  f.ready.resolve(); await flushPromises();
+  f.video.emit('ended');
+  assert.equal(f.counts().completions, 1);
+  f.player.dispose();
+});
+
 test('warm-up slices are paced during video and released on Skip/disposal', async () => {
   const f = fixture(); await f.playing();
   let yielded = false;

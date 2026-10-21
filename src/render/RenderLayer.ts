@@ -1,3 +1,5 @@
+import { calibrateGraphics, type GraphicsCalibrationResult } from './GraphicsCalibration.ts';
+import { DEFAULT_USER_KEY_BINDINGS, type UserKeyBindings } from '../core/KeyBindings.ts';
 import * as THREE from 'three';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 import { GelRendering, type GelRenderingMode } from './slime/GelRendering.ts';
@@ -150,6 +152,8 @@ export interface RenderLayerOptions {
  * their authored lighting below their own scene roots.
  */
 export class RenderLayer {
+  cameraShakeScale = 1;
+  keyBindings: UserKeyBindings = DEFAULT_USER_KEY_BINDINGS;
   readonly scene = new THREE.Scene();
   readonly cameraRig = new CameraRig();
   readonly renderer: THREE.WebGLRenderer;
@@ -189,7 +193,7 @@ export class RenderLayer {
     this.renderer = new THREE.WebGLRenderer({
       alpha: false,
       // Context MSAA cannot be changed without replacing the renderer/context.
-      // Both bounded profiles use the same conservative, non-MSAA canvas.
+      // All quality presets use the same conservative, non-MSAA canvas.
       antialias: false,
       powerPreference: 'high-performance',
     });
@@ -220,13 +224,15 @@ export class RenderLayer {
     this.watchDevicePixelRatio();
   }
 
+  get graphicsConfiguration(): GraphicsSettings { return { ...this.graphicsSettings }; }
+
   get canvas(): HTMLCanvasElement {
     return this.renderer.domElement;
   }
 
   /** Active allocation budget, including a temporary title/menu cap. */
   get pixelBudget(): number {
-    const profileBudget = GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile].pixelBudget;
+    const profileBudget = this.graphicsSettings.pixelBudget;
     return Math.min(profileBudget, this.presentationPixelBudget ?? profileBudget);
   }
 
@@ -309,6 +315,38 @@ export class RenderLayer {
     this.renderer.setAnimationLoop(callback);
   }
 
+  /** Recheck an already-loaded later level using its real current camera view. */
+  async calibrateCurrentView(isCurrent: () => boolean): Promise<GraphicsCalibrationResult> {
+    const previous = this.graphicsConfiguration, renderer = this.renderer, camera = this.cameraRig.camera;
+    const target = new THREE.WebGLRenderTarget(1, 1);
+    try {
+      this.setGraphicsSettings(GRAPHICS_PROFILES.standard.settings);
+      const viewport = this.getGameplayPrewarmViewport(new THREE.Vector4()), ratio = renderer.getPixelRatio();
+      target.setSize(Math.max(1, Math.round(viewport.z * ratio)), Math.max(1, Math.round(viewport.w * ratio)));
+      const draw = (): void => withIsolatedPrewarmState(renderer, () => {
+        renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
+        renderer.setScissorTest(false);
+        renderer.transmissionResolutionScale = 0.5;
+        // Quality changes can release shadow maps. Recreate them with normal
+        // updates before sampling receivers or timing the live workload.
+        this.render();
+      }, target);
+      let warmed = false;
+      const view = { warm: async () => {
+        if (warmed) return;
+        await withIsolatedPrewarmState(renderer, () => renderer.compileAsync(this.scene, camera), target);
+        draw(); warmed = true;
+      }, draw };
+      return await calibrateGraphics({ context: renderer.getContext() as WebGL2RenderingContext,
+        views: [view, view], now: () => this.hostWindow.performance.now(),
+        yieldTask: () => new Promise(resolve => this.hostWindow.setTimeout(resolve, 0)), isCurrent });
+    } finally { target.dispose(); this.setGraphicsSettings(previous); }
+  }
+
+  setBrightness(value: number): void {
+    this.renderer.toneMappingExposure = RENDER_EXPOSURE * THREE.MathUtils.clamp(value, 0.7, 1.3);
+  }
+
   setPixelRatioCap(cap: RenderPixelRatioCap): void {
     this.setGraphicsSettings({ ...this.graphicsSettings, renderPixelRatioCap: cap });
   }
@@ -316,12 +354,11 @@ export class RenderLayer {
   setGraphicsSettings(settings: GraphicsSettings): void {
     if (this.disposed) return;
     this.graphicsSettings = { ...settings };
-    const profile = GRAPHICS_PROFILES[settings.graphicsProfile];
     const quality = resolveGraphicsQuality(settings.graphicsPreset, settings.renderPixelRatioCap);
     this.effectivePixelRatioCap = quality.pixelRatioCap;
     this.gelRendering.setTransmissionResolutionScaleCap(quality.transmissionResolutionScale);
     this.gelRendering.setMode(settings.gelRenderingMode);
-    this.graphicsResources.setQuality(profile.shadowMapSizeCap, profile.effectsDensity);
+    this.graphicsResources.setQuality(settings.shadowMapSizeCap, settings.effectsDensity);
     this.resize();
   }
 
@@ -341,7 +378,7 @@ export class RenderLayer {
     const size = resolveRenderResolution(this.host.clientWidth, this.host.clientHeight,
       this.hostWindow.devicePixelRatio, {
         pixelRatioCap: this.effectivePixelRatioCap, renderScale: this.graphicsSettings.renderScale,
-        pixelBudget: GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile].pixelBudget,
+        pixelBudget: this.graphicsSettings.pixelBudget,
         maximumWidth: this.maximumWidth, maximumHeight: this.maximumHeight,
         minimumDrawingBufferDimension: Math.ceil(1 / this.renderer.transmissionResolutionScale),
       });
@@ -362,7 +399,7 @@ export class RenderLayer {
 
   getGraphicsDiagnostics(): GraphicsDiagnostics {
     this.renderer.getDrawingBufferSize(this.drawingBufferSize);
-    const settings = this.graphicsSettings, profile = GRAPHICS_PROFILES[settings.graphicsProfile];
+    const settings = this.graphicsSettings;
     return {
       viewportWidth: this.viewportWidth, viewportHeight: this.viewportHeight,
       drawingBufferWidth: this.drawingBufferSize.x, drawingBufferHeight: this.drawingBufferSize.y,
@@ -370,8 +407,8 @@ export class RenderLayer {
       requestedPixelRatioCap: settings.renderPixelRatioCap, graphicsPreset: settings.graphicsPreset,
       devicePixelRatio: this.hostWindow.devicePixelRatio, renderScale: this.activeRenderScale,
       graphicsProfile: graphicsProfileName(settings, this.gelRendering.value), graphicsProfileBase: settings.graphicsProfile,
-      pixelBudget: this.pixelBudget, shadowMapSizeCap: profile.shadowMapSizeCap,
-      effectsDensity: profile.effectsDensity, lightingPolicy: GRAPHICS_LIGHTING_POLICY,
+      pixelBudget: this.pixelBudget, shadowMapSizeCap: settings.shadowMapSizeCap,
+      effectsDensity: settings.effectsDensity, lightingPolicy: GRAPHICS_LIGHTING_POLICY,
       antialias: this.antialias,
       gelRenderingMode: this.gelRendering.value, transmissionResolutionScale: this.renderer.transmissionResolutionScale,
     };
@@ -426,12 +463,11 @@ export class RenderLayer {
     target.graphicsProfileBase = this.graphicsSettings.graphicsProfile;
     target.devicePixelRatio = this.hostWindow.devicePixelRatio;
     target.renderScale = this.activeRenderScale;
-    const profile = GRAPHICS_PROFILES[this.graphicsSettings.graphicsProfile];
     target.pixelBudget = this.pixelBudget;
     target.gelRenderingMode = this.gelRendering.value;
     target.transmissionResolutionScale = this.renderer.transmissionResolutionScale;
-    target.shadowMapSizeCap = profile.shadowMapSizeCap;
-    target.effectsDensity = profile.effectsDensity;
+    target.shadowMapSizeCap = this.graphicsSettings.shadowMapSizeCap;
+    target.effectsDensity = this.graphicsSettings.effectsDensity;
     target.antialias = this.antialias;
     target.lightingPolicy = GRAPHICS_LIGHTING_POLICY;
     target.drawCalls = this.renderer.info.render.calls;

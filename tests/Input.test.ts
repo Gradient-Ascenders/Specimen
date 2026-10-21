@@ -110,6 +110,45 @@ test('focus clearing remains visible until the next fixed update', () => {
   input.dispose();
 });
 
+test('pointer-lock loss clears held input and camera motion without a window blur', () => {
+  const { input, hostWindow, hostDocument, pointerLockElement } = createInput();
+  hostDocument.pointerLockElement = pointerLockElement;
+  dispatchKey(hostWindow, 'keydown', 'KeyW');
+  const down = Object.assign(new Event('mousedown'), { button: 2 });
+  hostWindow.dispatchEvent(down);
+  hostWindow.dispatchEvent(Object.assign(new Event('mousemove'), { movementX: 12, movementY: 8 }));
+  assert.equal(input.isDown('aimAbility'), true);
+  assert.equal(input.pointerDeltaX, 12);
+
+  hostDocument.pointerLockElement = null;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(input.held.size, 0);
+  assert.equal(input.pointerDeltaX, 0);
+  assert.equal(input.pointerDeltaY, 0);
+  assert.equal(input.wasClearedSinceFixedUpdate, true);
+  hostDocument.pointerLockElement = pointerLockElement;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  dispatchKey(hostWindow, 'keydown', 'KeyW', true);
+  assert.equal(input.isDown('moveForward'), false);
+  dispatchKey(hostWindow, 'keyup', 'KeyW');
+  dispatchKey(hostWindow, 'keydown', 'KeyW');
+  assert.equal(input.isDown('moveForward'), true);
+  input.dispose();
+});
+
+test('a late pointer-lock grant is released while gameplay input is disabled', () => {
+  const { input, hostDocument, pointerLockElement } = createInput();
+  let exits = 0;
+  Object.assign(hostDocument, { exitPointerLock: () => { exits++; } });
+  input.setEnabled(false);
+  hostDocument.pointerLockElement = pointerLockElement;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(exits, 1);
+  input.dispose();
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(exits, 1, 'Disposal removes the pointer-lock listener.');
+});
+
 test('mouse ability actions require pointer lock and preserve press/hold state', () => {
   const { input, hostWindow, hostDocument, pointerLockElement } = createInput();
 

@@ -479,3 +479,20 @@ for (const cancellation of ['unload','dispose'] as const) test(`Level 3 late tex
   assert.equal(late?.state,'disposed');assert.equal((late as unknown as {maintenanceMaps:unknown}).maintenanceMaps,undefined);
   assert.equal(completed,0);session.dispose();
 });
+
+
+test('initial calibration applies its selected settings before one full warm-up', async () => {
+  const runtime = new MockRuntime('level-1', progression), calls: string[] = [];
+  (runtime as GameLevelRuntime).prepareGraphics = async () => { calls.push('prepare'); };
+  const session = new GameSessionCoordinator({ initialRuntime: runtime, createLevelTwo: () => runtime, scheduleTransition: t => t() });
+  session.applyGraphicsSettings('low', () => calls.push('low'));
+  session.load();
+  await session.prepareInitialGraphics(async () => {
+    calls.push('calibrate');
+    session.applyGraphicsSettings('medium', () => calls.push('medium'));
+  });
+  assert.deepEqual(calls, ['low', 'calibrate', 'medium', 'prepare']);
+  session.applyGraphicsSettings('medium', () => calls.push('same'));
+  assert.deepEqual(calls, ['low', 'calibrate', 'medium', 'prepare', 'same']);
+  session.dispose();
+});

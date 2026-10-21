@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import * as THREE from 'three';
 import type { Input, InputAction } from '../src/core/Input.ts';
+import { DEFAULT_USER_KEY_BINDINGS } from '../src/core/KeyBindings.ts';
 import type { LoopStats } from '../src/core/Loop.ts';
 import { BlackoutLevelRuntime } from '../src/levels/BlackoutLevelRuntime.ts';
 import type { RenderLayer } from '../src/render/RenderLayer.ts';
@@ -151,7 +152,7 @@ function createFixture(debugAvailable = true,playArrival=false) {
   const runtime = new BlackoutLevelRuntime({
     host: host as unknown as HTMLElement,
     input: input as unknown as Input,
-    renderLayer: { scene, canvas: document.createElement(), cameraRig, render: () => {} } as unknown as RenderLayer,
+    renderLayer: { scene, canvas: document.createElement(), cameraRig, keyBindings: DEFAULT_USER_KEY_BINDINGS, render: () => {} } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt' },
     authoredRoomOne: true,
     playArrival,

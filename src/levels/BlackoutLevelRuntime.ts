@@ -1624,7 +1624,7 @@ export class BlackoutLevelRuntime {
       });
       rollback(() => maintenanceDrone.dispose());
       const dronePresentation = this.authoredRoomOne
-        ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted(), scene.maintenanceBay?.surfaceMaterials) : undefined;
+        ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted(), scene.maintenanceBay?.surfaceMaterials, () => this.renderLayer.keyBindings) : undefined;
       if (dronePresentation) {
         if(this.renderLayer.renderer) {
           this.shadowRequest = this.renderLayer.requestShadowConfiguration('blackout', { enabled: true });

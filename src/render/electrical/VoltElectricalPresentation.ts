@@ -1,3 +1,4 @@
+import { menuIconMarkup as icon } from '../../ui/MenuIcons.ts';
 import * as THREE from 'three';
 
 import type { VoltElectricalReadModel } from '../../abilities/VoltElectricalSystem.ts';
@@ -37,7 +38,7 @@ export class VoltElectricalPresentation {
     const crosshair = hostDocument.createElement('span');
     crosshair.className = 'volt-electrical-crosshair';
     crosshair.setAttribute('aria-hidden', 'true');
-    crosshair.textContent = '+';
+    crosshair.innerHTML = icon('Crosshair');
     crosshair.hidden = true;
 
     const status = hostDocument.createElement('p');
@@ -79,8 +80,8 @@ export class VoltElectricalPresentation {
     if (readModel.connectedTargetName) {
       if (this.status.hidden) this.status.hidden = false;
       const text = readModel.connectionUnstable
-        ? `CONNECTED · ${readModel.connectedTargetName} · CONNECTION UNSTABLE`
-        : `CONNECTED · ${readModel.connectedTargetName} · HOLD STILL`;
+        ? `${readModel.connectedTargetName} · Connection unstable`
+        : `${readModel.connectedTargetName} · Hold still`;
       if (this.status.textContent !== text) this.status.textContent = text;
       const state = readModel.connectionUnstable ? 'unstable' : 'connected';
       if (this.status.dataset.state !== state) this.status.dataset.state = state;

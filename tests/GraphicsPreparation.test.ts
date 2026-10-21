@@ -15,6 +15,17 @@ test('resolution, shadow size and capture scale do not change shader features; t
   assert.notEqual(graphicsTransmissionResourceKey(standard),graphicsTransmissionResourceKey({...standard,renderScale:.5}));
 });
 
+test('custom shadows and resolution invalidate their own preparation resources', () => {
+  const medium = GRAPHICS_PROFILES.standard.settings;
+  const custom = { ...medium, customGraphicsProfile: true };
+  assert.equal(graphicsPreparationKey(medium), graphicsPreparationKey(custom));
+  assert.equal(graphicsTransmissionResourceKey(medium), graphicsTransmissionResourceKey(custom));
+  assert.notEqual(graphicsPreparationKey(custom), graphicsPreparationKey({ ...custom, shadowMapSizeCap: 2048 }));
+  assert.notEqual(graphicsTransmissionResourceKey(custom), graphicsTransmissionResourceKey({ ...custom, pixelBudget: 3686400 }));
+  assert.equal(graphicsPreparationKey(custom), graphicsPreparationKey({ ...custom, effectsDensity: 0.75 }));
+  assert.equal(graphicsTransmissionResourceKey(custom), graphicsTransmissionResourceKey({ ...custom, effectsDensity: 0.75 }));
+});
+
 test('resource-only changes serialize and reuse shaders without marking an unapplied target ready', async () => {
   const states:boolean[]=[], applied:string[]=[], prepared:string[]=[];
   const gate=new GraphicsPreparation(p=>states.push(p));

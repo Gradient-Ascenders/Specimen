@@ -68,11 +68,11 @@ test('roster view uses explicit text and shape states for active, switchable, an
 
   assert.deepEqual(getSlimeRosterEntryView(bob), {
     state: 'active',
-    stateLabel: 'ACTIVE — CONTROLLED',
-    controlLabel: 'ACTIVE BODY',
+    stateLabel: 'Active',
+    controlLabel: '',
     ariaLabel: 'Bob: active, controlled body',
   });
-  assert.match(getSlimeRosterEntryView(goop)?.stateLabel ?? '', /LOCKED/);
+  assert.match(getSlimeRosterEntryView(goop)?.stateLabel ?? '', /Locked/);
   assert.equal(getSlimeRosterEntryView(volt), undefined);
 
   const inactiveBob = { ...bob, active: false };
@@ -85,7 +85,7 @@ test('roster view uses explicit text and shape states for active, switchable, an
   assert.equal(getSlimeRosterEntryView(inactiveBob)?.state, 'switchable');
   assert.match(
     getSlimeRosterEntryView(inactiveBob)?.controlLabel ?? '',
-    /TAB.*SWITCH/,
+    /Tab to switch/,
   );
   assert.equal(getSlimeRosterEntryView(activeGoop)?.state, 'active');
 });

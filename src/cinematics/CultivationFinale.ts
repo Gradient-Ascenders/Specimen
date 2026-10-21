@@ -25,6 +25,7 @@ interface Options {
   readonly voltPresentation:VoltCharacterPresentation;readonly set:CultivationFinaleSet;
   readonly acid:AcidSurfaceMaterial;readonly scene:THREE.Scene;readonly host:HTMLElement;
   readonly speech?:THREE.Object3D;
+  readonly getCameraShakeScale?:()=>number;
 }
 type Presentation=BobCharacterPresentation|GoopCharacterPresentation|VoltCharacterPresentation;
 const UP=new THREE.Vector3(0,1,0),ZERO=new THREE.Vector3();
@@ -358,11 +359,11 @@ export class CultivationFinale {
     this.target.y+=shot.target==='bob'||shot.target==='goop'||shot.target==='volt'?.25:0;
     const impactAge=t-T.coverImpact;
     if(impactAge>=0&&impactAge<.4){
-      const kick=.09*Math.exp(-impactAge*13)*Math.sin(impactAge*49);
+      const kick=(this.options.getCameraShakeScale?.()??1)*.09*Math.exp(-impactAge*13)*Math.sin(impactAge*49);
       this.eye.y+=kick;this.eye.x+=kick*.4;
     }
     if(t>=T.ductShake&&t<T.grateBreak+.8){
-      const shake=(.014+.026*finaleSmooth(T.ductShake,T.grateWarning,t))*(1-finaleSmooth(T.grateBreak,T.grateBreak+.8,t));
+      const shake=(this.options.getCameraShakeScale?.()??1)*(.014+.026*finaleSmooth(T.ductShake,T.grateWarning,t))*(1-finaleSmooth(T.grateBreak,T.grateBreak+.8,t));
       this.eye.x+=Math.sin(t*47)*shake;this.eye.y+=Math.sin(t*61)*shake*.65;
       this.target.z+=Math.sin(t*39)*shake*.35;
     }

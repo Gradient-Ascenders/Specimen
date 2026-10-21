@@ -1,3 +1,4 @@
+import { DEFAULT_USER_KEY_BINDINGS, keyLabel, type UserKeyBindings } from '../../../core/KeyBindings.ts';
 import * as THREE from 'three';
 import { markDecorativeEffect } from '../../GraphicsResourcePolicy.ts';
 import { disposeShadowLight, setShadowMapUpdatesActive } from '../../ShadowLightResources.ts';
@@ -31,6 +32,7 @@ export class MaintenanceDronePresentation {
   private elapsed = 0;
   private tutorialElapsed = 0;
   private readonly completeTutorial: () => void;
+  private readonly getKeyBindings: () => UserKeyBindings;
   private disposed = false;
   private readonly world?: CollisionWorld;
   private readonly ignored?: THREE.Mesh;
@@ -38,7 +40,8 @@ export class MaintenanceDronePresentation {
   private readonly beamOrigin = new THREE.Vector3();
   private readonly downward = new THREE.Vector3(0,-1,0);
 
-  constructor(authoringRoot: THREE.Group, host: HTMLElement, world?: CollisionWorld, ignored?: THREE.Mesh, completeTutorial: () => void = () => {}, kit?: BlackoutMaintenanceMaterials) {
+  constructor(authoringRoot: THREE.Group, host: HTMLElement, world?: CollisionWorld, ignored?: THREE.Mesh, completeTutorial: () => void = () => {}, kit?: BlackoutMaintenanceMaterials, getKeyBindings: () => UserKeyBindings = () => DEFAULT_USER_KEY_BINDINGS) {
+    this.getKeyBindings = getKeyBindings;
     this.completeTutorial = completeTutorial;
     this.world=world;this.ignored=ignored;
     this.root.name = 'maintenance-drone-presentation';
@@ -213,7 +216,8 @@ export class MaintenanceDronePresentation {
 
     const showMount = state.mountAvailable && !state.mounted;
     this.prompt.hidden = !activeVolt || (!showMount && !state.mounted);
-    this.prompt.textContent = state.mounted ? '[M] DISMOUNT' : (showMount ? '[M] MOUNT' : '');
+    const keys = this.getKeyBindings(), mount = keyLabel(keys.mountDrone);
+    this.prompt.textContent = state.mounted ? `${mount} · Dismount` : (showMount ? `${mount} · Mount` : '');
     if (!state.firstMountTutorialAvailable || state.tutorialCompleted) this.tutorialElapsed = 0;
     this.tutorial.hidden = !activeVolt || !state.mounted || !state.firstMountTutorialAvailable || state.tutorialCompleted;
     // Only count time actually visible after startup. The controller owns the
@@ -226,7 +230,7 @@ export class MaintenanceDronePresentation {
         this.tutorial.hidden = true;
       }
     }
-    this.tutorial.textContent = this.tutorial.hidden ? '' : 'FLIGHT CONTROLS  ·  WASD MOVE  ·  SPACE RISE  ·  SHIFT DESCEND  ·  M DISMOUNT';
+    this.tutorial.textContent = this.tutorial.hidden ? '' : `${[keys.moveForward, keys.moveLeft, keys.moveBackward, keys.moveRight].map(keyLabel).join(' ')} · Move  ·  ${keyLabel(keys.jump)} · Rise  ·  ${keyLabel(keys.droneDescend)} · Descend  ·  ${mount} · Dismount`;
     this.status.textContent = !activeVolt ? '' : shorted ? 'ELECTRICAL FAULT' : started ? 'SYSTEM STARTING…' : '';
     this.status.hidden = !activeVolt || (!shorted && !started);
   }

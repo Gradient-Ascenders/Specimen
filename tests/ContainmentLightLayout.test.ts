@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
 import { ContainmentLightLayout } from '../src/render/ContainmentLightLayout.ts';
 
-test('all authored rooms and doorway overlaps share two bounded light signatures without changing authored sources', async () => {
+test('all authored rooms and doorway overlaps prewarm bounded light signatures without changing authored sources', async () => {
   const level = new ContainmentLevelScene(), scene = new THREE.Scene();
   scene.add(level.root);
   const authored: THREE.Light[] = [];
@@ -23,12 +23,12 @@ test('all authored rooms and doorway overlaps share two bounded light signatures
       });
       assert.equal(points, 3);
       assert.equal(spots, shadows);
-      assert.ok(spots === 3 || spots === 10);
+      assert.ok(spots === 3 || spots === 6 || spots === 10);
       signatures.add([points, spots, shadows].join(':') );
       configurations++;
     });
     assert.equal(configurations, 9);
-    assert.deepEqual(signatures, new Set(['3:3:3', '3:10:10']));
+    assert.deepEqual(signatures, new Set(['3:3:3', '3:6:6', '3:10:10']));
     for (const {light, castShadow, position, color} of before) {
       assert.equal(light.castShadow, castShadow);
       assert.deepEqual(light.position.toArray(), position);
@@ -62,4 +62,45 @@ test('padding releases every initialized shadow map once and leaves authored map
   assert.equal(authoredDisposals, 0);
   assert.equal(scene.children.includes(layout.root), false);
   authored.dispose();
+});
+
+test('camera culling retains offscreen sources that can light the view and restores a failed draw', () => {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, 1, .1, 100);
+  const front = new THREE.SpotLight(0xffffff, 1, 5); front.position.z = -10;
+  const behind = new THREE.SpotLight(0xffffff, 1, 5); behind.position.z = 10;
+  const overlapping = new THREE.SpotLight(0xffffff, 1, 15); overlapping.position.z = 10;
+  const unlimited = new THREE.SpotLight(0xffffff, 1, 0); unlimited.position.z = 10;
+  const hidden = new THREE.SpotLight(0xffffff, 1, 5); hidden.visible = false;
+  const lights = [front, behind, overlapping, unlimited, hidden];
+  lights.forEach(light => light.castShadow = true);
+  scene.add(...lights);
+  const layout = new ContainmentLightLayout(scene);
+  const objects: THREE.Object3D[] = [];
+  scene.traverse(object => objects.push(object));
+  const before = objects.map(object => object.visible);
+  try {
+    const inspect = () => {
+      assert.equal(behind.visible, false);
+      assert.equal(front.visible, true);
+      assert.equal(overlapping.visible, true, 'a lamp behind the camera can still light visible receivers');
+      assert.equal(unlimited.visible, true, 'unbounded sources cannot be rejected with a finite sphere');
+      assert.equal(hidden.visible, false);
+      let spots = 0;
+      scene.traverseVisible(object => { if (object instanceof THREE.SpotLight) spots++; });
+      assert.equal(spots, 3, 'use the already prepared small layout');
+      assert.notEqual(layout.cameraCullKey, '');
+    };
+    assert.equal(layout.withCameraCulling(camera, () => { inspect(); return 42; }), 42);
+    assert.deepEqual(objects.map(object => object.visible), before);
+    assert.equal(layout.cameraCullKey, '');
+    assert.throws(() => layout.withCameraCulling(camera, () => {
+      inspect(); throw new Error('failed draw');
+    }), /failed draw/);
+    assert.deepEqual(objects.map(object => object.visible), before);
+    assert.equal(layout.cameraCullKey, '');
+    camera.rotation.y = Math.PI;
+    layout.withCameraCulling(camera, () => assert.equal(behind.visible, true, 'turning back restores the source'));
+    assert.deepEqual(objects.map(object => object.visible), before);
+  } finally { layout.dispose(); }
 });

@@ -157,7 +157,7 @@ test('profiles bound high-DPI/resize work, retain native HUD and survive all lev
     await page.evaluate(() => new Promise(requestAnimationFrame));
     const row = await draw(page); rows.push({ phase: 'dpi-change', ...row }); assertBudget(row);
     expect(row.diagnostics.devicePixelRatio).toBeCloseTo(deviceScaleFactor, 6);
-    await expect(page.locator('[data-graphics-diagnostics]')).toContainText(`display DPR ${deviceScaleFactor.toFixed(2)}`);
+    await expect(page.locator('[data-graphics-diagnostics]')).toContainText(`${row.canvas[0]} × ${row.canvas[1]} px`);
   }
   await cdp.send('Emulation.clearDeviceMetricsOverride'); await cdp.detach();
   await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
@@ -173,12 +173,14 @@ test('profiles bound high-DPI/resize work, retain native HUD and survive all lev
   expect(restored.diagnostics.requestedPixelRatioCap).toBe(1.5);
   expect(restored.diagnostics.transmissionResolutionScale).toBe(1);
   await page.locator('[data-setting="graphics-profile"]').selectOption('minimum');
+  await page.locator('[data-section="graphics"]').click();
   await page.locator('[data-setting="render-resolution"]').selectOption('2');
   await page.locator('[data-setting="render-scale"]').selectOption('0.5');
   const custom = await draw(page); assertBudget(custom);
   expect(custom.diagnostics.graphicsProfile).toBe('custom');
   await expect(page.locator('[data-setting="graphics-profile"]')).toHaveValue('custom');
   expect(custom.diagnostics.pixelBudget).toBe(921600);
+  await page.locator('[data-section="graphics"]').click();
   await page.locator('[data-setting="graphics-profile"]').selectOption('standard');
   await resume(page);
   for (const level of [1, 2, 3]) {
@@ -213,7 +215,8 @@ test('profiles bound high-DPI/resize work, retain native HUD and survive all lev
     await capture(page, `level-${level}-minimum.png`);
     await settings(page); await page.locator('[data-setting="graphics-profile"]').selectOption('standard'); await resume(page);
     if (level < 3) {
-      await settings(page); await page.locator('[data-setting="render-scale"]').selectOption('0.5'); await resume(page);
+      await settings(page); await page.locator('[data-section="graphics"]').click();
+      await page.locator('[data-setting="render-scale"]').selectOption('0.5'); await resume(page);
     }
   }
   await settings(page);
@@ -251,7 +254,8 @@ test('one-pixel-wide transmissive viewports keep complete physical framebuffers 
     ]) {
       const row = await page.evaluate(({ gelRenderingMode, graphicsPreset }) => {
         const rt = (window as any).__graphicsSession.runtime, layer = rt.renderLayer, renderer = layer.renderer;
-        layer.setGraphicsSettings({ graphicsProfile: 'standard', graphicsPreset, gelRenderingMode,
+        layer.setGraphicsSettings({ graphicsProfile: 'standard', customGraphicsProfile: true, pixelBudget: 2073600,
+          shadowMapSizeCap: 1024, effectsDensity: 1, graphicsPreset, gelRenderingMode,
           renderPixelRatioCap: 0.75, renderScale: 0.5 });
         const gl = renderer.getContext(), targets: { width: number; height: number; complete: boolean }[] = [];
         const original = renderer.setRenderTarget;

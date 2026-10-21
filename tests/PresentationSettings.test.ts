@@ -1,3 +1,4 @@
+import { GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DEFAULT_GAME_SETTINGS, GameSettings, PRESENTATION_PREFERENCES_KEY, type SettingsStorage } from '../src/ui/GameSettings.ts';
@@ -11,13 +12,15 @@ function memoryStorage(): SettingsStorage {
     removeItem: key => { entries.delete(key); } };
 }
 
-test('FPS and reduced-menu-motion persist without changing safe gameplay defaults on reload', () => {
+test('display preferences and a manual graphics choice persist independently', () => {
   const storage = memoryStorage(), first = new GameSettings({ storage });
   first.setShowFPS(true); first.setReduceMenuMotion(true);
   first.setGraphicsProfile('standard'); first.setMasterVolume(0.25);
   const reloaded = new GameSettings({ storage });
-  assert.deepEqual(reloaded.value, { ...DEFAULT_GAME_SETTINGS, showFPS: true, reduceMenuMotion: true });
-  assert.deepEqual(JSON.parse(storage.getItem(PRESENTATION_PREFERENCES_KEY)!), { showFPS: true, reduceMenuMotion: true });
+  assert.deepEqual(reloaded.value, { ...DEFAULT_GAME_SETTINGS, ...GRAPHICS_PROFILES.standard.settings, showFPS: true, reduceMenuMotion: true });
+  const saved = JSON.parse(storage.getItem(PRESENTATION_PREFERENCES_KEY)!);
+  assert.equal(saved.showFPS, true); assert.equal(saved.reduceMenuMotion, true);
+  assert.equal('graphicsProfile' in saved, false);
 });
 
 test('reset restores every default atomically and clears saved presentation preferences', () => {
@@ -96,20 +99,21 @@ test('menu focus wraps predictably and handles an empty or unfocused panel', () 
   assert.equal(nextMenuFocusIndex(0, 0, 1), -1);
 });
 
-test('settings expose five labelled sections, current values, descriptions and reset without duplicate controls', () => {
+test('settings group controls into five labelled tabs, unique controls and linked hints', () => {
   const markup = createSettingsPanelMarkup();
   for (const section of ['Graphics', 'Display', 'Audio', 'Controls', 'Accessibility']) {
-    assert.ok(markup.includes(`<legend>${section}</legend>`));
+    assert.ok(markup.includes(`>${section}</legend>`));
     assert.ok(markup.includes(`id="settings-${section.toLowerCase()}"`));
+    assert.ok(markup.includes(`aria-controls="settings-${section.toLowerCase()}"`));
   }
   const controls = [...markup.matchAll(/<(?:input|select)\b([^>]*)>/g)].map(match => match[1]);
   const keys = controls.map(control => control.match(/data-setting="([^"]+)"/)![1]);
-  assert.equal(keys.length, 12); assert.equal(new Set(keys).size, keys.length);
+  assert.equal(keys.length, 25); assert.equal(new Set(keys).size, keys.length);
   for (const attributes of controls) {
     const key = attributes.match(/data-setting="([^"]+)"/)![1];
-    const description = attributes.match(/aria-describedby="([^"]+)"/)![1];
+    const description = attributes.match(/aria-describedby="([^"]+)"/)?.[1];
     assert.ok(markup.includes(`data-setting-output="${key}"`));
-    assert.ok(markup.includes(`id="${description}"`));
+    if (description) assert.ok(markup.includes(`id="${description}"`));
   }
   assert.ok(markup.includes('data-action="reset-settings"'));
   assert.equal((markup.match(/data-autofocus/g) ?? []).length, 1);

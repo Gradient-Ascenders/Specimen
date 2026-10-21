@@ -78,7 +78,7 @@ export class GameSessionCoordinator {
 
   load(): void { this.runtime.load(); }
   start(): void {
-    if (this.graphicsPreparation.pending) { this.resumeAfterGraphics = true; return; }
+    if (this.graphicsPreparation.pending || this.initialPreparationPending) { this.resumeAfterGraphics = true; return; }
     if (!this.transitionFailed) this.runtime.start();
   }
   stop(): void { this.resumeAfterGraphics = false; if (!this.transitionFailed) this.runtime.stop(); }
@@ -98,12 +98,17 @@ export class GameSessionCoordinator {
         }) ?? runtime.prepareGraphics?.() ?? Promise.resolve();
       }});
   }
-  async prepareInitialGraphics(): Promise<void> {
+  async prepareInitialGraphics(selectGraphics?: () => Promise<void>): Promise<void> {
     const runtime = this.runtime;
     const generation = this.graphicsOwnerGeneration;
     let prepared = false;
     this.initialPreparationPending = true;
     try {
+      if (selectGraphics) await selectGraphics();
+      if (this.disposed || runtime !== this.runtime || generation !== this.graphicsOwnerGeneration) return;
+      const selected = this.queuedGraphics;
+      this.queuedGraphics = undefined;
+      if (selected) this.graphicsPreparation.stageInitial(selected.key, selected.apply, selected.resourceKey);
       await runtime.prepareGraphics?.();
       if (this.disposed || runtime !== this.runtime || generation !== this.graphicsOwnerGeneration) return;
       this.graphicsPreparation.adoptPrepared();
@@ -113,6 +118,10 @@ export class GameSessionCoordinator {
         this.initialPreparationPending = false;
         if (prepared && !this.disposed && runtime === this.runtime) this.flushGraphicsSettings();
         else this.queuedGraphics = undefined;
+        if (prepared && this.resumeAfterGraphics && !this.graphicsPreparation.pending && !this.disposed && runtime === this.runtime) {
+          this.resumeAfterGraphics = false;
+          runtime.start();
+        }
       }
     }
   }
@@ -148,11 +157,11 @@ export class GameSessionCoordinator {
   }
 
   fixedUpdate(deltaSeconds: number): void {
-    if (!this.transitionPending && !this.transitionFailed && !this.graphicsPreparation.pending) this.runtime.fixedUpdate(deltaSeconds);
+    if (!this.transitionPending && !this.transitionFailed && !this.graphicsPreparation.pending && !this.initialPreparationPending) this.runtime.fixedUpdate(deltaSeconds);
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
-    if (this.transitionPending || this.transitionFailed || this.graphicsPreparation.pending) return;
+    if (this.transitionPending || this.transitionFailed || this.graphicsPreparation.pending || this.initialPreparationPending) return;
     // The browser loop keeps ticking behind menus. Reusing its changing alpha
     // against frozen physics snapshots makes paused bodies and morphs oscillate.
     if (this.runtime.state === 'running') this.renderedInterpolationAlpha = interpolationAlpha;

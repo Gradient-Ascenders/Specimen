@@ -1,3 +1,4 @@
+import { menuIconMarkup as icon } from '../../ui/MenuIcons.ts';
 import * as THREE from 'three';
 
 import type {
@@ -65,12 +66,12 @@ export class SpecimenCombatPresentation {
 
     this.crosshair = hostDocument.createElement('span');
     this.crosshair.className = 'specimen-combat-crosshair';
-    this.crosshair.textContent = '+';
+    this.crosshair.innerHTML = icon('Crosshair');
     this.crosshair.hidden = true;
 
     this.label = hostDocument.createElement('span');
     this.label.className = 'specimen-combat-label';
-    this.label.textContent = 'SPECIMEN';
+    this.label.textContent = 'Specimen';
     this.label.hidden = true;
 
     this.charge = hostDocument.createElement('progress');

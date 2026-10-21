@@ -39,6 +39,7 @@ export class OpeningMoviePresentation {
   private lastFade = -1;
   private lastStatus = '';
   private lastPreparationSliceAt: number | undefined;
+  private playbackAttempt = 0;
 
   constructor(options: OpeningMoviePresentationOptions) {
     this.options = options;
@@ -87,7 +88,7 @@ export class OpeningMoviePresentation {
   skip(): void {
     if (!this.started || this.disposed || this.completed) return;
     this.skipped = true;
-    this.video.pause();
+    this.pauseMovie();
     this.setFade(1);
     this.releaseYields();
     if (!this.blackedOut) this.scheduleBlackout();
@@ -137,7 +138,7 @@ export class OpeningMoviePresentation {
     this.video.removeEventListener('ended', this.onEnded);
     this.video.removeEventListener('error', this.onMediaError);
     this.options.host.ownerDocument.removeEventListener('visibilitychange', this.onVisibility);
-    this.video.pause();
+    this.pauseMovie();
     this.video.removeAttribute('src');
     this.video.load();
     this.video.remove();
@@ -171,9 +172,18 @@ export class OpeningMoviePresentation {
 
   private playMovie(): void {
     if (this.disposed || this.completed || this.skipped || this.ended || this.options.host.ownerDocument.hidden) return;
+    const attempt = ++this.playbackAttempt;
     void this.video.play().catch(() => {
-      if (!this.disposed && !this.skipped && !this.options.host.ownerDocument.hidden) this.onMediaError();
+      // pause()/load() can reject an earlier play() after a newer attempt has
+      // already resumed. Only the current request can report a media failure.
+      if (attempt === this.playbackAttempt && !this.disposed && !this.skipped &&
+        !this.options.host.ownerDocument.hidden) this.onMediaError();
     });
+  }
+
+  private pauseMovie(): void {
+    this.playbackAttempt++;
+    this.video.pause();
   }
 
   private readonly onPlaying = (): void => {
@@ -200,7 +210,7 @@ export class OpeningMoviePresentation {
     if (this.disposed || this.completed || this.skipped) return;
     this.mediaFailed = true;
     this.moviePlaying = false;
-    this.video.pause();
+    this.pauseMovie();
     this.setFade(1);
     this.releaseYields();
     if (this.blackedOut) this.scheduleLevel();
@@ -209,7 +219,7 @@ export class OpeningMoviePresentation {
   };
 
   private readonly onVisibility = (): void => {
-    if (this.options.host.ownerDocument.hidden) this.video.pause();
+    if (this.options.host.ownerDocument.hidden) this.pauseMovie();
     else if (this.blackedOut && !this.mediaFailed) this.playMovie();
   };
 

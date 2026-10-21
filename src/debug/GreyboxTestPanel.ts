@@ -1,3 +1,4 @@
+import { menuIconMarkup as icon } from '../ui/MenuIcons.ts';
 export type DebugRoomId = 1 | 2 | 3 | 4 | 5;
 
 interface GreyboxTestPanelOptions {
@@ -50,7 +51,7 @@ export class GreyboxTestPanel {
         aria-expanded="true"
         aria-label="Collapse debug panel"
         title="Collapse debug panel"
-      >−</button>
+      >${icon('ChevronUp')}</button>
 
       <div class="test-panel-content">
         <p class="eyebrow">Level 1 containment diagnostics</p>
@@ -302,7 +303,7 @@ export class GreyboxTestPanel {
 
   private readonly toggleCollapsed = (): void => {
     const collapsed = this.element.classList.toggle('is-collapsed');
-    this.collapseButton.textContent = collapsed ? '+' : '−';
+    this.collapseButton.innerHTML = icon(collapsed ? 'ChevronDown' : 'ChevronUp');
     this.collapseButton.setAttribute('aria-expanded', String(!collapsed));
     this.collapseButton.setAttribute(
       'aria-label',
