@@ -8,11 +8,12 @@ import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
 import { captureContainmentCollisionFingerprint } from '../src/levels/ContainmentCollisionFingerprint.ts';
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import { createSignagePanel } from '../src/render/environment/containment/ContainmentModularComponents.ts';
-import { getUnsupportedContainmentSignCharacters } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
+import { CONTAINMENT_SIGNS } from '../src/render/environment/containment/ContainmentSignContent.ts';
+import { SIGNAGE_CONTENT_JSON } from '../src/render/environment/containment/signage.generated.ts';
 import { DEFAULT_SLIME_BASE_COLOUR } from '../src/render/slime/SlimePalette.ts';
 
-test('every authored Containment sign character has a visible vector glyph', () => {
-  assert.deepEqual(getUnsupportedContainmentSignCharacters(), []);
+test('baked Michroma signs match the current authored content and atlas order', () => {
+  assert.deepEqual(JSON.parse(SIGNAGE_CONTENT_JSON), CONTAINMENT_SIGNS, 'Run npm run generate:signage after editing content');
 });
 
 test('Containment procedural textures are compact, deterministic and correctly configured', () => {
@@ -24,12 +25,13 @@ test('Containment procedural textures are compact, deterministic and correctly c
   assert.equal(firstTextures.length, first.diagnostics.textureCount);
   assert.equal(first.diagnostics.textureCount, 10);
   assert.equal(first.diagnostics.materialCount, 22);
-  assert.equal(first.diagnostics.estimatedTextureBytes, 2_768_896);
+  assert.equal(first.diagnostics.estimatedTextureBytes, 10_633_216);
+  assert.equal(first.textures.signageAtlas.anisotropy, 8);
   firstTextures.forEach((texture, index) => {
     const counterpart = secondTextures[index];
     assert.deepEqual(
       [texture.image.width, texture.image.height],
-      texture === first.textures.signageAtlas ? [512, 1280] : [64, 64],
+      texture === first.textures.signageAtlas ? [1024, 2560] : [64, 64],
     );
     assert.equal(
       Buffer.from(texture.image.data.buffer).equals(
@@ -81,8 +83,8 @@ test('Containment procedural textures are compact, deterministic and correctly c
         'e934e6fb6f00fd412fcaf097b2ced1258dc8b5e832da4246d3e9f1f25141f91f',
       'containment-acid-static-foundation-albedo':
         '3a14713d56e94f4a7c7610630edf2a7ff2d051db6359f3c7ff18e0019f7e30ea',
-      'containment-vector-signage-atlas':
-        'd5ecf2d346484d04d23854dbb8e91c9156d0adc8e4a9e9e07d56f874c73f8a5c',
+      'containment-michroma-signage-atlas':
+        'ca5ecca5fb399bdb10c1447f5e06190332a39ab00773e646d781c6719aa4fe2e',
     },
   );
 

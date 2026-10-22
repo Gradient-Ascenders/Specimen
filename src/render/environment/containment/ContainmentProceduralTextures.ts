@@ -1,32 +1,10 @@
 import * as THREE from 'three';
+import { CONTAINMENT_SIGNS, type ContainmentSignLabel } from './ContainmentSignContent.ts';
+import { SIGNAGE_WIDTH, SIGNAGE_HEIGHT, SIGNAGE_PALETTE, SIGNAGE_RLE_BASE64 } from './signage.generated.ts';
+export type { ContainmentSignLabel } from './ContainmentSignContent.ts';
 
 const TEXTURE_SIZE = 64;
 const SIGN_ATLAS_WIDTH = 512;
-// Keep every vector sign on the approved 64 px row while extending the shared
-// atlas for Room 4. Earlier-room signage therefore retains its exact density.
-const SIGN_ATLAS_HEIGHT = 1280;
-
-export type ContainmentSignLabel =
-  | 'bay'
-  | 'specimen'
-  | 'locked'
-  | 'vent'
-  | 'chamber'
-  | 'ascent'
-  | 'roomThree'
-  | 'chemical'
-  | 'laserArray'
-  | 'adhesionTest'
-  | 'roomFour'
-  | 'serviceOne'
-  | 'transferTwo'
-  | 'laserCore'
-  | 'roomFiveExit'
-  | 'roomFive'
-  | 'primaryContainment'
-  | 'pressureArray'
-  | 'observationControl'
-  | 'compositeAccess';
 
 export interface ContainmentSignRegion {
   readonly uMin: number;
@@ -304,83 +282,26 @@ const VECTOR_GLYPHS: Readonly<Record<string, readonly Stroke[]>> = {
   Z: [[0.08, 0.08, 0.92, 0.08], [0.92, 0.08, 0.08, 0.92], [0.08, 0.92, 0.92, 0.92]],
 };
 
-const CONTAINMENT_SIGNS: readonly [
-  ContainmentSignLabel,
-  string,
-  string,
-  Rgba,
-][] = [
-  ['bay', 'C-01', 'BIOLOGICAL CONTAINMENT', [180, 141, 48, 255]],
-  ['specimen', 'SP-01', 'SPECIMEN TEST BAY', [83, 137, 135, 255]],
-  ['locked', 'LOCKED', 'DOOR C-01', [168, 54, 61, 255]],
-  ['vent', 'VENT ACCESS', 'SERVICE ROUTE', [117, 139, 60, 255]],
-  ['chamber', 'C-02', 'TRAVERSAL TEST CHAMBER', [83, 137, 135, 255]],
-  ['ascent', 'ASCENT 09 M', 'CALIBRATION ROUTE', [180, 141, 48, 255]],
-  ['roomThree', 'C-03', 'BIOLOGICAL MATERIAL TESTING', [83, 137, 135, 255]],
-  ['chemical', 'CHEMICAL CONTAINMENT', 'AUTHORIZED TEST AREA', [180, 141, 48, 255]],
-  ['laserArray', 'LASER ARRAY L-03', 'ALIGNMENT CONTROL', [168, 54, 61, 255]],
-  ['adhesionTest', 'ADHESION TEST A03', 'REPLACEABLE MEMBRANE', [83, 137, 135, 255]],
-  ['roomFour', 'C-04', 'VERTICAL TRANSFER CORE', [180, 141, 48, 255]],
-  ['serviceOne', 'S01  08 M', 'SERVICE LEVEL', [151, 159, 157, 255]],
-  ['transferTwo', 'S02  24 M', 'TRANSFER ARRAY', [180, 141, 48, 255]],
-  ['laserCore', 'L-04', 'ACTIVE ALIGNMENT ZONE', [168, 54, 61, 255]],
-  ['roomFiveExit', 'C-05', 'RESEARCH LAB ACCESS', [83, 137, 135, 255]],
-  ['roomFive', 'C-05', 'PRIMARY CONTAINMENT LAB', [180, 141, 48, 255]],
-  ['primaryContainment', 'PC-05', 'BIOLOGICAL PROCESS CHAMBER', [117, 139, 60, 255]],
-  ['pressureArray', 'PRESSURE ARRAY', 'MANIFOLD 05', [180, 141, 48, 255]],
-  ['observationControl', 'OBSERVATION CONTROL', 'SPECIMEN MONITORING', [83, 137, 135, 255]],
-  ['compositeAccess', 'COMPOSITE ACCESS', 'CORROSIVE CLEARANCE', [180, 141, 48, 255]],
-];
-
-/** Return authored, non-space sign characters that have no visible strokes. */
-export function getUnsupportedContainmentSignCharacters(): readonly string[] {
-  const unsupported = new Set<string>();
-  for (const [, title, subtitle] of CONTAINMENT_SIGNS) {
-    for (const character of `${title}${subtitle}`) {
-      if (
-        character !== ' ' &&
-        (VECTOR_GLYPHS[character]?.length ?? 0) === 0
-      ) {
-        unsupported.add(character);
-      }
-    }
-  }
-  return [...unsupported].sort();
-}
-
 function createSignageAtlas(): {
   readonly texture: THREE.DataTexture;
   readonly regions: Readonly<Record<ContainmentSignLabel, ContainmentSignRegion>>;
 } {
-  const pixels = new Uint8Array(SIGN_ATLAS_WIDTH * SIGN_ATLAS_HEIGHT * 4);
-  const unsupportedCharacters = getUnsupportedContainmentSignCharacters();
-  if (unsupportedCharacters.length > 0) {
-    throw new Error(
-      `Containment signage has unsupported vector glyphs: ${unsupportedCharacters.join(', ')}`,
-    );
+  // Baked from the same bundled Michroma font as the title. Decode once per
+  // resource owner; no browser font readiness, canvas, or per-frame allocation.
+  const encoded = atob(SIGNAGE_RLE_BASE64);
+  const pixels = new Uint8Array(SIGNAGE_WIDTH * SIGNAGE_HEIGHT * 4);
+  let offset = 0;
+  for (let i = 0; i < encoded.length; i += 3) {
+    const count = encoded.charCodeAt(i) | (encoded.charCodeAt(i + 1) << 8);
+    const [r, g, b] = SIGNAGE_PALETTE[encoded.charCodeAt(i + 2)];
+    for (let end = offset + count * 4; offset < end; offset += 4) {
+      pixels[offset] = r; pixels[offset + 1] = g; pixels[offset + 2] = b; pixels[offset + 3] = 255;
+    }
   }
-  const rowHeight = SIGN_ATLAS_HEIGHT / CONTAINMENT_SIGNS.length;
-  const background: Rgba = [25, 30, 31, 255];
-  const primary: Rgba = [232, 232, 224, 255];
-  const secondary: Rgba = [151, 159, 157, 255];
-
-  CONTAINMENT_SIGNS.forEach(([, title, subtitle, accent], row) => {
-    const y = row * rowHeight;
-    fillRect(pixels, 0, y, SIGN_ATLAS_WIDTH, rowHeight, background);
-    fillRect(pixels, 0, y, 7, rowHeight, accent);
-    fillRect(pixels, 19, y + 10, 3, 44, accent);
-    drawVectorTextFit(pixels, title, 34, y + 6, 448, 29, primary, 3.4);
-    drawVectorTextFit(pixels, subtitle, 35, y + 42, 445, 11, secondary, 1.7);
-  });
-
-  const texture = dataTexture(
-    'containment-vector-signage-atlas',
-    pixels,
-    SIGN_ATLAS_WIDTH,
-    SIGN_ATLAS_HEIGHT,
-    false,
-    THREE.SRGBColorSpace,
-  );
+  const texture = dataTexture('containment-michroma-signage-atlas', pixels,
+    SIGNAGE_WIDTH, SIGNAGE_HEIGHT, false, THREE.SRGBColorSpace);
+  // Three.js clamps this to the device maximum. Mipmaps keep distant signs stable.
+  texture.anisotropy = 8;
   const regions = Object.fromEntries(
     CONTAINMENT_SIGNS.map(([key], row) => [
       key,

@@ -42,7 +42,7 @@ All 3D models were created independently for Specimen.
 
 | Resource | Creator | Source | Licence | Use |
 | --- | --- | --- | --- | --- |
-| Michroma | Vernon Adams | [Fontsource](https://fontsource.org/fonts/michroma) | SIL OFL 1.1 | Headings. |
+| Michroma | Vernon Adams | [Fontsource](https://fontsource.org/fonts/michroma) | SIL OFL 1.1 | Headings and baked facility signs. |
 | Space Grotesk | Florian Karsten | [Fontsource](https://fontsource.org/fonts/space-grotesk) | SIL OFL 1.1 | Text and controls. |
 
 ## Code

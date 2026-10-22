@@ -259,8 +259,9 @@ export class ContainmentArtResources {
         map: signageAtlas,
         emissive: 0xffffff,
         emissiveMap: signageAtlas,
-        emissiveIntensity: 0.08,
-        roughness: 0.5,
+        // Keep text readable between fixtures without adding dynamic lights.
+        emissiveIntensity: 0.35,
+        roughness: 0.72,
         metalness: 0.02,
         side: THREE.DoubleSide,
       }),
