@@ -15,7 +15,7 @@ SOLE = -0.45
 SCENE = 'The Specimen Studio'
 CHARACTER = 'The Specimen Character'
 STUDIO = 'The Specimen Studio Rig'
-ASSET = 'specimen-grounded-puddle-v7'
+ASSET = 'specimen-yellow-bolt-tips-v12'
 BODY_HEIGHT = 1.78
 EYE_HEIGHT = 1.32
 EYE_SPACING = 0.255
@@ -151,14 +151,15 @@ def ellipsoid(name,centre,radii,organic=0.0,segments=64,rings=32):
 
 def body_profile():
     # The lower mass spreads onto the floor as one shallow liquid footprint.
+    # Chest and shoulders gain gentle volume; the pooled base stays dominant.
     profile = [(0.000,0.90,0.71),(0.040,0.94,0.745),
             (0.075,0.925,0.735),(0.140,0.865,0.670),
             (0.230,0.770,0.590),(0.310,0.690,0.535),
-            (0.400,0.640,0.510),(0.620,0.565,0.45),
-            (0.850,0.525,0.425),(1.080,0.505,0.415),
-            (1.300,0.515,0.425),(1.530,0.535,0.440),
-            (1.730,0.515,0.425),(1.910,0.440,0.370),
-            (2.040,0.315,0.280),(2.120,0.170,0.160),
+            (0.400,0.640,0.510),(0.620,0.595,0.465),
+            (0.850,0.575,0.460),(1.080,0.565,0.460),
+            (1.300,0.570,0.465),(1.530,0.580,0.478),
+            (1.730,0.550,0.450),(1.910,0.460,0.385),
+            (2.040,0.325,0.288),(2.120,0.172,0.162),
             (2.16,0.012,0.012)]
     return [(h*BODY_HEIGHT/2.16,rx,ry) for h,rx,ry in profile]
 
@@ -188,30 +189,44 @@ def rear_surface(height):
     return body_centre(height)[1]-samples[-1][2]
 
 
-def blade(name,outline,thickness=0.085):
+def blade(name,outline,thickness=0.085,tapered_points=()):
     # A closed, narrow solid in the sagittal plane. Voxel union softens edges.
-    vertices=[(sign*thickness/2,y,SOLE+h) for sign in (-1,1) for y,h in outline]
+    vertices=[(sign*thickness/2*(0.12 if (y,h) in tapered_points else 1.0),y,SOLE+h)
+              for sign in (-1,1) for y,h in outline]
     count=len(outline)
     faces=[tuple(reversed(range(count))),tuple(count+i for i in range(count))]
     faces.extend((i,(i+1)%count,(i+1)%count+count,i+count) for i in range(count))
     return mesh_object(name,vertices,faces)
 
 
-def crest_bolts():
-    return [(h*BODY_HEIGHT/2.16,length) for h,length in
-            [(0.24,0.28),(0.52,0.36),(0.86,0.43),(1.20,0.49),
-             (1.54,0.51),(1.86,0.52),(2.09,0.46)]]
+def dorsal_teeth():
+    return [(0.24,0.25),(0.46,0.30),(0.70,0.35),(0.96,0.40),(1.24,0.44)]
 
 
-def bolt_outline(height,length):
-    # A real two-bend lightning silhouette, rather than a pointed triangle.
-    y=rear_surface(min(height,BODY_HEIGHT-0.01))-0.075
-    direction=Vector((-0.88,0.475))
-    normal=Vector((0.475,0.88))
-    contour=[(0,-0.22),(0.46,-0.22),(0.33,0.08),
-             (1.0,0.16),(0.58,0.32),(0.69,0.58),(0,0.27)]
-    return [(y+length*(u*direction.x+v*normal.x),
-             height+length*(u*direction.y+v*normal.y)) for u,v in contour]
+def crown_outline():
+    # One uninterrupted zigzag: long swept crown, backward points and small hooks.
+    # Its front edge joins the forehead without an undercut or floating barb.
+    return [(-0.62,2.14),(0.12,1.85),(0.15,1.80),(0.22,1.68),
+            (-0.43,1.35),(-0.98,1.60),
+            (-0.62,1.76),(-0.66,1.69),(-0.49,1.75),
+            (-0.94,1.91),(-0.55,1.99),(-0.59,1.92),(-0.28,1.90)]
+
+
+def mohawk_outline():
+    crown=crown_outline()
+    # Embed a continuous inner edge into the body. The outer returns are one
+    # contour, so adjacent teeth cannot leave tunnels or extra overlapping fins.
+    heights=[0.10+i*1.53/48 for i in range(49)]
+    roots=[(rear_surface(h)+0.075,h) for h in reversed(heights)]
+    edge=[(rear_surface(0.10)+0.030,0.10)]
+    for h,length in dorsal_teeth():
+        y=rear_surface(h)
+        # A small upswept hook and reverse step accent each long point.
+        edge.extend([(y-length,h),
+                     (y-0.14-length*0.22,h+length*0.34),
+                     (y-0.14-length*0.30,h+length*0.18),
+                     (y-0.12-length*0.08,h+length*0.38)])
+    return crown[:4]+roots+edge+crown[5:]
 
 
 def build_body():
@@ -239,17 +254,8 @@ def build_body():
     faces.append(tuple((len(samples)-1)*segments+j for j in range(segments)))
     body=mesh_object('Specimen-Body',vertices,faces)
     parts=[body]
-    # A web connects every bolt into the same continuous Goop-like mohawk.
-    root_heights=[0.10+i*(BODY_HEIGHT-0.10)/48 for i in range(49)]
-    web=[(rear_surface(h)+0.055,h) for h in root_heights]
-    web+=[(rear_surface(h)-0.22,h) for h in reversed(root_heights)]
-    parts.append(blade('Mohawk-Web-Construction',web,0.115))
-    # The upper web closes the small tunnel where the two crown bolts overlap.
-    parts.append(blade('Crown-Web-Construction',
-        [(-0.25,1.61),(-0.54,1.76),(-0.48,1.96),(-0.12,1.78)],0.09))
-    for index,(height,length) in enumerate(crest_bolts()):
-        parts.append(blade('Lightning-Bolt-Construction-'+str(index),
-                           bolt_outline(height,length),0.085))
+    parts.append(blade('Continuous-Lightning-Mohawk',mohawk_outline(),0.10,
+                       tapered_points=(crown_outline()[0],crown_outline()[10])))
     body=join_objects(parts,'Specimen-Body')
     activate(body)
     remesh=body.modifiers.new('Continuous body and lightning mohawk','REMESH')
@@ -257,7 +263,15 @@ def build_body():
     remesh.voxel_size=0.012
     remesh.use_smooth_shade=True
     bpy.ops.object.modifier_apply(modifier=remesh.name)
+    crest_group=body.vertex_groups.new(name='Crest edge definition')
+    for vertex in body.data.vertices:
+        h=max(0.0,vertex.co.z-SOLE)
+        distance=rear_surface(min(h,BODY_HEIGHT))-vertex.co.y
+        t=max(0.0,min(1.0,(distance-0.035)/0.13))
+        t=t*t*(3-2*t)
+        crest_group.add([vertex.index],1.0-0.80*t,'REPLACE')
     smooth=body.modifiers.new('Soft liquid edges','SMOOTH')
+    smooth.vertex_group=crest_group.name
     smooth.factor=0.70
     smooth.iterations=5
     bpy.ops.object.modifier_apply(modifier=smooth.name)
@@ -317,7 +331,7 @@ def build_body():
                 vertex.co.y+=0.035*fold*upper
     for face in body.data.polygons:
         face.use_smooth=True
-    body['construction']='Full liquid lobes merge into a thin grounded puddle; seven webbed lightning-bolt crest peaks'
+    body['construction']='Grounded liquid lobes; continuous lightning mohawk with eight primary points and hooked secondary barbs'
     body.data.update()
     return body
 
@@ -534,22 +548,32 @@ def build_details():
                     break
             if len(controls)>1:
                 bolts.append(tube('Current-Twig',controls,sides=6,steps=1))
-    # Veins also follow the actual bolt geometry through the mohawk.
-    for h,length in crest_bolts():
-        y=rear_surface(min(h,BODY_HEIGHT-0.01))-0.075
-        direction=Vector((-0.88,0.475))
-        normal=Vector((0.475,0.88))
+    # Branches follow each new dorsal tooth, inset from its pointed boundary.
+    for h,length in dorsal_teeth():
+        y=rear_surface(h)
         controls=[]
-        for i,(u,v) in enumerate(((0,0.02),(0.36,-0.015),(0.48,0.19),(0.69,0.25),(0.90,0.18))):
-            py=y+length*(u*direction.x+v*normal.x)
-            pz=SOLE+h+length*(u*direction.y+v*normal.y)
+        path=[(y+0.025,h-0.06),(y-length*0.30,h-0.025),
+              (y-length*0.40,h+0.035),(y-length*0.67,h+0.015),
+              (y-length*0.86,h+0.008)]
+        for i,(py,pz) in enumerate(path):
+            pz+=SOLE
             q=contained_point((0.013,py,pz),0.012)
             controls.append((*q,0.0014 if i<4 else 0.00065))
         bolts.append(tube('Crest-Current',controls,sides=8,steps=2))
+    crown_paths=[
+        [(-0.08,1.68),(-0.12,1.83),(-0.21,1.92),(-0.31,2.005),(-0.44,2.062)],
+        [(-0.32,1.55),(-0.37,1.69),(-0.40,1.78),(-0.55,1.84),(-0.84,1.89)],
+        [(-0.37,1.37),(-0.52,1.48),(-0.65,1.50),(-0.66,1.57),(-0.89,1.60)],
+    ]
+    for path in crown_paths:
+        controls=[(*contained_point((0.013,y,SOLE+h),0.006),
+                   0.0015 if i<len(path)-1 else 0.00065)
+                  for i,(y,h) in enumerate(path)]
+        bolts.append(tube('Crown-Current',controls,sides=8,steps=2))
     controls=[]
     for i in range(40):
         h=0.12+i*(BODY_HEIGHT-0.14)/39
-        controls.append((0.012,rear_surface(h)-0.095,SOLE+h,0.0018))
+        controls.append((*contained_point((0.012,rear_surface(h)-0.060,SOLE+h),0.012),0.0018))
     bolts.append(tube('Spinal-Current',controls,sides=8,steps=1))
     veins=join_objects(bolts,'Specimen-Electric-Veins')
     # Reproject any thin-tube corners into the final concave sculpt.
@@ -559,6 +583,30 @@ def build_details():
 
 
 # SECTION: materials
+def bolt_tip_accents():
+    crown=crown_outline()
+    tips=[(*crown[i],radius) for i,radius in
+          ((0,0.14),(5,0.13),(9,0.13),(6,0.060),(10,0.060))]
+    for h,length in dorsal_teeth():
+        y=rear_surface(h)
+        tips.extend([(y-length,h,0.090),
+                     (y-0.14-length*0.22,h+length*0.34,0.055)])
+    return tips
+
+
+def bolt_tip_weight(point,tips):
+    x,y,z=point
+    if abs(x)>0.10:
+        return 0.0
+    h=z-SOLE
+    weight=0.0
+    for py,ph,radius in tips:
+        distance=math.hypot(y-py,h-ph)
+        t=max(0.0,min(1.0,(radius-distance)/(radius*0.65)))
+        weight=max(weight,t*t*(3-2*t))
+    return weight
+
+
 def material(name,colour,roughness,emission=0.0,transmission=0.0):
     mat=bpy.data.materials.get(name) or bpy.data.materials.new(name)
     mat.use_nodes=True
@@ -582,6 +630,12 @@ def lookdev():
     bsdf.inputs['Coat Roughness'].default_value=0.11
     bsdf.inputs['Subsurface Weight'].default_value=0.018
     bsdf.inputs['Subsurface Radius'].default_value=(0.06,0.14,0.10)
+    yellow,yellow_bsdf=material('Specimen-Yellow-Bolt-Tips',(1.0,0.82,0.020),0.13,
+                               transmission=0.94)
+    yellow_bsdf.inputs['Coat Weight'].default_value=0.26
+    yellow_bsdf.inputs['Coat Roughness'].default_value=0.11
+    yellow_bsdf.inputs['Subsurface Weight'].default_value=0.018
+    yellow_bsdf.inputs['Subsurface Radius'].default_value=(0.06,0.14,0.10)
     eye,eye_bsdf=material('Specimen-Obsidian-Eyes',(0.001,0.004,0.005),0.105)
     eye_bsdf.inputs['Coat Weight'].default_value=0.32
     aqua,aqua_bsdf=material('Specimen-Aqua-Flow',(0.62,0.92,0.81),0.12,emission=0.32,transmission=0.98)
@@ -637,9 +691,18 @@ def lookdev():
         colour_node.name='Specimen Gel Colour'
     colour_node.layer_name='SpecimenFlow'
     gel.node_tree.links.new(colour_node.outputs['Color'],bsdf.inputs['Base Color'])
+    yellow_colour=yellow.node_tree.nodes.get('Specimen Gel Colour')
+    if yellow_colour is None:
+        yellow_colour=yellow.node_tree.nodes.new('ShaderNodeVertexColor')
+        yellow_colour.name='Specimen Gel Colour'
+    yellow_colour.layer_name='SpecimenFlow'
+    yellow.node_tree.links.new(yellow_colour.outputs['Color'],yellow_bsdf.inputs['Base Color'])
     obj=bpy.data.objects['Specimen-Body']
+    obj.data.materials.append(yellow)
     attr=obj.data.color_attributes.get('SpecimenFlow') or obj.data.color_attributes.new(name='SpecimenFlow',type='FLOAT_COLOR',domain='POINT')
     obj.data.color_attributes.active_color=attr
+    tips=bolt_tip_accents()
+    weights=[]
     for vertex in obj.data.vertices:
         x,y,z=vertex.co
         h=z-SOLE
@@ -649,7 +712,13 @@ def lookdev():
         ridge=max(0.0,min(1.0,(-y+rear_surface(min(h,BODY_HEIGHT)))/0.20))
         mint=(0.39,0.72,0.60)
         blend=ridge*0.70
-        attr.data[vertex.index].color=tuple(base[i]*(1-blend)+mint[i]*blend for i in range(3))+(1.0,)
+        colour=tuple(base[i]*(1-blend)+mint[i]*blend for i in range(3))
+        weight=bolt_tip_weight(vertex.co,tips)
+        weights.append(weight)
+        gold=(1.0,0.82,0.020)
+        attr.data[vertex.index].color=tuple(colour[i]*(1-weight)+gold[i]*weight for i in range(3))+(1.0,)
+    for face in obj.data.polygons:
+        face.material_index=1 if sum(weights[i] for i in face.vertices)/len(face.vertices)>0.05 else 0
 
 
 # SECTION: motion

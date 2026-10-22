@@ -6,13 +6,22 @@ subsequent refinements shorten the body and replace the oval eyes with pointed,
 swept dragon-shaped lenses. Built and visually iterated through Blender MCP in
 the native Windows Blender GUI, then regenerated from the same recipe.
 
-The body is a continuous gel sculpt that melts into a shallow puddle, with seven
-joined lightning-bolt peaks running over the crown and down the back. A narrow web
-connects their angular notches into a mohawk. The dome is about 1.78 m high above
-the resting contact plane; the highest crest is about 2.09 m above it. The base
+The body is a continuous gel sculpt that melts into a shallow puddle, with an
+eight-point lightning mohawk. Its long swept crown, solid front root and deep return
+notches follow the approved concept. Three large crown points taper into five
+smaller dorsal teeth on one uninterrupted fin. Hooked secondary barbs add a
+stepped lightning outline, while the front root blends solidly into the head.
+Yellow accents fade into the teal gel at the eight main bolt tips and seven
+secondary hooks, using the same translucent surface as the surrounding gel.
+The dome is about 1.78 m high above
+the resting contact plane; the highest crest is about 2.12 m above it. The base
 is about 1.88 m wide, with four broad merging liquid lobes, an irregular
 ground-hugging edge and a fuller transition into the body. Separate raised foot
 pads have been removed. These are asset dimensions, not gameplay collider changes.
+
+The chest and shoulders have gently increased volume, with about 1.15 m width
+through the upper body. The 1.88 m footprint and fuller lower lobes retain the
+bottom-heavy slime proportions; the low grounded base profile is preserved.
 
 Clear desaturated teal gel surrounds five closed aqua flow ribbons and
 filaments, an irregular green fusion core, a brighter inner heart and three
@@ -31,16 +40,19 @@ as morphs; charging also pulses the gold emission.
 - `verify-specimen.py`: compare every imported GLB triangle with the source.
 - `specimen.validation.json`: measured topology, bounds and artifact hashes.
 - `specimen.roundtrip.json`: clean GLB import results and material checks.
-- `evidence/`: four full-body studio renders, a `base-detail.png` close-up,
-  and `living-gel-motion.mp4` showing all clips.
+- `evidence/`: four full-body studio renders, `base-detail.png`,
+  `mohawk-detail.png` and `spike-detail.png` close-ups, and
+  `living-gel-motion.mp4` showing all clips.
 - `reference/approved-lightning-mohawk.png`: the approved concept before the
   shorter-body and sharper-eye refinements.
 
-The export contains 104,944 triangles across six meshes under `The Specimen`:
+The export contains 108,352 triangles across six meshes under `The Specimen`:
 `Specimen-Body`, `Specimen-Eye-Left`, `Specimen-Eye-Right`,
 `Specimen-Acid-Core`, `Specimen-Aqua-Currents`, and `Specimen-Electric-Veins`.
-The body and crest form one connected closed mesh. The internal meshes contain
-separate closed volumes. All six meshes carry bounded deformation morphs,
+The body and crest form one connected closed mesh without tunnels. The crest
+keeps sharper edges while the body and base use softer smoothing. Electrical
+branches follow the new crown and dorsal teeth inside the gel. The internal
+meshes contain separate closed volumes. All six meshes carry bounded deformation morphs,
 with 47 authored targets across the asset.
 
 Blender uses +Z up and +Y forward. The GLB uses +Y up and -Z forward, with
@@ -94,7 +106,7 @@ From the repository root:
   --python assets/characters/specimen/generate-specimen.py
 ```
 
-Append `-- --render` to also regenerate the four studio views. Add `--preview`
+Append `-- --render` to also regenerate the studio views and detail renders. Add `--preview`
 to render and encode the ten-second motion preview using Blender's bundled
 video encoder. Existing rendered frames can be encoded with `-- --encode-only`.
 An interrupted preview can resume with `-- --preview --preview-start=N` when

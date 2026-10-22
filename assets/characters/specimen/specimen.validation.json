@@ -1,18 +1,19 @@
 {
-  "asset": "specimen-grounded-puddle-v7",
+  "asset": "specimen-yellow-bolt-tips-v12",
   "blender_version": "5.2.1 LTS",
   "runtime_up": "+Y",
   "runtime_forward": "-Z",
   "resting_contact_y_metres": -0.45,
   "meshes": {
     "Specimen-Body": {
-      "vertices": 33640,
-      "triangles": 67280,
+      "vertices": 35274,
+      "triangles": 70544,
       "connected_components": 1,
+      "euler_characteristic": 2,
       "non_manifold_edges": 0,
       "inconsistent_winding_edges": 0,
-      "signed_volume_m3": 1.5541574686552222,
-      "minimum_triangle_area_m2": 9.169919508167368e-07,
+      "signed_volume_m3": 1.6990729877484212,
+      "minimum_triangle_area_m2": 2.4733173731306124e-08,
       "runtime_bounds_metres": {
         "minimum": [
           -0.902905,
@@ -21,82 +22,86 @@
         ],
         "maximum": [
           0.972404,
-          1.64269,
-          0.893089
+          1.669254,
+          0.972815
         ]
       },
-      "geometry_sha256": "a6ae5e9e3940864fdaa742cc7fc9b5601e05034c908752ff3423927f08b0ea15"
+      "geometry_sha256": "53f7d84292b4e66422ce5eb48c8a541ed94e278e7f3ee08ed43d660d996905c6"
     },
     "Specimen-Eye-Left": {
       "vertices": 1538,
       "triangles": 3072,
       "connected_components": 1,
+      "euler_characteristic": 2,
       "non_manifold_edges": 0,
       "inconsistent_winding_edges": 0,
-      "signed_volume_m3": 0.002641594306665062,
-      "minimum_triangle_area_m2": 6.29545240826701e-07,
+      "signed_volume_m3": 0.002641705012380759,
+      "minimum_triangle_area_m2": 6.225457127584377e-07,
       "runtime_bounds_metres": {
         "minimum": [
           -0.44,
           0.693805,
-          -0.552916
+          -0.591939
         ],
         "maximum": [
           -0.07,
           1.001233,
-          -0.336078
+          -0.38635
         ]
       },
-      "geometry_sha256": "7baee49cf6a7ed13953969570c755ee9337b5381decd4897a5afb2947418905f"
+      "geometry_sha256": "7269663d89e1ce2cbdbc0f7a70f85114d0cdb2204a878c391dc26feefc4231e9"
     },
     "Specimen-Eye-Right": {
       "vertices": 1538,
       "triangles": 3072,
       "connected_components": 1,
+      "euler_characteristic": 2,
       "non_manifold_edges": 0,
       "inconsistent_winding_edges": 0,
-      "signed_volume_m3": 0.002641775288331704,
-      "minimum_triangle_area_m2": 6.280742468334211e-07,
+      "signed_volume_m3": 0.002641685079126156,
+      "minimum_triangle_area_m2": 6.223085051715316e-07,
       "runtime_bounds_metres": {
         "minimum": [
           0.07,
           0.693805,
-          -0.553901
+          -0.59343
         ],
         "maximum": [
           0.44,
           1.001233,
-          -0.33401
+          -0.383276
         ]
       },
-      "geometry_sha256": "fdf3fd81d57b30f238c6773cc48b798d777ab68ffb0274faaa38519998321484"
+      "geometry_sha256": "81adf153f67d77825706d1b50bca07b2691c7b37f21348574adc9679064f98be"
     },
     "Specimen-Aqua-Currents": {
       "vertices": 8184,
       "triangles": 16348,
       "connected_components": 5,
+      "euler_characteristic": 10,
       "non_manifold_edges": 0,
       "inconsistent_winding_edges": 0,
-      "signed_volume_m3": 0.03194178431595273,
-      "minimum_triangle_area_m2": 1.5735089675672498e-07,
+      "signed_volume_m3": 0.03198309477728589,
+      "minimum_triangle_area_m2": 1.5757633775592694e-07,
       "runtime_bounds_metres": {
         "minimum": [
-          -0.662518,
+          -0.662527,
           -0.354273,
-          -0.653639
+          -0.653645
         ],
         "maximum": [
           0.684317,
           1.230149,
-          0.441378
+          0.458016
         ]
       },
-      "geometry_sha256": "95180e14a93a160d17147527226ffa952bdac7d639412e5216e9be3a8c76a318"
+      "geometry_sha256": "712434102021068376542d45d4782169606af9c076a7fdba995b26cc304234b1"
     },
     "Specimen-Acid-Core": {
       "vertices": 5492,
       "triangles": 10964,
       "connected_components": 5,
+      "euler_characteristic": 10,
       "non_manifold_edges": 0,
       "inconsistent_winding_edges": 0,
       "signed_volume_m3": 0.05903949629302112,
@@ -116,169 +121,170 @@
       "geometry_sha256": "4da5931487d5d9a1b4b28c6c5473a18816401fd7f6b51a2f76101d6f8451c8e0"
     },
     "Specimen-Electric-Veins": {
-      "vertices": 2160,
-      "triangles": 4208,
-      "connected_components": 28,
+      "vertices": 2234,
+      "triangles": 4352,
+      "connected_components": 29,
+      "euler_characteristic": 58,
       "non_manifold_edges": 0,
       "inconsistent_winding_edges": 0,
-      "signed_volume_m3": 7.980863297631044e-05,
-      "minimum_triangle_area_m2": 8.774045312520684e-08,
+      "signed_volume_m3": 7.819613164966897e-05,
+      "minimum_triangle_area_m2": 6.332913794065975e-12,
       "runtime_bounds_metres": {
         "minimum": [
-          -0.580238,
-          -0.335194,
-          -0.615939
+          -0.58024,
+          -0.336587,
+          -0.615916
         ],
         "maximum": [
-          0.520299,
-          1.538115,
-          0.845031
+          0.520301,
+          1.609921,
+          0.89006
         ]
       },
-      "geometry_sha256": "d7e681c0f16d22a44416a6d35e8a795ecdbd1bb893284e8b9ba7ecff4a25248b"
+      "geometry_sha256": "07a399d69083e252538cd5d9903cce195a330eabc5b1c6a414fbb80e29ba8927"
     }
   },
   "static_asset": false,
   "armatures": 0,
   "animation_clips": 3,
   "external_textures": 0,
-  "source_sha256": "52169e1cec593a357c4a9bfaf695a5898955c920caca2bcb3e29a6f16f28d4a9",
+  "source_sha256": "9911922d6d45d91a23be1214269fbb78a266ed94bbe5bde2cd0dd81aab2cc16a",
   "motion": {
     "morphs": {
       "Specimen-Body": {
         "Breathe": {
-          "signed_volume_m3": 1.6038720745849038,
-          "minimum_triangle_area_m2": 9.381142221727326e-07
+          "signed_volume_m3": 1.7540755464159703,
+          "minimum_triangle_area_m2": 2.528885632408682e-08
         },
         "Squash": {
-          "signed_volume_m3": 1.5289509413112785,
-          "minimum_triangle_area_m2": 8.924376120258083e-07
+          "signed_volume_m3": 1.6749146836590578,
+          "minimum_triangle_area_m2": 2.308906735618728e-08
         },
         "Stretch": {
-          "signed_volume_m3": 1.599809253441545,
-          "minimum_triangle_area_m2": 9.498232824520429e-07
+          "signed_volume_m3": 1.7467406203209652,
+          "minimum_triangle_area_m2": 2.618106737571129e-08
         },
         "WobbleLeft": {
-          "signed_volume_m3": 1.5541995436542946,
-          "minimum_triangle_area_m2": 9.368060352065084e-07
+          "signed_volume_m3": 1.699138025054662,
+          "minimum_triangle_area_m2": 2.484961049901758e-08
         },
         "WobbleRight": {
-          "signed_volume_m3": 1.5542024248932922,
-          "minimum_triangle_area_m2": 8.988112978606897e-07
+          "signed_volume_m3": 1.6991200076671873,
+          "minimum_triangle_area_m2": 2.4673362145124145e-08
         },
         "Blink": {
-          "signed_volume_m3": 1.555397155737346,
-          "minimum_triangle_area_m2": 9.169919232680437e-07
+          "signed_volume_m3": 1.700334474000518,
+          "minimum_triangle_area_m2": 2.4733173113014914e-08
         },
         "Curious": {
-          "signed_volume_m3": 1.5536029874215893,
-          "minimum_triangle_area_m2": 9.169919232680437e-07
+          "signed_volume_m3": 1.6985264211985693,
+          "minimum_triangle_area_m2": 2.4733173113014914e-08
         },
         "Focus": {
-          "signed_volume_m3": 1.5559951668542764,
-          "minimum_triangle_area_m2": 9.169919232680437e-07
+          "signed_volume_m3": 1.700937125484143,
+          "minimum_triangle_area_m2": 2.4733173113014914e-08
         },
         "CrestFlexLeft": {
-          "signed_volume_m3": 1.5542122467187738,
-          "minimum_triangle_area_m2": 9.050381143573969e-07
+          "signed_volume_m3": 1.6990455998896177,
+          "minimum_triangle_area_m2": 2.4935831793493538e-08
         },
         "CrestFlexRight": {
-          "signed_volume_m3": 1.5541898447164855,
-          "minimum_triangle_area_m2": 9.296546530819312e-07
+          "signed_volume_m3": 1.6992125541588752,
+          "minimum_triangle_area_m2": 2.4550898960461e-08
         }
       },
       "Specimen-Eye-Left": {
         "Breathe": {
-          "signed_volume_m3": 0.0027380549059780415,
-          "minimum_triangle_area_m2": 6.4578293310976e-07
+          "signed_volume_m3": 0.0027378015302019776,
+          "minimum_triangle_area_m2": 6.387123992982806e-07
         },
         "Squash": {
-          "signed_volume_m3": 0.0026610523656434757,
-          "minimum_triangle_area_m2": 5.999033612724599e-07
+          "signed_volume_m3": 0.0026609830301869883,
+          "minimum_triangle_area_m2": 5.941833829611058e-07
         },
         "Stretch": {
-          "signed_volume_m3": 0.002678088899782457,
-          "minimum_triangle_area_m2": 6.621040910151768e-07
+          "signed_volume_m3": 0.00267804130462442,
+          "minimum_triangle_area_m2": 6.543092849958942e-07
         },
         "WobbleLeft": {
-          "signed_volume_m3": 0.002641914508028975,
-          "minimum_triangle_area_m2": 6.300521039760983e-07
+          "signed_volume_m3": 0.0026418120039792825,
+          "minimum_triangle_area_m2": 6.218647829267786e-07
         },
         "WobbleRight": {
-          "signed_volume_m3": 0.00264182025865208,
-          "minimum_triangle_area_m2": 6.296450766106728e-07
+          "signed_volume_m3": 0.002641705898457284,
+          "minimum_triangle_area_m2": 6.227494979996171e-07
         },
         "Blink": {
-          "signed_volume_m3": 0.000264186741389949,
-          "minimum_triangle_area_m2": 6.29856803091414e-08
+          "signed_volume_m3": 0.00026413004734611906,
+          "minimum_triangle_area_m2": 6.280744636771636e-08
         },
         "Curious": {
-          "signed_volume_m3": 0.0028267087427972606,
-          "minimum_triangle_area_m2": 6.767058129256388e-07
+          "signed_volume_m3": 0.0028266245938131838,
+          "minimum_triangle_area_m2": 6.690542340335603e-07
         },
         "Focus": {
-          "signed_volume_m3": 0.0021400366167227958,
-          "minimum_triangle_area_m2": 5.064197054822142e-07
+          "signed_volume_m3": 0.0021400222605786703,
+          "minimum_triangle_area_m2": 5.040129868807627e-07
         }
       },
       "Specimen-Eye-Right": {
         "Breathe": {
-          "signed_volume_m3": 0.0027378610774727954,
-          "minimum_triangle_area_m2": 6.444067676799281e-07
+          "signed_volume_m3": 0.0027378631314854593,
+          "minimum_triangle_area_m2": 6.384954024814837e-07
         },
         "Squash": {
-          "signed_volume_m3": 0.002660831044806855,
-          "minimum_triangle_area_m2": 5.985230745377546e-07
+          "signed_volume_m3": 0.0026609139616008783,
+          "minimum_triangle_area_m2": 5.946145320731812e-07
         },
         "Stretch": {
-          "signed_volume_m3": 0.0026779173461193295,
-          "minimum_triangle_area_m2": 6.606247300827172e-07
+          "signed_volume_m3": 0.0026779289592771724,
+          "minimum_triangle_area_m2": 6.537115695046785e-07
         },
         "WobbleLeft": {
-          "signed_volume_m3": 0.002641555094024047,
-          "minimum_triangle_area_m2": 6.282344966269871e-07
+          "signed_volume_m3": 0.0026416952213127822,
+          "minimum_triangle_area_m2": 6.225138229985816e-07
         },
         "WobbleRight": {
-          "signed_volume_m3": 0.0026415092774527693,
-          "minimum_triangle_area_m2": 6.28262390754964e-07
+          "signed_volume_m3": 0.0026416779025263772,
+          "minimum_triangle_area_m2": 6.213111623527976e-07
         },
         "Blink": {
-          "signed_volume_m3": 0.00026412436227474245,
-          "minimum_triangle_area_m2": 6.298586091164375e-08
+          "signed_volume_m3": 0.0002640783403246398,
+          "minimum_triangle_area_m2": 6.306648472204627e-08
         },
         "Curious": {
-          "signed_volume_m3": 0.0028267077294685805,
-          "minimum_triangle_area_m2": 6.751577496869886e-07
+          "signed_volume_m3": 0.0028268010251769247,
+          "minimum_triangle_area_m2": 6.689502543618384e-07
         },
         "Focus": {
-          "signed_volume_m3": 0.0021394820284115212,
-          "minimum_triangle_area_m2": 5.05819144088645e-07
+          "signed_volume_m3": 0.002139372888921187,
+          "minimum_triangle_area_m2": 5.014893921795724e-07
         }
       },
       "Specimen-Aqua-Currents": {
         "Breathe": {
-          "signed_volume_m3": 0.033154135216271495,
-          "minimum_triangle_area_m2": 1.611349560157551e-07
+          "signed_volume_m3": 0.03317744277798259,
+          "minimum_triangle_area_m2": 1.613734611364968e-07
         },
         "Squash": {
-          "signed_volume_m3": 0.03205066228591047,
-          "minimum_triangle_area_m2": 1.5457085728876838e-07
+          "signed_volume_m3": 0.03207321042364808,
+          "minimum_triangle_area_m2": 1.5517105766786745e-07
         },
         "Stretch": {
-          "signed_volume_m3": 0.032603612654385154,
-          "minimum_triangle_area_m2": 1.619994941477153e-07
+          "signed_volume_m3": 0.03262638619652058,
+          "minimum_triangle_area_m2": 1.6216890941027128e-07
         },
         "WobbleLeft": {
-          "signed_volume_m3": 0.032026445388013025,
-          "minimum_triangle_area_m2": 1.6137518539050168e-07
+          "signed_volume_m3": 0.032048805650693346,
+          "minimum_triangle_area_m2": 1.6174408281074211e-07
         },
         "WobbleRight": {
-          "signed_volume_m3": 0.03202652190997977,
-          "minimum_triangle_area_m2": 1.5624167143792268e-07
+          "signed_volume_m3": 0.03204890771807537,
+          "minimum_triangle_area_m2": 1.5646127085725133e-07
         },
         "Flow": {
-          "signed_volume_m3": 0.03192569600870748,
-          "minimum_triangle_area_m2": 1.538242493444491e-07
+          "signed_volume_m3": 0.03194821630080763,
+          "minimum_triangle_area_m2": 1.5429083553419337e-07
         }
       },
       "Specimen-Acid-Core": {
@@ -313,36 +319,36 @@
       },
       "Specimen-Electric-Veins": {
         "Breathe": {
-          "signed_volume_m3": 8.249316823627506e-05,
-          "minimum_triangle_area_m2": 8.997749551910956e-08
+          "signed_volume_m3": 8.084637413900235e-05,
+          "minimum_triangle_area_m2": 5.06808584080086e-12
         },
         "Squash": {
-          "signed_volume_m3": 7.96546292085772e-05,
-          "minimum_triangle_area_m2": 9.395548194886905e-08
+          "signed_volume_m3": 7.80467917719611e-05,
+          "minimum_triangle_area_m2": 1.5133361391831664e-12
         },
         "Stretch": {
-          "signed_volume_m3": 8.118976948682614e-05,
-          "minimum_triangle_area_m2": 8.535644547846312e-08
+          "signed_volume_m3": 7.95583041058127e-05,
+          "minimum_triangle_area_m2": 5.221343715434426e-12
         },
         "WobbleLeft": {
-          "signed_volume_m3": 7.968470145917432e-05,
-          "minimum_triangle_area_m2": 8.74469054700612e-08
+          "signed_volume_m3": 7.81161491515044e-05,
+          "minimum_triangle_area_m2": 6.581071262170697e-12
         },
         "WobbleRight": {
-          "signed_volume_m3": 7.972019680006308e-05,
-          "minimum_triangle_area_m2": 8.751342594564179e-08
+          "signed_volume_m3": 7.810455343012131e-05,
+          "minimum_triangle_area_m2": 6.49293519657558e-12
         },
         "CrestFlexLeft": {
-          "signed_volume_m3": 8.045383617306483e-05,
-          "minimum_triangle_area_m2": 8.810241657464502e-08
+          "signed_volume_m3": 7.858675380559056e-05,
+          "minimum_triangle_area_m2": 7.469934505340114e-12
         },
         "CrestFlexRight": {
-          "signed_volume_m3": 7.901569522849224e-05,
-          "minimum_triangle_area_m2": 8.698455465452141e-08
+          "signed_volume_m3": 7.761590860047342e-05,
+          "minimum_triangle_area_m2": 8.074654863804201e-12
         },
         "Charge": {
-          "signed_volume_m3": 0.0002950014795152593,
-          "minimum_triangle_area_m2": 4.295814238781963e-07
+          "signed_volume_m3": 0.0002970178186648316,
+          "minimum_triangle_area_m2": 8.14536029432654e-08
         }
       }
     },
@@ -351,25 +357,25 @@
         "frame": 1,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.554201046257125
+            "signed_volume_m3": 1.6991290829825167
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026418862879135454
+            "signed_volume_m3": 0.0026416805391017797
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002641619439737989
+            "signed_volume_m3": 0.002641716603828096
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03202697639887061,
-            "maximum_signed_surface_distance_metres": -0.010436770809349127
+            "signed_volume_m3": 0.032049438596736736,
+            "maximum_signed_surface_distance_metres": -0.02810077611739814
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05903356956150143,
-            "maximum_signed_surface_distance_metres": -0.08107450057286769
+            "maximum_signed_surface_distance_metres": -0.11580729286743008
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.973427264176824e-05,
-            "maximum_signed_surface_distance_metres": -0.005988702445876015
+            "signed_volume_m3": 7.809971706398734e-05,
+            "maximum_signed_surface_distance_metres": -0.005410837708041072
           }
         }
       },
@@ -377,25 +383,25 @@
         "frame": 31,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.6035687063110198
+            "signed_volume_m3": 1.7537453412440562
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0028341631549437807
+            "signed_volume_m3": 0.002834005754550617
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.00283058713284845
+            "signed_volume_m3": 0.002830758240416268
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.033081636632306045,
-            "maximum_signed_surface_distance_metres": -0.015897510258355396
+            "signed_volume_m3": 0.03310494199490085,
+            "maximum_signed_surface_distance_metres": -0.0268377498771315
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.059910812774259116,
-            "maximum_signed_surface_distance_metres": -0.08059072634205222
+            "maximum_signed_surface_distance_metres": -0.11499583955082926
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 8.266590257788309e-05,
-            "maximum_signed_surface_distance_metres": -0.006039537497031233
+            "signed_volume_m3": 8.095618492354184e-05,
+            "maximum_signed_surface_distance_metres": -0.00545837392564863
           }
         }
       },
@@ -403,25 +409,25 @@
         "frame": 50,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5701639186980734
+            "signed_volume_m3": 1.7166684909433665
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0003650290322336029
+            "signed_volume_m3": 0.000365007534317859
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.00035375902564756717
+            "signed_volume_m3": 0.0003538034756189745
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.032268423867189235,
-            "maximum_signed_surface_distance_metres": -0.017871316697437578
+            "signed_volume_m3": 0.03229111177232783,
+            "maximum_signed_surface_distance_metres": -0.025002535548992455
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05806862439018318,
-            "maximum_signed_surface_distance_metres": -0.0793679557973519
+            "maximum_signed_surface_distance_metres": -0.11319356147032522
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 8.069699139401365e-05,
-            "maximum_signed_surface_distance_metres": -0.005998772964176169
+            "signed_volume_m3": 7.905676038329663e-05,
+            "maximum_signed_surface_distance_metres": -0.0054373471066355705
           }
         }
       },
@@ -429,25 +435,25 @@
         "frame": 61,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5539917348857897
+            "signed_volume_m3": 1.6989040647272067
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.002705355837276121
+            "signed_volume_m3": 0.002705189099325859
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002708559824707043
+            "signed_volume_m3": 0.0027086275955667816
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.031925598253464416,
-            "maximum_signed_surface_distance_metres": -0.018037529483773795
+            "signed_volume_m3": 0.031948098759119935,
+            "maximum_signed_surface_distance_metres": -0.024673780659213662
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05740983759649595,
-            "maximum_signed_surface_distance_metres": -0.07902323530288413
+            "maximum_signed_surface_distance_metres": -0.11269407914005569
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.978577613639477e-05,
-            "maximum_signed_surface_distance_metres": -0.005980779570904815
+            "signed_volume_m3": 7.811380510828562e-05,
+            "maximum_signed_surface_distance_metres": -0.005426792427897453
           }
         }
       },
@@ -455,25 +461,25 @@
         "frame": 102,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5898384811850594
+            "signed_volume_m3": 1.738449327191807
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0002901424649432253
+            "signed_volume_m3": 0.0002900907064476617
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.0002919257654525609
+            "signed_volume_m3": 0.0002920472594235927
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.032794242344962456,
-            "maximum_signed_surface_distance_metres": -0.011533313190909666
+            "signed_volume_m3": 0.03281728673270249,
+            "maximum_signed_surface_distance_metres": -0.02954782434353831
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.06023767004907662,
-            "maximum_signed_surface_distance_metres": -0.08147436840226874
+            "maximum_signed_surface_distance_metres": -0.11634690273695014
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 8.149454148746275e-05,
-            "maximum_signed_surface_distance_metres": -0.006024666510427323
+            "signed_volume_m3": 7.990088643035816e-05,
+            "maximum_signed_surface_distance_metres": -0.005452449782751501
           }
         }
       },
@@ -481,25 +487,25 @@
         "frame": 121,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.554201046257125
+            "signed_volume_m3": 1.6991290829825167
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026418862879135454
+            "signed_volume_m3": 0.0026416805391017797
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002641619439737989
+            "signed_volume_m3": 0.002641716603828096
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03202697639887061,
-            "maximum_signed_surface_distance_metres": -0.010436770809349127
+            "signed_volume_m3": 0.032049438596736736,
+            "maximum_signed_surface_distance_metres": -0.02810077611739814
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05903356956150143,
-            "maximum_signed_surface_distance_metres": -0.08107450057286769
+            "maximum_signed_surface_distance_metres": -0.11580729286743008
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.973427264176824e-05,
-            "maximum_signed_surface_distance_metres": -0.005988702445876015
+            "signed_volume_m3": 7.809971706398734e-05,
+            "maximum_signed_surface_distance_metres": -0.005410837708041072
           }
         }
       },
@@ -507,25 +513,25 @@
         "frame": 141,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.554201046257125
+            "signed_volume_m3": 1.6991290829825167
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026418862879135454
+            "signed_volume_m3": 0.0026416805391017797
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002641619439737989
+            "signed_volume_m3": 0.002641716603828096
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03202697639887061,
-            "maximum_signed_surface_distance_metres": -0.010436770809349127
+            "signed_volume_m3": 0.032049438596736736,
+            "maximum_signed_surface_distance_metres": -0.02810077611739814
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05903356956150143,
-            "maximum_signed_surface_distance_metres": -0.08107450057286769
+            "maximum_signed_surface_distance_metres": -0.11580729286743008
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.973427264176824e-05,
-            "maximum_signed_surface_distance_metres": -0.005988702445876015
+            "signed_volume_m3": 7.809971706398734e-05,
+            "maximum_signed_surface_distance_metres": -0.005410837708041072
           }
         }
       },
@@ -533,25 +539,25 @@
         "frame": 145,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.533025670408163
+            "signed_volume_m3": 1.6790363671792032
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026621862260007845
+            "signed_volume_m3": 0.0026621000095682725
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.0026619484721971767
+            "signed_volume_m3": 0.002662052104289122
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03204212953393023,
-            "maximum_signed_surface_distance_metres": -0.01296295499196276
+            "signed_volume_m3": 0.032080196321715736,
+            "maximum_signed_surface_distance_metres": -0.026862827013246715
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.058736066872490056,
-            "maximum_signed_surface_distance_metres": -0.08545667084399611
+            "maximum_signed_surface_distance_metres": -0.12190041381836636
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.993768071284009e-05,
-            "maximum_signed_surface_distance_metres": -0.0055797958343646314
+            "signed_volume_m3": 7.821126643666372e-05,
+            "maximum_signed_surface_distance_metres": -0.005074397980934009
           }
         }
       },
@@ -559,25 +565,25 @@
         "frame": 153,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5743991576012342
+            "signed_volume_m3": 1.720328391880961
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.002660860964070958
+            "signed_volume_m3": 0.002660905428799746
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002660685063223885
+            "signed_volume_m3": 0.0026607101058573335
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03224105838487531,
-            "maximum_signed_surface_distance_metres": -0.0155490403371914
+            "signed_volume_m3": 0.0322636424980105,
+            "maximum_signed_surface_distance_metres": -0.024076471156149637
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05838130862499343,
-            "maximum_signed_surface_distance_metres": -0.07842943025752902
+            "maximum_signed_surface_distance_metres": -0.11209234288342107
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 8.085522438540844e-05,
-            "maximum_signed_surface_distance_metres": -0.0060155838274909
+            "signed_volume_m3": 7.909437658225905e-05,
+            "maximum_signed_surface_distance_metres": -0.005469570867717266
           }
         }
       },
@@ -585,25 +591,25 @@
         "frame": 163,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5515928353029478
+            "signed_volume_m3": 1.697110853800513
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026522269732775308
+            "signed_volume_m3": 0.0026520869566866168
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002652213533739456
+            "signed_volume_m3": 0.0026521681434417133
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.032053980708080666,
-            "maximum_signed_surface_distance_metres": -0.013851366948415489
+            "signed_volume_m3": 0.03208266076991275,
+            "maximum_signed_surface_distance_metres": -0.028242732863873243
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.058424832333509404,
-            "maximum_signed_surface_distance_metres": -0.08149670041166246
+            "maximum_signed_surface_distance_metres": -0.11618959308543708
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.974628622399911e-05,
-            "maximum_signed_surface_distance_metres": -0.005901286266521311
+            "signed_volume_m3": 7.811673877881435e-05,
+            "maximum_signed_surface_distance_metres": -0.005367529287468642
           }
         }
       },
@@ -611,25 +617,25 @@
         "frame": 189,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.554201046257125
+            "signed_volume_m3": 1.6991290829825167
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026418862879135454
+            "signed_volume_m3": 0.0026416805391017797
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002641619439737989
+            "signed_volume_m3": 0.002641716603828096
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03202697639887061,
-            "maximum_signed_surface_distance_metres": -0.010436770809349127
+            "signed_volume_m3": 0.032049438596736736,
+            "maximum_signed_surface_distance_metres": -0.02810077611739814
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05903356956150143,
-            "maximum_signed_surface_distance_metres": -0.08107450057286769
+            "maximum_signed_surface_distance_metres": -0.11580729286743008
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.973427264176824e-05,
-            "maximum_signed_surface_distance_metres": -0.005988702445876015
+            "signed_volume_m3": 7.809971706398734e-05,
+            "maximum_signed_surface_distance_metres": -0.005410837708041072
           }
         }
       },
@@ -637,25 +643,25 @@
         "frame": 211,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.554201046257125
+            "signed_volume_m3": 1.6991290829825167
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026418862879135454
+            "signed_volume_m3": 0.0026416805391017797
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002641619439737989
+            "signed_volume_m3": 0.002641716603828096
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03202697639887061,
-            "maximum_signed_surface_distance_metres": -0.010436770809349127
+            "signed_volume_m3": 0.032049438596736736,
+            "maximum_signed_surface_distance_metres": -0.02810077611739814
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05903356956150143,
-            "maximum_signed_surface_distance_metres": -0.08107450057286769
+            "maximum_signed_surface_distance_metres": -0.11580729286743008
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.973427264176824e-05,
-            "maximum_signed_surface_distance_metres": -0.005988702445876015
+            "signed_volume_m3": 7.809971706398734e-05,
+            "maximum_signed_surface_distance_metres": -0.005410837708041072
           }
         }
       },
@@ -663,25 +669,25 @@
         "frame": 241,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5528047164797139
+            "signed_volume_m3": 1.6983151308389586
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.00220212302118424
+            "signed_volume_m3": 0.002202036240926001
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.00220150558358038
+            "signed_volume_m3": 0.0022016327551786694
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03203536238703034,
-            "maximum_signed_surface_distance_metres": -0.015190551029832022
+            "signed_volume_m3": 0.032064045348948654,
+            "maximum_signed_surface_distance_metres": -0.02716936485376209
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.06067847965993237,
-            "maximum_signed_surface_distance_metres": -0.0680614510201849
+            "maximum_signed_surface_distance_metres": -0.10267992257104197
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 0.00013216160495055362,
-            "maximum_signed_surface_distance_metres": -0.005432728170262635
+            "signed_volume_m3": 0.00013251234669283315,
+            "maximum_signed_surface_distance_metres": -0.00515117566101253
           }
         }
       },
@@ -689,25 +695,25 @@
         "frame": 259,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5482203752725592
+            "signed_volume_m3": 1.6940816023639913
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0021238201903012546
+            "signed_volume_m3": 0.0021237126808261544
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002123327093495201
+            "signed_volume_m3": 0.002123278860559926
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.0320236505447653,
-            "maximum_signed_surface_distance_metres": -0.018404971354812005
+            "signed_volume_m3": 0.032052658284761705,
+            "maximum_signed_surface_distance_metres": -0.024321431177668273
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.06559557630937836,
-            "maximum_signed_surface_distance_metres": -0.039994000166188926
+            "maximum_signed_surface_distance_metres": -0.07463173117685074
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 0.00029342352992250964,
-            "maximum_signed_surface_distance_metres": -0.004296018047853067
+            "signed_volume_m3": 0.00029583281403218936,
+            "maximum_signed_surface_distance_metres": -0.004210647282889113
           }
         }
       },
@@ -715,25 +721,25 @@
         "frame": 263,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5475949046198327
+            "signed_volume_m3": 1.6934765500008455
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.002125454813314794
+            "signed_volume_m3": 0.0021254297707938483
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.0021250200926085463
+            "signed_volume_m3": 0.0021249747591447488
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03202792577271859,
-            "maximum_signed_surface_distance_metres": -0.0175622042655732
+            "signed_volume_m3": 0.03206565040837087,
+            "maximum_signed_surface_distance_metres": -0.02506274462211877
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.062497066250723744,
-            "maximum_signed_surface_distance_metres": -0.05698766274144873
+            "maximum_signed_surface_distance_metres": -0.09183007936371723
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 0.00019150530389722142,
-            "maximum_signed_surface_distance_metres": -0.00488373282178145
+            "signed_volume_m3": 0.0001930456600985527,
+            "maximum_signed_surface_distance_metres": -0.004774151020683348
           }
         }
       },
@@ -741,25 +747,25 @@
         "frame": 266,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.5514309007319964
+            "signed_volume_m3": 1.6970676585128768
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0021463159380215777
+            "signed_volume_m3": 0.0021462769016279046
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002145824218226622
+            "signed_volume_m3": 0.0021457339580539525
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03204156156533879,
-            "maximum_signed_surface_distance_metres": -0.01602070385490606
+            "signed_volume_m3": 0.03207041694638324,
+            "maximum_signed_surface_distance_metres": -0.02579025804448065
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.06620600996194413,
-            "maximum_signed_surface_distance_metres": -0.0397664521005936
+            "maximum_signed_surface_distance_metres": -0.07447139219402743
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 0.000294370331291649,
-            "maximum_signed_surface_distance_metres": -0.004365734766906826
+            "signed_volume_m3": 0.0002966106929280972,
+            "maximum_signed_surface_distance_metres": -0.004269474826287478
           }
         }
       },
@@ -767,25 +773,25 @@
         "frame": 283,
         "meshes": {
           "Specimen-Body": {
-            "signed_volume_m3": 1.554201046257125
+            "signed_volume_m3": 1.6991290829825167
           },
           "Specimen-Eye-Left": {
-            "signed_volume_m3": 0.0026418862879135454
+            "signed_volume_m3": 0.0026416805391017797
           },
           "Specimen-Eye-Right": {
-            "signed_volume_m3": 0.002641619439737989
+            "signed_volume_m3": 0.002641716603828096
           },
           "Specimen-Aqua-Currents": {
-            "signed_volume_m3": 0.03202697639887061,
-            "maximum_signed_surface_distance_metres": -0.010436770809349127
+            "signed_volume_m3": 0.032049438596736736,
+            "maximum_signed_surface_distance_metres": -0.02810077611739814
           },
           "Specimen-Acid-Core": {
             "signed_volume_m3": 0.05903356956150143,
-            "maximum_signed_surface_distance_metres": -0.08107450057286769
+            "maximum_signed_surface_distance_metres": -0.11580729286743008
           },
           "Specimen-Electric-Veins": {
-            "signed_volume_m3": 7.973427264176824e-05,
-            "maximum_signed_surface_distance_metres": -0.005988702445876015
+            "signed_volume_m3": 7.809971706398734e-05,
+            "maximum_signed_surface_distance_metres": -0.005410837708041072
           }
         }
       }
@@ -808,7 +814,7 @@
       }
     }
   },
-  "total_triangles": 104944,
-  "glb_sha256": "18973fb01c15ccea1c2aa4046f635873ba5312d0b5739916413fd8186666727f",
-  "blend_sha256": "78fbbe6bcf39fa7a0b3eb08de4f1570ad43e22c4e9a57b86cb67c9933aadcd9f"
+  "total_triangles": 108352,
+  "glb_sha256": "449b86724a4ed56da6f6deb5aec68d45bdfb80fce85a32a99f0aab409d01307f",
+  "blend_sha256": "bcb866e0ef3edca51bfb5e6854643518c8040bb3a8e8f3d66bfa4318e8e9db61"
 }

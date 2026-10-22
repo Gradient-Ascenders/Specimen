@@ -11,10 +11,11 @@
   "gold_emission_strength": 12.0,
   "gel_roughness": 0.12999999523162842,
   "mean_gel_linear_rgb": [
-    0.1757484534569306,
-    0.42909184526231287,
-    0.3606899471410886
+    0.19170195584785693,
+    0.4250995515029736,
+    0.334236851272345
   ],
+  "yellow_tip_vertices": 730,
   "submerged_current_geometry": true,
   "animations": {
     "Idle": {
@@ -22,12 +23,12 @@
       "morph_channels": 6,
       "glow": [
         {
-          "pointer": "/materials/5/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
           "minimum": 12.0,
           "maximum": 13.4399995803833
         },
         {
-          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "pointer": "/materials/7/extensions/KHR_materials_emissive_strength/emissiveStrength",
           "minimum": 20.0,
           "maximum": 22.399999618530273
         }
@@ -38,12 +39,12 @@
       "morph_channels": 6,
       "glow": [
         {
-          "pointer": "/materials/5/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
           "minimum": 12.0,
           "maximum": 16.200000762939453
         },
         {
-          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "pointer": "/materials/7/extensions/KHR_materials_emissive_strength/emissiveStrength",
           "minimum": 20.0,
           "maximum": 27.0
         }
@@ -54,12 +55,12 @@
       "morph_channels": 6,
       "glow": [
         {
-          "pointer": "/materials/5/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
           "minimum": 12.0,
           "maximum": 54.0
         },
         {
-          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "pointer": "/materials/7/extensions/KHR_materials_emissive_strength/emissiveStrength",
           "minimum": 20.0,
           "maximum": 90.0
         }
@@ -67,23 +68,23 @@
     }
   },
   "shape": {
-    "height_metres": 2.092690181732178,
-    "dome_height_metres": 1.779829216003418,
+    "height_metres": 2.1192538261413576,
+    "dome_height_metres": 1.7796830654144287,
     "cross_sections": {
       "0.13": {
-        "width_metres": 1.690737247467041,
-        "centre_y_metres": -0.0028374195098876953,
-        "centre_x_metres": 0.024166345596313477
+        "width_metres": 1.6907258033752441,
+        "centre_y_metres": -0.0028516054153442383,
+        "centre_x_metres": 0.0241701602935791
       },
       "0.7": {
-        "width_metres": 1.0495953559875488,
-        "centre_y_metres": 0.05301618576049805,
-        "centre_x_metres": 0.0012657642364501953
+        "width_metres": 1.1493635177612305,
+        "centre_y_metres": 0.05347716808319092,
+        "centre_x_metres": 0.0024700164794921875
       },
       "1.32": {
-        "width_metres": 1.0651345252990723,
-        "centre_y_metres": 0.11997270584106445,
-        "centre_x_metres": -0.0033719539642333984
+        "width_metres": 1.1486544609069824,
+        "centre_y_metres": 0.11972701549530029,
+        "centre_x_metres": -0.0030095577239990234
       }
     },
     "eyes": {
@@ -99,21 +100,21 @@
       }
     },
     "narrow_mohawk": true,
-    "grounded_base_width_metres": 1.871645748615265,
+    "grounded_base_width_metres": 1.8705726265907288,
     "puddle_rim_heights_metres": [
-      0.05615634918212892,
-      0.052019309997558605
+      0.05614585876464845,
+      0.05344076156616212
     ]
   },
   "internal_geometry": {
     "Specimen-Electric-Veins": {
-      "maximum_signed_surface_distance_metres": -0.005999428980203447
+      "maximum_signed_surface_distance_metres": -0.005493959877640009
     },
     "Specimen-Aqua-Currents": {
-      "maximum_signed_surface_distance_metres": -0.010436770809349127
+      "maximum_signed_surface_distance_metres": -0.02810002443764059
     },
     "Specimen-Acid-Core": {
-      "maximum_signed_surface_distance_metres": -0.08107450057286769
+      "maximum_signed_surface_distance_metres": -0.11580729286743008
     }
   },
   "meshes": {
@@ -147,9 +148,9 @@
       "triangle_multiset_matches": true
     },
     "Specimen-Body": {
-      "triangles": 67280,
+      "triangles": 70544,
       "maximum_position_error_metres": 0.0,
-      "maximum_morph_position_error_metres": 7.450580596923828e-09,
+      "maximum_morph_position_error_metres": 7.508562643358995e-09,
       "morph_targets": [
         "Blink",
         "Breathe",
@@ -165,7 +166,7 @@
       "triangle_multiset_matches": true
     },
     "Specimen-Electric-Veins": {
-      "triangles": 4208,
+      "triangles": 4352,
       "maximum_position_error_metres": 0.0,
       "maximum_morph_position_error_metres": 7.450580596923828e-09,
       "morph_targets": [

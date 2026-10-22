@@ -94,10 +94,14 @@ def main():
                   if 'COLOR_0' in mesh['primitives'][0]['attributes']}
     assert colour_meshes=={'Specimen-Body','Specimen-Acid-Core'}
     body_json=next(mesh for mesh in document['meshes'] if mesh['name']=='Specimen-Body')
-    colours=accessor_values(body_json['primitives'][0]['attributes']['COLOR_0'])
+    colours=[row for primitive in body_json['primitives']
+             for row in accessor_values(primitive['attributes']['COLOR_0'])]
     average_colour=[sum(row[i] for row in colours)/len(colours) for i in range(3)]
     assert average_colour[1]>=average_colour[2],('blue bias',average_colour)
     materials={material['name']:material for material in document['materials']}
+    yellow_tip_vertices=sum(row[0]>0.7 and row[1]>0.5 and row[2]<0.08 for row in colours)
+    assert yellow_tip_vertices>15,'yellow bolt-tip colours missing from export'
+    assert 'Specimen-Yellow-Bolt-Tips' in materials,'yellow tip material missing'
     transmission=materials['Specimen-Turquoise-Gel']['extensions']['KHR_materials_transmission']['transmissionFactor']
     assert abs(transmission-0.94)<1e-6
     strength=materials['Specimen-Golden-Discharge']['extensions']['KHR_materials_emissive_strength']['emissiveStrength']
@@ -136,7 +140,8 @@ def main():
         rim_heights.append(rim.z+0.45)
     # The fuller liquid shoulders rise just behind the grounded outer edge.
     assert max(rim_heights)<0.065,('puddle rim too thick',rim_heights)
-    assert sections['0.7']['width_metres']/sections['0.13']['width_metres']<0.85,'middle too wide'
+    upper_width=max(sections[h]['width_metres'] for h in ('0.7','1.32'))
+    assert upper_width/sections['0.13']['width_metres']<0.75,'upper body overwhelms pooled base'
     assert sections['1.32']['centre_y_metres']-sections['0.7']['centre_y_metres']>0.025,'missing forward lean'
     crest=[point for point in body_points if point.y<-0.65 and point.z+0.45>0.25]
     assert crest and max(abs(point.x) for point in crest)<0.09,'crest is not a narrow mohawk'
@@ -205,6 +210,7 @@ def main():
             'studio_excluded':True,'vertex_colours_preserved':sorted(colour_meshes),
             'transmission_factor':transmission,'gold_emission_strength':strength,
             'gel_roughness':roughness,'mean_gel_linear_rgb':average_colour,
+            'yellow_tip_vertices':yellow_tip_vertices,
             'submerged_current_geometry':True,'animations':animation_report,
             'shape':{'height_metres':height,'dome_height_metres':dome_height,
                      'cross_sections':sections,'eyes':eyes,'narrow_mohawk':True,

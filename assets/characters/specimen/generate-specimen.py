@@ -1,7 +1,7 @@
 """Rebuild the reviewed Specimen sculpt in an independent Blender process.
 
 blender --background --factory-startup --python assets/characters/specimen/generate-specimen.py
-Append -- --render to also produce four studio views.
+Append -- --render to also produce studio views and detail renders.
 """
 
 import hashlib
@@ -122,6 +122,7 @@ def topology(obj):
     assert tuple(obj.scale) == (1,1,1), obj.name
     if obj.name == 'Specimen-Body':
         assert components == 1, 'Slime body must be continuous'
+        assert len(mesh.vertices)-len(mesh.edges)+len(mesh.polygons)==2, 'Body or crest has a tunnel'
         assert abs(min(p[1] for p in points)-model.SOLE) < 1e-6
     signature = {
         'vertices': [[round(c,7) for c in point] for point in points],
@@ -131,6 +132,7 @@ def topology(obj):
         'vertices': len(mesh.vertices),
         'triangles': len(mesh.loop_triangles),
         'connected_components': components,
+        'euler_characteristic': len(mesh.vertices)-len(mesh.edges)+len(mesh.polygons),
         'non_manifold_edges': non_manifold,
         'inconsistent_winding_edges': winding,
         'signed_volume_m3': volume,
@@ -157,6 +159,8 @@ def render_views():
         scene.render.filepath = str(DIRECTORY/'evidence'/f'{name}.png')
         bpy.ops.render.render(write_still=True)
     render_base_detail()
+    render_mohawk_detail()
+    render_spike_detail()
     camera.location = (7.5,6.8,1.6)
     model.aim(camera,model.VIEW_TARGET)
 
@@ -174,6 +178,48 @@ def render_base_detail():
     camera.location=(7.5,6.8,0.95)
     model.aim(camera,(0,-0.02,model.SOLE+0.25))
     scene.render.filepath=str(DIRECTORY/'evidence'/'base-detail.png')
+    bpy.ops.render.render(write_still=True)
+    camera.location=position
+    camera.rotation_euler=rotation
+    camera.data.ortho_scale=scale
+    scene.render.resolution_x=width
+    scene.render.resolution_y=height
+
+
+def render_mohawk_detail():
+    scene=bpy.context.scene
+    camera=scene.camera
+    position=camera.location.copy()
+    rotation=camera.rotation_euler.copy()
+    scale=camera.data.ortho_scale
+    width,height=scene.render.resolution_x,scene.render.resolution_y
+    scene.render.resolution_x=1200
+    scene.render.resolution_y=900
+    camera.data.ortho_scale=1.55
+    camera.location=(7.5,6.8,1.40)
+    model.aim(camera,(0,-0.28,1.23))
+    scene.render.filepath=str(DIRECTORY/'evidence'/'mohawk-detail.png')
+    bpy.ops.render.render(write_still=True)
+    camera.location=position
+    camera.rotation_euler=rotation
+    camera.data.ortho_scale=scale
+    scene.render.resolution_x=width
+    scene.render.resolution_y=height
+
+
+def render_spike_detail():
+    scene=bpy.context.scene
+    camera=scene.camera
+    position=camera.location.copy()
+    rotation=camera.rotation_euler.copy()
+    scale=camera.data.ortho_scale
+    width,height=scene.render.resolution_x,scene.render.resolution_y
+    scene.render.resolution_x=1200
+    scene.render.resolution_y=900
+    camera.data.ortho_scale=1.10
+    camera.location=(8,2.0,0.55)
+    model.aim(camera,(0,-0.48,0.48))
+    scene.render.filepath=str(DIRECTORY/'evidence'/'spike-detail.png')
     bpy.ops.render.render(write_still=True)
     camera.location=position
     camera.rotation_euler=rotation
