@@ -84,6 +84,10 @@ class TestInput {
 }
 
 class TestCameraRig {
+  setThirdPersonOverride(): void {}
+  isFirstPersonForTarget(): boolean { return false; }
+  toggleViewMode(): void {}
+
   readonly camera = new THREE.PerspectiveCamera();
   readonly aimOrigin = new THREE.Vector3(0, 0.46, 2);
   readonly aimDirection = new THREE.Vector3(0, 0, 1);

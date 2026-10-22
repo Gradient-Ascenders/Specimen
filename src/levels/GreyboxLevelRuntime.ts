@@ -725,6 +725,7 @@ export class GreyboxLevelRuntime {
       return;
     }
 
+    if (this.input.enabled && this.input.wasPressed('toggleView')) this.renderLayer.cameraRig.toggleViewMode();
     let switchedThisStep = false;
     if (this.input.wasPressed('switchSlime')) {
       switchedThisStep = this.switchActiveSlime(resources);
@@ -848,6 +849,8 @@ export class GreyboxLevelRuntime {
     }
 
     this.recentFrameSeconds = stats.rawFrameDeltaSeconds;
+    this.renderLayer.cameraRig.setThirdPersonOverride(!!this.resources &&
+      (!this.resources.deathSequence.isPlaying || this.resources.containmentLevel.state !== 'playing'));
     this.finalePreparation?.schedule();
     if (resources.containmentLevel.state !== 'playing') {
       this.renderFinale(resources);
@@ -874,6 +877,7 @@ export class GreyboxLevelRuntime {
     } = resources;
     let cameraDistanceScale = 1;
     if (deathSequence.isPlaying) {
+      testScene.roomFive.art.presentMovingPlatforms(interpolationAlpha);
       const previous = body.previousPosition;
       const current = body.position;
       renderedProbePosition.set(
@@ -908,6 +912,7 @@ export class GreyboxLevelRuntime {
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
           : renderedProbePosition;
+      testScene.platformBoosters.update(this.state === 'running' ? stats.frameDeltaSeconds : 0, activeRenderedPosition);
       if (testScene.isInsideCameraTightVent(activeRenderedPosition)) {
         cameraDistanceScale = VENT_CAMERA_DISTANCE_SCALE;
       }
@@ -947,7 +952,7 @@ export class GreyboxLevelRuntime {
     const cameraDistanceMetres =
       this.renderLayer.cameraRig.currentFollowDistanceMetres;
     testScene.bob.setOpacity(
-      deathSequence.isPlaying && slimePair.activeSlimeId === 'bob'
+      deathSequence.isPlaying && slimePair.activeSlimeId === 'bob' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.body)
         ? resolveCameraTargetOpacity(
             cameraDistanceMetres,
             CAMERA_FADE_START_DISTANCE_METRES,
@@ -965,7 +970,7 @@ export class GreyboxLevelRuntime {
       !testScene.roomFive.releaseComplete && slimePair.activeSlimeId !== 'goop';
     reveal.setVisible(showReveal);
     testScene.goop.setVisible(goopAvailable && !showReveal);
-    testScene.goop.setOpacity(slimePair.activeSlimeId === 'goop'
+    testScene.goop.setOpacity(slimePair.activeSlimeId === 'goop' && !this.renderLayer.cameraRig.isFirstPersonForTarget(goopBody)
       ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
         cameraDistanceMetres, CAMERA_FADE_START_DISTANCE_METRES, CAMERA_FADE_END_DISTANCE_METRES, CAMERA_MINIMUM_TARGET_OPACITY)) : 1);
     const reflection = testScene.lighting.reflectionTargetForPosition(goopBody.position, testScene.isInsideCameraTightVent(goopBody.position));
@@ -1130,6 +1135,8 @@ export class GreyboxLevelRuntime {
         chargedJumpEnabled: goopDefinition.jumpMode === 'charged',
       },
     });
+    testScene.bob.setCameraView(this.renderLayer.cameraRig, body);
+    testScene.goop.setCameraView(this.renderLayer.cameraRig, goopBody);
     const slimePair = new PersistentSlimePair({
       manager: slimeManager,
       bobBody: body,

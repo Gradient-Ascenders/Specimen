@@ -339,6 +339,7 @@ function startGame(): void {
         levelOneAssets.clear();
         levelOneRuntime = createLevelOneRuntime();
         gameSession.reset(levelOneRuntime);
+        renderLayer.cameraRig.setViewMode('third-person', true);
         preparedInitialGraphicsKey = undefined;
         musicLevel = 'containment';
         gameCompleted = false;

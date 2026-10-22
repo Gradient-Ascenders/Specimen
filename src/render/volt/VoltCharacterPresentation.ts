@@ -1,3 +1,5 @@
+import { CameraBodyVisibility } from '../CameraBodyVisibility.ts';
+import type { CameraRig, CameraFollowTarget } from '../CameraRig.ts';
 import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
@@ -28,6 +30,9 @@ export interface VoltCharacterPresentationState {
 /** Per-instance authored gel. Placement, facing and burst are separate so a
  * level-owned navigation light follows placement even while aiming or fading. */
 export class VoltCharacterPresentation {
+  private readonly cameraBodyVisibility = new CameraBodyVisibility();
+  setCameraView(rig: CameraRig, target: CameraFollowTarget): void { this.cameraBodyVisibility.configure(rig, target); }
+
   private detail: CharacterDetail | undefined;
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
@@ -167,7 +172,8 @@ export class VoltCharacterPresentation {
           mesh.geometry.boundingSphere!.radius = (mesh.geometry.boundingSphere!.radius + 0.25) * 1.16;
         }
         disposeVoltMaterials(imported, new Set(asset.maps));
-        this.shape.add(root); this.asset = asset; this.materials = materials;
+        this.shape.add(root); for (const mesh of [asset.body, ...asset.eyes]) this.cameraBodyVisibility.bind(mesh);
+        this.asset = asset; this.materials = materials;
         if (detailIndices) {
           try { this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices); }
           catch { /* Source validation happens before any geometry is changed. */ }
@@ -400,6 +406,7 @@ export class VoltCharacterPresentation {
     this.materials?.reset(); this.opacity = 1; this.requestedVisible = true; this.applyVisibility(); this.present();
   }
   dispose(): void {
+    this.cameraBodyVisibility.dispose();
     if (this.disposed) return;
     this.disposed = true;
     this.detail?.dispose(); this.detail = undefined;

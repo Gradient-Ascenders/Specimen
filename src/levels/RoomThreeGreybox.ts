@@ -11,7 +11,7 @@ import {
   type TriggerContactTarget,
 } from './LevelTriggerVolume.ts';
 
-export const ROOM_3_CHECKPOINT_POSITION = new THREE.Vector3(0, 10.86, 51.4);
+export const ROOM_3_CHECKPOINT_POSITION = new THREE.Vector3(0, 11.36, 51.4);
 export const ROOM_3_CHECKPOINT_ID = 'containment-room-3-entry';
 export const ROOM_3_PUZZLE_GROUP_ID = 'containment-room-3';
 
@@ -158,7 +158,8 @@ export class RoomThreeGreybox {
   private buildTraversal(): void {
     const { platform, sticky, support } = this.builder.materials;
 
-    this.builder.addCollider({ name: 'room-3-entry-platform', size: [8, 0.5, 5], position: [0, 10.15, 51.5], material: platform });
+    // Meet Room 2's balcony at z=48.79795 with both walk surfaces at y=10.9.
+    this.builder.addCollider({ name: 'room-3-entry-platform', size: [8, 0.5, 5], position: [0, 10.65, 51.29795], material: platform });
     this.builder.addCollider({ name: 'room-3-platform-a-bounce', size: [4.5, 0.5, 4], position: [2.7885, 10.9032, 57.6261], material: platform });
     this.builder.addCollider({ name: 'room-3-platform-b-gap', size: [5.13, 0.5, 4], position: [11.2583, 11.4329, 59], material: platform });
 

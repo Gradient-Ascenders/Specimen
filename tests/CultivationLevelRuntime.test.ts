@@ -19,7 +19,7 @@ test('normal render never overwrites borrowed finale actors with a second world 
   const bob=body(),goop=body(),volt=body();
   const movie={active:true,present(){movieFrames++;}};
   const renderLayer={scene:new THREE.Scene(),cameraRig:{camera:new THREE.PerspectiveCamera(),aimPresentationWeight:0,
-    setContextualCamera(){},update(){},queueLookInput(){}},renderer:{compile(){}},render(){draws++;}};
+    setThirdPersonOverride(){},isFirstPersonForTarget(){return false;},setContextualCamera(){},update(){},queueLookInput(){}},renderer:{compile(){}},render(){draws++;}};
   const runtime=new CultivationLevelRuntime({authoredAssets:cultivationAssets,host:{dataset:{}} as unknown as HTMLElement,
     input:{enabled:true,endPointerUpdate(){}} as unknown as Input,renderLayer:renderLayer as unknown as RenderLayer,
     progression:{unlockedSlimeIds:['bob','goop'],activeSlimeId:'bob'},window:new EventTarget() as unknown as Window,debugAvailable:false});

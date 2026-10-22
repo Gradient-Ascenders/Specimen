@@ -11,6 +11,7 @@ import type { KinematicBody } from '../src/physics/KinematicBody.ts';
 import type { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
 import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+import { CameraRig } from '../src/render/CameraRig.ts';
 
 class FakeButton {
   private clickListener: (() => void) | null = null;
@@ -230,6 +231,10 @@ class RuntimeFakeInput {
 }
 
 class RuntimeFakeCameraRig {
+  setThirdPersonOverride(): void {}
+  isFirstPersonForTarget(): boolean { return false; }
+  toggleViewMode(): void {}
+
   readonly camera = new THREE.PerspectiveCamera();
   readonly aimOrigin = new THREE.Vector3(2, 0.46, 2);
   readonly aimDirection = new THREE.Vector3(-2, 0.64, 6).normalize();
@@ -285,6 +290,77 @@ class RuntimeFakeCameraRig {
     this.applyQueuedLookInput();
   }
 }
+
+test('real shared rig retains manual view through Volt/Goop aim, merge, Specimen fire and restart', () => {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', { configurable: true,
+    value: { createElement: () => new RuntimeFakeElement() } });
+  const cameraRig = new CameraRig(), scene = new THREE.Scene(), input = new RuntimeFakeInput();
+  const runtime = new BlackoutLevelRuntime({ host: new RuntimeFakeElement() as unknown as HTMLElement,
+    input: input as unknown as Input,
+    renderLayer: { scene, canvas: new RuntimeFakeElement(), cameraRig, render() {} } as unknown as RenderLayer,
+    progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt' } });
+  try {
+    runtime.load(); runtime.start();
+    const r = (runtime as any).resources;
+    const draw = () => { for (let i = 0; i < 24; i++) runtime.render(.5, { frameDeltaSeconds: 1 / 60 } as LoopStats); };
+    const checkThirdPersonAim = (aimActive: () => boolean) => {
+      cameraRig.setViewMode('third-person'); draw();
+      input.press('aimAbility'); runtime.fixedUpdate(1 / 60); draw();
+      assert.equal(aimActive(), true); assert.equal(cameraRig.firstPersonPresentationWeight, 1);
+      assert.equal(cameraRig.viewMode, 'third-person', 'Ability pose does not replace manual selection');
+      input.release('aimAbility'); runtime.fixedUpdate(1 / 60); draw();
+      assert.equal(cameraRig.firstPersonPresentationWeight, 0);
+      cameraRig.setViewMode('first-person'); draw();
+    };
+    draw(); assert.equal(cameraRig.viewMode, 'third-person');
+    input.press('toggleView'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(cameraRig.viewMode, 'first-person');
+    assert.equal(cameraRig.isFirstPersonForTarget(r.group.voltBody), true);
+    input.press('aimAbility'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(runtime.voltElectricalReadModel?.aimActive, true);
+    input.release('aimAbility'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(cameraRig.firstPersonPresentationWeight, 1);
+    checkThirdPersonAim(() => runtime.voltElectricalReadModel!.aimActive);
+    for (const id of ['bob', 'goop']) {
+      input.press('switchSlime'); runtime.fixedUpdate(1 / 60); draw();
+      assert.equal(runtime.getSlimeHUDSnapshot().activeSlimeId, id);
+      assert.equal(cameraRig.isFirstPersonForTarget(r.group[`${id}Body`]), true);
+    }
+    input.press('aimAbility'); input.press('fireAbility'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(r.acidProjectileSystem.aimReadModel.active, true);
+    const direction = cameraRig.camera.getWorldDirection(new THREE.Vector3());
+    assert.ok(direction.distanceTo(new THREE.Vector3().copy(r.acidProjectileSystem.aimReadModel.aimDirection)) < 1e-6);
+    input.release('aimAbility'); input.release('fireAbility'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(cameraRig.firstPersonPresentationWeight, 1);
+    checkThirdPersonAim(() => r.acidProjectileSystem.aimReadModel.active);
+    assert.equal(runtime.beginMerge(), true);
+    input.press('toggleView'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(cameraRig.viewMode, 'first-person');
+    assert.equal(cameraRig.firstPersonPresentationWeight, 0, 'Merge framing has precedence');
+    for (let i = 0; i < 359; i++) runtime.fixedUpdate(1 / 60);
+    draw();
+    assert.equal(runtime.phase, 'specimen');
+    assert.equal(cameraRig.isFirstPersonForTarget(r.specimenBody), true);
+    input.press('aimAbility'); input.press('fireAbility'); input.release('fireAbility'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(runtime.specimenAttackReadModel?.aimActive, true);
+    assert.equal(runtime.specimenAttackReadModel?.liveProjectileCount, 1);
+    input.release('aimAbility'); runtime.fixedUpdate(1 / 60); draw();
+    assert.equal(cameraRig.firstPersonPresentationWeight, 1);
+    checkThirdPersonAim(() => runtime.specimenAttackReadModel!.aimActive);
+    assert.equal(runtime.requestFailure(), true); draw();
+    assert.equal(cameraRig.firstPersonPresentationWeight, 0, 'Death presentation restores its subject');
+    for (let i = 0; i < 80; i++) runtime.fixedUpdate(1 / 60);
+    assert.equal(r.deathSequence.canRetry, true);
+    r.deathScreen.element.retryButton.click(); draw();
+    assert.equal(r.deathSequence.isPlaying, true);
+    assert.equal(cameraRig.viewMode, 'first-person');
+    assert.equal(cameraRig.isFirstPersonForTarget(r.group.activeBody), true);
+    runtime.restartLevel(); draw();
+    assert.equal(cameraRig.viewMode, 'first-person');
+    assert.equal(cameraRig.isFirstPersonForTarget(r.group.activeBody), true);
+  } finally { runtime.dispose(); Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument }); }
+});
 
 test('Goop retains real movement intent after drone updates and settles when control switches', () => {
   const originalDocument = globalThis.document;

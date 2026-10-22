@@ -43,7 +43,7 @@ export class RoomFiveDroneEncounter {
   private readonly searchLights: THREE.SpotLight[] = [];
   private readonly sewerLight = new THREE.PointLight(0xff7935, 0, 8);
   private readonly sewerLighting: CultivationSewerLighting;
-  private readonly platformBoosters: CultivationPlatformBoosters;
+  readonly platformBoosters: CultivationPlatformBoosters;
   private readonly unsubscribe: () => void;
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly direction = new THREE.Vector3();
@@ -57,11 +57,12 @@ export class RoomFiveDroneEncounter {
   readonly room: LevelTwoRoomFiveGreybox;
   constructor(room: LevelTwoRoomFiveGreybox, world: CollisionWorld, surfaces: SurfaceRegistry,
     bob: KinematicBody, goop: KinematicBody, requestDeath: (id: 'bob' | 'goop') => boolean,
-    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null }) {
+    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null },
+    boosterScope?: THREE.Object3D) {
     this.resources = new SecurityDronePresentationResources(surfaceMaps);
     this.room = room;
     this.sewerLighting = new CultivationSewerLighting(room.root, surfaceMaps);
-    this.platformBoosters = new CultivationPlatformBoosters(room, surfaceMaps);
+    this.platformBoosters = new CultivationPlatformBoosters(room, surfaceMaps, boosterScope);
     this.sewerDamage = new SewerDroneDamage(room.brokenCore);
     this.sewerLight.name = 'room-5-rusted-drone-light';
     // Keep the light registered after dissolution: removing a light changes shader
