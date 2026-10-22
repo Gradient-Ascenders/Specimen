@@ -817,7 +817,7 @@ export class GameFlowUI {
           </div>
         </section>
         <div class="hud-controls" data-collapsed="false">
-          <p class="hud-hint"><span><kbd data-control-hint="movement">WASD</kbd> Move</span><span><kbd data-control-hint="jump">Space</kbd> Jump</span><span><kbd data-control-hint="switchSlime">Tab</kbd> Switch</span><span><kbd data-control-hint="pause">P</kbd> Pause</span></p>
+          <p class="hud-hint"><span><kbd data-control-hint="movement">WASD</kbd> Move</span><span><kbd data-control-hint="jump">Space</kbd> Jump</span><span><kbd data-control-hint="switchSlime">Tab</kbd> Switch</span><span><kbd data-control-hint="toggleView">V</kbd> View</span><span><kbd data-control-hint="pause">P</kbd> Pause</span></p>
           <div class="hud-controls-summary" role="note" aria-label="Press H to show controls" aria-hidden="true">${icon('Keyboard')}<span>Controls</span><kbd>H</kbd></div>
         </div>
       </aside>

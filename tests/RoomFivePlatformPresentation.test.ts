@@ -5,6 +5,7 @@ import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
 import { ColliderTransformMode, CollisionHit, CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
+import { CameraRig } from '../src/render/CameraRig.ts';
 
 const dt = 1 / 60;
 const noMovement = new THREE.Vector3();
@@ -65,6 +66,8 @@ for (const fps of [30, 60, 90]) for (const riderIndex of [0, 1]) {
       const body = new KinematicBody({ world, surfaces,
         initialPosition: carrier.root.position.clone().add(new THREE.Vector3(0, carrier.size.y / 2 + .46, 0)) });
       const riderOffset = body.position.clone().sub(carrier.root.position);
+      const cameraRig = new CameraRig(); cameraRig.setFollowTarget(body, world); cameraRig.setViewMode('first-person', true);
+      let cameraOffset: THREE.Vector3 | undefined;
       let accumulator = .003, ticks = 0;
       for (let frame = 0; frame < fps * 13; frame++) {
         accumulator += 1 / fps;
@@ -85,6 +88,10 @@ for (const fps of [30, 60, 90]) for (const riderIndex of [0, 1]) {
           close(dressing(scene, index).getWorldPosition(new THREE.Vector3()), expected, 'Uniform motion including reversals');
         }
         const renderedBody = new THREE.Vector3().copy(body.previousPosition).lerp(body.position, alpha);
+        cameraRig.update(alpha, 1 / fps);
+        const offset = cameraRig.camera.position.clone().sub(renderedBody);
+        if (cameraOffset) assert.ok(offset.distanceTo(cameraOffset) < .00002, 'First-person camera shares the rider interpolation without lag');
+        cameraOffset = offset;
         const relative = renderedBody.sub(dressing(scene, riderIndex).getWorldPosition(new THREE.Vector3()));
         assert.ok(Math.abs(relative.x - riderOffset.x) < 1e-8 && Math.abs(relative.z - riderOffset.z) < 1e-8,
           'Rider and dressing must share one interpolation interval');

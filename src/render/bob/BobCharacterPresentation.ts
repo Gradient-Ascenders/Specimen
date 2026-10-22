@@ -1,3 +1,5 @@
+import { CameraBodyVisibility } from '../CameraBodyVisibility.ts';
+import type { CameraRig, CameraFollowTarget } from '../CameraRig.ts';
 import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
@@ -133,6 +135,9 @@ function measureCharacterAsset(
  * body and gameplay timing remain external; shaders add only surface detail.
  */
 export class BobCharacterPresentation {
+  private readonly cameraBodyVisibility = new CameraBodyVisibility();
+  setCameraView(rig: CameraRig, target: CameraFollowTarget): void { this.cameraBodyVisibility.configure(rig, target); }
+
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
   private readonly gelRendering: GelRendering | undefined;
@@ -318,6 +323,7 @@ export class BobCharacterPresentation {
       }
       for (const material of importedMaterials) material.dispose();
 
+      for (const mesh of [asset.body, ...asset.eyes]) this.cameraBodyVisibility.bind(mesh);
       this.asset = asset;
       this.assetDiagnostics = measureCharacterAsset(asset);
       this.captureWallContactGeometry(asset.body);
@@ -873,6 +879,7 @@ export class BobCharacterPresentation {
   }
 
   dispose(): void {
+    this.cameraBodyVisibility.dispose();
     if (this.disposed) return;
     this.reset();
     this.disposed = true;

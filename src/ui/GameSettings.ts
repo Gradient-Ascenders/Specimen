@@ -1,4 +1,4 @@
-import { DEFAULT_USER_KEY_BINDINGS, isBindableKey, isUserKeyBindings, type RebindableAction, type UserKeyBindings } from '../core/KeyBindings.ts';
+import { DEFAULT_USER_KEY_BINDINGS, isBindableKey, reconcileUserKeyBindings, type RebindableAction, type UserKeyBindings } from '../core/KeyBindings.ts';
 import type { GelRenderingMode } from '../render/slime/GelRendering.ts';
 import {
   DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_PROFILES, readGraphicsSettings, type GraphicsProfileId, type GraphicsSettings,
@@ -104,7 +104,7 @@ export class GameSettings {
           hudVisibility: ['automatic', 'always', 'minimal'].includes(preferences.hudVisibility as string) ? preferences.hudVisibility as HUDVisibility : 'automatic',
           pauseInBackground: typeof preferences.pauseInBackground === 'boolean' ? preferences.pauseInBackground : true,
           muteInBackground: typeof preferences.muteInBackground === 'boolean' ? preferences.muteInBackground : true,
-          keyBindings: isUserKeyBindings(preferences.keyBindings) ? preferences.keyBindings : DEFAULT_USER_KEY_BINDINGS,
+          keyBindings: reconcileUserKeyBindings(preferences.keyBindings),
         };
       }
     } catch {
