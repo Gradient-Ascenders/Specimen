@@ -1,0 +1,34 @@
+{
+  "archive": "cultivation-sentry-sounds.tar",
+  "archiveSha256": "85677f375023c550baa30fed8d2dde7d00cfb75aaad455d8a75196f66da1b317",
+  "processing": "Mono averaging, DC removal, gain with peak headroom, 2 ms fades, OGG Vorbis. No trimming or looping.",
+  "clips": [
+    {
+      "id": "cultivation-sentry-shove-01",
+      "source": "sentry-shove.wav",
+      "sourceSha256": "adfae8136cc02e511dffd4953ebdc6e20443f9347a6b4e45595ed6fbaa09027d",
+      "sourceDurationSeconds": 0.6065,
+      "sourceChannels": 2,
+      "gain": 0.6339,
+      "rms": 0.072893
+    },
+    {
+      "id": "cultivation-sentry-topple-01",
+      "source": "sentry-topple.wav",
+      "sourceSha256": "a73d8e4b1ec199982b6905d5f81cd02f18cbb28fb41b2eb868fa59f5b44f221a",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "gain": 1.148396,
+      "rms": 0.058558
+    },
+    {
+      "id": "cultivation-sentry-acid-splash-01",
+      "source": "sentry-acid-splash.wav",
+      "sourceSha256": "3b890f1e3bca6ab721dc8409d19f61d346192f7b9d8dfa863fafedc987b9511c",
+      "sourceDurationSeconds": 1.48,
+      "sourceChannels": 2,
+      "gain": 0.872715,
+      "rms": 0.073214
+    }
+  ]
+}

@@ -30,7 +30,8 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
     return { loaded, failed, pending };
   }), { timeout: 60_000 }).toEqual({ loaded: SOUND_BANKS.containment.length, failed: [], pending: 0 });
   expect(new Set(audioRequests).size).toBe(SOUND_BANKS.containment.length);
-  expect(audioRequests.some(url => url.includes('/volt/') || url.includes('/turrets/'))).toBe(false);
+  expect(audioRequests.some(url => url.includes('/volt/'))).toBe(false);
+  expect(audioRequests.filter(url => url.includes('/turrets/'))).toHaveLength(1);
   expect(audioRequests.every(url => new URL(url).pathname.startsWith('/group-folder/assets/audio/'))).toBe(true);
   // Start unlocks audio; the post-cutscene canvas gesture acquires pointer lock.
   await page.locator('canvas').click();
@@ -50,6 +51,11 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   expect(new Set(audioRequests.filter(url => url.includes('/goop/'))).size).toBe(5);
   expect(new Set(audioRequests.filter(url => url.includes('/world/'))).size).toBe(6);
   expect(new Set(audioRequests.filter(url => url.includes('/environment/'))).size).toBe(6);
+  expect(new Set(audioRequests.filter(url => url.includes('/polish/'))).size).toBe(10);
+  expect(new Set(audioRequests.filter(url => url.includes('/intro/'))).size).toBe(14);
+  expect(new Set(audioRequests.filter(url => url.includes('/escape/'))).size).toBe(9);
+  expect(new Set(audioRequests.filter(url => url.includes('/cultivation/'))).size).toBe(8);
+  expect(new Set(audioRequests.filter(url => url.includes('/blackout/'))).size).toBe(1);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
@@ -120,7 +126,15 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'suspended');
+  await page.evaluate(()=>window.addEventListener('click',()=>{
+    const audio=(window as any).__audioRuntime.audio;
+    const voice=[...audio.voices].find((v:any)=>v.sound==='ui-confirm-01');
+    (window as any).__menuAudio={paused:audio.diagnostics.paused,worldGain:audio.gameplayGain.gain.value,
+      channels:voice?.source.buffer.numberOfChannels,loop:voice?.source.loop};
+  },{once:true}));
   await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  expect(await page.evaluate(()=>(window as any).__menuAudio)).toEqual({paused:true,worldGain:0,channels:1,loop:false});
+  await page.getByRole('tab', { name: 'Audio', exact: true }).click();
   await page.locator('[data-setting="volume"]').press('Home');
   await page.locator('[data-setting="effects-volume"]').press('Home');
   for (let i=0;i<7;i++) await page.locator('[data-setting="effects-volume"]').press('ArrowRight');

@@ -67,7 +67,7 @@ export class CultivationPlatformSplashes {
           this.acid.disturb(this.worldPosition.x,this.worldPosition.z,this.worldPosition.y,1.7);
         }
         this.root.localToWorld(this.worldPosition.set(slot.x,this.surfaceY,slot.z));
-        gameplayAudioEvents.emit('cue',{sound:'goop-projectile-impact-01',position:this.worldPosition,maxDistance:28,volumeScale:.65});
+        gameplayAudioEvents.emit('cue',{sound:'goop-projectile-impact-01',position:this.worldPosition,maxDistance:28,volumeScale:1});
       }
       slot.previous=slot.drop.state;
     }

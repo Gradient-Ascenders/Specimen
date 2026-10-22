@@ -82,10 +82,16 @@ export class BlackoutVentArrival {
     if(!this.playing)return false;
     if(!Number.isFinite(dt)||dt<=0)throw new RangeError('Invalid Blackout arrival timestep.');
     this.previousElapsed=this.elapsed;this.elapsed=Math.min(V.duration,this.elapsed+dt);
+    // One shared slide bed, started by the movie clock rather than preparation
+    // or rendering. Layering the same recording three times would phase it.
+    if(this.previousElapsed===0&&this.elapsed<V.release.volt)
+      gameplayAudioEvents.emit('cue',{sound:'blackout-vent-slime-slide-01',volumeScale:1});
     this.updateActors(this.elapsed,dt);
     this.ventCollapse.update(this.elapsed);
+    if(this.previousElapsed<V.collapseStart&&this.elapsed>=V.collapseStart)
+      gameplayAudioEvents.emit('cue',{sound:'world-vent-break-01',position:this.ventCollapse.collisionMesh.getWorldPosition(this.sample),maxDistance:35});
     if(this.previousElapsed<V.collapseImpact&&this.elapsed>=V.collapseImpact)
-      gameplayAudioEvents.emit('cue',{sound:'world-platform-land-01',position:this.ventCollapse.collisionMesh.position,volumeScale:.7,maxDistance:35});
+      gameplayAudioEvents.emit('cue',{sound:'world-platform-land-01',position:this.ventCollapse.collisionMesh.getWorldPosition(this.sample),volumeScale:.35,maxDistance:35});
     if(this.elapsed>=V.duration){
       // Reacquire the real floor before normal movement resumes. CP1 and its
       // three existing body identities remain the recovery authority.
@@ -151,6 +157,7 @@ export class BlackoutVentArrival {
     camera.fov=THREE.MathUtils.lerp(fov,this.cameraFov,blend);camera.updateProjectionMatrix();camera.updateMatrixWorld(true);
   }
   cancel():void{
+    gameplayAudioEvents.emit('stopSound',{sound:'blackout-vent-slime-slide-01'});
     if(this.playing){
       this.ventCollapse.seal();
       for(const actor of this.actors){

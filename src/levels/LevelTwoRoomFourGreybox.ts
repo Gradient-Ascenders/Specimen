@@ -104,7 +104,7 @@ export class LevelTwoRoomFourGreybox {
     b.root.add(liftLight, liftLight.target);
     b.addLight('room-4-boarding-light', [0, 4, 2], 0xc8eaff, 22, 10);
     this.reset();
-    this.worldAudio = new WorldAudioSource({ root: this.root.getObjectByName('room-4-lift-floor')!, kind: 'machinery',
+    this.worldAudio = new WorldAudioSource({ root: this.root.getObjectByName('room-4-lift-floor')!, kind: 'machinery', travelCues: true,
       progress: () => this.controller.progress, settled: () => !this.controller.running });
   }
 
