@@ -74,7 +74,8 @@ test('the real arrival borrows existing bodies/models, animates each ejection an
     }
     assert.equal(completed,1);assert.equal(s.arrival.complete,true);
     assert.deepEqual(events,{bob:{launch:1,land:1},goop:{launch:1,land:1},volt:{launch:1,land:1}});
-    assert.equal(cues.length,7);assert.equal(cues.filter(c=>c==='world-platform-land-01').length,1);
+    assert.equal(cues.length,8);assert.equal(cues.filter(c=>c==='world-platform-land-01').length,1);
+    assert.equal(cues.filter(c=>c==='world-vent-break-01').length,1);
     assert.equal(s.camera.near,.1);assert.equal(s.camera.fov,48);
     for(const [i,id] of (['bob','goop','volt'] as const).entries()){
       assert.equal(s.presentations[id].root.parent,parents[i]);assert.equal(s.bodies[id].grounded,true);

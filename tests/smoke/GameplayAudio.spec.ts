@@ -51,6 +51,8 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   expect(new Set(audioRequests.filter(url => url.includes('/goop/'))).size).toBe(5);
   expect(new Set(audioRequests.filter(url => url.includes('/world/'))).size).toBe(6);
   expect(new Set(audioRequests.filter(url => url.includes('/environment/'))).size).toBe(6);
+  expect(new Set(audioRequests.filter(url => url.includes('/polish/'))).size).toBe(10);
+  expect(new Set(audioRequests.filter(url => url.includes('/intro/'))).size).toBe(14);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});
@@ -121,7 +123,14 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'suspended');
+  await page.evaluate(()=>window.addEventListener('click',()=>{
+    const audio=(window as any).__audioRuntime.audio;
+    const voice=[...audio.voices].find((v:any)=>v.sound==='ui-confirm-01');
+    (window as any).__menuAudio={paused:audio.diagnostics.paused,worldGain:audio.gameplayGain.gain.value,
+      channels:voice?.source.buffer.numberOfChannels,loop:voice?.source.loop};
+  },{once:true}));
   await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  expect(await page.evaluate(()=>(window as any).__menuAudio)).toEqual({paused:true,worldGain:0,channels:1,loop:false});
   await page.getByRole('tab', { name: 'Audio', exact: true }).click();
   await page.locator('[data-setting="volume"]').press('Home');
   await page.locator('[data-setting="effects-volume"]').press('Home');

@@ -25,6 +25,9 @@ All 3D models were created independently for Specimen.
 | Resource | Creator | Source | Licence | Use |
 | --- | --- | --- | --- | --- |
 | In-game sounds | Made with ElevenLabs | Supplied sound packs and turret recording; see the notes below. | Licence details not supplied | All character, machine, drone and environment effects. |
+| Interaction polish sounds | Made with ElevenLabs | Requester-supplied `polish-sounds-01.tar`. | Licence details not supplied | Buttons, bridge locking, lift and laser transitions, vent breaks, escape alarms and menu confirmation. |
+| Intro cutscene sounds | Made with ElevenLabs | Requester-supplied `intro-cutscene-sounds.tar`. | Licence details not supplied | Laboratory ambience, camera servos, doors, egg rocking/cracking/falling/breaking, pod seal/lift and Bob's gel movement. |
+| Intro camera variants | Made with ElevenLabs | Requester-supplied `intro-camera-sounds.tar`. | Licence details not supplied | Three distinct surveillance-camera movements replacing the original repeated camera cue. |
 
 ## Tools
 
@@ -126,6 +129,7 @@ texture assets, external code or third-party dependencies were introduced.
 | World interaction pack (4 recordings, 6 runtime effects) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `world-interaction-sounds.tar`, preserved in `assets/audio/world/` | Requester-supplied; generating account's plan/licence documentation not supplied | Door travel/settling, machinery movement, local laser hum and physical control press/release. Mono OGG with documented source edits, quiet loop balancing and circular overlaps; source archive retained unchanged. |
 | Environment pack (5 recordings, 6 runtime effects including Goop reuse) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `environment-sounds.tar`, preserved in `assets/audio/environment/`; existing originals in `assets/audio/goop/goop-sounds.tar` | Requester-supplied; generating account's plan/licence documentation not supplied | Falling platforms, heavy landing, flying/mountable drones, hover engines and monitor typing. Drone destruction edits Goop's active dissolution into completion with a short crossfade. Mono OGG; original archives retained unchanged. |
 | Specimen turret shot | Requester-generated using ElevenLabs Sound Effects | Supplied `specimen-turret-shot.wav`, converted to OGG Vorbis | No separate licence declaration supplied | Accepted turret projectile spawns across the shared drone firing system. |
+| Interaction polish pack (7 recordings, 10 runtime effects) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `polish-sounds-01.tar`, retained unchanged at repository root | Requester-supplied; generating account's plan/licence documentation not supplied | Button press/release, bridge latch, lift and laser transitions, vent breaks, escape alarms and menu confirmation. Documented source splits and gains in `docs/assets/polish-audio-import.json`. |
 | Osmotic Memory | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/osmotic-memory) | CC0 | Intro/title screen music; edited for looping and loudness. |
 | Thought Loop | GloryToTheMachine | [OpenGameArt](https://opengameart.org/content/thought-loop-glorytothemachine-ambientdeepnostalgic-loop) | CC BY 4.0 | Containment music; edited for loudness. Attribution: Music by GloryToTheMachine. |
 | Unsolved Investigation | isaiah658 | [OpenGameArt](https://opengameart.org/content/unsolved-investigation) | CC0 | Cultivation music; lossless WAV source converted to OGG. |

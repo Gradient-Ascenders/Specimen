@@ -1,6 +1,6 @@
 # Gameplay sound effects
 
-Specimen ships 30 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
+Specimen ships 54 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1, interaction polish 10, intro 14. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Movement uses authoritative KinematicBody events and resolved grounded velocity,
 
 ## Assets and provenance
 
-`public/assets/audio/{bob,goop,volt,world,environment,turrets}/` contains only runtime OGG files (475,527 bytes total). Source archives are not shipped in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
+`public/assets/audio/{bob,goop,volt,world,environment,turrets,polish,intro}/` contains only runtime OGG files. Source archives are not shipped in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
 
 The requester generated Bob's replacement recordings in ElevenLabs and selected them through listening review. The seven originals (six stereo PCM16 WAVs and one stereo Vorbis file, all 48 kHz) are preserved byte-for-byte in `assets/audio/bob/bob-sounds.tar`. `scripts/import-bob-audio.py` prepares the runtime files using NumPy and SoundFile/libsndfile: average stereo to mono, remove DC offset, balance levels without compression, cap peaks with headroom, apply 2 ms edge fades, and encode Vorbis. The powerful jump starts at source 0.58 s and hard landing at 0.30 s to remove separate preparation sounds before their main hit; soft landing starts at 0.065 s to remove its leading delay. Other clips retain their full timeline. `docs/assets/bob-audio-import.json` records source/archive hashes, trims, gains and resulting RMS. Reimport with `python3 scripts/import-bob-audio.py` after installing NumPy and SoundFile; Python is not a game dependency.
 
@@ -24,7 +24,7 @@ The five environment WAVs are preserved unchanged in `assets/audio/environment/e
 
 All in-game sound effects were generated with ElevenLabs Sound Effects, including the turret shot supplied separately by the requester. Separate licence documentation has not been supplied. `CREDITS.md` records provenance and feeds the existing in-game credits screen.
 
-`docs/assets/gameplay-audio-inventory.json` records all 30 decoded durations, sample rates, channel counts and peaks. All runtime assets are mono 48 kHz. Every file was fully decoded using libsndfile, and browser validation checks Web Audio decoding separately. Paths use Vite's relative `BASE_URL` (`./`) and remain beneath a nested deployment directory.
+`docs/assets/gameplay-audio-inventory.json` records all 54 decoded durations, sample rates, channel counts and peaks. All runtime assets are mono 48 kHz. Every file was fully decoded using libsndfile, and browser validation checks Web Audio decoding separately. Paths use Vite's relative `BASE_URL` (`./`) and remain beneath a nested deployment directory.
 
 ## Mix and volume
 
@@ -57,11 +57,75 @@ Repeated movement/jump/landing/body cues vary playback rate by up to 4%. Sources
 
 Voices are bounded at 24 globally and three per one-shot effect. Each standard loop has one voice and corrosion up to three. Authored acid pools in Containment, Cultivation and Blackout share one environmental voice: it plays within 18 m of the nearest surface point, follows the controlled body across wide basins, and stops outside that range. The clip does not create persistent projectile puddles or imply that ordinary impacts corrode surfaces. Additional world loops wait quietly for capacity. Per-effect one-shots are throttled to 35 ms; extreme rapid overlapping turret shots may be dropped by this mix limiter without changing projectile spawning. Loops fade in over 40 ms; stops are immediate to respect charge cancellation/destruction.
 
+## Interaction polish pack
+
+The seven requester-generated ElevenLabs stereo WAVs remain unchanged in
+`polish-sounds-01.tar`. Run `python3 scripts/import-polish-audio.py` with
+NumPy/SoundFile to create ten mono 48 kHz Vorbis clips in
+`public/assets/audio/polish/`. `docs/assets/polish-audio-import.json` records
+archive/source hashes, pair splits, gains, loop overlap and decoded levels.
+The importer splits the actual waveforms, removes DC, balances levels with peak
+headroom and applies 2 ms one-shot fades. The alarm gets a 20 ms circular overlap;
+its runtime loop is 4.98 seconds. Source archives never ship with the game.
+
+| Clip | Live mapping |
+| --- | --- |
+| `world-button-press-01` / `world-button-release-01` | Real wall-button and transit bridge-button state changes; both finale release-button presses. Pressure plates keep their existing heavier accents. |
+| `world-lever-lock-01` | One mechanical clunk when Volt latches the transit bridge. There is no standalone lever mechanic; restoring an already-locked bridge is silent. |
+| `world-lift-start-01` / `world-lift-stop-01` | Vertical MovingPlatform travel and the Cultivation scrolling lift. Startup follows actual motion; braking follows arrival or a physical hold. Restoration is silent. |
+| `world-laser-on-01` / `world-laser-off-01` | Nearby actual beam power changes, including timed/circuit/boss beams. Range entry, visibility changes, nearest-source selection and reset do not make switching cues. |
+| `world-vent-break-01` | Cultivation's metal cover breaking loose and its later duct-floor break; Blackout's entry-duct collapse. Containment's wooden acid-dissolved cover keeps its existing material cues. |
+| `world-containment-alarm-loop-01` | Containment drone reveal/combat and reinforcement escape, ending before the quiet exchange/blackout; Cultivation cell opening through escape to the vent. Background level is lowered after Containment reveals and during Cultivation dialogue. |
+| `ui-confirm-01` | Enabled menu-button confirmation by mouse, keyboard or controller, and nested-menu back actions. No sounds on automatic focus restoration. |
+
+Polish base gains are button press/release 0.9/0.65, bridge lock 1.1,
+lift start/stop 1.0/1.2, laser on/off 0.85/0.7, vent break 1.1, alarm 0.9
+and menu confirmation 0.35. Mechanisms/vents use the existing mechanism distance
+profile; laser switching uses the beam profile. Alarms and UI are nonpositional.
+Alarms are keyed loops, stopped by skip/reset/unload and suspended with pause.
+
+Menu confirmation uses the same cached audio context, compressor and effects/master
+controls. A gameplay gain bus mutes world voices while a menu click temporarily
+resumes the context; it suspends again when the click ends if gameplay is still
+paused. Focus muting still applies. No gameplay listener, mechanism, puzzle
+timing, damage or checkpoint state depends on any sound.
+
+## Intro cutscene effects
+
+The twelve supplied stereo WAVs remain unchanged in `intro-cutscene-sounds.tar`.
+`python3 scripts/import-intro-audio.py` (NumPy/SoundFile) creates fourteen mono
+48 kHz OGG effects in `public/assets/audio/intro/`. The manifest at
+`docs/assets/intro-audio-import.json` records source/archive hashes, gains and
+decoded levels. Import uses DC removal, peak headroom and 2 ms one-shot fades.
+Camera recordings come from the separate `intro-camera-sounds.tar`. Its three
+variants play in order 01, 02, 03, 01 across the corridor; the fourth cue is
+slightly quieter. The first variant has 80 ms of leading quiet trimmed. The
+original camera recording remains preserved in the initial archive. Both
+archives and each clip's source archive are recorded in the import manifest.
+The cracking clip loses 80 ms of leading silence and ambience uses an 80 ms
+circular overlap. No music is added.
+
+`OpeningAudio` follows the existing 54-second `OpeningGameTimeline` in both the
+default live player and explicit MP4 backup. The media file remains muted;
+the backup cues follow its actual `currentTime`, not loading or wall-clock time.
+Camera servos accompany the corridor pass. Door cues follow opening/closing at
+24.8/31 seconds. Rocking builds from 33.2 seconds; cracks play at 35.2, 37 and
+38.7 seconds. The seal releases just before the 40.7-second lid lift; falling
+starts at 44.2 seconds, shell impact at 44.8, gel spread at 45.05 and reforming
+at 46.75. Ambience fades in with the corridor reveal, softens for the hatching
+and fades out at the end. These are nonpositional cinematic cues sharing the
+existing effects/master sliders and focus muting.
+
+Sounds start only with visible playback, not shader preparation. Hidden tabs
+and video buffering suspend intro playback; repeated frames do not replay cues.
+Large seeks discard skipped one-shots. Skip/end/disposal stop only the intro's
+own loop and samples, preserving gameplay/menu audio during the handoff.
+
 ## Lifecycle
 
-- Boot preloads/decode-caches the 12 Bob/Goop, twelve world/environment clips and the shared turret recording needed by the Containment finale (25 total) while playback stays suspended. The Cultivation bank adds Volt's connection and ready accents for his live escape (27 total); he already has the shared body samples. Blackout adds the three remaining electrical clips (30 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
+- Boot preloads/decode-caches the 12 Bob/Goop, twelve world/environment clips, ten polish effects, fourteen intro effects and the shared turret recording needed by the Containment finale (49 total) while playback stays suspended. The Cultivation bank adds Volt's connection and ready accents for his live escape (51 total); he already has the shared body samples. Blackout adds the three remaining electrical clips (54 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
 
-Cultivation's Volt-release finale schedules existing alarm/activation beeps, body
+Cultivation's Volt-release finale uses the supplied alarm loop and schedules button, body
 launch/landing accents, positional gunfire, acid impacts and drone destruction at
 fixed story events. A single positional flight source follows the hijacked craft;
 ordinary encounter sources are suppressed. Goop's typed “Now we're even” originates
@@ -69,7 +133,7 @@ at the high escape vent beside Volt's cell; Volt's “Get on” has a positional
 Goop's "Follow me, I know the way out" uses the same positional blips after the
 entrance landing. Existing metal/body cues cover the shoulder strike, duct
 shudder and floor failure; shaking/failure sounds originate at the breaking panel.
-The opening alarm beeps are spaced 2.4 seconds apart, matching the slow room pulse.
+The alarm follows the movie clock from cell opening until the vent camera, softens under dialogue and stops on skip/reset/completion. Existing room lights retain their authored 2.4-second pulse.
 These events stop advancing with pause, and skipped shots are not replayed in bulk.
 - Pause/menus suspend the context and clear body travel accumulation. World loops preserve their offsets and resume once. Browser blur/visibility adds an independent suspension gate. Fixed-step state resumes body contact sampling and re-evaluates nearby basins, motors and active beams. Mechanism progress snapshots prevent resume from replaying an arrival.
 - Death stops existing voices, plays the shared rupture cue for Bob/Goop/Volt when applicable, and rejects further world sounds until successful recovery. Retry sounds the restored active identity.
@@ -81,7 +145,7 @@ These events stop advancing with pause, and skipped shots are not replayed in bu
 Four team-approved OGG tracks are stored in `public/assets/audio/music/` and
 credited in `CREDITS.md`. `BackgroundMusic` streams them with at most two
 HTMLAudioElements rather than decoding them into the sound-effects buffer bank.
-It uses no per-frame update work and does not change the 34/41/54 sound-effects
+It uses no per-frame update work and does not change the 49/51/54 sound-effects
 bank counts. Music follows the existing menu, pause, opening, transition, level
 and completion state, and uses the master volume without the effects slider.
 

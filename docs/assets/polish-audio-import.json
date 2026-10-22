@@ -1,0 +1,127 @@
+{
+  "archive": "polish-sounds-01.tar",
+  "archiveSha256": "e2fec57ee8d88be2921383c5a873aa8bd37b56f8d356ba25fee1516873a860cc",
+  "processing": "Stereo average to mono, DC removal, documented pair splits, gain with peak headroom, 2 ms one-shot fades; 20 ms circular overlap for the alarm; OGG Vorbis.",
+  "clips": [
+    {
+      "id": "world-button-press-01",
+      "source": "button-press.wav",
+      "sourceSha256": "1f7143bb14c941083c0b728ac5819958d842ec0fc4c4e8c47b1d8bb513872451",
+      "sourceDurationSeconds": 2.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 1.8,
+      "circularOverlapSeconds": 0,
+      "gain": 1.398265,
+      "rms": 0.040287
+    },
+    {
+      "id": "world-button-release-01",
+      "source": "button-press.wav",
+      "sourceSha256": "1f7143bb14c941083c0b728ac5819958d842ec0fc4c4e8c47b1d8bb513872451",
+      "sourceDurationSeconds": 2.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 1.25,
+      "trimEndSeconds": 0.5,
+      "circularOverlapSeconds": 0,
+      "gain": 1.94279,
+      "rms": 0.039326
+    },
+    {
+      "id": "world-lever-lock-01",
+      "source": "lever-lock.wav",
+      "sourceSha256": "4b8452b36a8a448340a020ac9d2efdffa52c23d07eb61ea855220641abcc0c27",
+      "sourceDurationSeconds": 2.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0.4,
+      "circularOverlapSeconds": 0,
+      "gain": 1.320726,
+      "rms": 0.063357
+    },
+    {
+      "id": "world-lift-start-01",
+      "source": "lift-start-stop.wav",
+      "sourceSha256": "8ed7d7479df36dd52aba5e8cadafe4d496570cde52f622c0bb89b0d18f791e5e",
+      "sourceDurationSeconds": 3.08,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 1.48,
+      "circularOverlapSeconds": 0,
+      "gain": 1.649951,
+      "rms": 0.064513
+    },
+    {
+      "id": "world-lift-stop-01",
+      "source": "lift-start-stop.wav",
+      "sourceSha256": "8ed7d7479df36dd52aba5e8cadafe4d496570cde52f622c0bb89b0d18f791e5e",
+      "sourceDurationSeconds": 3.08,
+      "sourceChannels": 2,
+      "trimStartSeconds": 1.63,
+      "trimEndSeconds": 0.0,
+      "circularOverlapSeconds": 0,
+      "gain": 1.592318,
+      "rms": 0.084696
+    },
+    {
+      "id": "world-laser-on-01",
+      "source": "laser-on-off.wav",
+      "sourceSha256": "c1bc620c499cbcdf73f7e32ff0b0f8576a689b742512841b4c614d9d63726805",
+      "sourceDurationSeconds": 3.08,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0.08,
+      "trimEndSeconds": 1.88,
+      "circularOverlapSeconds": 0,
+      "gain": 1.072536,
+      "rms": 0.06358
+    },
+    {
+      "id": "world-laser-off-01",
+      "source": "laser-on-off.wav",
+      "sourceSha256": "c1bc620c499cbcdf73f7e32ff0b0f8576a689b742512841b4c614d9d63726805",
+      "sourceDurationSeconds": 3.08,
+      "sourceChannels": 2,
+      "trimStartSeconds": 1.2,
+      "trimEndSeconds": 1.18,
+      "circularOverlapSeconds": 0,
+      "gain": 1.233837,
+      "rms": 0.062142
+    },
+    {
+      "id": "world-vent-break-01",
+      "source": "vent-break.wav",
+      "sourceSha256": "bbc2ff8748697de35368ff16004d70b571f89a1371aca18b47caa19e87068673",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0.0,
+      "circularOverlapSeconds": 0,
+      "gain": 1.183971,
+      "rms": 0.065966
+    },
+    {
+      "id": "world-containment-alarm-loop-01",
+      "source": "alarm-loop.wav",
+      "sourceSha256": "f32136f8080730bf818a7bd55a6d26dbe4c6c8e7a82fb49c615ef3a2d389e71d",
+      "sourceDurationSeconds": 5.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0.0,
+      "circularOverlapSeconds": 0.02,
+      "gain": 0.442957,
+      "rms": 0.065167
+    },
+    {
+      "id": "ui-confirm-01",
+      "source": "ui-confirm.wav",
+      "sourceSha256": "e73dc5a82fc77ecd28b06a8c04f285dd17a2dd013c3e8e7ef66a534516591e99",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimStartSeconds": 0,
+      "trimEndSeconds": 0.7,
+      "circularOverlapSeconds": 0,
+      "gain": 0.623576,
+      "rms": 0.065478
+    }
+  ]
+}

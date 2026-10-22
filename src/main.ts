@@ -197,6 +197,7 @@ function startGame(): void {
     slimeHUD: gameSession,
     actions: {
       enableMusic: unlockAudio,
+      playMenuConfirm: () => { audio.unlock(); audio.playUI(); },
       returnToMenu: async () => {
         await initialGraphicsTask;
         if (shuttingDown) return;
@@ -241,6 +242,7 @@ function startGame(): void {
         titlePresentation = undefined;
         const shared = {
           host: app,
+          audio,
           prepareLevel: () => {
             return prepareFirstGraphics().then(async () => {
               // Submission finishing is not GPU completion. Drain the hidden

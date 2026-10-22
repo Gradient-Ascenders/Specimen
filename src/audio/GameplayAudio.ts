@@ -50,8 +50,8 @@ export class GameplayAudio {
           (position.x-listener.x)**2 + (position.y-listener.y)**2 + (position.z-listener.z)**2 > maxDistance**2)) return;
         if (this.enabled && !this.dead && !this.resetting) audio.play(sound, position, false, volumeScale);
       }),
-      gameplayAudioEvents.on('loop', ({ key, sound, position }) => {
-        if (this.enabled && !this.dead && !this.resetting) audio.startLoop(key, sound, position);
+      gameplayAudioEvents.on('loop', ({ key, sound, position, volumeScale }) => {
+        if (this.enabled && !this.dead && !this.resetting) audio.startLoop(key, sound, position, volumeScale);
       }),
       gameplayAudioEvents.on('stop', ({ key }) => audio.stopLoop(key)),
       manager.events.on('activeChanged', () => this.clearCharacter()),

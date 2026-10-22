@@ -30,12 +30,10 @@ interface Options {
 type Presentation=BobCharacterPresentation|GoopCharacterPresentation|VoltCharacterPresentation;
 const UP=new THREE.Vector3(0,1,0),ZERO=new THREE.Vector3();
 const CUES:readonly(readonly[number,SoundId])[]=[
-  [T.button,'world-activation-01'],[T.open,'world-release-01'],
-  [T.open+.3,'world-activation-01'],[T.open+2.7,'world-activation-01'],[T.open+5.1,'world-activation-01'],
-  [T.open+7.5,'world-activation-01'],[T.open+9.9,'world-activation-01'],
+  [T.button,'world-button-press-01'],[T.open,'world-release-01'],
   [T.critical,'world-sign-tick-01'],[T.terminateVolt,'world-activation-01'],
   [T.coverJump,'bob-jump-01'],[T.coverLand,'bob-land-soft-01'],
-  [T.coverHit,'bob-contact-01'],[T.coverHit+.2,'world-release-01'],
+  [T.coverHit,'bob-contact-01'],[T.coverHit+.2,'world-vent-break-01'],
   [T.coverImpact,'world-platform-land-01'],[T.acidHit,'world-drone-dissolve-01'],
   [T.catastrophic,'world-sign-tick-01'],[T.terminateBob,'world-activation-01'],
   [T.voltJump,'bob-charged-jump-01'],[T.hijack,'volt-circuit-connect-01'],
@@ -44,7 +42,7 @@ const CUES:readonly(readonly[number,SoundId])[]=[
   [T.voltVentJump,'bob-jump-01'],[T.ductLand,'bob-land-soft-01'],
   [T.powerOff,'volt-circuit-release-01'],[T.rideAcidHit,'world-drone-dissolve-01'],
   [T.ductShake,'world-platform-land-01'],[T.grateWarning,'world-platform-land-01'],
-  [T.grateBreak,'world-release-01'],[T.drop,'bob-fall-01'],
+  [T.grateBreak,'world-vent-break-01'],[T.drop,'bob-fall-01'],
 ];
 const JUMPS=Object.freeze([
   {id:'bob',start:T.coverJump,end:T.coverLand},
@@ -224,6 +222,10 @@ export class CultivationFinale {
         this.options.room.root.localToWorld(this.signalPoint);this.options.acid.disturb(this.signalPoint.x,this.signalPoint.z,0,3);
       }
       const line=VOLT_FINALE_DIALOGUE.find(line=>this.elapsed>=line.start&&this.elapsed<line.end);
+      if(this.elapsed>=T.open&&this.elapsed<T.ventCamera) gameplayAudioEvents.emit('loop',{
+        key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:line?.3:.6,
+      });
+      else gameplayAudioEvents.emit('stop',{key:'cultivation-finale-alarm'});
       if(line){
         const actor=this.actors[line.speaker==='goop'?1:2];actor.pose.updateWorldMatrix(true,false);
         this.voiceModel.pageIndex=line.start;this.voiceModel.text=line.text.slice(0,Math.floor((this.elapsed-line.start)*22));
@@ -234,7 +236,7 @@ export class CultivationFinale {
       }
       this.options.acid.update(dt);
     }
-    if(this.elapsed>=T.duration){this.playing=false;this.overlay.present(T.duration);return true;}return false;
+    if(this.elapsed>=T.duration){gameplayAudioEvents.emit('stop',{key:'cultivation-finale-alarm'});this.playing=false;this.overlay.present(T.duration);return true;}return false;
   }
   present(camera:THREE.PerspectiveCamera,alpha:number):void{
     if(!this.playing)return;
@@ -436,6 +438,7 @@ export class CultivationFinale {
   }
   private cue(sound:SoundId,position:THREE.Vector3):void{gameplayAudioEvents.emit('cue',{sound,position,maxDistance:110,volumeScale:.8});}
   reset():void{
+    gameplayAudioEvents.emit('stop',{key:'cultivation-finale-alarm'});
     if(this.ventView){for(const entry of this.environment)entry.mesh.visible=entry.visible;this.ventView=false;}
     if(this.played){
       for(const actor of this.actors){

@@ -22,12 +22,12 @@ interface Options {
 }
 const UP = new THREE.Vector3(0, 1, 0), WALL = new THREE.Vector3(0, 0, -1), ZERO = new THREE.Vector3();
 const CUES: readonly (readonly [number, SoundId])[] = [
-  [.08, 'world-activation-01'], [3, 'world-release-01'], [5.5, 'world-door-stop-01'],
-  [15, 'world-activation-01'], [19.65, 'world-sign-tick-01'], [24.15, 'world-sign-tick-01'],
+  [.08, 'world-button-press-01'], [3, 'world-release-01'], [5.5, 'world-door-stop-01'],
+  [19.65, 'world-sign-tick-01'], [24.15, 'world-sign-tick-01'],
   [F(38), 'bob-jump-01'], [F(39.25), 'bob-land-soft-01'],
   [T.leap, 'bob-charged-jump-01'], [T.latch, 'bob-contact-01'],
   [F(56.8), 'bob-jump-01'], [T.droneHit, 'world-drone-dissolve-01'],
-  [T.restLanding, 'bob-land-hard-01'], [F(59.7), 'bob-jump-01'], [T.safeLanding, 'bob-land-soft-01'], [T.reinforcements, 'world-activation-01'],
+  [T.restLanding, 'bob-land-hard-01'], [F(59.7), 'bob-jump-01'], [T.safeLanding, 'bob-land-soft-01'],
   [T.doorHit, 'goop-projectile-impact-01'], [T.bobDive, 'bob-jump-01'], [T.goopDive, 'bob-jump-01'],
 ];
 

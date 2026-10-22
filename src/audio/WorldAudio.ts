@@ -8,6 +8,7 @@ interface SourceOptions {
   readonly kind: 'door' | 'machinery' | 'laser' | 'drone' | 'hover';
   readonly progress?: () => number;
   readonly settled?: () => boolean;
+  readonly travelCues?: boolean;
   readonly enabled?: () => boolean;
   readonly closestPoint?: (listener: AudioPosition, out: THREE.Vector3) => void;
 }
@@ -21,13 +22,15 @@ export class WorldAudioSource {
   readonly options: SourceOptions;
   generation = 0;
   baseline: number;
+  baselineEnabled: boolean;
   constructor(options: SourceOptions) {
     this.options = options;
     this.baseline = options.progress?.() ?? 0;
+    this.baselineEnabled = options.enabled?.() ?? true;
     sources.add(this);
   }
   /** A restore/teleport is not physical travel or an arrival. */
-  reset(): void { this.baseline = this.options.progress?.() ?? 0; this.generation++; }
+  reset(): void { this.baseline = this.options.progress?.() ?? 0; this.baselineEnabled = this.options.enabled?.() ?? true; this.generation++; }
   dispose(): void { sources.delete(this); }
 }
 
@@ -35,7 +38,7 @@ export class WorldAudioSource {
 export class WorldAudio {
   private readonly audio: AudioPlayback;
   private readonly root: THREE.Object3D;
-  private readonly samples = new Map<WorldAudioSource, { progress: number; generation: number }>();
+  private readonly samples = new Map<WorldAudioSource, { progress: number; generation: number; enabled: boolean; moving: boolean }>();
   private readonly playing = new Set<string>();
   private readonly point = new THREE.Vector3();
 
@@ -49,13 +52,17 @@ export class WorldAudio {
       let visible = this.root.visible;
       while (ancestor && ancestor !== this.root) { visible &&= ancestor.visible; ancestor = ancestor.parent; }
       if (!ancestor) continue;
-      const sample = this.samples.get(source) ?? { progress: source.baseline, generation: source.generation };
+      const sample = this.samples.get(source) ?? { progress: source.baseline, generation: source.generation, enabled: source.baselineEnabled, moving: false };
       const progress = options.progress?.() ?? 0;
       const restored = sample.generation !== source.generation;
       const moved = !restored && Math.abs(progress - sample.progress) > 1e-9;
+      const enabled = options.enabled?.() ?? true;
+      const wasEnabled = sample.enabled, wasMoving = sample.moving;
+      const settled = options.settled?.() ?? false;
       sample.progress = progress; sample.generation = source.generation;
+      sample.enabled = enabled; sample.moving = enabled && moved && !settled;
       this.samples.set(source, sample);
-      if (!listener || !visible || options.enabled?.() === false) continue;
+      if (!listener || !visible) continue;
       if (options.closestPoint) options.closestPoint(listener, this.point);
       else options.root.getWorldPosition(this.point);
       const distance = (this.point.x-listener.x)**2 + (this.point.y-listener.y)**2 + (this.point.z-listener.z)**2;
@@ -67,7 +74,15 @@ export class WorldAudio {
       // audible range instead of cutting a still-audible loop at the boundary.
       const fade = THREE.MathUtils.clamp((range - Math.sqrt(distance)) / (range * 0.25), 0, 1);
       const volumeScale = fade * fade * (3 - 2 * fade);
-      const settled = options.settled?.() ?? false;
+      // Only physical transitions sound; entering range/visibility, source
+      // selection and restoration never replay startup or shutdown accents.
+      if (!restored && laser && wasEnabled !== enabled)
+        this.audio.play(enabled ? 'world-laser-on-01' : 'world-laser-off-01', this.point, false, volumeScale);
+      if (!enabled) continue;
+      if (!restored && options.travelCues) {
+        if (moved && !wasMoving) this.audio.play('world-lift-start-01', this.point, false, volumeScale);
+        if ((moved && settled) || (wasMoving && !moved)) this.audio.play('world-lift-stop-01', this.point, false, volumeScale);
+      }
       if (options.kind === 'door' && moved && settled)
         this.audio.play('world-door-stop-01', this.point, true, volumeScale);
       if (continuous || (moved && !settled)) candidates.push({
@@ -100,7 +115,8 @@ export class WorldAudio {
     for (const key of this.playing) this.audio.stopLoop(key);
     this.playing.clear(); this.samples.clear();
     // Snapshot current poses so a level reset never sounds like an arrival.
-    for (const source of sources) this.samples.set(source, { progress: source.options.progress?.() ?? 0, generation: source.generation });
+    for (const source of sources) this.samples.set(source, { progress: source.options.progress?.() ?? 0,
+      generation: source.generation, enabled: source.options.enabled?.() ?? true, moving: false });
   }
   dispose(): void { this.reset(); this.samples.clear(); }
 }

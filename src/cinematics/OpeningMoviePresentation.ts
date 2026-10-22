@@ -1,6 +1,9 @@
 import { OPENING_GAME_TIMING, openingEase, sampleOpeningGame } from './OpeningGameTimeline.ts';
+import type { AudioPlayback } from '../audio/AudioManager.ts';
+import { OpeningAudio } from '../audio/OpeningAudio.ts';
 
 export interface OpeningMoviePresentationOptions {
+  readonly audio?: AudioPlayback;
   readonly host: HTMLElement;
   readonly videoHost: HTMLElement;
   readonly source: string;
@@ -20,6 +23,7 @@ export class OpeningMoviePresentation {
   private readonly options: OpeningMoviePresentationOptions;
   private readonly hostWindow: Window;
   private readonly video: HTMLVideoElement;
+  private readonly audio: OpeningAudio;
   private readonly frames = new Set<number>();
   private readonly yields = new Map<number, () => void>();
   private started = false;
@@ -44,13 +48,14 @@ export class OpeningMoviePresentation {
   constructor(options: OpeningMoviePresentationOptions) {
     this.options = options;
     this.hostWindow = options.window ?? window;
+    this.audio = new OpeningAudio(options.audio);
     this.video = options.createVideo?.() ?? options.host.ownerDocument.createElement('video');
     this.video.className = 'opening-video';
     this.video.setAttribute('aria-hidden', 'true');
     this.video.tabIndex = -1;
     this.video.playsInline = true;
-    // The authored live intro is silent too. Muted native playback is allowed
-    // after the asynchronous menu fade without relying on user activation.
+    // Both paths use the shared Web Audio cue track. Keep the backup video's
+    // native track muted so audio is never doubled or outside the SFX controls.
     this.video.muted = true;
     this.video.preload = 'auto';
     this.video.controls = false;
@@ -58,6 +63,7 @@ export class OpeningMoviePresentation {
     this.video.addEventListener('playing', this.onPlaying);
     this.video.addEventListener('ended', this.onEnded);
     this.video.addEventListener('error', this.onMediaError);
+    this.video.addEventListener('waiting', this.onWaiting);
     options.host.ownerDocument.addEventListener('visibilitychange', this.onVisibility);
     options.videoHost.prepend(this.video);
   }
@@ -82,12 +88,15 @@ export class OpeningMoviePresentation {
     }
     const stage = this.ended || this.skipped ? 'complete'
       : sampleOpeningGame(this.video.currentTime + this.options.sourceStartSeconds).stage;
+    if (this.moviePlaying && !this.skipped && !this.ended && !this.mediaFailed)
+      this.audio.update(this.video.currentTime + this.options.sourceStartSeconds);
     if (this.options.host.dataset.openingStage !== stage) this.options.host.dataset.openingStage = stage;
   }
 
   skip(): void {
     if (!this.started || this.disposed || this.completed) return;
     this.skipped = true;
+    this.audio.stop();
     this.pauseMovie();
     this.setFade(1);
     this.releaseYields();
@@ -131,12 +140,14 @@ export class OpeningMoviePresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.audio.stop();
     for (const id of this.frames) this.hostWindow.cancelAnimationFrame(id);
     this.frames.clear();
     this.releaseYields();
     this.video.removeEventListener('playing', this.onPlaying);
     this.video.removeEventListener('ended', this.onEnded);
     this.video.removeEventListener('error', this.onMediaError);
+    this.video.removeEventListener('waiting', this.onWaiting);
     this.options.host.ownerDocument.removeEventListener('visibilitychange', this.onVisibility);
     this.pauseMovie();
     this.video.removeAttribute('src');
@@ -184,7 +195,10 @@ export class OpeningMoviePresentation {
   private pauseMovie(): void {
     this.playbackAttempt++;
     this.video.pause();
+    this.audio.pause();
   }
+
+  private readonly onWaiting = (): void => { this.moviePlaying = false; this.audio.pause(); };
 
   private readonly onPlaying = (): void => {
     if (this.disposed || this.skipped || this.ended || this.mediaFailed) return;
@@ -198,6 +212,7 @@ export class OpeningMoviePresentation {
   private readonly onEnded = (): void => {
     if (this.disposed || this.completed) return;
     this.ended = true;
+    this.audio.stop();
     this.setFade(1);
     this.options.host.dataset.openingStage = 'complete';
     this.releaseYields();

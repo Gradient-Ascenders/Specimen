@@ -43,6 +43,15 @@ test('a preparation hold cannot consume the ending clock, and pause cannot run f
   assert.equal(prevented, false, 'Enter still activates pause/settings controls instead of being consumed by skip.');
 });
 
+test('skipping the Containment finale stops its alarm before the transition hold',()=>{
+  const stopped:string[]=[];
+  const runtime=new GreyboxLevelRuntime({debugAvailable:false,host:{},window:{},renderLayer:{},
+    input:{},audio:{stopLoop(key:string){stopped.push(key);}}} as unknown as GreyboxLevelRuntimeOptions);
+  const state=runtime as any;let skipped=0;
+  state.lifecycle={state:'running'};state.resources={containmentLevel:{state:'completing',skipEnding(){skipped++;}}};
+  state.skipFinale();assert.deepEqual(stopped,['containment-finale-alarm']);assert.equal(skipped,1);
+});
+
 test('9 is dev-only, Level-1-running-only, and previews the real ending rather than skipping to another level', () => {
   let begins=0, releases=0, cancelled=0, prevented=0;
   const input={enabled:true,setEnabled(value:boolean){this.enabled=value;},releasePointerLock(){releases++;}};

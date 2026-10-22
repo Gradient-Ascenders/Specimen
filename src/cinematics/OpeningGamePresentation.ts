@@ -1,11 +1,14 @@
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import type { OpeningGameScene } from './OpeningGameScene.ts';
 import { OPENING_GAME_TIMING, sampleOpeningGame } from './OpeningGameTimeline.ts';
+import type { AudioPlayback } from '../audio/AudioManager.ts';
+import { OpeningAudio } from '../audio/OpeningAudio.ts';
 
 type OpeningView = Pick<OpeningGameScene, 'room' | 'begin' | 'prepare' | 'apply' | 'dispose' | 'needsShadowUpdate'>;
 type OpeningRenderer = Pick<RenderLayer, 'renderer' | 'withShadowPreparation' | 'setPresentationResolution'>;
 
 export interface OpeningGamePresentationOptions {
+  readonly audio?: AudioPlayback;
   readonly scene: OpeningView;
   readonly renderLayer: OpeningRenderer;
   readonly host: HTMLElement;
@@ -24,6 +27,7 @@ export interface OpeningGamePresentationOptions {
 export class OpeningGamePresentation {
   private readonly options: OpeningGamePresentationOptions;
   private readonly hostWindow: Window;
+  private readonly audio: OpeningAudio;
   private started = false;
   private disposed = false;
   private completed = false;
@@ -50,6 +54,8 @@ export class OpeningGamePresentation {
   constructor(options: OpeningGamePresentationOptions) {
     this.options = options;
     this.hostWindow = options.window ?? window;
+    this.audio = new OpeningAudio(options.audio);
+    options.host.ownerDocument.addEventListener?.('visibilitychange', this.onVisibility);
   }
 
   start(): void {
@@ -117,6 +123,7 @@ export class OpeningGamePresentation {
   skip(): void {
     if (!this.started || this.disposed || this.completed) return;
     this.skipRequested = true;
+    this.audio.stop();
     this.seconds = OPENING_GAME_TIMING.end;
     this.updateFade(1);
     this.schedulePreparation();
@@ -161,6 +168,7 @@ export class OpeningGamePresentation {
     const resized = width !== this.width || height !== this.height;
     if (!resized && this.accumulator + 1e-9 < 1 / 30) return;
     const frame = sampleOpeningGame(this.seconds);
+    this.audio.update(frame.seconds);
     this.options.scene.apply(frame, width / height, this.options.reducedMotion);
     this.options.renderLayer.withShadowPreparation(true, () => {
       this.options.renderLayer.renderer.shadowMap.needsUpdate = this.options.scene.needsShadowUpdate;
@@ -188,6 +196,8 @@ export class OpeningGamePresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.audio.stop();
+    this.options.host.ownerDocument.removeEventListener?.('visibilitychange', this.onVisibility);
     this.hostWindow.cancelAnimationFrame(this.loadFrame);
     this.hostWindow.cancelAnimationFrame(this.levelLoadFrame);
     this.options.scene.dispose();
@@ -223,6 +233,10 @@ export class OpeningGamePresentation {
       this.tryComplete(false);
     });
   }
+
+  private readonly onVisibility = (): void => {
+    if (this.options.host.ownerDocument.hidden) this.audio.pause();
+  };
 
   private prepareLevel(): void {
     if (this.levelPending || this.levelReady || this.disposed) return;

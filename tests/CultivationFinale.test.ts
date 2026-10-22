@@ -46,6 +46,22 @@ test('Volt finale has contiguous authored shots, readable threat directives and 
   assert.ok(T.terminateVolt+2.5<T.coverRun&&T.terminateBob+3<T.voltJump,'directives remain readable before the action resumes');
 });
 
+test('escape alarm follows the movie clock, softens under dialogue, and stops on skip and reset',()=>{
+  const s=setup(),loops:{key:string;volumeScale?:number}[]=[],stops:string[]=[],cues:string[]=[];
+  const offs=[gameplayAudioEvents.on('loop',e=>loops.push(e)),gameplayAudioEvents.on('stop',e=>stops.push(e.key)),
+    gameplayAudioEvents.on('cue',e=>cues.push(e.sound))];
+  try{
+    s.movie.begin(s.camera,true);s.movie.update(T.open+.01);
+    assert.deepEqual(loops.at(-1),{key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:.6});
+    const count=loops.length;s.movie.present(s.camera,1);s.movie.present(s.camera,1);assert.equal(loops.length,count,'rendering cannot emit audio');
+    s.movie.update(T.even+.1-s.movie.seconds);assert.equal(loops.at(-1)!.volumeScale,.3);
+    assert.ok(cues.includes('world-button-press-01'));assert.ok(cues.includes('world-vent-break-01'));
+    const beforeSkip=cues.length;s.movie.requestSkip();s.movie.update(1/60);
+    assert.equal(stops.at(-1),'cultivation-finale-alarm');assert.equal(cues.length,beforeSkip,'skipping never replays the remaining cues');
+    s.movie.reset();assert.equal(stops.at(-1),'cultivation-finale-alarm');
+  }finally{offs.forEach(off=>off());s.dispose();}
+});
+
 test('actor routes stay continuous; boarding and deliberate vent jumps use shared craft positions',()=>{
   const a=new THREE.Vector3(),b=new THREE.Vector3();
   for(const id of ['bob','goop','volt'] as const){

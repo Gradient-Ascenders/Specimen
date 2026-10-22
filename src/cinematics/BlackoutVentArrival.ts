@@ -84,6 +84,8 @@ export class BlackoutVentArrival {
     this.previousElapsed=this.elapsed;this.elapsed=Math.min(V.duration,this.elapsed+dt);
     this.updateActors(this.elapsed,dt);
     this.ventCollapse.update(this.elapsed);
+    if(this.previousElapsed<V.collapseStart&&this.elapsed>=V.collapseStart)
+      gameplayAudioEvents.emit('cue',{sound:'world-vent-break-01',position:this.ventCollapse.collisionMesh.getWorldPosition(this.sample),maxDistance:35});
     if(this.previousElapsed<V.collapseImpact&&this.elapsed>=V.collapseImpact)
       gameplayAudioEvents.emit('cue',{sound:'world-platform-land-01',position:this.ventCollapse.collisionMesh.position,volumeScale:.7,maxDistance:35});
     if(this.elapsed>=V.duration){

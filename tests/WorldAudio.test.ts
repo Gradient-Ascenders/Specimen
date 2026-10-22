@@ -109,8 +109,10 @@ test('platforms sound actual travel, stay silent while held, and stop at the des
     platform.update(.1); audio.update(origin); assert.equal([...playback.loops.values()][0].sound,'world-machinery-loop-01');
     platform.hold();audio.update(origin);assert.equal(playback.loops.size,0);
     platform.update(.1);audio.update(origin);assert.equal(playback.loops.size,1);
-    platform.update(1);audio.update(origin);assert.equal(playback.loops.size,0);assert.deepEqual(playback.cues,[]);
+    platform.update(1);audio.update(origin);assert.equal(playback.loops.size,0);
+    assert.deepEqual(playback.cues,['world-lift-start-01','world-lift-stop-01','world-lift-start-01','world-lift-stop-01']);
     platform.restoreState({progress:.5,target:'start'});audio.update(origin);assert.equal(playback.loops.size,0);
+    assert.equal(playback.cues.length,4,'restoration is silent');
     platform.update(.1);audio.update(origin);assert.equal(playback.loops.size,1);
     audio.reset(); assert.equal(playback.loops.size,0); audio.update(origin); assert.equal(playback.loops.size,0);
     platform.update(.1);audio.update(origin);assert.equal(playback.loops.size,1);
@@ -158,8 +160,27 @@ test('pressure plates and wall controls play press/release once and reset silent
     button.setEnabled(true);button.update([{id:'bob',body:bob}]);assert.equal(cues.length,0);
     bob.attached=true;bob.supportCollider=button.surfaceMesh;button.update([{id:'bob',body:bob}]);button.update([{id:'bob',body:bob}]);
     bob.attached=false;button.update([{id:'bob',body:bob}]);bob.attached=true;button.update([{id:'bob',body:bob}]);button.reset();
-    assert.deepEqual(cues,['world-activation-01','world-release-01','world-activation-01']);
+    assert.deepEqual(cues,['world-button-press-01','world-button-release-01','world-button-press-01']);
   } finally {off();plate.dispose();button.dispose();world.clear();surfaces.clear();}
+});
+
+test('laser switching accents follow actual power changes, without cues on range entry, visibility changes or restoration',()=>{
+  const {root,playback,audio}=fixture();
+  const laser=new LaserHazard({id:'switching',start:new THREE.Vector3(-2,1,0),end:new THREE.Vector3(2,1,0)});
+  root.add(laser.root);
+  try {
+    audio.update(origin);assert.deepEqual(playback.cues,[]);
+    laser.setEnabled(false);audio.update(origin);audio.update(origin);
+    assert.deepEqual(playback.cues,['world-laser-off-01']);
+    laser.setEnabled(true);audio.update(origin);
+    assert.deepEqual(playback.cues,['world-laser-off-01','world-laser-on-01']);
+    audio.update({x:100,y:1,z:0});laser.setEnabled(false);audio.update({x:100,y:1,z:0});audio.update(origin);
+    assert.equal(playback.cues.length,2);
+    laser.reset();audio.update(origin);assert.equal(playback.cues.length,2);
+    root.visible=false;laser.setEnabled(false);audio.update(origin);root.visible=true;audio.update(origin);
+    assert.equal(playback.cues.length,2);
+    audio.reset();audio.update(origin);assert.equal(playback.cues.length,2);
+  }finally{audio.dispose();laser.dispose();}
 });
 
 test('Cultivation scrolling-shaft elevator sounds its authoritative descent',()=>{

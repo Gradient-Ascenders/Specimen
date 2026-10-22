@@ -8,6 +8,7 @@ interface Voice {
   readonly panner?: PannerNode;
   readonly key?: string;
   volumeScale: number;
+  readonly ui: boolean;
 }
 interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition; readonly volumeScale: number }
 type SpatialAudioTarget = {
@@ -80,6 +81,7 @@ export interface AudioPlayback {
   play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number): void;
   startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale?: number): void;
   stopLoop(key: string): void;
+  stopSound?(sound: SoundId): void;
   stopAll(): void;
   setPaused(paused: boolean): void;
   setListener(position: AudioPosition, forward?: AudioPosition, up?: AudioPosition): void;
@@ -90,6 +92,7 @@ export class AudioManager implements AudioPlayback {
   private context: AudioContext | undefined;
   private master: GainNode | undefined;
   private effects: GainNode | undefined;
+  private gameplayGain: GainNode | undefined;
   private compressor: DynamicsCompressorNode | undefined;
   private readonly buffers = new Map<SoundId, AudioBuffer>();
   private readonly voices = new Set<Voice>();
@@ -147,6 +150,9 @@ export class AudioManager implements AudioPlayback {
       this.context = this.createContext();
       this.master = this.context.createGain();
       this.effects = this.context.createGain();
+      this.gameplayGain = this.context.createGain();
+      this.gameplayGain.gain.value = this.paused ? 0 : 1;
+      this.gameplayGain.connect(this.effects);
       this.compressor = this.context.createDynamicsCompressor();
       this.compressor.threshold.value = -12;
       this.compressor.ratio.value = 4;
@@ -213,12 +219,16 @@ export class AudioManager implements AudioPlayback {
     }
   }
 
-  setPaused(paused: boolean): void { this.paused = paused; this.syncContext(); }
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (this.gameplayGain) this.gameplayGain.gain.value = paused ? 0 : 1;
+    this.syncContext();
+  }
   setFocused(focused: boolean): void { this.focused = focused; this.syncContext(); }
   private syncContext(): void {
     const context = this.context;
     if (!context || this.disposed || context.state === 'closed') return;
-    const shouldRun = this.unlocked && !this.paused && this.focused;
+    const shouldRun = this.unlocked && this.focused && (!this.paused || [...this.voices].some(voice => voice.ui));
     const operation = shouldRun ? context.resume() : context.suspend();
     void operation.then(() => { if (shouldRun) this.reconcileLoops(); }).catch(() => {});
   }
@@ -231,6 +241,17 @@ export class AudioManager implements AudioPlayback {
     // Per-effect limiter also bounds rapid turrets distributed across the level.
     if (now - (this.recent.get(sound) ?? -Infinity) < 0.035) return;
     if (this.createVoice(sound, position, undefined, varyPitch, scale)) this.recent.set(sound, now);
+  }
+
+  /** Menu one-shots share the effects/master mix, while paused world voices stay muted. */
+  playUI(): void {
+    if (this.disposed || !this.unlocked || !this.focused || !this.context || this.context.state === 'closed') return;
+    const sound = 'ui-confirm-01', now = this.context.currentTime;
+    if (now - (this.recent.get(sound) ?? -Infinity) < .035) return;
+    if (this.createVoice(sound, undefined, undefined, false, 1, true)) {
+      this.recent.set(sound, now);
+      this.syncContext();
+    }
   }
 
   startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale = 1): void {
@@ -258,6 +279,13 @@ export class AudioManager implements AudioPlayback {
       released = true;
     }
     if (released) this.reconcileLoops();
+  }
+
+  /** Release a cinematic's own clips without stopping gameplay/menu audio. */
+  stopSound(sound: SoundId): void {
+    for (const [key, request] of this.loops) if (request.sound === sound) this.loops.delete(key);
+    for (const voice of this.voices) if (voice.sound === sound) this.stopVoice(voice);
+    this.reconcileLoops();
   }
 
   stopAll(): void {
@@ -309,9 +337,9 @@ export class AudioManager implements AudioPlayback {
     if (!this.canPlay()) return;
     for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position, request.volumeScale);
   }
-  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1): boolean {
-    const buffer = this.buffers.get(sound), context = this.context, effects = this.effects;
-    if (!buffer || !context || !effects) return false;
+  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1, ui = false): boolean {
+    const buffer = this.buffers.get(sound), context = this.context, bus = ui ? this.effects : this.gameplayGain;
+    if (!buffer || !context || !bus) return false;
     const definition = SOUND_DEFINITIONS[sound];
     if (this.voices.size >= 24 || [...this.voices].filter(v => v.sound === sound).length >= definition.maxVoices) return false;
     const source = context.createBufferSource(), gain = context.createGain();
@@ -328,9 +356,9 @@ export class AudioManager implements AudioPlayback {
       panner.refDistance = spatial.refDistance;
       panner.maxDistance = 45;
       panner.rolloffFactor = spatial.rolloffFactor;
-      source.connect(gain); gain.connect(panner); panner.connect(effects);
-    } else { source.connect(gain); gain.connect(effects); }
-    const voice: Voice = { sound, source, gain, panner, key, volumeScale };
+      source.connect(gain); gain.connect(panner); panner.connect(bus);
+    } else { source.connect(gain); gain.connect(bus); }
+    const voice: Voice = { sound, source, gain, panner, key, volumeScale, ui };
     this.positionVoice(voice, position);
     this.voices.add(voice);
     source.onended = () => { this.releaseVoice(voice); this.reconcileLoops(); };
@@ -350,6 +378,7 @@ export class AudioManager implements AudioPlayback {
     if (!this.voices.delete(voice)) return;
     voice.source.onended = null;
     voice.source.disconnect(); voice.gain.disconnect(); voice.panner?.disconnect();
+    if (voice.ui) this.syncContext();
   }
   dispose(): void {
     if (this.disposed) return;
@@ -359,7 +388,7 @@ export class AudioManager implements AudioPlayback {
       this.pending.delete(sound); resolve();
     }
     this.stopAll(); this.buffers.clear();
-    this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
+    this.gameplayGain?.disconnect(); this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
     void this.context?.close().catch(() => {});
   }
 }

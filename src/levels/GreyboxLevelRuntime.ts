@@ -1622,7 +1622,11 @@ export class GreyboxLevelRuntime {
     if (this.lifecycle.state === 'running' && ((t >= timing.droneReveal && t < timing.droneHit) || (t >= timing.reinforcements && t < timing.blackout))) {
       const drone = this.finale.visuals.drones[t < timing.droneHit ? 0 : 1];
       this.audio?.startLoop('containment-finale-flight', 'world-drone-flight-loop-01', drone.root.position);
+      const reveal = t < timing.droneHit ? timing.droneReveal : timing.reinforcements;
+      this.audio?.startLoop('containment-finale-alarm', 'world-containment-alarm-loop-01', undefined, t < reveal+2 ? .7 : .35);
     } else this.audio?.stopLoop('containment-finale-flight');
+    if (!((t >= timing.droneReveal && t < timing.droneHit) || (t >= timing.reinforcements && t < timing.blackout)))
+      this.audio?.stopLoop('containment-finale-alarm');
     if (this.lifecycle.state === 'running' && t >= timing.doorHit && t < timing.doorOpen) {
       this.audio?.startLoop('containment-finale-door', 'goop-dissolve-loop-01', resources.testScene.roomFive.goopWoodenDoor.position);
     } else this.audio?.stopLoop('containment-finale-door');
@@ -1645,6 +1649,7 @@ export class GreyboxLevelRuntime {
   private readonly skipFinale = (): void => {
     const resources = this.resources;
     if (!resources || resources.containmentLevel.state !== 'completing' || this.lifecycle.state !== 'running') return;
+    this.audio?.stopLoop('containment-finale-alarm');
     this.finaleOverlay?.preparing();
     this.finale?.render(CONTAINMENT_FINALE_TIMING.end);
     resources.containmentLevel.skipEnding();

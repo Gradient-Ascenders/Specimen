@@ -395,6 +395,7 @@ export interface GameFlowActions {
   startSelectedLevel?(levelId: 'level-2' | 'level-3'): Promise<void> | void;
   playOpening?(): void;
   enableMusic?(): void;
+  playMenuConfirm?(): void;
   skipOpening?(): void;
   retryOpening?(): void;
   startGameplay(): void;
@@ -1117,7 +1118,8 @@ export class GameFlowUI {
     const target = (event.target as Element | null)?.closest<HTMLButtonElement>(
       'button[data-action]',
     );
-    if (!target) return;
+    if (!target || target.disabled || target.closest('[hidden]')) return;
+    this.actions.playMenuConfirm?.();
 
     switch (target.dataset.action) {
       case 'enable-music':
@@ -1243,6 +1245,7 @@ export class GameFlowUI {
     // onPointerLockChange and resolves to the same authoritative pause state.
     if (action === 'back') {
       event.preventDefault();
+      this.actions.playMenuConfirm?.();
       if (this.model.back()) this.syncState();
     }
   };
@@ -1430,6 +1433,7 @@ export class GameFlowUI {
   private navigateMenu(action: MenuAction): void {
     if (!this.menuNavigable) return;
     if (action === 'back') {
+      this.actions.playMenuConfirm?.();
       if (this.model.state === 'opening') this.actions.skipOpening?.();
       else if (this.model.state === 'paused') this.resume();
       else if (this.model.back()) this.syncState();

@@ -40,7 +40,8 @@ class Node {
   threshold = new Parameter(); ratio = new Parameter();
   loop = false; buffer: unknown; onended: (() => void) | null = null;
   starts = 0; stopped = false; disconnected = false;
-  connect() {} disconnect() { this.disconnected = true; }
+  connections: Node[] = [];
+  connect(target: Node) { this.connections.push(target); } disconnect() { this.disconnected = true; }
   start() { this.starts++; } stop() { this.stopped = true; this.onended?.(); }
 }
 class Context {
@@ -120,16 +121,16 @@ test('loop distance fades adjust one continuing voice and survive suspension and
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
-test('all 30 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 54 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 30);
+  assert.equal(ids.length, 54);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
     assert.equal(new URL(soundUrl(id), 'https://example.test/group-folder/').pathname, `/group-folder/${path}`);
     assert.equal(soundUrl(id, '/group-folder/'), `/group-folder/${path}`);
   }
-  for (const folder of ['bob','goop','volt','world','environment','turrets'])
+  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro'])
     assert.ok(readdirSync(new URL(`../public/assets/audio/${folder}/`, import.meta.url)).every(f => f.endsWith('.ogg')));
 });
 
@@ -263,6 +264,34 @@ test('dispose cancels queued audio and ignores decodes that complete after teard
     assert.equal(audio.diagnostics.pending, 0); assert.equal(audio.diagnostics.activeLoads, 0);
     await audio.preload(); audio.unlock(); assert.equal(requests, 4);
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('menu confirmation uses the shared mix while paused world voices remain muted and resume only with gameplay', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    await audio.preload(['ui-confirm-01','world-laser-loop-01']);
+    audio.unlock();audio.setPaused(false);await Promise.resolve();
+    audio.startLoop('laser','world-laser-loop-01',{x:0,y:1,z:0});
+    const state = audio as any, worldVoice = [...state.voices][0] as any;
+    assert.ok(worldVoice.panner.connections.includes(state.gameplayGain));
+    audio.setPaused(true);await Promise.resolve();assert.equal(context.state,'suspended');
+    audio.playUI();await Promise.resolve();
+    assert.equal(context.state,'running');assert.equal(state.gameplayGain.gain.value,0);
+    const ui = [...state.voices].find((v:any)=>v.ui) as any;
+    assert.equal(ui.sound,'ui-confirm-01');assert.equal(ui.panner,undefined);
+    assert.ok(ui.gain.connections.includes(state.effects),'menu volume goes through the same effects and master sliders');
+    const played=audio.diagnostics.played;audio.play('bob-jump-01');assert.equal(audio.diagnostics.played,played);
+    ui.source.onended();await Promise.resolve();
+    assert.equal(context.state,'suspended');assert.equal(state.gameplayGain.gain.value,0);
+    audio.setPaused(false);await Promise.resolve();
+    assert.equal(state.gameplayGain.gain.value,1);assert.ok(state.voices.has(worldVoice),'menu clicks retain existing loop ownership');
+    audio.setFocused(false);audio.playUI();assert.equal(audio.diagnostics.played,played);
+    audio.setFocused(true);audio.setPaused(true);context.currentTime+=1;audio.playUI();await Promise.resolve();
+    assert.equal(context.state,'running');audio.stopAll();await Promise.resolve();
+    assert.equal(context.state,'suspended','cancelling a menu click must also release its temporary context resume');
+  }finally{globalThis.fetch=originalFetch;audio.dispose();}
 });
 
 test('unsupported audio is optional and only attempts one context across banks', async () => {
