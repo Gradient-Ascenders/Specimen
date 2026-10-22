@@ -56,10 +56,13 @@ test('escape alarm follows the movie clock, softens under dialogue, and stops on
     assert.deepEqual(loops.at(-1),{key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:.6});
     const count=loops.length;s.movie.present(s.camera,1);s.movie.present(s.camera,1);assert.equal(loops.length,count,'rendering cannot emit audio');
     s.movie.update(T.even+.1-s.movie.seconds);assert.equal(loops.at(-1)!.volumeScale,.3);
-    assert.ok(cues.includes('world-button-press-01'));assert.ok(cues.includes('world-vent-break-01'));
-    const beforeSkip=cues.length;s.movie.requestSkip();s.movie.update(1/60);
-    assert.equal(stops.at(-1),'cultivation-finale-alarm');assert.equal(cues.length,beforeSkip,'skipping never replays the remaining cues');
-    s.movie.reset();assert.equal(stops.at(-1),'cultivation-finale-alarm');
+    assert.ok(cues.includes('world-button-press-01'));assert.ok(cues.includes('cultivation-cover-break-free-01'));
+    assert.equal(cues.includes('world-vent-break-01'),false,'The duct floor breaks later, not when the cover comes loose.');
+    const beforeSkip=cues.length,stopStart=stops.length;s.movie.requestSkip();s.movie.update(1/60);
+    for(const key of ['cultivation-finale-alarm',...VOLT_RESCUE_DISSOLVE_KEYS])assert.ok(stops.slice(stopStart).includes(key));
+    assert.equal(cues.length,beforeSkip,'skipping never replays the remaining cues');
+    const resetStart=stops.length;s.movie.reset();
+    for(const key of ['cultivation-finale-alarm',...VOLT_RESCUE_DISSOLVE_KEYS])assert.ok(stops.slice(resetStart).includes(key));
   }finally{offs.forEach(off=>off());s.dispose();}
 });
 
