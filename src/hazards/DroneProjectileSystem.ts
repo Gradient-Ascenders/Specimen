@@ -97,6 +97,7 @@ export class DroneProjectileSystem {
   private readonly world: CollisionWorld;
   private readonly damage: SlimeDamageSystem;
   private readonly config: DroneProjectileConfig;
+  private readonly damageBySlime: Readonly<Partial<Record<DroneProjectileTarget['slimeId'], number>>>;
   private readonly slots: readonly ProjectileSlot[];
   private readonly displacement = new THREE.Vector3();
   private readonly targetDisplacement = new THREE.Vector3();
@@ -108,10 +109,15 @@ export class DroneProjectileSystem {
     world: CollisionWorld,
     damage: SlimeDamageSystem,
     config: Partial<DroneProjectileConfig> = {},
+    damageBySlime: Partial<Record<DroneProjectileTarget['slimeId'], number>> = {},
   ) {
     this.world = world;
     this.damage = damage;
     this.config = { ...DEFAULT_DRONE_PROJECTILE_CONFIG, ...config };
+    this.damageBySlime = { ...damageBySlime };
+    for (const value of Object.values(this.damageBySlime)) {
+      if (!Number.isFinite(value) || value! <= 0) throw new Error('Drone target damage must be positive and finite.');
+    }
     for (const [label, value] of Object.entries(this.config)) {
       if (!Number.isFinite(value) || value <= 0) {
         throw new Error(`${label} must be positive and finite.`);
@@ -212,12 +218,13 @@ export class DroneProjectileSystem {
       if (targetHit && targetFraction < worldFraction - EPSILON) {
         slot.position.addScaledVector(this.displacement, targetFraction);
         syncSlot(slot);
-        this.damage.applyDamage(targetHit.slimeId, this.config.damage, slot.direction);
+        const damage = this.damageBySlime[targetHit.slimeId] ?? this.config.damage;
+        this.damage.applyDamage(targetHit.slimeId, damage, slot.direction);
         this.events.emit('slimeImpact', {
           projectileId: slot.read.id,
           ownerDroneId: slot.read.ownerDroneId,
           slimeId: targetHit.slimeId,
-          damage: this.config.damage,
+          damage,
           point: point(slot.position),
         });
         this.deactivate(slot, 'slime');

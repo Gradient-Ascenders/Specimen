@@ -1,7 +1,8 @@
 # Level 3 improvements: final review
 
-The subsequent [mandatory drone encounter](mandatory-drone-encounter.md) adds
-destruction-based route locks and accepted-hit retaliation on this same branch.
+The subsequent [local drone encounters](mandatory-drone-encounter.md) independently
+lock Bob's two lifts and Volt's bridge and add lethal Bob/Volt projectile damage
+with normal Goop retaliation on this same branch. The original exit rule remains.
 Its final validation and evidence supersede the older combat-only results below.
 
 Branch: `codex/final-polish-batch-3`. Original base:

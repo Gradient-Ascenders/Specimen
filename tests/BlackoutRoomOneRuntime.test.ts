@@ -812,6 +812,26 @@ test('Bob can walk onto the final bridge button in the complete runtime after Go
   } finally { f.cleanup(); }
 });
 
+for (const slimeId of ['bob', 'volt'] as const) test(`a real Room 2 drone hit kills ${slimeId} and retries through the existing death flow`, () => {
+  const f = createFixture();
+  try {
+    f.runtime.activateCheckpoint('cp3'); f.runtime.recoverActiveCheckpoint();
+    const { group, transit } = (f.runtime as any).resources;
+    while (group.activeSlimeId !== slimeId) f.switchSlime();
+    group[`${slimeId}Body`].teleport(slimeId === 'bob' ? new THREE.Vector3(10.5, 1.66, 102) : new THREE.Vector3(-16, 2.96, 132));
+    const impacts: number[] = [];
+    transit.projectiles.events.on('slimeImpact', (event: any) => { if (event.slimeId === slimeId) impacts.push(event.damage); });
+    for (let i = 0; i < 600 && f.input.enabled; i++) f.tick();
+    assert.deepEqual(impacts, [100]); assert.equal(f.input.enabled, false);
+    f.tick(70);
+    f.document.elements.find(element => element.className === 'death-screen')!.retryButton.click();
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+    assert.ok(transit.damage.health.every((h: any) => h.health === 100));
+    assert.ok(transit.emergingDrones.every((d: any) => d.state.state === 'dormant'));
+    assert.ok(transit.lifts.every((l: any) => !l.core.readModel.available)); assert.equal(transit.bridgeDeployed, false);
+  } finally { f.cleanup(); }
+});
+
 test('dying late in Room 2 resets every body and all puzzle state to the room entrance', () => {
   const f = createFixture();
   try {

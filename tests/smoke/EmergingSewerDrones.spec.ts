@@ -152,7 +152,7 @@ for (const [level, name] of [[2, 'Cultivation'], [3, 'Blackout']] as const) {
             try {
               direction.set(0, 0, scenario.moving ? 1 : 0);
               for (let i = 0; i < (scenario.moving ? 600 : 2400); i++) {
-                if (scenario.moving ? bodies.volt.position.z >= 136 : impacts > 0) break;
+                if (impacts > 0) break;
                 bodies.volt.update(1 / 60, direction); c.update(1 / 60, bodies);
                 minimumHealth = Math.min(minimumHealth, c.damage.health.find((h: any) => h.slimeId === 'volt').health);
               }
@@ -168,8 +168,8 @@ for (const [level, name] of [[2, 'Cultivation'], [3, 'Blackout']] as const) {
       });
       for (const result of guardCombat) {
         expect(result.acquired).toBeGreaterThan(0); expect(result.impacts).toBeGreaterThan(0);
-        expect(result.minimumHealth).toBeLessThanOrEqual(70); expect(result.grounded).toBe(true);
-        if (result.moving) { expect(result.z).toBeGreaterThanOrEqual(136); expect(result.speed).toBeGreaterThan(5.49); }
+        expect(result.minimumHealth).toBe(0); expect(result.grounded).toBe(true);
+        if (result.moving) { expect(result.z).toBeLessThan(136); expect(result.speed).toBeGreaterThan(5.49); }
       }
       await writeFile(`${evidence}/volt-guard-live-combat.json`, JSON.stringify(guardCombat, null, 2));
     } else {
@@ -271,92 +271,115 @@ for (const [level, name] of [[2, 'Cultivation'], [3, 'Blackout']] as const) {
   });
 }
 
-test('Level 3 mandatory drone destruction, real Goop retaliation and physical route interlocks', async ({ page, baseURL }) => {
+test('Level 3 local drone interlocks, real Goop retaliation and traversal', async ({ page, baseURL }) => {
   test.setTimeout(600_000);
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error' || /GL_INVALID_|CONTEXT_LOST_WEBGL/.test(m.text())) errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()}: ${r.url()}`); });
   page.on('requestfailed', r => { if (!isExpectedMusicCancellation(r, baseURL!)) errors.push(`${r.failure()?.errorText}: ${r.url()}`); });
-  await openLevel(page, 3, 'Blackout');
-  await page.setViewportSize({ width: 960, height: 540 });
+  await openLevel(page, 3, 'Blackout'); await page.setViewportSize({ width: 960, height: 540 });
   await page.evaluate(() => (window as any).__sewerSession.runtime.teleportToAuthoredRoom(2));
   await page.waitForFunction(() => !(window as any).__sewerSession.runtime.preparationQueue?.diagnostics.pending, null, { timeout: 180_000 });
-  const locked = await page.evaluate(() => {
-    const rt = (window as any).__sewerSession.runtime, r = rt.resources, c = r.transit;
+  const initial = await page.evaluate(() => {
+    const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
     c.reset(); c.setActive(true);
     const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
-    bodies.bob.teleport(bodies.bob.position.clone().set(6, .86, 84));
-    bodies.goop.teleport(bodies.goop.position.clone().set(8, .86, 84));
+    bodies.bob.teleport(bodies.bob.position.clone().set(6, .86, 84)); bodies.goop.teleport(bodies.goop.position.clone().set(8, .86, 84));
     bodies.volt.teleport(bodies.volt.position.clone().set(-16, 2.96, 90));
     for (const light of c.lights) light.target.setConnectionState(true);
     for (let i = 0; i < 91; i++) c.update(1 / 60, bodies);
     const dormant = c.emergingDrones.map((d: any) => ({ phase: d.state.state, y: d.shell.body.position.y }));
-    // Actual switch attachment cannot override the encounter interlock.
-    bodies.bob.teleport(c.room.switchBodyPosition);
-    for (let i = 0; i < 100; i++) { bodies.bob.update(1 / 60, bodies.bob.position.clone().set(-1, 0, 0)); c.update(1 / 60, bodies); }
-    const switchBlocked = !c.switchHeld && !c.bridgeDeployed;
-    bodies.bob.teleport(bodies.bob.position.clone().set(10, 1.91, 110));
-    for (const lift of c.lifts) lift.core.setConnectionState(true);
-    for (let i = 0; i < 150; i++) { bodies.bob.update(1 / 60, bodies.bob.position.clone().set(0, 0, 0)); c.update(1 / 60, bodies); }
-    const lifts = c.lifts.map((l: any) => ({ available: l.core.readModel.available, powered: l.core.readModel.powered, y: l.root.position.y }));
-    // A normal uninterrupted Volt run reaches the bridge approach, but cannot
-    // make a crossing: the authoritative bridge never extends for live guards.
-    bodies.volt.teleport(bodies.volt.position.clone().set(-16, 2.96, 117.5));
-    let voltFailed = false;
-    for (let i = 0; i < 360; i++) {
-      bodies.volt.update(1 / 60, bodies.volt.position.clone().set(0, 0, 1));
-      if (c.update(1 / 60, bodies) === 'volt') { voltFailed = true; break; }
-    }
-    // Also exercise the complete physical hallway barrier with real bodies,
-    // including a jumping attempt at its inner edge.
-    c.resetTransient();
-    const attempts = [];
-    for (const [id, x, jump] of [['bob', -3, true], ['volt', 3, false], ['bob', 0, false]] as const) {
-      const body = bodies[id]; body.teleport(body.position.clone().set(x, .86, 158));
-      let maxY = body.position.y;
-      for (let i = 0; i < 90; i++) {
-        body.update(1 / 60, body.position.clone().set(0, 0, 1), { pressed: jump && i === 2, held: jump && i >= 2 && i < 44, released: jump && i === 44 });
-        maxY = Math.max(maxY, body.position.y); c.update(1 / 60, bodies);
-      }
-      attempts.push({ id, jump, z: body.position.z, maxY });
-    }
-    (window as any).__mandatoryLockedState = c.capture();
-    bodies.bob.teleport(bodies.bob.position.clone().set(10, 1.91, 110));
-    bodies.volt.teleport(bodies.volt.position.clone().set(-16, 2.96, 132));
-    return { dormant, switchBlocked, lifts, voltFailed, bridgeDeployed: c.bridgeDeployed, attempts, complete: c.complete };
+    const obsolete: string[] = []; c.root.traverse((m: any) => { if (/transit-drone-interlock/.test(m.name)) obsolete.push(m.name); });
+    bodies.bob.teleport(bodies.bob.position.clone().set(-2, .86, 158));
+    for (let i = 0; i < 60; i++) bodies.bob.update(1 / 60, bodies.bob.position.clone().set(0, 0, 1));
+    const hallwayZ = bodies.bob.position.z; bodies.bob.teleport(bodies.bob.position.clone().set(6, .86, 84));
+    return { dormant, obsolete, hallwayZ };
   });
-  expect(locked.dormant).toEqual(Array.from({ length: 3 }, () => ({ phase: 'dormant', y: -.98 })));
-  expect(locked.switchBlocked).toBe(true); expect(locked.bridgeDeployed).toBe(false); expect(locked.complete).toBe(false);
-  expect(locked.lifts.every((l: any) => !l.available && !l.powered)).toBe(true);
-  expect(locked.voltFailed).toBe(true);
-  expect(locked.attempts.every((a: any) => a.z < 159)).toBe(true);
-  expect(locked.attempts[0].maxY).toBeGreaterThan(2);
-  await capture(page, 'mandatory-bob-lift-locked', [16, 6, 106], [10, 2.4, 111]);
-  await capture(page, 'mandatory-volt-bridge-locked', [-10, 7, 128], [-15, 2.5, 139]);
-  await capture(page, 'mandatory-exit-shutter-closed', [-2, 2.5, 157], [0, 2.5, 159]);
-
-  await page.evaluate(() => {
-    const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
-    c.emergingDrones[0].reset();
-    r.group.goopBody.teleport(r.group.goopBody.position.clone().set(18, -.52, 85));
-    r.group.bobBody.teleport(r.group.bobBody.position.clone().set(6, .86, 84));
-    const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
-    for (let i = 0; i < 45; i++) c.update(1 / 60, bodies);
-  });
-  await capture(page, 'mandatory-guard-emerging', [21, 2, 94], [18, .2, 100]);
-
+  expect(initial.dormant).toEqual(Array.from({ length: 3 }, () => ({ phase: 'dormant', y: -.98 })));
+  expect(initial.obsolete).toEqual([]); expect(initial.hallwayZ).toBeGreaterThan(161);
+  await capture(page, 'local-original-exit-unobstructed', [-2, 2.5, 157], [0, 2.5, 159]);
+  const routes: any[] = [];
   const combats: any[] = [];
   for (const index of [0, 1, 2]) {
+    if (index < 2) {
+      const attempts = await page.evaluate(index => {
+        const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
+        const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody }, body = bodies.bob;
+        const lift = c.lifts[index], target = c.room.bobRoutePlatforms[index === 0 ? 2 : 4], results = [];
+        for (const mode of ['run', 'charge', 'edge-charge', 'wall-charge']) {
+          c.resetTransient();
+          body.teleport(mode === 'wall-charge' ? body.position.clone().set(7.57, index === 0 ? 7.35 : 8.2, index === 0 ? 99.6 : 123.7) :
+            lift.root.position.clone().add(body.position.clone().set(mode === 'edge-charge' ? 1 : 0, .71, 0)));
+          for (let i = 0; i < 4; i++) body.update(1 / 60, body.position.clone().set(mode === 'wall-charge' ? -1 : 0, 0, 0));
+          const attached = body.attached;
+          if (mode !== 'run') for (let i = 0; i < 44; i++) body.update(1 / 60, body.position.clone().set(0, 0, 0), { pressed: i === 0, held: true, released: false });
+          const direction = target.position.clone().sub(body.position).setY(0).normalize();
+          if (mode !== 'run') body.update(1 / 60, direction, { pressed: false, held: false, released: true });
+          let reached = false, failure;
+          for (let i = 0; i < 150; i++) {
+            body.update(1 / 60, direction); failure = c.update(1 / 60, bodies); reached ||= body.isSupportedBy(target);
+            if (failure) break;
+          }
+          results.push({ mode, attached, reached, failure, available: lift.core.readModel.available, progress: lift.platform.progress,
+            phase: c.emergingDrones[index].state.state, position: body.position.toArray() });
+        }
+        c.resetTransient(); body.teleport(lift.root.position.clone().add(body.position.clone().set(0, .71, 0)));
+        return results;
+      }, index);
+      for (const result of attempts) { expect(result.reached).toBe(false); expect(result.available).toBe(false); expect(result.progress).toBe(0); }
+      expect(attempts.find((a: any) => a.mode === 'wall-charge').attached).toBe(true);
+      routes.push({ index, attempts });
+      await capture(page, `local-bob-lift-${index + 1}-locked`, [16, index === 0 ? 6 : 9, index === 0 ? 106 : 130], [10, index === 0 ? 2.4 : 5.5, index === 0 ? 111 : 135]);
+    } else {
+      const attempts = await page.evaluate(() => {
+        const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
+        const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody }, body = bodies.volt;
+        const results = [];
+        bodies.bob.teleport(c.room.switchBodyPosition);
+        for (let i = 0; i < 90; i++) { bodies.bob.update(1 / 60, bodies.bob.position.clone().set(-1, 0, 0)); c.update(1 / 60, bodies); }
+        for (const mode of ['cold-sprint', 'emergence-jump', 'active-jump']) {
+          c.emergingDrones[2].reset(); c.resetTransient();
+          body.teleport(body.position.clone().set(-16, 2.96, mode === 'cold-sprint' ? 90 : 136));
+          if (mode === 'active-jump') for (let i = 0; i < 100; i++) c.update(1 / 60, bodies);
+          if (mode !== 'cold-sprint') body.update(1 / 60, c.room.bridgeEnd.clone().sub(body.position).setY(0).normalize(), { pressed: true, held: false, released: false });
+          let failure, crossed = false;
+          for (let i = 0; i < 600; i++) {
+            const direction = mode === 'cold-sprint' ? body.position.clone().set(0, 0, 1) : c.room.bridgeEnd.clone().sub(body.position).setY(0).normalize();
+            body.update(1 / 60, direction); failure = c.update(1 / 60, bodies);
+            crossed ||= body.position.x > -4 || c.room.exitAt(body.position);
+            if (i === 15) r.manager.activate('goop'); // Switching never releases the bridge.
+            if (failure) break;
+          }
+          results.push({ mode, failure, crossed, held: c.switchHeld, bridge: c.bridgeDeployed, position: body.position.toArray(),
+            health: c.damage.health.find((h: any) => h.slimeId === 'volt').health });
+        }
+        c.resetTransient(); body.teleport(body.position.clone().set(-16, 2.96, 116));
+        return results;
+      });
+      for (const result of attempts) { expect(result.crossed).toBe(false); expect(result.bridge).toBe(false); expect(result.held).toBe(true); expect(result.failure).toBe('volt'); }
+      expect(attempts[0].health).toBe(0);
+      routes.push({ index, attempts });
+      await capture(page, 'local-volt-bridge-locked', [-10, 7, 128], [-15, 2.5, 139]);
+    }
     const response = await page.evaluate(index => {
       const rt = (window as any).__sewerSession.runtime, r = rt.resources, c = r.transit;
       const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody }, enemy = c.emergingDrones[index];
       c.resetTransient(); r.acidProjectileSystem.reset();
       bodies.bob.teleport(bodies.bob.position.clone().set(6, .86, 84));
       bodies.volt.teleport(bodies.volt.position.clone().set(-16, 2.96, 86));
-      const z = [100, 124, 132][index];
-      bodies.goop.teleport(bodies.goop.position.clone().set(index === 2 ? -8 : 18, -.52, z - 7));
+      const path = index === 0 ? [[18, 90], [18, 93]] : index === 1 ? [[18, 110], [18, 117]] : [[18, 130], [-8, 130], [-8, 125]];
       r.manager.activate('goop');
+      for (const [x, z] of path) {
+        for (let i = 0; i < 900; i++) {
+          const direction = bodies.goop.position.clone().set(x - bodies.goop.position.x, 0, z - bodies.goop.position.z);
+          if (direction.length() < .25 && bodies.goop.grounded) break;
+          bodies.goop.update(1 / 60, direction.length() > .15 ? direction.normalize() : direction.set(0, 0, 0));
+          const failure = c.update(1 / 60, bodies);
+          if (failure) throw new Error(`Unexpected ${failure} failure while Goop walks to guard ${index + 1}`);
+        }
+        if (Math.hypot(bodies.goop.position.x - x, bodies.goop.position.z - z) > .3 || !bodies.goop.grounded) throw new Error(`Goop cannot walk to ${x},${z}`);
+      }
       for (let i = 0; i < 180; i++) c.update(1 / 60, bodies);
       const camera = rt.renderLayer.cameraRig.camera;
       camera.position.copy(bodies.goop.position); camera.position.y += .7;
@@ -419,39 +442,120 @@ test('Level 3 mandatory drone destruction, real Goop retaliation and physical ro
         }
       }
       return { phase: enemy.state.state, completed: enemy.target.completed, hits: enemy.state.hits,
-        lifts: c.lifts.map((l: any) => l.core.readModel.available), cleared: c.encounterCleared };
+        lifts: c.lifts.map((l: any) => l.core.readModel.available), westCleared: c.voltRouteCleared };
     }, index);
     expect(destroyed).toMatchObject({ phase: 'destroyed', completed: true, hits: 3 });
     expect(destroyed.lifts).toEqual(index === 0 ? [true, false] : [true, true]);
-    expect(destroyed.cleared).toBe(index === 2);
+    expect(destroyed.westCleared).toBe(index === 2);
+    if (index < 2) {
+      const released = await page.evaluate(index => {
+        const rt = (window as any).__sewerSession.runtime, r = rt.resources, c = r.transit;
+        const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody }, lift = c.lifts[index], bob = bodies.bob;
+        c.resetTransient(); r.electricalSystem.reset('reset'); r.manager.activate('volt');
+        bob.teleport(lift.root.position.clone().add(bob.position.clone().set(0, .71, 0)));
+        bodies.volt.teleport(bodies.volt.position.clone().set(-16, 2.96, index === 0 ? 108 : 116));
+        const before = bob.position.y; let connection;
+        const socket = lift.root.getObjectByName(`${lift.id}-conducting-contact`);
+        const tick = (direction: any, jump?: any) => {
+          const aim = socket.getWorldPosition(bob.position.clone()), camera = rt.renderLayer.cameraRig.camera;
+          camera.up.set(0, 1, 0); camera.position.copy(bodies.volt.position); camera.lookAt(aim);
+          r.electricalSystem.update(1 / 60, { aimHeld: true, fireHeld: true, firePressed: true, gameplayInputEnabled: true, pointerLocked: true });
+          connection = r.electricalSystem.readModel.connectedTargetId;
+          bob.update(1 / 60, direction, jump); return c.update(1 / 60, bodies);
+        };
+        for (let i = 0; i < 160; i++) tick(bob.position.clone().set(0, 0, 0));
+        const carried = bob.position.y - before, progress = lift.platform.progress, supported = bob.isSupportedBy(lift.platform.collisionMesh);
+        const edge = lift.root.position.z + 1.4;
+        for (let i = 0; i < 30 && bob.position.z < edge; i++) tick(bob.position.clone().set(0, 0, 1));
+        for (let i = 0; i < 44; i++) tick(bob.position.clone().set(0, 0, 0), { pressed: i === 0, held: true, released: false });
+        const target = c.room.bobRoutePlatforms[index === 0 ? 2 : 4];
+        const direction = target.position.clone().sub(bob.position).setY(0).normalize();
+        tick(direction, { pressed: false, held: false, released: true });
+        let landed = false, failure;
+        for (let i = 0; i < 120; i++) {
+          const delta = target.position.clone().sub(bob.position).setY(0);
+          failure = tick(delta.length() > .5 ? delta.normalize() : delta.set(0, 0, 0));
+          if (bob.isSupportedBy(target)) { landed = true; break; }
+          if (failure) break;
+        }
+        r.electricalSystem.reset('reset');
+        return { carried, progress, supported, connection, landed, failure, position: bob.position.toArray(),
+          otherAvailable: c.lifts[1 - index].core.readModel.available };
+      }, index);
+      expect(released.connection).toBe(index === 0 ? 'transit-lift-a' : 'transit-lift-b');
+      expect(released.progress).toBe(1); expect(released.carried).toBeGreaterThan(2); expect(released.supported).toBe(true);
+      expect(released.landed, JSON.stringify(released)).toBe(true); expect(released.failure).toBeUndefined();
+      if (index === 0) expect(released.otherAvailable).toBe(false);
+      routes.push({ index, released });
+      await capture(page, `local-bob-lift-${index + 1}-released`, [16, index === 0 ? 6 : 9, index === 0 ? 106 : 130], [10, index === 0 ? 4.4 : 7.5, index === 0 ? 114 : 138]);
+    }
   }
-  const released = await page.evaluate(() => {
+  const crossing = await page.evaluate(() => {
     const rt = (window as any).__sewerSession.runtime, r = rt.resources, c = r.transit;
     const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
-    c.resetTransient();
-    const passes = [];
-    for (const id of ['bob', 'volt'] as const) {
-      const body = bodies[id]; body.teleport(body.position.clone().set(-2, .86, 158));
-      for (let i = 0; i < 60; i++) { body.update(1 / 60, body.position.clone().set(0, 0, 1)); c.update(1 / 60, bodies); }
-      passes.push({ id, z: body.position.z, grounded: body.grounded });
-    }
-    bodies.bob.teleport(c.room.switchBodyPosition);
+    c.resetTransient(); bodies.bob.teleport(c.room.switchBodyPosition);
     for (let i = 0; i < 95; i++) { bodies.bob.update(1 / 60, bodies.bob.position.clone().set(-1, 0, 0)); c.update(1 / 60, bodies); }
-    const bridge = c.bridgeDeployed;
-    const cleared = c.capture(); c.restore((window as any).__mandatoryLockedState);
-    const recoveredLocked = !c.encounterCleared && !c.bridgeDeployed && c.root.getObjectByName('transit-drone-interlock-shutter').visible;
-    c.restore(cleared);
+    const deployed = c.bridgeDeployed;
+    bodies.volt.teleport(bodies.volt.position.clone().set(-16, 2.96, 136));
+    let reached = false, failure;
+    for (let i = 0; i < 360; i++) {
+      const target = bodies.volt.position.clone().set(0, 0, 145);
+      bodies.volt.update(1 / 60, target.sub(bodies.volt.position).setY(0).normalize()); failure = c.update(1 / 60, bodies);
+      if (Math.hypot(bodies.volt.position.x, bodies.volt.position.z - 145) < .3 && bodies.volt.grounded) { reached = true; break; }
+      if (failure) break;
+    }
+    r.manager.activate('volt');
+    for (let i = 0; i < 95; i++) {
+      const aim = bodies.volt.position.clone(); c.lockReceiver.target.copySocketWorldPosition(aim);
+      const camera = rt.renderLayer.cameraRig.camera; camera.up.set(0, 1, 0); camera.position.copy(bodies.volt.position); camera.lookAt(aim);
+      r.electricalSystem.update(1 / 60, { aimHeld: true, fireHeld: true, firePressed: i === 0, gameplayInputEnabled: true, pointerLocked: true });
+      c.update(1 / 60, bodies);
+    }
+    const locked = c.bridgeLocked;
+    const saved = c.capture(), stale = JSON.parse(JSON.stringify(saved));
+    stale.sewerDrones = stale.sewerDrones.map(() => ({ state: 'dormant', elapsed: 0, hits: 0 }));
+    c.restore(stale);
+    const recoveredRestricted = c.lifts.every((l: any) => l.platform.progress === 0 && !l.core.readModel.available) && !c.bridgeDeployed && !c.bridgeLocked;
+    c.restore(saved);
     const info = rt.renderLayer.renderer.info;
-    return { passes, bridge, recoveredLocked, recoveredOpen: c.encounterCleared && !c.root.getObjectByName('transit-drone-interlock-shutter').visible,
-      glError: rt.renderLayer.renderer.getContext().getError(), memory: { ...info.memory }, lights: c.emergingDrones.length,
+    return { deployed, reached, failure, locked, recoveredRestricted, recoveredOpen: c.bridgeLocked,
+      glError: rt.renderLayer.renderer.getContext().getError(), memory: { ...info.memory },
       shadowMaps: c.emergingDrones.filter((d: any) => d.light.castShadow || d.light.shadow.map).length };
   });
-  expect(released.passes.every((p: any) => p.z > 161 && p.grounded)).toBe(true);
-  expect(released.bridge).toBe(true); expect(released.recoveredLocked).toBe(true); expect(released.recoveredOpen).toBe(true);
-  expect(released.glError).toBe(0); expect(released.shadowMaps).toBe(0);
-  await capture(page, 'mandatory-bob-bridge-released', [15, 10, 136], [7, 7, 143]);
-  await capture(page, 'mandatory-volt-bridge-released', [-10, 7, 128], [-15, 2.5, 139]);
-  await capture(page, 'mandatory-exit-shutter-open', [-2, 2.5, 157], [0, 2.5, 159]);
-  await writeFile(`${evidence}/mandatory-encounter-results.json`, JSON.stringify({ locked, combats, released, errors }, null, 2));
+  expect(crossing.deployed).toBe(true); expect(crossing.reached, JSON.stringify(crossing)).toBe(true); expect(crossing.failure).toBeUndefined();
+  expect(crossing.locked).toBe(true); expect(crossing.recoveredRestricted).toBe(true); expect(crossing.recoveredOpen).toBe(true);
+  expect(crossing.glError).toBe(0); expect(crossing.shadowMaps).toBe(0);
+  await capture(page, 'local-volt-bridge-released', [-10, 7, 128], [-15, 2.5, 139]);
+  await writeFile(`${evidence}/local-route-results.json`, JSON.stringify({ initial, routes, combats, crossing, errors }, null, 2));
+  expect(errors).toEqual([]);
+});
+
+for (const slimeId of ['bob', 'volt'] as const) test(`Level 3 one projectile kills ${slimeId} and the real retry restores the encounter`, async ({ page, baseURL }) => {
+  test.setTimeout(300_000); const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error' || /GL_INVALID_|CONTEXT_LOST_WEBGL/.test(m.text())) errors.push(m.text()); });
+  page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()}: ${r.url()}`); });
+  page.on('requestfailed', r => { if (!isExpectedMusicCancellation(r, baseURL!)) errors.push(`${r.failure()?.errorText}: ${r.url()}`); });
+  await openLevel(page, 3, 'Blackout');
+  const death = await page.evaluate(slimeId => {
+    const rt = (window as any).__sewerSession.runtime; rt.teleportToAuthoredRoom(2); rt.input.resetState();
+    const r = rt.resources, c = r.transit; r.manager.activate(slimeId);
+    r.group[`${slimeId}Body`].teleport(r.group.bobBody.position.clone().set(...(slimeId === 'bob' ? [10.5, 1.66, 102] : [-16, 2.96, 132])));
+    const hits: number[] = [], off = c.projectiles.events.on('slimeImpact', (e: any) => { if (e.slimeId === slimeId) hits.push(e.damage); });
+    for (let i = 0; i < 600 && rt.input.enabled; i++) rt.fixedUpdate(1 / 60);
+    off(); const health = c.damage.health.find((h: any) => h.slimeId === slimeId).health;
+    for (let i = 0; i < 90; i++) rt.fixedUpdate(1 / 60);
+    rt.render(.5, { frameDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 1 / 60 });
+    return { hits, health, enabled: rt.input.enabled };
+  }, slimeId);
+  expect(death.hits).toEqual([100]); expect(death.health).toBe(0); expect(death.enabled).toBe(false);
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  const retry = await page.evaluate(() => {
+    const rt = (window as any).__sewerSession.runtime, c = rt.resources.transit;
+    return { health: c.damage.health.map((h: any) => h.health), phases: c.emergingDrones.map((d: any) => d.state.state),
+      liftAvailability: c.lifts.map((l: any) => l.core.readModel.available), bridge: c.bridgeDeployed,
+      checkpoint: rt.activeCheckpoint.checkpointId, glError: rt.renderLayer.renderer.getContext().getError() };
+  });
+  expect(retry).toEqual({ health: [100, 100, 100], phases: ['dormant', 'dormant', 'dormant'], liftAvailability: [false, false], bridge: false, checkpoint: 'cp3', glError: 0 });
   expect(errors).toEqual([]);
 });

@@ -52,7 +52,7 @@ for (const [x, z] of [[-16, 130], [-16, 132], [-16, 134], [-15.3, 132], [-15.28,
       for (let i = 0; i < 2400 && !f.result().impacts; i++) f.tick();
       const result = f.result();
       assert.ok(f.bodies.volt.grounded && Math.abs(f.bodies.volt.position.y - 2.96001) < 1e-5);
-      assert.ok(result.impacts > 0 && result.minimumHealth <= 70, JSON.stringify(result));
+      assert.ok(result.impacts > 0 && result.minimumHealth === 0, JSON.stringify(result));
     } finally { f.dispose(); }
   });
 }
@@ -63,11 +63,11 @@ for (const x of [-16, -15.28]) for (const warmup of [0, 2, 4, 6, 8, 10, 12]) {
     const forward = new THREE.Vector3(0, 0, 1);
     try {
       for (let i = 0; i < warmup / DT; i++) f.tick();
-      for (let i = 0; i < 360 && f.bodies.volt.position.z < 136; i++) f.tick(forward);
+      for (let i = 0; i < 360 && !f.result().impacts; i++) f.tick(forward);
       const result = f.result();
-      assert.ok(f.bodies.volt.grounded && f.bodies.volt.position.z >= 136, 'Volt walks the complete catwalk to its approach deck without stopping or jumping');
+      assert.ok(f.bodies.volt.grounded && f.bodies.volt.position.z < 136, 'a real lethal hit ends the run before the crossing');
       assert.ok(f.bodies.volt.velocity.z > 5.49, 'the response must work at the normal 5.5 m/s running speed');
-      assert.ok(result.acquired > 0 && result.impacts > 0 && result.minimumHealth <= 70, JSON.stringify(result));
+      assert.ok(result.acquired > 0 && result.impacts > 0 && result.minimumHealth === 0, JSON.stringify(result));
     } finally { f.dispose(); }
   });
 }
@@ -77,10 +77,10 @@ for (const x of [-16, -15.28]) {
     const f = fixture(x, 90), forward = new THREE.Vector3(0, 0, 1);
     try {
       assert.equal(f.enemy.state.state, 'dormant');
-      for (let i = 0; i < 600 && f.bodies.volt.position.z < 136; i++) f.tick(forward);
+      for (let i = 0; i < 600 && !f.result().impacts; i++) f.tick(forward);
       const result = f.result();
-      assert.ok(f.bodies.volt.grounded && f.bodies.volt.position.z >= 136 && f.bodies.volt.velocity.z > 5.49);
-      assert.ok(result.acquired > 0 && result.impacts > 0 && result.minimumHealth <= 70, JSON.stringify(result));
+      assert.ok(f.bodies.volt.grounded && f.bodies.volt.position.z < 136 && f.bodies.volt.velocity.z > 5.49);
+      assert.ok(result.acquired > 0 && result.impacts > 0 && result.minimumHealth === 0, JSON.stringify(result));
     } finally { f.dispose(); }
   });
 }
@@ -101,8 +101,8 @@ test('a guard that acquired Volt drops him behind solid cover and can reacquire 
   const cover = new THREE.Mesh(new THREE.BoxGeometry(.2, 4, 12), new THREE.MeshBasicMaterial());
   cover.name = 'test-solid-cover'; cover.position.set(-14, 4, 132); cover.updateMatrixWorld();
   try {
-    for (let i = 0; i < 2400 && !f.result().impacts; i++) f.tick();
-    const impacts = f.result().impacts; assert.ok(impacts > 0);
+    for (let i = 0; i < 2400 && !f.result().acquired; i++) f.tick();
+    const impacts = f.result().impacts; assert.equal(impacts, 0); assert.ok(f.result().acquired > 0);
     f.world.register(cover);
     for (let i = 0; i < 300; i++) f.tick();
     assert.equal(f.result().impacts, impacts, 'acquired-target following must not bypass cover');

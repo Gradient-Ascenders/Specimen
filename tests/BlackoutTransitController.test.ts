@@ -71,7 +71,7 @@ test('room light fixtures stay dark while locked lift contacts signal their guar
   const f = fixture();
   try {
     for (const receiver of [...f.controller.lights, f.controller.lockReceiver]) {
-      assert.equal(receiver.targetMaterial.emissiveIntensity, 0);
+      assert.equal(receiver.targetMaterial.emissiveIntensity, receiver === f.controller.lockReceiver ? .6 : 0);
       receiver.root.traverse(object => {
         if (object instanceof THREE.Mesh) assert.notEqual(object.geometry.type, 'TorusGeometry');
       });

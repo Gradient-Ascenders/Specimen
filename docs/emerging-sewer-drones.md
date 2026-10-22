@@ -1,8 +1,9 @@
 # Emerging sewer drones — Polish Batch 3, Fix 1
 
-The later [mandatory encounter](mandatory-drone-encounter.md) interlocks the
-transit route with destruction, adds accepted-hit Goop retaliation and widens
-the cone to 0.275 radians. The initial implementation below is historical;
+The later [local encounters](mandatory-drone-encounter.md) independently interlock
+each lift and the west bridge, make real hits lethal for Bob/Volt while Goop
+retains normal damage, add accepted-hit retaliation and widen the cone to
+0.275 radians. The initial implementation below is historical;
 the linked follow-up documents the current behavior and validation.
 
 ## Implementation

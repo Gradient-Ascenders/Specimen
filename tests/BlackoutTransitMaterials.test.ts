@@ -54,7 +54,7 @@ test('textured static and interactive geometry preserves the reviewed transit ba
     !['transit-east-service-conduit-96', 'transit-east-service-conduit-116'].includes(saved.name));
   const meshes: THREE.Mesh[] = [];
   f.room.root.traverse(m => {
-    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly || m.name === 'transit-drone-interlock-shutter') return;
+    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly) return;
     for (let ancestor: THREE.Object3D | null = m; ancestor; ancestor = ancestor.parent) {
       if (ancestor.name.startsWith('transit-sewer-drone-')) return;
     }

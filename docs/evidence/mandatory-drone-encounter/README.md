@@ -1,37 +1,43 @@
-# Mandatory drone encounter evidence
+# Room 2 local encounter evidence
 
-Production Chromium captures use normal game lighting and exposure. Camera
-surveys stage authored body positions; real controllers, collision bodies,
-acid projectiles and hostile projectiles perform the checked interactions.
-They are repeatable encounter checks, not an uninterrupted playthrough.
+These production Chromium captures use the existing game lighting and exposure.
+Tests stage the beginning of each protected section, then use real bodies,
+collision, acid hits, electrical tethers and machinery. They do not represent
+an uninterrupted full-level playthrough.
 
-| Situation | Capture |
+| Encounter | Guard alive | Guard destroyed and original machinery used |
+| --- | --- | --- |
+| Bob's first lift | ![First lift locked](local-bob-lift-1-locked.png) | ![First lift crossed](local-bob-lift-1-released.png) |
+| Bob's second lift | ![Second lift locked](local-bob-lift-2-locked.png) | ![Second lift crossed](local-bob-lift-2-released.png) |
+| Volt's bridge | ![West crossing unavailable](local-volt-bridge-locked.png) | ![Original bridge crossed](local-volt-bridge-released.png) |
+
+The machine-readable browser results record running, charged-jump, edge-jump,
+sticky-wall and emergence attempts; actual Volt lift tethers; Bob's carried
+height and subsequent landing; and Volt crossing and powering the bridge lock.
+The first guard's destruction does not release the second lift. Guard destruction
+makes machinery available without performing its electrical/cooperative step.
+
+| Preserved combat / original exit | Capture |
 | --- | --- |
-| Widened normal surveillance beam covering Bob's route | ![Widened route scan](route-surveillance.png) |
-| Bob's lift remains unpowered while its guard lives | ![Locked Bob lift](mandatory-bob-lift-locked.png) |
-| Volt's bridge remains retracted while guards live | ![Locked Volt crossing](mandatory-volt-bridge-locked.png) |
-| Physical hallway shutter before destruction | ![Closed security shutter](mandatory-exit-shutter-closed.png) |
-| Half-submerged guard during emergence | ![Emerging guard](mandatory-guard-emerging.png) |
-| First guard redirects its beam and fires at Goop | ![First guard retaliating](mandatory-guard-1-retaliating.png) |
-| Second guard redirects its beam and fires at Goop | ![Second guard retaliating](mandatory-guard-2-retaliating.png) |
-| West guard retaliates toward Goop's basin firing position | ![West guard retaliating](mandatory-guard-3-retaliating.png) |
-| Bob can operate the bridge switch after the guards are destroyed | ![Bob's released route](mandatory-bob-bridge-released.png) |
-| The same Volt crossing after Goop destroys the guards | ![Released Volt crossing](mandatory-volt-bridge-released.png) |
-| The same hallway view with the security shutter released | ![Open security shutter](mandatory-exit-shutter-open.png) |
+| Normal widened surveillance | ![Route scan](route-surveillance.png) |
+| Half-submerged emergence | ![Emergence](mandatory-guard-emerging.png) |
+| Goop retaliation, first guard | ![First guard fires at Goop](mandatory-guard-1-retaliating.png) |
+| Goop retaliation, second guard | ![Second guard fires at Goop](mandatory-guard-2-retaliating.png) |
+| Goop retaliation, west guard | ![West guard fires at Goop](mandatory-guard-3-retaliating.png) |
+| Original hallway, no added barrier even with living guards | ![Open original hallway](local-original-exit-unobstructed.png) |
 
-The closed/open Volt and hallway pairs use identical survey cameras. Tests also
-assert real projectile hits on Goop, physical blocking before clearance, Bob and
-Volt walking through afterward, and locked/open checkpoint recovery.
+The approved combat captures remain valid: retaliation presentation is unchanged.
+Obsolete exit-barrier captures are removed. No inspection lights or production
+debug globals are added. Separate browser checks drive lethal real projectile
+hits on Bob/Volt and click the actual Retry button.
 
-Reproduce with:
+Reproduce after `npm run build`:
 
 ```text
-npm run build
-npx playwright test tests/smoke/EmergingSewerDrones.spec.ts --config playwright.smoke.config.ts --grep "mandatory drone"
+npx playwright test tests/smoke/EmergingSewerDrones.spec.ts --config playwright.smoke.config.ts
 ```
 
-Additional machine-readable results and logs are ignored local artifacts:
-`artifacts/evidence/batch-3-drone-refinement/mandatory-encounter-results.json`
-and `test-results/mandatory-*.log`.
+Ignored local results: `artifacts/evidence/batch-3-drone-refinement/local-route-results.json`
+and `test-results/local-*.log`.
 
-See [implementation and validation](../../mandatory-drone-encounter.md).
+[Mechanics, validation and local test steps](../../mandatory-drone-encounter.md).
