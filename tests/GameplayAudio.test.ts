@@ -31,6 +31,7 @@ class Parameter {
   value = 0;
   setTargetAtTime(value: number) { this.value = value; }
   linearRampToValueAtTime(value: number) { this.value = value; }
+  cancelScheduledValues() {}
 }
 class Node {
   gain = new Parameter();
@@ -65,6 +66,59 @@ const useLegacySpatialApi = (node: Node): number[] => {
     (x, y, z) => { position.splice(0, position.length, x, y, z); };
   return position;
 };
+
+test('world effects carry at room distances while body and sustained electrical sounds stay local', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  const sounds: SoundId[] = ['bob-contact-01', 'volt-circuit-hold-loop-01', 'world-laser-loop-01',
+    'world-door-movement-loop-01', 'world-machinery-loop-01', 'world-sign-tick-01',
+    'goop-dissolve-loop-01', 'world-platform-fall-01', 'world-platform-land-01'];
+  try {
+    await audio.preload(sounds); audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    for (const sound of sounds) audio.play(sound, { x: 10, y: 0, z: 0 });
+    const voices = [...(audio as any).voices];
+    const distanceGain = (sound: SoundId, distance: number): number => {
+      const { refDistance, rolloffFactor } = voices.find(v => v.sound === sound).panner;
+      return refDistance / (refDistance + rolloffFactor * (Math.max(distance, refDistance) - refDistance));
+    };
+    const oldGain = 3 / (3 + 1.5 * 7);
+    assert.equal(distanceGain('bob-contact-01', 10), oldGain);
+    assert.equal(distanceGain('volt-circuit-hold-loop-01', 10), oldGain);
+    for (const sound of sounds.slice(2)) {
+      assert.ok(distanceGain(sound, 10) >= oldGain * 1.8, `${sound} must retain more presence across the room`);
+      assert.ok(distanceGain(sound, 20) < distanceGain(sound, 10), `${sound} must still recede with distance`);
+    }
+    const impact = voices.find(v => v.sound === 'world-platform-land-01');
+    assert.ok(impact.gain.gain.value * distanceGain('world-platform-land-01', 15) > 0.5,
+      'heavy platform landings must remain prominent at a typical viewing distance');
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('loop distance fades adjust one continuing voice and survive suspension and capacity waits', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  const sound = 'world-laser-loop-01', base = SOUND_DEFINITIONS[sound].volume;
+  try {
+    await audio.preload([sound]); audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    audio.startLoop('beam', sound, { x: 14, y: 0, z: 0 }, .5);
+    const voice = [...(audio as any).voices][0];
+    assert.equal(voice.gain.gain.value, base * .5, 'initial fade-in must honor distance gain');
+    audio.startLoop('waiting', sound, { x: 15, y: 0, z: 0 }, .1);
+    assert.equal(context.sources.length, 1);
+    audio.startLoop('beam', sound, { x: 4, y: 0, z: 0 });
+    assert.equal(voice.gain.gain.value, base); assert.equal(context.sources.length, 1);
+    audio.setPaused(true); await Promise.resolve();
+    audio.startLoop('beam', sound, { x: 15, y: 0, z: 0 }, .1);
+    audio.setPaused(false); await Promise.resolve();
+    assert.equal(voice.gain.gain.value, base * .1); assert.equal(context.sources.length, 1);
+    audio.stopLoop('beam');
+    const waiting = [...(audio as any).voices][0];
+    assert.equal(waiting.key, 'waiting'); assert.equal(waiting.gain.gain.value, base * .1);
+    audio.stopAll(); assert.equal(audio.diagnostics.voices, 0);
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
 
 test('all 30 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];

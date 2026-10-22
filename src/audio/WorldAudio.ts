@@ -13,6 +13,7 @@ interface SourceOptions {
 }
 const sources = new Set<WorldAudioSource>();
 let nextSource = 0;
+const LOOP_RANGE = { door: 22, machinery: 24, laser: 16, drone: 20, hover: 16 } as const;
 
 /** Read-only presentation registration. It never controls a mechanism. */
 export class WorldAudioSource {
@@ -41,7 +42,7 @@ export class WorldAudio {
   constructor(audio: AudioPlayback, root: THREE.Object3D) { this.audio = audio; this.root = root; }
 
   update(listener: AudioPosition | undefined): void {
-    const candidates: { key: string; sound: SoundId; distance: number; position: THREE.Vector3; group: 'motor' | 'laser' | 'drone' | 'hover' }[] = [];
+    const candidates: { key: string; sound: SoundId; distance: number; volumeScale: number; position: THREE.Vector3; group: 'motor' | 'laser' | 'drone' | 'hover' }[] = [];
     for (const source of sources) {
       const options = source.options;
       let ancestor: THREE.Object3D | null = options.root;
@@ -60,13 +61,18 @@ export class WorldAudio {
       const distance = (this.point.x-listener.x)**2 + (this.point.y-listener.y)**2 + (this.point.z-listener.z)**2;
       const laser = options.kind === 'laser';
       const continuous = laser || options.kind === 'drone' || options.kind === 'hover';
-      if (distance > (laser ? 10 : options.kind === 'drone' ? 20 : 16)**2) continue;
+      const range = LOOP_RANGE[options.kind];
+      if (distance >= range**2) continue;
+      // Retain the positional falloff, then gently fade the last quarter of the
+      // audible range instead of cutting a still-audible loop at the boundary.
+      const fade = THREE.MathUtils.clamp((range - Math.sqrt(distance)) / (range * 0.25), 0, 1);
+      const volumeScale = fade * fade * (3 - 2 * fade);
       const settled = options.settled?.() ?? false;
       if (options.kind === 'door' && moved && settled)
-        this.audio.play('world-door-stop-01', this.point, true);
+        this.audio.play('world-door-stop-01', this.point, true, volumeScale);
       if (continuous || (moved && !settled)) candidates.push({
         // Keep the laser voice running when a different beam becomes nearest.
-        key: laser ? 'world:laser' : source.key, distance, position: this.point.clone(),
+        key: laser ? 'world:laser' : source.key, distance, volumeScale, position: this.point.clone(),
         group: laser ? 'laser' : options.kind === 'drone' ? 'drone' : options.kind === 'hover' ? 'hover' : 'motor',
         sound: laser ? 'world-laser-loop-01' : options.kind === 'drone' ? 'world-drone-flight-loop-01' : options.kind === 'hover' ? 'world-platform-hover-loop-01' : options.kind === 'door' ? 'world-door-movement-loop-01' : 'world-machinery-loop-01',
       });
@@ -83,7 +89,7 @@ export class WorldAudio {
       const key = candidate.group === 'drone' || candidate.group === 'hover'
         ? `world:${candidate.group}:${slot}` : candidate.key;
       keep.add(key);
-      this.audio.startLoop(key, candidate.sound, candidate.position);
+      this.audio.startLoop(key, candidate.sound, candidate.position, candidate.volumeScale);
     }
     for (const key of this.playing) if (!keep.has(key)) this.audio.stopLoop(key);
     this.playing.clear();

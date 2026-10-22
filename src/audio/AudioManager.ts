@@ -1,4 +1,4 @@
-import { SOUND_BANKS, SOUND_DEFINITIONS, soundUrl, type SoundId } from './SoundCatalog.ts';
+import { SOUND_BANKS, SOUND_DEFINITIONS, soundSpatialProfile, soundUrl, type SoundId } from './SoundCatalog.ts';
 import type { AudioPosition } from './GameplayAudioEvents.ts';
 
 interface Voice {
@@ -7,8 +7,9 @@ interface Voice {
   readonly gain: GainNode;
   readonly panner?: PannerNode;
   readonly key?: string;
+  volumeScale: number;
 }
-interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition }
+interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition; readonly volumeScale: number }
 type SpatialAudioTarget = {
   readonly positionX?: AudioParam;
   readonly positionY?: AudioParam;
@@ -77,7 +78,7 @@ const setListenerOrientation = (target: ListenerOrientationTarget, forward: Audi
 
 export interface AudioPlayback {
   play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number): void;
-  startLoop(key: string, sound: SoundId, position?: AudioPosition): void;
+  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale?: number): void;
   stopLoop(key: string): void;
   stopAll(): void;
   setPaused(paused: boolean): void;
@@ -232,14 +233,21 @@ export class AudioManager implements AudioPlayback {
     if (this.createVoice(sound, position, undefined, varyPitch, scale)) this.recent.set(sound, now);
   }
 
-  startLoop(key: string, sound: SoundId, position?: AudioPosition): void {
+  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale = 1): void {
     if (this.disposed) return;
+    const scale = Number.isFinite(volumeScale) ? Math.max(0, Math.min(1, volumeScale)) : 0;
     const previous = this.loops.get(key);
     if (previous && previous.sound !== sound) this.stopLoop(key);
-    this.loops.set(key, { sound, position });
+    this.loops.set(key, { sound, position, volumeScale: scale });
     const voice = [...this.voices].find(candidate => candidate.key === key);
-    if (voice) this.positionVoice(voice, position);
-    else if (this.canPlay()) this.createVoice(sound, position, key, sound.includes('movement'));
+    if (voice) {
+      this.positionVoice(voice, position);
+      if (voice.volumeScale !== scale) {
+        voice.volumeScale = scale;
+        voice.gain.gain.cancelScheduledValues(this.context!.currentTime);
+        voice.gain.gain.setTargetAtTime(SOUND_DEFINITIONS[sound].volume * scale, this.context!.currentTime, 0.025);
+      }
+    } else if (this.canPlay()) this.createVoice(sound, position, key, sound.includes('movement'), scale);
   }
 
   stopLoop(key: string): void {
@@ -299,7 +307,7 @@ export class AudioManager implements AudioPlayback {
   }
   private reconcileLoops(): void {
     if (!this.canPlay()) return;
-    for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position);
+    for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position, request.volumeScale);
   }
   private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1): boolean {
     const buffer = this.buffers.get(sound), context = this.context, effects = this.effects;
@@ -311,17 +319,18 @@ export class AudioManager implements AudioPlayback {
     source.loop = key !== undefined;
     source.playbackRate.value = varyPitch ? 0.96 + Math.random() * 0.08 : 1;
     gain.gain.value = key ? 0 : definition.volume * volumeScale;
-    if (key) gain.gain.linearRampToValueAtTime(definition.volume, context.currentTime + 0.04);
+    if (key) gain.gain.linearRampToValueAtTime(definition.volume * volumeScale, context.currentTime + 0.04);
     const panner = position ? context.createPanner() : undefined;
     if (panner) {
       panner.panningModel = 'equalpower';
       panner.distanceModel = 'inverse';
-      panner.refDistance = 3;
+      const spatial = soundSpatialProfile(sound);
+      panner.refDistance = spatial.refDistance;
       panner.maxDistance = 45;
-      panner.rolloffFactor = 1.5;
+      panner.rolloffFactor = spatial.rolloffFactor;
       source.connect(gain); gain.connect(panner); panner.connect(effects);
     } else { source.connect(gain); gain.connect(effects); }
-    const voice: Voice = { sound, source, gain, panner, key };
+    const voice: Voice = { sound, source, gain, panner, key, volumeScale };
     this.positionVoice(voice, position);
     this.voices.add(voice);
     source.onended = () => { this.releaseVoice(voice); this.reconcileLoops(); };

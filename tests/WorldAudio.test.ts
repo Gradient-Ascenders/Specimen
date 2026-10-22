@@ -21,9 +21,9 @@ import { LevelTwoRoomFourGreybox } from '../src/levels/LevelTwoRoomFourGreybox.t
 
 class Playback implements AudioPlayback {
   cues: SoundId[]=[];
-  loops=new Map<string,{sound:SoundId;position?:AudioPosition}>();
+  loops=new Map<string,{sound:SoundId;position?:AudioPosition;volumeScale:number}>();
   play(sound:SoundId) {this.cues.push(sound);}
-  startLoop(key:string,sound:SoundId,position?:AudioPosition) {this.loops.set(key,{sound,position:position?{...position}:undefined});}
+  startLoop(key:string,sound:SoundId,position?:AudioPosition,volumeScale=1) {this.loops.set(key,{sound,position:position?{...position}:undefined,volumeScale});}
   stopLoop(key:string) {this.loops.delete(key);}
   stopAll() {this.loops.clear();}
   setPaused() {}
@@ -34,6 +34,29 @@ function fixture() {
   const root=new THREE.Group(), playback=new Playback(), audio=new WorldAudio(playback,root);
   return {root,playback,audio};
 }
+
+test('world loops reach across rooms and fade smoothly to silence at their range boundary', () => {
+  for (const [kind, range] of [['door', 22], ['machinery', 24], ['laser', 16], ['drone', 20], ['hover', 16]] as const) {
+    const {root, playback, audio} = fixture(), node = new THREE.Group(); root.add(node);
+    let progress = 0;
+    const source = new WorldAudioSource({root: node, kind, progress: () => progress});
+    const update = (distance: number) => { progress += .01; audio.update({x: distance, y: 0, z: 0}); };
+    try {
+      update(range * .5);
+      assert.equal([...playback.loops.values()][0].volumeScale, 1);
+      const key = [...playback.loops.keys()][0];
+      update(range * .875);
+      assert.equal([...playback.loops.keys()][0], key, 'moving away must retain loop ownership');
+      assert.equal(playback.loops.get(key)!.volumeScale, .5);
+      update(range - .001);
+      assert.ok(playback.loops.get(key)!.volumeScale < .00001, 'the loop must approach silence before being culled');
+      update(range); assert.equal(playback.loops.size, 0);
+      update(range + 1); assert.equal(playback.loops.size, 0);
+      update(range * .5); assert.equal(playback.loops.size, 1);
+      node.visible = false; update(0); assert.equal(playback.loops.size, 0);
+    } finally { audio.dispose(); source.dispose(); }
+  }
+});
 
 test('door travel follows resolved movement and arrival clunks follow real endpoints only',()=>{
   const {root,playback,audio}=fixture();
