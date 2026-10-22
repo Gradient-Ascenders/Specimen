@@ -89,7 +89,7 @@ function startGame(): void {
   const graphicsPreparationYield = new GraphicsPreparationYield(
     (window as Window & {scheduler?: {yield(): Promise<void>}}).scheduler,
   );
-  const levelOneRuntime = new GreyboxLevelRuntime({
+  const createLevelOneRuntime = (): GreyboxLevelRuntime => new GreyboxLevelRuntime({
     host: app,
     audio,
     input,
@@ -102,6 +102,7 @@ function startGame(): void {
       : graphicsPreparationYield.yield(),
     characterLoaders: levelOneAssets.loaders,
   });
+  let levelOneRuntime = createLevelOneRuntime();
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
@@ -196,6 +197,44 @@ function startGame(): void {
     slimeHUD: gameSession,
     actions: {
       enableMusic: unlockAudio,
+      returnToMenu: async () => {
+        await initialGraphicsTask;
+        if (shuttingDown) return;
+        openingPresentation?.dispose();
+        openingPresentation = undefined;
+        titlePresentation?.dispose();
+        titlePresentation = undefined;
+        levelOneAssets.clear();
+        levelOneRuntime = createLevelOneRuntime();
+        gameSession.reset(levelOneRuntime);
+        preparedInitialGraphicsKey = undefined;
+        musicLevel = 'containment';
+        gameCompleted = false;
+        warmedLevelOneProgramBaseline = undefined;
+        warmedLevelOnePrograms = undefined;
+        sampleLevelOneShaderPrograms = undefined;
+        levelOneShaderProgramGuardActive = true;
+        levelOneShaderProgramGuardInvalidation = undefined;
+        performanceRecorder?.completeLevelOneShaderProgramGuard();
+        delete app.dataset.levelOnePrewarm;
+        titleRoom = new TitleScreenScene();
+        titlePresentation = new TitleScreenPresentation({
+          renderLayer, host: app, scene: titleRoom,
+          reduceMotion: settings.value.reduceMenuMotion,
+        });
+        await titlePresentation.prepare();
+      },
+      startSelectedLevel: async (levelId) => {
+        // Finish any title-settings preparation before replacing its runtime.
+        await initialGraphicsTask;
+        await selectInitialGraphics();
+        if (shuttingDown) return;
+        titlePresentation?.dispose();
+        titlePresentation = undefined;
+        titleRoom = undefined;
+        levelOneAssets.clear();
+        gameSession.startSelectedLevel(levelId);
+      },
       playOpening: () => {
         if (!titleRoom) return;
         titlePresentation?.dispose({ keepScene: true });
