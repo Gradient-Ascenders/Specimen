@@ -3,13 +3,6 @@ import type { LevelTwoRoomThreeGreybox } from '../../../levels/LevelTwoRoomThree
 import type { LevelTwoRoomTwoGreybox } from '../../../levels/LevelTwoRoomTwoGreybox.ts';
 import type { CultivationPlatformBoosters } from './CultivationPlatformBoosters.ts';
 
-/** Only the traversal-family posts lose their visible skin. Their authored
- * collision boxes remain, as do all permanent deck/machinery supports. */
-export const CULTIVATION_TRAVERSAL_SUPPORT_IDS = [
-  'cultivation-room-3-first-wall-exit-support', 'cultivation-room-3-west-wall-exit-support',
-  'cultivation-room-3-final-wall-exit-support',
-];
-
 /** Upper-route traversal family, including Bob's entry and former post decks. */
 export const CULTIVATION_ROOM_THREE_BOOSTER_IDS = [
   'entry', 'launch-island', 'cross-beam', 'first-wall-exit', 'offset-island', 'west-runup', 'west-wall-exit',

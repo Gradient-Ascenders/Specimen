@@ -10,7 +10,11 @@ import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import { LevelTwoRoomFiveGreybox } from '../src/levels/LevelTwoRoomFiveGreybox.ts';
 import { CultivationPlatformBoosters } from '../src/render/environment/cultivation/CultivationPlatformBoosters.ts';
-import { addCultivationRoomThreeBoosters, addCultivationButtonPlatformBooster, CULTIVATION_TRAVERSAL_SUPPORT_IDS } from '../src/render/environment/cultivation/CultivationBoosterPlatforms.ts';
+import { addCultivationRoomThreeBoosters, addCultivationButtonPlatformBooster } from '../src/render/environment/cultivation/CultivationBoosterPlatforms.ts';
+import { FORMER_TRAVERSAL_SUPPORTS } from './helpers/FormerTraversalSupports.ts';
+import { ColliderTransformMode, CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
+import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
+import { KinematicBody } from '../src/physics/KinematicBody.ts';
 
 function batches(root: THREE.Object3D): THREE.Group[] {
   const result: THREE.Group[] = [];
@@ -28,10 +32,6 @@ function assertClearance(batch: THREE.Group, colliders: readonly THREE.Mesh[]): 
     const volume = new THREE.Box3(new THREE.Vector3(point.x - .4 * scale, point.y - .85 * scale, point.z - .4 * scale),
       new THREE.Vector3(point.x + .4 * scale, point.y + .62 * scale, point.z + .4 * scale));
     for (const collider of colliders) {
-      if (CULTIVATION_TRAVERSAL_SUPPORT_IDS.includes(collider.name)) {
-        assert.equal((collider.material as THREE.Material).visible, false, 'Preserved support collisions must have no rendered skin');
-        continue;
-      }
       collider.geometry.computeBoundingBox(); collider.updateWorldMatrix(true, false);
       const bounds = collider.geometry.boundingBox!.clone().applyMatrix4(collider.matrixWorld);
       assert.equal(volume.intersectsBox(bounds), false,
@@ -118,18 +118,19 @@ test('Cultivation retains 21 Room 5 engines and equips all 13 Room 3 decks plus 
   } finally { boosters.dispose(); scene.dispose(); }
 });
 
-test('traversal post skins disappear without changing their collisions or button-platform shape/pose', () => {
+test('retired traversal poles leave no collision or render meshes; platform shapes/poses remain intact', () => {
   const raw = new LevelTwoRoomThreeGreybox(() => {});
   const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   const rawTwo = new LevelTwoRoomTwoGreybox(() => {}, scene.roomTwoToThreeGoopPassage.entryDoor);
   try {
-    for (const id of CULTIVATION_TRAVERSAL_SUPPORT_IDS) {
-      const before = raw.collisionMeshes.find(mesh => mesh.name === id)!, after = scene.roomThree.collisionMeshes.find(mesh => mesh.name === id)!;
+    for (const { id, platformId } of FORMER_TRAVERSAL_SUPPORTS) {
+      assert.equal(raw.root.getObjectByName(id), undefined);
+      assert.equal(scene.roomThree.root.getObjectByName(id), undefined);
+      assert.equal(scene.collisionMeshes.some(mesh => mesh.name === id), false);
+      const before = raw.collisionMeshes.find(mesh => mesh.name === platformId)!, after = scene.roomThree.collisionMeshes.find(mesh => mesh.name === platformId)!;
       assert.deepEqual(after.geometry.getAttribute('position').array, before.geometry.getAttribute('position').array);
       assert.deepEqual(after.geometry.index?.array, before.geometry.index?.array);
       assert.deepEqual(after.position, before.position); assert.deepEqual(after.quaternion.toArray(), before.quaternion.toArray());
-      assert.equal((after.material as THREE.Material).visible, false);
-      assert.equal(after.children.length, 0, 'No stale surface-skin proxy may render the removed post');
     }
     const ledge = scene.roomTwo.collisionMeshes.find(mesh => mesh.name === 'cultivation-room-2-button-rest-ledge')!;
     const originalLedge = rawTwo.collisionMeshes.find(mesh => mesh.name === ledge.name)!;
@@ -164,6 +165,54 @@ test('entry spill stays below the deck and short of the entry wall without chang
       neighbour.position.y + .25 - 1.47, neighbour.position.z)) < 1e-6)!;
     assert.ok(normal && normal.intensity > 5);
     assert.equal(normal.distance, 6, 'Neighbour retains the original spill range');
+  } finally { scene.dispose(); }
+});
+
+test('former traversal poles no longer block movement, camera, projectile or sight sweeps; decks still carry Bob', () => {
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
+  try {
+    scene.root.updateMatrixWorld(true);
+    for (const broadphaseEnabled of [false, true]) {
+      const world = new CollisionWorld({ broadphaseEnabled }), surfaces = new SurfaceRegistry();
+      world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
+      surfaces.registerAll(scene.collisionMeshes);
+      try {
+        for (const { id, platformId, position } of FORMER_TRAVERSAL_SUPPORTS) {
+          const platform = scene.roomThree.collisionMeshes.find(mesh => mesh.name === platformId)!;
+          const size = (platform.geometry as THREE.BoxGeometry).parameters;
+          const underside = platform.position.y - size.height / 2;
+          for (const y of [position[1], underside - 1.5]) {
+            const centre = scene.roomThree.root.localToWorld(new THREE.Vector3(position[0], y, position[2]));
+            for (const axis of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)]) {
+              const origin = centre.clone().addScaledVector(axis, -2), displacement = axis.clone().multiplyScalar(4);
+              for (const mask of [CollisionLayer.Movement, CollisionLayer.CameraObstruction, CollisionLayer.Projectile, CollisionLayer.LineOfSight]) {
+                const hit = new CollisionHit();
+                assert.equal(world.sweepSphere(origin, displacement, .45, hit, mask), false,
+                  `${id} footprint blocked query layer ${mask} with ${hit.object?.name}`);
+              }
+              assert.equal(world.raycast(origin, axis, 4, new CollisionHit()), false, `${id} must not be invisible cover`);
+            }
+          }
+          // A real Bob body, with normal gravity/acceleration, passes through
+          // the upper former pole volume instead of snagging on it in mid-air.
+          const start = scene.roomThree.root.localToWorld(new THREE.Vector3(position[0] - 2, underside - 1.5, position[2]));
+          const bob = new KinematicBody({ world, surfaces, initialPosition: start });
+          for (let step = 0; step < 60; step++) bob.update(1 / 60, new THREE.Vector3(1, 0, 0));
+          assert.ok(bob.position.x > start.x + 4, `Bob snagged in ${id}'s former volume`);
+          const top = scene.roomThree.root.localToWorld(platform.position.clone().add(new THREE.Vector3(0, size.height / 2 + .46, 0)));
+          const rider = new KinematicBody({ world, surfaces, initialPosition: top });
+          for (let step = 0; step < 12; step++) {
+            rider.update(1 / 60, new THREE.Vector3(1, 0, 0));
+            assert.equal(rider.isSupportedBy(platform), true, `${platformId} must remain walkable`);
+          }
+        }
+        const cover = scene.roomThree.collisionMeshes.find(mesh => mesh.name === 'cultivation-room-3-goop-cover-1')!;
+        const point = cover.getWorldPosition(new THREE.Vector3()), hit = new CollisionHit();
+        assert.equal(cover.userData.coverRole, 'drone-line-of-sight-blocker');
+        assert.equal(world.raycast(point.clone().add(new THREE.Vector3(-4, 0, 0)), new THREE.Vector3(1, 0, 0), 8, hit), true);
+        assert.equal(hit.object, cover, 'Authored drone cover must still block sight');
+      } finally { world.clear(); surfaces.clear(); }
+    }
   } finally { scene.dispose(); }
 });
 

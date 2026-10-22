@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { FORMER_TRAVERSAL_SUPPORTS } from '../helpers/FormerTraversalSupports.ts';
 
 async function observeSession(page: Page): Promise<void> {
   await page.route('**/assets/index-*.js', async route => {
@@ -10,6 +11,120 @@ async function observeSession(page: Page): Promise<void> {
     await route.fulfill({ response, body: source.replace(pattern, '$1=globalThis.__boosterSession=new $2({initialRuntime:') });
   });
 }
+
+test('former traversal support volumes stay clear in the live Cultivation collision world', async ({ page }, info) => {
+  test.setTimeout(600_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
+  await observeSession(page);
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
+  await page.evaluate(() => {
+    const rt = (window as any).__boosterSession.runtime;
+    rt.resources.containmentLevel.completeForDebug();
+  });
+  await page.locator('[data-action="enter-level"]').click({ timeout: 240_000 });
+  await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing', { timeout: 240_000 });
+  await page.evaluate(() => (window as any).__boosterSession.runtime.teleportToAuthoredPreviewRoom(3));
+  await page.waitForFunction(() => {
+    const rt = (window as any).__boosterSession.runtime;
+    return !rt.preparationQueue.diagnostics.pending && rt.resources.authoredPreview.roomThree.root.visible;
+  }, undefined, { timeout: 180_000 });
+  // Pause the outer game loop to isolate real Bob physics from drone damage
+  // and recovery. Keep the actual runtime collision registry and body intact.
+  const proof = await page.evaluate(formerSupports => {
+    const rt = (window as any).__boosterSession.runtime, r = rt.resources, layer = rt.renderLayer;
+    layer.setAnimationLoop(null); rt.stop();
+    const room = r.authoredPreview.roomThree, body = r.pair.bobBody, world = r.collisionWorld;
+    room.root.updateWorldMatrix(true, true);
+    const direction = body.movementHit.point.clone().set(1, 0, 0);
+    const Hit = body.movementHit.constructor;
+    const cases = formerSupports.map(({ id, platformId, position }) => {
+      if (room.root.getObjectByName(id) || r.authoredPreview.collisionMeshes.some((mesh: any) => mesh.name === id)) {
+        throw new Error(`Retired support remains: ${id}`);
+      }
+      const platform = room.collisionMeshes.find((mesh: any) => mesh.name === platformId);
+      const height = platform.geometry.parameters.height, underside = platform.position.y - height / 2;
+      let queries = 0;
+      for (const y of [position[1], underside - 1.5]) {
+        const centre = room.root.localToWorld(platform.position.clone().set(position[0], y, position[2]));
+        for (const axis of [direction, direction.clone().set(0, 0, 1)]) {
+          const origin = centre.clone().addScaledVector(axis, -2), displacement = axis.clone().multiplyScalar(4);
+          for (const mask of [1, 2, 4, 8]) {
+            const hit = new Hit();
+            if (world.sweepSphere(origin, displacement, body.radiusMetres, hit, mask)) {
+              throw new Error(`${id} query layer ${mask} obstructed by ${hit.object?.name}`);
+            }
+            queries++;
+          }
+          if (world.raycast(origin, axis, 4, new Hit())) throw new Error(`${id} still blocks sight`);
+          queries++;
+        }
+      }
+      const start = room.root.localToWorld(platform.position.clone().set(position[0] - 2, underside - 1.5, position[2]));
+      body.teleport(start);
+      for (let step = 0; step < 60; step++) body.update(1 / 60, direction);
+      const crossedMetres = body.position.x - start.x;
+      if (crossedMetres <= 4) throw new Error(`Bob snagged in ${id}: ${crossedMetres}`);
+      const top = platform.getWorldPosition(platform.position.clone()); top.y += height / 2 + .46;
+      body.teleport(top);
+      for (let step = 0; step < 12; step++) {
+        body.update(1 / 60, direction);
+        if (!body.isSupportedBy(platform)) throw new Error(`Bob lost support on ${platformId}`);
+      }
+      r.bobPresentation.setPosition(body.position); r.bobPresentation.present(1);
+      const point = platform.getWorldPosition(platform.position.clone()), camera = layer.cameraRig.camera;
+      camera.position.set(point.x + 4, point.y - 1.4, point.z + 5);
+      camera.lookAt(point.x, point.y - .7, point.z); camera.updateMatrixWorld(true);
+      const boosters = r.roomFiveEncounter.platformBoosters;
+      for (let frame = 0; frame < 90; frame++) boosters.update(1 / 60, point);
+      layer.setPresentationResolution(undefined); layer.render();
+      const png = layer.canvas.toDataURL('image/png');
+      return { id, platformId, queries, crossedMetres, deckSupported: true, png };
+    });
+    return { cases, boosterCount: r.roomFiveEncounter.platformBoosters.platformCount,
+      glError: layer.renderer.getContext().getError() };
+  }, FORMER_TRAVERSAL_SUPPORTS);
+  for (const { png, platformId } of proof.cases) {
+    await writeFile(info.outputPath(`${platformId}.png`), Buffer.from(png.split(',')[1], 'base64'));
+  }
+  const walks = [];
+  for (const { platformId } of FORMER_TRAVERSAL_SUPPORTS) {
+    const start = await page.evaluate(id => {
+      const rt = (window as any).__boosterSession.runtime, r = rt.resources;
+      const platform = r.authoredPreview.roomThree.collisionMeshes.find((mesh: any) => mesh.name === id);
+      const top = platform.getWorldPosition(platform.position.clone()); top.y += platform.geometry.parameters.height / 2 + .46;
+      r.pair.bobBody.teleport(top); rt.start();
+      return top.toArray();
+    }, platformId);
+    await page.keyboard.down('KeyW');
+    const walk = await page.evaluate(id => {
+      const session = (window as any).__boosterSession, rt = session.runtime, r = rt.resources;
+      const platform = r.authoredPreview.roomThree.collisionMeshes.find((mesh: any) => mesh.name === id);
+      // Normal input and the full fixed-update path: drones, hazards,
+      // checkpoints and puzzle controllers are enabled for these deck walks.
+      for (let step = 0; step < 12; step++) {
+        session.fixedUpdate(1 / 60);
+        if (!r.pair.bobBody.isSupportedBy(platform)) throw new Error(`Gameplay lost support on ${id}`);
+      }
+      const result = { platformId: id, end: [r.pair.bobBody.position.x, r.pair.bobBody.position.y, r.pair.bobBody.position.z],
+        playing: r.deathSequence.isPlaying, activeSlime: r.pair.activeSlimeId };
+      rt.stop(); return result;
+    }, platformId);
+    await page.keyboard.up('KeyW');
+    expect(walk.playing).toBe(true); expect(walk.activeSlime).toBe('bob');
+    expect(Math.hypot(walk.end[0] - start[0], walk.end[2] - start[2])).toBeGreaterThan(.05);
+    walks.push({ ...walk, start });
+  }
+  expect(proof.cases).toHaveLength(3); expect(proof.boosterCount).toBe(35);
+  expect(proof.glError).toBe(0); expect(errors).toEqual([]);
+  await writeFile(info.outputPath('support-collision-proof.json'), JSON.stringify({
+    ...proof, cases: proof.cases.map(({ png, ...result }) => result), walks, errors,
+  }, null, 2));
+});
 
 test('facility boosters: representative placement, visual and rendering budget evidence', async ({ page }, info) => {
   test.setTimeout(900_000);

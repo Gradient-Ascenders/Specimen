@@ -8,7 +8,6 @@ import { CultivationPlatformArt } from './CultivationPlatformArt.ts';
 import { createCultivationPlatformWear } from './CultivationPlatformWear.ts';
 import { createCultivationMembraneMaterial, createCultivationMembraneTextures, mapCultivationMembranePanel } from './CultivationMembraneMaterial.ts';
 import * as THREE from 'three';
-import { CULTIVATION_TRAVERSAL_SUPPORT_IDS } from './CultivationBoosterPlatforms.ts';
 import { createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
 import type { GreyboxRoomBuilder } from '../../../levels/GreyboxRoomBuilder.ts';
 
@@ -126,7 +125,6 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
       material = overrides.get(object.name) ?? material;
       // Explicit platform-family styling must win over broad room finishes.
       if (object.name === 'cultivation-room-2-button-rest-ledge') material = this.platform;
-      if (CULTIVATION_TRAVERSAL_SUPPORT_IDS.includes(object.name)) material = this.platformArt.hidden;
       if (material === this.platform) {
         platforms.push(object);
         material = this.platformArt.hidden;

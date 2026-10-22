@@ -16,7 +16,7 @@ in `CultivationPlatformBoosters.ts`.
 | Containment | 5 | 9 | 0 | Low platform C, central rest, three upper A platforms, final approach, final bounce and both moving platforms. Compact platform C's engine for floor clearance. Structural containment/observation/vent surfaces stay unchanged. |
 | Cultivation | 1 | 0 | 0 | Three rope-suspended drop platforms deliberately land on the floor. Engines would conflict with their rope/drop presentation and intersect the floor after landing. |
 | Cultivation | 2 | 1 | 0 | Button ledge uses standard traversal deck art and an engine. Three tethered drop blocks retain their brace/rope mechanics; vents stay unchanged. |
-| Cultivation | 3 | 13 | 0 | Entry, launch island, cross-beam, first wall exit, offset island, west runup, west wall exit, west return island, cross-room A/B, final wall exit, last island and drop launch. Hide only first/west/final traversal-post skins; preserve their collision boxes and all permanent structures. |
+| Cultivation | 3 | 13 | 0 | Entry, launch island, cross-beam, first wall exit, offset island, west runup, west wall exit, west return island, cross-room A/B, final wall exit, last island and drop launch. Remove first/west/final traversal poles, including their obsolete colliders; preserve all permanent structures. |
 | Cultivation | 4 | 0 | 0 | Existing lift/boarding structures have their own underdeck motor, corner lighting and shaft presentation. |
 | Cultivation | 5 | 0 | 21 | Preserve all original route jumps, safe-station decks and quiet release walkway. No duplicate engines. Shaft landing, sewer/duct floors, reunion deck and rescue bridge remain structural. |
 | Blackout | All | 0 | 0 | No facility booster integration or source changes. |
@@ -44,8 +44,10 @@ engines; the starting-platform follow-up adds one more.
 - Disposal releases each instanced buffer, shared geometry, material, light and
   audio registration once. Borrowed surface textures and mounting geometry stay
   with their existing owners. No new textures or dependencies.
-- Authoritative platform transforms, collision meshes/metadata, movement,
-  carrying, difficulty, checkpoints and level transitions are unchanged.
+- Authoritative platform transforms, deck collision meshes/metadata, movement,
+  carrying, difficulty, checkpoints and level transitions are unchanged. The
+  three obsolete Cultivation traversal-pole colliders are removed; see the
+  PR #233 correction below.
 
 ## Original rollout validation
 
@@ -115,7 +117,7 @@ Calculated booster vertex/index and instance-buffer storage changes from
 bytes** of these buffers. These estimates exclude driver/program overhead and
 the already-owned platform geometry/textures; they are not total VRAM usage.
 
-## Placement follow-up implementation
+## Previous placement follow-up implementation
 
 - Containment's first Room 2 engine uses uniform scale 0.6 and a -0.35 m
   mounting offset; its existing socket moves down to meet the compact housing.
@@ -126,8 +128,9 @@ the already-owned platform geometry/textures; they are not total VRAM usage.
   production scene instead of a separate palette workaround.
 - Cultivation's baked presentation was regenerated so the standard button deck
   appears and the three traversal posts leave no stale visible surface proxies.
-  Their authored collision positions/vertices/indices remain unchanged, as
-  required. Containment's A/B posts were presentation-only and are removed.
+  At that stage their authored collision boxes remained. The PR #233 correction
+  below removes those obsolete colliders as well. Containment's A/B posts were
+  presentation-only and are removed.
 - No Level 3 source, moving-platform logic, button mechanics, platform poses,
   collision metadata, checkpoint or traversal-route data changed.
 - Containment retains five batches; Cultivation adds one Room 2 batch (four
@@ -363,3 +366,64 @@ The live renderer measured exactly **one extra glow draw**, with **1,352 bytes**
 of additional vertex/index/instance buffers (driver overhead excluded). Two
 non-shadowed light slots remain; all 25 Containment engines and five attachment
 batches remain. No hardware FPS qualification is inferred from SwiftShader.
+
+## PR #233: remove obsolete Cultivation pole collisions
+
+The first/west/final wall-exit posts were still authored through
+`GreyboxRoomBuilder.addCollider()`. Dressing only set their material visibility
+to false; their meshes stayed visible and registered on the movement, camera,
+projectile and line-of-sight layers. Baseline sphere sweeps in the dressed scene
+hit each of the three invisible poles. This was an authoring mistake, not a
+reason to change CollisionWorld's material-independent collision semantics.
+
+Remove those three authored posts and the obsolete material override/ID list.
+Their decks and shared thrusters stay intact. The Room 3 collider inventory
+drops from 63 to 60; a before/after comparison confirms identical transforms,
+vertex/index arrays and gameplay metadata for every remaining collider,
+including real drone cover, soluble cables and structural geometry.
+
+Regenerate the Cultivation bundle because four indexed repair paths shift
+after the removed scene children. All 151 repairs remain; every other manifest
+field and the entire geometry/texture payload are byte-identical to the prior
+bundle. Its compressed size remains 7,691,310 bytes. There are no new lights,
+shadow maps, audio sources, draw submissions or per-frame allocations; three
+unnecessary collider registrations and meshes are eliminated.
+
+The regression now sweeps both axes through the middle and upper former pole
+volumes on all four blocking layers, with exhaustive and broadphase queries.
+It also checks sight rays, real Bob movement, grounded deck walking and retained
+drone cover. The production browser regression uses the live runtime registry,
+captures all three floating decks and tests ordinary keyboard-driven deck walks
+with the full gameplay update path. Its separate mid-air crossings isolate body
+physics from drone damage/recovery; this is focused area validation rather than
+a complete Room 3 puzzle playthrough.
+
+To repeat locally: run `npm run dev`, use **Select level → Level 2 Cultivation**,
+enter the level and press development shortcut **3**. Traverse the upper route
+to the first, west and final wall-exit decks. Walk/jump onto and off each deck;
+the decks must remain solid while the space below their thrusters is clear.
+Switch to Goop and verify that actual ground cover and soluble drone cables
+remain functional. For the reproducible production check after building:
+
+```text
+npx playwright test tests/smoke/PlatformBoosters.spec.ts --config playwright.smoke.config.ts --grep "former traversal support"
+```
+
+Correction validation on the branch including the existing `fafbe9d` merge:
+
+- Full Node suite: **1,471 passed**, zero failures. Targeted platform/layout/
+  preview/drone/controller/baked-asset suite: **54 passed**.
+- Type-check, production build, generated-asset reproducibility and 77-file
+  production-layout validation passed. Only the existing chunk-size warning
+  remains.
+- Production Chromium/SwiftShader regression: **1 passed**. All **60** live
+  sweep/ray queries were unobstructed. Bob crossed **4.052 m** through each
+  former pole footprint with normal body physics, then remained supported on
+  each deck. Ordinary W-key walks covered **0.672 m** on every deck through the
+  full runtime update, with Bob alive and supported throughout.
+- All **35 Cultivation thrusters** remain. The three underside captures were
+  visually inspected; nearby engines and platform art are intact. No console,
+  asset-loading or WebGL errors were observed. No hardware FPS claim is made.
+- Local images and measurement JSON are in
+  `test-results/support-collision-browser-final/`; repeat the command above to
+  recreate them. This area check does not replace a full puzzle playthrough.
