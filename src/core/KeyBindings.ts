@@ -4,6 +4,7 @@ export const KEY_BINDING_ACTIONS = [
   ['moveForward', 'Move forward'], ['moveBackward', 'Move backward'],
   ['moveLeft', 'Move left'], ['moveRight', 'Move right'], ['jump', 'Jump'],
   ['switchSlime', 'Switch specimen'], ['mountDrone', 'Mount drone'],
+  ['toggleView', 'Toggle camera view'],
   ['droneDescend', 'Descend'], ['pause', 'Pause'],
 ] as const;
 export type RebindableAction = (typeof KEY_BINDING_ACTIONS)[number][0];
@@ -11,7 +12,21 @@ export type UserKeyBindings = Readonly<Record<RebindableAction, string>>;
 export const DEFAULT_USER_KEY_BINDINGS: UserKeyBindings = {
   moveForward: 'KeyW', moveBackward: 'KeyS', moveLeft: 'KeyA', moveRight: 'KeyD',
   jump: 'Space', switchSlime: 'Tab', mountDrone: 'KeyM', droneDescend: 'ShiftLeft', pause: 'KeyP',
+  toggleView: 'KeyV',
 };
+
+/** Older saves lack toggleView. Keep every valid existing binding, assigning
+ * the new action an unused key if V was already rebound to another action. */
+export function reconcileUserKeyBindings(value: unknown): UserKeyBindings {
+  if (!value || typeof value !== 'object') return DEFAULT_USER_KEY_BINDINGS;
+  const saved = value as Record<string, unknown>;
+  if (saved.toggleView !== undefined) return isUserKeyBindings(value) ? value : DEFAULT_USER_KEY_BINDINGS;
+  const old = KEY_BINDING_ACTIONS.filter(([id]) => id !== 'toggleView').map(([id]) => saved[id]);
+  if (!old.every(key => typeof key === 'string' && isBindableKey(key)) || new Set(old).size !== old.length) return DEFAULT_USER_KEY_BINDINGS;
+  const toggleView = ['KeyV', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(key => `Key${key}`)]
+    .find(key => isBindableKey(key) && !old.includes(key))!;
+  return { ...saved, toggleView } as UserKeyBindings;
+}
 
 export function isBindableKey(code: string): boolean {
   return code !== 'KeyH' && /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Space|Tab|Enter|Backspace|ShiftLeft|ShiftRight|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Minus|Equal)$/.test(code);

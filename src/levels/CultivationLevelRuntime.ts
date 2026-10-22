@@ -578,6 +578,7 @@ export class CultivationLevelRuntime {
       this.input.endFixedUpdate(); return;
     }
 
+    if (this.input.enabled && !this.ventArrival.active && !resources.authoredPreview?.roomFive.controller.releasing && this.input.wasPressed('toggleView')) this.renderLayer.cameraRig.toggleViewMode();
     let switched = false;
     const releasingVolt = resources.authoredPreview?.roomFive.controller.releasing === true;
     // Keep native input available for pointer capture/pause. The entrance gates
@@ -750,6 +751,8 @@ export class CultivationLevelRuntime {
       this.renderLayer.render();
       return;
     }
+    this.renderLayer.cameraRig.setThirdPersonOverride(!resources.deathSequence.isPlaying || this.ventArrival.active ||
+      !!resources.roomThreeClearance?.active || !!resources.roomFiveFinale?.active);
     this.interpolate(resources.pair.bobBody, interpolationAlpha, resources.renderedBobPosition);
     this.interpolate(resources.pair.goopBody, interpolationAlpha, resources.renderedGoopPosition);
     this.interpolate(resources.voltBody, interpolationAlpha, resources.renderedVoltPosition);
@@ -880,10 +883,10 @@ export class CultivationLevelRuntime {
         this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
         !!resources.roomFiveFinale?.active,
       );
-      resources.goopPresentation.setOpacity(!resources.roomFiveFinale?.active && resources.manager.activeSlimeId === 'goop'
+      resources.goopPresentation.setOpacity(!resources.roomFiveFinale?.active && resources.manager.activeSlimeId === 'goop' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.pair.goopBody)
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
-      resources.voltPresentation.setOpacity(!resources.roomFiveFinale?.active && resources.manager.activeSlimeId === 'volt'
+      resources.voltPresentation.setOpacity(!resources.roomFiveFinale?.active && resources.manager.activeSlimeId === 'volt' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.voltBody)
         ? resolveCameraTargetOpacity(this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25) : 1);
       if (resources.droneProjectilePresentation?.mesh.visible) resources.droneProjectilePresentation.update(interpolationAlpha);
       if (resources.roomFourProjectiles?.mesh.visible) resources.roomFourProjectiles.update(interpolationAlpha);
@@ -1127,6 +1130,7 @@ export class CultivationLevelRuntime {
       const voltBody = new KinematicBody({ world: collisionWorld, surfaces: surfaceRegistry,
         initialPosition: new THREE.Vector3(), events: voltMovementEvents, config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false } });
       const voltPresentation = new VoltCharacterPresentation(voltBody.radiusMetres, this.renderLayer.gelRendering);
+      voltPresentation.setCameraView(this.renderLayer.cameraRig, voltBody);
       rollback(() => voltPresentation.dispose());
       voltPresentation.setCollisionWorld(collisionWorld);
       voltPresentation.setVisible(false);
@@ -1333,12 +1337,14 @@ export class CultivationLevelRuntime {
       voltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       authoredPreview?.roomFive.captiveVoltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       const goopPresentation = new GoopCharacterPresentation(goopBody.radiusMetres, this.renderLayer.gelRendering);
+      goopPresentation.setCameraView(this.renderLayer.cameraRig, goopBody);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(goopBody.position);
       goopPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       goopPresentation.setReflectionIntensity(CULTIVATION_BOB_REFLECTION.normal.body, CULTIVATION_BOB_REFLECTION.normal.eyes, true);
       this.renderLayer.scene.add(goopPresentation.root);
       const bobPresentation = new BobCharacterPresentation(bobBody.radiusMetres, this.renderLayer.gelRendering);
+      bobPresentation.setCameraView(this.renderLayer.cameraRig, bobBody);
       bobPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       bobPresentation.setReflectionIntensity(
         CULTIVATION_BOB_REFLECTION.normal.body,

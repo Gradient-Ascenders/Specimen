@@ -18,6 +18,7 @@ import type {
 } from './CameraProfile.ts';
 
 export type { ReadonlyCameraVector3 } from './CameraProfile.ts';
+export type CameraViewMode = 'third-person' | 'first-person';
 
 export const CAMERA_VERTICAL_FOV_DEGREES = 48;
 export const CAMERA_NEAR_PLANE_METRES = 0.1;
@@ -118,6 +119,8 @@ export interface CameraRigDiagnostics {
   readonly effectivePitchRadians: number;
   readonly aimPresentationBlend: number;
   readonly aimShoulderOffsetMetres: number;
+  readonly viewMode: CameraViewMode;
+  readonly firstPersonWeight: number;
 }
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -157,6 +160,7 @@ export class CameraRig {
   private readonly framingDisplacement = new THREE.Vector3();
   private readonly framingHit = new CollisionHit();
   private readonly cameraLookPivot = new THREE.Vector3();
+  private readonly cameraLookTarget = new THREE.Vector3();
   private readonly normalFramingPivot = new THREE.Vector3();
   private readonly contextualAnchorPosition = new THREE.Vector3();
   private readonly contextualFramingPivot = new THREE.Vector3();
@@ -204,6 +208,38 @@ export class CameraRig {
   private contextualProfileBlendTarget = 0;
   private aimPresentationBlend = 0;
   private aimPresentationBlendTarget = 0;
+  private selectedViewMode: CameraViewMode = 'third-person';
+  private viewBlend = 0;
+  private thirdPersonOverride = false;
+
+  get viewMode(): CameraViewMode { return this.selectedViewMode; }
+  setViewMode(mode: CameraViewMode, immediate = false): void {
+    if (mode !== 'first-person' && mode !== 'third-person') throw new Error('Invalid camera view mode');
+    this.selectedViewMode = mode;
+    if (immediate) this.viewBlend = mode === 'first-person' ? 1 : 0;
+  }
+  toggleViewMode(): void { this.setViewMode(this.selectedViewMode === 'third-person' ? 'first-person' : 'third-person'); }
+  /** External authored camera owners show their subject without changing the preference. */
+  setThirdPersonOverride(active: boolean): void {
+    if (this.thirdPersonOverride === active) return;
+    this.thirdPersonOverride = active;
+    if (!active) this.viewBlend = 0; // Smooth hand-back to the selected perspective.
+  }
+  get firstPersonPresentationWeight(): number {
+    if (this.thirdPersonOverride) return 0;
+    return Math.max(this.manualViewWeight, this.aimPresentationWeight);
+  }
+  private get manualViewWeight(): number {
+    if (this.thirdPersonOverride) return 0;
+    return THREE.MathUtils.smoothstep(this.viewBlend, 0, 1) * (1 - this.authoredThirdPersonWeight);
+  }
+  private get authoredThirdPersonWeight(): number {
+    return this.contextualCamera && !this.contextualCamera.profile.playerControlledPitch
+      ? this.getContextualProfileWeight() : 0;
+  }
+  isFirstPersonForTarget(target: CameraFollowTarget): boolean {
+    return this.followTarget === target && this.firstPersonPresentationWeight > .01;
+  }
 
   constructor(config: Partial<CameraRigConfig> = {}) {
     this.config = {
@@ -272,6 +308,10 @@ export class CameraRig {
     this.desiredContextualFramingOffset.set(0, 0, 0);
     this.aimPresentationBlend = 0;
     this.aimPresentationBlendTarget = 0;
+    // Perspective belongs to the session; checkpoints and level teardown reset
+    // transient presentation, not the player's selection.
+    this.viewBlend = this.selectedViewMode === 'first-person' ? 1 : 0;
+    this.thirdPersonOverride = false;
     this.aimShoulderDisplacement.set(0, 0, 0);
     this.preferredCameraPosition.set(0, 0, 0);
     this.clearTimeSeconds = 0;
@@ -556,6 +596,9 @@ export class CameraRig {
     }
     this.updateContextualTransition(safeDeltaSeconds);
     this.updateAimPresentationTransition(safeDeltaSeconds);
+    const viewTarget = this.selectedViewMode === 'first-person' ? 1 : 0;
+    const viewStep = safeDeltaSeconds / this.config.aimTransitionDurationSeconds;
+    this.viewBlend = THREE.MathUtils.clamp(viewTarget, this.viewBlend - viewStep, this.viewBlend + viewStep);
     this.applyQueuedLookInput();
     this.updateCameraDistance(safeAlpha, safeDeltaSeconds);
     this.writeCameraPose();
@@ -575,7 +618,7 @@ export class CameraRig {
 
   /** Allocation-free render blend used to suppress the body during transitions. */
   get aimPresentationWeight(): number {
-    return this.getAimPresentationWeight();
+    return this.thirdPersonOverride ? 0 : this.getAimPresentationWeight() * (1 - this.authoredThirdPersonWeight);
   }
 
   getDiagnostics(): CameraRigDiagnostics {
@@ -587,7 +630,7 @@ export class CameraRig {
       obstructionDistanceMetres: this.obstructed
         ? this.obstructionHit.distance
         : null,
-      obstructionRadiusMetres: this.config.obstructionRadiusMetres,
+      obstructionRadiusMetres: this.obstructionRadiusMetres,
       focusPosition: this.snapshotVector(this.cameraLookPivot),
       preferredCameraPosition: this.snapshotVector(
         this.preferredCameraPosition,
@@ -601,6 +644,8 @@ export class CameraRig {
       effectivePitchRadians: this.effectivePitchRadians,
       aimPresentationBlend: this.getAimPresentationWeight(),
       aimShoulderOffsetMetres: this.aimShoulderDisplacement.length(),
+      viewMode: this.selectedViewMode,
+      firstPersonWeight: this.firstPersonPresentationWeight,
     };
   }
 
@@ -664,7 +709,7 @@ export class CameraRig {
   }
 
   private wallTurnWouldCollapseCamera(): boolean {
-    if (!this.targetAttached || this.contextualCamera || !this.obstructionWorld) {
+    if (!this.targetAttached || this.contextualCamera || !this.obstructionWorld || this.firstPersonPresentationWeight > .01) {
       return false;
     }
     this.orientationGuardPivot.copy(this.smoothedTarget)
@@ -922,7 +967,8 @@ export class CameraRig {
 
     this.normalFramingPivot
       .copy(this.smoothedTarget)
-      .addScaledVector(this.smoothedUp, this.config.targetHeightMetres);
+      .lerp(this.interpolatedTarget, this.manualViewWeight)
+      .addScaledVector(this.smoothedUp, THREE.MathUtils.lerp(this.config.targetHeightMetres, .18, this.manualViewWeight));
 
     this.effectivePitchRadians = profile && !profile.playerControlledPitch
       ? THREE.MathUtils.lerp(
@@ -943,7 +989,7 @@ export class CameraRig {
       this.framingPivot.lerpVectors(
         this.normalFramingPivot,
         this.contextualFramingPivot,
-        profileWeight,
+        profileWeight * (1 - this.manualViewWeight),
       );
     } else {
       this.framingPivot.copy(this.normalFramingPivot);
@@ -955,7 +1001,7 @@ export class CameraRig {
     if (!profile || profile.playerControlledPitch) {
       this.framingDisplacement.subVectors(this.framingPivot, this.interpolatedTarget);
       if (this.obstructionWorld?.sweepSphere(this.interpolatedTarget, this.framingDisplacement,
-        this.config.obstructionRadiusMetres, this.framingHit, CollisionLayer.CameraObstruction)) {
+        this.obstructionRadiusMetres, this.framingHit, CollisionLayer.CameraObstruction)) {
         const length = this.framingDisplacement.length();
         this.framingPivot.copy(this.interpolatedTarget).addScaledVector(this.framingDisplacement,
           Math.max(0, this.framingHit.distance - this.config.obstructionBufferMetres) / length);
@@ -981,7 +1027,7 @@ export class CameraRig {
       this.obstructionWorld?.sweepSphere(
         this.framingPivot,
         this.boomDisplacement,
-        this.config.obstructionRadiusMetres,
+        this.obstructionRadiusMetres,
         this.obstructionHit,
         CollisionLayer.CameraObstruction,
       ) ?? false;
@@ -1013,7 +1059,7 @@ export class CameraRig {
         this.config.minimumDistanceMetres,
         this.config.aimFirstPersonDistanceMetres,
       ),
-      this.getAimPresentationWeight(),
+      this.firstPersonPresentationWeight,
     );
     this.currentDistanceMetres = resolveCameraDistance(
       this.currentDistanceMetres,
@@ -1040,13 +1086,21 @@ export class CameraRig {
     return THREE.MathUtils.lerp(
       authoredDistanceMetres,
       this.config.aimFirstPersonDistanceMetres,
-      this.getAimPresentationWeight(),
+      this.firstPersonPresentationWeight,
     );
+  }
+
+  private get obstructionRadiusMetres(): number {
+    if (this.firstPersonPresentationWeight <= .01) return this.config.obstructionRadiusMetres;
+    // Enclose the near-plane corners even at the maximum FOV on wide screens.
+    const halfHeight = this.camera.near * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    return Math.max(this.config.obstructionRadiusMetres,
+      Math.hypot(this.camera.near, halfHeight, halfHeight * this.camera.aspect));
   }
 
   private applyAimShoulderOffset(): void {
     const requestedOffsetMetres =
-      this.config.aimShoulderOffsetMetres * this.getAimPresentationWeight();
+      this.config.aimShoulderOffsetMetres * this.aimPresentationWeight;
     this.aimShoulderDisplacement.set(0, 0, 0);
     this.cameraLookPivot.copy(this.framingPivot);
     if (requestedOffsetMetres <= CAMERA_BASIS_EPSILON_SQ) return;
@@ -1065,7 +1119,12 @@ export class CameraRig {
       .copy(this.framingPivot)
       .addScaledVector(this.boomDirection, this.currentDistanceMetres);
     this.camera.up.copy(this.smoothedUp);
-    this.camera.lookAt(this.cameraLookPivot);
+    this.cameraLookTarget.copy(this.cameraLookPivot);
+    if (this.cameraLookTarget.distanceToSquared(this.camera.position) < 1e-10) {
+      // A fully collapsed collision boom still has a player-owned heading.
+      this.cameraLookTarget.copy(this.camera.position).sub(this.boomDirection);
+    }
+    this.camera.lookAt(this.cameraLookTarget);
     this.camera.updateMatrixWorld();
   }
 
