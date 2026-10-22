@@ -21,16 +21,16 @@ test('all authored rooms and doorway overlaps prewarm bounded light signatures w
         if (object instanceof THREE.PointLight) { points++; assert.equal(object.castShadow, false); }
         if (object instanceof THREE.SpotLight) { spots++; if (object.castShadow) shadows++; }
       });
-      // Four local elevator spills, plus the existing Room 3 source when its
-      // rig is in view. Verify these exact layouts are prepared before play.
-      assert.equal(points, coverage.includes(3) ? 5 : 4);
+      // Four local elevator spills, two shared booster slots, plus the existing
+      // Room 3 source when its rig is in view. Prewarm these exact layouts.
+      assert.equal(points, coverage.includes(3) ? 7 : 6);
       assert.equal(spots, shadows);
       assert.ok(spots === 3 || spots === 6 || spots === 10);
       signatures.add([points, spots, shadows].join(':') );
       configurations++;
     });
     assert.equal(configurations, 9);
-    assert.deepEqual(signatures, new Set(['4:3:3', '4:6:6', '4:10:10', '5:3:3', '5:6:6']));
+    assert.deepEqual(signatures, new Set(['6:3:3', '6:6:6', '6:10:10', '7:3:3', '7:6:6']));
     for (const {light, castShadow, position, color} of before) {
       assert.equal(light.castShadow, castShadow);
       assert.deepEqual(light.position.toArray(), position);

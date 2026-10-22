@@ -908,6 +908,7 @@ export class GreyboxLevelRuntime {
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
           : renderedProbePosition;
+      testScene.platformBoosters.update(this.state === 'running' ? stats.frameDeltaSeconds : 0, activeRenderedPosition);
       if (testScene.isInsideCameraTightVent(activeRenderedPosition)) {
         cameraDistanceScale = VENT_CAMERA_DISTANCE_SCALE;
       }

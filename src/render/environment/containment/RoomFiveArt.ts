@@ -790,6 +790,12 @@ export class RoomFiveArt {
         position: [0, -height * 0.5 + 0.11, 0],
         material: graphite,
       }),
+      // Connect the original booster housing to this deck's existing underbody.
+      // The borrowed collar shares the complete assembly's interpolated parent.
+      createBorrowedCylinder(this.resources, {
+        name: `${root.name}-booster-mount`, size: [.42, .22, .42],
+        position: [0, height * .5 - .6, 0], material: serviceMetal,
+      }),
       createInstancedChamferedBoxes(this.resources, {
         name: `${root.name}-side-socket-housings`,
         size: [0.28, 0.24, 0.5],
