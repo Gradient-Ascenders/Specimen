@@ -873,6 +873,7 @@ export class GreyboxLevelRuntime {
     } = resources;
     let cameraDistanceScale = 1;
     if (deathSequence.isPlaying) {
+      testScene.roomFive.art.presentMovingPlatforms(interpolationAlpha);
       const previous = body.previousPosition;
       const current = body.position;
       renderedProbePosition.set(

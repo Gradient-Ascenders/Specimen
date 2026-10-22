@@ -60,6 +60,7 @@ export class RoomFiveArt {
   readonly security: RoomFiveContainmentSecurity;
 
   private readonly resources: ContainmentArtResources;
+  private readonly movingPlatforms: readonly [MovingPlatform, MovingPlatform];
   private readonly signGeometries = new Set<THREE.BufferGeometry>();
   private readonly movingPlatformDressings: readonly THREE.Group[];
   private disposed = false;
@@ -70,6 +71,7 @@ export class RoomFiveArt {
     movingPlatforms: readonly [MovingPlatform, MovingPlatform],
   ) {
     this.resources = resources;
+    this.movingPlatforms = movingPlatforms;
     this.root.name = 'room-5-production-art';
     this.containmentAssembly.name = 'room-5-containment-assembly';
     this.containmentPanelRoot.name = 'room-5-containment-panel-root';
@@ -116,8 +118,24 @@ export class RoomFiveArt {
   }
 
   reset(): void {
+    for (const dressing of this.movingPlatformDressings) dressing.position.set(0, 0, 0);
     for (const pivot of Object.values(this.panelPivots)) {
       pivot.rotation.copy(CLOSED_PANEL_ROTATION);
+    }
+  }
+
+  /** Offset only the visible children into the same interpolation interval as
+   * the rider/camera. The parent roots and collision meshes stay authoritative. */
+  presentMovingPlatforms(interpolationAlpha: number): void {
+    const remaining = 1 - THREE.MathUtils.clamp(interpolationAlpha, 0, 1);
+    for (let index = 0; index < this.movingPlatforms.length; index++) {
+      const platform = this.movingPlatforms[index];
+      const previous = platform.previousPosition, current = platform.position;
+      this.movingPlatformDressings[index].position.set(
+        (previous.x - current.x) * remaining,
+        (previous.y - current.y) * remaining,
+        (previous.z - current.z) * remaining,
+      );
     }
   }
 
