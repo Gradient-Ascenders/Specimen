@@ -15,7 +15,7 @@ import { CultivationPreparationQueue } from '../render/CultivationPreparationQue
 import type { ElevatorDroneEncounter } from '../hazards/ElevatorDroneEncounter.ts';
 import type { ElevatorEncounterView } from '../ui/ElevatorEncounterView.ts';
 import type { RoomFiveDroneEncounter } from '../hazards/RoomFiveDroneEncounter.ts';
-import { addCultivationRoomThreeBoosters } from '../render/environment/cultivation/CultivationBoosterPlatforms.ts';
+import { addCultivationRoomThreeBoosters, addCultivationButtonPlatformBooster } from '../render/environment/cultivation/CultivationBoosterPlatforms.ts';
 import type { SecurityNetworkView } from '../ui/SecurityNetworkView.ts';
 import type { RoomFiveCheckpoint } from './CultivationRoomFiveController.ts';
 import { SLIME_DEFINITIONS, type SlimeId } from '../slimes/SlimeRoster.ts';
@@ -1354,6 +1354,7 @@ export class CultivationLevelRuntime {
       if (roomFiveEncounter) {
         rollback(() => roomFiveEncounter.dispose());
         addCultivationRoomThreeBoosters(roomFiveEncounter.platformBoosters, authoredPreview!.roomThree);
+        addCultivationButtonPlatformBooster(roomFiveEncounter.platformBoosters, authoredPreview!.roomTwo);
         roomFiveEncounter.presentation.mesh.name = 'cultivation-room-5-drone-projectiles';
         roomFiveEncounter.presentation.mesh.userData.presentationRoom = 5;
         this.renderLayer.scene.add(roomFiveEncounter.presentation.mesh);
@@ -1875,7 +1876,7 @@ export class CultivationLevelRuntime {
       this.emitAuthoredPreviewObjective();
     }
     if (preview.workload.simulated.has(5)) resources.roomFiveEncounter?.update(dt);
-    else if (preview.workload.simulated.has(3)) resources.roomFiveEncounter?.platformBoosters.update(dt, resources.pair.activeBody.position);
+    else if (preview.workload.simulated.has(3) || preview.workload.simulated.has(2)) resources.roomFiveEncounter?.platformBoosters.update(dt, resources.pair.activeBody.position);
     if (this.authoredPreviewRoomId !== 5) return;
     if (!resources.deathSequence.isPlaying) return;
     if (c.checkpoint !== this.roomFiveCheckpoint) {

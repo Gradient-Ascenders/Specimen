@@ -7,6 +7,9 @@ export interface BoosterPlatform {
   readonly id: string;
   /** Walking-surface centre in the attachment parent's local coordinates. */
   readonly top: readonly [number, number, number];
+  /** Compact the same unit assembly only where floor clearance requires it. */
+  readonly scale?: number;
+  readonly mountOffsetY?: number;
 }
 interface Batch { root: THREE.Group; visible: boolean }
 interface Jet { position: THREE.Vector3; world: THREE.Vector3; batch: Batch; id: number; score: number }
@@ -131,12 +134,16 @@ export class PlatformBoosters {
       mesh.userData.presentationOnly = true;
       mesh.userData.visualOnly = true;
       if (part < 3) { mesh.userData.shadowProxyReceiver = true; mesh.receiveShadow = part < 2; }
-      additions.forEach((platform, index) => mesh.setMatrixAt(index,
-        matrix.makeTranslation(platform.top[0], platform.top[1] - (part === 3 ? 1.32 : 0), platform.top[2])));
+      additions.forEach((platform, index) => {
+        const scale = platform.scale ?? 1;
+        matrix.makeScale(scale, scale, scale);
+        matrix.setPosition(platform.top[0], platform.top[1] + (platform.mountOffsetY ?? 0) - (part === 3 ? 1.32 * scale : 0), platform.top[2]);
+        mesh.setMatrixAt(index, matrix);
+      });
       mesh.computeBoundingSphere(); root.add(mesh); this.meshes.push(mesh);
     }
     for (const platform of additions) this.jets.push({
-      position: new THREE.Vector3(...platform.top).add(new THREE.Vector3(0, -1.32, 0)),
+      position: new THREE.Vector3(platform.top[0], platform.top[1] + (platform.mountOffsetY ?? 0) - 1.32 * (platform.scale ?? 1), platform.top[2]),
       world: new THREE.Vector3(), batch, id: this.jets.length, score: 0,
     });
   }

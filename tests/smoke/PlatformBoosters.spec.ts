@@ -24,9 +24,14 @@ test('facility boosters: representative placement, visual and rendering budget e
   await finishOpening(page);
   for (const level of [1, 2]) {
     const cases = level === 1 ? [
-      [2, 'room-2-platform-b-gap-lesson'], [3, 'room-3-platform-c'],
-      [5, 'room-5-upper-platform-a'], [5, 'room-5-moving-platform-1'], [5, 'room-5-moving-platform-2'],
-    ] as const : [[3, 'cultivation-room-3-bob-launch-island'], [5, 'room-5-route-0-jump-1']] as const;
+      [2, 'room-2-platform-a-height-lesson'], [2, 'room-2-top-of-sticky-wall-ledge'], [2, 'room-2-exit-balcony'],
+      [3, 'room-3-platform-a-bounce'], [3, 'room-3-platform-b-gap'],
+      [5, 'room-5-lower-platform-c'], [5, 'room-5-moving-platform-1'], [5, 'room-5-moving-platform-2'],
+    ] as const : [
+      [2, 'cultivation-room-2-button-rest-ledge'], [3, 'cultivation-room-3-bob-entry'],
+      [3, 'cultivation-room-3-bob-first-wall-exit'], [3, 'cultivation-room-3-bob-west-wall-exit'],
+      [3, 'cultivation-room-3-bob-final-wall-exit'], [5, 'room-5-route-0-jump-1'],
+    ] as const;
     for (const [room, name] of cases) {
       await page.evaluate(({ level, room }) => {
         const rt = (window as any).__boosterSession.runtime;
@@ -47,8 +52,10 @@ test('facility boosters: representative placement, visual and rendering budget e
         if (!platform) throw new Error(`Missing representative platform: ${name}`);
         const point = platform.getWorldPosition(platform.position.clone());
         const camera = layer.cameraRig.camera;
-        const side = level === 1 && room === 3 ? -1 : 1;
-        camera.position.set(point.x + side * 4, point.y - 1.4, point.z + side * 5);
+        // View wall/transition ledges from inside their room, avoiding the
+        // sticky wall and adjacent Room 3 entrance deck as foreground occluders.
+        const side = level === 1 && (room === 3 || name === 'room-2-top-of-sticky-wall-ledge' || name === 'room-2-exit-balcony') ? -1 : 1;
+        camera.position.set(point.x + side * 4, point.y - (name === 'room-2-platform-a-height-lesson' ? .9 : 1.4), point.z + side * 5);
         camera.lookAt(point.x, point.y - .7, point.z); camera.updateMatrixWorld(true);
         const boosters = level === 1 ? source.platformBoosters : r.roomFiveEncounter.platformBoosters;
         if (boosters) { boosters.reset(); for (let i = 0; i < 90; i++) boosters.update(1 / 60, point); }
@@ -72,8 +79,8 @@ test('facility boosters: representative placement, visual and rendering budget e
             if (object.userData.platformBoosterIds || object.name.endsWith('-booster-mount') ||
               object.name.startsWith('containment-platform-booster-spill-')) toggles.push(object);
           });
-        } else if (room === 3) {
-          const batch = owner.root.getObjectByName('cultivation-room-3-booster-batch');
+        } else if (room === 2 || room === 3) {
+          const batch = owner.root.getObjectByName(`cultivation-room-${room}-booster-batch`);
           if (batch) toggles.push(batch);
           layer.scene.traverse((object: any) => {
             if (object.name.startsWith('room-5-platform-booster-spill-')) toggles.push(object);
@@ -95,7 +102,7 @@ test('facility boosters: representative placement, visual and rendering budget e
       evidence.push(measurements);
       expect(capture.glError).toBe(0);
       if (phase === 'after') {
-        expect(capture.boosterCount).toBe(level === 1 ? 18 : 30);
+        expect(capture.boosterCount).toBe(level === 1 ? 24 : 35);
         const addedDraws = capture.effectsEnabled.drawCalls - capture.effectsDisabled.drawCalls;
         expect(addedDraws).toBeGreaterThanOrEqual(0);
         expect(addedDraws).toBeLessThanOrEqual(level === 1 ? 22 : 4);

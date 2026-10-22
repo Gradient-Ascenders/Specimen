@@ -1,4 +1,4 @@
-# Fix 4: facility platform boosters
+# Fix 4: facility platform boosters and placement follow-up
 
 The original Cultivation Room 5 engine, nozzle, rings, orange outer exhaust,
 bright inner core, shader animation and spill-light parameters now live in
@@ -10,18 +10,19 @@ in `CultivationPlatformBoosters.ts`.
 | Level | Room | New engines | Retained engines | Selection / exclusions |
 | --- | --- | ---: | ---: | --- |
 | Containment | 1 | 0 | 0 | Floors, specimen pedestal and vent structures; no matching floating traversal slabs. |
-| Containment | 2 | 5 | 0 | Platforms B/C/D and upper steps A/B. Exclude low platform A (full exhaust reaches the floor), the wall-mounted catch ledge and the structural exit balcony. |
-| Containment | 3 | 5 | 0 | Wall-exit ledge and platforms C/D/E/F. Exclude the entry platform and platforms A/B, which already have basin-supported actuator columns. |
+| Containment | 2 | 8 | 0 | Platforms A/B/C/D, sticky-wall ledge, upper steps A/B and exit balcony. Compact platform A's engine for floor clearance. |
+| Containment | 3 | 7 | 0 | Platforms A/B, wall-exit ledge and C/D/E/F. Remove A/B's decorative column/base/collar assemblies; preserve the large entry deck's support. |
 | Containment | 4 | 0 | 0 | Cargo lift, receiving/exit deck and duct; preserve the lift's own machinery and lighting. |
-| Containment | 5 | 8 | 0 | Central rest, three upper A platforms, final approach, final bounce and both moving platforms. Exclude low platform C (insufficient full-flame clearance above the floor) and the structural containment/observation/vent surfaces. |
+| Containment | 5 | 9 | 0 | Low platform C, central rest, three upper A platforms, final approach, final bounce and both moving platforms. Compact platform C's engine for floor clearance. Structural containment/observation/vent surfaces stay unchanged. |
 | Cultivation | 1 | 0 | 0 | Three rope-suspended drop platforms deliberately land on the floor. Engines would conflict with their rope/drop presentation and intersect the floor after landing. |
-| Cultivation | 2 | 0 | 0 | Three tethered drop blocks retain their existing brace/rope mechanics and presentation. Button ledge and vents are wall-mounted structures. |
-| Cultivation | 3 | 9 | 0 | Launch island, cross-beam, offset island, west runup, west return island, cross-room A/B, last island and drop launch. Exclude the entrance service deck, first/west/final wall exits with centre support columns, sticky-wall landings, cover and ground routes. |
+| Cultivation | 2 | 1 | 0 | Button ledge uses standard traversal deck art and an engine. Three tethered drop blocks retain their brace/rope mechanics; vents stay unchanged. |
+| Cultivation | 3 | 13 | 0 | Entry, launch island, cross-beam, first wall exit, offset island, west runup, west wall exit, west return island, cross-room A/B, final wall exit, last island and drop launch. Hide only first/west/final traversal-post skins; preserve their collision boxes and all permanent structures. |
 | Cultivation | 4 | 0 | 0 | Existing lift/boarding structures have their own underdeck motor, corner lighting and shaft presentation. |
 | Cultivation | 5 | 0 | 21 | Preserve all original route jumps, safe-station decks and quiet release walkway. No duplicate engines. Shaft landing, sewer/duct floors, reunion deck and rescue bridge remain structural. |
 | Blackout | All | 0 | 0 | No facility booster integration or source changes. |
 
-Total: **27 additions**, plus **21 unchanged Room 5 placements**.
+Current total: **38 additions**, plus **21 unchanged Room 5 placements**:
+24 Containment and 35 Cultivation. The screenshot follow-up adds 11 engines.
 
 ## Implementation and ownership
 
@@ -33,7 +34,7 @@ Total: **27 additions**, plus **21 unchanged Room 5 placements**.
   short mounting collars belong to `RoomFiveArt` and borrow existing resources.
   No second transform interpolation or dynamic instance-buffer upload occurs.
 - Cultivation retains its existing encounter lifecycle owner. Its two original
-  lights and single hover registration now serve both Rooms 3 and 5. Visual
+  lights and single hover registration now serve Rooms 2, 3 and 5. Visual
   batches retain their room visibility; the shared pool is excluded from other
   rooms' lighting profiles. The existing global hover-voice limit remains one.
 - Each owner selects the nearest two engines with the original 14 m selection
@@ -41,11 +42,11 @@ Total: **27 additions**, plus **21 unchanged Room 5 placements**.
   Selection uses a linear scan and reusable vectors, with no per-frame objects.
 - Disposal releases each instanced buffer, shared geometry, material, light and
   audio registration once. Borrowed surface textures and mounting geometry stay
-  with their existing owners. No new assets, textures or dependencies.
+  with their existing owners. No new textures or dependencies.
 - Authoritative platform transforms, collision meshes/metadata, movement,
   carrying, difficulty, checkpoints and level transitions are unchanged.
 
-## Validation
+## Original rollout validation
 
 - Full Node suite: **1,459 passed**. The first sandboxed pass could not create a
   production-validator symlink; the normal-permission rerun passed completely.
@@ -70,7 +71,7 @@ Total: **27 additions**, plus **21 unchanged Room 5 placements**.
   attachment error, zero render writes to authoritative positions, continued
   support, animated exhaust and a clean checkpoint reset.
 
-## Performance evidence
+## Original rollout performance evidence
 
 The reproducible browser check is `tests/smoke/PlatformBoosters.spec.ts`.
 Baseline observations are generated as `test-results/boosters-before.json`;
@@ -113,41 +114,90 @@ Calculated booster vertex/index and instance-buffer storage changes from
 bytes** of these buffers. These estimates exclude driver/program overhead and
 the already-owned platform geometry/textures; they are not total VRAM usage.
 
-## Manual inspection
+## Placement follow-up implementation
+
+- Containment's first Room 2 engine uses uniform scale 0.6 and a -0.35 m
+  mounting offset; its existing socket moves down to meet the compact housing.
+  Low Room 5 platform C uses scale 0.9 and offset -0.08 m. These are instance
+  transforms on the same shared geometry/shader, with floor clearance tested.
+- The button ledge's explicit platform finish now wins over the broad room
+  finish override. Its existing standard-deck recipe is generated through the
+  production scene instead of a separate palette workaround.
+- Cultivation's baked presentation was regenerated so the standard button deck
+  appears and the three traversal posts leave no stale visible surface proxies.
+  Their authored collision positions/vertices/indices remain unchanged, as
+  required. Containment's A/B posts were presentation-only and are removed.
+- No Level 3 source, moving-platform logic, button mechanics, platform poses,
+  collision metadata, checkpoint or traversal-route data changed.
+- Containment retains five batches; Cultivation adds one Room 2 batch (four
+  submissions maximum). Extra engines in existing batches add instances only.
+  Four shared geometries/materials, two non-shadowed lights per owner, the
+  bounded audio source and uniform-only flame animation remain intact.
+  Instance-buffer growth is 1,536 bytes in Containment and 1,280 in Cultivation.
+
+## Placement follow-up validation
+
+- Full Node suite: **1,460 passed**. This includes platform clearance, unchanged
+  collision fingerprints, button interaction, route/carry/reset tests, hidden
+  support collision arrays/poses and original Room 5 engine transforms.
+- Targeted platform/preview/moving-presentation suite: **40 passed**.
+- Type-check, production build and production-layout validation passed (77
+  files). The existing large-chunk warning remains. Generated Cultivation assets
+  reproduce exactly: 7,691,310 bytes, with 151 presentation repairs. The binary
+  grows by 29,214 bytes for the corrected standard button deck and post cleanup.
+- Production Chromium/SwiftShader checks cover all 11 added placements, both
+  moving platforms and an unchanged original Cultivation Room 5 engine.
+  Console, asset-loading and WebGL error checks pass. The real Level 3 handoff
+  leaves zero facility-booster batches.
+- Bob remains supported through the 390-fixed-step moving-platform browser
+  ride; attachment error and render writes to authoritative positions are both
+  zero. Exhaust animation and checkpoint reset pass.
+- Paired disabled/enabled effects samples show four engine submissions for
+  Cultivation Room 2's button deck and each inspected Room 3 view, with zero
+  additional submissions in original Room 5. Containment remains within its
+  existing 22-submission ceiling (including visible neighbouring/moving batches).
+  No extra dynamic/shadow lights, audio registrations, textures or per-frame
+  canvas/geometry work were introduced. Software frame timings are noisy and
+  do not establish hardware FPS; inspect normal play on the target machine.
+
+## Manual inspection (current placement)
 
 1. Run `npm run dev`, start Containment, then use development shortcuts **2**,
    **3** and **5**. Inspect the eligible slabs from above, beside and below.
-   The low first slab in Room 2 and low platform C in Room 5 intentionally have
-   no engine. Supported platforms should retain their columns.
+   Room 2's first slab, sticky-wall ledge and exit balcony now have engines.
+   Room 3's A/B slabs float without their old posts; its large entrance deck
+   retains its support. Room 5's low platform C has a compact engine.
 2. Ride both Room 5 platforms through complete reversals. The mounting collar,
    engine and flame origin should remain fixed to the deck. The flame itself
    should flicker downward. Walk/jump on and off; compare normal and throttled
    browser performance, then pause/resume, recover and restart.
 3. Enter Cultivation through normal progression (or the existing development
-   level-completion shortcut), then inspect Room 3's isolated upper islands.
-   The three column-supported wall exits intentionally have no booster.
+   level-completion shortcut), then inspect Room 2's button ledge. Its deck
+   should match the traversal slabs, with an engine below and the button still
+   working normally. In Room 3 inspect Bob's entry and first/west/final wall
+   exit decks: all have engines and the three tall visible posts are gone.
 4. Inspect Cultivation Room 5's original route and safe-station engines; their
    silhouette, core, flicker and warm spill should match the existing design.
    Move between nearby engines: hover sound should follow without stacking.
-5. Revisit the cargo lifts and Rooms 1/2. Their structures and lighting should
+5. Revisit the cargo lifts and Room 1. Their structures and lighting should
    remain unchanged. Retry checkpoints and transition to Blackout; no facility
    thrusters should appear in Blackout.
 
 Run `npx playwright test tests/smoke/PlatformBoosters.spec.ts --config
 playwright.smoke.config.ts` after `npm run build` to repeat the browser check.
 
-## Changed files
+## Follow-up changed files
 
-- `src/render/environment/PlatformBoosters.ts` — shared hardware, shader, batching, light/audio pool and disposal.
-- `src/render/environment/containment/ContainmentPlatformBoosters.ts` — explicit Containment placements and moving attachment parents.
-- `src/render/environment/cultivation/CultivationBoosterPlatforms.ts` — audited Cultivation Room 3 placements.
-- `src/render/environment/cultivation/CultivationPlatformBoosters.ts` — preserved original Room 5 selection using the shared component.
-- `src/render/environment/containment/RoomFiveArt.ts` — borrowed moving-deck mounting collars.
-- `src/levels/ContainmentLevelScene.ts` — Containment resource ownership, reset and recovery.
-- `src/levels/GreyboxLevelRuntime.ts` — render-pose update beside the existing platform interpolation.
-- `src/levels/CultivationLevelRuntime.ts` — Room 3 integration, shared scope and visibility/update scheduling.
-- `src/hazards/RoomFiveDroneEncounter.ts` — retain the existing lifecycle owner with a shared presentation scope.
-- `tests/PlatformBoosters.test.ts` — placement, clearance, motion, duplicates and resource regression tests.
-- `tests/ContainmentLightLayout.test.ts` — exact prewarmed point-light signatures.
-- `tests/smoke/PlatformBoosters.spec.ts` — production visual, paired rendering-cost, live motion/reset and level-transition checks.
-- `docs/polish-batch-2-platform-boosters.md` — this inventory, validation record and manual testing guide.
+- `src/render/environment/PlatformBoosters.ts` — optional compact instance transforms.
+- `src/render/environment/containment/ContainmentPlatformBoosters.ts` — six additional Containment placements.
+- `src/render/environment/containment/RoomTwoArt.ts` — connect the compact lowest engine's mounting socket.
+- `src/render/environment/containment/RoomThreeArt.ts` — remove A/B's standing presentation supports.
+- `src/render/environment/cultivation/CultivationBoosterPlatforms.ts` — five additional placements and explicit traversal-post IDs.
+- `src/render/environment/cultivation/CultivationLabMaterials.ts` — standard button deck styling and hidden traversal-post skins.
+- `src/levels/CultivationLevelRuntime.ts` — button engine integration and Room 2 shared-effect updates.
+- `scripts/generate-cultivation-assets.ts` — remove the obsolete duplicate button-deck recipe.
+- `src/assets/cultivation/authored-assets.bin` — regenerated presentation bundle.
+- `tests/PlatformBoosters.test.ts` — placement, clearance, preserved collision/pose, resource and movement checks.
+- `tests/smoke/PlatformBoosters.spec.ts` — expanded production room captures and rendering-budget evidence.
+- `tests/smoke/ProductionParity.spec.ts` — exact regenerated repair count.
+- `docs/polish-batch-2-platform-boosters.md` — current inventory, evidence and manual steps.

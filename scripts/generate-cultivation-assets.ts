@@ -1,17 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { CultivationAssetGenerator } from './lib/cultivation-asset-generator.ts';
-import { CultivationPlatformArt } from '../src/render/environment/cultivation/CultivationPlatformArt.ts';
-import type * as THREE from 'three';
 
 const generator = new CultivationAssetGenerator();
 const scene = new LevelTwoPreviewScene(() => {}, generator);
 try {
-  // The standalone lab-palette preview dresses this ledge as a deck. The
-  // weathered composition uses its floor finish; retain both authored recipes.
-  const palette = new CultivationPlatformArt(scene.labArt.platform, generator);
-  palette.add(scene.roomTwo.root.getObjectByName('cultivation-room-2-button-rest-ledge') as THREE.Mesh);
-  palette.dispose();
+  // The production scene now authors the button ledge's standard deck recipe.
   const bundle = Buffer.from(generator.bundle());
   const output = new URL('../src/assets/cultivation/authored-assets.bin', import.meta.url);
   if (process.argv.includes('--check')) {

@@ -471,7 +471,7 @@ export class RoomTwoArt {
       createBorrowedCylinder(this.resources, {
         name: `room-2-${platform.name}-central-actuator-socket`,
         size: [Math.min(width, depth) * 0.13, 0.24, Math.min(width, depth) * 0.13],
-        position: [x, y - height * 0.5 - 0.48, z],
+        position: [x, platform.name === 'platform-a-height-lesson' ? top - .67 : y - height * 0.5 - 0.48, z],
         material: serviceMetal,
       }),
     );

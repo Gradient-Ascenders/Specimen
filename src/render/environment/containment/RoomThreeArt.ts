@@ -25,8 +25,8 @@ interface PlatformDressing {
 
 const PLATFORM_DRESSINGS: readonly PlatformDressing[] = [
   { name: 'entry-platform', size: [8, 0.5, 5], position: [0, 10.65, 51.29795], support: 'basin', safetySide: 'x' },
-  { name: 'platform-a-bounce', size: [4.5, 0.5, 4], position: [2.7885, 10.9032, 57.6261], support: 'basin', safetySide: 'z' },
-  { name: 'platform-b-gap', size: [5.13, 0.5, 4], position: [11.2583, 11.4329, 59], support: 'basin', safetySide: 'x' },
+  { name: 'platform-a-bounce', size: [4.5, 0.5, 4], position: [2.7885, 10.9032, 57.6261], support: 'suspended', safetySide: 'z' },
+  { name: 'platform-b-gap', size: [5.13, 0.5, 4], position: [11.2583, 11.4329, 59], support: 'suspended', safetySide: 'x' },
   { name: 'wall-exit-ledge', size: [4.6, 0.5, 4.8], position: [14.7, 21.1, 66], support: 'suspended', safetySide: 'z' },
   { name: 'platform-c', size: [4.2, 0.5, 4], position: [10, 22.1, 60.5406], support: 'suspended', safetySide: 'x' },
   { name: 'platform-d', size: [4, 0.5, 4], position: [5, 23.7, 62.839], support: 'suspended', safetySide: 'z' },
