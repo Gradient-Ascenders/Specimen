@@ -128,3 +128,44 @@ test('elevator platform presentation follows a non-identity runtime transform', 
 
   presentation.dispose();
 });
+
+test('all four corner fixtures have matching non-shadowed spill throughout lift travel and reset', () => {
+  const source = createSource();
+  const presentation = new ElevatorPresentation(source as unknown as ElevatorSequence);
+  const lights: THREE.PointLight[] = [], lenses: THREE.Object3D[] = [];
+  source.root.traverse(object => {
+    if (object instanceof THREE.PointLight) lights.push(object);
+    if (object.name.endsWith('-warning-light-lens')) lenses.push(object);
+  });
+  try {
+    assert.equal(lights.length, 4);
+    assert.equal(lenses.length, 4);
+    for (const [index, light] of lights.entries()) {
+      assert.equal(light.castShadow, false);
+      assert.equal(light.distance, 3.6);
+      assert.equal(light.decay, 2);
+      assert.equal(light.parent, lenses[index].parent);
+      assertVectorClose(light.position, lenses[index].position.clone().add(new THREE.Vector3(0, .08, 0)));
+    }
+    for (const [state, colour, intensity] of [
+      ['warning', 0xffb323, 2.8 * .55],
+      ['ascending', 0xff9e1b, 1.8],
+      ['arrivalPause', 0x7bffb0, 2.4],
+      ['exitReady', 0x62e89a, .9],
+      ['waitingForRider', 0x222622, 0],
+    ] as const) {
+      source.state = state; source.stateElapsedSeconds = 0;
+      presentation.sync();
+      for (const light of lights) {
+        assert.equal(light.color.getHex(), colour);
+        assert.ok(Math.abs(light.intensity - intensity) < EPSILON);
+      }
+      for (const height of [0, 2, 4]) {
+        source.root.position.set(5, height, -3);
+        source.root.updateMatrixWorld(true);
+        lights.forEach((light, index) => assertVectorClose(light.getWorldPosition(new THREE.Vector3()),
+          lenses[index].getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, .08, 0))));
+      }
+    }
+  } finally { presentation.dispose(); }
+});

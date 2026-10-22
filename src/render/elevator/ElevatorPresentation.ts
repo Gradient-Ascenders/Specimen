@@ -340,14 +340,13 @@ export class ElevatorPresentation {
       lens.position.y += 0.12;
       this.platformDecoration.add(housing, lens);
 
-      if (lights.length < 2) {
-        const light = new THREE.PointLight(0xffa020, 0, 3.6, 2);
-        light.name = `${this.sequence.id}-warning-point-light`;
-        light.position.copy(lens.position);
-        light.position.y += 0.08;
-        this.platformDecoration.add(light);
-        lights.push(light);
-      }
+      // Each visible corner fixture needs the same local, non-shadowed spill.
+      const light = new THREE.PointLight(0xffa020, 0, 3.6, 2);
+      light.name = `${this.sequence.id}-warning-point-light`;
+      light.position.copy(lens.position);
+      light.position.y += 0.08;
+      this.platformDecoration.add(light);
+      lights.push(light);
     }
 
     return lights;
