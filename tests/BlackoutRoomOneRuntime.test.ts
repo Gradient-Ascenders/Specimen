@@ -791,7 +791,7 @@ test('Room 2 hazards stay authoritative when one body arrives before the others'
   } finally { f.cleanup(); }
 });
 
-test('Bob can walk onto the final bridge button in the complete runtime', () => {
+test('Bob can walk onto the final bridge button in the complete runtime after Goop clears the guards', () => {
   const f = createFixture();
   try {
     f.runtime.activateCheckpoint('cp5');
@@ -800,6 +800,7 @@ test('Bob can walk onto the final bridge button in the complete runtime', () => 
       group: { bobBody: KinematicBody; activeSlimeId: string };
       transit: BlackoutTransitController;
     } }).resources;
+    for (const enemy of transit.emergingDrones) enemy.state.destroy();
     while (group.activeSlimeId !== 'bob') f.switchSlime();
     f.input.press('moveLeft');
     f.tick(90);
@@ -821,6 +822,7 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
       transit: BlackoutTransitController;
     } }).resources;
     for (const stage of [1, 2]) {
+      for (let index = 0; index < stage; index++) transit.emergingDrones[index]!.state.destroy();
       const enemy = transit.emergingDrones[stage - 1]!;
       enemy.state.destroy();
       transit.lights[stage - 1]!.target.setConnectionState(true);

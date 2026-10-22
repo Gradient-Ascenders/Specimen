@@ -1,5 +1,10 @@
 # Emerging sewer drones — Polish Batch 3, Fix 1
 
+The later [mandatory encounter](mandatory-drone-encounter.md) interlocks the
+transit route with destruction, adds accepted-hit Goop retaliation and widens
+the cone to 0.275 radians. The initial implementation below is historical;
+the linked follow-up documents the current behavior and validation.
+
 ## Implementation
 
 Level 3 Room 2 has three damaged sewer drones. Their dormant body centres are

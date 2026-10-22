@@ -111,7 +111,7 @@ test('route beam and detection agree, ignore off-cone slimes and respect solid c
     const lightDirection = f.enemy.light.target.position.clone().sub(f.enemy.light.position).normalize();
     assert.ok(gaze.distanceTo(lightDirection) < 1e-9);
     assert.ok(gaze.distanceTo(new THREE.Vector3(0, 0, -1)) < .04, 'gaze stays on the authored route');
-    assert.ok(f.enemy.light.angle < .25, 'focused beam replaces the old .4-radian cone');
+    assert.ok(f.enemy.light.angle > .27 && f.enemy.light.angle < .28, '25% wider coverage retains a focused security beam');
     cover.position.set(0, 4, -3.5); cover.updateMatrixWorld(); f.world.register(cover);
     position.set(0, 4, -6);
     for (let i = 0; i < 120; i++) f.enemy.update(DT, [target], true);

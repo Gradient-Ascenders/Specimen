@@ -18,8 +18,8 @@ import { SecurityDrone, type SecurityDroneTarget } from '../hazards/SecurityDron
 import { DroneProjectileSystem, type DroneProjectileTarget } from '../hazards/DroneProjectileSystem.ts';
 import { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import { ScannerBeamPresentation } from '../render/hazards/ScannerBeamPresentation.ts';
-import { EmergingSewerDrone, TRANSIT_SEWER_DRONE_POSITIONS } from '../hazards/EmergingSewerDrone.ts';
-import { WEAK_SEWER_DRONE, type WeakSewerDroneSnapshot } from '../hazards/WeakSewerDrone.ts';
+import { EmergingSewerDrone, TRANSIT_SEWER_DRONE_POSITIONS, type EmergingSewerDroneSnapshot } from '../hazards/EmergingSewerDrone.ts';
+import { WEAK_SEWER_DRONE } from '../hazards/WeakSewerDrone.ts';
 import type { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
@@ -40,7 +40,7 @@ interface TransitSnapshot {
   readonly complete: boolean;
   readonly checkpointStage: number;
   readonly lights: readonly ReceiverSnapshot[];
-  readonly sewerDrones: readonly WeakSewerDroneSnapshot[];
+  readonly sewerDrones: readonly EmergingSewerDroneSnapshot[];
   readonly liftGrace: readonly number[];
   readonly lifts: readonly SerializableValue[];
   readonly switchHeld: boolean;
@@ -128,6 +128,14 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private readonly targetUnregisters: (() => void)[] = [];
   private readonly lampLights: THREE.PointLight[] = [];
   private readonly bridge: THREE.Mesh;
+  private readonly interlockShutter: THREE.Mesh;
+  private readonly interlockIndicators: THREE.InstancedMesh;
+  private readonly interlockColor = new THREE.Color();
+  private interlockIndicatorMask = -1;
+  private shutterRegistered = false;
+  get bobRouteCleared(): boolean { return this.guardDestroyed(0) && this.guardDestroyed(1); }
+  get voltRouteCleared(): boolean { return this.guardDestroyed(2); }
+  get encounterCleared(): boolean { return this.bobRouteCleared && this.voltRouteCleared; }
   private bridgeRegistered = false;
   private bridgeFullUVs?: Float32Array;
   private bridgeUVStretch = -1;
@@ -148,6 +156,26 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       mapBlackoutPropUVs(this.thrusterGeometry, this.steel.userData.tileSizeMetres);
     }
     this.room.root.add(this.root);
+    // A visible laboratory security shutter seals the only Room 3 hallway.
+    // It is separate from the accepted jammed-door/crate assembly at z=156.
+    this.interlockShutter = new THREE.Mesh(new THREE.BoxGeometry(7.9, 5.4, .24), this.steel);
+    this.interlockShutter.name = 'transit-drone-interlock-shutter';
+    this.interlockShutter.position.set(0, 3.1, 159);
+    this.interlockShutter.userData.surfaceTag = 'default';
+    if (kit) mapBlackoutPropUVs(this.interlockShutter.geometry, this.steel.userData.tileSizeMetres);
+    this.interlockShutter.castShadow = true; this.interlockShutter.receiveShadow = true;
+    this.root.add(this.interlockShutter);
+    // Three emissive status fittings make the lock readable in the dark hall.
+    // Borrow existing contact/exhaust resources; these add no actual lights.
+    this.interlockIndicators = new THREE.InstancedMesh(this.liftSocketGeometry, this.plumeMaterial, 3);
+    this.interlockIndicators.name = 'transit-drone-interlock-status';
+    this.interlockIndicators.userData.visualOnly = true;
+    const statusMatrix = new THREE.Matrix4().makeScale(.36 / .55, .14 / .65, .05 / .35);
+    for (let index = 0; index < 3; index++) {
+      statusMatrix.setPosition(index - 1, 2.8, 158.85);
+      this.interlockIndicators.setMatrixAt(index, statusMatrix);
+    }
+    this.root.add(this.interlockIndicators);
 
     const unregisterTargets = this.targetUnregisters;
     const ownedDissolves: DissolveTarget[] = [];
@@ -234,8 +262,8 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
         const receiverAdapter: ElectricalConnectionTarget = {
           id: slot.id, displayName: `Thruster lift ${index + 1}`, hitMeshes: [socket],
           copySocketWorldPosition: target => socket.localToWorld(target.set(0, 0, 0)),
-          isAvailable: () => this.active,
-          setConnectionState: connected => device.core.setConnectionState(connected),
+          isAvailable: () => this.active && this.guardDestroyed(index),
+          setConnectionState: connected => device.core.setConnectionState(connected && this.guardDestroyed(index)),
         };
         unregisterTargets.push(options.electricalTargets.register(receiverAdapter));
         device.core.setAvailable(false);
@@ -314,6 +342,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       throw error;
     }
     this.bridgeAudio = new WorldAudioSource({ root: this.bridge, kind: 'machinery', progress: () => this.bridgeProgress, settled: () => this.bridgeProgress === 0 || this.bridgeProgress === 1, enabled: () => this.active });
+    this.syncInterlocks();
   }
 
   get isActive(): boolean { return this.active; }
@@ -321,7 +350,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   setActive(active: boolean): void {
     if (this.disposed) return;
     this.active = active;
-    for (const lift of this.lifts) lift.core.setAvailable(active);
+    this.syncInterlocks();
     for (let i = 0; i < this.lifts.length; i++) this.updateLiftVisual(i);
     if (!active) for (const enemy of this.emergingDrones) enemy.suspend();
     for (const laser of this.lasers) laser.root.visible = active;
@@ -344,6 +373,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     if (this.disposed) return undefined;
     if (!Number.isFinite(dt) || dt <= 0) throw new Error('Transit controller deltaSeconds must be positive and finite.');
     if (!this.active) return undefined;
+    this.syncInterlocks();
     this.currentVoltPosition.set(bodies.volt.position.x, bodies.volt.position.y, bodies.volt.position.z);
     for (let i = 0; i < this.lights.length; i++) this.updateReceiver(this.lights[i]!, dt);
     this.updateReceiver(this.lockReceiver, dt);
@@ -371,12 +401,12 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       this.room.acidInteractions.fallPulse(bodies.volt);
       return 'volt';
     }
-    if (this.room.exitAt(bodies.bob.position) && this.room.exitAt(bodies.goop.position) && this.room.exitAt(bodies.volt.position) && this.bridgeLocked) this.complete = true;
+    if (this.encounterCleared && this.room.exitAt(bodies.bob.position) && this.room.exitAt(bodies.goop.position) && this.room.exitAt(bodies.volt.position) && this.bridgeLocked) this.complete = true;
     const bobOnPad = (mesh: THREE.Mesh, tolerance: number) => bodies.bob.isSupportedBy(mesh) && Math.abs(bodies.bob.position.z - mesh.position.z) <= tolerance;
     if (this.emergingDrones[0]?.state.state === 'destroyed' && bobOnPad(this.room.bobRoutePlatforms[1]!, 1.5)) this.checkpointTutorialReached = true;
     if (this.checkpointTutorialReached) this.checkpointStage = Math.max(this.checkpointStage, 1);
     const finalPad = this.room.bobRoutePlatforms[this.room.bobRoutePlatforms.length - 1]!;
-    if (this.emergingDrones[1]?.state.state === 'destroyed' && bobOnPad(finalPad, 2.5)) this.checkpointStage = Math.max(this.checkpointStage, 2);
+    if (this.bobRouteCleared && bobOnPad(finalPad, 2.5)) this.checkpointStage = Math.max(this.checkpointStage, 2);
     this.updateObjective();
     return undefined;
   }
@@ -408,20 +438,20 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.scannerBeams?.reset();
     this.liftGrace.forEach((_, i) => { this.liftGrace[i] = snapshot.liftGrace[i] ?? 0; });
     this.lifts.forEach((lift, i) => { if (snapshot.lifts[i] !== undefined) lift.restoreState(snapshot.lifts[i]!); });
-    this.switchHeld = snapshot.switchHeld;
-    this.bridgeDeployed = snapshot.bridgeDeployed;
-    this.bridgeProgress = Math.max(0, Math.min(1, snapshot.bridgeProgress ?? (snapshot.bridgeDeployed ? 1 : 0)));
-    this.bridgeLocked = snapshot.bridgeLocked;
+    this.switchHeld = this.encounterCleared && snapshot.switchHeld;
+    this.bridgeDeployed = this.encounterCleared && snapshot.bridgeDeployed;
+    this.bridgeProgress = this.encounterCleared ? Math.max(0, Math.min(1, snapshot.bridgeProgress ?? (snapshot.bridgeDeployed ? 1 : 0))) : 0;
+    this.bridgeLocked = this.encounterCleared && snapshot.bridgeLocked;
     this.bridgeRelease = snapshot.bridgeRelease;
-    this.restoreReceiver(this.lockReceiver, snapshot.lockReceiver);
-    this.complete = snapshot.complete;
+    this.restoreReceiver(this.lockReceiver, this.encounterCleared ? snapshot.lockReceiver : { charge: 0, latched: false });
+    this.complete = this.encounterCleared && snapshot.complete;
     for (const enemy of this.emergingDrones) { enemy.weapon.reset(); enemy.weapon.setCollisionEnabled(false); enemy.weapon.setPresentationVisible(false); enemy.suspend(); }
     for (const laser of this.lasers) laser.reset();
     this.laserElapsed = 0;
     this.laserPresentation?.sync();
     this.updateBridgeMeshes();
     this.bridgeAudio.reset();
-    for (const lift of this.lifts) lift.core.setAvailable(this.active);
+    this.syncInterlocks();
     for (let i = 0; i < this.lifts.length; i++) this.updateLiftVisual(i);
     this.updateLampBanks();
     this.updateSwitchButton();
@@ -451,6 +481,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.switchHeld = false; this.bridgeDeployed = false; this.bridgeLocked = false;
     this.bridgeRelease = 0; this.checkpointTutorialReached = false; this.checkpointStage = 0; this.complete = false;
     this.bridgeProgress = 0;
+    this.syncInterlocks();
     this.updateBridgeMeshes();
     this.bridgeAudio.reset();
     this.updateLampBanks();
@@ -470,6 +501,9 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       lift.dispose();
     }
     for (const enemy of this.emergingDrones) enemy.dispose();
+    if (this.shutterRegistered) { this.world.unregister(this.interlockShutter); this.surfaces.unregister(this.interlockShutter); }
+    this.interlockShutter.geometry.dispose();
+    this.interlockIndicators.dispose();
     if (this.bridgeRegistered) { this.world.unregister(this.bridge); this.surfaces.unregister(this.bridge); }
     this.laserPresentation?.dispose();
     for (const laser of [...this.lasers].reverse()) laser.dispose();
@@ -570,7 +604,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const close = dx * dx + dy * dy + dz * dz <= 0.9 * 0.9;
     const wallHeld = bob.attached && (bob.attachmentSurfaceName.includes('switch') || bob.attachmentSurfaceName.includes('bob-bridge-switch-sticky-wall'));
     const wasHeld = this.switchHeld;
-    this.switchHeld = !this.bridgeLocked && close && wallHeld;
+    this.switchHeld = this.bobRouteCleared && !this.bridgeLocked && close && wallHeld;
     if (wasHeld !== this.switchHeld) gameplayAudioEvents.emit('cue', {
       sound: this.switchHeld ? 'world-button-press-01' : 'world-button-release-01',
       position: this.room.switchButton.getWorldPosition(new THREE.Vector3()), maxDistance: 16,
@@ -581,13 +615,13 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     else if (this.bridgeProgress > 0) {
       this.bridgeRelease += dt;
     }
-    if (this.lockReceiver.latched) {
+    if (this.encounterCleared && this.lockReceiver.latched) {
       if (!this.bridgeLocked) gameplayAudioEvents.emit('cue', {
         sound: 'world-lever-lock-01', position: this.room.bridgeLockContact.getWorldPosition(new THREE.Vector3()), maxDistance: 24,
       });
       this.bridgeLocked = true; this.bridgeProgress = 1;
     }
-    const wantsBridge = this.bridgeLocked || this.switchHeld || (this.bridgeProgress > 0 && this.bridgeRelease < BRIDGE_RELEASE_SECONDS);
+    const wantsBridge = this.encounterCleared && (this.bridgeLocked || this.switchHeld || (this.bridgeProgress > 0 && this.bridgeRelease < BRIDGE_RELEASE_SECONDS));
     this.bridgeProgress = this.bridgeLocked ? 1 : THREE.MathUtils.clamp(this.bridgeProgress + (wantsBridge ? dt / 1.25 : -dt / 1.25), 0, 1);
     this.bridgeDeployed = this.bridgeProgress >= 0.98;
     this.updateBridgeMeshes();
@@ -596,7 +630,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private updateSwitchButton(): void {
     const material = this.room.switchButton.material;
     if (Array.isArray(material) || !(material instanceof THREE.MeshStandardMaterial)) return;
-    material.color.setHex(this.switchHeld || this.bridgeLocked ? 0x43c982 : 0x8b662b);
+    material.color.setHex(!this.bobRouteCleared ? 0xa03224 : this.switchHeld || this.bridgeLocked ? 0x43c982 : 0x8b662b);
     material.emissive.setHex(this.switchHeld || this.bridgeLocked ? 0x27ff83 : 0x50340c);
     material.emissiveIntensity = this.switchHeld || this.bridgeLocked ? 1.8 : 0.22;
   }
@@ -648,8 +682,39 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const powered = this.active && lift.core.readModel.powered;
     visual.root.position.copy(lift.root.position);
     visual.plumes.visible = powered;
-    visual.socket.emissiveIntensity = powered ? 1.5 : 0;
-    visual.socket.emissive.setHex(powered ? 0x48bc84 : 0x8c6916);
+    visual.socket.emissiveIntensity = !this.guardDestroyed(index) ? .6 : powered ? 1.5 : 0;
+    visual.socket.emissive.setHex(!this.guardDestroyed(index) ? 0xcc3020 : powered ? 0x48bc84 : 0x8c6916);
+  }
+
+  private guardDestroyed(index: number): boolean { return this.emergingDrones[index]?.state.state === 'destroyed'; }
+
+  private syncInterlocks(): void {
+    for (let index = 0; index < this.lifts.length; index++) {
+      const lift = this.lifts[index]!;
+      const available = this.active && this.guardDestroyed(index);
+      lift.core.setAvailable(available);
+      if (!available) { lift.core.setConnectionState(false); this.liftGrace[index] = 0; }
+    }
+    const closed = !this.encounterCleared;
+    this.interlockShutter.visible = closed;
+    this.interlockIndicators.visible = closed;
+    const mask = (this.guardDestroyed(0) ? 1 : 0) | (this.guardDestroyed(1) ? 2 : 0) | (this.guardDestroyed(2) ? 4 : 0);
+    if (mask !== this.interlockIndicatorMask) {
+      for (let index = 0; index < 3; index++) {
+        this.interlockColor.setHex(mask & (1 << index) ? 0x44ffaa : 0xff3322);
+        this.interlockIndicators.setColorAt(index, this.interlockColor);
+      }
+      this.interlockIndicators.instanceColor!.needsUpdate = true;
+      this.interlockIndicatorMask = mask;
+    }
+    if (closed === this.shutterRegistered) return;
+    if (closed) {
+      this.world.register(this.interlockShutter, undefined, ColliderTransformMode.Static);
+      this.surfaces.register(this.interlockShutter);
+    } else {
+      this.world.unregister(this.interlockShutter); this.surfaces.unregister(this.interlockShutter);
+    }
+    this.shutterRegistered = closed;
   }
 
   bindBurns(system: DissolveSystem): void { for (const enemy of this.emergingDrones) enemy.bindBurns(system); }
@@ -687,6 +752,8 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
 
   private updateObjective(): void {
     if (this.complete) this.objective = 'Room clear. Continue to the boss-room access.';
+    else if (!this.bobRouteCleared) this.objective = 'Security interlock: Goop must destroy both east-side drones to unlock Bob’s lifts and bridge switch.';
+    else if (!this.voltRouteCleared) this.objective = 'Security interlock: Goop must destroy the west-side drone before Volt can cross the bridge.';
     else if (this.bridgeLocked) this.objective = 'Regroup on the far side and reach the exit.';
     else if (this.bridgeDeployed) this.objective = this.lights[2]?.latched ? 'Clear the crossing with Goop, then power the exit door’s lower edge to lock the bridge.' : 'Power the bridge-side light bank and clear the crossing with Goop.';
     else if (this.checkpointTutorialReached) this.objective = 'Reactivate the transit lifts and find the far-side switch.';

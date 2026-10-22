@@ -30,7 +30,7 @@ function fixture() {
   };
 }
 
-test('Volt can acquire every light-bank and lift socket from the actual service catwalk', () => {
+test('Volt can acquire every light-bank and cleared lift socket from the actual service catwalk', () => {
   const f = fixture();
   const volt = { position: new THREE.Vector3(), radiusMetres: 0.45 };
   const aimPoint = new THREE.Vector3();
@@ -43,6 +43,8 @@ test('Volt can acquire every light-bank and lift socket from the actual service 
     config: { acquisitionRangeMetres: 100, instabilityWarningRangeMetres: 110, tetherBreakRangeMetres: 120 },
   });
   try {
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
+    f.controller.setActive(true);
     const targets = [
       ...f.controller.lights.map(receiver => receiver.target),
       ...f.controller.lifts.map(lift => {
@@ -93,7 +95,7 @@ test('Volt can power the existing exit-door edge from the far bridge landing and
     config: { acquisitionRangeMetres: 100, instabilityWarningRangeMetres: 110, tetherBreakRangeMetres: 120 },
   });
   try {
-    for (const drone of f.controller.drones) drone.setEnabled(false);
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
     for (let step = 0; step < 90; step += 1) {
       bob.update(DT, new THREE.Vector3(-1, 0, 0));
       f.controller.update(DT, { bob, goop, volt });

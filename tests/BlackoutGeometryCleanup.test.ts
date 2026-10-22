@@ -105,6 +105,7 @@ test('bridge starts flush across the approach deck edge and the catwalk has one 
   const targets = new ElectricalTargetRegistry(world);
   const controller = new BlackoutTransitController({ room, world, surfaces, electricalTargets: targets });
   try {
+    for (const enemy of controller.emergingDrones) enemy.state.destroy();
     const saved = controller.capture() as any; saved.bridgeProgress = 1; saved.bridgeDeployed = true;
     controller.restore(saved); room.root.updateMatrixWorld(true);
     const anchor = room.root.getObjectByName('transit-bridge-start-anchor') as THREE.Mesh;

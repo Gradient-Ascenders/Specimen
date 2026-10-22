@@ -2,6 +2,10 @@
 
 This pass continues on `codex/final-polish-batch-3`, preserving `af8c412`.
 
+The later [mandatory encounter follow-up](mandatory-drone-encounter.md) adds
+destruction-based route interlocks, Goop retaliation and a 0.275-radian cone.
+The refinement measurements below describe the preceding review pass.
+
 ## Positions and dormancy
 
 | Drone | Dormant body centre (metres) | Guarded route point (metres) |

@@ -24,6 +24,7 @@ const material = (mesh: THREE.Mesh) => mesh.material as THREE.MeshStandardMateri
 test('deployed bridge top corners meet both anchors across its full width', () => {
   const f = fixture();
   try {
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
     const bridge = f.controller.root.getObjectByName('transit-deployable-bridge-deck') as THREE.Mesh<THREE.BoxGeometry>;
     const state = f.controller.capture() as any;
     state.bridgeProgress = 1; state.bridgeDeployed = true;
@@ -53,7 +54,7 @@ test('textured static and interactive geometry preserves the reviewed transit ba
     !['transit-east-service-conduit-96', 'transit-east-service-conduit-116'].includes(saved.name));
   const meshes: THREE.Mesh[] = [];
   f.room.root.traverse(m => {
-    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly) return;
+    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly || m.name === 'transit-drone-interlock-shutter') return;
     for (let ancestor: THREE.Object3D | null = m; ancestor; ancestor = ancestor.parent) {
       if (ancestor.name.startsWith('transit-sewer-drone-')) return;
     }
@@ -104,6 +105,7 @@ test('authored surfaces carry shared maps, metric charts and distinct sticky/sup
 test('bridge partial deployment and retraction maintain metric length without reallocating buffers', () => {
   const f = fixture();
   try {
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
     const bridge = f.controller.root.getObjectByName('transit-deployable-bridge-deck') as THREE.Mesh<THREE.BoxGeometry>;
     const uv = bridge.geometry.attributes.uv, array = uv.array;
     const normal = bridge.geometry.attributes.normal;
@@ -126,6 +128,7 @@ test('bridge partial deployment and retraction maintain metric length without re
 test('lift motion leaves charts fixed and independent powered indicators retain private materials', () => {
   const f = fixture();
   try {
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
     f.controller.setActive(true);
     const indicators = [...f.controller.lights.map(l => l.targetMaterial), f.controller.lockReceiver.targetMaterial, f.room.switchButton.material];
     for (const lift of f.controller.lifts) indicators.push(material(lift.root.getObjectByName(`${lift.id}-conducting-contact`) as THREE.Mesh));

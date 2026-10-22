@@ -1,13 +1,17 @@
 # Level 3 improvements: final review
 
+The subsequent [mandatory drone encounter](mandatory-drone-encounter.md) adds
+destruction-based route locks and accepted-hit retaliation on this same branch.
+Its final validation and evidence supersede the older combat-only results below.
+
 Branch: `codex/final-polish-batch-3`. Original base:
 `5d016507016cc0e9877e819b9a3d9d58e25ecbae` (including PRs #233 and #234).
 During finalization, main advanced to
 `4c68cff1af93d01f5b2f27e97059e61d63e16a99` (sound-effects PR #235).
 It was integrated cleanly without conflict or history rewriting. The original
 implementation `af8c412` and refinement commit `519d2a3` are preserved. The PR
-diff against the new main contains the intended 48 Level 3 files, including the
-subsequent authored-catwalk combat regression;
+diff against the new main contained 48 Level 3 files before the mandatory
+encounter follow-up, including the authored-catwalk combat regression;
 main's already merged sound assets and other work are not proposed again.
 
 ## Scope

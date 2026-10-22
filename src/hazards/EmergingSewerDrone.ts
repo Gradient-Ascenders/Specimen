@@ -14,7 +14,9 @@ import { WorldAudioSource } from '../audio/WorldAudio.ts';
 
 export const TRANSIT_SEWER_EMERGENCE_RANGE = 16;
 export const TRANSIT_SEWER_ATTACK_RANGE = 10;
-export const TRANSIT_SEWER_CONE_HALF_ANGLE = .22;
+export const TRANSIT_SEWER_CONE_HALF_ANGLE = .275;
+export const TRANSIT_SEWER_ALERT_SECONDS = 5;
+export const TRANSIT_SEWER_RETALIATION_RANGE = 30;
 // The last guard needs clearance for the projectile radius and hover bob over
 // the inner catwalk rail, including Volt running close to that rail.
 export const TRANSIT_SEWER_DRONE_POSITIONS = [[18, -.68, 100], [18, -.68, 124], [-11.5, .72, 132]] as const;
@@ -29,6 +31,7 @@ export interface SewerDroneGuard {
 }
 
 export interface EmergingSewerDroneSnapshot extends WeakSewerDroneSnapshot {
+  readonly alertSeconds?: number;
   readonly position?: readonly number[];
   readonly rotation?: readonly number[];
   readonly motionSeconds?: number;
@@ -60,6 +63,9 @@ export class EmergingSewerDrone {
   private readonly materials = new Set<THREE.Material>();
   private readonly geometries = new Set<THREE.BufferGeometry>();
   private unbind?: () => void;
+  private alertSeconds = 0;
+  private readonly retaliationTargets: SecurityDroneTarget[] = [];
+  get retaliating(): boolean { return this.alertSeconds > 0 && this.state.state !== 'destroyed'; }
   private disposed = false;
   constructor(id: string, parent: THREE.Group, origin: THREE.Vector3,
     world: CollisionWorld, surfaces: SurfaceRegistry, projectiles: DroneProjectileSystem, resources: SecurityDronePresentationResources,
@@ -119,7 +125,19 @@ export class EmergingSewerDrone {
     this.audio = new WorldAudioSource({ root: this.shell.body, kind: 'drone', enabled: () => this.weapon.readModel.enabled });
     this.reset();
   }
-  bindBurns(system: DissolveSystem): void { this.unbind?.(); this.unbind = bindWeakSewerDroneBurns(system, this.target, this.state); }
+  bindBurns(system: DissolveSystem): void {
+    this.unbind?.();
+    const shared = bindWeakSewerDroneBurns(system, this.target, this.state);
+    const alert = system.events.on('burnStarted', event => {
+      if (event.target !== this.target) return;
+      if (this.state.state === 'destroyed') { this.alertSeconds = 0; this.suspend(); return; }
+      // Only accepted projectile reactions alert us. Refreshing an existing
+      // alert must not repeatedly restart the warning and suppress retaliation.
+      if (!this.retaliating) this.weapon.cancelTransientState();
+      this.alertSeconds = TRANSIT_SEWER_ALERT_SECONDS;
+    });
+    this.unbind = () => { alert(); shared(); };
+  }
   update(dt: number, targets: readonly SecurityDroneTarget[], enabled: boolean): void {
     if (!enabled) { this.suspend(); return; }
     let near = false;
@@ -133,10 +151,17 @@ export class EmergingSewerDrone {
       near ||= squared <= TRANSIT_SEWER_EMERGENCE_RANGE ** 2;
     }
     this.state.update(dt, near);
+    this.alertSeconds = Math.max(0, this.alertSeconds - dt);
+    if (this.state.state === 'destroyed') this.alertSeconds = 0;
+    this.retaliationTargets.length = 0;
+    if (this.retaliating) for (const target of targets) {
+      if (target.slimeId === 'goop' && target.eligible !== false) this.retaliationTargets.push(target);
+    }
+    const combatTargets = this.retaliationTargets.length ? this.retaliationTargets : targets;
     this.shell.body.visible = this.state.state !== 'destroyed' && !this.target.completed;
     let following = false;
-    if (this.followAcquiredTarget) for (const target of targets) {
-      if (target.eligible === false || target.slimeId !== this.weapon.readModel.targetSlimeId) continue;
+    if (this.retaliating || this.followAcquiredTarget) for (const target of combatTargets) {
+      if (target.eligible === false || target.slimeId !== (this.retaliating ? 'goop' : this.weapon.readModel.targetSlimeId)) continue;
       this.scanPoint.set(target.position.x, target.position.y, target.position.z);
       following = true; break;
     }
@@ -151,22 +176,29 @@ export class EmergingSewerDrone {
     this.shell.body.getWorldQuaternion(this.worldRotation);
     this.worldGaze.set(0, 0, -1).applyQuaternion(this.worldRotation);
     this.weapon.setPatrolDirection(this.worldGaze);
-    this.weapon.setEnabled(this.state.state === 'active'); this.weapon.update(dt, targets);
+    this.weapon.setDetectionRange(this.retaliating ? TRANSIT_SEWER_RETALIATION_RANGE : TRANSIT_SEWER_ATTACK_RANGE);
+    this.weapon.setEnabled(this.state.state === 'active'); this.weapon.update(dt, combatTargets);
+    if (this.retaliating && this.weapon.readModel.targetSlimeId === 'goop' &&
+        (this.weapon.readModel.state === 'warning' || this.weapon.readModel.state === 'firing')) this.alertSeconds = TRANSIT_SEWER_ALERT_SECONDS;
     this.syncLight();
   }
   private syncLight(): void {
     const power = this.weapon.readModel.enabled ? sewerDroneLampPower(this.motion.time) : 0;
     this.light.intensity = 26 * power;
+    const range = this.weapon.readModel.detectionRangeMetres;
+    this.light.distance = range;
+    this.beam.scale.setScalar(range / TRANSIT_SEWER_ATTACK_RANGE);
     this.shell.eye.material.color.setHex(power > .5 ? 0xffa13b : power ? 0x41180a : 0x080b07);
     this.direction.set(0, 0, -1).applyQuaternion(this.shell.body.quaternion);
     this.light.position.copy(this.shell.body.position).addScaledVector(this.direction, 1.3);
-    this.light.target.position.copy(this.light.position).addScaledVector(this.direction, TRANSIT_SEWER_ATTACK_RANGE);
+    this.light.target.position.copy(this.light.position).addScaledVector(this.direction, range);
     this.beam.position.copy(this.light.position); this.direction.negate(); this.beam.quaternion.setFromUnitVectors(this.up, this.direction);
     this.beam.material.opacity = .04 * power;
     if (!power) this.beam.visible = false;
   }
   suspend(): void { this.weapon.setEnabled(false); this.light.intensity = 0; this.beam.visible = false; }
   reset(): void {
+    this.alertSeconds = 0;
     this.state.reset(); this.motion.reset(); this.target.reset(); this.damage.reset(0); this.weapon.reset();
     this.weapon.setCollisionEnabled(false); this.weapon.setPresentationVisible(false);
     this.shell.body.position.copy(this.submerged);
@@ -177,11 +209,12 @@ export class EmergingSewerDrone {
     this.shell.body.visible = true; this.suspend(); this.syncLight();
   }
   capture(): EmergingSewerDroneSnapshot {
-    return { ...this.state.capture(), position: this.shell.body.position.toArray(),
+    return { ...this.state.capture(), alertSeconds: this.alertSeconds, position: this.shell.body.position.toArray(),
       rotation: this.shell.body.quaternion.toArray(), motionSeconds: this.motion.time };
   }
   restore(state: EmergingSewerDroneSnapshot): void {
     this.reset(); this.state.restore(state); this.damage.reset(state.hits);
+    this.alertSeconds = Number.isFinite(state.alertSeconds) ? THREE.MathUtils.clamp(state.alertSeconds!, 0, TRANSIT_SEWER_ALERT_SECONDS) : 0;
     if (state.state === 'active' || state.state === 'destroyed') this.shell.body.position.y = this.origin.y + WEAK_SEWER_DRONE.riseMetres;
     // Checkpoint restoration retains the actual damped emergence pose, so a
     // partially risen drone does not return to the acid and jump upward again.

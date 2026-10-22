@@ -83,7 +83,7 @@ interface MutableReadModel {
   readonly position: { x: number; y: number; z: number };
   readonly forward: { x: number; y: number; z: number };
   readonly scanDirection: { x: number; y: number; z: number };
-  readonly detectionRangeMetres: number;
+  detectionRangeMetres: number;
   readonly detectionHalfAngleRadians: number;
   stateElapsedSeconds: number;
 }
@@ -264,6 +264,12 @@ export class SecurityDrone {
     this.scanDirection.copy(this.baseForward);
   }
 
+  /** Encounter-local alert range; the same range drives the visible beam. */
+  setDetectionRange(metres: number): void {
+    if (!Number.isFinite(metres) || metres <= 0) throw new Error('Invalid drone detection range.');
+    this.model.detectionRangeMetres = metres;
+  }
+
   setEnabled(enabled: boolean): void {
     if (this.disposed || this.enabled === enabled) return;
     this.enabled = enabled;
@@ -321,6 +327,7 @@ export class SecurityDrone {
     this.root.quaternion.copy(this.initialQuaternion);
     this.scanPhase = normalizePhase(this.config.initialScanPhase);
     this.baseForward.copy(this.config.forward).normalize();
+    this.model.detectionRangeMetres = this.config.detectionRangeMetres;
     this.target = undefined;
     this.targetLossElapsed = 0;
     this.fireElapsed = 0;
@@ -429,7 +436,7 @@ export class SecurityDrone {
     const distanceSquared = this.displacement.lengthSq();
     if (
       distanceSquared <= EPSILON ||
-      distanceSquared > this.config.detectionRangeMetres * this.config.detectionRangeMetres
+      distanceSquared > this.model.detectionRangeMetres * this.model.detectionRangeMetres
     ) return false;
     this.targetDirection.copy(this.displacement).normalize();
     if (this.targetDirection.dot(this.baseForward) < this.maximumAcquisitionAngleCos) {

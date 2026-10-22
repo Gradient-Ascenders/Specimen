@@ -67,7 +67,7 @@ test('three room lights latch after 1.5 seconds and remain powered after disconn
   } finally { f.dispose(); }
 });
 
-test('conducting fixtures have no standby glow or yellow torus markers', () => {
+test('room light fixtures stay dark while locked lift contacts signal their guard interlocks', () => {
   const f = fixture();
   try {
     for (const receiver of [...f.controller.lights, f.controller.lockReceiver]) {
@@ -78,7 +78,7 @@ test('conducting fixtures have no standby glow or yellow torus markers', () => {
     }
     for (const lift of f.controller.lifts) {
       const contact = lift.root.getObjectByName(`${lift.id}-conducting-contact`) as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>;
-      assert.equal(contact.material.emissiveIntensity, 0);
+      assert.equal(contact.material.emissiveIntensity, .6, 'locked lifts visibly signal their drone interlock');
     }
   } finally { f.dispose(); }
 });
@@ -120,6 +120,7 @@ test('Bob must hold the wall switch to deploy the bridge; Volt can latch the far
   const f = fixture();
   const cues: string[] = [], off = gameplayAudioEvents.on('cue',e=>cues.push(e.sound));
   try {
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
     f.bodies.bob.position.copy(f.room.switchBodyPosition);
     (f.bodies.bob as unknown as { attached: boolean; attachmentSurfaceName: string }).attached = true;
     (f.bodies.bob as unknown as { attachmentSurfaceName: string }).attachmentSurfaceName = 'bob-bridge-switch-sticky-wall';
