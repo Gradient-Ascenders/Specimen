@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import * as THREE from 'three';
 import { AudioManager, type AudioPlayback } from '../src/audio/AudioManager.ts';
+import { prepareBlackoutArrivalAudio } from '../src/audio/BlackoutArrivalAudio.ts';
 import { WorldAudio } from '../src/audio/WorldAudio.ts';
 import { LaserHazard } from '../src/hazards/LaserHazard.ts';
 import { GameplayAudio, type AcidPoolBounds } from '../src/audio/GameplayAudio.ts';
@@ -121,19 +122,78 @@ test('loop distance fades adjust one continuing voice and survive suspension and
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
-test('all 71 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 72 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 71);
+  assert.equal(ids.length, 72);
   assert.equal(SOUND_BANKS.containment.some(id => id.startsWith('cultivation-')), false);
   assert.equal(SOUND_BANKS.cultivation.filter(id => id.startsWith('cultivation-')).length, 8);
+  assert.equal(SOUND_BANKS.containment.includes('blackout-vent-slime-slide-01'), false);
+  assert.equal(SOUND_BANKS.cultivation.includes('blackout-vent-slime-slide-01'), false);
+  assert.equal(SOUND_BANKS.blackout.includes('blackout-vent-slime-slide-01'), true);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
     assert.equal(new URL(soundUrl(id), 'https://example.test/group-folder/').pathname, `/group-folder/${path}`);
     assert.equal(soundUrl(id, '/group-folder/'), `/group-folder/${path}`);
   }
-  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro','escape','cultivation'])
+  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro','escape','cultivation','blackout'])
     assert.ok(readdirSync(new URL(`../public/assets/audio/${folder}/`, import.meta.url)).every(f => f.endsWith('.ogg')));
+});
+
+test('cold Blackout entry waits for the slide decode; repeat entry uses its cached buffer', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  let releaseSlide!: () => void, slideRequests = 0, prepared = false;
+  const delayedSlide = new Promise<void>(resolve => { releaseSlide = resolve; });
+  globalThis.fetch = async url => {
+    if (String(url).includes('blackout-vent-slime-slide-01')) { slideRequests++; await delayedSlide; }
+    return new Response(new Uint8Array([1]));
+  };
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    const preparation = prepareBlackoutArrivalAudio(audio).then(() => { prepared = true; });
+    audio.unlock(); audio.setPaused(false);
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(prepared, false, 'Do not start the first-frame movie cue before its download/decode completes.');
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length, 0, 'An undecoded one-shot would otherwise be dropped.');
+    releaseSlide(); await preparation;
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length, 1, 'The very first entry can now play the slide.');
+    audio.stopSound('blackout-vent-slime-slide-01'); context.currentTime += 1;
+    await prepareBlackoutArrivalAudio(audio);
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length, 2); assert.equal(slideRequests, 1);
+    assert.equal(SOUND_DEFINITIONS['blackout-vent-slime-slide-01'].volume, .35);
+  } finally { releaseSlide(); audio.dispose(); globalThis.fetch = originalFetch; }
+});
+
+test('first-frame slide schedules exactly once while the browser audio context is resuming', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  let finishResume!: () => void;
+  const resumed = new Promise<void>(resolve => { finishResume = () => { context.state = 'running'; resolve(); }; });
+  context.resume = () => resumed;
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    await audio.preload(['blackout-vent-slime-slide-01']);
+    audio.unlock();
+    audio.play('blackout-vent-slime-slide-01');assert.equal(context.sources.length,0,'Intentional pause still rejects cues.');
+    audio.setPaused(false);
+    assert.equal(context.state,'suspended');
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length,1,'The first-frame voice must survive asynchronous resume.');
+    assert.equal(context.sources[0].starts,1);
+    finishResume();await resumed;await Promise.resolve();
+    assert.equal(context.sources.length,1,'Resume must not replay the queued one-shot.');
+    audio.stopAll();context.currentTime+=1;
+    audio.setFocused(false);audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length,1,'Focus loss still rejects new voices.');
+  } finally { finishResume(); audio.dispose(); globalThis.fetch=originalFetch; }
+});
+
+test('Blackout arrival audio preparation tolerates failed and stalled optional audio', async () => {
+  await prepareBlackoutArrivalAudio({ preload: async () => { throw new Error('Unavailable audio'); } });
+  await prepareBlackoutArrivalAudio({ preload: () => new Promise<void>(() => {}) }, 1);
 });
 
 test('cached loading, autoplay, keyed loops, pause, position, limits, volume and teardown', async () => {

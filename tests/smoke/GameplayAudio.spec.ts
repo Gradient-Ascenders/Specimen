@@ -55,6 +55,7 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   expect(new Set(audioRequests.filter(url => url.includes('/intro/'))).size).toBe(14);
   expect(new Set(audioRequests.filter(url => url.includes('/escape/'))).size).toBe(9);
   expect(new Set(audioRequests.filter(url => url.includes('/cultivation/'))).size).toBe(8);
+  expect(new Set(audioRequests.filter(url => url.includes('/blackout/'))).size).toBe(1);
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});

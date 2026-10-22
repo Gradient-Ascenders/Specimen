@@ -19,17 +19,20 @@ CLIPS = {
 }
 
 
-def main(source=SOURCE, clips=CLIPS, report='cultivation-sentry-audio-import.json'):
+def main(source=SOURCE, clips=CLIPS, report='cultivation-sentry-audio-import.json', output=OUTPUT, max_gain=4):
     members = {}
-    with tarfile.open(source) as archive:
-        for member in archive.getmembers():
-            path = PurePosixPath(member.name)
-            if path.is_absolute() or '..' in path.parts or not member.isfile() or member.name in members:
-                raise ValueError(f'Unexpected archive member: {member.name}')
-            members[member.name] = archive.extractfile(member).read()
+    if source.suffix.lower() == '.wav':
+        members[source.name] = source.read_bytes()
+    else:
+        with tarfile.open(source) as archive:
+            for member in archive.getmembers():
+                path = PurePosixPath(member.name)
+                if path.is_absolute() or '..' in path.parts or not member.isfile() or member.name in members:
+                    raise ValueError(f'Unexpected archive member: {member.name}')
+                members[member.name] = archive.extractfile(member).read()
     if set(members) != {clip[0] for clip in clips.values()}:
         raise ValueError(f'Expected the {len(clips)} selected recordings')
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
     inventory, sources = [], []
     for sound, (name, target) in clips.items():
         original, rate = sf.read(io.BytesIO(members[name]), always_2d=True)
@@ -37,13 +40,13 @@ def main(source=SOURCE, clips=CLIPS, report='cultivation-sentry-audio-import.jso
             raise ValueError(f'Invalid source audio: {name}')
         mono = original.mean(axis=1)
         mono -= mono.mean()
-        gain = min(4, target / max(float(np.sqrt(np.mean(mono**2))), 1e-9),
+        gain = min(max_gain, target / max(float(np.sqrt(np.mean(mono**2))), 1e-9),
                    .7 / max(float(np.abs(mono).max()), 1e-9))
         mono *= gain
         edge = min(round(.002 * rate), len(mono) // 2)
         mono[:edge] *= np.linspace(0, 1, edge)
         mono[-edge:] *= np.linspace(1, 0, edge)
-        path = OUTPUT / f'{sound}.ogg'
+        path = output / f'{sound}.ogg'
         sf.write(path, mono, rate, format='OGG', subtype='VORBIS')
         decoded, rate = sf.read(path)
         peak = float(np.abs(decoded).max())
@@ -59,8 +62,9 @@ def main(source=SOURCE, clips=CLIPS, report='cultivation-sentry-audio-import.jso
     inventory_path = ROOT / 'docs/assets/gameplay-audio-inventory.json'
     others = [row for row in json.loads(inventory_path.read_text()) if row['id'] not in clips]
     inventory_path.write_text(json.dumps(sorted(others + inventory, key=lambda row: row['id']), indent=2) + '\n')
+    source_kind = 'sourceFile' if source.suffix.lower() == '.wav' else 'archive'
     (ROOT / 'docs/assets' / report).write_text(json.dumps({
-        'archive': str(source.relative_to(ROOT)), 'archiveSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+        source_kind: str(source.relative_to(ROOT)), source_kind + 'Sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
         'processing': 'Mono averaging, DC removal, gain with peak headroom, 2 ms fades, OGG Vorbis. No trimming or looping.',
         'clips': sources,
     }, indent=2) + '\n')

@@ -1,5 +1,14 @@
 [
   {
+    "id": "blackout-vent-slime-slide-01",
+    "path": "assets/audio/blackout/blackout-vent-slime-slide-01.ogg",
+    "durationSeconds": 4.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.70959,
+    "loop": false
+  },
+  {
     "id": "bob-charged-jump-01",
     "path": "assets/audio/bob/bob-charged-jump-01.ogg",
     "durationSeconds": 0.42,

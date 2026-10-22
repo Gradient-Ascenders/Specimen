@@ -122,6 +122,17 @@ test('Volt rescue selection prepares Cultivation before entering the movie', () 
   assert.equal(flow.state, 'playing');
 });
 
+test('Blackout arrival selection prepares the level before starting its normal entry sequence', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('blackout-arrival'), true);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('blackout-arrival'), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
 test('level selection waits for preparation and explicit entry before playing', () => {
   const flow = new GameFlowStateModel();
   flow.completeBoot();

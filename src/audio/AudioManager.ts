@@ -234,7 +234,11 @@ export class AudioManager implements AudioPlayback {
   }
 
   play(sound: SoundId, position?: AudioPosition, varyPitch = false, volumeScale = 1): void {
-    if (!this.canPlay()) return;
+    // resume() is asynchronous. Schedule a decoded first-frame one-shot on
+    // the suspended context's clock rather than dropping it before resume
+    // completes. Intentional pause, focus loss and locked audio still reject it.
+    if (this.disposed || !this.unlocked || this.paused || !this.focused ||
+      !this.context || this.context.state === 'closed') return;
     const scale = Number.isFinite(volumeScale) ? Math.max(0, Math.min(1, volumeScale)) : 0;
     if (scale === 0) return;
     const now = this.context!.currentTime;

@@ -49,7 +49,7 @@ export type GameFlowState =
   | 'transitioning'
   | 'transitionFailed';
 
-export type PreviewCutsceneId = 'intro' | 'escape' | 'sentry-clearance' | 'volt-rescue';
+export type PreviewCutsceneId = 'intro' | 'escape' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -318,7 +318,7 @@ export class GameFlowStateModel {
   }
 
   beginSelectedCutscene(cutscene: PreviewCutsceneId = 'intro'): boolean {
-    return this.transitionFrom('cutsceneSelect', cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' ? 'transitioning' : 'opening');
+    return this.transitionFrom('cutsceneSelect', cutscene === 'intro' || cutscene === 'escape' ? 'opening' : 'transitioning');
   }
 
   finishOpening(): boolean {
@@ -827,6 +827,9 @@ export class GameFlowUI {
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="volt-rescue">
               ${icon('Play')}<span><small>Level 2 · Room 5</small>Volt's rescue and escape</span>
             </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="blackout-arrival">
+              ${icon('Play')}<span><small>Level 3 · Blackout</small>Vent arrival</span>
+            </button>
           </nav>
           <footer class="credits-footer">
             <button type="button" class="system-action" data-action="back">
@@ -1190,7 +1193,7 @@ export class GameFlowUI {
         break;
       case 'select-cutscene': {
         const cutscene = target.dataset.cutscene;
-        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue') && this.model.beginSelectedCutscene(cutscene)) {
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') && this.model.beginSelectedCutscene(cutscene)) {
           this.syncState();
           this.actions.previewCutscene(cutscene);
         }
