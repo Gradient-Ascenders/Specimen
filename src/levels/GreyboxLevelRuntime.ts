@@ -873,6 +873,7 @@ export class GreyboxLevelRuntime {
     } = resources;
     let cameraDistanceScale = 1;
     if (deathSequence.isPlaying) {
+      testScene.roomFive.art.presentMovingPlatforms(interpolationAlpha);
       const previous = body.previousPosition;
       const current = body.position;
       renderedProbePosition.set(
@@ -907,6 +908,7 @@ export class GreyboxLevelRuntime {
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
           : renderedProbePosition;
+      testScene.platformBoosters.update(this.state === 'running' ? stats.frameDeltaSeconds : 0, activeRenderedPosition);
       if (testScene.isInsideCameraTightVent(activeRenderedPosition)) {
         cameraDistanceScale = VENT_CAMERA_DISTANCE_SCALE;
       }

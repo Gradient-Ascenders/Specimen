@@ -191,7 +191,10 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     readonly radius: number;
     readonly matrix: THREE.Matrix4;
     readonly centre: THREE.Vector3;
+    readonly previousCentre: THREE.Vector3;
+    previousVisible: boolean;
     visible: boolean;
+    changed: boolean;
   }[] = [];
   private readonly shadowSourcePosition = new THREE.Vector3();
   private readonly shadowSphere = new THREE.Sphere();
@@ -356,8 +359,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     });
     for (const [root, radius] of [
       [this.roomFour.elevatorPlatform.root, 7],
-      [this.roomFive.movingPlatformOne.root, 4],
-      [this.roomFive.movingPlatformTwo.root, 4],
+      ...this.roomFive.art.movingPlatformDressings.map(root => [root, 4] as const),
       [this.roomFive.goopPresentation.root.getObjectByName('player-slime-goop-character')!, 1.3],
       [options.roomOneArt.specimenAssembly, 4],
       [options.roomOneArt.eggRoot, 2],
@@ -370,8 +372,10 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       ...Object.values(this.roomFive.art.panelPivots).map(root => [root, 5] as const),
     ] as const) {
       root.updateWorldMatrix(true, false);
+      const centre = root.getWorldPosition(new THREE.Vector3());
+      const visible = isEffectivelyVisible(root);
       this.shadowMovingOwners.push({ root, radius, matrix: root.matrixWorld.clone(),
-        centre: root.getWorldPosition(new THREE.Vector3()), visible: root.visible });
+        centre, previousCentre: centre.clone(), visible, previousVisible: visible, changed: false });
     }
 
     this.applyRoomVisibility();
@@ -444,15 +448,21 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
    */
   prepareShadowFrame(participants: readonly Vector3State[]): void {
     if (this.disposed) return;
-    const changedOwners: { centre: THREE.Vector3; radius: number }[] = [];
+    let ownersChanged = false;
     for (const owner of this.shadowMovingOwners) {
       owner.root.updateWorldMatrix(true, false);
-      if (owner.matrix.equals(owner.root.matrixWorld) && owner.visible === owner.root.visible) continue;
-      changedOwners.push({ centre: owner.centre.clone(), radius: owner.radius });
+      const visible = isEffectivelyVisible(owner.root);
+      owner.changed = false;
+      if (owner.matrix.equals(owner.root.matrixWorld) && owner.visible === visible) continue;
+      // Retain both presented footprints without allocating per moving frame.
+      // Ancestor visibility matters because the dressing lives below its carrier.
+      owner.previousCentre.copy(owner.centre);
+      owner.previousVisible = owner.visible;
       owner.root.getWorldPosition(owner.centre);
-      changedOwners.push({ centre: owner.centre, radius: owner.radius });
       owner.matrix.copy(owner.root.matrixWorld);
-      owner.visible = owner.root.visible;
+      owner.visible = visible;
+      owner.changed = owner.previousVisible || visible;
+      ownersChanged ||= owner.changed;
     }
     // Dissolve shaders change silhouettes without changing a transform.
     const dissolvingDoor = this.roomFive.goopWoodenDoor;
@@ -478,7 +488,9 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
         (dissolveLive && intersects(dissolvingDoor.getWorldPosition(this.shadowSphere.center), 4));
       shadow.autoUpdate = dynamic;
       if (!shadow.map || (dissolveChanged && intersects(dissolvingDoor.getWorldPosition(this.shadowSphere.center), 4)) ||
-        changedOwners.some(owner => intersects(owner.centre, owner.radius)) ||
+        (ownersChanged && this.shadowMovingOwners.some(owner => owner.changed &&
+          ((owner.previousVisible && intersects(owner.previousCentre, owner.radius)) ||
+            (owner.visible && intersects(owner.centre, owner.radius))))) ||
         (!dynamic && this.previousShadowParticipants.some(position => intersects(position, 1.5)))) {
         shadow.needsUpdate = true;
       }

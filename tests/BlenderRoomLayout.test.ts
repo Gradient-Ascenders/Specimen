@@ -174,7 +174,6 @@ test('Room 3 second sticky wall joins its platform without an exposed sticky edg
     'cultivation-room-3-central-sticky-transfer',
     'cultivation-room-3-second-wall-sticky-landing',
     'cultivation-room-3-bob-west-wall-exit',
-    'cultivation-room-3-west-wall-exit-support',
   ] as const;
   const bounds = names.map((name) => {
     const mesh = scene.collisionMeshes.find((candidate) => candidate.name === name);
@@ -184,7 +183,7 @@ test('Room 3 second sticky wall joins its platform without an exposed sticky edg
 
   assert.ok(Math.abs(bounds[0].max.y - bounds[1].max.y) < 1e-6);
   assert.ok(Math.abs(bounds[1].max.y - bounds[2].max.y) < 1e-6);
-  assert.ok(Math.abs(bounds[2].min.y - bounds[3].max.y) < 1e-6);
+  assert.equal(scene.root.getObjectByName('cultivation-room-3-west-wall-exit-support'), undefined);
 
   scene.dispose();
   for (const target of targets) target.dispose();

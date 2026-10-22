@@ -785,7 +785,7 @@ test('debug room teleports activate and recover through real entry checkpoints',
     {
       roomId: 3,
       checkpointId: 'containment-room-3-entry',
-      position: new THREE.Vector3(0, 10.86, 51.4),
+      position: new THREE.Vector3(0, 11.36, 51.4),
     },
     {
       roomId: 4,

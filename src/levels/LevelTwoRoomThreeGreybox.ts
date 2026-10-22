@@ -352,7 +352,7 @@ export class LevelTwoRoomThreeGreybox {
   }
 
   private buildBobUpperRoute(): void {
-    const { platform, sticky, support } = this.builder.materials;
+    const { platform, sticky } = this.builder.materials;
 
     const platforms: ReadonlyArray<{
       readonly id: string;
@@ -431,20 +431,8 @@ export class LevelTwoRoomThreeGreybox {
     });
     this.configureDropWalls();
 
-    // Supports make each rest area read as a maintenance route rather than a
-    // collection of arbitrary boxes suspended in an empty room.
-    for (const [name, x, y, z, height] of [
-      ['first-wall-exit', 1, 11.8, 21, 23.6],
-      ['west-wall-exit', -16, 13, 38, 26],
-      ['final-wall-exit', 3, 12.8, 54.5, 25.6],
-    ] as const) {
-      this.builder.addCollider({
-        name: `cultivation-room-3-${name}-support`,
-        size: [0.8, height, 0.8],
-        position: [x, y, z],
-        material: support,
-      });
-    }
+    // These three wall-exit decks float on thrusters. Their former full-height
+    // poles are intentionally absent from both the scene and collision registry.
   }
 
   private buildThirdWallOpening(): void {

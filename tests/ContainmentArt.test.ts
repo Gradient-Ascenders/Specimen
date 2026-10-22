@@ -278,7 +278,10 @@ test('Room 3 art contains the acid and instruments the frozen route without owni
   assert.equal(art.acidSurface.userData.materialRole, 'replaceable-acid-surface');
   assert.equal(art.acidSurface.material, art.acidSurfaceMaterial);
   assert.ok(art.root.getObjectByName('room-3-basin-substantial-perimeter-curbs'));
-  assert.ok(art.root.getObjectByName('room-3-entry-platform-actuator-column'));
+  assert.equal(art.root.getObjectByName('room-3-entry-platform-actuator-column'), undefined);
+  assert.equal(art.root.getObjectByName('room-3-entry-platform-actuator-base-socket'), undefined);
+  assert.equal(art.root.getObjectByName('room-3-entry-platform-actuator-upper-collar'), undefined);
+  assert.ok(art.root.getObjectByName('room-3-entry-platform-underside-actuator-socket'));
   assert.ok(art.root.getObjectByName('room-3-first-static-laser-start-instrument-housing'));
   assert.equal(art.root.getObjectByName('room-3-upper-sweep-gantry-rail'), undefined);
   assert.equal(art.root.getObjectByName('room-3-platform-c-overhead-hanger-1'), undefined);

@@ -19,6 +19,93 @@ const lights = (scene: ContainmentLevelScene) => Object.keys(CONTAINMENT_SHADOW_
     return light;
   });
 
+function ownerCoverage(light: THREE.PointLight | THREE.SpotLight, centre: THREE.Vector3): boolean {
+  if (light.getWorldPosition(new THREE.Vector3()).distanceTo(centre) > light.distance + 4) return false;
+  if (!(light instanceof THREE.SpotLight)) return true;
+  light.shadow.updateMatrices(light);
+  return light.shadow.getFrustum().intersectsSphere(new THREE.Sphere(centre, 4));
+}
+
+function cacheMaps(sources: (THREE.PointLight | THREE.SpotLight)[]): void {
+  for (const light of sources) {
+    light.shadow.map ??= new THREE.WebGLRenderTarget(4, 4);
+    light.shadow.needsUpdate = false;
+  }
+}
+
+for (const index of [0, 1]) test(`platform ${index + 1} invalidates presented shadows between physics ticks, through reversal and restoration`, () => {
+  const scene = createScene(), sources = lights(scene), room = scene.roomFive;
+  const platform = [room.movingPlatformOne, room.movingPlatformTwo][index];
+  const visual = platform.root.getObjectByName(`room-5-moving-platform-${index + 1}-production-dressing`)!;
+  try {
+    const casters: THREE.Mesh[] = [];
+    visual.traverse(object => { if (object instanceof THREE.Mesh && object.castShadow) casters.push(object); });
+    assert.ok(casters.length >= 4, 'Tread, underbody, mount and socket silhouettes share the presented owner');
+    cacheMaps(sources); scene.lighting.prepareShadowFrame([]); cacheMaps(sources);
+    for (const state of [{ progress: .5, target: 'end' }, { progress: .5, target: 'start' }] as const) {
+      platform.restoreState(state); room.art.presentMovingPlatforms(1);
+      scene.lighting.prepareShadowFrame([]); cacheMaps(sources);
+      platform.update(1 / 60);
+      platform.root.updateWorldMatrix(true, false);
+      const authority = platform.root.matrixWorld.clone(), position = platform.root.position.clone();
+      let previous = visual.getWorldPosition(new THREE.Vector3());
+      // alpha samples are separate rendered frames, with no intervening physics.
+      for (const alpha of [.2, .5, .8]) {
+        room.art.presentMovingPlatforms(alpha);
+        const current = visual.getWorldPosition(new THREE.Vector3());
+        scene.lighting.prepareShadowFrame([]);
+        assert.ok(current.distanceTo(previous) > .001);
+        assert.deepEqual(platform.root.position, position);
+        assert.deepEqual(platform.root.matrixWorld, authority, 'Queries do not mutate authority');
+        assert.ok(sources.some(light => ownerCoverage(light, previous) || ownerCoverage(light, current)));
+        for (const light of sources) {
+          assert.equal(light.shadow.autoUpdate, false, 'No global auto-update');
+          assert.equal(light.shadow.needsUpdate, ownerCoverage(light, previous) || ownerCoverage(light, current),
+            `${light.name}, platform ${index + 1}, alpha ${alpha}`);
+        }
+        cacheMaps(sources); room.art.presentMovingPlatforms(alpha); scene.lighting.prepareShadowFrame([]);
+        assert.ok(sources.every(light => !light.shadow.needsUpdate), 'An identical presented pose reuses every cached map');
+        previous = current;
+      }
+    }
+    for (const restore of [() => platform.reset(), () => platform.restoreState({ progress: .8, target: 'start' })]) {
+      const previous = visual.getWorldPosition(new THREE.Vector3());
+      restore(); room.art.reset(); room.art.presentMovingPlatforms(.2);
+      const current = visual.getWorldPosition(new THREE.Vector3());
+      scene.lighting.prepareShadowFrame([]);
+      assert.equal(visual.position.lengthSq(), 0, 'Recovery clears stale interpolation');
+      for (const light of sources) assert.equal(light.shadow.needsUpdate,
+        ownerCoverage(light, previous) || ownerCoverage(light, current), `Restore coverage: ${light.name}`);
+      cacheMaps(sources); scene.lighting.prepareShadowFrame([]);
+      assert.ok(sources.every(light => !light.shadow.needsUpdate));
+    }
+  } finally { scene.dispose(); }
+});
+
+test('presented owner invalidates old/new zones and ancestor visibility without touching unrelated maps', () => {
+  const scene = createScene(), sources = lights(scene), platform = scene.roomFive.movingPlatformOne;
+  const visual = platform.root.getObjectByName('room-5-moving-platform-1-production-dressing')!;
+  const old = new THREE.Vector3(-4.8, 5.8, 9), next = new THREE.Vector3(9, 83, 110);
+  try {
+    // Separate light zones make failure to clear old depth observable. Move only
+    // the test's presentation object; no authored route or physics data changes.
+    visual.position.copy(old).sub(platform.root.position);
+    cacheMaps(sources); scene.lighting.prepareShadowFrame([]); cacheMaps(sources);
+    visual.position.copy(next).sub(platform.root.position); scene.lighting.prepareShadowFrame([]);
+    for (const light of sources) assert.equal(light.shadow.needsUpdate,
+      ownerCoverage(light, old) || ownerCoverage(light, next), `Old/new coverage: ${light.name}`);
+    cacheMaps(sources); platform.root.visible = false; scene.lighting.prepareShadowFrame([]);
+    for (const light of sources) assert.equal(light.shadow.needsUpdate, ownerCoverage(light, next), `Hide: ${light.name}`);
+    cacheMaps(sources); scene.lighting.prepareShadowFrame([]);
+    assert.ok(sources.every(light => !light.shadow.needsUpdate), 'Hidden unchanged assemblies stay cached');
+    visual.position.x += .5; scene.lighting.prepareShadowFrame([]);
+    assert.ok(sources.every(light => !light.shadow.needsUpdate), 'Moving an already hidden assembly needs no shadow draw');
+    platform.root.visible = true; scene.lighting.prepareShadowFrame([]);
+    const shown = visual.getWorldPosition(new THREE.Vector3());
+    for (const light of sources) assert.equal(light.shadow.needsUpdate, ownerCoverage(light, shown), `Show: ${light.name}`);
+  } finally { scene.dispose(); }
+});
+
 function covers(light: THREE.PointLight | THREE.SpotLight, position: THREE.Vector3): boolean {
   if (light instanceof THREE.PointLight) {
     const distance = light.getWorldPosition(new THREE.Vector3()).distanceTo(position);
