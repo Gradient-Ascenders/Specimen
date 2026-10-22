@@ -1,6 +1,6 @@
 # Gameplay sound effects
 
-Specimen ships 66 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1, interaction polish 10, intro 14, Containment escape 9, Cultivation sentries 3. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
+Specimen ships 71 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1, interaction polish 10, intro 14, Containment escape 9, Cultivation sentries 3, Volt rescue 5. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ The five environment WAVs are preserved unchanged in `assets/audio/environment/e
 
 All in-game sound effects were generated with ElevenLabs Sound Effects, including the turret shot supplied separately by the requester. Separate licence documentation has not been supplied. `CREDITS.md` records provenance and feeds the existing in-game credits screen.
 
-`docs/assets/gameplay-audio-inventory.json` records all 66 decoded durations, sample rates, channel counts and peaks. All runtime assets are mono 48 kHz. Every file was fully decoded using libsndfile, and browser validation checks Web Audio decoding separately. Paths use Vite's relative `BASE_URL` (`./`) and remain beneath a nested deployment directory.
+`docs/assets/gameplay-audio-inventory.json` records all 71 decoded durations, sample rates, channel counts and peaks. All runtime assets are mono 48 kHz. Every file was fully decoded using libsndfile, and browser validation checks Web Audio decoding separately. Paths use Vite's relative `BASE_URL` (`./`) and remain beneath a nested deployment directory.
 
 ## Mix and volume
 
@@ -176,9 +176,36 @@ upper island, then starts the existing descent and four-sentry sequence
 automatically. No level playthrough or extra Enter Level click is needed.
 The runtime entry remains unavailable in production, including `?debug=1`.
 
+## Volt rescue and escape cutscene
+
+`volt-rescue-sounds.tar` retains the five supplied recordings. Run
+`python3 scripts/import-volt-rescue-audio.py` with NumPy/SoundFile; it reuses
+the Cultivation mono/gain/fade importer and writes 48 kHz OGG files into
+`public/assets/audio/cultivation/`. All five are one-shots, with their supplied
+durations preserved (shutter 5 s, cover release 1 s, impact 2 s, hijack 1.48 s,
+floor strain 2 s). Source hashes and gain/level records are in
+`docs/assets/volt-rescue-audio-import.json`.
+
+The existing shared finale clock drives the shutter opening, cover release
+and drone impact, Volt's electrical hijack, and duct-floor warning. Existing
+scan/result/termination recordings accompany both threat assessments. Acid
+splashes reuse the sentry recording with 2.2-second Goop corrosion loops;
+combat deaths reuse drone destruction, and the abandoned craft uses the
+power-down effect. Existing flight, alarm, gunfire, body, vent-break and
+shaft-fall sounds remain in use. Skip, completion, reset and disposal stop
+the rescue recordings and keyed corrosion loops. The shared audio lifecycle
+continues to own pause and resume.
+
+In development, **Select cutscene → Volt's rescue and escape** prepares
+Cultivation and starts the full real Room 5 finale automatically, using the
+same forced-entry path as the existing 8 shortcut. No level playthrough or
+Enter Level click is required. The menu runtime entry is development-only;
+production `?debug=1` does not enable it. Normal completion unlocks Volt and
+hands off to Blackout unchanged.
+
 ## Lifecycle
 
-- Boot preloads/decode-caches the 12 Bob/Goop, twelve world/environment clips, ten polish effects, fourteen intro effects, nine escape effects and the shared turret recording needed by the Containment finale (58 total) while playback stays suspended. The Cultivation bank adds three sentry effects and Volt's connection and ready accents for his live escape (63 total); he already has the shared body samples. Blackout adds the three remaining electrical clips (66 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
+- Boot preloads/decode-caches the 12 Bob/Goop, twelve world/environment clips, ten polish effects, fourteen intro effects, nine escape effects and the shared turret recording needed by the Containment finale (58 total) while playback stays suspended. The Cultivation bank adds eight sentry/rescue effects and Volt's connection and ready accents for his live escape (68 total); he already has the shared body samples. Blackout adds the three remaining electrical clips (71 total). These requests begin ahead of module/visual preparation, without gating boot or transitions on optional audio. Cues arriving before a buffer is ready are dropped, never replayed late. Repeated/overlapping requests share per-sound promises and one context, with at most four fetch/decode jobs active. Unlock only requests the initial bank, never the later banks. Individual failures remain optional and are exposed in diagnostics. Disposal aborts fetches, cancels queued jobs and ignores late decodes. Trusted pointer/key gestures unlock playback; unsupported audio leaves gameplay operational.
 
 Cultivation's Volt-release finale uses the supplied alarm loop and schedules button, body
 launch/landing accents, positional gunfire, acid impacts and drone destruction at
@@ -200,7 +227,7 @@ These events stop advancing with pause, and skipped shots are not replayed in bu
 Four team-approved OGG tracks are stored in `public/assets/audio/music/` and
 credited in `CREDITS.md`. `BackgroundMusic` streams them with at most two
 HTMLAudioElements rather than decoding them into the sound-effects buffer bank.
-It uses no per-frame update work and does not change the 58/63/66 sound-effects
+It uses no per-frame update work and does not change the 58/68/71 sound-effects
 bank counts. Music follows the existing menu, pause, opening, transition, level
 and completion state, and uses the master volume without the effects slider.
 

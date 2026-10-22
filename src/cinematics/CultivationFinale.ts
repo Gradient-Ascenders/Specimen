@@ -10,6 +10,7 @@ import {gameplayAudioEvents} from '../audio/GameplayAudioEvents.ts';
 import {TypewriterAudio} from '../audio/TypewriterAudio.ts';
 import {WorldAudioSource} from '../audio/WorldAudio.ts';
 import type {SoundId} from '../audio/SoundCatalog.ts';
+import {VOLT_RESCUE_AUDIO_CUES,VOLT_RESCUE_DISSOLVE_KEYS,stopVoltRescueAudio} from '../audio/CultivationFinaleAudio.ts';
 import type {CultivationFinaleSet} from './CultivationFinaleSet.ts';
 import {CultivationFinaleOverlay,VOLT_FINALE_DIALOGUE} from './CultivationFinaleOverlay.ts';
 import {VOLT_FINALE as T,VOLT_FINALE_PROJECTILES,finaleSmooth,sampleVoltFinaleActor,
@@ -29,21 +30,6 @@ interface Options {
 }
 type Presentation=BobCharacterPresentation|GoopCharacterPresentation|VoltCharacterPresentation;
 const UP=new THREE.Vector3(0,1,0),ZERO=new THREE.Vector3();
-const CUES:readonly(readonly[number,SoundId])[]=[
-  [T.button,'world-button-press-01'],[T.open,'world-release-01'],
-  [T.critical,'world-sign-tick-01'],[T.terminateVolt,'world-activation-01'],
-  [T.coverJump,'bob-jump-01'],[T.coverLand,'bob-land-soft-01'],
-  [T.coverHit,'bob-contact-01'],[T.coverHit+.2,'world-vent-break-01'],
-  [T.coverImpact,'world-platform-land-01'],[T.acidHit,'world-drone-dissolve-01'],
-  [T.catastrophic,'world-sign-tick-01'],[T.terminateBob,'world-activation-01'],
-  [T.voltJump,'bob-charged-jump-01'],[T.hijack,'volt-circuit-connect-01'],
-  [T.bobJump,'bob-jump-01'],[T.boarded,'bob-land-soft-01'],
-  [T.bobVentJump,'bob-jump-01'],[T.bobVentLand,'bob-land-soft-01'],
-  [T.voltVentJump,'bob-jump-01'],[T.ductLand,'bob-land-soft-01'],
-  [T.powerOff,'volt-circuit-release-01'],[T.rideAcidHit,'world-drone-dissolve-01'],
-  [T.ductShake,'world-platform-land-01'],[T.grateWarning,'world-platform-land-01'],
-  [T.grateBreak,'world-vent-break-01'],[T.drop,'bob-fall-01'],
-];
 const JUMPS=Object.freeze([
   {id:'bob',start:T.coverJump,end:T.coverLand},
   {id:'volt',start:T.voltJump,end:T.hijack},
@@ -196,13 +182,15 @@ export class CultivationFinale {
     this.previous=this.elapsed;this.elapsed=this.skipRequested?T.duration:Math.min(T.duration,this.elapsed+dt);
     if(!this.skipRequested){
       this.updateActors(this.elapsed,dt);
-      for(const [time,sound] of CUES)if(time>this.previous&&time<=this.elapsed){
+      for(const [time,sound] of VOLT_RESCUE_AUDIO_CUES)if(time>this.previous&&time<=this.elapsed){
         if(time>=T.open&&time<T.alarmEnd)this.signalPoint.set(0,CELL.y,49);
         else if(time===T.ductShake||time===T.grateWarning||time===T.grateBreak)this.signalPoint.set(V.dropX,V.y,V.z);
         else if(time===T.acidHit)sampleVoltFinaleDrone(0,time,this.signalPoint);
         else if(time===T.powerOff||time===T.rideAcidHit)sampleVoltFinaleDrone(1,time,this.signalPoint);
         else sampleVoltFinaleActor(time===T.hijack||time===T.voltJump||time===T.voltVentJump||time===T.ductLand?'volt':'bob',time,this.signalPoint);
-        this.options.room.root.localToWorld(this.signalPoint);this.cue(sound,this.signalPoint);
+        this.options.room.root.localToWorld(this.signalPoint);
+        const scanner=sound==='escape-drone-scan-01'||sound==='escape-scan-result-01'||sound==='escape-termination-warning-01';
+        this.cue(sound,scanner?undefined:this.signalPoint);
       }
       for(const shot of VOLT_FINALE_PROJECTILES){
         if(shot.time>this.previous&&shot.time<=this.elapsed){
@@ -211,7 +199,7 @@ export class CultivationFinale {
         }
         const hit=shot.time+shot.duration;
         if(shot.kill!==undefined&&hit>this.previous&&hit<=this.elapsed){
-          this.options.room.root.localToWorld(this.signalPoint.fromArray(shot.to));this.cue(shot.kind==='acid'?'goop-projectile-impact-01':'world-drone-dissolve-01',this.signalPoint);
+          this.options.room.root.localToWorld(this.signalPoint.fromArray(shot.to));this.cue(shot.kind==='acid'?'goop-projectile-impact-01':'escape-drone-destruction-01',this.signalPoint);
         }
       }
       if(this.previous<T.acidHit&&this.elapsed>=T.acidHit){
@@ -220,6 +208,15 @@ export class CultivationFinale {
       if(this.previous<T.rideAcidHit&&this.elapsed>=T.rideAcidHit){
         sampleVoltFinaleDrone(1,T.rideAcidHit,this.signalPoint);this.signalPoint.y=0;
         this.options.room.root.localToWorld(this.signalPoint);this.options.acid.disturb(this.signalPoint.x,this.signalPoint.z,0,3);
+      }
+      for(const [index,time] of [T.acidHit,T.rideAcidHit].entries()){
+        const key=VOLT_RESCUE_DISSOLVE_KEYS[index];
+        if(this.previous<time&&this.elapsed>=time&&this.elapsed<time+2.2){
+          sampleVoltFinaleDrone(index,time,this.signalPoint);this.signalPoint.y=0;
+          this.options.room.root.localToWorld(this.signalPoint);
+          gameplayAudioEvents.emit('loop',{key,sound:'goop-dissolve-loop-01',position:this.signalPoint.clone(),volumeScale:.65});
+        }
+        if(this.previous<time+2.2&&this.elapsed>=time+2.2)gameplayAudioEvents.emit('stop',{key});
       }
       const line=VOLT_FINALE_DIALOGUE.find(line=>this.elapsed>=line.start&&this.elapsed<line.end);
       if(this.elapsed>=T.open&&this.elapsed<T.ventCamera) gameplayAudioEvents.emit('loop',{
@@ -236,7 +233,7 @@ export class CultivationFinale {
       }
       this.options.acid.update(dt);
     }
-    if(this.elapsed>=T.duration){gameplayAudioEvents.emit('stop',{key:'cultivation-finale-alarm'});this.playing=false;this.overlay.present(T.duration);return true;}return false;
+    if(this.elapsed>=T.duration){stopVoltRescueAudio();this.playing=false;this.overlay.present(T.duration);return true;}return false;
   }
   present(camera:THREE.PerspectiveCamera,alpha:number):void{
     if(!this.playing)return;
@@ -436,9 +433,9 @@ export class CultivationFinale {
     this.options.goopPresentation.setExpression('determined',t>=T.followMe&&t<T.grateWarning?.5:t>=at(62)&&t<T.even?.8:0);
     this.options.goopPresentation.setExpression('relieved',t>=T.even&&t<at(75)?.5:0);
   }
-  private cue(sound:SoundId,position:THREE.Vector3):void{gameplayAudioEvents.emit('cue',{sound,position,maxDistance:110,volumeScale:.8});}
+  private cue(sound:SoundId,position?:THREE.Vector3):void{gameplayAudioEvents.emit('cue',{sound,position,maxDistance:110,volumeScale:.8});}
   reset():void{
-    gameplayAudioEvents.emit('stop',{key:'cultivation-finale-alarm'});
+    stopVoltRescueAudio();
     if(this.ventView){for(const entry of this.environment)entry.mesh.visible=entry.visible;this.ventView=false;}
     if(this.played){
       for(const actor of this.actors){

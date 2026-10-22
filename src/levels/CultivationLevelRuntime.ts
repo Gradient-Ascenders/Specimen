@@ -217,6 +217,7 @@ export class CultivationLevelRuntime {
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
   private readonly sentryPreviewAvailable = import.meta.env?.DEV === true;
+  private readonly voltRescuePreviewAvailable = import.meta.env?.DEV === true;
   private readonly debugSupport: CultivationLevelDebugSupport | undefined;
   private readonly authoredAssets: CultivationAssetSource;
   private readonly initialProgression: LevelProgressionSnapshot;
@@ -551,6 +552,18 @@ export class CultivationLevelRuntime {
     this.input.releasePointerLock();
     this.host.dataset.cinematic = 'cultivation-clearance';
     return true;
+  }
+
+  /** The same real finale as the 8 shortcut, prepared directly from the title menu. */
+  previewVoltRescueForDebug(): boolean {
+    const resources = this.resources;
+    if (!this.voltRescuePreviewAvailable || !this.debugAvailable ||
+      (this.lifecycle.state !== 'stopped' && this.lifecycle.state !== 'running') ||
+      !resources?.authoredPreview || !resources.roomFiveFinale) return false;
+    if (!this.teleportToAuthoredPreviewRoom(5)) return false;
+    resources.manager.activate('bob');
+    this.input.releasePointerLock();
+    return this.beginVoltFinale(resources, true);
   }
 
   fixedUpdate(deltaSeconds: number): void {

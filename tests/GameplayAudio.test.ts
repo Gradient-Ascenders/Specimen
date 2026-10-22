@@ -121,11 +121,11 @@ test('loop distance fades adjust one continuing voice and survive suspension and
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
-test('all 66 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 71 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 66);
+  assert.equal(ids.length, 71);
   assert.equal(SOUND_BANKS.containment.some(id => id.startsWith('cultivation-')), false);
-  assert.equal(SOUND_BANKS.cultivation.filter(id => id.startsWith('cultivation-')).length, 3);
+  assert.equal(SOUND_BANKS.cultivation.filter(id => id.startsWith('cultivation-')).length, 8);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');

@@ -54,6 +54,7 @@ export class GameplayAudio {
         if (this.enabled && !this.dead && !this.resetting) audio.startLoop(key, sound, position, volumeScale);
       }),
       gameplayAudioEvents.on('stop', ({ key }) => audio.stopLoop(key)),
+      gameplayAudioEvents.on('stopSound', ({ sound }) => audio.stopSound?.(sound)),
       manager.events.on('activeChanged', () => this.clearCharacter()),
     );
     const boundBodies = new WeakSet<KinematicBody>();

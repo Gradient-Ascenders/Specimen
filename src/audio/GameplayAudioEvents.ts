@@ -7,4 +7,5 @@ export const gameplayAudioEvents = new EventBus<{
   cue: { readonly sound: SoundId; readonly position?: AudioPosition; readonly volumeScale?: number; readonly maxDistance?: number };
   loop: { readonly key: string; readonly sound: SoundId; readonly position?: AudioPosition; readonly volumeScale?: number };
   stop: { readonly key: string };
+  stopSound: { readonly sound: SoundId };
 }>();

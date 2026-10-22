@@ -13,6 +13,11 @@ const HEAVY_IMPACT: SoundSpatialProfile = { refDistance: 8, rolloffFactor: 0.7 }
 
 /** Mono OGG assets; requester-selected ElevenLabs character effects and shared turret audio. */
 export const SOUND_DEFINITIONS = {
+  'cultivation-volt-cell-open-01': { path: 'assets/audio/cultivation/cultivation-volt-cell-open-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: MECHANISM },
+  'cultivation-cover-break-free-01': { path: 'assets/audio/cultivation/cultivation-cover-break-free-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: MECHANISM },
+  'cultivation-cover-drone-impact-01': { path: 'assets/audio/cultivation/cultivation-cover-drone-impact-01.ogg', loop: false, volume: 1.1, maxVoices: 1, spatial: HEAVY_IMPACT },
+  'cultivation-volt-drone-hijack-01': { path: 'assets/audio/cultivation/cultivation-volt-drone-hijack-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: MECHANISM },
+  'cultivation-duct-floor-strain-01': { path: 'assets/audio/cultivation/cultivation-duct-floor-strain-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: MECHANISM },
   'cultivation-sentry-shove-01': { path: 'assets/audio/cultivation/cultivation-sentry-shove-01.ogg', loop: false, volume: 1, maxVoices: 2, spatial: MECHANISM },
   'cultivation-sentry-topple-01': { path: 'assets/audio/cultivation/cultivation-sentry-topple-01.ogg', loop: false, volume: .9, maxVoices: 2, spatial: MECHANISM },
   'cultivation-sentry-acid-splash-01': { path: 'assets/audio/cultivation/cultivation-sentry-acid-splash-01.ogg', loop: false, volume: 1, maxVoices: 2, spatial: MECHANISM },

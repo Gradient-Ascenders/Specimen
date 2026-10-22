@@ -63,6 +63,33 @@
     "loop": false
   },
   {
+    "id": "cultivation-cover-break-free-01",
+    "path": "assets/audio/cultivation/cultivation-cover-break-free-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.44411,
+    "loop": false
+  },
+  {
+    "id": "cultivation-cover-drone-impact-01",
+    "path": "assets/audio/cultivation/cultivation-cover-drone-impact-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.70311,
+    "loop": false
+  },
+  {
+    "id": "cultivation-duct-floor-strain-01",
+    "path": "assets/audio/cultivation/cultivation-duct-floor-strain-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.66858,
+    "loop": false
+  },
+  {
     "id": "cultivation-sentry-acid-splash-01",
     "path": "assets/audio/cultivation/cultivation-sentry-acid-splash-01.ogg",
     "durationSeconds": 1.48,
@@ -87,6 +114,24 @@
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.39391,
+    "loop": false
+  },
+  {
+    "id": "cultivation-volt-cell-open-01",
+    "path": "assets/audio/cultivation/cultivation-volt-cell-open-01.ogg",
+    "durationSeconds": 5.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.64475,
+    "loop": false
+  },
+  {
+    "id": "cultivation-volt-drone-hijack-01",
+    "path": "assets/audio/cultivation/cultivation-volt-drone-hijack-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.44172,
     "loop": false
   },
   {

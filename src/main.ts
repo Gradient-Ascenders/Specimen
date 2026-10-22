@@ -104,7 +104,7 @@ function startGame(): void {
   });
   let levelOneRuntime = createLevelOneRuntime();
   let levelTwoRuntime: import('./levels/CultivationLevelRuntime.ts').CultivationLevelRuntime | undefined;
-  let sentryPreviewRequested = false;
+  let cultivationPreviewRequested: 'sentry-clearance' | 'volt-rescue' | undefined;
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
@@ -306,11 +306,11 @@ function startGame(): void {
     actions: {
       previewCutscene: import.meta.env.DEV ? (cutscene) => {
         if (cutscene === 'escape') void previewEscape();
-        else if (cutscene === 'sentry-clearance') {
-          sentryPreviewRequested = true;
-          gameFlow.beginLevelTransition('Preparing sentry cutscene…', 'level-2');
+        else if (cutscene === 'sentry-clearance' || cutscene === 'volt-rescue') {
+          cultivationPreviewRequested = cutscene;
+          gameFlow.beginLevelTransition(cutscene === 'volt-rescue' ? 'Preparing Volt rescue cutscene…' : 'Preparing sentry cutscene…', 'level-2');
           void startSelectedLevel('level-2').catch(error => {
-            sentryPreviewRequested = false;
+            cultivationPreviewRequested = undefined;
             gameFlow.failLevelTransition(error instanceof Error ? error.message : String(error));
           });
         }
@@ -324,7 +324,7 @@ function startGame(): void {
         openingPresentation?.dispose();
         openingPresentation = undefined;
         levelTwoRuntime = undefined;
-        sentryPreviewRequested = false;
+        cultivationPreviewRequested = undefined;
         titlePresentation?.dispose();
         titlePresentation = undefined;
         levelOneAssets.clear();
@@ -462,10 +462,13 @@ function startGame(): void {
   const unsubscribeTransitionCompleted = gameSession.events.on(
     'transitionCompleted',
     ({ levelId }) => {
-      if (import.meta.env.DEV && sentryPreviewRequested && levelId === 'level-2') {
-        sentryPreviewRequested = false;
+      if (import.meta.env.DEV && cultivationPreviewRequested && levelId === 'level-2') {
+        const preview = cultivationPreviewRequested;
+        cultivationPreviewRequested = undefined;
         try {
-          if (!levelTwoRuntime?.previewSentryClearanceForDebug()) throw new Error('Sentry cutscene preview is not ready.');
+          const ready = preview === 'volt-rescue'
+            ? levelTwoRuntime?.previewVoltRescueForDebug() : levelTwoRuntime?.previewSentryClearanceForDebug();
+          if (!ready) throw new Error('Cutscene preview is not ready.');
           gameFlow.finishLevelTransition(levelId);
           gameFlow.enterPreparedLevel(false);
         } catch (error) {
@@ -476,7 +479,7 @@ function startGame(): void {
   );
   const unsubscribeTransitionFailed = gameSession.events.on(
     'transitionFailed',
-    ({ message }) => { sentryPreviewRequested = false; gameFlow.failLevelTransition(message); },
+    ({ message }) => { cultivationPreviewRequested = undefined; gameFlow.failLevelTransition(message); },
   );
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);

@@ -111,6 +111,17 @@ test('sentry cutscene selection prepares Cultivation before entering the movie',
   assert.equal(flow.state, 'playing');
 });
 
+test('Volt rescue selection prepares Cultivation before entering the movie', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('volt-rescue'), true);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('volt-rescue'), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
 test('level selection waits for preparation and explicit entry before playing', () => {
   const flow = new GameFlowStateModel();
   flow.completeBoot();

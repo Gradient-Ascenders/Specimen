@@ -49,7 +49,7 @@ export type GameFlowState =
   | 'transitioning'
   | 'transitionFailed';
 
-export type PreviewCutsceneId = 'intro' | 'escape' | 'sentry-clearance';
+export type PreviewCutsceneId = 'intro' | 'escape' | 'sentry-clearance' | 'volt-rescue';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -318,7 +318,7 @@ export class GameFlowStateModel {
   }
 
   beginSelectedCutscene(cutscene: PreviewCutsceneId = 'intro'): boolean {
-    return this.transitionFrom('cutsceneSelect', cutscene === 'sentry-clearance' ? 'transitioning' : 'opening');
+    return this.transitionFrom('cutsceneSelect', cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' ? 'transitioning' : 'opening');
   }
 
   finishOpening(): boolean {
@@ -824,6 +824,9 @@ export class GameFlowUI {
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="sentry-clearance">
               ${icon('Play')}<span><small>Level 2 · Room 3</small>Sentries into the acid</span>
             </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="volt-rescue">
+              ${icon('Play')}<span><small>Level 2 · Room 5</small>Volt's rescue and escape</span>
+            </button>
           </nav>
           <footer class="credits-footer">
             <button type="button" class="system-action" data-action="back">
@@ -1187,7 +1190,7 @@ export class GameFlowUI {
         break;
       case 'select-cutscene': {
         const cutscene = target.dataset.cutscene;
-        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'sentry-clearance') && this.model.beginSelectedCutscene(cutscene)) {
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue') && this.model.beginSelectedCutscene(cutscene)) {
           this.syncState();
           this.actions.previewCutscene(cutscene);
         }

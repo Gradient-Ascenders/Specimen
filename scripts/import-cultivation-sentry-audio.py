@@ -19,19 +19,19 @@ CLIPS = {
 }
 
 
-def main():
+def main(source=SOURCE, clips=CLIPS, report='cultivation-sentry-audio-import.json'):
     members = {}
-    with tarfile.open(SOURCE) as archive:
+    with tarfile.open(source) as archive:
         for member in archive.getmembers():
             path = PurePosixPath(member.name)
             if path.is_absolute() or '..' in path.parts or not member.isfile() or member.name in members:
                 raise ValueError(f'Unexpected archive member: {member.name}')
             members[member.name] = archive.extractfile(member).read()
-    if set(members) != {clip[0] for clip in CLIPS.values()}:
-        raise ValueError('Expected the three selected sentry recordings')
+    if set(members) != {clip[0] for clip in clips.values()}:
+        raise ValueError(f'Expected the {len(clips)} selected recordings')
     OUTPUT.mkdir(parents=True, exist_ok=True)
     inventory, sources = [], []
-    for sound, (name, target) in CLIPS.items():
+    for sound, (name, target) in clips.items():
         original, rate = sf.read(io.BytesIO(members[name]), always_2d=True)
         if rate != 48000 or not len(original) or not np.isfinite(original).all():
             raise ValueError(f'Invalid source audio: {name}')
@@ -57,10 +57,10 @@ def main():
                         'gain': round(gain, 6), 'rms': round(float(np.sqrt(np.mean(decoded**2))), 6)})
         print(f'{sound}: {len(decoded) / rate:.3f}s, peak {peak:.3f}')
     inventory_path = ROOT / 'docs/assets/gameplay-audio-inventory.json'
-    others = [row for row in json.loads(inventory_path.read_text()) if row['id'] not in CLIPS]
+    others = [row for row in json.loads(inventory_path.read_text()) if row['id'] not in clips]
     inventory_path.write_text(json.dumps(sorted(others + inventory, key=lambda row: row['id']), indent=2) + '\n')
-    (ROOT / 'docs/assets/cultivation-sentry-audio-import.json').write_text(json.dumps({
-        'archive': str(SOURCE.relative_to(ROOT)), 'archiveSha256': hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
+    (ROOT / 'docs/assets' / report).write_text(json.dumps({
+        'archive': str(source.relative_to(ROOT)), 'archiveSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
         'processing': 'Mono averaging, DC removal, gain with peak headroom, 2 ms fades, OGG Vorbis. No trimming or looping.',
         'clips': sources,
     }, indent=2) + '\n')
