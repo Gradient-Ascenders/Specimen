@@ -12,6 +12,7 @@ import sys
 
 import bpy
 import bmesh
+from mathutils.bvhtree import BVHTree
 
 DIRECTORY = Path(__file__).resolve().parent
 sys.path.insert(0, str(DIRECTORY))
@@ -36,7 +37,14 @@ def rebase_clip_times(path):
         if name in ('Specimen-Golden-Discharge','Specimen-Charged-Junctions'):
             node=bpy.data.materials[name].node_tree.nodes.get('Principled BSDF')
             material['emissiveFactor']=list(node.inputs['Emission Color'].default_value[:3])
-            material['extensions']['KHR_materials_emissive_strength']['emissiveStrength']=4.0 if name=='Specimen-Golden-Discharge' else 7.0
+            material['extensions']['KHR_materials_emissive_strength']['emissiveStrength']=12.0 if name=='Specimen-Golden-Discharge' else 20.0
+        elif name in ('Specimen-Luminous-Acid','Specimen-Fusion-Heart','Specimen-Acid-Swirl'):
+            # glTF vertex colours affect base colour, not emitted light. Keep
+            # the core's green material emission as the portable approximation.
+            node=bpy.data.materials[name].node_tree.nodes.get('Principled BSDF')
+            material['emissiveFactor']=list(node.inputs['Emission Color'].default_value[:3])
+            material.setdefault('extensions',{})['KHR_materials_emissive_strength']={
+                'emissiveStrength':node.inputs['Emission Strength'].default_value}
         elif extension=={}:
             del material['extensions']['KHR_materials_emissive_strength']
     for clip in document['animations']:
@@ -139,17 +147,39 @@ def render_views():
     scene = bpy.context.scene
     camera = scene.camera
     for name,position in [
-        ('three-quarter',(4.0,8.0,2.0)),
-        ('front',(0,8,1.3)),
-        ('side',(8,0,1.3)),
-        ('back',(0,-8,1.3)),
+        ('three-quarter',(7.5,6.8,1.6)),
+        ('front',(0,8,1.2)),
+        ('side',(8,0,1.2)),
+        ('back',(0,-8,1.2)),
     ]:
         camera.location = position
-        model.aim(camera,(0,0,0.40))
+        model.aim(camera,model.VIEW_TARGET)
         scene.render.filepath = str(DIRECTORY/'evidence'/f'{name}.png')
         bpy.ops.render.render(write_still=True)
-    camera.location = (4.0,8.0,2.0)
-    model.aim(camera,(0,0,0.40))
+    render_base_detail()
+    camera.location = (7.5,6.8,1.6)
+    model.aim(camera,model.VIEW_TARGET)
+
+
+def render_base_detail():
+    scene=bpy.context.scene
+    camera=scene.camera
+    position=camera.location.copy()
+    rotation=camera.rotation_euler.copy()
+    scale=camera.data.ortho_scale
+    width,height=scene.render.resolution_x,scene.render.resolution_y
+    scene.render.resolution_x=1200
+    scene.render.resolution_y=600
+    camera.data.ortho_scale=2.35
+    camera.location=(7.5,6.8,0.95)
+    model.aim(camera,(0,-0.02,model.SOLE+0.25))
+    scene.render.filepath=str(DIRECTORY/'evidence'/'base-detail.png')
+    bpy.ops.render.render(write_still=True)
+    camera.location=position
+    camera.rotation_euler=rotation
+    camera.data.ortho_scale=scale
+    scene.render.resolution_x=width
+    scene.render.resolution_y=height
 
 
 def motion_report(character):
@@ -171,6 +201,10 @@ def motion_report(character):
     for frame in (1,31,50,61,102,121,141,145,153,163,189,211,241,259,263,266,283):
         bpy.context.scene.frame_set(frame)
         graph=bpy.context.evaluated_depsgraph_get()
+        body=bpy.data.objects['Specimen-Body'].evaluated_get(graph)
+        body_mesh=body.to_mesh()
+        surface=BVHTree.FromPolygons([v.co for v in body_mesh.vertices],
+                                    [tuple(p.vertices) for p in body_mesh.polygons])
         values={}
         for obj in character:
             evaluated=obj.evaluated_get(graph)
@@ -183,7 +217,16 @@ def motion_report(character):
             if obj.name=='Specimen-Body':
                 assert abs(min(p.z for p in points)-model.SOLE)<1e-6,(frame,'sole moved')
             values[obj.name]={'signed_volume_m3':volume}
+            if obj.name in ('Specimen-Electric-Veins','Specimen-Aqua-Currents','Specimen-Acid-Core'):
+                maximum=-1.0
+                for point in points:
+                    nearest,normal,index,distance=surface.find_nearest(point)
+                    signed=(point-nearest).dot(normal)
+                    maximum=max(maximum,signed)
+                assert maximum<0.0015,(frame,obj.name,'animated interior escapes body',maximum)
+                values[obj.name]['maximum_signed_surface_distance_metres']=maximum
             evaluated.to_mesh_clear()
+        body.to_mesh_clear()
         sampled.append({'frame':frame,'meshes':values})
     bpy.context.scene.frame_set(1)
     return {'morphs':report,'sampled_animation_poses':sampled,
@@ -198,13 +241,18 @@ def render_motion():
     scene.render.use_persistent_data=True
     directory=DIRECTORY/'evidence'/'motion-frames'
     directory.mkdir(exist_ok=True)
+    resume_from=int(next((arg.split('=',1)[1] for arg in sys.argv
+                          if arg.startswith('--preview-start=')),'0'))
     frames=[]
     for clip,(start,end) in model.CLIPS.items():
         for frame in range(start,end,3):
             scene.frame_set(frame)
             filename=directory/f'{len(frames):04d}.png'
             scene.render.filepath=str(filename)
-            bpy.ops.render.render(write_still=True)
+            if len(frames)>=resume_from:
+                bpy.ops.render.render(write_still=True)
+            else:
+                assert filename.is_file(),('Missing previously rendered preview frame',filename)
             frames.append({'clip':clip,'source_frame':frame,'file':filename.name})
     (DIRECTORY/'evidence'/'motion-frames.json').write_text(json.dumps(frames,indent=2)+'\n')
     scene.frame_set(1)

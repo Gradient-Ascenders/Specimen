@@ -4,70 +4,121 @@
   "runtime_forward": "-Z",
   "studio_excluded": true,
   "vertex_colours_preserved": [
+    "Specimen-Acid-Core",
     "Specimen-Body"
   ],
-  "transmission_factor": 0.7799999713897705,
-  "gold_emission_strength": 4.0,
-  "gel_roughness": 0.1899999976158142,
+  "transmission_factor": 0.9399999976158142,
+  "gold_emission_strength": 12.0,
+  "gel_roughness": 0.12999999523162842,
   "mean_gel_linear_rgb": [
-    0.022399457395785742,
-    0.14245820040652818,
-    0.12754179681916306
+    0.1757484534569306,
+    0.42909184526231287,
+    0.3606899471410886
   ],
   "submerged_current_geometry": true,
   "animations": {
     "Idle": {
       "seconds": 5.0,
-      "morph_channels": 5,
+      "morph_channels": 6,
       "glow": [
         {
-          "pointer": "/materials/2/extensions/KHR_materials_emissive_strength/emissiveStrength",
-          "minimum": 4.0,
-          "maximum": 4.480000019073486
+          "pointer": "/materials/5/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 12.0,
+          "maximum": 13.4399995803833
         },
         {
-          "pointer": "/materials/3/extensions/KHR_materials_emissive_strength/emissiveStrength",
-          "minimum": 7.0,
-          "maximum": 7.840000152587891
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 20.0,
+          "maximum": 22.399999618530273
         }
       ]
     },
     "Settle": {
       "seconds": 2.0,
-      "morph_channels": 5,
+      "morph_channels": 6,
       "glow": [
         {
-          "pointer": "/materials/2/extensions/KHR_materials_emissive_strength/emissiveStrength",
-          "minimum": 4.0,
-          "maximum": 5.400000095367432
+          "pointer": "/materials/5/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 12.0,
+          "maximum": 16.200000762939453
         },
         {
-          "pointer": "/materials/3/extensions/KHR_materials_emissive_strength/emissiveStrength",
-          "minimum": 7.0,
-          "maximum": 9.449999809265137
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 20.0,
+          "maximum": 27.0
         }
       ]
     },
     "Charge": {
       "seconds": 3.0,
-      "morph_channels": 5,
+      "morph_channels": 6,
       "glow": [
         {
-          "pointer": "/materials/2/extensions/KHR_materials_emissive_strength/emissiveStrength",
-          "minimum": 4.0,
-          "maximum": 18.0
+          "pointer": "/materials/5/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 12.0,
+          "maximum": 54.0
         },
         {
-          "pointer": "/materials/3/extensions/KHR_materials_emissive_strength/emissiveStrength",
-          "minimum": 7.0,
-          "maximum": 31.5
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 20.0,
+          "maximum": 90.0
         }
       ]
     }
   },
+  "shape": {
+    "height_metres": 2.092690181732178,
+    "dome_height_metres": 1.779829216003418,
+    "cross_sections": {
+      "0.13": {
+        "width_metres": 1.690737247467041,
+        "centre_y_metres": -0.0028374195098876953,
+        "centre_x_metres": 0.024166345596313477
+      },
+      "0.7": {
+        "width_metres": 1.0495953559875488,
+        "centre_y_metres": 0.05301618576049805,
+        "centre_x_metres": 0.0012657642364501953
+      },
+      "1.32": {
+        "width_metres": 1.0651345252990723,
+        "centre_y_metres": 0.11997270584106445,
+        "centre_x_metres": -0.0033719539642333984
+      }
+    },
+    "eyes": {
+      "Specimen-Eye-Left": {
+        "centre_x_metres": -0.2549999989569187,
+        "centre_height_metres": 1.2975194573402404,
+        "outer_corner_rise_metres": 0.22940003871917725
+      },
+      "Specimen-Eye-Right": {
+        "centre_x_metres": 0.2549999989569187,
+        "centre_height_metres": 1.2975194573402404,
+        "outer_corner_rise_metres": 0.22940003871917725
+      }
+    },
+    "narrow_mohawk": true,
+    "grounded_base_width_metres": 1.871645748615265,
+    "puddle_rim_heights_metres": [
+      0.05615634918212892,
+      0.052019309997558605
+    ]
+  },
+  "internal_geometry": {
+    "Specimen-Electric-Veins": {
+      "maximum_signed_surface_distance_metres": -0.005999428980203447
+    },
+    "Specimen-Aqua-Currents": {
+      "maximum_signed_surface_distance_metres": -0.010436770809349127
+    },
+    "Specimen-Acid-Core": {
+      "maximum_signed_surface_distance_metres": -0.08107450057286769
+    }
+  },
   "meshes": {
     "Specimen-Acid-Core": {
-      "triangles": 5904,
+      "triangles": 10964,
       "maximum_position_error_metres": 0.0,
       "maximum_morph_position_error_metres": 3.725290298461914e-09,
       "morph_targets": [
@@ -81,13 +132,29 @@
       ],
       "triangle_multiset_matches": true
     },
-    "Specimen-Body": {
-      "triangles": 21644,
+    "Specimen-Aqua-Currents": {
+      "triangles": 16348,
       "maximum_position_error_metres": 0.0,
       "maximum_morph_position_error_metres": 3.725290298461914e-09,
       "morph_targets": [
+        "Breathe",
+        "Flow",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight"
+      ],
+      "triangle_multiset_matches": true
+    },
+    "Specimen-Body": {
+      "triangles": 67280,
+      "maximum_position_error_metres": 0.0,
+      "maximum_morph_position_error_metres": 7.450580596923828e-09,
+      "morph_targets": [
         "Blink",
         "Breathe",
+        "CrestFlexLeft",
+        "CrestFlexRight",
         "Curious",
         "Focus",
         "Squash",
@@ -98,12 +165,14 @@
       "triangle_multiset_matches": true
     },
     "Specimen-Electric-Veins": {
-      "triangles": 1408,
+      "triangles": 4208,
       "maximum_position_error_metres": 0.0,
-      "maximum_morph_position_error_metres": 3.725290298461914e-09,
+      "maximum_morph_position_error_metres": 7.450580596923828e-09,
       "morph_targets": [
         "Breathe",
         "Charge",
+        "CrestFlexLeft",
+        "CrestFlexRight",
         "Squash",
         "Stretch",
         "WobbleLeft",

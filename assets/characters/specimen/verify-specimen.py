@@ -18,9 +18,21 @@ def main():
         if obj.type!='MESH':
             continue
         obj.data.calc_loop_triangles()
+        points=[obj.matrix_world@vertex.co for vertex in obj.data.vertices]
+        # Several closed core strands meet at coincident cap centres. Treat
+        # coincident coordinates as one geometric ID for triangle comparison;
+        # nearest-neighbour lookup cannot select a unique topological ID there.
+        positions={}
+        canonical=[]
+        for index,point in enumerate(points):
+            position=tuple(round(value,7) for value in point)
+            if position not in positions:
+                positions[position]=index
+            canonical.append(positions[position])
         meshes[obj.name]={
-            'points':[obj.matrix_world@vertex.co for vertex in obj.data.vertices],
-            'triangles':Counter(tuple(sorted(t.vertices)) for t in obj.data.loop_triangles),
+            'points':points,
+            'canonical':canonical,
+            'triangles':Counter(tuple(sorted(canonical[i] for i in t.vertices)) for t in obj.data.loop_triangles),
             'morphs':{key.name:[obj.matrix_world@vertex.co for vertex in key.data]
                       for key in list(obj.data.shape_keys.key_blocks)[1:]},
         }
@@ -45,12 +57,16 @@ def main():
             values=[tuple(value/divisor for value in row) for row in values]
         return values
     expected={'Specimen-Body','Specimen-Eye-Left','Specimen-Eye-Right',
-              'Specimen-Acid-Core','Specimen-Electric-Veins'}
+              'Specimen-Acid-Core','Specimen-Electric-Veins','Specimen-Aqua-Currents'}
     assert {mesh['name'] for mesh in document['meshes']}==set(meshes)==expected
     assert {node['name'] for node in document['nodes']}==expected|{'The Specimen'}
     body_points=meshes['Specimen-Body']['points']
-    assert max(point.z for point in body_points)<-0.45+1.75
-    assert max(point.x for point in body_points)-min(point.x for point in body_points)<2.5
+    assert 2.0<max(point.z for point in body_points)+0.45<2.16
+    body_width=max(point.x for point in body_points)-min(point.x for point in body_points)
+    assert 1.75<body_width<2.05
+    contact=[point for point in body_points if abs(point.z+0.45)<1e-6]
+    contact_width=max(point.x for point in contact)-min(point.x for point in contact)
+    assert contact_width/body_width>0.87,('puddle does not meet ground',contact_width,body_width)
     assert not document.get('cameras')
     animations={animation['name']:animation for animation in document['animations']}
     assert set(animations)=={'Idle','Settle','Charge'}
@@ -61,7 +77,7 @@ def main():
         assert abs(min(inputs))<1e-6 and abs(max(inputs)-duration)<1e-5,(name,'duration')
         weight_channels=[channel for channel in animation['channels'] if channel['target']['path']=='weights']
         pointers=[channel for channel in animation['channels'] if channel['target']['path']=='pointer']
-        assert len(weight_channels)==5 and len(pointers)==2,(name,'missing motion or glow channels')
+        assert len(weight_channels)==len(expected) and len(pointers)==2,(name,'missing motion or glow channels')
         pulses=[]
         for channel in pointers:
             pointer=channel['target']['extensions']['KHR_animation_pointer']['pointer']
@@ -76,23 +92,75 @@ def main():
     assert all('KHR_lights_punctual' not in node.get('extensions',{}) for node in document['nodes'])
     colour_meshes={mesh['name'] for mesh in document['meshes']
                   if 'COLOR_0' in mesh['primitives'][0]['attributes']}
-    assert colour_meshes=={'Specimen-Body'}
+    assert colour_meshes=={'Specimen-Body','Specimen-Acid-Core'}
     body_json=next(mesh for mesh in document['meshes'] if mesh['name']=='Specimen-Body')
     colours=accessor_values(body_json['primitives'][0]['attributes']['COLOR_0'])
     average_colour=[sum(row[i] for row in colours)/len(colours) for i in range(3)]
     assert average_colour[1]>=average_colour[2],('blue bias',average_colour)
     materials={material['name']:material for material in document['materials']}
     transmission=materials['Specimen-Turquoise-Gel']['extensions']['KHR_materials_transmission']['transmissionFactor']
-    assert abs(transmission-0.78)<1e-6
+    assert abs(transmission-0.94)<1e-6
     strength=materials['Specimen-Golden-Discharge']['extensions']['KHR_materials_emissive_strength']['emissiveStrength']
-    assert abs(strength-4)<1e-6
+    assert abs(strength-12)<1e-6
     roughness=materials['Specimen-Turquoise-Gel']['pbrMetallicRoughness']['roughnessFactor']
-    assert abs(roughness-0.19)<1e-6
+    assert abs(roughness-0.13)<1e-6
     body=bpy.data.objects['Specimen-Body']
-    for vertex in bpy.data.objects['Specimen-Electric-Veins'].data.vertices:
-        x,y,z=vertex.co
-        hit,point,normal,face=body.ray_cast((x,3,z),(0,-1,0))
-        assert hit and point.y-y>0.025,('current is not submerged',tuple(vertex.co))
+    sections={}
+    for sample_height in (0.13,0.70,1.32):
+        z=-0.45+sample_height
+        # Offset from the centre plane to avoid the narrow dorsal web.
+        hit,front,normal,face=body.ray_cast((0.20,3,z),(0,-1,0))
+        assert hit
+        hit,back,normal,face=body.ray_cast((0.20,-3,z),(0,1,0))
+        assert hit
+        centre_y=(front.y+back.y)/2
+        hit,left,normal,face=body.ray_cast((-3,centre_y,z),(1,0,0))
+        assert hit
+        hit,right,normal,face=body.ray_cast((3,centre_y,z),(-1,0,0))
+        assert hit
+        sections[str(sample_height)]={'width_metres':right.x-left.x,
+                                      'centre_y_metres':centre_y,
+                                      'centre_x_metres':(left.x+right.x)/2}
+    height=max(point.z for point in body_points)+0.45
+    hit,dome,normal,face=body.ray_cast((0.0,0.18,4),(0,0,-1))
+    assert hit
+    dome_height=dome.z+0.45
+    assert 1.73<dome_height<1.82,('shortened dome',dome_height)
+    rim_heights=[]
+    for side in (-1,1):
+        hit,edge,normal,face=body.ray_cast((side*3,0,-0.448),(-side,0,0))
+        assert hit
+        x=edge.x-side*0.020
+        hit,rim,normal,face=body.ray_cast((x,0,4),(0,0,-1))
+        assert hit
+        rim_heights.append(rim.z+0.45)
+    # The fuller liquid shoulders rise just behind the grounded outer edge.
+    assert max(rim_heights)<0.065,('puddle rim too thick',rim_heights)
+    assert sections['0.7']['width_metres']/sections['0.13']['width_metres']<0.85,'middle too wide'
+    assert sections['1.32']['centre_y_metres']-sections['0.7']['centre_y_metres']>0.025,'missing forward lean'
+    crest=[point for point in body_points if point.y<-0.65 and point.z+0.45>0.25]
+    assert crest and max(abs(point.x) for point in crest)<0.09,'crest is not a narrow mohawk'
+    eyes={}
+    for name in ('Specimen-Eye-Left','Specimen-Eye-Right'):
+        points=meshes[name]['points']
+        x=(min(p.x for p in points)+max(p.x for p in points))/2
+        z=(min(p.z for p in points)+max(p.z for p in points))/2+0.45
+        assert 0.24<abs(x)<0.27 and 1.26<z<1.36,(name,'eye placement',x,z)
+        ordered=sorted(points,key=lambda p:p.x)
+        outer,inner=(ordered[0],ordered[-1]) if x<0 else (ordered[-1],ordered[0])
+        assert outer.z-inner.z>0.20,(name,'missing swept angular corners')
+        eyes[name]={'centre_x_metres':x,'centre_height_metres':z,
+                    'outer_corner_rise_metres':outer.z-inner.z}
+    containment={}
+    for name in ('Specimen-Electric-Veins','Specimen-Aqua-Currents','Specimen-Acid-Core'):
+        maximum=-1.0
+        for vertex in bpy.data.objects[name].data.vertices:
+            hit,point,normal,face=body.closest_point_on_mesh(vertex.co)
+            assert hit
+            signed=(vertex.co-point).dot(normal)
+            maximum=max(maximum,signed)
+            assert signed<0.0015,(name,'internal detail outside gel',tuple(vertex.co),signed)
+        containment[name]={'maximum_signed_surface_distance_metres':maximum}
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj,do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=str(DIRECTORY/'specimen.glb'))
@@ -113,7 +181,7 @@ def main():
             nearest,index,distance=tree.find(position)
             assert distance<0.000002,(obj.name,vertex.index,distance)
             maximum_error=max(maximum_error,distance)
-            mapping[vertex.index]=index
+            mapping[vertex.index]=source['canonical'][index]
         obj.data.calc_loop_triangles()
         triangles=Counter(tuple(sorted(mapping[i] for i in triangle.vertices))
                           for triangle in obj.data.loop_triangles)
@@ -138,6 +206,11 @@ def main():
             'transmission_factor':transmission,'gold_emission_strength':strength,
             'gel_roughness':roughness,'mean_gel_linear_rgb':average_colour,
             'submerged_current_geometry':True,'animations':animation_report,
+            'shape':{'height_metres':height,'dome_height_metres':dome_height,
+                     'cross_sections':sections,'eyes':eyes,'narrow_mohawk':True,
+                     'grounded_base_width_metres':contact_width,
+                     'puddle_rim_heights_metres':rim_heights},
+            'internal_geometry':containment,
             'meshes':results}
     (DIRECTORY/'specimen.roundtrip.json').write_text(json.dumps(report,indent=2)+'\n')
     print('SPECIMEN_ROUNDTRIP',json.dumps(report))
