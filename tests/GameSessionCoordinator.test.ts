@@ -59,6 +59,40 @@ const progression: LevelProgressionSnapshot = {
   activeSlimeId: 'goop',
 };
 
+for (const levelId of ['level-2', 'level-3'] as const) {
+  test(`menu starts ${levelId} without loading Containment and supplies its required roster`, () => {
+    const initial = new MockRuntime('level-1', { unlockedSlimeIds: ['bob'], activeSlimeId: 'bob' });
+    const selected = new MockRuntime(levelId, progression);
+    let received: LevelProgressionSnapshot | undefined;
+    let transition: (() => void) | undefined;
+    const factory = (snapshot: LevelProgressionSnapshot) => { received = snapshot; return selected; };
+    const session = new GameSessionCoordinator({
+      initialRuntime: initial,
+      createLevelTwo: factory,
+      createLevelThree: factory,
+      scheduleTransition: callback => { transition = callback; },
+    });
+    const completed: string[] = [];
+    session.events.on('transitionCompleted', event => completed.push(event.levelId));
+    session.startSelectedLevel(levelId);
+    session.startSelectedLevel(levelId === 'level-2' ? 'level-3' : 'level-2');
+    assert.equal(initial.calls.includes('load'), false);
+    transition!();
+    assert.deepEqual(received, {
+      unlockedSlimeIds: levelId === 'level-2' ? ['bob', 'goop'] : ['bob', 'goop', 'volt'],
+      activeSlimeId: 'bob',
+    });
+    assert.deepEqual(completed, [levelId]);
+    assert.equal(initial.state, 'disposed');
+    assert.equal(selected.state, 'stopped');
+    session.start();
+    assert.equal(selected.state, 'running');
+    session.restartLevel();
+    assert.equal(selected.calls.at(-1), 'restart');
+    session.dispose();
+  });
+}
+
 test('graphics changes gate simulation/draws, honor pause intent and release late work on unload', async () => {
   const runtime = new MockRuntime('level-1', progression);
   let finish!:()=>void, updates=0, draws=0;
@@ -79,6 +113,51 @@ test('graphics changes gate simulation/draws, honor pause intent and release lat
   session.start();session.applyGraphicsSettings('opaque',()=>{});session.unload();
   finish();await Promise.resolve();await Promise.resolve();
   assert.equal(runtime.state,'unloaded','late compiler completion must not restart unloaded resources');session.dispose();
+});
+
+test('return to menu releases the old level, retains listeners, and leaves a fresh run unloaded', () => {
+  const old = new MockRuntime('level-3', progression);
+  const fresh = new MockRuntime('level-1', progression);
+  const session = new GameSessionCoordinator({
+    initialRuntime: old, createLevelTwo: () => old, scheduleTransition: callback => callback(),
+  });
+  const objectives: string[] = [];
+  session.events.on('objectiveChanged', event => objectives.push(event.objective));
+  session.load();
+  session.start();
+  session.stop();
+  session.reset(fresh);
+  assert.equal(old.state, 'disposed');
+  assert.equal(session.state, 'unloaded');
+  assert.deepEqual(fresh.calls, []);
+  assert.deepEqual(fresh.debugInteractionCalls, [false]);
+  old.events.emit('objectiveChanged', { roomId: 1, objective: 'Old objective' });
+  fresh.events.emit('objectiveChanged', { roomId: 1, objective: 'New objective' });
+  assert.deepEqual(objectives, ['New objective']);
+  session.load();
+  session.start();
+  assert.equal(fresh.state, 'running');
+  session.dispose();
+});
+
+test('return to menu discards a late level factory result', async () => {
+  const old = new MockRuntime('level-1', progression);
+  const late = new MockRuntime('level-2', progression);
+  const fresh = new MockRuntime('level-1', progression);
+  let resolve!: (runtime: GameLevelRuntime) => void;
+  const session = new GameSessionCoordinator({
+    initialRuntime: old,
+    createLevelTwo: () => new Promise<GameLevelRuntime>(done => { resolve = done; }),
+    scheduleTransition: callback => callback(),
+  });
+  session.startSelectedLevel('level-2');
+  session.reset(fresh);
+  resolve(late);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(late.state, 'disposed');
+  assert.equal(session.state, 'unloaded');
+  session.dispose();
 });
 
 for(const intent of ['resume','pause','restart','unload'] as const) test(`resource-only preparation preserves ${intent} intent`,async()=>{

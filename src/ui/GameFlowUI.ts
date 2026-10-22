@@ -38,6 +38,7 @@ import {
 export type GameFlowState =
   | 'loading'
   | 'title'
+  | 'levelSelect'
   | 'opening'
   | 'playing'
   | 'paused'
@@ -82,7 +83,7 @@ export const getGameFlowKeyboardAction = (
     modifiers.metaKey || (modifiers.shiftKey && code !== 'ShiftLeft' && code !== 'ShiftRight');
   if (!hasModifier && code === pauseCode && state === 'playing') return 'pause';
   if (!hasModifier && code === pauseCode && state === 'paused') return 'resume';
-  if (code === 'Escape' && (state === 'settings' || state === 'credits')) {
+  if (code === 'Escape' && (state === 'settings' || state === 'credits' || state === 'levelSelect')) {
     return 'back';
   }
   return null;
@@ -295,6 +296,17 @@ export class GameFlowStateModel {
     return this.transitionFrom('title', 'opening');
   }
 
+  openLevelSelect(): boolean {
+    if (this.currentState !== 'title') return false;
+    this.menuReturnState = 'title';
+    this.setState('levelSelect');
+    return true;
+  }
+
+  beginSelectedLevel(): boolean {
+    return this.transitionFrom('levelSelect', 'transitioning');
+  }
+
   finishOpening(): boolean {
     return this.transitionFrom('opening', 'playing');
   }
@@ -307,6 +319,13 @@ export class GameFlowStateModel {
     return this.transitionFrom('paused', 'playing');
   }
 
+  beginReturnToMenu(): boolean {
+    if (this.currentState !== 'paused') return false;
+    this.menuReturnState = 'title';
+    this.setState('loading');
+    return true;
+  }
+
   openSettings(): boolean {
     return this.openSubmenu('settings');
   }
@@ -316,7 +335,7 @@ export class GameFlowStateModel {
   }
 
   back(): boolean {
-    if (this.currentState !== 'settings' && this.currentState !== 'credits') {
+    if (this.currentState !== 'settings' && this.currentState !== 'credits' && this.currentState !== 'levelSelect') {
       return false;
     }
     this.setState(this.menuReturnState);
@@ -372,6 +391,8 @@ export class GameFlowStateModel {
 }
 
 export interface GameFlowActions {
+  returnToMenu?(): Promise<void> | void;
+  startSelectedLevel?(levelId: 'level-2' | 'level-3'): Promise<void> | void;
   playOpening?(): void;
   enableMusic?(): void;
   skipOpening?(): void;
@@ -408,6 +429,7 @@ export interface GameFlowUIOptions {
 const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'loading',
   'title',
+  'levelSelect',
   'opening',
   'paused',
   'settings',
@@ -417,7 +439,7 @@ const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'transitionFailed',
 ]);
 
-const MENU_NAVIGATION_STATES = new Set<GameFlowState>(['title', 'opening', 'paused', 'settings', 'credits']);
+const MENU_NAVIGATION_STATES = new Set<GameFlowState>(['title', 'levelSelect', 'opening', 'paused', 'settings', 'credits']);
 
 export class GameFlowUI {
   readonly element: HTMLElement;
@@ -642,7 +664,7 @@ export class GameFlowUI {
     message: string,
     levelId: 'level-2' | 'level-3' = 'level-2',
   ): void {
-    if (!this.model.beginLevelTransition()) return;
+    if (this.model.state !== 'transitioning' && !this.model.beginLevelTransition()) return;
     const levelTwo = levelId === 'level-2';
     this.transitionRuntimeLabel.textContent = levelTwo
       ? 'Cultivation'
@@ -718,6 +740,9 @@ export class GameFlowUI {
             <button class="primary-action menu-action" data-action="start" data-autofocus>
               ${icon('Play')}<span>Start trial</span>
             </button>
+            <button class="menu-action" data-action="level-select">
+              ${icon('List')}<span>Select level</span>
+            </button>
             <button class="menu-action" data-action="settings">
               ${icon('Settings')}<span>Settings</span>
             </button>
@@ -728,6 +753,31 @@ export class GameFlowUI {
           <p class="title-music-prompt" data-title-music-prompt hidden>
             <button type="button" class="system-action" data-action="enable-music">${icon('Volume2')}<span>Enable music</span></button>
           </p>
+        </div>
+      </section>
+
+      <section class="flow-screen submenu-screen" data-flow-panel="levelSelect" aria-labelledby="level-select-heading" hidden>
+        <div class="system-panel lab-menu-panel level-select-panel">
+          <header class="system-panel-header">
+            <span class="signal-bar" aria-hidden="true"></span>
+            <h1 id="level-select-heading">Select level</h1>
+          </header>
+          <nav class="flow-actions game-menu level-select-actions" aria-label="Levels">
+            <button type="button" class="menu-action" data-action="select-level" data-level="level-1" data-autofocus>
+              ${icon('Play')}<span><small>Level 1</small>Containment</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-level" data-level="level-2">
+              ${icon('Play')}<span><small>Level 2</small>Cultivation</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-level" data-level="level-3">
+              ${icon('Play')}<span><small>Level 3</small>Blackout</span>
+            </button>
+          </nav>
+          <footer class="credits-footer">
+            <button type="button" class="system-action" data-action="back">
+              ${icon('ArrowLeft')}<span>Back</span>
+            </button>
+          </footer>
         </div>
       </section>
 
@@ -793,6 +843,9 @@ export class GameFlowUI {
             </button>
             <button class="menu-action" data-action="credits">
               ${icon('Info')}<span>Credits</span>
+            </button>
+            <button class="menu-action" data-action="return-to-menu">
+              ${icon('ArrowLeft')}<span>Return to menu</span>
             </button>
           </div>
           <p class="system-status" data-restart-status role="status" aria-live="polite"></p>
@@ -1011,6 +1064,55 @@ export class GameFlowUI {
     return element;
   }
 
+  private startTrial(): void {
+    if (this.actions.playOpening && this.model.beginOpening()) {
+      this.syncState();
+      this.actions.playOpening();
+      return;
+    }
+    if (this.model.state !== 'title') return;
+    this.actions.startGameplay();
+    if (this.model.start()) {
+      this.syncState();
+      this.actions.requestPointerLock();
+    }
+  }
+
+  private async returnToMenu(): Promise<void> {
+    if (!this.actions.returnToMenu || !this.model.beginReturnToMenu()) return;
+    this.requireElement('#loading-title').textContent = 'Returning to menu';
+    const status = this.requireElement('.loading-screen .system-copy');
+    status.textContent = 'Preparing main menu.';
+    this.switchFeedbackModel.clear();
+    this.switchFeedback.textContent = '';
+    this.restartStatus.textContent = '';
+    this.focusTargets.set('title', this.requireElement('[data-action="start"]'));
+    this.syncState();
+    try {
+      await this.actions.returnToMenu();
+      if (!this.disposed) this.completeBoot();
+    } catch {
+      if (!this.disposed) status.textContent = 'Could not open the main menu. Reload to try again.';
+    }
+  }
+
+  private async selectLevel(levelId: string | undefined): Promise<void> {
+    if (this.model.state !== 'levelSelect') return;
+    if (levelId === 'level-1') {
+      this.model.back();
+      this.startTrial();
+      return;
+    }
+    if ((levelId !== 'level-2' && levelId !== 'level-3') || !this.actions.startSelectedLevel) return;
+    if (!this.model.beginSelectedLevel()) return;
+    this.beginLevelTransition(`Entering Level ${levelId === 'level-2' ? '2' : '3'}…`, levelId);
+    try {
+      await this.actions.startSelectedLevel(levelId);
+    } catch (error) {
+      if (!this.disposed) this.failLevelTransition(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   private readonly onClick = (event: MouseEvent): void => {
     const target = (event.target as Element | null)?.closest<HTMLButtonElement>(
       'button[data-action]',
@@ -1022,18 +1124,16 @@ export class GameFlowUI {
         if (this.model.state === 'title') this.actions.enableMusic?.();
         break;
       case 'start':
-        if (this.actions.playOpening && this.model.beginOpening()) {
+        this.startTrial();
+        break;
+      case 'level-select':
+        if (this.model.openLevelSelect()) {
+          this.focusTargets.set('title', target);
           this.syncState();
-          this.actions.playOpening();
-          break;
         }
-        if (this.model.state === 'title') {
-          this.actions.startGameplay();
-        }
-        if (this.model.start()) {
-          this.syncState();
-          this.actions.requestPointerLock();
-        }
+        break;
+      case 'select-level':
+        void this.selectLevel(target.dataset.level);
         break;
       case 'skip-opening':
         if (this.model.state === 'opening') this.actions.skipOpening?.();
@@ -1046,6 +1146,9 @@ export class GameFlowUI {
         break;
       case 'restart':
         this.restart();
+        break;
+      case 'return-to-menu':
+        void this.returnToMenu();
         break;
       case 'enter-level':
         if (this.model.state !== 'transitioning' || target.hidden) break;

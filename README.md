@@ -56,6 +56,11 @@ npm run dev
 
 Open the local URL printed by Vite in a browser with WebGL 2 support.
 
+Choose **Start trial** to begin the story, or **Select level** on the main menu
+to enter Containment, Cultivation or Blackout. Later levels start with the
+specimens needed for their puzzles.
+Use **Return to menu** in the pause menu to end the current trial and choose again.
+
 **Default controls:** WASD to move, mouse to look, Space to jump, Tab to switch
 specimens and P to pause. Change bindings in Settings. Press **F1** to toggle the
 [HUD](docs/architecture/clean-gameplay-mode.md) while keeping aiming overlays.

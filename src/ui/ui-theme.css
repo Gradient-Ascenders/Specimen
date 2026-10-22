@@ -817,6 +817,31 @@
   color: var(--ui-text);
 }
 
+.game-flow[data-menu-origin] .submenu-screen .level-select-panel {
+  width: min(28rem, 100%);
+  height: auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--ui-space-4);
+}
+
+.level-select-panel .level-select-actions {
+  width: 100%;
+  margin-top: 0;
+  align-content: start;
+  overflow: auto;
+}
+
+.level-select-actions .menu-action small {
+  display: block;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-note-size);
+}
+
+.level-select-panel .credits-footer {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .game-flow[data-menu-origin] .submenu-screen .settings-panel {
   width: min(54rem, 100%);
   height: min(44rem, calc(100dvh - 3rem));
@@ -2092,6 +2117,7 @@ kbd {
   }
 
   .pause-actions {
+    gap: 0;
     margin-top: var(--ui-space-2);
   }
 
@@ -2115,6 +2141,10 @@ kbd {
 }
 
 @media (max-height: 420px) {
+  .pause-brand-mark {
+    width: 2rem;
+  }
+
   .title-signature,
   .title-description {
     display: none;

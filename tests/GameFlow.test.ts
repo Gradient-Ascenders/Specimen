@@ -48,6 +48,51 @@ test('restart is single-entry and returns directly to gameplay', () => {
   assert.equal(flow.finishRestart(), false);
 });
 
+test('level selector belongs to the title and restores it on cancel', () => {
+  const flow = new GameFlowStateModel();
+  assert.equal(flow.openLevelSelect(), false);
+  flow.completeBoot();
+  assert.equal(flow.openLevelSelect(), true);
+  assert.equal(flow.state, 'levelSelect');
+  assert.equal(flow.menuOrigin, 'title');
+  assert.equal(getGameFlowKeyboardAction('Escape', flow.state), 'back');
+  assert.equal(flow.back(), true);
+  assert.equal(flow.state, 'title');
+  flow.start();
+  flow.pause();
+  assert.equal(flow.openLevelSelect(), false);
+});
+
+test('return to menu requires pause and waits for a fresh title before starting', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  assert.equal(flow.beginReturnToMenu(), false);
+  flow.start();
+  assert.equal(flow.beginReturnToMenu(), false);
+  flow.pause();
+  assert.equal(flow.beginReturnToMenu(), true);
+  assert.equal(flow.state, 'loading');
+  assert.equal(flow.beginReturnToMenu(), false);
+  assert.equal(flow.start(), false);
+  assert.equal(flow.completeBoot(), true);
+  assert.equal(flow.state, 'title');
+  assert.equal(flow.menuOrigin, 'title');
+  assert.equal(flow.beginOpening(), true);
+});
+
+test('level selection waits for preparation and explicit entry before playing', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  assert.equal(flow.beginSelectedLevel(), false);
+  flow.openLevelSelect();
+  assert.equal(flow.beginSelectedLevel(), true);
+  assert.equal(flow.beginSelectedLevel(), false);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.back(), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
 test('level transition owns a visible non-interactive state and resumes gameplay', () => {
   const model = new GameFlowStateModel();
   model.completeBoot();
