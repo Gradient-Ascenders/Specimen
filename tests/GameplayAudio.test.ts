@@ -121,16 +121,18 @@ test('loop distance fades adjust one continuing voice and survive suspension and
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
-test('all 63 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 66 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 63);
+  assert.equal(ids.length, 66);
+  assert.equal(SOUND_BANKS.containment.some(id => id.startsWith('cultivation-')), false);
+  assert.equal(SOUND_BANKS.cultivation.filter(id => id.startsWith('cultivation-')).length, 3);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
     assert.equal(new URL(soundUrl(id), 'https://example.test/group-folder/').pathname, `/group-folder/${path}`);
     assert.equal(soundUrl(id, '/group-folder/'), `/group-folder/${path}`);
   }
-  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro','escape'])
+  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro','escape','cultivation'])
     assert.ok(readdirSync(new URL(`../public/assets/audio/${folder}/`, import.meta.url)).every(f => f.endsWith('.ogg')));
 });
 

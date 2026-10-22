@@ -103,6 +103,8 @@ function startGame(): void {
     characterLoaders: levelOneAssets.loaders,
   });
   let levelOneRuntime = createLevelOneRuntime();
+  let levelTwoRuntime: import('./levels/CultivationLevelRuntime.ts').CultivationLevelRuntime | undefined;
+  let sentryPreviewRequested = false;
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
@@ -115,7 +117,7 @@ function startGame(): void {
           : Promise.resolve(undefined),
         loadCultivationBakedAssets(new URL('./assets/cultivation/authored-assets.bin', import.meta.url)),
       ]);
-      return new runtimeModule.CultivationLevelRuntime({
+      return levelTwoRuntime = new runtimeModule.CultivationLevelRuntime({
         host: app,
         audio,
         input,
@@ -286,6 +288,17 @@ function startGame(): void {
     }
     openingPresentation.start();
   };
+  const startSelectedLevel = async (levelId: 'level-2' | 'level-3'): Promise<void> => {
+    // Finish title-settings preparation before replacing its runtime.
+    await initialGraphicsTask;
+    await selectInitialGraphics();
+    if (shuttingDown) return;
+    titlePresentation?.dispose();
+    titlePresentation = undefined;
+    titleRoom = undefined;
+    levelOneAssets.clear();
+    gameSession.startSelectedLevel(levelId);
+  };
   const gameFlow = new GameFlowUI({
     settings,
     creditsMarkdown,
@@ -293,6 +306,14 @@ function startGame(): void {
     actions: {
       previewCutscene: import.meta.env.DEV ? (cutscene) => {
         if (cutscene === 'escape') void previewEscape();
+        else if (cutscene === 'sentry-clearance') {
+          sentryPreviewRequested = true;
+          gameFlow.beginLevelTransition('Preparing sentry cutscene…', 'level-2');
+          void startSelectedLevel('level-2').catch(error => {
+            sentryPreviewRequested = false;
+            gameFlow.failLevelTransition(error instanceof Error ? error.message : String(error));
+          });
+        }
         else playOpening(true);
       } : undefined,
       enableMusic: unlockAudio,
@@ -302,6 +323,8 @@ function startGame(): void {
         if (shuttingDown) return;
         openingPresentation?.dispose();
         openingPresentation = undefined;
+        levelTwoRuntime = undefined;
+        sentryPreviewRequested = false;
         titlePresentation?.dispose();
         titlePresentation = undefined;
         levelOneAssets.clear();
@@ -324,17 +347,7 @@ function startGame(): void {
         });
         await titlePresentation.prepare();
       },
-      startSelectedLevel: async (levelId) => {
-        // Finish any title-settings preparation before replacing its runtime.
-        await initialGraphicsTask;
-        await selectInitialGraphics();
-        if (shuttingDown) return;
-        titlePresentation?.dispose();
-        titlePresentation = undefined;
-        titleRoom = undefined;
-        levelOneAssets.clear();
-        gameSession.startSelectedLevel(levelId);
-      },
+      startSelectedLevel,
       playOpening: () => playOpening(),
       skipOpening: () => openingPresentation?.skip(),
       retryOpening: () => { if (escapePreviewRequested) void previewEscape(); else openingPresentation?.retry(); },
@@ -448,11 +461,22 @@ function startGame(): void {
   );
   const unsubscribeTransitionCompleted = gameSession.events.on(
     'transitionCompleted',
-    ({ levelId }) => gameFlow.finishLevelTransition(levelId),
+    ({ levelId }) => {
+      if (import.meta.env.DEV && sentryPreviewRequested && levelId === 'level-2') {
+        sentryPreviewRequested = false;
+        try {
+          if (!levelTwoRuntime?.previewSentryClearanceForDebug()) throw new Error('Sentry cutscene preview is not ready.');
+          gameFlow.finishLevelTransition(levelId);
+          gameFlow.enterPreparedLevel(false);
+        } catch (error) {
+          gameFlow.failLevelTransition(error instanceof Error ? error.message : String(error));
+        }
+      } else gameFlow.finishLevelTransition(levelId);
+    },
   );
   const unsubscribeTransitionFailed = gameSession.events.on(
     'transitionFailed',
-    ({ message }) => gameFlow.failLevelTransition(message),
+    ({ message }) => { sentryPreviewRequested = false; gameFlow.failLevelTransition(message); },
   );
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);

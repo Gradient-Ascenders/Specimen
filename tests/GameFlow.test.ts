@@ -100,6 +100,17 @@ test('return to menu requires pause and waits for a fresh title before starting'
   assert.equal(flow.beginOpening(), true);
 });
 
+test('sentry cutscene selection prepares Cultivation before entering the movie', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('sentry-clearance'), true);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('sentry-clearance'), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
 test('level selection waits for preparation and explicit entry before playing', () => {
   const flow = new GameFlowStateModel();
   flow.completeBoot();

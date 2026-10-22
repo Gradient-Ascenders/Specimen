@@ -49,6 +49,8 @@ export type GameFlowState =
   | 'transitioning'
   | 'transitionFailed';
 
+export type PreviewCutsceneId = 'intro' | 'escape' | 'sentry-clearance';
+
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
 
@@ -315,8 +317,8 @@ export class GameFlowStateModel {
     return true;
   }
 
-  beginSelectedCutscene(): boolean {
-    return this.transitionFrom('cutsceneSelect', 'opening');
+  beginSelectedCutscene(cutscene: PreviewCutsceneId = 'intro'): boolean {
+    return this.transitionFrom('cutsceneSelect', cutscene === 'sentry-clearance' ? 'transitioning' : 'opening');
   }
 
   finishOpening(): boolean {
@@ -406,7 +408,7 @@ export interface GameFlowActions {
   returnToMenu?(): Promise<void> | void;
   startSelectedLevel?(levelId: 'level-2' | 'level-3'): Promise<void> | void;
   playOpening?(): void;
-  previewCutscene?(cutscene: 'intro' | 'escape'): void;
+  previewCutscene?(cutscene: PreviewCutsceneId): void;
   enableMusic?(): void;
   playMenuConfirm?(): void;
   skipOpening?(): void;
@@ -702,6 +704,15 @@ export class GameFlowUI {
     this.transitionContinueButton.focus();
   }
 
+  enterPreparedLevel(requestPointerLock = true): void {
+    if (this.model.state !== 'transitioning' || this.transitionContinueButton.hidden) return;
+    this.actions.startGameplay();
+    if (this.model.finishLevelTransition()) {
+      this.syncState();
+      if (requestPointerLock) this.actions.requestPointerLock();
+    }
+  }
+
   failLevelTransition(message: string): void {
     if (!this.model.failLevelTransition()) return;
     this.transitionFailureMessage.textContent = message;
@@ -809,6 +820,9 @@ export class GameFlowUI {
             </button>
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="escape">
               ${icon('Play')}<span><small>Level 1 · Containment</small>Goop's escape</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="sentry-clearance">
+              ${icon('Play')}<span><small>Level 2 · Room 3</small>Sentries into the acid</span>
             </button>
           </nav>
           <footer class="credits-footer">
@@ -1173,7 +1187,7 @@ export class GameFlowUI {
         break;
       case 'select-cutscene': {
         const cutscene = target.dataset.cutscene;
-        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape') && this.model.beginSelectedCutscene()) {
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'sentry-clearance') && this.model.beginSelectedCutscene(cutscene)) {
           this.syncState();
           this.actions.previewCutscene(cutscene);
         }
@@ -1204,12 +1218,7 @@ export class GameFlowUI {
         void this.returnToMenu();
         break;
       case 'enter-level':
-        if (this.model.state !== 'transitioning' || target.hidden) break;
-        this.actions.startGameplay();
-        if (this.model.finishLevelTransition()) {
-          this.syncState();
-          this.actions.requestPointerLock();
-        }
+        this.enterPreparedLevel();
         break;
       case 'settings':
         this.focusTargets.set(this.model.state, target);

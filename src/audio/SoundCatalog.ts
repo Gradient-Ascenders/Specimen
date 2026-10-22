@@ -13,6 +13,9 @@ const HEAVY_IMPACT: SoundSpatialProfile = { refDistance: 8, rolloffFactor: 0.7 }
 
 /** Mono OGG assets; requester-selected ElevenLabs character effects and shared turret audio. */
 export const SOUND_DEFINITIONS = {
+  'cultivation-sentry-shove-01': { path: 'assets/audio/cultivation/cultivation-sentry-shove-01.ogg', loop: false, volume: 1, maxVoices: 2, spatial: MECHANISM },
+  'cultivation-sentry-topple-01': { path: 'assets/audio/cultivation/cultivation-sentry-topple-01.ogg', loop: false, volume: .9, maxVoices: 2, spatial: MECHANISM },
+  'cultivation-sentry-acid-splash-01': { path: 'assets/audio/cultivation/cultivation-sentry-acid-splash-01.ogg', loop: false, volume: 1, maxVoices: 2, spatial: MECHANISM },
   'escape-power-down-01': { path: 'assets/audio/escape/escape-power-down-01.ogg', loop: false, volume: 1, maxVoices: 1 },
   'escape-cell-hatch-open-01': { path: 'assets/audio/escape/escape-cell-hatch-open-01.ogg', loop: false, volume: 0.9, maxVoices: 1 },
   'escape-drone-scan-01': { path: 'assets/audio/escape/escape-drone-scan-01.ogg', loop: false, volume: 0.85, maxVoices: 1 },
@@ -84,7 +87,7 @@ const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
 export const SOUND_BANKS = {
   escape: ALL_SOUND_IDS.filter(id => id.startsWith('escape-')),
   intro: ALL_SOUND_IDS.filter(id => id.startsWith('intro-')),
-  containment: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-')),
+  containment: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-') && !id.startsWith('cultivation-')),
   cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-') ||
     id === 'volt-circuit-connect-01' || id === 'volt-charge-ready-01'),
   blackout: ALL_SOUND_IDS,

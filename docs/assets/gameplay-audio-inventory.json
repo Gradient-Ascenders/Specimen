@@ -63,6 +63,33 @@
     "loop": false
   },
   {
+    "id": "cultivation-sentry-acid-splash-01",
+    "path": "assets/audio/cultivation/cultivation-sentry-acid-splash-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.5378,
+    "loop": false
+  },
+  {
+    "id": "cultivation-sentry-shove-01",
+    "path": "assets/audio/cultivation/cultivation-sentry-shove-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.57465,
+    "loop": false
+  },
+  {
+    "id": "cultivation-sentry-topple-01",
+    "path": "assets/audio/cultivation/cultivation-sentry-topple-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.39391,
+    "loop": false
+  },
+  {
     "id": "escape-cell-hatch-open-01",
     "path": "assets/audio/escape/escape-cell-hatch-open-01.ogg",
     "durationSeconds": 2.56,

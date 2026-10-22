@@ -216,6 +216,7 @@ export class CultivationLevelRuntime {
   private shadowRequest: RenderShadowRequest | undefined;
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
+  private readonly sentryPreviewAvailable = import.meta.env?.DEV === true;
   private readonly debugSupport: CultivationLevelDebugSupport | undefined;
   private readonly authoredAssets: CultivationAssetSource;
   private readonly initialProgression: LevelProgressionSnapshot;
@@ -518,6 +519,38 @@ export class CultivationLevelRuntime {
     this.debugInteractionEnabled = enabled;
     if (!enabled && this.debugVisible) this.closeDebugInspection(false);
     this.applyDebugPresentation();
+  }
+
+  /** Prepare the actual Room 3 movie while the developer selector holds the cover. */
+  previewSentryClearanceForDebug(): boolean {
+    const resources = this.resources;
+    if (!this.sentryPreviewAvailable || !this.debugAvailable ||
+      (this.lifecycle.state !== 'stopped' && this.lifecycle.state !== 'running') ||
+      !resources?.authoredPreview || !resources.roomThreeClearance) return false;
+    resources.manager.activate('bob');
+    if (!this.teleportToAuthoredPreviewRoom(3)) return false;
+    const platform = resources.authoredPreview.roomThree.collisionMeshes.find(mesh =>
+      mesh.name === 'cultivation-room-3-bob-last-island');
+    if (!platform) return false;
+    platform.updateWorldMatrix(true, false);
+    platform.geometry.computeBoundingBox();
+    const bounds = platform.geometry.boundingBox!.clone().applyMatrix4(platform.matrixWorld);
+    const position = bounds.getCenter(new THREE.Vector3());
+    const bob = resources.pair.bobBody;
+    position.y = bounds.max.y + bob.radiusMetres + .02;
+    bob.recoverAt(position);
+    // Establish real support through the same collision path as a normal landing.
+    for (let step = 0; step < 12 && !bob.grounded; step++) bob.update(1 / 60, resources.movement.set(0, 0, 0));
+    resources.bobPresentation.setPosition(bob.position);
+    this.resetRecoveryCamera(resources);
+    this.retargetCamera(resources);
+    this.renderLayer.cameraRig.update(1, 0);
+    if (!resources.roomThreeClearance.tryBegin(this.renderLayer.cameraRig.camera)) return false;
+    resources.acidProjectileSystem.reset();
+    this.input.resetState();
+    this.input.releasePointerLock();
+    this.host.dataset.cinematic = 'cultivation-clearance';
+    return true;
   }
 
   fixedUpdate(deltaSeconds: number): void {

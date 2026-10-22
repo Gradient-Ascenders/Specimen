@@ -29,6 +29,7 @@ All 3D models were created independently for Specimen.
 | Intro cutscene sounds | Made with ElevenLabs | Requester-supplied `intro-cutscene-sounds.tar`. | Licence details not supplied | Laboratory ambience, camera servos, doors, egg rocking/cracking/falling/breaking, pod seal/lift and Bob's gel movement. |
 | Intro camera variants | Made with ElevenLabs | Requester-supplied `intro-camera-sounds.tar`. | Licence details not supplied | Three distinct surveillance-camera movements replacing the original repeated camera cue. |
 | Escape cutscene sounds | Made with ElevenLabs | Requester-supplied `escape-cutscene.tar`. | Licence details not supplied | Containment power-down, hatch, drone scans/results/warning/strain/destruction, projectile impacts and shaft falls. |
+| Cultivation sentry sounds | Made with ElevenLabs | Requester-supplied `cultivation-sentry-sounds.tar`. | Licence details not supplied | Room 3 sentry shoves, topples and acid splashes; existing Goop dissolution supplies the sinking corrosion. |
 
 ## Tools
 
