@@ -1,5 +1,14 @@
 [
   {
+    "id": "blackout-vent-slime-slide-01",
+    "path": "assets/audio/blackout/blackout-vent-slime-slide-01.ogg",
+    "durationSeconds": 4.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.70959,
+    "loop": false
+  },
+  {
     "id": "bob-charged-jump-01",
     "path": "assets/audio/bob/bob-charged-jump-01.ogg",
     "durationSeconds": 0.42,
@@ -63,6 +72,159 @@
     "loop": false
   },
   {
+    "id": "cultivation-cover-break-free-01",
+    "path": "assets/audio/cultivation/cultivation-cover-break-free-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.44411,
+    "loop": false
+  },
+  {
+    "id": "cultivation-cover-drone-impact-01",
+    "path": "assets/audio/cultivation/cultivation-cover-drone-impact-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.70311,
+    "loop": false
+  },
+  {
+    "id": "cultivation-duct-floor-strain-01",
+    "path": "assets/audio/cultivation/cultivation-duct-floor-strain-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.66858,
+    "loop": false
+  },
+  {
+    "id": "cultivation-sentry-acid-splash-01",
+    "path": "assets/audio/cultivation/cultivation-sentry-acid-splash-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.5378,
+    "loop": false
+  },
+  {
+    "id": "cultivation-sentry-shove-01",
+    "path": "assets/audio/cultivation/cultivation-sentry-shove-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.57465,
+    "loop": false
+  },
+  {
+    "id": "cultivation-sentry-topple-01",
+    "path": "assets/audio/cultivation/cultivation-sentry-topple-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.39391,
+    "loop": false
+  },
+  {
+    "id": "cultivation-volt-cell-open-01",
+    "path": "assets/audio/cultivation/cultivation-volt-cell-open-01.ogg",
+    "durationSeconds": 5.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.64475,
+    "loop": false
+  },
+  {
+    "id": "cultivation-volt-drone-hijack-01",
+    "path": "assets/audio/cultivation/cultivation-volt-drone-hijack-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.44172,
+    "loop": false
+  },
+  {
+    "id": "escape-cell-hatch-open-01",
+    "path": "assets/audio/escape/escape-cell-hatch-open-01.ogg",
+    "durationSeconds": 2.56,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.63159,
+    "loop": false
+  },
+  {
+    "id": "escape-drone-destruction-01",
+    "path": "assets/audio/escape/escape-drone-destruction-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.63525,
+    "loop": false
+  },
+  {
+    "id": "escape-drone-scan-01",
+    "path": "assets/audio/escape/escape-drone-scan-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.16436,
+    "loop": false
+  },
+  {
+    "id": "escape-drone-strain-loop-01",
+    "path": "assets/audio/escape/escape-drone-strain-loop-01.ogg",
+    "durationSeconds": 1.92,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.18658,
+    "loop": true
+  },
+  {
+    "id": "escape-power-down-01",
+    "path": "assets/audio/escape/escape-power-down-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.35593,
+    "loop": false
+  },
+  {
+    "id": "escape-projectile-metal-impact-01",
+    "path": "assets/audio/escape/escape-projectile-metal-impact-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.57346,
+    "loop": false
+  },
+  {
+    "id": "escape-scan-result-01",
+    "path": "assets/audio/escape/escape-scan-result-01.ogg",
+    "durationSeconds": 0.3,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.17879,
+    "loop": false
+  },
+  {
+    "id": "escape-shaft-fall-01",
+    "path": "assets/audio/escape/escape-shaft-fall-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.57361,
+    "loop": false
+  },
+  {
+    "id": "escape-termination-warning-01",
+    "path": "assets/audio/escape/escape-termination-warning-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.26711,
+    "loop": false
+  },
+  {
     "id": "goop-acid-puddle-loop-01",
     "path": "assets/audio/goop/goop-acid-puddle-loop-01.ogg",
     "durationSeconds": 3.72,
@@ -108,12 +270,147 @@
     "loop": false
   },
   {
+    "id": "intro-bob-reform-01",
+    "path": "assets/audio/intro/intro-bob-reform-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.73861,
+    "loop": false
+  },
+  {
+    "id": "intro-bob-splat-01",
+    "path": "assets/audio/intro/intro-bob-splat-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.62185,
+    "loop": false
+  },
+  {
+    "id": "intro-camera-servo-01",
+    "path": "assets/audio/intro/intro-camera-servo-01.ogg",
+    "durationSeconds": 0.92,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.60561,
+    "loop": false
+  },
+  {
+    "id": "intro-camera-servo-02",
+    "path": "assets/audio/intro/intro-camera-servo-02.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.19049,
+    "loop": false
+  },
+  {
+    "id": "intro-camera-servo-03",
+    "path": "assets/audio/intro/intro-camera-servo-03.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.16124,
+    "loop": false
+  },
+  {
+    "id": "intro-door-close-01",
+    "path": "assets/audio/intro/intro-door-close-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.63599,
+    "loop": false
+  },
+  {
+    "id": "intro-door-open-01",
+    "path": "assets/audio/intro/intro-door-open-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.52111,
+    "loop": false
+  },
+  {
+    "id": "intro-egg-break-impact-01",
+    "path": "assets/audio/intro/intro-egg-break-impact-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.77098,
+    "loop": false
+  },
+  {
+    "id": "intro-egg-crack-01",
+    "path": "assets/audio/intro/intro-egg-crack-01.ogg",
+    "durationSeconds": 0.92,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.65511,
+    "loop": false
+  },
+  {
+    "id": "intro-egg-fall-01",
+    "path": "assets/audio/intro/intro-egg-fall-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.64805,
+    "loop": false
+  },
+  {
+    "id": "intro-egg-rock-01",
+    "path": "assets/audio/intro/intro-egg-rock-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.58174,
+    "loop": false
+  },
+  {
+    "id": "intro-lab-ambience-loop-01",
+    "path": "assets/audio/intro/intro-lab-ambience-loop-01.ogg",
+    "durationSeconds": 4.92,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.16024,
+    "loop": true
+  },
+  {
+    "id": "intro-pod-lid-raise-01",
+    "path": "assets/audio/intro/intro-pod-lid-raise-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.40295,
+    "loop": false
+  },
+  {
+    "id": "intro-pod-seal-release-01",
+    "path": "assets/audio/intro/intro-pod-seal-release-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.42167,
+    "loop": false
+  },
+  {
     "id": "specimen-turret-shot",
     "path": "assets/audio/turrets/specimen-turret-shot.ogg",
     "durationSeconds": 0.64,
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.87624,
+    "loop": false
+  },
+  {
+    "id": "ui-confirm-01",
+    "path": "assets/audio/polish/ui-confirm-01.ogg",
+    "durationSeconds": 0.3,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.46236,
     "loop": false
   },
   {
@@ -171,6 +468,33 @@
     "loop": false
   },
   {
+    "id": "world-button-press-01",
+    "path": "assets/audio/polish/world-button-press-01.ogg",
+    "durationSeconds": 0.2,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.58727,
+    "loop": false
+  },
+  {
+    "id": "world-button-release-01",
+    "path": "assets/audio/polish/world-button-release-01.ogg",
+    "durationSeconds": 0.25,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.59237,
+    "loop": false
+  },
+  {
+    "id": "world-containment-alarm-loop-01",
+    "path": "assets/audio/polish/world-containment-alarm-loop-01.ogg",
+    "durationSeconds": 4.98,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.3229,
+    "loop": true
+  },
+  {
     "id": "world-door-movement-loop-01",
     "path": "assets/audio/world/world-door-movement-loop-01.ogg",
     "durationSeconds": 0.8,
@@ -214,6 +538,51 @@
     "channels": 1,
     "peak": 0.10009,
     "loop": true
+  },
+  {
+    "id": "world-laser-off-01",
+    "path": "assets/audio/polish/world-laser-off-01.ogg",
+    "durationSeconds": 0.7,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.3987,
+    "loop": false
+  },
+  {
+    "id": "world-laser-on-01",
+    "path": "assets/audio/polish/world-laser-on-01.ogg",
+    "durationSeconds": 1.12,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.34781,
+    "loop": false
+  },
+  {
+    "id": "world-lever-lock-01",
+    "path": "assets/audio/polish/world-lever-lock-01.ogg",
+    "durationSeconds": 1.6,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.70379,
+    "loop": false
+  },
+  {
+    "id": "world-lift-start-01",
+    "path": "assets/audio/polish/world-lift-start-01.ogg",
+    "durationSeconds": 1.6,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.29486,
+    "loop": false
+  },
+  {
+    "id": "world-lift-stop-01",
+    "path": "assets/audio/polish/world-lift-stop-01.ogg",
+    "durationSeconds": 1.45,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.43804,
+    "loop": false
   },
   {
     "id": "world-machinery-loop-01",
@@ -267,6 +636,15 @@
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.46331,
+    "loop": false
+  },
+  {
+    "id": "world-vent-break-01",
+    "path": "assets/audio/polish/world-vent-break-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.65548,
     "loop": false
   }
 ]

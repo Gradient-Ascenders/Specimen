@@ -571,7 +571,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const wasHeld = this.switchHeld;
     this.switchHeld = !this.bridgeLocked && close && wallHeld;
     if (wasHeld !== this.switchHeld) gameplayAudioEvents.emit('cue', {
-      sound: this.switchHeld ? 'world-activation-01' : 'world-release-01',
+      sound: this.switchHeld ? 'world-button-press-01' : 'world-button-release-01',
       position: this.room.switchButton.getWorldPosition(new THREE.Vector3()), maxDistance: 16,
     });
     this.updateSwitchButton();
@@ -580,7 +580,12 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     else if (this.bridgeProgress > 0) {
       this.bridgeRelease += dt;
     }
-    if (this.lockReceiver.latched) { this.bridgeLocked = true; this.bridgeProgress = 1; }
+    if (this.lockReceiver.latched) {
+      if (!this.bridgeLocked) gameplayAudioEvents.emit('cue', {
+        sound: 'world-lever-lock-01', position: this.room.bridgeLockContact.getWorldPosition(new THREE.Vector3()), maxDistance: 24,
+      });
+      this.bridgeLocked = true; this.bridgeProgress = 1;
+    }
     const wantsBridge = this.bridgeLocked || this.switchHeld || (this.bridgeProgress > 0 && this.bridgeRelease < BRIDGE_RELEASE_SECONDS);
     this.bridgeProgress = this.bridgeLocked ? 1 : THREE.MathUtils.clamp(this.bridgeProgress + (wantsBridge ? dt / 1.25 : -dt / 1.25), 0, 1);
     this.bridgeDeployed = this.bridgeProgress >= 0.98;

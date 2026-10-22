@@ -1,9 +1,13 @@
 # Level 3 improvements: final review
 
-Branch: `codex/final-polish-batch-3`. Base reviewed:
-`5d016507016cc0e9877e819b9a3d9d58e25ecbae` (`origin/main`, including PRs #233 and #234).
-The original implementation commit `af8c412` is preserved; the final refinement
-commit follows it without rewriting history.
+Branch: `codex/final-polish-batch-3`. Original base:
+`5d016507016cc0e9877e819b9a3d9d58e25ecbae` (including PRs #233 and #234).
+During finalization, main advanced to
+`4c68cff1af93d01f5b2f27e97059e61d63e16a99` (sound-effects PR #235).
+It was integrated cleanly without conflict or history rewriting. The original
+implementation `af8c412` and refinement commit `519d2a3` are preserved. The PR
+diff against the new main still contains only the intended 47 Level 3 files;
+main's already merged sound assets and other work are not proposed again.
 
 ## Scope
 
@@ -54,13 +58,16 @@ An earlier hanger-only browser diagnostic dropped geometry count from 550 to
 FPS benchmark. Static surface cuts can add triangles. Hardware FPS on lab
 machines has not been measured.
 
-The final staged Level 3 post-combat browser snapshot reported 549 renderer
+Both final Level 3 post-combat browser snapshots (before and after integrating
+main) reported 549 renderer
 geometries, 51 textures and 154 calls. These whole-scene counts depend on camera,
 game state and asset/detail preparation; they are not a controlled before/after
 benchmark. The final check confirmed all three drone lights had no shadow map
 and the projectile pool capacity stayed at 48.
 
 ## Final validation
+
+Before main's sound-effects update was integrated:
 
 - Full unit suite: **1,494 passed, 0 failed**.
 - TypeScript type-check: passed.
@@ -70,6 +77,17 @@ and the projectile pool capacity stayed at 48.
   encounters, Level 3 tunnel/bridge geometry), with no console, asset-loading
   or WebGL errors. The final local logs are ignored under
   `test-results/batch-3-final-unit.log` and `test-results/batch-3-final-browser.log`.
+
+After clean integration of main at `4c68cff`:
+
+- Full unit suite: **1,519 passed, 0 failed**, including main's additional audio tests.
+- TypeScript type-check and production build: passed (existing large-chunk advisory).
+- Production layout and references: **120 files validated**, including main's new audio assets.
+- Production Chromium: **3 scenarios passed**, with no console, asset-loading
+  or WebGL errors; tunnel traversal, bridge cooperation and all three real
+  acid-drone interactions passed against the integrated build.
+- Logs: `test-results/batch-3-main-integrated-unit.log` and
+  `test-results/batch-3-main-integrated-browser.log` (ignored).
 
 Commands:
 

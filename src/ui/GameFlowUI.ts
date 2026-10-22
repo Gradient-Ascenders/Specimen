@@ -39,6 +39,7 @@ export type GameFlowState =
   | 'loading'
   | 'title'
   | 'levelSelect'
+  | 'cutsceneSelect'
   | 'opening'
   | 'playing'
   | 'paused'
@@ -47,6 +48,8 @@ export type GameFlowState =
   | 'restarting'
   | 'transitioning'
   | 'transitionFailed';
+
+export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -83,7 +86,7 @@ export const getGameFlowKeyboardAction = (
     modifiers.metaKey || (modifiers.shiftKey && code !== 'ShiftLeft' && code !== 'ShiftRight');
   if (!hasModifier && code === pauseCode && state === 'playing') return 'pause';
   if (!hasModifier && code === pauseCode && state === 'paused') return 'resume';
-  if (code === 'Escape' && (state === 'settings' || state === 'credits' || state === 'levelSelect')) {
+  if (code === 'Escape' && (state === 'settings' || state === 'credits' || state === 'levelSelect' || state === 'cutsceneSelect')) {
     return 'back';
   }
   return null;
@@ -307,6 +310,17 @@ export class GameFlowStateModel {
     return this.transitionFrom('levelSelect', 'transitioning');
   }
 
+  openCutsceneSelect(): boolean {
+    if (this.currentState !== 'title') return false;
+    this.menuReturnState = 'title';
+    this.setState('cutsceneSelect');
+    return true;
+  }
+
+  beginSelectedCutscene(cutscene: PreviewCutsceneId = 'intro'): boolean {
+    return this.transitionFrom('cutsceneSelect', cutscene === 'intro' || cutscene === 'escape' ? 'opening' : 'transitioning');
+  }
+
   finishOpening(): boolean {
     return this.transitionFrom('opening', 'playing');
   }
@@ -335,7 +349,7 @@ export class GameFlowStateModel {
   }
 
   back(): boolean {
-    if (this.currentState !== 'settings' && this.currentState !== 'credits' && this.currentState !== 'levelSelect') {
+    if (this.currentState !== 'settings' && this.currentState !== 'credits' && this.currentState !== 'levelSelect' && this.currentState !== 'cutsceneSelect') {
       return false;
     }
     this.setState(this.menuReturnState);
@@ -394,7 +408,9 @@ export interface GameFlowActions {
   returnToMenu?(): Promise<void> | void;
   startSelectedLevel?(levelId: 'level-2' | 'level-3'): Promise<void> | void;
   playOpening?(): void;
+  previewCutscene?(cutscene: PreviewCutsceneId): void;
   enableMusic?(): void;
+  playMenuConfirm?(): void;
   skipOpening?(): void;
   retryOpening?(): void;
   startGameplay(): void;
@@ -430,6 +446,7 @@ const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'loading',
   'title',
   'levelSelect',
+  'cutsceneSelect',
   'opening',
   'paused',
   'settings',
@@ -439,7 +456,7 @@ const FULL_SCREEN_STATES = new Set<GameFlowState>([
   'transitionFailed',
 ]);
 
-const MENU_NAVIGATION_STATES = new Set<GameFlowState>(['title', 'levelSelect', 'opening', 'paused', 'settings', 'credits']);
+const MENU_NAVIGATION_STATES = new Set<GameFlowState>(['title', 'levelSelect', 'cutsceneSelect', 'opening', 'paused', 'settings', 'credits']);
 
 export class GameFlowUI {
   readonly element: HTMLElement;
@@ -687,6 +704,15 @@ export class GameFlowUI {
     this.transitionContinueButton.focus();
   }
 
+  enterPreparedLevel(requestPointerLock = true): void {
+    if (this.model.state !== 'transitioning' || this.transitionContinueButton.hidden) return;
+    this.actions.startGameplay();
+    if (this.model.finishLevelTransition()) {
+      this.syncState();
+      if (requestPointerLock) this.actions.requestPointerLock();
+    }
+  }
+
   failLevelTransition(message: string): void {
     if (!this.model.failLevelTransition()) return;
     this.transitionFailureMessage.textContent = message;
@@ -743,6 +769,7 @@ export class GameFlowUI {
             <button class="menu-action" data-action="level-select">
               ${icon('List')}<span>Select level</span>
             </button>
+            ${this.actions.previewCutscene ? `<button class="menu-action" data-action="cutscene-select">${icon('List')}<span>Select cutscene</span></button>` : ''}
             <button class="menu-action" data-action="settings">
               ${icon('Settings')}<span>Settings</span>
             </button>
@@ -780,6 +807,40 @@ export class GameFlowUI {
           </footer>
         </div>
       </section>
+
+      ${this.actions.previewCutscene ? `<section class="flow-screen submenu-screen" data-flow-panel="cutsceneSelect" aria-labelledby="cutscene-select-heading" hidden>
+        <div class="system-panel lab-menu-panel level-select-panel">
+          <header class="system-panel-header">
+            <span class="signal-bar" aria-hidden="true"></span>
+            <h1 id="cutscene-select-heading">Select cutscene</h1>
+          </header>
+          <nav class="flow-actions game-menu level-select-actions" aria-label="Cutscenes">
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="intro" data-autofocus>
+              ${icon('Play')}<span><small>Intro</small>Bob's awakening</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="escape">
+              ${icon('Play')}<span><small>Level 1 · Containment</small>Goop's escape</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="cultivation-arrival">
+              ${icon('Play')}<span><small>Level 2 · Cultivation</small>Ceiling vent arrival</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="sentry-clearance">
+              ${icon('Play')}<span><small>Level 2 · Room 3</small>Sentries into the acid</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="volt-rescue">
+              ${icon('Play')}<span><small>Level 2 · Room 5</small>Volt's rescue and escape</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="blackout-arrival">
+              ${icon('Play')}<span><small>Level 3 · Blackout</small>Vent arrival</span>
+            </button>
+          </nav>
+          <footer class="credits-footer">
+            <button type="button" class="system-action" data-action="back">
+              ${icon('ArrowLeft')}<span>Back</span>
+            </button>
+          </footer>
+        </div>
+      </section>` : ''}
 
       <section class="flow-screen opening-screen" data-flow-panel="opening" aria-label="Bob's awakening" hidden>
         <div class="opening-fade" aria-hidden="true"></div>
@@ -1117,7 +1178,8 @@ export class GameFlowUI {
     const target = (event.target as Element | null)?.closest<HTMLButtonElement>(
       'button[data-action]',
     );
-    if (!target) return;
+    if (!target || target.disabled || target.closest('[hidden]')) return;
+    this.actions.playMenuConfirm?.();
 
     switch (target.dataset.action) {
       case 'enable-music':
@@ -1126,6 +1188,20 @@ export class GameFlowUI {
       case 'start':
         this.startTrial();
         break;
+      case 'cutscene-select':
+        if (this.actions.previewCutscene && this.model.openCutsceneSelect()) {
+          this.focusTargets.set('title', target);
+          this.syncState();
+        }
+        break;
+      case 'select-cutscene': {
+        const cutscene = target.dataset.cutscene;
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') && this.model.beginSelectedCutscene(cutscene)) {
+          this.syncState();
+          this.actions.previewCutscene(cutscene);
+        }
+        break;
+      }
       case 'level-select':
         if (this.model.openLevelSelect()) {
           this.focusTargets.set('title', target);
@@ -1151,12 +1227,7 @@ export class GameFlowUI {
         void this.returnToMenu();
         break;
       case 'enter-level':
-        if (this.model.state !== 'transitioning' || target.hidden) break;
-        this.actions.startGameplay();
-        if (this.model.finishLevelTransition()) {
-          this.syncState();
-          this.actions.requestPointerLock();
-        }
+        this.enterPreparedLevel();
         break;
       case 'settings':
         this.focusTargets.set(this.model.state, target);
@@ -1243,6 +1314,7 @@ export class GameFlowUI {
     // onPointerLockChange and resolves to the same authoritative pause state.
     if (action === 'back') {
       event.preventDefault();
+      this.actions.playMenuConfirm?.();
       if (this.model.back()) this.syncState();
     }
   };
@@ -1430,6 +1502,7 @@ export class GameFlowUI {
   private navigateMenu(action: MenuAction): void {
     if (!this.menuNavigable) return;
     if (action === 'back') {
+      this.actions.playMenuConfirm?.();
       if (this.model.state === 'opening') this.actions.skipOpening?.();
       else if (this.model.state === 'paused') this.resume();
       else if (this.model.back()) this.syncState();

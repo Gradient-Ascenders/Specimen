@@ -255,7 +255,7 @@ export class WallButton<Body extends WallButtonBody = WallButtonBody> {
     this.pad.material.emissive.setHex(nextPressed ? 0x124b25 : 0x4b1608);
 
     if (this.enabledValue) gameplayAudioEvents.emit('cue', {
-      sound: nextPressed ? 'world-activation-01' : 'world-release-01',
+      sound: nextPressed ? 'world-button-press-01' : 'world-button-release-01',
       position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 16,
     });
     this.events.emit('changed', {

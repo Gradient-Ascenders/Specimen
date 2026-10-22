@@ -8,6 +8,7 @@ import { BlackoutTransitRoom } from '../src/levels/BlackoutTransitRoom.ts';
 import { CollisionHit, CollisionLayer, ColliderTransformMode, CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import type { KinematicBody } from '../src/physics/KinematicBody.ts';
+import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
 
 const DT = 1 / 60;
 
@@ -117,6 +118,7 @@ test(`vertical laser ${index + 1} stays live with matching presentation and coll
 
 test('Bob must hold the wall switch to deploy the bridge; Volt can latch the far-side lock', () => {
   const f = fixture();
+  const cues: string[] = [], off = gameplayAudioEvents.on('cue',e=>cues.push(e.sound));
   try {
     f.bodies.bob.position.copy(f.room.switchBodyPosition);
     (f.bodies.bob as unknown as { attached: boolean; attachmentSurfaceName: string }).attached = true;
@@ -136,7 +138,12 @@ test('Bob must hold the wall switch to deploy the bridge; Volt can latch the far
     (f.bodies.bob as unknown as { attached: boolean }).attached = false;
     f.controller.update(DT, f.bodies);
     assert.equal(f.controller.bridgeDeployed, true, 'Volt locking the bridge frees Bob to leave the switch');
-  } finally { f.dispose(); }
+    assert.ok(cues.includes('world-button-press-01'));
+    assert.equal(cues.filter(sound=>sound==='world-lever-lock-01').length,1,'the bridge latch sounds once, not on every powered tick');
+    const snapshot=f.controller.capture(), count=cues.length;
+    f.controller.restore(snapshot);f.controller.update(DT,f.bodies);
+    assert.equal(cues.length,count,'checkpoint restoration never replays locking');
+  } finally { off(); f.dispose(); }
 });
 
 test('disposing the transit controller does not dispose its borrowed exit-door contact', () => {

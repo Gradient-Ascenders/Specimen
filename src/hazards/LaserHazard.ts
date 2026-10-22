@@ -434,6 +434,7 @@ export class LaserHazard {
       this.sequenceStateValue = 'static';
       this.applyCurrentPose();
     }
+    this.worldAudio?.reset();
   }
 
   dispose(): void {

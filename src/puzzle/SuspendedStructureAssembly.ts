@@ -362,14 +362,14 @@ export class DropToAcidAssembly extends SuspendedStructureAssembly {
       }
       remainingSeconds = remainingAfterDelay;
       this.setState('falling');
-      gameplayAudioEvents.emit('cue', { sound: 'world-platform-fall-01', position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 22 });
+      gameplayAudioEvents.emit('cue', { sound: 'world-platform-fall-01', position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 32 });
     }
 
     if (this.stateValue === 'falling' && this.advanceTravel(remainingSeconds)) {
       this.snapToFinalPose();
       this.setState('landed');
       this.events.emit('landed', { assembly: this });
-      gameplayAudioEvents.emit('cue', { sound: 'world-platform-land-01', position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 26 });
+      gameplayAudioEvents.emit('cue', { sound: 'world-platform-land-01', position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 40 });
     }
     this.finishStep();
   }
@@ -405,7 +405,7 @@ export class RopeCatchAssembly extends SuspendedStructureAssembly {
       }
       remainingSeconds = remainingAfterDelay;
       this.setState('dropping');
-      gameplayAudioEvents.emit('cue', { sound: 'world-platform-fall-01', position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 22 });
+      gameplayAudioEvents.emit('cue', { sound: 'world-platform-fall-01', position: this.root.getWorldPosition(new THREE.Vector3()), maxDistance: 32 });
     }
 
     if (this.stateValue === 'dropping') {
@@ -413,7 +413,7 @@ export class RopeCatchAssembly extends SuspendedStructureAssembly {
         this.snapToFinalPose();
         this.setState('ropeTaut');
         this.events.emit('ropeTaut', { assembly: this });
-        gameplayAudioEvents.emit('cue', { sound: 'world-platform-land-01', position: this.root.getWorldPosition(new THREE.Vector3()), volumeScale: .55, maxDistance: 26 });
+        gameplayAudioEvents.emit('cue', { sound: 'world-platform-land-01', position: this.root.getWorldPosition(new THREE.Vector3()), volumeScale: .55, maxDistance: 40 });
       }
       this.finishStep();
       return;
