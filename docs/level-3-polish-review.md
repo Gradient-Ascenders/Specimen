@@ -6,7 +6,8 @@ During finalization, main advanced to
 `4c68cff1af93d01f5b2f27e97059e61d63e16a99` (sound-effects PR #235).
 It was integrated cleanly without conflict or history rewriting. The original
 implementation `af8c412` and refinement commit `519d2a3` are preserved. The PR
-diff against the new main still contains only the intended 47 Level 3 files;
+diff against the new main contains the intended 48 Level 3 files, including the
+subsequent authored-catwalk combat regression;
 main's already merged sound assets and other work are not proposed again.
 
 ## Scope
@@ -112,6 +113,7 @@ CI; pending/finished CI status is reported separately on the pull request.
 
 ## Evidence and supporting notes
 
+- [PR #236 correction: live Volt-side fire and continuous traversal](acid-drone-refinement.md#pr-236-review-correction-volt-side-guard)
 - [Committed screenshots, including the wall-gap comparison](evidence/level-3-polish/README.md)
 - [Shared emerging-drone design](emerging-sewer-drones.md)
 - [Drone refinement details and historical validation](acid-drone-refinement.md)
@@ -163,6 +165,7 @@ reviewed `origin/main`; it includes the original implementation and refinements.
 - `tests/BlackoutTransitInteraction.test.ts`
 - `tests/BlackoutTransitMaterials.test.ts`
 - `tests/BlackoutTransitRoom.test.ts`
+- `tests/BlackoutVoltGuard.test.ts`
 - `tests/EmergingSewerDrone.test.ts`
 - `tests/GameplayAudio.test.ts`
 - `tests/fixtures/blackout-maintenance-authored-surfaces.json`

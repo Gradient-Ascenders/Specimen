@@ -15,13 +15,17 @@ import { WorldAudioSource } from '../audio/WorldAudio.ts';
 export const TRANSIT_SEWER_EMERGENCE_RANGE = 16;
 export const TRANSIT_SEWER_ATTACK_RANGE = 10;
 export const TRANSIT_SEWER_CONE_HALF_ANGLE = .22;
-export const TRANSIT_SEWER_DRONE_POSITIONS = [[18, -.68, 100], [18, -.68, 124], [-11.5, -.68, 132]] as const;
+// The last guard needs clearance for the projectile radius and hover bob over
+// the inner catwalk rail, including Volt running close to that rail.
+export const TRANSIT_SEWER_DRONE_POSITIONS = [[18, -.68, 100], [18, -.68, 124], [-11.5, .72, 132]] as const;
 
 export interface SewerDroneGuard {
   /** Authored point above the guarded deck, in the drone parent's coordinates. */
   readonly routeTarget: THREE.Vector3;
   readonly acidSurfaceY: number;
   readonly sweepMetres: number;
+  /** Keep the narrow gaze on an already acquired runner through the warning. */
+  readonly followAcquiredTarget?: boolean;
 }
 
 export interface EmergingSewerDroneSnapshot extends WeakSewerDroneSnapshot {
@@ -51,6 +55,7 @@ export class EmergingSewerDrone {
   private readonly worldGaze = new THREE.Vector3();
   private readonly worldRotation = new THREE.Quaternion();
   private readonly sweepMetres: number;
+  private readonly followAcquiredTarget: boolean;
   private readonly audio: WorldAudioSource;
   private readonly materials = new Set<THREE.Material>();
   private readonly geometries = new Set<THREE.BufferGeometry>();
@@ -63,6 +68,7 @@ export class EmergingSewerDrone {
     this.origin = origin.clone();
     this.submerged = origin.clone().setY(guard.acidSurfaceY);
     this.routeTarget = guard.routeTarget.clone(); this.sweepMetres = guard.sweepMetres;
+    this.followAcquiredTarget = guard.followAcquiredTarget ?? false;
     this.shell = createRustedSewerDrone();
     this.shell.body.name = `${id}-rusted-core`; this.shell.body.position.copy(this.submerged);
     this.shell.body.rotation.set(.2, 0, 1.1); parent.add(this.shell.body);
@@ -95,8 +101,8 @@ export class EmergingSewerDrone {
     this.damage = new SewerDroneDamage(this.shell.body, -1.18, `${id}-debris`);
     this.weapon = new SecurityDrone({ id, type: 'ceiling', initialPosition: this.submerged,
       colliderSize: new THREE.Vector3(2, 1.3, 2), forward: new THREE.Vector3(0, 0, -1), scanAxis: new THREE.Vector3(0, 1, 0),
-      // The room supplies a smooth route scan. AI must use that exact gaze,
-      // rather than rotating its own cone or following a detected slime.
+      // The adapter supplies the actual shell gaze, including acquired-target
+      // following. AI must not turn a separate cone away from the visible beam.
       scanHalfAngleRadians: 0, scanSpeedRadiansPerSecond: 0, trackTargets: false,
       detectionHalfAngleRadians: TRANSIT_SEWER_CONE_HALF_ANGLE, forwardAnchorMetres: 1.3,
       detectionRangeMetres: TRANSIT_SEWER_ATTACK_RANGE, warningSeconds: WEAK_SEWER_DRONE.warningSeconds,
@@ -128,9 +134,17 @@ export class EmergingSewerDrone {
     }
     this.state.update(dt, near);
     this.shell.body.visible = this.state.state !== 'destroyed' && !this.target.completed;
-    this.scanPoint.copy(this.routeTarget);
-    this.scanPoint.z += Math.sin(this.motion.time * .45) * this.sweepMetres;
-    this.shell.body.parent!.localToWorld(this.scanPoint);
+    let following = false;
+    if (this.followAcquiredTarget) for (const target of targets) {
+      if (target.eligible === false || target.slimeId !== this.weapon.readModel.targetSlimeId) continue;
+      this.scanPoint.set(target.position.x, target.position.y, target.position.z);
+      following = true; break;
+    }
+    if (!following) {
+      this.scanPoint.copy(this.routeTarget);
+      this.scanPoint.z += Math.sin(this.motion.time * .45) * this.sweepMetres;
+      this.shell.body.parent!.localToWorld(this.scanPoint);
+    }
     this.motion.update(dt, this.shell.body, this.state, this.origin, this.scanPoint, this.submerged.y);
     this.damage.update(dt, this.state.hits);
     this.weapon.root.position.copy(this.shell.body.position); this.weapon.root.quaternion.copy(this.shell.body.quaternion);

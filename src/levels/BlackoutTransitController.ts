@@ -254,7 +254,8 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       for (const [index, position] of TRANSIT_SEWER_DRONE_POSITIONS.entries()) {
         const enemy = new EmergingSewerDrone(`transit-sewer-drone-${index + 1}`, this.root,
           new THREE.Vector3(...position), options.world, options.surfaces, this.projectiles, this.resources,
-          { routeTarget: guardedRoutes[index]!, acidSurfaceY: this.room.acidBounds.surfaceY, sweepMetres: index === 2 ? 2 : 1 });
+          { routeTarget: guardedRoutes[index]!, acidSurfaceY: this.room.acidBounds.surfaceY, sweepMetres: index === 2 ? 2 : 1,
+            followAcquiredTarget: index === 2 });
         this.emergingDrones.push(enemy); ownedDrones.push(enemy.weapon); ownedDissolves.push(enemy.target);
       }
       this.scannerBeams = new ScannerBeamPresentation(this.world, this.emergingDrones.map(enemy => ({

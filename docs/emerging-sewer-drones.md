@@ -5,8 +5,9 @@
 Level 3 Room 2 has three damaged sewer drones. Their dormant body centres are
 `(18, -0.98, 100)`, `(18, -0.98, 124)` and `(-11.5, -0.98, 132)`, directly at
 the acid surface. Their level shells remain visibly half-submerged, with lamps
-and weapons off. All rise smoothly to the original hover height of about
-`3.32 m`, plus the existing small bob. The third drone is beside Volt's catwalk,
+and weapons off. The first two rise smoothly to about `3.32 m`; the third rises
+to `4.72 m` so live shots clear the catwalk rail even at the low point of its
+existing small bob. The third drone is beside Volt's catwalk,
 clear of its rails, rather than across the basin on Bob's side.
 
 `WeakSewerDrone` extracts the existing Level 2 Room 5 state machine, damped
@@ -22,8 +23,10 @@ Volt body within 16 m activates that area's drone; attack range is 10 m. Level
 original Level 2 warm point lamp remains unchanged. Transit's damaged spotlight
 uses the shared eye pulse continuously after emergence, with a matching cone.
 Its outer half-angle and detection half-angle are both 0.22 radians (about
-25 degrees across the full cone). A slow scan guards authored traversal points,
-not the nearest slime; its light, cone and detection share the same gaze and
+25 degrees across the full cone). A slow scan guards authored traversal points.
+The Volt-side guard follows a target only after normal acquisition, retaining
+the narrow cone through the warning while that slime moves; loss of LOS/range
+returns it to the route scan. Its light, cone and detection share the same gaze and
 origin. Solid line-of-sight blockers still protect targets. See
 `docs/acid-drone-refinement.md` for the follow-up evidence and exact route anchors.
 

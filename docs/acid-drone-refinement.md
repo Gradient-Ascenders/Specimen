@@ -13,8 +13,9 @@ This pass continues on `codex/final-polish-batch-3`, preserving `af8c412`.
 The acid crosses each level shell through its body centre. The skids and lower
 half stay submerged while the rusted upper body and broken rotor assemblies
 remain visible. Visibility does not enable weapons or searchlights. All three
-retain the 16 m proximity trigger, 1.5-second emergence state and original
-3.32 m hover height with its small bob. The shared motion accepts an optional
+retain the 16 m proximity trigger and 1.5-second emergence state. The first two
+hover at 3.32 m; the Volt-side guard hovers at 4.72 m after the PR #236 rail-clearance
+correction, with the existing small bob. The shared motion accepts an optional
 starting height; Level 2 retains its existing starting height and behaviour.
 
 Drone 3 is in the acid on the inner side of Volt's catwalk, whose centre is
@@ -41,8 +42,11 @@ near edge because its original hover height is below the upper deck; aiming at
 the deck centre would put the deck itself between the drone and Bob.
 
 The actual shell gaze drives the light, visible cone and AI, with a common
-origin 1.3 m ahead of the shell. AI target tracking is disabled for these three
-route guards. Nearby slimes outside the visible cone are not acquired. Existing
+origin 1.3 m ahead of the shell. The weapon's independent target tracking remains
+disabled. After normal acquisition, the Volt-side adapter follows that target
+with the actual shell gaze until LOS/range is lost, then resumes its route scan;
+the Bob-side guards continue their authored scans. Nearby slimes outside the
+visible cone are not acquired. Existing
 LOS and projectile collisions still block combat behind solid cover. Beam
 occlusion retains the existing bounded presentation sampler.
 
@@ -134,3 +138,49 @@ the unchanged reference encounter.
 - `docs/emerging-sewer-drones.md`
 - `docs/levels/blackout.md`
 - `docs/acid-drone-refinement.md`
+
+## PR #236 review correction: Volt-side guard
+
+The review's authored-room reproduction was valid. At grounded catwalk positions
+`(-16, 2.96001, 130/132/134)` and near the inner edge, the original guard acquired
+Volt but its live projectiles hit `volt-catwalk-rail--14.75`. Its 1 mm LOS sweep
+could pass where a projectile with 16 cm radius could not. A 0.8 m control rise
+fixed standing shots but still caught the rail in a moving edge case during the
+hover bob. Raise only the third guard's hover reference by 1.4 m (nominal centre
+4.72 m), leaving its half-submerged dormant centre and X/Z position unchanged.
+
+Continuous runs exposed a separate issue: Volt was briefly acquired, but left
+the narrow patrol cone before the unchanged 0.4-second warning completed. The
+Volt-side adapter now follows an already acquired target with the same damped
+shell aim. Light, beam and detection still use that actual gaze. No off-cone
+acquisition, independent invisible tracking, warning reduction or LOS bypass is
+introduced. Losing LOS/range releases the target and resumes the authored scan.
+Bob-side guards and the shared Level 2 motion implementation are unchanged.
+
+`tests/BlackoutVoltGuard.test.ts` registers the actual Room 2 colliders and uses
+real grounded KinematicBody movement and pooled projectiles. Its 23 cases cover
+the reviewed stationary positions, the nearest legal inner walking edge,
+continuous 5.5 m/s runs across seven emergence/scan phases, uninterrupted runs
+from the catwalk entry, damage, matched light/AI gaze, solid-cover blocking and
+target loss/reacquisition. Before the correction, standing cases had zero hits
+and running cases acquired briefly but fired no shots. The focused cases now pass.
+
+The full suite passed 1,540 tests before the last two cold-entry cases were added;
+the final focused run passed all 23, including those two additional cases.
+Type-check, build and 120-file production-layout validation passed. Browser
+coverage additionally uses actual runtime bodies at stationary positions and on
+continuous centre/inner-edge runs, and checks Goop's real acid shots from the
+acid-floor route against the raised drone.
+Both Level 2/Level 3 browser scenarios passed, followed by a successful final
+Level 3 rerun with all eight combat cases, including uninterrupted entry runs.
+Every combat case acquired Volt and landed a real 30-damage projectile hit;
+the moving cases remained grounded at 5.5 m/s. No console, asset-loading or
+WebGL errors were observed. Logs and live-combat JSON remain ignored under
+`test-results/pr-236-review-*.log` and
+`artifacts/evidence/batch-3-drone-refinement/volt-guard-live-combat.json`.
+
+This change adds no light, shadow map, geometry, material or pool allocation.
+The extra bounded target lookup reuses the existing scan vector. To test locally,
+enter Level 3 Room 2 and run Volt along the catwalk without stopping. Repeat near
+the inner rail, stand around z=130/132/134, then use Goop's three acid reactions.
+The rail must remain solid and other opaque cover must still block the guard.

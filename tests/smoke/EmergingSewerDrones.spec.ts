@@ -119,6 +119,51 @@ for (const [level, name] of [[2, 'Cultivation'], [3, 'Blackout']] as const) {
       expect(voltStage.shots).toBe(0); expect(voltStage.angles).toEqual([.22, .22, .22]);
       await capture(page, 'volt-drone-guarding-catwalk', [-6, 6, 123], [-13, 3, 132]);
       await writeFile(`${evidence}/dormant-and-emergence.json`, JSON.stringify({ dormant, voltStage }, null, 2));
+      const guardCombat = await page.evaluate(() => {
+        const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
+        const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
+        const saved = c.capture(), poses = Object.values(bodies).map((b: any) => b.position.clone());
+        const direction = bodies.volt.position.clone().set(0, 0, 0), results: any[] = [];
+        try {
+          for (const scenario of [
+            { x: -16, z: 130, moving: false }, { x: -16, z: 132, moving: false },
+            { x: -16, z: 134, moving: false }, { x: -15.28, z: 132, moving: false },
+            { x: -16, z: 117.5, moving: true }, { x: -15.28, z: 117.5, moving: true },
+            { x: -16, z: 90, moving: true }, { x: -15.28, z: 90, moving: true },
+          ]) {
+            c.reset(); c.setActive(true); r.manager.activate('volt');
+            bodies.bob.teleport(bodies.bob.position.clone().set(6, .86, 84));
+            bodies.goop.teleport(bodies.goop.position.clone().set(8, .86, 84));
+            bodies.volt.teleport(bodies.volt.position.clone().set(scenario.x, 2.96, scenario.z));
+            let acquired = 0, impacts = 0, minimumHealth = 100;
+            const enemy = c.emergingDrones[2];
+            const offAcquired = enemy.weapon.events.on('acquired', (event: any) => { if (event.slimeId === 'volt') acquired++; });
+            const offImpact = c.projectiles.events.on('slimeImpact', (event: any) => {
+              if (event.ownerDroneId === enemy.id && event.slimeId === 'volt') impacts++;
+            });
+            try {
+              direction.set(0, 0, scenario.moving ? 1 : 0);
+              for (let i = 0; i < (scenario.moving ? 600 : 2400); i++) {
+                if (scenario.moving ? bodies.volt.position.z >= 136 : impacts > 0) break;
+                bodies.volt.update(1 / 60, direction); c.update(1 / 60, bodies);
+                minimumHealth = Math.min(minimumHealth, c.damage.health.find((h: any) => h.slimeId === 'volt').health);
+              }
+              results.push({ ...scenario, acquired, impacts, minimumHealth, grounded: bodies.volt.grounded,
+                z: bodies.volt.position.z, speed: bodies.volt.velocity.z });
+            } finally { offAcquired(); offImpact(); }
+          }
+        } finally {
+          c.restore(saved);
+          Object.values(bodies).forEach((body: any, i) => body.teleport(poses[i]));
+        }
+        return results;
+      });
+      for (const result of guardCombat) {
+        expect(result.acquired).toBeGreaterThan(0); expect(result.impacts).toBeGreaterThan(0);
+        expect(result.minimumHealth).toBeLessThanOrEqual(70); expect(result.grounded).toBe(true);
+        if (result.moving) { expect(result.z).toBeGreaterThanOrEqual(136); expect(result.speed).toBeGreaterThan(5.49); }
+      }
+      await writeFile(`${evidence}/volt-guard-live-combat.json`, JSON.stringify(guardCombat, null, 2));
     } else {
       const state = await page.evaluate(() => {
         const rt = (window as any).__sewerSession.runtime, r = rt.resources;
@@ -152,6 +197,7 @@ for (const [level, name] of [[2, 'Cultivation'], [3, 'Blackout']] as const) {
         // Use a real camera ray from Goop's reachable basin location, then run
         // cooldown-paced projectiles and burn completion, with no direct hits.
         goop.teleport(aim.clone().add(aim.clone().set(-3, -3.5, -4)));
+        if (level === 3) goop.teleport(goop.position.clone().setY(-.52));
         const camera = rt.renderLayer.cameraRig.camera;
         camera.position.copy(goop.position); camera.position.y += .7; camera.lookAt(aim);
         const hits: number[] = [];
