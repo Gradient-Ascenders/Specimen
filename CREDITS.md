@@ -28,6 +28,7 @@ All 3D models were created independently for Specimen.
 | Interaction polish sounds | Made with ElevenLabs | Requester-supplied `polish-sounds-01.tar`. | Licence details not supplied | Buttons, bridge locking, lift and laser transitions, vent breaks, escape alarms and menu confirmation. |
 | Intro cutscene sounds | Made with ElevenLabs | Requester-supplied `intro-cutscene-sounds.tar`. | Licence details not supplied | Laboratory ambience, camera servos, doors, egg rocking/cracking/falling/breaking, pod seal/lift and Bob's gel movement. |
 | Intro camera variants | Made with ElevenLabs | Requester-supplied `intro-camera-sounds.tar`. | Licence details not supplied | Three distinct surveillance-camera movements replacing the original repeated camera cue. |
+| Escape cutscene sounds | Made with ElevenLabs | Requester-supplied `escape-cutscene.tar`. | Licence details not supplied | Containment power-down, hatch, drone scans/results/warning/strain/destruction, projectile impacts and shaft falls. |
 
 ## Tools
 

@@ -63,6 +63,26 @@ test('level selector belongs to the title and restores it on cancel', () => {
   assert.equal(flow.openLevelSelect(), false);
 });
 
+test('cutscene selector supports cancel and starts a selected cutscene without playing a level', () => {
+  const flow = new GameFlowStateModel();
+  assert.equal(flow.openCutsceneSelect(), false);
+  assert.equal(flow.beginSelectedCutscene(), false);
+  flow.completeBoot();
+  assert.equal(flow.openCutsceneSelect(), true);
+  assert.equal(flow.state, 'cutsceneSelect');
+  assert.equal(flow.menuOrigin, 'title');
+  assert.equal(getGameFlowKeyboardAction('Escape', flow.state), 'back');
+  assert.equal(flow.back(), true);
+  assert.equal(flow.state, 'title');
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene(), true);
+  assert.equal(flow.state, 'opening');
+  assert.equal(flow.beginSelectedCutscene(), false);
+  assert.equal(flow.openCutsceneSelect(), false);
+  assert.equal(flow.finishOpening(), true);
+  assert.equal(flow.openCutsceneSelect(), false);
+});
+
 test('return to menu requires pause and waits for a fresh title before starting', () => {
   const flow = new GameFlowStateModel();
   flow.completeBoot();

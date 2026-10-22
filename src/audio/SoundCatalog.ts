@@ -13,6 +13,15 @@ const HEAVY_IMPACT: SoundSpatialProfile = { refDistance: 8, rolloffFactor: 0.7 }
 
 /** Mono OGG assets; requester-selected ElevenLabs character effects and shared turret audio. */
 export const SOUND_DEFINITIONS = {
+  'escape-power-down-01': { path: 'assets/audio/escape/escape-power-down-01.ogg', loop: false, volume: 1, maxVoices: 1 },
+  'escape-cell-hatch-open-01': { path: 'assets/audio/escape/escape-cell-hatch-open-01.ogg', loop: false, volume: 0.9, maxVoices: 1 },
+  'escape-drone-scan-01': { path: 'assets/audio/escape/escape-drone-scan-01.ogg', loop: false, volume: 0.85, maxVoices: 1 },
+  'escape-scan-result-01': { path: 'assets/audio/escape/escape-scan-result-01.ogg', loop: false, volume: 0.85, maxVoices: 1 },
+  'escape-termination-warning-01': { path: 'assets/audio/escape/escape-termination-warning-01.ogg', loop: false, volume: 0.9, maxVoices: 1 },
+  'escape-drone-strain-loop-01': { path: 'assets/audio/escape/escape-drone-strain-loop-01.ogg', loop: true, volume: 0.7, maxVoices: 1, spatial: MECHANISM },
+  'escape-projectile-metal-impact-01': { path: 'assets/audio/escape/escape-projectile-metal-impact-01.ogg', loop: false, volume: 0.8, maxVoices: 3, spatial: MECHANISM },
+  'escape-drone-destruction-01': { path: 'assets/audio/escape/escape-drone-destruction-01.ogg', loop: false, volume: 1, maxVoices: 1 },
+  'escape-shaft-fall-01': { path: 'assets/audio/escape/escape-shaft-fall-01.ogg', loop: false, volume: 0.7, maxVoices: 2 },
   'intro-door-open-01': { path: 'assets/audio/intro/intro-door-open-01.ogg', loop: false, volume: 0.9, maxVoices: 1 },
   'intro-door-close-01': { path: 'assets/audio/intro/intro-door-close-01.ogg', loop: false, volume: 0.9, maxVoices: 1 },
   'intro-camera-servo-01': { path: 'assets/audio/intro/intro-camera-servo-01.ogg', loop: false, volume: 0.5, maxVoices: 1 },
@@ -73,6 +82,7 @@ const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
 // The live Cultivation escape includes Volt taking over a security drone.
 /** Cumulative banks start warming ahead of each level's visual preparation. */
 export const SOUND_BANKS = {
+  escape: ALL_SOUND_IDS.filter(id => id.startsWith('escape-')),
   intro: ALL_SOUND_IDS.filter(id => id.startsWith('intro-')),
   containment: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-')),
   cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-') ||

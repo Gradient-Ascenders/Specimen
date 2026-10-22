@@ -63,6 +63,87 @@
     "loop": false
   },
   {
+    "id": "escape-cell-hatch-open-01",
+    "path": "assets/audio/escape/escape-cell-hatch-open-01.ogg",
+    "durationSeconds": 2.56,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.63159,
+    "loop": false
+  },
+  {
+    "id": "escape-drone-destruction-01",
+    "path": "assets/audio/escape/escape-drone-destruction-01.ogg",
+    "durationSeconds": 2.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.63525,
+    "loop": false
+  },
+  {
+    "id": "escape-drone-scan-01",
+    "path": "assets/audio/escape/escape-drone-scan-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.16436,
+    "loop": false
+  },
+  {
+    "id": "escape-drone-strain-loop-01",
+    "path": "assets/audio/escape/escape-drone-strain-loop-01.ogg",
+    "durationSeconds": 1.92,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.18658,
+    "loop": true
+  },
+  {
+    "id": "escape-power-down-01",
+    "path": "assets/audio/escape/escape-power-down-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.35593,
+    "loop": false
+  },
+  {
+    "id": "escape-projectile-metal-impact-01",
+    "path": "assets/audio/escape/escape-projectile-metal-impact-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.57346,
+    "loop": false
+  },
+  {
+    "id": "escape-scan-result-01",
+    "path": "assets/audio/escape/escape-scan-result-01.ogg",
+    "durationSeconds": 0.3,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.17879,
+    "loop": false
+  },
+  {
+    "id": "escape-shaft-fall-01",
+    "path": "assets/audio/escape/escape-shaft-fall-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.57361,
+    "loop": false
+  },
+  {
+    "id": "escape-termination-warning-01",
+    "path": "assets/audio/escape/escape-termination-warning-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.26711,
+    "loop": false
+  },
+  {
     "id": "goop-acid-puddle-loop-01",
     "path": "assets/audio/goop/goop-acid-puddle-loop-01.ogg",
     "durationSeconds": 3.72,

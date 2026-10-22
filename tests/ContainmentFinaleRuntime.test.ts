@@ -49,7 +49,7 @@ test('skipping the Containment finale stops its alarm before the transition hold
     input:{},audio:{stopLoop(key:string){stopped.push(key);}}} as unknown as GreyboxLevelRuntimeOptions);
   const state=runtime as any;let skipped=0;
   state.lifecycle={state:'running'};state.resources={containmentLevel:{state:'completing',skipEnding(){skipped++;}}};
-  state.skipFinale();assert.deepEqual(stopped,['containment-finale-alarm']);assert.equal(skipped,1);
+  state.skipFinale();assert.deepEqual(stopped,['containment-finale-alarm','containment-finale-flight','containment-finale-door']);assert.equal(skipped,1);
 });
 
 test('9 is dev-only, Level-1-running-only, and previews the real ending rather than skipping to another level', () => {
@@ -75,6 +75,9 @@ test('9 is dev-only, Level-1-running-only, and previews the real ending rather t
   internals.onPreviewFinale(key);internals.onPreviewFinale(key);
   assert.equal(begins,1);assert.equal(completions,0,'Playback must finish before the normal Level 2 handoff.');
   assert.equal(cancelled,1);assert.equal(releases,1);assert.equal(prevented,1);assert.equal(input.enabled,false);
+  controller.state='playing';input.enabled=true;
+  assert.equal(runtime.previewEscapeForDebug(),true,'the developer menu can start the same real finale without a keyboard event');
+  assert.equal(begins,2);assert.equal(completions,0);
 });
 
 test('only programs introduced by explicit finale compiler and primer jobs are planned', async () => {

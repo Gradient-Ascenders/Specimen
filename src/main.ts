@@ -191,11 +191,110 @@ function startGame(): void {
     }).finally(() => { initialGraphicsTask = undefined; levelOneAssets.clear(); });
     return initialGraphicsTask;
   };
+  const escapePreviewFromUrl = import.meta.env.DEV && new URLSearchParams(window.location.search).get('cutscene') === 'escape';
+  let escapePreviewPending = false;
+  let escapePreviewRequested = false;
+  const previewEscape = async (): Promise<void> => {
+    if (!import.meta.env.DEV || escapePreviewPending) return;
+    escapePreviewPending = escapePreviewRequested = true;
+    gameFlow.setOpeningFade(1);
+    gameFlow.setOpeningStatus('Preparing escape cutscene…', false);
+    const skip = app.querySelector<HTMLButtonElement>('[data-action="skip-opening"]');
+    if (skip) skip.hidden = true;
+    try {
+      // Paint the opaque cover before normal world/cinematic preparation.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      if (shuttingDown) return;
+      titlePresentation?.dispose({keepScene:true}); titlePresentation = undefined;
+      titleRoom?.dispose(); titleRoom = undefined;
+      await prepareFirstGraphics();
+      await waitForGpuPreparation(renderLayer.renderer.getContext(),
+        () => new Promise(resolve => requestAnimationFrame(() => resolve())), () => !shuttingDown);
+      if (shuttingDown) return;
+      levelOneRuntime.completeOpening();
+      gameFlow.finishOpening(false);
+      if (!levelOneRuntime.previewEscapeForDebug()) throw new Error('Escape preview is not ready.');
+      escapePreviewRequested = false;
+      if (lastFrameStats) gameSession.render(0, lastFrameStats);
+    } catch (error) {
+      if (!shuttingDown) {
+        console.error('Escape cutscene preview failed.', error);
+        gameFlow.setOpeningStatus('Could not prepare the escape cutscene. Retry to continue.', true);
+      }
+    } finally {
+      escapePreviewPending = false;
+      if (skip) skip.hidden = false;
+    }
+  };
+  const playOpening = (forceIntro = false): void => {
+    if (escapePreviewFromUrl && !forceIntro) { void previewEscape(); return; }
+    if (!titleRoom) return;
+    titlePresentation?.dispose({ keepScene: true });
+    titlePresentation = undefined;
+    const shared = {
+      host: app,
+      audio,
+      prepareLevel: () => {
+        return prepareFirstGraphics().then(async () => {
+          // Submission finishing is not GPU completion. Drain the hidden
+          // warm-up queue before marking gameplay ready for the handoff.
+          await waitForGpuPreparation(renderLayer.renderer.getContext(),
+            () => new Promise(resolve => requestAnimationFrame(() => resolve())),
+            () => !shuttingDown);
+          if (shuttingDown) return;
+          const verification = levelOneRuntime.levelOnePrewarmVerification;
+          if (verification) app.dataset.levelOnePrewarm = JSON.stringify(verification);
+        });
+      },
+      onComplete: (userGesture: boolean) => {
+        levelOneRuntime.completeOpening();
+        openingPresentation?.dispose();
+        openingPresentation = undefined;
+        gameFlow.finishOpening(userGesture);
+        // Paint the warmed gameplay frame in the same task that removes
+        // the black cinematic fade; never flash the final intro camera.
+        if (lastFrameStats) gameSession.render(0, lastFrameStats);
+      },
+      onStatus: (message: string, failed: boolean) => gameFlow.setOpeningStatus(message, failed),
+      onFade: (opacity: number) => gameFlow.setOpeningFade(opacity),
+    };
+    // Ordinary Start uses live 3D with low-priority downloads/idle data prep.
+    // Preserve the existing MP4 player/export as an explicit backup.
+    if (getOpeningPlaybackMode(window.location.search) === 'live') {
+      const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
+      titleRoom = undefined;
+      openingPresentation = new OpeningGamePresentation({
+        ...shared, scene, renderLayer,
+        reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        preloadLevel: () => levelOneAssets.prepareLight(),
+      });
+    } else {
+      const videoHost = app.querySelector<HTMLElement>('[data-flow-panel="opening"]');
+      if (!videoHost) throw new Error('Missing opening video panel.');
+      openingPresentation = new OpeningMoviePresentation({
+        ...shared, videoHost,
+        source: new URL('./assets/cinematics/opening.mp4', import.meta.url).href,
+        sourceStartSeconds: OPENING_GAME_TIMING.blackoutEnd,
+        onBlackout: () => {
+          // No live cinematic scene, duplicate WebGL context or video
+          // texture. Release menu GPU resources behind the painted fade.
+          titleRoom?.dispose();
+          titleRoom = undefined;
+          renderLayer.setPresentationResolution(undefined);
+        },
+      });
+    }
+    openingPresentation.start();
+  };
   const gameFlow = new GameFlowUI({
     settings,
     creditsMarkdown,
     slimeHUD: gameSession,
     actions: {
+      previewCutscene: import.meta.env.DEV ? (cutscene) => {
+        if (cutscene === 'escape') void previewEscape();
+        else playOpening(true);
+      } : undefined,
       enableMusic: unlockAudio,
       playMenuConfirm: () => { audio.unlock(); audio.playUI(); },
       returnToMenu: async () => {
@@ -236,67 +335,9 @@ function startGame(): void {
         levelOneAssets.clear();
         gameSession.startSelectedLevel(levelId);
       },
-      playOpening: () => {
-        if (!titleRoom) return;
-        titlePresentation?.dispose({ keepScene: true });
-        titlePresentation = undefined;
-        const shared = {
-          host: app,
-          audio,
-          prepareLevel: () => {
-            return prepareFirstGraphics().then(async () => {
-              // Submission finishing is not GPU completion. Drain the hidden
-              // warm-up queue before marking gameplay ready for the handoff.
-              await waitForGpuPreparation(renderLayer.renderer.getContext(),
-                () => new Promise(resolve => requestAnimationFrame(() => resolve())),
-                () => !shuttingDown);
-              if (shuttingDown) return;
-              const verification = levelOneRuntime.levelOnePrewarmVerification;
-              if (verification) app.dataset.levelOnePrewarm = JSON.stringify(verification);
-            });
-          },
-          onComplete: (userGesture: boolean) => {
-            levelOneRuntime.completeOpening();
-            openingPresentation?.dispose();
-            openingPresentation = undefined;
-            gameFlow.finishOpening(userGesture);
-            // Paint the warmed gameplay frame in the same task that removes
-            // the black cinematic fade; never flash the final intro camera.
-            if (lastFrameStats) gameSession.render(0, lastFrameStats);
-          },
-          onStatus: (message: string, failed: boolean) => gameFlow.setOpeningStatus(message, failed),
-          onFade: (opacity: number) => gameFlow.setOpeningFade(opacity),
-        };
-        // Ordinary Start uses live 3D with low-priority downloads/idle data prep.
-        // Preserve the existing MP4 player/export as an explicit backup.
-        if (getOpeningPlaybackMode(window.location.search) === 'live') {
-          const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
-          titleRoom = undefined;
-          openingPresentation = new OpeningGamePresentation({
-            ...shared, scene, renderLayer,
-            reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-            preloadLevel: () => levelOneAssets.prepareLight(),
-          });
-        } else {
-          const videoHost = app.querySelector<HTMLElement>('[data-flow-panel="opening"]');
-          if (!videoHost) throw new Error('Missing opening video panel.');
-          openingPresentation = new OpeningMoviePresentation({
-            ...shared, videoHost,
-            source: new URL('./assets/cinematics/opening.mp4', import.meta.url).href,
-            sourceStartSeconds: OPENING_GAME_TIMING.blackoutEnd,
-            onBlackout: () => {
-              // No live cinematic scene, duplicate WebGL context or video
-              // texture. Release menu GPU resources behind the painted fade.
-              titleRoom?.dispose();
-              titleRoom = undefined;
-              renderLayer.setPresentationResolution(undefined);
-            },
-          });
-        }
-        openingPresentation.start();
-      },
+      playOpening: () => playOpening(),
       skipOpening: () => openingPresentation?.skip(),
-      retryOpening: () => openingPresentation?.retry(),
+      retryOpening: () => { if (escapePreviewRequested) void previewEscape(); else openingPresentation?.retry(); },
       startGameplay: () => lifecycleCoordinator.startGameplay(),
       stopGameplay: () => lifecycleCoordinator.stopGameplay(),
       setGameplayInputEnabled: (enabled) => input.setEnabled(enabled),

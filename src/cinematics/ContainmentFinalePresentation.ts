@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { SoundId } from '../audio/SoundCatalog.ts';
+import { CONTAINMENT_FINALE_AUDIO_CUES, ContainmentFinaleMovementAudio, containmentProjectileImpactSound } from '../audio/ContainmentFinaleAudio.ts';
 import type { ContainmentLevelScene } from '../levels/ContainmentLevelScene.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import type { CinematicPreparationJob } from './IdleCinematicPreparation.ts';
@@ -17,19 +18,10 @@ interface Options {
   readonly world: ContainmentLevelScene;
   readonly camera: THREE.PerspectiveCamera;
   readonly overlay: ContainmentFinaleOverlay;
-  readonly cue: (sound: SoundId, position?: THREE.Vector3) => void;
+  readonly cue: (sound: SoundId, position?: THREE.Vector3, volumeScale?: number) => void;
   readonly openDoor: () => void;
 }
 const UP = new THREE.Vector3(0, 1, 0), WALL = new THREE.Vector3(0, 0, -1), ZERO = new THREE.Vector3();
-const CUES: readonly (readonly [number, SoundId])[] = [
-  [.08, 'world-button-press-01'], [3, 'world-release-01'], [5.5, 'world-door-stop-01'],
-  [19.65, 'world-sign-tick-01'], [24.15, 'world-sign-tick-01'],
-  [F(38), 'bob-jump-01'], [F(39.25), 'bob-land-soft-01'],
-  [T.leap, 'bob-charged-jump-01'], [T.latch, 'bob-contact-01'],
-  [F(56.8), 'bob-jump-01'], [T.droneHit, 'world-drone-dissolve-01'],
-  [T.restLanding, 'bob-land-hard-01'], [F(59.7), 'bob-jump-01'], [T.safeLanding, 'bob-land-soft-01'],
-  [T.doorHit, 'goop-projectile-impact-01'], [T.bobDive, 'bob-jump-01'], [T.goopDive, 'bob-jump-01'],
-];
 
 /** Borrows the two already-loaded models. Their owners retain all asset ownership. */
 export class ContainmentFinalePresentation {
@@ -59,6 +51,7 @@ export class ContainmentFinalePresentation {
   private readonly bobIntent = new THREE.Vector3();
   private readonly goopIntent = new THREE.Vector3();
   private readonly direction = new THREE.Vector3();
+  private readonly movementAudio = new ContainmentFinaleMovementAudio();
   private readonly bobSurface = new THREE.Vector3(0, 1, 0);
   private readonly bobState: BobCharacterPresentationState = {
     locomotionPositionWorld: this.bobPosition, velocityWorld: this.bobVelocity,
@@ -105,13 +98,15 @@ export class ContainmentFinalePresentation {
     this.setDressing.begin();
     this.started = true; this.lastRenderedSeconds = 0; this.lastFixedSeconds = 0; this.doorOpened = false;
     this.actorSeconds = 0; this.updateActors(0, 0);
+    this.movementAudio.reset();
+    this.movementAudio.update(sampleContainmentFinale(0, this.bobStart), () => {});
     this.render(0);
   }
 
   fixedUpdate(seconds: number): void {
     if (!this.started || this.disposed) return;
     const { cue } = this.options, before = this.lastFixedSeconds;
-    for (const [time, sound] of CUES) if (time > before && time <= seconds) cue(sound);
+    for (const [time, sound] of CONTAINMENT_FINALE_AUDIO_CUES) if (time > before && time <= seconds) cue(sound);
     for (const shot of this.visuals.shots) if (shot.t > before && shot.t <= seconds) {
       this.direction.fromArray(shot.from); cue(shot.green ? 'goop-shoot-01' : 'specimen-turret-shot', this.direction);
       if (shot.green) {
@@ -119,14 +114,19 @@ export class ContainmentFinalePresentation {
         this.options.world.roomFive.goopPresentation.onAcidFired(this.direction);
       }
     }
-    for (const shot of this.visuals.shots) if (shot.impact && shot.t+shot.duration>before && shot.t+shot.duration<=seconds) {
-      this.direction.fromArray(shot.to); cue('goop-projectile-impact-01', this.direction);
+    for (const shot of this.visuals.shots) if (shot.t+shot.duration>before && shot.t+shot.duration<=seconds) {
+      const sound = containmentProjectileImpactSound(shot);
+      if (sound) { this.direction.fromArray(shot.to); cue(sound, this.direction); }
     }
     for (const jump of FINALE_GOOP_DODGES) {
       if (jump.start>before && jump.start<=seconds) cue('bob-jump-01');
       if (jump.end>before && jump.end<=seconds) cue('bob-land-soft-01');
     }
     this.advanceActors(seconds);
+    this.movementAudio.update(sampleContainmentFinale(seconds, this.bobStart), (position, volumeScale) => {
+      this.direction.fromArray(position);
+      cue('bob-contact-01', this.direction, volumeScale);
+    });
     if (!this.doorOpened && seconds >= T.doorHit) { this.doorOpened = true; this.options.openDoor(); }
     this.lastFixedSeconds = seconds;
   }
@@ -247,6 +247,7 @@ export class ContainmentFinalePresentation {
   }
 
   reset(): void {
+    this.movementAudio.reset();
     if (!this.started) return;
     const { world, camera } = this.options;
     this.setDressing.reset();
