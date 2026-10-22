@@ -46,10 +46,11 @@ test('deployed bridge top corners meet both anchors across its full width', () =
 test('textured static and interactive geometry preserves the reviewed transit baseline', () => {
   const f = fixture();
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-transit-authored-surfaces.json', import.meta.url), 'utf8'));
-  // Retain the reviewed geometry contract for every unchanged surface. Only
-  // the explicitly replaced wall-drone/cover family leaves this baseline.
+  // Retain the reviewed geometry contract except the replaced drone/cover
+  // family and the explicitly removed light hangers/two observation-panel rods.
   baseline.surfaces = baseline.surfaces.filter((saved: { name: string }) =>
-    !/^transit-(cover|security|bridge-cover)/.test(saved.name));
+    !/^transit-(cover|security|bridge-cover|light-bank-hanger-)/.test(saved.name) &&
+    !['transit-east-service-conduit-96', 'transit-east-service-conduit-116'].includes(saved.name));
   const meshes: THREE.Mesh[] = [];
   f.room.root.traverse(m => {
     if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly) return;

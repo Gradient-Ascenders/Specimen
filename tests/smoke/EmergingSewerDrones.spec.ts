@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 
-const evidence = 'artifacts/evidence/batch-3-sewer-drones';
+const evidence = 'artifacts/evidence/batch-3-drone-refinement';
 async function openLevel(page: Page, level: number, name: string) {
   await page.route('**/assets/index-*.js', async route => {
     const response = await route.fetch(), source = await response.text();
@@ -62,34 +62,63 @@ for (const [level, name] of [[2, 'Cultivation'], [3, 'Blackout']] as const) {
       null, { timeout: 180_000, polling: 250 });
 
     if (level === 3) {
-      const stages = await page.evaluate(() => {
-        const rt = (window as any).__sewerSession.runtime, r = rt.resources, c = r.transit;
+      const dormant = await page.evaluate(() => {
+        const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
         r.group.bobBody.teleport(r.group.bobBody.position.clone().set(6, .86, 84));
         r.group.voltBody.teleport(r.group.voltBody.position.clone().set(-16, 2.96, 90));
         r.group.goopBody.teleport(r.group.goopBody.position.clone().set(8, .86, 84));
         const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
-        const stages: any[] = [c.emergingDrones.map((d: any) => d.state.state)];
-        for (const z of [85, 109, 131]) {
-          bodies.goop.teleport(bodies.goop.position.clone().set(18, -.52, z));
-          for (let i = 0; i < 120; i++) c.update(1 / 60, bodies);
-          stages.push(c.emergingDrones.map((d: any) => d.state.state));
-          if (c.projectiles.liveCount) throw new Error('Drone fired inside the safe emergence annulus');
-        }
-        return stages;
-      });
-      expect(stages).toEqual([['dormant', 'dormant', 'dormant'], ['active', 'dormant', 'dormant'],
-        ['active', 'active', 'dormant'], ['active', 'active', 'active']]);
-      await page.evaluate(() => {
-        const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
-        const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
         for (const receiver of c.lights) receiver.target.setConnectionState(true);
         for (let i = 0; i < 90; i++) c.update(1 / 60, bodies);
         for (const receiver of c.lights) receiver.target.setConnectionState(false);
+        const rods: string[] = [];
+        c.root.traverse((o: any) => { if (o.name.startsWith('transit-light-bank-hanger-')) rods.push(o.name); });
+        return { rods, horizontalRods: c.room.collisionMeshes.filter((m: any) => m.name.startsWith('transit-east-service-conduit-')).map((m: any) => m.name),
+          lights: c.lights.length, drones: c.emergingDrones.map((d: any) => ({
+          state: d.state.state, y: d.shell.body.position.y, visible: d.shell.body.visible,
+          armed: d.weapon.readModel.enabled, lamp: d.light.intensity,
+        })) };
       });
-      await capture(page, 'level-3-room-2-emerged', [0, 16, 86], [15, 2, 119]);
-      for (const [index, z] of [100, 124, 146].entries()) {
-        await capture(page, `level-3-drone-${index + 1}`, [11, 5, z - 6], [18, 3.3, z]);
+      expect(dormant.rods).toEqual([]); expect(dormant.lights).toBe(3);
+      expect(dormant.horizontalRods).toEqual(['transit-east-service-conduit-136']);
+      for (const drone of dormant.drones) expect(drone).toEqual({ state: 'dormant', y: -.98, visible: true, armed: false, lamp: 0 });
+      await capture(page, 'bob-drone-1-dormant', [15, 1.4, 96], [18, -.7, 100]);
+      await capture(page, 'bob-drone-2-dormant', [15, 1.4, 120], [18, -.7, 124]);
+      await capture(page, 'volt-drone-dormant', [-8, 1.4, 128], [-11.5, -.7, 132]);
+      await capture(page, 'overhead-lights-cleaned', [-5, 13, 88], [14, 12, 111]);
+      for (const [index, z] of [85, 109].entries()) {
+        const stage = await page.evaluate(z => {
+          const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
+          const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
+          bodies.goop.teleport(bodies.goop.position.clone().set(18, -.52, z));
+          let maxStep = 0;
+          const enemy = c.emergingDrones[z === 85 ? 0 : 1];
+          for (let i = 0; i < 120; i++) {
+            const y = enemy.shell.body.position.y; c.update(1 / 60, bodies);
+            maxStep = Math.max(maxStep, Math.abs(enemy.shell.body.position.y - y));
+          }
+          return { phases: c.emergingDrones.map((d: any) => d.state.state), maxStep, shots: c.projectiles.liveCount };
+        }, z);
+        expect(stage.phases).toEqual(index === 0 ? ['active', 'dormant', 'dormant'] : ['active', 'active', 'dormant']);
+        expect(stage.maxStep).toBeLessThan(.09); expect(stage.shots).toBe(0);
+        await capture(page, `bob-drone-${index + 1}-guarding-route`, [8, 7, z + 8], [15, 2.8, z + 15]);
       }
+      const voltStage = await page.evaluate(() => {
+        const r = (window as any).__sewerSession.runtime.resources, c = r.transit;
+        const bodies = { bob: r.group.bobBody, goop: r.group.goopBody, volt: r.group.voltBody };
+        bodies.goop.teleport(bodies.goop.position.clone().set(10, -.52, 139));
+        bodies.bob.teleport(bodies.bob.position.clone().set(10, 8.06, 142.5));
+        c.update(1 / 60, bodies);
+        const before = c.emergingDrones[2].state.state;
+        bodies.volt.teleport(bodies.volt.position.clone().set(-16, 2.96, 117.5));
+        for (let i = 0; i < 120; i++) c.update(1 / 60, bodies);
+        return { before, after: c.emergingDrones[2].state.state, shots: c.projectiles.liveCount,
+          angles: c.emergingDrones.map((d: any) => d.light.angle) };
+      });
+      expect(voltStage.before).toBe('dormant'); expect(voltStage.after).toBe('active');
+      expect(voltStage.shots).toBe(0); expect(voltStage.angles).toEqual([.22, .22, .22]);
+      await capture(page, 'volt-drone-guarding-catwalk', [-6, 6, 123], [-13, 3, 132]);
+      await writeFile(`${evidence}/dormant-and-emergence.json`, JSON.stringify({ dormant, voltStage }, null, 2));
     } else {
       const state = await page.evaluate(() => {
         const rt = (window as any).__sewerSession.runtime, r = rt.resources;

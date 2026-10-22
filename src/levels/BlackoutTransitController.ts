@@ -164,7 +164,6 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       const lights = this.room.receiverPositions.map((position, index) => {
         const target = this.makeReceiver(`transit-light-${String.fromCharCode(97 + index)}`, `Light bank ${String.fromCharCode(65 + index)}`, position, options.electricalTargets, unregisterTargets, true);
         this.lampLights.push(target.light);
-        this.dressingBox(`transit-light-bank-hanger-${index}`, new THREE.Vector3(.08,20.7-position.y,.08), new THREE.Vector3(position.x,(20.7+position.y)/2,position.z));
         return target;
       });
       this.lights = lights;
@@ -245,9 +244,17 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       });
       this.lifts = lifts;
 
+      const guardedRoutes = [
+        this.room.bobRoutePlatforms[1]!.position.clone().add(new THREE.Vector3(0, .7, 0)),
+        // Scan the exposed near edge of the upper landing. The drone hovers
+        // below its deck, so the centre of that deck would block its own LOS.
+        this.room.bobRoutePlatforms[3]!.position.clone().add(new THREE.Vector3(2, .7, 0)),
+        this.room.voltCatwalk.position.clone().setZ(132).add(new THREE.Vector3(0, .7, 0)),
+      ];
       for (const [index, position] of TRANSIT_SEWER_DRONE_POSITIONS.entries()) {
         const enemy = new EmergingSewerDrone(`transit-sewer-drone-${index + 1}`, this.root,
-          new THREE.Vector3(...position), options.world, options.surfaces, this.projectiles, this.resources);
+          new THREE.Vector3(...position), options.world, options.surfaces, this.projectiles, this.resources,
+          { routeTarget: guardedRoutes[index]!, acidSurfaceY: this.room.acidBounds.surfaceY, sweepMetres: index === 2 ? 2 : 1 });
         this.emergingDrones.push(enemy); ownedDrones.push(enemy.weapon); ownedDissolves.push(enemy.target);
       }
       this.scannerBeams = new ScannerBeamPresentation(this.world, this.emergingDrones.map(enemy => ({
@@ -279,7 +286,8 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       this.bridge = new THREE.Mesh(new THREE.BoxGeometry(bridgeDirection.length(), 0.45, 3.6), new THREE.MeshStandardMaterial({ color: 0x353e41, roughness: 0.72, metalness: 0.7 }));
       this.bridge.name = 'transit-deployable-bridge-deck'; this.bridge.position.copy(bridgeCentre);
       this.bridge.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(bridgeAlong, bridgeUp, bridgeAcross));
-      this.bridge.visible = false; this.bridge.userData.surfaceTag = 'default'; this.root.add(this.bridge);
+      this.bridge.visible = false; this.bridge.userData.surfaceTag = 'default';
+      this.bridge.userData.preciseMovementCorners = true; this.root.add(this.bridge);
       this.bridgeStartPosition.copy(bridgeStart);
       this.bridgeEndPosition.copy(bridgeEnd);
 
@@ -376,7 +384,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const state: TransitSnapshot = {
       active: this.active, complete: this.complete, checkpointStage: this.checkpointStage,
       lights: this.lights.map(({ charge, latched }) => ({ charge, latched })),
-      sewerDrones: this.emergingDrones.map(enemy => enemy.state.capture()),
+      sewerDrones: this.emergingDrones.map(enemy => enemy.capture()),
       liftGrace: [...this.liftGrace], switchHeld: this.switchHeld, bridgeDeployed: this.bridgeDeployed,
       lifts: this.lifts.map(lift => lift.captureState()),
       bridgeLocked: this.bridgeLocked, bridgeRelease: this.bridgeRelease,
@@ -513,18 +521,6 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     Object.assign(receiver, { target, root, light, targetMaterial, ownsTargetMaterial: !existingTargetMesh, connected: false, charge: 0, latched: false, unregister: registry.register(target) });
     registrations.push(receiver.unregister);
     return receiver;
-  }
-
-  private dressingBox(name: string, size: THREE.Vector3, position: THREE.Vector3, material: THREE.Material = this.steel): THREE.Mesh {
-    const mesh = new THREE.Mesh(this.dressingGeometry, material);
-    mesh.name = name;
-    mesh.scale.copy(size);
-    mesh.position.copy(position);
-    this.mapScaledDressing(mesh);
-    mesh.userData.presentationOnly = true;
-    mesh.receiveShadow = true;
-    this.root.add(mesh);
-    return mesh;
   }
 
   private mapScaledDressing(mesh: THREE.Mesh): void {

@@ -2,10 +2,12 @@
 
 ## Implementation
 
-Level 3 Room 2 now has three damaged sewer drones at `(18, -0.68, 100)`,
-`(18, -0.68, 124)` and `(18, -0.68, 146)`. These are acid emergence anchors;
-the hidden shells begin 3 m below them and rise to hover approximately 4 m above
-them. The third anchor occupies the far-right acid area.
+Level 3 Room 2 has three damaged sewer drones. Their dormant body centres are
+`(18, -0.98, 100)`, `(18, -0.98, 124)` and `(-11.5, -0.98, 132)`, directly at
+the acid surface. Their level shells remain visibly half-submerged, with lamps
+and weapons off. All rise smoothly to the original hover height of about
+`3.32 m`, plus the existing small bob. The third drone is beside Volt's catwalk,
+clear of its rails, rather than across the basin on Bob's side.
 
 `WeakSewerDrone` extracts the existing Level 2 Room 5 state machine, damped
 rise/hover/aim motion, damaged-eye pulse and three-reaction acid coordinator.
@@ -19,6 +21,11 @@ Volt body within 16 m activates that area's drone; attack range is 10 m. Level
 2 keeps its original Goop-only proximity trigger and 40 m weapon range. The
 original Level 2 warm point lamp remains unchanged. Transit's damaged spotlight
 uses the shared eye pulse continuously after emergence, with a matching cone.
+Its outer half-angle and detection half-angle are both 0.22 radians (about
+25 degrees across the full cone). A slow scan guards authored traversal points,
+not the nearest slime; its light, cone and detection share the same gaze and
+origin. Solid line-of-sight blockers still protect targets. See
+`docs/acid-drone-refinement.md` for the follow-up evidence and exact route anchors.
 
 The old three cover panels, soluble supports, guide rails, cradles, release link,
 armoured drones and their collider registrations are removed. Checkpoint
@@ -63,7 +70,8 @@ integration coverage, not an uninterrupted start-to-finish playthrough.
 
 Generated screenshots and diagnostic JSON are ignored under
 `artifacts/evidence/batch-3-sewer-drones/`. They include the Level 2 reference,
-the powered Level 3 room survey and individual drone views. The survey camera
+the initial powered Level 3 room survey and individual drone views. Refinement
+images are under `artifacts/evidence/batch-3-drone-refinement/`. The survey camera
 is deliberately reproducible rather than presented as a normal player camera.
 
 ## Local testing
@@ -72,7 +80,7 @@ is deliberately reproducible rather than presented as a normal player camera.
    development build press **2** to use the existing Room 2 shortcut.
 2. Keep the other bodies at the entry. Approach along Bob's route or Goop's
    acid route. Observe each area activate independently before shooting range.
-3. Check the far-right acid area for the third drone. Restore the room light
+3. Approach along Volt’s catwalk for the third drone. Restore the room light
    banks with Volt to inspect the rusted shells in the dark facility.
 4. Switch to Goop, hold right mouse to aim, and fire three separate left-click
    acid shots at each drone. Confirm highlighting, progressive missing parts,
@@ -87,7 +95,7 @@ Repeat automated validation with `npm test`, `npm run type-check`,
 `npm run build`, `npm run validate:production`, and
 `npx playwright test tests/smoke/EmergingSewerDrones.spec.ts --config playwright.smoke.config.ts`.
 
-## Completed checks
+## Initial implementation checks (af8c412)
 
 - `npm test`: 1,487 passed, zero failures.
 - `npm run type-check`: passed.
@@ -96,7 +104,7 @@ Repeat automated validation with `npm test`, `npm run type-check`,
 - Production Chromium: both Level 2/Level 3 scenarios passed; extended Level 3 bridge and non-shadowed-light inspection also passed.
 - Browser console, asset requests and WebGL error checks: no errors observed.
 
-## Files changed
+## Initial implementation files (af8c412)
 
 - `docs/emerging-sewer-drones.md`
 - `docs/levels/blackout.md`

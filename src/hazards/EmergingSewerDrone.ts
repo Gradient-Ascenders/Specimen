@@ -9,12 +9,26 @@ import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import type { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import type { DroneProjectileSystem } from './DroneProjectileSystem.ts';
 import { SecurityDrone, type SecurityDroneTarget } from './SecurityDrone.ts';
-import { bindWeakSewerDroneBurns, SewerDroneMotion, sewerDroneLampPower, WeakSewerDroneState, WEAK_SEWER_DRONE } from './WeakSewerDrone.ts';
+import { bindWeakSewerDroneBurns, SewerDroneMotion, sewerDroneLampPower, WeakSewerDroneState, WEAK_SEWER_DRONE, type WeakSewerDroneSnapshot } from './WeakSewerDrone.ts';
 import { WorldAudioSource } from '../audio/WorldAudio.ts';
 
 export const TRANSIT_SEWER_EMERGENCE_RANGE = 16;
 export const TRANSIT_SEWER_ATTACK_RANGE = 10;
-export const TRANSIT_SEWER_DRONE_POSITIONS = [[18, -.68, 100], [18, -.68, 124], [18, -.68, 146]] as const;
+export const TRANSIT_SEWER_CONE_HALF_ANGLE = .22;
+export const TRANSIT_SEWER_DRONE_POSITIONS = [[18, -.68, 100], [18, -.68, 124], [-11.5, -.68, 132]] as const;
+
+export interface SewerDroneGuard {
+  /** Authored point above the guarded deck, in the drone parent's coordinates. */
+  readonly routeTarget: THREE.Vector3;
+  readonly acidSurfaceY: number;
+  readonly sweepMetres: number;
+}
+
+export interface EmergingSewerDroneSnapshot extends WeakSewerDroneSnapshot {
+  readonly position?: readonly number[];
+  readonly rotation?: readonly number[];
+  readonly motionSeconds?: number;
+}
 
 /** Room adapter around the shared sewer state, motion, hit reactions and AI. */
 export class EmergingSewerDrone {
@@ -24,7 +38,7 @@ export class EmergingSewerDrone {
   readonly shell;
   readonly target: DissolveTarget;
   readonly weapon: SecurityDrone;
-  readonly light = new THREE.SpotLight(0xffa13b, 0, TRANSIT_SEWER_ATTACK_RANGE, .4, .3, 2);
+  readonly light = new THREE.SpotLight(0xffa13b, 0, TRANSIT_SEWER_ATTACK_RANGE, TRANSIT_SEWER_CONE_HALF_ANGLE, .2, 2);
   readonly beam: THREE.Mesh<THREE.ConeGeometry, THREE.MeshBasicMaterial>;
   private readonly origin: THREE.Vector3;
   private readonly submerged: THREE.Vector3;
@@ -32,15 +46,23 @@ export class EmergingSewerDrone {
   private readonly direction = new THREE.Vector3(0, 0, -1);
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly aim = new THREE.Vector3();
+  private readonly routeTarget: THREE.Vector3;
+  private readonly scanPoint = new THREE.Vector3();
+  private readonly worldGaze = new THREE.Vector3();
+  private readonly worldRotation = new THREE.Quaternion();
+  private readonly sweepMetres: number;
   private readonly audio: WorldAudioSource;
   private readonly materials = new Set<THREE.Material>();
   private readonly geometries = new Set<THREE.BufferGeometry>();
   private unbind?: () => void;
   private disposed = false;
   constructor(id: string, parent: THREE.Group, origin: THREE.Vector3,
-    world: CollisionWorld, surfaces: SurfaceRegistry, projectiles: DroneProjectileSystem, resources: SecurityDronePresentationResources) {
+    world: CollisionWorld, surfaces: SurfaceRegistry, projectiles: DroneProjectileSystem, resources: SecurityDronePresentationResources,
+    guard: SewerDroneGuard) {
     this.id = id;
-    this.origin = origin.clone(); this.submerged = origin.clone().add(new THREE.Vector3(0, -3, 0));
+    this.origin = origin.clone();
+    this.submerged = origin.clone().setY(guard.acidSurfaceY);
+    this.routeTarget = guard.routeTarget.clone(); this.sweepMetres = guard.sweepMetres;
     this.shell = createRustedSewerDrone();
     this.shell.body.name = `${id}-rusted-core`; this.shell.body.position.copy(this.submerged);
     this.shell.body.rotation.set(.2, 0, 1.1); parent.add(this.shell.body);
@@ -73,14 +95,17 @@ export class EmergingSewerDrone {
     this.damage = new SewerDroneDamage(this.shell.body, -1.18, `${id}-debris`);
     this.weapon = new SecurityDrone({ id, type: 'ceiling', initialPosition: this.submerged,
       colliderSize: new THREE.Vector3(2, 1.3, 2), forward: new THREE.Vector3(0, 0, -1), scanAxis: new THREE.Vector3(0, 1, 0),
-      scanHalfAngleRadians: .035, scanSpeedRadiansPerSecond: .12, detectionHalfAngleRadians: Math.PI,
+      // The room supplies a smooth route scan. AI must use that exact gaze,
+      // rather than rotating its own cone or following a detected slime.
+      scanHalfAngleRadians: 0, scanSpeedRadiansPerSecond: 0, trackTargets: false,
+      detectionHalfAngleRadians: TRANSIT_SEWER_CONE_HALF_ANGLE, forwardAnchorMetres: 1.3,
       detectionRangeMetres: TRANSIT_SEWER_ATTACK_RANGE, warningSeconds: WEAK_SEWER_DRONE.warningSeconds,
       fireIntervalSeconds: WEAK_SEWER_DRONE.fireIntervalSeconds, targetLossGraceSeconds: .1, cooldownSeconds: .5,
       muzzleAnchor: new THREE.Vector3(0, -.1, -2.5), targetPolicy: 'all', initialScanPhase: 0 }, world, surfaces, projectiles, resources, this.target.mesh);
     parent.add(this.weapon.root);
     this.weapon.setCollisionEnabled(false); this.weapon.setPresentationVisible(false);
     this.light.name = `${id}-search-light`; this.light.castShadow = false; parent.add(this.light, this.light.target);
-    const geometry = new THREE.ConeGeometry(Math.tan(.4) * TRANSIT_SEWER_ATTACK_RANGE, TRANSIT_SEWER_ATTACK_RANGE, 16, 1, true);
+    const geometry = new THREE.ConeGeometry(Math.tan(TRANSIT_SEWER_CONE_HALF_ANGLE) * TRANSIT_SEWER_ATTACK_RANGE, TRANSIT_SEWER_ATTACK_RANGE, 16, 1, true);
     geometry.translate(0, -TRANSIT_SEWER_ATTACK_RANGE / 2, 0);
     this.beam = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffa13b, transparent: true, opacity: .04,
       depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
@@ -91,7 +116,7 @@ export class EmergingSewerDrone {
   bindBurns(system: DissolveSystem): void { this.unbind?.(); this.unbind = bindWeakSewerDroneBurns(system, this.target, this.state); }
   update(dt: number, targets: readonly SecurityDroneTarget[], enabled: boolean): void {
     if (!enabled) { this.suspend(); return; }
-    let near = false, closest = targets[0]!, distance = Infinity;
+    let near = false;
     // Test proximity against the final acid emergence area, not the submerged
     // mesh; use all persistent bodies, independent of currently selected slime.
     for (const target of targets) {
@@ -99,14 +124,19 @@ export class EmergingSewerDrone {
       this.aim.set(target.position.x, target.position.y, target.position.z);
       this.shell.body.parent!.worldToLocal(this.aim);
       const squared = this.aim.distanceToSquared(this.origin);
-      if (squared < distance) { distance = squared; closest = target; }
       near ||= squared <= TRANSIT_SEWER_EMERGENCE_RANGE ** 2;
     }
     this.state.update(dt, near);
-    this.shell.body.visible = this.state.state !== 'dormant' && this.state.state !== 'destroyed' && !this.target.completed;
-    this.motion.update(dt, this.shell.body, this.state, this.origin, closest.position);
+    this.shell.body.visible = this.state.state !== 'destroyed' && !this.target.completed;
+    this.scanPoint.copy(this.routeTarget);
+    this.scanPoint.z += Math.sin(this.motion.time * .45) * this.sweepMetres;
+    this.shell.body.parent!.localToWorld(this.scanPoint);
+    this.motion.update(dt, this.shell.body, this.state, this.origin, this.scanPoint, this.submerged.y);
     this.damage.update(dt, this.state.hits);
     this.weapon.root.position.copy(this.shell.body.position); this.weapon.root.quaternion.copy(this.shell.body.quaternion);
+    this.shell.body.getWorldQuaternion(this.worldRotation);
+    this.worldGaze.set(0, 0, -1).applyQuaternion(this.worldRotation);
+    this.weapon.setPatrolDirection(this.worldGaze);
     this.weapon.setEnabled(this.state.state === 'active'); this.weapon.update(dt, targets);
     this.syncLight();
   }
@@ -125,14 +155,27 @@ export class EmergingSewerDrone {
   reset(): void {
     this.state.reset(); this.motion.reset(); this.target.reset(); this.damage.reset(0); this.weapon.reset();
     this.weapon.setCollisionEnabled(false); this.weapon.setPresentationVisible(false);
-    this.shell.body.position.copy(this.submerged); this.shell.body.rotation.set(.2, 0, 1.1); this.shell.body.visible = false; this.suspend();
+    this.shell.body.position.copy(this.submerged);
+    // A level shell intersects the acid through its body centre, not through a
+    // tilted rotor tip. Visibility alone never enables weapons or searchlights.
+    this.aim.subVectors(this.routeTarget, this.submerged).setY(0).normalize();
+    this.shell.body.quaternion.setFromUnitVectors(this.direction.set(0, 0, -1), this.aim);
+    this.shell.body.visible = true; this.suspend(); this.syncLight();
   }
-  restore(state: ReturnType<WeakSewerDroneState['capture']>): void {
+  capture(): EmergingSewerDroneSnapshot {
+    return { ...this.state.capture(), position: this.shell.body.position.toArray(),
+      rotation: this.shell.body.quaternion.toArray(), motionSeconds: this.motion.time };
+  }
+  restore(state: EmergingSewerDroneSnapshot): void {
     this.reset(); this.state.restore(state); this.damage.reset(state.hits);
-    this.shell.body.position.copy(state.state === 'dormant' ? this.submerged : this.origin);
-    if (state.state === 'active' || state.state === 'destroyed') this.shell.body.position.y += WEAK_SEWER_DRONE.riseMetres;
+    if (state.state === 'active' || state.state === 'destroyed') this.shell.body.position.y = this.origin.y + WEAK_SEWER_DRONE.riseMetres;
+    // Checkpoint restoration retains the actual damped emergence pose, so a
+    // partially risen drone does not return to the acid and jump upward again.
+    if (state.position?.length === 3 && state.position.every(Number.isFinite)) this.shell.body.position.fromArray(state.position);
+    if (state.rotation?.length === 4 && state.rotation.every(Number.isFinite)) this.shell.body.quaternion.fromArray(state.rotation).normalize();
+    if (state.motionSeconds !== undefined && Number.isFinite(state.motionSeconds) && state.motionSeconds >= 0) this.motion.time = state.motionSeconds;
     if (state.hits === 3) this.target.advance(this.target.dissolveDurationSeconds);
-    this.shell.body.visible = state.state !== 'dormant' && state.state !== 'destroyed';
+    this.shell.body.visible = state.state !== 'destroyed';
   }
   dispose(): void {
     if (this.disposed) return; this.disposed = true;

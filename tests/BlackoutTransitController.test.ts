@@ -207,7 +207,7 @@ test('Room 2 starts dormant and disposal releases every registered target and pu
   } finally { controller.dispose(); electricalTargets.dispose(); room.dispose(); world.clear(); surfaces.clear(); }
 });
 
-test('sewer drones emerge sequentially from their own areas, including the far-right acid', () => {
+test('Bob-side drones emerge sequentially while the third waits beside Volt’s route', () => {
   const f = fixture();
   try {
     assert.deepEqual(f.controller.emergingDrones.map(d => d.state.state), ['dormant', 'dormant', 'dormant']);
@@ -216,10 +216,23 @@ test('sewer drones emerge sequentially from their own areas, including the far-r
       f.bodies.goop.position.set(18, -.52, z);
       for (let i = 0; i < 120; i++) f.controller.update(DT, f.bodies);
       assert.deepEqual(f.controller.emergingDrones.map(d => d.state.state),
-        [0, 1, 2].map(i => i <= index ? 'active' : 'dormant'));
+        [0, 1, 2].map(i => i < 2 && i <= index ? 'active' : 'dormant'));
       assert.equal(f.controller.emergingDrones[index]!.shell.body.visible, true);
-      assert.ok(f.controller.emergingDrones[index]!.shell.body.position.y > -.98);
+      if (index < 2) assert.ok(f.controller.emergingDrones[index]!.shell.body.position.y > -.98);
     }
+    f.bodies.bob.position.set(10, 8.06, 142.5);
+    f.bodies.goop.position.set(10, -.52, 139);
+    f.controller.update(DT, f.bodies);
+    assert.equal(f.controller.emergingDrones[2]!.state.state, 'dormant', 'separate Bob/Goop routes do not wake Volt’s drone');
+    f.bodies.volt.position.set(-16, 2.96, 117.5);
+    for (let i = 0; i < 120; i++) f.controller.update(DT, f.bodies);
+    assert.equal(f.controller.emergingDrones[2]!.state.state, 'active');
+    const third = f.controller.emergingDrones[2]!.shell.body;
+    assert.ok(third.position.x < -10 && third.position.z === 132);
+    assert.equal(f.controller.projectiles.liveCount, 0, 'Volt can observe emergence outside attack range');
+    f.room.root.updateMatrixWorld(true);
+    const hull = third.geometry.boundingBox!.clone().applyMatrix4(third.matrixWorld);
+    assert.ok(!hull.intersectsBox(new THREE.Box3().setFromObject(f.room.voltCatwalk)), 'relocation leaves the actual catwalk clear');
   } finally { f.dispose(); }
 });
 

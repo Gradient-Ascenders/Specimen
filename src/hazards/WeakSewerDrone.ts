@@ -46,11 +46,12 @@ export class SewerDroneMotion {
   private readonly rotation = new THREE.Quaternion();
   private readonly forward = new THREE.Vector3(0, 0, -1);
   update(dt: number, body: THREE.Mesh, state: WeakSewerDroneState, origin: THREE.Vector3,
-    target: { readonly x: number; readonly y: number; readonly z: number }): void {
+    target: { readonly x: number; readonly y: number; readonly z: number }, emergenceStartY = origin.y): void {
     if (state.state !== 'rebooting' && state.state !== 'active') return;
     this.time += dt;
     const lift = THREE.MathUtils.smoothstep(state.elapsed, 0, WEAK_SEWER_DRONE.emergenceSeconds);
-    body.position.y = THREE.MathUtils.damp(body.position.y, origin.y + lift * (WEAK_SEWER_DRONE.riseMetres + Math.sin(this.time * 2.2) * .18), 6, dt);
+    const rise = origin.y + WEAK_SEWER_DRONE.riseMetres - emergenceStartY;
+    body.position.y = THREE.MathUtils.damp(body.position.y, emergenceStartY + lift * (rise + Math.sin(this.time * 2.2) * .18), 6, dt);
     this.aim.set(target.x, target.y, target.z); body.parent!.worldToLocal(this.aim);
     this.aim.sub(body.position).normalize();
     this.rotation.setFromUnitVectors(this.forward, this.aim);
