@@ -28,6 +28,9 @@ export function createContainmentPlatformBoosters(scene: ContainmentLevelScene):
       return { id, top: [point.x, point.y, point.z],
         ...(id === 'room-2-platform-a-height-lesson' ? { scale: .6, mountOffsetY: -.35 } : {}),
         ...(id === 'room-5-lower-platform-c' ? { scale: .9, mountOffsetY: -.08 } : {}),
+        // The unshadowed spill must stay below this deck and short of its
+        // enclosing entry wall; retain the default range on open platforms.
+        ...(id === 'room-3-entry-platform' ? { spillRangeMetres: 1.4 } : {}),
       };
     });
     boosters.addPlatforms(parent, platforms, `containment-room-${room}`);

@@ -10,9 +10,11 @@ export interface BoosterPlatform {
   /** Compact the same unit assembly only where floor clearance requires it. */
   readonly scale?: number;
   readonly mountOffsetY?: number;
+  /** Localize unshadowed spill near enclosing walls/decks; default is 6 m. */
+  readonly spillRangeMetres?: number;
 }
 interface Batch { root: THREE.Group; visible: boolean }
-interface Jet { position: THREE.Vector3; world: THREE.Vector3; batch: Batch; id: number; score: number }
+interface Jet { position: THREE.Vector3; world: THREE.Vector3; batch: Batch; id: number; score: number; spillRangeMetres: number }
 
 /** Shared Cultivation engine/exhaust, with four submissions per attachment group,
  * two non-shadowed spill lights and one nearest-engine hover source per owner.
@@ -145,6 +147,7 @@ export class PlatformBoosters {
     for (const platform of additions) this.jets.push({
       position: new THREE.Vector3(platform.top[0], platform.top[1] + (platform.mountOffsetY ?? 0) - 1.32 * (platform.scale ?? 1), platform.top[2]),
       world: new THREE.Vector3(), batch, id: this.jets.length, score: 0,
+      spillRangeMetres: platform.spillRangeMetres ?? 6,
     });
   }
 
@@ -175,7 +178,11 @@ export class PlatformBoosters {
         lamp.light.intensity = THREE.MathUtils.damp(lamp.light.intensity, power, 8, dt);
       }
       if (lamp.jet >= 0) {
-        lamp.light.position.copy(this.jets[lamp.jet].world); lamp.light.position.y -= .15;
+        const jet = this.jets[lamp.jet];
+        // Follow the currently assigned jet through fade-out, then restore the
+        // next jet's authored range when this pooled slot changes ownership.
+        lamp.light.distance = jet.spillRangeMetres;
+        lamp.light.position.copy(jet.world); lamp.light.position.y -= .15;
         lamp.light.parent!.worldToLocal(lamp.light.position);
       }
     }

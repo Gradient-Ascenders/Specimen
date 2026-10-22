@@ -142,6 +142,47 @@ test('traversal post skins disappear without changing their collisions or button
   } finally { raw.dispose(); rawTwo.dispose(); scene.dispose(); }
 });
 
+test('entry spill stays below the deck and short of the entry wall without changing nearby engines', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  try {
+    const entry = scene.collisionMeshes.find(mesh => mesh.name === 'room-3-entry-platform')!;
+    const lamps: THREE.PointLight[] = [];
+    scene.root.traverse(object => { if (object.name.startsWith('containment-platform-booster-spill-')) lamps.push(object as THREE.PointLight); });
+    const settle = (point: THREE.Vector3) => { for (let i = 0; i < 120; i++) scene.platformBoosters.update(1 / 60, point); };
+    settle(entry.position);
+    const lamp = lamps.find(light => Math.abs(light.position.z - entry.position.z) < 1e-6)!;
+    assert.ok(lamp && lamp.intensity > 5, 'Entry underside light remains powered');
+    assert.equal(lamps.length, 2); assert.ok(lamps.every(light => !light.castShadow));
+    const lightPosition = lamp.getWorldPosition(new THREE.Vector3());
+    const top = entry.position.y + (entry.geometry as THREE.BoxGeometry).parameters.height / 2;
+    assert.ok(lightPosition.y + lamp.distance < top, 'Spill cannot cross the walking-surface plane');
+    assert.ok(Math.abs(lightPosition.z - 49.2) > lamp.distance, 'Spill cannot reach the front of the entry wall');
+    assert.ok(top - .5 - lightPosition.y < lamp.distance, 'Underside remains inside the light range');
+    const neighbour = scene.collisionMeshes.find(mesh => mesh.name === 'room-3-platform-a-bounce')!;
+    settle(neighbour.position);
+    const normal = lamps.find(light => light.position.distanceTo(new THREE.Vector3(neighbour.position.x,
+      neighbour.position.y + .25 - 1.47, neighbour.position.z)) < 1e-6)!;
+    assert.ok(normal && normal.intensity > 5);
+    assert.equal(normal.distance, 6, 'Neighbour retains the original spill range');
+  } finally { scene.dispose(); }
+});
+
+test('a reused light slot restores the default range after leaving a compact spill', () => {
+  const parent = new THREE.Group(), boosters = new PlatformBoosters(parent, 'range-test');
+  boosters.addPlatforms(boosters.root, [{ id: 'enclosed', top: [0, 3, 0], spillRangeMetres: 1.4 },
+    { id: 'open', top: [30, 3, 0] }], 'range-test');
+  try {
+    const lamps = boosters.root.children.filter(object => object instanceof THREE.PointLight) as THREE.PointLight[];
+    for (let i = 0; i < 120; i++) boosters.update(1 / 60, { x: 0, y: 3, z: 0 });
+    const slot = lamps.find(light => light.intensity > 5)!;
+    assert.equal(slot.distance, 1.4);
+    for (let i = 0; i < 120; i++) boosters.update(1 / 60, { x: 30, y: 3, z: 0 });
+    assert.ok(slot.intensity > 5); assert.equal(slot.position.x, 30); assert.equal(slot.distance, 6);
+    boosters.reset();
+    assert.ok(lamps.every(light => light.intensity === 0));
+  } finally { boosters.dispose(); }
+});
+
 test('shared geometry/materials and instance buffers dispose exactly once; borrowed maps survive', () => {
   const parent = new THREE.Group(), other = new THREE.Group(), map = new THREE.Texture(); parent.add(other);
   const boosters = new PlatformBoosters(parent, 'test', { bumpMap: map, roughnessMap: map });

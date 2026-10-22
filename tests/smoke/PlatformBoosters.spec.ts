@@ -143,7 +143,7 @@ test('facility boosters: representative placement, visual and rendering budget e
   await writeFile(`test-results/boosters-${phase}.json`, JSON.stringify({ evidence, errors }, null, 2));
 });
 
-test('Room 3 entry floats without support remnants and still supports Bob', async ({ page }, info) => {
+test('Room 3 entry floats with localized spill and still supports Bob', async ({ page }, info) => {
   test.setTimeout(300_000);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -177,18 +177,56 @@ test('Room 3 entry floats without support remnants and still supports Bob', asyn
       layer.render();
       return layer.canvas.toDataURL('image/png');
     });
+    const lamps: any[] = [];
+    scene.root.traverse((object: any) => {
+      if (object.name.startsWith('containment-platform-booster-spill-')) lamps.push(object);
+    });
+    const entryLamp = lamps.find(light => Math.abs(light.position.z - point.z) < 1e-6);
+    const range = entryLamp.distance, intensity = entryLamp.intensity;
+    camera.position.set(point.x + 5, point.y + 3.35, point.z + 8);
+    camera.lookAt(point.x, point.y + .35, point.z - 1.1); camera.updateMatrixWorld(true);
+    const gl = layer.renderer.getContext();
+    const wallPixel = point.clone().set(2, 11.3, 49.201).project(camera);
+    const sampleWall = () => {
+      const pixels = new Uint8Array(5 * 5 * 4);
+      gl.readPixels(Math.round((wallPixel.x + 1) * gl.drawingBufferWidth / 2) - 2,
+        Math.round((wallPixel.y + 1) * gl.drawingBufferHeight / 2) - 2, 5, 5, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      const red = pixels.reduce((sum, value, index) => sum + (index % 4 === 0 ? value : 0), 0) / 25;
+      return red;
+    };
+    // Reproduce the old range and compare the same wall patch in one frame/task.
+    entryLamp.distance = 6; layer.render();
+    const oldWallRed = sampleWall(); captures.push(layer.canvas.toDataURL('image/png'));
+    entryLamp.distance = range; layer.render();
+    const fixedWallRed = sampleWall(); captures.push(layer.canvas.toDataURL('image/png'));
+    entryLamp.intensity = 0; layer.render();
+    const unlitWallRed = sampleWall();
+    entryLamp.intensity = intensity;
+    const neighbour = scene.collisionMeshes.find((mesh: any) => mesh.name === 'room-3-platform-a-bounce');
+    const neighbourPoint = neighbour.getWorldPosition(neighbour.position.clone());
+    for (let i = 0; i < 120; i++) scene.platformBoosters.update(1 / 60, neighbourPoint);
+    camera.position.set(neighbourPoint.x - 4, neighbourPoint.y - 1.4, neighbourPoint.z - 5);
+    camera.lookAt(neighbourPoint.x, neighbourPoint.y - .7, neighbourPoint.z); camera.updateMatrixWorld(true);
+    layer.render(); captures.push(layer.canvas.toDataURL('image/png'));
     return { captures, before, after: platform.position.toArray(), supported: r.body.isSupportedBy(platform),
+      spill: { range, intensity, oldWallRed, fixedWallRed, unlitWallRed,
+        lightCount: lamps.length, shadows: lamps.some(light => light.castShadow) },
       entryEngines: ids.filter((id: string) => id === platform.name).length, batches: batches.length,
       supportRemnants: names.filter(name => /^room-3-entry-platform-actuator-(column|base-socket|upper-collar)$/.test(name)),
-      glError: layer.renderer.getContext().getError() };
+      glError: gl.getError() };
   });
   for (const [index, png] of proof.captures.entries()) {
-    await writeFile(info.outputPath(`entry-angle-${index + 1}.png`), Buffer.from(png.split(',')[1], 'base64'));
+    const label = ['entry-angle-1', 'entry-angle-2', 'entry-old-spill', 'entry-fixed-spill', 'neighbour'][index];
+    await writeFile(info.outputPath(`${label}.png`), Buffer.from(png.split(',')[1], 'base64'));
   }
   const { captures, ...measurements } = proof;
   await writeFile(info.outputPath('entry-proof.json'), JSON.stringify(measurements, null, 2));
   expect(proof.after).toEqual(proof.before); expect(proof.supported).toBe(true);
   expect(proof.entryEngines).toBe(1); expect(proof.batches).toBe(5); expect(proof.supportRemnants).toEqual([]);
+  expect(proof.spill.intensity).toBeGreaterThan(5); expect(proof.spill.lightCount).toBe(2); expect(proof.spill.shadows).toBe(false);
+  expect(proof.spill.range).toBe(1.4);
+  expect(proof.spill.oldWallRed).toBeGreaterThan(proof.spill.unlitWallRed + 1);
+  expect(Math.abs(proof.spill.fixedWallRed - proof.spill.unlitWallRed)).toBeLessThanOrEqual(1);
   expect(proof.glError).toBe(0); expect(errors).toEqual([]);
 });
 

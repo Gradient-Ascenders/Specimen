@@ -236,3 +236,43 @@ Files changed for this adjustment:
 - `tests/PlatformBoosters.test.ts`
 - `tests/smoke/PlatformBoosters.spec.ts`
 - `docs/polish-batch-2-platform-boosters.md`
+
+## Room 3 entry spill-light follow-up
+
+The engine's flame and hot rings use unlit materials; the wall illumination
+came from its pooled, unshadowed omnidirectional point light. The default 6 m
+cutoff extended through the deck and across the entry-wall panels. Platform
+geometry cannot shield a non-shadowed point light.
+
+`BoosterPlatform.spillRangeMetres` now lets enclosed placements bound their spill
+without changing the shared light budget or other engines. Only the Containment
+Room 3 entry opts into 1.4 m. Its light remains at the original nozzle-relative
+position, with the same colour, intensity, flicker, fade and decay. This cutoff
+ends below the walking-surface plane and before the closest entry-wall face,
+while retaining warm illumination on the underside. The flame, housing,
+platform, collision and gameplay are unchanged.
+
+The range follows the slot's currently assigned engine through fade-out and
+reassignment; open platforms retain the original 6 m cutoff. No new lights,
+shadows, shaders, materials, draw batches, textures or audio sources are added.
+The per-frame path still uses the existing bounded pool without allocations.
+
+Regression coverage includes the entry's geometric light bounds, its powered
+underside, the neighbouring platform's default range, and restoration of a
+reused light slot's original range. The focused browser check compares the old
+6 m spill, the localized spill and the entry lamp switched off at the same wall
+patch; it also captures two underside views and a neighbouring engine.
+
+Changed files: `PlatformBoosters.ts`, `ContainmentPlatformBoosters.ts`,
+`tests/PlatformBoosters.test.ts`, `tests/smoke/PlatformBoosters.spec.ts`, and this
+guide. To inspect locally, run `npm run dev`, enter Containment Room 3 with the
+development **3** shortcut, compare the entry wall/door above the deck with its
+underside, then inspect platform A's existing warm glow and cross the room seam.
+
+Validation passed: 12 targeted Node tests, type-check, production build,
+77-file production-layout validation and the focused Chromium/SwiftShader check.
+The wall patch's mean red channel was 77.08 with the old range and 44.4 with the
+localized range, exactly matching the entry lamp switched off (44.4). Two
+underside views and the neighbouring engine were visually inspected. Bob stayed
+supported, platform position stayed unchanged, five batches/two non-shadowed
+lights remained, and no console, asset-loading or WebGL errors were observed.
