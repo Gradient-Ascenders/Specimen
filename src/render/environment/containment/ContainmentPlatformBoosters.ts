@@ -31,6 +31,11 @@ export function createContainmentPlatformBoosters(scene: ContainmentLevelScene):
         // The unshadowed spill must stay below this deck and short of its
         // enclosing entry wall; retain the default range on open platforms.
         ...(id === 'room-3-entry-platform' ? { spillRangeMetres: 1.4 } : {}),
+        // This balcony shares the doorway wall with Room 3. A non-shadowed
+        // light here leaks through its deck/wall, so keep its glow on the skin.
+        // The rendered deck seat ends .32 m below the tread; offset .015 m
+        // underneath that skin, rather than using the thicker collision box.
+        ...(id === 'room-2-exit-balcony' ? { surfaceGlowY: point.y - .335 } : {}),
       };
     });
     boosters.addPlatforms(parent, platforms, `containment-room-${room}`);

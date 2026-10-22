@@ -12,17 +12,22 @@ export interface BoosterPlatform {
   readonly mountOffsetY?: number;
   /** Localize unshadowed spill near enclosing walls/decks; default is 6 m. */
   readonly spillRangeMetres?: number;
+  /** Parent-local deck underside Y: use a depth-tested surface glow instead of
+   * an unshadowed point-light contribution near enclosing solid geometry. */
+  readonly surfaceGlowY?: number;
 }
 interface Batch { root: THREE.Group; visible: boolean }
-interface Jet { position: THREE.Vector3; world: THREE.Vector3; batch: Batch; id: number; score: number; spillRangeMetres: number }
+interface Jet { position: THREE.Vector3; world: THREE.Vector3; batch: Batch; id: number; score: number; spillRangeMetres: number; spillEnabled: boolean }
 
 /** Shared Cultivation engine/exhaust, with four submissions per attachment group,
- * two non-shadowed spill lights and one nearest-engine hover source per owner.
+ * plus an optional surface-glow submission, two non-shadowed spill lights and
+ * one nearest-engine hover source per owner.
  * Attachment groups inherit their parent's presentation transform verbatim. */
 export class PlatformBoosters {
   readonly root = new THREE.Group();
   private readonly materials: THREE.Material[];
   private readonly geometries: THREE.BufferGeometry[] = [];
+  private surfaceGlowGeometry?: THREE.BufferGeometry;
   private readonly meshes: THREE.InstancedMesh[] = [];
   private readonly batches: Batch[] = [];
   private readonly ids = new Set<string>();
@@ -144,10 +149,26 @@ export class PlatformBoosters {
       });
       mesh.computeBoundingSphere(); root.add(mesh); this.meshes.push(mesh);
     }
+    const glows = additions.filter(platform => platform.surfaceGlowY !== undefined);
+    if (glows.length) {
+      // One shared, texture-free disk; reuse the existing animated additive
+      // exhaust material. This illuminates no other surface and tests depth.
+      const mesh = new THREE.InstancedMesh(this.surfaceGlowGeometry ??= createSurfaceGlowGeometry(), this.materials[3], glows.length);
+      mesh.name = `${name}-platform-booster-surface-glow`;
+      mesh.userData.presentationOnly = true; mesh.userData.visualOnly = true;
+      glows.forEach((platform, index) => {
+        const scale = platform.scale ?? 1;
+        matrix.makeScale(scale, scale, scale);
+        matrix.setPosition(platform.top[0], platform.surfaceGlowY!, platform.top[2]);
+        mesh.setMatrixAt(index, matrix);
+      });
+      mesh.computeBoundingSphere(); root.add(mesh); this.meshes.push(mesh);
+    }
     for (const platform of additions) this.jets.push({
       position: new THREE.Vector3(platform.top[0], platform.top[1] + (platform.mountOffsetY ?? 0) - 1.32 * (platform.scale ?? 1), platform.top[2]),
       world: new THREE.Vector3(), batch, id: this.jets.length, score: 0,
       spillRangeMetres: platform.spillRangeMetres ?? 6,
+      spillEnabled: platform.surfaceGlowY === undefined,
     });
   }
 
@@ -163,7 +184,7 @@ export class PlatformBoosters {
     for (const jet of this.jets) {
       jet.world.copy(jet.position).applyMatrix4(jet.batch.root.matrixWorld);
       jet.score = jet.batch.visible ? jet.world.distanceToSquared(this.observer) : Infinity;
-      if (!jet.batch.visible) continue;
+      if (!jet.batch.visible || !jet.spillEnabled) continue;
       if (!first || jet.score < first.score) { second = first; first = jet; }
       else if (!second || jet.score < second.score) second = jet;
     }
@@ -214,10 +235,26 @@ export class PlatformBoosters {
     for (const batch of this.batches) { batch.root.removeFromParent(); batch.root.clear(); }
     for (const mesh of this.meshes) mesh.dispose();
     for (const geometry of this.geometries) geometry.dispose();
+    this.surfaceGlowGeometry?.dispose();
     for (const material of this.materials) material.dispose();
     for (const lamp of this.lamps) { lamp.light.removeFromParent(); lamp.light.dispose(); }
     this.root.removeFromParent(); this.root.clear();
   }
+}
+
+function createSurfaceGlowGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.CircleGeometry(1.2, 24).rotateX(Math.PI / 2);
+  // Keep local Y exactly zero: the exhaust shader's flicker cannot move this
+  // disk through its receiver. Down-facing normals hide it from above.
+  const positions = geometry.getAttribute('position'), colors = new Float32Array(positions.count * 3);
+  const warm = new THREE.Color(0xff8a32), color = new THREE.Color();
+  for (let i = 0; i < positions.count; i++) {
+    positions.setY(i, 0);
+    const strength = .6 * Math.max(0, 1 - Math.hypot(positions.getX(i), positions.getZ(i)) / 1.2);
+    color.copy(warm).multiplyScalar(strength).toArray(colors, i * 3);
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
 }
 
 function isVisible(object: THREE.Object3D): boolean {

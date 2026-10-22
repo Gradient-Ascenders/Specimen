@@ -105,7 +105,7 @@ test('facility boosters: representative placement, visual and rendering budget e
         expect(capture.boosterCount).toBe(level === 1 ? 25 : 35);
         const addedDraws = capture.effectsEnabled.drawCalls - capture.effectsDisabled.drawCalls;
         expect(addedDraws).toBeGreaterThanOrEqual(0);
-        expect(addedDraws).toBeLessThanOrEqual(level === 1 ? 22 : 4);
+        expect(addedDraws).toBeLessThanOrEqual(level === 1 ? 23 : 4);
         if (level === 2 && room === 5) expect(addedDraws).toBe(0);
         else expect(addedDraws).toBeGreaterThan(0);
       }
@@ -227,6 +227,119 @@ test('Room 3 entry floats with localized spill and still supports Bob', async ({
   expect(proof.spill.range).toBe(1.4);
   expect(proof.spill.oldWallRed).toBeGreaterThan(proof.spill.unlitWallRed + 1);
   expect(Math.abs(proof.spill.fixedWallRed - proof.spill.unlitWallRed)).toBeLessThanOrEqual(1);
+  expect(proof.glError).toBe(0); expect(errors).toEqual([]);
+});
+
+test('entry doorway light-source isolation prevents the exit balcony leaking across the full wall', async ({ page }, info) => {
+  test.setTimeout(300_000);
+  await page.setViewportSize({ width: 800, height: 600 });
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
+  await observeSession(page);
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
+  const proof = await page.evaluate(() => {
+    const session = (window as any).__boosterSession, rt = session.runtime, r = rt.resources, layer = rt.renderLayer;
+    layer.setAnimationLoop(null); r.containmentLevel.teleportToRoomForDebug(3);
+    r.body.teleport({ x: .6, y: 11.36, z: 49.8 });
+    for (let i = 0; i < 60; i++) session.fixedUpdate(1 / 60);
+    session.render(1, { fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 1 / 60, frameDeltaSeconds: 1 / 60,
+      stepsThisFrame: 1, interpolationAlpha: 1, droppedSimulationTimeSeconds: 0, renderFps: 60 });
+    const boosters = r.testScene.platformBoosters;
+    boosters.reset(); for (let i = 0; i < 120; i++) boosters.update(1 / 60, r.body.position);
+    const ids = boosters.batches.flatMap((batch: any) => batch.root.userData.platformBoosterIds);
+    const offender = boosters.jets[ids.indexOf('room-2-exit-balcony')];
+    const excluded = !offender.spillEnabled;
+    const glow = r.testScene.root.getObjectByName('containment-room-2-platform-booster-surface-glow');
+    const settle = () => { boosters.reset(); for (let i = 0; i < 120; i++) boosters.update(1 / 60, r.body.position); };
+    const camera = layer.cameraRig.camera, captures: { name: string; png: string }[] = [];
+    const comparisons: any[] = [], candidates: any[] = [];
+    layer.setPresentationResolution(undefined);
+    for (const [view, position, target] of [
+      ['room2-doorway', [-4, 13.5, 44.5], [.7, 11.4, 49.3]],
+      ['screenshot-close', [1, 12.4, 47], [-1.2, 11.5, 49.2]],
+      ['room3-doorway', [-5, 12.8, 57], [0, 11.2, 49.1]],
+    ] as const) {
+      camera.position.set(...position); camera.lookAt(...target); camera.updateMatrixWorld(true);
+      const gl = layer.renderer.getContext(), width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
+      // Cover the visible wall panels and doorway posts across the whole view,
+      // excluding the open doorway. Project rays onto the authored wall plane.
+      const mask: number[] = [], ray = r.body.position.clone();
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        ray.set((x + .5) / width * 2 - 1, (y + .5) / height * 2 - 1, .5).unproject(camera).sub(camera.position);
+        const t = (49.14 - camera.position.z) / ray.z;
+        const wx = camera.position.x + ray.x * t, wy = camera.position.y + ray.y * t;
+        if (t > 0 && Math.abs(wx) < 16 && wy >= 10.85 && wy <= 20 && (Math.abs(wx) >= 1.25 || wy >= 14.2)) mask.push((y * width + x) * 4);
+      }
+      const compare = (a: Uint8Array, b: Uint8Array) => {
+        let changed = 0, maximum = 0;
+        for (const offset of mask) {
+          const delta = Math.max(...[0, 1, 2].map(channel => Math.abs(a[offset + channel] - b[offset + channel])));
+          if (delta > 2) changed++; maximum = Math.max(maximum, delta);
+        }
+        return { changed, maximum, wallPixels: mask.length };
+      };
+      const capture = (name: string) => {
+        layer.render(); captures.push({ name: `${view}-${name}`, png: layer.canvas.toDataURL('image/png') });
+        const pixels = new Uint8Array(width * height * 4); gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        return pixels;
+      };
+      // Replay 2c7c96b's actual two-source assignment with unchanged geometry,
+      // camera, exposure and clock. Isolate each contribution before testing fix.
+      offender.spillEnabled = true; glow.visible = false; settle();
+      const lamps = boosters.lamps.map((slot: any) => ({ light: slot.light, platform: ids[slot.jet], intensity: slot.light.intensity }));
+      candidates.push({ view, sources: lamps.map((slot: any) => ({ platform: slot.platform,
+        position: slot.light.position.toArray(), range: slot.light.distance, intensity: slot.intensity })) });
+      const before = capture('before');
+      let withoutOffender!: Uint8Array;
+      for (const slot of lamps) {
+        slot.light.intensity = 0;
+        const pixels = capture(`without-${slot.platform}`);
+        if (slot.platform === 'room-2-exit-balcony') withoutOffender = pixels;
+        slot.light.intensity = slot.intensity;
+      }
+      for (const slot of lamps) slot.light.intensity = 0;
+      const withoutPool = capture('without-pool');
+      offender.spillEnabled = false; glow.visible = true; settle();
+      const after = capture('after'), powers = boosters.lamps.map((slot: any) => slot.light.intensity);
+      boosters.lamps.forEach((slot: any) => slot.light.intensity = 0);
+      const afterWithoutPool = capture('after-without-pool');
+      boosters.lamps.forEach((slot: any, i: number) => slot.light.intensity = powers[i]);
+      comparisons.push({ view, offenderContribution: compare(before, withoutOffender),
+        otherOldSource: compare(withoutOffender, withoutPool), finalWallSpill: compare(after, afterWithoutPool) });
+    }
+    const point = r.testScene.collisionMeshes.find((mesh: any) => mesh.name === 'room-2-exit-balcony').position;
+    camera.position.set(point.x - 5, point.y - 1.8, point.z - 5);
+    camera.lookAt(point.x, point.y - .8, point.z); camera.updateMatrixWorld(true);
+    layer.render(); captures.push({ name: 'exit-underside-after', png: layer.canvas.toDataURL('image/png') });
+    const drawsWithGlow = layer.renderer.info.render.calls;
+    glow.visible = false; layer.render(); const drawsWithoutGlow = layer.renderer.info.render.calls; glow.visible = true;
+    for (const [id, label] of [['room-3-entry-platform', 'entry-underside-after'], ['room-3-platform-a-bounce', 'neighbour-after']]) {
+      const p = r.testScene.collisionMeshes.find((mesh: any) => mesh.name === id).position;
+      boosters.reset(); for (let i = 0; i < 120; i++) boosters.update(1 / 60, p);
+      camera.position.set(p.x - 5, p.y - 1.8, p.z + 6);
+      camera.lookAt(p.x, p.y - .8, p.z); camera.updateMatrixWorld(true);
+      layer.render(); captures.push({ name: label, png: layer.canvas.toDataURL('image/png') });
+    }
+    return { captures, candidates, comparisons, excluded, glowCount: glow.count, additionalGlowDraws: drawsWithGlow - drawsWithoutGlow,
+      observer: r.body.position.toArray(), exposure: layer.renderer.toneMappingExposure,
+      glError: layer.renderer.getContext().getError() };
+  });
+  for (const { name, png } of proof.captures) await writeFile(info.outputPath(`${name}.png`), Buffer.from(png.split(',')[1], 'base64'));
+  const { captures, ...measurements } = proof;
+  await writeFile(info.outputPath('source-isolation.json'), JSON.stringify({ ...measurements, errors }, null, 2));
+  expect(proof.excluded).toBe(true); expect(proof.glowCount).toBe(1);
+  expect(proof.additionalGlowDraws).toBe(1);
+  for (const comparison of proof.comparisons) {
+    expect(comparison.finalWallSpill.wallPixels).toBeGreaterThan(10_000);
+    expect(comparison.finalWallSpill.changed).toBe(0);
+  }
+  const screenshotSide = proof.comparisons.find(item => item.view === 'room2-doorway');
+  expect(screenshotSide.offenderContribution.changed).toBeGreaterThan(100);
+  expect(screenshotSide.otherOldSource.changed).toBe(0);
   expect(proof.glError).toBe(0); expect(errors).toEqual([]);
 });
 

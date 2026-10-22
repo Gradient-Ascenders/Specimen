@@ -276,3 +276,90 @@ localized range, exactly matching the entry lamp switched off (44.4). Two
 underside views and the neighbouring engine were visually inspected. Bob stayed
 supported, platform position stayed unchanged, five batches/two non-shadowed
 lights remained, and no console, asset-loading or WebGL errors were observed.
+
+## Remaining doorway leakage: source isolation and permanent correction
+
+The earlier 1.4 m validation was incomplete: it sampled the Room 3-facing wall
+and attributed the opposite-side glow to the wrong engine. The user's new view
+looks from Room 2 toward the doorway. Before changing production code, browser
+captures disabled each pooled contribution independently with the same camera,
+exposure and game state. Disabling the entry engine left the orange patch;
+disabling **Room 2's exit-balcony engine** removed it.
+
+At the doorway observer [.6, 11.36001, 49.8], the original pool assigned:
+
+| Source | World light position | Range |
+| --- | --- | --- |
+| Room 3 entry | [0, 9.43, 51.29795] | 1.4 m |
+| Room 2 exit balcony | [0, 9.43, 46.79795] | 6 m |
+
+The pool was behaving as authored. The exit balcony's unshadowed point light
+crossed its deck and lit the Room 2 wall/doorpost. Changing only the entry
+engine's range could not eliminate that contribution. Flame/hot-ring materials
+are unlit and do not illuminate surrounding objects.
+
+Only the exit balcony now opts into `surfaceGlowY`: it is excluded from point
+light selection while its engine, flame, hot rings and positional audio remain.
+A down-facing, depth-tested radial glow sits .015 m below its rendered deck-seat
+underside, following the same attachment transform. It reuses the animated
+exhaust material and one lazy, shared, texture-free disk geometry. The shader
+cannot move its flat Y=0 vertices through the receiver, and it is invisible from
+above. The Room 3 entry retains its previous 1.4 m light; every other engine
+retains its previous light settings. No platform/collision/interpolation,
+checkpoint, transition or Level 3 data changed.
+
+Trade-off: the exit balcony's warmth is a cosmetic surface glow rather than
+general illumination of actors/floors. It costs one extra instanced submission
+(24 triangles), one shared disk buffer and one instance matrix, with no new
+material, texture, shader, shadow map, light or audio source. The same two-light
+selection scan remains allocation-free. Other attachment batches stay at four
+engine submissions; the Containment browser ceiling changes from 22 to 23 to
+account explicitly for the one local overlay.
+
+`tests/PlatformBoosters.test.ts` now exercises the actual offending balcony at
+three observer locations, verifies it never receives a powered point-light
+slot, checks glow material reuse/downward orientation and resource disposal,
+and retains collision, route and neighbouring-light checks.
+
+The production browser regression reconstructs the screenshot-side view and
+also inspects the doorway from Room 3. It replays the actual two-source state
+from `2c7c96b`, switches off each source individually, then captures the permanent
+fix and the fixed scene with pooled contributions disabled. Its comparison mask
+covers the visible wall panels and doorway posts across each view, rather than
+a small sampled patch. All paired captures lock camera, exposure and clock.
+Underside and neighbouring-engine captures check retained visual quality.
+
+Files changed: `src/render/environment/PlatformBoosters.ts`,
+`src/render/environment/containment/ContainmentPlatformBoosters.ts`,
+`tests/PlatformBoosters.test.ts`, `tests/smoke/PlatformBoosters.spec.ts`, and this
+guide. Run `npm run dev`, enter Containment with **3**, walk across the entry
+seam into Room 2, and face back toward the doorway/black wall band and both
+posts. Inspect both deck undersides and nearby platform A afterward.
+
+Final validation: **27 targeted Node tests passed**, including the actual
+offender-selection regression, collision snapshot and grounded room seam.
+Type-check, production build and 77-file production-layout validation passed.
+The existing entry/neighbor browser check and full-wall isolation checks passed;
+the final test also includes a closer reconstruction of the screenshot view.
+There were no console, asset-loading or WebGL errors. The engine undersides,
+deck-attached glow and unchanged neighbouring engine were visually inspected.
+
+| Final view | Wall/post pixels compared | Pixels changed by old exit light (>2/255) | Pixels changed by remaining pooled lights after fix |
+| --- | ---: | ---: | ---: |
+| Room 2 doorway | 115,693 | 30,795 | 0 |
+| Screenshot-side close-up | 71,981 | 13,346 | 0 |
+| Room 3 doorway | 124,615 | 310 | 0 |
+
+The final maximum channel difference with pooled lights disabled was exactly
+zero in all three wall masks. Cameras are reconstructed from the screenshot,
+not recovered original transforms; each before/after pair uses exactly the same
+transform, exposure and clock. A separate pre-correction production capture was
+saved before modifying the lighting implementation. Evidence is under
+`test-results/entry-leak-before/` (actual baseline), `entry-leak-diagnosis/`
+(individual sources), and `entry-leak-closeup/` (paired replay, final appearance,
+undersides, neighbour, source positions and full-wall metrics).
+
+The live renderer measured exactly **one extra glow draw**, with **1,352 bytes**
+of additional vertex/index/instance buffers (driver overhead excluded). Two
+non-shadowed light slots remain; all 25 Containment engines and five attachment
+batches remain. No hardware FPS qualification is inferred from SwiftShader.

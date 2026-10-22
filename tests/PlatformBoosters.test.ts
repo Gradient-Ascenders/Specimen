@@ -183,6 +183,31 @@ test('a reused light slot restores the default range after leaving a compact spi
   } finally { boosters.dispose(); }
 });
 
+test('the actual doorway offender never receives a light slot; its surface glow shares exhaust resources', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  try {
+    const exit = scene.collisionMeshes.find(mesh => mesh.name === 'room-2-exit-balcony')!;
+    const lamps: THREE.PointLight[] = [];
+    scene.root.traverse(object => { if (object.name.startsWith('containment-platform-booster-spill-')) lamps.push(object as THREE.PointLight); });
+    const oldSource = new THREE.Vector3(exit.position.x, exit.position.y + .25 - 1.47, exit.position.z);
+    for (const observer of [exit.position, new THREE.Vector3(.6, 11.36, 49.8), new THREE.Vector3(2.7885, 11, 57.6261)]) {
+      for (let i = 0; i < 120; i++) {
+        scene.platformBoosters.update(1 / 60, observer);
+        assert.ok(lamps.every(light => light.intensity === 0 || light.getWorldPosition(new THREE.Vector3()).distanceTo(oldSource) > .01),
+          'The exit-balcony light caused the doorway leak and must never be selected');
+      }
+    }
+    const glow = scene.root.getObjectByName('containment-room-2-platform-booster-surface-glow') as THREE.InstancedMesh;
+    const flames = scene.root.getObjectByName('containment-room-2-platform-booster-flames') as THREE.InstancedMesh;
+    assert.equal(glow.count, 1); assert.equal(glow.material, flames.material);
+    assert.equal((glow.material as THREE.Material).depthTest, true);
+    const positions = glow.geometry.getAttribute('position'), normals = glow.geometry.getAttribute('normal');
+    for (let i = 0; i < positions.count; i++) { assert.equal(positions.getY(i), 0); assert.ok(normals.getY(i) < -.99); }
+    let disposed = 0; glow.geometry.addEventListener('dispose', () => disposed++);
+    scene.dispose(); assert.equal(disposed, 1);
+  } finally { scene.dispose(); }
+});
+
 test('shared geometry/materials and instance buffers dispose exactly once; borrowed maps survive', () => {
   const parent = new THREE.Group(), other = new THREE.Group(), map = new THREE.Texture(); parent.add(other);
   const boosters = new PlatformBoosters(parent, 'test', { bumpMap: map, roughnessMap: map });
