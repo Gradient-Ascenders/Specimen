@@ -154,6 +154,14 @@ starts the same ending from anywhere in running Level 1. These preview
 entry points are development-only; `?debug=1` does not enable them in a
 production build. Normal pause, skip and level handoff still apply.
 
+## Cultivation ceiling vent arrival
+
+In development, **Select cutscene → Ceiling vent arrival** prepares Cultivation
+and automatically starts its normal Room 1 entrance: Bob and Goop fall through
+the ceiling vent and land using their existing body physics and landing audio.
+No new sounds or arrival timing changes are introduced. Like the Blackout
+preview, it uses normal level entry without an Enter Level click.
+
 ## Cultivation Room 3 sentry cutscene
 
 `cultivation-sentry-sounds.tar` retains the three supplied WAVs. Run

@@ -105,7 +105,7 @@ function startGame(): void {
   });
   let levelOneRuntime = createLevelOneRuntime();
   let levelTwoRuntime: import('./levels/CultivationLevelRuntime.ts').CultivationLevelRuntime | undefined;
-  let levelPreviewRequested: 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | undefined;
+  let levelPreviewRequested: 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | undefined;
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
@@ -311,10 +311,11 @@ function startGame(): void {
     actions: {
       previewCutscene: import.meta.env.DEV ? (cutscene) => {
         if (cutscene === 'escape') void previewEscape();
-        else if (cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') {
+        else if (cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') {
           levelPreviewRequested = cutscene;
           const levelId = cutscene === 'blackout-arrival' ? 'level-3' : 'level-2';
           const message = cutscene === 'blackout-arrival' ? 'Preparing Blackout arrival…'
+            : cutscene === 'cultivation-arrival' ? 'Preparing Cultivation arrival…'
             : cutscene === 'volt-rescue' ? 'Preparing Volt rescue cutscene…' : 'Preparing sentry cutscene…';
           gameFlow.beginLevelTransition(message, levelId);
           void startSelectedLevel(levelId).catch(error => {
@@ -474,8 +475,8 @@ function startGame(): void {
         const preview = levelPreviewRequested;
         levelPreviewRequested = undefined;
         try {
-          // Blackout's normal start already plays its real vent arrival.
-          const ready = preview === 'blackout-arrival' || (preview === 'volt-rescue'
+          // Normal level entry already stages both real vent arrivals.
+          const ready = preview === 'blackout-arrival' || preview === 'cultivation-arrival' || (preview === 'volt-rescue'
             ? levelTwoRuntime?.previewVoltRescueForDebug() : levelTwoRuntime?.previewSentryClearanceForDebug());
           if (!ready) throw new Error('Cutscene preview is not ready.');
           gameFlow.finishLevelTransition(levelId);

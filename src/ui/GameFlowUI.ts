@@ -49,7 +49,7 @@ export type GameFlowState =
   | 'transitioning'
   | 'transitionFailed';
 
-export type PreviewCutsceneId = 'intro' | 'escape' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival';
+export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -821,6 +821,9 @@ export class GameFlowUI {
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="escape">
               ${icon('Play')}<span><small>Level 1 · Containment</small>Goop's escape</span>
             </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="cultivation-arrival">
+              ${icon('Play')}<span><small>Level 2 · Cultivation</small>Ceiling vent arrival</span>
+            </button>
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="sentry-clearance">
               ${icon('Play')}<span><small>Level 2 · Room 3</small>Sentries into the acid</span>
             </button>
@@ -1193,7 +1196,7 @@ export class GameFlowUI {
         break;
       case 'select-cutscene': {
         const cutscene = target.dataset.cutscene;
-        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') && this.model.beginSelectedCutscene(cutscene)) {
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') && this.model.beginSelectedCutscene(cutscene)) {
           this.syncState();
           this.actions.previewCutscene(cutscene);
         }
