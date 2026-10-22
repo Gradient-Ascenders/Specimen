@@ -24,7 +24,7 @@ interface PlatformDressing {
 }
 
 const PLATFORM_DRESSINGS: readonly PlatformDressing[] = [
-  { name: 'entry-platform', size: [8, 0.5, 5], position: [0, 10.15, 51.5], support: 'basin', safetySide: 'x' },
+  { name: 'entry-platform', size: [8, 0.5, 5], position: [0, 10.65, 51.29795], support: 'basin', safetySide: 'x' },
   { name: 'platform-a-bounce', size: [4.5, 0.5, 4], position: [2.7885, 10.9032, 57.6261], support: 'basin', safetySide: 'z' },
   { name: 'platform-b-gap', size: [5.13, 0.5, 4], position: [11.2583, 11.4329, 59], support: 'basin', safetySide: 'x' },
   { name: 'wall-exit-ledge', size: [4.6, 0.5, 4.8], position: [14.7, 21.1, 66], support: 'suspended', safetySide: 'z' },
@@ -462,7 +462,7 @@ export class RoomThreeArt {
   private buildTransitionsAndSignage(): void {
     const { graphite, serviceMetal, secondaryCeramic } = this.resources.materials;
     this.root.add(
-      createChamferedBox(this.resources, { name: 'room-3-entry-instrumented-threshold', size: [3.45, 0.22, 0.5], radius: 0.05, position: [0, 10.13, 49.48], material: serviceMetal }),
+      createChamferedBox(this.resources, { name: 'room-3-entry-instrumented-threshold', size: [3.45, 0.22, 0.5], radius: 0.05, position: [0, 10.63, 49.48], material: serviceMetal }),
       createInstancedChamferedBoxes(this.resources, { name: 'room-3-entry-graphite-jambs', size: [0.34, 4.2, 0.38], radius: 0.055, material: graphite, transforms: [-1.72, 1.72].map((x) => ({ position: [x, 12.1, 49.0] })) }),
       createRectangularFrame(this.resources, { name: 'room-3-exit-duct-graphite-collar', width: 3.0, height: 3.15, barWidth: 0.28, depth: 0.32, position: [9, 32.2, 76.82], material: graphite }),
       createRectangularFrame(this.resources, { name: 'room-3-exit-duct-service-liner', width: 2.62, height: 2.72, barWidth: 0.12, depth: 0.2, position: [9, 32.2, 76.78], material: serviceMetal }),
