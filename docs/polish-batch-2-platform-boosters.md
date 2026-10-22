@@ -11,7 +11,7 @@ in `CultivationPlatformBoosters.ts`.
 | --- | --- | ---: | ---: | --- |
 | Containment | 1 | 0 | 0 | Floors, specimen pedestal and vent structures; no matching floating traversal slabs. |
 | Containment | 2 | 8 | 0 | Platforms A/B/C/D, sticky-wall ledge, upper steps A/B and exit balcony. Compact platform A's engine for floor clearance. |
-| Containment | 3 | 7 | 0 | Platforms A/B, wall-exit ledge and C/D/E/F. Remove A/B's decorative column/base/collar assemblies; preserve the large entry deck's support. |
+| Containment | 3 | 8 | 0 | Entry platform, A/B, wall-exit ledge and C/D/E/F. Remove entry/A/B's decorative column/base/collar assemblies. |
 | Containment | 4 | 0 | 0 | Cargo lift, receiving/exit deck and duct; preserve the lift's own machinery and lighting. |
 | Containment | 5 | 9 | 0 | Low platform C, central rest, three upper A platforms, final approach, final bounce and both moving platforms. Compact platform C's engine for floor clearance. Structural containment/observation/vent surfaces stay unchanged. |
 | Cultivation | 1 | 0 | 0 | Three rope-suspended drop platforms deliberately land on the floor. Engines would conflict with their rope/drop presentation and intersect the floor after landing. |
@@ -21,8 +21,9 @@ in `CultivationPlatformBoosters.ts`.
 | Cultivation | 5 | 0 | 21 | Preserve all original route jumps, safe-station decks and quiet release walkway. No duplicate engines. Shaft landing, sewer/duct floors, reunion deck and rescue bridge remain structural. |
 | Blackout | All | 0 | 0 | No facility booster integration or source changes. |
 
-Current total: **38 additions**, plus **21 unchanged Room 5 placements**:
-24 Containment and 35 Cultivation. The screenshot follow-up adds 11 engines.
+Current total: **39 additions**, plus **21 unchanged Room 5 placements**:
+25 Containment and 35 Cultivation. The first screenshot follow-up added 11
+engines; the starting-platform follow-up adds one more.
 
 ## Implementation and ownership
 
@@ -133,9 +134,10 @@ the already-owned platform geometry/textures; they are not total VRAM usage.
   submissions maximum). Extra engines in existing batches add instances only.
   Four shared geometries/materials, two non-shadowed lights per owner, the
   bounded audio source and uniform-only flame animation remain intact.
-  Instance-buffer growth is 1,536 bytes in Containment and 1,280 in Cultivation.
+  Including the starting-platform follow-up, instance-buffer growth is 1,792
+  bytes in Containment and 1,280 in Cultivation.
 
-## Placement follow-up validation
+## Previous placement follow-up validation
 
 - Full Node suite: **1,460 passed**. This includes platform clearance, unchanged
   collision fingerprints, button interaction, route/carry/reset tests, hidden
@@ -165,8 +167,8 @@ the already-owned platform geometry/textures; they are not total VRAM usage.
 1. Run `npm run dev`, start Containment, then use development shortcuts **2**,
    **3** and **5**. Inspect the eligible slabs from above, beside and below.
    Room 2's first slab, sticky-wall ledge and exit balcony now have engines.
-   Room 3's A/B slabs float without their old posts; its large entrance deck
-   retains its support. Room 5's low platform C has a compact engine.
+   Room 3's entry platform and A/B slabs float without their old posts.
+   Room 5's low platform C has a compact engine.
 2. Ride both Room 5 platforms through complete reversals. The mounting collar,
    engine and flame origin should remain fixed to the deck. The flame itself
    should flicker downward. Walk/jump on and off; compare normal and throttled
@@ -186,7 +188,7 @@ the already-owned platform geometry/textures; they are not total VRAM usage.
 Run `npx playwright test tests/smoke/PlatformBoosters.spec.ts --config
 playwright.smoke.config.ts` after `npm run build` to repeat the browser check.
 
-## Follow-up changed files
+## Previous placement follow-up changed files
 
 - `src/render/environment/PlatformBoosters.ts` — optional compact instance transforms.
 - `src/render/environment/containment/ContainmentPlatformBoosters.ts` — six additional Containment placements.
@@ -201,3 +203,36 @@ playwright.smoke.config.ts` after `npm run build` to repeat the browser check.
 - `tests/smoke/PlatformBoosters.spec.ts` — expanded production room captures and rendering-budget evidence.
 - `tests/smoke/ProductionParity.spec.ts` — exact regenerated repair count.
 - `docs/polish-batch-2-platform-boosters.md` — current inventory, evidence and manual steps.
+
+## Room 3 starting-platform follow-up
+
+The entry platform now uses the existing suspended dressing, which removes its
+decorative column, base socket and upper collar as one assembly. A standard,
+full-size thruster attaches to the unchanged walking-surface centre through the
+existing Room 3 batch. Its underside socket matches the neighbouring slabs.
+The authored platform remains at [0, 10.65, 51.29795], with the same 8 x 0.5 x 5 m
+collision box, gameplay metadata and Room 2 walking seam.
+
+Containment now has 25 engines in the same five batches. This adds four instance
+matrices (256 bytes), with no new draw batch, geometry, material, texture, light,
+shadow caster or audio source. Cultivation, Level 3 and other structures stay
+unchanged.
+
+The updated regression checks verify one entry engine, no column/base/collar
+remnants (including static batch sources), full engine/exhaust clearance,
+unchanged collision snapshots and the gap-free grounded room transition.
+The focused production browser check captures two underside views and runs 60
+real fixed steps with Bob standing on the entry deck, checking unchanged deck
+position, continued support, five batches and no console/asset/WebGL errors.
+Validation passed: 23 targeted Node tests, type-check, production build,
+77-file production-layout validation and the focused Chromium/SwiftShader
+browser check. Both captured underside views were visually inspected.
+
+Files changed for this adjustment:
+
+- `src/render/environment/containment/RoomThreeArt.ts`
+- `src/render/environment/containment/ContainmentPlatformBoosters.ts`
+- `tests/ContainmentArt.test.ts`
+- `tests/PlatformBoosters.test.ts`
+- `tests/smoke/PlatformBoosters.spec.ts`
+- `docs/polish-batch-2-platform-boosters.md`

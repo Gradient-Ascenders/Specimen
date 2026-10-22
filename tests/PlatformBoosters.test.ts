@@ -40,21 +40,21 @@ function assertClearance(batch: THREE.Group, colliders: readonly THREE.Mesh[]): 
   }
 }
 
-test('Containment explicitly equips 8/7/9 platforms, with compact low engines and full moving-route clearance', () => {
+test('Containment explicitly equips 8/8/9 platforms, with compact low engines and full moving-route clearance', () => {
   const scene = new ContainmentLevelScene(() => {});
   try {
-    assert.equal(scene.platformBoosters.platformCount, 24);
+    assert.equal(scene.platformBoosters.platformCount, 25);
     const allBatches = batches(scene.root);
-    assert.deepEqual(allBatches.map(batch => batch.userData.platformBoosterIds.length).sort((a, b) => a - b), [1, 1, 7, 7, 8]);
+    assert.deepEqual(allBatches.map(batch => batch.userData.platformBoosterIds.length).sort((a, b) => a - b), [1, 1, 7, 8, 8]);
     const ids = allBatches.flatMap(batch => batch.userData.platformBoosterIds);
-    assert.equal(new Set(ids).size, 24);
+    assert.equal(new Set(ids).size, 25);
     assert.equal(ids.includes('room-2-platform-a-height-lesson'), true);
     assert.equal(ids.includes('room-5-lower-platform-c'), true);
-    assert.equal(ids.some(id => /cargo|room-1-|room-4-|entry-platform/.test(id)), false);
-    assert.ok(scene.root.getObjectByName('room-3-entry-platform-actuator-column'), 'Permanent entry deck support stays');
+    assert.equal(ids.some(id => /cargo|room-1-|room-4-/.test(id)), false);
+    assert.equal(ids.filter(id => id === 'room-3-entry-platform').length, 1);
     const renderedSourceNames: string[] = [];
     scene.root.traverse(object => renderedSourceNames.push(object.name, ...(object.userData.staticBatchSourceNames ?? [])));
-    assert.equal(renderedSourceNames.some(name => /^room-3-platform-(a-bounce|b-gap)-actuator-(column|base-socket|upper-collar)$/.test(name)), false);
+    assert.equal(renderedSourceNames.some(name => /^room-3-(entry-platform|platform-a-bounce|platform-b-gap)-actuator-(column|base-socket|upper-collar)$/.test(name)), false);
     for (const room of [2, 3, 5] as const) for (const id of CONTAINMENT_BOOSTER_PLATFORMS[room]) assert.ok(ids.includes(id));
     for (const batch of allBatches) assertClearance(batch, scene.collisionMeshes);
     for (const platform of [scene.roomFive.movingPlatformOne, scene.roomFive.movingPlatformTwo]) {

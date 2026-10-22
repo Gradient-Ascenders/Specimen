@@ -25,7 +25,7 @@ test('facility boosters: representative placement, visual and rendering budget e
   for (const level of [1, 2]) {
     const cases = level === 1 ? [
       [2, 'room-2-platform-a-height-lesson'], [2, 'room-2-top-of-sticky-wall-ledge'], [2, 'room-2-exit-balcony'],
-      [3, 'room-3-platform-a-bounce'], [3, 'room-3-platform-b-gap'],
+      [3, 'room-3-entry-platform'], [3, 'room-3-platform-a-bounce'], [3, 'room-3-platform-b-gap'],
       [5, 'room-5-lower-platform-c'], [5, 'room-5-moving-platform-1'], [5, 'room-5-moving-platform-2'],
     ] as const : [
       [2, 'cultivation-room-2-button-rest-ledge'], [3, 'cultivation-room-3-bob-entry'],
@@ -102,7 +102,7 @@ test('facility boosters: representative placement, visual and rendering budget e
       evidence.push(measurements);
       expect(capture.glError).toBe(0);
       if (phase === 'after') {
-        expect(capture.boosterCount).toBe(level === 1 ? 24 : 35);
+        expect(capture.boosterCount).toBe(level === 1 ? 25 : 35);
         const addedDraws = capture.effectsEnabled.drawCalls - capture.effectsDisabled.drawCalls;
         expect(addedDraws).toBeGreaterThanOrEqual(0);
         expect(addedDraws).toBeLessThanOrEqual(level === 1 ? 22 : 4);
@@ -141,6 +141,55 @@ test('facility boosters: representative placement, visual and rendering budget e
   expect(blackout.boosterBatches).toBe(0); expect(blackout.glError).toBe(0); evidence.push(blackout);
   expect(errors).toEqual([]);
   await writeFile(`test-results/boosters-${phase}.json`, JSON.stringify({ evidence, errors }, null, 2));
+});
+
+test('Room 3 entry floats without support remnants and still supports Bob', async ({ page }, info) => {
+  test.setTimeout(300_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
+  await observeSession(page);
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await page.locator('[data-action="start"]').click({ timeout: 120_000 });
+  await finishOpening(page);
+  const proof = await page.evaluate(() => {
+    const session = (window as any).__boosterSession, rt = session.runtime, r = rt.resources, layer = rt.renderLayer;
+    layer.setAnimationLoop(null);
+    r.containmentLevel.teleportToRoomForDebug(3);
+    const scene = r.testScene, platform = scene.collisionMeshes.find((mesh: any) => mesh.name === 'room-3-entry-platform');
+    const before = platform.position.toArray(), point = platform.getWorldPosition(platform.position.clone());
+    r.body.teleport({ x: point.x, y: point.y + platform.geometry.parameters.height / 2 + .46, z: point.z - .8 });
+    for (let step = 0; step < 60; step++) session.fixedUpdate(1 / 60);
+    const names: string[] = [], batches: any[] = [];
+    scene.root.traverse((object: any) => {
+      names.push(object.name, ...(object.userData.staticBatchSourceNames ?? []));
+      if (object.userData.platformBoosterIds) batches.push(object);
+    });
+    const ids = batches.flatMap(batch => batch.userData.platformBoosterIds);
+    const camera = layer.cameraRig.camera;
+    scene.platformBoosters.reset();
+    for (let i = 0; i < 90; i++) scene.platformBoosters.update(1 / 60, point);
+    layer.setPresentationResolution(undefined);
+    const captures = [-1, 1].map(side => {
+      camera.position.set(point.x + side * 5, point.y - 1.8, point.z - side * 6);
+      camera.lookAt(point.x, point.y - .8, point.z); camera.updateMatrixWorld(true);
+      layer.render();
+      return layer.canvas.toDataURL('image/png');
+    });
+    return { captures, before, after: platform.position.toArray(), supported: r.body.isSupportedBy(platform),
+      entryEngines: ids.filter((id: string) => id === platform.name).length, batches: batches.length,
+      supportRemnants: names.filter(name => /^room-3-entry-platform-actuator-(column|base-socket|upper-collar)$/.test(name)),
+      glError: layer.renderer.getContext().getError() };
+  });
+  for (const [index, png] of proof.captures.entries()) {
+    await writeFile(info.outputPath(`entry-angle-${index + 1}.png`), Buffer.from(png.split(',')[1], 'base64'));
+  }
+  const { captures, ...measurements } = proof;
+  await writeFile(info.outputPath('entry-proof.json'), JSON.stringify(measurements, null, 2));
+  expect(proof.after).toEqual(proof.before); expect(proof.supported).toBe(true);
+  expect(proof.entryEngines).toBe(1); expect(proof.batches).toBe(5); expect(proof.supportRemnants).toEqual([]);
+  expect(proof.glError).toBe(0); expect(errors).toEqual([]);
 });
 
 test('both Room 5 booster assemblies stay attached through actual fixed updates, fractional renders and reset', async ({ page }, info) => {

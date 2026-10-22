@@ -7,7 +7,7 @@ import { PlatformBoosters, type BoosterPlatform } from '../PlatformBoosters.ts';
 export const CONTAINMENT_BOOSTER_PLATFORMS = {
   2: ['room-2-platform-a-height-lesson', 'room-2-platform-b-gap-lesson', 'room-2-platform-c-side-jump', 'room-2-platform-d-sticky-launch',
     'room-2-top-of-sticky-wall-ledge', 'room-2-upper-step-a', 'room-2-upper-step-b', 'room-2-exit-balcony'],
-  3: ['room-3-platform-a-bounce', 'room-3-platform-b-gap', 'room-3-wall-exit-ledge', 'room-3-platform-c', 'room-3-platform-d', 'room-3-platform-e', 'room-3-platform-f'],
+  3: ['room-3-entry-platform', 'room-3-platform-a-bounce', 'room-3-platform-b-gap', 'room-3-wall-exit-ledge', 'room-3-platform-c', 'room-3-platform-d', 'room-3-platform-e', 'room-3-platform-f'],
   5: ['room-5-lower-platform-c', 'room-5-central-rest-platform', 'room-5-upper-platform-a', 'room-5-upper-platform-a.001',
     'room-5-upper-platform-a.003', 'room-5-final-approach-platform', 'room-5-final-bounce-platform'],
 } as const;
