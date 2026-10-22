@@ -62,7 +62,9 @@ export class RoomFiveArt {
   private readonly resources: ContainmentArtResources;
   private readonly movingPlatforms: readonly [MovingPlatform, MovingPlatform];
   private readonly signGeometries = new Set<THREE.BufferGeometry>();
-  private readonly movingPlatformDressings: readonly THREE.Group[];
+  /** Complete presented assemblies; shadow tracking must follow these poses,
+   * rather than their fixed-step physics parents. Allocated once during build. */
+  readonly movingPlatformDressings: readonly THREE.Group[];
   private disposed = false;
 
   constructor(
