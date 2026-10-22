@@ -392,7 +392,7 @@ test('the complete runtime grants long range only inside Room 2, including early
   const f = createFixture();
   try {
     const resources = electricalRoomInternals(f.runtime);
-    for (const drone of resources.transit.drones) drone.setEnabled(false);
+    for (const enemy of resources.transit.emergingDrones) enemy.state.destroy();
     const targets = [
       ...resources.transit.lights.map(receiver => receiver.target),
       ...resources.transit.lifts.map(lift => {
@@ -579,7 +579,7 @@ test('Room 1 completion initializes Room 2 exactly once and CP3 owns later recov
     const unsubscribe = f.runtime.events.on('objectiveChanged', ({ roomId, objective }) => {
       // The authored Room 2 has its own progress objectives; count only the
       // one-shot Room 1 handoff announcement.
-      if (roomId === 'room-2' && objective === 'Restore the transit lights and lower cover for Bob') roomTwoObjectives += 1;
+      if (roomId === 'room-2' && objective === 'Restore the transit lights and clear the sewer drones for Bob') roomTwoObjectives += 1;
     });
 
     bodies.bob.position.set(6, 0.86, 83);
@@ -821,12 +821,12 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
       transit: BlackoutTransitController;
     } }).resources;
     for (const stage of [1, 2]) {
-      const cover = transit.covers[stage - 1]!;
-      cover.support.advance(cover.support.dissolveDurationSeconds);
+      const enemy = transit.emergingDrones[stage - 1]!;
+      enemy.state.destroy();
       transit.lights[stage - 1]!.target.setConnectionState(true);
       f.tick(120);
       transit.lights[stage - 1]!.target.setConnectionState(false);
-      assert.equal(cover.deployed, true);
+      assert.equal(enemy.state.state, 'destroyed');
       assert.equal(transit.lights[stage - 1]!.latched, true);
       const checkpoint = BLACKOUT_TRANSIT_CHECKPOINTS[stage]!;
       group.bobBody.teleport(checkpoint.bodyPositions.bob);
@@ -842,7 +842,7 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
         assert.ok(restored[id].distanceTo(BLACKOUT_TRANSIT_CHECKPOINTS[0]!.bodyPositions[id]) < 1e-6,
           `${id} should return to Room 2 entry even if parked far from the active slime`);
       }
-      assert.ok(transit.covers.every(cover => !cover.deployed && cover.support.progress === 0));
+      assert.ok(transit.emergingDrones.every(enemy => enemy.state.state === 'dormant' && enemy.state.hits === 0));
       assert.ok(transit.lights.every(light => !light.latched && light.charge === 0));
       assert.equal(transit.bridgeLocked,false);
       assert.equal(transit.bridgeDeployed,false);

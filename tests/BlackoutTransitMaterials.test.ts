@@ -46,8 +46,18 @@ test('deployed bridge top corners meet both anchors across its full width', () =
 test('textured static and interactive geometry preserves the reviewed transit baseline', () => {
   const f = fixture();
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-transit-authored-surfaces.json', import.meta.url), 'utf8'));
+  // Retain the reviewed geometry contract for every unchanged surface. Only
+  // the explicitly replaced wall-drone/cover family leaves this baseline.
+  baseline.surfaces = baseline.surfaces.filter((saved: { name: string }) =>
+    !/^transit-(cover|security|bridge-cover)/.test(saved.name));
   const meshes: THREE.Mesh[] = [];
-  f.room.root.traverse(m => { if (m instanceof THREE.Mesh && !m.name.includes('batched') && !m.userData.visualOnly) meshes.push(m); });
+  f.room.root.traverse(m => {
+    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly) return;
+    for (let ancestor: THREE.Object3D | null = m; ancestor; ancestor = ancestor.parent) {
+      if (ancestor.name.startsWith('transit-sewer-drone-')) return;
+    }
+    meshes.push(m);
+  });
   try {
     assert.equal(meshes.length, baseline.surfaces.length);
     for (const [i, mesh] of meshes.entries()) {
@@ -82,12 +92,9 @@ test('authored surfaces carry shared maps, metric charts and distinct sticky/sup
     }
     const sticky = material(f.room.bobSwitchWall), deck = material(f.room.catwalk);
     assert.notEqual(sticky, deck); assert.notEqual(sticky.color.getHex(), deck.color.getHex());
-    for (const cover of f.controller.covers) {
-      assert.ok(material(cover.panel).map);
-      assert.ok(material(cover.support.mesh).map);
-      assert.notEqual(material(cover.panel).map, material(cover.support.mesh).map);
-      assert.equal(cover.support.mesh.userData.soluble, true);
-      assert.notEqual(cover.panel.userData.soluble, true);
+    for (const enemy of f.controller.emergingDrones) {
+      assert.equal(enemy.target.mesh.userData.soluble, true);
+      assert.equal(enemy.shell.body.geometry.hasAttribute('color'), true);
     }
     assert.equal(f.kit.diagnostics.textureCount, 24, 'Room 2 reuses eight existing families without new maps');
   } finally { f.dispose(); }
@@ -138,12 +145,10 @@ test('lift motion leaves charts fixed and independent powered indicators retain 
       assert.equal(hash(lift.platform.collisionMesh.geometry.attributes.uv.array), before);
       assert.equal(lift.platform.collisionMesh.material.map, deckMap);
     }
-    const cover = f.controller.covers[0];
-    cover.support.advance(cover.support.dissolveDurationSeconds);
-    assert.equal(cover.support.completed, true);
+    const enemy = f.controller.emergingDrones[0]; enemy.state.destroy();
     const saved = f.controller.capture(); f.controller.reset(); f.controller.restore(saved);
-    assert.equal(cover.support.completed, true); assert.equal(cover.panel.visible, true);
-    f.controller.reset(); assert.equal(cover.support.completed, false);
+    assert.equal(enemy.target.completed, true); assert.equal(enemy.shell.body.visible, false);
+    f.controller.reset(); assert.equal(enemy.target.completed, false);
   } finally { f.dispose(); }
 });
 
@@ -161,7 +166,7 @@ test('Room 2 borrowers survive until the bay owner disposes maps exactly once ac
     for (const t of textures) { counts.set(t, 0); t.addEventListener('dispose', () => counts.set(t, counts.get(t)! + 1)); }
     assert.equal(kit.diagnostics.textureCount, 24);
     const owned = [controller.lights[0].targetMaterial, controller.lights[1].targetMaterial, controller.lights[2].targetMaterial,
-      material(controller.covers[0].panel), material(controller.lifts[0].root.getObjectByName('transit-lift-a-contact-mount') as THREE.Mesh)];
+      material(controller.lifts[0].root.getObjectByName('transit-lift-a-contact-mount') as THREE.Mesh)];
     const materialCounts = new Map(owned.map(m => [m, 0]));
     for (const m of owned) m.addEventListener('dispose', () => materialCounts.set(m, materialCounts.get(m)! + 1));
     controller.dispose(); controller.dispose(); room.dispose(); room.dispose();

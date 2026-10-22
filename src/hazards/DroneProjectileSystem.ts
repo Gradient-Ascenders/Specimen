@@ -59,7 +59,7 @@ interface ProjectileSlot {
 }
 
 export interface DroneProjectileTarget {
-  readonly slimeId: 'bob' | 'goop';
+  readonly slimeId: 'bob' | 'goop' | 'volt';
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly previousPosition: { readonly x: number; readonly y: number; readonly z: number };
   readonly radiusMetres: number;
@@ -78,7 +78,7 @@ export interface DroneProjectileEvents {
   slimeImpact: {
     readonly projectileId: number;
     readonly ownerDroneId: string;
-    readonly slimeId: 'bob' | 'goop';
+    readonly slimeId: 'bob' | 'goop' | 'volt';
     readonly damage: number;
     readonly point: Readonly<VectorState>;
   };

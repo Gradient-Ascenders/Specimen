@@ -3,7 +3,6 @@ import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import * as THREE from 'three';
 import { mapBlackoutBoxUVs, mapBlackoutPropUVs } from '../render/environment/blackout/BlackoutMaintenanceUVs.ts';
 import { borrowBlackoutMaps, updateBlackoutStretchUVs } from '../render/environment/blackout/BlackoutTransitMaterials.ts';
-import { setShadowMapUpdatesActive } from '../render/ShadowLightResources.ts';
 
 import type { ElectricalConnectionTarget, ElectricalTargetRegistry } from '../abilities/ElectricalTargetRegistry.ts';
 import { DissolveTarget } from '../abilities/DissolveTarget.ts';
@@ -18,7 +17,10 @@ import { LaserHazard, type LaserContactTarget } from '../hazards/LaserHazard.ts'
 import { SecurityDrone, type SecurityDroneTarget } from '../hazards/SecurityDrone.ts';
 import { DroneProjectileSystem, type DroneProjectileTarget } from '../hazards/DroneProjectileSystem.ts';
 import { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
-import { ShadowedDroneBeam } from '../render/hazards/ShadowedDroneBeam.ts';
+import { ScannerBeamPresentation } from '../render/hazards/ScannerBeamPresentation.ts';
+import { EmergingSewerDrone, TRANSIT_SEWER_DRONE_POSITIONS } from '../hazards/EmergingSewerDrone.ts';
+import { WEAK_SEWER_DRONE, type WeakSewerDroneSnapshot } from '../hazards/WeakSewerDrone.ts';
+import type { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import { SlimeDamageSystem } from '../systems/SlimeDamageSystem.ts';
@@ -29,7 +31,6 @@ export type TransitBodies = Record<TransitSlimeId, KinematicBody>;
 const LIGHT_CHARGE_SECONDS = 1.5;
 const BRIDGE_RELEASE_SECONDS = 0.75;
 const LIFT_RESIDUAL_SECONDS = 1.2;
-const COVER_DROP_SECONDS = 0.85;
 const LOCK_RECEIVER_APPROACH = new THREE.Vector3(0, 0.86, 145);
 const LOCK_RECEIVER_RANGE_SQ = 9;
 
@@ -39,7 +40,7 @@ interface TransitSnapshot {
   readonly complete: boolean;
   readonly checkpointStage: number;
   readonly lights: readonly ReceiverSnapshot[];
-  readonly covers: readonly { readonly progress: number; readonly elapsed: number; readonly deployed: boolean }[];
+  readonly sewerDrones: readonly WeakSewerDroneSnapshot[];
   readonly liftGrace: readonly number[];
   readonly lifts: readonly SerializableValue[];
   readonly switchHeld: boolean;
@@ -63,14 +64,6 @@ interface MutableTimedReceiver {
   latched: boolean;
 }
 
-interface CoverState {
-  readonly panel: THREE.Mesh;
-  readonly support: DissolveTarget;
-  readonly startY: number;
-  readonly endY: number;
-  elapsed: number;
-  deployed: boolean;
-}
 interface TransitCarrier extends PoweredCarrierBody {}
 
 /**
@@ -86,13 +79,14 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   lockReceiver!: MutableTimedReceiver;
   lifts: readonly PoweredLiftDevice[] = [];
   dissolveTargets: readonly DissolveTarget[] = [];
-  covers: readonly CoverState[] = [];
+  readonly emergingDrones: EmergingSewerDrone[] = [];
+  private scannerBeams?: ScannerBeamPresentation;
   drones: readonly SecurityDrone[] = [];
   lasers: readonly LaserHazard[] = [];
   private laserPresentation?: LaserHazardPresentation;
   private laserElapsed = 0;
   private readonly laserOffset = new THREE.Vector3();
-  readonly damage = new SlimeDamageSystem({ maximumHealth: 100 });
+  readonly damage = new SlimeDamageSystem({ maximumHealth: 100 }, ['bob', 'goop', 'volt']);
   readonly projectiles: DroneProjectileSystem;
   readonly projectilePresentation: DroneProjectilePresentation;
 
@@ -115,12 +109,10 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private readonly liftGrace = [0, 0];
   private readonly carrierBodies: TransitCarrier[] = [];
   private readonly carrierOrder: TransitSlimeId[] = ['bob', 'goop', 'volt'];
-  private readonly beamDirection = new THREE.Vector3();
-  private readonly beamUp = new THREE.Vector3(0, 1, 0);
   private readonly bobLaserTarget: LaserContactTarget = { id: 'bob', position: new THREE.Vector3(), radiusMetres: 0.45 };
   private readonly voltLaserTarget: LaserContactTarget = { id: 'volt', position: new THREE.Vector3(), radiusMetres: 0.45 };
   private readonly currentVoltPosition = new THREE.Vector3();
-  private pendingFailure: 'bob' | 'volt' | undefined;
+  private pendingFailure: TransitSlimeId | undefined;
   private readonly resources = new SecurityDronePresentationResources(undefined, true);
   private readonly lightGeometry = new THREE.BoxGeometry(1.25, 0.45, 0.32);
   private readonly dressingGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -130,18 +122,11 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private readonly liftVisuals: {root: THREE.Group; plumes: THREE.Group; socket: THREE.MeshStandardMaterial}[] = [];
   private readonly lightTargetGeometry = new THREE.BoxGeometry(1.05, 0.8, 0.22);
   private readonly lampTargetGeometry = new THREE.BoxGeometry(2.4, 0.4, 0.85);
-  private readonly coverGeometry = new THREE.BoxGeometry(0.32, 4.2, 7.2);
-  private readonly supportGeometry = new THREE.BoxGeometry(0.5, 0.42, 0.42);
   private readonly liftSocketGeometry = new THREE.BoxGeometry(0.55, 0.65, 0.35);
   private readonly steel = new THREE.MeshStandardMaterial({ color: 0x2a3337, roughness: 0.7, metalness: 0.72 });
-  private readonly wood = new THREE.MeshStandardMaterial({ color: 0x38251a, roughness: 0.96, metalness: 0.02 });
-  private readonly solubleWood = new THREE.MeshStandardMaterial({ color: 0x55402a, roughness: 0.92 });
   private readonly indicatorMaterials: THREE.MeshStandardMaterial[] = [];
-  private readonly beamMeshes: THREE.Mesh[] = [];
   private readonly targetUnregisters: (() => void)[] = [];
-  private readonly searchLights: THREE.SpotLight[] = [];
   private readonly lampLights: THREE.PointLight[] = [];
-  private readonly coverRegistered = new Set<THREE.Mesh>();
   private readonly bridge: THREE.Mesh;
   private bridgeRegistered = false;
   private bridgeFullUVs?: Float32Array;
@@ -157,11 +142,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const kit = this.room.surfaceMaterials;
     if (kit) {
       borrowBlackoutMaps(this.steel, kit.get('machineryMetal'));
-      borrowBlackoutMaps(this.wood, kit.get('ductSteel'));
-      this.wood.color.setHex(0xffffff); this.wood.metalness = .52;
-      borrowBlackoutMaps(this.solubleWood, kit.get('acidPlatform'));
-      this.solubleWood.color.setHex(0xb59970);
-      for (const [geometry, material] of [[this.coverGeometry, this.wood], [this.supportGeometry, this.solubleWood], [this.liftSocketGeometry, this.steel], [this.lampTargetGeometry, this.steel], [this.lightTargetGeometry, this.steel]] as const) {
+      for (const [geometry, material] of [[this.liftSocketGeometry, this.steel], [this.lampTargetGeometry, this.steel], [this.lightTargetGeometry, this.steel]] as const) {
         mapBlackoutPropUVs(geometry, material.userData.tileSizeMetres);
       }
       mapBlackoutPropUVs(this.thrusterGeometry, this.steel.userData.tileSizeMetres);
@@ -175,11 +156,11 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const ownedLasers: LaserHazard[] = [];
     let projectileSystem: DroneProjectileSystem | undefined;
     try {
-      projectileSystem = new DroneProjectileSystem(options.world, this.damage, { damage: 60, speedMetresPerSecond: 120, poolCapacity: 48, lifetimeSeconds: 1.2, maximumRangeMetres: 36 });
+      projectileSystem = new DroneProjectileSystem(options.world, this.damage, { damage: WEAK_SEWER_DRONE.projectileDamage, speedMetresPerSecond: WEAK_SEWER_DRONE.projectileSpeed, poolCapacity: 48, lifetimeSeconds: 1.2, maximumRangeMetres: 36 });
       this.projectiles = projectileSystem;
       this.projectilePresentation = new DroneProjectilePresentation(projectileSystem.states, 0.09);
       this.root.add(this.projectilePresentation.mesh);
-      this.damage.events.on('died', ({ slimeId }) => { this.pendingFailure = slimeId === 'goop' ? 'volt' : 'bob'; });
+      this.damage.events.on('died', ({ slimeId }) => { this.pendingFailure = slimeId; });
       const lights = this.room.receiverPositions.map((position, index) => {
         const target = this.makeReceiver(`transit-light-${String.fromCharCode(97 + index)}`, `Light bank ${String.fromCharCode(65 + index)}`, position, options.electricalTargets, unregisterTargets, true);
         this.lampLights.push(target.light);
@@ -264,49 +245,14 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       });
       this.lifts = lifts;
 
-      const covers = [
-        { drone: new THREE.Vector3(18, 5.5, 100), panel: new THREE.Vector3(14, 4.4, 101), support: new THREE.Vector3(14, 11.5, 101), forward: new THREE.Vector3(-0.82, -0.45, 0.15) },
-        { drone: new THREE.Vector3(18, 8, 124), panel: new THREE.Vector3(14, 8.1, 125), support: new THREE.Vector3(14, 11.5, 125), forward: new THREE.Vector3(-0.82, -0.4, 0.12) },
-        { drone: new THREE.Vector3(1, 6.5, 142), panel: new THREE.Vector3(-4, 4.9, 141), support: new THREE.Vector3(0, 11.5, 141), forward: new THREE.Vector3(-0.9, -0.3, -0.18) },
-      ];
-      const states: CoverState[] = [];
-      for (const [index, config] of covers.entries()) {
-        const panel = new THREE.Mesh(this.coverGeometry, this.wood);
-        panel.name = `transit-cover-${index + 1}`;
-        panel.position.set(config.panel.x, 13.7, config.panel.z);
-        panel.visible = true;
-        panel.castShadow = true;
-        panel.receiveShadow = true;
-        panel.userData.surfaceTag = 'default';
-        this.root.add(panel);
-        const supportMesh = new THREE.Mesh(this.supportGeometry, this.solubleWood);
-        supportMesh.name = `transit-cover-support-${index + 1}`;
-        supportMesh.position.copy(config.support);
-        supportMesh.userData.soluble = true;
-        supportMesh.userData.surfaceTag = 'default';
-        this.root.add(supportMesh);
-        const support = new DissolveTarget({ id: `transit-cover-support-${index + 1}`, mesh: supportMesh, collisionWorld: options.world, surfaceRegistry: options.surfaces, dissolveDurationSeconds: 0.85, collisionDisableProgress: 0.65, activationRangeMetres: 13 });
-        ownedDissolves.push(support);
-        const cover = { panel, support, startY: 13.7, endY: config.panel.y, elapsed: 0, deployed: false };
-        states.push(cover);
-        this.setCoverOcclusion(cover, true);
-        // Retained guide rails terminate at the ceiling crossbeam. The soluble
-        // latch releases the panel into a fixed lower cradle, not free physics.
-        const bottom = config.panel.y - 2.2;
-        for (const side of [-1, 1]) this.dressingBox(
-          `transit-cover-${index + 1}-guide-${side}`,
-          new THREE.Vector3(0.2, 20.7 - bottom, 0.2),
-          new THREE.Vector3(config.panel.x, (20.7 + bottom) / 2, config.panel.z + side * 3.7),
-        );
-        this.dressingBox(`transit-cover-${index + 1}-lower-cradle`,
-          new THREE.Vector3(0.48, 0.18, 7.6), new THREE.Vector3(config.panel.x, bottom, config.panel.z));
-        if (config.support.x !== config.panel.x) this.dressingBox('transit-bridge-cover-release-link',
-          new THREE.Vector3(Math.abs(config.support.x - config.panel.x), 0.12, 0.12),
-          new THREE.Vector3((config.support.x + config.panel.x) / 2, config.support.y, config.support.z));
-        const drone = this.makeDrone(`transit-security-${index + 1}`, config.drone, config.forward, options.world, options.surfaces, ownedDrones);
-        this.addBeam(drone, index);
+      for (const [index, position] of TRANSIT_SEWER_DRONE_POSITIONS.entries()) {
+        const enemy = new EmergingSewerDrone(`transit-sewer-drone-${index + 1}`, this.root,
+          new THREE.Vector3(...position), options.world, options.surfaces, this.projectiles, this.resources);
+        this.emergingDrones.push(enemy); ownedDrones.push(enemy.weapon); ownedDissolves.push(enemy.target);
       }
-      this.covers = states;
+      this.scannerBeams = new ScannerBeamPresentation(this.world, this.emergingDrones.map(enemy => ({
+        mesh: enemy.beam, ignoredCollider: enemy.target.mesh, enabled: () => this.active && enemy.weapon.readModel.enabled,
+      })));
       this.dissolveTargets = ownedDissolves;
 
       const lasers = [
@@ -350,9 +296,9 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     } catch (error) {
       this.laserPresentation?.dispose();
       for (const unregister of unregisterTargets.reverse()) unregister();
-      for (const target of ownedDissolves.reverse()) target.dispose();
+      for (const enemy of this.emergingDrones) enemy.dispose();
       for (const lift of ownedLifts.reverse()) lift.dispose();
-      for (const drone of ownedDrones.reverse()) drone.dispose();
+
       for (const laser of ownedLasers.reverse()) laser.dispose();
       projectileSystem?.dispose();
       this.root.removeFromParent();
@@ -368,12 +314,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.active = active;
     for (const lift of this.lifts) lift.core.setAvailable(active);
     for (let i = 0; i < this.lifts.length; i++) this.updateLiftVisual(i);
-    for (const drone of this.drones) drone.setEnabled(active);
-    for (let i = 0; i < this.drones.length; i++) this.updateBeam(this.drones[i]!, i);
-    for (const light of this.searchLights) {
-      light.intensity = active ? 26 : 0;
-      setShadowMapUpdatesActive(light, active);
-    }
+    if (!active) for (const enemy of this.emergingDrones) enemy.suspend();
     for (const laser of this.lasers) laser.root.visible = active;
     if (this.laserPresentation) this.laserPresentation.root.visible = active;
     this.updateLampBanks();
@@ -398,7 +339,6 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     for (let i = 0; i < this.lights.length; i++) this.updateReceiver(this.lights[i]!, dt);
     this.updateReceiver(this.lockReceiver, dt);
     this.updateLampBanks();
-    this.updateCovers(dt);
     this.updateSwitchAndBridge(dt, bodies.bob);
     this.updateLifts(dt, bodies);
     this.damage.update(dt);
@@ -424,10 +364,10 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     }
     if (this.room.exitAt(bodies.bob.position) && this.room.exitAt(bodies.goop.position) && this.room.exitAt(bodies.volt.position) && this.bridgeLocked) this.complete = true;
     const bobOnPad = (mesh: THREE.Mesh, tolerance: number) => bodies.bob.isSupportedBy(mesh) && Math.abs(bodies.bob.position.z - mesh.position.z) <= tolerance;
-    if (this.covers[0]?.deployed && bobOnPad(this.room.bobRoutePlatforms[1]!, 1.5)) this.checkpointTutorialReached = true;
+    if (this.emergingDrones[0]?.state.state === 'destroyed' && bobOnPad(this.room.bobRoutePlatforms[1]!, 1.5)) this.checkpointTutorialReached = true;
     if (this.checkpointTutorialReached) this.checkpointStage = Math.max(this.checkpointStage, 1);
     const finalPad = this.room.bobRoutePlatforms[this.room.bobRoutePlatforms.length - 1]!;
-    if (this.covers[1]?.deployed && bobOnPad(finalPad, 2.5)) this.checkpointStage = Math.max(this.checkpointStage, 2);
+    if (this.emergingDrones[1]?.state.state === 'destroyed' && bobOnPad(finalPad, 2.5)) this.checkpointStage = Math.max(this.checkpointStage, 2);
     this.updateObjective();
     return undefined;
   }
@@ -436,7 +376,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     const state: TransitSnapshot = {
       active: this.active, complete: this.complete, checkpointStage: this.checkpointStage,
       lights: this.lights.map(({ charge, latched }) => ({ charge, latched })),
-      covers: this.covers.map(({ support, elapsed, deployed }) => ({ progress: support.progress, elapsed, deployed })),
+      sewerDrones: this.emergingDrones.map(enemy => enemy.state.capture()),
       liftGrace: [...this.liftGrace], switchHeld: this.switchHeld, bridgeDeployed: this.bridgeDeployed,
       lifts: this.lifts.map(lift => lift.captureState()),
       bridgeLocked: this.bridgeLocked, bridgeRelease: this.bridgeRelease,
@@ -455,16 +395,8 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.checkpointStage = snapshot.checkpointStage;
     this.checkpointTutorialReached = snapshot.checkpointTutorialReached;
     this.lights.forEach((receiver, i) => this.restoreReceiver(receiver, snapshot.lights[i] ?? { charge: 0, latched: false }));
-    this.covers.forEach((cover, i) => {
-      cover.support.reset();
-      const saved = snapshot.covers[i] ?? { progress: 0, deployed: false };
-      if (saved.progress > 0) cover.support.advance(cover.support.dissolveDurationSeconds * saved.progress);
-      cover.elapsed = Math.max(0, Math.min(COVER_DROP_SECONDS, saved.elapsed ?? (saved.deployed ? COVER_DROP_SECONDS : 0)));
-      cover.deployed = saved.deployed;
-      cover.panel.position.y = THREE.MathUtils.lerp(cover.startY, cover.endY, THREE.MathUtils.smoothstep(cover.elapsed / COVER_DROP_SECONDS, 0, 1));
-      cover.panel.visible = true;
-      this.setCoverOcclusion(cover, true);
-    });
+    this.emergingDrones.forEach((enemy, i) => { if (snapshot.sewerDrones[i]) enemy.restore(snapshot.sewerDrones[i]!); else enemy.reset(); });
+    this.scannerBeams?.reset();
     this.liftGrace.forEach((_, i) => { this.liftGrace[i] = snapshot.liftGrace[i] ?? 0; });
     this.lifts.forEach((lift, i) => { if (snapshot.lifts[i] !== undefined) lift.restoreState(snapshot.lifts[i]!); });
     this.switchHeld = snapshot.switchHeld;
@@ -474,7 +406,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.bridgeRelease = snapshot.bridgeRelease;
     this.restoreReceiver(this.lockReceiver, snapshot.lockReceiver);
     this.complete = snapshot.complete;
-    for (const drone of this.drones) drone.reset();
+    for (const enemy of this.emergingDrones) { enemy.weapon.reset(); enemy.weapon.setCollisionEnabled(false); enemy.weapon.setPresentationVisible(false); enemy.suspend(); }
     for (const laser of this.lasers) laser.reset();
     this.laserElapsed = 0;
     this.laserPresentation?.sync();
@@ -482,12 +414,6 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.bridgeAudio.reset();
     for (const lift of this.lifts) lift.core.setAvailable(this.active);
     for (let i = 0; i < this.lifts.length; i++) this.updateLiftVisual(i);
-    for (let i = 0; i < this.drones.length; i++) {
-      this.drones[i]!.setEnabled(this.active);
-      this.beamMeshes[i]!.visible = this.active;
-      this.searchLights[i]!.intensity = this.active ? 26 : 0;
-      setShadowMapUpdatesActive(this.searchLights[i]!, this.active);
-    }
     this.updateLampBanks();
     this.updateSwitchButton();
   }
@@ -497,7 +423,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.projectiles.reset();
     this.projectilePresentation.reset();
     this.damage.reset();
-    for (const drone of this.drones) drone.reset();
+    for (const enemy of this.emergingDrones) { enemy.weapon.reset(); enemy.weapon.setCollisionEnabled(false); enemy.weapon.setPresentationVisible(false); enemy.suspend(); }
   }
 
   reset(): void {
@@ -505,14 +431,11 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.projectiles.reset(); this.damage.reset();
     this.pendingFailure = undefined;
     for (const receiver of [...this.lights, this.lockReceiver]) this.restoreReceiver(receiver, { charge: 0, latched: false });
-    for (const cover of this.covers) {
-      cover.support.reset(); cover.elapsed = 0; cover.deployed = false;
-      cover.panel.position.y = cover.startY; this.setCoverOcclusion(cover, true);
-    }
+    for (const enemy of this.emergingDrones) enemy.reset();
+    this.scannerBeams?.reset();
     this.liftGrace.fill(0);
     for (const lift of this.lifts) lift.reset();
     for (let i = 0; i < this.lifts.length; i++) this.updateLiftVisual(i);
-    for (const drone of this.drones) drone.reset();
     for (const laser of this.lasers) laser.reset();
     this.laserElapsed = 0;
     this.laserPresentation?.sync();
@@ -537,22 +460,15 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       lift.root.getObjectByName(lift.id + '-contact-mount')?.removeFromParent();
       lift.dispose();
     }
-    for (const target of [...this.dissolveTargets].reverse()) target.dispose();
-    for (const cover of this.covers) {
-      if (this.coverRegistered.delete(cover.panel)) this.world.unregister(cover.panel);
-      cover.panel.removeFromParent();
-    }
+    for (const enemy of this.emergingDrones) enemy.dispose();
     if (this.bridgeRegistered) { this.world.unregister(this.bridge); this.surfaces.unregister(this.bridge); }
-    for (const drone of [...this.drones].reverse()) drone.dispose();
     this.laserPresentation?.dispose();
     for (const laser of [...this.lasers].reverse()) laser.dispose();
     this.projectilePresentation.dispose();
     this.projectiles.dispose(); this.damage.dispose(); this.resources.dispose();
-    for (const beam of this.beamMeshes) { beam.removeFromParent(); beam.geometry.dispose(); (beam.material as THREE.Material).dispose(); }
-    for (const light of this.searchLights) { light.dispose(); light.removeFromParent(); light.target.removeFromParent(); }
     for (const light of this.lampLights) light.removeFromParent();
     this.root.removeFromParent(); this.root.clear();
-    this.lightGeometry.dispose(); this.lightTargetGeometry.dispose(); this.coverGeometry.dispose(); this.supportGeometry.dispose(); this.liftSocketGeometry.dispose();
+    this.lightGeometry.dispose(); this.lightTargetGeometry.dispose(); this.liftSocketGeometry.dispose();
     this.dressingGeometry.dispose();
     for (const geometry of this.texturedDressing) geometry.dispose();
     this.texturedDressing.clear();
@@ -563,7 +479,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       if (receiver.ownsTargetMaterial) receiver.targetMaterial.dispose();
       else receiver.targetMaterial.emissiveIntensity = 0;
     }
-    this.steel.dispose(); this.wood.dispose(); this.solubleWood.dispose();
+    this.steel.dispose();
     for (const material of this.indicatorMaterials) material.dispose();
   }
 
@@ -651,23 +567,6 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     this.updateReceiver(receiver, 0.000001);
   }
 
-  private updateCovers(dt: number): void {
-    for (const cover of this.covers) {
-      if (cover.deployed || !cover.support.completed) continue;
-      cover.elapsed = Math.min(COVER_DROP_SECONDS, cover.elapsed + dt);
-      const t = THREE.MathUtils.smoothstep(cover.elapsed / COVER_DROP_SECONDS, 0, 1);
-      cover.panel.position.y = THREE.MathUtils.lerp(cover.startY, cover.endY, t);
-      if (cover.elapsed >= COVER_DROP_SECONDS) { cover.deployed = true; this.setCoverOcclusion(cover, true); }
-    }
-  }
-
-  private setCoverOcclusion(cover: CoverState, enabled: boolean): void {
-    if (enabled && !this.coverRegistered.has(cover.panel)) {
-      this.world.register(cover.panel, CollisionLayer.LineOfSight | CollisionLayer.Projectile, ColliderTransformMode.Dynamic);
-      this.coverRegistered.add(cover.panel);
-    } else if (!enabled && this.coverRegistered.delete(cover.panel)) this.world.unregister(cover.panel);
-  }
-
   private updateSwitchAndBridge(dt: number, bob: KinematicBody): void {
     const switchPoint = this.room.switchBodyPosition;
     const dx = bob.position.x - switchPoint.x, dy = bob.position.y - switchPoint.y, dz = bob.position.z - switchPoint.z;
@@ -751,65 +650,25 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     visual.socket.emissive.setHex(powered ? 0x48bc84 : 0x8c6916);
   }
 
-  private makeDrone(id: string, position: THREE.Vector3, forward: THREE.Vector3, world: CollisionWorld, surfaces: SurfaceRegistry, owned: SecurityDrone[]): SecurityDrone {
-    const drone = new SecurityDrone({ id, type: 'ceiling', initialPosition: position, colliderSize: new THREE.Vector3(1.4, 0.8, 1.4), forward: forward.clone().normalize(), scanAxis: new THREE.Vector3(0, 1, 0), scanHalfAngleRadians: 0.22, scanSpeedRadiansPerSecond: 0.18, trackTargets: true, forwardAnchorMetres: 1.2, detectionHalfAngleRadians: 0.34, detectionRangeMetres: 30, warningSeconds: 0.08, fireIntervalSeconds: 0.045, targetLossGraceSeconds: 0.08, cooldownSeconds: 0.15, muzzleAnchor: new THREE.Vector3(0, -0.1, -0.8), targetPolicy: 'both', initialScanPhase: 0.25 }, world, surfaces, this.projectiles, this.resources);
-    drone.presentation.root.traverse(object => { if (object.name.includes('mount') || object.name.includes('linkage')) object.visible = false; });
-    this.root.add(drone.root); owned.push(drone); return drone;
-  }
+  bindBurns(system: DissolveSystem): void { for (const enemy of this.emergingDrones) enemy.bindBurns(system); }
 
-  private addBeam(drone: SecurityDrone, index: number): void {
-    const range = 30;
-    const light = new THREE.SpotLight(0xff1830, 26, range, 0.34, 0.48, 2); light.name = `${drone.id}-search-light`; light.castShadow = true;
-    light.shadow.mapSize.set(1024, 1024); light.shadow.bias = -0.00005; light.shadow.normalBias = 0.012;
-    const beam = new ShadowedDroneBeam(light, range, 0.34).mesh;
-    beam.name = `${drone.id}-searchlight`; this.room.root.add(beam); this.beamMeshes.push(beam);
-    this.room.root.add(light, light.target); this.searchLights.push(light);
-    drone.root.userData.transitBeamIndex = index;
-  }
+  updatePresentation(dt: number, camera: THREE.Camera): void { this.scannerBeams?.update(dt, camera); }
 
-  private readonly roomTargets: SecurityDroneTarget[] = [
-    { slimeId: 'bob', position: new THREE.Vector3() },
-    // Reuse the existing drone target/LOS/projectile runtime for Volt while
-    // Goop remains acid-safe and is handled by the room-specific cover puzzle.
-    { slimeId: 'goop', position: new THREE.Vector3() },
-  ];
-  private readonly roomProjectileTargets: DroneProjectileTarget[] = [
-    { slimeId: 'bob', position: new THREE.Vector3(), previousPosition: new THREE.Vector3(), radiusMetres: 0.45 },
-    { slimeId: 'goop', position: new THREE.Vector3(), previousPosition: new THREE.Vector3(), radiusMetres: 0.45 },
-  ];
+  private readonly roomTargets: SecurityDroneTarget[] = (['bob', 'goop', 'volt'] as const)
+    .map(slimeId => ({ slimeId, position: new THREE.Vector3() }));
+  private readonly roomProjectileTargets: DroneProjectileTarget[] = (['bob', 'goop', 'volt'] as const)
+    .map(slimeId => ({ slimeId, position: new THREE.Vector3(), previousPosition: new THREE.Vector3(), radiusMetres: .45 }));
 
   private updateDrones(dt: number, bodies: TransitBodies): void {
-    const bobTarget = this.roomTargets[0]!.position as THREE.Vector3;
-    const voltTarget = this.roomTargets[1]!.position as THREE.Vector3;
-    bobTarget.set(bodies.bob.position.x, bodies.bob.position.y, bodies.bob.position.z);
-    voltTarget.set(bodies.volt.position.x, bodies.volt.position.y, bodies.volt.position.z);
-    const bobProjectile = this.roomProjectileTargets[0]!;
-    (bobProjectile.position as THREE.Vector3).set(bodies.bob.position.x, bodies.bob.position.y, bodies.bob.position.z);
-    (bobProjectile.previousPosition as THREE.Vector3).set(bodies.bob.previousPosition.x, bodies.bob.previousPosition.y, bodies.bob.previousPosition.z);
-    const voltProjectile = this.roomProjectileTargets[1]!;
-    (voltProjectile.position as THREE.Vector3).set(bodies.volt.position.x, bodies.volt.position.y, bodies.volt.position.z);
-    (voltProjectile.previousPosition as THREE.Vector3).set(bodies.volt.previousPosition.x, bodies.volt.previousPosition.y, bodies.volt.previousPosition.z);
-    for (let i = 0; i < this.drones.length; i++) {
-      const drone = this.drones[i]!;
-      drone.update(dt, this.roomTargets);
-      this.updateBeam(drone, i);
+    for (let i = 0; i < this.roomTargets.length; i++) {
+      const target = this.roomTargets[i]!, projectile = this.roomProjectileTargets[i]!, body = bodies[target.slimeId];
+      (target.position as THREE.Vector3).copy(body.position);
+      (projectile.position as THREE.Vector3).copy(body.position);
+      (projectile.previousPosition as THREE.Vector3).copy(body.previousPosition);
+      (projectile as { radiusMetres: number }).radiusMetres = body.radiusMetres;
     }
+    for (const enemy of this.emergingDrones) enemy.update(dt, this.roomTargets, this.active);
     this.projectiles.update(dt, this.roomProjectileTargets);
-  }
-
-  private updateBeam(drone: SecurityDrone, index: number): void {
-    const beam = this.beamMeshes[index]!;
-    const light = this.searchLights[index]!;
-    beam.visible = this.active;
-    if (!this.active) return;
-    beam.position.copy(drone.root.position).addScaledVector(drone.readModel.scanDirection, 1.2);
-    this.beamDirection.set(drone.readModel.scanDirection.x, drone.readModel.scanDirection.y, drone.readModel.scanDirection.z);
-    // The shader samples this light's depth map per fragment, leaving clear
-    // parts of the cone intact while masking the shadows of real geometry.
-    light.position.copy(beam.position);
-    light.target.position.copy(beam.position).addScaledVector(this.beamDirection, 30);
-    this.beamDirection.negate();
-    beam.quaternion.setFromUnitVectors(this.beamUp, this.beamDirection);
   }
 
   private updateLasers(dt: number): void {
@@ -827,9 +686,9 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private updateObjective(): void {
     if (this.complete) this.objective = 'Room clear. Continue to the boss-room access.';
     else if (this.bridgeLocked) this.objective = 'Regroup on the far side and reach the exit.';
-    else if (this.bridgeDeployed) this.objective = this.lights[2]?.latched ? 'Shield Volt’s crossing, then power the exit door’s lower edge to lock the bridge.' : 'Power the bridge-side light bank and find a way to shield Volt.';
+    else if (this.bridgeDeployed) this.objective = this.lights[2]?.latched ? 'Clear the crossing with Goop, then power the exit door’s lower edge to lock the bridge.' : 'Power the bridge-side light bank and clear the crossing with Goop.';
     else if (this.checkpointTutorialReached) this.objective = 'Reactivate the transit lifts and find the far-side switch.';
-    else if (this.lights.some(light => light.latched)) this.objective = 'Use Goop to release the cover blocking the searchlight.';
+    else if (this.lights.some(light => light.latched)) this.objective = 'Use Goop to destroy the emerging sewer drones and clear the route for Bob.';
     else this.objective = 'Find Volt’s maintenance route and restore a local light bank.';
   }
 }
@@ -837,6 +696,6 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
 function parseSnapshot(value: SerializableValue): TransitSnapshot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid transit checkpoint state.');
   const state = value as unknown as TransitSnapshot;
-  if (!Array.isArray(state.lights) || !Array.isArray(state.covers) || !Array.isArray(state.liftGrace)) throw new Error('Incomplete transit checkpoint state.');
+  if (!Array.isArray(state.lights) || !Array.isArray(state.sewerDrones) || !Array.isArray(state.liftGrace)) throw new Error('Incomplete transit checkpoint state.');
   return state;
 }

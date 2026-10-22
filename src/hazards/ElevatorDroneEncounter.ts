@@ -80,7 +80,7 @@ export class ElevatorDroneEncounter {
       const flight = new LiftDroneFlightPresentation(drone.presentation, this.resources, this.flameMaterial, target, i * 1.7);
       return { flight, drone, target, root, phase: 'pending', fallTime: 0, ejected: 0 };
     });
-    this.unsubscribers.push(this.damage.events.on('died', ({ slimeId }) => requestDeath(slimeId)));
+    this.unsubscribers.push(this.damage.events.on('died', ({ slimeId }) => { if (slimeId !== 'volt') requestDeath(slimeId); }));
     this.unsubscribers.push(dissolve.events.on('burnStarted', ({ target }) => {
       const slot = this.slots.find(s => s.target === target);
       if (!slot || (slot.phase !== 'approaching' && slot.phase !== 'firing')) return;

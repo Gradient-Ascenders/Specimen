@@ -35,8 +35,11 @@ dismounts. Aim freezes authoritative flight velocity. Mounting is Volt-only and
 cannot carry stale input across pause, switch, or recovery.
 
 Room 2 is the powered transit gauntlet. Volt reveals and powers infrastructure,
-Goop changes retained cover, and Bob traverses lifts, sticky sections, lasers,
-and drones. The final bridge requires Bob to hold a switch until Volt reaches
+Goop destroys three damaged sewer drones, and Bob traverses lifts, sticky
+sections and lasers. Each drone emerges independently when any persistent slime
+approaches within 16 m, but attacks only within 10 m after emerging. Three acid
+reactions destroy each drone. The old shoot-support/drop-cover puzzle is removed.
+The final bridge requires Bob to hold a switch until Volt reaches
 and powers the far contact. Room-scoped electrical range must not leak back into
 Room 1.
 

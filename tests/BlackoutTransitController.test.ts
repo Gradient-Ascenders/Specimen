@@ -37,8 +37,8 @@ function fixture() {
   const controller = new BlackoutTransitController({ room, world, surfaces, electricalTargets });
   controller.setActive(true);
   const bodies: TransitBodies = {
-    bob: fakeBody(new THREE.Vector3(15, 1, 90)),
-    goop: fakeBody(new THREE.Vector3(18, -0.545, 90)),
+    bob: fakeBody(new THREE.Vector3(6, .86, 84)),
+    goop: fakeBody(new THREE.Vector3(8, .86, 84)),
     volt: fakeBody(new THREE.Vector3(-16, 2.96, 90)),
   };
   return {
@@ -82,25 +82,7 @@ test('conducting fixtures have no standby glow or yellow torus markers', () => {
   } finally { f.dispose(); }
 });
 
-test('drone head follows a moving visible target and rapid fire defeats exposure within half a second', () => {
-  const f = fixture();
-  try {
-    const drone = f.controller.drones[0]!;
-    f.bodies.bob.position.set(10.5,1.66,102);
-    const hoverPosition = drone.root.position.clone();
-    f.controller.update(DT,f.bodies);
-    const head = drone.root.getObjectByName(`${drone.id}-tracking-head`)!;
-    const before = head.quaternion.clone();
-    f.bodies.bob.position.z += .55;
-    f.controller.update(DT,f.bodies);
-    assert.ok(before.angleTo(head.quaternion) > .01, 'head must aim toward the moving victim rather than remain in its patrol pose');
-    let failed: string | undefined;
-    let elapsed = 2*DT;
-    while(!failed && elapsed < .5) { failed=f.controller.update(DT,f.bodies); elapsed+=DT; }
-    assert.equal(failed,'bob','remaining exposed cannot outrun the slow old firing cadence');
-    assert.deepEqual(drone.root.position.toArray(), hoverPosition.toArray(), 'head tracking does not become a patrol or chase');
-  } finally { f.dispose(); }
-});
+
 
 for (const [index, baseY, sweep, period] of [[0, 5.1, 2.4, 1.2], [1, 8.35, 2.75, 0.9]] as const) {
 test(`vertical laser ${index + 1} stays live with matching presentation and collision clear of solids`, () => {
@@ -129,54 +111,9 @@ test(`vertical laser ${index + 1} stays live with matching presentation and coll
 });
 }
 
-test('drones visibly sweep and red beam volumes use their own shadow depth without a flat cutoff', () => {
-  const f = fixture();
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(12,.2,12),new THREE.MeshStandardMaterial());
-  try {
-    const drone = f.controller.drones[0]!;
-    const start = new THREE.Vector3().copy(drone.readModel.scanDirection);
-    const hoverPosition = drone.root.position.clone();
-    for (let i=0;i<60;i++) f.controller.update(DT,f.bodies);
-    const direction = new THREE.Vector3().copy(drone.readModel.scanDirection);
-    assert.ok(start.angleTo(direction) > 0.1 && start.angleTo(direction) < 0.23, 'livelier bounded idle sweep without moving the drone');
-    assert.deepEqual(drone.root.position.toArray(), hoverPosition.toArray(), 'the authored hover position remains fixed while sweeping');
-    const beam = f.room.root.getObjectByName(`${drone.id}-searchlight`) as THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>;
-    const light = f.room.root.getObjectByName(`${drone.id}-search-light`) as THREE.SpotLight;
-    assert.equal(light.color.getHex(), 0xff1830);
-    assert.equal(beam.material.uniforms.beamShadowMatrix.value,light.shadow.matrix);
-    assert.match(beam.material.fragmentShader,/texture\(beamShadow/);
-    assert.equal(light.castShadow,true);
-    wall.position.copy(beam.position).addScaledVector(direction,2);
-    wall.quaternion.copy(beam.quaternion); wall.updateMatrixWorld(true);
-    f.world.register(wall);
-    f.controller.update(DT,f.bodies);
-    assert.equal(beam.scale.y,1,'a blocker must mask only shadowed fragments, not shrink the whole cone');
-    f.world.unregister(wall);
-    f.controller.update(DT,f.bodies);
-    assert.equal(beam.scale.y,1);
-  } finally {
-    f.world.unregister(wall); wall.geometry.dispose(); wall.material.dispose(); f.dispose();
-  }
-});
 
-test('a dissolved support releases a retained cover that physically blocks drone LOS', () => {
-  const f = fixture();
-  try {
-    const cover = f.controller.covers[0]!;
-    cover.support.advance(cover.support.dissolveDurationSeconds);
-    for (let i = 0; i < 60; i++) f.controller.update(DT, f.bodies);
-    assert.equal(cover.deployed, true);
-    assert.equal(cover.panel.visible, true, 'the cover remains as a sight blocker');
 
-    const origin = new THREE.Vector3(18, 5.5, 100);
-    const end = new THREE.Vector3(10, 3.8, 102);
-    const direction = end.clone().sub(origin);
-    const drone = f.controller.drones[0]!;
-    const hit = new CollisionHit();
-    assert.equal(f.world.raycast(origin, direction, direction.length(), hit, CollisionLayer.LineOfSight, drone.collider), true);
-    assert.equal(hit.object, cover.panel, 'the deployed cover, not merely its visual cone, occludes detection rays');
-  } finally { f.dispose(); }
-});
+
 
 test('Bob must hold the wall switch to deploy the bridge; Volt can latch the far-side lock', () => {
   const f = fixture();
@@ -219,21 +156,20 @@ test('disposing the transit controller does not dispose its borrowed exit-door c
   assert.equal(disposed, 1, 'the room disposes the contact material exactly once');
 });
 
-test('checkpoint capture restores lights, cover progress, lift position, and bridge state', () => {
+test('checkpoint capture restores lights, sewer damage, lift position, and bridge state', () => {
   const f = fixture();
   try {
     f.controller.lights[1]!.target.setConnectionState(true);
     for (let i = 0; i < 90; i++) f.controller.update(DT, f.bodies);
     f.controller.lights[1]!.target.setConnectionState(false);
-    const cover = f.controller.covers[0]!;
-    cover.support.advance(cover.support.dissolveDurationSeconds);
+    f.controller.emergingDrones[0]!.state.hit();
     for (let i = 0; i < 30; i++) f.controller.update(DT, f.bodies);
     const saved = f.controller.capture();
     f.controller.reset();
     f.controller.restore(saved);
     assert.equal(f.controller.lights[1]!.latched, true);
-    assert.ok(f.controller.covers[0]!.elapsed > 0);
-    assert.equal(f.controller.covers[0]!.deployed, false, 'mid-fall cover resumes its checkpoint pose');
+    assert.equal(f.controller.emergingDrones[0]!.state.hits, 1);
+    assert.equal(f.controller.emergingDrones[0]!.state.state, 'active');
   } finally { f.dispose(); }
 });
 
@@ -251,46 +187,7 @@ test('drone acquisition provides a warning window; Goop remains acid-safe while 
   } finally { f.dispose(); }
 });
 
-test('each scanning drone threatens its route until its matching physical cover is lowered', () => {
-  const cases = [
-    { index: 0, body: 'bob' as const, position: new THREE.Vector3(10.5, 1.66, 102) },
-    { index: 1, body: 'bob' as const, position: new THREE.Vector3(9.5, 4.86, 126) },
-    { index: 2, body: 'volt' as const, position: new THREE.Vector3(-8, 1.96, 140) },
-  ];
-  for (const scenario of cases) {
-    const f = fixture();
-    try {
-      const body = f.bodies[scenario.body];
-      const safePosition = new THREE.Vector3().copy(body.position);
-      body.position.copy(scenario.position);
-      body.previousPosition.copy(scenario.position);
-      const drone = f.controller.drones[scenario.index]!;
-      const fixedDirection = { ...drone.readModel.scanDirection };
-      assert.equal(f.controller.update(DT, f.bodies), undefined);
-      assert.equal(drone.readModel.state, 'warning', `drone ${scenario.index + 1} must cover its intended route`);
-      let failed: string | undefined;
-      for (let step = 0; step < 240 && !failed; step++) failed = f.controller.update(DT, f.bodies);
-      assert.equal(failed, scenario.body, 'remaining exposed should cause damage and failure, not harmless detection');
-      const startDirection = new THREE.Vector3(fixedDirection.x, fixedDirection.y, fixedDirection.z);
-      const direction = drone.readModel.scanDirection;
-      assert.ok(startDirection.angleTo(new THREE.Vector3(direction.x, direction.y, direction.z)) < 0.15,
-        'small scan motion must remain centred on the authored route, not track bodies freely');
 
-      body.position.copy(safePosition);
-      body.previousPosition.copy(safePosition);
-      f.controller.resetTransient();
-      const cover = f.controller.covers[scenario.index]!;
-      cover.support.advance(cover.support.dissolveDurationSeconds);
-      for (let step = 0; step < 60; step++) f.controller.update(DT, f.bodies);
-      assert.equal(cover.deployed, true);
-      body.position.copy(scenario.position);
-      body.previousPosition.copy(scenario.position);
-      for (let step = 0; step < 180; step++) assert.equal(f.controller.update(DT, f.bodies), undefined);
-      assert.equal(drone.readModel.targetSlimeId, undefined, `cover ${scenario.index + 1} must block actual detection`);
-      assert.equal(cover.panel.castShadow, true, 'the physical blocker must also occlude its searchlight');
-    } finally { f.dispose(); }
-  }
-});
 
 test('Room 2 starts dormant and disposal releases every registered target and puzzle collider', () => {
   const room = new BlackoutTransitRoom();
@@ -308,4 +205,44 @@ test('Room 2 starts dormant and disposal releases every registered target and pu
     assert.equal(electricalTargets.size, 0);
     assert.equal(world.colliderCount, 0);
   } finally { controller.dispose(); electricalTargets.dispose(); room.dispose(); world.clear(); surfaces.clear(); }
+});
+
+test('sewer drones emerge sequentially from their own areas, including the far-right acid', () => {
+  const f = fixture();
+  try {
+    assert.deepEqual(f.controller.emergingDrones.map(d => d.state.state), ['dormant', 'dormant', 'dormant']);
+    for (const [index, z] of [85, 109, 131].entries()) {
+      // Only Goop approaches; persistent inactive bodies remain at the entry.
+      f.bodies.goop.position.set(18, -.52, z);
+      for (let i = 0; i < 120; i++) f.controller.update(DT, f.bodies);
+      assert.deepEqual(f.controller.emergingDrones.map(d => d.state.state),
+        [0, 1, 2].map(i => i <= index ? 'active' : 'dormant'));
+      assert.equal(f.controller.emergingDrones[index]!.shell.body.visible, true);
+      assert.ok(f.controller.emergingDrones[index]!.shell.body.position.y > -.98);
+    }
+  } finally { f.dispose(); }
+});
+
+test('obsolete covers, supports and beam blockers are absent from collision queries', () => {
+  const f = fixture();
+  try {
+    f.room.root.traverse(object => assert.doesNotMatch(object.name, /^transit-(cover|security|bridge-cover)/));
+    assert.deepEqual(f.controller.dissolveTargets.map(t => t.id),
+      ['transit-sewer-drone-1', 'transit-sewer-drone-2', 'transit-sewer-drone-3']);
+    for (const [x, y, z] of [[14, 11.5, 101], [14, 11.5, 125], [0, 11.5, 141],
+      [14, 13.7, 101], [14, 13.7, 125], [-4, 13.7, 141]]) {
+      const hit = new CollisionHit();
+      for (const mask of [CollisionLayer.Movement, CollisionLayer.LineOfSight, CollisionLayer.Projectile]) {
+        assert.equal(f.world.sweepSphere(new THREE.Vector3(x - 1, y, z), new THREE.Vector3(2, 0, 0), .1, hit, mask), false,
+          `${x},${y},${z} should no longer contain ${hit.object?.name}`);
+      }
+    }
+    // Checkpoints now follow Goop's enemy clear and Bob's original landing.
+    const pad = f.room.bobRoutePlatforms[1]!;
+    f.bodies.bob.position.copy(pad.position); f.bodies.bob.position.y += .7;
+    f.bodies.bob.isSupportedBy = mesh => mesh === pad;
+    f.controller.update(DT, f.bodies); assert.equal(f.controller.checkpointStage, 0);
+    f.controller.emergingDrones[0]!.state.destroy();
+    f.controller.update(DT, f.bodies); assert.equal(f.controller.checkpointStage, 1);
+  } finally { f.dispose(); }
 });
