@@ -1,4 +1,5 @@
 import { SpecimenCharacterPresentation } from '../render/specimen/SpecimenCharacterPresentation.ts';
+import { SpecimenReflectionEnvironment } from '../render/specimen/SpecimenReflectionEnvironment.ts';
 import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
@@ -220,6 +221,7 @@ interface BlackoutRuntimeResources {
   readonly renderedGoopPosition: THREE.Vector3;
   goopDeathActive: boolean;
   bobReflectionEnvironment: BobReflectionEnvironment | undefined;
+  specimenReflectionEnvironment: SpecimenReflectionEnvironment | undefined;
   readonly bobPresentationState: BobCharacterPresentationState;
   readonly bobMovementIntent: THREE.Vector3;
   readonly goopMovementIntent: THREE.Vector3;
@@ -441,7 +443,8 @@ export class BlackoutLevelRuntime {
     );
     resources.goopPresentation.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
     resources.voltPresentation.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
-    resources.specimenCharacter.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
+    resources.specimenReflectionEnvironment ??= new SpecimenReflectionEnvironment(this.renderLayer.renderer);
+    resources.specimenCharacter.setReflectionEnvironment(resources.specimenReflectionEnvironment.texture);
     return this.presentationPreparation ??= Promise.all([
       resources.bobPresentation.prepare(),
       resources.goopPresentation.prepare(),
@@ -1531,7 +1534,7 @@ export class BlackoutLevelRuntime {
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.65 * specimenScale, 0.65 * specimenScale, 0.25)) : 1);
       const specimenReflection = resources.goopReflectionLighting.weightAt(resources.renderedSpecimenPosition);
-      resources.specimenCharacter.setReflectionIntensity(0.12 * specimenReflection, 0.28 * specimenReflection);
+      resources.specimenCharacter.setReflectionIntensity(2.2 * specimenReflection, 1.8 * specimenReflection);
       const voltReflection = resources.goopReflectionLighting.weightAt(resources.renderedVoltPosition);
       resources.voltPresentation.setReflectionIntensity(0.12 * voltReflection, 0.28 * voltReflection);
     }
@@ -2050,6 +2053,7 @@ export class BlackoutLevelRuntime {
         goopReflectionLighting: new GelReflectionLighting(this.renderLayer.scene),
         renderedGoopPosition: new THREE.Vector3(), goopDeathActive: false,
         bobReflectionEnvironment: undefined,
+        specimenReflectionEnvironment: undefined,
         bobPresentationState,
         bobMovementIntent: new THREE.Vector3(),
         goopMovementIntent: new THREE.Vector3(),
@@ -2262,6 +2266,7 @@ export class BlackoutLevelRuntime {
     resources.goopPresentation.dispose();
     resources.voltPresentation.dispose();
     resources.specimenCharacter.dispose();
+    resources.specimenReflectionEnvironment?.dispose();
     resources.bobReflectionEnvironment?.dispose();
     resources.puzzleRegistry.clear();
     resources.manager.clearLevelRegistrations();
@@ -2462,6 +2467,10 @@ export class BlackoutLevelRuntime {
     if (resources.bobDeathActive) {
       resources.bobPresentation.finishDeath(resources.group.bobBody.position);
       resources.bobDeathActive = false;
+    }
+    if (resources.specimenCharacter.diagnostics.deathActive) {
+      resources.specimenCharacter.reset();
+      if (this.currentRoom.local.finalBoss) resources.specimenCharacter.setYaw(Math.PI);
     }
     this.syncVisuals(resources);
     resources.deathScreen.hide();

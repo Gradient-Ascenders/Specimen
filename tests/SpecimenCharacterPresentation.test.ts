@@ -59,6 +59,79 @@ test('failed loads retry; completion after disposal cannot attach a model or lea
   assert.equal(releases, 1); assert.equal(late.ready, false); assert.equal(root.parent, null);
 });
 
+test('interior capture composition and shell depth survive camera fades, quality switches and reset', async () => {
+  const policy = new GelRendering({ transmissionResolutionScale: 1 });
+  const p = new SpecimenCharacterPresentation(0.675, policy), root = await loadSpecimen();
+  const asset = validateSpecimenAsset(root);
+  await p.prepare(async () => root);
+  const regions = asset.meshes.map(mesh => ({ mesh, material: mesh.material,
+    opacity: mesh.material.opacity, depthWrite: mesh.material.depthWrite, order: mesh.renderOrder }));
+  const heart = regions.find(region => /Fusion-Heart/.test(region.material.name))!;
+  const interior = regions.filter(region => /Aqua-Flow|Luminous-Acid/.test(region.material.name));
+  const shells = regions.filter(region => /Turquoise-Gel|Yellow-Bolt-Tips/.test(region.material.name));
+  assert.equal(interior.length, 2);
+  for (const { material, order } of interior) {
+    assert.equal(material.transmission, 0);
+    assert.equal(material.blending, THREE.CustomBlending);
+    assert.equal(material.blendSrc, THREE.SrcAlphaFactor);
+    assert.equal(material.blendDst, THREE.OneMinusSrcAlphaFactor);
+    assert.ok(material.opacity < 1);
+    assert.ok(order > heart.order);
+  }
+  for (const mode of ['minimum', 'reduced-transmission', 'physical'] as const) {
+    policy.setMode(mode);
+    p.setOpacity(0.25);
+    assert.ok(regions.every(({ material }) => material.transparent && !material.depthWrite));
+    p.reset();
+    for (const { material, opacity, depthWrite } of regions) {
+      assert.equal(material.transparent, false, 'restored regions must participate in the transmission capture');
+      assert.equal(material.opacity, opacity);
+      assert.equal(material.depthWrite, depthWrite);
+    }
+    for (const { material, order } of shells) {
+      assert.equal(material.transmission > 0, mode !== 'minimum');
+      assert.equal(material.depthWrite, true);
+      assert.ok(order > Math.max(...interior.map(region => region.order)), 'Low quality composites the shell after the interior');
+    }
+    assert.ok(interior.every(({ material }) => !material.depthWrite));
+  }
+  p.dispose();
+});
+
+test('living fusion surfaces share presentation time and charge; pupil coordinates preserve authored geometry', async () => {
+  const root = await loadSpecimen(), asset = validateSpecimenAsset(root);
+  const positions = asset.meshes.map(mesh => mesh.geometry.getAttribute('position').array.slice());
+  const p = new SpecimenCharacterPresentation();
+  await p.prepare(async () => root);
+  const uniforms = [...new Set(asset.meshes.map(mesh => mesh.material))].map(material => {
+    const shader = { vertexShader: THREE.ShaderLib.physical.vertexShader,
+      fragmentShader: THREE.ShaderLib.physical.fragmentShader, uniforms: {} } as Parameters<typeof material.onBeforeCompile>[0];
+    material.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+    return shader.uniforms;
+  });
+  for (const [index, mesh] of asset.meshes.entries()) {
+    assert.deepEqual(mesh.geometry.getAttribute('position').array, positions[index]);
+    if (!mesh.name.startsWith('Specimen-Eye')) continue;
+    const pupil = mesh.geometry.getAttribute('specimenEye');
+    assert.equal(pupil.count, mesh.geometry.getAttribute('position').count);
+    assert.ok(pupil.array.every(Number.isFinite));
+    assert.ok(Array.from({ length: pupil.count }, (_, i) => i).some(i =>
+      Math.hypot(pupil.getX(i), pupil.getY(i)) < 1 && pupil.getZ(i) > 0.5));
+  }
+  const combat = attack(); combat.chargeAmount = 0.8;
+  p.update(0.25, state(), combat); p.present(1);
+  for (const surface of uniforms) {
+    assert.equal(surface.uSpecimenTime!.value, 0.25);
+    assert.equal(surface.uSpecimenCharge!.value, 0.8);
+  }
+  p.reset();
+  for (const surface of uniforms) {
+    assert.equal(surface.uSpecimenTime!.value, 0);
+    assert.equal(surface.uSpecimenCharge!.value, 0);
+  }
+  p.dispose();
+});
+
 test('motion, landing and aim deform every matching region while adhesion keeps the sole on the support plane', async () => {
   const p = new SpecimenCharacterPresentation(), root = await loadSpecimen(), asset = validateSpecimenAsset(root);
   await p.prepare(async () => root); p.setVisible(true);

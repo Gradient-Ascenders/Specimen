@@ -6,6 +6,11 @@ export const DEFAULT_GEL_RENDERING_MODE: GelRenderingMode = 'physical';
 export const isGelRenderingMode = (value: string): value is GelRenderingMode =>
   GEL_RENDERING_MODES.some(mode => mode === value);
 
+/** Medium retains three quarters of each dimension; High uses native pixels. */
+export function resolveGelTransmissionResolutionScale(mode: GelRenderingMode, cap: number): number {
+  return Math.min(cap, mode === 'reduced-transmission' ? 0.75 : 1);
+}
+
 /** Session-owned policy. Materials unregister on disposal, including failed loads. */
 export class GelRendering {
   private readonly bodies = new Map<THREE.MeshPhysicalMaterial, number>();
@@ -47,11 +52,8 @@ export class GelRendering {
   }
 
   private applyTransmissionResolutionScale(): void {
-    // Half width and height: one quarter of the transmission target's pixels.
-    this.renderer.transmissionResolutionScale = Math.min(
-      this.transmissionResolutionScaleCap,
-      this.mode === 'reduced-transmission' ? 0.5 : 1,
-    );
+    this.renderer.transmissionResolutionScale = resolveGelTransmissionResolutionScale(
+      this.mode, this.transmissionResolutionScaleCap);
   }
 
   private apply(body: THREE.MeshPhysicalMaterial, authoredTransmission: number): void {

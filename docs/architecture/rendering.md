@@ -555,8 +555,13 @@ until a session configures them; the application defaults to Minimum hardware.
 | Setting / policy value | Material path | Transmission target |
 |---|---|---|
 | Minimum hardware / `minimum` | Non-transmissive physical gel with authored tint, roughness, clearcoat, Fresnel specular, reflection map and emission | No character-triggered capture, resolve or mipmaps |
-| Balanced / `reduced-transmission` | Authored physical transmission | Half width and height (25% of capture pixels), using Three's `transmissionResolutionScale = 0.5` |
+| Balanced / `reduced-transmission` | Authored physical transmission | 75% width and height (56.25% of capture pixels), using Three's `transmissionResolutionScale = 0.75` |
 | High / `physical` | Authored physical transmission | Full resolution when the additional Performance cap is off |
+
+The Specimen bounds its refraction filter to mip level 0.25 so the fusion heart,
+aqua ribbons and electrical veins retain detail on Medium and High. Surface
+roughness still controls its glossy highlights; the non-transmissive Low path
+does not use this filter.
 
 Main's optional Performance preset is retained as **Additional performance cap**.
 Off (`normal`) is the default for this extra cap; the overall application still
@@ -612,11 +617,11 @@ npm run validate:production
 
 The gel comparison intercepts the production bundle only to expose the existing
 render layer to the test. It freezes a real Level 1 view and compares physical,
-half-resolution and minimum gel at exactly the same camera, actors, viewport
+reduced-resolution and minimum gel at exactly the same camera, actors, viewport
 and drawing buffer, then repeats modes to check bounded resources. It writes
 screenshots and raw `comparison.json` to `artifacts/evidence/issue-188/`.
 It asserts nonblank frames, zero GL errors, zero transmission-environment draws
-in minimum mode, half-sized balanced targets, and stable warm texture/program
+in minimum mode, 75%-sized balanced targets, and stable warm texture/program
 counts. WebGL timer queries, when available, record six independent full
 frames and one sequential, non-nested pass breakdown: transmission environment,
 screen environment, character, shadows and resolve/mipmap. Sum segments with

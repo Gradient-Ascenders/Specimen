@@ -82,6 +82,44 @@ test('authored Specimen replaces the fusion sphere through merge, camera modes, 
   });
   expect(active).toMatchObject({ radius: 0.675, bob: false, volt: false, oldSphere: false });
 
+  const composition = await page.evaluate(() => {
+    const { renderLayer: layer, resources } = window.__specimenModelProbe;
+    const originalMode = layer.gelRendering.value;
+    const interior: THREE.Mesh[] = [];
+    resources.specimenCharacter.root.traverse(object => {
+      const mesh = object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhysicalMaterial>;
+      if (mesh.isMesh && /Aqua-Flow|Luminous-Acid/.test(mesh.material.name)) interior.push(mesh);
+    });
+    const draws: { name: string; capture: boolean }[] = [];
+    const hooks = interior.map(mesh => {
+      const before = mesh.onBeforeRender;
+      mesh.onBeforeRender = function (...args) {
+        before.apply(this, args);
+        draws.push({ name: mesh.name, capture: layer.renderer.getRenderTarget() !== null });
+      };
+      return () => { mesh.onBeforeRender = before; };
+    });
+    try {
+      return ['physical', 'reduced-transmission', 'minimum'].map(mode => {
+        layer.gelRendering.setMode(mode as 'physical' | 'reduced-transmission' | 'minimum');
+        draws.length = 0; layer.render();
+        return { mode, interiorCount: interior.length,
+          capture: [...new Set(draws.filter(draw => draw.capture).map(draw => draw.name))],
+          screen: [...new Set(draws.filter(draw => !draw.capture).map(draw => draw.name))],
+          glError: layer.renderer.getContext().getError() };
+      });
+    } finally {
+      for (const restore of hooks) restore();
+      layer.gelRendering.setMode(originalMode);
+    }
+  });
+  for (const result of composition) {
+    expect(result.interiorCount).toBe(2);
+    expect(result.screen).toHaveLength(2);
+    expect(result.capture).toHaveLength(result.mode === 'minimum' ? 0 : 2);
+    expect(result.glError).toBe(0);
+  }
+
   await page.evaluate(() => {
     const p = window.__specimenModelProbe;
     p.renderLayer.cameraRig.setViewMode('first-person', true);

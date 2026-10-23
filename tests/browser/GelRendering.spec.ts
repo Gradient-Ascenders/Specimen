@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { expect, test } from './fixtures.ts';
+import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 
 // Read-only production instrumentation; no globals are added to shipped code.
 // Frozen camera controls establish pass attribution, not interactive FPS.
@@ -10,7 +11,7 @@ test.use({ actionTimeout: 60_000, viewport: { width: Number(process.env.GEL_CAPT
   height: Number(process.env.GEL_CAPTURE_HEIGHT ?? 360) },
   deviceScaleFactor: Number(process.env.GEL_CAPTURE_DPR ?? 1) });
 
-test('gel modes bound transmission work and resources at identical production poses', async ({ page, browser }) => {
+test('gel modes bound transmission work and resources at identical production poses', async ({ page, browser, baseURL }) => {
   test.setTimeout(600_000);
   const out = resolve('artifacts/evidence/issue-188');
   await mkdir(out, { recursive: true });
@@ -19,7 +20,9 @@ test('gel modes bound transmission work and resources at identical production po
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', e => { if (e.type() === 'error' || /GL_INVALID_|CONTEXT_LOST_WEBGL/i.test(e.text())) errors.push(e.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  page.on('requestfailed', r => errors.push(r.url()));
+  page.on('requestfailed', request => {
+    if (!isExpectedMusicCancellation(request, baseURL!)) errors.push(`${request.failure()?.errorText}: ${request.url()}`);
+  });
   await page.route('**/assets/*.js', async route => {
     const response = await route.fetch();
     const source = await response.text();
@@ -160,8 +163,9 @@ test('gel modes bound transmission work and resources at identical production po
     }
   }
   const [physical, reduced, minimum, physicalAgain, minimumAgain] = rows;
-  expect(reduced.targets[0].width).toBe(Math.floor(physical.targets[0].width / 2));
-  expect(reduced.targets[0].height).toBe(Math.floor(physical.targets[0].height / 2));
+  // Three retains fractional target dimensions; WebGL allocates whole pixels.
+  expect(Math.floor(reduced.targets[0].width)).toBe(Math.floor(physical.targets[0].width * 0.75));
+  expect(Math.floor(reduced.targets[0].height)).toBe(Math.floor(physical.targets[0].height * 0.75));
   for (const row of rows) {
     expect(row.camera).toEqual(physical.camera);
     expect([row.diagnostics.drawingBufferWidth, row.diagnostics.drawingBufferHeight])

@@ -168,6 +168,7 @@ export class SpecimenCharacterPresentation {
       }
     }
     this.materials?.setCharge(THREE.MathUtils.lerp(this.previousWeights.Charge, this.weights.Charge, alpha));
+    this.materials?.setTime(this.clock);
   }
   startDeath(position: Vector3State): void { this.dead = true; this.burst.start(position); this.applyVisibility(); }
   updateDeath(dt: number): void { this.burst.update(dt); }
