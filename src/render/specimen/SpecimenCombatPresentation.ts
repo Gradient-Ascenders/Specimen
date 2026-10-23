@@ -113,8 +113,8 @@ export class SpecimenCombatPresentation {
     const model = this.source.readModel;
     if(this.projectileMaterial instanceof THREE.ShaderMaterial)this.projectileMaterial.uniforms.uTime!.value=performance.now()/1000;
     this.label.hidden = !activeForm;
-    this.crosshair.hidden = !activeForm || !model.aimActive;
-    this.charge.hidden = !activeForm || !model.aimActive;
+    this.crosshair.hidden = !activeForm || !model.fireEnabled;
+    this.charge.hidden = !activeForm || !model.fireEnabled;
     this.charge.value = model.chargeAmount;
     this.charge.dataset.state = model.fullyCharged
       ? 'full'

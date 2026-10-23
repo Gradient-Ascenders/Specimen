@@ -33,6 +33,10 @@ export interface SpecimenAttackConfig {
   readonly maximumDamageUnits: number;
   readonly maximumSplashRadiusMetres: number;
   readonly launchClearanceMetres: number;
+  /** Opt-in upper-body muzzle for large specimens standing on lift decks. */
+  readonly launchHeightOffsetMetres?: number;
+  /** Hip-fire keeps the shoulder camera; RMB remains a separate aim mode. */
+  readonly allowHipFire?: boolean;
   /** Production merged form reserves area damage for a complete charge. */
   readonly splashRequiresFullCharge?: boolean;
 }
@@ -61,6 +65,7 @@ interface MutableVector3State {
 
 export interface SpecimenAttackReadModel {
   readonly aimActive: boolean;
+  readonly fireEnabled: boolean;
   readonly charging: boolean;
   readonly chargeAmount: number;
   readonly fullyCharged: boolean;
@@ -75,6 +80,7 @@ export interface SpecimenAttackReadModel {
 
 interface MutableAttackReadModel {
   aimActive: boolean;
+  fireEnabled: boolean;
   charging: boolean;
   chargeAmount: number;
   fullyCharged: boolean;
@@ -256,6 +262,7 @@ export class SpecimenProjectileSystem {
     this.projectileReadStates = this.slots.map((slot) => slot.read);
     this.readModelValue = {
       aimActive: false,
+      fireEnabled: false,
       charging: false,
       chargeAmount: 0,
       fullyCharged: false,
@@ -282,6 +289,17 @@ export class SpecimenProjectileSystem {
     return this.slots.length;
   }
 
+  /** Complete an externally verified continuous projectile-pair collision.
+   * This never damages a target or creates splash through intervening cover. */
+  interceptProjectile(id:number,at:ReadonlyVector3State):boolean {
+    if(this.disposed)return false;
+    const slot=this.slots.find(s=>s.read.active&&s.read.id===id);if(!slot)return false;
+    if(!Number.isFinite(at.x)||!Number.isFinite(at.y)||!Number.isFinite(at.z))throw new Error('Projectile interception point must be finite.');
+    slot.position.copy(at);this.syncProjectile(slot);
+    this.events.emit('impact',{projectileId:id,targetId:undefined,kind:'world',chargeAmount:slot.chargeAmount,fullyCharged:slot.fullyCharged,point:point(slot.position)});
+    if(slot.read.active)this.deactivate(slot,'impact');this.syncLiveCount();return true;
+  }
+
   update(deltaSeconds: number, controls: SpecimenAttackControls): void {
     this.assertActive('update Specimen projectiles');
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
@@ -295,16 +313,18 @@ export class SpecimenProjectileSystem {
       this.cooldownRemainingSeconds - deltaSeconds,
     );
 
-    const canAim =
+    const controlsEnabled =
       controls.active &&
       controls.gameplayInputEnabled &&
-      controls.pointerLocked &&
-      controls.aimHeld;
+      controls.pointerLocked;
+    const canAim=controlsEnabled&&controls.aimHeld;
+    const canFire=controlsEnabled&&(controls.aimHeld||this.config.allowHipFire===true);
+    this.readModelValue.fireEnabled=canFire;
 
     this.setAimActive(canAim);
     if (controls.cancelled) this.cancelCharge();
 
-    if (canAim) {
+    if (canFire) {
       this.updateAimState();
 
       if (
@@ -347,6 +367,7 @@ export class SpecimenProjectileSystem {
   cancelInput(): void {
     if (this.disposed) return;
     this.setAimActive(false);
+    this.readModelValue.fireEnabled=false;
     this.cancelCharge();
     this.clearAim();
     this.syncCooldownReadModel();
@@ -432,7 +453,7 @@ export class SpecimenProjectileSystem {
         this.aimDisplacement,
         AIM_PROBE_RADIUS_METRES,
         this.aimHit,
-        CollisionLayer.CameraObstruction,
+        CollisionLayer.CameraObstruction | CollisionLayer.Projectile,
       )
     ) {
       this.aimPoint.copy(this.aimHit.point);
@@ -470,11 +491,9 @@ export class SpecimenProjectileSystem {
     }
     if (!slot) return false;
 
-    this.launchDirection.set(
-      this.aimPoint.x - this.body.position.x,
-      this.aimPoint.y - this.body.position.y,
-      this.aimPoint.z - this.body.position.z,
-    );
+    this.launchPosition.set(this.body.position.x,
+      this.body.position.y + (this.config.launchHeightOffsetMetres ?? 0),this.body.position.z);
+    this.launchDirection.subVectors(this.aimPoint,this.launchPosition);
     if (this.launchDirection.lengthSq() <= EPSILON) {
       this.launchDirection.copy(this.aimDirection);
     } else {
@@ -490,11 +509,6 @@ export class SpecimenProjectileSystem {
       this.body.radiusMetres +
       radiusMetres +
       this.config.launchClearanceMetres;
-    this.launchPosition.set(
-      this.body.position.x,
-      this.body.position.y,
-      this.body.position.z,
-    );
     this.launchDisplacement
       .copy(this.launchDirection)
       .multiplyScalar(launchDistance);
@@ -846,7 +860,7 @@ export class SpecimenProjectileSystem {
             1,
           );
     this.readModelValue.canStartCharge =
-      this.readModelValue.aimActive &&
+      this.readModelValue.fireEnabled &&
       !this.charging &&
       this.cooldownRemainingSeconds <= EPSILON;
   }
@@ -858,6 +872,8 @@ export class SpecimenProjectileSystem {
   }
 
   private validateConfig(): void {
+    const muzzleHeight=this.config.launchHeightOffsetMetres??0;
+    if(!Number.isFinite(muzzleHeight)||muzzleHeight<0)throw new Error('launchHeightOffsetMetres must be finite and non-negative.');
     const positive: ReadonlyArray<[string, number]> = [
       ['fullChargeSeconds', this.config.fullChargeSeconds],
       ['minimumCooldownSeconds', this.config.minimumCooldownSeconds],

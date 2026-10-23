@@ -16,7 +16,7 @@ import { MaintenanceDronePresentation } from '../render/environment/blackout/Mai
 import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
 import { FinalBossEncounter } from '../boss/FinalBossEncounter.ts';
 import { FinalBossPresentation } from '../boss/FinalBossPresentation.ts';
-import { FINAL_BOSS_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_WEAPON, FINAL_SPLIT_ANCHORS, FINAL_SPECIMEN_CAMERA } from '../boss/FinalBossConfig.ts';
+import { FINAL_ARENA, FINAL_BOSS_CHECKPOINT, FINAL_BOSS_PHASE_TWO_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_WEAPON, FINAL_SPLIT_ANCHORS, FINAL_SPECIMEN_CAMERA, FINAL_SPECIMEN_START_PITCH } from '../boss/FinalBossConfig.ts';
 
 import {
   SentinelBossDevelopmentRig,
@@ -898,6 +898,7 @@ export class BlackoutLevelRuntime {
 
     if(resources.finalBoss?.cinematic) {
       resources.finalBoss.update(deltaSeconds,this.input.wasPressed('skipCinematic'));
+      this.commitFinalBossPhaseTwoCheckpoint(resources);
       resources.specimenAttack.cancelInput();this.renderLayer.cameraRig.setAimPresentationActive(false,true);
       if(resources.finalBoss.controller.consumeDefeat())this.commitBossDefeat(resources);
       if(resources.finalBoss.controller.readModel.state==='complete') {
@@ -960,7 +961,7 @@ export class BlackoutLevelRuntime {
         this.notifyHUD(undefined, true);
         if(resources.finalBoss) {
           this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
-          this.renderLayer.cameraRig.setGroundOrbitPitchRadians?.(-.08);
+          this.renderLayer.cameraRig.setGroundOrbitPitchRadians?.(FINAL_SPECIMEN_START_PITCH);
           resources.checkpoints.activate('cp8','bob');
           this.transitionPhase('boss');
         }
@@ -1176,6 +1177,7 @@ export class BlackoutLevelRuntime {
       }
     }
 
+    if(specimenGameplay)resources.finalBoss?.advancePlatforms(deltaSeconds);
     this.updateBobPresentation(deltaSeconds, resources);
     if (!specimenGameplay) {
       // The group owns a stable Bob/Goop/Volt array, including inactive bodies.
@@ -1227,6 +1229,7 @@ export class BlackoutLevelRuntime {
     if (resources.phase.phase === 'boss') {
       if(resources.finalBoss) {
         resources.finalBoss.update(deltaSeconds);
+        this.commitFinalBossPhaseTwoCheckpoint(resources);
         if(resources.finalBoss.controller.consumeDefeat())this.commitBossDefeat(resources);
       } else resources.sentinelRig.controller.update(deltaSeconds, {
         specimen: resources.specimenBody,
@@ -1376,7 +1379,8 @@ export class BlackoutLevelRuntime {
       ? [resources.specimenBody]
       : resources.group.bodies;
     for (const participatingBody of participatingBodies) {
-      if (participatingBody.position.y < OUT_OF_BOUNDS_Y) {
+      const failureY=specimenGameplay&&resources.finalBoss?FINAL_ARENA.fallFailureY:OUT_OF_BOUNDS_Y;
+      if (participatingBody.position.y < failureY) {
         this.requestFailure();
         this.gameplayAudio?.update();
         this.input.endFixedUpdate();
@@ -1468,11 +1472,23 @@ export class BlackoutLevelRuntime {
     }
     this.input.endPointerUpdate();
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    resources?.scene.finalArena?.presentPlatforms(interpolationAlpha);
+    resources?.finalBoss?.present(interpolationAlpha);
     resources?.ventArrival?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
     resources?.finalBoss?.presentCamera(this.renderLayer.cameraRig.camera);
     if(resources?.finalBoss&&resources.phase.phase==='merging') {
       const camera=this.renderLayer.cameraRig.camera;
       camera.position.set(-7,4.5,191);camera.lookAt(FINAL_MERGE_ANCHOR);camera.updateMatrixWorld(true);
+    }
+    if(resources?.finalBoss&&resources.specimenForm.readModel.controlledForm==='specimen') {
+      // Looking up at the enlarged boss can shorten the boom against a deck.
+      // Hide only our own model when the resolved lens enters its silhouette;
+      // keep collision, combat authority and all cinematic poses unchanged.
+      const nearBody=!resources.finalBoss.cinematic&&this.renderLayer.cameraRig.camera.position.distanceToSquared(resources.specimenBody.position)<(resources.specimenBody.radiusMetres*1.65)**2;
+      const visible=!resources.specimenAttack.readModel.aimActive&&!nearBody;
+      const mesh=resources.specimenVisual,materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+      for(const material of materials)material.visible=visible;
+      for(const child of mesh.children)child.visible=visible;
     }
     this.gameplayAudio?.updateListener();
     if (resources) {
@@ -1685,7 +1701,10 @@ export class BlackoutLevelRuntime {
         checkpoints.registerCheckpoint(checkpoint);
       }
       if (scene.bossStaging) checkpoints.registerCheckpoint(BLACKOUT_BOSS_STAGING_CHECKPOINT);
-      if (scene.finalArena) checkpoints.registerCheckpoint(FINAL_BOSS_CHECKPOINT);
+      if (scene.finalArena) {
+        checkpoints.registerCheckpoint(FINAL_BOSS_CHECKPOINT);
+        checkpoints.registerCheckpoint(FINAL_BOSS_PHASE_TWO_CHECKPOINT);
+      }
       checkpoints.activate('cp1', initialActive);
 
       const maintenanceDroneFixture =
@@ -2347,8 +2366,8 @@ export class BlackoutLevelRuntime {
     resources.specimenForm.restore(snapshot.controlledForm);
     resources.sentinelRig.syncPresentation();
     if(resources.finalBoss&&snapshot.room.local.finalBoss) {
-      resources.phase.restore('boss');this.currentRoom={roomId:'room-4b',phase:'boss',local:{finalBoss:true}};
-      resources.finalBoss.start(true);
+      resources.phase.restore('boss');this.currentRoom={roomId:'room-4b',phase:'boss',local:{...snapshot.room.local,finalBoss:true}};
+      if(snapshot.room.local.bossPhase===2)resources.finalBoss.startPhaseTwo();else resources.finalBoss.start(true);
     }
     resources.movement.set(0, 0, 0);
     resources.bobMovementIntent.set(0, 0, 0);
@@ -2372,7 +2391,7 @@ export class BlackoutLevelRuntime {
     if (snapshot.room.roomId === 'room-2' || snapshot.room.local.bossStaging || snapshot.room.local.finalBoss) {
       this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
     }
-    if(snapshot.room.local.finalBoss)this.renderLayer.cameraRig.setGroundOrbitPitchRadians?.(-.08);
+    if(snapshot.room.local.finalBoss)this.renderLayer.cameraRig.setGroundOrbitPitchRadians?.(FINAL_SPECIMEN_START_PITCH);
     this.retargetCamera(resources);
     this.syncVisuals(resources);
     this.notifyHUD(undefined, true);
@@ -2421,6 +2440,13 @@ export class BlackoutLevelRuntime {
     checkpointId: BlackoutCheckpointId,
   ): void {
     if (checkpointId !== 'cp9') return;
+
+    if(resources.finalBoss) {
+      const boss=resources.finalBoss.controller;
+      if(resources.phase.phase!=='boss'||!boss.combatActive||boss.readModel.phase!==2||!boss.readModel.weakPointOpen)
+        throw new Error('CP9 is only available after reaching phase two of the final boss.');
+      return;
+    }
 
     const boss = resources.sentinelRig.controller;
     if (
@@ -2594,6 +2620,13 @@ export class BlackoutLevelRuntime {
       }
     }
     return true;
+  }
+
+  private commitFinalBossPhaseTwoCheckpoint(resources:BlackoutRuntimeResources):void {
+    if(!resources.finalBoss?.controller.combatActive||!resources.finalBoss.controller.consumeTransition())return;
+    const room:BlackoutRoomState={roomId:'room-4b',phase:'boss',local:{...this.currentRoom.local,finalBoss:true,merged:true,bossPhase:2}};
+    resources.checkpoints.activate('cp9','bob',room);this.currentRoom=room;
+    this.notifyHUD();this.events.emit('objectiveChanged',{roomId:room.roomId,objective:objectiveFor(room)});
   }
 
   private commitBossDefeat(resources: BlackoutRuntimeResources): void {

@@ -196,6 +196,32 @@ test('tap, partial, and full charge all derive damage cooldown and splash from o
   }
 });
 
+test('opt-in hip-fire charges and releases without aim mode, but pointer-lock loss cancels safely',()=>{
+  const f=createFixture({allowHipFire:true,projectileSpeedMetresPerSecond:1,projectileLifetimeSeconds:60});
+  const damage:number[]=[];f.system.events.on('projectileFired',e=>damage.push(e.damageUnits));
+  try {
+    f.system.update(.75,controls({aimHeld:false,firePressed:true,fireHeld:true}));
+    assert.equal(f.system.readModel.aimActive,false);assert.equal(f.system.readModel.fireEnabled,true);
+    assert.equal(f.system.readModel.chargeAmount,.5);
+    f.system.update(.01,controls({aimHeld:false,fireReleased:true}));assert.deepEqual(damage,[2]);
+    readyCooldown(f.system);f.system.update(.2,controls({aimHeld:false,firePressed:true,fireHeld:true}));
+    f.system.update(.01,controls({aimHeld:false,pointerLocked:false,fireReleased:true}));
+    assert.equal(f.system.readModel.charging,false);assert.equal(f.system.readModel.fireEnabled,false);assert.deepEqual(damage,[2]);
+    f.system.update(.01,controls({aimHeld:false,fireHeld:true}));assert.equal(f.system.readModel.charging,false);
+  }finally{f.dispose();}
+});
+
+test('third-person hip-fire converges on the combat target under the camera crosshair',()=>{
+  const f=createFixture({allowHipFire:true}),target=addTarget(f,'hip-fire-target',new THREE.Vector3(0,.675,10));
+  try {
+    f.aimOrigin.set(4,4,-8);f.aimDirection.subVectors(target.meshes[0]!.position,f.aimOrigin).normalize();
+    f.system.update(.01,controls({aimHeld:false,firePressed:true,fireReleased:true}));
+    for(let i=0;i<60;i++)f.system.update(1/60,controls({aimHeld:false}));
+    assert.equal(target.target.healthUnits,2,'a camera-on-target shot must not miss from muzzle/camera parallax');
+    assert.equal(f.system.readModel.aimActive,false);
+  }finally{target.dispose();f.dispose();}
+});
+
 test('charge cancellation and cooldown require a fresh press and never buffer held fire', () => {
   const fixture = createFixture({
     projectileSpeedMetresPerSecond: 1,

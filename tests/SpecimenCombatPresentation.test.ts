@@ -35,6 +35,7 @@ class FakeElement {
 
 const readModel: SpecimenAttackReadModel = {
   aimActive: true,
+  fireEnabled: true,
   charging: true,
   chargeAmount: 0.5,
   fullyCharged: false,

@@ -19,9 +19,12 @@ import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacter
 import type {BobCharacterPresentation} from '../src/render/bob/BobCharacterPresentation.ts';
 import type {GoopCharacterPresentation} from '../src/render/goop/GoopCharacterPresentation.ts';
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
+import { CollisionHit, CollisionLayer, type CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
+import type { CombatTargetRegistry } from '../src/combat/CombatTargetRegistry.ts';
 import type { FinalBossEncounter } from '../src/boss/FinalBossEncounter.ts';
-import { FINAL_SPECIMEN_RADIUS } from '../src/boss/FinalBossConfig.ts';
+import type { ExterminationArena } from '../src/boss/ExterminationArena.ts';
+import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_ARENA_ORBIT, FINAL_MERGE_ANCHOR, FINAL_BOSS_TUNING, FINAL_SPECIMEN_RADIUS } from '../src/boss/FinalBossConfig.ts';
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -176,8 +179,60 @@ function createFixture(debugAvailable = true,playArrival=false) {
 }
 
 function finalBossInternals(runtime:BlackoutLevelRuntime) {
-  return (runtime as unknown as {resources:{finalBoss:FinalBossEncounter;specimenBody:KinematicBody;combatTargets:{size:number}}}).resources;
+  return (runtime as unknown as {resources:{finalBoss:FinalBossEncounter;specimenBody:KinematicBody;collisionWorld:CollisionWorld;combatTargets:{size:number};scene:{finalArena:ExterminationArena}}}).resources;
 }
+
+test('phase two automatically saves CP9 on normal and skipped transitions; repeated deaths/pit falls retry cleanly without replaying phase one',()=>{
+  for(const skip of [false,true]) {
+    const f=createFixture();try {
+      assert.throws(()=>f.runtime.activateCheckpoint('cp9'),/after reaching phase two/);
+      f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+      f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+      assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');assert.throws(()=>f.runtime.activateCheckpoint('cp9'),/after reaching phase two/);
+      const {finalBoss:b,specimenBody:body,scene:{finalArena:arena}}=finalBossInternals(f.runtime);
+      const targets=finalBossInternals(f.runtime).combatTargets as unknown as CombatTargetRegistry,size=targets.size;
+      const hit={projectileId:1,targetId:'core',kind:'direct' as const,chargeAmount:0,fullyCharged:false,damageUnits:999,point:body.position,direction:body.position};
+      for(let wave=0;wave<3;wave++) {
+        b.controller.applyImpact(hit);f.tick(82);
+        for(const root of b.squad.root.children)if(root.visible)targets.getRegistrationForMesh(root.children[0] as THREE.Mesh)!.target.applyImpact(hit);
+      }
+      assert.equal(b.controller.damagePlayer(40,-1234),true);b.controller.applyImpact(hit);f.tick();
+      assert.equal(b.controller.readModel.state,'transition');assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');
+      f.runtime.stop();f.tick(360);assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');f.runtime.start();
+      if(skip){f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');}else f.tick(301);
+      assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp9');assert.equal(f.runtime.activeCheckpoint?.room.local.bossPhase,2);
+      assert.equal(b.controller.readModel.playerHealth,60,'saving a checkpoint must not heal the live attempt');
+      assert.equal(b.controller.readModel.phase,2);assert.equal(f.runtime.roomState.local.bossPhase,2);
+      const snapshot=JSON.stringify(f.runtime.activeCheckpoint);
+      for(let retry=0;retry<3;retry++) {
+        b.controller.applyImpact(hit);f.tick();assert.equal(b.reinforcements.activeCount,8);
+        b.healthPacks.drop(body.position.clone().add(new THREE.Vector3(5,2,0)));
+        b.projectiles.fireOrb(new THREE.Vector3(0,20,FINAL_ARENA.centreZ),body.position);
+        const cover=arena.cover[0]!;arena.breakCoverAlong(cover.position,cover.position,1);assert.equal(cover.visible,false);
+        f.input.press('fireAbility');f.tick();assert.equal(f.runtime.specimenAttackReadModel?.charging,true);
+        if(retry===1) {
+          const damage=b.controller.damagePlayer;b.controller.damagePlayer=()=>false;
+          body.recoverAt(new THREE.Vector3(0,2.07,FINAL_ARENA.centreZ));
+          for(let i=0;i<350&&b.controller.readModel.state!=='suspended';i++)f.tick();
+          b.controller.damagePlayer=damage;assert.equal(b.controller.readModel.state,'suspended');
+        } else assert.equal(f.runtime.requestFailure(),true);
+        assert.equal(f.runtime.requestFailure(),false);f.tick(80);
+        const screen=f.document.elements.find(e=>e.className==='death-screen')!;assert.equal(screen.hidden,false);screen.retryButton.click();
+        assert.equal(b.controller.readModel.phase,2);assert.equal(b.controller.readModel.state,'combat');assert.equal(b.controller.readModel.health,100);
+        assert.equal(b.controller.readModel.playerHealth,100);assert.equal(b.controller.readModel.defenseIndex,3);assert.equal(b.controller.readModel.reinforcementIndex,0);
+        assert.equal(b.controller.readModel.shieldActive,false);assert.equal(b.cinematic,false);assert.equal(b.squad.activeCount,0);assert.equal(b.projectiles.liveCount,0);
+        assert.equal(b.reinforcements.activeCount,0);assert.equal(b.reinforcements.liveProjectileCount,0);assert.equal(b.healthPacks.activeCount,0);
+        assert.equal(b.evasion.active,false);assert.equal(b.presentation.rollRig.rotation.z,0);assert.equal(f.runtime.specimenAttackReadModel?.charging,false);
+        assert.equal(f.runtime.specimenProjectileStates.some(s=>s.active),false);assert.ok(arena.cover.every(c=>c.visible));assert.ok(body.position.distanceTo(FINAL_MERGE_ANCHOR)<.05);
+        assert.equal(f.runtime.specimenFormReadModel?.controlledForm,'specimen');assert.equal(f.input.enabled,true);assert.equal(f.input.pointerLocked,true);
+        assert.equal(targets.size,size);f.tick();assert.equal(JSON.stringify(f.runtime.activeCheckpoint),snapshot,'recovery must not overwrite or downgrade CP9');
+      }
+      f.runtime.restartLevel();assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp1');assert.equal(b.controller.readModel.state,'idle');
+      f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+      assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');assert.equal(b.controller.readModel.phase,1);assert.equal(b.controller.readModel.health,200);
+    }finally{f.cleanup();}
+  }
+});
 
 test('natural boss entry gathers the three real bodies, merges, saves CP8 and preserves earlier room recovery',()=>{
   const f=createFixture();try {
@@ -192,7 +247,7 @@ test('natural boss entry gathers the three real bodies, merges, saves CP8 and pr
     f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(f.runtime.finalBossReadModel!.state,'combat');
     const targetCount=finalBossInternals(f.runtime).combatTargets.size;
     for(let retry=0;retry<3;retry++) {
-      f.runtime.recoverActiveCheckpoint();assert.equal(f.runtime.finalBossReadModel!.health,180);assert.equal(f.runtime.finalBossReadModel!.phase,1);
+      f.runtime.recoverActiveCheckpoint();assert.equal(f.runtime.finalBossReadModel!.health,FINAL_BOSS_TUNING.health);assert.equal(f.runtime.finalBossReadModel!.phase,1);
       assert.equal(finalBossInternals(f.runtime).finalBoss.squad.activeCount,0);
       assert.equal(finalBossInternals(f.runtime).combatTargets.size,targetCount);
     }
@@ -209,17 +264,88 @@ test('Room 4 debug shortcut is gated, ending uses the legal macro flow and compl
       if(!available){assert.equal(f.runtime.roomState.roomId,'room-1');continue;}
       const b=finalBossInternals(f.runtime).finalBoss;
       f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
-      const expose=()=>{for(let i=0;i<1500&&!b.controller.readModel.weakPointOpen;i++)f.tick();assert.equal(b.controller.readModel.weakPointOpen,true);};
+      // Isolate legal lifecycle handoffs from combat balance; this is not a
+      // simulated input-only victory of the hard encounter.
+      b.controller.damagePlayer=()=>false;
+      const expose=()=>assert.equal(b.controller.readModel.weakPointOpen,true);
       const hit={projectileId:1,targetId:'core',kind:'direct' as const,chargeAmount:1,fullyCharged:true,damageUnits:999,point:new THREE.Vector3(),direction:new THREE.Vector3()};
+      for(let wave=0;wave<3;wave++) {
+        b.controller.applyImpact(hit);for(let i=0;i<100&&b.squad.activeCount===0;i++)f.tick();
+        const targets=finalBossInternals(f.runtime).combatTargets as unknown as CombatTargetRegistry;
+        for(const root of b.squad.root.children)if(root.visible){const target=targets.getRegistrationForMesh(root.children[0] as THREE.Mesh)!.target;target.applyImpact({...hit,targetId:target.id});}
+        f.tick();assert.equal(b.controller.readModel.shieldActive,false);
+      }
       expose();b.controller.applyImpact(hit);f.tick();assert.equal(b.controller.readModel.state,'transition');
       f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(b.controller.readModel.phase,2);
+      for(const hp of [70,50,20]){expose();b.controller.applyImpact(hit);f.tick();assert.equal(b.controller.readModel.health,hp);assert.equal(b.controller.readModel.shieldActive,false);}
       expose();b.controller.applyImpact(hit);f.tick();assert.equal(f.runtime.roomState.phase,'boss-defeated');
       assert.equal(b.squad.activeCount,0);assert.equal(b.squad.liveProjectileCount,0);
+      assert.equal(b.reinforcements.activeCount,0);assert.equal(b.reinforcements.liveProjectileCount,0);assert.equal(b.healthPacks.activeCount,0);
       f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(b.controller.readModel.state,'escape');
+      f.tick(50);const previous=finalBossInternals(f.runtime).specimenBody.position.clone();f.tick();
+      const direction=finalBossInternals(f.runtime).specimenBody.position.clone().sub(previous).normalize();
+      const forward=new THREE.Vector3(0,0,-1).applyQuaternion(b.presentation.specimen.quaternion);
+      assert.ok(forward.dot(direction)>.99,'escape must face its direction around the ring');
+      assert.ok(Math.hypot(previous.x,previous.z-FINAL_ARENA.centreZ)>FINAL_ARENA_RING.innerRadius+FINAL_SPECIMEN_RADIUS,'escape must not cross the abyss');
       f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(f.runtime.roomState.phase,'complete');
       f.tick(100);assert.equal(completions,1);f.runtime.transitionPhase('complete');assert.equal(completions,1);
     }finally{f.cleanup();}
   }
+});
+
+test('looking up close to a boss deck hides only the fused visual, then restores it with camera clearance',()=>{
+  const f=createFixture();try {
+    f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+    const body=finalBossInternals(f.runtime).specimenBody;
+    const mesh=f.scene.getObjectByName('merged-bob-goop-volt') as THREE.Mesh;
+    const material=mesh.material as THREE.Material;
+    f.cameraRig.camera.position.copy(body.position);f.render();assert.equal(material.visible,false);
+    assert.ok(mesh.children.every(child=>!child.visible));assert.equal(body.radiusMetres,FINAL_SPECIMEN_RADIUS);
+    f.cameraRig.camera.position.copy(body.position).add(new THREE.Vector3(0,3,-12));f.render();assert.equal(material.visible,true);
+    assert.ok(mesh.children.every(child=>child.visible));assert.equal(f.runtime.finalBossReadModel?.playerHealth,100);
+  } finally {f.cleanup();}
+});
+
+test('live threshold defense pauses healing and drones, breaks on actual target kills, and resets cleanly at CP8',()=>{
+  const f=createFixture();try {
+    f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+    const {finalBoss:b,specimenBody:body}=finalBossInternals(f.runtime);b.controller.damagePlayer=()=>false;
+    const impact={projectileId:1,targetId:'core',kind:'direct' as const,chargeAmount:1,fullyCharged:true,damageUnits:999,point:body.position,direction:body.position};
+    b.controller.applyImpact(impact);f.tick(90);assert.equal(b.squad.activeCount,11);assert.equal(b.presentation.shield.visible,true);
+    const hp=b.controller.readModel.health,pose=b.squad.root.children[0]!.position.clone();
+    f.runtime.stop();f.tick(120);f.render();assert.equal(b.controller.readModel.health,hp);assert.deepEqual(b.squad.root.children[0]!.position,pose);
+    f.runtime.start();f.tick(60);assert.ok(b.controller.readModel.health>hp+2.4);
+    const targets=finalBossInternals(f.runtime).combatTargets as unknown as CombatTargetRegistry,size=targets.size;
+    for(const root of b.squad.root.children)if(root.visible){const target=targets.getRegistrationForMesh(root.children[0] as THREE.Mesh)!.target;target.applyImpact({...impact,targetId:target.id});}
+    assert.equal(b.controller.readModel.shieldActive,false);f.tick();assert.equal(b.presentation.shield.visible,false);
+    f.runtime.recoverActiveCheckpoint();assert.equal(b.controller.readModel.defenseIndex,0);assert.equal(b.controller.readModel.health,FINAL_BOSS_TUNING.health);
+    assert.equal(b.squad.activeCount,0);assert.equal(b.projectiles.liveCount,0);assert.equal(targets.size,size);
+  }finally{f.cleanup();}
+});
+
+test('pit falls retry on the main ring without bringing back the disabled floating platforms',()=>{
+  const f=createFixture();try {
+    const originalFar=f.cameraRig.camera.far;
+    f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+    const {finalBoss:b,specimenBody:body}=finalBossInternals(f.runtime);b.controller.damagePlayer=()=>false;
+    f.render();assert.equal(f.cameraRig.camera.far,FINAL_ARENA.cameraFar);
+    assert.equal(f.scene.getObjectByName('orbit-platform-collider-0'),undefined);
+    f.runtime.stop();f.tick(120);f.render();f.runtime.start();f.tick(60);
+    body.recoverAt(new THREE.Vector3(0,2.07,FINAL_ARENA.centreZ));f.tick(90);
+    assert.ok(body.position.y<-10);assert.notEqual(b.controller.readModel.state,'suspended','do not kill the pit fall after only five metres');
+    for(let i=0;i<250&&b.controller.readModel.state!=='suspended';i++)f.tick();
+    assert.equal(b.controller.readModel.state,'suspended');
+    assert.equal(f.cameraRig.camera.far,originalFar);
+    f.runtime.recoverActiveCheckpoint();assert.equal(b.controller.readModel.state,'combat');
+    assert.ok(body.position.distanceTo(FINAL_MERGE_ANCHOR)<.05);
+    assert.ok(Math.hypot(body.position.x,body.position.z-FINAL_ARENA.centreZ)>FINAL_ARENA_RING.innerRadius);
+    assert.equal(f.scene.getObjectByName('orbit-platform-collider-0'),undefined);assert.equal(b.squad.activeCount,0);
+    f.render();assert.equal(f.cameraRig.camera.far,FINAL_ARENA.cameraFar);
+    f.runtime.restartLevel();assert.equal(f.cameraRig.camera.far,originalFar);
+  }finally{f.cleanup();}
 });
 
 function electricalRoomInternals(runtime: BlackoutLevelRuntime) {
