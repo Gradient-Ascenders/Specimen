@@ -149,10 +149,14 @@ export class FinalBossController {
     }
     return {accepted:true,destroyed:m.health===0};
   }
-  damagePlayer(amount:number,serial=this.model.attackSerial):boolean {
+  canDamagePlayer(amount:number,serial=this.model.attackSerial):boolean {
     const m=this.model;
-    if(this.devInvincible||!this.combatActive||this.transitionPending||this.defeatPending||m.invulnerability>0||!Number.isFinite(amount)||amount<=0||
-      (serial>=0&&serial===this.lastMajorDamageAttack))return false;
+    return !this.devInvincible&&this.combatActive&&!this.transitionPending&&!this.defeatPending&&m.invulnerability<=0&&Number.isFinite(amount)&&amount>0&&
+      !(serial>=0&&serial===this.lastMajorDamageAttack);
+  }
+  damagePlayer(amount:number,serial=this.model.attackSerial):boolean {
+    if(!this.canDamagePlayer(amount,serial))return false;
+    const m=this.model;
     if(serial>=0)this.lastMajorDamageAttack=serial;
     m.playerHealth=Math.max(0,m.playerHealth-amount);m.invulnerability=T.playerDamageGraceSeconds;return true;
   }

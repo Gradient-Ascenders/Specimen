@@ -2364,6 +2364,47 @@ kbd {
   letter-spacing: var(--ui-track-body);
 }
 
+.specimen-combat-crosshair[data-hit='hit'] { color: #efffff; }
+.specimen-combat-crosshair[data-hit='blocked'] { color: #ffbd66; }
+.specimen-combat-crosshair[data-pulse='a'] { animation: specimen-hit-a 0.2s ease-out; }
+.specimen-combat-crosshair[data-pulse='b'] { animation: specimen-hit-b 0.2s ease-out; }
+@keyframes specimen-hit-a { from { transform: translate(-50%, -50%) scale(1.45); } }
+@keyframes specimen-hit-b { from { transform: translate(-50%, -50%) scale(1.45); } }
+.specimen-hit-marker {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 1.5rem);
+  transform: translate(-50%, -50%);
+  color: #c5fff2;
+  font: 1.4rem var(--ui-font-body);
+  text-shadow: 0 0 0.5rem #36e7e4;
+}
+.specimen-hit-marker[data-kind='blocked'] { color: #ffbd66; text-shadow: 0 0 0.4rem #ff7733; }
+.specimen-dodge-feedback {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 3rem);
+  transform: translateX(-50%);
+  color: #baffef;
+  font: 0.75rem var(--ui-font-display);
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 0.7rem #4cffe0, 0 2px 4px #000;
+  animation: specimen-dodge 0.28s ease-out both;
+}
+.specimen-combat-overlay[data-dodged='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgb(131 255 230 / 60%);
+  box-shadow: inset 0 0 3rem rgb(62 255 216 / 24%);
+  animation: specimen-dodge 0.28s ease-out both;
+}
+.specimen-hit-marker[hidden], .specimen-dodge-feedback[hidden] { display: none; }
+@keyframes specimen-dodge { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .specimen-combat-crosshair[data-pulse] { animation: none; }
+}
+
 .specimen-combat-charge {
   position: absolute;
   left: 50%;

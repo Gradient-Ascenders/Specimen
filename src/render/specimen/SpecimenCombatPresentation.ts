@@ -4,12 +4,15 @@ import type { SpecimenDash } from '../../combat/SpecimenDash.ts';
 
 import type {
   SpecimenAttackReadModel,
+  SpecimenAttackEvents,
   SpecimenProjectileReadState,
 } from '../../combat/SpecimenProjectileSystem.ts';
+import type { EventBus } from '../../core/EventBus.ts';
 
 export interface SpecimenCombatPresentationSource {
   readonly readModel: SpecimenAttackReadModel;
   readonly projectileStates: readonly SpecimenProjectileReadState[];
+  readonly events?: EventBus<SpecimenAttackEvents>;
 }
 
 /**
@@ -37,6 +40,13 @@ export class SpecimenCombatPresentation {
   private readonly dashLabel: HTMLElement;
   private readonly dash: SpecimenDash | undefined;
   private readonly projectileColor = new THREE.Color();
+  private readonly unsubscribe: (() => void)[] = [];
+  private readonly hitMarker: HTMLElement;
+  private readonly dodgeFeedback: HTMLElement;
+  private hitRemaining = 0;
+  private dodgeRemaining = 0;
+  private pulse = false;
+  private feedbackEnabled = false;
   private disposed = false;
 
   constructor(options: {
@@ -101,6 +111,16 @@ export class SpecimenCombatPresentation {
     this.crosshair.innerHTML = icon('Crosshair');
     this.crosshair.hidden = true;
 
+    this.hitMarker = hostDocument.createElement('span');
+    this.hitMarker.className = 'specimen-hit-marker';
+    this.hitMarker.hidden = true;
+    this.hitMarker.setAttribute('aria-live', 'off');
+    this.dodgeFeedback = hostDocument.createElement('span');
+    this.dodgeFeedback.className = 'specimen-dodge-feedback';
+    this.dodgeFeedback.textContent = 'DODGED';
+    this.dodgeFeedback.hidden = true;
+    this.dodgeFeedback.setAttribute('role', 'status');
+
     this.label = hostDocument.createElement('span');
     this.label.className = 'specimen-combat-label';
     this.label.textContent = 'Specimen';
@@ -123,12 +143,28 @@ export class SpecimenCombatPresentation {
     this.overcharge.setAttribute('aria-label', 'Overcharge accuracy streak');
     this.abilities.append(this.dashLabel, this.dashCharge, this.overchargeLabel, this.overcharge);
 
-    element.append(this.crosshair, this.label, this.charge, this.abilities);
+    element.append(this.crosshair, this.hitMarker, this.dodgeFeedback, this.label, this.charge, this.abilities);
     this.element = element;
 
     try {
       options.scene.add(this.root);
       options.host.append(this.element);
+      if (this.source.events) this.unsubscribe.push(this.source.events.on('hitFeedback', event => {
+        if (!this.feedbackEnabled) return;
+        this.hitRemaining = 0.2;
+        this.hitMarker.hidden = false;
+        this.hitMarker.textContent = event.kind === 'hit' ? '×' : '◇';
+        this.hitMarker.dataset.kind = event.kind;
+        this.crosshair.dataset.hit = event.kind;
+        this.pulse = !this.pulse;
+        this.crosshair.dataset.pulse = this.hitMarker.dataset.pulse = this.pulse ? 'a' : 'b';
+      }));
+      if (options.dash) this.unsubscribe.push(options.dash.events.on('dodged', () => {
+        if (!this.feedbackEnabled) return;
+        this.dodgeRemaining = 0.28;
+        this.dodgeFeedback.hidden = false;
+        this.element.dataset.dodged = 'true';
+      }));
     } catch (error) {
       this.root.removeFromParent();
       this.element.remove();
@@ -138,9 +174,19 @@ export class SpecimenCombatPresentation {
     }
   }
 
-  update(activeForm: boolean): void {
+  update(activeForm: boolean, deltaSeconds = 0): void {
     if (this.disposed) return;
     const model = this.source.readModel;
+    this.feedbackEnabled = activeForm && model.fireEnabled;
+    if (!this.feedbackEnabled) this.clearFeedback();
+    this.hitRemaining = Math.max(0, this.hitRemaining - deltaSeconds);
+    this.dodgeRemaining = Math.max(0, this.dodgeRemaining - deltaSeconds);
+    if (this.hitRemaining === 0) {
+      this.hitMarker.hidden = true;
+      delete this.crosshair.dataset.hit;
+      delete this.crosshair.dataset.pulse;
+    }
+    if (this.dodgeRemaining === 0) { this.dodgeFeedback.hidden = true; delete this.element.dataset.dodged; }
     if(this.projectileMaterial instanceof THREE.ShaderMaterial)this.projectileMaterial.uniforms.uTime!.value=performance.now()/1000;
     this.label.hidden = !activeForm;
     this.crosshair.hidden = !activeForm || !model.fireEnabled;
@@ -183,6 +229,16 @@ export class SpecimenCombatPresentation {
     this.crosshair.hidden = true;
     this.charge.hidden = true;
     this.abilities.hidden = true;
+    this.feedbackEnabled = false;
+    this.clearFeedback();
+  }
+
+  private clearFeedback(): void {
+    this.hitRemaining = this.dodgeRemaining = 0;
+    this.hitMarker.hidden = this.dodgeFeedback.hidden = true;
+    delete this.crosshair.dataset.hit;
+    delete this.crosshair.dataset.pulse;
+    delete this.element.dataset.dodged;
   }
 
   getDiagnostics(): {
@@ -200,6 +256,7 @@ export class SpecimenCombatPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const off of this.unsubscribe) off();
     this.root.removeFromParent();
     this.element.remove();
     this.projectiles.dispose();

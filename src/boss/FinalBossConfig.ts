@@ -81,7 +81,7 @@ export const FINAL_SPECIMEN_MOVEMENT = Object.freeze({
   adhesionEnabled: false, reboundEnabled: true, chargedJumpEnabled: true,
 });
 export const FINAL_SPECIMEN_WEAPON: Partial<SpecimenAttackConfig> = Object.freeze({
-  fullChargeSeconds: 1.5, minimumCooldownSeconds: .12, maximumCooldownSeconds: .18,
+  fullChargeSeconds: 1.5, minimumCooldownSeconds: .15, maximumCooldownSeconds: .22,
   maximumLiveProjectiles: 32,
   projectileSpeedMetresPerSecond: 50, maximumRangeMetres: 145, projectileLifetimeSeconds: 3.2,
   minimumProjectileRadiusMetres: .18, maximumProjectileRadiusMetres: .7,

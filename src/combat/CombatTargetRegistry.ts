@@ -20,6 +20,7 @@ export interface CombatImpact {
   readonly kind: CombatImpactKind;
   readonly chargeAmount: number;
   readonly fullyCharged: boolean;
+  readonly overcharged?: boolean;
   readonly damageUnits: number;
   readonly point: CombatVector3;
   readonly direction: CombatVector3;

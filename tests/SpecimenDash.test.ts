@@ -9,6 +9,19 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 
 const dt = 1 / 60, zero = new THREE.Vector3(), forward = new THREE.Vector3(0, 0, -1), up = new THREE.Vector3(0, 1, 0);
 
+test('perfect-dodge confirmation fires once per active burst and never during recovery or after cancellation', () => {
+  const dash = new SpecimenDash(); let dodges = 0;
+  dash.events.on('dodged', () => dodges++);
+  const controls = { enabled: true, pressed: true, cancelled: false, movement: forward, forward, up };
+  assert.equal(dash.confirmDodge(), false);
+  dash.update(dt, controls); assert.equal(dodges, 0, 'dashing alone is not a perfect dodge');
+  assert.equal(dash.confirmDodge(), true); assert.equal(dash.confirmDodge(), false); assert.equal(dodges, 1);
+  dash.update(0.3, { ...controls, pressed: false }); assert.equal(dash.confirmDodge(), false);
+  dash.update(1, controls); assert.equal(dash.confirmDodge(), true); assert.equal(dodges, 2);
+  dash.cancel(); assert.equal(dash.confirmDodge(), false);
+  dash.reset(); dash.update(dt, controls); assert.equal(dash.confirmDodge(), true); assert.equal(dodges, 3);
+});
+
 test('dash locks the requested direction, has a cooldown and cancels on input loss', () => {
   const dash = new SpecimenDash(); let starts = 0;
   dash.events.on('started', () => starts++);

@@ -10,6 +10,7 @@ import type { ReadonlyVector3State } from '../physics/KinematicBody.ts';
 import {
   type CombatImpact,
   type CombatImpactRejectionReason,
+  type CombatImpactResult,
   type CombatTargetRegistration,
   type CombatTargetRegistry,
 } from './CombatTargetRegistry.ts';
@@ -194,6 +195,13 @@ export interface SpecimenAttackEvents {
     readonly accepted: boolean;
     readonly destroyed: boolean;
     readonly rejectionReason?: CombatImpactRejectionReason;
+  };
+  /** One presentation cue per blast; accepted damage takes priority over a deflection. */
+  hitFeedback: {
+    readonly projectileId: number;
+    readonly kind: 'hit' | 'blocked';
+    readonly point: ReadonlyVector3State;
+    readonly fullyCharged: boolean;
   };
   projectileDespawned: {
     readonly projectileId: number;
@@ -675,51 +683,63 @@ export class SpecimenProjectileSystem {
   }
 
   private resolveImpact(slot: ProjectileSlot, hit: CollisionHit): void {
-    const directRegistration = this.targets.getRegistrationForMesh(hit.object);
-    this.gatherSplashCandidates(slot, hit.point, directRegistration);
+    // Capture before target callbacks: a destruction reaction may reset the pool.
+    const projectileId = slot.read.id, fullyCharged = slot.fullyCharged, impactPoint = point(hit.point);
+    let accepted = false, blocked = false;
+    try {
+      const directRegistration = this.targets.getRegistrationForMesh(hit.object);
+      this.gatherSplashCandidates(slot, hit.point, directRegistration);
 
-    if (
-      directRegistration &&
-      this.targets.isRegistered(directRegistration) &&
-      directRegistration.target.isCombatActive()
-    ) {
-      this.applyTargetImpact(
-        slot,
-        directRegistration,
-        'direct',
-        slot.damageUnits,
-        hit.point,
-      );
-      // Recovery/reset is allowed to run inside a destruction reaction. If it
-      // cleared this slot, abort the remainder of the blast immediately.
-      if (!slot.read.active) return;
+      if (
+        directRegistration &&
+        this.targets.isRegistered(directRegistration) &&
+        directRegistration.target.isCombatActive()
+      ) {
+        const result = this.applyTargetImpact(
+          slot,
+          directRegistration,
+          'direct',
+          slot.damageUnits,
+          hit.point,
+        );
+        accepted = result.accepted;
+        blocked = !result.accepted && result.rejectionReason !== 'inactive';
+        // Recovery/reset is allowed to run inside a destruction reaction. If it
+        // cleared this slot, abort the remainder of the blast immediately.
+        if (!slot.read.active) return;
+      }
+      // Splash never counts as accuracy. A world hit or rejected direct impact
+      // breaks an unfinished streak, but cannot remove an already earned shot.
+      this.recordAccuracy(slot, false);
+
+      for (const candidate of this.splashCandidates) {
+        if (!this.targets.isRegistered(candidate.registration)) continue;
+        if (!candidate.registration.target.isCombatActive()) continue;
+        const result = this.applyTargetImpact(
+          slot,
+          candidate.registration,
+          'splash',
+          candidate.damageUnits,
+          hit.point,
+        );
+        accepted ||= result.accepted;
+        if (!slot.read.active) return;
+      }
+
+      this.events.emit('impact', {
+        projectileId: slot.read.id,
+        targetId: directRegistration?.target.id,
+        kind: directRegistration ? 'direct' : 'world',
+        chargeAmount: slot.chargeAmount,
+        fullyCharged: slot.fullyCharged,
+        point: point(hit.point),
+      });
+      this.deactivate(slot, 'impact');
+    } finally {
+      if (accepted || blocked) this.events.emit('hitFeedback', {
+        projectileId, kind: accepted ? 'hit' : 'blocked', point: impactPoint, fullyCharged,
+      });
     }
-    // Splash never counts as accuracy. A world hit or rejected direct impact
-    // breaks an unfinished streak, but cannot remove an already earned shot.
-    this.recordAccuracy(slot, false);
-
-    for (const candidate of this.splashCandidates) {
-      if (!this.targets.isRegistered(candidate.registration)) continue;
-      if (!candidate.registration.target.isCombatActive()) continue;
-      this.applyTargetImpact(
-        slot,
-        candidate.registration,
-        'splash',
-        candidate.damageUnits,
-        hit.point,
-      );
-      if (!slot.read.active) return;
-    }
-
-    this.events.emit('impact', {
-      projectileId: slot.read.id,
-      targetId: directRegistration?.target.id,
-      kind: directRegistration ? 'direct' : 'world',
-      chargeAmount: slot.chargeAmount,
-      fullyCharged: slot.fullyCharged,
-      point: point(hit.point),
-    });
-    this.deactivate(slot, 'impact');
   }
 
   private gatherSplashCandidates(
@@ -815,13 +835,14 @@ export class SpecimenProjectileSystem {
     kind: 'direct' | 'splash',
     damageUnits: number,
     pointValue: THREE.Vector3,
-  ): void {
+  ): CombatImpactResult {
     const impact: CombatImpact = {
       projectileId: slot.read.id,
       targetId: registration.target.id,
       kind,
       chargeAmount: slot.chargeAmount,
       fullyCharged: slot.fullyCharged,
+      overcharged: slot.read.overcharged,
       damageUnits,
       point: point(pointValue),
       direction: point(slot.direction),
@@ -835,6 +856,7 @@ export class SpecimenProjectileSystem {
       destroyed: result.destroyed,
       rejectionReason: result.rejectionReason,
     });
+    return result;
   }
 
   private activateProjectile(

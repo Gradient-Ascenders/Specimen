@@ -12,7 +12,7 @@ import type { SpecimenProjectileSystem } from '../../src/combat/SpecimenProjecti
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../../src/physics/KinematicBody.ts';
 import type { SpecimenDash } from '../../src/combat/SpecimenDash.ts';
 import type { CombatTargetRegistry } from '../../src/combat/CombatTargetRegistry.ts';
-import { FINAL_MERGE_ANCHOR } from '../../src/boss/FinalBossConfig.ts';
+import { FINAL_ARENA, FINAL_MERGE_ANCHOR } from '../../src/boss/FinalBossConfig.ts';
 import { CollisionLayer, type CollisionHit, type CollisionWorld } from '../../src/physics/CollisionWorld.ts';
 
 interface MovementProbe {
@@ -57,6 +57,7 @@ async function step(page: Page, frames: number) {
     try { runtime.render(1, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>); } finally { layer.render = draw; }
     return { ...resources.specimenCharacter.diagnostics, grounded: resources.specimenBody.grounded,
       charge: resources.specimenBody.chargeFraction, y: resources.specimenBody.position.y,
+      health: resources.finalBoss.controller.readModel.playerHealth,
       speed: Math.hypot(resources.specimenBody.velocity.x, resources.specimenBody.velocity.z),
       dash: resources.specimenDash.readModel,
       topSpeed: resources.specimenBody.maximumLocomotionSpeedMetresPerSecond };
@@ -89,7 +90,7 @@ async function capture(page: Page, name: string) {
   await writeFile(`${evidence}/${name}.png`, Buffer.from(png, 'base64'));
 }
 
-test('real Specimen controls drive fast movement, aura, normal gravity, shot facing and rapid follow-up fire', async ({ page }) => {
+test('real Specimen controls drive movement, dash I-frames, charge, overcharge and damage feedback', async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 960, height: 640 });
   const errors: string[] = [];
@@ -192,10 +193,10 @@ test('real Specimen controls drive fast movement, aura, normal gravity, shot fac
       aimActive: resources.specimenAttack.readModel.aimActive };
   });
   expect(shotFacing.aimActive).toBe(false); expect(shotFacing.dot).toBeGreaterThan(0.999);
-  await mouse(page, true); await mouse(page, false); await step(page, 1); await step(page, 12);
+  await mouse(page, true); await mouse(page, false); await step(page, 1); await step(page, 15);
   const followUp = await page.evaluate(() => window.__specimenMovementShots);
   expect(followUp.map(shot => shot.charged)).toEqual([true, false]);
-  for (let i = 0; i < 8; i++) { await mouse(page, true); await mouse(page, false); await step(page, 8); }
+  for (let i = 0; i < 8; i++) { await mouse(page, true); await mouse(page, false); await step(page, 10); }
   const shots = await page.evaluate(() => window.__specimenMovementShots);
   expect(shots).toHaveLength(10);
   await capture(page, 'firing');
@@ -228,7 +229,12 @@ test('real Specimen controls drive fast movement, aura, normal gravity, shot fac
   }, { x: FINAL_MERGE_ANCHOR.x, y: FINAL_MERGE_ANCHOR.y, z: FINAL_MERGE_ANCHOR.z, mask: CollisionLayer.Projectile });
   let overcharge;
   try {
-    for (let i = 0; i < 4; i++) { await mouse(page, true); await mouse(page, false); await step(page, 24); }
+    for (let i = 0; i < 4; i++) {
+      await mouse(page, true); await mouse(page, false); await step(page, 18);
+      await expect(page.locator('.specimen-hit-marker')).toBeVisible();
+      await expect(page.locator('.specimen-hit-marker')).toHaveAttribute('data-kind', 'hit');
+      await step(page, 6);
+    }
     overcharge = await page.evaluate(() => ({ ...window.__specimenMovementProbe.resources.specimenAttack.readModel }));
     await writeFile(`${evidence}/accuracy.json`, JSON.stringify(await page.evaluate(() => ({
       model: window.__specimenMovementProbe.resources.specimenAttack.readModel,
@@ -242,20 +248,83 @@ test('real Specimen controls drive fast movement, aura, normal gravity, shot fac
     expect(await page.evaluate(() => window.__specimenMovementShots.at(-1)!.overcharged)).toBe(true);
     expect(await page.evaluate(() => window.__specimenMovementProbe.resources.specimenAttack.readModel.overchargeReady)).toBe(false);
   } finally { await page.evaluate(() => window.__specimenAccuracyCleanup()); }
-  // An actual enemy orb goes through hit authority and the new damage callback.
+  // Restore real damage authority for an overlapping orb during the actual
+  // Shift dash, then verify damage resumes while the dash is still recharging.
+  await step(page, 1);
+  await press(page, 'ShiftLeft'); const evading = await step(page, 1);
+  expect(evading.dashing).toBe(true);
   await page.evaluate(() => {
     const { resources, layer } = window.__specimenMovementProbe;
     resources.finalBoss.controller.damagePlayer = window.__specimenDamageAuthority;
-    const target = layer.cameraRig.camera.position.clone().copy(resources.specimenBody.position), origin = target.clone(); origin.y += 6;
+    const target = layer.cameraRig.camera.position.clone().copy(resources.specimenBody.position), origin = target.clone(); origin.y += 0.5;
+    resources.finalBoss.projectiles.fireOrb(origin, target);
+  });
+  const protectedDash = await step(page, 1);
+  expect(protectedDash.health).toBe(evading.health); expect(protectedDash.damageRipple).toBe(0);
+  await expect(page.locator('.specimen-combat-overlay')).toHaveAttribute('data-dodged', 'true');
+  await expect(page.locator('.specimen-dodge-feedback')).toBeVisible();
+  await page.screenshot({ path: `${evidence}/perfect-dodge-feedback.png` });
+  await page.evaluate(() => { window.__specimenMovementProbe.resources.finalBoss.controller.damagePlayer = () => false; });
+  const recoveredDash = await step(page, 12);
+  expect(recoveredDash.dashing).toBe(false); expect(recoveredDash.dash.cooldownRemainingSeconds).toBeGreaterThan(0);
+  await page.evaluate(() => {
+    const { resources, layer } = window.__specimenMovementProbe;
+    resources.finalBoss.controller.damagePlayer = window.__specimenDamageAuthority;
+    const target = layer.cameraRig.camera.position.clone().copy(resources.specimenBody.position), origin = target.clone(); origin.y += 0.5;
     resources.finalBoss.projectiles.fireOrb(origin, target);
   });
   const damaged = await step(page, 5);
   await page.evaluate(() => { window.__specimenMovementProbe.resources.finalBoss.controller.damagePlayer = () => false; });
+  expect(damaged.health).toBeLessThan(recoveredDash.health);
   expect(damaged.damageRipple).toBeGreaterThan(0); await capture(page, 'damage-ripple');
+  const chargedImpact = await page.evaluate(() => {
+    const { resources } = window.__specimenMovementProbe, boss = resources.finalBoss, p = boss.presentation;
+    // Route through the registered weak-point adapter so the reaction still
+    // depends on accepted damage. Keep this inspection separate from aiming.
+    boss.reset(); boss.start(true); boss.update(1 / 60);
+    const target = resources.combatTargets.getRegistrationForMesh(p.core)!.target;
+    const before = boss.controller.readModel.health, anchor = p.coreWorld.clone(), muzzle = p.eyeMuzzle.clone();
+    const result = target.applyImpact({ projectileId: 9001, targetId: target.id, kind: 'direct', fullyCharged: true,
+      chargeAmount: 1, damageUnits: 1, point: anchor, direction: { x: 0, y: 0, z: 1 } });
+    p.refreshWorldAnchors();
+    return { accepted: result.accepted, damage: before - boss.controller.readModel.health, reaction: p.hitReactionStrength,
+      anchorMovement: p.coreWorld.distanceTo(anchor), muzzleMovement: p.eyeMuzzle.distanceTo(muzzle) };
+  });
+  expect(chargedImpact).toEqual({ accepted: true, damage: 1, reaction: 1, anchorMovement: 0, muzzleMovement: 0 });
+  await step(page, 1);
+  async function inspectBoss(name: string) {
+    const png = await page.evaluate(centreZ => {
+      const { resources, layer } = window.__specimenMovementProbe, camera = layer.cameraRig.camera;
+      camera.position.set(-65, 75, centreZ - 65); camera.fov = 66; camera.lookAt(0, 6, centreZ);
+      camera.updateProjectionMatrix(); camera.updateMatrixWorld(true); resources.specimenCharacter.setOpacity(1); layer.render();
+      return layer.renderer.domElement.toDataURL('image/png').split(',')[1]!;
+    }, FINAL_ARENA.centreZ);
+    await writeFile(`${evidence}/${name}.png`, Buffer.from(png, 'base64'));
+  }
+  await inspectBoss('boss-charged-hit');
+  // Seed normal authority selection for deterministic presentation captures.
+  for (const [attack, random] of [['ram', 0.99], ['laser-beam', 0.6]] as const) {
+    await page.evaluate(random => {
+      const { resources } = window.__specimenMovementProbe, boss = resources.finalBoss;
+      const authority = boss.controller as unknown as { random: () => number }, original = authority.random;
+      boss.reset(); authority.random = () => random;
+      try { boss.controller.startPhaseTwo(resources.specimenBody.position); } finally { authority.random = original; }
+    }, random);
+    await step(page, 35);
+    const warnings = await page.evaluate(() => {
+      const boss = window.__specimenMovementProbe.resources.finalBoss;
+      return { attack: boss.controller.readModel.attack, ram: boss.presentation.ramWarning.visible,
+        beam: boss.presentation.beamWarning.visible, direction: boss.presentation.beamWarning.userData.direction };
+    });
+    expect(warnings.attack).toBe(attack); expect(attack === 'ram' ? warnings.ram : warnings.beam).toBe(true);
+    await inspectBoss(`${attack}-warning`);
+  }
+  await page.evaluate(() => window.__specimenMovementProbe.resources.finalBoss.suspend());
+  expect(await page.evaluate(() => window.__specimenMovementProbe.resources.finalBoss.presentation.beamWarning.visible)).toBe(false);
   const sounds = await page.evaluate(() => window.__specimenMovementSounds);
-  for (const sound of ['bob-contact-01', 'bob-charged-jump-01', 'bob-land-hard-01', 'world-platform-land-01', 'volt-circuit-connect-01'])
+  for (const sound of ['bob-contact-01', 'bob-charged-jump-01', 'bob-land-hard-01', 'world-platform-land-01', 'volt-circuit-connect-01', 'goop-projectile-impact-01'])
     expect(sounds.some(cue => cue.sound === sound && cue.played), `${sound} created an actual audio voice`).toBe(true);
   await writeFile(`${evidence}/observations.json`, JSON.stringify({ running, dash, turning, compressed, launch, landing, impact, settled,
-    chargeShot, recoil, shotFacing, shots, overcharge, damaged, sounds }, null, 2));
+    chargeShot, recoil, shotFacing, shots, overcharge, evading, protectedDash, recoveredDash, damaged, chargedImpact, sounds }, null, 2));
   expect(errors).toEqual([]);
 });

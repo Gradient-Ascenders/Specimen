@@ -32,10 +32,17 @@ test('charge audio rises without extra voices and release, pause, landing and di
     body.events.emit('jumped', { chargeFraction: 1, speedMetresPerSecond: 20, directionWorld: { x: 0, y: 1, z: 0 } });
     body.events.emit('landed', { impactSpeedMetresPerSecond: 19 }); body.events.emit('landed', { impactSpeedMetresPerSecond: 19 });
     assert.equal(sounds.filter(sound => sound === 'world-platform-land-01').length, 1, 'one charged flight gets one heavy accent');
+    weapon.events.emit('hitFeedback', { projectileId: 1, kind: 'hit', point: body.position, fullyCharged: false });
+    assert.equal(sounds.at(-1), 'goop-projectile-impact-01');
+    weapon.events.emit('hitFeedback', { projectileId: 2, kind: 'blocked', point: body.position, fullyCharged: false });
+    assert.equal(sounds.at(-1), 'volt-circuit-release-01');
+    dash.events.emit('dodged', {}); assert.equal(sounds.at(-1), 'volt-circuit-connect-01');
     controls.firePressed = controls.fireHeld = true; controls.fireReleased = false;
     weapon.update(0.2, controls); feedback.update(); assert.equal(loops.size, 1);
     feedback.setEnabled(false); assert.equal(loops.size, 0);
     const count = sounds.length; feedback.dispose();
+    weapon.events.emit('hitFeedback', { projectileId: 3, kind: 'hit', point: body.position, fullyCharged: false });
+    dash.events.emit('dodged', {});
     weapon.cancelInput(); controls.fireReleased = true; weapon.update(0.3, controls);
     assert.equal(sounds.length, count, 'disposed feedback cannot react to later shots');
   } finally { feedback.dispose(); weapon.dispose(); targets.dispose(); world.clear(); }

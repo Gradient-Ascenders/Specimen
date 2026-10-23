@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { ExterminationArena } from '../src/boss/ExterminationArena.ts';
 import { FinalBossEncounter } from '../src/boss/FinalBossEncounter.ts';
 import { FinalBossPresentation } from '../src/boss/FinalBossPresentation.ts';
-import { FINAL_ARENA, FINAL_ARENA_ORBIT, FINAL_BOSS_TUNING as T, FINAL_DRONE_FLIGHT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_WEAPON } from '../src/boss/FinalBossConfig.ts';
+import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_ARENA_ORBIT, FINAL_BOSS_TUNING as T, FINAL_DRONE_FLIGHT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_WEAPON } from '../src/boss/FinalBossConfig.ts';
 import { finalBossAttackTiming } from '../src/boss/FinalBossController.ts';
 import { ExterminatorProjectiles } from '../src/boss/attacks/ExterminatorProjectiles.ts';
 import { CombatTargetRegistry } from '../src/combat/CombatTargetRegistry.ts';
@@ -12,6 +12,7 @@ import { SpecimenProjectileSystem, type SpecimenAttackControls } from '../src/co
 import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
+import { SpecimenDash, SPECIMEN_DASH } from '../src/combat/SpecimenDash.ts';
 
 const controls=(o:Partial<SpecimenAttackControls>={}):SpecimenAttackControls=>({active:true,aimHeld:false,fireHeld:false,firePressed:false,fireReleased:false,gameplayInputEnabled:true,pointerLocked:true,...o});
 const hit=(damageUnits=999)=>({projectileId:1,targetId:'core',kind:'direct' as const,chargeAmount:1,fullyCharged:true,damageUnits,point:new THREE.Vector3(),direction:new THREE.Vector3()});
@@ -25,7 +26,9 @@ function fixture(random=()=>0,invincible=true,orbitingPlatforms=false) {
   const body=new KinematicBody({world,surfaces,initialPosition:FINAL_MERGE_ANCHOR,config:FINAL_SPECIMEN_MOVEMENT});
   const aimDirection=new THREE.Vector3(0,0,1);
   const weapon=new SpecimenProjectileSystem({collisionWorld:world,targetRegistry:targets,body,config:FINAL_SPECIMEN_WEAPON,aimRayProvider:{copyAimRay:(o,d)=>{o.copy(body.position);d.copy(aimDirection);}}});
-  const presentation=new FinalBossPresentation(),boss=new FinalBossEncounter({arena,world,targets,body,weapon,presentation,random,host:new Element() as unknown as HTMLElement,requestFailure:()=>{boss.suspend();return true;}});
+  const dash=new SpecimenDash();let damageReactions=0,dodges=0;dash.events.on('dodged',()=>dodges++);
+  const presentation=new FinalBossPresentation(),boss=new FinalBossEncounter({arena,world,targets,body,weapon,presentation,random,host:new Element() as unknown as HTMLElement,
+    isPlayerInvulnerable:()=>dash.readModel.active,onPlayerDamaged:()=>damageReactions++,onPlayerDodged:()=>{dash.confirmDodge();},requestFailure:()=>{boss.suspend();return true;}});
   boss.start(true);if(invincible)boss.controller.damagePlayer=()=>false;
   const move=new THREE.Vector3();
   const tick=(n=1,running=false)=>{for(let i=0;i<n;i++){
@@ -33,8 +36,97 @@ function fixture(random=()=>0,invincible=true,orbitingPlatforms=false) {
     body.update(1/60,move);boss.advancePlatforms(1/60);weapon.update(1/60,controls());boss.update(1/60);
   }};
   const killSquad=()=>{for(const root of boss.squad.root.children)if(root.visible){const target=targets.getRegistrationForMesh(root.children[0] as THREE.Mesh)!.target;target.applyImpact({...hit(),targetId:target.id});}};
-  return {arena,world,targets,body,weapon,aimDirection,presentation,boss,tick,killSquad,dispose:()=>{boss.dispose();weapon.dispose();targets.dispose();arena.dispose();world.clear();surfaces.clear();}};
+  return {arena,world,targets,body,weapon,aimDirection,presentation,boss,dash,get damageReactions(){return damageReactions;},get dodges(){return dodges;},tick,killSquad,dispose:()=>{boss.dispose();weapon.dispose();targets.dispose();arena.dispose();world.clear();surfaces.clear();}};
 }
+
+for(const end of ['elapsed','cancelled','reset'] as const)test(`dash I-frames reject real orb damage and end immediately when ${end}`,()=>{
+  const f=fixture(()=>0,false),movement=new THREE.Vector3(1,0,0),up=new THREE.Vector3(0,1,0);
+  const input={enabled:true,pressed:true,cancelled:false,movement,forward:movement,up};
+  const orb=()=>{
+    const target=new THREE.Vector3().copy(f.body.position),origin=target.clone();origin.y+=4;
+    assert.equal(f.boss.projectiles.fireOrb(origin,target),true);
+    f.boss.projectiles.update(.04,f.body);
+  };
+  try {
+    f.dash.update(1/60,input);assert.equal(f.dash.readModel.active,true);
+    orb();orb();assert.equal(f.boss.controller.readModel.playerHealth,100);assert.equal(f.dodges,1,'overlapping attacks give one cue for this dash');
+    assert.equal(f.boss.controller.readModel.invulnerability,0,'a dodged orb cannot start damage grace');
+    assert.equal(f.damageReactions,0);assert.equal(f.boss.projectiles.liveCount,0,'dodged projectiles resolve normally');
+    input.pressed=false;
+    if(end==='elapsed')f.dash.update(SPECIMEN_DASH.durationSeconds,input);
+    else if(end==='cancelled')f.dash.update(1/60,{...input,cancelled:true});
+    else f.dash.reset();
+    assert.equal(f.dash.readModel.active,false);
+    if(end!=='reset')assert.ok(f.dash.readModel.cooldownRemainingSeconds>0,'cooldown does not extend I-frames');
+    orb();assert.equal(f.boss.controller.readModel.playerHealth,100-T.orbDamage);
+    assert.equal(f.damageReactions,1);
+  }finally{f.dispose();}
+});
+
+test('ordinary damage grace does not award a perfect dodge',()=>{
+  const f=fixture(()=>0,false);
+  try {
+    assert.equal(f.boss.controller.damagePlayer(5,-1),true);
+    const forward=new THREE.Vector3(0,0,-1);
+    f.dash.update(1/60,{enabled:true,pressed:true,cancelled:false,movement:forward,forward,up:new THREE.Vector3(0,1,0)});
+    const origin=f.body.position.clone().add(new THREE.Vector3(0,4,0));
+    f.boss.projectiles.fireOrb(origin,f.body.position);f.boss.projectiles.update(.04,f.body);
+    assert.equal(f.dodges,0);assert.equal(f.boss.controller.readModel.playerHealth,95);
+  }finally{f.dispose();}
+});
+
+test('powerful accepted core impacts shudder the render without moving any combat anchor',()=>{
+  const f=fixture();
+  try {
+    f.tick();
+    const core=f.targets.getRegistrationForMesh(f.presentation.core)!.target;
+    const anchor=f.presentation.coreWorld.clone(),muzzle=f.presentation.eyeMuzzle.clone();
+    assert.equal(core.applyImpact({...hit(1),fullyCharged:false,chargeAmount:0}).accepted,true);
+    assert.equal(f.presentation.hitReactionStrength,0);
+    assert.equal(core.applyImpact(hit(1)).accepted,true);assert.equal(f.presentation.hitReactionStrength,1);
+    f.presentation.refreshWorldAnchors();
+    assert.ok(f.presentation.coreWorld.distanceTo(anchor)<1e-9);assert.ok(f.presentation.eyeMuzzle.distanceTo(muzzle)<1e-9);
+    f.tick(24);assert.equal(f.presentation.hitReactionStrength,0,'reaction decays without stunning the boss');
+    assert.equal(core.applyImpact({...hit(1),fullyCharged:false,overcharged:true}).accepted,true);assert.equal(f.presentation.hitReactionStrength,1);
+    f.boss.reset();assert.equal(f.presentation.hitReactionStrength,0);
+    assert.equal(core.applyImpact(hit(1)).accepted,false);assert.equal(f.presentation.hitReactionStrength,0,'rejected hits cannot shudder');
+  }finally{f.dispose();}
+});
+
+test('RAM marks its full forward lane and laser direction warnings follow live reversals and clear on suspension',()=>{
+  const f=fixture(()=>.99);
+  try {
+    f.boss.reset();assert.equal(f.boss.controller.startPhaseTwo(f.body.position),true);f.tick();const p=f.presentation;
+    assert.equal(f.boss.controller.readModel.attack,'ram');assert.equal(p.ramWarning.visible,true);
+    const toPlayer=f.body.position.clone().sub(p.machine.position).setY(0).length();
+    assert.ok(p.ramWarning.scale.z>toPlayer,'the warning extends beyond the player to the charge destination');
+    assert.ok(p.ramWarning.scale.x>=p.ramHull.widthMetres);
+    f.boss.suspend();assert.equal(p.ramWarning.visible,false);assert.equal(p.beamWarning.visible,false);
+  }finally{f.dispose();}
+  const beam=fixture(()=>.7);
+  try {
+    beam.tick();const p=beam.presentation,m=beam.boss.controller.readModel;
+    assert.equal(m.attack,'laser-beam');assert.equal(p.beamWarning.visible,true);assert.equal(p.beamWarning.count,5);
+    const checkArrows=()=>{
+      const matrix=new THREE.Matrix4(),radial=new THREE.Vector3(),forward=new THREE.Vector3(),tangent=new THREE.Vector3();
+      for(let i=0;i<p.beamWarning.count;i++) {
+        p.beamWarning.getMatrixAt(i,matrix);radial.setFromMatrixPosition(matrix);
+        const radius=Math.hypot(radial.x,radial.z-FINAL_ARENA.centreZ);
+        assert.ok(radius>FINAL_ARENA_RING.innerRadius&&radius<FINAL_ARENA_RING.outerRadius,'direction arrows sit on the playable walkway');
+        radial.sub(p.machine.position).setY(0).normalize();tangent.set(radial.z,0,-radial.x).multiplyScalar(p.beamWarning.userData.direction);
+        forward.set(0,0,-1).transformDirection(matrix);assert.ok(forward.dot(tangent)>.999,'arrowheads point along the indicated sweep');
+      }
+    };
+    checkArrows();
+    while(m.stage==='telegraph')beam.tick();
+    const first=m.beamDirection;assert.equal(p.beamWarning.userData.direction,first);
+    for(let i=0;i<1200&&m.beamDirection===first;i++)beam.tick();
+    assert.notEqual(m.beamDirection,first);assert.equal(p.beamWarning.userData.direction,m.beamDirection);
+    checkArrows();
+    beam.boss.suspend();assert.equal(p.beamWarning.visible,false);
+    beam.boss.reset();assert.equal(p.beamWarning.visible,false);
+  }finally{beam.dispose();}
+});
 
 test('Gun Blast produces simultaneous triples from both animated cannon emitters, at a bounded fast cadence',()=>{
   const f=fixture();try {

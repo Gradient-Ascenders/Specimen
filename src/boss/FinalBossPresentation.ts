@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import type { SpecimenCharacterPresentation } from '../render/specimen/SpecimenCharacterPresentation.ts';
 import { ExterminatorWarDrone } from './ExterminatorWarDrone.ts';
 import { ExterminatorRamHull } from './ExterminatorRamHull.ts';
+import { initialBeamDirection } from './ExterminatorBeamSweep.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { FinalBossReadModel } from './FinalBossController.ts';
-import { FINAL_ARENA, FINAL_BOSS_TUNING, FINAL_SPECIMEN_RADIUS } from './FinalBossConfig.ts';
+import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_BOSS_TUNING, FINAL_SPECIMEN_RADIUS } from './FinalBossConfig.ts';
 
 /** Shared geometries/materials and fixed pools: no allocations per shot/phase. */
 export class FinalBossPresentation {
@@ -25,6 +26,7 @@ export class FinalBossPresentation {
   readonly explosion:THREE.Mesh;
   readonly coreWorld=new THREE.Vector3();
   readonly ramWarning:THREE.Mesh;
+  readonly beamWarning:THREE.InstancedMesh<THREE.BufferGeometry,THREE.MeshBasicMaterial>;
   readonly ramHull:ExterminatorRamHull;
   readonly ramImpact:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;
   readonly smoke:THREE.InstancedMesh;
@@ -56,6 +58,7 @@ export class FinalBossPresentation {
   private ramStage='';
   private readonly ramStart=new THREE.Vector3();
   private readonly ramEnd=new THREE.Vector3();
+  private readonly warningEnd=new THREE.Vector3();
   private ramYaw=0;
   private readonly smokeSlots=Array.from({length:48},()=>({age:9,life:0,position:new THREE.Vector3(),velocity:new THREE.Vector3()}));
   private smokeCursor=0;
@@ -124,14 +127,22 @@ export class FinalBossPresentation {
     }
     this.particles=new THREE.InstancedMesh(this.geom(new THREE.IcosahedronGeometry(1,0)),this.glow,64);
     this.particles.frustumCulled=false;this.particles.count=0;this.root.add(this.particles);
-    const warning=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{uTime:{value:0},uCharge:{value:0}},
-      vertexShader:'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader:`varying vec3 vP;uniform float uTime,uCharge;void main(){
-        float chevron=step(.5,fract((vP.z+abs(vP.x)*.5)*9.-uTime*(1.+uCharge*3.)));
-        float edge=smoothstep(.32,.49,abs(vP.x));
-        gl_FragColor=vec4(mix(vec3(1.,.32,.035),vec3(1.,.8,.3),chevron),(.07+chevron*.24+edge*.4)*(.5+uCharge*.5));
+    const warning=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{uTime:{value:0},uCharge:{value:0},uLength:{value:1},
+      uCentreZ:{value:FINAL_ARENA.centreZ},uInnerRadius:{value:FINAL_ARENA_RING.innerRadius},uOuterRadius:{value:FINAL_ARENA_RING.outerRadius}},
+      vertexShader:'varying vec3 vP;varying vec2 vFloorXZ;void main(){vP=position;vFloorXZ=(modelMatrix*vec4(position,1.)).xz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader:`varying vec3 vP;varying vec2 vFloorXZ;uniform float uTime,uCharge,uLength,uCentreZ,uInnerRadius,uOuterRadius;void main(){
+        float floorRadius=distance(vFloorXZ,vec2(0.,uCentreZ));
+        if(floorRadius<uInnerRadius||floorRadius>uOuterRadius)discard;
+        float chevron=step(.58,fract(vP.z*uLength*.12+abs(vP.x)*1.5-uTime*(1.+uCharge*2.)));
+        float edge=step(.46,abs(vP.x));float cap=step(.48,abs(vP.z));
+        float pulse=.88+.12*sin(uTime*(5.+uCharge*9.));
+        gl_FragColor=vec4(mix(vec3(1.,.22,.025),vec3(1.,.88,.4),max(chevron,max(edge,cap))),(.2+chevron*.26+max(edge,cap)*.45)*pulse);
       }`});this.material.add(warning);
     this.ramWarning=new THREE.Mesh(this.geom(new THREE.BoxGeometry(1,.035,1)),warning);this.ramWarning.name='ram-trajectory-warning';this.ramWarning.visible=false;this.root.add(this.ramWarning);
+    const arrow=this.geom(new THREE.BufferGeometry());
+    arrow.setAttribute('position',new THREE.Float32BufferAttribute([0,0,-2,-2,0,1.5,0,0,.4,0,0,-2,0,0,.4,2,0,1.5],3));arrow.computeVertexNormals();
+    const arrowMaterial=new THREE.MeshBasicMaterial({color:0xffd074,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide});this.material.add(arrowMaterial);
+    this.beamWarning=new THREE.InstancedMesh(arrow,arrowMaterial,5);this.beamWarning.name='laser-sweep-direction-warning';this.beamWarning.frustumCulled=false;this.beamWarning.visible=false;this.root.add(this.beamWarning);
     const impactMaterial=new THREE.MeshBasicMaterial({color:0xffd28e,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending});this.material.add(impactMaterial);
     this.ramImpact=new THREE.Mesh(this.geom(new THREE.RingGeometry(.78,1,48)),impactMaterial);this.ramImpact.name='ram-wall-shockwave';this.ramImpact.visible=false;this.root.add(this.ramImpact);
     const smokeMaterial=new THREE.MeshBasicMaterial({color:0x26313a,transparent:true,opacity:.27,depthWrite:false});this.material.add(smokeMaterial);
@@ -192,6 +203,7 @@ export class FinalBossPresentation {
     this.specimen.userData.floorOffset=body.grounded?FINAL_SPECIMEN_RADIUS*(squash-1):0;
     }
     this.machine.updateMatrixWorld(true);this.core.getWorldPosition(this.coreWorld);this.warDrone.copyEyeMuzzle(this.eyeMuzzle);
+    this.updateBeamWarning(model,body);
     this.shield.visible=defence;this.shield.position.copy(this.machine.position);this.shield.updateMatrixWorld(true);
     this.shield.material.uniforms.uTime!.value=time;this.shield.material.uniforms.uHit!.value=model.rejectedFlash*3;this.shield.material.uniforms.uHeal!.value=model.regenerating?1:0;
     this.eyeFlash=Math.max(0,this.eyeFlash-dt);
@@ -234,9 +246,7 @@ export class FinalBossPresentation {
       else if(model.stage==='active') {
         this.direction.subVectors(model.lockedTarget,this.ramStart).setY(0).normalize();
         this.ramYaw=Math.atan2(-this.direction.x,-this.direction.z);
-        this.ramEnd.copy(model.lockedTarget).addScaledVector(this.direction,18).setY(FINAL_BOSS_TUNING.ramHeight);
-        const radius=Math.hypot(this.ramEnd.x,this.ramEnd.z-FINAL_ARENA.centreZ),limit=FINAL_ARENA.radius-8;
-        if(radius>limit){this.ramEnd.x*=limit/radius;this.ramEnd.z=FINAL_ARENA.centreZ+(this.ramEnd.z-FINAL_ARENA.centreZ)*limit/radius;}
+        this.copyRamDestination(this.ramStart,model.lockedTarget,this.ramEnd);
       } else this.ramEnd.set(0,FINAL_BOSS_TUNING.hoverY,FINAL_ARENA.centreZ);
     }
     const progress=model.progress;
@@ -253,12 +263,37 @@ export class FinalBossPresentation {
     if(model.stage==='telegraph') {
       this.machine.rotation.x=Math.sin(progress*Math.PI)*.12;
       this.machine.rotation.z=Math.sin(progress*Math.PI*4)*.025*progress;
-      this.direction.subVectors(body.position,this.machine.position).setY(0);const length=this.direction.length();this.direction.normalize();
-      this.ramWarning.visible=true;this.ramWarning.position.copy(this.machine.position).addScaledVector(this.direction,length/2).setY(FINAL_ARENA.floorY+.08);
-      this.ramWarning.rotation.y=Math.atan2(this.direction.x,this.direction.z);this.ramWarning.scale.set(this.ramHull.widthMetres,1,length);
-      const warning=this.ramWarning.material as THREE.ShaderMaterial;warning.uniforms.uTime!.value=this.lastTime;warning.uniforms.uCharge!.value=progress;
+    }
+    if(model.stage!=='recovery') {
+      const start=model.stage==='active'?this.ramStart:this.machine.position;
+      if(model.stage==='active')this.warningEnd.copy(this.ramEnd);else this.copyRamDestination(start,body.position,this.warningEnd);
+      this.direction.subVectors(this.warningEnd,start).setY(0);const length=this.direction.length();this.direction.normalize();
+      this.ramWarning.visible=true;this.ramWarning.position.copy(start).addScaledVector(this.direction,length/2).setY(FINAL_ARENA.floorY+.1);
+      this.ramWarning.rotation.y=Math.atan2(this.direction.x,this.direction.z);this.ramWarning.scale.set(this.ramHull.widthMetres+2*FINAL_SPECIMEN_RADIUS,1,length);
+      const warning=this.ramWarning.material as THREE.ShaderMaterial;warning.uniforms.uTime!.value=this.lastTime;warning.uniforms.uCharge!.value=model.stage==='active'?1:progress;warning.uniforms.uLength!.value=length;
     }
   }
+  private copyRamDestination(start:THREE.Vector3,target:THREE.Vector3Like,out:THREE.Vector3):void {
+    this.direction.subVectors(target,start).setY(0).normalize();out.copy(target).addScaledVector(this.direction,18).setY(FINAL_BOSS_TUNING.ramHeight);
+    const radius=Math.hypot(out.x,out.z-FINAL_ARENA.centreZ),limit=FINAL_ARENA.radius-8;
+    if(radius>limit){out.x*=limit/radius;out.z=FINAL_ARENA.centreZ+(out.z-FINAL_ARENA.centreZ)*limit/radius;}
+  }
+  private updateBeamWarning(model:FinalBossReadModel,body:KinematicBody):void {
+    this.beamWarning.visible=model.state==='combat'&&model.attack==='laser-beam'&&model.stage!=='recovery';
+    if(!this.beamWarning.visible)return;
+    const direction=model.stage==='telegraph'?initialBeamDirection(model.beamTargetYaw,body.position):model.beamDirection;
+    this.beamWarning.userData.direction=direction;
+    this.beamWarning.material.color.setHex(model.stage==='telegraph'||model.beamTurning?0xffd074:0xff6c70);
+    for(let i=0;i<5;i++) {
+      const yaw=this.machine.rotation.y+direction*(.06+i*.09),radius=FINAL_ARENA_RING.radius;
+      this.dummy.position.set(this.machine.position.x-Math.sin(yaw)*radius,FINAL_ARENA.floorY+.12,this.machine.position.z-Math.cos(yaw)*radius);
+      this.dummy.rotation.set(0,yaw+direction*Math.PI/2,0);this.dummy.scale.setScalar(1.7);this.dummy.updateMatrix();this.beamWarning.setMatrixAt(i,this.dummy.matrix);
+    }
+    this.beamWarning.instanceMatrix.needsUpdate=true;
+  }
+  reactToChargedHit(position:THREE.Vector3):void {this.warDrone.reactToChargedHit();this.burst(position,28);}
+  get hitReactionStrength():number {return this.warDrone.hitReactionStrength;}
+  clearAttackWarnings():void {this.ramWarning.visible=false;this.beamWarning.visible=false;}
   showRamImpact(point:THREE.Vector3,normal:THREE.Vector3):void {
     this.ramImpactAge=0;this.ramImpact.visible=true;this.ramImpact.position.copy(point).addScaledVector(normal,.12);
     this.ramImpact.quaternion.setFromUnitVectors(this.impactForward,normal);this.ramImpact.scale.setScalar(3);this.ramImpact.material.opacity=.9;this.burst(point,32);
@@ -305,6 +340,7 @@ export class FinalBossPresentation {
   }
   reset():void {
     this.heading=Math.PI;this.lastTime=0;this.root.visible=false;this.warDrone.reset();
+    this.clearAttackWarnings();
     this.beam.visible=false;this.beamCore.visible=false;this.beamImpact.visible=false;this.shield.visible=false;this.eyeCharge.visible=false;
     this.finalShot.visible=false;this.explosion.visible=false;this.beamSerial=-1;this.eyeFlash=0;
     this.ramSerial=-1;this.ramStage='';this.ramWarning.visible=false;this.evasionOffset.set(0,0,0);this.evasionRoll=0;
@@ -317,7 +353,7 @@ export class FinalBossPresentation {
   }
   dispose():void {
     if(this.disposed)return;this.disposed=true;
-    this.particles.dispose();this.smoke.dispose();this.warDrone.dispose();
+    this.particles.dispose();this.smoke.dispose();this.beamWarning.dispose();this.warDrone.dispose();
     this.root.removeFromParent();if(!this.authoredSpecimen)this.specimen.removeFromParent();this.root.clear();
     for(const g of this.geometry)g.dispose();for(const m of this.material)m.dispose();
   }

@@ -619,6 +619,8 @@ test('death/reset clears charge, cooldown, and every pooled projectile without r
 
 test('reset invoked from a destruction reaction clears the pool and aborts remaining splash work safely', () => {
   const fixture = createFixture();
+  const feedback: string[] = [];
+  fixture.system.events.on('hitFeedback', event => feedback.push(event.kind));
   let direct: ReturnType<typeof addTarget> | undefined;
   const splash = addTarget(
     fixture,
@@ -649,6 +651,7 @@ test('reset invoked from a destruction reaction clears the pool and aborts remai
     fixture.system.update(0.2, controls());
 
     assert.equal(direct.target.destroyed, true);
+    assert.deepEqual(feedback, ['hit'], 'a reset inside destruction still confirms the accepted hit once');
     assert.equal(splash.target.healthUnits, 5);
     assert.equal(fixture.system.readModel.liveProjectileCount, 0);
     assert.equal(
@@ -665,6 +668,35 @@ test('reset invoked from a destruction reaction clears the pool and aborts remai
     splash.dispose();
     fixture.dispose();
   }
+});
+
+test('a blast confirms accepted damage once across direct and splash targets, and deflections have a distinct cue', () => {
+  const f = createFixture();
+  const direct = addTarget(f, 'direct', new THREE.Vector3(0, 0.675, 5), { healthUnits: 50 });
+  const splash = addTarget(f, 'splash', new THREE.Vector3(1, 0.675, 5), { healthUnits: 50 });
+  const cues: string[] = [];
+  f.system.events.on('hitFeedback', event => cues.push(event.kind));
+  const shoot = () => {
+    f.system.update(1.5, controls({ firePressed: true, fireHeld: true }));
+    f.system.update(1 / 60, controls({ fireReleased: true }));
+    f.system.update(0.2, controls());
+  };
+  try {
+    shoot();
+    assert.ok(direct.target.healthUnits < 50 && splash.target.healthUnits < 50);
+    assert.deepEqual(cues, ['hit']);
+    direct.target.applyImpact = () => ({ accepted: false, destroyed: false, rejectionReason: 'armour' });
+    shoot();
+    assert.deepEqual(cues, ['hit', 'hit'], 'accepted splash takes priority over direct armour');
+    splash.unregister();
+    shoot();
+    assert.deepEqual(cues, ['hit', 'hit', 'blocked']);
+    direct.unregister();
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2)); wall.position.set(0, 0.675, 5);
+    f.world.register(wall);
+    try { shoot(); assert.equal(cues.length, 3, 'world impacts are not enemy hits'); }
+    finally { f.world.unregister(wall); wall.geometry.dispose(); (wall.material as THREE.Material).dispose(); }
+  } finally { direct.dispose(); splash.dispose(); f.dispose(); }
 });
 
 

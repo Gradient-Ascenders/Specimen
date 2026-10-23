@@ -18,6 +18,18 @@ import { FixtureCombatTarget } from '../src/combat/CombatTargetAdapters.ts';
 
 const target=new THREE.Vector3(0,2.07,finalArenaZ(197));
 const impact=(damageUnits=12):CombatImpact=>({projectileId:1,targetId:'extermination-core',kind:'direct',chargeAmount:1,fullyCharged:true,damageUnits,point:target,direction:target});
+
+test('checking whether an attack could hurt the player does not consume health, grace or its attack serial',()=>{
+  const b=new FinalBossController();b.start(true);
+  try {
+    assert.equal(b.canDamagePlayer(7,42),true);assert.equal(b.canDamagePlayer(7,42),true);
+    assert.equal(b.readModel.playerHealth,100);assert.equal(b.readModel.invulnerability,0);
+    assert.equal(b.damagePlayer(7,42),true);assert.equal(b.canDamagePlayer(7,-1),false);
+    b.update(.46,target);assert.equal(b.canDamagePlayer(7,42),false,'an already consumed major attack is not a perfect dodge');
+    assert.equal(b.canDamagePlayer(7,-1),true);
+    b.suspend();assert.equal(b.canDamagePlayer(7,-1),false);
+  }finally{b.dispose();}
+});
 function until(b:FinalBossController,predicate:()=>boolean,steps=12000):void {
   for(let i=0;i<steps&&!predicate();i++)b.update(1/60,target);
   assert.ok(predicate(),JSON.stringify(b.readModel));

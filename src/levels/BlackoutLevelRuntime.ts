@@ -1261,7 +1261,7 @@ export class BlackoutLevelRuntime {
       resources.specimenCharacter.update(deltaSeconds, resources.specimenBody, resources.specimenAttack.readModel);
       resources.specimenAbilityAudio?.update();
     }
-    resources.specimenPresentation.update(specimenGameplay);
+    resources.specimenPresentation.update(specimenGameplay, deltaSeconds);
 
     if (resources.phase.phase === 'boss') {
       if(resources.finalBoss) {
@@ -1944,7 +1944,9 @@ export class BlackoutLevelRuntime {
 
       const finalBoss=scene.finalArena&&finalPresentation?new FinalBossEncounter({arena:scene.finalArena,world:collisionWorld,
         targets:combatTargets,body:specimenBody,weapon:specimenAttack,presentation:finalPresentation,host:this.host,audio:this.audio,
+        isPlayerInvulnerable: () => specimenDash.readModel.active,
         onPlayerDamaged: amount => specimenCharacter.onDamage(amount),
+        onPlayerDodged: () => { specimenDash.confirmDodge(); },
         requestFailure:()=>this.requestFailure()}):undefined;
       if(finalBoss)rollback(()=>finalBoss.dispose());
 
