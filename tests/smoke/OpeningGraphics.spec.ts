@@ -29,7 +29,7 @@ for (const preset of ['normal', 'performance'] as const) {
       const renderer = (window as any).__openingGraphicsRuntime.renderLayer.renderer;
       return {error:renderer.getContext().getError(), scale:renderer.transmissionResolutionScale};
     });
-    expect(graphics.scale).toBe(.5);
+    expect(graphics.scale).toBe(preset === 'performance' ? .5 : .75);
     expect(graphics.error).toBe(0);
     expect(errors).toEqual([]);
   });
