@@ -30,6 +30,8 @@ for implementation details and historical evidence.
   jumping, adhesion, and camera rules.
 - [Slimes and abilities](gameplay/slimes-and-abilities.md) — roster ownership,
   switching, Goop, Volt, and the merged Specimen.
+- [Companion regrouping](gameplay/companion-regrouping.md) — safe idle-character
+  catch-up routes, puzzle eligibility and manual traversal boundaries.
 - [Puzzles, hazards, and combat](gameplay/puzzles-hazards-and-combat.md) — shared
   component contracts, fixed-step ordering, resets, and damage authority.
 

@@ -1442,6 +1442,36 @@
   content: '';
 }
 
+.goop-speed-overlay {
+  position: fixed;
+  z-index: 12;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  background: radial-gradient(ellipse at center, transparent 60%, rgb(185 235 186 / 3%) 79%, rgb(185 235 186 / 13%) 100%);
+}
+
+.goop-speed-streak {
+  position: absolute;
+  width: clamp(3rem, 7vw, 8rem);
+  height: 1.5px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, rgb(220 255 215 / 80%), transparent);
+  transform-origin: center;
+  animation: goop-speed-streak .72s linear infinite;
+}
+
+@keyframes goop-speed-streak {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--speed-angle)) translateX(-2vw) scaleX(.65); }
+  30% { opacity: .85; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--speed-angle)) translateX(5vw) scaleX(1.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goop-speed-streak { display: none; animation: none; }
+}
+
 .slime-damage-vignette {
   --damage-colour-rgb: 114 234 208;
   position: fixed;

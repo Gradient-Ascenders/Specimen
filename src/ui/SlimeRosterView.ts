@@ -50,18 +50,20 @@ export function getSlimeRosterEntryView(
 export function formatPassiveInteractionStatus(
   snapshot: SlimeHUDSnapshot,
 ): string | undefined {
-  const messages = snapshot.passiveInteractions
-    .filter((interaction) => snapshot.activeSlimeId !== interaction.slimeId)
+  const inactive = snapshot.passiveInteractions
+    .filter((interaction) => snapshot.activeSlimeId !== interaction.slimeId);
+  const messages = inactive
     .map((interaction) => {
       const entry = snapshot.roster.find(
         (candidate) => candidate.id === interaction.slimeId,
       );
       const name = entry?.displayName ?? interaction.slimeId;
+      if (interaction.kind === 'companion') return `${name}: ${interaction.label}.`;
       return `${name} holds the ${interaction.label} while inactive.`;
     });
 
   if (messages.length === 0) return undefined;
-  return `${messages.join(' ')} Switching keeps it active.`;
+  return `${messages.join(' ')}${inactive.some(interaction => interaction.kind !== 'companion') ? ' Switching keeps it active.' : ''}`;
 }
 
 export class SlimeSwitchFeedbackModel {

@@ -286,7 +286,9 @@ export class BlackoutTransitRoom {
 
     // Acid is a continuous lower floor; its dark surface is intentionally
     // walkable for Goop and lethal only through the controller's acidAt test.
-    this.box('transit-acid-basin-subfloor', [width, 0.35, length + 0.5], [0, -1.18, 118], darkSteel);
+    const acidSupport = this.box('transit-acid-basin-subfloor', [width, 0.35, length + 0.5], [0, -1.18, 118], darkSteel);
+    // This collider supports the liquid; the visible acid sheet is not solid.
+    acidSupport.userData.locomotionMedium = 'acid';
     const acidSurface = this.visualBox('transit-acid-surface', [width - 0.5, 0.035, length], [0, -0.985, 118], acid);
     acidSurface.userData.textureRole = 'acid-floor';
     acidSurface.userData.authoringRole = 'blackout-transit-acid-visual';
