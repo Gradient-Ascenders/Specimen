@@ -51,10 +51,11 @@ test('the extra Performance cap composes with profiles without losing gel or den
   settings.setGraphicsPreset('normal'); layer.setGraphicsSettings(settings.value);
   assert.equal(layer.effectivePixelRatioCap, 1.5); assert.equal(renderer.transmissionResolutionScale, 1);
   settings.setGelRenderingMode('reduced-transmission'); layer.setGraphicsSettings(settings.value);
-  assert.equal(renderer.transmissionResolutionScale, .5);
+  assert.equal(renderer.transmissionResolutionScale, .75);
   for (const preset of ['performance', 'normal'] as const) {
     settings.setGraphicsPreset(preset); settings.setRenderPixelRatioCap(.75); layer.setGraphicsSettings(settings.value);
-    assert.equal(layer.effectivePixelRatioCap, .75); assert.equal(renderer.transmissionResolutionScale, .5);
+    assert.equal(layer.effectivePixelRatioCap, .75);
+    assert.equal(renderer.transmissionResolutionScale, preset === 'performance' ? .5 : .75);
   }
   settings.setGraphicsProfile('minimum'); layer.setGraphicsSettings(settings.value);
   assert.equal(layer.gelRendering.value, 'minimum'); assert.equal(settings.value.graphicsPreset, 'normal');

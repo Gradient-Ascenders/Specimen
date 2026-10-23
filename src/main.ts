@@ -28,6 +28,7 @@ import { getOpeningPlaybackMode } from './cinematics/OpeningPlaybackMode.ts';
 import { OPENING_GAME_TIMING } from './cinematics/OpeningGameTimeline.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import { GraphicsPreparationOverlay } from './ui/GraphicsPreparationOverlay.ts';
+import { GoopSpeedOverlay } from './ui/GoopSpeedOverlay.ts';
 import { graphicsPreparationKey, graphicsTransmissionResourceKey } from './render/GraphicsProfiles.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
@@ -500,6 +501,7 @@ function startGame(): void {
   );
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);
+  const goopSpeedOverlay = new GoopSpeedOverlay(app);
   const graphicsPreparationOverlay = new GraphicsPreparationOverlay(app);
   const unsubscribeGraphicsPreparation = gameSession.events.on('graphicsPreparationChanged',
     ({pending, failed}) => graphicsPreparationOverlay.update(pending, failed));
@@ -513,6 +515,8 @@ function startGame(): void {
     render: (interpolationAlpha, stats) => {
       lastFrameStats = stats;
       gameFlow.updateFrame(stats.rawFrameDeltaSeconds);
+      if (gameFlow.state !== 'playing' || titlePresentation || openingPresentation) goopSpeedOverlay.reset();
+      else goopSpeedOverlay.update(stats.frameDeltaSeconds, gameSession.getSpeedEffectStrength());
       if (titlePresentation) {
         if (autoDetecting) return;
         titlePresentation.render(stats.frameDeltaSeconds);
@@ -607,6 +611,7 @@ function startGame(): void {
     document.removeEventListener('visibilitychange', focusAudio);
     unsubscribeObjectiveChanged();
     unsubscribeGraphicsPreparation(); graphicsPreparationOverlay.dispose();
+    goopSpeedOverlay.dispose();
     unsubscribeTransitionStarted();
     unsubscribeTransitionCompleted();
     unsubscribeTransitionFailed();

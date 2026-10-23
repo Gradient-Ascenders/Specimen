@@ -16,6 +16,8 @@ import type { BlackoutMaintenanceBayController } from '../src/levels/BlackoutMai
 import type { VoltElectricalSystem } from '../src/abilities/VoltElectricalSystem.ts';
 import type { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+import { loadSpecimen } from './fixtures/SpecimenAssetFixture.ts';
+import type { SpecimenCharacterPresentation } from '../src/render/specimen/SpecimenCharacterPresentation.ts';
 import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import type {BobCharacterPresentation} from '../src/render/bob/BobCharacterPresentation.ts';
 import type {GoopCharacterPresentation} from '../src/render/goop/GoopCharacterPresentation.ts';
@@ -183,20 +185,34 @@ function createFixture(debugAvailable = true,playArrival=false,cameraRig=new Tes
 }
 
 function finalBossInternals(runtime:BlackoutLevelRuntime) {
-  return (runtime as unknown as {resources:{finalBoss:FinalBossEncounter;specimenBody:KinematicBody;collisionWorld:CollisionWorld;combatTargets:{size:number};scene:{finalArena:ExterminationArena}}}).resources;
+  return (runtime as unknown as {resources:{finalBoss:FinalBossEncounter;specimenBody:KinematicBody;specimenCharacter:SpecimenCharacterPresentation;collisionWorld:CollisionWorld;combatTargets:{size:number};scene:{finalArena:ExterminationArena}}}).resources;
 }
 
-test('the merged boss body and all its parts respect first-person hiding, while boss cinematics restore third person without changing the preference',()=>{
+test('debug room access cannot enable invincibility without the Vite development build flag',()=>{
+  const f=createFixture(true);try {
+    f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+    f.input.press('debugToggleInvincibility');f.tick();f.input.release('debugToggleInvincibility');
+    const {finalBoss:boss}=finalBossInternals(f.runtime);
+    assert.equal(boss.controller.devInvincible,false);
+    assert.equal(f.document.elements.some(element=>element.className==='final-boss-dev-invincibility'),false);
+    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+    boss.controller.toggleDevInvincibility();assert.equal(boss.controller.damagePlayer(20,-1),true);
+    assert.equal(f.runtime.requestFailure(),true);
+  }finally{f.cleanup();}
+});
+
+test('the merged boss body and all its parts respect first-person hiding, while boss cinematics restore third person without changing the preference',async()=>{
   // Most runtime tests use a deliberately inert camera; this handoff needs the
   // real rig and its camera-pass suppression state.
   const rig=new CameraRig(),f=createFixture(true,false,rig as unknown as TestCameraRig);try {
+    await finalBossInternals(f.runtime).specimenCharacter.prepare(loadSpecimen);
     rig.setViewMode('first-person');
     f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');f.render();
     const {finalBoss:b,specimenBody:body}=finalBossInternals(f.runtime);
     assert.equal(b.cinematic,true);assert.equal(rig.isFirstPersonForTarget(body),false);assert.equal(rig.viewMode,'first-person');
     f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
     for(let i=0;i<20;i++)f.render();assert.equal(rig.isFirstPersonForTarget(body),true);
-    const meshes:THREE.Mesh[]=[];b.presentation.specimen.traverse(o=>{if(o instanceof THREE.Mesh)meshes.push(o);});assert.ok(meshes.length>=7);
+    const meshes:THREE.Mesh[]=[];b.presentation.specimen.traverse(o=>{if(o instanceof THREE.Mesh)meshes.push(o);});assert.equal(meshes.length,6);
     for(const mesh of meshes) {
       const material=Array.isArray(mesh.material)?mesh.material[0]!:mesh.material,color=material.colorWrite,depth=material.depthWrite;
       assert.equal(mesh.visible,true);assert.equal(material.visible,true,'camera-pass suppression must not globally hide the shared actor material');
@@ -362,7 +378,7 @@ test('Room 4 debug shortcut is gated, ending uses the legal macro flow and compl
       f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(b.controller.readModel.state,'escape');
       f.tick(50);const previous=finalBossInternals(f.runtime).specimenBody.position.clone();f.tick();
       const direction=finalBossInternals(f.runtime).specimenBody.position.clone().sub(previous).normalize();
-      const forward=new THREE.Vector3(0,0,-1).applyQuaternion(b.presentation.specimen.quaternion);
+      const forward=new THREE.Vector3(0,0,-1).applyQuaternion(f.scene.getObjectByName('specimen-sole-pivot')!.getWorldQuaternion(new THREE.Quaternion()));
       assert.ok(forward.dot(direction)>.99,'escape must face its direction around the ring');
       assert.ok(Math.hypot(previous.x,previous.z-FINAL_ARENA.centreZ)>FINAL_ARENA_RING.innerRadius+FINAL_SPECIMEN_RADIUS,'escape must not cross the abyss');
       f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(f.runtime.roomState.phase,'complete');
@@ -376,12 +392,11 @@ test('looking up close to a boss deck hides only the fused visual, then restores
     f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
     f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
     const body=finalBossInternals(f.runtime).specimenBody;
-    const mesh=f.scene.getObjectByName('merged-bob-goop-volt') as THREE.Mesh;
-    const material=mesh.material as THREE.Material;
-    f.cameraRig.camera.position.copy(body.position);f.render();assert.equal(material.visible,false);
-    assert.ok(mesh.children.every(child=>!child.visible));assert.equal(body.radiusMetres,FINAL_SPECIMEN_RADIUS);
-    f.cameraRig.camera.position.copy(body.position).add(new THREE.Vector3(0,3,-12));f.render();assert.equal(material.visible,true);
-    assert.ok(mesh.children.every(child=>child.visible));assert.equal(f.runtime.finalBossReadModel?.playerHealth,100);
+    const character=finalBossInternals(f.runtime).specimenCharacter;
+    f.cameraRig.camera.position.copy(body.position);f.render();assert.equal(character.diagnostics.visible,false);
+    assert.equal(character.diagnostics.opacity,0);assert.equal(body.radiusMetres,FINAL_SPECIMEN_RADIUS);
+    f.cameraRig.camera.position.copy(body.position).add(new THREE.Vector3(0,3,-12));f.render();assert.equal(character.diagnostics.visible,true);
+    assert.ok(character.diagnostics.opacity>0);assert.equal(f.runtime.finalBossReadModel?.playerHealth,100);
   } finally {f.cleanup();}
 });
 
@@ -996,6 +1011,22 @@ test('Room 1 separate entrances enter Room 2 without snapping bodies back to spa
     assert.equal(f.runtime.getSlimePositions()!.bob.x, 5, 'physical entry must not teleport Bob to the checkpoint marker');
     f.tick(10);
     assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+  } finally { f.cleanup(); }
+});
+
+test('Goop can catch up toward Bob while the player returns to Volt at the bay entrance', () => {
+  const f = createFixture();
+  try {
+    const r = (f.runtime as any).resources;
+    r.group.bobBody.teleport(new THREE.Vector3(6, .46, 56));
+    r.group.goopBody.teleport(new THREE.Vector3(6, .46, 50));
+    const volt = r.group.voltBody.position.clone();
+    f.tick(180);
+    assert.equal(r.manager.activeSlimeId, 'volt');
+    assert.ok(r.group.goopBody.position.z > 51.5, 'Bob already reached the exit, so Goop remains eligible while Volt is controlled');
+    assert.ok(r.group.goopBody.position.z < 54, 'the unpowered door still blocks the companion');
+    assert.ok(r.group.voltBody.position.distanceTo(volt) < .01, 'the player-controlled character receives no companion input');
+    assert.equal(r.deathSequence.isPlaying, true);
   } finally { f.cleanup(); }
 });
 

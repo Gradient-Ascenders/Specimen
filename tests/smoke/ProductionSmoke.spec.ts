@@ -143,8 +143,10 @@ test('Performance production loads Cultivation and Blackout and restarts each at
   const voltAssets = new Set<string>();
   const cultivationAssets = new Set<string>();
   const audioAssets = new Set<string>();
-  const effectUrlsFor = (bank: readonly (keyof typeof SOUND_DEFINITIONS)[]) => bank
-    .map(id => new URL(SOUND_DEFINITIONS[id].path, baseURL!).href).sort();
+  // Cue aliases may share a recording. Compare unique network assets, just
+  // like audioAssets, while still requiring the complete bank with no extras.
+  const effectUrlsFor = (bank: readonly (keyof typeof SOUND_DEFINITIONS)[]) => [...new Set(bank
+    .map(id => new URL(SOUND_DEFINITIONS[id].path, baseURL!).href))].sort();
   const soundEffectUrls = new Set(effectUrlsFor(SOUND_BANKS.blackout));
   const detailAssets = new Set<string>();
   page.on('response', response => {

@@ -128,6 +128,37 @@ function readyCooldown(system: SpecimenProjectileSystem): void {
   system.update(0.81, controls());
 }
 
+test('accepted direct hits earn one boosted shot; shields, misses and reset obey accuracy boundaries', () => {
+  const fixture = createFixture({ overchargeHitsRequired: 4, splashRequiresFullCharge: true });
+  const target = addTarget(fixture, 'accuracy-target', new THREE.Vector3(0, 0.675, 5), { kind: 'weak-point', healthUnits: 1000 });
+  const fired: { overcharged: boolean; damageUnits: number; splashRadiusMetres: number }[] = [];
+  let ready = 0;
+  fixture.system.events.on('overchargeReady', () => ready++);
+  fixture.system.events.on('projectileFired', event => fired.push(event));
+  const hit = () => { fireTap(fixture.system); readyCooldown(fixture.system); };
+  try {
+    hit(); hit(); assert.equal(fixture.system.readModel.overchargeProgress, 0.5);
+    target.target.setWeakPointOpen(false); hit(); assert.equal(fixture.system.readModel.overchargeProgress, 0, 'shield hits break the unfinished streak');
+    target.target.setWeakPointOpen(true); hit();
+    fixture.aimDirection.set(1, 0, 0); hit(); fixture.system.update(2, controls());
+    assert.equal(fixture.system.readModel.overchargeProgress, 0, 'an expired miss cannot build accuracy');
+    fixture.aimDirection.set(0, 0, 1);
+    for (let i = 0; i < 4; i++) hit();
+    assert.equal(ready, 1); assert.equal(fixture.system.readModel.overchargeReady, true);
+    assert.equal(fixture.system.readModel.overchargeProgress, 1);
+    fireTap(fixture.system);
+    assert.equal(fired.at(-1)!.overcharged, true);
+    assert.ok(fired.at(-1)!.damageUnits > 3, 'even a rewarded tap has stronger damage than a normal full shot');
+    assert.ok(fired.at(-1)!.splashRadiusMetres > 0);
+    assert.equal(fixture.system.readModel.overchargeReady, false);
+    assert.equal(fixture.system.projectileStates.find(slot => slot.active)!.overcharged, true);
+    readyCooldown(fixture.system); fireTap(fixture.system);
+    assert.equal(fired.at(-1)!.overcharged, false, 'one reward cannot boost two shots');
+    fixture.system.reset(); assert.equal(fixture.system.readModel.overchargeProgress, 0);
+    assert.equal(fixture.system.readModel.overchargeReady, false);
+  } finally { target.dispose(); fixture.dispose(); }
+});
+
 test('tap, partial, and full charge all derive damage cooldown and splash from one chargeAmount', () => {
   const fixture = createFixture({
     projectileSpeedMetresPerSecond: 1,
@@ -152,7 +183,7 @@ test('tap, partial, and full charge all derive damage cooldown and splash from o
     assert.equal(fired[0]?.damageUnits, 1);
     assert.equal(fired[0]?.splashRadiusMetres, 0);
     assert.ok(
-      Math.abs(fixture.system.readModel.cooldownRemainingSeconds - 0.35) <
+      Math.abs(fixture.system.readModel.cooldownRemainingSeconds - 0.12) <
         0.02,
     );
     assert.equal(fixture.system.readModel.cooldownProgress, 0);
@@ -222,7 +253,7 @@ test('third-person hip-fire converges on the combat target under the camera cros
   }finally{target.dispose();f.dispose();}
 });
 
-test('charge cancellation and cooldown require a fresh press and never buffer held fire', () => {
+test('cancellation needs a fresh press; the next charge can start during recovery without repeating held fire', () => {
   const fixture = createFixture({
     projectileSpeedMetresPerSecond: 1,
     projectileLifetimeSeconds: 60,
@@ -262,11 +293,11 @@ test('charge cancellation and cooldown require a fresh press and never buffer he
       firePressed: true,
       fireHeld: true,
     }));
-    assert.equal(fixture.system.readModel.charging, false);
+    assert.equal(fixture.system.readModel.charging, true);
     fixture.system.update(0.4, controls({
       fireHeld: true,
     }));
-    assert.equal(fixture.system.readModel.charging, false);
+    assert.equal(fixture.system.readModel.charging, true);
     assert.equal(fired, 1);
 
     fixture.system.update(1 / 60, controls({
@@ -274,8 +305,46 @@ test('charge cancellation and cooldown require a fresh press and never buffer he
       fireReleased: true,
     }));
     assert.equal(fired, 2);
+    fixture.system.update(1, controls({ fireHeld: true }));
+    assert.equal(fired, 2, 'holding after release cannot repeat the shot');
   } finally {
     fixture.dispose();
+  }
+});
+
+test('a quick tap after full charge queues one shot and fires at the short recovery boundary', () => {
+  const f = createFixture({ projectileSpeedMetresPerSecond: 1, projectileLifetimeSeconds: 60, allowHipFire: true });
+  const fired: number[] = [];
+  f.system.events.on('projectileFired', event => fired.push(event.chargeAmount));
+  try {
+    f.system.update(1.5, controls({ aimHeld: false, firePressed: true, fireHeld: true }));
+    f.system.update(1 / 60, controls({ aimHeld: false, fireReleased: true }));
+    assert.deepEqual(fired, [1]);
+    assert.equal(f.system.readModel.cooldownRemainingSeconds, 0.18);
+    fireTap(f.system);
+    assert.deepEqual(fired, [1], 'the next click is retained inside the recovery window');
+    f.system.update(0.17, controls({ aimHeld: false }));
+    assert.deepEqual(fired, [1, 0]);
+    f.system.update(1, controls({ aimHeld: false, fireHeld: true }));
+    assert.deepEqual(fired, [1, 0], 'there is only one queued release');
+  } finally { f.dispose(); }
+});
+
+test('queued releases are cleared by cancellation, pointer-lock loss, pause and reset', () => {
+  for (const boundary of ['cancelled', 'pointer-lock', 'inactive', 'pause', 'reset']) {
+    const f = createFixture({ projectileSpeedMetresPerSecond: 1, projectileLifetimeSeconds: 60 });
+    let fired = 0; f.system.events.on('projectileFired', () => fired++);
+    try {
+      fireTap(f.system); fireTap(f.system);
+      assert.equal(fired, 1);
+      if (boundary === 'pause') f.system.cancelInput();
+      else if (boundary === 'reset') f.system.reset();
+      else f.system.update(1 / 60, controls({ cancelled: boundary === 'cancelled',
+        pointerLocked: boundary !== 'pointer-lock', active: boundary !== 'inactive' }));
+      f.system.update(1, controls({ fireHeld: true }));
+      assert.equal(fired, 1, `${boundary} must discard the queued trigger`);
+      assert.equal(f.system.readModel.charging, false);
+    } finally { f.dispose(); }
   }
 });
 
@@ -550,6 +619,8 @@ test('death/reset clears charge, cooldown, and every pooled projectile without r
 
 test('reset invoked from a destruction reaction clears the pool and aborts remaining splash work safely', () => {
   const fixture = createFixture();
+  const feedback: string[] = [];
+  fixture.system.events.on('hitFeedback', event => feedback.push(event.kind));
   let direct: ReturnType<typeof addTarget> | undefined;
   const splash = addTarget(
     fixture,
@@ -580,6 +651,7 @@ test('reset invoked from a destruction reaction clears the pool and aborts remai
     fixture.system.update(0.2, controls());
 
     assert.equal(direct.target.destroyed, true);
+    assert.deepEqual(feedback, ['hit'], 'a reset inside destruction still confirms the accepted hit once');
     assert.equal(splash.target.healthUnits, 5);
     assert.equal(fixture.system.readModel.liveProjectileCount, 0);
     assert.equal(
@@ -596,6 +668,35 @@ test('reset invoked from a destruction reaction clears the pool and aborts remai
     splash.dispose();
     fixture.dispose();
   }
+});
+
+test('a blast confirms accepted damage once across direct and splash targets, and deflections have a distinct cue', () => {
+  const f = createFixture();
+  const direct = addTarget(f, 'direct', new THREE.Vector3(0, 0.675, 5), { healthUnits: 50 });
+  const splash = addTarget(f, 'splash', new THREE.Vector3(1, 0.675, 5), { healthUnits: 50 });
+  const cues: string[] = [];
+  f.system.events.on('hitFeedback', event => cues.push(event.kind));
+  const shoot = () => {
+    f.system.update(1.5, controls({ firePressed: true, fireHeld: true }));
+    f.system.update(1 / 60, controls({ fireReleased: true }));
+    f.system.update(0.2, controls());
+  };
+  try {
+    shoot();
+    assert.ok(direct.target.healthUnits < 50 && splash.target.healthUnits < 50);
+    assert.deepEqual(cues, ['hit']);
+    direct.target.applyImpact = () => ({ accepted: false, destroyed: false, rejectionReason: 'armour' });
+    shoot();
+    assert.deepEqual(cues, ['hit', 'hit'], 'accepted splash takes priority over direct armour');
+    splash.unregister();
+    shoot();
+    assert.deepEqual(cues, ['hit', 'hit', 'blocked']);
+    direct.unregister();
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 0.2)); wall.position.set(0, 0.675, 5);
+    f.world.register(wall);
+    try { shoot(); assert.equal(cues.length, 3, 'world impacts are not enemy hits'); }
+    finally { f.world.unregister(wall); wall.geometry.dispose(); (wall.material as THREE.Material).dispose(); }
+  } finally { direct.dispose(); splash.dispose(); f.dispose(); }
 });
 
 

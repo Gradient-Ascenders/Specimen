@@ -43,6 +43,8 @@ export interface KinematicBodyConfig {
   skinWidthMetres: number;
   gravityMetresPerSecondSquared: number;
   maxSpeedMetresPerSecond: number;
+  /** Ground-only affinity; 1 keeps ordinary movement on acid floors. */
+  acidSpeedMultiplier: number;
   groundAccelerationMetresPerSecondSquared: number;
   airAccelerationMetresPerSecondSquared: number;
   groundBrakingMetresPerSecondSquared: number;
@@ -93,6 +95,7 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   skinWidthMetres: 0.01,
   gravityMetresPerSecondSquared: 18,
   maxSpeedMetresPerSecond: 5.5,
+  acidSpeedMultiplier: 1,
   groundAccelerationMetresPerSecondSquared: 32,
   airAccelerationMetresPerSecondSquared: 12,
   groundBrakingMetresPerSecondSquared: 36,
@@ -138,6 +141,12 @@ export interface KinematicBodyOptions {
   initialPosition: ReadonlyVector3State;
   config?: Partial<KinematicBodyConfig>;
   events?: EventBus<MovementEvents>;
+}
+
+/** Temporary ability tuning for one step, without changing the body's base configuration. */
+export interface LocomotionModifiers {
+  readonly speedMultiplier: number;
+  readonly accelerationMultiplier: number;
 }
 
 /**
@@ -376,8 +385,23 @@ export class KinematicBody {
     return this.config.maximumJumpChargeSeconds;
   }
 
+  get locomotionSpeedMultiplier(): number {
+    const acidSupport = this.groundedValue &&
+      (this.supportColliderValue?.userData.textureRole === 'acid-floor' ||
+        this.supportColliderValue?.userData.locomotionMedium === 'acid');
+    return acidSupport ? this.config.acidSpeedMultiplier : 1;
+  }
+
   get maximumLocomotionSpeedMetresPerSecond(): number {
-    return this.config.maxSpeedMetresPerSecond;
+    return this.config.maxSpeedMetresPerSecond * this.locomotionSpeedMultiplier;
+  }
+
+  /** Current planar travel before ordinary grounded braking brings us to rest. */
+  get groundStoppingDistanceMetres(): number {
+    const normalSpeed = this.velocityValue.dot(this.groundNormalValue);
+    const speedSquared = Math.max(0, this.velocityValue.lengthSq() - normalSpeed * normalSpeed);
+    const braking = this.config.groundBrakingMetresPerSecondSquared * this.supportTractionMultiplier;
+    return braking > 0 ? speedSquared / (2 * braking) : Infinity;
   }
 
   get lastContactNormal(): ReadonlyVector3State {
@@ -407,9 +431,14 @@ export class KinematicBody {
     deltaSeconds: number,
     movementDirectionWorld: ReadonlyVector3State,
     jumpInput: Readonly<JumpInputState> = NO_JUMP_INPUT,
+    locomotion?: LocomotionModifiers,
   ): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error('KinematicBody deltaSeconds must be positive and finite.');
+    }
+    if (locomotion && (!Number.isFinite(locomotion.speedMultiplier) || locomotion.speedMultiplier <= 0 ||
+      !Number.isFinite(locomotion.accelerationMultiplier) || locomotion.accelerationMultiplier <= 0)) {
+      throw new Error('Locomotion multipliers must be positive and finite.');
     }
 
     this.previousPositionValue.copy(this.currentPosition);
@@ -467,6 +496,7 @@ export class KinematicBody {
       movementDirectionWorld,
       attachedAtStepStart,
       this.movementUpAtStepStart,
+      locomotion,
     );
     this.applyGravity(deltaSeconds);
 
@@ -966,6 +996,7 @@ export class KinematicBody {
     movementDirectionWorld: ReadonlyVector3State,
     attachedAtStepStart: boolean,
     movementUpAtStepStart: THREE.Vector3,
+    modifiers?: LocomotionModifiers,
   ): void {
     this.moveInput.set(
       THREE.MathUtils.clamp(movementDirectionWorld.x, -1, 1),
@@ -1002,7 +1033,7 @@ export class KinematicBody {
       if (this.targetVelocity.lengthSq() > MOVEMENT_EPSILON_SQ) {
         this.targetVelocity
           .normalize()
-          .multiplyScalar(this.config.maxSpeedMetresPerSecond);
+          .multiplyScalar(this.maximumLocomotionSpeedMetresPerSecond * (modifiers?.speedMultiplier ?? 1));
 
         this.velocityDelta
           .subVectors(this.targetVelocity, this.planarVelocity);
@@ -1015,7 +1046,7 @@ export class KinematicBody {
             ? this.config.groundAccelerationMetresPerSecondSquared
             : this.config.airAccelerationMetresPerSecondSquared) *
           traction;
-        const maximumVelocityChange = acceleration * deltaSeconds;
+        const maximumVelocityChange = acceleration * deltaSeconds * (modifiers?.accelerationMultiplier ?? 1);
         const deltaLength = this.velocityDelta.length();
 
         if (deltaLength > maximumVelocityChange && deltaLength > 0) {
@@ -1743,6 +1774,7 @@ export class KinematicBody {
       ['skinWidthMetres', config.skinWidthMetres],
       ['gravityMetresPerSecondSquared', config.gravityMetresPerSecondSquared],
       ['maxSpeedMetresPerSecond', config.maxSpeedMetresPerSecond],
+      ['acidSpeedMultiplier', config.acidSpeedMultiplier],
       [
         'groundAccelerationMetresPerSecondSquared',
         config.groundAccelerationMetresPerSecondSquared,

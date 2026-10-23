@@ -55,11 +55,17 @@ export class FinalBossController {
   private defeatDelivered=false;
   private transitionDelivered=false;
   private disposed=false;
+  private devInvincibilityEnabled=false;
   private readonly beamSweep=new ExterminatorBeamSweep();
 
   constructor(options:{random?:()=>number}={}) {this.random=options.random??Math.random;}
   get cinematic():boolean {return ['intro','transition','defeated','escape'].includes(this.model.state);}
   get combatActive():boolean {return this.model.state==='combat';}
+  get devInvincible():boolean {return !!import.meta.env?.DEV&&this.devInvincibilityEnabled;}
+  toggleDevInvincibility():void {
+    if(!import.meta.env?.DEV||this.disposed||!['intro','combat','transition'].includes(this.model.state))return;
+    this.devInvincibilityEnabled=!this.devInvincibilityEnabled;
+  }
   get time():number {return this.totalTime;}
   start(shortIntro=false):boolean {
     if(this.disposed||this.model.state!=='idle')return false;
@@ -143,10 +149,14 @@ export class FinalBossController {
     }
     return {accepted:true,destroyed:m.health===0};
   }
-  damagePlayer(amount:number,serial=this.model.attackSerial):boolean {
+  canDamagePlayer(amount:number,serial=this.model.attackSerial):boolean {
     const m=this.model;
-    if(!this.combatActive||this.transitionPending||this.defeatPending||m.invulnerability>0||!Number.isFinite(amount)||amount<=0||
-      (serial>=0&&serial===this.lastMajorDamageAttack))return false;
+    return !this.devInvincible&&this.combatActive&&!this.transitionPending&&!this.defeatPending&&m.invulnerability<=0&&Number.isFinite(amount)&&amount>0&&
+      !(serial>=0&&serial===this.lastMajorDamageAttack);
+  }
+  damagePlayer(amount:number,serial=this.model.attackSerial):boolean {
+    if(!this.canDamagePlayer(amount,serial))return false;
+    const m=this.model;
     if(serial>=0)this.lastMajorDamageAttack=serial;
     m.playerHealth=Math.max(0,m.playerHealth-amount);m.invulnerability=T.playerDamageGraceSeconds;return true;
   }
@@ -169,6 +179,7 @@ export class FinalBossController {
   deflect():void {this.model.rejectedFlash=.3;}
   suspend():void {this.model.state='suspended';this.model.weakPointOpen=false;this.model.shieldActive=false;this.model.regenerating=false;}
   reset():void {
+    this.devInvincibilityEnabled=false;
     const m=this.model;m.state='idle';m.phase=1;m.health=m.maximumHealth;m.playerHealth=100;m.invulnerability=0;
     m.attack='gun-blast';m.stage='telegraph';m.progress=0;m.elapsed=0;m.attackSerial=0;m.weakPointOpen=false;m.shieldActive=false;m.regenerating=false;
     m.defenseIndex=0;m.defenseThreshold=0;m.summonCount=0;m.defendersRemaining=0;m.hitFlash=0;m.rejectedFlash=0;m.lockedTarget.set(0,0,0);

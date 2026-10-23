@@ -19,6 +19,10 @@ export class GameplayAudio {
   private readonly bodyMotion = { x: 0, y: 0, z: 0 };
   private bodyMotionTracked = false;
   private bodyContactMetres = 0;
+  private movementBody: KinematicBody | undefined;
+  private specimenBody: KinematicBody | undefined;
+  private specimenActive: () => boolean = () => false;
+  private specimenUnsubscribers: (() => void)[] = [];
   private readonly worldAudio: WorldAudio | undefined;
   private readonly audio: AudioPlayback;
   private readonly manager: SlimeManager<KinematicBody>;
@@ -62,37 +66,49 @@ export class GameplayAudio {
       const body = manager.getBody(id);
       if (!body || boundBodies.has(body)) return;
       boundBodies.add(body);
-      const cue = (sound: SoundId, varyPitch = false, volumeScale = 1) => {
-        if (this.enabled && !this.dead && !this.resetting && manager.getBody(id) === body) audio.play(sound, body.position, varyPitch, volumeScale);
-      };
-      this.unsubscribers.push(
-        body.events.on('jumped', ({ chargeFraction }) => {
-          this.clearBodyTravel();
-          cue(id === 'bob' && chargeFraction >= 0.8 ? 'bob-charged-jump-01' : 'bob-jump-01', true);
-        }),
-        body.events.on('landed', ({ impactSpeedMetresPerSecond: speed }) => {
-          this.clearBodyTravel();
-          cue(speed >= 8 ? 'bob-land-hard-01' : 'bob-land-soft-01', true);
-        }),
-        body.events.on('obstacleImpact', () => {
-          this.clearBodyTravel(); cue('bob-contact-01', true, 0.8);
-        }),
-      );
-      if (id === 'bob') this.unsubscribers.push(
-        body.events.on('attached', () => { this.clearBodyTravel(); cue('bob-contact-01'); }),
-        body.events.on('detached', () => { this.clearBodyTravel(); cue('bob-detach-01', true, 0.65); }),
-        body.events.on('bounced', () => {
-          this.clearBodyTravel();
-          // A hard floor landing already sounded before its passive rebound.
-          if (!body.landedThisStep) cue('bob-land-hard-01', true);
-        }),
-        body.events.on('regripped', () => { this.clearBodyTravel(); cue('bob-contact-01', true, 0.55); }),
-      );
+      this.unsubscribers.push(...this.bindBodySounds(body, () => manager.getBody(id) === body, id === 'bob', id === 'bob'));
     };
     for (const id of ['bob', 'goop', 'volt'] as const) bindBody(id);
     this.unsubscribers.push(manager.events.on('registered', ({ slimeId }) => {
       if (slimeId === 'bob' || slimeId === 'goop' || slimeId === 'volt') bindBody(slimeId);
     }));
+  }
+
+  /** The fusion body lives outside the three-slime roster. Keep its event
+   * subscriptions level-owned and silent while a cinematic borrows the actor. */
+  bindSpecimen(body: KinematicBody, active: () => boolean = () => true): void {
+    for (const unsubscribe of this.specimenUnsubscribers) unsubscribe();
+    this.clearBodyTravel();
+    this.specimenBody = body; this.specimenActive = active;
+    this.specimenUnsubscribers = this.bindBodySounds(body,
+      () => this.controlledBody() === body && this.specimenActive(), true, true);
+  }
+
+  private bindBodySounds(body: KinematicBody, current: () => boolean, charged: boolean, wallSounds: boolean): (() => void)[] {
+    const cue = (sound: SoundId, varyPitch = false, volumeScale = 1) => {
+      if (this.enabled && !this.dead && !this.resetting && current()) this.audio.play(sound, body.position, varyPitch, volumeScale);
+    };
+    const subscriptions = [
+      body.events.on('jumped', ({ chargeFraction }) => {
+        this.clearBodyTravel();
+        cue(charged && chargeFraction >= 0.8 ? 'bob-charged-jump-01' : 'bob-jump-01', true);
+      }),
+      body.events.on('landed', ({ impactSpeedMetresPerSecond: speed }) => {
+        this.clearBodyTravel(); cue(speed >= 8 ? 'bob-land-hard-01' : 'bob-land-soft-01', true);
+      }),
+      body.events.on('obstacleImpact', () => { this.clearBodyTravel(); cue('bob-contact-01', true, 0.8); }),
+    ];
+    if (wallSounds) subscriptions.push(
+      body.events.on('attached', () => { this.clearBodyTravel(); cue('bob-contact-01'); }),
+      body.events.on('detached', () => { this.clearBodyTravel(); cue('bob-detach-01', true, 0.65); }),
+      body.events.on('bounced', () => {
+        this.clearBodyTravel();
+        // A hard landing already sounded before its passive rebound.
+        if (!body.landedThisStep) cue('bob-land-hard-01', true);
+      }),
+      body.events.on('regripped', () => { this.clearBodyTravel(); cue('bob-contact-01', true, 0.55); }),
+    );
+    return subscriptions;
   }
 
   setEnabled(enabled: boolean): void {
@@ -106,13 +122,14 @@ export class GameplayAudio {
     if (!this.enabled || this.dead) return;
     this.resetting = false;
     const id = this.manager.activeSlimeId;
-    const body = this.manager.activeBody;
+    let body = this.manager.activeBody;
     const controlled = this.controlledBody();
     this.updateListener();
     this.updateAcidPools(controlled?.position);
     this.worldAudio?.update(controlled?.position);
-    if (controlled !== body) { this.clearCharacter(); return; }
-    if (!body || (id !== 'bob' && id !== 'goop' && id !== 'volt')) { this.clearCharacter(); return; }
+    if (controlled && controlled === this.specimenBody && this.specimenActive()) body = controlled;
+    else if (controlled !== body || !body || (id !== 'bob' && id !== 'goop' && id !== 'volt')) { this.clearCharacter(); return; }
+    if (this.movementBody !== body) { this.clearBodyTravel(); this.movementBody = body; }
     const v = body.velocity, n = body.groundNormal;
     const normalSpeed = v.x * n.x + v.y * n.y + v.z * n.z;
     const tangentSpeedSquared = Math.max(0, v.x*v.x + v.y*v.y + v.z*v.z - normalSpeed*normalSpeed);
@@ -150,15 +167,17 @@ export class GameplayAudio {
     const normalDistance = dx * normal.x + dy * normal.y + dz * normal.z;
     const tangentDistance = Math.sqrt(Math.max(0, dx * dx + dy * dy + dz * dz - normalDistance * normalDistance));
     this.bodyContactMetres += tangentDistance;
-    if (this.bodyContactMetres >= 1.25) {
-      this.bodyContactMetres %= 1.25;
-      this.audio.play('bob-contact-01', body.position, true, body.attached ? 0.25 : 0.35);
+    const stride = body === this.specimenBody ? 1.25 * body.radiusMetres / 0.45 : 1.25;
+    if (this.bodyContactMetres >= stride) {
+      this.bodyContactMetres %= stride;
+      this.audio.play('bob-contact-01', body.position, true, body.attached ? 0.25 : body === this.specimenBody ? 0.45 : 0.35);
     }
   }
 
   private clearBodyTravel(): void {
     this.bodyMotionTracked = false;
     this.bodyContactMetres = 0;
+    this.movementBody = undefined;
   }
 
   private updateAcidPools(listener: AudioPosition | undefined): void {
@@ -183,6 +202,7 @@ export class GameplayAudio {
   died(id: string | undefined): void {
     this.reset();
     if ((id === 'bob' || id === 'goop' || id === 'volt') && this.enabled) this.audio.play('bob-fall-01', this.manager.getBody(id)?.position);
+    else if (this.enabled && this.controlledBody() === this.specimenBody && this.specimenBody) this.audio.play('bob-fall-01', this.specimenBody.position);
     // Allow the death one-shot to finish; reject further world events.
     this.dead = true;
   }
@@ -192,7 +212,9 @@ export class GameplayAudio {
     this.resetting = false;
     this.setEnabled(true);
     const id = this.manager.activeSlimeId;
-    if (id === 'bob' || id === 'goop' || id === 'volt') this.audio.play('bob-contact-01', this.manager.activeBody?.position, false, 0.8);
+    const controlled = this.controlledBody();
+    if (controlled && (controlled === this.specimenBody || id === 'bob' || id === 'goop' || id === 'volt'))
+      this.audio.play('bob-contact-01', controlled.position, false, 0.8);
   }
   private clearCharacter(): void {
     this.clearBodyTravel();
@@ -211,6 +233,8 @@ export class GameplayAudio {
   dispose(): void {
     this.enabled = false;
     for (const unsubscribe of this.unsubscribers) unsubscribe();
+    for (const unsubscribe of this.specimenUnsubscribers) unsubscribe();
+    this.specimenUnsubscribers = []; this.specimenBody = undefined;
     this.reset();
     this.worldAudio?.dispose();
   }

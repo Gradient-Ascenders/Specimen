@@ -19,6 +19,9 @@ export class ExterminatorWarDrone {
   private readonly flashTime=[0,0];
   private readonly localTarget=new THREE.Vector3();
   private readonly eyeMuzzle=new THREE.Group();
+  private readonly hitStrength={value:0};
+  private readonly hitTime={value:0};
+  private hitRemaining=0;
   private readonly flashMaterial=new THREE.MeshBasicMaterial({color:0xffd88c,transparent:true,opacity:.85,depthWrite:false,blending:THREE.AdditiveBlending});
   private readonly yellow=this.armour(0xb39b38,.62,.62);
   private readonly yellowLight=this.armour(0xd0b852,.59,.6);
@@ -166,6 +169,8 @@ export class ExterminatorWarDrone {
     const visor=this.plate([3.3,.37,.9],[0,1.75,-4.4],this.gunmetal);visor.rotation.x=-.1;
   }
   update(time:number,open:boolean,phase:1|2,dt:number,model?:Readonly<FinalBossReadModel>,target?:THREE.Vector3Like):void {
+    this.hitRemaining=Math.max(0,this.hitRemaining-dt);this.hitTime.value+=dt;
+    this.hitStrength.value=(this.hitRemaining/.3)**2;
     const gun=model?.state==='combat'&&model.attack==='gun-blast',defend=model?.shieldActive===true;
     const spin=gun?(model.stage==='telegraph'?4+model.progress*31:35):model?.attack==='ram'?
       model.stage==='telegraph'?15+model.progress*50:model.stage==='active'?65:25:defend?22:phase===2?25:17;
@@ -183,9 +188,12 @@ export class ExterminatorWarDrone {
     this.red.color.setHex(gun?0xff7337:phase===2?0xff182f:0xff3041);
   }
   kickGuns():void {for(let i=0;i<2;i++){this.recoil[i]=.24;this.flashTime[i]=.065;this.flashes[i]!.visible=true;}}
+  reactToChargedHit():void {this.hitRemaining=.3;this.hitTime.value=0;this.hitStrength.value=1;}
+  get hitReactionStrength():number {return this.hitStrength.value;}
   copyGunMuzzle(index:number,out:THREE.Vector3):THREE.Vector3 {return this.muzzles[index]!.getWorldPosition(out);}
   copyEyeMuzzle(out:THREE.Vector3):THREE.Vector3 {return this.eyeMuzzle.getWorldPosition(out);}
   reset():void {
+    this.hitRemaining=0;this.hitStrength.value=0;this.hitTime.value=0;
     for(const shutter of this.shutters)shutter.position.y=0;
     for(const rotor of this.rotors)rotor.rotation.y=0;
     for(const drum of this.drums)drum.rotation.z=0;
@@ -199,8 +207,11 @@ export class ExterminatorWarDrone {
     const m=new THREE.MeshStandardMaterial({color,roughness,metalness,emissive:color,emissiveIntensity:.085});
     // Deterministic triplanar wear works on merged parts without bitmap assets.
     m.onBeforeCompile=shader=>{
-      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 machineP;')
-        .replace('#include <begin_vertex>','#include <begin_vertex>\nmachineP=position;');
+      shader.uniforms.uBossHit=this.hitStrength;shader.uniforms.uBossHitTime=this.hitTime;
+      // Vertex-only shudder leaves muzzle anchors, projectile proxies and the
+      // swept RAM hull at their authoritative poses.
+      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 machineP;uniform float uBossHit,uBossHitTime;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nmachineP=position;transformed+=uBossHit*vec3(sin(uBossHitTime*135.)*.1,sin(uBossHitTime*111.)*.065,cos(uBossHitTime*127.)*.08);');
       shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 machineP;float wearHash(vec3 p){return fract(sin(dot(p,vec3(12.9898,78.233,45.16)))*43758.5453);}')
         .replace('#include <color_fragment>','#include <color_fragment>\nfloat grain=wearHash(floor(machineP*48.));float chip=step(.978,wearHash(floor(machineP*13.)));diffuseColor.rgb*=.89+grain*.18;diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.055,.066,.073),chip*.7);');
     };this.materials.add(m);return m;

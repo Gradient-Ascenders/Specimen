@@ -59,7 +59,7 @@ export class BlackoutAscentLift {
     this.floor = this.solid('lift-car-floor', [8, .8, 8.4], [0, 0, V.centreZ], this.worn);
     this.solid('lift-lab-landing', [12.8, .8, 5.1], [0, 0, 187.45], this.white);
     for (const sign of [-1, 1]) {
-      this.solid(`lift-shaft-wall-${sign}`, [.4, 52, 11], [sign * 6, 3, 180], this.dark);
+      this.solid(`lift-shaft-wall-${sign}`, [.4, 52, 10.3], [sign * 6, 3, 179.65], this.dark);
       this.solid(`lift-entry-shoulder-${sign}`, [1.6, 5.4, 2.5], [sign * 4.9, 3.1, 175.25], this.dark);
       if (sign < 0) this.solid(`lift-car-side-rail-${sign}`, [.16, .15, 7.6], [sign * 3.8, 1.65, V.centreZ], this.frame);
       else {
@@ -67,18 +67,18 @@ export class BlackoutAscentLift {
         this.solid('lift-car-side-rail-outlet-back', [.16, .15, 2.3], [3.8, 1.65, 183.35], this.frame);
       }
       for (const z of sign < 0 ? [177.1, 180.7, 184.3] : [177.1, 180.4, 182.2, 184.3]) {
-        this.solid(`lift-rail-post-${sign}-${z}`, [.15, 1.2, .15], [sign * 3.8, 1, z], this.frame);
+        this.solid(`lift-rail-post-${sign}-${z}`, [.15, 1.175, .15], [sign * 3.8, .9875, z], this.frame);
         this.box('lift-rail-foot', [.35, .08, .35], [sign * 3.8, .46, z], this.dark);
       }
-      this.box('lift-car-sill', [.24, .2, 8.4], [sign * 3.87, .44, V.centreZ], this.dark);
+      this.box('lift-car-sill', [.16, .2, 8.3], [sign * 3.87, .44, V.centreZ], this.dark);
       this.box('lift-guide-rail', [.16, 54, .3], [sign * 4.9, 3, V.centreZ], this.frame);
       this.box('lift-suspension-cable', [.045, 49, .045], [sign * 3.4, 22, 183.8], this.frame);
-      this.box('lift-car-overhead-column', [.19, 4.8, .22], [sign * 3.8, 2.8, 184.3], this.frame);
+      this.box('lift-car-overhead-column', [.19, 4.6, .22], [sign * 3.8, 2.9, 184.3], this.frame);
       this.box('lift-side-caution', [.2, .025, 7.4], [sign * 3.35, .415, V.centreZ], this.amber);
     }
-    this.box('lift-car-overhead-crossmember', [7.8, .26, .3], [0, 5.1, 184.3], this.frame);
+    this.box('lift-car-overhead-crossmember', [8, .26, .3], [0, 5.1, 184.3], this.frame);
     this.box('lift-car-underframe', [8.3, .3, 8.65], [0, -.52, V.centreZ], this.dark);
-    for (let i = 0; i < 8; i++) this.box('lift-floor-panel-seam', [7.4, .012, .018], [0, .407, 177.3 + i], this.dark);
+    for (let i = 0; i < 8; i++) this.box('lift-floor-panel-seam', [6.4, .012, .018], [0, .407, 177.3 + i], this.dark);
     for (const x of [-2.6, 2.6]) for (const z of [177.25, 184.1]) {
       for (let i = 0; i < 5; i++) {
         const stripe = this.box('lift-caution-stripe', [.17, .018, .38], [x + i * .22 - .44, .42, z], i % 2 ? this.dark : this.amber);
@@ -92,7 +92,7 @@ export class BlackoutAscentLift {
     this.dynamicColliders.push(this.labDoor);
     for (const side of [-1, 1]) {
       this.box('lift-lab-door-panel', [3.95, 5.8, .04], [side * 2.08, 0, -.145], this.white, this.labDoor);
-      this.box('lift-lab-door-centre-seal', [.045, 6.2, .03], [side * .08, 0, -.17], this.frame, this.labDoor);
+      this.box('lift-lab-door-centre-seal', [.045, 6.2, .03], [side * .08, 0, -.21], this.frame, this.labDoor);
       this.box('lift-lab-door-window', [1.6, .16, .05], [side * 2.1, 1, -.18], this.strip, this.labDoor);
     }
     for (const gate of [this.rearGate, this.frontGate]) {
@@ -191,7 +191,7 @@ export class BlackoutAscentLift {
       this.box(name, size, position, material, cabinet);
     const studGeometry = this.geometry(new THREE.CylinderGeometry(.047, .047, .15, 10));
     const screwGeometry = this.geometry(new THREE.CylinderGeometry(.025, .025, .035, 8));
-    const padGeometry = this.geometry(new THREE.CylinderGeometry(.027, .027, .012, 8));
+    const padGeometry = this.geometry(new THREE.CylinderGeometry(.022, .022, .012, 8));
     const cylinder = (name: string, geometry: THREE.BufferGeometry, position: readonly [number, number, number], material: THREE.Material): THREE.Mesh => {
       const mesh = new THREE.Mesh(geometry, material); mesh.name = name; mesh.rotation.z = Math.PI / 2;
       mesh.position.set(...position); cabinet.add(mesh); return mesh;
@@ -235,9 +235,9 @@ export class BlackoutAscentLift {
       const coil = new THREE.Mesh(winding, copper); coil.name = 'lift-pcb-inductor-winding';
       coil.rotation.y = Math.PI / 2; coil.position.set(3.45 + i * .022, 1.24, 181.52); cabinet.add(coil);
     }
-    for (const [y, z] of [[2.28, 180.95], [1.39, 181.15], [1.39, 181.38]]) box('lift-pcb-resistor', [.04, .055, .105], [3.53, y!, z!], chip);
-    box('lift-pcb-live-indicator', [.04, .045, .09], [3.52, 2.28, 181.62], this.status);
-    box('lift-terminal-carrier', [.12, .45, .64], [3.49, 1.72, 181.25], this.white);
+    for (const [y, z] of [[2.28, 180.95], [1.39, 181.15], [1.39, 181.38]]) box('lift-pcb-resistor', [.06, .055, .105], [3.53, y!, z!], chip);
+    box('lift-pcb-live-indicator', [.04, .045, .09], [3.505, 2.28, 181.62], this.status);
+    box('lift-terminal-carrier', [.2, .45, .64], [3.49, 1.72, 181.25], this.white);
     for (const z of [181.05, 181.45]) {
       cylinder('lift-power-terminal', studGeometry, [3.365, 1.72, z], copper);
       cylinder('lift-terminal-contact-screw', screwGeometry, [3.272, 1.72, z], solder);
@@ -250,8 +250,8 @@ export class BlackoutAscentLift {
     hinge.rotation.y = 1.9; cabinet.add(hinge);
     const cover = this.box('lift-broken-cabinet-door', [.075, 1.49, 1.22], [-.02, 0, -.66], this.worn, hinge);
     this.box('lift-cover-inner-service-diagram', [.012, .7, .72], [.025, .08, -.67], diagram, hinge);
-    for (const z of [-.92, -.44]) this.box('lift-cover-diagram-trace', [.004, .4, .014], [.035, .06, z], copper, hinge);
-    for (const y of [-.14, .26]) this.box('lift-cover-diagram-trace', [.004, .014, .47], [.035, y, -.68], copper, hinge);
+    for (const z of [-.92, -.44]) this.box('lift-cover-diagram-trace', [.004, .386, .014], [.045, .06, z], copper, hinge);
+    for (const y of [-.14, .26]) this.box('lift-cover-diagram-trace', [.004, .014, .47], [.045, y, -.68], copper, hinge);
     for (const z of [-.8, -.58]) this.box('lift-cover-diagram-component', [.008, .08, .12], [.041, .06, z], chip, hinge);
     this.box('lift-cover-warning-inlay', [.009, .05, .7], [-.065, .57, -.66], this.amber, hinge);
     const hingeGeometry = this.geometry(new THREE.CylinderGeometry(.04, .04, .16, 10));
@@ -285,22 +285,26 @@ export class BlackoutAscentLift {
   private buildLab(): void {
     for (const sign of [-1, 1]) {
       this.solid('lift-lab-outer-wall', [.4, 6.8, 5.2], [sign * 6.4, 3.8, 187.4], this.white);
-      this.solid('lift-lab-front-shoulder', [2.25, 6.8, .3], [sign * 5.275, 3.8, 185], this.white);
-      for (let i = 0; i < 3; i++) this.box('lift-lab-wall-joint', [.03, 6.3, .025], [sign * 6.18, 3.6, 185.3 + i * 1.9], this.seam);
+      this.solid('lift-lab-front-shoulder', [1.97, 6.8, .3], [sign * 5.215, 3.8, 185], this.white);
+      for (let i = 0; i < 3; i++) {
+        this.box('lift-lab-wall-joint', [.03, .61, .025], [sign * 6.18, .935, 185.3 + i * 1.9], this.seam);
+        this.box('lift-lab-wall-joint', [.03, 5.39, .025], [sign * 6.18, 4.055, 185.3 + i * 1.9], this.seam);
+      }
       this.box('lift-lab-teal-inlay', [.035, .12, 5], [sign * 6.17, 1.3, 187.4], this.strip);
-      this.box('lift-lab-skirt', [.07, .18, 5], [sign * 6.16, .5, 187.4], this.frame);
+      this.box('lift-lab-skirt', [.07, .18, 3.9], [sign * 6.16, .5, 187.25], this.frame);
       this.box('lift-lab-door-jamb', [.16, 5.3, .3], [sign * 4.15, 3.05, 185], this.frame);
-      this.solid('lift-lab-rear-wall', [2.15, 6.8, .3], [sign * 5.325, 3.8, 190], this.white);
-      this.box('lift-lab-rear-inlay', [1.7, .08, .04], [sign * 5.3, 1.3, 189.82], this.strip);
-      this.box('lift-lab-rear-panel-seam', [.025, 6.3, .04], [sign * 5.4, 3.6, 189.82], this.seam);
+      this.solid('lift-lab-rear-wall', [1.95, 6.8, .3], [sign * 5.225, 3.8, 189.4], this.white);
+      this.box('lift-lab-rear-inlay', [1.7, .08, .04], [sign * 5.3, 1.3, 189.22], this.strip);
+      this.box('lift-lab-rear-panel-seam', [.025, .79, .04], [sign * 5.4, .845, 189.22], this.seam);
+      this.box('lift-lab-rear-panel-seam', [.025, 5.39, .04], [sign * 5.4, 4.055, 189.22], this.seam);
     }
     this.solid('lift-lab-ceiling', [12.8, .3, 5.2], [0, 7.35, 187.4], this.white);
-    this.solid('lift-lab-door-header', [8.5, 1.5, .3], [0, 6.45, 185], this.white);
-    this.solid('lift-lab-rear-header', [8.5, .6, .3], [0, 7.05, 190], this.white);
+    this.solid('lift-lab-door-header', [8.46, 1.5, .3], [0, 6.45, 185], this.white);
+    this.solid('lift-lab-rear-header', [8.5, .6, .3], [0, 7.05, 189.4], this.white);
     for (const x of [-5, 0, 5]) {
       this.box('lift-lab-ceiling-fixture', [2.5, .12, .8], [x, 7.1, 187.5], this.frame);
       this.box('lift-lab-ceiling-diffuser', [2.2, .04, .6], [x, 7.015, 187.5], this.strip);
-      this.box('lift-lab-floor-expansion-seam', [.018, .012, 5], [x, .407, 187.4], this.seam);
+      this.box('lift-lab-floor-expansion-seam', [.018, .012, 3.9], [x, .407, 187.25], this.seam);
     }
     this.box('lift-lab-arrival-indicator', [2.5, .12, .05], [0, 5.82, 184.8], this.strip);
     for (const x of [-3.8, 3.8]) this.box('lift-lab-floor-guide', [.08, .02, 4], [x, .42, 187.5], this.strip);

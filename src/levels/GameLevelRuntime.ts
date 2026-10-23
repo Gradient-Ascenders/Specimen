@@ -4,6 +4,7 @@ import type { PerformanceGameplaySnapshot } from '../core/PerformanceSnapshot.ts
 import type { SlimeHUDListener, SlimeHUDSnapshot } from '../slimes/SlimeHUDState.ts';
 import type { LevelLifecycleState } from './LevelLifecycle.ts';
 import type { LevelProgressionSnapshot } from './LevelProgression.ts';
+import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 
 export interface GameLevelRuntimeEvents {
   objectiveChanged: { readonly roomId: string | number; readonly objective: string };
@@ -28,10 +29,13 @@ export interface GameLevelRuntime {
   dispose(): void;
   fixedUpdate(deltaSeconds: number): void;
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void;
+  /** Optional presentation-only strength for the controlled Goop's acid boost. */
+  getSpeedEffectStrength?(): number;
   setDebugInteractionEnabled(enabled: boolean): void;
   prepareCleanGameplay?(): void;
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void;
   getSlimeHUDSnapshot(): SlimeHUDSnapshot;
+  getPlayerHealth?(): SlimeHealthReadModel | undefined;
   captureProgressionSnapshot(): LevelProgressionSnapshot;
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void;
 }

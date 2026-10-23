@@ -1,0 +1,217 @@
+{
+  "mesh_geometry_matches": true,
+  "runtime_up": "+Y",
+  "runtime_forward": "-Z",
+  "studio_excluded": true,
+  "vertex_colours_preserved": [
+    "Specimen-Acid-Core",
+    "Specimen-Body"
+  ],
+  "transmission_factor": 0.9399999976158142,
+  "gold_emission_strength": 12.0,
+  "gel_roughness": 0.12999999523162842,
+  "mean_gel_linear_rgb": [
+    0.19170195584785693,
+    0.4250995515029736,
+    0.334236851272345
+  ],
+  "yellow_tip_vertices": 730,
+  "submerged_current_geometry": true,
+  "animations": {
+    "Idle": {
+      "seconds": 5.0,
+      "morph_channels": 6,
+      "glow": [
+        {
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 12.0,
+          "maximum": 13.4399995803833
+        },
+        {
+          "pointer": "/materials/7/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 20.0,
+          "maximum": 22.399999618530273
+        }
+      ]
+    },
+    "Settle": {
+      "seconds": 2.0,
+      "morph_channels": 6,
+      "glow": [
+        {
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 12.0,
+          "maximum": 16.200000762939453
+        },
+        {
+          "pointer": "/materials/7/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 20.0,
+          "maximum": 27.0
+        }
+      ]
+    },
+    "Charge": {
+      "seconds": 3.0,
+      "morph_channels": 6,
+      "glow": [
+        {
+          "pointer": "/materials/6/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 12.0,
+          "maximum": 54.0
+        },
+        {
+          "pointer": "/materials/7/extensions/KHR_materials_emissive_strength/emissiveStrength",
+          "minimum": 20.0,
+          "maximum": 90.0
+        }
+      ]
+    }
+  },
+  "shape": {
+    "height_metres": 2.1192538261413576,
+    "dome_height_metres": 1.7796830654144287,
+    "cross_sections": {
+      "0.13": {
+        "width_metres": 1.6907258033752441,
+        "centre_y_metres": -0.0028516054153442383,
+        "centre_x_metres": 0.0241701602935791
+      },
+      "0.7": {
+        "width_metres": 1.1493635177612305,
+        "centre_y_metres": 0.05347716808319092,
+        "centre_x_metres": 0.0024700164794921875
+      },
+      "1.32": {
+        "width_metres": 1.1486544609069824,
+        "centre_y_metres": 0.11972701549530029,
+        "centre_x_metres": -0.0030095577239990234
+      }
+    },
+    "eyes": {
+      "Specimen-Eye-Left": {
+        "centre_x_metres": -0.2549999989569187,
+        "centre_height_metres": 1.2975194573402404,
+        "outer_corner_rise_metres": 0.22940003871917725
+      },
+      "Specimen-Eye-Right": {
+        "centre_x_metres": 0.2549999989569187,
+        "centre_height_metres": 1.2975194573402404,
+        "outer_corner_rise_metres": 0.22940003871917725
+      }
+    },
+    "narrow_mohawk": true,
+    "grounded_base_width_metres": 1.8705726265907288,
+    "puddle_rim_heights_metres": [
+      0.05614585876464845,
+      0.05344076156616212
+    ]
+  },
+  "internal_geometry": {
+    "Specimen-Electric-Veins": {
+      "maximum_signed_surface_distance_metres": -0.005493959877640009
+    },
+    "Specimen-Aqua-Currents": {
+      "maximum_signed_surface_distance_metres": -0.02810002443764059
+    },
+    "Specimen-Acid-Core": {
+      "maximum_signed_surface_distance_metres": -0.11580729286743008
+    }
+  },
+  "meshes": {
+    "Specimen-Acid-Core": {
+      "triangles": 10964,
+      "maximum_position_error_metres": 0.0,
+      "maximum_morph_position_error_metres": 3.725290298461914e-09,
+      "morph_targets": [
+        "Breathe",
+        "Charge",
+        "Flow",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight"
+      ],
+      "triangle_multiset_matches": true
+    },
+    "Specimen-Aqua-Currents": {
+      "triangles": 16348,
+      "maximum_position_error_metres": 0.0,
+      "maximum_morph_position_error_metres": 3.725290298461914e-09,
+      "morph_targets": [
+        "Breathe",
+        "Flow",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight"
+      ],
+      "triangle_multiset_matches": true
+    },
+    "Specimen-Body": {
+      "triangles": 70544,
+      "maximum_position_error_metres": 0.0,
+      "maximum_morph_position_error_metres": 7.508562643358995e-09,
+      "morph_targets": [
+        "Blink",
+        "Breathe",
+        "CrestFlexLeft",
+        "CrestFlexRight",
+        "Curious",
+        "Focus",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight"
+      ],
+      "triangle_multiset_matches": true
+    },
+    "Specimen-Electric-Veins": {
+      "triangles": 4352,
+      "maximum_position_error_metres": 0.0,
+      "maximum_morph_position_error_metres": 7.450580596923828e-09,
+      "morph_targets": [
+        "Breathe",
+        "Charge",
+        "CrestFlexLeft",
+        "CrestFlexRight",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight"
+      ],
+      "triangle_multiset_matches": true
+    },
+    "Specimen-Eye-Left": {
+      "triangles": 3072,
+      "maximum_position_error_metres": 0.0,
+      "maximum_morph_position_error_metres": 0.0,
+      "morph_targets": [
+        "Blink",
+        "Breathe",
+        "Curious",
+        "Focus",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight"
+      ],
+      "triangle_multiset_matches": true
+    },
+    "Specimen-Eye-Right": {
+      "triangles": 3072,
+      "maximum_position_error_metres": 0.0,
+      "maximum_morph_position_error_metres": 0.0,
+      "morph_targets": [
+        "Blink",
+        "Breathe",
+        "Curious",
+        "Focus",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight"
+      ],
+      "triangle_multiset_matches": true
+    }
+  }
+}

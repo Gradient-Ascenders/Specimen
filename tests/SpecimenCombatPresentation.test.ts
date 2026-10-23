@@ -5,9 +5,12 @@ import * as THREE from 'three';
 
 import type {
   SpecimenAttackReadModel,
+  SpecimenAttackEvents,
   SpecimenProjectileReadState,
 } from '../src/combat/SpecimenProjectileSystem.ts';
 import { SpecimenCombatPresentation } from '../src/render/specimen/SpecimenCombatPresentation.ts';
+import { EventBus } from '../src/core/EventBus.ts';
+import { SpecimenDash } from '../src/combat/SpecimenDash.ts';
 
 class FakeElement {
   readonly dataset: Record<string, string> = {};
@@ -46,6 +49,8 @@ const readModel: SpecimenAttackReadModel = {
   aimDirection: { x: 0, y: 0, z: 1 },
   aimPoint: { x: 0, y: 0, z: 10 },
   liveProjectileCount: 2,
+  overchargeProgress: 0,
+  overchargeReady: false,
 };
 
 function projectile(
@@ -62,6 +67,7 @@ function projectile(
     chargeAmount: 0.5,
     fullyCharged: false,
     radiusMetres: 0.15,
+    overcharged: false,
   };
 }
 
@@ -122,4 +128,28 @@ test('Specimen combat presentation reuses one bounded projectile mesh and one ov
     false,
   );
   assert.equal(host.children[0]?.isConnected, false);
+});
+
+test('hit and dodge feedback expires on simulation time, clears on suspension and unsubscribes on disposal', () => {
+  const scene = new THREE.Scene(), host = new FakeElement(), events = new EventBus<SpecimenAttackEvents>(), dash = new SpecimenDash();
+  const p = new SpecimenCombatPresentation({ scene, host: host as unknown as HTMLElement,
+    source: { readModel, projectileStates: [projectile(1, false, 0)], events }, dash,
+    document: { createElement: () => new FakeElement() } as unknown as Document });
+  const overlay = host.children[0]!, crosshair = overlay.children.find(c => c.className === 'specimen-combat-crosshair')!;
+  const hit = overlay.children.find(c => c.className === 'specimen-hit-marker')!;
+  const dodge = overlay.children.find(c => c.className === 'specimen-dodge-feedback')!;
+  const cue = (kind: 'hit' | 'blocked') => events.emit('hitFeedback', { projectileId: 1, kind,
+    point: { x: 0, y: 0, z: 1 }, fullyCharged: false });
+  try {
+    p.update(true); cue('hit'); assert.equal(hit.hidden, false); assert.equal(hit.textContent, '×');
+    const firstPulse = crosshair.dataset.pulse;
+    cue('hit'); assert.notEqual(crosshair.dataset.pulse, firstPulse, 'rapid consecutive hits each restart the pulse');
+    cue('blocked'); assert.equal(hit.textContent, '◇'); assert.equal(crosshair.dataset.hit, 'blocked');
+    dash.events.emit('dodged', {}); assert.equal(dodge.hidden, false); assert.equal(overlay.dataset.dodged, 'true');
+    p.update(true); assert.equal(dodge.hidden, false, 'render-only updates do not advance feedback time');
+    p.update(true, 0.3); assert.equal(hit.hidden, true); assert.equal(dodge.hidden, true); assert.equal(overlay.dataset.dodged, undefined);
+    cue('hit'); p.suspend(); assert.equal(hit.hidden, true); cue('hit'); assert.equal(hit.hidden, true);
+    p.update(true); assert.equal(hit.hidden, true, 'resuming does not restore stale feedback');
+    p.dispose(); cue('hit'); dash.events.emit('dodged', {}); assert.equal(hit.hidden, true); assert.equal(dodge.hidden, true);
+  } finally { p.dispose(); }
 });

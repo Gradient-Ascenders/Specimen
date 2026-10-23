@@ -3,13 +3,13 @@ import type { CameraRig, CameraFollowTarget } from './CameraRig.ts';
 
 /** Suppress only colour/depth writes in the player's camera pass. Shadow
  * passes use separate hooks/materials, so the controlled body keeps its shadow.
- * Bind once when an actor's asset loads; effects and other actors are untouched. */
+ * Bind once per component; unbound effects and other actors are untouched. */
 export class CameraBodyVisibility {
   private rig: CameraRig | undefined;
   private target: CameraFollowTarget | undefined;
   private readonly cleanups: (() => void)[] = [];
   configure(rig: CameraRig, target: CameraFollowTarget): void { this.rig = rig; this.target = target; }
-  bind(mesh: THREE.Mesh): void {
+  bind(mesh: THREE.Mesh | THREE.Points | THREE.Line): void {
     const before = mesh.onBeforeRender, after = mesh.onAfterRender;
     let suppressed = false, colorWrite = true, depthWrite = true;
     const rig = this;

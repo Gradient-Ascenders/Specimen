@@ -18,6 +18,18 @@ import { FixtureCombatTarget } from '../src/combat/CombatTargetAdapters.ts';
 
 const target=new THREE.Vector3(0,2.07,finalArenaZ(197));
 const impact=(damageUnits=12):CombatImpact=>({projectileId:1,targetId:'extermination-core',kind:'direct',chargeAmount:1,fullyCharged:true,damageUnits,point:target,direction:target});
+
+test('checking whether an attack could hurt the player does not consume health, grace or its attack serial',()=>{
+  const b=new FinalBossController();b.start(true);
+  try {
+    assert.equal(b.canDamagePlayer(7,42),true);assert.equal(b.canDamagePlayer(7,42),true);
+    assert.equal(b.readModel.playerHealth,100);assert.equal(b.readModel.invulnerability,0);
+    assert.equal(b.damagePlayer(7,42),true);assert.equal(b.canDamagePlayer(7,-1),false);
+    b.update(.46,target);assert.equal(b.canDamagePlayer(7,42),false,'an already consumed major attack is not a perfect dodge');
+    assert.equal(b.canDamagePlayer(7,-1),true);
+    b.suspend();assert.equal(b.canDamagePlayer(7,-1),false);
+  }finally{b.dispose();}
+});
 function until(b:FinalBossController,predicate:()=>boolean,steps=12000):void {
   for(let i=0;i<steps&&!predicate();i++)b.update(1/60,target);
   assert.ok(predicate(),JSON.stringify(b.readModel));
@@ -127,19 +139,21 @@ test('large form checkpoint fits the real arena and movement is scoped above Bob
     assert.equal(f.body.grounded,true);assert.ok(Math.abs(f.body.position.y-FINAL_SPECIMEN_RADIUS-.41)<.02);
     assert.equal(FINAL_BOSS_CHECKPOINT.specimenClearanceRadius,FINAL_SPECIMEN_RADIUS);
     assert.ok(FINAL_SPECIMEN_MOVEMENT.maxSpeedMetresPerSecond>DEFAULT_KINEMATIC_BODY_CONFIG.maxSpeedMetresPerSecond*2);
-    assert.equal(FINAL_SPECIMEN_MOVEMENT.maximumJumpSpeedMetresPerSecond,DEFAULT_KINEMATIC_BODY_CONFIG.maximumJumpSpeedMetresPerSecond*2.5);
+    assert.equal(FINAL_SPECIMEN_MOVEMENT.maxSpeedMetresPerSecond,DEFAULT_KINEMATIC_BODY_CONFIG.maxSpeedMetresPerSecond*3);
+    assert.equal(FINAL_SPECIMEN_MOVEMENT.minimumJumpSpeedMetresPerSecond,DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond);
   } finally {f.dispose();}
 });
 
-test('the specimen fully charges a jump in 0.35 seconds and keeps its heavy 11-metre launch without changing Bob',()=>{
+test('the specimen uses normal gravity and retains the charged height required for boss attacks',()=>{
   const f=arenaFixture(),zero=new THREE.Vector3();try {
     for(let i=0;i<22;i++)f.body.update(1/60,zero,{pressed:i===0,held:true,released:false,cancelled:false});
     assert.equal(f.body.chargeFraction,1);assert.equal(f.body.maximumJumpChargeSeconds,.35);assert.equal(DEFAULT_KINEMATIC_BODY_CONFIG.maximumJumpChargeSeconds,.7);
     f.body.update(1/60,zero,{pressed:false,held:false,released:true,cancelled:false});
     let peak=0;
     for(let i=0;i<180;i++){f.body.update(1/60,zero);peak=Math.max(peak,f.body.position.y-FINAL_SPECIMEN_RADIUS-FINAL_ARENA.floorY);}
-    assert.ok(peak>10&&peak<12,`jump apex ${peak}`);
-    assert.equal(FINAL_SPECIMEN_MOVEMENT.gravityMetresPerSecondSquared,27);assert.equal(DEFAULT_KINEMATIC_BODY_CONFIG.gravityMetresPerSecondSquared,18);
+    assert.ok(peak>10.5&&peak<11.5,`jump apex ${peak}`);
+    assert.ok(peak>FINAL_BOSS_TUNING.beamHeight+FINAL_BOSS_TUNING.beamRadius+.4,'full charge clears the beam with margin');
+    assert.equal(FINAL_SPECIMEN_MOVEMENT.gravityMetresPerSecondSquared,DEFAULT_KINEMATIC_BODY_CONFIG.gravityMetresPerSecondSquared);
     assert.equal(DEFAULT_KINEMATIC_BODY_CONFIG.maximumJumpSpeedMetresPerSecond,9.84);
   }finally{f.dispose();}
 });
@@ -347,7 +361,7 @@ test('partial-charge direct hits kill one target, while full charge destroys an 
       weapon.update(charged?1.5:.6,controls({firePressed:true,fireHeld:true}));weapon.update(1/60,controls({fireReleased:true}));
       for(let i=0;i<40;i++)weapon.update(1/60,controls());
       assert.equal(targets[0]!.destroyed,true);assert.equal(targets[1]!.destroyed,charged);assert.equal(targets[2]!.destroyed,charged);
-      assert.ok(weapon.projectileStates.length<=12);weapon.reset();assert.equal(weapon.readModel.liveProjectileCount,0);
+      assert.equal(weapon.projectileStates.length,32);weapon.reset();assert.equal(weapon.readModel.liveProjectileCount,0);
     } finally {weapon.dispose();registry.dispose();for(const m of meshes){m.geometry.dispose();(m.material as THREE.Material).dispose();}}
   }
 });

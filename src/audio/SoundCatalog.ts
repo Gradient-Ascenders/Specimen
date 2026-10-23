@@ -60,6 +60,7 @@ export const SOUND_DEFINITIONS = {
   'volt-charge-ready-01': { path: 'assets/audio/volt/volt-charge-ready-01.ogg', loop: false, volume: 0.5, maxVoices: 3 },
   'volt-circuit-connect-01': { path: 'assets/audio/volt/volt-circuit-connect-01.ogg', loop: false, volume: 0.5, maxVoices: 3 },
   'volt-circuit-hold-loop-01': { path: 'assets/audio/volt/volt-circuit-hold-loop-01.ogg', loop: true, volume: 0.055, maxVoices: 1 },
+  'specimen-charge-loop-01': { path: 'assets/audio/volt/volt-circuit-hold-loop-01.ogg', loop: true, volume: 0.24, maxVoices: 1, spatial: MECHANISM },
   'volt-circuit-release-01': { path: 'assets/audio/volt/volt-circuit-release-01.ogg', loop: false, volume: 0.38, maxVoices: 3 },
   'volt-shoot-01': { path: 'assets/audio/volt/volt-shoot-01.ogg', loop: false, volume: 0.5, maxVoices: 3 },
   'world-door-movement-loop-01': { path: 'assets/audio/world/world-door-movement-loop-01.ogg', loop: true, volume: 1.2, maxVoices: 2, spatial: MECHANISM },
@@ -93,8 +94,8 @@ const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
 export const SOUND_BANKS = {
   escape: ALL_SOUND_IDS.filter(id => id.startsWith('escape-')),
   intro: ALL_SOUND_IDS.filter(id => id.startsWith('intro-')),
-  containment: ALL_SOUND_IDS.filter(id => !id.startsWith('volt-') && !id.startsWith('cultivation-') && !id.startsWith('blackout-')),
-  cultivation: ALL_SOUND_IDS.filter(id => !id.startsWith('blackout-') && (!id.startsWith('volt-') ||
+  containment: ALL_SOUND_IDS.filter(id => id !== 'specimen-charge-loop-01' && !id.startsWith('volt-') && !id.startsWith('cultivation-') && !id.startsWith('blackout-')),
+  cultivation: ALL_SOUND_IDS.filter(id => id !== 'specimen-charge-loop-01' && !id.startsWith('blackout-') && (!id.startsWith('volt-') ||
     id === 'volt-circuit-connect-01' || id === 'volt-charge-ready-01')),
   blackout: ALL_SOUND_IDS,
 } as const;

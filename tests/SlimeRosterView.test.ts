@@ -117,6 +117,15 @@ test('passive status stays absent without a relevant inactive-body interaction',
   );
 });
 
+test('companion status describes movement without claiming that a mechanism is held', () => {
+  assert.equal(formatPassiveInteractionStatus(snapshot({passiveInteractions: [
+    {slimeId: 'bob', label: 'Catching up', kind: 'companion'},
+  ]})), 'Bob: Catching up.');
+  assert.equal(formatPassiveInteractionStatus(snapshot({passiveInteractions: [
+    {slimeId: 'bob', label: 'Waiting for a clear path', kind: 'companion'},
+  ]})), 'Bob: Waiting for a clear path.');
+});
+
 test('switch feedback only reports a successful player switch and clears on recovery or restart', () => {
   const model = new SlimeSwitchFeedbackModel();
   assert.equal(model.update(snapshot()), '');
