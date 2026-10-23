@@ -13,6 +13,7 @@ export type InputAction =
   | 'debugReset'
   | 'debugTestRecovery'
   | 'debugCompleteLevel'
+  | 'debugToggleInvincibility'
   | 'debugTeleportRoomOne'
   | 'debugTeleportRoomTwo'
   | 'debugTeleportRoomThree'
@@ -46,6 +47,7 @@ export const DEFAULT_ACTION_BINDINGS = {
   debugReset: [{ kind: 'key', code: 'KeyR' }],
   debugTestRecovery: [{ kind: 'key', code: 'KeyF' }],
   debugCompleteLevel: [{ kind: 'key', code: 'Digit0' }],
+  debugToggleInvincibility: [{ kind: 'key', code: 'KeyI' }],
   debugTeleportRoomOne: [{ kind: 'key', code: 'Digit1' }],
   debugTeleportRoomTwo: [{ kind: 'key', code: 'Digit2' }],
   debugTeleportRoomThree: [{ kind: 'key', code: 'Digit3' }],

@@ -2322,6 +2322,8 @@ kbd {
 .final-boss-message {position:absolute;bottom:15%;left:15%;width:70%;text-align:center;font-size:clamp(.65rem,1.3vw,.9rem);letter-spacing:.08em;text-shadow:0 2px 7px #000,0 0 3px #000;}
 .final-boss-cinematic {position:absolute;left:10%;width:80%;top:72%;text-align:center;white-space:pre-line;font-size:clamp(.8rem,2vw,1.5rem);letter-spacing:.16em;text-shadow:0 2px 9px #000;line-height:1.7;}
 .final-boss-skip {position:absolute;right:3%;bottom:4%;pointer-events:auto;color:#b2d3cb;background:#09141ccc;border:1px solid #67bca466;padding:.6rem;font:inherit;font-size:.7rem;}
+.final-boss-dev-invincibility {position:absolute;left:4%;bottom:9%;pointer-events:auto;color:#b2d3cb;background:#09141ccc;border:1px solid #67bca466;padding:.6rem;font:inherit;font-size:.7rem;}
+.final-boss-dev-invincibility[aria-pressed='true'] {color:#d8fff1;border-color:#8ce36a;background:#183522ee;}
 .final-boss-hud[data-hit='true'] {box-shadow:inset 0 0 70px #ef354733;}
 .final-boss-hud[data-state='transition'] .final-boss-cinematic {color:#ff7b71;}
 #app[data-boss-encounter='true'] .hud-roster, #app[data-boss-encounter='true'] .hud-objective-module {display:none;}

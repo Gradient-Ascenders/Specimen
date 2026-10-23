@@ -188,6 +188,19 @@ function finalBossInternals(runtime:BlackoutLevelRuntime) {
   return (runtime as unknown as {resources:{finalBoss:FinalBossEncounter;specimenBody:KinematicBody;specimenCharacter:SpecimenCharacterPresentation;collisionWorld:CollisionWorld;combatTargets:{size:number};scene:{finalArena:ExterminationArena}}}).resources;
 }
 
+test('debug room access cannot enable invincibility without the Vite development build flag',()=>{
+  const f=createFixture(true);try {
+    f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+    f.input.press('debugToggleInvincibility');f.tick();f.input.release('debugToggleInvincibility');
+    const {finalBoss:boss}=finalBossInternals(f.runtime);
+    assert.equal(boss.controller.devInvincible,false);
+    assert.equal(f.document.elements.some(element=>element.className==='final-boss-dev-invincibility'),false);
+    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+    boss.controller.toggleDevInvincibility();assert.equal(boss.controller.damagePlayer(20,-1),true);
+    assert.equal(f.runtime.requestFailure(),true);
+  }finally{f.cleanup();}
+});
+
 test('the merged boss body and all its parts respect first-person hiding, while boss cinematics restore third person without changing the preference',async()=>{
   // Most runtime tests use a deliberately inert camera; this handoff needs the
   // real rig and its camera-pass suppression state.

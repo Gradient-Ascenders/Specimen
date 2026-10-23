@@ -613,6 +613,7 @@ export class BlackoutLevelRuntime {
   requestFailure(): boolean {
     const resources = this.requireResources();
     if(resources.finalBoss?.cinematic)return false;
+    if(resources.phase.phase==='boss'&&resources.finalBoss?.controller.devInvincible)return false;
     if (this.lifecycle.state !== 'running' || resources.phase.terminal) return false;
     if (!resources.deathSequence.requestDeath(
       () => {
@@ -907,6 +908,9 @@ export class BlackoutLevelRuntime {
       return;
     }
 
+    if(import.meta.env?.DEV&&this.debugInteractionEnabled&&this.input.enabled&&resources.phase.phase==='boss'&&this.input.wasPressed('debugToggleInvincibility')) {
+      resources.finalBoss?.controller.toggleDevInvincibility();
+    }
     if(resources.finalBoss?.cinematic) {
       resources.finalBoss.update(deltaSeconds,this.input.wasPressed('skipCinematic'));
       this.commitFinalBossPhaseTwoCheckpoint(resources);
@@ -1396,6 +1400,11 @@ export class BlackoutLevelRuntime {
     for (const participatingBody of participatingBodies) {
       const failureY=specimenGameplay&&resources.finalBoss?FINAL_ARENA.fallFailureY:OUT_OF_BOUNDS_Y;
       if (participatingBody.position.y < failureY) {
+        if(specimenGameplay&&resources.phase.phase==='boss'&&resources.finalBoss?.controller.devInvincible) {
+          participatingBody.recoverAt(FINAL_MERGE_ANCHOR);
+          this.retargetCamera(resources);this.syncVisuals(resources);
+          this.gameplayAudio?.update();this.input.endFixedUpdate();return;
+        }
         this.requestFailure();
         this.gameplayAudio?.update();
         this.input.endFixedUpdate();

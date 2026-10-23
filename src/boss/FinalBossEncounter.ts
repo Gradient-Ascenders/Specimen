@@ -60,6 +60,7 @@ export class FinalBossEncounter {
   private readonly message:HTMLElement;
   private readonly cinematicText:HTMLElement;
   private readonly skip:HTMLButtonElement;
+  private readonly devInvincibilityToggle?:HTMLButtonElement;
   private oldState:FinalBossState='idle';
   private oldStage='';
   private summonSerial=-1;
@@ -119,7 +120,12 @@ export class FinalBossEncounter {
     this.playerHealth=doc.createElement('progress');this.playerHealth.max=100;this.playerHealth.className='final-boss-integrity';this.playerHealth.setAttribute('aria-label','Specimen integrity');
     this.message=doc.createElement('div');this.message.className='final-boss-message';this.cinematicText=doc.createElement('div');this.cinematicText.className='final-boss-cinematic';
     this.skip=doc.createElement('button');this.skip.className='final-boss-skip';this.skip.textContent='Enter · Skip cinematic';this.skip.onclick=()=>{this.skipRequested=true;};
-    this.element.append(this.phaseLabel,this.bossHealth,this.playerHealth,this.message,this.cinematicText,this.skip);options.host.append(this.element);this.reset();
+    this.element.append(this.phaseLabel,this.bossHealth,this.playerHealth,this.message,this.cinematicText,this.skip);
+    if(import.meta.env?.DEV) {
+      this.devInvincibilityToggle=doc.createElement('button');this.devInvincibilityToggle.type='button';this.devInvincibilityToggle.className='final-boss-dev-invincibility';this.devInvincibilityToggle.hidden=true;
+      this.devInvincibilityToggle.onclick=()=>{this.controller.toggleDevInvincibility();this.sync();this.devInvincibilityToggle?.blur();};this.element.append(this.devInvincibilityToggle);
+    }
+    options.host.append(this.element);this.reset();
   }
   get cinematic():boolean {return this.controller.cinematic;}
   presentMerge(progress:number):void {this.element.hidden=false;this.element.dataset.state='merging';this.options.host.dataset.bossEncounter='true';this.bossHealth.hidden=true;this.playerHealth.hidden=true;this.phaseLabel.hidden=true;this.message.hidden=true;this.skip.hidden=true;this.cinematicText.hidden=false;this.cinematicText.textContent=progress<.6?'BOB. GOOP. VOLT.':'ONE SPECIMEN.';}
@@ -171,6 +177,11 @@ export class FinalBossEncounter {
     this.element.hidden=['idle','suspended','complete'].includes(m.state);this.element.dataset.state=m.state;this.element.dataset.phase=String(m.phase);this.element.dataset.hit=m.invulnerability>0?'true':'false';this.element.dataset.attack=m.attack;this.element.dataset.shield=m.shieldActive?'true':'false';
     if(m.state!=='idle'&&m.state!=='suspended')this.options.host.dataset.bossEncounter='true';else delete this.options.host.dataset.bossEncounter;
     this.bossHealth.value=m.health;this.playerHealth.value=m.playerHealth;this.bossHealth.hidden=false;this.playerHealth.hidden=false;this.phaseLabel.hidden=false;this.message.hidden=false;
+    if(import.meta.env?.DEV&&this.devInvincibilityToggle) {
+      this.devInvincibilityToggle.hidden=!['intro','combat','transition'].includes(m.state);
+      this.devInvincibilityToggle.textContent=`DEV · I · INVINCIBILITY ${this.controller.devInvincible?'ON':'OFF'}`;
+      this.devInvincibilityToggle.setAttribute('aria-pressed',String(this.controller.devInvincible));
+    }
     this.phaseLabel.textContent=`EXTERMINATOR / ${m.phase===1?'CONTAINMENT':'EXTERMINATION'} · ${Math.ceil(m.health)}/${m.maximumHealth} HP${m.phase===2&&this.reinforcements.activeCount?` · ADVANCED ${this.reinforcements.activeCount}`:''}`;
     this.message.textContent=m.state==='combat'?(m.shieldActive?`${CAPTION['summon-defend']} · ${m.defendersRemaining} REMAIN · +${T.healPerSecond} HP/s`:
       m.attack==='laser-beam'?`${m.phase===2?'LASER BEAM · FULL CIRCLE + FIVE TARGETED HALF-SWEEPS':CAPTION['laser-beam']} · SWEEP ${Math.min(m.beamLapsCompleted+1,m.phase===2?6:T.beamCircles)}/${m.phase===2?6:T.beamCircles}${m.beamTurning?' · TURNING':m.beamDirection<0?' · REVERSE':''}`:CAPTION[m.attack]):'';
@@ -289,6 +300,6 @@ export class FinalBossEncounter {
   }
   clearAttacks():void {this.squad.clear();this.droneFlight.reset();this.projectiles.clear();this.reinforcements.reset();this.evasion.reset();this.shake=0;this.hostileShots.count=0;this.presentation.clearRamImpact();this.presentation.beam.visible=false;this.presentation.beamCore.visible=false;this.presentation.beamImpact.visible=false;this.presentation.shield.visible=false;this.presentation.eyeCharge.visible=false;this.presentation.ramWarning.visible=false;for(let i=0;i<6;i++)this.options.arena.setSector(i,'inactive');this.oldStage='';this.options.audio?.stopLoop('final-boss-beam');}
   suspend():void {this.controller.suspend();this.clearAttacks();this.healthPacks.reset();this.options.audio?.stopLoop('final-boss-engine');this.element.hidden=true;}
-  reset():void {this.clearAttacks();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.element.hidden=true;this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');delete this.options.host.dataset.bossEncounter;}
+  reset():void {this.clearAttacks();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.element.hidden=true;if(this.devInvincibilityToggle)this.devInvincibilityToggle.hidden=true;this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');delete this.options.host.dataset.bossEncounter;}
   dispose():void {if(this.disposed)return;this.reset();for(const off of this.unregister)off();for(const drone of this.drones)drone.dispose();this.droneResources.dispose();this.squad.dispose();this.reinforcements.dispose();this.healthPacks.dispose();this.projectiles.dispose();this.hostileShots.removeFromParent();this.hostileShots.dispose();this.shotGeometry.dispose();this.shotMaterial.dispose();this.presentation.dispose();this.controller.dispose();this.element.remove();this.disposed=true;}
 }
