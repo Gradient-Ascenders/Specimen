@@ -372,6 +372,7 @@ function startGame(): void {
       isGameplayInputEnabled: () => input.enabled,
       isCinematicPlaying: () => gameFlowCinematicCanPause(app.dataset.cinematic, app.dataset.gameState),
       restartLevel: () => lifecycleCoordinator.restartLevel(),
+      restartGame:()=>window.location.reload(),
       recalibrateGraphics: async () => {
         settings.requestGraphicsCalibration();
         autoDetecting = true;
@@ -439,8 +440,10 @@ function startGame(): void {
     music.setScene(scene.track, scene.play);
   });
   const unsubscribeGameCompleted = gameSession.events.on('gameCompleted', () => {
+    if(gameCompleted)return;
     gameCompleted = true;
     music.setScene(null, true);
+    gameFlow.completeGame();
   });
   const unsubscribeTitlePresentation = gameFlow.subscribe((state) => {
     if (state !== 'playing' || warmedLevelOneProgramBaseline !== undefined) return;

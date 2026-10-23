@@ -17,7 +17,8 @@ export type InputAction =
   | 'debugTeleportRoomTwo'
   | 'debugTeleportRoomThree'
   | 'debugTeleportRoomFour'
-  | 'debugTeleportRoomFive';
+  | 'debugTeleportRoomFive'
+  | 'skipCinematic';
 
 export type InputBinding =
   | { readonly kind: 'key'; readonly code: string }
@@ -50,6 +51,7 @@ export const DEFAULT_ACTION_BINDINGS = {
   debugTeleportRoomThree: [{ kind: 'key', code: 'Digit3' }],
   debugTeleportRoomFour: [{ kind: 'key', code: 'Digit4' }],
   debugTeleportRoomFive: [{ kind: 'key', code: 'Digit5' }],
+  skipCinematic: [{ kind: 'key', code: 'Enter' }],
 } as const satisfies ActionBindings;
 
 export interface InputOptions {

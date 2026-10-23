@@ -404,6 +404,13 @@ export class CameraRig {
     this.queuedYawRadians = 0;
   }
 
+  /** Set authored starting pitch without manufacturing sensitivity-dependent input. */
+  setGroundOrbitPitchRadians(pitchRadians:number):void {
+    if(!Number.isFinite(pitchRadians))throw new Error('ground orbit pitch must be finite.');
+    this.pitchRadians=THREE.MathUtils.clamp(pitchRadians,this.config.minimumPitchRadians,this.config.maximumPitchRadians);
+    this.effectivePitchRadians=this.pitchRadians;this.queuedPitchRadians=0;
+  }
+
   /** Temporarily shorten the boom for an authored tight-space camera zone. */
   setFollowDistanceScale(scale: number): void {
     if (

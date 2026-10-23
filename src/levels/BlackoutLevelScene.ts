@@ -5,6 +5,7 @@ import { BLACKOUT_FOUNDATION_LENGTH_METRES } from './BlackoutFoundationManifest.
 import { BlackoutMaintenanceBay } from './BlackoutMaintenanceBay.ts';
 import { BlackoutTransitRoom } from './BlackoutTransitRoom.ts';
 import { BlackoutBossStaging } from './BlackoutBossStaging.ts';
+import { ExterminationArena } from '../boss/ExterminationArena.ts';
 
 /** Minimal dark Level 3 shell; powered-device fixtures are composed at runtime. */
 export class BlackoutLevelScene {
@@ -13,6 +14,7 @@ export class BlackoutLevelScene {
   readonly maintenanceBay?: BlackoutMaintenanceBay;
   readonly transitRoom?: BlackoutTransitRoom;
   readonly bossStaging?: BlackoutBossStaging;
+  readonly finalArena?: ExterminationArena;
 
   constructor(authoredRoomOne = false, mapData?: BlackoutMaintenanceMapData) {
     this.root.name = 'blackout-level-3-foundation';
@@ -20,9 +22,11 @@ export class BlackoutLevelScene {
       if (!mapData) throw new Error('Room 1 texture maps must be prepared before scene construction.');
       this.maintenanceBay = new BlackoutMaintenanceBay(mapData);
       this.transitRoom = new BlackoutTransitRoom(this.maintenanceBay.surfaceMaterials);
-      this.bossStaging = new BlackoutBossStaging();
+      this.bossStaging = new BlackoutBossStaging(true);
+      this.finalArena = new ExterminationArena();
       this.root.add(this.maintenanceBay.root, this.transitRoom.root, this.bossStaging.root);
-      this.collisionMeshes = [...this.maintenanceBay.collisionMeshes, ...this.transitRoom.collisionMeshes, ...this.bossStaging.collisionMeshes];
+      this.root.add(this.finalArena.root);
+      this.collisionMeshes = [...this.maintenanceBay.collisionMeshes, ...this.transitRoom.collisionMeshes, ...this.bossStaging.collisionMeshes, ...this.finalArena.collisionMeshes];
       this.root.add(new THREE.HemisphereLight(0x34404a, 0x080a0b, .025));
       return;
     }
@@ -77,6 +81,7 @@ export class BlackoutLevelScene {
     this.transitRoom?.dispose();
     this.maintenanceBay?.dispose();
     this.bossStaging?.dispose();
+    this.finalArena?.dispose();
     this.root.removeFromParent();
     this.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;

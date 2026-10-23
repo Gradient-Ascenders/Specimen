@@ -348,6 +348,11 @@ export class GameFlowStateModel {
     return this.openSubmenu('credits');
   }
 
+  completeGame():boolean {
+    if(this.currentState!=='playing')return false;
+    this.menuReturnState='title';this.setState('credits');return true;
+  }
+
   back(): boolean {
     if (this.currentState !== 'settings' && this.currentState !== 'credits' && this.currentState !== 'levelSelect' && this.currentState !== 'cutsceneSelect') {
       return false;
@@ -423,6 +428,7 @@ export interface GameFlowActions {
   isGameplayInputEnabled(): boolean;
   isCinematicPlaying?(): boolean;
   restartLevel(): void;
+  restartGame?():void;
   recalibrateGraphics?(): Promise<void>;
   applySettings(settings: Readonly<GameSettingsSnapshot>): void;
   getGraphicsDiagnostics?(): GraphicsDiagnostics;
@@ -615,6 +621,17 @@ export class GameFlowUI {
 
   get gameplayActive(): boolean {
     return this.model.state === 'playing';
+  }
+
+  private gameFinished=false;
+  /** Existing Level 3 completion is the sole authority for the final credits. */
+  completeGame():void {
+    if(this.disposed||!this.model.completeGame())return;
+    this.gameFinished=true;this.actions.stopGameplay();this.syncState();
+  }
+  private backToMenu():void {
+    if(this.gameFinished&&this.model.state==='credits'&&this.actions.restartGame) {this.actions.restartGame();return;}
+    if(this.model.back())this.syncState();
   }
 
   /** Reuse the existing application loop; FPS DOM writes are limited to twice/second. */
@@ -1261,7 +1278,7 @@ export class GameFlowUI {
         this.settingsFeedback.textContent = 'Default settings restored.';
         break;
       case 'back':
-        if (this.model.back()) this.syncState();
+        this.backToMenu();
         break;
     }
   };
@@ -1315,7 +1332,7 @@ export class GameFlowUI {
     if (action === 'back') {
       event.preventDefault();
       this.actions.playMenuConfirm?.();
-      if (this.model.back()) this.syncState();
+      this.backToMenu();
     }
   };
 
@@ -1505,7 +1522,7 @@ export class GameFlowUI {
       this.actions.playMenuConfirm?.();
       if (this.model.state === 'opening') this.actions.skipOpening?.();
       else if (this.model.state === 'paused') this.resume();
-      else if (this.model.back()) this.syncState();
+      else this.backToMenu();
       return;
     }
     const controls = this.menuControls();

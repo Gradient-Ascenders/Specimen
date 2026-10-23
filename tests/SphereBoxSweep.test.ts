@@ -46,3 +46,24 @@ test('precise ramp corners honor world transforms and leave other query masks un
   assert.equal(world.sweepSphere(start, delta, 1, hit, CollisionLayer.Movement), true);
   world.clear(); mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose();
 });
+
+test('opt-in boss lift corners use the real rounded boundary for friendly and hostile sweeps', () => {
+  for (const broadphaseEnabled of [true, false]) {
+    const world = new CollisionWorld({ broadphaseEnabled }), hit = new CollisionHit();
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(9, .8, 9));
+    deck.position.set(55, 23.6, 290); deck.userData.preciseSweepCorners = true; world.register(deck);
+    try {
+      // Each coordinate is inside the expanded bounding box, but the sphere
+      // still misses the physical top/side corner by more than its radius.
+      const origin = deck.position.clone().add(new THREE.Vector3(-7, 1, 5.1)), delta = new THREE.Vector3(14, 0, 0);
+      for (const mask of [CollisionLayer.Projectile, CollisionLayer.Movement]) {
+        assert.equal(world.sweepSphere(origin, delta, .7, hit, mask), false);
+        assert.equal(world.sweepSphere(origin.clone().add(delta), delta.clone().negate(), .7, hit, mask), false);
+        assert.equal(world.sweepSphere(deck.position.clone().add(new THREE.Vector3(0, 5, 0)), new THREE.Vector3(0, -10, 0), .7, hit, mask), true,
+          'a real shot into the centre of the deck must still be blocked');
+      }
+      delete deck.userData.preciseSweepCorners;
+      assert.equal(world.sweepSphere(origin, delta, .7, hit, CollisionLayer.Projectile), true, 'unrelated legacy boxes retain their existing conservative solver');
+    } finally { world.clear(); deck.geometry.dispose(); (deck.material as THREE.Material).dispose(); }
+  }
+});
