@@ -1,4 +1,6 @@
 import { CULTIVATION_LEVEL_GAMEPLAY_SUPPORT as gameplay } from './CultivationLevelGameplay.ts';
+import { CompanionRegroup } from '../slimes/CompanionRegroup.ts';
+import { cultivationCompanionWalk } from './CultivationCompanionWalks.ts';
 import { CultivationVentArrival } from '../cinematics/CultivationVentArrival.ts';
 import { CultivationRoomThreeClearance } from '../cinematics/CultivationRoomThreeClearance.ts';
 import { CultivationFinale } from '../cinematics/CultivationFinale.ts';
@@ -206,6 +208,9 @@ interface CultivationRuntimeResources {
 }
 
 export class CultivationLevelRuntime {
+  private readonly companions = new CompanionRegroup();
+  private readonly companionPosition = new THREE.Vector3();
+  private readonly companionLeader = new THREE.Vector3();
   private readonly ventArrival = new CultivationVentArrival();
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
@@ -504,7 +509,7 @@ export class CultivationLevelRuntime {
     return {
       roster: resources.manager.getRosterState(),
       activeSlimeId: resources.manager.activeSlimeId,
-      passiveInteractions: [],
+      passiveInteractions: this.companions.passiveInteractions,
       playerSwitchFeedback: undefined,
       resetSwitchFeedback: false,
     };
@@ -600,6 +605,7 @@ export class CultivationLevelRuntime {
       return;
     }
     if (resources.roomFiveFinale?.active) {
+      this.resetCompanions();
       if (resources.roomFiveFinale.update(deltaSeconds)) this.completeVoltFinale(resources);
       this.gameplayAudio?.update(); this.input.endFixedUpdate(); return;
     }
@@ -615,6 +621,7 @@ export class CultivationLevelRuntime {
       resources.acidProjectileSystem.reset();this.input.resetState();this.host.dataset.cinematic='cultivation-clearance';
     }
     if(clearance?.active){
+      this.resetCompanions();
       if(clearance.update(deltaSeconds)){this.input.resetState();this.clearRoomThreeCinematicUi();}
       resources.authoredPreview?.roomThreeObservation.updateCamera(deltaSeconds,resources.pair.bobBody.position);
       this.gameplayAudio?.update();this.input.endFixedUpdate();return;
@@ -665,16 +672,13 @@ export class CultivationLevelRuntime {
     if (this.authoredPreviewRoomId === undefined) {
       this.updateStructuralAssemblies(deltaSeconds, resources);
     }
-    if (!switched && activeBody === resources.pair.bobBody) {
-      resources.pair.bobBody.update(deltaSeconds, resources.movement, resources.jumpInputState);
-      resources.pair.goopBody.update(deltaSeconds, resources.noMovement);
-    } else if (!switched && activeBody === resources.pair.goopBody) {
-      resources.pair.bobBody.update(deltaSeconds, resources.noMovement);
-      resources.pair.goopBody.update(deltaSeconds, resources.movement, resources.jumpInputState);
-    } else {
-      resources.pair.bobBody.update(deltaSeconds, resources.noMovement);
-      resources.pair.goopBody.update(deltaSeconds, resources.noMovement);
-    }
+    this.updateCompanions(resources, switched || releasingVolt || this.ventArrival.active);
+    resources.pair.bobBody.update(deltaSeconds,
+      !switched && activeBody === resources.pair.bobBody ? resources.movement : this.companions.movement.bob,
+      !switched && activeBody === resources.pair.bobBody ? resources.jumpInputState : this.companions.jump.bob);
+    resources.pair.goopBody.update(deltaSeconds,
+      !switched && activeBody === resources.pair.goopBody ? resources.movement : this.companions.movement.goop,
+      !switched && activeBody === resources.pair.goopBody ? resources.jumpInputState : this.companions.jump.goop);
     if (resources.manager.isAvailable('volt')) {
       resources.voltBody.update(deltaSeconds, !switched && activeBody === resources.voltBody ? resources.movement : resources.noMovement,
         activeBody === resources.voltBody ? resources.jumpInputState : undefined);
@@ -784,7 +788,7 @@ export class CultivationLevelRuntime {
         resources,
         !switched && activeBody === resources.pair.bobBody
           ? resources.movement
-          : resources.noMovement,
+          : this.companions.movement.bob,
       );
     }
     this.gameplayAudio?.update();
@@ -1638,6 +1642,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    this.resetCompanions();
     this.gameplayAudio?.setEnabled(false);
     const resources = this.requireResources();
     resources.acidProjectileSystem.cancelAim();
@@ -1691,6 +1696,7 @@ export class CultivationLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.companions.reset();
     this.clearVoltFinaleUi();
     this.clearRoomThreeCinematicUi();
     this.ventArrival.cancel();
@@ -1891,6 +1897,7 @@ export class CultivationLevelRuntime {
   private resetAndRecoverAuthoredPreviewRoom(
     resources: CultivationRuntimeResources,
   ): void {
+    this.resetCompanions();
     resources.roomFiveFinale?.reset(); this.clearVoltFinaleUi();
     this.clearRoomThreeCinematicUi();
     resources.acidProjectileSystem.reset();
@@ -2158,6 +2165,7 @@ export class CultivationLevelRuntime {
       return false;
     }
     this.gameplayAudio?.died(dyingSlimeId);
+    this.resetCompanions();
     this.lastDeathSlimeId = dyingSlimeId;
     this.input.setEnabled(false);
     this.input.releasePointerLock();
@@ -2211,6 +2219,33 @@ export class CultivationLevelRuntime {
     this.renderLayer.cameraRig.setFollowTarget(resources.pair.activeBody, resources.collisionWorld);
   }
 
+  private resetCompanions(): void {
+    this.companions.beginStep();
+    if (this.companions.commit()) this.notifyHUD();
+  }
+
+  private updateCompanions(resources: CultivationRuntimeResources, blocked: boolean): void {
+    this.companions.beginStep();
+    const preview = resources.authoredPreview;
+    if (!blocked && this.input.enabled && preview) {
+      preview.root.worldToLocal(this.companionLeader.copy(resources.pair.activeBody.position));
+      for (const id of ['bob', 'goop'] as const) {
+        const body = id === 'bob' ? resources.pair.bobBody : resources.pair.goopBody;
+        if (body === resources.pair.activeBody) continue;
+        preview.root.worldToLocal(this.companionPosition.copy(body.position));
+        const walk = cultivationCompanionWalk({
+          id, position: this.companionPosition, leader: this.companionLeader,
+          goopPassageUnlocked: !preview.roomTwoToThreeGoopPassage.entryDoor.locked,
+          groundDronesDisabled: resources.roomThreeEncounter?.readModel.allGroundDronesDisabled === true,
+          projectilesClear: resources.roomThreeEncounter?.projectiles.liveCount === 0,
+          liftWaiting: preview.roomFour.controller.readModel.state === 'waitingForSlimes',
+        });
+        this.companions.steer(id, body, walk, resources.collisionWorld, preview.root);
+      }
+    }
+    if (this.companions.commit()) this.notifyHUD();
+  }
+
   private updateBobPresentation(
     deltaSeconds: number,
     resources: CultivationRuntimeResources,
@@ -2231,7 +2266,7 @@ export class CultivationLevelRuntime {
     resources.bobPresentation.update(deltaSeconds, state);
     const goopState = resources.goopPresentationState;
     goopState.grounded = resources.pair.goopBody.grounded;
-    goopState.movementIntentWorld = resources.pair.activeBody === resources.pair.goopBody ? resources.movement : resources.noMovement;
+    goopState.movementIntentWorld = resources.pair.activeBody === resources.pair.goopBody ? resources.movement : this.companions.movement.goop;
     resources.goopPresentation.update(deltaSeconds, goopState);
     resources.voltPresentationState.grounded = resources.voltBody.grounded;
     resources.voltPresentationState.movementIntentWorld = resources.pair.activeBody === resources.voltBody ? resources.movement : resources.noMovement;
@@ -2327,7 +2362,7 @@ export class CultivationLevelRuntime {
       ? {
           roster: resources.manager.getRosterState(),
           activeSlimeId: resources.manager.activeSlimeId,
-          passiveInteractions: [],
+          passiveInteractions: this.companions.passiveInteractions,
           playerSwitchFeedback,
           resetSwitchFeedback,
         }

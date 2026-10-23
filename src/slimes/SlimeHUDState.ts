@@ -4,6 +4,7 @@ import type { SlimeId } from './SlimeRoster.ts';
 export interface SlimePassiveInteraction {
   readonly slimeId: SlimeId;
   readonly label: string;
+  readonly kind?: 'companion';
 }
 
 export interface SlimePlayerSwitchFeedback {

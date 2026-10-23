@@ -949,6 +949,22 @@ test('Room 1 separate entrances enter Room 2 without snapping bodies back to spa
   } finally { f.cleanup(); }
 });
 
+test('Goop can catch up toward Bob while the player returns to Volt at the bay entrance', () => {
+  const f = createFixture();
+  try {
+    const r = (f.runtime as any).resources;
+    r.group.bobBody.teleport(new THREE.Vector3(6, .46, 56));
+    r.group.goopBody.teleport(new THREE.Vector3(6, .46, 50));
+    const volt = r.group.voltBody.position.clone();
+    f.tick(180);
+    assert.equal(r.manager.activeSlimeId, 'volt');
+    assert.ok(r.group.goopBody.position.z > 51.5, 'Bob already reached the exit, so Goop remains eligible while Volt is controlled');
+    assert.ok(r.group.goopBody.position.z < 54, 'the unpowered door still blocks the companion');
+    assert.ok(r.group.voltBody.position.distanceTo(volt) < .01, 'the player-controlled character receives no companion input');
+    assert.equal(r.deathSequence.isPlaying, true);
+  } finally { f.cleanup(); }
+});
+
 test('Level 3 number keys 1–3 teleport all bodies to clean room checkpoints', () => {
   const f = createFixture();
   try {
