@@ -16,7 +16,7 @@ export interface SpecimenCombatPresentationSource {
 }
 
 /**
- * Minimal bounded verification presentation for #127.
+ * Bounded projectile visuals and combat feedback from the weapon read model.
  *
  * Gameplay truth remains in SpecimenProjectileSystem. One InstancedMesh and one
  * DOM overlay are allocated for the loaded level and reused for all shots.
@@ -33,11 +33,15 @@ export class SpecimenCombatPresentation {
   private readonly crosshair: HTMLElement;
   private readonly label: HTMLElement;
   private readonly charge: HTMLProgressElement;
+  private readonly chargeDisplay: HTMLElement;
+  private readonly chargeLabel: HTMLElement;
   private readonly abilities: HTMLElement;
   private readonly overcharge: HTMLProgressElement;
   private readonly overchargeLabel: HTMLElement;
   private readonly dashCharge: HTMLProgressElement;
   private readonly dashLabel: HTMLElement;
+  private readonly dashState: HTMLElement;
+  private readonly overchargeState: HTMLElement;
   private readonly dash: SpecimenDash | undefined;
   private readonly projectileColor = new THREE.Color();
   private readonly unsubscribe: (() => void)[] = [];
@@ -104,7 +108,7 @@ export class SpecimenCombatPresentation {
     const element = hostDocument.createElement('div');
     element.className = 'specimen-combat-overlay';
     element.setAttribute('data-clean-gameplay-aiming', '');
-    element.setAttribute('aria-live', 'polite');
+    element.setAttribute('aria-live', 'off');
 
     this.crosshair = hostDocument.createElement('span');
     this.crosshair.className = 'specimen-combat-crosshair';
@@ -132,18 +136,32 @@ export class SpecimenCombatPresentation {
     this.charge.value = 0;
     this.charge.hidden = true;
     this.charge.setAttribute('aria-label', 'Shot charge');
+    this.chargeDisplay = hostDocument.createElement('div');
+    this.chargeDisplay.className = 'specimen-charge-display';
+    this.chargeDisplay.hidden = true;
+    this.chargeLabel = hostDocument.createElement('span');
+    this.chargeLabel.className = 'specimen-charge-label';
+    this.chargeDisplay.append(this.charge, this.chargeLabel);
 
     this.abilities = hostDocument.createElement('div'); this.abilities.className = 'specimen-abilities';
     this.abilities.setAttribute('aria-live', 'off');
-    this.dashLabel = hostDocument.createElement('span'); this.dashLabel.className = 'specimen-dash-label';
+    this.dashLabel = hostDocument.createElement('div'); this.dashLabel.className = 'specimen-dash-label';
+    const dashName = hostDocument.createElement('span');
+    dashName.innerHTML = `${icon('ArrowRight')}<strong>Dash</strong><kbd>Shift</kbd>`;
+    this.dashState = hostDocument.createElement('span'); this.dashState.className = 'specimen-ability-state';
+    this.dashLabel.append(dashName, this.dashState);
     this.dashCharge = hostDocument.createElement('progress'); this.dashCharge.max = 1;
     this.dashCharge.setAttribute('aria-label', 'Dash recovery');
-    this.overchargeLabel = hostDocument.createElement('span');
+    this.overchargeLabel = hostDocument.createElement('div'); this.overchargeLabel.className = 'specimen-overcharge-label';
+    const overchargeName = hostDocument.createElement('span');
+    overchargeName.innerHTML = `${icon('Crosshair')}<strong>Overcharge</strong>`;
+    this.overchargeState = hostDocument.createElement('span'); this.overchargeState.className = 'specimen-ability-state';
+    this.overchargeLabel.append(overchargeName, this.overchargeState);
     this.overcharge = hostDocument.createElement('progress'); this.overcharge.max = 1;
     this.overcharge.setAttribute('aria-label', 'Overcharge accuracy streak');
     this.abilities.append(this.dashLabel, this.dashCharge, this.overchargeLabel, this.overcharge);
 
-    element.append(this.crosshair, this.hitMarker, this.dodgeFeedback, this.label, this.charge, this.abilities);
+    element.append(this.crosshair, this.hitMarker, this.dodgeFeedback, this.label, this.chargeDisplay, this.abilities);
     this.element = element;
 
     try {
@@ -192,6 +210,11 @@ export class SpecimenCombatPresentation {
     this.crosshair.hidden = !activeForm || !model.fireEnabled;
     this.charge.hidden = !activeForm || !model.fireEnabled;
     this.charge.value = model.chargeAmount;
+    this.chargeDisplay.hidden = !activeForm || !model.fireEnabled || !model.charging;
+    this.chargeDisplay.dataset.full = String(model.fullyCharged);
+    const chargeText = model.fullyCharged ? 'Release' : '';
+    this.chargeLabel.hidden = !model.fullyCharged;
+    if (this.chargeLabel.textContent !== chargeText) this.chargeLabel.textContent = chargeText;
     this.charge.dataset.state = model.fullyCharged
       ? 'full'
       : model.charging
@@ -199,10 +222,17 @@ export class SpecimenCombatPresentation {
         : 'ready';
     this.abilities.hidden = !activeForm || !model.fireEnabled;
     this.dashLabel.hidden = this.dashCharge.hidden = !this.dash;
-    this.dashCharge.value = this.dash?.readModel.cooldownProgress ?? 1;
-    this.dashLabel.textContent = this.dashCharge.value >= 1 ? 'SHIFT · DASH READY' : 'SHIFT · DASH RECHARGING';
+    const dashModel = this.dash?.readModel;
+    this.dashCharge.value = dashModel?.cooldownProgress ?? 1;
+    const dashReady = this.dashCharge.value >= 1;
+    this.abilities.dataset.dashReady = String(dashReady);
+    const dashText = dashReady ? 'Ready' : '';
+    this.dashState.hidden = !dashReady;
+    if (this.dashState.textContent !== dashText) this.dashState.textContent = dashText;
     this.overcharge.value = model.overchargeProgress;
-    this.overchargeLabel.textContent = model.overchargeReady ? 'OVERCHARGE · NEXT SHOT BOOSTED' : 'OVERCHARGE · LAND CONSECUTIVE HITS';
+    const overchargeText = model.overchargeReady ? 'Ready' : model.overchargeProgress > 0 ? `${Math.round(model.overchargeProgress * 100)}%` : '';
+    this.overchargeState.hidden = !overchargeText;
+    if (this.overchargeState.textContent !== overchargeText) this.overchargeState.textContent = overchargeText;
     this.abilities.dataset.overcharged = String(model.overchargeReady);
 
     let count = 0;
@@ -228,6 +258,7 @@ export class SpecimenCombatPresentation {
     if (this.disposed) return;
     this.crosshair.hidden = true;
     this.charge.hidden = true;
+    this.chargeDisplay.hidden = true;
     this.abilities.hidden = true;
     this.feedbackEnabled = false;
     this.clearFeedback();

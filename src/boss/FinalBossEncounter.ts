@@ -13,17 +13,10 @@ import { FINAL_ARENA, FINAL_ARENA_SCALE, FINAL_ARENA_RING, FINAL_BOSS_TUNING as 
 import { ExterminatorDroneFlight } from './ExterminatorDroneFlight.ts';
 import { FinalBossController, type FinalBossState } from './FinalBossController.ts';
 import { FinalBossPresentation } from './FinalBossPresentation.ts';
+import { FinalBossHud } from './FinalBossHud.ts';
 import { BossHealthPacks } from './BossHealthPacks.ts';
 import { ExterminatorReinforcements } from './ExterminatorReinforcements.ts';
 import { ExterminatorEvasion } from './ExterminatorEvasion.ts';
-
-const CAPTION={
-  'gun-blast':'GUN BLAST · DODGE OR USE COVER',
-  'laser-shots':'LASER ORBS · DODGE OR SHOOT THEM DOWN',
-  'summon-defend':'SUMMON & DEFEND · DESTROY EVERY DRONE TO BREAK THE SHIELD',
-  'laser-beam':'LASER BEAM · THREE SWEEPS · JUMP OR USE COVER',
-  'ram':'RAM · CLEAR THE CHARGE PATH · COVER WILL BREAK',
-} as const;
 
 /** Visible emitters/endpoints and hit authority share one source. */
 export class FinalBossEncounter {
@@ -54,13 +47,7 @@ export class FinalBossEncounter {
   private readonly rightMuzzle=new THREE.Vector3();
   private readonly line=new THREE.Line3();
   private readonly hit=new CollisionHit();
-  private readonly bossHealth:HTMLProgressElement;
-  private readonly playerHealth:HTMLProgressElement;
-  private readonly phaseLabel:HTMLElement;
-  private readonly message:HTMLElement;
-  private readonly cinematicText:HTMLElement;
-  private readonly skip:HTMLButtonElement;
-  private readonly devInvincibilityToggle?:HTMLButtonElement;
+  private readonly hud:FinalBossHud;
   private oldState:FinalBossState='idle';
   private oldStage='';
   private summonSerial=-1;
@@ -114,20 +101,16 @@ export class FinalBossEncounter {
     this.unregister.push(this.squad.events.on('destroyed',e=>{const at=this.squad.root.children[e.slotIndex]!.position;p.burst(at,16);if(!this.droneFlight.isGuardian(e.slotIndex))this.healthPacks.drop(at);this.controller.droneDestroyed();options.audio?.play('world-drone-dissolve-01',at,true,.75);}));
     this.unregister.push(this.squad.events.on('projectileFired',e=>options.audio?.play('specimen-turret-shot',this.squad.root.children.find(r=>r.name.startsWith(e.droneId))?.position,true,.3)));
     this.hostileShots=new THREE.InstancedMesh(this.shotGeometry,this.shotMaterial,this.squad.poolCapacity);this.hostileShots.frustumCulled=false;this.hostileShots.count=0;arena.root.add(this.hostileShots);
-    const doc=options.host.ownerDocument??document;this.element=doc.createElement('section');this.element.className='final-boss-hud';this.element.hidden=true;
-    this.phaseLabel=doc.createElement('div');this.phaseLabel.className='final-boss-heading';this.bossHealth=doc.createElement('progress');this.bossHealth.max=T.health;this.bossHealth.setAttribute('aria-label','Exterminator health');
-    this.playerHealth=doc.createElement('progress');this.playerHealth.max=100;this.playerHealth.className='final-boss-integrity';this.playerHealth.setAttribute('aria-label','Specimen integrity');
-    this.message=doc.createElement('div');this.message.className='final-boss-message';this.cinematicText=doc.createElement('div');this.cinematicText.className='final-boss-cinematic';
-    this.skip=doc.createElement('button');this.skip.className='final-boss-skip';this.skip.textContent='Enter · Skip cinematic';this.skip.onclick=()=>{this.skipRequested=true;};
-    this.element.append(this.phaseLabel,this.bossHealth,this.playerHealth,this.message,this.cinematicText,this.skip);
-    if(import.meta.env?.DEV) {
-      this.devInvincibilityToggle=doc.createElement('button');this.devInvincibilityToggle.type='button';this.devInvincibilityToggle.className='final-boss-dev-invincibility';this.devInvincibilityToggle.hidden=true;
-      this.devInvincibilityToggle.onclick=()=>{this.controller.toggleDevInvincibility();this.sync();this.devInvincibilityToggle?.blur();};this.element.append(this.devInvincibilityToggle);
-    }
+    this.hud=new FinalBossHud(options.host.ownerDocument??document,{
+      host:options.host,
+      onSkip:()=>{this.skipRequested=true;},
+      onToggleInvincibility:import.meta.env?.DEV?()=>{this.controller.toggleDevInvincibility();this.sync();}:undefined,
+    });
+    this.element=this.hud.element;
     options.host.append(this.element);this.reset();
   }
   get cinematic():boolean {return this.controller.cinematic;}
-  presentMerge(progress:number):void {this.element.hidden=false;this.element.dataset.state='merging';this.options.host.dataset.bossEncounter='true';this.bossHealth.hidden=true;this.playerHealth.hidden=true;this.phaseLabel.hidden=true;this.message.hidden=true;this.skip.hidden=true;this.cinematicText.hidden=false;this.cinematicText.textContent=progress<.6?'BOB. GOOP. VOLT.':'ONE SPECIMEN.';}
+  presentMerge(progress:number):void {this.hud.presentMerge(progress);this.options.host.dataset.bossEncounter='true';}
   start(shortIntro=false):boolean {if(!this.controller.start(shortIntro))return false;this.activateEncounter();return true;}
   startPhaseTwo():boolean {if(!this.controller.startPhaseTwo(this.options.body.position))return false;this.activateEncounter();return true;}
   private activateEncounter():void {this.options.arena.setPowered(true);this.options.arena.setDoors(true);this.options.audio?.startLoop('final-boss-engine','world-machinery-loop-01',this.presentation.machine.position);this.sync();}
@@ -173,18 +156,8 @@ export class FinalBossEncounter {
   private sync():void {
     const m=this.controller.readModel,{arena,body}=this.options,p=this.presentation;p.update(m,this.controller.time,body);
     arena.setPowered(m.state!=='idle'&&m.state!=='suspended',m.phase===2||m.state==='transition',this.controller.time);arena.setDoors(m.state!=='idle',m.state==='escape'||m.state==='complete');arena.deployment(m.state==='intro'?m.progress:1);arena.setDamaged(m.phase===2||['defeated','escape','complete'].includes(m.state));
-    this.element.hidden=['idle','suspended','complete'].includes(m.state);this.element.dataset.state=m.state;this.element.dataset.phase=String(m.phase);this.element.dataset.hit=m.invulnerability>0?'true':'false';this.element.dataset.attack=m.attack;this.element.dataset.shield=m.shieldActive?'true':'false';
+    this.hud.update(m,this.reinforcements.activeCount,this.controller.devInvincible);
     if(m.state!=='idle'&&m.state!=='suspended')this.options.host.dataset.bossEncounter='true';else delete this.options.host.dataset.bossEncounter;
-    this.bossHealth.value=m.health;this.playerHealth.value=m.playerHealth;this.bossHealth.hidden=false;this.playerHealth.hidden=false;this.phaseLabel.hidden=false;this.message.hidden=false;
-    if(import.meta.env?.DEV&&this.devInvincibilityToggle) {
-      this.devInvincibilityToggle.hidden=!['intro','combat','transition'].includes(m.state);
-      this.devInvincibilityToggle.textContent=`DEV · I · INVINCIBILITY ${this.controller.devInvincible?'ON':'OFF'}`;
-      this.devInvincibilityToggle.setAttribute('aria-pressed',String(this.controller.devInvincible));
-    }
-    this.phaseLabel.textContent=`EXTERMINATOR / ${m.phase===1?'CONTAINMENT':'EXTERMINATION'} · ${Math.ceil(m.health)}/${m.maximumHealth} HP${m.phase===2&&this.reinforcements.activeCount?` · ADVANCED ${this.reinforcements.activeCount}`:''}`;
-    this.message.textContent=m.state==='combat'?(m.shieldActive?`${CAPTION['summon-defend']} · ${m.defendersRemaining} REMAIN · +${T.healPerSecond} HP/s`:
-      m.attack==='laser-beam'?`${m.phase===2?'LASER BEAM · FULL CIRCLE + FIVE TARGETED HALF-SWEEPS':CAPTION['laser-beam']} · SWEEP ${Math.min(m.beamLapsCompleted+1,m.phase===2?6:T.beamCircles)}/${m.phase===2?6:T.beamCircles} · SWEEP ${this.presentation.beamWarning.userData.direction===-1?'↻':'↺'}${m.beamTurning?' · TURNING':''}`:m.attack==='ram'?'RAM · CLEAR THE MARKED LANE · COVER WILL BREAK':CAPTION[m.attack]):'';
-    this.skip.hidden=!this.cinematic;this.cinematicText.hidden=!this.cinematic;this.cinematicText.textContent=m.state==='intro'?(m.progress<.45?'CONTAINMENT HAS FAILED':'EXTERMINATION CHAMBER'):m.state==='transition'?'EXTERMINATION PROTOCOL ACTIVATED\nALL SAFETY LIMITERS DISABLED':m.state==='defeated'?(m.progress<.55?'DEFENCE CORE DESTROYED':'EMERGENCY EGRESS BREACHED'):'TOGETHER. FREE.';
     if(m.state==='escape') {
       const progress=THREE.MathUtils.smoothstep(m.progress,0,.85),angle=-Math.PI/2+Math.min(1,progress/.88)*Math.PI,r=FINAL_ARENA_RING.radius;
       this.closest.set(Math.cos(angle)*r,FINAL_MERGE_ANCHOR.y+.1*Math.abs(Math.sin(progress*50)),FINAL_ARENA.centreZ+Math.sin(angle)*r);
@@ -308,7 +281,7 @@ export class FinalBossEncounter {
     const t=this.controller.time;camera.position.x+=Math.sin(t*83)*this.shake;camera.position.y+=Math.sin(t*67+.8)*this.shake*.65;camera.position.z+=Math.sin(t*97+1.7)*this.shake*.45;
   }
   clearAttacks():void {this.squad.clear();this.droneFlight.reset();this.projectiles.clear();this.reinforcements.reset();this.evasion.reset();this.shake=0;this.hostileShots.count=0;this.presentation.clearRamImpact();this.presentation.beam.visible=false;this.presentation.beamCore.visible=false;this.presentation.beamImpact.visible=false;this.presentation.shield.visible=false;this.presentation.eyeCharge.visible=false;this.presentation.clearAttackWarnings();for(let i=0;i<6;i++)this.options.arena.setSector(i,'inactive');this.oldStage='';this.options.audio?.stopLoop('final-boss-beam');}
-  suspend():void {this.controller.suspend();this.clearAttacks();this.healthPacks.reset();this.options.audio?.stopLoop('final-boss-engine');this.element.hidden=true;}
-  reset():void {this.clearAttacks();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.element.hidden=true;if(this.devInvincibilityToggle)this.devInvincibilityToggle.hidden=true;this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');delete this.options.host.dataset.bossEncounter;}
-  dispose():void {if(this.disposed)return;this.reset();for(const off of this.unregister)off();for(const drone of this.drones)drone.dispose();this.droneResources.dispose();this.squad.dispose();this.reinforcements.dispose();this.healthPacks.dispose();this.projectiles.dispose();this.hostileShots.removeFromParent();this.hostileShots.dispose();this.shotGeometry.dispose();this.shotMaterial.dispose();this.presentation.dispose();this.controller.dispose();this.element.remove();this.disposed=true;}
+  suspend():void {this.controller.suspend();this.clearAttacks();this.healthPacks.reset();this.options.audio?.stopLoop('final-boss-engine');this.hud.hide();}
+  reset():void {this.clearAttacks();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.hud.hide();this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');delete this.options.host.dataset.bossEncounter;}
+  dispose():void {if(this.disposed)return;this.reset();for(const off of this.unregister)off();for(const drone of this.drones)drone.dispose();this.droneResources.dispose();this.squad.dispose();this.reinforcements.dispose();this.healthPacks.dispose();this.projectiles.dispose();this.hostileShots.removeFromParent();this.hostileShots.dispose();this.shotGeometry.dispose();this.shotMaterial.dispose();this.presentation.dispose();this.controller.dispose();this.hud.dispose();this.disposed=true;}
 }
