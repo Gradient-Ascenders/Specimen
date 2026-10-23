@@ -19,7 +19,7 @@ test('normal render never overwrites borrowed finale actors with a second world 
   const bob=body(),goop=body(),volt=body();
   const movie={active:true,present(){movieFrames++;}};
   const renderLayer={scene:new THREE.Scene(),cameraRig:{camera:new THREE.PerspectiveCamera(),aimPresentationWeight:0,
-    setContextualCamera(){},update(){},queueLookInput(){}},renderer:{compile(){}},render(){draws++;}};
+    setThirdPersonOverride(){},isFirstPersonForTarget(){return false;},setContextualCamera(){},update(){},queueLookInput(){}},renderer:{compile(){}},render(){draws++;}};
   const runtime=new CultivationLevelRuntime({authoredAssets:cultivationAssets,host:{dataset:{}} as unknown as HTMLElement,
     input:{enabled:true,endPointerUpdate(){}} as unknown as Input,renderLayer:renderLayer as unknown as RenderLayer,
     progression:{unlockedSlimeIds:['bob','goop'],activeSlimeId:'bob'},window:new EventTarget() as unknown as Window,debugAvailable:false});
@@ -283,6 +283,25 @@ test('8 shortcut belongs only to a loaded running Level 2 dev runtime; editable 
   internal.lifecycle.state='running';internal.resources=undefined;internal.onVoltFinaleKeyDown(key());assert.equal(starts,2,'unloaded/non-Level-2 resources cannot run it');
   internal.resources=resources;movie.active=true;internal.onVoltFinaleKeyDown(key());assert.equal(starts,2);
   internal.onVoltFinaleKeyDown(key('Enter'));assert.equal(skips,1);assert.equal(prevented,3);
+});
+
+test('Volt rescue menu preview is development-only and launches the real Room 5 finale from stopped preparation', () => {
+  const runtime=Object.create(CultivationLevelRuntime.prototype) as CultivationLevelRuntime;
+  const internal=runtime as any;
+  let teleports=0,starts=0,activated='';
+  Object.assign(internal,{
+    voltRescuePreviewAvailable:false,debugAvailable:true,lifecycle:{state:'stopped'},
+    resources:{authoredPreview:{},roomFiveFinale:{},manager:{activate(id:string){activated=id;}}},
+    input:{releasePointerLock(){}},
+    teleportToAuthoredPreviewRoom(room:number){assert.equal(room,5);teleports++;return true;},
+    beginVoltFinale(_resources:unknown,force:boolean){assert.equal(force,true);assert.equal(activated,'bob');starts++;return true;},
+  });
+  assert.equal(runtime.previewVoltRescueForDebug(),false,'Production ?debug=1 does not enable this entry.');
+  internal.voltRescuePreviewAvailable=true;
+  assert.equal(runtime.previewVoltRescueForDebug(),true);
+  assert.equal(teleports,1);assert.equal(starts,1);
+  internal.lifecycle.state='unloaded';assert.equal(runtime.previewVoltRescueForDebug(),false);
+  internal.lifecycle.state='stopped';internal.resources=undefined;assert.equal(runtime.previewVoltRescueForDebug(),false);
 });
 
 test('resource-free release fallback registers Volt without requiring the retired exit bay', () => {

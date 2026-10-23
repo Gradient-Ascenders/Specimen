@@ -16,6 +16,8 @@ import { CultivationRoomThreeClearance, ROOM_THREE_CLEARANCE_PLATFORMS } from '.
 import { CULTIVATION_ROOM_THREE_MONITOR_SCRIPT as SCRIPT, CULTIVATION_ROOM_THREE_MONITOR_COLOURS as COLOURS,
   CULTIVATION_ROOM_THREE_MONITOR_TRIGGER as TRIGGER } from '../src/render/environment/cultivation/CultivationRoomThreeObservation.ts';
 import { paginateMonitorSections } from '../src/render/environment/containment/ContainmentMonitorDialogue.ts';
+import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
+import { CultivationLevelRuntime } from '../src/levels/CultivationLevelRuntime.ts';
 
 const ZERO=new THREE.Vector3();
 function fixture(){
@@ -43,6 +45,53 @@ function fixture(){
   return {scene,world,surfaces,targets,bob,goop,encounter,presentation,camera,movie,place,
     dispose(){movie.dispose();encounter.dispose();presentation.dispose();targets.forEach(t=>t.dispose());world.clear();surfaces.clear();scene.dispose();}};
 }
+
+test('developer sentry preview starts the full movie and sounds each shove, topple and real acid contact once',()=>{
+  const f=fixture();
+  const runtime=Object.create(CultivationLevelRuntime.prototype) as CultivationLevelRuntime;
+  const internal=runtime as any;
+  const cues:string[]=[],loops:string[]=[],stops:string[]=[];
+  const off=[
+    gameplayAudioEvents.on('cue',event=>{
+      if(event.sound.startsWith('cultivation-sentry-')){
+        cues.push(event.sound);
+        if(event.sound==='cultivation-sentry-acid-splash-01')
+          assert.ok(f.encounter.readModel.groundDisabledCount>0,'A splash follows a real disable, not a guessed timer.');
+      }
+    }),
+    gameplayAudioEvents.on('loop',event=>{if(event.key.startsWith('cultivation-sentry-')){loops.push(event.key);assert.equal(event.sound,'goop-dissolve-loop-01');}}),
+    gameplayAudioEvents.on('stop',event=>{if(event.key.startsWith('cultivation-sentry-'))stops.push(event.key);}),
+  ];
+  let activated='';
+  Object.assign(internal,{
+    debugAvailable:true,sentryPreviewAvailable:false,lifecycle:{state:'stopped'},
+    host:{dataset:{}},input:{resetState(){},releasePointerLock(){}},
+    renderLayer:{cameraRig:{camera:f.camera,update(){}}},
+    teleportToAuthoredPreviewRoom(room:number){assert.equal(room,3);return true;},
+    resetRecoveryCamera(){},retargetCamera(){},
+    resources:{authoredPreview:f.scene,roomThreeClearance:f.movie,pair:{bobBody:f.bob},
+      manager:{activate(id:string){activated=id;}},movement:new THREE.Vector3(),
+      bobPresentation:f.presentation,acidProjectileSystem:{reset(){}}},
+  });
+  try{
+    assert.equal(runtime.previewSentryClearanceForDebug(),false,'Production debug UI cannot enable the preview.');
+    internal.sentryPreviewAvailable=true;
+    assert.equal(runtime.previewSentryClearanceForDebug(),true);
+    assert.equal(activated,'bob');assert.equal(internal.host.dataset.cinematic,'cultivation-clearance');
+    assert.deepEqual(f.movie.descent.steps.map(step=>step.landingName),['floor','rebound']);
+    while(f.movie.active){
+      f.movie.update(1/60);
+      const count=cues.length;f.movie.present(f.camera,.5);assert.equal(cues.length,count,'Rendering never repeats audio.');
+    }
+    for(const sound of ['cultivation-sentry-shove-01','cultivation-sentry-topple-01','cultivation-sentry-acid-splash-01'])
+      assert.equal(cues.filter(cue=>cue===sound).length,4,sound);
+    assert.equal(loops.length,4);assert.equal(new Set(loops).size,4);
+    assert.ok(loops.every(key=>stops.includes(key)),'Completion stops every corrosion loop.');
+    stops.length=0;f.movie.reset();
+    assert.ok(loops.every(key=>stops.includes(key)),'Reset also releases every corrosion loop.');
+    assert.equal(f.encounter.readModel.groundDisabledCount,4);
+  }finally{off.forEach(unsubscribe=>unsubscribe());f.dispose();}
+});
 
 test('all Room 3 sentries flash bounded protective shields at real acid impacts and keep their resistant gameplay bodies',()=>{
   const f=fixture(),shields=f.encounter.shields,colliders=f.world.colliderCount;

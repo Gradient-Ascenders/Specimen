@@ -1,3 +1,5 @@
+import { CameraBodyVisibility } from '../CameraBodyVisibility.ts';
+import type { CameraRig, CameraFollowTarget } from '../CameraRig.ts';
 import type { GelRendering } from '../slime/GelRendering.ts';
 import * as THREE from 'three';
 import { loadCharacterAsset } from '../slime/LoadCharacterAsset.ts';
@@ -40,6 +42,9 @@ export interface GoopCharacterPresentationState {
 
 /** Visual-only elastic body motion, seated eyes, and a trailing ground skirt. */
 export class GoopCharacterPresentation {
+  private readonly cameraBodyVisibility = new CameraBodyVisibility();
+  setCameraView(rig: CameraRig, target: CameraFollowTarget): void { this.cameraBodyVisibility.configure(rig, target); }
+
   private detail: CharacterDetail | undefined;
   readonly root = new THREE.Group();
   readonly radiusMetres: number;
@@ -170,6 +175,7 @@ export class GoopCharacterPresentation {
         // Per-load geometry belongs to this instance; no cache or reparenting.
         root.position.y = 0.45;
         this.shape.add(root);
+        for (const mesh of [asset.body, ...asset.eyes]) this.cameraBodyVisibility.bind(mesh);
         this.asset = asset; this.materials = materials;
         if (detailIndices) {
           try { this.detail = new CharacterDetail(root, [asset.body, ...asset.eyes], detailIndices); }
@@ -411,6 +417,7 @@ export class GoopCharacterPresentation {
     this.applyVisibility(); this.present();
   }
   dispose(): void {
+    this.cameraBodyVisibility.dispose();
     if (this.disposed) return;
     this.disposed = true;
     this.detail?.dispose(); this.detail = undefined;

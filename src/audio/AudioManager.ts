@@ -1,4 +1,4 @@
-import { SOUND_BANKS, SOUND_DEFINITIONS, soundUrl, type SoundId } from './SoundCatalog.ts';
+import { SOUND_BANKS, SOUND_DEFINITIONS, soundSpatialProfile, soundUrl, type SoundId } from './SoundCatalog.ts';
 import type { AudioPosition } from './GameplayAudioEvents.ts';
 
 interface Voice {
@@ -7,8 +7,10 @@ interface Voice {
   readonly gain: GainNode;
   readonly panner?: PannerNode;
   readonly key?: string;
+  volumeScale: number;
+  readonly ui: boolean;
 }
-interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition }
+interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition; readonly volumeScale: number }
 type SpatialAudioTarget = {
   readonly positionX?: AudioParam;
   readonly positionY?: AudioParam;
@@ -77,8 +79,9 @@ const setListenerOrientation = (target: ListenerOrientationTarget, forward: Audi
 
 export interface AudioPlayback {
   play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number): void;
-  startLoop(key: string, sound: SoundId, position?: AudioPosition): void;
+  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale?: number): void;
   stopLoop(key: string): void;
+  stopSound?(sound: SoundId): void;
   stopAll(): void;
   setPaused(paused: boolean): void;
   setListener(position: AudioPosition, forward?: AudioPosition, up?: AudioPosition): void;
@@ -89,6 +92,7 @@ export class AudioManager implements AudioPlayback {
   private context: AudioContext | undefined;
   private master: GainNode | undefined;
   private effects: GainNode | undefined;
+  private gameplayGain: GainNode | undefined;
   private compressor: DynamicsCompressorNode | undefined;
   private readonly buffers = new Map<SoundId, AudioBuffer>();
   private readonly voices = new Set<Voice>();
@@ -146,6 +150,9 @@ export class AudioManager implements AudioPlayback {
       this.context = this.createContext();
       this.master = this.context.createGain();
       this.effects = this.context.createGain();
+      this.gameplayGain = this.context.createGain();
+      this.gameplayGain.gain.value = this.paused ? 0 : 1;
+      this.gameplayGain.connect(this.effects);
       this.compressor = this.context.createDynamicsCompressor();
       this.compressor.threshold.value = -12;
       this.compressor.ratio.value = 4;
@@ -212,18 +219,26 @@ export class AudioManager implements AudioPlayback {
     }
   }
 
-  setPaused(paused: boolean): void { this.paused = paused; this.syncContext(); }
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (this.gameplayGain) this.gameplayGain.gain.value = paused ? 0 : 1;
+    this.syncContext();
+  }
   setFocused(focused: boolean): void { this.focused = focused; this.syncContext(); }
   private syncContext(): void {
     const context = this.context;
     if (!context || this.disposed || context.state === 'closed') return;
-    const shouldRun = this.unlocked && !this.paused && this.focused;
+    const shouldRun = this.unlocked && this.focused && (!this.paused || [...this.voices].some(voice => voice.ui));
     const operation = shouldRun ? context.resume() : context.suspend();
     void operation.then(() => { if (shouldRun) this.reconcileLoops(); }).catch(() => {});
   }
 
   play(sound: SoundId, position?: AudioPosition, varyPitch = false, volumeScale = 1): void {
-    if (!this.canPlay()) return;
+    // resume() is asynchronous. Schedule a decoded first-frame one-shot on
+    // the suspended context's clock rather than dropping it before resume
+    // completes. Intentional pause, focus loss and locked audio still reject it.
+    if (this.disposed || !this.unlocked || this.paused || !this.focused ||
+      !this.context || this.context.state === 'closed') return;
     const scale = Number.isFinite(volumeScale) ? Math.max(0, Math.min(1, volumeScale)) : 0;
     if (scale === 0) return;
     const now = this.context!.currentTime;
@@ -232,14 +247,32 @@ export class AudioManager implements AudioPlayback {
     if (this.createVoice(sound, position, undefined, varyPitch, scale)) this.recent.set(sound, now);
   }
 
-  startLoop(key: string, sound: SoundId, position?: AudioPosition): void {
+  /** Menu one-shots share the effects/master mix, while paused world voices stay muted. */
+  playUI(): void {
+    if (this.disposed || !this.unlocked || !this.focused || !this.context || this.context.state === 'closed') return;
+    const sound = 'ui-confirm-01', now = this.context.currentTime;
+    if (now - (this.recent.get(sound) ?? -Infinity) < .035) return;
+    if (this.createVoice(sound, undefined, undefined, false, 1, true)) {
+      this.recent.set(sound, now);
+      this.syncContext();
+    }
+  }
+
+  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale = 1): void {
     if (this.disposed) return;
+    const scale = Number.isFinite(volumeScale) ? Math.max(0, Math.min(1, volumeScale)) : 0;
     const previous = this.loops.get(key);
     if (previous && previous.sound !== sound) this.stopLoop(key);
-    this.loops.set(key, { sound, position });
+    this.loops.set(key, { sound, position, volumeScale: scale });
     const voice = [...this.voices].find(candidate => candidate.key === key);
-    if (voice) this.positionVoice(voice, position);
-    else if (this.canPlay()) this.createVoice(sound, position, key, sound.includes('movement'));
+    if (voice) {
+      this.positionVoice(voice, position);
+      if (voice.volumeScale !== scale) {
+        voice.volumeScale = scale;
+        voice.gain.gain.cancelScheduledValues(this.context!.currentTime);
+        voice.gain.gain.setTargetAtTime(SOUND_DEFINITIONS[sound].volume * scale, this.context!.currentTime, 0.025);
+      }
+    } else if (this.canPlay()) this.createVoice(sound, position, key, sound.includes('movement'), scale);
   }
 
   stopLoop(key: string): void {
@@ -250,6 +283,13 @@ export class AudioManager implements AudioPlayback {
       released = true;
     }
     if (released) this.reconcileLoops();
+  }
+
+  /** Release a cinematic's own clips without stopping gameplay/menu audio. */
+  stopSound(sound: SoundId): void {
+    for (const [key, request] of this.loops) if (request.sound === sound) this.loops.delete(key);
+    for (const voice of this.voices) if (voice.sound === sound) this.stopVoice(voice);
+    this.reconcileLoops();
   }
 
   stopAll(): void {
@@ -299,11 +339,11 @@ export class AudioManager implements AudioPlayback {
   }
   private reconcileLoops(): void {
     if (!this.canPlay()) return;
-    for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position);
+    for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position, request.volumeScale);
   }
-  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1): boolean {
-    const buffer = this.buffers.get(sound), context = this.context, effects = this.effects;
-    if (!buffer || !context || !effects) return false;
+  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1, ui = false): boolean {
+    const buffer = this.buffers.get(sound), context = this.context, bus = ui ? this.effects : this.gameplayGain;
+    if (!buffer || !context || !bus) return false;
     const definition = SOUND_DEFINITIONS[sound];
     if (this.voices.size >= 24 || [...this.voices].filter(v => v.sound === sound).length >= definition.maxVoices) return false;
     const source = context.createBufferSource(), gain = context.createGain();
@@ -311,17 +351,18 @@ export class AudioManager implements AudioPlayback {
     source.loop = key !== undefined;
     source.playbackRate.value = varyPitch ? 0.96 + Math.random() * 0.08 : 1;
     gain.gain.value = key ? 0 : definition.volume * volumeScale;
-    if (key) gain.gain.linearRampToValueAtTime(definition.volume, context.currentTime + 0.04);
+    if (key) gain.gain.linearRampToValueAtTime(definition.volume * volumeScale, context.currentTime + 0.04);
     const panner = position ? context.createPanner() : undefined;
     if (panner) {
       panner.panningModel = 'equalpower';
       panner.distanceModel = 'inverse';
-      panner.refDistance = 3;
+      const spatial = soundSpatialProfile(sound);
+      panner.refDistance = spatial.refDistance;
       panner.maxDistance = 45;
-      panner.rolloffFactor = 1.5;
-      source.connect(gain); gain.connect(panner); panner.connect(effects);
-    } else { source.connect(gain); gain.connect(effects); }
-    const voice: Voice = { sound, source, gain, panner, key };
+      panner.rolloffFactor = spatial.rolloffFactor;
+      source.connect(gain); gain.connect(panner); panner.connect(bus);
+    } else { source.connect(gain); gain.connect(bus); }
+    const voice: Voice = { sound, source, gain, panner, key, volumeScale, ui };
     this.positionVoice(voice, position);
     this.voices.add(voice);
     source.onended = () => { this.releaseVoice(voice); this.reconcileLoops(); };
@@ -341,6 +382,7 @@ export class AudioManager implements AudioPlayback {
     if (!this.voices.delete(voice)) return;
     voice.source.onended = null;
     voice.source.disconnect(); voice.gain.disconnect(); voice.panner?.disconnect();
+    if (voice.ui) this.syncContext();
   }
   dispose(): void {
     if (this.disposed) return;
@@ -350,7 +392,7 @@ export class AudioManager implements AudioPlayback {
       this.pending.delete(sound); resolve();
     }
     this.stopAll(); this.buffers.clear();
-    this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
+    this.gameplayGain?.disconnect(); this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
     void this.context?.close().catch(() => {});
   }
 }

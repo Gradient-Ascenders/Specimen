@@ -1,5 +1,6 @@
 import { gameplayBindings } from './core/KeyBindings.ts';
 import { AudioManager } from './audio/AudioManager.ts';
+import { prepareBlackoutArrivalAudio } from './audio/BlackoutArrivalAudio.ts';
 import { BackgroundMusic, musicForFlow, type MusicLevel } from './audio/BackgroundMusic.ts';
 import { SOUND_BANKS } from './audio/SoundCatalog.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
@@ -89,7 +90,7 @@ function startGame(): void {
   const graphicsPreparationYield = new GraphicsPreparationYield(
     (window as Window & {scheduler?: {yield(): Promise<void>}}).scheduler,
   );
-  const levelOneRuntime = new GreyboxLevelRuntime({
+  const createLevelOneRuntime = (): GreyboxLevelRuntime => new GreyboxLevelRuntime({
     host: app,
     audio,
     input,
@@ -102,6 +103,9 @@ function startGame(): void {
       : graphicsPreparationYield.yield(),
     characterLoaders: levelOneAssets.loaders,
   });
+  let levelOneRuntime = createLevelOneRuntime();
+  let levelTwoRuntime: import('./levels/CultivationLevelRuntime.ts').CultivationLevelRuntime | undefined;
+  let levelPreviewRequested: 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | undefined;
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
@@ -114,7 +118,7 @@ function startGame(): void {
           : Promise.resolve(undefined),
         loadCultivationBakedAssets(new URL('./assets/cultivation/authored-assets.bin', import.meta.url)),
       ]);
-      return new runtimeModule.CultivationLevelRuntime({
+      return levelTwoRuntime = new runtimeModule.CultivationLevelRuntime({
         host: app,
         audio,
         input,
@@ -126,10 +130,14 @@ function startGame(): void {
       });
     },
     createLevelThree: async (progression) => {
+      // Prioritize the first-frame cue and prepare it alongside the visuals.
+      // The rest of the bank stays optional and does not gate the transition.
+      const arrivalAudio = prepareBlackoutArrivalAudio(audio);
       void audio.preload(SOUND_BANKS.blackout);
       const [runtimeModule, maintenanceMaps] = await Promise.all([
         import('./levels/BlackoutLevelRuntime.ts'),
         loadBlackoutMaintenanceMapData(new URL('./assets/blackout/maintenance-maps.bin', import.meta.url)),
+        arrivalAudio,
       ]);
       return new runtimeModule.BlackoutLevelRuntime({
         host: app,
@@ -190,72 +198,169 @@ function startGame(): void {
     }).finally(() => { initialGraphicsTask = undefined; levelOneAssets.clear(); });
     return initialGraphicsTask;
   };
+  const escapePreviewFromUrl = import.meta.env.DEV && new URLSearchParams(window.location.search).get('cutscene') === 'escape';
+  let escapePreviewPending = false;
+  let escapePreviewRequested = false;
+  const previewEscape = async (): Promise<void> => {
+    if (!import.meta.env.DEV || escapePreviewPending) return;
+    escapePreviewPending = escapePreviewRequested = true;
+    gameFlow.setOpeningFade(1);
+    gameFlow.setOpeningStatus('Preparing escape cutscene…', false);
+    const skip = app.querySelector<HTMLButtonElement>('[data-action="skip-opening"]');
+    if (skip) skip.hidden = true;
+    try {
+      // Paint the opaque cover before normal world/cinematic preparation.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      if (shuttingDown) return;
+      titlePresentation?.dispose({keepScene:true}); titlePresentation = undefined;
+      titleRoom?.dispose(); titleRoom = undefined;
+      await prepareFirstGraphics();
+      await waitForGpuPreparation(renderLayer.renderer.getContext(),
+        () => new Promise(resolve => requestAnimationFrame(() => resolve())), () => !shuttingDown);
+      if (shuttingDown) return;
+      levelOneRuntime.completeOpening();
+      gameFlow.finishOpening(false);
+      if (!levelOneRuntime.previewEscapeForDebug()) throw new Error('Escape preview is not ready.');
+      escapePreviewRequested = false;
+      if (lastFrameStats) gameSession.render(0, lastFrameStats);
+    } catch (error) {
+      if (!shuttingDown) {
+        console.error('Escape cutscene preview failed.', error);
+        gameFlow.setOpeningStatus('Could not prepare the escape cutscene. Retry to continue.', true);
+      }
+    } finally {
+      escapePreviewPending = false;
+      if (skip) skip.hidden = false;
+    }
+  };
+  const playOpening = (forceIntro = false): void => {
+    if (escapePreviewFromUrl && !forceIntro) { void previewEscape(); return; }
+    if (!titleRoom) return;
+    titlePresentation?.dispose({ keepScene: true });
+    titlePresentation = undefined;
+    const shared = {
+      host: app,
+      audio,
+      prepareLevel: () => {
+        return prepareFirstGraphics().then(async () => {
+          // Submission finishing is not GPU completion. Drain the hidden
+          // warm-up queue before marking gameplay ready for the handoff.
+          await waitForGpuPreparation(renderLayer.renderer.getContext(),
+            () => new Promise(resolve => requestAnimationFrame(() => resolve())),
+            () => !shuttingDown);
+          if (shuttingDown) return;
+          const verification = levelOneRuntime.levelOnePrewarmVerification;
+          if (verification) app.dataset.levelOnePrewarm = JSON.stringify(verification);
+        });
+      },
+      onComplete: (userGesture: boolean) => {
+        levelOneRuntime.completeOpening();
+        openingPresentation?.dispose();
+        openingPresentation = undefined;
+        gameFlow.finishOpening(userGesture);
+        // Paint the warmed gameplay frame in the same task that removes
+        // the black cinematic fade; never flash the final intro camera.
+        if (lastFrameStats) gameSession.render(0, lastFrameStats);
+      },
+      onStatus: (message: string, failed: boolean) => gameFlow.setOpeningStatus(message, failed),
+      onFade: (opacity: number) => gameFlow.setOpeningFade(opacity),
+    };
+    // Ordinary Start uses live 3D with low-priority downloads/idle data prep.
+    // Preserve the existing MP4 player/export as an explicit backup.
+    if (getOpeningPlaybackMode(window.location.search) === 'live') {
+      const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
+      titleRoom = undefined;
+      openingPresentation = new OpeningGamePresentation({
+        ...shared, scene, renderLayer,
+        reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        preloadLevel: () => levelOneAssets.prepareLight(),
+      });
+    } else {
+      const videoHost = app.querySelector<HTMLElement>('[data-flow-panel="opening"]');
+      if (!videoHost) throw new Error('Missing opening video panel.');
+      openingPresentation = new OpeningMoviePresentation({
+        ...shared, videoHost,
+        source: new URL('./assets/cinematics/opening.mp4', import.meta.url).href,
+        sourceStartSeconds: OPENING_GAME_TIMING.blackoutEnd,
+        onBlackout: () => {
+          // No live cinematic scene, duplicate WebGL context or video
+          // texture. Release menu GPU resources behind the painted fade.
+          titleRoom?.dispose();
+          titleRoom = undefined;
+          renderLayer.setPresentationResolution(undefined);
+        },
+      });
+    }
+    openingPresentation.start();
+  };
+  const startSelectedLevel = async (levelId: 'level-2' | 'level-3'): Promise<void> => {
+    // Finish title-settings preparation before replacing its runtime.
+    await initialGraphicsTask;
+    await selectInitialGraphics();
+    if (shuttingDown) return;
+    titlePresentation?.dispose();
+    titlePresentation = undefined;
+    titleRoom = undefined;
+    levelOneAssets.clear();
+    gameSession.startSelectedLevel(levelId);
+  };
   const gameFlow = new GameFlowUI({
     settings,
     creditsMarkdown,
     slimeHUD: gameSession,
     actions: {
-      enableMusic: unlockAudio,
-      playOpening: () => {
-        if (!titleRoom) return;
-        titlePresentation?.dispose({ keepScene: true });
-        titlePresentation = undefined;
-        const shared = {
-          host: app,
-          prepareLevel: () => {
-            return prepareFirstGraphics().then(async () => {
-              // Submission finishing is not GPU completion. Drain the hidden
-              // warm-up queue before marking gameplay ready for the handoff.
-              await waitForGpuPreparation(renderLayer.renderer.getContext(),
-                () => new Promise(resolve => requestAnimationFrame(() => resolve())),
-                () => !shuttingDown);
-              if (shuttingDown) return;
-              const verification = levelOneRuntime.levelOnePrewarmVerification;
-              if (verification) app.dataset.levelOnePrewarm = JSON.stringify(verification);
-            });
-          },
-          onComplete: (userGesture: boolean) => {
-            levelOneRuntime.completeOpening();
-            openingPresentation?.dispose();
-            openingPresentation = undefined;
-            gameFlow.finishOpening(userGesture);
-            // Paint the warmed gameplay frame in the same task that removes
-            // the black cinematic fade; never flash the final intro camera.
-            if (lastFrameStats) gameSession.render(0, lastFrameStats);
-          },
-          onStatus: (message: string, failed: boolean) => gameFlow.setOpeningStatus(message, failed),
-          onFade: (opacity: number) => gameFlow.setOpeningFade(opacity),
-        };
-        // Ordinary Start uses live 3D with low-priority downloads/idle data prep.
-        // Preserve the existing MP4 player/export as an explicit backup.
-        if (getOpeningPlaybackMode(window.location.search) === 'live') {
-          const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
-          titleRoom = undefined;
-          openingPresentation = new OpeningGamePresentation({
-            ...shared, scene, renderLayer,
-            reducedMotion: settings.value.reduceMenuMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-            preloadLevel: () => levelOneAssets.prepareLight(),
-          });
-        } else {
-          const videoHost = app.querySelector<HTMLElement>('[data-flow-panel="opening"]');
-          if (!videoHost) throw new Error('Missing opening video panel.');
-          openingPresentation = new OpeningMoviePresentation({
-            ...shared, videoHost,
-            source: new URL('./assets/cinematics/opening.mp4', import.meta.url).href,
-            sourceStartSeconds: OPENING_GAME_TIMING.blackoutEnd,
-            onBlackout: () => {
-              // No live cinematic scene, duplicate WebGL context or video
-              // texture. Release menu GPU resources behind the painted fade.
-              titleRoom?.dispose();
-              titleRoom = undefined;
-              renderLayer.setPresentationResolution(undefined);
-            },
+      previewCutscene: import.meta.env.DEV ? (cutscene) => {
+        if (cutscene === 'escape') void previewEscape();
+        else if (cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') {
+          levelPreviewRequested = cutscene;
+          const levelId = cutscene === 'blackout-arrival' ? 'level-3' : 'level-2';
+          const message = cutscene === 'blackout-arrival' ? 'Preparing Blackout arrival…'
+            : cutscene === 'cultivation-arrival' ? 'Preparing Cultivation arrival…'
+            : cutscene === 'volt-rescue' ? 'Preparing Volt rescue cutscene…' : 'Preparing sentry cutscene…';
+          gameFlow.beginLevelTransition(message, levelId);
+          void startSelectedLevel(levelId).catch(error => {
+            levelPreviewRequested = undefined;
+            gameFlow.failLevelTransition(error instanceof Error ? error.message : String(error));
           });
         }
-        openingPresentation.start();
+        else playOpening(true);
+      } : undefined,
+      enableMusic: unlockAudio,
+      playMenuConfirm: () => { audio.unlock(); audio.playUI(); },
+      returnToMenu: async () => {
+        await initialGraphicsTask;
+        if (shuttingDown) return;
+        openingPresentation?.dispose();
+        openingPresentation = undefined;
+        levelTwoRuntime = undefined;
+        levelPreviewRequested = undefined;
+        titlePresentation?.dispose();
+        titlePresentation = undefined;
+        levelOneAssets.clear();
+        levelOneRuntime = createLevelOneRuntime();
+        gameSession.reset(levelOneRuntime);
+        renderLayer.cameraRig.setViewMode('third-person', true);
+        preparedInitialGraphicsKey = undefined;
+        musicLevel = 'containment';
+        gameCompleted = false;
+        warmedLevelOneProgramBaseline = undefined;
+        warmedLevelOnePrograms = undefined;
+        sampleLevelOneShaderPrograms = undefined;
+        levelOneShaderProgramGuardActive = true;
+        levelOneShaderProgramGuardInvalidation = undefined;
+        performanceRecorder?.completeLevelOneShaderProgramGuard();
+        delete app.dataset.levelOnePrewarm;
+        titleRoom = new TitleScreenScene();
+        titlePresentation = new TitleScreenPresentation({
+          renderLayer, host: app, scene: titleRoom,
+          reduceMotion: settings.value.reduceMenuMotion,
+        });
+        await titlePresentation.prepare();
       },
+      startSelectedLevel,
+      playOpening: () => playOpening(),
       skipOpening: () => openingPresentation?.skip(),
-      retryOpening: () => openingPresentation?.retry(),
+      retryOpening: () => { if (escapePreviewRequested) void previewEscape(); else openingPresentation?.retry(); },
       startGameplay: () => lifecycleCoordinator.startGameplay(),
       stopGameplay: () => lifecycleCoordinator.stopGameplay(),
       setGameplayInputEnabled: (enabled) => input.setEnabled(enabled),
@@ -369,11 +474,26 @@ function startGame(): void {
   );
   const unsubscribeTransitionCompleted = gameSession.events.on(
     'transitionCompleted',
-    ({ levelId }) => gameFlow.finishLevelTransition(levelId),
+    ({ levelId }) => {
+      if (import.meta.env.DEV && levelPreviewRequested && levelId === (levelPreviewRequested === 'blackout-arrival' ? 'level-3' : 'level-2')) {
+        const preview = levelPreviewRequested;
+        levelPreviewRequested = undefined;
+        try {
+          // Normal level entry already stages both real vent arrivals.
+          const ready = preview === 'blackout-arrival' || preview === 'cultivation-arrival' || (preview === 'volt-rescue'
+            ? levelTwoRuntime?.previewVoltRescueForDebug() : levelTwoRuntime?.previewSentryClearanceForDebug());
+          if (!ready) throw new Error('Cutscene preview is not ready.');
+          gameFlow.finishLevelTransition(levelId);
+          gameFlow.enterPreparedLevel(false);
+        } catch (error) {
+          gameFlow.failLevelTransition(error instanceof Error ? error.message : String(error));
+        }
+      } else gameFlow.finishLevelTransition(levelId);
+    },
   );
   const unsubscribeTransitionFailed = gameSession.events.on(
     'transitionFailed',
-    ({ message }) => gameFlow.failLevelTransition(message),
+    ({ message }) => { levelPreviewRequested = undefined; gameFlow.failLevelTransition(message); },
   );
 
   app.replaceChildren(renderLayer.canvas, gameFlow.element);

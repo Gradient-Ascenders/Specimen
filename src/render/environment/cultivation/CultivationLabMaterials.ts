@@ -121,9 +121,10 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
       else if (/^room-2-panel-(seam|course)-/.test(object.name)) material = this.metal;
       else if (object.name.startsWith('room-2-upper-service-trim-')) material = this.duct;
       else if (object.name.startsWith('room-2-fluorescent-strip-')) material = this.fixture;
-      if (object.name === 'cultivation-room-2-button-rest-ledge') material = this.platform;
       if (object.userData.textureRole === 'acid-floor') material = this.acid;
       material = overrides.get(object.name) ?? material;
+      // Explicit platform-family styling must win over broad room finishes.
+      if (object.name === 'cultivation-room-2-button-rest-ledge') material = this.platform;
       if (material === this.platform) {
         platforms.push(object);
         material = this.platformArt.hidden;

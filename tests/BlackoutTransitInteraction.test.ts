@@ -30,7 +30,7 @@ function fixture() {
   };
 }
 
-test('Volt can acquire every light-bank and lift socket from the actual service catwalk', () => {
+test('Volt can acquire every light-bank and cleared lift socket from the actual service catwalk', () => {
   const f = fixture();
   const volt = { position: new THREE.Vector3(), radiusMetres: 0.45 };
   const aimPoint = new THREE.Vector3();
@@ -43,6 +43,8 @@ test('Volt can acquire every light-bank and lift socket from the actual service 
     config: { acquisitionRangeMetres: 100, instabilityWarningRangeMetres: 110, tetherBreakRangeMetres: 120 },
   });
   try {
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
+    f.controller.setActive(true);
     const targets = [
       ...f.controller.lights.map(receiver => receiver.target),
       ...f.controller.lifts.map(lift => {
@@ -93,7 +95,7 @@ test('Volt can power the existing exit-door edge from the far bridge landing and
     config: { acquisitionRangeMetres: 100, instabilityWarningRangeMetres: 110, tetherBreakRangeMetres: 120 },
   });
   try {
-    for (const drone of f.controller.drones) drone.setEnabled(false);
+    for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
     for (let step = 0; step < 90; step += 1) {
       bob.update(DT, new THREE.Vector3(-1, 0, 0));
       f.controller.update(DT, { bob, goop, volt });
@@ -124,11 +126,12 @@ test('Volt can power the existing exit-door edge from the far bridge landing and
   } finally { system.dispose(); f.dispose(); }
 });
 
-test('Goop can shoot and dissolve all three retained cover supports from the acid floor', () => {
+test('Goop can highlight and destroy all three emerged sewer drones with three acid reactions', () => {
   const f = fixture();
   const goop = { position: new THREE.Vector3(), radiusMetres: 0.45 };
   const aimPoint = new THREE.Vector3();
   const dissolve = new DissolveSystem(f.controller.dissolveTargets);
+  f.controller.bindBurns(dissolve);
   const acid = new AcidProjectileSystem({
     slimeManager: { activeBody: goop, activeSlimeId: 'goop', canActiveUseAbility: () => true },
     collisionWorld: f.world, dissolveSystem: dissolve,
@@ -139,12 +142,19 @@ test('Goop can shoot and dissolve all three retained cover supports from the aci
   try {
     for (const target of f.controller.dissolveTargets) {
       acid.reset();
+      const enemy = f.controller.emergingDrones.find(enemy => enemy.target === target)!;
+      enemy.state.update(2, true); enemy.shell.body.position.set(18, 3.32, enemy.shell.body.position.z); enemy.shell.body.visible = true;
       target.mesh.getWorldPosition(aimPoint);
       goop.position.set(aimPoint.x + 2, -0.545, aimPoint.z - 2);
-      acid.update(DT, { aimHeld: true, firePressed: true, gameplayInputEnabled: true, pointerLocked: true });
-      for (let i = 0; i < 150; i++) {
-        acid.update(DT, { aimHeld: true, firePressed: false, gameplayInputEnabled: true, pointerLocked: true });
-        dissolve.update(DT);
+      for (let hit = 0; hit < 3; hit++) {
+        acid.update(DT, { aimHeld: true, firePressed: true, gameplayInputEnabled: true, pointerLocked: true });
+        assert.ok(acid.aimReadModel.visibleSolubleIds.includes(target.id), 'Same soluble aim-target highlighting path');
+        for (let i = 0; i < 35; i++) {
+          acid.update(DT, { aimHeld: true, firePressed: false, gameplayInputEnabled: true, pointerLocked: true });
+          dissolve.update(DT);
+        }
+        assert.equal(enemy.state.hits, hit + 1);
+        assert.equal(target.completed, hit === 2, 'Only the third accepted reaction destroys the enemy');
       }
       assert.equal(target.completed, true, `${target.id} must be reachable with real Goop projectiles from the basin`);
     }

@@ -16,7 +16,7 @@ export function musicForFlow(
   menuOrigin: 'title' | 'paused',
   level: MusicLevel,
 ): { track: MusicTrack | null; play: boolean } {
-  if (state === 'title' || ((state === 'credits' || state === 'settings') && menuOrigin === 'title'))
+  if (state === 'title' || state === 'levelSelect' || state === 'cutsceneSelect' || ((state === 'credits' || state === 'settings') && menuOrigin === 'title'))
     return { track: 'intro', play: true };
   if (state === 'playing') return { track: level, play: true };
   if (state === 'paused' || state === 'restarting' || state === 'settings' || state === 'credits')

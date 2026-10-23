@@ -1,6 +1,7 @@
 import { calibrateGraphics, chooseAutomaticGraphicsProfile, GRAPHICS_CALIBRATION_BUDGET_MS, type CalibrationView, type GraphicsCalibrationResult } from '../render/GraphicsCalibration.ts';
 import { GRAPHICS_PROFILES } from '../render/GraphicsProfiles.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import { containmentDroneFlightSound, stopContainmentFinaleAudio } from '../audio/ContainmentFinaleAudio.ts';
 import { IdleCinematicPreparation, type CinematicPreparationJob } from '../cinematics/IdleCinematicPreparation.ts';
 import { ContainmentFinaleOverlay } from '../cinematics/ContainmentFinaleOverlay.ts';
 import type { ContainmentFinalePresentation } from '../cinematics/ContainmentFinalePresentation.ts';
@@ -671,7 +672,7 @@ export class GreyboxLevelRuntime {
     if (containmentLevel.state !== 'playing') {
       // Never advance the film clock while preparation is incomplete. Every
       // fallback job runs on a rendered frame behind an opaque screen instead.
-      if (this.finale?.active && this.finalePreparation?.ready) {
+      if (containmentLevel.state !== 'complete' && this.finale?.active && this.finalePreparation?.ready) {
         this.finale.fixedUpdate(Math.min(CONTAINMENT_FINALE_TIMING.end, testScene.roomFive.endingSeconds + deltaSeconds));
         resources.dissolveSystem.update(deltaSeconds);
         containmentLevel.update(deltaSeconds);
@@ -724,6 +725,7 @@ export class GreyboxLevelRuntime {
       return;
     }
 
+    if (this.input.enabled && this.input.wasPressed('toggleView')) this.renderLayer.cameraRig.toggleViewMode();
     let switchedThisStep = false;
     if (this.input.wasPressed('switchSlime')) {
       switchedThisStep = this.switchActiveSlime(resources);
@@ -847,6 +849,8 @@ export class GreyboxLevelRuntime {
     }
 
     this.recentFrameSeconds = stats.rawFrameDeltaSeconds;
+    this.renderLayer.cameraRig.setThirdPersonOverride(!!this.resources &&
+      (!this.resources.deathSequence.isPlaying || this.resources.containmentLevel.state !== 'playing'));
     this.finalePreparation?.schedule();
     if (resources.containmentLevel.state !== 'playing') {
       this.renderFinale(resources);
@@ -873,6 +877,7 @@ export class GreyboxLevelRuntime {
     } = resources;
     let cameraDistanceScale = 1;
     if (deathSequence.isPlaying) {
+      testScene.roomFive.art.presentMovingPlatforms(interpolationAlpha);
       const previous = body.previousPosition;
       const current = body.position;
       renderedProbePosition.set(
@@ -907,6 +912,7 @@ export class GreyboxLevelRuntime {
         slimePair.activeSlimeId === 'goop'
           ? renderedGoopPosition
           : renderedProbePosition;
+      testScene.platformBoosters.update(this.state === 'running' ? stats.frameDeltaSeconds : 0, activeRenderedPosition);
       if (testScene.isInsideCameraTightVent(activeRenderedPosition)) {
         cameraDistanceScale = VENT_CAMERA_DISTANCE_SCALE;
       }
@@ -946,7 +952,7 @@ export class GreyboxLevelRuntime {
     const cameraDistanceMetres =
       this.renderLayer.cameraRig.currentFollowDistanceMetres;
     testScene.bob.setOpacity(
-      deathSequence.isPlaying && slimePair.activeSlimeId === 'bob'
+      deathSequence.isPlaying && slimePair.activeSlimeId === 'bob' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.body)
         ? resolveCameraTargetOpacity(
             cameraDistanceMetres,
             CAMERA_FADE_START_DISTANCE_METRES,
@@ -964,7 +970,7 @@ export class GreyboxLevelRuntime {
       !testScene.roomFive.releaseComplete && slimePair.activeSlimeId !== 'goop';
     reveal.setVisible(showReveal);
     testScene.goop.setVisible(goopAvailable && !showReveal);
-    testScene.goop.setOpacity(slimePair.activeSlimeId === 'goop'
+    testScene.goop.setOpacity(slimePair.activeSlimeId === 'goop' && !this.renderLayer.cameraRig.isFirstPersonForTarget(goopBody)
       ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
         cameraDistanceMetres, CAMERA_FADE_START_DISTANCE_METRES, CAMERA_FADE_END_DISTANCE_METRES, CAMERA_MINIMUM_TARGET_OPACITY)) : 1);
     const reflection = testScene.lighting.reflectionTargetForPosition(goopBody.position, testScene.isInsideCameraTightVent(goopBody.position));
@@ -1129,6 +1135,8 @@ export class GreyboxLevelRuntime {
         chargedJumpEnabled: goopDefinition.jumpMode === 'charged',
       },
     });
+    testScene.bob.setCameraView(this.renderLayer.cameraRig, body);
+    testScene.goop.setCameraView(this.renderLayer.cameraRig, goopBody);
     const slimePair = new PersistentSlimePair({
       manager: slimeManager,
       bobBody: body,
@@ -1550,7 +1558,7 @@ export class GreyboxLevelRuntime {
       this.finale = new ContainmentFinalePresentation({
         scene: this.renderLayer.scene, world: resources.testScene, camera: this.renderLayer.cameraRig.camera,
         overlay: this.finaleOverlay,
-        cue: (sound, position) => this.audio?.play(sound, position, true, .8),
+        cue: (sound, position, volumeScale = .8) => this.audio?.play(sound, position, !sound.startsWith('escape-'), volumeScale),
         openDoor: () => {
           const target = resources.dissolveSystem.getTargetForMesh(resources.testScene.roomFive.goopWoodenDoor);
           if (target) resources.dissolveSystem.startBurn(target);
@@ -1595,7 +1603,7 @@ export class GreyboxLevelRuntime {
     this.gameplayAudio?.setEnabled(false);
     this.host.dataset.cinematic = 'containment-finale';
     this.finaleOverlay ??= new ContainmentFinaleOverlay(this.host, this.skipFinale);
-    if (resources.containmentLevel.state === 'complete') { this.finaleOverlay.preparing(); return; }
+    if (resources.containmentLevel.state === 'complete') { stopContainmentFinaleAudio(this.audio); this.finaleOverlay.preparing(); return; }
     if (!this.finalePreparation?.ready || !this.finale) {
       this.finaleOverlay.preparing(this.finalePreparation?.diagnostics.failed);
       // Paint the opaque cover before submitting the first remaining job.
@@ -1621,8 +1629,12 @@ export class GreyboxLevelRuntime {
     const timing = CONTAINMENT_FINALE_TIMING;
     if (this.lifecycle.state === 'running' && ((t >= timing.droneReveal && t < timing.droneHit) || (t >= timing.reinforcements && t < timing.blackout))) {
       const drone = this.finale.visuals.drones[t < timing.droneHit ? 0 : 1];
-      this.audio?.startLoop('containment-finale-flight', 'world-drone-flight-loop-01', drone.root.position);
+      this.audio?.startLoop('containment-finale-flight', containmentDroneFlightSound(t), drone.root.position);
+      const reveal = t < timing.droneHit ? timing.droneReveal : timing.reinforcements;
+      this.audio?.startLoop('containment-finale-alarm', 'world-containment-alarm-loop-01', undefined, t < reveal+2 ? .7 : .35);
     } else this.audio?.stopLoop('containment-finale-flight');
+    if (!((t >= timing.droneReveal && t < timing.droneHit) || (t >= timing.reinforcements && t < timing.blackout)))
+      this.audio?.stopLoop('containment-finale-alarm');
     if (this.lifecycle.state === 'running' && t >= timing.doorHit && t < timing.doorOpen) {
       this.audio?.startLoop('containment-finale-door', 'goop-dissolve-loop-01', resources.testScene.roomFive.goopWoodenDoor.position);
     } else this.audio?.stopLoop('containment-finale-door');
@@ -1645,6 +1657,7 @@ export class GreyboxLevelRuntime {
   private readonly skipFinale = (): void => {
     const resources = this.resources;
     if (!resources || resources.containmentLevel.state !== 'completing' || this.lifecycle.state !== 'running') return;
+    stopContainmentFinaleAudio(this.audio);
     this.finaleOverlay?.preparing();
     this.finale?.render(CONTAINMENT_FINALE_TIMING.end);
     resources.containmentLevel.skipEnding();
@@ -1656,23 +1669,28 @@ export class GreyboxLevelRuntime {
     event.preventDefault(); this.skipFinale();
   };
 
-  private readonly onPreviewFinale = (event: KeyboardEvent): void => {
+  /** Developer entry shared by the menu preview and the existing 9 shortcut. */
+  previewEscapeForDebug(): boolean {
     const resources = this.resources;
     if (!this.finaleShortcutAvailable || !this.debugAvailable ||
-      (event.code !== 'Digit9' && event.code !== 'Numpad9') || event.repeat ||
-      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
       this.lifecycle.state !== 'running' || !this.input.enabled || !this.debugInteractionEnabled ||
-      !resources?.deathSequence.isPlaying || resources.containmentLevel.state !== 'playing') return;
-    if (typeof Element !== 'undefined' && event.target instanceof Element &&
-      event.target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
-    if (!resources.containmentLevel.beginEndingForDebug()) return;
+      !resources?.deathSequence.isPlaying || resources.containmentLevel.state !== 'playing') return false;
+    if (!resources.containmentLevel.beginEndingForDebug()) return false;
     // Warm remaining GPU jobs with Room 5's real signature, not the room we left.
     this.lightLayout?.sync();
-    event.preventDefault();
     resources.acidProjectileSystem.cancelAim();
     this.input.setEnabled(false);
     this.input.releasePointerLock();
     this.host.dataset.gameState = 'level-completing';
+    return true;
+  }
+
+  private readonly onPreviewFinale = (event: KeyboardEvent): void => {
+    if ((event.code !== 'Digit9' && event.code !== 'Numpad9') || event.repeat ||
+      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (typeof Element !== 'undefined' && event.target instanceof Element &&
+      event.target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+    if (this.previewEscapeForDebug()) event.preventDefault();
   };
 
   /**

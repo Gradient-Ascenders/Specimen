@@ -710,15 +710,15 @@ test('a fully charged jump lands without an automatic hop', () => {
   floor.geometry.dispose();
 });
 
-test('a fully charged jump from the Room 2 exit height hops on the Room 3 entry platform', () => {
+test('a fully charged jump onto a half-metre lower floor triggers a landing hop', () => {
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   const events = new EventBus<MovementEvents>();
   const lowerFloor = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 5));
-  lowerFloor.name = 'room-3-entry-platform';
+  lowerFloor.name = 'lower-landing-floor';
   lowerFloor.position.y = 10.15;
   const launchPlatform = new THREE.Mesh(new THREE.BoxGeometry(7, 0.5, 4));
-  launchPlatform.name = 'room-2-exit-balcony';
+  launchPlatform.name = 'raised-launch-platform';
   launchPlatform.position.y = 10.65;
   lowerFloor.updateWorldMatrix(true, false);
   launchPlatform.updateWorldMatrix(true, false);

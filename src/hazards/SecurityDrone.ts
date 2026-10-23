@@ -16,7 +16,7 @@ import type { DroneProjectileSystem } from './DroneProjectileSystem.ts';
 
 const EPSILON = 1e-9;
 
-export type DroneTargetPolicy = 'bob-only' | 'goop-only' | 'both';
+export type DroneTargetPolicy = 'bob-only' | 'goop-only' | 'both' | 'all';
 export type SecurityDroneState =
   | 'scanning'
   | 'warning'
@@ -26,7 +26,7 @@ export type SecurityDroneState =
   | 'disabled';
 
 export interface SecurityDroneTarget {
-  readonly slimeId: 'bob' | 'goop';
+  readonly slimeId: 'bob' | 'goop' | 'volt';
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   /** False while the persistent body is outside this encounter's room. */
   readonly eligible?: boolean;
@@ -65,7 +65,7 @@ export interface SecurityDroneReadModel {
   readonly type: SecurityDroneConfig['type'];
   readonly enabled: boolean;
   readonly state: SecurityDroneState;
-  readonly targetSlimeId: 'bob' | 'goop' | undefined;
+  readonly targetSlimeId: 'bob' | 'goop' | 'volt' | undefined;
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly forward: { readonly x: number; readonly y: number; readonly z: number };
   readonly scanDirection: { readonly x: number; readonly y: number; readonly z: number };
@@ -79,11 +79,11 @@ interface MutableReadModel {
   readonly type: SecurityDroneConfig['type'];
   enabled: boolean;
   state: SecurityDroneState;
-  targetSlimeId: 'bob' | 'goop' | undefined;
+  targetSlimeId: 'bob' | 'goop' | 'volt' | undefined;
   readonly position: { x: number; y: number; z: number };
   readonly forward: { x: number; y: number; z: number };
   readonly scanDirection: { x: number; y: number; z: number };
-  readonly detectionRangeMetres: number;
+  detectionRangeMetres: number;
   readonly detectionHalfAngleRadians: number;
   stateElapsedSeconds: number;
 }
@@ -94,10 +94,10 @@ export interface SecurityDroneEvents {
     readonly previousState: SecurityDroneState;
     readonly state: SecurityDroneState;
   };
-  acquired: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' };
-  lost: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' };
-  warning: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' };
-  fired: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' };
+  acquired: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' | 'volt' };
+  lost: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' | 'volt' };
+  warning: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' | 'volt' };
+  fired: { readonly droneId: string; readonly slimeId: 'bob' | 'goop' | 'volt' };
   reset: { readonly droneId: string };
 }
 
@@ -264,6 +264,12 @@ export class SecurityDrone {
     this.scanDirection.copy(this.baseForward);
   }
 
+  /** Encounter-local alert range; the same range drives the visible beam. */
+  setDetectionRange(metres: number): void {
+    if (!Number.isFinite(metres) || metres <= 0) throw new Error('Invalid drone detection range.');
+    this.model.detectionRangeMetres = metres;
+  }
+
   setEnabled(enabled: boolean): void {
     if (this.disposed || this.enabled === enabled) return;
     this.enabled = enabled;
@@ -321,6 +327,7 @@ export class SecurityDrone {
     this.root.quaternion.copy(this.initialQuaternion);
     this.scanPhase = normalizePhase(this.config.initialScanPhase);
     this.baseForward.copy(this.config.forward).normalize();
+    this.model.detectionRangeMetres = this.config.detectionRangeMetres;
     this.target = undefined;
     this.targetLossElapsed = 0;
     this.fireElapsed = 0;
@@ -429,7 +436,7 @@ export class SecurityDrone {
     const distanceSquared = this.displacement.lengthSq();
     if (
       distanceSquared <= EPSILON ||
-      distanceSquared > this.config.detectionRangeMetres * this.config.detectionRangeMetres
+      distanceSquared > this.model.detectionRangeMetres * this.model.detectionRangeMetres
     ) return false;
     this.targetDirection.copy(this.displacement).normalize();
     if (this.targetDirection.dot(this.baseForward) < this.maximumAcquisitionAngleCos) {
@@ -444,7 +451,7 @@ export class SecurityDrone {
       0.001,
       this.hit,
       CollisionLayer.LineOfSight,
-      this.collider,
+      this.projectileCollisionProxy ?? this.collider,
     );
   }
 
@@ -514,8 +521,8 @@ export class SecurityDrone {
     this.syncReadModel();
   }
 
-  private policyAllows(slimeId: 'bob' | 'goop'): boolean {
-    return this.config.targetPolicy === 'both' || this.config.targetPolicy === `${slimeId}-only`;
+  private policyAllows(slimeId: 'bob' | 'goop' | 'volt'): boolean {
+    return this.config.targetPolicy === 'all' || (this.config.targetPolicy === 'both' && slimeId !== 'volt') || this.config.targetPolicy === `${slimeId}-only`;
   }
 
   private syncReadModel(): void {

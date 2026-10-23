@@ -70,6 +70,11 @@ canvas {
 }
 
 /* The finale owns only the view; pause/settings keep the normal game-flow layer. */
+/* HUD animations set child visibility explicitly, so remove its layout box
+ * during cinematics instead of relying on inherited visibility. */
+#app:is([data-cinematic="containment-finale"], [data-cinematic="cultivation-finale"],
+  [data-cinematic="cultivation-clearance"], [data-cinematic="blackout-arrival"])
+  > .game-flow[data-state="playing"] .game-hud { display: none !important; }
 #app[data-cinematic="containment-finale"] > :not([data-gameplay-canvas]):not(.game-flow):not(.containment-finale),
 #app[data-cinematic="containment-finale"] > .game-flow[data-state="playing"] { visibility: hidden !important; }
 .containment-finale { position: absolute; inset: 0; z-index: 7; pointer-events: none; color: #dcf6ff; }

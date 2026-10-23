@@ -8,6 +8,11 @@ import { consolidateStaticRoomVisuals } from '../render/StaticRoomVisuals.ts';
 import type { ContainmentStaticBatchResult } from '../render/environment/containment/ContainmentStaticBatching.ts';
 
 import type { BlackoutCheckpointDefinition } from './BlackoutCheckpointManager.ts';
+import { repairStaticBoxSurfaces } from '../render/geometry/CoplanarSurfaceGeometry.ts';
+
+const BRIDGE_APPROACH_CENTRE = new THREE.Vector3(-16, 2.5, 136);
+const BRIDGE_APPROACH_LENGTH = 3.5;
+const BRIDGE_APPROACH_FORWARD = new THREE.Vector3(16, 0, 8).normalize();
 
 export const BLACKOUT_TRANSIT_LAYOUT = Object.freeze({
   minX: -22,
@@ -119,7 +124,7 @@ export class BlackoutTransitRoom {
   ] as const;
   readonly switchPosition = new THREE.Vector3(7.12, 8.55, 142.5);
   readonly switchBodyPosition = new THREE.Vector3(7.4, 8.06, 142.5);
-  readonly bridgeStart = new THREE.Vector3(-16, 2.5, 136);
+  readonly bridgeStart = BRIDGE_APPROACH_CENTRE.clone().addScaledVector(BRIDGE_APPROACH_FORWARD, BRIDGE_APPROACH_LENGTH / 2);
   readonly bridgeEnd = new THREE.Vector3(0, 0.4, 144);
   readonly exitPosition = new THREE.Vector3(0, 0.86, 151);
   readonly switchButton: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
@@ -202,6 +207,7 @@ export class BlackoutTransitRoom {
       });
     }
     this.update(0);
+    repairStaticBoxSurfaces(this.root, mesh => mesh === this.catwalk || mesh.name === 'transit-bridge-start-anchor');
     const immutable: THREE.Mesh[] = [];
     this.root.traverse(object => {
       if (object instanceof THREE.Mesh && object !== this.switchButton && object !== this.bridgeLockContact &&
@@ -424,7 +430,10 @@ export class BlackoutTransitRoom {
   ): void {
     // Anchoring pads are fixed, collision-safe endpoints. The controller owns
     // the retractable bridge deck spanning diagonally between these points.
-    this.box('transit-bridge-start-anchor', [3.8, 0.5, 3.5], [-16, 2.25, 136], steel);
+    // Align this existing approach slab to the bridge, with the ramp beginning
+    // at its front edge. A centre-anchored ramp used to descend under the slab.
+    const start = this.box('transit-bridge-start-anchor', [BRIDGE_APPROACH_LENGTH, 0.5, 3.8], [-16, 2.25, 136], steel);
+    start.rotation.y = -Math.atan2(BRIDGE_APPROACH_FORWARD.z, BRIDGE_APPROACH_FORWARD.x);
     this.box('transit-bridge-end-anchor', [7, 0.5, 6], [0, 0.15, 144], steel);
     this.visualBox('transit-bridge-start-marking', [3.1, 0.025, 0.13], [-16, 2.512, 136], warning);
     this.visualBox('transit-bridge-end-marking', [3.5, 0.025, 0.13], [0, 0.414, 144], warning);
@@ -544,7 +553,8 @@ export class BlackoutTransitRoom {
     }
     for (const z of [96, 116, 136]) {
       this.box(`transit-west-service-conduit-${z}`, [0.2, 0.42, 9], [-20.8, 13.5, z], trim);
-      this.box(`transit-east-service-conduit-${z}`, [0.2, 0.42, 9], [20.8, 13.5, z], trim);
+      // Keep the first two observation panels clear of the horizontal rods.
+      if (z === 136) this.box(`transit-east-service-conduit-${z}`, [0.2, 0.42, 9], [20.8, 13.5, z], trim);
     }
     // Darkened observation panels hint at the chamber's old control gallery.
     for (const z of [98, 118, 138]) {

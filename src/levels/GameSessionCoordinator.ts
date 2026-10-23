@@ -205,6 +205,27 @@ export class GameSessionCoordinator {
     this.events.clear();
   }
 
+  /** Release the current run while retaining application subscriptions. */
+  reset(initialRuntime: GameLevelRuntime): void {
+    if (this.disposed) {
+      initialRuntime.dispose();
+      return;
+    }
+    ++this.graphicsOwnerGeneration;
+    this.initialPreparationPending = false;
+    this.queuedGraphics = undefined;
+    this.resumeAfterGraphics = false;
+    this.graphicsPreparation.cancel();
+    this.cancelPendingTransition();
+    this.unbindRuntime();
+    this.runtime.dispose();
+    this.runtime = initialRuntime;
+    this.transitionFailed = false;
+    this.debugInteractionEnabled = false;
+    initialRuntime.setDebugInteractionEnabled(false);
+    this.bindRuntime(initialRuntime);
+  }
+
   private bindRuntime(runtime: GameLevelRuntime): void {
     this.renderedInterpolationAlpha = 0;
     this.unsubscribeRuntimeEvents = [
@@ -213,6 +234,14 @@ export class GameSessionCoordinator {
     ];
     this.unsubscribeRuntimeHUD = runtime.subscribeSlimeHUD((snapshot) => {
       for (const listener of this.hudListeners) listener(snapshot);
+    });
+  }
+
+  /** Enter a later level with the roster earned before its normal arrival. */
+  startSelectedLevel(levelId: SessionLevelId): void {
+    this.beginTransition(levelId, {
+      unlockedSlimeIds: levelId === 'level-2' ? ['bob', 'goop'] : ['bob', 'goop', 'volt'],
+      activeSlimeId: 'bob',
     });
   }
 
@@ -235,12 +264,15 @@ export class GameSessionCoordinator {
       });
       return;
     }
+    if (nextLevelId !== 'level-2' && nextLevelId !== 'level-3') return;
+    this.beginTransition(nextLevelId, this.runtime.captureProgressionSnapshot());
+  }
+
+  private beginTransition(target: SessionLevelId, progression: LevelProgressionSnapshot): void {
     if (
-      (nextLevelId !== 'level-2' && nextLevelId !== 'level-3') ||
       this.transitionPending || this.transitionFailed || this.disposed
     ) return;
 
-    const target = nextLevelId as SessionLevelId;
     const factory = target === 'level-2' ? this.createLevelTwo : this.createLevelThree;
     if (!factory) {
       this.transitionFailed = true;
@@ -252,7 +284,6 @@ export class GameSessionCoordinator {
       return;
     }
 
-    const progression = this.runtime.captureProgressionSnapshot();
     if (this.runtime.state === 'running') this.runtime.stop();
     this.transitionPending = true;
     const transitionGeneration = ++this.transitionGeneration;

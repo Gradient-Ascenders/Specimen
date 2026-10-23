@@ -54,6 +54,115 @@ test('final completion opens the existing credits once and returns to the title,
   assert.equal(flow.completeGame(),false);assert.equal(flow.resume(),false);assert.equal(flow.back(),true);assert.equal(flow.state,'title');
 });
 
+test('level selector belongs to the title and restores it on cancel', () => {
+  const flow = new GameFlowStateModel();
+  assert.equal(flow.openLevelSelect(), false);
+  flow.completeBoot();
+  assert.equal(flow.openLevelSelect(), true);
+  assert.equal(flow.state, 'levelSelect');
+  assert.equal(flow.menuOrigin, 'title');
+  assert.equal(getGameFlowKeyboardAction('Escape', flow.state), 'back');
+  assert.equal(flow.back(), true);
+  assert.equal(flow.state, 'title');
+  flow.start();
+  flow.pause();
+  assert.equal(flow.openLevelSelect(), false);
+});
+
+test('cutscene selector supports cancel and starts a selected cutscene without playing a level', () => {
+  const flow = new GameFlowStateModel();
+  assert.equal(flow.openCutsceneSelect(), false);
+  assert.equal(flow.beginSelectedCutscene(), false);
+  flow.completeBoot();
+  assert.equal(flow.openCutsceneSelect(), true);
+  assert.equal(flow.state, 'cutsceneSelect');
+  assert.equal(flow.menuOrigin, 'title');
+  assert.equal(getGameFlowKeyboardAction('Escape', flow.state), 'back');
+  assert.equal(flow.back(), true);
+  assert.equal(flow.state, 'title');
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene(), true);
+  assert.equal(flow.state, 'opening');
+  assert.equal(flow.beginSelectedCutscene(), false);
+  assert.equal(flow.openCutsceneSelect(), false);
+  assert.equal(flow.finishOpening(), true);
+  assert.equal(flow.openCutsceneSelect(), false);
+});
+
+test('return to menu requires pause and waits for a fresh title before starting', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  assert.equal(flow.beginReturnToMenu(), false);
+  flow.start();
+  assert.equal(flow.beginReturnToMenu(), false);
+  flow.pause();
+  assert.equal(flow.beginReturnToMenu(), true);
+  assert.equal(flow.state, 'loading');
+  assert.equal(flow.beginReturnToMenu(), false);
+  assert.equal(flow.start(), false);
+  assert.equal(flow.completeBoot(), true);
+  assert.equal(flow.state, 'title');
+  assert.equal(flow.menuOrigin, 'title');
+  assert.equal(flow.beginOpening(), true);
+});
+
+test('sentry cutscene selection prepares Cultivation before entering the movie', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('sentry-clearance'), true);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('sentry-clearance'), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
+test('Volt rescue selection prepares Cultivation before entering the movie', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('volt-rescue'), true);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('volt-rescue'), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
+test('Cultivation arrival selection prepares the level before starting its normal ceiling drop', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('cultivation-arrival'), true);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('cultivation-arrival'), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
+test('Blackout arrival selection prepares the level before starting its normal entry sequence', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('blackout-arrival'), true);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('blackout-arrival'), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
+test('level selection waits for preparation and explicit entry before playing', () => {
+  const flow = new GameFlowStateModel();
+  flow.completeBoot();
+  assert.equal(flow.beginSelectedLevel(), false);
+  flow.openLevelSelect();
+  assert.equal(flow.beginSelectedLevel(), true);
+  assert.equal(flow.beginSelectedLevel(), false);
+  assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.back(), false);
+  assert.equal(flow.finishLevelTransition(), true);
+  assert.equal(flow.state, 'playing');
+});
+
 test('level transition owns a visible non-interactive state and resumes gameplay', () => {
   const model = new GameFlowStateModel();
   model.completeBoot();

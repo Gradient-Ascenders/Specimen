@@ -224,7 +224,7 @@ export class RoomThreeDroneEncounter {
     this.presentationResourceDiagnostics =
       this.presentationResources.diagnostics;
     this.unsubscribeDamageDeath = this.damage.events.on('died', ({ slimeId }) => {
-      options.requestDeath(slimeId);
+      if (slimeId !== 'volt') options.requestDeath(slimeId);
     });
   }
 

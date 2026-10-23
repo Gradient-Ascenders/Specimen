@@ -5,6 +5,8 @@ import { BackgroundMusic, musicForFlow } from '../src/audio/BackgroundMusic.ts';
 test('soundtrack follows menu origin, pause, opening, and three gameplay levels', () => {
   assert.deepEqual(musicForFlow('loading', 'title', 'containment'), { track: null, play: false });
   assert.deepEqual(musicForFlow('title', 'title', 'containment'), { track: 'intro', play: true });
+  assert.deepEqual(musicForFlow('levelSelect', 'title', 'containment'), { track: 'intro', play: true });
+  assert.deepEqual(musicForFlow('cutsceneSelect', 'title', 'containment'), { track: 'intro', play: true });
   assert.deepEqual(musicForFlow('settings', 'title', 'containment'), { track: 'intro', play: true });
   assert.deepEqual(musicForFlow('credits', 'title', 'containment'), { track: 'intro', play: true });
   assert.deepEqual(musicForFlow('opening', 'title', 'containment'), { track: null, play: true });

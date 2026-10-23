@@ -100,3 +100,64 @@ export function createCoplanarSurfaceRepairs(root: THREE.Object3D,
   }
   return replacements;
 }
+
+/** Authoring-time cleanup for static box skins. Physics retains the authored
+ * box bounds; UVs/normals follow the cut faces and normal room ownership disposes
+ * the replacement buffers. Run before static batching and collider registration.
+ */
+export function repairStaticBoxSurfaces(root: THREE.Object3D, include: (mesh: THREE.Mesh) => boolean): void {
+  const eligible = (mesh: THREE.Mesh) => !(mesh instanceof THREE.InstancedMesh) && !(mesh instanceof THREE.SkinnedMesh) && include(mesh);
+  const replacements = createCoplanarSurfaceRepairs(root,
+    mesh => eligible(mesh) ? root : mesh);
+  for (const [mesh, geometry] of replacements) {
+    if (!eligible(mesh)) { geometry.dispose(); continue; }
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const authoredBounds = mesh.geometry.boundingBox!.clone();
+    mesh.geometry.dispose();
+    geometry.boundingBox = authoredBounds;
+    mesh.geometry = geometry;
+  }
+}
+
+/** Trim a static module's render skin to vertical connector planes. End caps
+ * lie inside the adjoining module; authored box collision bounds stay intact.
+ */
+export function trimStaticBoxEnds(mesh: THREE.Mesh, minimumZ: number, maximumZ: number): void {
+  mesh.updateWorldMatrix(true, false);
+  const source = mesh.geometry;
+  if (!source.boundingBox) source.computeBoundingBox();
+  const authoredBounds = source.boundingBox!.clone();
+  const inverse = mesh.matrixWorld.clone().invert();
+  const planes = [new THREE.Plane(new THREE.Vector3(0, 0, 1), -minimumZ),
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), maximumZ)].map(plane => plane.applyMatrix4(inverse));
+  const attributes = Object.entries(source.attributes), arrays = attributes.map(() => [] as number[]);
+  const positionIndex = attributes.findIndex(([name]) => name === 'position');
+  const point = new THREE.Vector3();
+  const count = source.index?.count ?? source.attributes.position.count;
+  for (let triangle = 0; triangle < count; triangle += 3) {
+    let polygon = [0, 1, 2].map(corner => {
+      const index = source.index?.getX(triangle + corner) ?? triangle + corner;
+      return attributes.map(([, attribute]) => Array.from({ length: attribute.itemSize }, (_, c) => attribute.getComponent(index, c)));
+    });
+    for (const plane of planes) {
+      const clipped: typeof polygon = [];
+      for (let i = 0; i < polygon.length; i++) {
+        const a = polygon[i]!, b = polygon[(i + 1) % polygon.length]!;
+        const da = plane.distanceToPoint(point.fromArray(a[positionIndex]!)), db = plane.distanceToPoint(point.fromArray(b[positionIndex]!));
+        if (da >= -1e-8) clipped.push(a);
+        if ((da > 1e-8 && db < -1e-8) || (da < -1e-8 && db > 1e-8)) {
+          const t = da / (da - db);
+          clipped.push(a.map((values, j) => values.map((value, c) => value + (b[j]![c]! - value) * t)));
+        }
+      }
+      polygon = clipped;
+    }
+    for (let i = 1; i + 1 < polygon.length; i++) for (const vertex of [polygon[0]!, polygon[i]!, polygon[i + 1]!]) {
+      vertex.forEach((values, attribute) => arrays[attribute]!.push(...values));
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  attributes.forEach(([name, attribute], i) => geometry.setAttribute(name, new THREE.Float32BufferAttribute(arrays[i]!, attribute.itemSize)));
+  geometry.boundingBox = authoredBounds; geometry.computeBoundingSphere();
+  mesh.geometry = geometry; source.dispose();
+}

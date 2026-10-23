@@ -10,9 +10,11 @@ export class SewerDroneDamage {
   private elapsed = 0;
   private previousHits = -1;
   private readonly breakup = new DroneBreakupPresentation(1, 2.8);
-  constructor(body: THREE.Mesh) {
+  private readonly floorY: number;
+  constructor(body: THREE.Mesh, floorY = -12, debrisName = 'room-5-sewer-drone-debris') {
+    this.floorY = floorY;
     this.body = body;
-    this.breakup.root.name = 'room-5-sewer-drone-debris';
+    this.breakup.root.name = debrisName;
     body.parent!.add(this.breakup.root);
     this.parts = body.children.filter(part => typeof part.userData.damageStage === 'number');
     const geometry = new THREE.BufferGeometry();
@@ -26,7 +28,7 @@ export class SewerDroneDamage {
     this.elapsed += dt;
     if (hits !== this.previousHits) {
       if (hits === 3 && this.previousHits >= 0 && this.previousHits < 3) {
-        this.breakup.burst(0, this.body.position.x, this.body.position.y, this.body.position.z, -12);
+        this.breakup.burst(0, this.body.position.x, this.body.position.y, this.body.position.z, this.floorY);
         this.body.visible = false;
       } else if (hits < 3) this.breakup.reset();
       this.previousHits = hits; this.elapsed = 0;

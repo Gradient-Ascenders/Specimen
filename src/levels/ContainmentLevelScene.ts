@@ -1,4 +1,6 @@
 import type { GelRendering } from '../render/slime/GelRendering.ts';
+import { createContainmentPlatformBoosters } from '../render/environment/containment/ContainmentPlatformBoosters.ts';
+import type { PlatformBoosters } from '../render/environment/PlatformBoosters.ts';
 import * as THREE from 'three';
 
 import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
@@ -150,6 +152,7 @@ const PRESERVED_STATIC_ART_NAMES = {
 
 /** Complete Level 1 scene composition while preserving the teaching-scene API. */
 export class ContainmentLevelScene {
+  readonly platformBoosters: PlatformBoosters;
   readonly root = new THREE.Group();
   readonly artResources = new ContainmentArtResources();
   readonly teaching: ContainmentTeachingScene;
@@ -243,6 +246,7 @@ export class ContainmentLevelScene {
       3: this.roomThree.art.root, 5: this.roomFive.art.root,
     });
     this.surveillanceCameras.reset(this.teaching.copySpawnPosition(new THREE.Vector3()));
+    this.platformBoosters = createContainmentPlatformBoosters(this);
     this.measuredFirstUseGeometryResources =
       resolveMeasuredFirstUseGeometryResources(this.root);
     // Preserve light-bearing ancestry (including the elevator warning lamps):
@@ -405,6 +409,7 @@ export class ContainmentLevelScene {
   }
 
   resetPresentation(): void {
+    this.platformBoosters.reset();
     this.lighting.reset();
     this.roomOneMonitor.reset();
     this.roomTwoMonitor.reset();
@@ -415,6 +420,7 @@ export class ContainmentLevelScene {
   }
 
   reconcilePresentationAfterRecovery(bobPosition: Vector3State): void {
+    this.platformBoosters.reset();
     this.surveillanceCameras.reset(bobPosition);
     this.lighting.setTraversalPosition(bobPosition);
     this.lighting.setBobInDarkDuct(
@@ -432,6 +438,7 @@ export class ContainmentLevelScene {
   }
 
   dispose(): void {
+    this.platformBoosters.dispose();
     this.surveillanceCameras.dispose();
     this.roomOneMonitor.dispose();
     this.roomTwoMonitor.dispose();

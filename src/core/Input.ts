@@ -5,6 +5,7 @@ export type InputAction =
   | 'moveRight'
   | 'jump'
   | 'switchSlime'
+  | 'toggleView'
   | 'mountDrone'
   | 'droneDescend'
   | 'aimAbility'
@@ -34,6 +35,7 @@ export const DEFAULT_ACTION_BINDINGS = {
   moveRight: [{ kind: 'key', code: 'KeyD' }],
   jump: [{ kind: 'key', code: 'Space' }],
   switchSlime: [{ kind: 'key', code: 'Tab' }],
+  toggleView: [{ kind: 'key', code: 'KeyV' }],
   mountDrone: [{ kind: 'key', code: 'KeyM' }],
   droneDescend: [
     { kind: 'key', code: 'ShiftLeft' },
@@ -311,6 +313,10 @@ export class Input {
     if (!actions) return;
 
     if (!this.enabledValue) return;
+
+    // Settings/text editors must never consume a gameplay view toggle.
+    const target = event.target as HTMLElement | null;
+    if (actions.includes('toggleView') && target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
 
     // Mapped game controls belong to the game, not browser UI. In particular,
     // this prevents Space from activating whichever debug button last held

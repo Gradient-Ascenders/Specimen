@@ -667,3 +667,24 @@ human-input victory or a hardware FPS qualification.
   explicit scenario fixtures, not a human-input victory or hardware FPS claim.
   Evidence: `/tmp/specimen-boss-model-ram-browser-results/`, including
   `ram-model-contact-evidence.json` and the solid-model-contact capture.
+
+### Current-main integration and PR handoff (23 October 2026)
+
+- Integrated current main's camera modes, menus, sounds and Level 3 transit
+  encounters. Resolutions preserve final-boss gathering/credits/checkpoints
+  alongside those features, rather than restoring the old transit objectives.
+  Fused-model descendants all use the shared camera-pass visibility hooks;
+  authored boss cinematics override the view temporarily without resetting
+  the player's selected first-/third-person preference. A real-camera runtime
+  regression verifies suppression/restoration for every fused body part.
+- Final post-integration full suite: **1,659 passed**, **one existing skip**, no
+  failures. Production build/TypeScript, generated-asset reproduction,
+  **120-file** production layout validation and whitespace checks pass.
+- Post-integration production Chromium/SwiftShader: **passed in 3.0 minutes**,
+  **36 captures**, all **GL error 0**, no browser/shader errors. The measured
+  **13.0625 m** jump apex clears the low turbine section, and a controlled solid
+  turbine contact still causes **45 HP** runtime damage. Real firing/jumping,
+  checkpoint Retry, all later waves and credits still pass. Later positioning
+  and authority are controlled fixtures, not a full human-input victory or
+  hardware qualification. Final browser evidence:
+  `/tmp/specimen-boss-main-merge-browser-results/`.

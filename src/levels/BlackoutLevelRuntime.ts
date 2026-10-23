@@ -1,3 +1,4 @@
+import { CameraBodyVisibility } from '../render/CameraBodyVisibility.ts';
 import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
@@ -198,6 +199,7 @@ interface BlackoutRuntimeResources {
   readonly specimenAttack: SpecimenProjectileSystem;
   readonly specimenPresentation: SpecimenCombatPresentation;
   readonly specimenVisual: THREE.Mesh;
+  readonly specimenCameraVisibility: CameraBodyVisibility;
   readonly specimenLight: THREE.PointLight;
   readonly unregisterElectricalCheckpointParticipant: () => void;
   readonly unregisterPoweredDevicesCheckpointParticipant: () => void;
@@ -987,6 +989,7 @@ export class BlackoutLevelRuntime {
       return;
     }
 
+    if (this.input.enabled && this.input.wasPressed('toggleView')) this.renderLayer.cameraRig.toggleViewMode();
     let switched = false;
     if (
       this.currentRoom.phase === 'three-slime' ||
@@ -1396,6 +1399,9 @@ export class BlackoutLevelRuntime {
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
     const resources = this.resources;
     if (resources) {
+      this.renderLayer.cameraRig.setThirdPersonOverride(!resources.deathSequence.isPlaying || !!resources.ventArrival?.active || !!resources.finalBoss?.cinematic ||
+        resources.phase.phase === 'merging' || resources.phase.phase === 'splitting' ||
+        resources.phase.phase === 'boss-defeated' || resources.phase.terminal);
       this.syncVisuals(resources);
       const mergePresentation=!!resources.finalBoss&&resources.phase.phase==='merging';
       if(!mergePresentation) {
@@ -1481,11 +1487,11 @@ export class BlackoutLevelRuntime {
       camera.position.set(-7,4.5,191);camera.lookAt(FINAL_MERGE_ANCHOR);camera.updateMatrixWorld(true);
     }
     if(resources?.finalBoss&&resources.specimenForm.readModel.controlledForm==='specimen') {
-      // Looking up at the enlarged boss can shorten the boom against a deck.
-      // Hide only our own model when the resolved lens enters its silhouette;
-      // keep collision, combat authority and all cinematic poses unchanged.
-      const nearBody=!resources.finalBoss.cinematic&&this.renderLayer.cameraRig.camera.position.distanceToSquared(resources.specimenBody.position)<(resources.specimenBody.radiusMetres*1.65)**2;
-      const visible=!resources.specimenAttack.readModel.aimActive&&!nearBody;
+      // First-person/aim hiding uses the shared camera-pass hooks so shadows
+      // survive. Only a shortened third-person boom needs silhouette hiding.
+      const firstPerson=this.renderLayer.cameraRig.isFirstPersonForTarget(resources.specimenBody);
+      const nearBody=!firstPerson&&!resources.finalBoss.cinematic&&this.renderLayer.cameraRig.camera.position.distanceToSquared(resources.specimenBody.position)<(resources.specimenBody.radiusMetres*1.65)**2;
+      const visible=!nearBody;
       const mesh=resources.specimenVisual,materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
       for(const material of materials)material.visible=visible;
       for(const child of mesh.children)child.visible=visible;
@@ -1494,18 +1500,19 @@ export class BlackoutLevelRuntime {
     if (resources) {
       resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
-      resources.goopPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&resources.group.activeSlimeId === 'goop'
+      resources.goopPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&resources.group.activeSlimeId === 'goop' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.group.goopBody)
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
       // PMREM is shared with Bob. Dark rooms receive no permanent reflection fill.
       const reflectionWeight = resources.goopReflectionLighting.weightAt(resources.renderedGoopPosition);
       resources.goopPresentation.setReflectionIntensity(0.12 * reflectionWeight, 0.28 * reflectionWeight);
-      resources.voltPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&resources.group.activeSlimeId === 'volt'
+      resources.voltPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&resources.group.activeSlimeId === 'volt' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.group.voltBody)
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
       const voltReflection = resources.goopReflectionLighting.weightAt(resources.renderedVoltPosition);
       resources.voltPresentation.setReflectionIntensity(0.12 * voltReflection, 0.28 * voltReflection);
     }
+    resources?.transit?.updatePresentation(stats.frameDeltaSeconds, this.renderLayer.cameraRig.camera);
     resources?.hallwayShadows?.prepareFrame(resources.hallwayShadowParticipants);
     this.renderLayer.render();
   }
@@ -1740,6 +1747,7 @@ export class BlackoutLevelRuntime {
       rollback(() => deathScreen.dispose());
       this.host.append(deathScreen.element);
       const voltPresentation = new VoltCharacterPresentation(group.voltBody.radiusMetres, this.renderLayer.gelRendering);
+      voltPresentation.setCameraView(this.renderLayer.cameraRig, group.voltBody);
       rollback(() => voltPresentation.dispose());
       voltPresentation.setCollisionWorld(collisionWorld);
       voltPresentation.setPosition(group.voltBody.position);
@@ -1748,6 +1756,7 @@ export class BlackoutLevelRuntime {
       rollback(voltMovementEvents.on('jumped', event => voltPresentation.onLaunch(event)));
       const voltPresentationState = createBobPresentationState(group.voltBody);
       const goopPresentation = new GoopCharacterPresentation(group.goopBody.radiusMetres, this.renderLayer.gelRendering);
+      goopPresentation.setCameraView(this.renderLayer.cameraRig, group.goopBody);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(group.goopBody.position);
       this.renderLayer.scene.add(goopPresentation.root);
@@ -1756,6 +1765,7 @@ export class BlackoutLevelRuntime {
       const goopPresentationState = createBobPresentationState(group.goopBody);
       const bobPresentation = new BobCharacterPresentation(
         group.bobBody.radiusMetres, this.renderLayer.gelRendering);
+      bobPresentation.setCameraView(this.renderLayer.cameraRig, group.bobBody);
       bobPresentation.setPosition(group.bobBody.position);
       rollback(() => bobPresentation.dispose());
       this.renderLayer.scene.add(bobPresentation.root);
@@ -1782,6 +1792,10 @@ export class BlackoutLevelRuntime {
       const finalPresentation=scene.finalArena?new FinalBossPresentation():undefined;
       const specimenVisual = finalPresentation?.specimen ?? createSpecimenVisual();
       rollback(() => finalPresentation ? finalPresentation.dispose() : disposeSlimeVisual(specimenVisual));
+      const specimenCameraVisibility = new CameraBodyVisibility();
+      specimenCameraVisibility.configure(this.renderLayer.cameraRig, specimenBody);
+      specimenVisual.traverse(object=>{if(object instanceof THREE.Mesh)specimenCameraVisibility.bind(object);});
+      rollback(() => specimenCameraVisibility.dispose());
       this.renderLayer.scene.add(specimenVisual);
       const specimenLight = new THREE.PointLight(0xff584a, 2.4, 10, 2);
       specimenLight.name = 'blackout-specimen-light';
@@ -1802,6 +1816,7 @@ export class BlackoutLevelRuntime {
       if (unregisterTransitCheckpointParticipant) rollback(unregisterTransitCheckpointParticipant);
       const dissolveSystem = new DissolveSystem(transit?.dissolveTargets ?? []);
       rollback(() => dissolveSystem.dispose());
+      transit?.bindBurns(dissolveSystem);
       const acidProjectileSystem = new AcidProjectileSystem({
         slimeManager: manager,
         collisionWorld,
@@ -1996,7 +2011,7 @@ export class BlackoutLevelRuntime {
         specimenForm,
         specimenAttack,
         specimenPresentation,
-        specimenVisual,
+        specimenVisual, specimenCameraVisibility,
         specimenLight,
         unregisterElectricalCheckpointParticipant,
         unregisterPoweredDevicesCheckpointParticipant,
@@ -2225,6 +2240,7 @@ export class BlackoutLevelRuntime {
     resources.goopPresentation.dispose();
     resources.bobReflectionEnvironment?.dispose();
     resources.voltPresentation.dispose();
+    resources.specimenCameraVisibility.dispose();
     if(!resources.finalBoss)disposeSlimeVisual(resources.specimenVisual);
     resources.puzzleRegistry.clear();
     resources.manager.clearLevelRegistrations();
@@ -2546,27 +2562,7 @@ export class BlackoutLevelRuntime {
       (this.authoredRoomOne ? BLACKOUT_VOLT_LIGHT_INTENSITY.authored : BLACKOUT_VOLT_LIGHT_INTENSITY.foundation);
     resources.specimenLight.visible = specimenControlled;
 
-    // Aim presentation hides only the currently controlled body material.
-    const hideVoltBody =
-      !specimenControlled &&
-      resources.manager.activeSlimeId === 'volt' &&
-      resources.electricalSystem.readModel.aimActive;
-    resources.voltPresentation.setVisible(groupVisible && !hideVoltBody);
-
-    const hideGoopBody =
-      !specimenControlled &&
-      resources.manager.activeSlimeId === 'goop' &&
-      resources.acidProjectileSystem.aimReadModel.active;
-    resources.goopPresentation.setVisible(groupVisible && !hideGoopBody);
-
-    const specimenMaterials = Array.isArray(resources.specimenVisual.material)
-      ? resources.specimenVisual.material
-      : [resources.specimenVisual.material];
-    for (const material of specimenMaterials) {
-      material.visible =
-        !(specimenControlled && resources.specimenAttack.readModel.aimActive);
-    }
-    if(resources.finalBoss)for(const child of resources.specimenVisual.children)child.visible=!resources.specimenAttack.readModel.aimActive;
+    resources.goopPresentation.setVisible(groupVisible);
     resources.specimenPresentation.update(specimenControlled);
   }
 
@@ -2800,10 +2796,10 @@ function objectiveFor(room: BlackoutRoomState): string {
   switch (room.roomId) {
     case 'room-1': return 'Use Volt to bring the restricted sector back online';
     case 'room-2': return room.local.transitComplete ? 'Transit restored — boss-sector entrance reached' : room.local.transitStage === 2
-      ? 'Bob holds the bridge. Goop clears its sightline. Volt crosses and locks it.'
+      ? 'Bob holds the bridge. Goop clears the drones. Volt crosses and locks it.'
       : room.local.transitStage === 1
-        ? 'Use Volt to raise the cargo lifts and Goop to shield Bob’s route'
-        : 'Restore the transit lights and lower cover for Bob';
+        ? 'Use Volt to raise the cargo lifts and Goop to clear the drones from Bob’s route'
+        : 'Restore the transit lights and clear the sewer drones for Bob';
     case 'room-3': return 'Bring all three specimens into the final chamber';
     case 'room-4a': return 'Enter the merge chamber';
     case 'room-4b': return 'Defeat the facility defence system';
