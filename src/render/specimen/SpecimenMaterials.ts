@@ -13,7 +13,7 @@ function configureCaptureBlending(material: THREE.MeshPhysicalMaterial): void {
   material.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
 }
 
-/** Preserve the authored nine material regions, including vertex-painted tips. */
+/** Preserve the authored materials, including vertex-painted tips and lightning. */
 export class SpecimenMaterials {
   private readonly materials: readonly THREE.MeshPhysicalMaterial[];
   private readonly base = new Map<THREE.MeshPhysicalMaterial, {

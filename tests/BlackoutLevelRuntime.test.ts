@@ -787,8 +787,8 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
       const mesh = volt.root.getObjectByName(name) as THREE.Mesh;
       assert.ok(mesh.castShadow && mesh.receiveShadow && mesh.visible);
     }
-    assert.equal(specimen.diagnostics.meshCount, 10);
-    assert.equal(specimen.diagnostics.triangles, 108352);
+    assert.equal(specimen.diagnostics.meshCount, 6);
+    assert.equal(specimen.diagnostics.triangles, 81040);
     assert.equal(specimen.diagnostics.visible, false);
     const specimenEye = specimen.root.getObjectByName('Specimen-Eye-Left') as THREE.Mesh;
     assert.ok(specimenEye.castShadow && specimenEye.receiveShadow);

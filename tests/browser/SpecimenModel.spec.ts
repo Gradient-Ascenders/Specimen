@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from './fixtures.ts';
 import type { BlackoutLevelRuntime } from '../../src/levels/BlackoutLevelRuntime.ts';
 import type { SpecimenCharacterPresentation } from '../../src/render/specimen/SpecimenCharacterPresentation.ts';
@@ -55,7 +55,7 @@ test('authored Specimen replaces the fusion sphere through merge, camera modes, 
   await page.waitForFunction(() => window.__specimenModelProbe?.runtime.state === 'running' &&
     !window.__specimenModelProbe.resources.ventArrival?.active, undefined, { timeout: 120_000 });
   expect(await page.evaluate(() => window.__specimenModelProbe.resources.specimenCharacter.diagnostics)).toMatchObject({
-    ready: true, visible: false, triangles: 108352, meshCount: 10,
+    ready: true, visible: false, triangles: 81040, meshCount: 6,
   });
 
   const merged = await page.evaluate(() => {
@@ -78,17 +78,25 @@ test('authored Specimen replaces the fusion sphere through merge, camera modes, 
     const p = window.__specimenModelProbe, r = p.resources;
     return { diagnostics: r.specimenCharacter.diagnostics, radius: r.specimenBody.radiusMetres,
       bob: r.bobPresentation.diagnostics.visible, volt: r.voltPresentation.diagnostics.visible,
-      oldSphere: !!p.renderLayer.scene.getObjectByName('blackout-specimen-body') };
+      oldSphere: !!p.renderLayer.scene.getObjectByName('blackout-specimen-body'),
+      asset: r.specimenCharacter.root.getObjectByName('The_Specimen')?.userData.asset,
+      removedInternals: !!r.specimenCharacter.root.getObjectByName('Specimen-Acid-Core') ||
+        !!r.specimenCharacter.root.getObjectByName('Specimen-Aqua-Currents') };
   });
-  expect(active).toMatchObject({ radius: 0.675, bob: false, volt: false, oldSphere: false });
+  expect(active).toMatchObject({ radius: 0.675, bob: false, volt: false, oldSphere: false,
+    asset: 'specimen-lightning-only-v1', removedInternals: false });
 
   const composition = await page.evaluate(() => {
     const { renderLayer: layer, resources } = window.__specimenModelProbe;
     const originalMode = layer.gelRendering.value;
+    const originalOpacity = resources.specimenCharacter.diagnostics.opacity;
+    // Inspect capture at full opacity; frame timing can otherwise leave the
+    // lightning in the camera-fade transparent queue instead of the capture.
+    resources.specimenCharacter.setOpacity(1);
     const interior: THREE.Mesh[] = [];
     resources.specimenCharacter.root.traverse(object => {
       const mesh = object as THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhysicalMaterial>;
-      if (mesh.isMesh && /Aqua-Flow|Luminous-Acid/.test(mesh.material.name)) interior.push(mesh);
+      if (mesh.isMesh && /Golden-Discharge|Charged-Junctions/.test(mesh.material.name)) interior.push(mesh);
     });
     const draws: { name: string; capture: boolean }[] = [];
     const hooks = interior.map(mesh => {
@@ -103,7 +111,7 @@ test('authored Specimen replaces the fusion sphere through merge, camera modes, 
       return ['physical', 'reduced-transmission', 'minimum'].map(mode => {
         layer.gelRendering.setMode(mode as 'physical' | 'reduced-transmission' | 'minimum');
         draws.length = 0; layer.render();
-        return { mode, interiorCount: interior.length,
+        return { mode, opacityBefore: originalOpacity, interiorCount: interior.length,
           capture: [...new Set(draws.filter(draw => draw.capture).map(draw => draw.name))],
           screen: [...new Set(draws.filter(draw => !draw.capture).map(draw => draw.name))],
           glError: layer.renderer.getContext().getError() };
@@ -111,8 +119,10 @@ test('authored Specimen replaces the fusion sphere through merge, camera modes, 
     } finally {
       for (const restore of hooks) restore();
       layer.gelRendering.setMode(originalMode);
+      resources.specimenCharacter.setOpacity(originalOpacity);
     }
   });
+  await writeFile('artifacts/evidence/specimen-integration/composition.json', JSON.stringify(composition, null, 2));
   for (const result of composition) {
     expect(result.interiorCount).toBe(2);
     expect(result.screen).toHaveLength(2);

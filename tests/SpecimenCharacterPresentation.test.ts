@@ -11,14 +11,19 @@ const state = () => ({ locomotionPosition: new THREE.Vector3(), velocity: new TH
   gameplayUp: new THREE.Vector3(0, 1, 0), grounded: true, landedThisStep: false, chargingJump: false, chargeFraction: 0 });
 const attack = () => ({ aimActive: false, aimDirection: new THREE.Vector3(0, 0, -1), chargeAmount: 0 });
 
-test('real final-fusion GLB preserves ten regions, yellow vertex colours and playable morph clips', async () => {
+test('active final-fusion GLB keeps six lightning-only regions, yellow vertex colours and playable morph clips', async () => {
   const root = await loadSpecimen(), asset = validateSpecimenAsset(root);
-  assert.equal(asset.meshes.length, 10);
+  assert.equal(asset.meshes.length, 6);
+  assert.deepEqual([...new Set(asset.meshes.map(mesh => mesh.material.name))].sort(), [
+    'Specimen-Charged-Junctions', 'Specimen-Golden-Discharge', 'Specimen-Obsidian-Eyes',
+    'Specimen-Turquoise-Gel', 'Specimen-Yellow-Bolt-Tips',
+  ]);
+  assert.equal(root.getObjectByName('Specimen-Acid-Core'), undefined);
+  assert.equal(root.getObjectByName('Specimen-Aqua-Currents'), undefined);
   const tips = asset.meshes.find(mesh => mesh.material.name === 'Specimen-Yellow-Bolt-Tips')!;
   assert.ok(tips.geometry.getAttribute('color'));
-  assert.deepEqual(root.animations.map(clip => [clip.name, clip.tracks.length]), [['Idle', 10], ['Settle', 10], ['Charge', 10]]);
-  const core = asset.meshes.find(mesh => mesh.material.name === 'Specimen-Fusion-Heart')!;
-  core.geometry.morphAttributes.position![0]!.setX(0, NaN);
+  assert.deepEqual(root.animations.map(clip => [clip.name, clip.tracks.length]), [['Idle', 6], ['Settle', 6], ['Charge', 6]]);
+  tips.geometry.morphAttributes.position![0]!.setX(0, NaN);
   assert.throws(() => validateSpecimenAsset(root), /Non-finite/);
   disposeSpecimenAsset(root);
 });
@@ -59,24 +64,21 @@ test('failed loads retry; completion after disposal cannot attach a model or lea
   assert.equal(releases, 1); assert.equal(late.ready, false); assert.equal(root.parent, null);
 });
 
-test('interior capture composition and shell depth survive camera fades, quality switches and reset', async () => {
+test('lightning capture and shell depth survive camera fades, quality switches and reset', async () => {
   const policy = new GelRendering({ transmissionResolutionScale: 1 });
   const p = new SpecimenCharacterPresentation(0.675, policy), root = await loadSpecimen();
   const asset = validateSpecimenAsset(root);
   await p.prepare(async () => root);
   const regions = asset.meshes.map(mesh => ({ mesh, material: mesh.material,
     opacity: mesh.material.opacity, depthWrite: mesh.material.depthWrite, order: mesh.renderOrder }));
-  const heart = regions.find(region => /Fusion-Heart/.test(region.material.name))!;
-  const interior = regions.filter(region => /Aqua-Flow|Luminous-Acid/.test(region.material.name));
+  const interior = regions.filter(region => /Golden-Discharge|Charged-Junctions/.test(region.material.name));
   const shells = regions.filter(region => /Turquoise-Gel|Yellow-Bolt-Tips/.test(region.material.name));
   assert.equal(interior.length, 2);
-  for (const { material, order } of interior) {
+  for (const { material } of interior) {
     assert.equal(material.transmission, 0);
-    assert.equal(material.blending, THREE.CustomBlending);
-    assert.equal(material.blendSrc, THREE.SrcAlphaFactor);
-    assert.equal(material.blendDst, THREE.OneMinusSrcAlphaFactor);
-    assert.ok(material.opacity < 1);
-    assert.ok(order > heart.order);
+    assert.equal(material.opacity, 1);
+    assert.equal(material.depthWrite, true);
+    assert.ok(material.emissiveIntensity >= 12);
   }
   for (const mode of ['minimum', 'reduced-transmission', 'physical'] as const) {
     policy.setMode(mode);
@@ -93,7 +95,7 @@ test('interior capture composition and shell depth survive camera fades, quality
       assert.equal(material.depthWrite, true);
       assert.ok(order > Math.max(...interior.map(region => region.order)), 'Low quality composites the shell after the interior');
     }
-    assert.ok(interior.every(({ material }) => !material.depthWrite));
+    assert.ok(interior.every(({ material }) => material.depthWrite));
   }
   p.dispose();
 });

@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-export const SPECIMEN_ASSET_URL = new URL('../../../assets/characters/specimen/specimen.glb', import.meta.url).href;
-export const SPECIMEN_ASSET_VERSION = 'specimen-yellow-bolt-tips-v12';
+export const SPECIMEN_ASSET_URL = new URL('../../../assets/characters/specimen/variants/lightning-only/specimen-lightning-only.glb', import.meta.url).href;
+export const SPECIMEN_ASSET_VERSION = 'specimen-lightning-only-v1';
 export const SPECIMEN_RESTING_SOLE = -0.45;
-export const SPECIMEN_TRIANGLES = 108352;
+export const SPECIMEN_TRIANGLES = 81040;
 
 export interface SpecimenAsset {
   readonly root: THREE.Group;
@@ -58,7 +58,7 @@ export function validateSpecimenAsset(root: THREE.Group): SpecimenAsset {
     triangles += object.geometry.index.count / 3;
     meshes.push(object as SpecimenAsset['meshes'][number]);
   });
-  if (meshes.length !== 10 || triangles !== SPECIMEN_TRIANGLES ||
+  if (meshes.length !== 6 || triangles !== SPECIMEN_TRIANGLES ||
     !['Idle', 'Settle', 'Charge'].every(name => root.animations.some(clip => clip.name === name))) {
     throw new Error('Incomplete Specimen asset');
   }

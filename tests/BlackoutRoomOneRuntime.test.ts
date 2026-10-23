@@ -212,7 +212,7 @@ test('the merged boss body and all its parts respect first-person hiding, while 
     assert.equal(b.cinematic,true);assert.equal(rig.isFirstPersonForTarget(body),false);assert.equal(rig.viewMode,'first-person');
     f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
     for(let i=0;i<20;i++)f.render();assert.equal(rig.isFirstPersonForTarget(body),true);
-    const meshes:THREE.Mesh[]=[];b.presentation.specimen.traverse(o=>{if(o instanceof THREE.Mesh)meshes.push(o);});assert.ok(meshes.length>=7);
+    const meshes:THREE.Mesh[]=[];b.presentation.specimen.traverse(o=>{if(o instanceof THREE.Mesh)meshes.push(o);});assert.equal(meshes.length,6);
     for(const mesh of meshes) {
       const material=Array.isArray(mesh.material)?mesh.material[0]!:mesh.material,color=material.colorWrite,depth=material.depthWrite;
       assert.equal(mesh.visible,true);assert.equal(material.visible,true,'camera-pass suppression must not globally hide the shared actor material');
