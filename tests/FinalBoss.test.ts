@@ -60,12 +60,12 @@ test('boss is vulnerable outside its defensive shield, and complete damage gates
 test('85/70/55 crossings synchronously protect against overkill, heal slowly, and fire once even after healing above a threshold',()=>{
   const b=new FinalBossController({random:()=>.5});b.start(true);
   for(const [i,threshold] of FINAL_BOSS_TUNING.defenseThresholds.entries()) {
-    b.applyImpact(impact(999));assert.equal(b.readModel.health,[170,140,110][i]);
+    b.applyImpact(impact(999));assert.equal(b.readModel.health,[637.5,525,412.5][i]);
     assert.equal(b.readModel.shieldActive,true);assert.equal(b.readModel.defenseThreshold,threshold);
     assert.equal(b.readModel.summonCount,[11,13,18][i]);assert.equal(b.applyImpact(impact(999)).accepted,false);
     until(b,()=>b.readModel.stage==='active');const hp=b.readModel.health;b.update(2,target);
     assert.ok(Math.abs(b.readModel.health-hp-5)<.05);assert.equal(b.skipCinematic(target),false);
-    b.update(100,target);assert.equal(b.readModel.health,FINAL_BOSS_TUNING.health);assert.equal(b.readModel.shieldActive,true,'shield must never time out');
+    b.update(FINAL_BOSS_TUNING.health/FINAL_BOSS_TUNING.healPerSecond,target);assert.equal(b.readModel.health,FINAL_BOSS_TUNING.health);assert.equal(b.readModel.shieldActive,true,'shield must never time out');
     const n=b.readModel.defendersRemaining;
     for(let j=0;j<n-1;j++)b.droneDestroyed();assert.equal(b.readModel.shieldActive,true);
     b.droneDestroyed();assert.equal(b.readModel.shieldActive,false);assert.equal(b.readModel.regenerating,false);

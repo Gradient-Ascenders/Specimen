@@ -24,7 +24,7 @@ export function finalArenaSupportY(feetY:number):number {
   return feetY>=FINAL_ARENA_ORBIT.lowY-.15 ? THREE.MathUtils.clamp(feetY,FINAL_ARENA_ORBIT.lowY,FINAL_ARENA_ORBIT.highY) : FINAL_ARENA.floorY;
 }
 export const FINAL_BOSS_TUNING = Object.freeze({
-  health:200,phaseTwoHealth:100,scale:3,hoverY:18,defenseHoverY:26,
+  health:750,phaseTwoHealth:375,scale:3,hoverY:18,defenseHoverY:26,
   defenseThresholds:Object.freeze([.85,.70,.55]),healPerSecond:2.5,
   defenseGroups:Object.freeze([Object.freeze([4,4]),Object.freeze([5,5]),Object.freeze([5,5,5])]),
   shieldRadius:28,droneCount:18,droneHealth:6,pursuers:3,
@@ -33,7 +33,7 @@ export const FINAL_BOSS_TUNING = Object.freeze({
   gunSpeed:164,gunRadius:.25,gunDamage:7,gunVolleySeconds:.16,gunCapacity:96,
   orbSpeed:63,orbRadius:1.25,orbDamage:20,orbCount:3,orbBursts:5,orbIntervalSeconds:.8,orbCapacity:24,
   phaseTwoOrbCount:5,orbSpreadIntervalSeconds:.13,orbSpreadRadians:.095,
-  reinforcementHealth:Object.freeze([70,50,20]),advancedGroups:Object.freeze([3,3]),advancedPursuers:2,
+  reinforcementHealth:Object.freeze([262.5,187.5,75]),advancedGroups:Object.freeze([3,3]),advancedPursuers:2,
   advancedScale:1.8,advancedAttackSpeed:1,advancedProjectileCapacity:64,
   healthPackCapacity:24,healthPackFraction:.25,
   // Keep the thicker beam's lower edge above the ring instead of burying it
