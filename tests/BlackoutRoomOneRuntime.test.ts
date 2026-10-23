@@ -262,7 +262,7 @@ test('phase two automatically saves CP9 on normal and skipped transitions; repea
         } else assert.equal(f.runtime.requestFailure(),true);
         assert.equal(f.runtime.requestFailure(),false);f.tick(80);
         const screen=f.document.elements.find(e=>e.className==='death-screen')!;assert.equal(screen.hidden,false);screen.retryButton.click();
-        assert.equal(b.controller.readModel.phase,2);assert.equal(b.controller.readModel.state,'combat');assert.equal(b.controller.readModel.health,100);
+        assert.equal(b.controller.readModel.phase,2);assert.equal(b.controller.readModel.state,'combat');assert.equal(b.controller.readModel.health,FINAL_BOSS_TUNING.phaseTwoHealth);
         assert.equal(b.controller.readModel.playerHealth,100);assert.equal(b.controller.readModel.defenseIndex,3);assert.equal(b.controller.readModel.reinforcementIndex,0);
         assert.equal(b.controller.readModel.shieldActive,false);assert.equal(b.cinematic,false);assert.equal(b.squad.activeCount,0);assert.equal(b.projectiles.liveCount,0);
         assert.equal(b.reinforcements.activeCount,0);assert.equal(b.reinforcements.liveProjectileCount,0);assert.equal(b.healthPacks.activeCount,0);
@@ -273,7 +273,7 @@ test('phase two automatically saves CP9 on normal and skipped transitions; repea
       }
       f.runtime.restartLevel();assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp1');assert.equal(b.controller.readModel.state,'idle');
       f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
-      assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');assert.equal(b.controller.readModel.phase,1);assert.equal(b.controller.readModel.health,200);
+      assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');assert.equal(b.controller.readModel.phase,1);assert.equal(b.controller.readModel.health,FINAL_BOSS_TUNING.health);
     }finally{f.cleanup();}
   }
 });
@@ -321,7 +321,7 @@ test('Room 4 debug shortcut is gated, ending uses the legal macro flow and compl
       }
       expose();b.controller.applyImpact(hit);f.tick();assert.equal(b.controller.readModel.state,'transition');
       f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(b.controller.readModel.phase,2);
-      for(const hp of [70,50,20]){expose();b.controller.applyImpact(hit);f.tick();assert.equal(b.controller.readModel.health,hp);assert.equal(b.controller.readModel.shieldActive,false);}
+      for(const hp of FINAL_BOSS_TUNING.reinforcementHealth){expose();b.controller.applyImpact(hit);f.tick();assert.equal(b.controller.readModel.health,hp);assert.equal(b.controller.readModel.shieldActive,false);}
       expose();b.controller.applyImpact(hit);f.tick();assert.equal(f.runtime.roomState.phase,'boss-defeated');
       assert.equal(b.squad.activeCount,0);assert.equal(b.squad.liveProjectileCount,0);
       assert.equal(b.reinforcements.activeCount,0);assert.equal(b.reinforcements.liveProjectileCount,0);assert.equal(b.healthPacks.activeCount,0);

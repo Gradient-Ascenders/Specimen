@@ -82,7 +82,7 @@ test('boss HUD presents controller states, readable compact layouts and bounded 
   const hud = page.locator('.final-boss-hud');
   const danger = hud.locator('.final-boss-danger');
   const evidence = 'artifacts/evidence/boss-hud'; await mkdir(evidence, { recursive: true });
-  await expect(hud.getByRole('progressbar', { name: 'Exterminator health', exact: true })).toHaveJSProperty('value', 200);
+  await expect(hud.getByRole('progressbar', { name: 'Exterminator health', exact: true })).toHaveJSProperty('value', 750);
   await expect(hud.locator('.final-boss-phase')).toHaveText('Phase 1');
   await expect(page.locator('.specimen-charge-display')).toBeVisible();
   await expect(page.locator('.specimen-dash-label')).toContainText('Ready');
@@ -136,7 +136,7 @@ test('boss HUD presents controller states, readable compact layouts and bounded 
   await page.evaluate(() => {
     const { controller, sync, model } = window.__bossHudUi;
     controller.damagePlayer(75, 1);
-    controller.applyImpact({ projectileId: 1, targetId: 'core', kind: 'direct', chargeAmount: 1, fullyCharged: true, damageUnits: 40, point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: 1 } });
+    controller.applyImpact({ projectileId: 1, targetId: 'core', kind: 'direct', chargeAmount: 1, fullyCharged: true, damageUnits: controller.readModel.maximumHealth * .2, point: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0, z: 1 } });
     controller.update(1.35, { x: 0, y: 0, z: 0 });
     model.overchargeReady = true; model.overchargeProgress = 1; sync();
   });

@@ -185,7 +185,7 @@ test('production boss renders both phases, health drops, advanced reinforcements
   await step(page,20);await aim(page);
   const beforeHipFire=(await model(page)).health;
   // Keep this partial release below the first shield crossing after the prior
-  // full hit: 182 HP minus about 10.2 damage stays above the 170 HP gate.
+  // full hit: 732 HP minus about 10.2 damage stays above the 637.5 HP gate.
   await mouse(page,0,true);await step(page,30);
   expect((await model(page)).aimActive).toBe(false);expect((await model(page)).charging).toBe(true);
   await expect(page.locator('.specimen-combat-crosshair')).toBeVisible();
@@ -292,7 +292,7 @@ test('production boss renders both phases, health drops, advanced reinforcements
   });await step(page,80);await page.locator('.death-retry').click();await step(page,1);
   await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('canvas[data-gameplay-canvas]'));
   const retry=await model(page);
-  expect(retry.checkpoint).toBe('cp9');expect(retry.phase).toBe(2);expect(retry.state).toBe('combat');expect(retry.health).toBe(100);expect(retry.playerHealth).toBe(100);
+  expect(retry.checkpoint).toBe('cp9');expect(retry.phase).toBe(2);expect(retry.state).toBe('combat');expect(retry.health).toBe(FINAL_BOSS_TUNING.phaseTwoHealth);expect(retry.playerHealth).toBe(100);
   expect(retry.shield).toBe(false);expect(retry.drones).toBe(0);expect(retry.advanced).toBe(0);expect(retry.packs).toBe(0);expect(retry.reinforcementIndex).toBe(0);
   expect(await page.evaluate(()=>{
     const r=(window as any).__bossSession.runtime,f=r.resources.finalBoss,a=r.resources.scene.finalArena;
