@@ -169,6 +169,11 @@ export class GameSessionCoordinator {
     this.runtime.render(this.renderedInterpolationAlpha, stats);
   }
 
+  getSpeedEffectStrength(): number {
+    if (this.disposed || this.transitionPending || this.transitionFailed || this.graphicsPreparation.pending || this.initialPreparationPending) return 0;
+    return this.runtime.getSpeedEffectStrength?.() ?? 0;
+  }
+
   subscribeSlimeHUD(listener: SlimeHUDListener): () => void {
     this.hudListeners.add(listener);
     listener(this.getSlimeHUDSnapshot());

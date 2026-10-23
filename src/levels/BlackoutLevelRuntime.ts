@@ -16,6 +16,10 @@ import { BlackoutMaintenanceBayController } from './BlackoutMaintenanceBayContro
 import { BlackoutTransitController } from './BlackoutTransitController.ts';
 import { BLACKOUT_TRANSIT_CHECKPOINTS } from './BlackoutTransitRoom.ts';
 import { BLACKOUT_BOSS_STAGING_CHECKPOINT } from './BlackoutBossStaging.ts';
+import { CompanionRegroup } from '../slimes/CompanionRegroup.ts';
+import { GOOP_ACID_SPEED_MULTIPLIER } from '../slimes/SlimeRoster.ts';
+import { blackoutCompanionWalk } from './BlackoutCompanionWalks.ts';
+import { goopSpeedEffectStrength } from '../ui/GoopSpeedOverlay.ts';
 import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
 import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
 import { FinalBossEncounter } from '../boss/FinalBossEncounter.ts';
@@ -247,6 +251,7 @@ interface BlackoutRuntimeResources {
 }
 
 export class BlackoutLevelRuntime {
+  private readonly companions = new CompanionRegroup();
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
@@ -541,7 +546,7 @@ export class BlackoutLevelRuntime {
         : resources.manager.activeSlimeId,
       controlledForm: specimenControlled ? 'specimen' : 'slime',
       activeFormLabel: specimenControlled ? 'SPECIMEN' : undefined,
-      passiveInteractions: [],
+      passiveInteractions: this.companions.passiveInteractions,
       playerSwitchFeedback: undefined,
       resetSwitchFeedback: false,
     };
@@ -668,6 +673,7 @@ export class BlackoutLevelRuntime {
     }
     if (resources.specimenForm.readModel.controlledForm === 'specimen') resources.specimenCharacter.startDeath(resources.specimenBody.position);
     this.gameplayAudio?.died(resources.specimenForm.readModel.controlledForm === 'group' ? resources.manager.activeSlimeId : undefined);
+    this.resetCompanions();
     resources.electricalSystem.reset('death');
     resources.acidProjectileSystem.reset();
     resources.goopAcidPresentation.reset();
@@ -706,6 +712,7 @@ export class BlackoutLevelRuntime {
       return false;
     }
 
+    this.resetCompanions();
     this.input.resetState();
     resources.electricalSystem.disconnect('merge');
     resources.electricalSystem.cancelAim();
@@ -743,6 +750,7 @@ export class BlackoutLevelRuntime {
       return false;
     }
 
+    this.resetCompanions();
     this.input.resetState();
     resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     this.renderLayer.cameraRig.setAimPresentationActive(false, true);
@@ -882,6 +890,7 @@ export class BlackoutLevelRuntime {
     if (this.lifecycle.state !== 'running') return;
     const resources = this.requireResources();
     if(resources.ventArrival?.active){
+      this.resetCompanions();
       resources.scene.maintenanceBay?.advanceAcid(deltaSeconds);
       if(resources.ventArrival.update(deltaSeconds)){
         this.clearArrivalUi();this.input.resetState();
@@ -930,6 +939,7 @@ export class BlackoutLevelRuntime {
       resources.finalBoss?.controller.toggleDevInvincibility();
     }
     if(resources.finalBoss?.cinematic) {
+      this.resetCompanions();
       resources.finalBoss.update(deltaSeconds,this.input.wasPressed('skipCinematic'));
       this.commitFinalBossPhaseTwoCheckpoint(resources);
       resources.specimenAttack.cancelInput(); resources.specimenDash.cancel(); resources.specimenAbilityAudio?.setEnabled(false);this.renderLayer.cameraRig.setAimPresentationActive(false,true);
@@ -1104,6 +1114,7 @@ export class BlackoutLevelRuntime {
     resources.bobMovementIntent.set(0, 0, 0);
     resources.goopMovementIntent.set(0, 0, 0);
     resources.voltMovementIntent.set(0, 0, 0);
+    this.companions.beginStep();
 
     // Switching changes input ownership, not gravity. Keep the other bodies
     // falling and landing; mounted Volt is carried by the drone instead.
@@ -1111,9 +1122,36 @@ export class BlackoutLevelRuntime {
       resources.movement.set(0, 0, 0);
       for (const passiveBody of resources.group.bodies) {
         if (passiveBody === resources.group.voltBody && resources.maintenanceDrone.voltMounted) continue;
-        if (passiveBody !== body || switched) passiveBody.update(deltaSeconds, resources.movement);
+        if (passiveBody !== body || switched) {
+          const id = passiveBody === resources.group.bobBody ? 'bob'
+            : passiveBody === resources.group.goopBody ? 'goop' : 'volt';
+          const bay = resources.maintenanceBay?.bay;
+          // With three slimes, the player may return to Volt to power a door
+          // after Bob reaches its far side. Keep Goop's catch-up eligible.
+          let leader = body;
+          for (const candidate of resources.group.bodies) {
+            if (candidate !== passiveBody && candidate.position.z > leader.position.z) leader = candidate;
+          }
+          const walk = !switched && this.input.enabled && this.currentRoom.phase === 'three-slime'
+            ? blackoutCompanionWalk({
+              id, position: passiveBody.position, leader: leader.position,
+              bayAvailable: !!bay,
+              mainRouteReady: !!bay && [resources.group.bobBody, resources.group.goopBody].every(
+                slime => bay.vestibuleAt(slime.position) || bay.transitAt(slime.position)),
+              bridgeLocked: resources.transit?.bridgeLocked === true,
+              transitComplete: resources.transit?.complete === true || this.currentRoom.local.bossStaging === true,
+              conducting: resources.electricalSystem.readModel.connectedTargetId !== undefined,
+              mounted: resources.maintenanceDrone.voltMounted,
+            }) : undefined;
+          const intent = this.companions.steer(id, passiveBody, walk, resources.collisionWorld);
+          const presentationIntent = id === 'bob' ? resources.bobMovementIntent
+            : id === 'goop' ? resources.goopMovementIntent : resources.voltMovementIntent;
+          presentationIntent.copy(intent);
+          passiveBody.update(deltaSeconds, intent, this.companions.jump[id]);
+        }
       }
     }
+    if (this.companions.commit()) this.notifyHUD();
 
     if (!switched) {
       this.renderLayer.cameraRig.queueLookInput(
@@ -1569,6 +1607,13 @@ export class BlackoutLevelRuntime {
     this.renderLayer.render();
   }
 
+  getSpeedEffectStrength(): number {
+    const r = this.resources;
+    if (!r || this.lifecycle.state !== 'running' || !this.input.enabled || !r.deathSequence.isPlaying ||
+        r.ventArrival?.active || r.finalBoss?.cinematic || this.currentRoom.phase !== 'three-slime' || r.manager.activeSlimeId !== 'goop') return 0;
+    return goopSpeedEffectStrength(r.group.goopBody);
+  }
+
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
     const resources = this.resources;
     writePerformanceInput(target,this.input);
@@ -1683,6 +1728,7 @@ export class BlackoutLevelRuntime {
             adhesionEnabled: definition.abilities.adhesion,
             reboundEnabled: definition.abilities.rebound,
             chargedJumpEnabled: definition.jumpMode === 'charged',
+            acidSpeedMultiplier: id === 'goop' ? GOOP_ACID_SPEED_MULTIPLIER : 1,
           },
         });
       };
@@ -2175,6 +2221,7 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly stopResources = (): void => {
+    this.resetCompanions();
     this.gameplayAudio?.setEnabled(false);
     const resources = this.requireResources();
     resources.electricalSystem.cancelAim();
@@ -2263,6 +2310,7 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.companions.reset();
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
@@ -2411,6 +2459,7 @@ export class BlackoutLevelRuntime {
     resources: BlackoutRuntimeResources,
     resumeInput: boolean,
   ): void {
+    this.resetCompanions();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.reset();
     resources.ventArrival?.cancel();this.clearArrivalUi();
     resources.scene.maintenanceBay?.acidInteractions.reset();
@@ -2556,6 +2605,11 @@ export class BlackoutLevelRuntime {
   }
 
   private readonly voltAimDirection = new THREE.Vector3();
+  private resetCompanions(): void {
+    this.companions.beginStep();
+    if (this.companions.commit()) this.notifyHUD();
+  }
+
   private updateBobPresentation(
     deltaSeconds: number,
     resources: BlackoutRuntimeResources,
@@ -2774,7 +2828,7 @@ export class BlackoutLevelRuntime {
             resources.specimenForm.readModel.controlledForm === 'specimen'
               ? 'SPECIMEN'
               : undefined,
-          passiveInteractions: [],
+          passiveInteractions: this.companions.passiveInteractions,
           playerSwitchFeedback: feedback,
           resetSwitchFeedback,
         }
@@ -2823,8 +2877,7 @@ function createBobPresentationState(
     attached: body.attached,
     chargingJump: body.chargingJump,
     jumpCharge: body.chargeFraction,
-    maximumLocomotionSpeedMetresPerSecond:
-      body.maximumLocomotionSpeedMetresPerSecond,
+    get maximumLocomotionSpeedMetresPerSecond() { return body.maximumLocomotionSpeedMetresPerSecond; },
     contactCount: body.contactsThisStep,
     contactNormalWorld: body.lastContactNormal,
     contactSpeedMetresPerSecond: body.lastContactImpactSpeedMetresPerSecond,
