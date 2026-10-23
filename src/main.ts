@@ -2,6 +2,7 @@ import { gameplayBindings } from './core/KeyBindings.ts';
 import { AudioManager } from './audio/AudioManager.ts';
 import { prepareBlackoutArrivalAudio } from './audio/BlackoutArrivalAudio.ts';
 import { BackgroundMusic, musicForFlow, type MusicLevel } from './audio/BackgroundMusic.ts';
+import { cinematicMusicEvents } from './audio/CinematicMusic.ts';
 import { SOUND_BANKS } from './audio/SoundCatalog.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import { loadCultivationBakedAssets } from './render/environment/cultivation/CultivationBakedAssets.ts';
@@ -64,6 +65,8 @@ function startGame(): void {
   let activeLoop: Loop | undefined;
   const audio = new AudioManager(import.meta.env.BASE_URL);
   const music = new BackgroundMusic(import.meta.env.BASE_URL);
+  const unsubscribeCinematicStarted = cinematicMusicEvents.on('started', cue => music.beginCinematic(cue));
+  const unsubscribeCinematicStopped = cinematicMusicEvents.on('stopped', cue => music.endCinematic(cue));
   void audio.preload(SOUND_BANKS.containment);
   const unlockAudio = (): void => { audio.unlock(); music.unlock(); };
   const focusAudio = (): void => {
@@ -435,6 +438,7 @@ function startGame(): void {
   let menuOrigin: 'title' | 'paused' = 'title';
   let gameCompleted = false;
   const unsubscribeMusic = gameFlow.subscribe((state) => {
+    if (state === 'title' || state === 'restarting' || state === 'transitionFailed') music.cancelCinematic();
     if (state === 'title' || state === 'paused') menuOrigin = state;
     if (gameCompleted) return;
     const scene = musicForFlow(state, menuOrigin, musicLevel);
@@ -626,6 +630,8 @@ function startGame(): void {
     gameFlow.dispose();
     gameSession.dispose();
     music.dispose();
+    unsubscribeCinematicStarted();
+    unsubscribeCinematicStopped();
     audio.dispose();
     input.dispose();
     renderLayer.dispose();

@@ -1,3 +1,4 @@
+import { cinematicMusicEvents, type CinematicMusic } from '../src/audio/CinematicMusic.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -500,4 +501,21 @@ test('escape craft faces its travel, settles upright near Goop, and breakaway ro
     assert.ok(set.ductGrates[0].rotation.z<-.7&&set.ductGrates[1].rotation.z>.7);
     set.reset();assert.ok(set.ductGrates.every(hinge=>hinge.rotation.z===0));
   }finally{s.dispose();}
+});
+
+test('Volt rescue music uses the remapped visible timeline for normal and preview playback, reset and skip', () => {
+  const s=setup(),cues:CinematicMusic[]=[],stopped:CinematicMusic[]=[];
+  const offs=[cinematicMusicEvents.on('started',cue=>cues.push(cue)),cinematicMusicEvents.on('stopped',cue=>stopped.push(cue))];
+  try {
+    assert.equal(cues.length,0); assert.equal(s.movie.begin(s.camera),false); assert.equal(cues.length,0);
+    for(const force of [true,false]) {
+      if(!force)s.preview.roomFive.controller.security.release();
+      assert.equal(s.movie.begin(s.camera,force),true);
+      const cue=cues.at(-1)!;assert.equal(cue.track,'rescue');assert.equal(cue.duration,T.duration);assert.equal(T.duration,129);
+      s.movie.update(T.duration-.5);s.movie.present(s.camera,1);assert.equal(cue.seconds,T.duration-.5);
+      s.movie.requestSkip();s.movie.update(1/60);assert.equal(stopped.at(-1),cue);
+      s.movie.reset();assert.equal(stopped.filter(item=>item===cue).length,1);
+    }
+    assert.equal(cues.length,2);
+  } finally {s.dispose();offs.forEach(off=>off());}
 });

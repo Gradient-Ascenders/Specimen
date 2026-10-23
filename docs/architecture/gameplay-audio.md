@@ -321,3 +321,32 @@ test exposes the existing runtime for observation without replacing game/audio
 logic; the production smoke tests run without runtime injection.
 
 Browser checks can verify decoding, resources and gameplay synchronization, but do not establish a human listening review on speakers/headphones. Cross-browser and subjective final mix review remain useful before release. See the PR for actual executed results.
+
+## Cinematic music
+
+`BackgroundMusic` also streams the three requester-supplied OGG recordings in
+`public/assets/audio/music/04-*` through `06-*`, unchanged from the supplied ZIP.
+See the existing Music table in `CREDITS.md` for creators, source and CC BY 4.0
+attribution links. No long music enters the decoded SFX bank.
+
+`CinematicMusic` publishes discrete ownership start/stop notifications. The shared
+music owner reads its continuous clock at 20 Hz only while a targeted cinematic
+owns music. Live opening starts on its first prepared cinematic frame, with time
+relative to the initial menu blackout; the muted MP4 backup uses its media clock
+and playing/waiting/pause/seeking events. The two real finales (including dev
+previews) own their cues and use the existing remapped timeline constants.
+
+Cinematic ownership overrides flow routing, including finales while flow is
+`playing`. Entry pauses both previous media players before starting the new,
+non-looping recording. The last second fades according to the cinematic clock;
+Skip/disposal fades for 800 ms before restoring destination flow music. Loading
+stays silent. Title/restart/failed transitions cancel stale cinematic ownership.
+Pause, focus and master/music controls remain shared; SFX gain is independent.
+A stationary live clock pauses playback after 250 ms, including rendering holds
+when background muting is disabled. Media seek drift above 350 ms is corrected;
+resume retains position. Rejected playback waits for the next user gesture.
+
+Standard music gain remains 0.28. High Tech Lab additionally uses 0.60× playback
+gain, and the quieter The Way Out uses 1.25× (maximum effective volume 0.35 before
+user sliders). Source recordings, speeds, visual/event timings and all existing
+SFX mappings remain unchanged. Non-target cinematics retain their original audio.

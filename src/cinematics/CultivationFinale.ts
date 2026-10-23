@@ -1,3 +1,4 @@
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import * as THREE from 'three';
 import type {LevelTwoRoomFiveGreybox} from '../levels/LevelTwoRoomFiveGreybox.ts';
 import type {RoomFiveDroneEncounter} from '../hazards/RoomFiveDroneEncounter.ts';
@@ -81,6 +82,7 @@ export class CultivationFinale {
   private readonly voice:TypewriterAudio;
   private readonly flightAudio:WorldAudioSource;
   private readonly voiceModel={text:'',pageIndex:0};
+  private music=new CinematicMusic('rescue',T.duration);
   private previous=0;
   private elapsed=0;
   private playing=false;
@@ -173,6 +175,7 @@ export class CultivationFinale {
     room.root.updateWorldMatrix(true,true);this.boardPivot.attach(room.releaseCover);this.boardPivot.attach(room.releaseCoverCollider);
     set.annex.visible=set.effects.visible=true;
     this.previous=this.elapsed=0;this.skipRequested=false;this.playing=this.played=true;
+    this.music=new CinematicMusic('rescue',T.duration);
     this.updateActors(0,1/60);this.present(camera,1);return true;
   }
   requestSkip():void{if(this.playing)this.skipRequested=true;}
@@ -233,10 +236,11 @@ export class CultivationFinale {
       }
       this.options.acid.update(dt);
     }
-    if(this.elapsed>=T.duration){stopVoltRescueAudio();this.playing=false;this.overlay.present(T.duration);return true;}return false;
+    if(this.elapsed>=T.duration){this.music.stop();stopVoltRescueAudio();this.playing=false;this.overlay.present(T.duration);return true;}return false;
   }
   present(camera:THREE.PerspectiveCamera,alpha:number):void{
     if(!this.playing)return;
+    this.music.update(this.elapsed);
     const t=THREE.MathUtils.lerp(this.previous,this.elapsed,THREE.MathUtils.clamp(alpha,0,1));
     const {room,encounter,set}=this.options;
     for(const actor of this.actors){
@@ -435,6 +439,7 @@ export class CultivationFinale {
   }
   private cue(sound:SoundId,position?:THREE.Vector3):void{gameplayAudioEvents.emit('cue',{sound,position,maxDistance:110,volumeScale:.8});}
   reset():void{
+    this.music.stop();
     stopVoltRescueAudio();
     if(this.ventView){for(const entry of this.environment)entry.mesh.visible=entry.visible;this.ventView=false;}
     if(this.played){

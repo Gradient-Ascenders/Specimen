@@ -1,3 +1,4 @@
+import { cinematicMusicEvents, type CinematicMusic } from '../src/audio/CinematicMusic.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -586,4 +587,27 @@ test('playback shares the existing loop with a 30Hz cap and stops redrawing whil
   assert.equal(f.counts().draws, endDraws);
   f.player.dispose(); f.levelReady.resolve(); await flushPromises();
   assert.equal(f.counts().completions, 0);
+});
+
+test('live opening music waits for prepared visible frames and stops during final loading', async () => {
+  const cues: CinematicMusic[] = [], stopped: CinematicMusic[] = [];
+  const offs = [cinematicMusicEvents.on('started', cue => cues.push(cue)), cinematicMusicEvents.on('stopped', cue => stopped.push(cue))];
+  const f = playerFixture();
+  try {
+    f.player.start(); f.blackout(); f.flushFrames(); f.flushFrames();
+    assert.equal(cues.length, 0);
+    f.sceneReady.resolve(); await flushPromises(); f.player.render(.1);
+    assert.equal(cues.length, 1); const cue = cues[0]!;
+    assert.equal(cue.track, 'awakening'); assert.ok(cue.seconds < .2);
+    for (let frame = 0; frame < 540; frame++) f.player.render(.1);
+    assert.deepEqual(stopped, [cue]); assert.equal(f.counts().completions, 0, 'level loading can still be pending after the film');
+  } finally { f.player.dispose(); offs.forEach(off => off()); }
+});
+
+test('an early live skip never acquires cinematic music', () => {
+  const cues: CinematicMusic[] = [];
+  const off = cinematicMusicEvents.on('started', cue => cues.push(cue));
+  const f = playerFixture();
+  try { f.player.start(); f.player.skip(); f.player.render(.1); assert.equal(cues.length, 0); }
+  finally { f.player.dispose(); off(); }
 });

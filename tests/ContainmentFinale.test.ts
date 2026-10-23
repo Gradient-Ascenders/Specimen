@@ -1,3 +1,4 @@
+import { cinematicMusicEvents, type CinematicMusic } from '../src/audio/CinematicMusic.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -191,4 +192,26 @@ test('the film borrows existing actors, freezes on the same clock, restores owne
     assert.equal(disposedSourceGeometry, 0, 'Cinematic batch disposal must not free borrowed gameplay geometry.');
     assert.ok(world.bob.root.children.length > 0, 'Borrowed model owner survives film disposal.');
   } finally { film.dispose(); dissolve.dispose(); target.dispose(); surfaces.clear(); collisions.clear(); world.dispose(); }
+});
+
+test('Containment music starts with the prepared film and ends on its real clock, skip or disposal', async () => {
+  const world = new ContainmentLevelScene(() => {}), scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  scene.add(world.root);
+  const overlay = { render() {}, hide() {} } as unknown as ContainmentFinaleOverlay;
+  const film = new ContainmentFinalePresentation({ scene, world, camera, overlay, cue() {}, openDoor() {} });
+  const cues: CinematicMusic[] = [], stopped: CinematicMusic[] = [];
+  const offs = [cinematicMusicEvents.on('started', cue => cues.push(cue)), cinematicMusicEvents.on('stopped', cue => stopped.push(cue))];
+  try {
+    for (const job of film.preparationJobs()) await job.run();
+    assert.equal(cues.length, 0);
+    film.begin(new THREE.Vector3()); const first = cues[0]!;
+    assert.equal(first.track, 'escape'); assert.equal(first.duration, T.end);
+    film.render(T.end - .5); assert.equal(first.seconds, T.end - .5);
+    film.fixedUpdate(T.end); assert.deepEqual(stopped, [first]);
+    film.reset(); film.begin(new THREE.Vector3()); const second = cues[1]!;
+    assert.notEqual(first, second); assert.equal(second.seconds, 0);
+    film.render(T.end); assert.deepEqual(stopped, [first, second]);
+    film.reset(); film.begin(new THREE.Vector3()); film.dispose();
+    assert.deepEqual(stopped, cues);
+  } finally { film.dispose(); world.dispose(); offs.forEach(off => off()); }
 });

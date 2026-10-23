@@ -1,14 +1,21 @@
 import type { GameFlowState } from '../ui/GameFlowUI.ts';
+import type { CinematicMusic, CinematicTrack } from './CinematicMusic.ts';
 
-export type MusicTrack = 'intro' | 'containment' | 'cultivation' | 'blackout';
-export type MusicLevel = Exclude<MusicTrack, 'intro'>;
+export type MusicLevel = 'containment' | 'cultivation' | 'blackout';
+export type MusicTrack = 'intro' | MusicLevel | CinematicTrack;
 
 const MUSIC_PATHS: Record<MusicTrack, string> = {
   intro: 'assets/audio/music/00-intro-osmotic-memory.ogg',
   containment: 'assets/audio/music/01-containment-thought-loop.ogg',
   cultivation: 'assets/audio/music/02-cultivation-unsolved-investigation.ogg',
   blackout: 'assets/audio/music/03-blackout-searching.ogg',
+  awakening: 'assets/audio/music/04-opening-tension.ogg',
+  escape: 'assets/audio/music/05-containment-escape-high-tech-lab.ogg',
+  rescue: 'assets/audio/music/06-cultivation-volt-rescue-the-way-out.ogg',
 };
+
+const cinematicGain = (track: MusicTrack | null): number => track === 'escape' ? 0.60 : track === 'rescue' ? 1.25 : 1;
+const isCinematic = (track: MusicTrack | null): boolean => track === 'awakening' || track === 'escape' || track === 'rescue';
 
 /** Menu music continues in title submenus; gameplay music pauses with the game. */
 export function musicForFlow(
@@ -25,7 +32,7 @@ export function musicForFlow(
 }
 
 type MusicElement = Pick<HTMLAudioElement,
-  'src' | 'loop' | 'preload' | 'volume' | 'paused' | 'play' | 'pause' | 'removeAttribute'>;
+  'src' | 'loop' | 'preload' | 'volume' | 'currentTime' | 'paused' | 'play' | 'pause' | 'removeAttribute'>;
 
 /**
  * Stream long OGG tracks instead of adding them to the decoded gameplay-SFX
@@ -46,6 +53,93 @@ export class BackgroundMusic {
   private volume = 1;
   private fadeTimer: ReturnType<typeof setInterval> | undefined;
   private readonly musicGain = 0.28;
+  private cinematic: CinematicMusic | undefined;
+  private cinematicTimer: ReturnType<typeof setInterval> | undefined;
+  private flowTrack: MusicTrack | null = null;
+  private flowPlay = false;
+  private cinematicEnvelope = 1;
+  private endingCinematic = false;
+  private lastCinematicSeconds = -1;
+  private stationaryTicks = 0;
+  private playbackFailed = false;
+
+  /** Cinematics override flow routing even while the game still says playing. */
+  beginCinematic(cinematic: CinematicMusic): void {
+    if (this.disposed || this.cinematic === cinematic) return;
+    this.clearCinematic();
+    this.cancelFade();
+    this.endingCinematic = false;
+    for (const player of this.players) player.pause();
+    this.requested = null;
+    this.lastCinematicSeconds = -1;
+    this.stationaryTicks = 0;
+    this.cinematic = cinematic;
+    this.cinematicEnvelope = 1;
+    this.applyScene(cinematic.track, this.flowPlay && cinematic.playing);
+    this.current.loop = false;
+    this.syncCinematic(false);
+    this.cinematicTimer = setInterval(() => this.syncCinematic(), 50);
+  }
+
+  endCinematic(cinematic: CinematicMusic): void {
+    if (this.cinematic !== cinematic || this.disposed) return;
+    this.clearCinematic();
+    // A finale can finish before flow leaves playing (for example while a
+    // graphics preparation settles). Wait for an explicit destination route.
+    this.flowTrack = null;
+    // Finish the outgoing soundtrack before starting destination music.
+    this.cancelFade();
+    const previous = this.current;
+    const initialVolume = previous.volume;
+    const initialTarget = this.targetVolume;
+    this.endingCinematic = true;
+    let tick = 0;
+    this.fadeTimer = setInterval(() => {
+      previous.volume = Math.min(1, initialVolume * (initialTarget > 0 ? this.targetVolume / initialTarget : 0)) * (1 - ++tick / 32);
+      if (tick === 32) {
+        this.cancelFade();
+        this.endingCinematic = false;
+        previous.pause();
+        this.requested = null;
+        this.cinematicEnvelope = 1;
+        this.applyScene(this.flowTrack, this.flowPlay);
+      }
+    }, 25);
+  }
+
+  cancelCinematic(): void {
+    if (!this.cinematic && !this.endingCinematic) return;
+    this.clearCinematic();
+    this.cancelFade();
+    this.endingCinematic = false;
+    for (const player of this.players) player.pause();
+    this.requested = null;
+    this.cinematicEnvelope = 1;
+  }
+
+  private clearCinematic(): void {
+    this.cinematic = undefined;
+    if (this.cinematicTimer !== undefined) clearInterval(this.cinematicTimer);
+    this.cinematicTimer = undefined;
+  }
+
+  private syncCinematic(resume = true): void {
+    const cinematic = this.cinematic;
+    if (!cinematic) return;
+    this.cinematicEnvelope = Math.max(0, Math.min(1, cinematic.duration - cinematic.seconds));
+    this.stationaryTicks = cinematic.seconds === this.lastCinematicSeconds ? this.stationaryTicks + 1 : 0;
+    this.lastCinematicSeconds = cinematic.seconds;
+    this.enabled = this.flowPlay && cinematic.playing && this.stationaryTicks < 5;
+    // Media seeks and stalled/slow rendering follow the presentation clock.
+    // Metadata may not yet be available, so a failed seek is retried next tick.
+    try {
+      if (Math.abs(this.current.currentTime - cinematic.seconds) > .35)
+        this.current.currentTime = cinematic.seconds;
+    } catch { /* Wait for media metadata. */ }
+    if (!this.canPlay()) this.current.pause();
+    else if (resume) this.resume();
+    this.current.volume = this.targetVolume;
+  }
 
   constructor(base = './', createPlayer: () => MusicElement = () => new Audio()) {
     this.base = base;
@@ -70,8 +164,19 @@ export class BackgroundMusic {
   }
 
   setScene(track: MusicTrack | null, play: boolean): void {
+    this.flowTrack = track;
+    this.flowPlay = play;
+    if (this.cinematic) { this.syncCinematic(); return; }
+    if (this.endingCinematic && play && track !== 'intro') return;
+    this.endingCinematic = false;
+    this.cinematicEnvelope = 1;
+    this.applyScene(track, play);
+  }
+
+  private applyScene(track: MusicTrack | null, play: boolean): void {
     if (this.disposed) return;
     const changed = this.requested !== track;
+    if (changed) this.playbackFailed = false;
     this.requested = track;
     this.enabled = play;
     if (changed || !play) this.setAutoplayBlocked(false);
@@ -81,6 +186,7 @@ export class BackgroundMusic {
       if (changed && track !== null) {
         const player = this.players[this.active];
         player.src = this.url(track);
+        player.loop = !isCinematic(track);
         player.volume = this.targetVolume;
       }
       return;
@@ -95,12 +201,17 @@ export class BackgroundMusic {
    * required. This never resets the track's playback position.
    */
   unlock(): void {
+    this.playbackFailed = false;
     if (this.canPlay()) this.resume();
   }
 
   setFocused(focused: boolean): void {
     if (this.focused === focused || this.disposed) return;
     this.focused = focused;
+    if (!focused && this.endingCinematic) {
+      this.cancelCinematic();
+      this.applyScene(this.flowTrack, this.flowPlay);
+    }
     if (!this.canPlay()) {
       this.cancelFade();
       for (const player of this.players) player.pause();
@@ -120,7 +231,7 @@ export class BackgroundMusic {
     if (!this.fadeTimer) this.players[this.active].volume = this.targetVolume;
   }
 
-  private get targetVolume(): number { return this.master * this.volume * this.musicGain; }
+  private get targetVolume(): number { return Math.min(1, this.master * this.volume * this.musicGain * cinematicGain(this.requested) * this.cinematicEnvelope); }
   private get current(): MusicElement { return this.players[this.active]; }
   private canPlay(): boolean { return !this.disposed && this.focused && this.enabled; }
   private url(track: MusicTrack): string { return this.base + MUSIC_PATHS[track]; }
@@ -130,12 +241,13 @@ export class BackgroundMusic {
     const player = this.current;
     if (!player.src) player.src = this.url(this.requested);
     if (!this.fadeTimer) player.volume = this.targetVolume;
-    if (player.paused) this.start(player);
+    if (player.paused && !this.playbackFailed) this.start(player);
   }
 
   private switchTrack(track: MusicTrack | null): void {
     this.cancelFade();
     const previous = this.current;
+    this.players[1 - this.active].pause();
     if (track === null) {
       // Opening and level transitions fade music out, rather than carrying the
       // previous level's theme into a potentially long shader-loading screen.
@@ -146,9 +258,10 @@ export class BackgroundMusic {
     const next = this.players[nextIndex];
     next.pause();
     next.src = this.url(track);
+    next.loop = !isCinematic(track);
     next.volume = 0;
     this.active = nextIndex;
-    if (!previous.src) {
+    if (!previous.src || isCinematic(track)) {
       // First title appearance should not wait for a crossfade from silence.
       next.volume = this.targetVolume;
       this.start(next);
@@ -174,11 +287,13 @@ export class BackgroundMusic {
   }
 
   private start(player: MusicElement): void {
+    const source = player.src;
     // Attempt menu playback immediately; compliant browsers can permit it on
     // revisits or when the user has granted this origin autoplay permission.
     // A fresh Chromium profile can reject audible playback without a gesture.
     const failed = (error: unknown): void => {
-      if (this.disposed || this.current !== player || !this.canPlay() || !player.paused) return;
+      if (this.disposed || this.current !== player || player.src !== source || !this.canPlay() || !player.paused) return;
+      this.playbackFailed = true;
       if (typeof error === 'object' && error !== null &&
         'name' in error && error.name === 'NotAllowedError') {
         this.setAutoplayBlocked(true);
@@ -186,7 +301,9 @@ export class BackgroundMusic {
     };
     try {
       void player.play().then(
-        () => { if (!this.disposed && this.current === player) this.setAutoplayBlocked(false); },
+        () => {
+          if (!this.disposed && this.current === player && player.src === source) this.setAutoplayBlocked(false);
+        },
         failed,
       );
     } catch (error) {
@@ -204,6 +321,7 @@ export class BackgroundMusic {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.clearCinematic();
     this.cancelFade();
     this.autoplayBlockedListener = undefined;
     for (const player of this.players) {

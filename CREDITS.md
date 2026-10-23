@@ -19,6 +19,9 @@ All 3D models were created independently for Specimen.
 | Thought Loop | GloryToTheMachine | [OpenGameArt](https://opengameart.org/content/thought-loop-glorytothemachine-ambientdeepnostalgic-loop) | CC BY 4.0 | Containment music · edited for volume. |
 | Unsolved Investigation | isaiah658 | [OpenGameArt](https://opengameart.org/content/unsolved-investigation) | CC0 | Cultivation music. |
 | Searching | yd | [OpenGameArt](https://opengameart.org/content/searching) | CC0 | Blackout music · edited for looping and volume. |
+| Tension | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/tension-0) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Bob's Awakening music · converted to OGG for game use. |
+| High Tech Lab | remaxim | [OpenGameArt](https://opengameart.org/content/high-tech-lab) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Goop's Escape music · converted to OGG for game use · reduced playback gain (0.60×). |
+| The Way Out | Kevin MacLeod | [Incompetech](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100045) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Volt's Rescue and Escape music · converted to OGG for game use. |
 
 ## Sound effects
 

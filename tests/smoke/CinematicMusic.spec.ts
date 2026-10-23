@@ -1,0 +1,158 @@
+import { expect, test, type Page } from '@playwright/test';
+import { finishOpening } from '../helpers/OpeningHandoff.ts';
+
+async function observeMusic(page: Page) {
+  await page.addInitScript(() => {
+    const Original = window.Audio;
+    (window as any).__musicPlayers = [];
+    window.Audio = new Proxy(Original, {
+      construct(target, args) {
+        const player = Reflect.construct(target, args);
+        (window as any).__musicPlayers.push(player);
+        return player;
+      },
+    });
+  });
+}
+const snapshot = (page: Page) => page.evaluate(() => ((window as any).__musicPlayers as HTMLAudioElement[])
+  .map(p => ({ src: p.src, paused: p.paused, loop: p.loop, time: p.currentTime, volume: p.volume, error: p.error?.message })));
+
+for (const mode of ['live', 'video']) {
+  test(`${mode} opening owns one streamed soundtrack, then skip restores level music under a nested base`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
+    await observeMusic(page);
+    await page.goto(`./?opening=${mode === 'video' ? 'mp4' : 'live'}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-flow-panel="title"]')).toBeVisible({ timeout: 180_000 });
+    await page.locator('[data-action="start"]').click();
+    await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('04-opening') && !p.paused && p.time > .1), { timeout: 120_000 }).toBe(true);
+    let state = await snapshot(page);
+    expect(state).toHaveLength(2);
+    expect(state.filter(p => !p.paused)).toHaveLength(1);
+    expect(state.find(p => p.src.includes('04-opening'))).toMatchObject({ loop: false, error: undefined });
+    expect(state.every(p => !p.src || new URL(p.src).pathname.startsWith('/group-folder/assets/audio/music/'))).toBe(true);
+    if (mode === 'video') {
+      const video = page.locator('video.opening-video');
+      await expect(video).toHaveJSProperty('muted', true);
+      await video.evaluate((v: HTMLVideoElement) => v.pause());
+      await expect.poll(async () => (await snapshot(page)).filter(p => !p.paused).length).toBe(0);
+      await video.evaluate(async (v: HTMLVideoElement) => { v.currentTime = 5; await v.play(); });
+      await expect.poll(async () => page.evaluate(() => {
+        const video = document.querySelector('video')!;
+        const music = ((window as any).__musicPlayers as HTMLAudioElement[]).find(p => p.src.includes('04-opening'))!;
+        return !music.paused && Math.abs(video.currentTime - music.currentTime) < .5;
+      })).toBe(true);
+    }
+    await finishOpening(page, false);
+    await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('01-containment') && !p.paused), { timeout: 15_000 }).toBe(true);
+    state = await snapshot(page);
+    expect(state.filter(p => !p.paused)).toHaveLength(1);
+    expect(state.find(p => p.src.includes('04-opening'))?.paused ?? true).toBe(true);
+    await page.keyboard.press('KeyP');
+    await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
+    await expect.poll(async () => (await snapshot(page)).filter(p => !p.paused).length).toBe(0);
+    expect(errors).toEqual([]);
+  });
+}
+
+test('prepared OGGs decode at the nested URL and credits use the existing music rows', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  const files = ['04-opening-tension.ogg', '05-containment-escape-high-tech-lab.ogg', '06-cultivation-volt-rescue-the-way-out.ogg'];
+  const decoded = await page.evaluate(async files => {
+    const context = new AudioContext();
+    try {
+      return await Promise.all(files.map(async file => {
+        const url = new URL('assets/audio/music/' + file, location.href);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
+        const buffer = await context.decodeAudioData(await response.arrayBuffer());
+        return { path: url.pathname, duration: buffer.duration, channels: buffer.numberOfChannels, rate: buffer.sampleRate };
+      }));
+    } finally { await context.close(); }
+  }, files);
+  for (let index = 0; index < decoded.length; index++) {
+    expect(decoded[index]!.path).toBe('/group-folder/assets/audio/music/' + files[index]);
+    expect(decoded[index]!.channels).toBe(2);
+    expect(decoded[index]!.duration).toBeCloseTo([99.1, 152.92, 172.56][index]!, 0);
+  }
+  await expect(page.locator('[data-flow-panel="title"]')).toBeVisible({ timeout: 180_000 });
+  await page.locator('[data-flow-panel="title"] [data-action="credits"]').click();
+  for (const [title, creator] of [['Tension', 'Tsorthan Grove'], ['High Tech Lab', 'remaxim'], ['The Way Out', 'Kevin MacLeod']]) {
+    const row = page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: new RegExp(`^${title}$`) }) });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('.credits-creator')).toHaveText(creator!);
+    await expect(row.locator('.credits-licence a')).toHaveAttribute('href', 'https://creativecommons.org/licenses/by/4.0/');
+    await expect(row.locator('.credits-use')).toContainText('converted to OGG');
+    await expect(row.locator('h3 a')).toHaveAttribute('href', /^https:\/\//);
+  }
+  await page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^High Tech Lab$/ }) }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('cinematic-music-credits.png') });
+  expect(errors).toEqual([]);
+});
+
+
+test('real finales own streamed music across pause, skip and level handoffs; vent arrival has no unique track', async ({ page }) => {
+  test.setTimeout(600_000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
+  await observeMusic(page);
+  // Observe the shipped owner, using the same completion contracts as the
+  // existing ProductionParity regression, without replacing gameplay/audio.
+  await page.route('**/assets/index-*.js', async route => {
+    const response = await route.fetch(), source = await response.text();
+    const pattern = /([A-Za-z_$][\w$]*)=new ([A-Za-z_$][\w$]*)\(\{initialRuntime:/;
+    expect(source).toMatch(pattern);
+    await route.fulfill({ response, body: source.replace(pattern, '$1=globalThis.__musicSession=new $2({initialRuntime:') });
+  });
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
+  await page.locator('[data-action="start"]').click(); await finishOpening(page, false);
+  await page.evaluate(() => {
+    const rt = (window as any).__musicSession.runtime;
+    if (!rt.resources.containmentLevel.beginEndingForDebug()) throw new Error('Containment ending did not start');
+  });
+  await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('05-containment') && !p.paused), { timeout: 180_000 }).toBe(true);
+  let state = await snapshot(page);
+  expect(state.filter(p => !p.paused)).toHaveLength(1);
+  expect(state.find(p => p.src.includes('05-containment'))!.loop).toBe(false);
+  expect(state.find(p => p.src.includes('05-containment'))!.volume).toBeCloseTo(.28 * .6, 2);
+  await page.keyboard.press('KeyP');
+  await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
+  await expect.poll(async () => (await snapshot(page)).filter(p => !p.paused).length).toBe(0);
+  await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
+  await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('05-containment') && !p.paused)).toBe(true);
+  await page.evaluate(() => (window as any).__musicSession.runtime.skipFinale());
+  await expect(page.locator('[data-action="enter-level"]')).toBeVisible({ timeout: 240_000 });
+  expect((await snapshot(page)).every(p => p.paused)).toBe(true);
+  await page.locator('[data-action="enter-level"]').click();
+  await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('02-cultivation') && !p.paused), { timeout: 30_000 }).toBe(true);
+  await page.waitForFunction(() => !(window as any).__musicSession.runtime.ventArrival.active, undefined, { timeout: 90_000 });
+  expect((await snapshot(page)).some(p => p.src.includes('06-cultivation'))).toBe(false);
+  await page.evaluate(() => {
+    const rt = (window as any).__musicSession.runtime;
+    rt.teleportToAuthoredPreviewRoom(5);
+    const r = rt.resources, controller = r.authoredPreview.roomFive.controller;
+    controller.reset('controls'); controller.update(1.5, false, false, false, true);
+    controller.update(4, false, false, false, false); rt.updateRoomFive(1 / 60, r);
+    if (!r.roomFiveFinale.active) throw new Error('Volt release did not start');
+  });
+  await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('06-cultivation') && !p.paused), { timeout: 30_000 }).toBe(true);
+  state = await snapshot(page); expect(state.filter(p => !p.paused)).toHaveLength(1);
+  expect(state.find(p => p.src.includes('06-cultivation'))!.loop).toBe(false);
+  await page.evaluate(() => {
+    const rt = (window as any).__musicSession.runtime;
+    rt.resources.roomFiveFinale.requestSkip(); rt.fixedUpdate(1 / 60);
+  });
+  await expect(page.locator('[data-action="enter-level"]')).toBeVisible({ timeout: 240_000 });
+  expect((await snapshot(page)).every(p => p.paused)).toBe(true);
+  await page.locator('[data-action="enter-level"]').click();
+  await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('03-blackout') && !p.paused), { timeout: 30_000 }).toBe(true);
+  expect((await snapshot(page)).filter(p => !p.paused)).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
