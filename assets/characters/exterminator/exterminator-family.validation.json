@@ -1,0 +1,12 @@
+{
+  "version": "exterminator-family-v1",
+  "coordinates": "X,Y-up,Z; forward -Z; boss scale 3; minions base size 1.8x1x1.7",
+  "roots": [
+    "EX_Boss",
+    "SW_Guardian",
+    "SW_Pursuer",
+    "SW_Advanced"
+  ],
+  "meshes": 109,
+  "triangles": 63916
+}

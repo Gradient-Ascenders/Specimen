@@ -458,12 +458,14 @@ export class BlackoutLevelRuntime {
     resources.specimenReflectionEnvironment ??= new SpecimenReflectionEnvironment(this.renderLayer.renderer);
     resources.specimenCharacter.setReflectionEnvironment(resources.specimenReflectionEnvironment.texture);
     resources.scene.finalArena?.surfaceMaterials.setEnvironment(resources.bobReflectionEnvironment.texture);
+    resources.finalBoss?.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
     return this.presentationPreparation ??= Promise.all([
       resources.bobPresentation.prepare(),
       resources.goopPresentation.prepare(),
       resources.voltPresentation.prepare(),
       resources.specimenCharacter.prepare(),
       resources.scene.finalArena?.prepare(),
+      resources.finalBoss?.prepare(),
     ]).then(async () => {
       if (this.resources !== resources) return;
       // The retained light layout includes distant and unpowered fixtures.

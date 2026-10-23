@@ -27,7 +27,7 @@ export const FINAL_BOSS_TUNING = Object.freeze({
   health:750,phaseTwoHealth:375,scale:3,hoverY:18,defenseHoverY:26,
   defenseThresholds:Object.freeze([.85,.70,.55]),healPerSecond:2.5,
   defenseGroups:Object.freeze([Object.freeze([4,4]),Object.freeze([5,5]),Object.freeze([5,5,5])]),
-  shieldRadius:28,droneCount:18,droneHealth:6,pursuers:3,
+  shieldRadius:28,droneCount:18,droneHealth:6,pursuers:3,minionScale:1.15,
   phaseOneDroneFireSeconds:1.05,phaseTwoDroneFireSeconds:.9,guardianAttackSpeed:1.5,
   droneProjectileSpeed:28,guardianProjectileSpeed:84,pursuerHitboxScale:2,hostileProjectileCapacity:128,
   gunSpeed:164,gunRadius:.25,gunDamage:7,gunVolleySeconds:.16,gunCapacity:96,
@@ -48,7 +48,7 @@ export const FINAL_DRONE_FLIGHT = Object.freeze({
   maximumSpeed:20,maximumAcceleration:28,maximumVerticalSpeed:9,
   pursuitRadius:11,pursuitAngularSpeed:.28,hoverOffset:3.2,
   guardianRadius:36,groupSeparationRadians:1.05,
-  collisionRadius:.9,avoidanceSeconds:.3,
+  collisionRadius:.9*FINAL_BOSS_TUNING.minionScale,avoidanceSeconds:.3,
 });
 export const FINAL_SPECIMEN_RADIUS = 1.65;
 export const FINAL_SPECIMEN_START_PITCH = -.26;

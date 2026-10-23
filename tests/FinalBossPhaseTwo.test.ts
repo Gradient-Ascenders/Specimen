@@ -244,8 +244,9 @@ test('all three advanced wings can coexist while the boss attacks: six clean lar
       assert.equal(f.boss.controller.readModel.shieldActive,false);assert.equal(f.boss.controller.readModel.attackSerial,serial);
       const wing=f.boss.reinforcements.wings[i]!;assert.equal(wing.flight.guardianCount,6);assert.equal(wing.squad.root.children.filter((_,j)=>!wing.flight.isGuardian(j)).length,2);
       const root=wing.squad.root.children[0]!,collider=root.children[0] as THREE.Mesh;
-      assert.equal((collider.geometry as THREE.BoxGeometry).parameters.width,1.8*T.advancedScale);
-      assert.ok(wing.visuals[0]!.root.getObjectByName(`advanced-${i}-0-armoured-shell`));
+      assert.equal((collider.geometry as THREE.BoxGeometry).parameters.width,1.8*T.advancedScale*T.minionScale);
+      assert.equal(wing.visuals[0]!.advanced,true);
+      assert.equal(wing.visuals[0]!.root.scale.x,T.advancedScale*T.minionScale);
     }
     f.tick(300);assert.ok(f.presentation.smoke.count>0&&f.presentation.smoke.count<=48);
     assert.ok(f.boss.reinforcements.liveProjectileCount<=3*T.advancedProjectileCapacity);

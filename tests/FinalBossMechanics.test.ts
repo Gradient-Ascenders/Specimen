@@ -248,12 +248,12 @@ test('a fully charged impact really destroys multiple members of an authored gua
   }finally{f.dispose();}
 });
 
-test('mobile attacker envelopes cover visible wing grazes without scaling models or guardians',()=>{
+test('mobile attacker envelopes cover visible wing grazes independently of the shared model size increase',()=>{
   const f=fixture();try {
     f.boss.controller.applyImpact(hit());f.tick(82+480);
     const attacker=f.boss.squad.root.children[8]!,guard=f.boss.squad.root.children[0]!;
     const proxy=attacker.children[0] as THREE.Mesh,normal=guard.children[0] as THREE.Mesh,hitResult=new CollisionHit();
-    assert.equal(proxy.scale.x,2);assert.equal(normal.scale.x,1);assert.equal(attacker.children[1]!.scale.x,1);
+    assert.equal(proxy.scale.x,2);assert.equal(normal.scale.x,1);assert.equal(attacker.children[1]!.scale.x,T.minionScale);
     const origin=attacker.position.clone().add(new THREE.Vector3(1.45,8,0));
     assert.equal(f.world.sweepSphere(origin,new THREE.Vector3(0,-10,0),.18,hitResult,CollisionLayer.Projectile),true);
     assert.equal(hitResult.object,proxy,'a wing-edge shot should count, not pass through the visual drone');
