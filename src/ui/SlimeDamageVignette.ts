@@ -10,6 +10,7 @@ export interface SlimeDamageVignetteOptions {
 const SLIME_DAMAGE_COLOUR = {
   bob: '114 234 208',
   goop: '145 207 75',
+  volt: '255 210 100',
 } as const;
 
 const HIT_PULSE_FADE_PER_SECOND = 2.4;
@@ -20,10 +21,10 @@ export class SlimeDamageVignette {
   readonly element: HTMLElement;
 
   private readonly damage: SlimeDamageSystem;
-  private readonly hitPulse = { bob: 0, goop: 0 };
+  private readonly hitPulse = { bob: 0, goop: 0, volt: 0 };
   private readonly unsubscribeDamaged: () => void;
   private readonly unsubscribeReset: () => void;
-  private activeSlimeId: 'bob' | 'goop' | undefined;
+  private activeSlimeId: 'bob' | 'goop' | 'volt' | undefined;
   private renderedOpacity = -1;
   private disposed = false;
 
@@ -46,7 +47,7 @@ export class SlimeDamageVignette {
 
   update(
     deltaSeconds: number,
-    activeSlimeId: 'bob' | 'goop',
+    activeSlimeId: 'bob' | 'goop' | 'volt',
     visible = true,
   ): void {
     if (this.disposed) return;
@@ -58,6 +59,7 @@ export class SlimeDamageVignette {
       0,
       this.hitPulse.bob - HIT_PULSE_FADE_PER_SECOND * deltaSeconds,
     );
+    this.hitPulse.volt = Math.max(0, this.hitPulse.volt - HIT_PULSE_FADE_PER_SECOND * deltaSeconds);
     this.hitPulse.goop = Math.max(
       0,
       this.hitPulse.goop - HIT_PULSE_FADE_PER_SECOND * deltaSeconds,
@@ -90,6 +92,7 @@ export class SlimeDamageVignette {
 
   reset(): void {
     if (this.disposed) return;
+    this.hitPulse.volt = 0;
     this.hitPulse.bob = 0;
     this.hitPulse.goop = 0;
     this.renderedOpacity = 0;

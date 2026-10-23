@@ -690,7 +690,7 @@ test('timed receivers sound completion once, share tether audio and stay silent 
   try {
     controller.setActive(true);
     const receiver=controller.lights[0]; receiver.target.setConnectionState(true);
-    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(15),goop:fake(18),volt:fake(-16)});
+    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(6),goop:fake(8),volt:fake(-16)});
     assert.equal(cues.filter(s=>s==='volt-charge-ready-01').length,1);
     assert.deepEqual(cues,['volt-charge-ready-01']);
     assert.deepEqual(loops,[], 'charging must not layer another buzz over the tether');
@@ -698,7 +698,7 @@ test('timed receivers sound completion once, share tether audio and stay silent 
     controller.reset(); receiver.target.setConnectionState(true); controller.reset();
     assert.deepEqual(cues,['volt-charge-ready-01']);
     receiver.target.setConnectionState(true);
-    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(15),goop:fake(18),volt:fake(-16)});
+    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(6),goop:fake(8),volt:fake(-16)});
     assert.deepEqual(cues,['volt-charge-ready-01','volt-charge-ready-01']);
   } finally { for(const off of offs)off(); controller.dispose(); registry.dispose(); room.dispose(); world.clear(); surfaces.clear(); }
 });

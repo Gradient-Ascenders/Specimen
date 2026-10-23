@@ -1,3 +1,4 @@
+import { bindWeakSewerDroneBurns } from '../hazards/WeakSewerDrone.ts';
 import type { GelRendering } from '../render/slime/GelRendering.ts';
 import * as THREE from 'three';
 import { VoltCharacterPresentation } from '../render/volt/VoltCharacterPresentation.ts';
@@ -207,10 +208,8 @@ export class LevelTwoRoomFiveGreybox {
   }
   bindBurns(system: DissolveSystem): void {
     const core = system.registeredTargets.find(target => target.mesh === this.brokenCore);
-    if (core) this.subscriptions.push(system.setCompletionSound(core, () =>
-      this.controller.brokenDroneHits >= 3 ? 'world-drone-dissolve-01' : 'goop-dissolve-complete-01'));
+    if (core) this.subscriptions.push(bindWeakSewerDroneBurns(system, core, this.controller.sewerDrone));
     this.subscriptions.push(system.events.on('burnStarted', ({ target }) => {
-      if (target.mesh === this.brokenCore) this.controller.hitBrokenDrone();
       for (const mesh of this.controls.values()) if (mesh === target.mesh) {
         this.contactOrder.set(target, ++this.nextContactOrder); break;
       }
@@ -223,11 +222,6 @@ export class LevelTwoRoomFiveGreybox {
           this.appliedContactOrder = order; this.controller.security.toggle(network);
         }
         this.resetControls.push(target); return;
-      }
-      if (target.mesh === this.brokenCore && this.controller.brokenDroneHits < 3) {
-        // The completed reaction has already left the coordinator's active set.
-        // Rearm without a hidden frame; permanent damage belongs to the room controller.
-        target.reset();
       }
     }));
   }

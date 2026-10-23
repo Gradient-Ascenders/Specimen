@@ -392,7 +392,7 @@ test('the complete runtime grants long range only inside Room 2, including early
   const f = createFixture();
   try {
     const resources = electricalRoomInternals(f.runtime);
-    for (const drone of resources.transit.drones) drone.setEnabled(false);
+    for (const enemy of resources.transit.emergingDrones) enemy.state.destroy();
     const targets = [
       ...resources.transit.lights.map(receiver => receiver.target),
       ...resources.transit.lifts.map(lift => {
@@ -579,7 +579,7 @@ test('Room 1 completion initializes Room 2 exactly once and CP3 owns later recov
     const unsubscribe = f.runtime.events.on('objectiveChanged', ({ roomId, objective }) => {
       // The authored Room 2 has its own progress objectives; count only the
       // one-shot Room 1 handoff announcement.
-      if (roomId === 'room-2' && objective === 'Restore the transit lights and lower cover for Bob') roomTwoObjectives += 1;
+      if (roomId === 'room-2' && objective === 'Restore the transit lights and clear the sewer drones for Bob') roomTwoObjectives += 1;
     });
 
     bodies.bob.position.set(6, 0.86, 83);
@@ -791,7 +791,7 @@ test('Room 2 hazards stay authoritative when one body arrives before the others'
   } finally { f.cleanup(); }
 });
 
-test('Bob can walk onto the final bridge button in the complete runtime', () => {
+test('Bob can walk onto the final bridge button in the complete runtime after Goop clears the guards', () => {
   const f = createFixture();
   try {
     f.runtime.activateCheckpoint('cp5');
@@ -800,6 +800,7 @@ test('Bob can walk onto the final bridge button in the complete runtime', () => 
       group: { bobBody: KinematicBody; activeSlimeId: string };
       transit: BlackoutTransitController;
     } }).resources;
+    for (const enemy of transit.emergingDrones) enemy.state.destroy();
     while (group.activeSlimeId !== 'bob') f.switchSlime();
     f.input.press('moveLeft');
     f.tick(90);
@@ -808,6 +809,26 @@ test('Bob can walk onto the final bridge button in the complete runtime', () => 
     assert.equal(group.bobBody.attached, true, `Bob stopped at ${group.bobBody.position.toArray()}`);
     assert.equal(group.bobBody.attachmentSurfaceName, 'bob-bridge-switch-sticky-wall');
     assert.equal(transit.bridgeDeployed, true);
+  } finally { f.cleanup(); }
+});
+
+for (const slimeId of ['bob', 'volt'] as const) test(`a real Room 2 drone hit kills ${slimeId} and retries through the existing death flow`, () => {
+  const f = createFixture();
+  try {
+    f.runtime.activateCheckpoint('cp3'); f.runtime.recoverActiveCheckpoint();
+    const { group, transit } = (f.runtime as any).resources;
+    while (group.activeSlimeId !== slimeId) f.switchSlime();
+    group[`${slimeId}Body`].teleport(slimeId === 'bob' ? new THREE.Vector3(10.5, 1.66, 102) : new THREE.Vector3(-16, 2.96, 132));
+    const impacts: number[] = [];
+    transit.projectiles.events.on('slimeImpact', (event: any) => { if (event.slimeId === slimeId) impacts.push(event.damage); });
+    for (let i = 0; i < 600 && f.input.enabled; i++) f.tick();
+    assert.deepEqual(impacts, [100]); assert.equal(f.input.enabled, false);
+    f.tick(70);
+    f.document.elements.find(element => element.className === 'death-screen')!.retryButton.click();
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp3');
+    assert.ok(transit.damage.health.every((h: any) => h.health === 100));
+    assert.ok(transit.emergingDrones.every((d: any) => d.state.state === 'dormant'));
+    assert.ok(transit.lifts.every((l: any) => !l.core.readModel.available)); assert.equal(transit.bridgeDeployed, false);
   } finally { f.cleanup(); }
 });
 
@@ -821,12 +842,13 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
       transit: BlackoutTransitController;
     } }).resources;
     for (const stage of [1, 2]) {
-      const cover = transit.covers[stage - 1]!;
-      cover.support.advance(cover.support.dissolveDurationSeconds);
+      for (let index = 0; index < stage; index++) transit.emergingDrones[index]!.state.destroy();
+      const enemy = transit.emergingDrones[stage - 1]!;
+      enemy.state.destroy();
       transit.lights[stage - 1]!.target.setConnectionState(true);
       f.tick(120);
       transit.lights[stage - 1]!.target.setConnectionState(false);
-      assert.equal(cover.deployed, true);
+      assert.equal(enemy.state.state, 'destroyed');
       assert.equal(transit.lights[stage - 1]!.latched, true);
       const checkpoint = BLACKOUT_TRANSIT_CHECKPOINTS[stage]!;
       group.bobBody.teleport(checkpoint.bodyPositions.bob);
@@ -842,7 +864,7 @@ test('dying late in Room 2 resets every body and all puzzle state to the room en
         assert.ok(restored[id].distanceTo(BLACKOUT_TRANSIT_CHECKPOINTS[0]!.bodyPositions[id]) < 1e-6,
           `${id} should return to Room 2 entry even if parked far from the active slime`);
       }
-      assert.ok(transit.covers.every(cover => !cover.deployed && cover.support.progress === 0));
+      assert.ok(transit.emergingDrones.every(enemy => enemy.state.state === 'dormant' && enemy.state.hits === 0));
       assert.ok(transit.lights.every(light => !light.latched && light.charge === 0));
       assert.equal(transit.bridgeLocked,false);
       assert.equal(transit.bridgeDeployed,false);
