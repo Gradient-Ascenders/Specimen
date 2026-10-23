@@ -1,6 +1,7 @@
 import { CULTIVATION_LEVEL_GAMEPLAY_SUPPORT as gameplay } from './CultivationLevelGameplay.ts';
 import { CompanionRegroup } from '../slimes/CompanionRegroup.ts';
 import { cultivationCompanionWalk } from './CultivationCompanionWalks.ts';
+import { goopSpeedEffectStrength } from '../ui/GoopSpeedOverlay.ts';
 import { CultivationVentArrival } from '../cinematics/CultivationVentArrival.ts';
 import { CultivationRoomThreeClearance } from '../cinematics/CultivationRoomThreeClearance.ts';
 import { CultivationFinale } from '../cinematics/CultivationFinale.ts';
@@ -20,7 +21,7 @@ import type { RoomFiveDroneEncounter } from '../hazards/RoomFiveDroneEncounter.t
 import { addCultivationRoomThreeBoosters, addCultivationButtonPlatformBooster } from '../render/environment/cultivation/CultivationBoosterPlatforms.ts';
 import type { SecurityNetworkView } from '../ui/SecurityNetworkView.ts';
 import type { RoomFiveCheckpoint } from './CultivationRoomFiveController.ts';
-import { SLIME_DEFINITIONS, type SlimeId } from '../slimes/SlimeRoster.ts';
+import { GOOP_ACID_SPEED_MULTIPLIER, SLIME_DEFINITIONS, type SlimeId } from '../slimes/SlimeRoster.ts';
 
 import {
   createAuthoredDissolveTarget,
@@ -446,6 +447,14 @@ export class CultivationLevelRuntime {
         .map((entry) => entry.id),
       activeSlimeId: resources.manager.activeSlimeId!,
     };
+  }
+
+  getSpeedEffectStrength(): number {
+    const r = this.resources;
+    if (!r || this.lifecycle.state !== 'running' || !this.input.enabled || !r.deathSequence.isPlaying ||
+        this.ventArrival.active || r.roomThreeClearance?.active || r.roomFiveFinale?.active ||
+        r.authoredPreview?.roomFive.controller.releasing || r.controller.readModel.state !== 'playing' || r.manager.activeSlimeId !== 'goop') return 0;
+    return goopSpeedEffectStrength(r.pair.goopBody);
   }
 
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
@@ -1167,6 +1176,7 @@ export class CultivationLevelRuntime {
           adhesionEnabled: goopDefinition.abilities.adhesion,
           reboundEnabled: goopDefinition.abilities.rebound,
           chargedJumpEnabled: goopDefinition.jumpMode === 'charged',
+          acidSpeedMultiplier: GOOP_ACID_SPEED_MULTIPLIER,
         },
       });
       const pair = new PersistentSlimePair({
@@ -2287,7 +2297,7 @@ export class CultivationLevelRuntime {
       attached: body.attached,
       chargingJump: body.chargingJump,
       jumpCharge: body.chargeFraction,
-      maximumLocomotionSpeedMetresPerSecond: body.maximumLocomotionSpeedMetresPerSecond,
+      get maximumLocomotionSpeedMetresPerSecond() { return body.maximumLocomotionSpeedMetresPerSecond; },
       contactCount: body.contactsThisStep,
       contactNormalWorld: body.lastContactNormal,
       contactSpeedMetresPerSecond: body.lastContactImpactSpeedMetresPerSecond,

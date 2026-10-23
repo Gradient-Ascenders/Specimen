@@ -43,6 +43,8 @@ export interface KinematicBodyConfig {
   skinWidthMetres: number;
   gravityMetresPerSecondSquared: number;
   maxSpeedMetresPerSecond: number;
+  /** Ground-only affinity; 1 keeps ordinary movement on acid floors. */
+  acidSpeedMultiplier: number;
   groundAccelerationMetresPerSecondSquared: number;
   airAccelerationMetresPerSecondSquared: number;
   groundBrakingMetresPerSecondSquared: number;
@@ -93,6 +95,7 @@ export const DEFAULT_KINEMATIC_BODY_CONFIG: Readonly<KinematicBodyConfig> = {
   skinWidthMetres: 0.01,
   gravityMetresPerSecondSquared: 18,
   maxSpeedMetresPerSecond: 5.5,
+  acidSpeedMultiplier: 1,
   groundAccelerationMetresPerSecondSquared: 32,
   airAccelerationMetresPerSecondSquared: 12,
   groundBrakingMetresPerSecondSquared: 36,
@@ -376,8 +379,23 @@ export class KinematicBody {
     return this.config.maximumJumpChargeSeconds;
   }
 
+  get locomotionSpeedMultiplier(): number {
+    const acidSupport = this.groundedValue &&
+      (this.supportColliderValue?.userData.textureRole === 'acid-floor' ||
+        this.supportColliderValue?.userData.locomotionMedium === 'acid');
+    return acidSupport ? this.config.acidSpeedMultiplier : 1;
+  }
+
   get maximumLocomotionSpeedMetresPerSecond(): number {
-    return this.config.maxSpeedMetresPerSecond;
+    return this.config.maxSpeedMetresPerSecond * this.locomotionSpeedMultiplier;
+  }
+
+  /** Current planar travel before ordinary grounded braking brings us to rest. */
+  get groundStoppingDistanceMetres(): number {
+    const normalSpeed = this.velocityValue.dot(this.groundNormalValue);
+    const speedSquared = Math.max(0, this.velocityValue.lengthSq() - normalSpeed * normalSpeed);
+    const braking = this.config.groundBrakingMetresPerSecondSquared * this.supportTractionMultiplier;
+    return braking > 0 ? speedSquared / (2 * braking) : Infinity;
   }
 
   get lastContactNormal(): ReadonlyVector3State {
@@ -1002,7 +1020,7 @@ export class KinematicBody {
       if (this.targetVelocity.lengthSq() > MOVEMENT_EPSILON_SQ) {
         this.targetVelocity
           .normalize()
-          .multiplyScalar(this.config.maxSpeedMetresPerSecond);
+          .multiplyScalar(this.maximumLocomotionSpeedMetresPerSecond);
 
         this.velocityDelta
           .subVectors(this.targetVelocity, this.planarVelocity);
@@ -1743,6 +1761,7 @@ export class KinematicBody {
       ['skinWidthMetres', config.skinWidthMetres],
       ['gravityMetresPerSecondSquared', config.gravityMetresPerSecondSquared],
       ['maxSpeedMetresPerSecond', config.maxSpeedMetresPerSecond],
+      ['acidSpeedMultiplier', config.acidSpeedMultiplier],
       [
         'groundAccelerationMetresPerSecondSquared',
         config.groundAccelerationMetresPerSecondSquared,

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 
-import { CompanionRegroup, type CompanionWalk } from '../src/slimes/CompanionRegroup.ts';
+import { CompanionRegroup, type CompanionId, type CompanionWalk } from '../src/slimes/CompanionRegroup.ts';
+import { GOOP_ACID_SPEED_MULTIPLIER } from '../src/slimes/SlimeRoster.ts';
 import { cultivationCompanionWalk, type CultivationCompanionState } from '../src/levels/CultivationCompanionWalks.ts';
 import { blackoutCompanionWalk, type BlackoutCompanionState } from '../src/levels/BlackoutCompanionWalks.ts';
 import { LevelTwoPreviewScene, LEVEL_TWO_ROOM_TWO_OFFSET_Z as TWO,
@@ -29,9 +30,10 @@ const blackoutState = (overrides: Partial<BlackoutCompanionState> = {}): Blackou
 function physics(meshes: readonly THREE.Mesh[]) {
   const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
   world.registerAll(meshes); surfaces.registerAll(meshes);
-  const createBody = (p: THREE.Vector3, bob = false) => {
+  const createBody = (p: THREE.Vector3, id: CompanionId = 'goop') => {
     const body = new KinematicBody({world, surfaces, initialPosition: p,
-      config: {adhesionEnabled: bob, reboundEnabled: false, chargedJumpEnabled: bob}});
+      config: {adhesionEnabled: id === 'bob', reboundEnabled: false, chargedJumpEnabled: id === 'bob',
+        acidSpeedMultiplier: id === 'goop' ? GOOP_ACID_SPEED_MULTIPLIER : 1}});
     for (let i = 0; i < 30; i++) body.update(DT, ZERO);
     return body;
   };
@@ -126,7 +128,7 @@ test('Blackout companions walk the safe bay corridor, rising duct and transit ex
       {id: 'volt' as const, start: new THREE.Vector3(-16, .9, 65), leader: new THREE.Vector3(6, .86, 84), end: 81.3},
       {id: 'goop' as const, start: new THREE.Vector3(10.5, .86, 152), leader: new THREE.Vector3(0, .86, 180), end: 179.3},
     ]) {
-      const body = p.createBody(trial.start, trial.id === 'bob'), companion = new CompanionRegroup();
+      const body = p.createBody(trial.start, trial.id), companion = new CompanionRegroup();
       for (let i = 0; i < 1200; i++) {
         const walk = blackoutCompanionWalk(blackoutState({...trial, position: body.position, mainRouteReady: true, bridgeLocked: true}));
         companion.beginStep(); body.update(DT, companion.steer(trial.id, body, walk, p.world), companion.jump[trial.id]);

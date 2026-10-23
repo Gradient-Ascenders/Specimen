@@ -14,7 +14,9 @@ import { BlackoutTransitController } from './BlackoutTransitController.ts';
 import { BLACKOUT_TRANSIT_CHECKPOINTS } from './BlackoutTransitRoom.ts';
 import { BLACKOUT_BOSS_STAGING_CHECKPOINT } from './BlackoutBossStaging.ts';
 import { CompanionRegroup } from '../slimes/CompanionRegroup.ts';
+import { GOOP_ACID_SPEED_MULTIPLIER } from '../slimes/SlimeRoster.ts';
 import { blackoutCompanionWalk } from './BlackoutCompanionWalks.ts';
+import { goopSpeedEffectStrength } from '../ui/GoopSpeedOverlay.ts';
 import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
 import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
 import { FinalBossEncounter } from '../boss/FinalBossEncounter.ts';
@@ -1553,6 +1555,13 @@ export class BlackoutLevelRuntime {
     this.renderLayer.render();
   }
 
+  getSpeedEffectStrength(): number {
+    const r = this.resources;
+    if (!r || this.lifecycle.state !== 'running' || !this.input.enabled || !r.deathSequence.isPlaying ||
+        r.ventArrival?.active || r.finalBoss?.cinematic || this.currentRoom.phase !== 'three-slime' || r.manager.activeSlimeId !== 'goop') return 0;
+    return goopSpeedEffectStrength(r.group.goopBody);
+  }
+
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
     const resources = this.resources;
     writePerformanceInput(target,this.input);
@@ -1667,6 +1676,7 @@ export class BlackoutLevelRuntime {
             adhesionEnabled: definition.abilities.adhesion,
             reboundEnabled: definition.abilities.rebound,
             chargedJumpEnabled: definition.jumpMode === 'charged',
+            acidSpeedMultiplier: id === 'goop' ? GOOP_ACID_SPEED_MULTIPLIER : 1,
           },
         });
       };
@@ -2813,8 +2823,7 @@ function createBobPresentationState(
     attached: body.attached,
     chargingJump: body.chargingJump,
     jumpCharge: body.chargeFraction,
-    maximumLocomotionSpeedMetresPerSecond:
-      body.maximumLocomotionSpeedMetresPerSecond,
+    get maximumLocomotionSpeedMetresPerSecond() { return body.maximumLocomotionSpeedMetresPerSecond; },
     contactCount: body.contactsThisStep,
     contactNormalWorld: body.lastContactNormal,
     contactSpeedMetresPerSecond: body.lastContactImpactSpeedMetresPerSecond,

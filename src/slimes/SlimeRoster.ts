@@ -1,5 +1,8 @@
 export type SlimeId = 'bob' | 'goop' | 'volt';
 
+/** Goop's ground speed while supported by an authored acid floor. */
+export const GOOP_ACID_SPEED_MULTIPLIER = 1.5;
+
 export type SlimeAbility =
   | 'adhesion'
   | 'rebound'

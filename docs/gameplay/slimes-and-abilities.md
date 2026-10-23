@@ -18,7 +18,13 @@ not transfer live instances.
   metadata, not visual detection.
 - **Goop** aims with the camera and fires pooled acid projectiles. Only explicit
   dissolve/combat targets accept hits. Dissolve state is reversible on reset and
-  collision changes are coordinated with the owning component.
+  collision changes are coordinated with the owning component. While grounded
+  on acid, Goop moves 50% faster (8.25 m/s instead of 5.5 m/s), using the same
+  physics rule for player movement and automatic catch-up. Dry platforms and
+  airborne movement use his ordinary speed target. While controlling Goop,
+  peripheral screen streaks fade in as his actual acid speed exceeds normal
+  speed. The centre stays clear for aiming; reduced-motion mode uses a static
+  edge glow. Idle AI movement does not trigger the screen effect.
 - **Volt** acquires registered electrical targets within the active room's
   range and physical line of sight. Connections break on range, obstruction,
   input release, switching, recovery, or disposal. Devices, not Volt's visual

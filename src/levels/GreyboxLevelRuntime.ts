@@ -10,6 +10,8 @@ import { prepareCinematicProgram } from '../cinematics/CinematicProgramPreparati
 import { waitForGpuPreparation } from '../render/WaitForGpuPreparation.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import * as THREE from 'three';
+import { GOOP_ACID_SPEED_MULTIPLIER } from '../slimes/SlimeRoster.ts';
+import { goopSpeedEffectStrength } from '../ui/GoopSpeedOverlay.ts';
 import {
 
   createAuthoredDissolveTarget,
@@ -382,6 +384,13 @@ export class GreyboxLevelRuntime {
         .map((entry) => entry.id as PlayableSlimeId),
       activeSlimeId: resources.slimePair.activeSlimeId,
     };
+  }
+
+  getSpeedEffectStrength(): number {
+    const r = this.resources;
+    if (!r || this.lifecycle.state !== 'running' || !this.input.enabled || !r.deathSequence.isPlaying ||
+        this.finale?.active || r.containmentLevel.state !== 'playing' || r.slimeManager.activeSlimeId !== 'goop') return 0;
+    return goopSpeedEffectStrength(r.goopBody);
   }
 
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {
@@ -1133,6 +1142,7 @@ export class GreyboxLevelRuntime {
         adhesionEnabled: goopDefinition.abilities.adhesion,
         reboundEnabled: goopDefinition.abilities.rebound,
         chargedJumpEnabled: goopDefinition.jumpMode === 'charged',
+        acidSpeedMultiplier: GOOP_ACID_SPEED_MULTIPLIER,
       },
     });
     testScene.bob.setCameraView(this.renderLayer.cameraRig, body);

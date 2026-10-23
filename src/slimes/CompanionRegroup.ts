@@ -92,7 +92,8 @@ export class CompanionRegroup {
       }
     }
     const end = walk.points.at(-1)!;
-    if (Math.hypot(end[0] - this.local.x, end[2] - this.local.z) < .6) return movement;
+    const stoppingDistance = body.groundStoppingDistanceMetres;
+    if (Math.hypot(end[0] - this.local.x, end[2] - this.local.z) < Math.max(.6, stoppingDistance + .1)) return movement;
     // First join the lane sideways; never cut diagonally across room obstacles.
     if (nearestDistance > .16) this.target.copy(this.nearest);
     else {
@@ -109,7 +110,7 @@ export class CompanionRegroup {
 
     // Look beyond stopping distance. A shut door, removed floor or newly
     // obstructed route yields zero input instead of walking into danger.
-    const lookAhead = Math.min(distance, .9);
+    const lookAhead = Math.min(distance, Math.max(.9, stoppingDistance + .2));
     this.origin.copy(body.position);
     this.probe.copy(movement).multiplyScalar(lookAhead);
     let obstructed = world.sweepSphere(this.origin, this.probe, body.radiusMetres, this.hit,

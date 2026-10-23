@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-async function openLevel(page: Page, level: number, name: string) {
+async function openLevel(page: Page, level: number, name: string, manualLoop = true) {
   await page.route('**/assets/index-*.js', async route => {
     const response = await route.fetch(), source = await response.text();
     const pattern = /([A-Za-z_$][\w$]*)=new ([A-Za-z_$][\w$]*)\(\{initialRuntime:/;
@@ -18,7 +18,7 @@ async function openLevel(page: Page, level: number, name: string) {
     return rt.input.enabled && !rt.ventArrival?.active && !rt.resources.ventArrival?.active && !rt.preparationQueue?.diagnostics.pending;
   }, null, {timeout: 180_000});
   await page.locator('canvas[data-gameplay-canvas]').click();
-  await page.evaluate(() => (window as any).__companionSession.runtime.renderLayer.setAnimationLoop(null));
+  if (manualLoop) await page.evaluate(() => (window as any).__companionSession.runtime.renderLayer.setAnimationLoop(null));
 }
 
 test('Level 2 companion catches up through production physics, yields to Tab, pauses and resets on retry', async ({page}) => {
@@ -59,17 +59,91 @@ test('Level 2 companion catches up through production physics, yields to Tab, pa
     rt.fixedUpdate(1);
     const pauseMotion = r.pair.goopBody.position.distanceTo(paused);
     rt.start();
-    for (let i = 0; i < 1800; i++) rt.fixedUpdate(1 / 60);
+    let aiAcidSpeed = 0;
+    for (let i = 0; i < 1800; i++) {
+      rt.fixedUpdate(1 / 60);
+      if (r.pair.goopBody.grounded && r.pair.goopBody.supportCollider?.userData.textureRole === 'acid-floor') {
+        aiAcidSpeed = Math.max(aiAcidSpeed, Math.hypot(r.pair.goopBody.velocity.x, r.pair.goopBody.velocity.z));
+      }
+    }
     const arrived = r.pair.goopBody.position.z;
     rt.resetAndRecoverAuthoredPreviewRoom(r);
     const reset = {movement: rt.companions.movement.goop.lengthSq(), jump: rt.companions.jump.goop.pressed,
       status: rt.getSlimeHUDSnapshot().passiveInteractions};
-    return {pauseMotion, arrived, reset, playing: r.deathSequence.isPlaying};
+    return {pauseMotion, arrived, reset, aiAcidSpeed, playing: r.deathSequence.isPlaying};
   });
   expect(finished.pauseMotion).toBe(0);
   expect(finished.arrived).toBeGreaterThan(80);
   expect(finished.playing).toBe(true);
   expect(finished.reset).toEqual({movement: 0, jump: false, status: []});
+  expect(finished.aiAcidSpeed).toBeCloseTo(8.25, 5);
+  await page.evaluate(() => {
+    const rt = (window as any).__companionSession.runtime, r = rt.resources;
+    r.manager.activate('goop');
+    r.pair.goopBody.recoverAt(r.pair.goopBody.position.clone().set(74, .46, 20));
+    rt.renderLayer.cameraRig.setGroundOrbitYawRadians(Math.PI);
+  });
+  await page.keyboard.down('KeyW');
+  const player = await page.evaluate(() => {
+    const rt = (window as any).__companionSession.runtime, body = rt.resources.pair.goopBody;
+    for (let i = 0; i < 90; i++) rt.fixedUpdate(1 / 60);
+    return {speed: Math.hypot(body.velocity.x, body.velocity.z), maximum: body.maximumLocomotionSpeedMetresPerSecond,
+      presentationMaximum: rt.resources.goopPresentationState.maximumLocomotionSpeedMetresPerSecond,
+      support: body.supportCollider?.userData.textureRole, playing: rt.resources.deathSequence.isPlaying};
+  });
+  await page.keyboard.up('KeyW');
+  expect(player.playing).toBe(true);
+  expect(player.support).toBe('acid-floor');
+  expect(player.maximum).toBe(8.25);
+  expect(player.presentationMaximum).toBe(8.25);
+  expect(player.speed).toBeCloseTo(finished.aiAcidSpeed, 5);
+  expect(errors).toEqual([]);
+});
+
+test('Goop acid boost has a peripheral screen cue that clears on switching and pause', async ({page}, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await openLevel(page, 2, 'Cultivation', false);
+  await page.setViewportSize({width: 1280, height: 720});
+  await page.evaluate(() => {
+    const rt = (window as any).__companionSession.runtime;
+    rt.teleportToAuthoredPreviewRoom(2);
+    const r = rt.resources;
+    r.manager.activate('goop');
+    r.pair.bobBody.recoverAt(r.pair.bobBody.position.clone().set(64, .66, 82));
+    r.pair.goopBody.recoverAt(r.pair.goopBody.position.clone().set(74, .46, 19));
+    rt.renderLayer.cameraRig.reset(); rt.retargetCamera(r);
+    rt.renderLayer.cameraRig.setGroundOrbitYawRadians(Math.PI);
+  });
+  const overlay = page.locator('.goop-speed-overlay');
+  await expect(overlay).toBeHidden();
+  await page.keyboard.down('KeyW');
+  await expect.poll(() => overlay.evaluate(element => Number((element as HTMLElement).style.opacity))).toBeGreaterThan(.65);
+  const boosted = await page.evaluate(() => {
+    const rt = (window as any).__companionSession.runtime;
+    return {strength: rt.getSpeedEffectStrength(), speed: Math.hypot(rt.resources.pair.goopBody.velocity.x, rt.resources.pair.goopBody.velocity.z)};
+  });
+  expect(boosted.strength).toBeGreaterThan(.9);
+  expect(boosted.speed).toBeCloseTo(8.25, 4);
+  await expect(overlay).toHaveCSS('pointer-events', 'none');
+  await page.screenshot({path: info.outputPath('goop-acid-screen-speed.png')});
+  await page.keyboard.press('Tab');
+  await page.keyboard.up('KeyW');
+  await expect(overlay).toBeHidden();
+  expect(await page.evaluate(() => (window as any).__companionSession.runtime.getSpeedEffectStrength())).toBe(0);
+  await page.evaluate(() => {
+    const rt = (window as any).__companionSession.runtime, r = rt.resources;
+    r.manager.activate('goop');
+    r.pair.goopBody.recoverAt(r.pair.goopBody.position.clone().set(74, .46, 19));
+  });
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  await page.keyboard.down('KeyW');
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator('.goop-speed-streak').first()).toHaveCSS('animation-name', 'none');
+  await expect(overlay.locator('.goop-speed-streak').first()).toHaveCSS('display', 'none');
+  await page.keyboard.press('KeyP');
+  await page.keyboard.up('KeyW');
+  await expect(overlay).toBeHidden();
   expect(errors).toEqual([]);
 });
 
