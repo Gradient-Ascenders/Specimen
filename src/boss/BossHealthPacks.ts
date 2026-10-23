@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CollisionHit, CollisionLayer, type CollisionWorld } from '../physics/CollisionWorld.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_BOSS_TUNING as T } from './FinalBossConfig.ts';
+import { createBossHealthPackModel } from './BossHealthPackModel.ts';
 
 interface Pack {active:boolean;position:THREE.Vector3;previous:THREE.Vector3;velocity:number;age:number;settled:boolean;}
 
@@ -11,6 +12,7 @@ export class BossHealthPacks {
   readonly packs:readonly Pack[];
   private readonly slots:Pack[]=Array.from({length:T.healthPackCapacity},()=>({active:false,position:new THREE.Vector3(),previous:new THREE.Vector3(),velocity:0,age:0,settled:false}));
   private readonly meshes:THREE.InstancedMesh[]=[];
+  private beaconMesh:THREE.InstancedMesh|undefined;
   private readonly geometries:THREE.BufferGeometry[]=[];
   private readonly materials:THREE.Material[]=[];
   private readonly dummy=new THREE.Object3D();
@@ -21,11 +23,10 @@ export class BossHealthPacks {
   private disposed=false;
   constructor(world:CollisionWorld) {
     this.world=world;this.packs=this.slots;this.root.name='boss-medical-drops';
-    const white=new THREE.MeshStandardMaterial({color:0xe7f8f0,roughness:.3,metalness:.3});
-    const green=new THREE.MeshBasicMaterial({color:0x36ffad});this.materials.push(white,green);
-    for(const [geometry,material] of [[new THREE.BoxGeometry(1.3,.65,1),white],[new THREE.BoxGeometry(.22,.04,.75),green],
-      [new THREE.BoxGeometry(.75,.04,.22),green],[new THREE.TorusGeometry(.85,.045,5,20),green]] as const) {
-      this.geometries.push(geometry);const mesh=new THREE.InstancedMesh(geometry,material,T.healthPackCapacity);mesh.count=0;mesh.frustumCulled=false;this.meshes.push(mesh);this.root.add(mesh);
+    for(const {name,geometry,material,beacon} of createBossHealthPackModel()) {
+      this.geometries.push(geometry);this.materials.push(material);
+      const mesh=new THREE.InstancedMesh(geometry,material,T.healthPackCapacity);mesh.name=name;mesh.count=0;mesh.frustumCulled=false;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.meshes.push(mesh);this.root.add(mesh);if(beacon)this.beaconMesh=mesh;
     }
   }
   get activeCount():number {return this.slots.filter(s=>s.active).length;}
@@ -54,8 +55,7 @@ export class BossHealthPacks {
       if(!s.active)continue;this.point.lerpVectors(s.previous,s.position,THREE.MathUtils.clamp(alpha,0,1));
       for(let i=0;i<this.meshes.length;i++) {
         this.dummy.position.copy(this.point);this.dummy.rotation.set(0,0,0);this.dummy.scale.setScalar(1);
-        if(i===1||i===2)this.dummy.position.y+=.35;
-        if(i===3){this.dummy.position.y+=.5+.08*Math.sin(s.age*4);this.dummy.rotation.x=-Math.PI/2;this.dummy.scale.setScalar(1+.1*Math.sin(s.age*4));}
+        if(this.meshes[i]===this.beaconMesh)this.dummy.scale.setScalar(1+.035*Math.sin(s.age*4));
         this.dummy.updateMatrix();this.meshes[i]!.setMatrixAt(count,this.dummy.matrix);
       }count++;
     }for(const mesh of this.meshes){mesh.count=count;mesh.instanceMatrix.needsUpdate=true;}
