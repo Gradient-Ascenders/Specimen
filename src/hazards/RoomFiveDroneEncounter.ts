@@ -1,3 +1,4 @@
+import { SewerDroneMotion, sewerDroneLampPower, WEAK_SEWER_DRONE } from './WeakSewerDrone.ts';
 import { batchMaintenanceScout } from '../render/hazards/BatchMaintenanceScout.ts';
 import { WorldAudioSource } from '../audio/WorldAudio.ts';
 import { disposeShadowLight } from '../render/ShadowLightResources.ts';
@@ -47,10 +48,8 @@ export class RoomFiveDroneEncounter {
   private readonly unsubscribe: () => void;
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly direction = new THREE.Vector3();
-  private readonly sewerAim = new THREE.Vector3();
-  private readonly sewerRotation = new THREE.Quaternion();
+  private readonly sewerMotion = new SewerDroneMotion();
   private readonly sewerForward = new THREE.Vector3(0, 0, -1);
-  private sewerTime = 0;
   private readonly sewerDamage: SewerDroneDamage;
   private disposed = false;
   private cinematic = false;
@@ -69,7 +68,7 @@ export class RoomFiveDroneEncounter {
     // variants across the entire room. Power it down without hiding its parent.
     room.root.add(this.sewerLight);
     this.updateSewerLightPosition();
-    this.projectiles = new DroneProjectileSystem(world, this.damage, { damage: 30, speedMetresPerSecond: 120 });
+    this.projectiles = new DroneProjectileSystem(world, this.damage, { damage: WEAK_SEWER_DRONE.projectileDamage, speedMetresPerSecond: WEAK_SEWER_DRONE.projectileSpeed });
     this.presentation = new DroneProjectilePresentation(this.projectiles.states);
     // Projectile state is world-space, unlike authored room geometry.
     this.targets = [{ slimeId: 'bob', position: bob.position }, { slimeId: 'goop', position: goop.position }];
@@ -79,10 +78,10 @@ export class RoomFiveDroneEncounter {
       const drone = new SecurityDrone({ id, type: 'ceiling', initialPosition: position,
         colliderSize: new THREE.Vector3(2, 1.3, 2), forward: forward.normalize(), scanAxis: new THREE.Vector3(0, 1, 0),
         scanHalfAngleRadians: .035, scanSpeedRadiansPerSecond: .12, detectionHalfAngleRadians: sewer ? Math.PI : ROOM_FIVE_DRONE_VIEW_HALF_ANGLE,
-        detectionRangeMetres: sewer ? 40 : ROOM_FIVE_DRONE_VIEW_RANGE, warningSeconds: sewer ? .4 : .6,
+        detectionRangeMetres: sewer ? WEAK_SEWER_DRONE.attackRangeMetres : ROOM_FIVE_DRONE_VIEW_RANGE, warningSeconds: sewer ? WEAK_SEWER_DRONE.warningSeconds : .6,
         detectionAnchor: sewer ? undefined : new THREE.Vector3(),
         forwardAnchorMetres: sewer ? undefined : 1.4,
-        fireIntervalSeconds: sewer ? .65 : .12, targetLossGraceSeconds: .1, cooldownSeconds: .5,
+        fireIntervalSeconds: sewer ? WEAK_SEWER_DRONE.fireIntervalSeconds : .12, targetLossGraceSeconds: .1, cooldownSeconds: .5,
         muzzleAnchor: new THREE.Vector3(0, -.1, sewer ? -2.5 : -1.1), targetPolicy: sewer ? 'goop-only' : 'bob-only', initialScanPhase: 0 },
       world, surfaces, this.projectiles, this.resources);
       room.root.add(drone.root); return drone;
@@ -152,7 +151,7 @@ export class RoomFiveDroneEncounter {
     this.brokenDrone.setCollisionEnabled(false);
     this.flightAudio.push(new WorldAudioSource({ root: room.brokenCore, kind: 'drone', enabled: () =>
       (room.controller.brokenDroneState === 'rebooting' || room.controller.brokenDroneState === 'active') && room.controller.brokenDroneHits < 3 }));
-    this.unsubscribe = this.damage.events.on('died', ({ slimeId }) => requestDeath(slimeId));
+    this.unsubscribe = this.damage.events.on('died', ({ slimeId }) => { if (slimeId !== 'volt') requestDeath(slimeId); });
     // Encounter geometry is attached after room dressing. Preserve its explicit
     // exclusions and the platform hull/receiver split on this final assignment.
     const acidMaterials = new Set<THREE.Material>();
@@ -195,22 +194,14 @@ export class RoomFiveDroneEncounter {
       ? 18 * THREE.MathUtils.smoothstep(this.room.controller.rebootElapsed, .9, 1.5) : 0;
     const shell = this.room.brokenCore;
     this.sewerDamage.update(dt, this.room.controller.brokenDroneHits);
-    if (sewerState === 'rebooting' || sewerState === 'active') {
-      this.sewerTime += dt;
-      const lift = THREE.MathUtils.smoothstep(this.room.controller.rebootElapsed, 0, 1.5);
-      shell.position.y = THREE.MathUtils.damp(shell.position.y, SEWER_DRONE_POSITION.y + lift * (4 + Math.sin(this.sewerTime * 2.2) * .18), 6, dt);
-      this.sewerAim.copy(this.targets[1].position); this.room.root.worldToLocal(this.sewerAim);
-      this.sewerAim.sub(shell.position).normalize();
-      this.sewerRotation.setFromUnitVectors(this.sewerForward, this.sewerAim);
-      shell.quaternion.slerp(this.sewerRotation, 1 - Math.exp(-8 * dt));
-    }
+    this.sewerMotion.update(dt, shell, this.room.controller.sewerDrone, SEWER_DRONE_POSITION, this.targets[1].position);
     this.updateSewerLightPosition();
     this.brokenDrone.root.position.copy(shell.position);
     this.brokenDrone.root.quaternion.copy(shell.quaternion);
     this.brokenDrone.setEnabled(sewerState === 'active');
     this.brokenDrone.update(dt, this.targets);
     if (this.room.controller.brokenDroneState === 'rebooting') {
-      this.brokenDrone.frontIndicator.material.color.setHex(Math.sin(this.room.controller.rebootElapsed * 35) > 0 ? 0xffa13b : 0x202020);
+      this.brokenDrone.frontIndicator.material.color.setHex(sewerDroneLampPower(this.room.controller.rebootElapsed) > .5 ? 0xffa13b : 0x202020);
     }
     this.room.sewer.eye.material.color.copy(this.brokenDrone.frontIndicator.material.color);
     if (sewerState === 'dormant') this.room.sewer.eye.material.color.setHex(0x080b07);
@@ -260,7 +251,7 @@ export class RoomFiveDroneEncounter {
     // a separate authored shell/acid target, including its destruction lifetime.
     this.brokenDrone.setPresentationVisible(false);
     this.brokenDrone.setCollisionEnabled(false);
-    this.sewerTime = 0;
+    this.sewerMotion.reset();
     this.sewerLighting.reset();
     this.platformBoosters.reset();
     this.room.brokenCore.position.copy(SEWER_DRONE_POSITION);

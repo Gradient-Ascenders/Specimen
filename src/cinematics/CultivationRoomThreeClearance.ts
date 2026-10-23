@@ -49,7 +49,9 @@ export class CultivationRoomThreeClearance {
   private readonly matrix=new THREE.Matrix4();
   private readonly scale=new THREE.Vector3();
   private readonly pushed=[false,false,false,false];
+  private readonly toppled=[false,false,false,false];
   private readonly splashed=[false,false,false,false];
+  private readonly splashSeconds=[NaN,NaN,NaN,NaN];
   private playing=false;
   private played=false;
   private elapsed=0;
@@ -102,7 +104,7 @@ export class CultivationRoomThreeClearance {
     this.firstMove=this.descent.landSeconds+.65;this.end=this.firstMove+4*ROOM_THREE_CLEARANCE_TIMING.pushInterval+3.7;
     this.elapsed=this.previousElapsed=0;this.played=this.playing=true;
     this.startEye.copy(camera.position);this.startOrientation.copy(camera.quaternion);
-    encounter.cancelTransientState();this.pushed.fill(false);this.splashed.fill(false);
+    encounter.cancelTransientState();this.pushed.fill(false);this.toppled.fill(false);this.splashed.fill(false);this.splashSeconds.fill(NaN);
     return true;
   }
 
@@ -145,26 +147,36 @@ export class CultivationRoomThreeClearance {
       const pushAt=this.firstMove+i*T.pushInterval+1.45;
       if(!this.pushed[i]&&this.elapsed>=pushAt){
         encounter.groundDrones[ORDER[i]].beginCinematicPush(2.1);this.pushed[i]=true;
-        gameplayAudioEvents.emit('cue',{sound:'bob-contact-01',position:this.world});
+        gameplayAudioEvents.emit('cue',{sound:'cultivation-sentry-shove-01',position:this.world,maxDistance:80});
+      }
+      if(this.pushed[i]&&!this.toppled[i]&&this.elapsed>=pushAt+.12){
+        encounter.groundDrones[ORDER[i]].drone.root.getWorldPosition(this.pointForSplash);
+        gameplayAudioEvents.emit('cue',{sound:'cultivation-sentry-topple-01',position:this.pointForSplash,maxDistance:80});
+        this.toppled[i]=true;
       }
     }
     // Keep real tipping, acid contact and completion events authoritative.
     encounter.update(dt,'goop',ZERO,{bob:false,goop:false});
     for(let i=0;i<ORDER.length;i++){
-      const drone=encounter.groundDrones[ORDER[i]],age=this.elapsed-(this.firstMove+i*T.pushInterval+2.35);
+      const drone=encounter.groundDrones[ORDER[i]];
       if(drone.readModel.state!=='permanentlyDisabled')continue;
       if(!this.splashed[i]){
         drone.drone.root.getWorldPosition(this.pointForSplash);
         acid.disturb(this.pointForSplash.x,this.pointForSplash.z,0,2.2);
-        gameplayAudioEvents.emit('cue',{sound:'world-drone-dissolve-01',position:this.pointForSplash,maxDistance:36});
+        gameplayAudioEvents.emit('cue',{sound:'cultivation-sentry-acid-splash-01',position:this.pointForSplash,maxDistance:80});
+        gameplayAudioEvents.emit('loop',{key:this.dissolveKey(i),sound:'goop-dissolve-loop-01',position:this.pointForSplash.clone(),volumeScale:.65});
+        this.splashSeconds[i]=this.elapsed;
         this.splashed[i]=true;
       }
-      drone.submergeDisabled(smooth(age/T.sinkSeconds)*3.2);
+      const age=this.elapsed-this.splashSeconds[i];
+      if(age>=T.sinkSeconds&&this.previousElapsed-this.splashSeconds[i]<T.sinkSeconds)
+        gameplayAudioEvents.emit('stop',{key:this.dissolveKey(i)});
+      drone.submergeDisabled(smooth((this.elapsed-(this.firstMove+i*T.pushInterval+2.35))/T.sinkSeconds)*3.2);
     }
     this.presentBubbles();
     acid.update(dt);
     if(this.elapsed>=this.end){
-      bob.recoverAt(this.world);this.playing=false;this.bubbles.count=0;return true;
+      this.stopAudio();bob.recoverAt(this.world);this.playing=false;this.bubbles.count=0;return true;
     }
     return false;
   }
@@ -187,7 +199,9 @@ export class CultivationRoomThreeClearance {
     camera.position.lerpVectors(this.eye,camera.position,back);camera.quaternion.slerp(this.orientation,1-back);camera.updateMatrixWorld(true);
   }
 
-  reset():void{this.playing=this.played=false;this.bottomEntry=false;this.elapsed=this.previousElapsed=0;this.bubbles.count=0;}
+  private dissolveKey(index:number):string{return `cultivation-sentry-dissolve-${index}`;}
+  private stopAudio():void{for(let i=0;i<ORDER.length;i++)gameplayAudioEvents.emit('stop',{key:this.dissolveKey(i)});}
+  reset():void{this.stopAudio();this.playing=this.played=false;this.bottomEntry=false;this.elapsed=this.previousElapsed=0;this.bubbles.count=0;this.splashSeconds.fill(NaN);}
   dispose():void{
     if(this.disposed)return;this.reset();this.disposed=true;this.root.removeFromParent();this.root.clear();
     this.bubbles.dispose();this.geometry.dispose();this.material.dispose();

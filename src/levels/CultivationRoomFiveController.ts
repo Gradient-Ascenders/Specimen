@@ -1,3 +1,4 @@
+import { WeakSewerDroneState } from '../hazards/WeakSewerDrone.ts';
 import { SecurityNetworkController } from '../puzzle/SecurityNetworkController.ts';
 
 export type RoomFiveCheckpoint = 'split' | 'controls' | 'rescued';
@@ -6,9 +7,10 @@ export type RoomFiveCheckpoint = 'split' | 'controls' | 'rescued';
 export class CultivationRoomFiveController {
   readonly security = new SecurityNetworkController();
   checkpoint: RoomFiveCheckpoint = 'split';
-  brokenDroneState: 'dormant' | 'rebooting' | 'active' | 'destroyed' = 'dormant';
-  rebootElapsed = 0;
-  brokenDroneHits = 0;
+  readonly sewerDrone = new WeakSewerDroneState();
+  get brokenDroneState() { return this.sewerDrone.state; }
+  get rebootElapsed() { return this.sewerDrone.elapsed; }
+  get brokenDroneHits() { return this.sewerDrone.hits; }
   buttonProgress = 0;
   private bobReachedRoute = false;
   private goopPassedDrone = false;
@@ -27,11 +29,7 @@ export class CultivationRoomFiveController {
   update(dt: number, nearBrokenDrone: boolean, bobOnRoute: boolean,
     goopPastDrone: boolean, bobUsingButton: boolean): void {
     if (!Number.isFinite(dt) || dt <= 0) throw new Error('Invalid Room 5 timestep');
-    if (this.brokenDroneState === 'dormant' && nearBrokenDrone) this.brokenDroneState = 'rebooting';
-    if (this.brokenDroneState === 'rebooting') {
-      this.rebootElapsed += dt;
-      if (this.rebootElapsed + 1e-9 >= 1.5) this.brokenDroneState = 'active';
-    }
+    this.sewerDrone.update(dt, nearBrokenDrone);
     // Either slime can get here first. Moving Bob away from the first safe
     // station must not erase Goop's progress through the sewer (or vice versa).
     this.bobReachedRoute ||= bobOnRoute;
@@ -48,22 +46,16 @@ export class CultivationRoomFiveController {
       if (this.rescued) this.checkpoint = 'rescued';
     }
   }
-  hitBrokenDrone(): void {
-    if (this.brokenDroneState === 'destroyed') return;
-    this.brokenDroneHits = Math.min(3, this.brokenDroneHits + 1);
-    if (this.brokenDroneHits === 3) this.destroyBrokenDrone();
-    else { this.brokenDroneState = 'active'; this.rebootElapsed = 1.5; }
-  }
-  destroyBrokenDrone(): void { this.brokenDroneState = 'destroyed'; this.brokenDroneHits = 3; }
+  hitBrokenDrone(): void { this.sewerDrone.hit(); }
+  destroyBrokenDrone(): void { this.sewerDrone.destroy(); }
   powerExit(): void { if (this.rescued) this.exitPowered = true; }
   finish(): void { if (this.rescued) this.complete = true; }
   reset(checkpoint: RoomFiveCheckpoint = 'split'): void {
     this.checkpoint = checkpoint;
     this.security.reset();
-    this.brokenDroneState = checkpoint === 'split' ? 'dormant' : 'destroyed';
-    this.brokenDroneHits = checkpoint === 'split' ? 0 : 3;
+    this.sewerDrone.reset(checkpoint !== 'split');
     this.bobReachedRoute = this.goopPassedDrone = checkpoint !== 'split';
-    this.rebootElapsed = 0; this.buttonProgress = 0; this.releaseElapsed = 0;
+    this.buttonProgress = 0; this.releaseElapsed = 0;
     this.exitPowered = false; this.complete = false;
     if (checkpoint === 'rescued') { this.security.release(); this.releaseElapsed = 4; this.buttonProgress = 1; }
   }

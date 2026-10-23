@@ -70,7 +70,9 @@ export class SpecimenCharacterPresentation {
     this.root.name = 'player-specimen-presentation';
     this.placement.name = 'player-specimen-placement';
     this.shape.name = 'specimen-sole-pivot';
-    this.shape.position.y = -radiusMetres - SPECIMEN_RESTING_SOLE;
+    const assetScale = radiusMetres / 0.675;
+    this.shape.scale.setScalar(assetScale);
+    this.shape.position.y = -radiusMetres - SPECIMEN_RESTING_SOLE * assetScale;
     this.facing.add(this.shape); this.support.add(this.facing);
     this.placement.add(this.support); this.root.add(this.placement, this.burst.root);
     this.applyVisibility();
@@ -111,6 +113,7 @@ export class SpecimenCharacterPresentation {
   }
   setCameraView(rig: CameraRig, target: CameraFollowTarget): void { this.cameraVisibility.configure(rig, target); }
   setPosition(position: Vector3State): void { this.placement.position.set(position.x, position.y, position.z); }
+  setYaw(yaw: number): void { this.yaw = this.previousYaw = yaw; this.present(1); }
   setVisible(visible: boolean): void { this.visible = visible; this.applyVisibility(); }
   setOpacity(opacity: number): void {
     this.opacity = THREE.MathUtils.clamp(opacity, 0, 1); this.materials?.setOpacity(this.opacity); this.applyVisibility();

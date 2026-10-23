@@ -18,6 +18,7 @@ import {VOLT_FINALE_DIALOGUE,voltFinaleScan,voltFinaleScanStage} from '../src/ci
 import {auditOpaqueSurfaces} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import {gameplayAudioEvents} from '../src/audio/GameplayAudioEvents.ts';
 import {loadVolt} from './fixtures/VoltAssetFixture.ts';
+import {VOLT_RESCUE_DISSOLVE_KEYS} from '../src/audio/CultivationFinaleAudio.ts';
 
 function setup(){
   const preview=new LevelTwoPreviewScene(()=>{},cultivationAssets),scene=new THREE.Scene();scene.add(preview.root);
@@ -44,6 +45,25 @@ test('Volt finale has contiguous authored shots, readable threat directives and 
   assert.deepEqual(VOLT_FINALE_DIALOGUE.map(line=>[line.speaker,line.text]),[['goop',"Now we're even"],['volt','Get on'],['goop','Follow me, I know the way out']]);
   assert.ok(T.followMe>T.ventCamera+1.5&&T.ductRun>=T.followMe+3,'a quiet recovery beat precedes Goop\'s direction, then they walk');
   assert.ok(T.terminateVolt+2.5<T.coverRun&&T.terminateBob+3<T.voltJump,'directives remain readable before the action resumes');
+});
+
+test('escape alarm follows the movie clock, softens under dialogue, and stops on skip and reset',()=>{
+  const s=setup(),loops:{key:string;volumeScale?:number}[]=[],stops:string[]=[],cues:string[]=[];
+  const offs=[gameplayAudioEvents.on('loop',e=>loops.push(e)),gameplayAudioEvents.on('stop',e=>stops.push(e.key)),
+    gameplayAudioEvents.on('cue',e=>cues.push(e.sound))];
+  try{
+    s.movie.begin(s.camera,true);s.movie.update(T.open+.01);
+    assert.deepEqual(loops.at(-1),{key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:.6});
+    const count=loops.length;s.movie.present(s.camera,1);s.movie.present(s.camera,1);assert.equal(loops.length,count,'rendering cannot emit audio');
+    s.movie.update(T.even+.1-s.movie.seconds);assert.equal(loops.at(-1)!.volumeScale,.3);
+    assert.ok(cues.includes('world-button-press-01'));assert.ok(cues.includes('cultivation-cover-break-free-01'));
+    assert.equal(cues.includes('world-vent-break-01'),false,'The duct floor breaks later, not when the cover comes loose.');
+    const beforeSkip=cues.length,stopStart=stops.length;s.movie.requestSkip();s.movie.update(1/60);
+    for(const key of ['cultivation-finale-alarm',...VOLT_RESCUE_DISSOLVE_KEYS])assert.ok(stops.slice(stopStart).includes(key));
+    assert.equal(cues.length,beforeSkip,'skipping never replays the remaining cues');
+    const resetStart=stops.length;s.movie.reset();
+    for(const key of ['cultivation-finale-alarm',...VOLT_RESCUE_DISSOLVE_KEYS])assert.ok(stops.slice(resetStart).includes(key));
+  }finally{offs.forEach(off=>off());s.dispose();}
 });
 
 test('actor routes stay continuous; boarding and deliberate vent jumps use shared craft positions',()=>{
@@ -80,7 +100,13 @@ test('live finale borrows the real actors/cover/drones, freezes normal combat, a
   const parents=roots.map(root=>root.parent),coverPosition=r.releaseCover.position.clone();
   const matrix=s.preview.voltFinaleSet.fragments.instanceMatrix,material=s.preview.voltFinaleSet.fragments.material;
   const colliders=s.world.colliderCount,cameraFov=s.camera.fov;
-  const cues:string[]=[],unsubscribe=gameplayAudioEvents.on('cue',cue=>cues.push(cue.sound));
+  const cues:string[]=[],loops:string[]=[],stops:string[]=[],stoppedSounds:string[]=[];
+  const unsubscribe=[
+    gameplayAudioEvents.on('cue',cue=>cues.push(cue.sound)),
+    gameplayAudioEvents.on('loop',cue=>{if(cue.key.startsWith('cultivation-rescue-dissolve-')){loops.push(cue.key);assert.equal(cue.sound,'goop-dissolve-loop-01');}}),
+    gameplayAudioEvents.on('stop',cue=>stops.push(cue.key)),
+    gameplayAudioEvents.on('stopSound',cue=>stoppedSounds.push(cue.sound)),
+  ];
   let launches=0,landings=0;
   const launch=s.bobPresentation.onLaunch.bind(s.bobPresentation),land=s.bobPresentation.onLanding.bind(s.bobPresentation);
   s.bobPresentation.onLaunch=event=>{launches++;launch(event);};s.bobPresentation.onLanding=(normal,speed)=>{landings++;land(normal,speed);};
@@ -96,7 +122,16 @@ test('live finale borrows the real actors/cover/drones, freezes normal combat, a
     }
     assert.equal(completions,1);assert.equal(s.movie.complete,true);
     assert.equal(launches,3);assert.equal(landings,3,'cover hop, boarding and the deliberate jump into the vent each animate once');
-    assert.ok(cues.includes('volt-circuit-connect-01'));assert.ok(cues.includes('goop-shoot-01'));assert.ok(cues.includes('world-drone-dissolve-01'));
+    for(const sound of ['cultivation-volt-cell-open-01','cultivation-cover-break-free-01','cultivation-cover-drone-impact-01',
+      'cultivation-volt-drone-hijack-01','cultivation-duct-floor-strain-01']){
+      assert.equal(cues.filter(cue=>cue===sound).length,1,sound);
+      assert.ok(stoppedSounds.includes(sound),'Completion releases rescue recordings.');
+    }
+    for(const sound of ['escape-drone-scan-01','escape-scan-result-01','escape-termination-warning-01','cultivation-sentry-acid-splash-01'])
+      assert.equal(cues.filter(cue=>cue===sound).length,2,sound);
+    assert.ok(cues.includes('goop-shoot-01'));assert.ok(cues.includes('escape-drone-destruction-01'));
+    assert.deepEqual(loops,[...VOLT_RESCUE_DISSOLVE_KEYS]);
+    assert.ok(loops.every(key=>stops.includes(key)));
     assert.equal(s.preview.voltFinaleSet.fragments.instanceMatrix,matrix);assert.equal(s.preview.voltFinaleSet.fragments.material,material);
     assert.equal(s.world.colliderCount,colliders,'the trigger does not cook geometry or add colliders');
     assert.equal(r.controller.complete,false,'only the runtime may complete/unlock the next level');
@@ -105,8 +140,12 @@ test('live finale borrows the real actors/cover/drones, freezes normal combat, a
     assert.equal(r.releaseCover.parent,r.root);assert.deepEqual(r.releaseCover.position,coverPosition);
     assert.equal(r.releaseCover.geometry,geometry);assert.equal(s.preview.voltFinaleSet.effects.visible,false);
     assert.equal(s.movie.begin(s.camera,true),true,'restart reuses the same prepared resources');
+    const count=cues.length;stoppedSounds.length=0;stops.length=0;
     s.movie.requestSkip();assert.equal(s.movie.update(1/60),true);
-  }finally{unsubscribe();s.dispose();}
+    assert.equal(cues.length,count,'Skipping never replays the unplayed sounds.');
+    assert.ok(stoppedSounds.includes('cultivation-volt-cell-open-01'));
+    assert.ok(VOLT_RESCUE_DISSOLVE_KEYS.every(key=>stops.includes(key)));
+  }finally{unsubscribe.forEach(off=>off());s.dispose();}
 });
 
 test('cover lands on the vulnerable real drone before they fall into acid; glass opens with no duplicate Volt',()=>{

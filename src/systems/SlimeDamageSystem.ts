@@ -13,7 +13,7 @@ export const DEFAULT_SLIME_DAMAGE_CONFIG: Readonly<SlimeDamageConfig> = {
 };
 
 export interface SlimeHealthReadModel {
-  readonly slimeId: 'bob' | 'goop';
+  readonly slimeId: 'bob' | 'goop' | 'volt';
   readonly health: number;
   readonly maximumHealth: number;
   readonly normalizedHealth: number;
@@ -23,7 +23,7 @@ export interface SlimeHealthReadModel {
 }
 
 interface MutableSlimeHealthReadModel {
-  readonly slimeId: 'bob' | 'goop';
+  readonly slimeId: 'bob' | 'goop' | 'volt';
   health: number;
   readonly maximumHealth: number;
   normalizedHealth: number;
@@ -34,14 +34,14 @@ interface MutableSlimeHealthReadModel {
 
 export interface SlimeDamageEvents {
   damaged: {
-    readonly slimeId: 'bob' | 'goop';
+    readonly slimeId: 'bob' | 'goop' | 'volt';
     readonly damage: number;
     readonly normalizedHealth: number;
     readonly direction: { readonly x: number; readonly y: number; readonly z: number } | undefined;
   };
-  regenerationStarted: { readonly slimeId: 'bob' | 'goop' };
-  regenerationCompleted: { readonly slimeId: 'bob' | 'goop' };
-  died: { readonly slimeId: 'bob' | 'goop' };
+  regenerationStarted: { readonly slimeId: 'bob' | 'goop' | 'volt' };
+  regenerationCompleted: { readonly slimeId: 'bob' | 'goop' | 'volt' };
+  died: { readonly slimeId: 'bob' | 'goop' | 'volt' };
   reset: Record<string, never>;
 }
 
@@ -52,16 +52,17 @@ export class SlimeDamageSystem {
 
   private readonly config: SlimeDamageConfig;
   private readonly states: readonly MutableSlimeHealthReadModel[];
+  private readonly statesById = new Map<'bob' | 'goop' | 'volt', MutableSlimeHealthReadModel>();
   private disposed = false;
 
-  constructor(config: Partial<SlimeDamageConfig> = {}) {
+  constructor(config: Partial<SlimeDamageConfig> = {}, slimeIds: readonly ('bob' | 'goop' | 'volt')[] = ['bob', 'goop']) {
     this.config = { ...DEFAULT_SLIME_DAMAGE_CONFIG, ...config };
     for (const [label, value] of Object.entries(this.config)) {
       if (!Number.isFinite(value) || value <= 0) {
         throw new Error(`${label} must be positive and finite.`);
       }
     }
-    this.states = (['bob', 'goop'] as const).map((slimeId) => ({
+    this.states = slimeIds.map((slimeId) => ({
       slimeId,
       health: this.config.maximumHealth,
       maximumHealth: this.config.maximumHealth,
@@ -70,6 +71,7 @@ export class SlimeDamageSystem {
       regenerating: false,
       dead: false,
     }));
+    for (const state of this.states) this.statesById.set(state.slimeId, state);
     this.health = this.states;
   }
 
@@ -111,7 +113,7 @@ export class SlimeDamageSystem {
   }
 
   applyDamage(
-    slimeId: 'bob' | 'goop',
+    slimeId: 'bob' | 'goop' | 'volt',
     damage: number,
     direction?: { readonly x: number; readonly y: number; readonly z: number },
   ): boolean {
@@ -157,8 +159,10 @@ export class SlimeDamageSystem {
     this.disposed = true;
   }
 
-  private requireState(slimeId: 'bob' | 'goop'): MutableSlimeHealthReadModel {
-    return this.states[slimeId === 'bob' ? 0 : 1]!;
+  private requireState(slimeId: 'bob' | 'goop' | 'volt'): MutableSlimeHealthReadModel {
+    const state = this.statesById.get(slimeId);
+    if (!state) throw new Error(`No health registered for ${slimeId}`);
+    return state;
   }
 
   private sync(state: MutableSlimeHealthReadModel): void {

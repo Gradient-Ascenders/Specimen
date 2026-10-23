@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {BlackoutVentArrival} from '../src/cinematics/BlackoutVentArrival.ts';
 import {BLACKOUT_ENTRY_VENT as V,sampleBlackoutArrival,blackoutEntryVentFloor} from '../src/cinematics/BlackoutVentArrivalLayout.ts';
@@ -31,6 +32,17 @@ function setup(withAmbient=false){
     dispose(){arrival.dispose();Object.values(presentations).forEach(p=>p.dispose());bay.dispose();world.clear();surfaces.clear();}};
 }
 
+test('the replacement vent slide reaches an audible mix level with peak headroom',()=>{
+  const report=JSON.parse(readFileSync(new URL('../docs/assets/blackout-arrival-audio-import.json',import.meta.url),'utf8'));
+  const inventory=JSON.parse(readFileSync(new URL('../docs/assets/gameplay-audio-inventory.json',import.meta.url),'utf8'));
+  const source=report.clips.find((clip:{id:string})=>clip.id==='blackout-vent-slime-slide-01');
+  const asset=inventory.find((clip:{id:string})=>clip.id==='blackout-vent-slime-slide-01');
+  assert.equal(source.source,'vent-slime-slide-2.wav');
+  assert.ok(source.rms>=.05,'The replacement must not remain near its previous .017 RMS.');
+  assert.ok(asset.peak<.95,'Normalization retains clipping headroom.');
+  assert.equal(asset.durationSeconds,4);
+});
+
 test('all three slide routes are continuous, clear the wall opening, and land on the existing safe CP1 anchors',()=>{
   const s=setup(),a=new THREE.Vector3(),b=new THREE.Vector3(),hit=new CollisionHit();try{
     s.arrival.begin(s.camera);
@@ -54,6 +66,7 @@ test('all three slide routes are continuous, clear the wall opening, and land on
 test('the real arrival borrows existing bodies/models, animates each ejection and landing once, and hands back without replay',()=>{
   const s=setup(),parents=Object.values(s.presentations).map(p=>p.root.parent),cues:string[]=[];
   const off=gameplayAudioEvents.on('cue',cue=>cues.push(cue.sound));
+  const stopped:string[]=[],offStop=gameplayAudioEvents.on('stopSound',cue=>stopped.push(cue.sound));
   const events={bob:{launch:0,land:0},goop:{launch:0,land:0},volt:{launch:0,land:0}};
   for(const id of ['bob','goop','volt'] as const){
     const p=s.presentations[id],launch=p.onLaunch.bind(p),land=p.onLanding.bind(p);
@@ -74,27 +87,37 @@ test('the real arrival borrows existing bodies/models, animates each ejection an
     }
     assert.equal(completed,1);assert.equal(s.arrival.complete,true);
     assert.deepEqual(events,{bob:{launch:1,land:1},goop:{launch:1,land:1},volt:{launch:1,land:1}});
-    assert.equal(cues.length,7);assert.equal(cues.filter(c=>c==='world-platform-land-01').length,1);
+    assert.equal(cues.length,9);assert.equal(cues.filter(c=>c==='world-platform-land-01').length,1);
+    assert.equal(cues.filter(c=>c==='blackout-vent-slime-slide-01').length,1,'One slide bed, not three stacked copies.');
+    assert.equal(cues[0],'blackout-vent-slime-slide-01','Sliding starts before the drops and landings.');
+    assert.ok(stopped.includes('blackout-vent-slime-slide-01'),'Completion releases the slide voice.');
+    assert.equal(cues.filter(c=>c==='world-vent-break-01').length,1);
     assert.equal(s.camera.near,.1);assert.equal(s.camera.fov,48);
     for(const [i,id] of (['bob','goop','volt'] as const).entries()){
       assert.equal(s.presentations[id].root.parent,parents[i]);assert.equal(s.bodies[id].grounded,true);
       assert.deepEqual(new THREE.Vector3().copy(s.bodies[id].position).toArray(),BLACKOUT_CHECKPOINTS[0]!.bodyPositions[id].toArray());
     }
     assert.equal(s.arrival.begin(s.camera),false,'checkpoint recovery/resuming cannot replay the intro');
-  }finally{off();s.dispose();}
+  }finally{off();offStop();s.dispose();}
 });
 
 test('rendering never advances the arrival, cancellation restores ownership, and camera hand-back is continuous',()=>{
-  const s=setup(),follow=new THREE.Vector3(2,2.4,7),q=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.2,.3,0));try{
+  const s=setup(),follow=new THREE.Vector3(2,2.4,7),q=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.2,.3,0));
+  let slideCues=0,slideStops=0;
+  const off=[gameplayAudioEvents.on('cue',cue=>{if(cue.sound==='blackout-vent-slime-slide-01')slideCues++;}),
+    gameplayAudioEvents.on('stopSound',cue=>{if(cue.sound==='blackout-vent-slime-slide-01')slideStops++;})];
+  try{
     s.arrival.begin(s.camera);s.arrival.update(1);
     const render=()=>{s.camera.position.copy(follow);s.camera.quaternion.copy(q);s.arrival.present(s.camera,.5);};
     render();const eye=s.camera.position.clone(),orientation=s.camera.quaternion.clone();render();
     assert.equal(s.arrival.seconds,1);assert.deepEqual(s.camera.position,eye);assert.deepEqual(s.camera.quaternion.toArray(),orientation.toArray());
+    assert.equal(slideCues,1,'Repeated render samples never restart the slide.');
     s.arrival.update(V.duration-1-.00001);s.camera.position.copy(follow);s.camera.quaternion.copy(q);s.arrival.present(s.camera,1);
     assert.ok(s.camera.position.distanceTo(follow)<1e-6);assert.ok(s.camera.quaternion.angleTo(q)<1e-6);
     s.arrival.cancel();assert.equal(s.arrival.active,false);assert.ok(Object.values(s.presentations).every(p=>p.root.parent===s.scene));
+    assert.equal(slideStops,1,'Cancellation releases the recording.');
     assert.equal(s.camera.near,.1);assert.equal(s.camera.fov,48);
-  }finally{s.dispose();}
+  }finally{off.forEach(unsubscribe=>unsubscribe());s.dispose();}
 });
 
 test('entry vent details share the existing kit and have no coplanar surface conflicts',()=>{

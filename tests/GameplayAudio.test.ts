@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import * as THREE from 'three';
 import { AudioManager, type AudioPlayback } from '../src/audio/AudioManager.ts';
+import { prepareBlackoutArrivalAudio } from '../src/audio/BlackoutArrivalAudio.ts';
 import { WorldAudio } from '../src/audio/WorldAudio.ts';
 import { LaserHazard } from '../src/hazards/LaserHazard.ts';
 import { GameplayAudio, type AcidPoolBounds } from '../src/audio/GameplayAudio.ts';
@@ -31,6 +32,7 @@ class Parameter {
   value = 0;
   setTargetAtTime(value: number) { this.value = value; }
   linearRampToValueAtTime(value: number) { this.value = value; }
+  cancelScheduledValues() {}
 }
 class Node {
   gain = new Parameter();
@@ -39,7 +41,8 @@ class Node {
   threshold = new Parameter(); ratio = new Parameter();
   loop = false; buffer: unknown; onended: (() => void) | null = null;
   starts = 0; stopped = false; disconnected = false;
-  connect() {} disconnect() { this.disconnected = true; }
+  connections: Node[] = [];
+  connect(target: Node) { this.connections.push(target); } disconnect() { this.disconnected = true; }
   start() { this.starts++; } stop() { this.stopped = true; this.onended?.(); }
 }
 class Context {
@@ -66,17 +69,131 @@ const useLegacySpatialApi = (node: Node): number[] => {
   return position;
 };
 
-test('all 30 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('world effects carry at room distances while body and sustained electrical sounds stay local', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  const sounds: SoundId[] = ['bob-contact-01', 'volt-circuit-hold-loop-01', 'world-laser-loop-01',
+    'world-door-movement-loop-01', 'world-machinery-loop-01', 'world-sign-tick-01',
+    'goop-dissolve-loop-01', 'world-platform-fall-01', 'world-platform-land-01'];
+  try {
+    await audio.preload(sounds); audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    for (const sound of sounds) audio.play(sound, { x: 10, y: 0, z: 0 });
+    const voices = [...(audio as any).voices];
+    const distanceGain = (sound: SoundId, distance: number): number => {
+      const { refDistance, rolloffFactor } = voices.find(v => v.sound === sound).panner;
+      return refDistance / (refDistance + rolloffFactor * (Math.max(distance, refDistance) - refDistance));
+    };
+    const oldGain = 3 / (3 + 1.5 * 7);
+    assert.equal(distanceGain('bob-contact-01', 10), oldGain);
+    assert.equal(distanceGain('volt-circuit-hold-loop-01', 10), oldGain);
+    for (const sound of sounds.slice(2)) {
+      assert.ok(distanceGain(sound, 10) >= oldGain * 1.8, `${sound} must retain more presence across the room`);
+      assert.ok(distanceGain(sound, 20) < distanceGain(sound, 10), `${sound} must still recede with distance`);
+    }
+    const impact = voices.find(v => v.sound === 'world-platform-land-01');
+    assert.ok(impact.gain.gain.value * distanceGain('world-platform-land-01', 15) > 0.5,
+      'heavy platform landings must remain prominent at a typical viewing distance');
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('loop distance fades adjust one continuing voice and survive suspension and capacity waits', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  const sound = 'world-laser-loop-01', base = SOUND_DEFINITIONS[sound].volume;
+  try {
+    await audio.preload([sound]); audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    audio.startLoop('beam', sound, { x: 14, y: 0, z: 0 }, .5);
+    const voice = [...(audio as any).voices][0];
+    assert.equal(voice.gain.gain.value, base * .5, 'initial fade-in must honor distance gain');
+    audio.startLoop('waiting', sound, { x: 15, y: 0, z: 0 }, .1);
+    assert.equal(context.sources.length, 1);
+    audio.startLoop('beam', sound, { x: 4, y: 0, z: 0 });
+    assert.equal(voice.gain.gain.value, base); assert.equal(context.sources.length, 1);
+    audio.setPaused(true); await Promise.resolve();
+    audio.startLoop('beam', sound, { x: 15, y: 0, z: 0 }, .1);
+    audio.setPaused(false); await Promise.resolve();
+    assert.equal(voice.gain.gain.value, base * .1); assert.equal(context.sources.length, 1);
+    audio.stopLoop('beam');
+    const waiting = [...(audio as any).voices][0];
+    assert.equal(waiting.key, 'waiting'); assert.equal(waiting.gain.gain.value, base * .1);
+    audio.stopAll(); assert.equal(audio.diagnostics.voices, 0);
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('all 72 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 30);
+  assert.equal(ids.length, 72);
+  assert.equal(SOUND_BANKS.containment.some(id => id.startsWith('cultivation-')), false);
+  assert.equal(SOUND_BANKS.cultivation.filter(id => id.startsWith('cultivation-')).length, 8);
+  assert.equal(SOUND_BANKS.containment.includes('blackout-vent-slime-slide-01'), false);
+  assert.equal(SOUND_BANKS.cultivation.includes('blackout-vent-slime-slide-01'), false);
+  assert.equal(SOUND_BANKS.blackout.includes('blackout-vent-slime-slide-01'), true);
   for (const id of ids) {
     const path = SOUND_DEFINITIONS[id].path;
     assert.equal(readFileSync(new URL(`../public/${path}`, import.meta.url)).subarray(0,4).toString(), 'OggS');
     assert.equal(new URL(soundUrl(id), 'https://example.test/group-folder/').pathname, `/group-folder/${path}`);
     assert.equal(soundUrl(id, '/group-folder/'), `/group-folder/${path}`);
   }
-  for (const folder of ['bob','goop','volt','world','environment','turrets'])
+  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro','escape','cultivation','blackout'])
     assert.ok(readdirSync(new URL(`../public/assets/audio/${folder}/`, import.meta.url)).every(f => f.endsWith('.ogg')));
+});
+
+test('cold Blackout entry waits for the slide decode; repeat entry uses its cached buffer', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  let releaseSlide!: () => void, slideRequests = 0, prepared = false;
+  const delayedSlide = new Promise<void>(resolve => { releaseSlide = resolve; });
+  globalThis.fetch = async url => {
+    if (String(url).includes('blackout-vent-slime-slide-01')) { slideRequests++; await delayedSlide; }
+    return new Response(new Uint8Array([1]));
+  };
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    const preparation = prepareBlackoutArrivalAudio(audio).then(() => { prepared = true; });
+    audio.unlock(); audio.setPaused(false);
+    await Promise.resolve(); await Promise.resolve();
+    assert.equal(prepared, false, 'Do not start the first-frame movie cue before its download/decode completes.');
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length, 0, 'An undecoded one-shot would otherwise be dropped.');
+    releaseSlide(); await preparation;
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length, 1, 'The very first entry can now play the slide.');
+    audio.stopSound('blackout-vent-slime-slide-01'); context.currentTime += 1;
+    await prepareBlackoutArrivalAudio(audio);
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length, 2); assert.equal(slideRequests, 1);
+    assert.equal(SOUND_DEFINITIONS['blackout-vent-slime-slide-01'].volume, .35);
+  } finally { releaseSlide(); audio.dispose(); globalThis.fetch = originalFetch; }
+});
+
+test('first-frame slide schedules exactly once while the browser audio context is resuming', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  let finishResume!: () => void;
+  const resumed = new Promise<void>(resolve => { finishResume = () => { context.state = 'running'; resolve(); }; });
+  context.resume = () => resumed;
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    await audio.preload(['blackout-vent-slime-slide-01']);
+    audio.unlock();
+    audio.play('blackout-vent-slime-slide-01');assert.equal(context.sources.length,0,'Intentional pause still rejects cues.');
+    audio.setPaused(false);
+    assert.equal(context.state,'suspended');
+    audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length,1,'The first-frame voice must survive asynchronous resume.');
+    assert.equal(context.sources[0].starts,1);
+    finishResume();await resumed;await Promise.resolve();
+    assert.equal(context.sources.length,1,'Resume must not replay the queued one-shot.');
+    audio.stopAll();context.currentTime+=1;
+    audio.setFocused(false);audio.play('blackout-vent-slime-slide-01');
+    assert.equal(context.sources.length,1,'Focus loss still rejects new voices.');
+  } finally { finishResume(); audio.dispose(); globalThis.fetch=originalFetch; }
+});
+
+test('Blackout arrival audio preparation tolerates failed and stalled optional audio', async () => {
+  await prepareBlackoutArrivalAudio({ preload: async () => { throw new Error('Unavailable audio'); } });
+  await prepareBlackoutArrivalAudio({ preload: () => new Promise<void>(() => {}) }, 1);
 });
 
 test('cached loading, autoplay, keyed loops, pause, position, limits, volume and teardown', async () => {
@@ -209,6 +326,34 @@ test('dispose cancels queued audio and ignores decodes that complete after teard
     assert.equal(audio.diagnostics.pending, 0); assert.equal(audio.diagnostics.activeLoads, 0);
     await audio.preload(); audio.unlock(); assert.equal(requests, 4);
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('menu confirmation uses the shared mix while paused world voices remain muted and resume only with gameplay', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    await audio.preload(['ui-confirm-01','world-laser-loop-01']);
+    audio.unlock();audio.setPaused(false);await Promise.resolve();
+    audio.startLoop('laser','world-laser-loop-01',{x:0,y:1,z:0});
+    const state = audio as any, worldVoice = [...state.voices][0] as any;
+    assert.ok(worldVoice.panner.connections.includes(state.gameplayGain));
+    audio.setPaused(true);await Promise.resolve();assert.equal(context.state,'suspended');
+    audio.playUI();await Promise.resolve();
+    assert.equal(context.state,'running');assert.equal(state.gameplayGain.gain.value,0);
+    const ui = [...state.voices].find((v:any)=>v.ui) as any;
+    assert.equal(ui.sound,'ui-confirm-01');assert.equal(ui.panner,undefined);
+    assert.ok(ui.gain.connections.includes(state.effects),'menu volume goes through the same effects and master sliders');
+    const played=audio.diagnostics.played;audio.play('bob-jump-01');assert.equal(audio.diagnostics.played,played);
+    ui.source.onended();await Promise.resolve();
+    assert.equal(context.state,'suspended');assert.equal(state.gameplayGain.gain.value,0);
+    audio.setPaused(false);await Promise.resolve();
+    assert.equal(state.gameplayGain.gain.value,1);assert.ok(state.voices.has(worldVoice),'menu clicks retain existing loop ownership');
+    audio.setFocused(false);audio.playUI();assert.equal(audio.diagnostics.played,played);
+    audio.setFocused(true);audio.setPaused(true);context.currentTime+=1;audio.playUI();await Promise.resolve();
+    assert.equal(context.state,'running');audio.stopAll();await Promise.resolve();
+    assert.equal(context.state,'suspended','cancelling a menu click must also release its temporary context resume');
+  }finally{globalThis.fetch=originalFetch;audio.dispose();}
 });
 
 test('unsupported audio is optional and only attempts one context across banks', async () => {
@@ -545,7 +690,7 @@ test('timed receivers sound completion once, share tether audio and stay silent 
   try {
     controller.setActive(true);
     const receiver=controller.lights[0]; receiver.target.setConnectionState(true);
-    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(15),goop:fake(18),volt:fake(-16)});
+    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(6),goop:fake(8),volt:fake(-16)});
     assert.equal(cues.filter(s=>s==='volt-charge-ready-01').length,1);
     assert.deepEqual(cues,['volt-charge-ready-01']);
     assert.deepEqual(loops,[], 'charging must not layer another buzz over the tether');
@@ -553,7 +698,7 @@ test('timed receivers sound completion once, share tether audio and stay silent 
     controller.reset(); receiver.target.setConnectionState(true); controller.reset();
     assert.deepEqual(cues,['volt-charge-ready-01']);
     receiver.target.setConnectionState(true);
-    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(15),goop:fake(18),volt:fake(-16)});
+    for(let i=0;i<120;i++) controller.update(1/60,{bob:fake(6),goop:fake(8),volt:fake(-16)});
     assert.deepEqual(cues,['volt-charge-ready-01','volt-charge-ready-01']);
   } finally { for(const off of offs)off(); controller.dispose(); registry.dispose(); room.dispose(); world.clear(); surfaces.clear(); }
 });

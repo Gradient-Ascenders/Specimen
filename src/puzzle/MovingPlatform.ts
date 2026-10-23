@@ -132,7 +132,10 @@ export class MovingPlatform {
     );
     this.previousPositionValue.copy(this.root.position);
     this.state = this.resolveState();
-    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue, settled: () => this.isAtStart || this.isAtEnd });
+    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue,
+      settled: () => this.isAtStart || this.isAtEnd,
+      travelCues: Math.abs(this.endValue.y-this.startValue.y) > .01 &&
+        Math.hypot(this.endValue.x-this.startValue.x, this.endValue.z-this.startValue.z) < .01 });
   }
 
   get platformState(): MovingPlatformState {

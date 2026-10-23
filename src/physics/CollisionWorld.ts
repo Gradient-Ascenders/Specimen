@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { SphereBoxSweep } from './SphereBoxSweep.ts';
+import { sweptSpherePairFraction } from './ContinuousCollision.ts';
 
 const AXIS_EPSILON = 1e-9;
 const CONTACT_EPSILON = 1e-7;
 const BROADPHASE_CELL_SIZE_METRES = 10;
 const MAX_GRID_CELLS_PER_COLLIDER = 256;
+const SPHERE_CENTRE=Object.freeze({x:0,y:0,z:0});
 
 type BroadphaseZCells = Map<number, RegisteredCollider[]>;
 type BroadphaseYCells = Map<number, BroadphaseZCells>;
@@ -453,11 +455,13 @@ export class CollisionWorld {
       // ellipsoid. Expanding by radius / minScale is conservative and avoids
       // missing collisions without requiring an ellipsoid solver.
       const localRadius = radius / minimumScale;
-      // Opt-in rounded Minkowski corners avoid phantom ledges where a ramp
-      // meets a flat bank. Other colliders and camera/projectile sweeps retain
-      // the established conservative box expansion.
-      const preciseMovement = (queryMask & CollisionLayer.Movement) !== 0 && mesh.userData.preciseMovementCorners === true;
-      const fraction = preciseMovement ? this.sphereBoxSweep.sweep(collider.localBounds,
+      // Opt-in rounded Minkowski corners avoid phantom ramp ledges and the
+      // inflated square corners of boss lift decks. Other scenery retains its
+      // established conservative expansion, including ordinary projectiles.
+      const preciseCorners = ((queryMask & CollisionLayer.Movement) !== 0 && mesh.userData.preciseMovementCorners === true)
+        || mesh.userData.preciseSweepCorners === true;
+      const sphereRadius=collider.mesh.userData.collisionSphereRadius as number|undefined;
+      const fraction = sphereRadius!==undefined?this.sweepLocalSphere(sphereRadius,localRadius):preciseCorners ? this.sphereBoxSweep.sweep(collider.localBounds,
         this.localStart, this.localDisplacement, localRadius, this.candidateNormalLocal) : this.sweepExpandedLocalBox(
         collider.localBounds,
         localRadius,
@@ -573,7 +577,8 @@ export class CollisionWorld {
 
       if (!this.broadphaseEnabled) this.queryCandidateCount++;
       this.queryNarrowChecks++;
-      const fraction = this.raycastLocalBox(
+      const sphereRadius=collider.mesh.userData.collisionSphereRadius as number|undefined;
+      const fraction = sphereRadius!==undefined?this.sweepLocalSphere(sphereRadius,0):this.raycastLocalBox(
         collider.localBounds,
         this.localStart,
         this.localDisplacement,
@@ -598,6 +603,16 @@ export class CollisionWorld {
       .copy(origin)
       .lerp(this.worldEnd, outHit.fraction);
     return true;
+  }
+
+  /** Opt-in analytical sphere; existing level boxes keep their exact behavior.
+   * Owners centre this geometry at local zero. Inverse-world conversion keeps
+   * rays exact and moving-sphere expansion conservative under unequal scales. */
+  private sweepLocalSphere(radius:number,expansion:number):number|undefined {
+    if(!Number.isFinite(radius)||radius<=0)throw new Error('Collision sphere radius must be positive and finite.');
+    const fraction=sweptSpherePairFraction(this.localStart,this.localDisplacement,expansion,SPHERE_CENTRE,SPHERE_CENTRE,radius);
+    if(fraction!==undefined){this.candidateNormalLocal.copy(this.localStart).addScaledVector(this.localDisplacement,fraction);if(this.candidateNormalLocal.lengthSq()<AXIS_EPSILON)this.candidateNormalLocal.copy(this.localDisplacement).negate();this.candidateNormalLocal.normalize();}
+    return fraction;
   }
 
   private resetSweepDiagnostics(): void {

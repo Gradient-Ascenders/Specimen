@@ -1245,7 +1245,7 @@
 
 .credits-entries {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: var(--ui-space-2);
 }
 
@@ -2310,7 +2310,23 @@ kbd {
 }
 
 
-/* Minimal Specimen combat verification UI. Final HUD/VFX ownership remains #133/#136/#137. */
+/* The final chamber uses the same pooled weapon UI, with its own encounter HUD. */
+.final-boss-hud { position:absolute;inset:0;z-index:14;pointer-events:none;color:#d8fff1;font-family:var(--font-mono,monospace); }
+.final-boss-hud[hidden], .final-boss-hud [hidden] {display:none;}
+.final-boss-heading { position:absolute;top:2.5%;left:23%;width:54%;text-align:center;letter-spacing:.2em;font-size:clamp(.65rem,1.4vw,.95rem);text-shadow:0 2px 8px #000; }
+.final-boss-hud > progress {position:absolute;top:7%;left:23%;width:54%;height:.65rem;border:1px solid #94e9dc66;background:#061319;accent-color:#4fdabb;}
+.final-boss-hud > .final-boss-integrity {top:auto;bottom:6%;left:4%;width:18%;height:.6rem;accent-color:#8ce36a;}
+.final-boss-hud > progress::-webkit-progress-bar {background:#08161c;}
+.final-boss-hud > progress::-webkit-progress-value {background:linear-gradient(90deg,#2da68e,#87f4d1);}
+.final-boss-hud[data-phase='2'] > progress:first-of-type::-webkit-progress-value {background:linear-gradient(90deg,#e84b49,#ffac67);}
+.final-boss-message {position:absolute;bottom:15%;left:15%;width:70%;text-align:center;font-size:clamp(.65rem,1.3vw,.9rem);letter-spacing:.08em;text-shadow:0 2px 7px #000,0 0 3px #000;}
+.final-boss-cinematic {position:absolute;left:10%;width:80%;top:72%;text-align:center;white-space:pre-line;font-size:clamp(.8rem,2vw,1.5rem);letter-spacing:.16em;text-shadow:0 2px 9px #000;line-height:1.7;}
+.final-boss-skip {position:absolute;right:3%;bottom:4%;pointer-events:auto;color:#b2d3cb;background:#09141ccc;border:1px solid #67bca466;padding:.6rem;font:inherit;font-size:.7rem;}
+.final-boss-hud[data-hit='true'] {box-shadow:inset 0 0 70px #ef354733;}
+.final-boss-hud[data-state='transition'] .final-boss-cinematic {color:#ff7b71;}
+#app[data-boss-encounter='true'] .hud-roster, #app[data-boss-encounter='true'] .hud-objective-module {display:none;}
+.final-boss-hud::after {content:'SPECIMEN INTEGRITY / WASD · SPACE · RMB AIM · LMB TAP OR HOLD';position:absolute;bottom:2.5%;left:4%;font-size:clamp(.5rem,1.1vw,.75rem);text-shadow:0 2px 4px #000;}
+.final-boss-hud[data-state='intro']::before,.final-boss-hud[data-state='merging']::before,.final-boss-hud[data-state='transition']::before,.final-boss-hud[data-state='defeated']::before,.final-boss-hud[data-state='escape']::before {content:'';position:absolute;inset:0;border-top:5vh solid #000;border-bottom:5vh solid #000;}
 .specimen-combat-overlay {
   position: absolute;
   inset: 0;

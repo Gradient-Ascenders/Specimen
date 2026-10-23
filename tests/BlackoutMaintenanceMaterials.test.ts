@@ -127,7 +127,7 @@ test('untouched authored mesh fingerprints still match the baseline around the n
       assert.deepEqual(mesh.scale.toArray(), saved.scale); assert.deepEqual(mesh.userData, saved.userData);
       assert.equal(hash(mesh.geometry.attributes.position.array), saved.positionHash, saved.name);
       assert.equal(hash(mesh.geometry.attributes.normal.array), saved.normalHash, saved.name);
-      assert.equal(hash(mesh.geometry.index!.array), saved.indexHash, saved.name);
+      assert.equal(mesh.geometry.index ? hash(mesh.geometry.index.array) : null, saved.indexHash, saved.name);
       assert.equal(mesh.castShadow, saved.castShadow); assert.equal(mesh.receiveShadow, saved.receiveShadow);
     }
     assert.equal(bay.root.getObjectByName('ceiling-entry-vent-frame'),undefined);

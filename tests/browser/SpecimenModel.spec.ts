@@ -5,7 +5,6 @@ import type { SpecimenCharacterPresentation } from '../../src/render/specimen/Sp
 import type { KinematicBody } from '../../src/physics/KinematicBody.ts';
 import type { RenderLayer } from '../../src/render/RenderLayer.ts';
 import type { SpecimenProjectileSystem } from '../../src/combat/SpecimenProjectileSystem.ts';
-import type { BlackoutCheckpointManager } from '../../src/levels/BlackoutCheckpointManager.ts';
 import type * as THREE from 'three';
 
 type RuntimeProbe = BlackoutLevelRuntime & {
@@ -23,8 +22,6 @@ interface Probe {
     bobPresentation: { diagnostics: { visible: boolean } };
     voltPresentation: { diagnostics: { visible: boolean } };
     specimenLight: THREE.PointLight;
-    checkpoints: BlackoutCheckpointManager<KinematicBody>;
-    group: { bobBody: KinematicBody; goopBody: KinematicBody; voltBody: KinematicBody };
   };
   renderLayer: RenderLayer;
   advance(dt: number): void;
@@ -40,8 +37,10 @@ test('authored Specimen replaces the fusion sphere through merge, camera modes, 
   page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
   await page.route('**/assets/*.js', async route => {
     const response = await route.fetch();
+    // Exercise the foundation merge/split lifecycle independently of the new
+    // boss cinematics; FinalBoss smoke coverage owns the authored encounter.
     const body = (await response.text()).replace(/export\{([A-Za-z_$][\w$]*) as BlackoutLevelRuntime\};/,
-      'class __SpecimenModelRuntime extends $1{constructor(...args){super(...args);globalThis.__specimenModelProbe={runtime:this,get resources(){return this.runtime.resources},get renderLayer(){return this.runtime.renderLayer},advance:this.fixedUpdate.bind(this)}}}export{__SpecimenModelRuntime as BlackoutLevelRuntime};');
+      'class __SpecimenModelRuntime extends $1{constructor(...args){super({...args[0],authoredRoomOne:false,playArrival:false});globalThis.__specimenModelProbe={runtime:this,get resources(){return this.runtime.resources},get renderLayer(){return this.runtime.renderLayer},advance:this.fixedUpdate.bind(this)}}}export{__SpecimenModelRuntime as BlackoutLevelRuntime};');
     await route.fulfill({ response, body });
   });
   await page.goto('/?debug=1', { waitUntil: 'domcontentloaded' });
@@ -94,15 +93,9 @@ test('authored Specimen replaces the fusion sphere through merge, camera modes, 
   await page.screenshot({ path: 'artifacts/evidence/specimen-integration/first-person.png' });
   await page.evaluate(() => window.__specimenModelProbe.renderLayer.cameraRig.setViewMode('third-person', true));
 
-  // CP8 belongs to the foundation encounter. Register its fusion-form fixture
-  // in this authored-room session to exercise the same recovery authority.
+  // Recover the foundation's registered fusion-form checkpoint.
   await page.evaluate(() => {
     const p = window.__specimenModelProbe;
-    const r = p.resources;
-    r.checkpoints.registerCheckpoint({ id: 'cp8', controlledForm: 'specimen',
-      specimenPosition: r.specimenBody.position.clone(), activeSlimeId: 'bob',
-      bodyPositions: { bob: r.group.bobBody.position, goop: r.group.goopBody.position, volt: r.group.voltBody.position },
-      room: { roomId: 'room-4b', phase: 'specimen', local: { merged: true } } });
     p.runtime.activateCheckpoint('cp8'); p.runtime.recoverActiveCheckpoint();
   });
   expect(await page.evaluate(() => window.__specimenModelProbe.resources.specimenCharacter.diagnostics)).toMatchObject({

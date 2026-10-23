@@ -19,9 +19,9 @@
         1,
         1
       ],
-      "positionHash": "154a5d474f4aac5ec07c317885351fbb3f82c629193b52e6008f52ad5f047d34",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "568cdf13aa14bb55845e772ef0c57cba7823961254fcc471f3acc6a95777e4e8",
+      "normalHash": "546660b513a27235875d54dec0803a12d60bbf228fc217897ce3179307bf8f64",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -122,7 +122,7 @@
       "collider": true,
       "position": [
         -12.6,
-        -0.475,
+        -0.5,
         7
       ],
       "rotation": [
@@ -136,7 +136,7 @@
         1,
         1
       ],
-      "positionHash": "1a21be87648347cacb6307215bb2eaf79f29e013ff31d788aee758f7d6bcdb70",
+      "positionHash": "0b8e6cdeb297d7ca6bc38fa63b51778d3babed57a711526239c48591c248b85f",
       "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
       "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
       "userData": {
@@ -151,7 +151,7 @@
       "collider": true,
       "position": [
         5.5,
-        -0.475,
+        -0.5,
         7
       ],
       "rotation": [
@@ -165,7 +165,7 @@
         1,
         1
       ],
-      "positionHash": "40cb9cf413a72b6f9f41c25d78b9fb79e9d654dd7010441c3db6926b2569a2b0",
+      "positionHash": "7742fc967546a6880fd81c6b9baca964e7db9efd99afed380bdb639a0cf846c0",
       "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
       "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
       "userData": {
@@ -281,9 +281,9 @@
         1,
         1
       ],
-      "positionHash": "74065563951d72b69ff6a8e3f406be24e34e55c79f01f7c0ce1d0057ff8b0b1d",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "4ce9df9baedba71273fc5ce8187aacfc2e2d2a05077322aa8c5c5d1032ac2d0b",
+      "normalHash": "5797c334f31207221a6a7e7d7665e462de8087e609df819eeda41cf9261ed5d7",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision",
@@ -399,9 +399,9 @@
         1,
         1
       ],
-      "positionHash": "09a7b013342a795421f4198fe2ad7514d2d4d94a5cde4929f795836d55ffc879",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "c564e74632d0526d241329759669c162db5110b7285ab04ad20f1e3d1a57896d",
+      "normalHash": "faf9354d8f15563866470e519ef51bc1e059a9c0c98ed72354a9e420deaa4a09",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -428,9 +428,9 @@
         1,
         1
       ],
-      "positionHash": "dda7d87155364f7ef4df33e66aae50ced0916b77a2441f6cc9fe5aa1dc5f7f2d",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "7c8c6eb9d267fd857affb0b27a78b89a99a611efd7e1297f4b6bb5ba46c20666",
+      "normalHash": "ff2727db48fce16e69af2fb45b1b9d4289f560eed844616bb7b7529ec52d6b58",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -515,9 +515,9 @@
         1,
         1
       ],
-      "positionHash": "c16c70ad40260e35f8679f3c6dd074fa6d096f78ed015a1dfcc858d0969a1552",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "f9cf7e678558a2ed1092d4501dd8c8b1c708c98c2d3edfb4dfed78d10cf63007",
+      "normalHash": "c9bba118e2e7501638d31db4ce2e9df0d2a74c0dadd2b3eb40300b802985f5e5",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -544,9 +544,9 @@
         1,
         1
       ],
-      "positionHash": "c16c70ad40260e35f8679f3c6dd074fa6d096f78ed015a1dfcc858d0969a1552",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "e79e65855b090d86fa78feb6c540df10340a5fcfba0cc088c335c50e14383a8c",
+      "normalHash": "b729495dc10a20502703ab68425f0c01d482224cdec6c10a6bff59757b712ae8",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -573,9 +573,9 @@
         1,
         1
       ],
-      "positionHash": "a6e74b0ee07b7e56e253af5886b8d65e5254f6e5d33bedf07588d945f78d7868",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "cfdfa478154d54c0bc0bf88f77cf08d5f455cb5ea5f6569cd0a6fa21412b31b7",
+      "normalHash": "5f9733a23942e6cd18e90b422983d8d9912392042adca1781b87e31d1e5a57ee",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -807,9 +807,9 @@
         1,
         1
       ],
-      "positionHash": "5bb88ce59a93ebfc43d865ffd7a79bf6a129cc133b090697fdd86f87b6870811",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "ee1a8549f8661a645abba2f49e3edc1423e1d384be1201722625f87c354afedc",
+      "normalHash": "b351b18899b12a50d50d3da7297ae7dd6029516fc05a528a03d240243adba65b",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -836,9 +836,9 @@
         1,
         1
       ],
-      "positionHash": "5bb88ce59a93ebfc43d865ffd7a79bf6a129cc133b090697fdd86f87b6870811",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "f3383fafcbf1339fa50e47c48db3fabc7d789e5cb8e8467f1ae5c1f8e634074c",
+      "normalHash": "fd1b598acc0fcd647bdf1b7a6ee70b0bd70a16b07dc70c9a146d9d2ccd679744",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -865,9 +865,9 @@
         1,
         1
       ],
-      "positionHash": "740ec2cc2526f6c77379b255ee222a2006d77613b1c4de97b5dc087a04541720",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "96551dd56a97b2b19f260c7a0e48112e5aea9101b53f1fba3b5a15f23915a279",
+      "normalHash": "3463a2d7aabc83f29be6ae04b068065f6d001b715cec23f87c1a095c81de3905",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -939,7 +939,7 @@
       "position": [
         -11.75,
         1.1,
-        60
+        59.85
       ],
       "rotation": [
         0,
@@ -952,9 +952,9 @@
         1,
         1
       ],
-      "positionHash": "ecdf6ef2dcec50c0080be9e0b4edeae7f8b98fb94abba0ce847e6e25f3b7d549",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "197b6ac542b8d8a460c657057e9ebe74090b64987f06ef78e2e185b5baa243ca",
+      "normalHash": "fe43cac281769d223c957fe2481d8ee40f62fc543a0c9260e46266f78c011077",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -968,7 +968,7 @@
       "position": [
         -10.25,
         1.1,
-        63
+        63.15
       ],
       "rotation": [
         0,
@@ -981,9 +981,9 @@
         1,
         1
       ],
-      "positionHash": "ecdf6ef2dcec50c0080be9e0b4edeae7f8b98fb94abba0ce847e6e25f3b7d549",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "add558ae15143b99693cd2452ef0ae84c5d95a43c1449d2bb6909b9dc00a8396",
+      "normalHash": "09f88dca36a5389b6cca32bf3e645a563560b030420ea06ac88e81075ae17a2d",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -995,7 +995,7 @@
       "name": "vent-turn-east-wall",
       "collider": true,
       "position": [
-        -5.25,
+        -5.1,
         1.1,
         61.5
       ],
@@ -1024,7 +1024,7 @@
       "name": "vent-turn-west-wall",
       "collider": true,
       "position": [
-        -16.75,
+        -16.9,
         1.1,
         61.5
       ],
@@ -1068,9 +1068,9 @@
         1,
         1
       ],
-      "positionHash": "0337678980eeeab61cae06e41f318e5632a766b64831f3115526fef61aba139d",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "be8cc4abffde2a8ce780b956e74e35aaaf245a1db50dde9c3ba810edaa1ad923",
+      "normalHash": "c12ab893be0cfddb36d7213a9155e65db9abc98d7df4fa62f061e720bcc00dcd",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision",
@@ -1098,9 +1098,9 @@
         1,
         1
       ],
-      "positionHash": "0337678980eeeab61cae06e41f318e5632a766b64831f3115526fef61aba139d",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "a3eeb0e516061549076eb5aa2a5a4d7900488e233ee6bcc1216f905d6f3c59c9",
+      "normalHash": "5745d8da587699701d34227e3b9509b476c1d8e3698d9d44b055c01ad416d5ae",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1127,9 +1127,9 @@
         1,
         1
       ],
-      "positionHash": "46a04ba4e478da1c6fa8b84dae7d55641ef17d7f666281d4dd0cf34fb3c75f66",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "a1827002614b9dd362b075c61c96d2c8eb4e50b33fe6077c7dd2c524c83ad07c",
+      "normalHash": "295e88455eb3684dd748006e04c1422ff8a5eeb9a23b6230de7dc7c60085d5c5",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1156,9 +1156,9 @@
         1,
         1
       ],
-      "positionHash": "46a04ba4e478da1c6fa8b84dae7d55641ef17d7f666281d4dd0cf34fb3c75f66",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "748668a96741a4cc302d17973f447d1117cba3701ce8e444aae7cd4fb3ce7766",
+      "normalHash": "1612d2fb085f570b0f9370e620113f7687aa42f584b30ecb62facc733d71d041",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1199,9 +1199,9 @@
       "name": "vent-frame-side--6.77-53.75",
       "collider": true,
       "position": [
-        -6.77,
+        -6.79,
         1.1,
-        53.75
+        53.815
       ],
       "rotation": [
         0,
@@ -1214,9 +1214,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "6d363164a1a92757f2e5c19b22e2552e6eaecdfbcae1149fa78a23c86a0d8c0b",
+      "normalHash": "2d0c678bf74c6ea23bd315084156bc76d814a3ba4e9d469b1e1601a381ced106",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1228,9 +1228,9 @@
       "name": "vent-frame-side--5.23-53.75",
       "collider": true,
       "position": [
-        -5.23,
+        -5.21,
         1.1,
-        53.75
+        53.815
       ],
       "rotation": [
         0,
@@ -1243,9 +1243,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "07e3837e6d0ca07efe9f5429da2a0318d21eaa3e091bfbdb3e018b3d174167d9",
+      "normalHash": "cf745b547ad45eef5f74370cb2e8971a97bdb4f0eba286a7a40b5b808629d352",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1259,7 +1259,7 @@
       "position": [
         -6,
         2.28,
-        53.75
+        53.815
       ],
       "rotation": [
         0,
@@ -1286,7 +1286,7 @@
       "name": "vent-frame-side--6.77-55.5",
       "collider": true,
       "position": [
-        -6.77,
+        -6.79,
         1.1,
         55.5
       ],
@@ -1301,9 +1301,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "6d363164a1a92757f2e5c19b22e2552e6eaecdfbcae1149fa78a23c86a0d8c0b",
+      "normalHash": "2d0c678bf74c6ea23bd315084156bc76d814a3ba4e9d469b1e1601a381ced106",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1315,7 +1315,7 @@
       "name": "vent-frame-side--5.23-55.5",
       "collider": true,
       "position": [
-        -5.23,
+        -5.21,
         1.1,
         55.5
       ],
@@ -1330,9 +1330,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "07e3837e6d0ca07efe9f5429da2a0318d21eaa3e091bfbdb3e018b3d174167d9",
+      "normalHash": "cf745b547ad45eef5f74370cb2e8971a97bdb4f0eba286a7a40b5b808629d352",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1373,7 +1373,7 @@
       "name": "vent-frame-side--6.77-57.5",
       "collider": true,
       "position": [
-        -6.77,
+        -6.79,
         1.1,
         57.5
       ],
@@ -1388,9 +1388,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "6d363164a1a92757f2e5c19b22e2552e6eaecdfbcae1149fa78a23c86a0d8c0b",
+      "normalHash": "2d0c678bf74c6ea23bd315084156bc76d814a3ba4e9d469b1e1601a381ced106",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1402,7 +1402,7 @@
       "name": "vent-frame-side--5.23-57.5",
       "collider": true,
       "position": [
-        -5.23,
+        -5.21,
         1.1,
         57.5
       ],
@@ -1417,9 +1417,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "07e3837e6d0ca07efe9f5429da2a0318d21eaa3e091bfbdb3e018b3d174167d9",
+      "normalHash": "cf745b547ad45eef5f74370cb2e8971a97bdb4f0eba286a7a40b5b808629d352",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1460,7 +1460,7 @@
       "name": "vent-frame-side--6.77-59.5",
       "collider": true,
       "position": [
-        -6.77,
+        -6.79,
         1.1,
         59.5
       ],
@@ -1475,9 +1475,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "6d363164a1a92757f2e5c19b22e2552e6eaecdfbcae1149fa78a23c86a0d8c0b",
+      "normalHash": "2d0c678bf74c6ea23bd315084156bc76d814a3ba4e9d469b1e1601a381ced106",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1489,7 +1489,7 @@
       "name": "vent-frame-side--5.23-59.5",
       "collider": true,
       "position": [
-        -5.23,
+        -5.21,
         1.1,
         59.5
       ],
@@ -1504,9 +1504,9 @@
         1,
         1
       ],
-      "positionHash": "02debb1c4796a0c503f83c9f3541d48b60172de535d4cb5c1b04623b7eb3e3ab",
-      "normalHash": "cf38d80691f04d52b9686807b830aec77584c7ecdc0ceed56144923548dd5593",
-      "indexHash": "7d2c65fffb490f18b89d5d949a36ac6fe37f052789bdc3ad49759abb3ecd0898",
+      "positionHash": "07e3837e6d0ca07efe9f5429da2a0318d21eaa3e091bfbdb3e018b3d174167d9",
+      "normalHash": "cf745b547ad45eef5f74370cb2e8971a97bdb4f0eba286a7a40b5b808629d352",
+      "indexHash": null,
       "userData": {
         "surfaceTag": "default",
         "authoringRole": "blackout-maintenance-bay-collision"
@@ -1548,7 +1548,7 @@
       "collider": false,
       "position": [
         0,
-        0.012,
+        -0.0125,
         -1.5
       ],
       "rotation": [
@@ -1574,7 +1574,7 @@
       "collider": false,
       "position": [
         0,
-        0.012,
+        -0.0125,
         6.3
       ],
       "rotation": [
@@ -1600,7 +1600,7 @@
       "collider": false,
       "position": [
         0,
-        0.012,
+        -0.0125,
         48.4
       ],
       "rotation": [
@@ -1626,7 +1626,7 @@
       "collider": false,
       "position": [
         0,
-        0.012,
+        -0.0125,
         52.8
       ],
       "rotation": [

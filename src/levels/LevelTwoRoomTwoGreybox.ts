@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 
 import type { DissolveTarget } from '../abilities/DissolveTarget.ts';
 import {
@@ -674,6 +675,11 @@ export class LevelTwoRoomTwoGreybox {
     const { surface } = this.wallButtonPresentation;
     surface.userData.pressed = pressed;
     surface.userData.presentationState = pressed ? 'pressed-green' : 'ready-red';
+    if (!immediate) gameplayAudioEvents.emit('cue', {
+      sound: pressed ? 'world-button-press-01' : 'world-button-release-01',
+      position: this.wallButtonPresentation.pad.getWorldPosition(new THREE.Vector3()),
+      maxDistance: 16,
+    });
     if (immediate) {
       this.wallButtonPressProgress = pressed ? 1 : 0;
       this.writeWallButtonPressPose();

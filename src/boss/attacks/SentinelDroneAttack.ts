@@ -57,6 +57,7 @@ interface ProjectileSlot {
   ownerCollider: THREE.Mesh | undefined;
   ageSeconds: number;
   distanceMetres: number;
+  speedMetresPerSecond: number;
 }
 
 class SentinelDroneProjectilePool {
@@ -68,6 +69,7 @@ class SentinelDroneProjectilePool {
   private readonly radiusMetres: number;
   private readonly lifetimeSeconds: number;
   private readonly maximumRangeMetres: number;
+  private readonly collisionMask:number;
   private readonly hit = new CollisionHit();
   private readonly displacement = new THREE.Vector3();
   private readonly targetDisplacement = new THREE.Vector3();
@@ -82,6 +84,7 @@ class SentinelDroneProjectilePool {
       readonly radiusMetres?: number;
       readonly lifetimeSeconds?: number;
       readonly maximumRangeMetres?: number;
+      readonly collisionMask?:number;
     } = {},
   ) {
     this.world = world;
@@ -90,6 +93,7 @@ class SentinelDroneProjectilePool {
     this.radiusMetres = options.radiusMetres ?? 0.12;
     this.lifetimeSeconds = options.lifetimeSeconds ?? 4;
     this.maximumRangeMetres = options.maximumRangeMetres ?? 50;
+    this.collisionMask=options.collisionMask??CollisionLayer.Projectile;
     if (!Number.isInteger(capacity) || capacity <= 0) {
       throw new Error('Sentinel hostile projectile pool capacity must be a positive integer.');
     }
@@ -116,6 +120,7 @@ class SentinelDroneProjectilePool {
       ownerCollider: undefined,
       ageSeconds: 0,
       distanceMetres: 0,
+      speedMetresPerSecond:this.speedMetresPerSecond,
     }));
     this.states = this.slots.map((slot) => slot.read);
   }
@@ -131,6 +136,7 @@ class SentinelDroneProjectilePool {
     ownerCollider: THREE.Mesh,
     origin: THREE.Vector3,
     direction: THREE.Vector3,
+    speedMetresPerSecond=this.speedMetresPerSecond,
   ): number | undefined {
     this.assertActive('spawn');
     const slot = this.slots.find((candidate) => !candidate.read.active);
@@ -146,6 +152,7 @@ class SentinelDroneProjectilePool {
     slot.ownerCollider = ownerCollider;
     slot.ageSeconds = 0;
     slot.distanceMetres = 0;
+    slot.speedMetresPerSecond=speedMetresPerSecond;
     syncProjectile(slot);
     return slot.read.id;
   }
@@ -169,7 +176,7 @@ class SentinelDroneProjectilePool {
         this.maximumRangeMetres - slot.distanceMetres,
       );
       const distance = Math.min(
-        this.speedMetresPerSecond *
+        slot.speedMetresPerSecond *
           Math.min(deltaSeconds, remainingLifetime),
         remainingRange,
       );
@@ -185,7 +192,7 @@ class SentinelDroneProjectilePool {
         this.displacement,
         this.radiusMetres,
         this.hit,
-        CollisionLayer.Projectile,
+        this.collisionMask,
         slot.ownerCollider,
       );
       const worldFraction = worldHit
@@ -282,9 +289,11 @@ class SentinelBossDrone implements CombatTarget {
 
   private readonly world: CollisionWorld;
   private readonly projectiles: SentinelDroneProjectilePool;
-  private readonly fireIntervalSeconds: number;
+  private fireIntervalSeconds: number;
+  private projectileSpeedMetresPerSecond:number|undefined;
   private readonly healthMaximum: number;
   private readonly onDestroyed: (drone: SentinelBossDrone) => void;
+  private readonly blocksLineOfSight:boolean;
   private readonly position = new THREE.Vector3();
   private readonly aimDirection = new THREE.Vector3();
 
@@ -299,8 +308,10 @@ class SentinelBossDrone implements CombatTarget {
     readonly world: CollisionWorld;
     readonly projectiles: SentinelDroneProjectilePool;
     readonly healthUnits: number;
+    readonly colliderSize?: THREE.Vector3Like;
     readonly fireIntervalSeconds: number;
     readonly onDestroyed: (drone: SentinelBossDrone) => void;
+    readonly blocksLineOfSight?:boolean;
   }) {
     this.id = options.id;
     this.world = options.world;
@@ -309,6 +320,7 @@ class SentinelBossDrone implements CombatTarget {
     this.healthValue = this.healthMaximum;
     this.fireIntervalSeconds = options.fireIntervalSeconds;
     this.onDestroyed = options.onDestroyed;
+    this.blocksLineOfSight=options.blocksLineOfSight??true;
     if (
       !Number.isFinite(this.healthMaximum) ||
       this.healthMaximum <= 0 ||
@@ -320,7 +332,7 @@ class SentinelBossDrone implements CombatTarget {
 
     this.root.name = `${this.id}-sentinel-drone`;
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.8, 0.55, 0.8),
+      new THREE.BoxGeometry(options.colliderSize?.x ?? .8, options.colliderSize?.y ?? .55, options.colliderSize?.z ?? .8),
       new THREE.MeshStandardMaterial({
         color: 0x59636b,
         emissive: 0x5b1016,
@@ -344,13 +356,13 @@ class SentinelBossDrone implements CombatTarget {
     return this.healthValue;
   }
 
-  deploy(position: THREE.Vector3): void {
+  deploy(position: THREE.Vector3, fireDelaySeconds = 0): void {
     this.assertActive('deploy');
     this.deactivate(false);
     this.root.position.copy(position);
     this.root.visible = true;
     this.healthValue = this.healthMaximum;
-    this.fireElapsedSeconds = 0;
+    this.fireElapsedSeconds = -fireDelaySeconds;
     this.activeValue = true;
     this.registerCollider();
   }
@@ -377,9 +389,26 @@ class SentinelBossDrone implements CombatTarget {
         this.hitMeshes[0]!,
         this.position,
         this.aimDirection,
+        this.projectileSpeedMetresPerSecond,
       );
       if (projectileId !== undefined) onProjectileFired(projectileId);
     }
+  }
+
+  setFireIntervalSeconds(seconds: number): void {
+    if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('Drone fire interval must be positive and finite.');
+    this.fireIntervalSeconds = seconds;
+  }
+
+  setProjectileSpeedMetresPerSecond(speed:number):void {
+    if(!Number.isFinite(speed)||speed<=0)throw new Error('Drone projectile speed must be positive and finite.');
+    this.projectileSpeedMetresPerSecond=speed;
+  }
+
+  setHitboxScale(scale:number):void {
+    if(!Number.isFinite(scale)||scale<=0)throw new Error('Drone hitbox scale must be positive and finite.');
+    // Scale only the dedicated combat envelope, never its visible model.
+    this.hitMeshes[0]!.scale.setScalar(scale);this.hitMeshes[0]!.updateWorldMatrix(true,false);
   }
 
   isCombatActive(): boolean {
@@ -422,6 +451,7 @@ class SentinelBossDrone implements CombatTarget {
     this.deactivate(false);
     this.healthValue = this.healthMaximum;
     this.fireElapsedSeconds = 0;
+    this.projectileSpeedMetresPerSecond=undefined;this.setHitboxScale(1);
   }
 
   dispose(): void {
@@ -454,7 +484,7 @@ class SentinelBossDrone implements CombatTarget {
     if (this.colliderRegistered) return;
     this.world.register(
       this.hitMeshes[0]!,
-      CollisionLayer.Projectile | CollisionLayer.LineOfSight,
+      CollisionLayer.Projectile | (this.blocksLineOfSight?CollisionLayer.LineOfSight:0),
       ColliderTransformMode.Dynamic,
     );
     this.colliderRegistered = true;
@@ -484,6 +514,8 @@ export class SentinelDroneSquad {
   private readonly projectiles: SentinelDroneProjectilePool;
   private readonly drones: SentinelBossDrone[] = [];
   private readonly anchors: readonly THREE.Vector3[];
+  private readonly fireStaggerSeconds: number;
+  private readonly deploymentDelaySeconds:number;
   private readonly unregisterTargets: Array<() => void> = [];
   private disposed = false;
 
@@ -495,25 +527,41 @@ export class SentinelDroneSquad {
     readonly droneHealthUnits?: number;
     readonly fireIntervalSeconds?: number;
     readonly projectileCapacity?: number;
+    readonly projectileSpeedMetresPerSecond?: number;
+    readonly projectileLifetimeSeconds?: number;
+    readonly projectileRangeMetres?: number;
+    readonly fireStaggerSeconds?: number;
+    readonly deploymentDelaySeconds?:number;
+    readonly projectileCollisionMask?:number;
+    readonly idPrefix?: string;
+    readonly colliderSize?: THREE.Vector3Like;
+    readonly blocksLineOfSight?:boolean;
   }) {
     this.world = options.collisionWorld;
     const maximumDrones = options.maximumDrones ?? 4;
     if (
       !Number.isInteger(maximumDrones) ||
       maximumDrones < 1 ||
-      maximumDrones > 4 ||
+      maximumDrones > 18 ||
       options.anchors.length < maximumDrones
     ) {
       throw new Error(
-        'Sentinel drone squad requires 1-4 slots and one anchor per slot.',
+        'Sentinel drone squad requires 1-18 slots and one anchor per slot.',
       );
     }
     this.anchors = options.anchors
       .slice(0, maximumDrones)
       .map((anchor) => anchor.clone());
+    this.fireStaggerSeconds = options.fireStaggerSeconds ?? 0;
+    this.deploymentDelaySeconds=options.deploymentDelaySeconds??0;
+    if (!Number.isFinite(this.fireStaggerSeconds) || this.fireStaggerSeconds < 0) throw new Error('Drone fire stagger must be non-negative and finite.');
+    if(!Number.isFinite(this.deploymentDelaySeconds)||this.deploymentDelaySeconds<0)throw new Error('Drone deployment delay must be finite and non-negative.');
     this.projectiles = new SentinelDroneProjectilePool(
       this.world,
-      { capacity: options.projectileCapacity ?? 16 },
+      { capacity: options.projectileCapacity ?? 16,
+        speedMetresPerSecond: options.projectileSpeedMetresPerSecond,
+        lifetimeSeconds: options.projectileLifetimeSeconds,
+        maximumRangeMetres: options.projectileRangeMetres,collisionMask:options.projectileCollisionMask },
     );
     this.projectileStates = this.projectiles.states;
     this.root.name = 'sentinel-drone-squad';
@@ -521,10 +569,11 @@ export class SentinelDroneSquad {
     try {
       for (let index = 0; index < maximumDrones; index += 1) {
         const drone = new SentinelBossDrone({
-          id: `sentinel-drone-${index + 1}`,
+          id: `${options.idPrefix ?? 'sentinel-drone'}-${index + 1}`,
           world: this.world,
           projectiles: this.projectiles,
           healthUnits: options.droneHealthUnits ?? 2,
+          colliderSize: options.colliderSize,
           fireIntervalSeconds: options.fireIntervalSeconds ?? 1.25,
           onDestroyed: (destroyed) => {
             this.events.emit('destroyed', {
@@ -532,6 +581,7 @@ export class SentinelDroneSquad {
               slotIndex: this.drones.indexOf(destroyed),
             });
           },
+          blocksLineOfSight:options.blocksLineOfSight,
         });
         this.drones.push(drone);
         this.root.add(drone.root);
@@ -567,7 +617,7 @@ export class SentinelDroneSquad {
     this.clear();
     for (let index = 0; index < count; index += 1) {
       const drone = this.drones[index]!;
-      drone.deploy(this.anchors[index]!);
+      drone.deploy(this.anchors[index]!,this.deploymentDelaySeconds+index*this.fireStaggerSeconds);
       this.events.emit('deployed', {
         droneId: drone.id,
         slotIndex: index,
@@ -590,6 +640,31 @@ export class SentinelDroneSquad {
       });
     }
     this.projectiles.update(deltaSeconds, target, requestFailure);
+  }
+
+  setFireIntervalSeconds(seconds: number): void {
+    this.assertActive('change fire interval');
+    if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('Drone fire interval must be positive and finite.');
+    for (const drone of this.drones) drone.setFireIntervalSeconds(seconds);
+  }
+
+  /** Encounter-local role tuning; ordinary legacy squads keep one cadence. */
+  setDroneFireIntervalSeconds(index:number,seconds:number):void {
+    this.assertActive('change individual fire interval');
+    const drone=this.drones[index];if(!drone)throw new Error('Drone slot is outside the bounded squad.');
+    drone.setFireIntervalSeconds(seconds);
+  }
+
+  setDroneProjectileSpeedMetresPerSecond(index:number,speed:number):void {
+    this.assertActive('change individual projectile speed');
+    const drone=this.drones[index];if(!drone)throw new Error('Drone slot is outside the bounded squad.');
+    drone.setProjectileSpeedMetresPerSecond(speed);
+  }
+
+  setDroneHitboxScale(index:number,scale:number):void {
+    this.assertActive('change individual hitbox');
+    const drone=this.drones[index];if(!drone)throw new Error('Drone slot is outside the bounded squad.');
+    drone.setHitboxScale(scale);
   }
 
   clear(): void {

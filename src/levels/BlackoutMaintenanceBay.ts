@@ -10,6 +10,7 @@ import { mapBlackoutBoxUVs } from '../render/environment/blackout/BlackoutMainte
 import {buildBlackoutEntryVent} from '../render/environment/blackout/BlackoutEntryVent.ts';
 import {BlackoutEntryVentCollapse} from '../render/environment/blackout/BlackoutEntryVentCollapse.ts';
 import {BLACKOUT_ENTRY_VENT as ENTRY} from '../cinematics/BlackoutVentArrivalLayout.ts';
+import { repairStaticBoxSurfaces, trimStaticBoxEnds } from '../render/geometry/CoplanarSurfaceGeometry.ts';
 
 export const BLACKOUT_BAY_LAYOUT = Object.freeze({
   chamberWidth: 34,
@@ -80,8 +81,8 @@ export class BlackoutMaintenanceBay {
     acid.userData.textureRole = 'acid-floor';
     // Close the exposed under-apron corners, but leave a clear 5 m doorway
     // aligned to Bob's first step so this seal does not become a jump wall.
-    this.box('entry-apron-riser-west', [8.2, 1.05, 0.25], [-12.6, -0.475, acidStartZ], darkSteel);
-    this.box('entry-apron-riser-east', [18, 1.05, 0.25], [5.5, -0.475, acidStartZ], darkSteel);
+    this.box('entry-apron-riser-west', [8.2, 1, 0.25], [-12.6, -0.5, acidStartZ], darkSteel);
+    this.box('entry-apron-riser-east', [18, 1, 0.25], [5.5, -0.5, acidStartZ], darkSteel);
 
     // Three broad, staggered steps borrow Level 2 Room 1's alternating layout,
     // but extend the centre spacing to 11.5 m for this wider acid basin.
@@ -147,37 +148,49 @@ export class BlackoutMaintenanceBay {
     // up exactly with the northbound inlet and westbound ascending shaft.
     this.box('vent-turn-floor', [11.5, 0.2, 3], [-11, -0.1, 61.5], steel);
     this.box('vent-turn-ceiling', [11.5, 0.2, 3], [-11, 2.3, 61.5], darkSteel);
-    this.box('vent-turn-south-west', [10, 2.2, 0.3], [-11.75, 1.1, 60], darkSteel);
-    this.box('vent-turn-north-east', [10, 2.2, 0.3], [-10.25, 1.1, 63], darkSteel);
-    this.box('vent-turn-east-wall', [0.3, 2.2, 3], [-5.25, 1.1, 61.5], darkSteel);
-    this.box('vent-turn-west-wall', [0.3, 2.2, 3], [-16.75, 1.1, 61.5], darkSteel);
+    // Put wall thickness outside the authored clear turn chamber. Centring it
+    // on the boundaries formerly left 15 cm ledges at both duct openings.
+    this.box('vent-turn-south-west', [10, 2.2, 0.3], [-11.75, 1.1, 59.85], darkSteel);
+    this.box('vent-turn-north-east', [10, 2.2, 0.3], [-10.25, 1.1, 63.15], darkSteel);
+    this.box('vent-turn-east-wall', [0.3, 2.2, 3], [-5.1, 1.1, 61.5], darkSteel);
+    this.box('vent-turn-west-wall', [0.3, 2.2, 3], [-16.9, 1.1, 61.5], darkSteel);
     // The last few centimetres rise above the catwalk lip so Volt's sphere
     // clears the deck's vertical edge instead of snagging on a coplanar seam.
     const ductRise = 2.58;
-    const ductLength = Math.hypot(17, ductRise) + 0.2;
+    const ductLength = Math.hypot(17, ductRise);
     const ductAngle = Math.atan2(ductRise, 17);
     const ductCenterZ = 71.5;
     const ductFloor = this.box('volt-rising-duct-floor', [1.5, 0.2, ductLength], [-16, ductRise / 2 - 0.1 / Math.cos(ductAngle), ductCenterZ], steel);
     ductFloor.rotation.x = -ductAngle;
     ductFloor.userData.preciseMovementCorners = true;
+    trimStaticBoxEnds(ductFloor, 63, 80);
     const ductCeiling = this.box('volt-rising-duct-ceiling', [1.5, 0.2, ductLength], [-16, ductRise / 2 + 2.3, ductCenterZ], darkSteel);
     ductCeiling.rotation.x = -ductAngle;
+    trimStaticBoxEnds(ductCeiling, 63, 79.75);
     for (const sideX of [-16.85, -15.15]) {
       const sideWall = this.box(`volt-rising-duct-side-${sideX}`, [0.2, 2.2, ductLength], [sideX, ductRise / 2 + 1.1, ductCenterZ], steel);
       sideWall.rotation.x = -ductAngle;
+      // The tilted end face stops short at floor level. Extend only its render
+      // skin far enough to cut a complete vertical join; retain the collider.
+      sideWall.geometry.computeBoundingBox();
+      const collisionBounds = sideWall.geometry.boundingBox!.clone();
+      sideWall.geometry.scale(1, 1, (ductLength + 2.2 * Math.tan(ductAngle) + .002) / ductLength);
+      sideWall.geometry.boundingBox = collisionBounds;
+      trimStaticBoxEnds(sideWall, 63, 79.75);
     }
     // Short level outlet apron joins the rising shaft to Volt's separate
     // service catwalk (top 2.5 m) at the west side of Room 2.
     this.box('volt-catwalk-entry-extension', [2.8, 0.2, 6], [-16, 2.4, 83], steel);
     // Recessed industrial rim and repeated duct seams, outside the walking bore.
     for (const z of [rearZ - 0.25, rearZ + 1.5, rearZ + 3.5, rearZ + 5.5]) {
-      for (const x of [-6.77, -5.23]) this.box(`vent-frame-side-${x}-${z}`, [0.08, 2.3, 0.08], [x, 1.1, z], trim);
-      this.box(`vent-frame-header-${z}`, [1.62, 0.08, 0.08], [-6, 2.28, z], trim);
+      const flushZ = z === rearZ - .25 ? rearZ - .185 : z;
+      for (const x of [-6.77, -5.23]) this.box(`vent-frame-side-${x}-${z}`, [0.08, 2.3, 0.08], [x < -6 ? -6.79 : -5.21, 1.1, flushZ], trim);
+      this.box(`vent-frame-header-${z}`, [1.62, 0.08, 0.08], [-6, 2.28, flushZ], trim);
     }
 
     // Visible but non-emissive hazard markings, conduit, and the ceiling entry grille.
-    for (const z of [-1.5, acidStartZ - 0.7]) this.warningStrip(`entry-warning-${z}`, chamberWidth - 2, [0, 0.012, z], warning);
-    for (const z of [acidEndZ + 0.4, rearZ - 1.2]) this.warningStrip(`exit-warning-${z}`, chamberWidth - 2, [0, 0.012, z], warning);
+    for (const z of [-1.5, acidStartZ - 0.7]) this.warningStrip(`entry-warning-${z}`, chamberWidth - 2, [0, -.0125, z], warning);
+    for (const z of [acidEndZ + 0.4, rearZ - 1.2]) this.warningStrip(`exit-warning-${z}`, chamberWidth - 2, [0, -.0125, z], warning);
 
     this.arcGeometry.setAttribute('position',new THREE.BufferAttribute(this.arcPositions,3));
     const arcs=new THREE.LineSegments(this.arcGeometry,this.arcMaterial);
@@ -208,6 +221,7 @@ export class BlackoutMaintenanceBay {
       this.hallwayLights.push(light);
     }
     this.applySurfaceMaterials();
+    repairStaticBoxSurfaces(this.root, mesh => /^(vent-|volt-|rear-wall-|entry-|exit-safe-platform|exit-warning-)/.test(mesh.name));
     this.root.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];

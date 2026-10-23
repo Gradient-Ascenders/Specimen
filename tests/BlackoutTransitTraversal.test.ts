@@ -214,6 +214,7 @@ test('Bob crosses the whole elevated route using separated charged jumps and bot
     const electricalTargets = new ElectricalTargetRegistry(s.world);
     const controller = new BlackoutTransitController({ room: s.room, world: s.world, surfaces: s.surfaces, electricalTargets });
     try {
+      for (const enemy of controller.emergingDrones) enemy.state.destroy();
       controller.setActive(true);
       controller.update(FIXED_DT, { bob, goop: s.goop, volt: s.volt });
       assert.equal(controller.switchHeld, true,
