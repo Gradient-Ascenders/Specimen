@@ -73,7 +73,7 @@ canvas {
 /* HUD animations set child visibility explicitly, so remove its layout box
  * during cinematics instead of relying on inherited visibility. */
 #app:is([data-cinematic="containment-finale"], [data-cinematic="cultivation-finale"],
-  [data-cinematic="cultivation-clearance"], [data-cinematic="blackout-arrival"])
+  [data-cinematic="cultivation-clearance"], [data-cinematic="blackout-arrival"], [data-cinematic="blackout-elevator"])
   > .game-flow[data-state="playing"] .game-hud { display: none !important; }
 #app[data-cinematic="containment-finale"] > :not([data-gameplay-canvas]):not(.game-flow):not(.containment-finale),
 #app[data-cinematic="containment-finale"] > .game-flow[data-state="playing"] { visibility: hidden !important; }
@@ -87,6 +87,11 @@ canvas {
 .cultivation-finale .finale-threat-level { font-size: clamp(1.1rem, 4.7vw, 4rem); }
 .cultivation-finale .finale-subtitle { font: 600 clamp(1rem, 1.9vw, 1.35rem) / 1.5 var(--ui-font-body); }
 .cultivation-finale .finale-subtitle[data-speaker="volt"] { color: #ffdb6b; }
+#app[data-cinematic="blackout-elevator"] > :not([data-gameplay-canvas]):not(.game-flow):not(.blackout-elevator),
+#app[data-cinematic="blackout-elevator"] > .game-flow[data-state="playing"] { visibility: hidden !important; }
+.blackout-elevator .finale-subtitle { width: auto; left: 8%; right: 8%; font: 500 clamp(.95rem, 1.8vw, 1.3rem) / 1.5 var(--ui-font-body); letter-spacing: .025em; }
+.blackout-elevator .finale-subtitle[data-speaker="goop"] { color: #a4ed73; }
+.blackout-elevator .finale-subtitle[data-speaker="volt"] { color: #ffdb6b; }
 .finale-alarm-wash { position: absolute; inset: 8% 0; background: #ff101a; pointer-events: none; }
 .finale-bar { position: absolute; left: 0; right: 0; height: 8%; background: #010305; z-index: 2; }
 .finale-bar.top { top: 0; } .finale-bar.bottom { bottom: 0; }

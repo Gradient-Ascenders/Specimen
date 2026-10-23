@@ -266,7 +266,7 @@ test('natural boss entry gathers the three real bodies, merges, saves CP8 and pr
   const f=createFixture();try {
     f.runtime.activateCheckpoint('cp6');
     const bodies=electricalRoomInternals(f.runtime).group;
-    for(const [i,id] of (['bob','goop','volt'] as const).entries())bodies[`${id}Body`].recoverAt(new THREE.Vector3((i-1)*2,.86,185));
+    for(const [i,id] of (['bob','goop','volt'] as const).entries())bodies[`${id}Body`].recoverAt(new THREE.Vector3((i-1)*2,.86,189.2));
     f.tick();assert.equal(f.runtime.roomState.phase,'merging');f.tick(361);
     assert.equal(f.runtime.roomState.phase,'boss');assert.equal(f.runtime.finalBossReadModel?.state,'intro');
     assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');assert.equal(finalBossInternals(f.runtime).specimenBody.radiusMetres,FINAL_SPECIMEN_RADIUS);
@@ -282,6 +282,56 @@ test('natural boss entry gathers the three real bodies, merges, saves CP8 and pr
     f.runtime.restartLevel();assert.equal(f.runtime.roomState.roomId,'room-1');assert.equal(f.runtime.finalBossReadModel!.state,'idle');
     assert.equal(bodies.bobBody.radiusMetres,.45);assert.equal(bodies.voltBody.radiusMetres,.45);
   }finally{f.cleanup();}
+});
+
+for (const [index, slimeId] of (['bob', 'goop', 'volt'] as const).entries()) test(`${slimeId} starts the elevator only with all three in its room and at least one standing on the deck`, () => {
+  const f = createFixture(); try {
+    f.runtime.activateCheckpoint('cp3'); f.runtime.recoverActiveCheckpoint();
+    const r = (f.runtime as any).resources;
+    while (r.group.activeSlimeId !== slimeId) f.switchSlime();
+    assert.equal(r.transit.bridgeLocked, false);
+    for (const [i, id] of (['bob', 'goop', 'volt'] as const).entries()) r.group[`${id}Body`].teleport(new THREE.Vector3((i - 1) * 1.5, .86, 175.2));
+    f.tick();
+    assert.equal(r.elevatorAscent.active, false, 'all three in the room alone must not start the movie');
+    const missing = (['bob', 'goop', 'volt'] as const)[(index + 1) % 3]!;
+    r.group[`${missing}Body`].teleport(new THREE.Vector3(0, .86, 173));
+    r.group[`${slimeId}Body`].teleport(new THREE.Vector3(0, .86, 180.7));
+    f.tick();
+    assert.equal(r.elevatorAscent.active, false, `wait for ${missing}, even with someone already on the lift`);
+    r.group[`${missing}Body`].teleport(new THREE.Vector3(1.5, .86, 175.2));
+    f.tick();
+    assert.equal(r.transit.complete, false, 'the old exit marker and bridge lock are not additional trigger requirements');
+    assert.equal(r.elevatorAscent.active, true); assert.equal(r.transit.isActive, false);
+    assert.equal(r.transit.bridgeLocked, false, 'boarding does not silently solve or depend on the bridge puzzle');
+    assert.equal(f.runtime.requestFailure(), false); assert.equal(f.runtime.phase, 'three-slime');
+    f.tick(100); const time = r.elevatorAscent.seconds, positions = f.runtime.getSlimePositions();
+    f.render(); f.render(); assert.equal(r.elevatorAscent.seconds, time);
+    f.runtime.stop(); f.tick(100); assert.equal(r.elevatorAscent.seconds, time); assert.deepEqual(f.runtime.getSlimePositions(), positions);
+    f.runtime.start(); f.input.press('skipCinematic'); f.tick(); f.input.release('skipCinematic');
+    assert.equal(r.elevatorAscent.complete, true); assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp6');
+    assert.equal(f.runtime.roomState.local.elevatorComplete, true); assert.equal(r.group.activeSlimeId, slimeId);
+    f.tick(3); assert.equal(f.runtime.phase, 'three-slime', 'arriving in the lab must not force an immediate boss merge');
+    f.runtime.recoverActiveCheckpoint(); assert.equal(r.elevatorAscent.complete, true); assert.equal(r.elevatorAscent.active, false);
+    assert.equal(r.scene.bossStaging.ascentLift.frontGate.position.y, 8.4); assert.equal(r.group.activeSlimeId, slimeId);
+    f.runtime.restartLevel(); assert.equal(r.elevatorAscent.complete, false); assert.equal(r.scene.bossStaging.ascentLift.frontGate.position.y, 3.05);
+  } finally { f.cleanup(); }
+});
+
+test('the developer elevator picker preview cancels the vent arrival and safely starts before level entry, but stays gated outside debug', () => {
+  for (const available of [false, true]) {
+    const f = createFixture(available, true); try {
+      const r = (f.runtime as any).resources;
+      assert.equal(f.runtime.previewElevatorForDebug(), available);
+      if (!available) { assert.equal(r.ventArrival.active, true); continue; }
+      assert.equal(r.ventArrival.active, false); assert.equal(r.elevatorAscent.active, true);
+      assert.equal(f.runtime.beginMerge(), false); assert.equal(r.transit.isActive, false);
+      f.runtime.stop(); assert.equal(f.runtime.previewElevatorForDebug(), true);
+      const t = r.elevatorAscent.seconds; f.tick(120); assert.equal(r.elevatorAscent.seconds, t);
+      f.runtime.start(); f.input.press('skipCinematic'); f.tick(); f.input.release('skipCinematic');
+      assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp6');
+      assert.equal(r.scene.bossStaging.ascentLift.labDoor.position.y, 3.55);
+    } finally { f.cleanup(); }
+  }
 });
 
 test('Room 4 debug shortcut is gated, ending uses the legal macro flow and completion fires once',()=>{

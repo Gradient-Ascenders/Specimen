@@ -1,32 +1,38 @@
 import * as THREE from 'three';
 import type { BlackoutCheckpointDefinition } from './BlackoutCheckpointManager.ts';
 import { BLACKOUT_TRANSIT_EXIT_HALLWAY } from './BlackoutTransitRoom.ts';
+import { BlackoutAscentLift, BLACKOUT_ASCENT_LIFT } from './BlackoutAscentLift.ts';
 
 const ENTRY_Z = BLACKOUT_TRANSIT_EXIT_HALLWAY.endZ;
 const CENTRE_Z = ENTRY_Z + 8;
 const END_Z = ENTRY_Z + 16;
 
-/** Safe Room 3 shortcut destination until the revised boss arena is authored. */
 export const BLACKOUT_BOSS_STAGING_CHECKPOINT: BlackoutCheckpointDefinition = {
   id: 'cp6',
   activeSlimeId: 'bob',
   bodyPositions: {
-    bob: new THREE.Vector3(-2, .86, ENTRY_Z + 6),
-    goop: new THREE.Vector3(0, .86, ENTRY_Z + 6),
-    volt: new THREE.Vector3(2, .86, ENTRY_Z + 6),
+    bob: BLACKOUT_ASCENT_LIFT.landing.bob.clone(),
+    goop: BLACKOUT_ASCENT_LIFT.landing.goop.clone(),
+    volt: BLACKOUT_ASCENT_LIFT.landing.volt.clone(),
   },
-  room: {roomId:'room-3', phase:'three-slime', local:{bossStaging:true}},
+  room: {roomId:'room-3', phase:'three-slime', local:{bossStaging:true,elevatorComplete:true}},
 };
 
 export class BlackoutBossStaging {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
+  readonly ascentLift?: BlackoutAscentLift;
   private readonly geometry = new THREE.BoxGeometry(1,1,1);
   private readonly collisionGeometries: THREE.BoxGeometry[] = [];
   private readonly steel = new THREE.MeshStandardMaterial({color:0x26302d,roughness:.85,metalness:.25});
   private readonly amber = new THREE.MeshStandardMaterial({color:0xf8be58,emissive:0xffb73d,emissiveIntensity:.7});
 
   constructor(openToArena = false) {
+    if (openToArena) {
+      this.ascentLift = new BlackoutAscentLift();
+      this.root.add(this.ascentLift.root); this.collisionMeshes.push(...this.ascentLift.collisionMeshes);
+      return;
+    }
     this.root.name = 'blackout-room-3-boss-staging-not-final-arena';
     this.box('boss-staging-floor',[18,.8,16],[0,0,CENTRE_Z]);
     this.box('boss-staging-west-wall',[.4,7,16],[-9,3.9,CENTRE_Z]);
@@ -51,6 +57,7 @@ export class BlackoutBossStaging {
   }
 
   dispose(): void {
+    this.ascentLift?.dispose();
     this.root.removeFromParent(); this.root.clear();
     this.geometry.dispose(); this.steel.dispose(); this.amber.dispose();
     for (const geometry of this.collisionGeometries) geometry.dispose();
