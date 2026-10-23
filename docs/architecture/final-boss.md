@@ -1,6 +1,6 @@
 # The Extermination Chamber
 
-Implemented from `docs/planning/boss level plan.md`; initial investigation is in
+Implemented from the [original boss level plan](https://github.com/Gradient-Ascenders/Specimen/blob/1a213a0/docs/planning/boss%20level%20plan.md); initial investigation is in
 `final-boss-investigation.md`. The optional fusion tutorial remains saved on
 `feat/fused-slime-mechanics` at local commit `a70a1c9`, outside this branch.
 
