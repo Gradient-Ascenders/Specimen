@@ -150,6 +150,12 @@ test('Blackout arrival selection prepares the level before starting its normal e
   assert.equal(flow.state, 'playing');
 });
 
+test('the quiet-ascent picker waits for Level 3 preparation before starting the elevator', () => {
+  const flow = new GameFlowStateModel(); flow.completeBoot(); flow.openCutsceneSelect();
+  assert.equal(flow.beginSelectedCutscene('blackout-elevator'), true); assert.equal(flow.state, 'transitioning');
+  assert.equal(flow.beginSelectedCutscene('blackout-elevator'), false); assert.equal(flow.finishLevelTransition(), true); assert.equal(flow.state, 'playing');
+});
+
 test('level selection waits for preparation and explicit entry before playing', () => {
   const flow = new GameFlowStateModel();
   flow.completeBoot();
@@ -206,7 +212,7 @@ test('pause ownership defers to a death flow that disabled gameplay input', () =
 });
 
 test('all active story sequences keep native pause when character controls are locked', () => {
-  for (const cinematic of ['cultivation-finale', 'cultivation-clearance', 'blackout-arrival']) {
+  for (const cinematic of ['cultivation-finale', 'cultivation-clearance', 'blackout-arrival', 'blackout-elevator']) {
     const pausable = gameFlowCinematicCanPause(cinematic, 'playing');
     assert.equal(pausable, true, cinematic);
     assert.equal(gameFlowCanPause('playing', false, pausable), true, cinematic);

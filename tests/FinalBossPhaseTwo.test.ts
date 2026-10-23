@@ -53,16 +53,16 @@ function fixture(invincible=true,random=()=>0) {
   return {arena,world,targets,body,weapon,presentation,boss,tick,killSquad,phaseTwo,aimCore,dispose:()=>{boss.dispose();weapon.dispose();targets.dispose();arena.dispose();world.clear();surfaces.clear();}};
 }
 
-test('phase two starts at exactly 100/200 HP; reinforcement crossings are once-only without shield/healing or attack interruption',()=>{
+test('phase two starts at exactly 375/750 HP; reinforcement crossings are once-only without shield/healing or attack interruption',()=>{
   const c=new FinalBossController({random:()=>0});c.start(true);
   try {
     for(let i=0;i<3;i++){c.applyImpact(hit());c.update(1.35,target);for(let j=0,n=c.readModel.defendersRemaining;j<n;j++)c.droneDestroyed();c.update(1.21,target);}
-    assert.equal(c.readModel.maximumHealth,200);assert.equal(T.phaseTwoHealth,c.readModel.maximumHealth/2);
-    c.applyImpact(hit(c.readModel.health-101));c.update(1/60,target);assert.equal(c.readModel.health,101);assert.equal(c.readModel.phase,1);assert.equal(c.readModel.state,'combat');
+    assert.equal(c.readModel.maximumHealth,750);assert.equal(T.phaseTwoHealth,c.readModel.maximumHealth/2);
+    c.applyImpact(hit(c.readModel.health-376));c.update(1/60,target);assert.equal(c.readModel.health,376);assert.equal(c.readModel.phase,1);assert.equal(c.readModel.state,'combat');
     c.applyImpact(hit(1));assert.equal(c.applyImpact(hit()).accepted,false,'the halfway crossing must close damage synchronously');
-    c.update(1/60,target);assert.equal(c.readModel.health,100);assert.equal(c.readModel.state,'transition');c.skipCinematic(target);
+    c.update(1/60,target);assert.equal(c.readModel.health,375);assert.equal(c.readModel.state,'transition');c.skipCinematic(target);
     const serial=c.readModel.attackSerial;
-    for(const [i,hp] of [70,50,20].entries()) {
+    for(const [i,hp] of [262.5,187.5,75].entries()) {
       c.applyImpact(hit());assert.equal(c.readModel.health,hp);assert.equal(c.readModel.reinforcementIndex,i+1);
       assert.equal(c.readModel.attackSerial,serial);assert.equal(c.readModel.shieldActive,false);assert.equal(c.readModel.weakPointOpen,true);
       c.update(.1,target);assert.equal(c.readModel.health,hp);assert.equal(c.readModel.regenerating,false);
@@ -72,32 +72,32 @@ test('phase two starts at exactly 100/200 HP; reinforcement crossings are once-o
   }finally{c.dispose();}
 });
 
-test('the 200 HP boss shields exactly at 170, 140 and 110 HP, all before the 100 HP phase transition',()=>{
+test('the 750 HP boss shields exactly at 637.5, 525 and 412.5 HP, all before the 375 HP phase transition',()=>{
   const c=new FinalBossController({random:()=>0});c.start(true);
   try {
-    assert.equal(c.readModel.health,200);
-    for(const [i,hp] of [170,140,110].entries()) {
+    assert.equal(c.readModel.health,750);
+    for(const [i,hp] of [637.5,525,412.5].entries()) {
       c.applyImpact(hit(c.readModel.health-hp-1));c.update(1/60,target);
       assert.equal(c.readModel.health,hp+1);assert.equal(c.readModel.shieldActive,false);assert.equal(c.readModel.defenseIndex,i);
       c.applyImpact(hit(1));assert.equal(c.readModel.health,hp);assert.equal(c.readModel.shieldActive,true);assert.equal(c.readModel.defenseIndex,i+1);
       c.update(1.35,target);for(let j=0,n=c.readModel.defendersRemaining;j<n;j++)c.droneDestroyed();c.update(1.21,target);
     }
-    c.applyImpact(hit());c.update(1/60,target);assert.equal(c.readModel.health,100);assert.equal(c.readModel.state,'transition');
+    c.applyImpact(hit());c.update(1/60,target);assert.equal(c.readModel.health,375);assert.equal(c.readModel.state,'transition');
     c.skipCinematic(target);assert.equal(c.readModel.phase,2);assert.equal(c.readModel.shieldActive,false);
   }finally{c.dispose();}
 });
 
-test('phase-two checkpoint entry starts fresh combat at 100 HP without an intro, shield replay or duplicate transition event',()=>{
+test('phase-two checkpoint entry starts fresh combat at 375 HP without an intro, shield replay or duplicate transition event',()=>{
   const c=new FinalBossController({random:()=>.999});
   try {
     assert.equal(c.startPhaseTwo(target),true);const m=c.readModel;
-    assert.equal(m.state,'combat');assert.equal(m.phase,2);assert.equal(m.health,100);assert.equal(m.maximumHealth,200);
+    assert.equal(m.state,'combat');assert.equal(m.phase,2);assert.equal(m.health,375);assert.equal(m.maximumHealth,750);
     assert.equal(m.playerHealth,100);assert.equal(m.defenseIndex,3);assert.equal(m.shieldActive,false);assert.equal(m.regenerating,false);
     assert.equal(m.reinforcementIndex,0);assert.equal(m.defendersRemaining,0);assert.equal(m.stage,'telegraph');assert.equal(m.attack,'ram');
     assert.equal(c.cinematic,false);assert.equal(c.consumeTransition(),false);assert.equal(c.startPhaseTwo(target),false);assert.equal(c.start(true),false);
-    assert.equal(c.damagePlayer(45,-1),true);c.applyImpact(hit());assert.equal(m.health,70);assert.equal(m.reinforcementIndex,1);
+    assert.equal(c.damagePlayer(45,-1),true);c.applyImpact(hit());assert.equal(m.health,262.5);assert.equal(m.reinforcementIndex,1);
     c.suspend();assert.equal(c.startPhaseTwo(target),false);c.reset();assert.equal(c.startPhaseTwo(target),true);
-    assert.equal(m.health,100);assert.equal(m.playerHealth,100);assert.equal(m.invulnerability,0);assert.equal(m.reinforcementIndex,0);assert.equal(c.consumeTransition(),false);
+    assert.equal(m.health,375);assert.equal(m.playerHealth,100);assert.equal(m.invulnerability,0);assert.equal(m.reinforcementIndex,0);assert.equal(c.consumeTransition(),false);
   }finally{c.dispose();}
   assert.equal(c.startPhaseTwo(target),false);
 });

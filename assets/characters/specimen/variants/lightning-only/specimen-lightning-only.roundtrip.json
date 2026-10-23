@@ -1,0 +1,28 @@
+{
+  "source_glb_sha256": "449b86724a4ed56da6f6deb5aec68d45bdfb80fce85a32a99f0aab409d01307f",
+  "variant_glb_sha256": "f2ce712cc4dc09195378a683771df4b77660e490258649120de2c34b0d5313ab",
+  "loader": "parseSpecimenAsset / Three.js",
+  "mesh_regions": 6,
+  "materials": 5,
+  "triangles": 81040,
+  "retained_geometry_morphs_transforms_and_materials_exact": true,
+  "retained_animation_and_lightning_pulse_samples_exact": true,
+  "studio_excluded": true,
+  "animations": {
+    "Idle": {
+      "seconds": 5,
+      "morph_regions": 6,
+      "lightning_pulse_channels": 2
+    },
+    "Settle": {
+      "seconds": 2,
+      "morph_regions": 6,
+      "lightning_pulse_channels": 2
+    },
+    "Charge": {
+      "seconds": 3,
+      "morph_regions": 6,
+      "lightning_pulse_channels": 2
+    }
+  }
+}

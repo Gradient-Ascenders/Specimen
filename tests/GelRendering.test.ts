@@ -20,7 +20,7 @@ test('preset transmission cap composes with gel mode in either setting order', (
   rendering.setMode('reduced-transmission');
   rendering.setTransmissionResolutionScaleCap(0.5);
   rendering.setTransmissionResolutionScaleCap(1);
-  assert.equal(renderer.transmissionResolutionScale, 0.5, 'Normal retains explicit soft refraction');
+  assert.equal(renderer.transmissionResolutionScale, 0.75, 'Medium retains more interior detail');
   rendering.setMode('physical');
   assert.equal(renderer.transmissionResolutionScale, 1);
 });
@@ -59,7 +59,7 @@ test('minimum gel removes transmission from every identity while preserving surf
     assert.equal(set.body.emissiveMap, index === 2 ? emission : null);
   }
   rendering.setMode('reduced-transmission');
-  assert.equal(renderer.transmissionResolutionScale, 0.5);
+  assert.equal(renderer.transmissionResolutionScale, 0.75);
   assert.deepEqual(sets.map(set => set.body.transmission), [0.28, 0.28, 0.55]);
   rendering.setMode('physical');
   assert.equal(renderer.transmissionResolutionScale, 1);

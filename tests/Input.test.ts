@@ -85,6 +85,10 @@ test('level completion debug shortcut uses zero without repeat retriggers', () =
   assertOrphanRepeatIsIgnored('Digit0', 'debugCompleteLevel');
 });
 
+test('invincibility debug shortcut uses I without repeat retriggers', () => {
+  assertOrphanRepeatIsIgnored('KeyI', 'debugToggleInvincibility');
+});
+
 test('movement-key orphan repeat cannot reactivate after input reset', () => {
   assertOrphanRepeatIsIgnored('KeyW', 'moveForward');
 });

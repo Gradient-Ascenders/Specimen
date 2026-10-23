@@ -106,7 +106,8 @@ function startGame(): void {
   });
   let levelOneRuntime = createLevelOneRuntime();
   let levelTwoRuntime: import('./levels/CultivationLevelRuntime.ts').CultivationLevelRuntime | undefined;
-  let levelPreviewRequested: 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | undefined;
+  let levelThreeRuntime: import('./levels/BlackoutLevelRuntime.ts').BlackoutLevelRuntime | undefined;
+  let levelPreviewRequested: 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator' | undefined;
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
@@ -140,7 +141,7 @@ function startGame(): void {
         loadBlackoutMaintenanceMapData(new URL('./assets/blackout/maintenance-maps.bin', import.meta.url)),
         arrivalAudio,
       ]);
-      return new runtimeModule.BlackoutLevelRuntime({
+      levelThreeRuntime = new runtimeModule.BlackoutLevelRuntime({
         host: app,
         audio,
         input,
@@ -150,6 +151,7 @@ function startGame(): void {
         debugAvailable,
         maintenanceMaps,
       });
+      return levelThreeRuntime;
     },
     scheduleTransition: (transition) => {
       requestAnimationFrame(() => transition());
@@ -312,10 +314,10 @@ function startGame(): void {
     actions: {
       previewCutscene: import.meta.env.DEV ? (cutscene) => {
         if (cutscene === 'escape') void previewEscape();
-        else if (cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') {
+        else if (cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator') {
           levelPreviewRequested = cutscene;
-          const levelId = cutscene === 'blackout-arrival' ? 'level-3' : 'level-2';
-          const message = cutscene === 'blackout-arrival' ? 'Preparing Blackout arrival…'
+          const levelId = cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' ? 'level-3' : 'level-2';
+          const message = cutscene === 'blackout-elevator' ? 'Preparing the service elevator…' : cutscene === 'blackout-arrival' ? 'Preparing Blackout arrival…'
             : cutscene === 'cultivation-arrival' ? 'Preparing Cultivation arrival…'
             : cutscene === 'volt-rescue' ? 'Preparing Volt rescue cutscene…' : 'Preparing sentry cutscene…';
           gameFlow.beginLevelTransition(message, levelId);
@@ -476,13 +478,14 @@ function startGame(): void {
   const unsubscribeTransitionCompleted = gameSession.events.on(
     'transitionCompleted',
     ({ levelId }) => {
-      if (import.meta.env.DEV && levelPreviewRequested && levelId === (levelPreviewRequested === 'blackout-arrival' ? 'level-3' : 'level-2')) {
+      if (import.meta.env.DEV && levelPreviewRequested && levelId === (levelPreviewRequested === 'blackout-arrival' || levelPreviewRequested === 'blackout-elevator' ? 'level-3' : 'level-2')) {
         const preview = levelPreviewRequested;
         levelPreviewRequested = undefined;
         try {
           // Normal level entry already stages both real vent arrivals.
-          const ready = preview === 'blackout-arrival' || preview === 'cultivation-arrival' || (preview === 'volt-rescue'
-            ? levelTwoRuntime?.previewVoltRescueForDebug() : levelTwoRuntime?.previewSentryClearanceForDebug());
+          const ready = preview === 'blackout-arrival' || preview === 'cultivation-arrival' || (preview === 'blackout-elevator'
+            ? levelThreeRuntime?.previewElevatorForDebug() : preview === 'volt-rescue'
+              ? levelTwoRuntime?.previewVoltRescueForDebug() : levelTwoRuntime?.previewSentryClearanceForDebug());
           if (!ready) throw new Error('Cutscene preview is not ready.');
           gameFlow.finishLevelTransition(levelId);
           gameFlow.enterPreparedLevel(false);

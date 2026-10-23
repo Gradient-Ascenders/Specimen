@@ -11,6 +11,8 @@ import type { KinematicBody } from '../src/physics/KinematicBody.ts';
 import type { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
 import type { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+import { loadSpecimen } from './fixtures/SpecimenAssetFixture.ts';
+import type { SpecimenCharacterPresentation } from '../src/render/specimen/SpecimenCharacterPresentation.ts';
 import { CameraRig } from '../src/render/CameraRig.ts';
 
 class FakeButton {
@@ -776,7 +778,8 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
     const groupBodies = scene.getObjectsByProperty('name', 'player-slime-volt-presentation') as THREE.Mesh[];
     const volt = (runtime as unknown as { resources: { voltPresentation: VoltCharacterPresentation } }).resources.voltPresentation;
     await volt.prepare(loadVolt);
-    const specimen = scene.getObjectByName('blackout-specimen-body') as THREE.Mesh;
+    const specimen = (runtime as unknown as { resources: { specimenCharacter: SpecimenCharacterPresentation } }).resources.specimenCharacter;
+    await specimen.prepare(loadSpecimen);
     assert.equal(groupBodies.length, 1);
     assert.ok(scene.getObjectByName("player-slime-goop-presentation"));
     assert.ok(groupBodies.every(root => root.getObjectByName('player-slime-volt-character')));
@@ -784,8 +787,11 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
       const mesh = volt.root.getObjectByName(name) as THREE.Mesh;
       assert.ok(mesh.castShadow && mesh.receiveShadow && mesh.visible);
     }
-    assert.ok(specimen.castShadow && specimen.receiveShadow);
-    assert.equal(specimen.visible, false);
+    assert.equal(specimen.diagnostics.meshCount, 6);
+    assert.equal(specimen.diagnostics.triangles, 81040);
+    assert.equal(specimen.diagnostics.visible, false);
+    const specimenEye = specimen.root.getObjectByName('Specimen-Eye-Left') as THREE.Mesh;
+    assert.ok(specimenEye.castShadow && specimenEye.receiveShadow);
 
     assert.equal(runtime.beginMerge(), true);
     assert.equal(runtime.beginMerge(), false);
@@ -816,7 +822,7 @@ test('Blackout merge hands control to Specimen once, disables switching, and exp
     assert.equal(runtime.specimenFormReadModel?.mergeProgress, 1);
     runtime.render(0, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>);
     assert.ok(groupBodies.every(root => !root.getObjectByName('player-slime-volt-character')!.visible));
-    assert.equal(specimen.visible, true);
+    assert.equal(specimen.diagnostics.visible, true);
 
     const hud = runtime.getSlimeHUDSnapshot();
     assert.equal(hud.controlledForm, 'specimen');

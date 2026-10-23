@@ -1,6 +1,6 @@
 # The Extermination Chamber
 
-Implemented from `docs/planning/boss level plan.md`; initial investigation is in
+Implemented from the [original boss level plan](https://github.com/Gradient-Ascenders/Specimen/blob/1a213a0/docs/planning/boss%20level%20plan.md); initial investigation is in
 `final-boss-investigation.md`. The optional fusion tutorial remains saved on
 `feat/fused-slime-mechanics` at local commit `a70a1c9`, outside this branch.
 
@@ -14,6 +14,14 @@ For iteration, run `npm run dev` with `?debug=1`, enter Level 3 and let its
 arrival finish, then press **4**. Existing **0** shortcuts advance earlier
 levels; **1/2/3** retain their Level 3 destinations. Production without debug
 ignores the Room 4 shortcut.
+
+While in the boss room under `npm run dev`, press **I** or click the HUD's
+**DEV · I · INVINCIBILITY** button to toggle player invincibility. It starts
+**OFF**, blocks all boss/drone damage and death requests, and returns falls to
+the safe ring spawn without resetting the fight. It persists through the phase
+transition and pause; retry, restart and leaving the level reset it to OFF.
+Production builds and `npm run preview` cannot enable it, including with
+`?debug=1`.
 
 - WASD moves; Space fully charges a jump in **.35 s** (Bob retains **.7 s**);
   right mouse optionally aims/zooms. Launch strength/gravity are unchanged.
@@ -688,3 +696,10 @@ human-input victory or a hardware FPS qualification.
   and authority are controlled fixtures, not a full human-input victory or
   hardware qualification. Final browser evidence:
   `/tmp/specimen-boss-main-merge-browser-results/`.
+
+### 750 HP boss tuning (24 October 2026)
+
+- Boss maximum/retry HP is **750**, with phase two and CP9 recovery at **375 HP**.
+- The existing 85 / 70 / 55% shield gates now fall at **637.5 / 525 / 412.5 HP**.
+  Phase-two reinforcement gates retain their proportions at **262.5 / 187.5 / 75 HP**.
+  Wave sizes, healing rate and attack cadence remain unchanged.

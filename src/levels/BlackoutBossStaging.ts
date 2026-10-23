@@ -1,40 +1,48 @@
 import * as THREE from 'three';
 import type { BlackoutCheckpointDefinition } from './BlackoutCheckpointManager.ts';
 import { BLACKOUT_TRANSIT_EXIT_HALLWAY } from './BlackoutTransitRoom.ts';
+import { BlackoutAscentLift, BLACKOUT_ASCENT_LIFT } from './BlackoutAscentLift.ts';
 
 const ENTRY_Z = BLACKOUT_TRANSIT_EXIT_HALLWAY.endZ;
 const CENTRE_Z = ENTRY_Z + 8;
 const END_Z = ENTRY_Z + 16;
 
-/** Safe Room 3 shortcut destination until the revised boss arena is authored. */
 export const BLACKOUT_BOSS_STAGING_CHECKPOINT: BlackoutCheckpointDefinition = {
   id: 'cp6',
   activeSlimeId: 'bob',
   bodyPositions: {
-    bob: new THREE.Vector3(-2, .86, ENTRY_Z + 6),
-    goop: new THREE.Vector3(0, .86, ENTRY_Z + 6),
-    volt: new THREE.Vector3(2, .86, ENTRY_Z + 6),
+    bob: BLACKOUT_ASCENT_LIFT.landing.bob.clone(),
+    goop: BLACKOUT_ASCENT_LIFT.landing.goop.clone(),
+    volt: BLACKOUT_ASCENT_LIFT.landing.volt.clone(),
   },
-  room: {roomId:'room-3', phase:'three-slime', local:{bossStaging:true}},
+  room: {roomId:'room-3', phase:'three-slime', local:{bossStaging:true,elevatorComplete:true}},
 };
 
 export class BlackoutBossStaging {
   readonly root = new THREE.Group();
   readonly collisionMeshes: THREE.Mesh[] = [];
+  readonly ascentLift?: BlackoutAscentLift;
   private readonly geometry = new THREE.BoxGeometry(1,1,1);
   private readonly collisionGeometries: THREE.BoxGeometry[] = [];
   private readonly steel = new THREE.MeshStandardMaterial({color:0x26302d,roughness:.85,metalness:.25});
+  private readonly collisionMaterial = new THREE.MeshBasicMaterial({visible:false});
   private readonly amber = new THREE.MeshStandardMaterial({color:0xf8be58,emissive:0xffb73d,emissiveIntensity:.7});
 
   constructor(openToArena = false) {
+    if (openToArena) {
+      this.ascentLift = new BlackoutAscentLift();
+      this.root.add(this.ascentLift.root); this.collisionMeshes.push(...this.ascentLift.collisionMeshes);
+      return;
+    }
     this.root.name = 'blackout-room-3-boss-staging-not-final-arena';
     this.box('boss-staging-floor',[18,.8,16],[0,0,CENTRE_Z]);
-    this.box('boss-staging-west-wall',[.4,7,16],[-9,3.9,CENTRE_Z]);
-    this.box('boss-staging-east-wall',[.4,7,16],[9,3.9,CENTRE_Z]);
+    this.box('boss-staging-west-wall',[.4,7,16],[-9,3.9,CENTRE_Z],[.4,6.8,15.8],[-9,3.8,CENTRE_Z+.1]);
+    this.box('boss-staging-east-wall',[.4,7,16],[9,3.9,CENTRE_Z],[.4,6.8,15.8],[9,3.8,CENTRE_Z+.1]);
     const portalWidth = BLACKOUT_TRANSIT_EXIT_HALLWAY.width;
     const flankWidth = (18 - portalWidth) / 2;
     for (const sign of [-1, 1]) {
-      this.box(`boss-staging-entry-wall-${sign}`, [flankWidth,7,.4], [sign * (portalWidth + flankWidth) / 2,3.9,ENTRY_Z]);
+      this.box(`boss-staging-entry-wall-${sign}`, [flankWidth,7,.4], [sign * (portalWidth + flankWidth) / 2,3.9,ENTRY_Z],
+        [flankWidth,6.8,.4], [sign * (portalWidth + flankWidth) / 2,3.8,ENTRY_Z]);
     }
     const headerHeight = 7.4 - BLACKOUT_TRANSIT_EXIT_HALLWAY.ceilingY;
     this.box('boss-staging-entry-header',[portalWidth,headerHeight,.4],[0,7.4 - headerHeight / 2,ENTRY_Z]);
@@ -51,20 +59,28 @@ export class BlackoutBossStaging {
   }
 
   dispose(): void {
+    this.ascentLift?.dispose();
     this.root.removeFromParent(); this.root.clear();
-    this.geometry.dispose(); this.steel.dispose(); this.amber.dispose();
+    this.geometry.dispose(); this.steel.dispose(); this.amber.dispose(); this.collisionMaterial.dispose();
     for (const geometry of this.collisionGeometries) geometry.dispose();
     this.collisionGeometries.length = 0;
   }
 
-  private box(name:string, size:readonly[number,number,number], position:readonly[number,number,number]):void {
+  private box(name:string, size:readonly[number,number,number], position:readonly[number,number,number], artSize?:readonly[number,number,number], artPosition=position):void {
     // Bake solid dimensions into the geometry: non-uniform mesh scaling makes
     // conservative sphere sweeps expand thin walls far into the previous room.
     const geometry = new THREE.BoxGeometry(...size);
     this.collisionGeometries.push(geometry);
-    const mesh = new THREE.Mesh(geometry,this.steel);
+    const mesh = new THREE.Mesh(geometry,artSize ? this.collisionMaterial : this.steel);
     mesh.name=name; mesh.position.set(...position);
     mesh.userData.surfaceTag='default';
     this.root.add(mesh); this.collisionMeshes.push(mesh);
+    if (artSize) {
+      // Rendered wall/ceiling joints fit edge to edge; the original solid's
+      // identity and dimensions continue to drive movement and projectiles.
+      mesh.layers.set(31);
+      const art = new THREE.Mesh(this.geometry,this.steel);
+      art.name=`${name}-art`; art.position.set(...artPosition); art.scale.set(...artSize); this.root.add(art);
+    }
   }
 }

@@ -1,4 +1,4 @@
-import type { GelRenderingMode } from './slime/GelRendering.ts';
+import { resolveGelTransmissionResolutionScale, type GelRenderingMode } from './slime/GelRendering.ts';
 import { isRenderPixelRatioCap, isRenderScale, type RenderPixelRatioCap, type RenderScale } from './RenderResolution.ts';
 import type { GraphicsPreset } from './GraphicsQuality.ts';
 import { resolveGraphicsQuality } from './GraphicsQuality.ts';
@@ -46,7 +46,7 @@ export function graphicsPreparationKey(settings: GraphicsSettings): string {
 export function graphicsTransmissionResourceKey(settings: GraphicsSettings): string {
   if (settings.gelRenderingMode === 'minimum') return 'no-transmission';
   const quality = resolveGraphicsQuality(settings.graphicsPreset, settings.renderPixelRatioCap);
-  const scale = Math.min(quality.transmissionResolutionScale, settings.gelRenderingMode === 'reduced-transmission' ? .5 : 1);
+  const scale = resolveGelTransmissionResolutionScale(settings.gelRenderingMode, quality.transmissionResolutionScale);
   return [scale, quality.pixelRatioCap, settings.renderScale, settings.pixelBudget].join(':');
 }
 

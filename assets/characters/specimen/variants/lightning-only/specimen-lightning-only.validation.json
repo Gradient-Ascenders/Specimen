@@ -1,0 +1,98 @@
+{
+  "asset": "specimen-lightning-only-v1",
+  "variant_of": "specimen-yellow-bolt-tips-v12",
+  "source_blend_sha256": "ca12b3fa24249303fae71fb5c90b14633a85323543ee24a54d89384f9e282f85",
+  "source_glb_sha256": "449b86724a4ed56da6f6deb5aec68d45bdfb80fce85a32a99f0aab409d01307f",
+  "blender_version": "5.2.1 LTS",
+  "removed_objects": [
+    "Specimen-Acid-Core",
+    "Specimen-Aqua-Currents"
+  ],
+  "retained_meshes": {
+    "Specimen-Body": {
+      "sha256": "b8f857a350a019cd94c383268a75e6f6b462b555674dbed77e49530341484227",
+      "vertices": 35274,
+      "triangles": 70544,
+      "morphs": [
+        "Basis",
+        "Breathe",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight",
+        "Blink",
+        "Curious",
+        "Focus",
+        "CrestFlexLeft",
+        "CrestFlexRight"
+      ],
+      "materials": [
+        "Specimen-Turquoise-Gel",
+        "Specimen-Yellow-Bolt-Tips"
+      ]
+    },
+    "Specimen-Eye-Left": {
+      "sha256": "84fe4a398d58fcdc883aef9cf19a8c9ae68a1a3b5639c0d8369782666d30d1f9",
+      "vertices": 1538,
+      "triangles": 3072,
+      "morphs": [
+        "Basis",
+        "Breathe",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight",
+        "Blink",
+        "Curious",
+        "Focus"
+      ],
+      "materials": [
+        "Specimen-Obsidian-Eyes"
+      ]
+    },
+    "Specimen-Eye-Right": {
+      "sha256": "80c77b766d20ef73e06845d91546da95018239c4cb15c95ca35321c468a1f315",
+      "vertices": 1538,
+      "triangles": 3072,
+      "morphs": [
+        "Basis",
+        "Breathe",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight",
+        "Blink",
+        "Curious",
+        "Focus"
+      ],
+      "materials": [
+        "Specimen-Obsidian-Eyes"
+      ]
+    },
+    "Specimen-Electric-Veins": {
+      "sha256": "426611880f575e1f22ece8e16835e547986f47168af88adad068ff1bb924efed",
+      "vertices": 2234,
+      "triangles": 4352,
+      "morphs": [
+        "Basis",
+        "Breathe",
+        "Squash",
+        "Stretch",
+        "WobbleLeft",
+        "WobbleRight",
+        "CrestFlexLeft",
+        "CrestFlexRight",
+        "Charge"
+      ],
+      "materials": [
+        "Specimen-Golden-Discharge",
+        "Specimen-Charged-Junctions"
+      ]
+    }
+  },
+  "retained_geometry_and_morphs_unchanged": true,
+  "total_triangles": 81040,
+  "blend_sha256": "96a7657651948b706f6ba446ca5c864262292fba8ae2620df9d8f2b8df0f9291",
+  "glb_sha256": "f2ce712cc4dc09195378a683771df4b77660e490258649120de2c34b0d5313ab",
+  "original_files_unchanged": true
+}

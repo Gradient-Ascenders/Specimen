@@ -93,9 +93,9 @@ for(const side of [-1,1])test(`a real full-charge jump clears the ${side<0?'left
   const body=new KinematicBody({world,surfaces,initialPosition:v(side*22,2.07,0),config:FINAL_SPECIMEN_MOVEMENT}),zero=v();
   const simulate=(charged:boolean)=>{
     body.recoverAt(v(side*22,2.07,0));for(let i=0;i<5;i++)body.update(1/60,zero);
-    const held=charged?22:1;for(let i=0;i<held;i++)body.update(1/60,zero,{pressed:i===0,held:true,released:false,cancelled:false});
+    const held=charged?22:12;for(let i=0;i<held;i++)body.update(1/60,zero,{pressed:i===0,held:true,released:false,cancelled:false});
     body.update(1/60,zero,{pressed:false,held:false,released:true,cancelled:false});
-    const timing=charged?.895:.48;
+    const timing=body.lastJumpSpeedMetresPerSecond/FINAL_SPECIMEN_MOVEMENT.gravityMetresPerSecondSquared-1/60;
     p.machine.rotation.set(0,0,0);p.machine.position.set(0,T.ramHeight,-150*timing);p.refreshWorldAnchors();p.ramHull.reset();
     let contact=false,peak=body.position.y;
     // Same geometry/scale and a late-RAM speed. Pass the whole model across

@@ -14,6 +14,9 @@ import { menuIconMarkup as icon } from './MenuIcons.ts';
 import { SLIME_PORTRAITS } from './SlimePortraits.ts';
 import { SlimeRosterPresentation } from './SlimeRosterPresentation.ts';
 import { HudPanelPresentation } from './HudPanelPresentation.ts';
+import { HudFooterLayout } from './HudFooterLayout.ts';
+import { PlayerHealthHud } from './PlayerHealthHud.ts';
+import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 import { FrameRateCounter } from './FrameRateCounter.ts';
 import { MenuGamepadNavigation, nextMenuFocusIndex, type MenuAction } from './MenuNavigation.ts';
 import {
@@ -49,7 +52,7 @@ export type GameFlowState =
   | 'transitioning'
   | 'transitionFailed';
 
-export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival';
+export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -65,7 +68,7 @@ export const gameFlowCinematicCanPause = (
   cinematic: string | undefined,
   gameState: string | undefined,
 ): boolean => cinematic === 'cultivation-finale' || cinematic === 'cultivation-clearance' ||
-  cinematic === 'blackout-arrival' || cinematic === 'containment-finale' && gameState === 'level-completing';
+  cinematic === 'blackout-arrival' || cinematic === 'blackout-elevator' || cinematic === 'containment-finale' && gameState === 'level-completing';
 
 export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
@@ -437,6 +440,7 @@ export interface GameFlowActions {
 
 export interface SlimeHUDSource {
   subscribeSlimeHUD(listener: (snapshot: SlimeHUDSnapshot) => void): () => void;
+  getPlayerHealth?(): SlimeHealthReadModel | undefined;
 }
 
 export interface GameFlowUIOptions {
@@ -508,6 +512,9 @@ export class GameFlowUI {
   private readonly slimeRoster: HTMLElement;
   private readonly rosterPresentation: SlimeRosterPresentation;
   private readonly controlHints: HudPanelPresentation;
+  private readonly healthHud: PlayerHealthHud;
+  private readonly hudFooter: HudFooterLayout;
+  private readonly slimeHUD?: SlimeHUDSource;
   private readonly passiveStatus: HTMLElement;
   private readonly switchFeedback: HTMLElement;
   private readonly transitionRuntimeLabel: HTMLElement;
@@ -528,6 +535,7 @@ export class GameFlowUI {
     this.settings = options.settings;
     this.hostDocument = options.document ?? document;
     this.hostWindow = options.window ?? window;
+    this.slimeHUD = options.slimeHUD;
     this.element = this.createElement(options.creditsMarkdown);
 
     this.requireElement('.title-description').textContent = chooseTitleScreenLine(this.hostWindow);
@@ -582,6 +590,10 @@ export class GameFlowUI {
     this.rosterPresentation = new SlimeRosterPresentation(this.requireElement('.hud-roster'), this.hostWindow);
     this.controlHints = new HudPanelPresentation(this.requireElement('.hud-controls'),
       this.requireElement('.hud-hint'), this.requireElement('.hud-controls-summary'), this.hostWindow, 'Y');
+    this.healthHud = new PlayerHealthHud(this.hostDocument, this.hostWindow);
+    this.requireElement('.game-hud').append(this.healthHud.element);
+    this.hudFooter = new HudFooterLayout(this.hostDocument.querySelector<HTMLElement>('#app') ?? this.hostDocument.documentElement,
+      this.requireElement('.hud-controls'));
     this.transitionRuntimeLabel = this.requireElement('[data-transition-runtime-label]');
     this.transitionMessage = this.requireElement('[data-transition-message]');
     this.transitionCopy = this.requireElement('[data-transition-copy]');
@@ -637,6 +649,10 @@ export class GameFlowUI {
   /** Reuse the existing application loop; FPS DOM writes are limited to twice/second. */
   updateFrame(deltaSeconds: number): void {
     if (this.disposed) return;
+    if (this.model.state === 'playing') {
+      this.healthHud.update(this.actions.isCinematicPlaying?.() ? undefined : this.slimeHUD?.getPlayerHealth?.(),
+        this.actions.isGameplayInputEnabled() && !this.hostDocument.hidden ? deltaSeconds : 0);
+    }
     if (this.hasGamepad && this.menuNavigable) {
       const pad = this.readGamepads().find(candidate => candidate?.connected && candidate.mapping === 'standard');
       const action = this.gamepadNavigation.sample(pad ?? undefined, deltaSeconds);
@@ -745,6 +761,8 @@ export class GameFlowUI {
     this.unsubscribeSlimeHUD();
     this.rosterPresentation.dispose();
     this.controlHints.dispose();
+    this.healthHud.dispose();
+    this.hudFooter.dispose();
     this.additionalControls.dispose();
     this.settingHelp.dispose();
     this.model.dispose();
@@ -849,6 +867,9 @@ export class GameFlowUI {
             </button>
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="blackout-arrival">
               ${icon('Play')}<span><small>Level 3 · Blackout</small>Vent arrival</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="blackout-elevator">
+              ${icon('Play')}<span><small>Level 3 · Service elevator</small>The quiet ascent</span>
             </button>
           </nav>
           <footer class="credits-footer">
@@ -1068,6 +1089,7 @@ export class GameFlowUI {
     }
 
     const gameplayActive = state === 'playing';
+    if ((!gameplayActive && state !== 'paused' && this.model.menuOrigin !== 'paused') || state === 'restarting' || state === 'transitioning') this.healthHud.reset();
     if (gameplayActive) {
       this.rosterPresentation.reset();
       this.controlHints.reset();
@@ -1213,7 +1235,7 @@ export class GameFlowUI {
         break;
       case 'select-cutscene': {
         const cutscene = target.dataset.cutscene;
-        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival') && this.model.beginSelectedCutscene(cutscene)) {
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator') && this.model.beginSelectedCutscene(cutscene)) {
           this.syncState();
           this.actions.previewCutscene(cutscene);
         }
@@ -1602,6 +1624,7 @@ export class GameFlowUI {
   }
 
   private readonly onSlimeHUDChanged = (snapshot: SlimeHUDSnapshot): void => {
+    if (snapshot.resetSwitchFeedback) this.healthHud.reset();
     this.switchFeedback.textContent = this.switchFeedbackModel.update(snapshot);
 
     const entries = snapshot.roster.flatMap((entry) => {
