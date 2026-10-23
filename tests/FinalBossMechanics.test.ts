@@ -263,7 +263,7 @@ test('the three pursuers follow a real charged jump without retreating to the bo
         velocities[index]!.copy(velocity);previous[index]!.copy(root.position);
       });
     }
-    assert.ok(apex-FINAL_MERGE_ANCHOR.y>10);assert.equal(f.body.grounded,true);
+    assert.ok(apex-FINAL_MERGE_ANCHOR.y>10.5);assert.equal(f.body.grounded,true);
   }finally{f.dispose();}
 });
 

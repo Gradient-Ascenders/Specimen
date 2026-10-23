@@ -3,6 +3,10 @@ import * as THREE from 'three';
 export interface SpecimenSurfaceUniforms {
   time: THREE.IUniform<number>;
   charge: THREE.IUniform<number>;
+  damage: THREE.IUniform<number>;
+  damageAge: THREE.IUniform<number>;
+  overcharge: THREE.IUniform<number>;
+  recoil: THREE.IUniform<number>;
 }
 
 type Region = 'shell' | 'flow' | 'core' | 'eye' | 'electric';
@@ -13,6 +17,9 @@ const TISSUE = /* glsl */`
   varying vec3 vSpecimenRest;
   uniform float uSpecimenTime;
   uniform float uSpecimenCharge;
+  uniform float uSpecimenDamage;
+  uniform float uSpecimenDamageAge;
+  uniform float uSpecimenOvercharge;
   vec2 specimenHash(vec2 p) {
     return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
   }
@@ -56,13 +63,23 @@ export function configureSpecimenSurface(
   region: Region,
   uniforms: SpecimenSurfaceUniforms,
 ): void {
-  material.customProgramCacheKey = () => `specimen-living-fusion-v2-${region}`;
+  material.customProgramCacheKey = () => `specimen-living-fusion-v3-${region}`;
   material.onBeforeCompile = shader => {
     shader.uniforms.uSpecimenTime = uniforms.time;
     shader.uniforms.uSpecimenCharge = uniforms.charge;
+    shader.uniforms.uSpecimenDamage = uniforms.damage;
+    shader.uniforms.uSpecimenDamageAge = uniforms.damageAge;
+    shader.uniforms.uSpecimenOvercharge = uniforms.overcharge;
+    shader.uniforms.uSpecimenRecoil = uniforms.recoil;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vSpecimenRest;${region === 'eye' ? '\nattribute vec3 specimenEye; varying vec3 vSpecimenEye;' : ''}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSpecimenRest;
+        uniform float uSpecimenDamage; uniform float uSpecimenDamageAge; uniform float uSpecimenRecoil;${region === 'eye' ? '\nattribute vec3 specimenEye; varying vec3 vSpecimenEye;' : ''}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\nvSpecimenRest = position;${region === 'eye' ? '\nvSpecimenEye = specimenEye;' : ''}`);
+    shader.vertexShader = shader.vertexShader.replace('#include <morphtarget_vertex>', `
+      #include <morphtarget_vertex>
+      float damageWave = sin(length(position - vec3(0.0, 0.15, -0.25)) * 38.0 - uSpecimenDamageAge * 32.0);
+      transformed += normalize(objectNormal) * damageWave * uSpecimenDamage * 0.012;
+      transformed.z -= smoothstep(0.85, 1.5, position.y) * uSpecimenRecoil * 0.13;`);
     shader.fragmentShader = shader.fragmentShader.replace('#include <common>',
       `#include <common>\n${TISSUE}${region === 'eye' ? '\nvarying vec3 vSpecimenEye;' : ''}`);
 
@@ -93,6 +110,11 @@ export function configureSpecimenSurface(
         totalEmissiveRadiance += specimenJade * (0.6 + 0.3 * uSpecimenCharge);
         totalEmissiveRadiance += vec3(0.02, 0.7, 0.65) * specimenRim * 0.85;
         totalEmissiveRadiance += vec3(1.0, 0.72, 0.015) * specimenAccent * (0.8 + specimenRim * 2.0) * (1.0 + uSpecimenCharge);`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `
+        #include <emissivemap_fragment>
+        float damageRipple = pow(0.5 + 0.5 * sin(length(vSpecimenRest - vec3(0.0, 0.15, -0.25)) * 38.0 - uSpecimenDamageAge * 32.0), 5.0);
+        totalEmissiveRadiance += vec3(0.12, 0.8, 0.72) * damageRipple * uSpecimenDamage * 2.5;
+        totalEmissiveRadiance += vec3(0.4, 0.24, 0.003) * uSpecimenOvercharge * (0.7 + 0.3 * sin(uSpecimenTime * 9.0));`);
       // Keep the skin's diffuse jade separate from the clearer transmitted
       // light, so the tissue remains dark while gold and the heart stay bright.
       shader.fragmentShader = shader.fragmentShader.replace('#include <transmission_fragment>', `
@@ -133,8 +155,10 @@ export function configureSpecimenSurface(
         '#include <morphtarget_vertex>\ntransformed += normalize(objectNormal) * 0.0015;');
       shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `
         #include <emissivemap_fragment>
-        float currentPulse = 0.88 + 0.12 * sin(vSpecimenRest.y * 11.0 - uSpecimenTime * 2.0);
-        totalEmissiveRadiance *= currentPulse;`);
+        float currentPulse = 0.88 + 0.12 * sin(vSpecimenRest.y * 11.0 - uSpecimenTime * (2.0 + uSpecimenCharge * 9.0));
+        float gathering = pow(0.5 + 0.5 * sin(vSpecimenRest.y * 24.0 - uSpecimenTime * (5.0 + uSpecimenCharge * 12.0)), 6.0);
+        float flicker = mix(1.0, 0.35 + 0.65 * abs(sin(uSpecimenTime * 65.0)), uSpecimenDamage);
+        totalEmissiveRadiance *= (currentPulse + gathering * uSpecimenCharge * 1.5 + uSpecimenOvercharge * 0.6) * flicker;`);
     }
   };
 }

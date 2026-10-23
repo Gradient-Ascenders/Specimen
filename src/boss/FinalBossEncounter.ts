@@ -37,7 +37,7 @@ export class FinalBossEncounter {
   readonly element:HTMLElement;
   readonly beamStart=new THREE.Vector3();
   readonly beamEnd=new THREE.Vector3();
-  private readonly options:{arena:ExterminationArena;world:CollisionWorld;targets:CombatTargetRegistry;body:KinematicBody;weapon:SpecimenProjectileSystem;host:HTMLElement;audio?:AudioPlayback;presentation:FinalBossPresentation;requestFailure:()=>boolean;random?:()=>number};
+  private readonly options:{arena:ExterminationArena;world:CollisionWorld;targets:CombatTargetRegistry;body:KinematicBody;weapon:SpecimenProjectileSystem;host:HTMLElement;audio?:AudioPlayback;presentation:FinalBossPresentation;requestFailure:()=>boolean;onPlayerDamaged?:(amount:number)=>void;random?:()=>number};
   private readonly unregister:Array<()=>void>=[];
   private readonly droneResources=new SecurityDronePresentationResources(undefined,true);
   private readonly drones:SecurityDronePresentation[]=[];
@@ -81,7 +81,7 @@ export class FinalBossEncounter {
   constructor(options:FinalBossEncounter['options']) {
     this.options=options;this.controller=new FinalBossController({random:options.random});this.presentation=options.presentation;
     this.droneFlight=new ExterminatorDroneFlight(options.world);
-    const {world,targets,arena,body,weapon}=options,p=this.presentation;arena.root.add(p.root);
+    const {world,targets,arena,weapon}=options,p=this.presentation;arena.root.add(p.root);
     this.evasion=new ExterminatorEvasion({world,eye:p.core,machine:p.machine});
     for(const collider of [arena.entryDoor,arena.exitDoor,...arena.platforms.map(p=>p.collider)])world.setTransformMode(collider,ColliderTransformMode.Dynamic);
     const weakPoint=new SentinelWeakPointTarget({id:'extermination-core',hitMeshes:[p.core],authority:{
@@ -113,7 +113,6 @@ export class FinalBossEncounter {
     });
     this.unregister.push(this.squad.events.on('destroyed',e=>{const at=this.squad.root.children[e.slotIndex]!.position;p.burst(at,16);if(!this.droneFlight.isGuardian(e.slotIndex))this.healthPacks.drop(at);this.controller.droneDestroyed();options.audio?.play('world-drone-dissolve-01',at,true,.75);}));
     this.unregister.push(this.squad.events.on('projectileFired',e=>options.audio?.play('specimen-turret-shot',this.squad.root.children.find(r=>r.name.startsWith(e.droneId))?.position,true,.3)));
-    this.unregister.push(weapon.events.on('projectileFired',e=>options.audio?.play('volt-shoot-01',body.position,true,e.fullyCharged?1:.6)),weapon.events.on('fullChargeReached',()=>options.audio?.play('volt-charge-ready-01',body.position,false,.8)));
     this.hostileShots=new THREE.InstancedMesh(this.shotGeometry,this.shotMaterial,this.squad.poolCapacity);this.hostileShots.frustumCulled=false;this.hostileShots.count=0;arena.root.add(this.hostileShots);
     const doc=options.host.ownerDocument??document;this.element=doc.createElement('section');this.element.className='final-boss-hud';this.element.hidden=true;
     this.phaseLabel=doc.createElement('div');this.phaseLabel.className='final-boss-heading';this.bossHealth=doc.createElement('progress');this.bossHealth.max=T.health;this.bossHealth.setAttribute('aria-label','Exterminator health');
@@ -259,7 +258,7 @@ export class FinalBossEncounter {
     this.squad.update(dt,body,()=>this.hitPlayer(8,this.shotDamageSerial--));let count=0;
     for(const s of this.squad.projectileStates){if(!s.active)continue;this.dummy.position.copy(s.position);this.dummy.scale.setScalar(1);this.dummy.updateMatrix();this.hostileShots.setMatrixAt(count++,this.dummy.matrix);}this.hostileShots.count=count;if(count)this.hostileShots.instanceMatrix.needsUpdate=true;
   }
-  private hitPlayer(amount:number,serial?:number):boolean {if(!this.controller.damagePlayer(amount,serial))return false;this.options.audio?.play('bob-contact-01',this.options.body.position,true,.8);if(this.controller.readModel.playerHealth===0)this.options.requestFailure();return true;}
+  private hitPlayer(amount:number,serial?:number):boolean {if(!this.controller.damagePlayer(amount,serial))return false;this.options.onPlayerDamaged?.(amount);this.options.audio?.play('bob-contact-01',this.options.body.position,true,.8);if(this.controller.readModel.playerHealth===0)this.options.requestFailure();return true;}
   presentCamera(camera:THREE.PerspectiveCamera):void {
     const m=this.controller.readModel;
     const active=m.state!=='idle'&&m.state!=='suspended'&&m.state!=='complete';

@@ -219,12 +219,12 @@ test('production boss renders both phases, health drops, advanced reinforcements
   expect(await page.evaluate(id=>(window as any).__bossSession.runtime.resources.finalBoss.projectiles.shots.some((s:any)=>s.active&&s.id===id),orbId)).toBe(false);
   await writeFile(info.outputPath('orb-counter-evidence.json'),JSON.stringify({orbId,counters},null,2));
   await capture(page,info.outputPath('boss-orb-countered.png'));
-  // Actual player input, not a recovered airborne pose, verifies the boosted jump.
+  // Actual player input verifies the normal-gravity jump and beam clearance.
   const beforeJump=(await model(page)).position.y;
   await key(page,'Space',true);await step(page,22);await key(page,'Space',false);
   let apex=beforeJump;
   for(let i=0;i<90;i++){await step(page,2);apex=Math.max(apex,(await model(page)).position.y);}
-  expect(apex-beforeJump).toBeGreaterThan(10);expect(apex-beforeJump).toBeLessThan(12);
+  expect(apex-beforeJump).toBeGreaterThan(10.5);expect(apex-beforeJump).toBeLessThan(11.5);
   expect((await model(page)).drones).toBe(0);
   // An idle player should not survive the new sustained attacks. Verify the
   // actual damage/death flow, then return to a clean full-health checkpoint.

@@ -2327,7 +2327,7 @@ kbd {
 .final-boss-hud[data-hit='true'] {box-shadow:inset 0 0 70px #ef354733;}
 .final-boss-hud[data-state='transition'] .final-boss-cinematic {color:#ff7b71;}
 #app[data-boss-encounter='true'] .hud-roster, #app[data-boss-encounter='true'] .hud-objective-module {display:none;}
-.final-boss-hud::after {content:'SPECIMEN INTEGRITY / WASD · SPACE · RMB AIM · LMB TAP OR HOLD';position:absolute;bottom:2.5%;left:4%;font-size:clamp(.5rem,1.1vw,.75rem);text-shadow:0 2px 4px #000;}
+.final-boss-hud::after {content:'SPECIMEN INTEGRITY / WASD · SPACE · SHIFT DASH · RMB AIM · LMB TAP OR HOLD';position:absolute;bottom:2.5%;left:4%;font-size:clamp(.5rem,1.1vw,.75rem);text-shadow:0 2px 4px #000;}
 .final-boss-hud[data-state='intro']::before,.final-boss-hud[data-state='merging']::before,.final-boss-hud[data-state='transition']::before,.final-boss-hud[data-state='defeated']::before,.final-boss-hud[data-state='escape']::before {content:'';position:absolute;inset:0;border-top:5vh solid #000;border-bottom:5vh solid #000;}
 .specimen-combat-overlay {
   position: absolute;
@@ -2395,6 +2395,26 @@ kbd {
     0 0 0.4rem rgb(229 255 88 / 60%),
     0 0 0.9rem rgb(255 78 61 / 38%);
 }
+
+.specimen-abilities {
+  position: absolute;
+  right: 4%;
+  bottom: 7%;
+  display: grid;
+  gap: 0.3rem;
+  width: min(17rem, 40vw);
+  padding: 0.6rem 0.75rem;
+  color: #b8ffea;
+  background: rgb(3 18 20 / 80%);
+  border: 1px solid rgb(97 255 206 / 35%);
+  border-radius: 0.35rem;
+  font-size: clamp(0.55rem, 1.2vw, 0.72rem);
+  text-shadow: 0 1px 3px #000;
+}
+.specimen-abilities[hidden] { display: none; }
+.specimen-abilities progress { width: 100%; height: 0.3rem; accent-color: #87ffd5; }
+.specimen-abilities[data-overcharged='true'] { color: #ffec83; border-color: #ffdf63; box-shadow: 0 0 0.8rem rgb(255 206 53 / 28%); }
+.specimen-abilities[data-overcharged='true'] progress { accent-color: #ffdf63; }
 
 /* Cinematic controls share menu affordances without covering the picture. */
 .finale-skip {

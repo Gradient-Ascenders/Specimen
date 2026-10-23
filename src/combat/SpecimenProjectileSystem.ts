@@ -39,12 +39,14 @@ export interface SpecimenAttackConfig {
   readonly allowHipFire?: boolean;
   /** Production merged form reserves area damage for a complete charge. */
   readonly splashRequiresFullCharge?: boolean;
+  /** Zero/omitted disables the direct-hit streak reward. */
+  readonly overchargeHitsRequired?: number;
 }
 
 export const DEFAULT_SPECIMEN_ATTACK_CONFIG: Readonly<SpecimenAttackConfig> = {
   fullChargeSeconds: 1.5,
-  minimumCooldownSeconds: 0.35,
-  maximumCooldownSeconds: 0.8,
+  minimumCooldownSeconds: 0.12,
+  maximumCooldownSeconds: 0.18,
   projectileSpeedMetresPerSecond: 30,
   maximumRangeMetres: 60,
   projectileLifetimeSeconds: 2,
@@ -76,6 +78,8 @@ export interface SpecimenAttackReadModel {
   readonly aimDirection: ReadonlyVector3State;
   readonly aimPoint: ReadonlyVector3State;
   readonly liveProjectileCount: number;
+  readonly overchargeProgress: number;
+  readonly overchargeReady: boolean;
 }
 
 interface MutableAttackReadModel {
@@ -91,6 +95,8 @@ interface MutableAttackReadModel {
   readonly aimDirection: MutableVector3State;
   readonly aimPoint: MutableVector3State;
   liveProjectileCount: number;
+  overchargeProgress: number;
+  overchargeReady: boolean;
 }
 
 export interface SpecimenProjectileReadState {
@@ -102,6 +108,7 @@ export interface SpecimenProjectileReadState {
   readonly chargeAmount: number;
   readonly fullyCharged: boolean;
   readonly radiusMetres: number;
+  readonly overcharged: boolean;
 }
 
 interface MutableProjectileReadState {
@@ -113,6 +120,7 @@ interface MutableProjectileReadState {
   chargeAmount: number;
   fullyCharged: boolean;
   radiusMetres: number;
+  overcharged: boolean;
 }
 
 interface ProjectileSlot {
@@ -127,6 +135,7 @@ interface ProjectileSlot {
   radiusMetres: number;
   ageSeconds: number;
   distanceMetres: number;
+  accuracyRecorded: boolean;
 }
 
 export interface SpecimenAttackBody {
@@ -157,6 +166,7 @@ export interface SpecimenAttackEvents {
   chargeStarted: Record<string, never>;
   chargeCancelled: { readonly chargeAmount: number };
   fullChargeReached: Record<string, never>;
+  overchargeReady: Record<string, never>;
   shotRejected: {
     readonly reason: SpecimenShotRejectReason;
     readonly chargeAmount: number;
@@ -165,6 +175,7 @@ export interface SpecimenAttackEvents {
     readonly projectileId: number;
     readonly chargeAmount: number;
     readonly fullyCharged: boolean;
+    readonly overcharged: boolean;
     readonly damageUnits: number;
     readonly splashRadiusMetres: number;
     readonly position: ReadonlyVector3State;
@@ -232,10 +243,13 @@ export class SpecimenProjectileSystem {
   private readonly readModelValue: MutableAttackReadModel;
   private charging = false;
   private chargeSeconds = 0;
+  private queuedReleaseCharge: number | undefined;
   private fullChargeCueEmitted = false;
   private cooldownRemainingSeconds = 0;
   private cooldownDurationSeconds = 0;
   private nextProjectileId = 1;
+  private directHitStreak = 0;
+  private accuracyGeneration = 0;
   private disposed = false;
 
   constructor(options: {
@@ -273,6 +287,8 @@ export class SpecimenProjectileSystem {
       aimDirection: vectorState(0, 0, -1),
       aimPoint: vectorState(),
       liveProjectileCount: 0,
+      overchargeProgress: 0,
+      overchargeReady: false,
     };
     this.syncCooldownReadModel();
   }
@@ -296,6 +312,7 @@ export class SpecimenProjectileSystem {
     const slot=this.slots.find(s=>s.read.active&&s.read.id===id);if(!slot)return false;
     if(!Number.isFinite(at.x)||!Number.isFinite(at.y)||!Number.isFinite(at.z))throw new Error('Projectile interception point must be finite.');
     slot.position.copy(at);this.syncProjectile(slot);
+    this.recordAccuracy(slot, false);
     this.events.emit('impact',{projectileId:id,targetId:undefined,kind:'world',chargeAmount:slot.chargeAmount,fullyCharged:slot.fullyCharged,point:point(slot.position)});
     if(slot.read.active)this.deactivate(slot,'impact');this.syncLiveCount();return true;
   }
@@ -324,13 +341,19 @@ export class SpecimenProjectileSystem {
     this.setAimActive(canAim);
     if (controls.cancelled) this.cancelCharge();
 
-    if (canFire) {
+    if (canFire && !controls.cancelled) {
       this.updateAimState();
+
+      if (this.queuedReleaseCharge !== undefined && this.cooldownRemainingSeconds <= EPSILON) {
+        const queued = this.queuedReleaseCharge;
+        this.queuedReleaseCharge = undefined;
+        this.releaseShot(queued);
+      }
 
       if (
         controls.firePressed &&
         !this.charging &&
-        this.cooldownRemainingSeconds <= EPSILON
+        this.queuedReleaseCharge === undefined
       ) {
         this.beginCharge();
       }
@@ -382,6 +405,10 @@ export class SpecimenProjectileSystem {
     }
     this.cooldownRemainingSeconds = 0;
     this.cooldownDurationSeconds = 0;
+    this.directHitStreak = 0;
+    this.accuracyGeneration++;
+    this.readModelValue.overchargeReady = false;
+    this.readModelValue.overchargeProgress = 0;
     this.syncLiveCount();
     this.syncCooldownReadModel();
   }
@@ -413,11 +440,18 @@ export class SpecimenProjectileSystem {
   }
 
   private finishChargeAndRelease(chargeAmount: number): void {
-    const fired = this.fireProjectile(chargeAmount);
     this.charging = false;
     this.chargeSeconds = 0;
     this.fullChargeCueEmitted = false;
     this.syncChargeReadModel();
+    // Keep one deliberate release during recovery. Holding the button never
+    // repeats shots, and every input/death/reset boundary clears this request.
+    if (this.cooldownRemainingSeconds > EPSILON) this.queuedReleaseCharge = chargeAmount;
+    else this.releaseShot(chargeAmount);
+  }
+
+  private releaseShot(chargeAmount: number): void {
+    const fired = this.fireProjectile(chargeAmount);
     if (!fired) {
       this.events.emit('shotRejected', {
         reason: 'pool-full',
@@ -427,8 +461,9 @@ export class SpecimenProjectileSystem {
   }
 
   private cancelCharge(): void {
-    if (!this.charging) return;
-    const chargeAmount = this.chargeAmount;
+    if (!this.charging && this.queuedReleaseCharge === undefined) return;
+    const chargeAmount = this.charging ? this.chargeAmount : this.queuedReleaseCharge!;
+    this.queuedReleaseCharge = undefined;
     this.charging = false;
     this.chargeSeconds = 0;
     this.fullChargeCueEmitted = false;
@@ -490,6 +525,8 @@ export class SpecimenProjectileSystem {
       }
     }
     if (!slot) return false;
+    const overcharged = this.readModelValue.overchargeReady;
+    const power = overcharged ? Math.max(0.65, chargeAmount) : chargeAmount;
 
     this.launchPosition.set(this.body.position.x,
       this.body.position.y + (this.config.launchHeightOffsetMetres ?? 0),this.body.position.z);
@@ -503,7 +540,7 @@ export class SpecimenProjectileSystem {
     const radiusMetres = THREE.MathUtils.lerp(
       this.config.minimumProjectileRadiusMetres,
       this.config.maximumProjectileRadiusMetres,
-      chargeAmount,
+      power,
     );
     const launchDistance =
       this.body.radiusMetres +
@@ -530,11 +567,11 @@ export class SpecimenProjectileSystem {
     const damageUnits = THREE.MathUtils.lerp(
       this.config.minimumDamageUnits,
       this.config.maximumDamageUnits,
-      chargeAmount,
-    );
+      power,
+    ) * (overcharged ? 1.6 : 1);
     const splashRadiusMetres =
-      this.config.splashRequiresFullCharge && !fullyCharged ? 0 :
-        this.config.maximumSplashRadiusMetres * chargeAmount;
+      this.config.splashRequiresFullCharge && !fullyCharged && !overcharged ? 0 :
+        this.config.maximumSplashRadiusMetres * power;
 
     this.activateProjectile(
       slot,
@@ -546,6 +583,12 @@ export class SpecimenProjectileSystem {
       splashRadiusMetres,
       radiusMetres,
     );
+    slot.read.overcharged = overcharged;
+    if (overcharged) {
+      this.directHitStreak = 0;
+      this.readModelValue.overchargeReady = false;
+      this.readModelValue.overchargeProgress = 0;
+    }
 
     this.cooldownDurationSeconds = THREE.MathUtils.lerp(
       this.config.minimumCooldownSeconds,
@@ -557,6 +600,7 @@ export class SpecimenProjectileSystem {
       projectileId: slot.read.id,
       chargeAmount,
       fullyCharged,
+      overcharged,
       damageUnits,
       splashRadiusMetres,
       position: point(slot.position),
@@ -650,6 +694,9 @@ export class SpecimenProjectileSystem {
       // cleared this slot, abort the remainder of the blast immediately.
       if (!slot.read.active) return;
     }
+    // Splash never counts as accuracy. A world hit or rejected direct impact
+    // breaks an unfinished streak, but cannot remove an already earned shot.
+    this.recordAccuracy(slot, false);
 
     for (const candidate of this.splashCandidates) {
       if (!this.targets.isRegistered(candidate.registration)) continue;
@@ -779,7 +826,9 @@ export class SpecimenProjectileSystem {
       point: point(pointValue),
       direction: point(slot.direction),
     };
+    const generation = this.accuracyGeneration;
     const result = registration.target.applyImpact(impact);
+    if (generation === this.accuracyGeneration && slot.read.active && kind === 'direct') this.recordAccuracy(slot, result.accepted);
     this.events.emit('targetImpact', {
       impact,
       accepted: result.accepted,
@@ -810,6 +859,8 @@ export class SpecimenProjectileSystem {
     slot.radiusMetres = radiusMetres;
     slot.ageSeconds = 0;
     slot.distanceMetres = 0;
+    slot.accuracyRecorded = false;
+    slot.read.overcharged = false;
     this.syncProjectile(slot);
   }
 
@@ -818,6 +869,7 @@ export class SpecimenProjectileSystem {
     reason: SpecimenAttackEvents['projectileDespawned']['reason'],
   ): void {
     if (!slot.read.active) return;
+    if (reason === 'expired') this.recordAccuracy(slot, false);
     const projectileId = slot.read.id;
     slot.read.active = false;
     slot.ageSeconds = 0;
@@ -862,7 +914,7 @@ export class SpecimenProjectileSystem {
     this.readModelValue.canStartCharge =
       this.readModelValue.fireEnabled &&
       !this.charging &&
-      this.cooldownRemainingSeconds <= EPSILON;
+      this.queuedReleaseCharge === undefined;
   }
 
   private syncLiveCount(): void {
@@ -871,7 +923,29 @@ export class SpecimenProjectileSystem {
     this.readModelValue.liveProjectileCount = count;
   }
 
+  private breakAccuracyStreak(): void {
+    if (this.readModelValue.overchargeReady) return;
+    this.directHitStreak = 0;
+    this.readModelValue.overchargeProgress = 0;
+  }
+
+  private recordAccuracy(slot: ProjectileSlot, accepted: boolean): void {
+    const required = this.config.overchargeHitsRequired ?? 0;
+    if (slot.accuracyRecorded || required === 0) return;
+    slot.accuracyRecorded = true;
+    if (this.readModelValue.overchargeReady) return;
+    if (!accepted) { this.breakAccuracyStreak(); return; }
+    this.directHitStreak++;
+    this.readModelValue.overchargeProgress = Math.min(1, this.directHitStreak / required);
+    if (this.directHitStreak >= required) {
+      this.readModelValue.overchargeReady = true;
+      this.events.emit('overchargeReady', {});
+    }
+  }
+
   private validateConfig(): void {
+    if (!Number.isInteger(this.config.overchargeHitsRequired ?? 0) || (this.config.overchargeHitsRequired ?? 0) < 0)
+      throw new Error('overchargeHitsRequired must be a non-negative integer.');
     const muzzleHeight=this.config.launchHeightOffsetMetres??0;
     if(!Number.isFinite(muzzleHeight)||muzzleHeight<0)throw new Error('launchHeightOffsetMetres must be finite and non-negative.');
     const positive: ReadonlyArray<[string, number]> = [
@@ -951,6 +1025,7 @@ function createProjectileSlot(): ProjectileSlot {
       chargeAmount: 0,
       fullyCharged: false,
       radiusMetres: DEFAULT_SPECIMEN_ATTACK_CONFIG.minimumProjectileRadiusMetres,
+      overcharged: false,
     },
     position: new THREE.Vector3(),
     previousPosition: new THREE.Vector3(),
@@ -962,6 +1037,7 @@ function createProjectileSlot(): ProjectileSlot {
     radiusMetres: DEFAULT_SPECIMEN_ATTACK_CONFIG.minimumProjectileRadiusMetres,
     ageSeconds: 0,
     distanceMetres: 0,
+    accuracyRecorded: false,
   };
 }
 

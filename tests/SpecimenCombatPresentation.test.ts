@@ -46,6 +46,8 @@ const readModel: SpecimenAttackReadModel = {
   aimDirection: { x: 0, y: 0, z: 1 },
   aimPoint: { x: 0, y: 0, z: 10 },
   liveProjectileCount: 2,
+  overchargeProgress: 0,
+  overchargeReady: false,
 };
 
 function projectile(
@@ -62,6 +64,7 @@ function projectile(
     chargeAmount: 0.5,
     fullyCharged: false,
     radiusMetres: 0.15,
+    overcharged: false,
   };
 }
 

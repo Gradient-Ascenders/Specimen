@@ -66,26 +66,30 @@ export const FINAL_SPLIT_ANCHORS = {
 const bob = DEFAULT_KINEMATIC_BODY_CONFIG;
 export const FINAL_SPECIMEN_MOVEMENT = Object.freeze({
   radiusMetres: FINAL_SPECIMEN_RADIUS,
-  maxSpeedMetresPerSecond: bob.maxSpeedMetresPerSecond * 2.4,
-  groundAccelerationMetresPerSecondSquared: bob.groundAccelerationMetresPerSecondSquared * 2.4,
-  groundBrakingMetresPerSecondSquared: bob.groundBrakingMetresPerSecondSquared * 2.4,
+  maxSpeedMetresPerSecond: bob.maxSpeedMetresPerSecond * 3,
+  groundAccelerationMetresPerSecondSquared: bob.groundAccelerationMetresPerSecondSquared * 3,
+  groundBrakingMetresPerSecondSquared: bob.groundBrakingMetresPerSecondSquared * 3,
   airAccelerationMetresPerSecondSquared: bob.airAccelerationMetresPerSecondSquared * 3,
-  gravityMetresPerSecondSquared: bob.gravityMetresPerSecondSquared * 1.5,
-  minimumJumpSpeedMetresPerSecond: bob.minimumJumpSpeedMetresPerSecond * 2.5,
-  maximumJumpSpeedMetresPerSecond: bob.maximumJumpSpeedMetresPerSecond * 2.5,
+  gravityMetresPerSecondSquared: bob.gravityMetresPerSecondSquared,
+  minimumJumpSpeedMetresPerSecond: bob.minimumJumpSpeedMetresPerSecond,
+  // Normal gravity and a normal tap jump. The full-charge height is still
+  // required to clear the actual RAM turbines, which a 6.8 m jump hits.
+  maximumJumpSpeedMetresPerSecond: Math.sqrt(2 * bob.gravityMetresPerSecondSquared * 11.2),
   maximumJumpChargeSeconds: bob.maximumJumpChargeSeconds / 2,
   slimeHardLandingImpactSpeedMetresPerSecond: bob.slimeHardLandingImpactSpeedMetresPerSecond * 2.5,
-  slimeLandingReactionHopSpeedMetresPerSecond: bob.slimeLandingReactionHopSpeedMetresPerSecond * 2.5,
+  slimeLandingReactionHopSpeedMetresPerSecond: bob.slimeLandingReactionHopSpeedMetresPerSecond,
   adhesionEnabled: false, reboundEnabled: true, chargedJumpEnabled: true,
 });
 export const FINAL_SPECIMEN_WEAPON: Partial<SpecimenAttackConfig> = Object.freeze({
-  fullChargeSeconds: 1.5, minimumCooldownSeconds: .25, maximumCooldownSeconds: .9,
+  fullChargeSeconds: 1.5, minimumCooldownSeconds: .12, maximumCooldownSeconds: .18,
+  maximumLiveProjectiles: 32,
   projectileSpeedMetresPerSecond: 50, maximumRangeMetres: 145, projectileLifetimeSeconds: 3.2,
   minimumProjectileRadiusMetres: .18, maximumProjectileRadiusMetres: .7,
   minimumDamageUnits: 2, maximumDamageUnits: 18, maximumSplashRadiusMetres: 14,
   splashRequiresFullCharge: true,
   launchHeightOffsetMetres: .75,
   allowHipFire:true,
+  overchargeHitsRequired: 4,
 });
 /** Re-entry deliberately restores a fresh encounter, not an attack in progress. */
 export const FINAL_BOSS_CHECKPOINT: BlackoutCheckpointDefinition = {

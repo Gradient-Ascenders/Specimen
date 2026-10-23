@@ -4,6 +4,7 @@ export type InputAction =
   | 'moveLeft'
   | 'moveRight'
   | 'jump'
+  | 'dash'
   | 'switchSlime'
   | 'toggleView'
   | 'mountDrone'
@@ -35,6 +36,7 @@ export const DEFAULT_ACTION_BINDINGS = {
   moveLeft: [{ kind: 'key', code: 'KeyA' }],
   moveRight: [{ kind: 'key', code: 'KeyD' }],
   jump: [{ kind: 'key', code: 'Space' }],
+  dash: [{ kind: 'key', code: 'ShiftLeft' }, { kind: 'key', code: 'ShiftRight' }],
   switchSlime: [{ kind: 'key', code: 'Tab' }],
   toggleView: [{ kind: 'key', code: 'KeyV' }],
   mountDrone: [{ kind: 'key', code: 'KeyM' }],

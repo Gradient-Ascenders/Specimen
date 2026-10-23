@@ -7,9 +7,133 @@ import { SpecimenCharacterPresentation } from '../src/render/specimen/SpecimenCh
 import { GelRendering } from '../src/render/slime/GelRendering.ts';
 import { CameraRig } from '../src/render/CameraRig.ts';
 
-const state = () => ({ locomotionPosition: new THREE.Vector3(), velocity: new THREE.Vector3(),
+const state = () => ({ position: new THREE.Vector3(), locomotionPosition: new THREE.Vector3(), velocity: new THREE.Vector3(),
+  maximumLocomotionSpeedMetresPerSecond: 6,
   gameplayUp: new THREE.Vector3(0, 1, 0), grounded: true, landedThisStep: false, chargingJump: false, chargeFraction: 0 });
 const attack = () => ({ aimActive: false, aimDirection: new THREE.Vector3(0, 0, -1), chargeAmount: 0 });
+
+function travel(p: SpecimenCharacterPresentation, motion: ReturnType<typeof state>, frames: number, direction = new THREE.Vector3(0, 0, -1)) {
+  motion.velocity.copy(direction).multiplyScalar(motion.maximumLocomotionSpeedMetresPerSecond);
+  for (let i = 0; i < frames; i++) {
+    motion.locomotionPosition.addScaledVector(motion.velocity, 1 / 60);
+    p.update(1 / 60, motion, attack());
+    p.present(1);
+  }
+}
+
+test('hip-fire charging overrides travel facing and a tap faces its actual projectile direction', async () => {
+  const p = new SpecimenCharacterPresentation(), motion = state(), combat = { ...attack(), charging: true };
+  await p.prepare(loadSpecimen);
+  try {
+    combat.aimDirection.set(1, 0, 0);
+    for (let i = 0; i < 30; i++) {
+      motion.locomotionPosition.z -= 0.1;
+      p.update(1 / 60, motion, combat);
+    }
+    assert.ok(Math.abs(p.diagnostics.yaw + Math.PI / 2) < 0.001, 'LMB follows the shot direction without RMB');
+    combat.charging = false;
+    p.onShot(new THREE.Vector3(0, 0, 1)); p.update(1 / 60, motion, combat); p.present(1);
+    assert.ok(Math.abs(Math.cos(p.diagnostics.yaw) + 1) < 1e-6, 'a tap immediately faces the real muzzle direction');
+    for (let i = 0; i < 10; i++) {
+      motion.locomotionPosition.z -= 0.1; p.update(1 / 60, motion, combat);
+    }
+    assert.ok(Math.abs(Math.cos(p.diagnostics.yaw) + 1) < 1e-6, 'running cannot turn the body away during the firing pose');
+    p.reset(); travel(p, motion, 60);
+    assert.ok(Math.abs(p.diagnostics.yaw) < 0.001, 'reset clears the held firing direction');
+  } finally { p.dispose(); }
+});
+
+test('Specimen leans into resolved running travel, counterleans through reversals and banks into turns', async () => {
+  const p = new SpecimenCharacterPresentation(), motion = state();
+  await p.prepare(loadSpecimen);
+  try {
+    p.update(1 / 60, motion, attack());
+    travel(p, motion, 60);
+    assert.ok(p.diagnostics.signedLean > 0.95);
+    const forwardYaw = p.diagnostics.yaw;
+    travel(p, motion, 1, new THREE.Vector3(0, 0, 1));
+    assert.equal(p.diagnostics.reversing, true);
+    assert.equal(p.diagnostics.yaw, forwardYaw, 'reverse first gathers the body before turning');
+    travel(p, motion, 7, new THREE.Vector3(0, 0, 1));
+    assert.ok(p.diagnostics.signedLean < 0, 'reverse travel loads a counterlean');
+    let maximumBank = 0;
+    for (let i = 0; i < 75; i++) {
+      const before = p.diagnostics.yaw;
+      travel(p, motion, 1, new THREE.Vector3(0, 0, 1));
+      const change = Math.atan2(Math.sin(p.diagnostics.yaw - before), Math.cos(p.diagnostics.yaw - before));
+      assert.ok(Math.abs(change) <= Math.PI * 3 / 60 + 1e-8, 'turn rate is bounded');
+      maximumBank = Math.max(maximumBank, Math.abs(p.diagnostics.turnBank));
+    }
+    assert.ok(maximumBank > 0.35);
+    assert.equal(p.diagnostics.reversing, false);
+    assert.ok(p.diagnostics.signedLean > 0.9);
+    for (let i = 0; i < 60; i++) p.update(1 / 60, motion, attack());
+    assert.ok(Math.abs(p.diagnostics.signedLean) < 0.001, 'blocked velocity cannot keep a running lean');
+    assert.ok(Math.abs(p.diagnostics.turnBank) < 0.001);
+    p.setPosition(new THREE.Vector3(100, 5, 0));
+    p.update(1 / 60, motion, attack());
+    assert.ok(Math.abs(p.diagnostics.signedLean) < 0.001, 'carrier/placement travel does not drive locomotion');
+    p.reset(); p.present(1);
+    assert.equal(p.diagnostics.bodyHeightScale, 1);
+    assert.equal(p.diagnostics.signedLean, 0);
+    assert.equal(p.diagnostics.turnBank, 0);
+    assert.equal(p.root.getObjectByName('specimen-elastic-motion')!.matrix.equals(new THREE.Matrix4()), true);
+  } finally { p.dispose(); }
+});
+
+test('held jump compresses immediately, release springs into stretch, and landing compresses then settles', async () => {
+  const p = new SpecimenCharacterPresentation(), motion = state();
+  await p.prepare(loadSpecimen);
+  try {
+    motion.chargingJump = true;
+    p.update(1 / 60, motion, attack());
+    assert.ok(p.diagnostics.bodyHeightScale < 0.98, 'the first held frame starts gathering the body');
+    for (let i = 0; i < 30; i++) {
+      motion.chargeFraction = Math.min(1, (i + 1) / 21);
+      p.update(1 / 60, motion, attack());
+    }
+    assert.ok(p.diagnostics.bodyHeightScale < 0.67);
+    p.onLaunch({ chargeFraction: 1, speedMetresPerSecond: 24.6, directionWorld: { x: 0, y: 1, z: 0 } });
+    motion.chargingJump = false; motion.chargeFraction = 0; motion.grounded = false; motion.velocity.y = 24.6;
+    for (let i = 0; i < 4; i++) p.update(1 / 60, motion, attack());
+    const launchHeight = p.diagnostics.bodyHeightScale;
+    assert.ok(launchHeight > 1.2, 'takeoff releases the stored squash into a short spring');
+    motion.velocity.y = 0;
+    for (let i = 0; i < 30; i++) p.update(1 / 60, motion, attack());
+    assert.ok(p.diagnostics.bodyHeightScale < launchHeight - 0.1, 'the launch pose relaxes near the apex');
+    p.onLanding(20); motion.grounded = true; motion.landedThisStep = true;
+    p.update(1 / 60, motion, attack()); motion.landedThisStep = false;
+    for (let i = 0; i < 6; i++) p.update(1 / 60, motion, attack());
+    assert.ok(p.diagnostics.bodyHeightScale < 0.83);
+    for (let i = 0; i < 40; i++) p.update(1 / 60, motion, attack());
+    assert.ok(Math.abs(p.diagnostics.bodyHeightScale - 1) < 0.002);
+    assert.ok(Object.values(p.diagnostics.weights).every(value => Number.isFinite(value) && value >= 0 && value <= 1));
+  } finally { p.dispose(); }
+});
+
+test('lean and charged squash retain the sole plane at both playable scales and wall orientations', async () => {
+  for (const radius of [0.675, 1.65]) {
+    const p = new SpecimenCharacterPresentation(radius), motion = state();
+    await p.prepare(loadSpecimen);
+    try {
+      p.setPosition(new THREE.Vector3(radius, 2, 0));
+      motion.gameplayUp.set(1, 0, 0);
+      p.update(1 / 60, motion, attack());
+      travel(p, motion, 60);
+      for (const charging of [false, true]) {
+        motion.chargingJump = charging; motion.chargeFraction = charging ? 1 : 0;
+        for (let i = 0; i < 30; i++) p.update(1 / 60, motion, attack());
+        for (const alpha of [0, 0.5, 1]) {
+          p.present(alpha); p.root.updateMatrixWorld(true);
+          const sole = new THREE.Vector3(0, -0.45, 0);
+          p.root.getObjectByName('The_Specimen')!.localToWorld(sole);
+          assert.ok(Math.abs(sole.x) < 1e-6, `${radius} radius sole remains on the wall`);
+          assert.ok(Math.abs(sole.y - 2) < 1e-6);
+        }
+      }
+    } finally { p.dispose(); }
+  }
+});
 
 test('active final-fusion GLB keeps six lightning-only regions, yellow vertex colours and playable morph clips', async () => {
   const root = await loadSpecimen(), asset = validateSpecimenAsset(root);
@@ -44,6 +168,12 @@ test('preparation deduplicates, retains requests, fades every region and release
   policy.setMode('physical'); assert.ok(asset.meshes.some(mesh => mesh.material.transmission > 0));
   const owned = new Set<THREE.BufferGeometry | THREE.Material>();
   for (const mesh of asset.meshes) for (const resource of [mesh.geometry, mesh.material, mesh.customDepthMaterial, mesh.customDistanceMaterial]) if (resource) owned.add(resource);
+  p.root.getObjectByName('specimen-action-effects')!.traverse(object => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points) {
+      owned.add(object.geometry);
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) owned.add(material);
+    }
+  });
   const disposed = new Map<object, number>();
   for (const resource of [...owned, environment]) resource.addEventListener('dispose', () => disposed.set(resource, (disposed.get(resource) ?? 0) + 1));
   p.dispose(); p.dispose();
@@ -126,10 +256,33 @@ test('living fusion surfaces share presentation time and charge; pupil coordinat
     assert.equal(surface.uSpecimenTime!.value, 0.25);
     assert.equal(surface.uSpecimenCharge!.value, 0.8);
   }
+  p.setVisible(true);
+  const motion = state();
+  p.onShot(combat.aimDirection, 1); p.onDamage(20);
+  p.update(1 / 60, motion, { ...combat, charging: true, overchargeReady: true, overchargeProgress: 1 }); p.present(1);
+  assert.ok(p.diagnostics.recoil > 0); assert.ok(p.diagnostics.damageRipple > 0);
+  assert.equal(p.diagnostics.effects.chargeArcsVisible, true);
+  for (const surface of uniforms) {
+    assert.ok(surface.uSpecimenRecoil!.value > 0); assert.ok(surface.uSpecimenDamage!.value > 0);
+    assert.equal(surface.uSpecimenOvercharge!.value, 1);
+  }
+  p.onLaunch({ chargeFraction: 1, speedMetresPerSecond: 20, directionWorld: motion.gameplayUp });
+  p.onLanding(20, motion.position, motion.gameplayUp);
+  assert.equal(p.diagnostics.effects.landingActive, true);
+  p.setDashing(true); p.update(1 / 60, motion, { ...combat, charging: true });
+  assert.ok(p.diagnostics.effects.afterimages > 0);
+  p.setOpacity(0);
+  assert.ok(p.diagnostics.effects.afterimages > 0, 'camera body fades cannot delete world-space dash echoes');
+  assert.equal(p.diagnostics.effects.chargeArcsVisible, false);
+  p.setOpacity(1); assert.equal(p.diagnostics.effects.chargeArcsVisible, true);
+  const arcs = p.root.getObjectByName('specimen-charge-arcs') as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  assert.ok(arcs.material.opacity > 0, 'camera fade restoration restores both arc visibility and opacity');
   p.reset();
+  assert.deepEqual(p.diagnostics.effects, { landingActive: false, chargeArcsVisible: false, afterimages: 0 });
   for (const surface of uniforms) {
     assert.equal(surface.uSpecimenTime!.value, 0);
     assert.equal(surface.uSpecimenCharge!.value, 0);
+    assert.equal(surface.uSpecimenDamage!.value, 0); assert.equal(surface.uSpecimenOvercharge!.value, 0);
   }
   p.dispose();
 });

@@ -20,7 +20,8 @@ export class SpecimenMaterials {
     opacity: number; emission: number; transparent: boolean; depthWrite: boolean;
   }>();
   private readonly shadowOpacity = { value: 1 };
-  private readonly surfaceUniforms: SpecimenSurfaceUniforms = { time: { value: 0 }, charge: { value: 0 } };
+  private readonly surfaceUniforms: SpecimenSurfaceUniforms = { time: { value: 0 }, charge: { value: 0 },
+    damage: { value: 0 }, damageAge: { value: 0 }, overcharge: { value: 0 }, recoil: { value: 0 } };
 
   constructor(asset: SpecimenAsset, gelRendering?: GelRendering) {
     this.materials = [...new Set(asset.meshes.map(mesh => mesh.material))];
@@ -117,6 +118,9 @@ export class SpecimenMaterials {
       (/Golden-Discharge|Charged-Junctions|Fusion-Heart/.test(material.name) ? 1 + 2 * value * value : 1);
   }
   setTime(seconds: number): void { this.surfaceUniforms.time.value = seconds; }
+  setDamage(amount: number, age: number): void { this.surfaceUniforms.damage.value = amount; this.surfaceUniforms.damageAge.value = age; }
+  setOvercharge(value: number): void { this.surfaceUniforms.overcharge.value = value; }
+  setRecoil(value: number): void { this.surfaceUniforms.recoil.value = value; }
   setReflectionEnvironment(texture: THREE.Texture | null): void {
     for (const material of this.materials) { material.envMap = texture; material.needsUpdate = true; }
   }

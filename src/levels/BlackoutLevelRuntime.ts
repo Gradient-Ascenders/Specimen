@@ -2,6 +2,8 @@ import { SpecimenCharacterPresentation } from '../render/specimen/SpecimenCharac
 import { SpecimenReflectionEnvironment } from '../render/specimen/SpecimenReflectionEnvironment.ts';
 import { VoltCharacterPresentation, type VoltCharacterPresentationState } from '../render/volt/VoltCharacterPresentation.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
+import { SpecimenAbilityAudio } from '../audio/SpecimenAbilityAudio.ts';
+import { SpecimenDash } from '../combat/SpecimenDash.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
@@ -198,6 +200,8 @@ interface BlackoutRuntimeResources {
   readonly specimenBody: KinematicBody;
   readonly specimenForm: SpecimenFormController;
   readonly specimenAttack: SpecimenProjectileSystem;
+  readonly specimenDash: SpecimenDash;
+  readonly specimenAbilityAudio?: SpecimenAbilityAudio;
   readonly specimenPresentation: SpecimenCombatPresentation;
   readonly specimenCharacter: SpecimenCharacterPresentation;
   readonly specimenLight: THREE.PointLight;
@@ -656,7 +660,7 @@ export class BlackoutLevelRuntime {
     resources.electricalSystem.reset('death');
     resources.acidProjectileSystem.reset();
     resources.goopAcidPresentation.reset();
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.sentinelRig.controller.cancelTransient('death');
     resources.finalBoss?.suspend();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);
@@ -696,7 +700,7 @@ export class BlackoutLevelRuntime {
     resources.electricalSystem.cancelAim();
     resources.acidProjectileSystem.reset();
     resources.goopAcidPresentation.reset();
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.sentinelRig.controller.cancelTransient('phase-change');
     resources.maintenanceDrone.recoverImmediately('checkpoint');
     resources.dronePresentation?.update(0, resources.maintenanceDrone.readModel,
@@ -729,7 +733,7 @@ export class BlackoutLevelRuntime {
     }
 
     this.input.resetState();
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     this.renderLayer.cameraRig.setAimPresentationActive(false, true);
     this.currentRoom = {
       roomId: 'ending',
@@ -810,7 +814,7 @@ export class BlackoutLevelRuntime {
     if (next === 'boss') {
       if(resources.finalBoss) {
         if(resources.finalBoss.controller.readModel.state!=='idle'||!resources.phase.transition('boss'))return false;
-        resources.finalBoss.start();resources.specimenAttack.reset();this.input.resetState();
+        resources.finalBoss.start();resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);this.input.resetState();
         this.renderLayer.cameraRig.setAimPresentationActive(false,true);
         this.currentRoom={roomId:'room-4b',phase:'boss',local:{finalBoss:true}};
         this.events.emit('objectiveChanged',{roomId:'room-4b',objective:'Survive the attack. Charge a shot when the core opens.'});return true;
@@ -823,7 +827,7 @@ export class BlackoutLevelRuntime {
         resources.phase.restore('specimen');
         return false;
       }
-      resources.specimenAttack.reset();
+      resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
       resources.acidProjectileSystem.reset();
       resources.goopAcidPresentation.reset();
       this.renderLayer.cameraRig.setAimPresentationActive(false, true);
@@ -847,7 +851,7 @@ export class BlackoutLevelRuntime {
       resources.acidProjectileSystem.reset();
       resources.goopAcidPresentation.reset();
       resources.electricalSystem.cancelAim();
-      resources.specimenAttack.reset();
+      resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
       resources.sentinelRig.controller.cancelTransient('phase-change');
       resources.poweredDeviceRig.recomputePower();
       this.renderLayer.cameraRig.setAimPresentationActive(false, true);
@@ -917,7 +921,7 @@ export class BlackoutLevelRuntime {
     if(resources.finalBoss?.cinematic) {
       resources.finalBoss.update(deltaSeconds,this.input.wasPressed('skipCinematic'));
       this.commitFinalBossPhaseTwoCheckpoint(resources);
-      resources.specimenAttack.cancelInput();this.renderLayer.cameraRig.setAimPresentationActive(false,true);
+      resources.specimenAttack.cancelInput(); resources.specimenDash.cancel(); resources.specimenAbilityAudio?.setEnabled(false);this.renderLayer.cameraRig.setAimPresentationActive(false,true);
       if(resources.finalBoss.controller.consumeDefeat())this.commitBossDefeat(resources);
       if(resources.finalBoss.controller.readModel.state==='complete') {
         if(this.beginSplit()&&this.completeSplit())this.transitionPhase('complete');
@@ -998,7 +1002,7 @@ export class BlackoutLevelRuntime {
       resources.phase.phase === 'splitting' ||
       resources.phase.phase === 'boss-defeated'
     ) {
-      resources.specimenAttack.cancelInput();
+      resources.specimenAttack.cancelInput(); resources.specimenDash.cancel(); resources.specimenAbilityAudio?.setEnabled(false);
       resources.poweredDeviceRig.updateMechanics(deltaSeconds, []);
       resources.poweredDeviceRig.updateHazards(deltaSeconds, []);
       this.syncVisuals(resources);
@@ -1165,7 +1169,14 @@ export class BlackoutLevelRuntime {
         } else if (!specimenGameplay && body === resources.group.voltBody) {
           resources.voltMovementIntent.copy(resources.movement);
         }
-        body.update(deltaSeconds, resources.movement, resources.jump);
+        if (specimenGameplay) {
+          resources.specimenAbilityAudio?.setEnabled(this.input.enabled && this.input.pointerLocked && !this.input.wasClearedSinceFixedUpdate);
+          resources.specimenDash.update(deltaSeconds, { enabled: this.input.enabled && this.input.pointerLocked,
+            pressed: this.input.wasPressed('dash'), cancelled: this.input.wasClearedSinceFixedUpdate,
+            movement: resources.movement, forward: resources.specimenAttack.readModel.aimDirection, up: body.gameplayUp });
+          if (resources.specimenDash.readModel.active) resources.movement.copy(resources.specimenDash.movementDirection);
+        }
+        body.update(deltaSeconds, resources.movement, resources.jump, specimenGameplay ? resources.specimenDash.locomotion : undefined);
 
         resources.maintenanceDrone.update(deltaSeconds, {
           horizontalDirection: resources.movement.set(0, 0, 0),
@@ -1245,7 +1256,11 @@ export class BlackoutLevelRuntime {
       resources.specimenAttack.readModel.aimActive ||
       resources.acidProjectileSystem.aimReadModel.active,
     );
-    if (specimenGameplay) resources.specimenCharacter.update(deltaSeconds, resources.specimenBody, resources.specimenAttack.readModel);
+    if (specimenGameplay) {
+      resources.specimenCharacter.setDashing(resources.specimenDash.readModel.active);
+      resources.specimenCharacter.update(deltaSeconds, resources.specimenBody, resources.specimenAttack.readModel);
+      resources.specimenAbilityAudio?.update();
+    }
     resources.specimenPresentation.update(specimenGameplay);
 
     if (resources.phase.phase === 'boss') {
@@ -1684,6 +1699,9 @@ export class BlackoutLevelRuntime {
         initialPosition: this.authoredRoomOne ? FINAL_MERGE_ANCHOR : BLACKOUT_SPECIMEN_MERGE_ANCHOR,
         config: {
           radiusMetres: BLACKOUT_SPECIMEN_RADIUS_METRES,
+          maxSpeedMetresPerSecond: FINAL_SPECIMEN_MOVEMENT.maxSpeedMetresPerSecond,
+          groundAccelerationMetresPerSecondSquared: FINAL_SPECIMEN_MOVEMENT.groundAccelerationMetresPerSecondSquared,
+          groundBrakingMetresPerSecondSquared: FINAL_SPECIMEN_MOVEMENT.groundBrakingMetresPerSecondSquared,
           adhesionEnabled: true,
           reboundEnabled: true,
           chargedJumpEnabled: true,
@@ -1818,6 +1836,8 @@ export class BlackoutLevelRuntime {
       const specimenCharacter = new SpecimenCharacterPresentation(specimenBody.radiusMetres, this.renderLayer.gelRendering);
       specimenCharacter.setCameraView(this.renderLayer.cameraRig, specimenBody);
       rollback(() => specimenCharacter.dispose());
+      rollback(specimenBody.events.on('jumped', event => specimenCharacter.onLaunch(event)));
+      rollback(specimenBody.events.on('landed', event => specimenCharacter.onLanding(event.impactSpeedMetresPerSecond, specimenBody.position, specimenBody.groundNormal)));
       this.renderLayer.scene.add(specimenCharacter.root);
       const finalPresentation=scene.finalArena?new FinalBossPresentation(specimenCharacter):undefined;
       if(finalPresentation)rollback(() => finalPresentation.dispose());
@@ -1914,12 +1934,17 @@ export class BlackoutLevelRuntime {
         targetRegistry: combatTargets,
         body: specimenBody,
         aimRayProvider: this.renderLayer.cameraRig,
-        ...(this.authoredRoomOne?{config:FINAL_SPECIMEN_WEAPON}:{}),
+        config: this.authoredRoomOne ? FINAL_SPECIMEN_WEAPON : { overchargeHitsRequired: 4 },
       });
       rollback(() => specimenAttack.dispose());
+      rollback(specimenAttack.events.on('projectileFired', event => specimenCharacter.onShot(event.direction, event.chargeAmount, event.overcharged)));
+      const specimenDash = new SpecimenDash();
+      const specimenAbilityAudio = this.audio ? new SpecimenAbilityAudio(this.audio, specimenBody, specimenAttack, specimenDash) : undefined;
+      if (specimenAbilityAudio) rollback(() => specimenAbilityAudio.dispose());
 
       const finalBoss=scene.finalArena&&finalPresentation?new FinalBossEncounter({arena:scene.finalArena,world:collisionWorld,
         targets:combatTargets,body:specimenBody,weapon:specimenAttack,presentation:finalPresentation,host:this.host,audio:this.audio,
+        onPlayerDamaged: amount => specimenCharacter.onDamage(amount),
         requestFailure:()=>this.requestFailure()}):undefined;
       if(finalBoss)rollback(()=>finalBoss.dispose());
 
@@ -1927,6 +1952,7 @@ export class BlackoutLevelRuntime {
         scene: this.renderLayer.scene,
         host: this.host,
         source: specimenAttack,
+        dash: specimenDash,
         electricGoop: this.authoredRoomOne,
       });
       rollback(() => specimenPresentation.dispose());
@@ -2034,6 +2060,8 @@ export class BlackoutLevelRuntime {
         specimenBody,
         specimenForm,
         specimenAttack,
+        specimenDash,
+        specimenAbilityAudio,
         specimenPresentation,
         specimenCharacter,
         specimenLight,
@@ -2072,6 +2100,8 @@ export class BlackoutLevelRuntime {
           specimenForm.readModel.controlledForm === 'specimen' ? specimenBody :
             phase.phase === 'merging' ? undefined : manager.activeBody, this.renderLayer.scene, this.renderLayer.cameraRig.camera);
         this.gameplayAudio = gameplayAudio;
+        gameplayAudio.bindSpecimen(specimenBody, () => !finalBoss?.cinematic &&
+          (phase.phase === 'specimen' || phase.phase === 'boss'));
         rollback(() => {
           gameplayAudio.dispose();
           if (this.gameplayAudio === gameplayAudio) this.gameplayAudio = undefined;
@@ -2137,7 +2167,7 @@ export class BlackoutLevelRuntime {
     resources.electricalSystem.cancelAim();
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
-    resources.specimenAttack.cancelInput();
+    resources.specimenAttack.cancelInput(); resources.specimenDash.cancel(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.maintenanceDrone.suspendInput();
     resources.specimenPresentation.suspend();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
@@ -2168,7 +2198,7 @@ export class BlackoutLevelRuntime {
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
     resources.goopAcidPresentation.reset();
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
     resources.checkpoints.resetToInitial();
@@ -2237,6 +2267,7 @@ export class BlackoutLevelRuntime {
     resources.acidProjectileSystem.dispose();
     resources.dissolveSystem.dispose();
     resources.specimenPresentation.dispose();
+    resources.specimenAbilityAudio?.dispose();
     resources.specimenAttack.dispose();
     resources.electricalSystem.dispose();
     resources.unregisterElectricalCheckpointParticipant();
@@ -2330,7 +2361,7 @@ export class BlackoutLevelRuntime {
     resources.electricalSystem.cancelAim();
     resources.acidProjectileSystem.reset();
     resources.goopAcidPresentation.reset();
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.maintenanceDrone.suspendInput();
     resources.electricalPresentation.update(
       resources.electricalSystem.readModel,
@@ -2382,7 +2413,7 @@ export class BlackoutLevelRuntime {
     resources.acidProjectileSystem.reset();
     resources.dissolveSystem.reset();
     resources.goopAcidPresentation.reset();
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.specimenPresentation.suspend();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);
@@ -2574,6 +2605,7 @@ export class BlackoutLevelRuntime {
     }
     resources.voltPresentation.setVisible(groupVisible);
     resources.specimenCharacter.setVisible(specimenControlled);
+    resources.specimenCharacter.setTrailEnabled(specimenControlled && !resources.finalBoss?.cinematic);
     if(merging&&resources.finalBoss) {
       const progress=resources.specimenForm.readModel.mergeProgress;
       const t=THREE.MathUtils.smoothstep(progress,.05,.95);
@@ -2666,7 +2698,7 @@ export class BlackoutLevelRuntime {
       throw new Error('Sentinel defeat could not commit Blackout boss-defeated phase.');
     }
 
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.sentinelRig.controller.cancelTransient('defeat');
     resources.sentinelRig.droneSquad.clear();
     resources.sentinelRig.syncPresentation();
@@ -2695,7 +2727,7 @@ export class BlackoutLevelRuntime {
     this.gameplayAudio?.setEnabled(false);
     resources.electricalSystem.disconnect('completion');
     resources.electricalSystem.cancelAim();
-    resources.specimenAttack.reset();
+    resources.specimenAttack.reset(); resources.specimenDash.reset(); resources.specimenAbilityAudio?.setEnabled(false);
     resources.poweredDeviceRig.recomputePower();
     resources.electricalPresentation.update(resources.electricalSystem.readModel);
     this.renderLayer.cameraRig.setAimPresentationActive(false);

@@ -104,13 +104,15 @@ test('loop distance fades adjust one continuing voice and survive suspension and
   const sound = 'world-laser-loop-01', base = SOUND_DEFINITIONS[sound].volume;
   try {
     await audio.preload([sound]); audio.setPaused(false); audio.unlock(); await Promise.resolve();
-    audio.startLoop('beam', sound, { x: 14, y: 0, z: 0 }, .5);
+    audio.startLoop('beam', sound, { x: 14, y: 0, z: 0 }, .5, 0.7);
     const voice = [...(audio as any).voices][0];
     assert.equal(voice.gain.gain.value, base * .5, 'initial fade-in must honor distance gain');
+    assert.equal(voice.source.playbackRate.value, 0.7);
     audio.startLoop('waiting', sound, { x: 15, y: 0, z: 0 }, .1);
     assert.equal(context.sources.length, 1);
-    audio.startLoop('beam', sound, { x: 4, y: 0, z: 0 });
+    audio.startLoop('beam', sound, { x: 4, y: 0, z: 0 }, 1, 1.8);
     assert.equal(voice.gain.gain.value, base); assert.equal(context.sources.length, 1);
+    assert.equal(voice.source.playbackRate.value, 1.8, 'charge pitch changes without restarting the voice');
     audio.setPaused(true); await Promise.resolve();
     audio.startLoop('beam', sound, { x: 15, y: 0, z: 0 }, .1);
     audio.setPaused(false); await Promise.resolve();
@@ -122,9 +124,9 @@ test('loop distance fades adjust one continuing voice and survive suspension and
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
-test('all 72 runtime assets exist as OGG and resolve beneath a relative deployment base', () => {
+test('all 73 runtime sound definitions resolve to OGG beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 72);
+  assert.equal(ids.length, 73);
   assert.equal(SOUND_BANKS.containment.some(id => id.startsWith('cultivation-')), false);
   assert.equal(SOUND_BANKS.cultivation.filter(id => id.startsWith('cultivation-')).length, 8);
   assert.equal(SOUND_BANKS.containment.includes('blackout-vent-slime-slide-01'), false);
@@ -303,7 +305,8 @@ test('progression banks deduplicate overlapping loads and unlock, with at most f
     assert.deepEqual(SOUND_BANKS.cultivation.filter(id=>id.startsWith('volt-')),
       ['volt-charge-ready-01','volt-circuit-connect-01'], 'the two Volt-finale accents warm with Level 2; gameplay electrical loops still wait for Blackout');
     await audio.preload(SOUND_BANKS.blackout);
-    assert.equal(requests.length, SOUND_BANKS.blackout.length); assert.equal(new Set(requests).size, SOUND_BANKS.blackout.length);
+    assert.equal(requests.length, SOUND_BANKS.blackout.length);
+    assert.equal(new Set(requests).size, new Set(SOUND_BANKS.blackout.map(id => soundUrl(id, '/group-folder/'))).size);
     assert.equal(contexts, 1); assert.equal(peak, 4);
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
@@ -418,6 +421,50 @@ function directorFixture(initialIds = ['bob', 'goop', 'volt'], pools: readonly A
   const director = new GameplayAudio(audio, manager as unknown as SlimeManager<KinematicBody>, pools);
   return { audio,bodies,manager,director,registered };
 }
+
+test('Specimen gains resolved-distance movement, charged launch, impact and recovery sounds outside the roster', async () => {
+  const { audio, bodies, manager, director } = directorFixture();
+  const specimen = { ...bodies.bob, radiusMetres: 1.65, position: { x: 40, y: 2, z: 10 },
+    locomotionPosition: { x: 0, y: 0, z: 0 }, events: new EventBus<MovementEvents>() };
+  let controlled = manager.activeBody, cinematic = false;
+  (director as any).controlledBody = () => controlled;
+  director.bindSpecimen(specimen as unknown as KinematicBody, () => !cinematic);
+  director.bindSpecimen(specimen as unknown as KinematicBody, () => !cinematic);
+  const jump = (chargeFraction: number) => specimen.events.emit('jumped', {
+    chargeFraction, speedMetresPerSecond: 24.6, directionWorld: { x: 0, y: 1, z: 0 },
+  });
+  try {
+    director.setEnabled(true); director.update();
+    jump(1); assert.equal(audio.cues.length, 0, 'the stored fusion body is silent before merging');
+    controlled = specimen; director.update();
+    specimen.position.x += 20; director.update(); assert.equal(audio.cues.length, 0, 'carriers do not create footsteps');
+    specimen.locomotionPosition.x += 4.7; director.update();
+    assert.deepEqual(audio.cues, ['bob-contact-01']); assert.equal(audio.levels[0], 0.45);
+    specimen.chargingJump = true; specimen.locomotionPosition.x += 10; director.update();
+    assert.equal(audio.cues.length, 1, 'charging stops body contacts');
+    jump(1); jump(0.2);
+    specimen.events.emit('landed', { impactSpeedMetresPerSecond: 3 });
+    specimen.events.emit('landed', { impactSpeedMetresPerSecond: 20 });
+    assert.deepEqual(audio.cues.slice(1), ['bob-charged-jump-01', 'bob-jump-01', 'bob-land-soft-01', 'bob-land-hard-01']);
+    specimen.landedThisStep = true; specimen.events.emit('bounced', {});
+    assert.equal(audio.cues.length, 5, 'landing and passive rebound share one impact cue');
+    cinematic = true; director.update(); jump(1);
+    specimen.locomotionPosition.x += 20; director.update();
+    assert.equal(audio.cues.length, 5, 'cinematics suspend movement sounds');
+    cinematic = false; specimen.chargingJump = false; specimen.landedThisStep = false;
+    director.update(); assert.equal(audio.cues.length, 5, 'returning control seeds travel without a stored footstep');
+    director.setEnabled(false); jump(1); assert.equal(audio.cues.length, 5);
+    director.setEnabled(true); director.update();
+    director.died(undefined); assert.equal(audio.cues.at(-1), 'bob-fall-01');
+    jump(1); assert.equal(audio.cues.length, 6);
+    director.respawn(); assert.equal(audio.cues.at(-1), 'bob-contact-01');
+    assert.deepEqual(audio.listener, specimen.position);
+    await Promise.resolve(); director.update();
+    controlled = bodies.volt; director.update(); jump(1);
+    assert.equal(audio.cues.length, 7, 'split stops fusion-body audio');
+  } finally { director.dispose(); }
+  const count = audio.cues.length; jump(1); assert.equal(audio.cues.length, count);
+});
 
 test('Volt unlocked later in Cultivation acquires jump and landing audio exactly once', () => {
   const {audio,bodies,manager,director,registered}=directorFixture(['bob','goop']);
@@ -566,7 +613,7 @@ test('terminal Blackout completion stops all voices once even though the scene r
   const noop=()=>{};
   const runtime:any={
     completionEmitted:false,gameplayAudio:director,
-    requireResources:()=>({phase:{terminal:true},electricalSystem:{disconnect:noop,cancelAim:noop,readModel:{}},specimenAttack:{reset:noop},poweredDeviceRig:{recomputePower:noop},electricalPresentation:{update:noop}}),
+    requireResources:()=>({phase:{terminal:true},electricalSystem:{disconnect:noop,cancelAim:noop,readModel:{}},specimenAttack:{reset:noop},specimenDash:{reset:noop},poweredDeviceRig:{recomputePower:noop},electricalPresentation:{update:noop}}),
     renderLayer:{cameraRig:{setAimPresentationActive:noop}},input:{setEnabled:noop,releasePointerLock:noop},host:{dataset:{}},events:new EventBus<any>(),
   };
   let completions=0; runtime.events.on('completed',()=>completions++);
