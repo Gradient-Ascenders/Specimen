@@ -222,8 +222,10 @@ export class CultivationFinale {
         if(this.previous<time+2.2&&this.elapsed>=time+2.2)gameplayAudioEvents.emit('stop',{key});
       }
       const line=VOLT_FINALE_DIALOGUE.find(line=>this.elapsed>=line.start&&this.elapsed<line.end);
+      // Keep the sustained alarm below the quieter music recording; dramatic
+      // combat/mechanical accents retain their existing independent gains.
       if(this.elapsed>=T.open&&this.elapsed<T.ventCamera) gameplayAudioEvents.emit('loop',{
-        key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:line?.3:.6,
+        key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:line?.125:.25,
       });
       else gameplayAudioEvents.emit('stop',{key:'cultivation-finale-alarm'});
       if(line){

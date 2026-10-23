@@ -54,9 +54,9 @@ test('escape alarm follows the movie clock, softens under dialogue, and stops on
     gameplayAudioEvents.on('cue',e=>cues.push(e.sound))];
   try{
     s.movie.begin(s.camera,true);s.movie.update(T.open+.01);
-    assert.deepEqual(loops.at(-1),{key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:.6});
+    assert.deepEqual(loops.at(-1),{key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:.25});
     const count=loops.length;s.movie.present(s.camera,1);s.movie.present(s.camera,1);assert.equal(loops.length,count,'rendering cannot emit audio');
-    s.movie.update(T.even+.1-s.movie.seconds);assert.equal(loops.at(-1)!.volumeScale,.3);
+    s.movie.update(T.even+.1-s.movie.seconds);assert.equal(loops.at(-1)!.volumeScale,.125);
     assert.ok(cues.includes('world-button-press-01'));assert.ok(cues.includes('cultivation-cover-break-free-01'));
     assert.equal(cues.includes('world-vent-break-01'),false,'The duct floor breaks later, not when the cover comes loose.');
     const beforeSkip=cues.length,stopStart=stops.length;s.movie.requestSkip();s.movie.update(1/60);

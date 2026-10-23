@@ -347,6 +347,18 @@ when background muting is disabled. Media seek drift above 350 ms is corrected;
 resume retains position. Rejected playback waits for the next user gesture.
 
 Standard music gain remains 0.28. High Tech Lab additionally uses 0.60× playback
-gain, and the quieter The Way Out uses 1.25× (maximum effective volume 0.35 before
+gain, and the quieter The Way Out uses 1.75× (maximum effective volume 0.49 before
 user sliders). Source recordings, speeds, visual/event timings and all existing
 SFX mappings remain unchanged. Non-target cinematics retain their original audio.
+
+Volt's sustained cinematic alarm uses 0.25× playback scale, or 0.125× under
+dialogue (previously 0.60× / 0.30×). The shared alarm asset/catalog gain (0.9),
+Goop's alarm mix and every combat/mechanical accent remain unchanged. At default
+sliders, K-weighted measurements over the cinematic alarm sections put Goop's
+music near -27.6 LUFS and its sustained alarm near -31.3 LUFS. Volt's previous
+music/alarm were about -30.3 / -26.6 LUFS; the adjusted mix is about -27.3 /
+-34.2 LUFS. This compensates for the source recordings' different loudness and
+gives the continuous alarm more room beneath the music. Measurements include
+the existing SFX compressor and default 0.8 SFX volume; music remains streamed
+outside that compressor. These are component measurements, not a listening
+evaluation or a guarantee against clipping at every user-selected mix.

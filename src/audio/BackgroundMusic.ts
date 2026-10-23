@@ -14,7 +14,9 @@ const MUSIC_PATHS: Record<MusicTrack, string> = {
   rescue: 'assets/audio/music/06-cultivation-volt-rescue-the-way-out.ogg',
 };
 
-const cinematicGain = (track: MusicTrack | null): number => track === 'escape' ? 0.60 : track === 'rescue' ? 1.25 : 1;
+// Rescue's recording is quieter at source; bring it close to Escape's audible
+// music level while retaining headroom (0.28 * 1.75 = 0.49 at full sliders).
+const cinematicGain = (track: MusicTrack | null): number => track === 'escape' ? 0.60 : track === 'rescue' ? 1.75 : 1;
 const isCinematic = (track: MusicTrack | null): boolean => track === 'awakening' || track === 'escape' || track === 'rescue';
 
 /** Menu music continues in title submenus; gameplay music pauses with the game. */

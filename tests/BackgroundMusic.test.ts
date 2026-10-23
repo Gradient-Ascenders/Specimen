@@ -159,7 +159,7 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
   for (const [track, file, gain] of [
     ['awakening', '04-opening-tension.ogg', 1],
     ['escape', '05-containment-escape-high-tech-lab.ogg', .60],
-    ['rescue', '06-cultivation-volt-rescue-the-way-out.ogg', 1.25],
+    ['rescue', '06-cultivation-volt-rescue-the-way-out.ogg', 1.75],
   ] as const) {
     const cue = new CinematicMusic(track, 129);
     cue.update(0);

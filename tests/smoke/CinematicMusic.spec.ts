@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { VOLT_FINALE } from '../../src/cinematics/CultivationFinaleTimeline.ts';
 
 async function observeMusic(page: Page) {
   await page.addInitScript(() => {
@@ -122,6 +123,16 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
   expect(state.filter(p => !p.paused)).toHaveLength(1);
   expect(state.find(p => p.src.includes('05-containment'))!.loop).toBe(false);
   expect(state.find(p => p.src.includes('05-containment'))!.volume).toBeCloseTo(.28 * .6, 2);
+  const goopMix = await page.evaluate(() => {
+    const rt = (window as any).__musicSession.runtime, r = rt.resources;
+    const time = 18; // Three seconds after the drone reveal: sustained reference alarm.
+    rt.finale.fixedUpdate(time);
+    r.containmentLevel.update(Math.max(0, time - r.testScene.roomFive.endingSeconds));
+    rt.renderFinale(r);
+    return { alarm: rt.audio.loops.get('containment-finale-alarm')?.volumeScale,
+      master: rt.audio.diagnostics.masterVolume, effects: rt.audio.diagnostics.effectsVolume };
+  });
+  expect(goopMix).toEqual({ alarm: .35, master: 1, effects: .8 });
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await expect.poll(async () => (await snapshot(page)).filter(p => !p.paused).length).toBe(0);
@@ -145,6 +156,37 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
   await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('06-cultivation') && !p.paused), { timeout: 30_000 }).toBe(true);
   state = await snapshot(page); expect(state.filter(p => !p.paused)).toHaveLength(1);
   expect(state.find(p => p.src.includes('06-cultivation'))!.loop).toBe(false);
+  await expect.poll(async () => (await snapshot(page)).find(p => p.src.includes('06-cultivation'))!.volume).toBeCloseTo(.49, 4);
+  const voltMix = await page.evaluate(timing => {
+    const rt = (window as any).__musicSession.runtime, movie = rt.resources.roomFiveFinale;
+    movie.update(Math.max(.001, timing.open + .1 - movie.seconds));
+    const normal = rt.audio.loops.get('cultivation-finale-alarm')?.volumeScale;
+    movie.update(timing.even + .1 - movie.seconds);
+    movie.present(rt.renderLayer.cameraRig.camera, 1);
+    return { normal, dialogue: rt.audio.loops.get('cultivation-finale-alarm')?.volumeScale,
+      master: rt.audio.diagnostics.masterVolume, effects: rt.audio.diagnostics.effectsVolume };
+  }, VOLT_FINALE);
+  expect(voltMix).toEqual({ normal: .25, dialogue: .125, master: 1, effects: .8 });
+  await test.info().attach('cinematic-mix-comparison', { contentType: 'application/json',
+    body: Buffer.from(JSON.stringify({ goop: { ...goopMix, music: .168 }, volt: { ...voltMix, music: .49 } }, null, 2)) });
+  // Exercise the actual controls while Volt's soundtrack owns the music route.
+  await page.keyboard.press('KeyP');
+  await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
+  await page.getByRole('tab', { name: 'Audio', exact: true }).click();
+  const setVolume = async (setting: string, value: string) => page.locator(`[data-setting="${setting}"]`).evaluate((element, value) => {
+    (element as HTMLInputElement).value = value;
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  }, value);
+  await setVolume('effects-volume', '0');
+  await expect.poll(async () => (await snapshot(page)).find(p => p.src.includes('06-cultivation'))!.volume).toBeCloseTo(.49, 4);
+  await setVolume('music-volume', '50');
+  await expect.poll(async () => (await snapshot(page)).find(p => p.src.includes('06-cultivation'))!.volume).toBeCloseTo(.245, 4);
+  await setVolume('volume', '50');
+  await expect.poll(async () => (await snapshot(page)).find(p => p.src.includes('06-cultivation'))!.volume).toBeCloseTo(.1225, 4);
+  await setVolume('effects-volume', '80'); await setVolume('music-volume', '100'); await setVolume('volume', '100');
+  await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
+  await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
+  await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('06-cultivation') && !p.paused)).toBe(true);
   await page.evaluate(() => {
     const rt = (window as any).__musicSession.runtime;
     rt.resources.roomFiveFinale.requestSkip(); rt.fixedUpdate(1 / 60);
