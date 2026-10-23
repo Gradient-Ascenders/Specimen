@@ -1,4 +1,5 @@
 import { CULTIVATION_LEVEL_GAMEPLAY_SUPPORT as gameplay } from './CultivationLevelGameplay.ts';
+import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 import { CultivationVentArrival } from '../cinematics/CultivationVentArrival.ts';
 import { CultivationRoomThreeClearance } from '../cinematics/CultivationRoomThreeClearance.ts';
 import { CultivationFinale } from '../cinematics/CultivationFinale.ts';
@@ -508,6 +509,17 @@ export class CultivationLevelRuntime {
       playerSwitchFeedback: undefined,
       resetSwitchFeedback: false,
     };
+  }
+
+  getPlayerHealth(): SlimeHealthReadModel | undefined {
+    const resources = this.resources;
+    if (!resources || !resources.deathSequence.isPlaying || this.host.dataset.cinematic ||
+        resources.roomFiveFinale?.active || this.ventArrival.active) return undefined;
+    const active = resources.manager.activeBody;
+    if (!active) return undefined;
+    const room = resources.authoredPreview?.resolveRoomId(active.position) ?? resources.controller.activeRoomId;
+    const encounter = room === 3 ? resources.roomThreeEncounter : room === 4 ? resources.roomFourEncounter : room === 5 ? resources.roomFiveEncounter : undefined;
+    return encounter?.damage.health.find(health => health.slimeId === resources.manager.activeSlimeId);
   }
 
   prepareCleanGameplay(): void {

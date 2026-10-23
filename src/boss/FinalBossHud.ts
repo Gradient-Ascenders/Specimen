@@ -40,8 +40,6 @@ export class FinalBossHud {
   private readonly doc: Document;
   private readonly host?: HTMLElement;
   private controls?: HTMLElement;
-  private controlsResize?: ResizeObserver;
-  private controlsMutation?: MutationObserver;
   private readonly animations = new Map<HTMLElement, ReturnType<typeof animate>>();
   private cueKey = '';
   private cinematicKey = '';
@@ -167,7 +165,6 @@ export class FinalBossHud {
       this.devToggle.hidden = !combat;
       this.devToggle.setAttribute('aria-pressed', String(devInvincible));
     }
-    if (entering) this.measureControls();
     if (!combat) { this.presentCinematic(model.state, model.progress); return; }
     this.cinematicKey = '';
     this.setText(this.phase, `Phase ${model.phase}`);
@@ -223,7 +220,6 @@ export class FinalBossHud {
     this.danger.hidden = true;
     if (this.devToggle) this.devToggle.hidden = true;
     this.invincibleBadge.hidden = true;
-    this.host?.style?.removeProperty?.('--boss-controls-height');
     for (const animation of this.animations.values()) animation.cancel();
     this.animations.clear();
     this.cueKey = this.cinematicKey = '';
@@ -233,8 +229,6 @@ export class FinalBossHud {
   dispose(): void {
     this.hide();
     this.disposed = true;
-    this.controlsResize?.disconnect();
-    this.controlsMutation?.disconnect();
     this.devToggle?.remove();
     this.element.remove();
   }
@@ -245,28 +239,7 @@ export class FinalBossHud {
     if (!controls) return;
     this.controls = controls;
     const hint = controls.querySelector<HTMLElement>('.hud-hint');
-    const compact = controls.querySelector<HTMLElement>('.hud-controls-summary');
     if (this.devToggle) hint?.append(this.devToggle);
-    const view = this.doc.defaultView;
-    if (view?.ResizeObserver) {
-      this.controlsResize = new view.ResizeObserver(() => this.measureControls());
-      if (hint) this.controlsResize.observe(hint);
-      if (compact) this.controlsResize.observe(compact);
-    }
-    if (view?.MutationObserver) {
-      this.controlsMutation = new view.MutationObserver(() => this.measureControls());
-      this.controlsMutation.observe(controls, { attributes: true, attributeFilter: ['data-collapsed'] });
-    }
-  }
-
-  private measureControls(): void {
-    if (this.element.hidden || !this.controls) return;
-    const panel = this.controls.querySelector<HTMLElement>(this.controls.dataset.collapsed === 'true'
-      ? '.hud-controls-summary' : '.hud-hint');
-    const height = `${panel?.offsetHeight || 44}px`;
-    if (this.host?.style?.getPropertyValue('--boss-controls-height') !== height) {
-      this.host?.style?.setProperty('--boss-controls-height', height);
-    }
   }
 
   private presentCinematic(state: string, progress: number): void {

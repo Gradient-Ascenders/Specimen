@@ -2,11 +2,13 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import type { DeathScreen } from '../../src/ui/DeathScreen.ts';
 import type { GameFlowUI } from '../../src/ui/GameFlowUI.ts';
+import type { SlimeDamageSystem } from '../../src/systems/SlimeDamageSystem.ts';
 import { test, expect } from './fixtures.ts';
 
 declare global {
   interface Window {
-    __hudTest: { flow: GameFlowUI; death: DeathScreen };
+    __hudTest: { flow: GameFlowUI; death: DeathScreen; damage: SlimeDamageSystem;
+      healthState: { slimeId: 'bob' | 'goop' | 'volt'; eligible: boolean } };
   }
 }
 
@@ -27,6 +29,8 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
         export { GameSettings } from '/src/ui/GameSettings.ts';
         export { DeathScreen } from '/src/ui/DeathScreen.ts';
         export { CleanGameplayMode } from '/src/ui/CleanGameplayMode.ts';
+        export { SlimeDamageSystem } from '/src/systems/SlimeDamageSystem.ts';
+        export { EMPTY_SLIME_HUD_SNAPSHOT } from '/src/slimes/SlimeHUDState.ts';
         import '/src/style.css';
         import '/src/ui/ui-theme.css';
       ` : undefined,
@@ -54,12 +58,18 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await page.goto('./__hud-fixture');
   await page.evaluate(async () => {
     const fixtureUrl = new URL('./__hud-fixture.js', location.href).href;
-    const { GameFlowUI, GameSettings, DeathScreen, CleanGameplayMode } = await import(fixtureUrl);
+    const { GameFlowUI, GameSettings, DeathScreen, CleanGameplayMode, SlimeDamageSystem, EMPTY_SLIME_HUD_SNAPSHOT } = await import(fixtureUrl);
     let inputEnabled = false;
     const app = document.querySelector<HTMLElement>('#app')!;
+    const damage = new SlimeDamageSystem({}, ['bob', 'goop', 'volt']);
+    const healthState = { slimeId: 'bob', eligible: true };
     const flow: GameFlowUI = new GameFlowUI({
       settings: new GameSettings(),
       creditsMarkdown: '',
+      slimeHUD: {
+        subscribeSlimeHUD: (listener: (snapshot: unknown) => void) => { listener(EMPTY_SLIME_HUD_SNAPSHOT); return () => {}; },
+        getPlayerHealth: () => healthState.eligible ? damage.health.find((health: { slimeId: string }) => health.slimeId === healthState.slimeId) : undefined,
+      },
       actions: {
         startGameplay: () => { inputEnabled = true; },
         stopGameplay: () => { inputEnabled = false; },
@@ -80,7 +90,7 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
     app.append(flow.element);
     const death = new DeathScreen({ onRetry: () => {}, backgroundElements: [] });
     app.append(death.element);
-    Object.assign(window, { __hudTest: { flow, death } });
+    Object.assign(window, { __hudTest: { flow, death, damage, healthState } });
     flow.completeBoot();
   });
   const flow = page.locator('.game-flow');
@@ -100,6 +110,70 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await expect(page.locator('.hud-roster')).toBeVisible();
   await expect(page.locator('.hud-hint')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('hud-visible.png') });
+
+  // Normal health comes from the actual damage/regeneration system. UI time
+  // advances only through the existing game loop, including the full-health hold.
+  const health = page.locator('.player-health-hud');
+  await page.evaluate(() => window.__hudTest.flow.updateFrame(0));
+  await expect(health).toBeHidden();
+  await page.evaluate(() => { const { damage, flow } = window.__hudTest; damage.applyDamage('bob', 20); flow.updateFrame(0); });
+  await expect(health).toBeVisible();
+  await expect(health.getByRole('progressbar')).toHaveJSProperty('value', 80);
+  const animatedHealing = await page.evaluate(() => {
+    const { damage, flow } = window.__hudTest; damage.update(3); flow.updateFrame(.1);
+    return document.querySelector('.player-health-fill')!.getAnimations().length > 0;
+  });
+  expect(animatedHealing).toBe(true);
+  await expect(health.locator('.final-boss-player-status')).toHaveText('Healing');
+  await expect.poll(() => health.evaluate(el => el.getAnimations().length)).toBe(0);
+  const normalPosition = await health.evaluate(el => ({ left: el.getBoundingClientRect().left, bottom: el.getBoundingClientRect().bottom,
+    controlsTop: document.querySelector('.hud-hint')!.getBoundingClientRect().top }));
+  expect(normalPosition.left).toBeGreaterThanOrEqual(12);
+  expect(normalPosition.bottom).toBeLessThan(normalPosition.controlsTop);
+  await page.screenshot({ path: testInfo.outputPath('health-healing.png') });
+  await page.evaluate(() => { const { damage, flow } = window.__hudTest; damage.update(1); flow.updateFrame(0); flow.updateFrame(.99); });
+  await expect(health).toBeVisible();
+  await expect(health.locator('.final-boss-player-value')).toHaveText('100');
+  await page.keyboard.press('KeyP');
+  await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
+  await page.evaluate(() => window.__hudTest.flow.updateFrame(5));
+  await page.locator('[data-flow-panel="paused"] [data-action="resume"]').click();
+  await expect(health).toBeVisible();
+  await page.evaluate(() => window.__hudTest.flow.updateFrame(.02));
+  await expect(health).toHaveAttribute('data-state', 'leaving');
+  await expect(health).toBeHidden();
+
+  // Damage during the exit must reverse it; a stale completion cannot hide
+  // a freshly wounded player. A healthy newly selected slime has no bar.
+  await page.evaluate(() => {
+    const { damage, flow } = window.__hudTest;
+    damage.applyDamage('bob', 10); flow.updateFrame(0); damage.update(5); flow.updateFrame(0); flow.updateFrame(1.01);
+    damage.applyDamage('bob', 10); flow.updateFrame(0);
+  });
+  await expect(health).toHaveAttribute('data-state', 'visible');
+  await expect.poll(() => health.evaluate(el => el.getAnimations().length)).toBe(0);
+  await expect(health).toBeVisible();
+  await expect(health.locator('.final-boss-player-value')).toHaveText('90');
+  await page.evaluate(() => { window.__hudTest.healthState.slimeId = 'goop'; window.__hudTest.flow.updateFrame(0); });
+  await expect(health).toBeHidden();
+  await page.evaluate(() => { window.__hudTest.healthState.slimeId = 'bob'; window.__hudTest.flow.updateFrame(0); });
+  await expect(health).toBeVisible();
+  await page.evaluate(() => { window.__hudTest.healthState.eligible = false; window.__hudTest.flow.updateFrame(0); });
+  await expect(health).toBeHidden();
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => {
+    const { damage, flow, healthState } = window.__hudTest;
+    damage.reset(); healthState.eligible = true; damage.applyDamage('volt', 20); healthState.slimeId = 'volt'; flow.updateFrame(0);
+  });
+  await expect(health).toBeVisible();
+  expect(await health.evaluate(el => el.getAnimations({ subtree: true }).length)).toBe(0);
+  await page.evaluate(() => { const { damage, flow } = window.__hudTest; damage.update(5); flow.updateFrame(0); flow.updateFrame(.99); });
+  await expect(health).toBeVisible();
+  await page.evaluate(() => window.__hudTest.flow.updateFrame(.02));
+  await expect(health).toBeHidden();
+  await page.evaluate(() => { window.__hudTest.healthState.eligible = false; window.__hudTest.flow.updateFrame(0); });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   await page.keyboard.press('F1');
   await expect(app).toHaveAttribute('data-clean-gameplay', 'true');

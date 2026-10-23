@@ -88,6 +88,7 @@ import {
 import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
 import { VoltElectricalPresentation } from '../render/electrical/VoltElectricalPresentation.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
+import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 import { SpecimenCombatPresentation } from '../render/specimen/SpecimenCombatPresentation.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
@@ -544,6 +545,14 @@ export class BlackoutLevelRuntime {
       playerSwitchFeedback: undefined,
       resetSwitchFeedback: false,
     };
+  }
+
+  getPlayerHealth(): SlimeHealthReadModel | undefined {
+    const resources = this.resources;
+    if (!resources || !resources.deathSequence.isPlaying || this.host.dataset.cinematic ||
+        this.host.dataset.bossEncounter === 'true' || resources.specimenForm.readModel.controlledForm !== 'group' ||
+        !resources.transit?.isActive) return undefined;
+    return resources.transit.damage.health.find(health => health.slimeId === resources.manager.activeSlimeId);
   }
 
   captureProgressionSnapshot(): LevelProgressionSnapshot {

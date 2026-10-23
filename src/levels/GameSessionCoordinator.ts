@@ -10,6 +10,7 @@ import {
 import type { LevelLifecycleState } from './LevelLifecycle.ts';
 import type { GameLevelRuntime } from './GameLevelRuntime.ts';
 import type { LevelProgressionSnapshot } from './LevelProgression.ts';
+import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 
 export type SessionLevelId = 'level-2' | 'level-3';
 
@@ -176,6 +177,11 @@ export class GameSessionCoordinator {
 
   getSlimeHUDSnapshot(): SlimeHUDSnapshot {
     return this.transitionFailed ? EMPTY_SLIME_HUD_SNAPSHOT : this.runtime.getSlimeHUDSnapshot();
+  }
+
+  getPlayerHealth(): SlimeHealthReadModel | undefined {
+    if (this.disposed || this.transitionPending || this.transitionFailed || this.initialPreparationPending) return undefined;
+    return this.runtime.getPlayerHealth?.();
   }
 
   writePerformanceSnapshot(target: PerformanceGameplaySnapshot): void {

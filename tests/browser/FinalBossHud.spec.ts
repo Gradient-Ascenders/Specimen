@@ -6,11 +6,13 @@ import type { FinalBossHud } from '../../src/boss/FinalBossHud.ts';
 import type { FinalBossController } from '../../src/boss/FinalBossController.ts';
 import type { SpecimenCombatPresentation } from '../../src/render/specimen/SpecimenCombatPresentation.ts';
 import type { HudPanelPresentation } from '../../src/ui/HudPanelPresentation.ts';
+import type { HudFooterLayout } from '../../src/ui/HudFooterLayout.ts';
 
 declare global {
   interface Window {
     __bossHudUi: { hud: FinalBossHud; controller: FinalBossController; combat: SpecimenCombatPresentation;
       controls: HudPanelPresentation;
+      footer: HudFooterLayout;
       model: { fireEnabled: boolean; charging: boolean; fullyCharged: boolean; chargeAmount: number; overchargeProgress: number; overchargeReady: boolean };
       sync: () => void };
   }
@@ -31,6 +33,7 @@ test('boss HUD presents controller states, readable compact layouts and bounded 
         export { SpecimenCombatPresentation } from '/src/render/specimen/SpecimenCombatPresentation.ts';
         export { SpecimenDash } from '/src/combat/SpecimenDash.ts';
         export { HudPanelPresentation } from '/src/ui/HudPanelPresentation.ts';
+        export { HudFooterLayout } from '/src/ui/HudFooterLayout.ts';
         export { Scene } from 'three';
         import '@fontsource/michroma/400.css';
         import '@fontsource-variable/space-grotesk';
@@ -59,7 +62,7 @@ test('boss HUD presents controller states, readable compact layouts and bounded 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/__boss-hud');
   await page.evaluate(async () => {
-    const { FinalBossHud, FinalBossController, SpecimenCombatPresentation, SpecimenDash, HudPanelPresentation, Scene } = await import(new URL('./__boss-hud.js', location.href).href);
+    const { FinalBossHud, FinalBossController, SpecimenCombatPresentation, SpecimenDash, HudPanelPresentation, HudFooterLayout, Scene } = await import(new URL('./__boss-hud.js', location.href).href);
     const app = document.querySelector<HTMLElement>('#app')!;
     const controller = new FinalBossController({ random: () => .7 });
     const hud = new FinalBossHud(document, { host: app,
@@ -70,8 +73,9 @@ test('boss HUD presents controller states, readable compact layouts and bounded 
     const model = { fireEnabled: true, charging: true, chargeAmount: .5, fullyCharged: false, overchargeProgress: .5, overchargeReady: false };
     const combat = new SpecimenCombatPresentation({ scene: new Scene(), host: app, source: { readModel: model, projectileStates: [] }, dash: new SpecimenDash() });
     const controls = new HudPanelPresentation(app.querySelector('.hud-controls')!, app.querySelector('.hud-hint')!, app.querySelector('.hud-controls-summary')!, window, 'Y');
+    const footer = new HudFooterLayout(app, app.querySelector('.hud-controls')!);
     const sync = () => { hud.update(controller.readModel, 0, controller.devInvincible); combat.update(controller.readModel.state === 'combat'); };
-    Object.assign(window, { __bossHudUi: { hud, controller, model, combat, controls, sync } });
+    Object.assign(window, { __bossHudUi: { hud, controller, model, combat, controls, footer, sync } });
     controller.start(true); sync();
     await document.fonts.ready;
   });
@@ -210,7 +214,7 @@ test('boss HUD presents controller states, readable compact layouts and bounded 
   await expect(hud).toBeHidden();
   await expect(devToggle).toBeHidden();
   expect(await hud.evaluate(el => el.getAnimations({ subtree: true }).length)).toBe(0);
-  await page.evaluate(() => { window.__bossHudUi.hud.dispose(); window.__bossHudUi.combat.dispose(); window.__bossHudUi.controls.dispose(); });
+  await page.evaluate(() => { window.__bossHudUi.hud.dispose(); window.__bossHudUi.combat.dispose(); window.__bossHudUi.controls.dispose(); window.__bossHudUi.footer.dispose(); });
   await expect(hud).toHaveCount(0);
   await expect(page.locator('.final-boss-dev-invincibility')).toHaveCount(0);
   expect(await page.locator('#app').evaluate(el => (el as HTMLElement).style.getPropertyValue('--boss-controls-height'))).toBe('');

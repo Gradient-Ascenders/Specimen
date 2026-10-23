@@ -2310,32 +2310,32 @@ kbd {
 }
 
 
-/* Align the encounter panels and the existing footer tools to one margin. */
-#app[data-boss-encounter='true'] {
+/* Share the lower-left health position across normal levels and the finale. */
+#app {
   --boss-hud-edge: clamp(0.75rem, 2.2vw, 2rem);
   --boss-hud-gap: 0.75rem;
   --boss-controls-bottom: var(--boss-hud-edge);
   --boss-panels-bottom: calc(var(--boss-controls-bottom) + var(--boss-controls-height, 44px) + var(--boss-hud-gap));
 }
-#app[data-boss-encounter='true'] .hud-controls {
+#app .hud-controls {
   right: var(--boss-hud-edge);
   bottom: var(--boss-controls-bottom);
   max-width: calc(100% - var(--boss-hud-edge) * 2);
 }
-#app[data-boss-encounter='true'] .hud-hint { width: 100%; max-width: 100%; min-height: var(--ui-control-height); }
-#app[data-boss-encounter='true'] > .performance-recorder {
+#app .hud-hint { width: 100%; max-width: 100%; min-height: var(--ui-control-height); }
+#app > .performance-recorder {
   left: var(--boss-hud-edge);
   bottom: var(--boss-hud-edge);
 }
-#app[data-boss-encounter='true'] .recorder-panel summary { min-height: calc(var(--ui-control-height) - 2px); }
-#app[data-boss-encounter='true']:has(> .performance-recorder) .hud-controls {
+#app .recorder-panel summary { min-height: calc(var(--ui-control-height) - 2px); }
+#app:has(> .performance-recorder) .hud-controls {
   max-width: calc(100% - var(--boss-hud-edge) * 2 - 10rem - var(--boss-hud-gap));
 }
 @media (max-width: 800px) {
-  #app[data-boss-encounter='true']:has(> .performance-recorder) {
+  #app:has(> .performance-recorder) {
     --boss-controls-bottom: calc(var(--boss-hud-edge) + var(--ui-control-height) + var(--boss-hud-gap));
   }
-  #app[data-boss-encounter='true']:has(> .performance-recorder) .hud-controls {
+  #app:has(> .performance-recorder) .hud-controls {
     max-width: calc(100% - var(--boss-hud-edge) * 2);
   }
 }
@@ -2454,6 +2454,22 @@ kbd {
 .final-boss-attack-progress::-moz-progress-bar { background: var(--boss-threat) !important; }
 .final-boss-hud[data-stage='recovery']:not([data-shield='true']) .final-boss-message { --boss-threat: #9bd7ca; border-color: rgb(155 215 202 / 26%); }
 .final-boss-player { position: absolute; left: var(--boss-edge); bottom: var(--boss-panels-bottom, calc(var(--boss-edge) + 3.5rem)); width: clamp(9rem, 18vw, 14rem); padding: 0.75rem; }
+.player-health-hud {
+  --boss-edge: var(--boss-hud-edge);
+  color: var(--ui-text);
+  font: 400 0.8125rem/1.4 var(--ui-font-body);
+  font-variant-numeric: tabular-nums;
+  transform-origin: bottom left;
+  transition: border-color 180ms, box-shadow 180ms;
+}
+.player-health-track { height: 0.3125rem; overflow: hidden; border-radius: 2px; background: #030a10; }
+.player-health-fill { display: block; width: 100%; height: 100%; transform-origin: left; background: linear-gradient(90deg, #548c78, #b2e6c1); }
+.player-health-hud[data-critical='true'] .player-health-fill { background: #f3a292; }
+.player-health-hud[data-healing='true'] { border-color: #739e88; box-shadow: 0 0 1rem rgb(155 215 202 / 9%); }
+.player-health-hud[data-healing='true'] .player-health-fill { background: linear-gradient(90deg, #6aaa91, #d1ffe1); }
+.player-health-hud[data-healing='true'] .final-boss-player-status { color: #b2e6c1; }
+.player-health-meter { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+#app[data-boss-encounter='true'] .player-health-hud { display: none; }
 .final-boss-invincible { position: absolute; left: 0; bottom: calc(100% + 0.5rem); display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.3rem 0.5rem; border: 1px solid #739e88; border-radius: var(--ui-radius-sm); color: #c4eada; background: rgb(10 21 28 / 94%); font-size: 0.75rem; white-space: nowrap; }
 .final-boss-invincible::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #b2e6c1; }
 .final-boss-player-header { display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.625rem; }
@@ -2576,6 +2592,7 @@ kbd {
 .specimen-hit-marker[hidden], .specimen-dodge-feedback[hidden] { display: none; }
 @keyframes specimen-dodge { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
+  .player-health-hud { transition: none; }
   .specimen-combat-crosshair[data-pulse] { animation: none; }
 }
 
