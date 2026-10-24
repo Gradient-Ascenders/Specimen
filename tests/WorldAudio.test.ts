@@ -35,6 +35,28 @@ function fixture() {
   return {root,playback,audio};
 }
 
+test('lift presentation can shape motor pitch and rail accents without changing travel or replaying cues on reset',()=>{
+  const {root,playback,audio}=fixture();
+  let rate=0;
+  const loop=playback.startLoop.bind(playback);
+  playback.startLoop=(key,sound,position,volumeScale=1,playbackRate=1)=>{
+    rate=playbackRate;loop(key,sound,position,volumeScale);
+  };
+  const platform=new MovingPlatform({id:'weighted-lift',start:new THREE.Vector3(),end:new THREE.Vector3(0,10,0),
+    travelDurationSeconds:10,audioPresentation:{playbackRate:p=>.8+.2*p,volumeScale:()=>1.1,
+      travelAccents:[{at:.3,sound:'world-door-stop-01',volumeScale:.18}]}});
+  root.add(platform.root);
+  try{
+    audio.update(origin);platform.setActive(true);platform.update(2);audio.update({x:0,y:2,z:0});
+    assert.equal(platform.progress,.2);assert.ok(Math.abs(rate-.84)<1e-8);
+    assert.equal([...playback.loops.values()][0].volumeScale,1.1);
+    platform.update(1.5);audio.update({x:0,y:3.5,z:0});
+    assert.equal(playback.cues.filter(cue=>cue==='world-door-stop-01').length,1);
+    const cues=playback.cues.slice();platform.reset();audio.update(origin);
+    assert.deepEqual(playback.cues,cues,'A restore is not a rail joint or arrival.');
+  }finally{audio.dispose();platform.dispose();}
+});
+
 test('world loops reach across rooms and fade smoothly to silence at their range boundary', () => {
   for (const [kind, range] of [['door', 22], ['machinery', 24], ['laser', 16], ['drone', 20], ['hover', 16]] as const) {
     const {root, playback, audio} = fixture(), node = new THREE.Group(); root.add(node);

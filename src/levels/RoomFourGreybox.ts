@@ -8,6 +8,8 @@ import { MovingPlatform } from '../puzzle/MovingPlatform.ts';
 import { ElevatorPresentation } from '../render/elevator/ElevatorPresentation.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomFourArt } from '../render/environment/containment/RoomFourArt.ts';
+import type {RoomFourShellLoader} from '../render/environment/containment/RoomFourShell.ts';
+import type {AuthoredLaserEmitter} from '../render/hazards/LaserHazardPresentation.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import type {
   ContextualCameraContext,
@@ -65,6 +67,11 @@ export class RoomFourGreybox {
     end: new THREE.Vector3(9, 74.5, 85.5),
     size: new THREE.Vector3(8, 0.5, 8),
     travelDurationSeconds: 45,
+    audioPresentation:{
+      playbackRate:progress=>.76+.30*Math.min(1,progress/.06,(1-progress)/.06),
+      volumeScale:()=>1.12,
+      travelAccents:[.22,.42,.64,.83].map(at=>({at,sound:'world-door-stop-01' as const,volumeScale:.18})),
+    },
   });
   readonly elevator = new ElevatorSequence({
     id: 'room-4-cargo-elevator',
@@ -131,6 +138,7 @@ export class RoomFourGreybox {
     });
     this.elevatorPresentation = new ElevatorPresentation(this.elevator);
     this.art = new RoomFourArt(artResources, hazards);
+    this.elevatorPresentation.mountAuthoredCar(this.art.shell.carRoot);
     this.root.add(
       this.lasers.root,
       this.laserPresentation.root,
@@ -142,6 +150,17 @@ export class RoomFourGreybox {
 
   updateEntryTrigger(body: KinematicBody): void {
     this.checkpointTrigger.update(body);
+  }
+
+  async prepareArt(borrowFinish:(name:string)=>THREE.Material,kit:AuthoredLaserEmitter,
+    loader?:RoomFourShellLoader):Promise<void>{
+    await this.art.prepare(borrowFinish,loader);
+    this.art.shell.attachPresentation(this.elevatorPresentation);
+    this.art.shell.attachLasers(this.laserPresentation,kit,this.lasers.hazards);
+    this.syncPresentation();
+  }
+  get renderSources():readonly THREE.Object3D[]{
+    return [...this.art.renderSources,...this.elevatorPresentation.renderSources,this.laserPresentation.root];
   }
 
   updateFailureTrigger(body: KinematicBody): void {
@@ -280,6 +299,7 @@ export class RoomFourGreybox {
     this.exitLock.visible = locked;
     this.laserPresentation.sync();
     this.elevatorPresentation.sync();
+    this.art.shell.sync(this.elevator);
   }
 
   private syncLiftCameraProfile(): void {

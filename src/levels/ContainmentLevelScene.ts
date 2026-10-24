@@ -14,6 +14,7 @@ import { ContainmentSurveillanceCameras } from '../render/environment/containmen
 import { fitContainmentShadowCullingBounds } from '../render/environment/containment/ContainmentShadowCoverage.ts';
 import type {RoomTwoShellLoader} from '../render/environment/containment/RoomTwoShell.ts';
 import type {RoomThreeShellLoader} from '../render/environment/containment/RoomThreeShell.ts';
+import type {RoomFourShellLoader} from '../render/environment/containment/RoomFourShell.ts';
 import type {ContainmentSurveillanceModelLoader} from '../render/environment/containment/ContainmentSurveillanceModel.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -307,7 +308,7 @@ export class ContainmentLevelScene {
   }
 
   async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader,roomThreeLoader?:RoomThreeShellLoader,
-    cameraLoader?:ContainmentSurveillanceModelLoader):Promise<void>{
+    cameraLoader?:ContainmentSurveillanceModelLoader,roomFourLoader?:RoomFourShellLoader):Promise<void>{
     await this.teaching.roomOneArt.prepare();
     if(this.disposed)return;
     await this.teaching.roomTwoArt.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomTwoLoader);
@@ -315,16 +316,20 @@ export class ContainmentLevelScene {
     await this.surveillanceCameras.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),cameraLoader);
     if(this.disposed)return;
     await this.roomThree.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomThreeLoader);
+    if(this.disposed)return;
+    await this.roomFour.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
+      this.roomThree.art.shell.borrowLaserEmitter()!,roomFourLoader);
   }
 
   private currentFirstUseGeometryResources():readonly THREE.Mesh[]{
     // The old hardware timings are historical. Prime the new authored buffers
     // explicitly instead of uploading retired procedural Room 2/3 proxies.
-    const roomTwo=this.teaching.roomTwoArt.shell,roomThree=this.roomThree.art.shell;
+    const roomTwo=this.teaching.roomTwoArt.shell,roomThree=this.roomThree.art.shell,roomFour=this.roomFour.art.shell;
     return [...this.measuredFirstUseGeometryResources.filter(object=>
-      !(roomTwo.ready&&object.name.startsWith('room-2-'))&&!(roomThree.ready&&object.name.startsWith('room-3-'))),
+      !(roomTwo.ready&&object.name.startsWith('room-2-'))&&!(roomThree.ready&&object.name.startsWith('room-3-'))&&
+      !(roomFour.ready&&object.name.startsWith('room-4-'))),
       ...(roomTwo.ready?roomTwo.renderMeshes:[]),...(roomThree.ready?this.roomThree.authoredRenderMeshes:[]),
-      ...this.surveillanceCameras.authoredRenderMeshes];
+      ...this.surveillanceCameras.authoredRenderMeshes,...(roomFour.ready?roomFour.renderMeshes:[])];
   }
 
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
@@ -406,10 +411,13 @@ export class ContainmentLevelScene {
         : undefined;
     // Past the two opaque duct bends, the old pod is fully occluded. Keeping
     // it submitted creates otherwise-unused material variants under later rigs.
-    const completedRoomOne = roomId <= 3 &&
+    const completedRoomOne = (roomId <= 3 &&
       activePosition.z >= 25.1 && cameraPosition.z >= 25.1 &&
       activePosition.z < 78 && cameraPosition.z < 78 &&
-      activePosition.y < 34 && cameraPosition.y < 34
+      activePosition.y < 34 && cameraPosition.y < 34) ||
+      // The enclosed lift is beyond two offset rooms and their opaque walls.
+      // The old pod cannot be seen here, even during the low arrival camera.
+      (roomId===4&&activePosition.z>=79.2&&cameraPosition.z>=79.2)
       ? this.completedRoomOneBranches : undefined;
     if (!branches && !completedRoomOne) return draw();
 

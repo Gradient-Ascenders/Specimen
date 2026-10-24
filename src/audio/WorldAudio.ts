@@ -11,6 +11,9 @@ interface SourceOptions {
   readonly travelCues?: boolean;
   readonly enabled?: () => boolean;
   readonly closestPoint?: (listener: AudioPosition, out: THREE.Vector3) => void;
+  readonly volumeScale?:()=>number;
+  readonly playbackRate?:()=>number;
+  readonly travelAccents?:readonly {readonly at:number;readonly sound:SoundId;readonly volumeScale:number}[];
 }
 const sources = new Set<WorldAudioSource>();
 let nextSource = 0;
@@ -45,7 +48,7 @@ export class WorldAudio {
   constructor(audio: AudioPlayback, root: THREE.Object3D) { this.audio = audio; this.root = root; }
 
   update(listener: AudioPosition | undefined): void {
-    const candidates: { key: string; sound: SoundId; distance: number; volumeScale: number; position: THREE.Vector3; group: 'motor' | 'laser' | 'drone' | 'hover' }[] = [];
+    const candidates: { key: string; sound: SoundId; distance: number; volumeScale: number; playbackRate:number; position: THREE.Vector3; group: 'motor' | 'laser' | 'drone' | 'hover' }[] = [];
     for (const source of sources) {
       const options = source.options;
       let ancestor: THREE.Object3D | null = options.root;
@@ -59,6 +62,7 @@ export class WorldAudio {
       const enabled = options.enabled?.() ?? true;
       const wasEnabled = sample.enabled, wasMoving = sample.moving;
       const settled = options.settled?.() ?? false;
+      const previousProgress=sample.progress;
       sample.progress = progress; sample.generation = source.generation;
       sample.enabled = enabled; sample.moving = enabled && moved && !settled;
       this.samples.set(source, sample);
@@ -79,6 +83,10 @@ export class WorldAudio {
       if (!restored && laser && wasEnabled !== enabled)
         this.audio.play(enabled ? 'world-laser-on-01' : 'world-laser-off-01', this.point, false, volumeScale);
       if (!enabled) continue;
+      if(!restored&&moved)for(const accent of options.travelAccents??[]){
+        if(previousProgress<accent.at&&progress>=accent.at)
+          this.audio.play(accent.sound,this.point,false,volumeScale*accent.volumeScale);
+      }
       if (!restored && options.travelCues) {
         if (moved && !wasMoving) this.audio.play('world-lift-start-01', this.point, false, volumeScale);
         if ((moved && settled) || (wasMoving && !moved)) this.audio.play('world-lift-stop-01', this.point, false, volumeScale);
@@ -87,7 +95,8 @@ export class WorldAudio {
         this.audio.play('world-door-stop-01', this.point, true, volumeScale);
       if (continuous || (moved && !settled)) candidates.push({
         // Keep the laser voice running when a different beam becomes nearest.
-        key: laser ? 'world:laser' : source.key, distance, volumeScale, position: this.point.clone(),
+        key: laser ? 'world:laser' : source.key, distance, volumeScale:volumeScale*(options.volumeScale?.()??1),
+        playbackRate:options.playbackRate?.()??1,position: this.point.clone(),
         group: laser ? 'laser' : options.kind === 'drone' ? 'drone' : options.kind === 'hover' ? 'hover' : 'motor',
         sound: laser ? 'world-laser-loop-01' : options.kind === 'drone' ? 'world-drone-flight-loop-01' : options.kind === 'hover' ? 'world-platform-hover-loop-01' : options.kind === 'door' ? 'world-door-movement-loop-01' : 'world-machinery-loop-01',
       });
@@ -104,7 +113,7 @@ export class WorldAudio {
       const key = candidate.group === 'drone' || candidate.group === 'hover'
         ? `world:${candidate.group}:${slot}` : candidate.key;
       keep.add(key);
-      this.audio.startLoop(key, candidate.sound, candidate.position, candidate.volumeScale);
+      this.audio.startLoop(key, candidate.sound, candidate.position, candidate.volumeScale,candidate.playbackRate);
     }
     for (const key of this.playing) if (!keep.has(key)) this.audio.stopLoop(key);
     this.playing.clear();

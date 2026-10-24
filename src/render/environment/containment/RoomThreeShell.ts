@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {ContainmentArtMaterials} from './ContainmentArtResources.ts';
-import type {LaserHazardPresentation} from '../../hazards/LaserHazardPresentation.ts';
+import type {AuthoredLaserEmitter,LaserHazardPresentation} from '../../hazards/LaserHazardPresentation.ts';
 
 export const ROOM_THREE_SHELL_URL=new URL('../../../../assets/environments/containment-room-three/room-three-laboratory.glb',import.meta.url).href;
 export type RoomThreeShellLoader=(signal:AbortSignal)=>Promise<THREE.Group>;
@@ -81,9 +81,14 @@ export class RoomThreeShell{
 
   attachLasers(presentation:LaserHazardPresentation):void{
     if(!this.source||this.detachEmitter||this.disposed)return;
-    this.detachEmitter=presentation.attachEmitterModel({housing:this.source.getObjectByName('R3_LaserHousing')!,
+    this.detachEmitter=presentation.attachEmitterModel(this.borrowLaserEmitter()!);
+  }
+
+  borrowLaserEmitter():AuthoredLaserEmitter|undefined{
+    if(!this.source||this.disposed)return undefined;
+    return {housing:this.source.getObjectByName('R3_LaserHousing')!,
       aperture:(this.source.getObjectByName('R3_LaserAperture') as THREE.Mesh).geometry,
-      shutter:(this.source.getObjectByName('R3_LaserShutter') as THREE.Mesh).geometry});
+      shutter:(this.source.getObjectByName('R3_LaserShutter') as THREE.Mesh).geometry};
   }
 
   get ready():boolean{return !!this.source;}

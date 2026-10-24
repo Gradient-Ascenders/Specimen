@@ -11,6 +11,7 @@ import {loadRoomOneShellFixture} from './helpers/RoomOneShellAsset.ts';
 import {loadRoomTwoShellFixture} from './helpers/RoomTwoShellAsset.ts';
 import {loadRoomThreeShellFixture} from './helpers/RoomThreeShellAsset.ts';
 import {loadOpeningLaboratoryFixture} from './helpers/OpeningLaboratoryAsset.ts';
+import {loadRoomFourShellFixture} from './helpers/RoomFourShellAsset.ts';
 
 function createFixtures() {
   const roots = { 1: new THREE.Group(), 2: new THREE.Group(), 3: new THREE.Group(), 5: new THREE.Group() };
@@ -157,7 +158,7 @@ test('Rooms 1–3 use the exact shared cutscene camera and the doorway camera cl
   const originals=new Map(meshes(prefab).map(mesh=>[mesh.name,mesh.geometry]));
   try{
     await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
-    await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,async()=>source);
+    await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,async()=>source,loadRoomFourShellFixture);
     assert.deepEqual(rig.modelDiagnostics,{ready:true,cameras:5,meshes:5,textureCount:0});
     const geometry=new Set<THREE.BufferGeometry>();
     for(const camera of rig.cameras){

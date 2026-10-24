@@ -40,6 +40,12 @@ Cultivation.
   documents the source, runtime ownership and moving-state surface checks.
 - Level-owned effects and resources are disposed on unload; restart restores
   authored state without rebuilding static room geometry.
+- Room 4's Blender freight lift adds a car body, guide carriages, cables,
+  recessed counterweight and three shaft sections. A height display, charging
+  optics and pocket doors read the existing lift and hazard state. The original
+  travel, collision and camera profiles remain authoritative.
+  [Room 4 freight lift](../../assets/environments/containment-room-four/README.md)
+  documents assembly ownership and moving-surface checks.
 - Surveillance cameras in Rooms 1–3 share the intro's `OI_Camera` geometry and
   existing finish bank. Their pan/tilt owners still track Bob; the doorway mount
   clears the raised shutter throughout its full rotation range.

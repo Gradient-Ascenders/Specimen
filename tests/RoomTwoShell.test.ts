@@ -12,10 +12,11 @@ import {loadRoomOneShellFixture} from './helpers/RoomOneShellAsset.ts';
 import {loadRoomTwoShellFixture} from './helpers/RoomTwoShellAsset.ts';
 import {loadRoomThreeShellFixture} from './helpers/RoomThreeShellAsset.ts';
 import {loadOpeningLaboratoryFixture} from './helpers/OpeningLaboratoryAsset.ts';
+import {loadRoomFourShellFixture} from './helpers/RoomFourShellAsset.ts';
 
 async function prepare(scene:ContainmentLevelScene){
   await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
-  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture);
+  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture);
 }
 
 test('the Blender hall shares finish resources and preserves all collision data, landings and openings',async()=>{

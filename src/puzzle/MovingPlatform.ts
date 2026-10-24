@@ -1,4 +1,5 @@
 import { WorldAudioSource } from '../audio/WorldAudio.ts';
+import type {SoundId} from '../audio/SoundCatalog.ts';
 import * as THREE from 'three';
 
 import { EventBus } from '../core/EventBus.ts';
@@ -39,6 +40,11 @@ export interface MovingPlatformOptions {
   readonly initialProgress?: number;
   /** Direction the platform travels after construction and reset. */
   readonly initialTarget?: 'start' | 'end';
+  readonly audioPresentation?:{
+    readonly volumeScale?:(progress:number)=>number;
+    readonly playbackRate?:(progress:number)=>number;
+    readonly travelAccents?:readonly {readonly at:number;readonly sound:SoundId;readonly volumeScale:number}[];
+  };
 }
 
 /**
@@ -133,6 +139,9 @@ export class MovingPlatform {
     this.previousPositionValue.copy(this.root.position);
     this.state = this.resolveState();
     this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue,
+      volumeScale:()=>options.audioPresentation?.volumeScale?.(this.progressValue)??1,
+      playbackRate:()=>options.audioPresentation?.playbackRate?.(this.progressValue)??1,
+      travelAccents:options.audioPresentation?.travelAccents,
       settled: () => this.isAtStart || this.isAtEnd,
       travelCues: Math.abs(this.endValue.y-this.startValue.y) > .01 &&
         Math.hypot(this.endValue.x-this.startValue.x, this.endValue.z-this.startValue.z) < .01 });

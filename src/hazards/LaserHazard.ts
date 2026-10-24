@@ -262,6 +262,22 @@ export class LaserHazard {
     return this.sequenceElapsedSecondsValue;
   }
 
+  /** Read-only lead time for warning optics; it never advances the timeline. */
+  get secondsUntilEnabled():number|undefined {
+    if(this.enabled)return 0;
+    if(!this.timeline||!this.circuitGateEnabledValue||this.sequenceStateValue==='complete')return undefined;
+    let seconds=0;
+    const steps=this.timeline.steps;
+    for(let offset=0;offset<steps.length;offset++){
+      const index=this.stepIndexValue+offset;
+      if(index>=steps.length&&!this.timeline.repeat)return undefined;
+      const step=steps[index%steps.length];
+      if(step.enabled)return seconds;
+      seconds+=Math.max(0,step.durationSeconds-(offset===0?this.stepElapsedSeconds:0));
+    }
+    return undefined;
+  }
+
   /** Progress of the current timeline step in [0, 1]. */
   get phaseProgress(): number {
     const step = this.timeline?.steps[this.stepIndexValue];

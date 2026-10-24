@@ -33,7 +33,7 @@ test('the chemical hall renders its route and optical heads, prewarms doorway vi
   });
   expect(initial.shell.ready).toBe(true);expect(initial.shell.meshes).toBe(14);
   expect(initial.shell.textureCount).toBe(0);expect(initial.shell.lasersAttached).toBe(true);
-  expect(initial.prime.resourceCount).toBe(45);expect(initial.prime.resourcesPrimed).toBe(true);
+  expect(initial.prime.resourceCount).toBe(74);expect(initial.prime.resourcesPrimed).toBe(true);
   const evidence='artifacts/evidence/room-three-shell';await mkdir(evidence,{recursive:true});
   const observations=[];
   for(const [name,room,body,eye,target,fov,time] of [

@@ -2636,6 +2636,7 @@ function createRoomPrewarmSources(
     }
   } else {
     if(roomId===3&&resources.testScene.roomThree.art.shell.ready)sources.push(...resources.testScene.roomThree.renderSources);
+    else if(roomId===4&&resources.testScene.roomFour.art.shell.ready)sources.push(...resources.testScene.roomFour.renderSources);
     else sources.push(requiredNamedObject(levelRoot, `containment-room-${roomId}-greybox`));
     for (const child of teachingRoot.children) {
       if (child.name.startsWith('player-slime-')) sources.push(child);
@@ -2662,6 +2663,9 @@ function createRoomPrewarmSources(
     // The high doorway exposes the new basin, wall finishes and optical heads
     // before the Room 3 rig takes over. Prepare their actual shared buffers.
     sources.push(...resources.testScene.roomThree.renderSources,resources.testScene.roomThreeMonitor.root);
+  }
+  if((roomId===3||roomId===5)&&resources.testScene.roomFour.art.shell.ready){
+    sources.push(...resources.testScene.roomFour.renderSources);
   }
 
   // Development spawn markers can also be seen from the far rooms.
