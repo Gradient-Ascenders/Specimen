@@ -13,6 +13,7 @@ import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/Col
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { SpecimenDash, SPECIMEN_DASH } from '../src/combat/SpecimenDash.ts';
+import { bossMusicEvents, type BossMusic } from '../src/audio/BossMusic.ts';
 
 const controls=(o:Partial<SpecimenAttackControls>={}):SpecimenAttackControls=>({active:true,aimHeld:false,fireHeld:false,firePressed:false,fireReleased:false,gameplayInputEnabled:true,pointerLocked:true,...o});
 const hit=(damageUnits=999)=>({projectileId:1,targetId:'core',kind:'direct' as const,chargeAmount:1,fullyCharged:true,damageUnits,point:new THREE.Vector3(),direction:new THREE.Vector3()});
@@ -526,4 +527,30 @@ test('opt-in spherical shields match their visible boundary, not an invisible bo
     assert.equal(world.raycast(new THREE.Vector3(27,27,-60),forward,120,ray,CollisionLayer.Projectile),true);assert.equal(ray.object?.uuid,box.uuid);
     world.clear();sphere.geometry.dispose();(sphere.material as THREE.Material).dispose();box.geometry.dispose();(box.material as THREE.Material).dispose();
   }
+});
+
+
+test('boss music begins at combat, spans both phases, fades on defeat and releases each retry attempt',()=>{
+  const starts:BossMusic[]=[],defeats:BossMusic[]=[],stops:BossMusic[]=[];
+  const off=[bossMusicEvents.on('started',cue=>starts.push(cue)),bossMusicEvents.on('defeated',cue=>defeats.push(cue)),bossMusicEvents.on('stopped',cue=>stops.push(cue))];
+  const f=fixture();
+  try {
+    f.boss.reset();starts.length=stops.length=0;
+    assert.equal(f.boss.start(),true);f.boss.update(8);assert.equal(starts.length,0,'the boss introduction retains normal music');
+    f.boss.update(1);assert.equal(starts.length,1);const first=starts[0]!;
+    for(let wave=0;wave<T.defenseThresholds.length;wave++) {
+      assert.equal(f.boss.controller.applyImpact(hit()).accepted,true);
+      f.tick(83);f.killSquad();f.tick();
+    }
+    assert.equal(f.boss.controller.applyImpact(hit()).accepted,true);f.tick();
+    assert.equal(f.boss.controller.readModel.state,'transition');assert.equal(starts.length,1);
+    f.boss.update(1/60,true);assert.equal(f.boss.controller.readModel.phase,2);assert.equal(starts.length,1,'Phase 2 keeps the original music owner');
+    for(let hits=0;hits<10&&f.boss.controller.readModel.health>0;hits++) {f.boss.controller.applyImpact(hit());f.tick();}
+    assert.equal(f.boss.controller.readModel.state,'defeated');assert.deepEqual(defeats,[first]);
+    f.boss.reset();assert.deepEqual(stops,[first],'reset cancels a pending victory fade');
+    assert.equal(f.boss.startPhaseTwo(),true);assert.equal(starts.length,2);assert.notEqual(starts[1],first);
+    f.boss.suspend();assert.equal(stops.at(-1),starts[1]);
+    f.boss.reset();f.boss.start(true);assert.equal(starts.length,3);
+    f.boss.dispose();assert.equal(stops.at(-1),starts[2]);
+  }finally{f.dispose();off.forEach(unsubscribe=>unsubscribe());}
 });

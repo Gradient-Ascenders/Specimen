@@ -1,3 +1,4 @@
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import { OPENING_GAME_TIMING, openingEase, sampleOpeningGame } from './OpeningGameTimeline.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import { OpeningAudio } from '../audio/OpeningAudio.ts';
@@ -24,6 +25,7 @@ export class OpeningMoviePresentation {
   private readonly hostWindow: Window;
   private readonly video: HTMLVideoElement;
   private readonly audio: OpeningAudio;
+  private readonly music = new CinematicMusic('awakening', OPENING_GAME_TIMING.end - OPENING_GAME_TIMING.blackoutEnd);
   private readonly frames = new Set<number>();
   private readonly yields = new Map<number, () => void>();
   private started = false;
@@ -64,6 +66,9 @@ export class OpeningMoviePresentation {
     this.video.addEventListener('ended', this.onEnded);
     this.video.addEventListener('error', this.onMediaError);
     this.video.addEventListener('waiting', this.onWaiting);
+    this.video.addEventListener('pause', this.onWaiting);
+    this.video.addEventListener('seeking', this.onWaiting);
+    this.video.addEventListener('seeked', this.onSeeked);
     options.host.ownerDocument.addEventListener('visibilitychange', this.onVisibility);
     options.videoHost.prepend(this.video);
   }
@@ -88,8 +93,10 @@ export class OpeningMoviePresentation {
     }
     const stage = this.ended || this.skipped ? 'complete'
       : sampleOpeningGame(this.video.currentTime + this.options.sourceStartSeconds).stage;
-    if (this.moviePlaying && !this.skipped && !this.ended && !this.mediaFailed)
+    if (this.moviePlaying && !this.skipped && !this.ended && !this.mediaFailed) {
+      this.music.update(this.video.currentTime);
       this.audio.update(this.video.currentTime + this.options.sourceStartSeconds);
+    }
     if (this.options.host.dataset.openingStage !== stage) this.options.host.dataset.openingStage = stage;
   }
 
@@ -97,6 +104,7 @@ export class OpeningMoviePresentation {
     if (!this.started || this.disposed || this.completed) return;
     this.skipped = true;
     this.audio.stop();
+    this.music.stop();
     this.pauseMovie();
     this.setFade(1);
     this.releaseYields();
@@ -141,6 +149,7 @@ export class OpeningMoviePresentation {
     if (this.disposed) return;
     this.disposed = true;
     this.audio.stop();
+    this.music.stop();
     for (const id of this.frames) this.hostWindow.cancelAnimationFrame(id);
     this.frames.clear();
     this.releaseYields();
@@ -148,6 +157,9 @@ export class OpeningMoviePresentation {
     this.video.removeEventListener('ended', this.onEnded);
     this.video.removeEventListener('error', this.onMediaError);
     this.video.removeEventListener('waiting', this.onWaiting);
+    this.video.removeEventListener('pause', this.onWaiting);
+    this.video.removeEventListener('seeking', this.onWaiting);
+    this.video.removeEventListener('seeked', this.onSeeked);
     this.options.host.ownerDocument.removeEventListener('visibilitychange', this.onVisibility);
     this.pauseMovie();
     this.video.removeAttribute('src');
@@ -196,13 +208,19 @@ export class OpeningMoviePresentation {
     this.playbackAttempt++;
     this.video.pause();
     this.audio.pause();
+    this.music.pause();
   }
 
-  private readonly onWaiting = (): void => { this.moviePlaying = false; this.audio.pause(); };
+  private readonly onWaiting = (): void => { this.moviePlaying = false; this.audio.pause(); this.music.pause(); };
+
+  private readonly onSeeked = (): void => {
+    if (!this.video.paused && !this.video.seeking) this.onPlaying();
+  };
 
   private readonly onPlaying = (): void => {
     if (this.disposed || this.skipped || this.ended || this.mediaFailed) return;
     this.moviePlaying = true;
+    this.music.update(this.video.currentTime);
     this.setFade(0); // The file itself contains the laboratory reveal/final fade.
     // Let the native decoder present frames before CPU construction starts.
     this.scheduleLevel();
@@ -213,6 +231,7 @@ export class OpeningMoviePresentation {
     if (this.disposed || this.completed) return;
     this.ended = true;
     this.audio.stop();
+    this.music.stop();
     this.setFade(1);
     this.options.host.dataset.openingStage = 'complete';
     this.releaseYields();

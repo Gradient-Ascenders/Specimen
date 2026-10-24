@@ -39,6 +39,8 @@ export interface MovingPlatformOptions {
   readonly initialProgress?: number;
   /** Direction the platform travels after construction and reset. */
   readonly initialTarget?: 'start' | 'end';
+  /** Disable the mechanical motor layer when an authored hover engine owns audio. */
+  readonly machineryAudio?: boolean;
 }
 
 /**
@@ -50,7 +52,7 @@ export interface MovingPlatformOptions {
  */
 export class MovingPlatform {
   readonly root = new THREE.Group();
-  private readonly worldAudio: WorldAudioSource;
+  private readonly worldAudio: WorldAudioSource | undefined;
   readonly events = new EventBus<MovingPlatformEvents>();
   readonly displacement = new THREE.Vector3();
   readonly collisionMesh: THREE.Mesh<
@@ -132,7 +134,7 @@ export class MovingPlatform {
     );
     this.previousPositionValue.copy(this.root.position);
     this.state = this.resolveState();
-    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue,
+    this.worldAudio = options.machineryAudio === false ? undefined : new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue,
       settled: () => this.isAtStart || this.isAtEnd,
       travelCues: Math.abs(this.endValue.y-this.startValue.y) > .01 &&
         Math.hypot(this.endValue.x-this.startValue.x, this.endValue.z-this.startValue.z) < .01 });
@@ -218,7 +220,7 @@ export class MovingPlatform {
     this.previousPositionValue.copy(this.root.position);
     this.displacement.set(0, 0, 0);
     this.setState(this.resolveState());
-    this.worldAudio.reset();
+    this.worldAudio?.reset();
   }
 
   /**
@@ -304,11 +306,11 @@ export class MovingPlatform {
     this.previousPositionValue.copy(this.root.position);
     this.displacement.set(0, 0, 0);
     this.setState(this.resolveState());
-    this.worldAudio.reset();
+    this.worldAudio?.reset();
   }
 
   dispose(): void {
-    this.worldAudio.dispose();
+    this.worldAudio?.dispose();
     this.events.clear();
     this.root.removeFromParent();
     this.root.traverse((object) => {
