@@ -362,3 +362,12 @@ gives the continuous alarm more room beneath the music. Measurements include
 the existing SFX compressor and default 0.8 SFX volume; music remains streamed
 outside that compressor. These are component measurements, not a listening
 evaluation or a guarantee against clipping at every user-selected mix.
+
+Containment Room 5's two moving platforms use their authored booster-hover
+engines only. Their `MovingPlatform` definitions set `machineryAudio: false`,
+which omits the additional `world-machinery-loop-01` source responsible for the
+repetitive knocking during traversal. This is an instance-level audio choice;
+other platforms retain mechanical motors by default. Platform motion, riders,
+lasers, monitor/dialogue cues and cinematic audio are unchanged. The omitted
+sources are never registered, so reset/retry/disposal cannot retain or recreate
+a hidden mechanical layer for these two platforms.

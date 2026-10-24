@@ -114,6 +114,14 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
   await page.goto('./', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-action="start"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-action="start"]').click(); await finishOpening(page, false);
+  await page.evaluate(() => (window as any).__musicSession.runtime.resources.containmentLevel.teleportToRoomForDebug(5));
+  await expect.poll(() => page.evaluate(() => [...(window as any).__musicSession.runtime.audio.loops.values()]
+    .some((loop: any) => loop.sound === 'world-platform-hover-loop-01')), { timeout: 30_000 }).toBe(true);
+  const traversalSounds = await page.evaluate(() => [...(window as any).__musicSession.runtime.audio.loops.values()]
+    .map((loop: any) => loop.sound));
+  expect(traversalSounds).not.toContain('world-machinery-loop-01');
+  expect(traversalSounds).toContain('world-laser-loop-01');
+  expect((await snapshot(page)).filter(p => !p.paused).every(p => p.src.includes('01-containment'))).toBe(true);
   await page.evaluate(() => {
     const rt = (window as any).__musicSession.runtime;
     if (!rt.resources.containmentLevel.beginEndingForDebug()) throw new Error('Containment ending did not start');
@@ -133,6 +141,11 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
       master: rt.audio.diagnostics.masterVolume, effects: rt.audio.diagnostics.effectsVolume };
   });
   expect(goopMix).toEqual({ alarm: .35, master: 1, effects: .8 });
+  const finaleSounds = await page.evaluate(() => [...(window as any).__musicSession.runtime.audio.loops.values()]
+    .map((loop: any) => loop.sound));
+  expect(finaleSounds).not.toContain('world-machinery-loop-01');
+  expect(finaleSounds).toContain('world-drone-flight-loop-01');
+  expect(finaleSounds).toContain('world-containment-alarm-loop-01');
   await page.keyboard.press('KeyP');
   await expect(page.locator('[data-flow-panel="paused"]')).toBeVisible();
   await expect.poll(async () => (await snapshot(page)).filter(p => !p.paused).length).toBe(0);
@@ -140,7 +153,10 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
   await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('05-containment') && !p.paused)).toBe(true);
   await page.evaluate(() => (window as any).__musicSession.runtime.skipFinale());
   await expect(page.locator('[data-action="enter-level"]')).toBeVisible({ timeout: 240_000 });
-  expect((await snapshot(page)).every(p => p.paused)).toBe(true);
+  // GPU preparation can paint Enter before the queued final fade ticks run.
+  await expect.poll(async () => (await snapshot(page)).every(p => p.paused)).toBe(true);
+  expect(await page.evaluate(() => [...(window as any).__musicSession.runtime.audio.loops.keys()]
+    .some((key: any) => key.startsWith('containment-finale-')))).toBe(false);
   await page.locator('[data-action="enter-level"]').click();
   await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('02-cultivation') && !p.paused), { timeout: 30_000 }).toBe(true);
   await page.waitForFunction(() => !(window as any).__musicSession.runtime.ventArrival.active, undefined, { timeout: 90_000 });
@@ -192,7 +208,7 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
     rt.resources.roomFiveFinale.requestSkip(); rt.fixedUpdate(1 / 60);
   });
   await expect(page.locator('[data-action="enter-level"]')).toBeVisible({ timeout: 240_000 });
-  expect((await snapshot(page)).every(p => p.paused)).toBe(true);
+  await expect.poll(async () => (await snapshot(page)).every(p => p.paused)).toBe(true);
   await page.locator('[data-action="enter-level"]').click();
   await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('03-blackout') && !p.paused), { timeout: 30_000 }).toBe(true);
   expect((await snapshot(page)).filter(p => !p.paused)).toHaveLength(1);
