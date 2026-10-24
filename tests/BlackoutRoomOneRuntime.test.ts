@@ -175,7 +175,7 @@ function createFixture(debugAvailable = true,playArrival=false,cameraRig=new Tes
   const tick = (count = 1) => { for (let i = 0; i < count; i += 1) runtime.fixedUpdate(1 / 60); };
   const switchSlime = () => { input.press('switchSlime'); tick(); input.release('switchSlime'); tick(); };
   return {
-    runtime, input, document, scene, cameraRig, tick, switchSlime,
+    runtime, input, document, scene, host, cameraRig, tick, switchSlime,
     render: () => runtime.render(0, { frameDeltaSeconds: 1 / 60 } as Readonly<LoopStats>),
     cleanup: () => {
       runtime.dispose();
@@ -198,6 +198,31 @@ test('debug room access cannot enable invincibility without the Vite development
     f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
     boss.controller.toggleDevInvincibility();assert.equal(boss.controller.damagePlayer(20,-1),true);
     assert.equal(f.runtime.requestFailure(),true);
+  }finally{f.cleanup();}
+});
+
+test('continuous mouse turns keep every sample across render-only and catch-up frames through multiple full revolutions',()=>{
+  const rig=new CameraRig(),f=createFixture(true,false,rig as unknown as TestCameraRig);
+  try {
+    f.input.press('debugTeleportRoomFour');f.tick();f.input.release('debugTeleportRoomFour');
+    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');
+    const r=finalBossInternals(f.runtime);r.finalBoss.controller.damagePlayer=()=>false;
+    for(let i=0;i<60;i++)f.render();
+    const forward=new THREE.Vector3(),previous=rig.camera.quaternion.clone();
+    rig.camera.getWorldDirection(forward);const start=Math.atan2(forward.x,forward.z);
+    let radians=0,accumulator=0;
+    for(let frame=0;frame<720;frame++) {
+      const dt=frame%7===0?1/30:1/144,pixels=dt*800;
+      f.input.pointerDeltaX+=pixels;radians-=pixels*.0022;accumulator+=dt;
+      while(accumulator>=1/60){f.tick();accumulator-=1/60;}
+      f.runtime.render(accumulator*60,{frameDeltaSeconds:dt} as Readonly<LoopStats>);
+      rig.camera.getWorldDirection(forward);
+      const yaw=Math.atan2(forward.x,forward.z),error=Math.atan2(Math.sin(yaw-start-radians),Math.cos(yaw-start-radians));
+      assert.ok(Math.abs(error)<1e-7,`mouse displacement lost or duplicated at frame ${frame}: ${error}`);
+      assert.ok(previous.angleTo(rig.camera.quaternion)<pixels*.0022+.00001,`rotation snapped at frame ${frame}`);
+      previous.copy(rig.camera.quaternion);
+    }
+    assert.ok(Math.abs(radians)>Math.PI*4);
   }finally{f.cleanup();}
 });
 
@@ -266,7 +291,7 @@ test('phase two automatically saves CP9 on normal and skipped transitions; repea
         assert.equal(b.controller.readModel.playerHealth,100);assert.equal(b.controller.readModel.defenseIndex,3);assert.equal(b.controller.readModel.reinforcementIndex,0);
         assert.equal(b.controller.readModel.shieldActive,false);assert.equal(b.cinematic,false);assert.equal(b.squad.activeCount,0);assert.equal(b.projectiles.liveCount,0);
         assert.equal(b.reinforcements.activeCount,0);assert.equal(b.reinforcements.liveProjectileCount,0);assert.equal(b.healthPacks.activeCount,0);
-        assert.equal(b.evasion.active,false);assert.equal(b.presentation.rollRig.rotation.z,0);assert.equal(f.runtime.specimenAttackReadModel?.charging,false);
+        assert.equal(b.presentation.evasionOffset.length(),0);assert.equal(b.presentation.rollRig.rotation.z,0);assert.equal(f.runtime.specimenAttackReadModel?.charging,false);
         assert.equal(f.runtime.specimenProjectileStates.some(s=>s.active),false);assert.ok(arena.cover.every(c=>c.visible));assert.ok(body.position.distanceTo(FINAL_MERGE_ANCHOR)<.05);
         assert.equal(f.runtime.specimenFormReadModel?.controlledForm,'specimen');assert.equal(f.input.enabled,true);assert.equal(f.input.pointerLocked,true);
         assert.equal(targets.size,size);f.tick();assert.equal(JSON.stringify(f.runtime.activeCheckpoint),snapshot,'recovery must not overwrite or downgrade CP9');
@@ -278,26 +303,110 @@ test('phase two automatically saves CP9 on normal and skipped transitions; repea
   }
 });
 
-test('natural boss entry gathers the three real bodies, merges, saves CP8 and preserves earlier room recovery',()=>{
+test('natural lab entry plays the research escape, hands off directly to combat, and retries without replaying the film',()=>{
   const f=createFixture();try {
     f.runtime.activateCheckpoint('cp6');
     const bodies=electricalRoomInternals(f.runtime).group;
     for(const [i,id] of (['bob','goop','volt'] as const).entries())bodies[`${id}Body`].recoverAt(new THREE.Vector3((i-1)*2,.86,189.2));
-    f.tick();assert.equal(f.runtime.roomState.phase,'merging');f.tick(361);
-    assert.equal(f.runtime.roomState.phase,'boss');assert.equal(f.runtime.finalBossReadModel?.state,'intro');
+    f.tick(); const movie = (f.runtime as any).resources.researchFinale;
+    assert.equal(movie.active, true); assert.equal(f.runtime.roomState.phase, 'three-slime');
+    assert.equal(f.runtime.requestFailure(), false, 'the research sequence owns damage and movement');
+    f.tick(120); const time = movie.seconds; f.render(); f.render(); assert.equal(movie.seconds, time);
+    f.runtime.stop(); f.tick(120); assert.equal(movie.seconds, time); f.runtime.start();
+    f.input.press('skipCinematic'); f.tick(); f.input.release('skipCinematic');
+    assert.equal(movie.complete, true); assert.equal(movie.active, false);
+    assert.equal(f.runtime.roomState.phase,'boss');assert.equal(f.runtime.finalBossReadModel?.state,'combat');
     assert.equal(f.runtime.activeCheckpoint?.checkpointId,'cp8');assert.equal(finalBossInternals(f.runtime).specimenBody.radiusMetres,FINAL_SPECIMEN_RADIUS);
-    assert.equal(f.runtime.requestFailure(),false,'cinematics suspend all damage');
-    f.runtime.stop();const elapsed=f.runtime.finalBossReadModel!.elapsed;f.tick(100);assert.equal(f.runtime.finalBossReadModel!.elapsed,elapsed);f.runtime.start();
-    f.input.press('skipCinematic');f.tick();f.input.release('skipCinematic');assert.equal(f.runtime.finalBossReadModel!.state,'combat');
     const targetCount=finalBossInternals(f.runtime).combatTargets.size;
     for(let retry=0;retry<3;retry++) {
       f.runtime.recoverActiveCheckpoint();assert.equal(f.runtime.finalBossReadModel!.health,FINAL_BOSS_TUNING.health);assert.equal(f.runtime.finalBossReadModel!.phase,1);
       assert.equal(finalBossInternals(f.runtime).finalBoss.squad.activeCount,0);
       assert.equal(finalBossInternals(f.runtime).combatTargets.size,targetCount);
+      assert.equal(movie.active, false); assert.equal(movie.complete, true);
     }
     f.runtime.restartLevel();assert.equal(f.runtime.roomState.roomId,'room-1');assert.equal(f.runtime.finalBossReadModel!.state,'idle');
     assert.equal(bodies.bobBody.radiusMetres,.45);assert.equal(bodies.voltBody.radiusMetres,.45);
   }finally{f.cleanup();}
+});
+
+test('loading rehearses the actual research views without advancing physics, dialogue or cinematic ownership', async () => {
+  const f = createFixture(); try {
+    const r = (f.runtime as any).resources, movie = r.researchFinale;
+    const bodies = [r.group.bobBody, r.group.goopBody, r.group.voltBody, r.specimenBody];
+    const positions = bodies.map(b => b.position.toArray()), parents = [r.bobPresentation, r.goopPresentation, r.voltPresentation].map(p => p.root.parent);
+    const hidden = movie.wing.root.visible, intensity = movie.wing.lightRoot.children.filter((o: THREE.Object3D) => o instanceof THREE.Light).map((o: THREE.Light) => o.intensity);
+    let frames = 0;
+    await movie.primePresentationFrames(f.scene, async (camera: THREE.PerspectiveCamera) => {
+      frames++; assert.ok(camera.position.toArray().every(Number.isFinite));
+      assert.deepEqual(bodies.map(b => b.position.toArray()), positions);
+      assert.equal(movie.seconds, 0); assert.equal(movie.active, false); assert.equal(f.host.dataset.cinematic, undefined);
+    });
+    assert.ok(frames >= 20); assert.equal(movie.preparation.complete, true);
+    assert.equal(movie.wing.root.visible, hidden); assert.equal(movie.diagnostics.effects.shots, 0);
+    assert.deepEqual(movie.wing.lightRoot.children.filter((o: THREE.Object3D) => o instanceof THREE.Light).map((o: THREE.Light) => o.intensity), intensity);
+    assert.deepEqual([r.bobPresentation, r.goopPresentation, r.voltPresentation].map(p => p.root.parent), parents);
+    await assert.rejects(movie.primePresentationFrames(f.scene, async () => { throw new Error('driver lost'); }), /driver lost/);
+    assert.deepEqual(bodies.map(b => b.position.toArray()), positions); assert.equal(movie.wing.root.visible, hidden);
+    assert.equal(movie.active, false); assert.equal(movie.seconds, 0);
+  } finally { f.cleanup(); }
+});
+
+test('research hides the overlapping arena shell until the viewing room without removing its light slots', () => {
+  const f = createFixture(); try {
+    const r = (f.runtime as any).resources, movie = r.researchFinale;
+    const arena = r.scene.finalArena as ExterminationArena;
+    const shell = arena.root.getObjectByName('continuous-lab-walkway')!;
+    const hiddenFragment = arena.armourFragments[0]!;
+    const lights = arena.root.children.filter(o => o instanceof THREE.Light);
+    assert.equal(shell.visible, true); assert.equal(hiddenFragment.visible, false);
+    assert.equal(f.runtime.previewResearchForDebug(), true);
+    movie.update(215);
+    assert.equal(shell.visible, false, 'the arena must not block the corridor reveal');
+    assert.ok(lights.every(light => light.visible), 'keep the warmed light count stable');
+    movie.update(22);
+    assert.equal(shell.visible, true, 'the boss chamber must be visible through the viewing glass');
+    assert.equal(hiddenFragment.visible, false);
+    movie.reset();
+    assert.equal(shell.visible, true); assert.equal(hiddenFragment.visible, false);
+  } finally { f.cleanup(); }
+});
+
+test('research film reaches every major beat, keeps render-only samples non-authoritative, and restores ownership on recovery', () => {
+  const f = createFixture(); try {
+    const r = (f.runtime as any).resources;
+    const beforePreparation = [r.group.bobBody, r.group.goopBody, r.group.voltBody, r.specimenBody].map(b => b.position.toArray());
+    r.researchFinale.primeResources((roots: readonly THREE.Object3D[]) => {
+      assert.equal(roots.length, 4); assert.equal(r.researchFinale.seconds, 0); assert.equal(r.researchFinale.active, false);
+    });
+    assert.deepEqual([r.group.bobBody, r.group.goopBody, r.group.voltBody, r.specimenBody].map(b => b.position.toArray()), beforePreparation);
+    assert.equal(f.runtime.previewResearchForDebug(), true);
+    const movie = r.researchFinale, parents = [r.bobPresentation.root.parent, r.goopPresentation.root.parent, r.voltPresentation.root.parent];
+    for (const [seconds, shot] of [[22, 'bob-reaction'], [39, 'catastrophic-research'], [96, 'the-scientists'], [133, 'empty-search'],
+      [155, 'hallway-chase'], [201, 'crossfire'], [215, 'specimen-reveal'], [237, 'arena-overlook'], [242.7, 'glass-ambush'], [245, 'arena-impact'], [258, 'pit-opening'], [265, 'exterminator-emergence']] as const) {
+      while (movie.seconds < seconds) f.tick();
+      assert.equal(movie.diagnostics.shot, shot);
+      const time = movie.seconds; f.render(); f.render(); assert.equal(movie.seconds, time);
+      assert.ok(r.bobPresentation.root.parent === parents[0] && r.goopPresentation.root.parent === parents[1] && r.voltPresentation.root.parent === parents[2]);
+      if (seconds === 133) { assert.ok(movie.actors.every((a: any) => !a.pose.visible), 'searchlights must illuminate an empty room'); assert.equal(movie.wing.monitorDrone.visible, true); }
+      if (seconds === 215) assert.equal(movie.diagnostics.visibleDrones, 8);
+      if (seconds === 245) assert.equal(movie.diagnostics.glassIntact, false);
+      if (seconds === 237) { assert.equal(movie.diagnostics.pitCoverVisible, true); assert.equal(r.scene.finalArena.entryDoor.position.y, 4.4); }
+      if (seconds === 258) { assert.ok(movie.diagnostics.pitOpenProgress > 0); assert.equal(r.finalBoss.presentation.root.visible, false); }
+      if (seconds === 265) {
+        assert.ok(r.finalBoss.presentation.machine.position.y > 4, 'the boss must emerge through the open cover');
+        assert.ok(Math.cos(r.specimenCharacter.diagnostics.yaw) < -.99, 'the Specimen must face the opening before the boss rises');
+      }
+    }
+    while (movie.active) f.tick();
+    assert.equal(f.runtime.phase, 'boss'); assert.equal(f.runtime.finalBossReadModel?.state, 'combat');
+    assert.equal(f.runtime.activeCheckpoint?.checkpointId, 'cp8'); assert.equal(f.host.dataset.cinematic, undefined);
+    assert.equal(movie.diagnostics.visibleDrones, 0);
+    f.runtime.restartLevel(); assert.equal(movie.complete, false);
+    assert.equal(f.runtime.previewResearchForDebug(), true); f.tick(60);
+    f.runtime.activateCheckpoint('cp6'); f.runtime.recoverActiveCheckpoint();
+    assert.equal(movie.active, false); assert.equal(f.host.dataset.cinematic, undefined);
+    for (const p of [r.bobPresentation, r.goopPresentation, r.voltPresentation]) assert.equal(p.root.parent, f.scene);
+  } finally { f.cleanup(); }
 });
 
 for (const [index, slimeId] of (['bob', 'goop', 'volt'] as const).entries()) test(`${slimeId} starts the elevator only with all three in its room and at least one standing on the deck`, () => {

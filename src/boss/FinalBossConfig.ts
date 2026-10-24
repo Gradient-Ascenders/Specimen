@@ -24,6 +24,7 @@ export function finalArenaSupportY(feetY:number):number {
   return feetY>=FINAL_ARENA_ORBIT.lowY-.15 ? THREE.MathUtils.clamp(feetY,FINAL_ARENA_ORBIT.lowY,FINAL_ARENA_ORBIT.highY) : FINAL_ARENA.floorY;
 }
 export const FINAL_BOSS_TUNING = Object.freeze({
+  playerHealth:100,coverHealthMultiplier:5,
   health:750,phaseTwoHealth:375,scale:3,hoverY:18,defenseHoverY:26,
   defenseThresholds:Object.freeze([.85,.70,.55]),healPerSecond:2.5,
   defenseGroups:Object.freeze([Object.freeze([4,4]),Object.freeze([5,5]),Object.freeze([5,5,5])]),
@@ -81,12 +82,13 @@ export const FINAL_SPECIMEN_MOVEMENT = Object.freeze({
   adhesionEnabled: false, reboundEnabled: true, chargedJumpEnabled: true,
 });
 export const FINAL_SPECIMEN_WEAPON: Partial<SpecimenAttackConfig> = Object.freeze({
-  fullChargeSeconds: 1.5, minimumCooldownSeconds: .15, maximumCooldownSeconds: .22,
+  fullChargeSeconds: .75, minimumCooldownSeconds: .15, maximumCooldownSeconds: .22,
   maximumLiveProjectiles: 32,
   projectileSpeedMetresPerSecond: 50, maximumRangeMetres: 145, projectileLifetimeSeconds: 3.2,
   minimumProjectileRadiusMetres: .18, maximumProjectileRadiusMetres: .7,
-  minimumDamageUnits: 2, maximumDamageUnits: 18, maximumSplashRadiusMetres: 14,
+  minimumDamageUnits: 1, maximumDamageUnits: 18, maximumSplashRadiusMetres: 14,
   splashRequiresFullCharge: true,
+  damageRequiresFullCharge: true,
   launchHeightOffsetMetres: .75,
   allowHipFire:true,
   overchargeHitsRequired: 4,

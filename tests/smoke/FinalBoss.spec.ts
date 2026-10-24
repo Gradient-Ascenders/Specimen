@@ -16,7 +16,7 @@ async function step(page:Page,count:number,traceDodge=false) {
     const samples:Array<{roll:number;offset:number;active:boolean}>=[];
     for(let i=0;i<count;i++) {
       r.fixedUpdate(1/60);layer.cameraRig.update(1,1/60);
-      if(traceDodge){const f=r.resources.finalBoss;samples.push({roll:f.presentation.rollRig.rotation.z,offset:f.evasion.offset.length(),active:f.evasion.active});}
+      if(traceDodge){const f=r.resources.finalBoss;samples.push({roll:f.presentation.rollRig.rotation.z,offset:f.presentation.evasionOffset.length(),active:f.presentation.evasionOffset.length()>0});}
     }
     const draw=layer.render;layer.render=()=>{};try{r.render(1,{frameDeltaSeconds:1/60});}finally{layer.render=draw;}
     return samples;
@@ -50,7 +50,7 @@ async function model(page:Page) {return page.evaluate(()=>{
     beamRetargeting:m.beamRetargeting,beamTurning:m.beamTurning,beamSegment:m.beamSegment,beamAngle:m.beamRotationRadians,
     beamVisible:r.resources.finalBoss.presentation.beam.visible,beamRadius:r.resources.finalBoss.presentation.beam.scale.x,
     reinforcementIndex:m.reinforcementIndex,advanced:r.resources.finalBoss.reinforcements.activeCount,
-    packs:r.resources.finalBoss.healthPacks.activeCount,dodge:r.resources.finalBoss.evasion.offset.length(),
+    packs:r.resources.finalBoss.healthPacks.activeCount,dodge:r.resources.finalBoss.presentation.evasionOffset.length(),
     checkpoint:r.activeCheckpoint.checkpointId,
     charging:r.specimenAttackReadModel.charging,projectiles:r.specimenAttackReadModel.liveProjectileCount,
     position:{...r.resources.specimenBody.position},drones:r.resources.finalBoss.squad.activeCount};
@@ -184,17 +184,12 @@ test('production boss renders both phases, health drops, advanced reinforcements
   await page.evaluate(()=>(window as any).__bossSession.runtime.resources.finalBoss.projectiles.clear());
   await step(page,20);await aim(page);
   const beforeHipFire=(await model(page)).health;
-  // Keep this partial release below the first shield crossing after the prior
-  // full hit: 732 HP minus about 10.2 damage stays above the 637.5 HP gate.
-  await mouse(page,0,true);await step(page,30);
+  await mouse(page,0,true);await step(page,8);
   expect((await model(page)).aimActive).toBe(false);expect((await model(page)).charging).toBe(true);
   await expect(page.locator('.specimen-combat-crosshair')).toBeVisible();
   await aim(page);await mouse(page,0,false);await step(page,1);
   for(let i=0;i<32&&(await model(page)).projectiles>0;i++)await step(page,5);
-  // aim() advances sixteen held frames too, so assert the actual monotonic
-  // partial-charge damage rather than calling it a fixed 50% release.
-  expect(beforeHipFire-(await model(page)).health).toBeGreaterThan(2);
-  expect(beforeHipFire-(await model(page)).health).toBeLessThan(18);
+  expect(beforeHipFire-(await model(page)).health).toBe(1);
   expect((await model(page)).shield).toBe(false);
   await capture(page,info.outputPath('boss-hip-fire-partial-hit.png'));
   // Public authority selects a fresh real eye volley; actual pointer input
@@ -307,33 +302,23 @@ test('production boss renders both phases, health drops, advanced reinforcements
   },FINAL_SPECIMEN_START_PITCH);await step(page,15);
   await capture(page,info.outputPath('boss-phase-two.png'));
   expect(await page.evaluate(()=>(window as any).__bossSession.runtime.resources.finalBoss.presentation.smoke.count)).toBeGreaterThan(0);
-  // Actual uncharged hip-fire input now deals exactly two damage. The RAM
-  // counter below can then deal a full 18 without crossing the 70 HP wave gate.
+  // Incomplete hip-fire charges retain the same one-damage floor as taps.
   await advanceAuthority(page,'gun-blast',true);
   await page.evaluate(()=>(window as any).__bossSession.runtime.resources.finalBoss.projectiles.clear());await step(page,30);await aim(page);
   const beforeTap=(await model(page)).health;await mouse(page,0,true);await mouse(page,0,false);await step(page,1);
   for(let i=0;i<40&&(await model(page)).projectiles>0;i++)await step(page,5);
-  expect(beforeTap-(await model(page)).health).toBe(2);await capture(page,info.outputPath('boss-phase-two-uncharged-hit.png'));
-  // Identical real charge/aim/release input is dodged only after phase two begins.
+  expect(beforeTap-(await model(page)).health).toBe(1);await capture(page,info.outputPath('boss-phase-two-uncharged-hit.png'));
   await advanceAuthority(page,'gun-blast',true);
   await page.evaluate(()=>(window as any).__bossSession.runtime.resources.finalBoss.projectiles.clear());await step(page,30);
-  const beforeDodge=(await model(page)).health;
+  const beforeFull=(await model(page)).health;
   await mouse(page,2,true);await mouse(page,0,true);await step(page,90);await aim(page);await mouse(page,0,false);
-  const rollTrace=await step(page,30,true);expect(rollTrace.every(s=>!s.active)).toBe(true);
-  for(let i=0;i<30&&(await model(page)).dodge<20;i++)rollTrace.push(...await step(page,3,true));
-  expect((await model(page)).dodge).toBeGreaterThan(20);await capture(page,info.outputPath('boss-phase-two-full-charge-evaded.png'));
+  const rollTrace=await step(page,30,true);
   for(let i=0;i<32&&(await model(page)).projectiles>0;i++)rollTrace.push(...await step(page,5,true));
-  rollTrace.push(...await step(page,120,true));
-  let previousRoll=0,rollTravel=0,reachedPeak=false,returnSamples=0;
-  for(const s of rollTrace) {
-    rollTravel+=Math.abs(Math.atan2(Math.sin(s.roll-previousRoll),Math.cos(s.roll-previousRoll)));previousRoll=s.roll;
-    if(s.offset>33.9)reachedPeak=true;
-    if(reachedPeak&&s.active&&s.offset<33.5){expect(s.roll).toBe(0);returnSamples++;}
-  }
-  expect(rollTravel).toBeCloseTo(Math.PI*2,6);expect(returnSamples).toBeGreaterThan(10);
-  expect(rollTrace.at(-1)!.roll).toBe(0);expect(rollTrace.at(-1)!.active).toBe(false);
-  await writeFile(info.outputPath('single-roll-evidence.json'),JSON.stringify({rollTravel,returnSamples,samples:rollTrace},null,2));
-  expect((await model(page)).health).toBe(beforeDodge);await mouse(page,2,false);
+  expect(rollTrace.every(s=>!s.active&&s.offset===0&&s.roll===0)).toBe(true);
+  expect((await model(page)).health).toBe(beforeFull-18);
+  await capture(page,info.outputPath('boss-phase-two-full-charge-hit.png'));
+  await writeFile(info.outputPath('no-evasion-evidence.json'),JSON.stringify({before:beforeFull,after:(await model(page)).health,samples:rollTrace},null,2));
+  await mouse(page,2,false);
   expect((await model(page)).drones).toBe(0);
   expect(await page.evaluate(()=>(window as any).__bossSession.runtime.resources.finalBoss.squad.liveProjectileCount)).toBe(0);
   // The removed platforms must not survive as invisible movement colliders.

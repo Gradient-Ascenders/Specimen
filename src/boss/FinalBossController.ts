@@ -16,7 +16,7 @@ export interface FinalBossReadModel {
   reinforcementIndex:number;orbCount:number;
   beamLapsCompleted:number;beamDirection:1|-1;beamDirections:readonly (1|-1)[];beamRotationRadians:number;
   beamRetargeting:boolean;beamTargetYaw:number;beamTurning:boolean;beamSegment:number;
-  readonly lockedTarget:THREE.Vector3;hitFlash:number;rejectedFlash:number;
+  readonly lockedTarget:THREE.Vector3;hitFlash:number;rejectedFlash:number;stunRemaining:number;
 }
 const NORMAL:readonly FinalBossNormalAttack[]=['gun-blast','laser-shots','laser-beam'];
 const PHASE_TWO:readonly FinalBossNormalAttack[]=[...NORMAL,'ram'];
@@ -39,9 +39,9 @@ export function finalBossAttackTiming(attack:FinalBossAttack,phase:1|2):readonly
  * retrigger health thresholds, or silently time out the defensive shield. */
 export class FinalBossController {
   private readonly model:FinalBossReadModel={
-    state:'idle',phase:1,health:T.health,maximumHealth:T.health,playerHealth:100,maximumPlayerHealth:100,invulnerability:0,
+    state:'idle',phase:1,health:T.health,maximumHealth:T.health,playerHealth:T.playerHealth,maximumPlayerHealth:T.playerHealth,invulnerability:0,
     attack:'gun-blast',stage:'telegraph',progress:0,elapsed:0,attackSerial:0,weakPointOpen:false,shieldActive:false,regenerating:false,
-    defenseIndex:0,defenseThreshold:0,summonCount:0,defendersRemaining:0,lockedTarget:new THREE.Vector3(),hitFlash:0,rejectedFlash:0,
+    defenseIndex:0,defenseThreshold:0,summonCount:0,defendersRemaining:0,lockedTarget:new THREE.Vector3(),hitFlash:0,rejectedFlash:0,stunRemaining:0,
     reinforcementIndex:0,orbCount:T.orbCount,beamRetargeting:false,beamTargetYaw:0,beamTurning:false,beamSegment:0,
     beamLapsCompleted:0,beamDirection:1,beamDirections:[1,-1,1],beamRotationRadians:0,
   };
@@ -83,9 +83,12 @@ export class FinalBossController {
     if(this.disposed||!Number.isFinite(dt)||dt<=0)throw new Error('Final boss requires a positive finite step.');
     const m=this.model;
     if(m.state==='idle'||m.state==='suspended'||m.state==='complete')return;
-    this.totalTime+=dt;m.hitFlash=Math.max(0,m.hitFlash-dt);m.rejectedFlash=Math.max(0,m.rejectedFlash-dt);m.invulnerability=Math.max(0,m.invulnerability-dt);
-    if(this.defeatPending){this.defeatPending=false;m.state='defeated';m.elapsed=0;m.progress=0;return;}
-    if(this.transitionPending){this.transitionPending=false;m.state='transition';m.elapsed=0;m.progress=0;return;}
+    m.hitFlash=Math.max(0,m.hitFlash-dt);m.rejectedFlash=Math.max(0,m.rejectedFlash-dt);m.invulnerability=Math.max(0,m.invulnerability-dt);
+    const stopped=m.state==='combat'?Math.min(dt,m.stunRemaining):0;
+    m.stunRemaining=Math.max(0,m.stunRemaining-dt);dt-=stopped;this.totalTime+=dt;
+    if(this.defeatPending){this.defeatPending=false;m.stunRemaining=0;m.state='defeated';m.elapsed=0;m.progress=0;return;}
+    if(this.transitionPending){this.transitionPending=false;m.stunRemaining=0;m.state='transition';m.elapsed=0;m.progress=0;return;}
+    if(dt<=1e-9)return;
     if(this.cinematic) {
       m.elapsed+=dt;const duration=m.state==='intro'?9:m.state==='transition'?5:m.state==='defeated'?7:6;
       m.progress=Math.min(1,m.elapsed/duration);if(m.elapsed>=duration)this.finishCinematic(target);return;
@@ -147,6 +150,7 @@ export class FinalBossController {
       if(m.phase===1&&m.health<=T.phaseTwoHealth){m.weakPointOpen=false;this.transitionPending=true;}
       if(m.phase===2&&m.health<=0){m.weakPointOpen=false;this.defeatPending=true;}
     }
+    if(impact.fullyCharged&&m.weakPointOpen&&!this.transitionPending&&!this.defeatPending)m.stunRemaining=.5;
     return {accepted:true,destroyed:m.health===0};
   }
   canDamagePlayer(amount:number,serial=this.model.attackSerial):boolean {
@@ -177,12 +181,12 @@ export class FinalBossController {
   }
   consumeTransition():boolean {if(this.transitionDelivered||this.model.phase!==2)return false;this.transitionDelivered=true;return true;}
   deflect():void {this.model.rejectedFlash=.3;}
-  suspend():void {this.model.state='suspended';this.model.weakPointOpen=false;this.model.shieldActive=false;this.model.regenerating=false;}
+  suspend():void {this.model.state='suspended';this.model.stunRemaining=0;this.model.weakPointOpen=false;this.model.shieldActive=false;this.model.regenerating=false;}
   reset():void {
     this.devInvincibilityEnabled=false;
-    const m=this.model;m.state='idle';m.phase=1;m.health=m.maximumHealth;m.playerHealth=100;m.invulnerability=0;
+    const m=this.model;m.state='idle';m.phase=1;m.health=m.maximumHealth;m.playerHealth=m.maximumPlayerHealth;m.invulnerability=0;
     m.attack='gun-blast';m.stage='telegraph';m.progress=0;m.elapsed=0;m.attackSerial=0;m.weakPointOpen=false;m.shieldActive=false;m.regenerating=false;
-    m.defenseIndex=0;m.defenseThreshold=0;m.summonCount=0;m.defendersRemaining=0;m.hitFlash=0;m.rejectedFlash=0;m.lockedTarget.set(0,0,0);
+    m.defenseIndex=0;m.defenseThreshold=0;m.summonCount=0;m.defendersRemaining=0;m.hitFlash=0;m.rejectedFlash=0;m.stunRemaining=0;m.lockedTarget.set(0,0,0);
     m.reinforcementIndex=0;m.orbCount=T.orbCount;m.beamRetargeting=false;m.beamTargetYaw=0;m.beamTurning=false;m.beamSegment=0;this.beamSweep.reset(1,0);
     m.beamLapsCompleted=0;m.beamDirection=1;m.beamDirections=[1,-1,1];m.beamRotationRadians=0;
     this.lastNormal=undefined;this.totalTime=0;this.lastMajorDamageAttack=-1;this.transitionPending=false;this.defeatPending=false;this.defeatDelivered=false;this.transitionDelivered=false;

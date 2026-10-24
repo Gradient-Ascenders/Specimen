@@ -52,7 +52,7 @@ export type GameFlowState =
   | 'transitioning'
   | 'transitionFailed';
 
-export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator';
+export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator' | 'blackout-research';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -68,7 +68,7 @@ export const gameFlowCinematicCanPause = (
   cinematic: string | undefined,
   gameState: string | undefined,
 ): boolean => cinematic === 'cultivation-finale' || cinematic === 'cultivation-clearance' ||
-  cinematic === 'blackout-arrival' || cinematic === 'blackout-elevator' || cinematic === 'containment-finale' && gameState === 'level-completing';
+  cinematic === 'blackout-arrival' || cinematic === 'blackout-elevator' || cinematic === 'blackout-research' || cinematic === 'containment-finale' && gameState === 'level-completing';
 
 export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
@@ -871,6 +871,9 @@ export class GameFlowUI {
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="blackout-elevator">
               ${icon('Play')}<span><small>Level 3 · Service elevator</small>The quiet ascent</span>
             </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="blackout-research">
+              ${icon('Play')}<span><small>Level 3 · Research &amp; escape</small>The Specimen</span>
+            </button>
           </nav>
           <footer class="credits-footer">
             <button type="button" class="system-action" data-action="back">
@@ -1235,7 +1238,7 @@ export class GameFlowUI {
         break;
       case 'select-cutscene': {
         const cutscene = target.dataset.cutscene;
-        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator') && this.model.beginSelectedCutscene(cutscene)) {
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' || cutscene === 'blackout-research') && this.model.beginSelectedCutscene(cutscene)) {
           this.syncState();
           this.actions.previewCutscene(cutscene);
         }

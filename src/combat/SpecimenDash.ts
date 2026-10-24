@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { EventBus } from '../core/EventBus.ts';
 import type { ReadonlyVector3State } from '../physics/KinematicBody.ts';
 
-export const SPECIMEN_DASH = Object.freeze({ durationSeconds: 0.18, cooldownSeconds: 1.2,
-  speedMultiplier: 2.3, accelerationMultiplier: 10 });
+export const SPECIMEN_DASH = Object.freeze({ durationSeconds: 0.22, cooldownSeconds: 1.2,
+  speedMultiplier: 2.7, accelerationMultiplier: 10 });
 
 /** Supplies a short locomotion request; the body still owns sweeps, gravity and contacts. */
 export class SpecimenDash {
