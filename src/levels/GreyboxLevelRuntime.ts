@@ -56,7 +56,8 @@ import { PuzzleRegistry } from '../puzzle/PuzzleRegistry.ts';
 import { GoopAcidPresentation } from '../render/acid/GoopAcidPresentation.ts';
 import type { BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
-import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
+import type {ContainmentRadiance} from '../render/environment/containment/ContainmentRadiance.ts';
+import {installContainmentSoftShadows} from '../render/environment/containment/ContainmentSoftShadows.ts';
 import { prepareCharacterCameraFades } from '../render/slime/PrepareCharacterCameraFades.ts';
 import { requiresTransmissionPreparation } from '../render/TransmissionPreparation.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
@@ -186,7 +187,7 @@ export interface GreyboxLevelRuntimeOptions {
 
 interface GreyboxRuntimeResources {
   readonly testScene: ContainmentLevelScene;
-  readonly bobReflectionEnvironment: BobReflectionEnvironment;
+  readonly bobReflectionEnvironment: ContainmentRadiance;
   readonly containmentLevel: ContainmentLevelController;
   readonly collisionWorld: CollisionWorld;
   readonly surfaceRegistry: SurfaceRegistry;
@@ -461,7 +462,7 @@ export class GreyboxLevelRuntime {
 
   load(): void {
     this.lifecycle.load();
-    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('containment', { enabled: true });
+    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('containment', { enabled: true,contactHardening:true });
   }
 
   start(): void {
@@ -563,6 +564,19 @@ export class GreyboxLevelRuntime {
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
         if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material, true);
       }
+    });
+    const scene=resources.testScene;
+    scene.configureLightingQuality(this.renderLayer.graphicsConfiguration,this.renderLayer.renderer.shadowMap.type);
+    await scene.radiance.prepare(this.renderLayer.renderer,scene.root);
+    if(this.resources!==resources)return;
+    scene.bob.setReflectionEnvironment(scene.radiance.texture);
+    scene.goop.setReflectionEnvironment(scene.radiance.texture);
+    scene.roomFive.goopPresentation.setReflectionEnvironment(scene.radiance.texture);
+    scene.lighting.setBakedIndirectLighting(true);
+    scene.root.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      for(const material of Array.isArray(object.material)?object.material:[object.material])
+        if(material instanceof THREE.MeshStandardMaterial)installContainmentSoftShadows(material);
     });
     this.lightLayout ??= new ContainmentLightLayout(this.renderLayer.scene);
   }
@@ -1063,16 +1077,13 @@ export class GreyboxLevelRuntime {
 
   private readonly loadResources = (): void => {
     let containmentLevel: ContainmentLevelController;
-    const bobReflectionEnvironment = new BobReflectionEnvironment(
-      this.renderLayer.renderer,
-    );
     const testScene = new ContainmentLevelScene(
       (failure: ContainmentHazardFailure) => {
         containmentLevel.requestHazardFailure(failure);
       },
       { includeDevelopmentHelpers: this.debugAvailable, gelRendering: this.renderLayer.gelRendering },
     );
-    testScene.bob.setReflectionEnvironment(bobReflectionEnvironment.texture);
+    const bobReflectionEnvironment=testScene.radiance;
     this.renderLayer.scene.add(testScene.root);
 
     const collisionWorld = new CollisionWorld();
@@ -1663,6 +1674,7 @@ export class GreyboxLevelRuntime {
   }
 
   private prepareContainmentShadows(testScene: ContainmentLevelScene, participants: readonly Vector3State[]): void {
+    testScene.configureLightingQuality(this.renderLayer.graphicsConfiguration,this.renderLayer.renderer.shadowMap.type);
     const key = `${testScene.lightingDiagnostics.visibleRoomIds.join(',')}:${this.lightLayout?.cameraCullKey ?? ''}`;
     if (key !== this.lastShadowLayoutKey) {
       this.lightLayout?.sync();

@@ -17,6 +17,9 @@ import type {RoomThreeShellLoader} from '../render/environment/containment/RoomT
 import type {RoomFourShellLoader} from '../render/environment/containment/RoomFourShell.ts';
 import type {RoomFiveShellLoader} from '../render/environment/containment/RoomFiveShell.ts';
 import {ContainmentLightingArt} from '../render/environment/containment/ContainmentLightingArt.ts';
+import {ContainmentRadiance} from '../render/environment/containment/ContainmentRadiance.ts';
+import {setContainmentSoftShadowQuality} from '../render/environment/containment/ContainmentSoftShadows.ts';
+import type {GraphicsSettings} from '../render/GraphicsProfiles.ts';
 import type {ContainmentSurveillanceModelLoader} from '../render/environment/containment/ContainmentSurveillanceModel.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -160,6 +163,8 @@ const PRESERVED_STATIC_ART_NAMES = {
 /** Complete Level 1 scene composition while preserving the teaching-scene API. */
 export class ContainmentLevelScene {
   readonly lightingArt=new ContainmentLightingArt();
+  readonly radiance=new ContainmentRadiance();
+  private lightingQualityKey='';
   readonly platformBoosters: PlatformBoosters;
   readonly root = new THREE.Group();
   readonly artResources = new ContainmentArtResources();
@@ -342,6 +347,14 @@ export class ContainmentLevelScene {
       ...this.lightingArt.renderMeshes];
   }
 
+  configureLightingQuality(settings:GraphicsSettings,type:THREE.ShadowMapType):void{
+    const key=`${settings.shadowMapSizeCap}:${settings.effectsDensity}:${type}`;
+    if(key===this.lightingQualityKey)return;this.lightingQualityKey=key;
+    this.radiance.setQuality(settings);
+    this.lighting.shafts.setQuality(settings,type);
+    setContainmentSoftShadowQuality(this.lighting.root,type===THREE.BasicShadowMap);
+  }
+
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
   get solubleTargetMeshes(): readonly THREE.Mesh[] {
     return [this.roomFive.goopWoodenDoor];
@@ -512,6 +525,7 @@ export class ContainmentLevelScene {
     this.roomThreeMonitor.dispose();
     this.roomFiveMonitor.dispose();
     this.lightingArt.dispose();
+    this.radiance.dispose();
     this.lighting.dispose();
     for (const staticBatch of this.staticBatches) staticBatch.dispose();
     this.roomFive.dispose();

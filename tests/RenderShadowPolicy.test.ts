@@ -61,3 +61,16 @@ test('renderer disposal invalidates outstanding level requests', () => {
   assert.equal(policy.activeOwner, undefined);
   assert.throws(() => policy.request('late-load', { enabled: true }), /disposed/);
 });
+
+test('High contact hardening is opt-in, prepares raw depth and restores other level owners',()=>{
+  const {shadowMap,policy}=createPolicy();
+  const containment=policy.request('containment',{enabled:true,contactHardening:true});
+  assert.equal(shadowMap.type,THREE.PCFShadowMap);
+  policy.setHighQuality(true);assert.equal(shadowMap.type,THREE.BasicShadowMap);
+  policy.withPreparation(true,()=>assert.equal(shadowMap.type,THREE.BasicShadowMap));
+  const other=policy.request('cultivation',{enabled:true});
+  assert.equal(shadowMap.type,THREE.PCFShadowMap);
+  other.dispose();assert.equal(shadowMap.type,THREE.BasicShadowMap);
+  policy.setHighQuality(false);assert.equal(shadowMap.type,THREE.PCFShadowMap);
+  containment.dispose();assert.equal(shadowMap.enabled,false);
+});

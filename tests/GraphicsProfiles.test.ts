@@ -36,6 +36,7 @@ test('the extra Performance cap composes with profiles without losing gel or den
   layer.gelRendering = new GelRendering(renderer);
   const qualities: number[][] = [];
   layer.graphicsResources = { setQuality: (shadow: number, effects: number) => qualities.push([shadow, effects]) };
+  layer.shadowPolicy={setHighQuality:()=>{}};
   layer.resize = () => {
     const profile = GRAPHICS_PROFILES[layer.graphicsSettings.graphicsProfile as 'minimum' | 'standard'];
     const size = resolveRenderResolution(3840, 2160, 2, { pixelRatioCap: layer.effectivePixelRatioCap,
@@ -77,6 +78,7 @@ test('Custom retains values, exposes resource controls and presets restore all q
   layer.gelRendering = new GelRendering({ transmissionResolutionScale: 1 });
   let quality: number[] = [];
   layer.graphicsResources = { setQuality: (...values: number[]) => { quality = values; } };
+  layer.shadowPolicy={setHighQuality:()=>{}};
   layer.resize = () => {};
   layer.setGraphicsSettings(settings.value);
   assert.deepEqual(quality, [2048, 0.75]);
@@ -139,6 +141,18 @@ test('root handoffs refresh the catalog; hidden lights, small fixtures and dorma
   assert.deepEqual(light.shadow.mapSize.toArray(), [512, 512]); // No access to departed ownership.
   scene.add(root); policy.sync();
   assert.deepEqual(light.shadow.mapSize.toArray(), [1024, 1024]);
+  policy.dispose();
+});
+
+test('switching depth sampler type releases dormant maps even when their dimensions stay the same',()=>{
+  const scene=new THREE.Scene(),root=new THREE.Group(),light=new THREE.SpotLight();
+  light.castShadow=true;light.shadow.mapSize.set(1,1);root.visible=false;root.add(light);scene.add(root);
+  const policy=new GraphicsResourcePolicy(scene);policy.sync();
+  const map=new THREE.WebGLRenderTarget(1,1);light.shadow.map=map;light.shadow.needsUpdate=false;
+  let disposed=0;map.addEventListener('dispose',()=>disposed++);
+  policy.invalidateShadowMaps();
+  assert.equal(disposed,1);assert.equal(light.shadow.map,null);assert.equal(light.shadow.needsUpdate,true);
+  policy.invalidateShadowMaps();assert.equal(disposed,1);
   policy.dispose();
 });
 

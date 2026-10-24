@@ -524,6 +524,23 @@ held buttons activating the next screen. Gameplay controls are unchanged.
 
 ## Materials, lighting, and shadows
 
+Containment's five authored rooms share offline-baked L1 irradiance volumes and
+five local reflection captures. `ContainmentRadiance` owns the packed 3D volume
+and CubeUV atlas; world-space shader hooks preserve existing gel deformation,
+dissolve, finite-light evaluation and depth ownership. Indirect light and
+box-projected reflections interpolate through doorways without runtime captures.
+Low samples the constant irradiance band; Medium/High retain its directional
+terms. The bank adds about 307 KiB to loading and 3.46 MiB of retained GPU data.
+See [bake provenance and reproduction](../../assets/environments/containment-lighting/README.md).
+
+Selected atmospheric shafts reuse cached fixture depth with bounded scattering
+shells. High additionally enables contact-hardening PCSS on one key spotlight
+per room. Renderer-global sampler policy remains in `RenderLayer`; only opted-in
+Containment requests raw depth, while other levels and lower quality settings
+retain native PCF. A sampler-type change invalidates all catalogued shadow
+targets, including dormant padding slots. Full loading preparation covers the
+new shader paths before gameplay resumes.
+
 Shared presentation helpers may reuse geometry, materials, and procedural
 textures, but ownership must be explicit. The creator disposes a resource once;
 borrowers must not dispose it. A level unload must return renderer geometry and

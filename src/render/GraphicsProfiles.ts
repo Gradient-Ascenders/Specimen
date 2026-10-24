@@ -27,9 +27,9 @@ export interface GraphicsSettings {
   readonly gelRenderingMode: GelRenderingMode;
 }
 
-/** Current profiles change shader source only when transmission crosses zero.
- * Capture scale, canvas scale, shadow-map dimensions and point draw counts are
- * resource/uniform changes. Physical and reduced transmission share programs. */
+/** Gel shader features change only when transmission crosses zero. High's
+ * opted-in raw-depth shadow programs are covered by graphicsPreparationKey's
+ * shadow cap. Physical and reduced transmission share gel programs. */
 export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRenderingMode'>): string {
   return settings.gelRenderingMode === 'minimum' ? 'opaque-gel' : 'transmissive-gel';
 }

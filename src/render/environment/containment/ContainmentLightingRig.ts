@@ -9,6 +9,7 @@ import type {
 import type { BobCharacterPresentation } from '../../bob/BobCharacterPresentation.ts';
 import type { RoomOneArt } from './RoomOneArt.ts';
 import { ContainmentPointEffect } from './ContainmentPointEffect.ts';
+import {ContainmentLightShafts} from './ContainmentLightShafts.ts';
 import { DissolveMaterial } from '../../dissolve/DissolveMaterial.ts';
 import type { Vector3State } from '../../slime/SlimePresentationContract.ts';
 import {
@@ -115,6 +116,8 @@ const BOB_DUCT_REFLECTION = { body: 0.1, eyes: 0.24 } as const;
  */
 export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   readonly root = new THREE.Group();
+  readonly shafts:ContainmentLightShafts;
+  private bakedIndirect=false;
 
   private readonly levelRoot: THREE.Object3D;
   private readonly roomFour: RoomFourGreybox;
@@ -368,6 +371,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       this.authoredIntensities.set(object, object.intensity);
       if (configureContainmentShadow(object)) this.shadowLights.push(object);
     });
+    this.shafts=new ContainmentLightShafts(this.root);
     for (const [root, radius] of [
       [this.roomFour.elevatorPlatform.root, 7],
       ...this.roomFive.art.movingPlatformDressings.map(root => [root, 4] as const),
@@ -657,11 +661,13 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.syncElevatorLighting();
     this.bobImpactEffect.update(deltaSeconds);
     this.goopReleaseEffect.update(deltaSeconds);
+    this.shafts.update();
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.shafts.dispose();
     for (const light of this.shadowLights) {
       light.shadow.dispose();
       light.shadow.map = null;
@@ -699,6 +705,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       this.foundation.groundColor.add(this.ambientGround.setHex(ambience.ground).multiplyScalar(weight));
       this.foundation.intensity+=ambience.intensity*weight;
     }
+    if(this.bakedIndirect)this.foundation.intensity*=.82;
     for (const [roomId, group] of this.roomGroups) {
       const weight = weights.get(roomId) ?? 0;
       group.visible = weight > 0;
@@ -707,6 +714,11 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
         object.intensity = (this.authoredIntensities.get(object) ?? object.intensity) * weight;
       });
     }
+    this.shafts?.update();
+  }
+
+  setBakedIndirectLighting(enabled:boolean):void{
+    if(this.bakedIndirect===enabled)return;this.bakedIndirect=enabled;this.applyRoomVisibility();
   }
 
   private setAuthoredIntensity(light: THREE.Light, intensity: number): void {

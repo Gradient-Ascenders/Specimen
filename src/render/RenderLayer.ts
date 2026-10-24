@@ -23,6 +23,9 @@ const BACKGROUND_COLOUR = 0x07110f;
 
 export interface RenderShadowConfiguration {
   readonly enabled: boolean;
+  /** Raw depth is required for blocker search. Only opted-in levels use it,
+   * and only while the High shadow budget is selected. */
+  readonly contactHardening?: boolean;
 }
 
 export interface RenderShadowRequest {
@@ -34,13 +37,17 @@ export interface RenderShadowRequest {
 export class RenderShadowPolicy {
   private readonly shadowMap: THREE.WebGLRenderer['shadowMap'];
   private disposed = false;
+  private highQuality=false;
+  private readonly onTypeChange:(()=>void)|undefined;
   private readonly requests: {
     owner: string;
     enabled: boolean;
+    contactHardening:boolean;
   }[] = [];
 
-  constructor(shadowMap: THREE.WebGLRenderer['shadowMap']) {
+  constructor(shadowMap: THREE.WebGLRenderer['shadowMap'],onTypeChange?:()=>void) {
     this.shadowMap = shadowMap;
+    this.onTypeChange=onTypeChange;
     this.apply();
   }
 
@@ -53,7 +60,7 @@ export class RenderShadowPolicy {
     if (this.disposed) throw new Error('Cannot prepare a disposed shadow policy.');
     const { enabled: previousEnabled, type, autoUpdate, needsUpdate } = this.shadowMap;
     this.shadowMap.enabled = enabled;
-    this.shadowMap.type = THREE.PCFShadowMap;
+    this.shadowMap.type = this.activeType;
     this.shadowMap.autoUpdate = false;
     this.shadowMap.needsUpdate = false;
     try {
@@ -65,14 +72,15 @@ export class RenderShadowPolicy {
 
   request(owner: string, configuration: RenderShadowConfiguration): RenderShadowRequest {
     if (this.disposed) throw new Error('Cannot request a disposed shadow policy.');
-    const entry = { owner, enabled: configuration.enabled };
+    const entry = { owner, enabled: configuration.enabled,contactHardening:configuration.contactHardening??false };
     this.requests.push(entry);
     this.apply();
     let released = false;
     return {
       update: (next) => {
-        if (released || this.disposed || entry.enabled === next.enabled) return;
+        if (released || this.disposed || (entry.enabled === next.enabled&&entry.contactHardening===(next.contactHardening??false))) return;
         entry.enabled = next.enabled;
+        entry.contactHardening=next.contactHardening??false;
         this.apply();
       },
       dispose: () => {
@@ -92,12 +100,23 @@ export class RenderShadowPolicy {
     this.disposed = true;
   }
 
+  setHighQuality(enabled:boolean):void{
+    if(this.disposed||this.highQuality===enabled)return;
+    this.highQuality=enabled;this.apply();
+  }
+
+  private get activeType():THREE.ShadowMapType{
+    return this.highQuality&&this.requests[this.requests.length-1]?.contactHardening?THREE.BasicShadowMap:THREE.PCFShadowMap;
+  }
+
   private apply(): void {
     const enabled = this.requests[this.requests.length - 1]?.enabled ?? false;
+    const typeChanged=this.shadowMap.type!==this.activeType;
     const changed = this.shadowMap.enabled !== enabled ||
-      this.shadowMap.type !== THREE.PCFShadowMap || !this.shadowMap.autoUpdate;
+      this.shadowMap.type !== this.activeType || !this.shadowMap.autoUpdate;
     this.shadowMap.enabled = enabled;
-    this.shadowMap.type = THREE.PCFShadowMap;
+    this.shadowMap.type = this.activeType;
+    if(typeChanged)this.onTypeChange?.();
     // Characters and hatch geometry move: static caching is not safe here.
     this.shadowMap.autoUpdate = true;
     if (changed) this.shadowMap.needsUpdate = true;
@@ -209,7 +228,7 @@ export class RenderLayer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = RENDER_EXPOSURE;
-    this.shadowPolicy = new RenderShadowPolicy(this.renderer.shadowMap);
+    this.shadowPolicy = new RenderShadowPolicy(this.renderer.shadowMap,()=>this.graphicsResources.invalidateShadowMaps());
     this.renderer.setClearColor(BACKGROUND_COLOUR, 1);
     this.renderer.domElement.setAttribute('aria-hidden', 'true');
 
@@ -359,6 +378,7 @@ export class RenderLayer {
     this.gelRendering.setTransmissionResolutionScaleCap(quality.transmissionResolutionScale);
     this.gelRendering.setMode(settings.gelRenderingMode);
     this.graphicsResources.setQuality(settings.shadowMapSizeCap, settings.effectsDensity);
+    this.shadowPolicy.setHighQuality(settings.shadowMapSizeCap===2048);
     this.resize();
   }
 

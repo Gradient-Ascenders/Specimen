@@ -7,7 +7,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 export class ShadowedDroneBeam {
   readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
 
-  constructor(light: THREE.SpotLight, range: number, angle: number) {
+  constructor(light: THREE.SpotLight, range: number, angle: number,
+    options:{readonly colour?:THREE.ColorRepresentation;readonly opacity?:number;readonly soft?:boolean}={}) {
     const shells = [.45, .72, 1].map(scale => {
       const geometry = new THREE.ConeGeometry(Math.tan(angle) * range * scale, range, 48, 1, true);
       geometry.translate(0, -range / 2, 0);
@@ -29,15 +30,19 @@ export class ShadowedDroneBeam {
       uniforms: {
         beamShadow: { value: fallbackDepth }, beamShadowMatrix: { value: light.shadow.matrix },
         beamShadowReady: { value: false }, beamRange: { value: range },
-        beamColor: { value: new THREE.Color(0xff1830) },
+        beamColor: { value: new THREE.Color(options.colour??0xff1830) },
+        beamOpacity:{value:options.opacity??.022},beamSoft:{value:options.soft??false},
+        beamTangent:{value:Math.tan(angle)},
       },
       vertexShader: `
         out vec3 beamWorld;
         out float beamDistance;
+        out vec3 beamLocal;
         void main() {
           vec4 world = modelMatrix * vec4(position, 1.0);
           beamWorld = world.xyz;
           beamDistance = -position.y;
+          beamLocal=position;
           gl_Position = projectionMatrix * viewMatrix * world;
         }`,
       fragmentShader: `
@@ -50,8 +55,12 @@ export class ShadowedDroneBeam {
         uniform bool beamShadowReady;
         uniform float beamRange;
         uniform vec3 beamColor;
+        uniform float beamOpacity;
+        uniform bool beamSoft;
+        uniform float beamTangent;
         in vec3 beamWorld;
         in float beamDistance;
+        in vec3 beamLocal;
         out vec4 beamOutput;
         void main() {
           if (!beamShadowReady) discard;
@@ -64,7 +73,13 @@ export class ShadowedDroneBeam {
             float visible = step(uv.z - 0.00005, texture(beamShadow, uv.xy).r);
           #endif
           float fade = 1.0 - smoothstep(beamRange * 0.65, beamRange, beamDistance);
-          float alpha = 0.022 * fade * visible;
+          float alpha = beamOpacity * fade * visible;
+          if(beamSoft){
+            float radial=length(beamLocal.xz)/max(0.001,beamDistance*beamTangent);
+            float edge=1.0-smoothstep(0.35,1.05,radial);
+            float grain=fract(sin(dot(floor(beamWorld*18.0),vec3(12.9898,78.233,37.719)))*43758.5453);
+            alpha*=mix(0.22,1.0,edge)*mix(0.88,1.0,grain)*smoothstep(0.0,0.5,beamDistance);
+          }
           if (alpha < 0.001) discard;
           beamOutput = vec4(beamColor, alpha);
         }`,

@@ -877,13 +877,13 @@ test('Bob reflections snap across restart and recreate across level reload', asy
   });
 
   expect(await readReflectionState()).toEqual({
-    mapName: 'bob-laboratory-pmrem',
+    mapName: 'containment-five-room-parallax-pmrem',
     body: 0.42,
     eyes: 1.12,
     zone: 'room',
     bodyTarget: 0.42,
     eyeTarget: 1.12,
-    environmentName: 'bob-laboratory-pmrem',
+    environmentName: 'containment-five-room-parallax-pmrem',
   });
 
   await page.evaluate(() => {
@@ -994,8 +994,8 @@ test('Bob reflections snap across restart and recreate across level reload', asy
   expect(reloaded).toEqual({
     oldEnvironmentDisposed: true,
     newEnvironmentDisposed: false,
-    mapName: 'bob-laboratory-pmrem',
-    environmentName: 'bob-laboratory-pmrem',
+    mapName: 'containment-five-room-parallax-pmrem',
+    environmentName: 'containment-five-room-parallax-pmrem',
     body: 0.42,
     eyes: 1.12,
   });
