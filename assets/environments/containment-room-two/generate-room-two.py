@@ -164,7 +164,10 @@ def end_wall(front):
     z=48.8 if front else 27.2
     x0,x1=(-1.5,1.5) if front else (-9.5,-7.3)
     y0,y1=(10.4,14.1) if front else (10.2,12.8)
-    xs=(-14.8,x0,x1,14.8) if front else (-14.8,x0,x1,-5.2,9.8,14.8)
+    # Close against the side-wall backing at X=+-15.18, not the narrower
+    # floor's X=+-14.8. Stopping at the floor edge leaves vertical openings
+    # beside the corner pilasters when viewed obliquely from the climb route.
+    xs=(-15.18,x0,x1,15.18) if front else (-15.18,x0,x1,-5.2,9.8,15.18)
     ys=(0,1.4,6.3,y0,y1,18) if front else (0,1.4,1.8,5.8,6.3,y0,y1,18)
     for i in range(len(xs)-1):
         for j in range(len(ys)-1):

@@ -20,6 +20,29 @@ async function prepare(scene:ContainmentLevelScene){
   await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture,loadRoomFiveShellFixture);
 }
 
+test('Room 2 end-wall corners are sealed up to the side backing while both passages remain open',async()=>{
+  const root=await loadRoomTwoShellFixture();root.updateMatrixWorld(true);
+  try{
+    for(const z of [27.2,48.8])for(const side of [-1,1])
+      for(const edge of [14.81,14.95,15.04,15.17])for(const y of [.03,1.4,6.3,8,10.2,12.8,14.8,17.95]){
+        const direction=z===27.2?-1:1;
+        const hits=new THREE.Raycaster(new THREE.Vector3(side*edge,y,z-direction*.1),
+          new THREE.Vector3(0,0,direction),0,.18).intersectObject(root,true);
+        assert.ok(hits[0],`Open corner at X=${side*edge}, Y=${y}, Z=${z}.`);
+        assert.ok(Math.abs(hits[0].point.z-z)<1e-4,'The end wall itself must close the seam.');
+      }
+    for(const [x,y,z] of [[-8.4,11.5,26.8],[0,12.25,48.4]]){
+      assert.deepEqual(new THREE.Raycaster(new THREE.Vector3(x,y,z),new THREE.Vector3(0,0,1),0,.8)
+        .intersectObject(root,true),[],'Keep the original passage open.');
+    }
+  }finally{
+    const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
+    root.traverse(object=>{if(object instanceof THREE.Mesh){geometries.add(object.geometry);
+      for(const material of Array.isArray(object.material)?object.material:[object.material])materials.add(material);}});
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+  }
+});
+
 test('the Blender hall shares finish resources and preserves all collision data, landings and openings',async()=>{
   const scene=new ContainmentLevelScene(()=>{}),shell=scene.teaching.roomTwoArt.shell;
   const collision=captureContainmentCollisionFingerprint(scene.collisionMeshes);
@@ -27,13 +50,13 @@ test('the Blender hall shares finish resources and preserves all collision data,
     await prepare(scene);
     assert.deepEqual(captureContainmentCollisionFingerprint(scene.collisionMeshes),collision);
     assert.equal(shell.diagnostics.meshes,15);assert.ok(shell.diagnostics.triangles<40_000);
-    assert.equal(shell.diagnostics.textureCount,0);assert.equal(scene.surveillanceCameras.modelDiagnostics.cameras,5);
+    assert.equal(shell.diagnostics.textureCount,0);assert.equal(scene.surveillanceCameras.modelDiagnostics.cameras,6);
     const bytes=await readFile(new URL('../assets/environments/containment-room-two/room-two-hall.glb',import.meta.url));
     const json=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
     assert.equal(json.images,undefined);assert.equal(json.animations,undefined);assert.equal(json.cameras,undefined);
     shell.root.traverse(object=>{
       assert.ok(!(object instanceof THREE.Light||object instanceof THREE.Camera));
-      if(!(object instanceof THREE.Mesh))return;
+      if(!(object instanceof THREE.Mesh)||object.userData.lightingOnly)return;
       for(const attribute of Object.values(object.geometry.attributes))assert.ok((attribute as THREE.BufferAttribute).array.every(Number.isFinite));
       if(object.name.endsWith('_Sticky'))assert.equal(object.material,scene.artResources.materials.stickyMembrane);
       else assert.equal(object.material,scene.teaching.roomOneArt.shell.borrowFinish(object.name.split('_').at(-1)!));
@@ -56,7 +79,7 @@ test('the Blender hall shares finish resources and preserves all collision data,
     assert.equal(prime.uniqueGeometryCount,prime.resourceCount);
     const root=shell.root.children[0];
     scene.resetTeachingPresentation();await scene.prepareEnvironmentArt(()=>{throw new Error('Must reuse prepared architecture');});
-    assert.equal(root,shell.root.children[0]);assert.equal(scene.surveillanceCameras.modelDiagnostics.cameras,5);
+    assert.equal(root,shell.root.children[0]);assert.equal(scene.surveillanceCameras.modelDiagnostics.cameras,6);
   }finally{scene.dispose();}
 });
 

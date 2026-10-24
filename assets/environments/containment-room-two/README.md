@@ -73,6 +73,11 @@ cameras, at 0.1 mm and 2 mm tolerances. Landing, side-jump, climbing, upper rout
 exit and reset poses have no reported conflicts. A separate assembled-level
 check covers new geometry against neighbouring room and duct surfaces.
 
+Both end walls reach the side-wall backing at X=±15.18 rather than stopping at
+the narrower floor edge. This closes the vertical corner gaps beside the
+pilasters, including close, oblique views from the adhesion route. The existing
+doorway and duct openings remain unchanged.
+
 Focused checks: `tests/RoomTwoShell.test.ts`, the Containment collider/art/lighting
 and platform-booster tests, and `tests/browser/RoomTwoShell.spec.ts`. Production
 captures and before/after surface reports live under ignored
