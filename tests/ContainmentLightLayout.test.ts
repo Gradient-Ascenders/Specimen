@@ -14,23 +14,23 @@ test('all authored rooms and doorway overlaps prewarm bounded light signatures w
   let configurations = 0;
   const signatures = new Set<string>();
   try {
-    await level.lighting.prewarmShaderConfigurations(async (_roomId, coverage) => {
+    await level.lighting.prewarmShaderConfigurations(async () => {
       layout.sync();
       let points = 0, spots = 0, shadows = 0;
       scene.traverseVisible(object => {
         if (object instanceof THREE.PointLight) { points++; assert.equal(object.castShadow, false); }
         if (object instanceof THREE.SpotLight) { spots++; if (object.castShadow) shadows++; }
       });
-      // Four local elevator spills, two shared booster slots, plus the existing
-      // Room 3 source when its rig is in view. Prewarm these exact layouts.
-      assert.equal(points, coverage.includes(3) ? 7 : 6);
+      // Share Room 3's seventh point slot in the smaller layouts. The duct
+      // keeps its existing six-point, ten-spot family.
+      assert.equal(points, spots === 10 ? 6 : 7);
       assert.equal(spots, shadows);
       assert.ok(spots === 3 || spots === 6 || spots === 10);
       signatures.add([points, spots, shadows].join(':') );
       configurations++;
     });
     assert.equal(configurations, 9);
-    assert.deepEqual(signatures, new Set(['6:3:3', '6:6:6', '6:10:10', '7:3:3', '7:6:6']));
+    assert.deepEqual(signatures, new Set(['6:10:10', '7:3:3', '7:6:6']));
     for (const {light, castShadow, position, color} of before) {
       assert.equal(light.castShadow, castShadow);
       assert.deepEqual(light.position.toArray(), position);

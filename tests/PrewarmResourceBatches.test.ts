@@ -43,3 +43,18 @@ test('batches omit invisible materials while retaining dormant art, mixed materi
   assert.deepEqual(createPrewarmResourceBatches([collider, dormant, mixed]).flat(), [child, dormant, mixed]);
   geometry.dispose(); visible.dispose(); hidden.dispose();
 });
+
+test('a matching layout reuses prepared leaves while new descendants and other layouts remain required', () => {
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshBasicMaterial();
+  const parent = new THREE.Mesh(geometry, material), child = new THREE.Mesh(geometry, material);
+  parent.add(child); parent.visible = false;
+  const prepared = new Set<THREE.Object3D>([parent]);
+  assert.deepEqual(createPrewarmResourceBatches([parent, child], 8, prepared).flat(), [child]);
+  assert.deepEqual([...prepared], [parent], 'Collection must not mark buffers ready before their draw completes.');
+  prepared.add(child);
+  assert.deepEqual(createPrewarmResourceBatches([parent], 8, prepared), []);
+  assert.deepEqual(createPrewarmResourceBatches([parent], 8, new Set()).flat(), [parent, child],
+    'A different lighting/program layout still requires its own real bindings.');
+  assert.equal(parent.visible, false); assert.equal(child.parent, parent);
+  geometry.dispose(); material.dispose();
+});

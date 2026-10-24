@@ -21,7 +21,13 @@ function fixture(parallel: boolean, cancelAt = Infinity) {
   let viewport = new THREE.Vector4(0, 0, 640, 360), scissor = viewport.clone(), scissorTest = false;
   let target: THREE.WebGLRenderTarget | null = null;
   let jobs = 0, jobsThisTurn = 0, maxJobsPerTurn = 0, yields = 0;
+  const compiledConfigurations = new Set<string>();
+  let configurationsAtFirstDraw = 0;
   const record = () => { jobs++; jobsThisTurn++; maxJobsPerTurn = Math.max(maxJobsPerTurn, jobsThisTurn); };
+  const compile = (root: THREE.Object3D) => {
+    if (root.name.startsWith('containment-lighting-compile-')) compiledConfigurations.add(root.name);
+    record();
+  };
   // A submission/scheduling spy, not a WebGL renderer or a GPU benchmark.
   const renderer = {
     transmissionResolutionScale: 0.5, extensions: { has: () => parallel },
@@ -39,7 +45,8 @@ function fixture(parallel: boolean, cancelAt = Infinity) {
     getScissorTest: () => scissorTest, setScissorTest: (value: boolean) => { scissorTest = value; },
     getRenderTarget: () => target, setRenderTarget: (value: THREE.WebGLRenderTarget | null) => { target = value; },
     getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0,
-    compile: record, compileAsync: async () => record(), render: () => {
+    compile, compileAsync: async (root: THREE.Object3D) => compile(root), render: () => {
+      if (configurationsAtFirstDraw === 0) configurationsAtFirstDraw = compiledConfigurations.size;
       assert.ok(target instanceof THREE.WebGLRenderTarget, 'background warm-up must never render into the visible canvas');
       record();
     },
@@ -68,7 +75,7 @@ function fixture(parallel: boolean, cancelAt = Infinity) {
   };
   probe.resources = resources; probe.lightingPrewarmGeneration = 1;
   return { runtime, probe, resources, snapshot, before, level,
-    counts: () => ({ jobs, yields, maxJobsPerTurn }),
+    counts: () => ({ jobs, yields, maxJobsPerTurn, configurationsAtFirstDraw }),
     dispose: () => { for (const batch of probe.depthPrewarmGroups) batch.dispose(); level.dispose(); policy.dispose(); },
   };
 }
@@ -81,6 +88,8 @@ for (const parallel of [false, true]) test(`Level 1 prewarm yields between GPU j
     assert.ok(f.counts().jobs > 80, 'Exercise the complete room, overlap, fade, alternate-view and final priming sequence.');
     assert.equal(f.counts().maxJobsPerTurn, 1, 'An entire room must not monopolize one cinematic frame.');
     assert.ok(f.counts().yields >= f.counts().jobs);
+    assert.equal(f.counts().configurationsAtFirstDraw, 9,
+      'Submit all room and doorway variants before a first-use draw can force shader synchronization.');
     assert.equal(f.level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount, 23);
     assert.equal(f.level.measuredFirstUseGeometryPrimeDiagnostics.resourcesPrimed, true);
     assert.equal(f.runtime.levelOnePrewarmVerification?.measuredProgramDelta, 0);

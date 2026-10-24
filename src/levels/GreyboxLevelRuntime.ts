@@ -248,6 +248,8 @@ interface LightingPrewarmStepProfile {
   readonly programsBefore: number;
   readonly programsAfterCompile: number;
   readonly programsAfter: number;
+  readonly programsCreatedDuringPrime: number;
+  readonly resourceBatches: number;
   readonly pointLights: number;
   readonly spotLights: number;
   readonly directionalLights: number;
@@ -256,6 +258,7 @@ interface LightingPrewarmStepProfile {
 
 interface LightingPrewarmProfile {
   readonly durationMs: number;
+  readonly programWaitDurationMs: number;
   readonly programsBefore: number;
   readonly programsAfter: number;
   readonly measuredFirstUseResourcePrimeDurationMs: number;
@@ -2196,30 +2199,30 @@ export class GreyboxLevelRuntime {
     const programsBefore = renderer.info.programs?.length ?? 0;
     const started = this.hostWindow.performance.now();
     const steps: LightingPrewarmStepProfile[] = [];
+    const preparedResourceLayouts = new Map<string, Set<THREE.Object3D>>();
+    const compilations = new Map<string, {
+      compiledObjects: number; compileDurationMs: number;
+      programsBefore: number; programsAfterCompile: number;
+    }>();
     const programBindings = new ProgramBindingPrewarm();
     const isCurrent = (): boolean =>
       this.resources === resources &&
       this.lightingPrewarmGeneration === generation;
 
     try {
-      // This draw remains behind the loading screen. The one-pixel
-      // viewport initializes first-use fixture buffers without flashing a room.
+      // Submit the complete variant set before synchronizing with the driver.
+      // Per-room compileAsync/inspection/draw barriers used to serialize almost
+      // the entire level's compilation despite parallel compilation support.
       await resources.testScene.lighting.prewarmShaderConfigurations(
         async (roomId, coverageRoomIds) => {
           await this.yieldPreparation?.();
           if (!isCurrent()) return;
           this.lightLayout?.sync();
           const stepProgramsBefore = renderer.info.programs?.length ?? 0;
-          const stepStarted = this.hostWindow.performance.now();
-          const signature = countVisibleLights(
-            this.renderLayer.scene,
-            prewarmCamera,
-          );
           const compileSubset = new THREE.Group();
-          const roomResources: THREE.Object3D[] = [];
+          compileSubset.name = `containment-lighting-compile-${coverageRoomIds.join('-')}`;
           let compiledObjects = 0;
           for (const coverageRoomId of coverageRoomIds) {
-            roomResources.push(...createRoomPrewarmSources(resources, coverageRoomId));
             const roomSubset = createRoomCompileSubset(resources, coverageRoomId);
             compiledObjects += roomSubset.userData.compiledObjects as number;
             compileSubset.add(...roomSubset.children);
@@ -2227,19 +2230,13 @@ export class GreyboxLevelRuntime {
           compileSubset.userData.compiledObjects = compiledObjects;
           const compileStarted = this.hostWindow.performance.now();
           try {
-            if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-              await withIsolatedPrewarmState(renderer, () => renderer.compileAsync(
-                compileSubset, prewarmCamera, this.renderLayer.scene,
-              ));
-            } else {
-              withIsolatedPrewarmState(renderer, () => renderer.compile(
-                compileSubset, prewarmCamera, this.renderLayer.scene,
-              ));
-            }
+            withIsolatedPrewarmState(renderer, () => renderer.compile(
+              compileSubset, prewarmCamera, this.renderLayer.scene,
+            ));
             await this.yieldPreparation?.();
             if (!isCurrent()) return;
             // Hidden camera draws cannot see every morph/instanced/dissolve
-            // caster. Compile their actual PCF depth materials independently.
+            // caster. Compile their actual depth materials independently.
             const depthBatch = createDepthPrewarmGroup(compileSubset);
             this.depthPrewarmGroups.push(depthBatch);
             this.compilingDepthGroups.add(depthBatch);
@@ -2248,12 +2245,8 @@ export class GreyboxLevelRuntime {
               if (object instanceof THREE.Light && object.layers.test(prewarmCamera.layers)) shadowScene.add(object.clone(false));
             });
             try {
-              await withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () => {
-                if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-                  return renderer.compileAsync(depthBatch.group, prewarmCamera, shadowScene);
-                }
-                renderer.compile(depthBatch.group, prewarmCamera, shadowScene);
-              }), transmissionPrewarmTarget);
+              withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
+                renderer.compile(depthBatch.group, prewarmCamera, shadowScene)), transmissionPrewarmTarget);
             } finally {
               shadowScene.clear();
               this.compilingDepthGroups.delete(depthBatch);
@@ -2261,45 +2254,25 @@ export class GreyboxLevelRuntime {
             }
             await this.yieldPreparation?.();
             if (!isCurrent()) return;
-            // Bob's transmission pass renders opaque surfaces into a linear
-            // target without canvas tone mapping. Warm that program variant
-            // too, even when a surface misses the hidden boot camera frustum.
-            const opaqueSubset = new THREE.Group();
-            for (const source of requiresTransmissionPreparation(this.renderLayer.scene) ? compileSubset.children : []) {
-              if (!isRenderableObject(source)) continue;
-              const materials = (
-                Array.isArray(source.material)
-                  ? source.material
-                  : [source.material]
-              ).filter(material => material.visible && !material.transparent);
-              if (materials.length === 0) continue;
-              const clone = source.clone(false) as typeof source;
-              clone.material = Array.isArray(source.material) ? materials : materials[0];
-              opaqueSubset.add(clone);
-            }
-            try {
-              await withIsolatedPrewarmState(renderer, () => {
-                if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-                  return renderer.compileAsync(opaqueSubset, prewarmCamera, this.renderLayer.scene);
-                }
-                renderer.compile(opaqueSubset, prewarmCamera, this.renderLayer.scene);
-              }, transmissionPrewarmTarget);
-            } finally {
-              disposeCompileInstances(opaqueSubset);
-              opaqueSubset.clear();
-            }
+            // Isolated primers draw *all* selected materials into a linear
+            // target, including glass, particles, gel and Low's opaque bodies.
+            // An opaque-only transmission subset leaves those variants to
+            // compile synchronously during hundreds of later hidden draws.
+            withIsolatedPrewarmState(renderer, () =>
+              renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene), transmissionPrewarmTarget);
             await this.yieldPreparation?.();
             if (!isCurrent()) return;
             // Camera fades change the existing eyes' opaque/transparent shader
             // variant. Retain both on their live material before gameplay starts.
             await prepareCharacterCameraFades(
               [resources.testScene.bob, resources.testScene.goop, resources.testScene.roomFive.goopPresentation],
-              () => {
-              if (renderer.extensions.has('KHR_parallel_shader_compile')) {
-                return withIsolatedPrewarmState(renderer, () => renderer.compileAsync(compileSubset, prewarmCamera, this.renderLayer.scene));
-              }
-              withIsolatedPrewarmState(renderer, () => renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene));
-            });
+              async () => {
+                withIsolatedPrewarmState(renderer, () => renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene));
+                await this.yieldPreparation?.();
+                if (!isCurrent()) return;
+                withIsolatedPrewarmState(renderer, () =>
+                  renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene), transmissionPrewarmTarget);
+              });
             if(roomId===1 && coverageRoomIds.includes(2) && this.lightLayout &&
               resources.testScene.teaching.roomTwoArt.shell.ready){
               // The last duct turn camera-culls the ten-spot overlap to six.
@@ -2317,17 +2290,13 @@ export class GreyboxLevelRuntime {
                 for(const target of targets){
                   await this.yieldPreparation?.();
                   if(!isCurrent())return;
-                  await withIsolatedPrewarmState(renderer,()=>this.lightLayout!.withCameraCulling(prewarmCamera,()=>{
-                    if(renderer.extensions.has('KHR_parallel_shader_compile'))
-                      return renderer.compileAsync(ductSubset,prewarmCamera,this.renderLayer.scene);
-                    renderer.compile(ductSubset,prewarmCamera,this.renderLayer.scene);
-                  }),target);
+                  withIsolatedPrewarmState(renderer,()=>this.lightLayout!.withCameraCulling(prewarmCamera,()=>
+                    renderer.compile(ductSubset,prewarmCamera,this.renderLayer.scene)),target);
                 }
               }finally{
                 disposeCompileInstances(ductSubset);ductSubset.clear();prewarmCamera.copy(saved);
               }
             }
-            await programBindings.prepare(renderer.info.programs, this.yieldPreparation, isCurrent);
           } finally {
             disposeCompileInstances(compileSubset);
             compileSubset.clear();
@@ -2335,6 +2304,34 @@ export class GreyboxLevelRuntime {
           const compileDurationMs =
             this.hostWindow.performance.now() - compileStarted;
           const programsAfterCompile = renderer.info.programs?.length ?? 0;
+          compilations.set(coverageRoomIds.join(','), {
+            compiledObjects, compileDurationMs, programsBefore: stepProgramsBefore, programsAfterCompile,
+          });
+        },
+      );
+      if (!isCurrent()) return;
+      const waitStarted = this.hostWindow.performance.now();
+      await programBindings.prepare(renderer.info.programs, this.yieldPreparation, isCurrent);
+      const programWaitDurationMs = this.hostWindow.performance.now() - waitStarted;
+      if (!isCurrent()) return;
+
+      // Real draws still initialize shadow maps, live buffers, VAOs and the
+      // retained transmission target. Keep this coverage behind loading too.
+      await resources.testScene.lighting.prewarmShaderConfigurations(
+        async (roomId, coverageRoomIds) => {
+          await this.yieldPreparation?.();
+          if (!isCurrent()) return;
+          this.lightLayout?.sync();
+          const compilation = compilations.get(coverageRoomIds.join(','))!;
+          const stepStarted = this.hostWindow.performance.now();
+          const primeProgramsBefore = renderer.info.programs?.length ?? 0;
+          const signature = countVisibleLights(this.renderLayer.scene, prewarmCamera);
+          const roomResources = coverageRoomIds.flatMap(id => createRoomPrewarmSources(resources, id));
+          const layoutKey = [signature.programKey, renderer.shadowMap.type, renderer.shadowMap.enabled,
+            requiresTransmissionPreparation(this.renderLayer.scene)].join(':');
+          let preparedResources = preparedResourceLayouts.get(layoutKey);
+          if (!preparedResources) preparedResourceLayouts.set(layoutKey, preparedResources = new Set());
+          const batches = createPrewarmResourceBatches(roomResources, 8, preparedResources);
           await this.yieldPreparation?.();
           if (!isCurrent()) return;
           const target = LIGHTING_PREWARM_CAMERA_TARGETS[roomId];
@@ -2349,13 +2346,17 @@ export class GreyboxLevelRuntime {
           // Compilation only prepares one representative of each material.
           // Upload every live geometry/instance buffer and bind its actual VAO
           // now, including dormant resources, without one giant upload task.
-          for (const batch of createPrewarmResourceBatches(roomResources)) {
+          for (const batch of batches) {
             await this.yieldPreparation?.();
             if (!isCurrent()) return;
             withIsolatedPrewarmState(renderer, () => this.renderLayer.withShadowPreparation(true, () =>
               renderIsolatedPrewarmResources(renderer, this.renderLayer.scene, prewarmCamera,
                 batch, { includeHidden: true, includeDescendants: false }),
             ), transmissionPrewarmTarget);
+            // This exact layout has bound the live source buffers/VAOs. Keep
+            // the mixed-resource, alternate-view and fade draws below; only
+            // repeated leaf upload slices can be reused by another handoff.
+            for (const object of batch) preparedResources.add(object);
           }
           await this.yieldPreparation?.();
           if (!isCurrent()) return;
@@ -2431,13 +2432,15 @@ export class GreyboxLevelRuntime {
             this.hostWindow.performance.now() - primeStarted;
           steps.push({
             roomId,
-            compiledObjects: compileSubset.userData.compiledObjects as number,
-            durationMs: this.hostWindow.performance.now() - stepStarted,
-            compileDurationMs,
+            compiledObjects: compilation.compiledObjects,
+            durationMs: compilation.compileDurationMs + this.hostWindow.performance.now() - stepStarted,
+            compileDurationMs: compilation.compileDurationMs,
             primeDurationMs,
-            programsBefore: stepProgramsBefore,
-            programsAfterCompile,
+            programsBefore: compilation.programsBefore,
+            programsAfterCompile: compilation.programsAfterCompile,
             programsAfter: renderer.info.programs?.length ?? 0,
+            programsCreatedDuringPrime: (renderer.info.programs?.length ?? 0) - primeProgramsBefore,
+            resourceBatches: batches.length,
             ...signature,
           });
         },
@@ -2535,6 +2538,7 @@ export class GreyboxLevelRuntime {
       } finally { camera.copy(savedCamera); }
       this.lightingPrewarmProfile = {
         durationMs: this.hostWindow.performance.now() - started,
+        programWaitDurationMs,
         programsBefore,
         programsAfter: renderer.info.programs?.length ?? 0,
         measuredFirstUseResourcePrimeDurationMs,
@@ -2595,16 +2599,21 @@ function countVisibleLights(
   | 'spotLights'
   | 'directionalLights'
   | 'hemisphereLights'
-> {
+> & { programKey: string } {
   let pointLights = 0;
   let spotLights = 0;
   let directionalLights = 0;
   let hemisphereLights = 0;
+  let pointShadows = 0, spotShadows = 0, directionalShadows = 0, spotMaps = 0, shadowedSpotMaps = 0;
   root.traverseVisible((object) => {
     if (!object.layers.test(camera.layers)) return;
-    if (object instanceof THREE.PointLight) pointLights += 1;
-    else if (object instanceof THREE.SpotLight) spotLights += 1;
-    else if (object instanceof THREE.DirectionalLight) directionalLights += 1;
+    if (object instanceof THREE.PointLight) { pointLights += 1; if (object.castShadow) pointShadows++; }
+    else if (object instanceof THREE.SpotLight) {
+      spotLights += 1;
+      if (object.castShadow) spotShadows++;
+      if (object.map) { spotMaps++; if (object.castShadow) shadowedSpotMaps++; }
+    }
+    else if (object instanceof THREE.DirectionalLight) { directionalLights += 1; if (object.castShadow) directionalShadows++; }
     else if (object instanceof THREE.HemisphereLight) hemisphereLights += 1;
   });
   return {
@@ -2612,6 +2621,8 @@ function countVisibleLights(
     spotLights,
     directionalLights,
     hemisphereLights,
+    programKey: [pointLights, spotLights, directionalLights, hemisphereLights,
+      pointShadows, spotShadows, directionalShadows, spotMaps, shadowedSpotMaps].join(':'),
   };
 }
 
@@ -2643,7 +2654,9 @@ function createRoomPrewarmSources(
         (roomId === 1 && child.name.startsWith('duct-')) ||
         child.name.startsWith('player-slime-')
       ) {
-        sources.push(child);
+        if (child === resources.testScene.teaching.roomTwoArt.root) {
+          sources.push(...resources.testScene.teaching.roomTwoArt.renderSources);
+        } else sources.push(child);
       }
     }
   } else {

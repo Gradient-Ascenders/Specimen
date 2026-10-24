@@ -48,9 +48,13 @@ vec3 containmentProbe(vec3 p,vec3 n,int room){
 vec3 containmentIndirect(vec3 n){
   vec3 p=cWorldPosition+n*0.22;
   int a,b;float blend;containmentRooms(p,a,b,blend);
-  if(blend<=0.0)return containmentProbe(p,n,a)*cIndirectStrength;
-  if(blend>=1.0)return containmentProbe(p,n,b)*cIndirectStrength;
-  return mix(containmentProbe(p,n,a),containmentProbe(p,n,b),blend)*cIndirectStrength;
+  // Keep one sampling site for the interior and one for a doorway. Repeating
+  // these functions in each return makes ANGLE inline four copies of the SH
+  // interpolation into every material/light-layout program.
+  if(blend>=1.0)a=b;
+  vec3 irradiance=containmentProbe(p,n,a);
+  if(blend>0.0&&blend<1.0)irradiance=mix(irradiance,containmentProbe(p,n,b),blend);
+  return irradiance*cIndirectStrength;
 }
 vec3 containmentProjectedDirection(vec3 direction,int room){
   vec3 p=clamp(cWorldPosition,cRoomMin[room]+0.01,cRoomMax[room]-0.01);
@@ -84,9 +88,10 @@ function reflectionGLSL(tileHeight:number):string{
   }
   vec4 containmentRoomRadiance(vec3 direction,float roughness){
     int a,b;float blend;containmentRooms(cWorldPosition,a,b,blend);
-    if(blend<=0.0)return vec4(containmentReflectionTile(direction,roughness,a),1.0);
-    if(blend>=1.0)return vec4(containmentReflectionTile(direction,roughness,b),1.0);
-    return vec4(mix(containmentReflectionTile(direction,roughness,a),containmentReflectionTile(direction,roughness,b),blend),1.0);
+    if(blend>=1.0)a=b;
+    vec3 radiance=containmentReflectionTile(direction,roughness,a);
+    if(blend>0.0&&blend<1.0)radiance=mix(radiance,containmentReflectionTile(direction,roughness,b),blend);
+    return vec4(radiance,1.0);
   }
   #endif
   `;
@@ -118,6 +123,6 @@ export function installContainmentRadianceShader(material:THREE.MeshStandardMate
         .replace('textureCubeUV( envMap, envMapRotation * reflectVec, roughness )','containmentRoomRadiance( envMapRotation * reflectVec, roughness )'))
       .replace('#include <lights_fragment_maps>',`#include <lights_fragment_maps>\n#if defined(RE_IndirectDiffuse)\nirradiance+=containmentIndirect(transformNormalByInverseViewMatrix(geometryNormal,viewMatrix));\n#endif`);
   };
-  material.customProgramCacheKey=()=>`${key}:containment-radiance-l1-v1`;
+  material.customProgramCacheKey=()=>`${key}:containment-radiance-l1-v2`;
   material.needsUpdate=true;
 }

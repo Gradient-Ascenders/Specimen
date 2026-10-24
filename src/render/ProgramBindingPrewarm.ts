@@ -1,5 +1,6 @@
 interface ProgramBindings {
   getUniforms(): unknown;
+  isReady?(): boolean;
 }
 
 /** compile() can return before the driver's first-use link/reflection work.
@@ -13,7 +14,15 @@ export class ProgramBindingPrewarm {
     yieldPreparation: (() => Promise<void>) | undefined,
     isCurrent: () => boolean,
   ): Promise<void> {
-    for (const program of [...(programs ?? [])]) {
+    const pending = [...new Set(programs ?? [])].filter(program => !this.ready.has(program));
+    // Submit every variant before asking the driver for uniform locations or
+    // diagnostics. Those synchronous queries otherwise serialize compilation,
+    // including variants compileAsync misses when one material has many states.
+    while (isCurrent() && pending.some(program => program.isReady?.() === false)) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    if (!isCurrent()) return;
+    for (const program of pending) {
       if (this.ready.has(program)) continue;
       await yieldPreparation?.();
       if (!isCurrent()) return;

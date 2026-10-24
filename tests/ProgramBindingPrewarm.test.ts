@@ -24,3 +24,32 @@ test('cancellation at a yield leaves that program untouched and a later attempt 
   assert.equal(calls, 1);
   await warm.prepare(undefined, undefined, () => true);
 });
+
+test('all submitted variants finish linking before any synchronous first-use inspection', async () => {
+  const warm = new ProgramBindingPrewarm();
+  let linked = false, inspections = 0;
+  const first = { isReady: () => true, getUniforms: () => { inspections++; } };
+  const last = { isReady: () => linked, getUniforms: () => { inspections++; } };
+  const preparation = warm.prepare([first, last], undefined, () => true);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(inspections, 0, 'Do not block the driver on an earlier variant while others are linking.');
+  linked = true;
+  await preparation;
+  assert.equal(inspections, 2);
+});
+
+test('cancellation during parallel linking prevents inspection and permits a later retry', async () => {
+  const warm = new ProgramBindingPrewarm();
+  let active = true, linked = false, inspections = 0;
+  const program = { isReady: () => {
+    assert.ok(active || linked, 'Do not query a retired GL program after cancellation.');
+    return linked;
+  }, getUniforms: () => { inspections++; } };
+  const preparation = warm.prepare([program], undefined, () => active);
+  active = false;
+  await preparation;
+  assert.equal(inspections, 0);
+  linked = true;
+  await warm.prepare([program], undefined, () => true);
+  assert.equal(inspections, 1);
+});

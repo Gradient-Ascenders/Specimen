@@ -108,6 +108,12 @@ export class RoomTwoArt {
     });
   }
 
+  /** The storyboard stays available to CPU tooling, but never needs GPU
+   * programs or buffers once the authored hall has replaced it. */
+  get renderSources():readonly THREE.Object3D[]{
+    return this.shell.ready?[this.shell.root]:[this.root];
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

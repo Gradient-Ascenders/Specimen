@@ -191,6 +191,26 @@ original mixed transmission/VAO pass. Steps yield for 33ms after cheap jobs and
 backup can still contend with decoding/playback; it is not the default. Both
 paths use real isolated framebuffers without clearing a visible cinematic.
 
+Level 1 submits its five room and four doorway shader configurations before
+waiting for driver completion. Both canvas and linear offscreen variants include
+glass, particles, gel, shadow casters and camera fades, including opaque Low-mode
+bodies. Restricting the linear subset to opaque transmission receivers leaves
+expensive programs to compile synchronously during the primers. The binding
+prewarmer checks every submitted program's parallel-link readiness before
+requesting uniforms or diagnostics; material-level `compileAsync` alone can miss
+earlier variants of a shared material. Jobs still yield individually and restore
+renderer state synchronously. Real shadow allocation, buffer/VAO uploads,
+mixed-resource draws and the final retained-camera/GPU readiness checks follow.
+
+Containment shares three light signatures: seven points with three or six
+shadowed spots, and the existing six-point/ten-spot duct layout. Padding sources
+have zero radiance and use the finite-light early-out. This retains the authored
+sources while avoiding separate six/seven-point shader families in the smaller
+layouts. Leaf upload slices may be reused only within the same preparation run
+and complete light/shadow/map signature; mixed-resource, fade and alternate-view
+draws still run. Once Room 2's authored shell is ready, its retired construction
+storyboard is excluded from shader and buffer preparation.
+
 Both paths keep gameplay simulation, input, HUD and debug controls disabled.
 Skip (button, Escape or controller B) skips the film, not readiness. A slow load
 holds at the faded ending; failed preparation exposes Retry. Gameplay cannot

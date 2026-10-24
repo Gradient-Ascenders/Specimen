@@ -47,7 +47,10 @@ test('the Blender hall shares finish resources and preserves all collision data,
   const scene=new ContainmentLevelScene(()=>{}),shell=scene.teaching.roomTwoArt.shell;
   const collision=captureContainmentCollisionFingerprint(scene.collisionMeshes);
   try{
+    assert.deepEqual(scene.teaching.roomTwoArt.renderSources,[scene.teaching.roomTwoArt.root]);
     await prepare(scene);
+    assert.deepEqual(scene.teaching.roomTwoArt.renderSources,[shell.root],
+      'Production GPU preparation must use the authored hall rather than its retired storyboard.');
     assert.deepEqual(captureContainmentCollisionFingerprint(scene.collisionMeshes),collision);
     assert.equal(shell.diagnostics.meshes,15);assert.ok(shell.diagnostics.triangles<40_000);
     assert.equal(shell.diagnostics.textureCount,0);assert.equal(scene.surveillanceCameras.modelDiagnostics.cameras,6);

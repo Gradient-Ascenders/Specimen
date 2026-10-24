@@ -7,11 +7,12 @@ const ISOLATED_RESOURCE_PREWARM_LAYER = 31;
 export function createPrewarmResourceBatches(
   roots: readonly THREE.Object3D[],
   limit = 8,
+  prepared?: ReadonlySet<THREE.Object3D>,
 ): THREE.Object3D[][] {
   if (!Number.isInteger(limit) || limit < 1) throw new Error('Prewarm batch limit must be a positive integer.');
   const seen = new Set<THREE.Object3D>(), objects: THREE.Object3D[] = [];
   for (const root of roots) root.traverse(object => {
-    if (seen.has(object) || !(object instanceof THREE.Mesh || object instanceof THREE.Line ||
+    if (seen.has(object) || prepared?.has(object) || !(object instanceof THREE.Mesh || object instanceof THREE.Line ||
       object instanceof THREE.Points || object instanceof THREE.Sprite)) return;
     seen.add(object);
     // Dormant visible art still needs an upload. Collider-only materials can

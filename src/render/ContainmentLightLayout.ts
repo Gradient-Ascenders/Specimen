@@ -6,7 +6,7 @@ import { disposeShadowLight } from './ShadowLightResources.ts';
  * maps initialized once, never recurring shadow passes. */
 export class ContainmentLightLayout {
   readonly root = new THREE.Group();
-  private readonly points = Array.from({ length: 3 }, () => new THREE.PointLight(0, 0));
+  private readonly points = Array.from({ length: 7 }, () => new THREE.PointLight(0, 0));
   private readonly spots = Array.from({ length: 10 }, () => new THREE.SpotLight(0, 0));
   private readonly cameraCullSources: THREE.SpotLight[] = [];
   private readonly cameraFrustum = new THREE.Frustum();
@@ -50,12 +50,17 @@ export class ContainmentLightLayout {
         spots++;
       }
     });
-    this.points.forEach((light, i) => light.visible = i < Math.max(0, 3 - points));
     // Room 2/3 overlaps contain six real spots. Giving them the ten-slot
     // layout carries four unused shadow coordinates and light contributions
     // through every fragment, including the gel's refraction capture. All
     // three layouts are visited by the existing hidden room/overlap prewarm.
     const target = spots <= 3 ? 3 : spots <= 6 ? 6 : 10;
+    // Room 3 adds one acid spill to the six shared point slots. Pad the
+    // smaller spot layouts to seven points so Room 2/3/4 and their handoffs
+    // share programs. Keep the existing six-point, ten-spot duct layout.
+    // Zero-radiance slots take the existing finite-light early-out.
+    const pointTarget = target === 10 ? 6 : 7;
+    this.points.forEach((light, i) => light.visible = i < Math.max(0, pointTarget - points));
     this.spots.forEach((light, i) => light.visible = i < Math.max(0, target - spots));
     this.root.visible = true;
   }
