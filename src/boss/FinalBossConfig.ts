@@ -24,7 +24,7 @@ export function finalArenaSupportY(feetY:number):number {
   return feetY>=FINAL_ARENA_ORBIT.lowY-.15 ? THREE.MathUtils.clamp(feetY,FINAL_ARENA_ORBIT.lowY,FINAL_ARENA_ORBIT.highY) : FINAL_ARENA.floorY;
 }
 export const FINAL_BOSS_TUNING = Object.freeze({
-  health:200,phaseTwoHealth:100,scale:3,hoverY:18,defenseHoverY:26,
+  health:750,phaseTwoHealth:375,scale:3,hoverY:18,defenseHoverY:26,
   defenseThresholds:Object.freeze([.85,.70,.55]),healPerSecond:2.5,
   defenseGroups:Object.freeze([Object.freeze([4,4]),Object.freeze([5,5]),Object.freeze([5,5,5])]),
   shieldRadius:28,droneCount:18,droneHealth:6,pursuers:3,
@@ -33,7 +33,7 @@ export const FINAL_BOSS_TUNING = Object.freeze({
   gunSpeed:164,gunRadius:.25,gunDamage:7,gunVolleySeconds:.16,gunCapacity:96,
   orbSpeed:63,orbRadius:1.25,orbDamage:20,orbCount:3,orbBursts:5,orbIntervalSeconds:.8,orbCapacity:24,
   phaseTwoOrbCount:5,orbSpreadIntervalSeconds:.13,orbSpreadRadians:.095,
-  reinforcementHealth:Object.freeze([70,50,20]),advancedGroups:Object.freeze([3,3]),advancedPursuers:2,
+  reinforcementHealth:Object.freeze([262.5,187.5,75]),advancedGroups:Object.freeze([3,3]),advancedPursuers:2,
   advancedScale:1.8,advancedAttackSpeed:1,advancedProjectileCapacity:64,
   healthPackCapacity:24,healthPackFraction:.25,
   // Keep the thicker beam's lower edge above the ring instead of burying it
@@ -66,26 +66,30 @@ export const FINAL_SPLIT_ANCHORS = {
 const bob = DEFAULT_KINEMATIC_BODY_CONFIG;
 export const FINAL_SPECIMEN_MOVEMENT = Object.freeze({
   radiusMetres: FINAL_SPECIMEN_RADIUS,
-  maxSpeedMetresPerSecond: bob.maxSpeedMetresPerSecond * 2.4,
-  groundAccelerationMetresPerSecondSquared: bob.groundAccelerationMetresPerSecondSquared * 2.4,
-  groundBrakingMetresPerSecondSquared: bob.groundBrakingMetresPerSecondSquared * 2.4,
+  maxSpeedMetresPerSecond: bob.maxSpeedMetresPerSecond * 3,
+  groundAccelerationMetresPerSecondSquared: bob.groundAccelerationMetresPerSecondSquared * 3,
+  groundBrakingMetresPerSecondSquared: bob.groundBrakingMetresPerSecondSquared * 3,
   airAccelerationMetresPerSecondSquared: bob.airAccelerationMetresPerSecondSquared * 3,
-  gravityMetresPerSecondSquared: bob.gravityMetresPerSecondSquared * 1.5,
-  minimumJumpSpeedMetresPerSecond: bob.minimumJumpSpeedMetresPerSecond * 2.5,
-  maximumJumpSpeedMetresPerSecond: bob.maximumJumpSpeedMetresPerSecond * 2.5,
+  gravityMetresPerSecondSquared: bob.gravityMetresPerSecondSquared,
+  minimumJumpSpeedMetresPerSecond: bob.minimumJumpSpeedMetresPerSecond,
+  // Normal gravity and a normal tap jump. The full-charge height is still
+  // required to clear the actual RAM turbines, which a 6.8 m jump hits.
+  maximumJumpSpeedMetresPerSecond: Math.sqrt(2 * bob.gravityMetresPerSecondSquared * 11.2),
   maximumJumpChargeSeconds: bob.maximumJumpChargeSeconds / 2,
   slimeHardLandingImpactSpeedMetresPerSecond: bob.slimeHardLandingImpactSpeedMetresPerSecond * 2.5,
-  slimeLandingReactionHopSpeedMetresPerSecond: bob.slimeLandingReactionHopSpeedMetresPerSecond * 2.5,
+  slimeLandingReactionHopSpeedMetresPerSecond: bob.slimeLandingReactionHopSpeedMetresPerSecond,
   adhesionEnabled: false, reboundEnabled: true, chargedJumpEnabled: true,
 });
 export const FINAL_SPECIMEN_WEAPON: Partial<SpecimenAttackConfig> = Object.freeze({
-  fullChargeSeconds: 1.5, minimumCooldownSeconds: .25, maximumCooldownSeconds: .9,
+  fullChargeSeconds: 1.5, minimumCooldownSeconds: .15, maximumCooldownSeconds: .22,
+  maximumLiveProjectiles: 32,
   projectileSpeedMetresPerSecond: 50, maximumRangeMetres: 145, projectileLifetimeSeconds: 3.2,
   minimumProjectileRadiusMetres: .18, maximumProjectileRadiusMetres: .7,
   minimumDamageUnits: 2, maximumDamageUnits: 18, maximumSplashRadiusMetres: 14,
   splashRequiresFullCharge: true,
   launchHeightOffsetMetres: .75,
   allowHipFire:true,
+  overchargeHitsRequired: 4,
 });
 /** Re-entry deliberately restores a fresh encounter, not an attack in progress. */
 export const FINAL_BOSS_CHECKPOINT: BlackoutCheckpointDefinition = {

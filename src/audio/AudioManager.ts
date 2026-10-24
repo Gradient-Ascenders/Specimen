@@ -10,7 +10,7 @@ interface Voice {
   volumeScale: number;
   readonly ui: boolean;
 }
-interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition; readonly volumeScale: number }
+interface LoopRequest { readonly sound: SoundId; readonly position?: AudioPosition; readonly volumeScale: number; readonly playbackRate: number }
 type SpatialAudioTarget = {
   readonly positionX?: AudioParam;
   readonly positionY?: AudioParam;
@@ -79,7 +79,7 @@ const setListenerOrientation = (target: ListenerOrientationTarget, forward: Audi
 
 export interface AudioPlayback {
   play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number): void;
-  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale?: number): void;
+  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale?: number, playbackRate?: number): void;
   stopLoop(key: string): void;
   stopSound?(sound: SoundId): void;
   stopAll(): void;
@@ -258,21 +258,23 @@ export class AudioManager implements AudioPlayback {
     }
   }
 
-  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale = 1): void {
+  startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale = 1, playbackRate = 1): void {
     if (this.disposed) return;
     const scale = Number.isFinite(volumeScale) ? Math.max(0, Math.min(1, volumeScale)) : 0;
+    const rate = Number.isFinite(playbackRate) ? Math.max(0.25, Math.min(4, playbackRate)) : 1;
     const previous = this.loops.get(key);
     if (previous && previous.sound !== sound) this.stopLoop(key);
-    this.loops.set(key, { sound, position, volumeScale: scale });
+    this.loops.set(key, { sound, position, volumeScale: scale, playbackRate: rate });
     const voice = [...this.voices].find(candidate => candidate.key === key);
     if (voice) {
       this.positionVoice(voice, position);
+      if (previous?.playbackRate !== rate) voice.source.playbackRate.value = rate;
       if (voice.volumeScale !== scale) {
         voice.volumeScale = scale;
         voice.gain.gain.cancelScheduledValues(this.context!.currentTime);
         voice.gain.gain.setTargetAtTime(SOUND_DEFINITIONS[sound].volume * scale, this.context!.currentTime, 0.025);
       }
-    } else if (this.canPlay()) this.createVoice(sound, position, key, sound.includes('movement'), scale);
+    } else if (this.canPlay()) this.createVoice(sound, position, key, sound.includes('movement'), scale, false, rate);
   }
 
   stopLoop(key: string): void {
@@ -339,9 +341,9 @@ export class AudioManager implements AudioPlayback {
   }
   private reconcileLoops(): void {
     if (!this.canPlay()) return;
-    for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position, request.volumeScale);
+    for (const [key, request] of this.loops) this.startLoop(key, request.sound, request.position, request.volumeScale, request.playbackRate);
   }
-  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1, ui = false): boolean {
+  private createVoice(sound: SoundId, position?: AudioPosition, key?: string, varyPitch = false, volumeScale = 1, ui = false, playbackRate = 1): boolean {
     const buffer = this.buffers.get(sound), context = this.context, bus = ui ? this.effects : this.gameplayGain;
     if (!buffer || !context || !bus) return false;
     const definition = SOUND_DEFINITIONS[sound];
@@ -349,7 +351,7 @@ export class AudioManager implements AudioPlayback {
     const source = context.createBufferSource(), gain = context.createGain();
     source.buffer = buffer;
     source.loop = key !== undefined;
-    source.playbackRate.value = varyPitch ? 0.96 + Math.random() * 0.08 : 1;
+    source.playbackRate.value = playbackRate * (varyPitch ? 0.96 + Math.random() * 0.08 : 1);
     gain.gain.value = key ? 0 : definition.volume * volumeScale;
     if (key) gain.gain.linearRampToValueAtTime(definition.volume * volumeScale, context.currentTime + 0.04);
     const panner = position ? context.createPanner() : undefined;

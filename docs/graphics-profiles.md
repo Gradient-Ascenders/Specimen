@@ -18,7 +18,7 @@ those preferences and restores the safe session defaults in one update.
 | Absolute drawing-buffer budget | 921,600 pixels (720p area) | 2,073,600 pixels (1080p area) |
 | Device-density cap | 1× | 1.5× |
 | Render scale after capped density | 75% per dimension | 100% |
-| Character gel | Non-transmissive glossy physical gel | Authored refraction with half-width/height capture |
+| Character gel | Non-transmissive glossy physical gel | Authored refraction with 75% width/height capture |
 | Shadow-map maximum, per face | 512×512 | 1024×1024 |
 | Opted-in decorative point density | 50%, rounded up | Authored count |
 | Main-canvas multisample antialiasing | Off | Off |
@@ -65,7 +65,7 @@ The actual density is the minimum of this, `sqrt(pixelBudget / CSS area)` and
 the device's texture/renderbuffer/viewport limits. A longest-edge bound and a
 capture-aware physical-pixel floor also handle degenerate/narrow viewports. The
 shortest side is at least `ceil(1 / transmissionResolutionScale)` pixels (two
-for half-resolution refraction), so its multisampled target retains a physical
+for balanced or Performance-capped refraction), so its multisampled target retains a physical
 texel even for a one-CSS-pixel host. The longest edge reserves that short-side
 cost inside the same absolute pixel budget, including pathological aspect ratios.
 Changes to the capture floor resize the canvas even at unchanged CSS size/DPR. Integer
@@ -138,7 +138,7 @@ a native puzzle-completion or sustained gameplay benchmark.
 A dedicated narrow-host regression overrides the UI's normal 320px minimum and
 performs real production draws at 1×360, 640×1 and 1×1 CSS pixels. It checks
 multisampled target dimensions, actual framebuffer completeness and GL errors
-while toggling half/full/no refraction and the additional Performance cap. This
+while toggling reduced/full/no refraction and the additional Performance cap. This
 regression was added in response to review; it has not been browser/GPU-executed
 locally because computer testing remains stopped.
 

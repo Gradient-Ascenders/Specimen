@@ -1,7 +1,7 @@
 # Extermination Chamber implementation investigation
 
 Baseline: `origin/main` at `64d9eaa` (22 October 2026). Specification:
-`docs/planning/boss level plan.md`, read in full before implementation.
+the [original boss level plan](https://github.com/Gradient-Ascenders/Specimen/blob/1a213a0/docs/planning/boss%20level%20plan.md), read in full before implementation.
 
 ## Preserved work
 

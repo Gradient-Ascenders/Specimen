@@ -1,0 +1,21 @@
+{
+  "version": "extermination-lair-v1",
+  "coordinates": "game X,Y-up,Z; arena centre at zero",
+  "floor": [
+    62.0,
+    99.5,
+    0.4
+  ],
+  "ceiling": 96.0,
+  "roots": [
+    "Lair_Static",
+    "Lair_EntryDoor",
+    "Lair_ExitDoor",
+    "Lair_Hatch",
+    "Lair_Cover_Bastion",
+    "Lair_Cover_Capacitor",
+    "Lair_Cover_HeatSink"
+  ],
+  "meshes": 44,
+  "triangles": 107704
+}

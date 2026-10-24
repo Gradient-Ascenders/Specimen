@@ -143,6 +143,12 @@ export interface KinematicBodyOptions {
   events?: EventBus<MovementEvents>;
 }
 
+/** Temporary ability tuning for one step, without changing the body's base configuration. */
+export interface LocomotionModifiers {
+  readonly speedMultiplier: number;
+  readonly accelerationMultiplier: number;
+}
+
 /**
  * Sphere-based authoritative gameplay body with authored surface behaviour.
  *
@@ -425,9 +431,14 @@ export class KinematicBody {
     deltaSeconds: number,
     movementDirectionWorld: ReadonlyVector3State,
     jumpInput: Readonly<JumpInputState> = NO_JUMP_INPUT,
+    locomotion?: LocomotionModifiers,
   ): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       throw new Error('KinematicBody deltaSeconds must be positive and finite.');
+    }
+    if (locomotion && (!Number.isFinite(locomotion.speedMultiplier) || locomotion.speedMultiplier <= 0 ||
+      !Number.isFinite(locomotion.accelerationMultiplier) || locomotion.accelerationMultiplier <= 0)) {
+      throw new Error('Locomotion multipliers must be positive and finite.');
     }
 
     this.previousPositionValue.copy(this.currentPosition);
@@ -485,6 +496,7 @@ export class KinematicBody {
       movementDirectionWorld,
       attachedAtStepStart,
       this.movementUpAtStepStart,
+      locomotion,
     );
     this.applyGravity(deltaSeconds);
 
@@ -984,6 +996,7 @@ export class KinematicBody {
     movementDirectionWorld: ReadonlyVector3State,
     attachedAtStepStart: boolean,
     movementUpAtStepStart: THREE.Vector3,
+    modifiers?: LocomotionModifiers,
   ): void {
     this.moveInput.set(
       THREE.MathUtils.clamp(movementDirectionWorld.x, -1, 1),
@@ -1020,7 +1033,7 @@ export class KinematicBody {
       if (this.targetVelocity.lengthSq() > MOVEMENT_EPSILON_SQ) {
         this.targetVelocity
           .normalize()
-          .multiplyScalar(this.maximumLocomotionSpeedMetresPerSecond);
+          .multiplyScalar(this.maximumLocomotionSpeedMetresPerSecond * (modifiers?.speedMultiplier ?? 1));
 
         this.velocityDelta
           .subVectors(this.targetVelocity, this.planarVelocity);
@@ -1033,7 +1046,7 @@ export class KinematicBody {
             ? this.config.groundAccelerationMetresPerSecondSquared
             : this.config.airAccelerationMetresPerSecondSquared) *
           traction;
-        const maximumVelocityChange = acceleration * deltaSeconds;
+        const maximumVelocityChange = acceleration * deltaSeconds * (modifiers?.accelerationMultiplier ?? 1);
         const deltaLength = this.velocityDelta.length();
 
         if (deltaLength > maximumVelocityChange && deltaLength > 0) {
