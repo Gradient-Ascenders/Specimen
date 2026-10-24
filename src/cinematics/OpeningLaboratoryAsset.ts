@@ -13,7 +13,7 @@ export async function parseOpeningLaboratory(bytes: ArrayBuffer): Promise<THREE.
   return scene;
 }
 
-async function loadAsset(signal: AbortSignal): Promise<THREE.Group> {
+export async function loadOpeningLaboratory(signal: AbortSignal): Promise<THREE.Group> {
   const response=await fetch(OPENING_LABORATORY_URL,{signal});
   if (!response.ok) throw new Error('Could not load the opening laboratory.');
   return parseOpeningLaboratory(await response.arrayBuffer());
@@ -33,7 +33,7 @@ export class OpeningLaboratoryAsset {
   constructor() {this.root.name='opening-blender-laboratory';this.root.userData.visualOnly=true;}
 
   prepare(borrowFinish:(name:string)=>THREE.Material,
-    loader:(signal:AbortSignal)=>Promise<THREE.Group>=loadAsset):Promise<void> {
+    loader:(signal:AbortSignal)=>Promise<THREE.Group>=loadOpeningLaboratory):Promise<void> {
     if(this.disposed)return Promise.resolve();
     return this.preparation??=loader(this.abort.signal).then(source=>{
       if(this.disposed){disposeGeometry(source,true);return;}

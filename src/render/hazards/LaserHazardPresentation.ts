@@ -45,6 +45,13 @@ export interface LaserHazardPresentationOptions {
   readonly showEndEmitters?: boolean;
 }
 
+export interface AuthoredLaserEmitter {
+  /** Geometry faces along local +Y, behind the authoritative beam origin. */
+  readonly housing: THREE.Object3D;
+  readonly aperture: THREE.BufferGeometry;
+  readonly shutter: THREE.BufferGeometry;
+}
+
 /**
  * Presentation-only adapter for the deterministic laser runtime.
  *
@@ -141,6 +148,41 @@ export class LaserHazardPresentation {
     for (const visual of this.visuals) {
       this.syncVisual(visual);
     }
+  }
+
+  /** Borrow a rigid model while preserving the live endpoint/status owners.
+   * The asset owner detaches it before releasing its shared geometry. */
+  attachEmitterModel(model:AuthoredLaserEmitter):()=>void{
+    const bodyMaterialVisible=this.emitterBodyMaterial.visible;
+    this.emitterBodyMaterial.visible=false;
+    const replacements:{mesh:THREE.Mesh;geometry:THREE.BufferGeometry;position:THREE.Vector3;scale:THREE.Vector3}[]=[];
+    const housings:{body:THREE.Object3D;visible:boolean;model:THREE.Object3D}[]=[];
+    for(const visual of this.visuals){
+      for(const emitter of [visual.startEmitter,visual.endEmitter]){
+        const body=emitter.getObjectByName(`${emitter.name}-housing-collar`)!;
+        const housing=model.housing.clone(true);
+        housing.name=`${emitter.name}-authored-housing`;
+        housings.push({body,visible:body.visible,model:housing});
+        body.visible=false;emitter.add(housing);
+        for(const [suffix,geometry] of [['active-aperture',model.aperture],['inactive-aperture',model.aperture],
+          ['inactive-shutters',model.shutter]] as const){
+          const mesh=emitter.getObjectByName(`${emitter.name}-${suffix}`) as THREE.Mesh;
+          replacements.push({mesh,geometry:mesh.geometry,position:mesh.position.clone(),scale:mesh.scale.clone()});
+          mesh.geometry=geometry;mesh.position.set(0,0,0);mesh.scale.set(1,1,1);
+        }
+      }
+    }
+    this.sync();
+    let detached=false;
+    return ()=>{
+      if(detached)return;detached=true;
+      this.emitterBodyMaterial.visible=bodyMaterialVisible;
+      for(const replacement of replacements){
+        replacement.mesh.geometry=replacement.geometry;
+        replacement.mesh.position.copy(replacement.position);replacement.mesh.scale.copy(replacement.scale);
+      }
+      for(const housing of housings){housing.model.removeFromParent();housing.body.visible=housing.visible;}
+    };
   }
 
   dispose(): void {

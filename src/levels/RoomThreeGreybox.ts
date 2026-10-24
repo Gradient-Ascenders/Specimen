@@ -5,6 +5,7 @@ import { LaserHazardSystem } from '../hazards/LaserHazardSystem.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { ROOM_THREE_ACID_SURFACE_Y_METRES, RoomThreeArt } from '../render/environment/containment/RoomThreeArt.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
+import type {RoomThreeShellLoader} from '../render/environment/containment/RoomThreeShell.ts';
 import { GreyboxRoomBuilder } from './GreyboxRoomBuilder.ts';
 import {
   LevelTriggerVolume,
@@ -72,6 +73,25 @@ export class RoomThreeGreybox {
 
   updateEntryTrigger(target: TriggerContactTarget): void {
     this.checkpointTrigger.update(target);
+  }
+
+  async prepareArt(borrowFinish:(name:string)=>THREE.Material,loader?:RoomThreeShellLoader):Promise<void>{
+    await this.art.prepare(borrowFinish,loader);
+    this.art.shell.attachLasers(this.laserPresentation);
+  }
+
+  get renderSources():readonly THREE.Object3D[]{
+    return [...this.art.renderSources,this.laserPresentation.root];
+  }
+
+  /** One real emitter's buffers represent the shared twelve endpoint models. */
+  get authoredRenderMeshes():readonly THREE.Mesh[]{
+    const meshes=[...this.art.shell.renderMeshes];
+    const emitter=this.laserPresentation.root.getObjectByName('room-3-first-static-laser-presentation-emitter-start');
+    emitter?.traverseVisible(object=>{if(object instanceof THREE.Mesh)meshes.push(object);});
+    const shutter=emitter?.getObjectByName('room-3-first-static-laser-presentation-emitter-start-inactive-shutters');
+    if(shutter instanceof THREE.Mesh&&!meshes.some(mesh=>mesh.geometry===shutter.geometry))meshes.push(shutter);
+    return meshes;
   }
 
   updateFailureTrigger(target: TriggerContactTarget): void {

@@ -10,10 +10,12 @@ import {RoomOneShell} from '../src/render/environment/containment/RoomOneShell.t
 import {auditOpaqueSurfaces,collectOpaqueTriangles,findOpaqueSurfaceOverlaps} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import {loadRoomOneShellFixture} from './helpers/RoomOneShellAsset.ts';
 import {loadRoomTwoShellFixture} from './helpers/RoomTwoShellAsset.ts';
+import {loadRoomThreeShellFixture} from './helpers/RoomThreeShellAsset.ts';
+import {loadOpeningLaboratoryFixture} from './helpers/OpeningLaboratoryAsset.ts';
 
 async function prepare(scene:ContainmentLevelScene){
   await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
-  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture);
+  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture);
 }
 
 test('the Blender hall shares finish resources and preserves all collision data, landings and openings',async()=>{
@@ -23,7 +25,7 @@ test('the Blender hall shares finish resources and preserves all collision data,
     await prepare(scene);
     assert.deepEqual(captureContainmentCollisionFingerprint(scene.collisionMeshes),collision);
     assert.equal(shell.diagnostics.meshes,15);assert.ok(shell.diagnostics.triangles<40_000);
-    assert.equal(shell.diagnostics.textureCount,0);assert.equal(shell.diagnostics.cameras,2);
+    assert.equal(shell.diagnostics.textureCount,0);assert.equal(scene.surveillanceCameras.modelDiagnostics.cameras,5);
     const bytes=await readFile(new URL('../assets/environments/containment-room-two/room-two-hall.glb',import.meta.url));
     const json=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
     assert.equal(json.images,undefined);assert.equal(json.animations,undefined);assert.equal(json.cameras,undefined);
@@ -52,7 +54,7 @@ test('the Blender hall shares finish resources and preserves all collision data,
     assert.equal(prime.uniqueGeometryCount,prime.resourceCount);
     const root=shell.root.children[0];
     scene.resetTeachingPresentation();await scene.prepareEnvironmentArt(()=>{throw new Error('Must reuse prepared architecture');});
-    assert.equal(root,shell.root.children[0]);assert.equal(shell.diagnostics.cameras,2);
+    assert.equal(root,shell.root.children[0]);assert.equal(scene.surveillanceCameras.modelDiagnostics.cameras,5);
   }finally{scene.dispose();}
 });
 
@@ -107,6 +109,6 @@ test('a late hall load is released after unload without adopting geometry or all
   source.traverse(object=>{if(object instanceof THREE.Mesh)object.geometry.addEventListener('dispose',()=>count++);});
   const ready=shell.prepare(name=>room.borrowFinish(name),materials.materials,()=>new Promise(resolve=>{release=resolve;}));
   shell.dispose();release(source);await ready;
-  assert.equal(count,20);assert.equal(shell.ready,false);
+  assert.equal(count,15);assert.equal(shell.ready,false);
   room.dispose();materials.dispose();
 });

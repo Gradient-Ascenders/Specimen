@@ -3,7 +3,7 @@
 The existing 30 x 22 x 18 m teaching route is the immutable reference.
 Interactive stages: setup(), build_shell(), build_service_bay(), build_platforms(),
 build_adhesion(), build_observation(), build_drone_wrecks(), build_gantry(),
-build_camera(), preview(), export_asset().
+preview(), export_asset().
 Only the R2_ objects in the owned studio are regenerated.
 """
 import bpy
@@ -30,7 +30,7 @@ FINISHES = {
     'Graphite':((.028,.043,.052),.65,.25), 'Alloy':((.28,.35,.37),.37,.7),
     'Glass':((.13,.24,.27),.17,.12), 'Light':((.76,.86,.88),.4,0),
     'Screen':((.055,.23,.25),.5,0), 'Amber':((.52,.28,.06),.5,.12),
-    'Sticky':((.03,.55,.58),.65,0), 'Record':((.9,.02,.04),.5,0),
+    'Sticky':((.03,.55,.58),.65,0),
 }
 
 
@@ -70,7 +70,7 @@ def setup():
         if name=='Glass':
             p.inputs['Alpha'].default_value=.19
             mat.surface_render_method='DITHERED'
-        if name in {'Light','Screen','Record'}:
+        if name in {'Light','Screen'}:
             p.inputs['Emission Color'].default_value=(*tint,1)
             p.inputs['Emission Strength'].default_value=1
     print('Room 2 studio initialized; other scenes retained.')
@@ -224,14 +224,13 @@ def build_shell():
     end_wall(False)
     end_wall(True)
     portal('Drop duct collar',-8.4,11.5,27.37,2.2,2.6)
-    portal('Exit portal',0,12.25,48.63,3,3.7)
-    # A single inset bar marks the exit; no floating text or decorative thresholds.
-    box('Exit indicator housing',(2.3,.28,.16),(0,14.6,48.59),'Graphite')
-    box('Exit indicator',(2.1,.07,.018),(0,14.6,48.497),'Screen',.006)
+    # Room 3 owns the complete shared bulkhead, including the Room 2 face.
+    # Keep this opening free of a second frame or overlapping indicator.
     # Existing monitor/camera brackets keep their authored locations.
     box('Monitor mounting panel',(.22,2.5,5),(14.91,7.73804,31.7),'Cool')
     box('Monitor camera mounting pad',(.22,.68,.6),(14.96,8.04,34.65),'Alloy')
-    box('Exit camera mounting pad',(.68,.68,.18),(0,15.25,48.94),'Alloy')
+    # Above the shutter's complete camera tilt envelope, not just its rest pose.
+    box('Exit camera mounting pad',(.68,.68,.18),(0,16.20,48.94),'Alloy')
     print('Open structural hall, inset landing floor, faceted upper walls and physical portals built.')
 
 
@@ -511,34 +510,6 @@ def build_gantry():
     print('Calibration gantry and three integrated fixtures built without additional runtime lights.')
 
 
-def build_camera():
-    camera=bpy.data.objects.new(PREFIX+'Surveillance',None)
-    camera['asset']='containment-room-two-camera-v1'
-    bpy.context.scene.collection.objects.link(camera)
-    before=set(bpy.context.scene.objects)
-    box('Camera housing',(.47,.26,.55),(0,0,.065),'Ivory',.025,'Camera')
-    box('Camera sunshade',(.55,.035,.76),(0,.17,.15),'Ivory',.01,'Camera')
-    for side in (-1,1):
-        box('Camera shade flange '+str(side),(.025,.10,.70),(side*.26,.10,.15),'Ivory',.008,'Camera')
-        box('Camera cooling panel '+str(side),(.018,.17,.24),(side*.246,-.015,-.04),'Graphite',.006,'Camera')
-        for z in (-.11,-.045,.02,.085):
-            box('Camera cooling rib '+str(side)+' '+str(z),(.024,.13,.012),(side*.267,-.015,z),'Alloy',.003,'Camera')
-        tube('Camera hinge pin '+str(side),(side*.234,0,-.04),(side*.285,0,-.04),.025,'Graphite',16,'Camera')
-        tube('Camera hinge '+str(side),(side*.285,0,-.04),(side*.34,0,-.04),.07,'Alloy',16,'Camera')
-    box('Camera front seal',(.414,.225,.02),(0,0,.35),'Graphite',.012,'Camera')
-    tube('Camera lens mount',(0,0,.365),(0,0,.405),.096,'Alloy',24,'Camera')
-    tube('Camera focus barrel',(0,0,.405),(0,0,.53),.074,'Graphite',24,'Camera')
-    for z in (.424,.465,.506):
-        tube('Camera focus ring '+str(z),(0,0,z),(0,0,z+.016),.083,'Alloy',24,'Camera')
-    tube('Camera optical bezel',(0,0,.53),(0,0,.545),.067,'Graphite',24,'Camera')
-    tube('Camera optical glass',(0,0,.55),(0,0,.555),.052,'Screen',24,'Camera')
-    box('Camera recording diode',(.025,.025,.012),(.15,.055,.371),'Record',.003,'Camera')
-    for obj in set(bpy.context.scene.objects)-before:
-        if obj.type=='MESH':
-            obj.parent=camera
-    print('Shared custom surveillance-camera prefab built for the existing tracking joints.')
-
-
 def preview():
     scene=bpy.context.scene
     for obj in list(scene.objects):
@@ -562,8 +533,6 @@ def preview():
     scene.render.engine='CYCLES'
     scene.cycles.samples=24
     # Prefab is separate from the room and excluded from the architectural batch.
-    bpy.data.objects[PREFIX+'Surveillance'].hide_render=True
-    bpy.data.objects[PREFIX+'Surveillance'].hide_set(True)
     for area in bpy.context.screen.areas if bpy.context.screen else ():
         if area.type=='VIEW_3D':
             space=area.spaces.active
@@ -578,25 +547,21 @@ def preview():
 def export_asset():
     scene=bpy.context.scene
     root=bpy.data.objects[PREFIX+'Architecture']
-    prefab=bpy.data.objects[PREFIX+'Surveillance']
     selected,active=list(bpy.context.selected_objects),bpy.context.view_layer.objects.active
     root.name=PREFIX+'Editable architecture'
     runtime=bpy.data.objects.new(PREFIX+'Architecture',None)
     runtime['asset']='containment-room-two-v1'
     scene.collection.objects.link(runtime)
-    camera=bpy.data.objects.new(PREFIX+'Camera',None)
-    camera['asset']='containment-room-two-camera-v1'
-    scene.collection.objects.link(camera)
     copies=[]
     try:
         groups={}
-        for source in list(root.children)+list(prefab.children):
+        for source in list(root.children):
             obj=source.copy()
             obj.data=source.data.copy()
             obj.hide_render=False
             scene.collection.objects.link(obj)
             obj.hide_set(False)
-            obj.parent=camera if source.parent==prefab else runtime
+            obj.parent=runtime
             copies.append(obj.data)
             key=(obj.get('region','Shell'),obj.data.materials[0].name)
             groups.setdefault(key,[]).append(obj)
@@ -611,17 +576,16 @@ def export_asset():
             obj.name=PREFIX+'Batch_'+region+'_'+finish.removeprefix(PREFIX)
             copies.append(obj.data)
         bpy.ops.object.select_all(action='DESELECT')
-        for obj in [runtime,camera]+list(runtime.children)+list(camera.children):
+        for obj in [runtime]+list(runtime.children):
             obj.select_set(True)
         bpy.context.view_layer.objects.active=runtime
         bpy.ops.export_scene.gltf(filepath=HERE+'/room-two-hall.glb',export_format='GLB',
             use_selection=True,use_active_scene=True,export_yup=True,export_extras=True,
             export_cameras=False,export_lights=False,export_animations=False,export_materials='PLACEHOLDER')
     finally:
-        for obj in list(runtime.children)+list(camera.children):
+        for obj in list(runtime.children):
             bpy.data.objects.remove(obj,do_unlink=True)
         bpy.data.objects.remove(runtime,do_unlink=True)
-        bpy.data.objects.remove(camera,do_unlink=True)
         for data in set(copies):
             if data.users==0:
                 bpy.data.meshes.remove(data)
@@ -629,7 +593,7 @@ def export_asset():
         for obj in selected:
             obj.select_set(True)
         bpy.context.view_layer.objects.active=active
-    print('Exported shared-finish geometry and one camera prefab, without textures or lights.')
+    print('Exported shared-finish architecture without textures or lights; surveillance uses the original cutscene model.')
 
 
 def save_source():
@@ -650,7 +614,6 @@ def main():
     build_observation()
     build_drone_wrecks()
     build_gantry()
-    build_camera()
     preview()
     export_asset()
     save_source()

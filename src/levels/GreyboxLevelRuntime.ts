@@ -160,6 +160,16 @@ const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
     'room-3-first-static-laser-presentation-emitter-start-active-aperture',
   ],
   2: ['room-3-acid-surface-material-integration-point'],
+  3: [
+    // The new finish bank replaces the old Room 3 ceramic, gasket, sign and
+    // warning meshes. Their neighbouring-room counterparts can still enter
+    // the entry/upper-duct frustum under Room 3's seven-point light layout.
+    'room-4-east-wall-asymmetric-ceramic-service-skin',
+    'room-4-guide-rail-isolation-pads',
+    'room-4-entry-core-sign',
+    'room-4-power-cabinet-status-slots',
+  ],
+  4: ['room-5-goop-wooden-door', 'room-5-goop-speech-billboard'],
   5: ['room-3-acid-surface-material-integration-point'],
 };
 export interface GreyboxLevelRuntimeOptions {
@@ -2284,7 +2294,8 @@ export class GreyboxLevelRuntime {
               // That smaller layout can already see the new hall's finishes.
               const saved=prewarmCamera.clone();
               const ductSubset=createCompileSubset('containment-duct-exit-shader-prewarm-subset',
-                resources.testScene.teaching.roomTwoArt.shell.renderMeshes);
+                [...resources.testScene.teaching.roomTwoArt.shell.renderMeshes,
+                  ...(resources.testScene.roomThree.art.shell.ready?resources.testScene.roomThree.renderSources:[])]);
               try{
                 prewarmCamera.position.set(-8.289,11.671,24.008);
                 prewarmCamera.lookAt(-8.797,10.945,25.98);
@@ -2624,9 +2635,8 @@ function createRoomPrewarmSources(
       }
     }
   } else {
-    sources.push(
-      requiredNamedObject(levelRoot, `containment-room-${roomId}-greybox`),
-    );
+    if(roomId===3&&resources.testScene.roomThree.art.shell.ready)sources.push(...resources.testScene.roomThree.renderSources);
+    else sources.push(requiredNamedObject(levelRoot, `containment-room-${roomId}-greybox`));
     for (const child of teachingRoot.children) {
       if (child.name.startsWith('player-slime-')) sources.push(child);
     }
@@ -2647,6 +2657,11 @@ function createRoomPrewarmSources(
     const hall=resources.testScene.teaching.roomTwoArt;
     sources.push(...(hall.shell.ready?hall.shell.renderMeshes:[hall.root]),
       resources.testScene.roomTwoMonitor.root);
+  }
+  if(roomId===2&&resources.testScene.roomThree.art.shell.ready){
+    // The high doorway exposes the new basin, wall finishes and optical heads
+    // before the Room 3 rig takes over. Prepare their actual shared buffers.
+    sources.push(...resources.testScene.roomThree.renderSources,resources.testScene.roomThreeMonitor.root);
   }
 
   // Development spawn markers can also be seen from the far rooms.
@@ -2673,6 +2688,8 @@ function createCompileSubset(name:string,sources:readonly THREE.Object3D[]):THRE
   let compiledObjects = 0;
   const addCompileObject = (object: THREE.Object3D): void => {
     if (!isRenderableObject(object)) return;
+    const materials=Array.isArray(object.material)?object.material:[object.material];
+    if(!materials.some(material=>material.visible))return;
     const compileSignature = compileObjectSignature(object);
     if (compiledSignatures.has(compileSignature)) return;
     compiledSignatures.add(compileSignature);

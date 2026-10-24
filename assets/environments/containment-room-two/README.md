@@ -19,7 +19,7 @@ No downloaded models, textures or fonts are introduced.
 
 - `generate-room-two.py`: reproducible geometry and material-batched GLB export.
 - `room-two-hall.blend`: editable studio; individual architectural parts,
-  harnesses, cameras and wreck components remain separately editable.
+  harnesses and wreck components remain separately editable.
 - `room-two-hall.glb`: runtime geometry, in the game's X/Y-up/Z coordinates.
 
 Run from the repository root:
@@ -33,10 +33,9 @@ objects. Reconcile accepted edits into the generator before regenerating and
 reviewing the exported asset. Other live Blender scenes are retained. Preview
 lighting and render cameras are excluded from the GLB.
 
-`R2_Architecture` carries version `containment-room-two-v1`; the separate
-`R2_Camera` prefab carries `containment-room-two-camera-v1`. Temporary mesh copies
+`R2_Architecture` carries version `containment-room-two-v1`. Temporary mesh copies
 are joined by region and finish during export; source meshes are not joined.
-`R2_Batch_{Shell|Platforms|Camera}_{finish}` names select borrowed materials.
+`R2_Batch_{Shell|Platforms}_{finish}` names select borrowed materials.
 
 ## Runtime and performance
 
@@ -45,8 +44,9 @@ It borrows Room 1's existing ceramic/resin map bank and finish instances, plus
 the existing sticky material. UVs use world metres. No extra texture bank,
 dynamic lights, shadow maps or post-processing targets are allocated.
 
-Architecture, harnesses and wrecks total 35,584 triangles in 15 finish batches;
-the two tracking cameras share one five-batch geometry prefab. Only the platform
+Architecture, harnesses and wrecks total 34,936 triangles in 15 finish batches.
+The two tracking cameras use the original cutscene model shared by Rooms 1–3;
+the older Room 2 camera prefab is no longer exported. Only the platform
 batches cast shadows. The existing three room lights, two pooled booster spill
 lights and their activation rules remain with their current owners. The old
 procedural storyboard is hidden before gameplay and its retired buffers are
@@ -57,6 +57,11 @@ distances, adhesion coverage and door/duct clearances keep their existing
 authorities. Restart reuses prepared geometry and materials; unload releases
 owned geometry without disposing borrowed finishes. The original Iris Xe upload
 timings predate this asset and do not measure its hardware performance.
+
+The exit uses Room 3's shared raised-shutter bulkhead. Room 2 supplies the wall
+opening and existing camera mount, with no duplicate frame or indicator.
+The doorway surveillance mount is raised to leave clearance over the shutter
+through the complete camera tilt range.
 
 ## Surface ownership and checks
 

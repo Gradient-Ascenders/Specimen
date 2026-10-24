@@ -7,6 +7,10 @@ import { RoomThreeGreybox } from '../src/levels/RoomThreeGreybox.ts';
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import { ContainmentSurveillanceCameras, CONTAINMENT_SURVEILLANCE_PLACEMENTS,
   CONTAINMENT_SURVEILLANCE_TRACKING } from '../src/render/environment/containment/ContainmentSurveillanceCameras.ts';
+import {loadRoomOneShellFixture} from './helpers/RoomOneShellAsset.ts';
+import {loadRoomTwoShellFixture} from './helpers/RoomTwoShellAsset.ts';
+import {loadRoomThreeShellFixture} from './helpers/RoomThreeShellAsset.ts';
+import {loadOpeningLaboratoryFixture} from './helpers/OpeningLaboratoryAsset.ts';
 
 function createFixtures() {
   const roots = { 1: new THREE.Group(), 2: new THREE.Group(), 3: new THREE.Group(), 5: new THREE.Group() };
@@ -145,6 +149,50 @@ test('all fixtures share three bounded geometries and two materials without per-
     assert.equal(disposed, 5);
     assert.ok(rig.cameras.every(camera => camera.root.parent === null));
   } finally { rig.dispose(); }
+});
+
+test('Rooms 1–3 use the exact shared cutscene camera and the doorway camera clears the shutter through its full tilt range',async()=>{
+  const scene=new ContainmentLevelScene(()=>{}),rig=scene.surveillanceCameras;
+  const source=await loadOpeningLaboratoryFixture(),prefab=source.getObjectByName('OI_Camera')!;
+  const originals=new Map(meshes(prefab).map(mesh=>[mesh.name,mesh.geometry]));
+  try{
+    await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
+    await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,async()=>source);
+    assert.deepEqual(rig.modelDiagnostics,{ready:true,cameras:5,meshes:5,textureCount:0});
+    const geometry=new Set<THREE.BufferGeometry>();
+    for(const camera of rig.cameras){
+      const model=camera.tilt.getObjectByName('containment-authored-surveillance-camera');
+      if(camera.placement.roomId===5){assert.equal(model,undefined);continue;}
+      assert.ok(model);
+      for(const mesh of meshes(model)){
+        geometry.add(mesh.geometry);
+        assert.equal(mesh.castShadow,false);assert.equal(mesh.receiveShadow,false);
+        if(mesh.name.startsWith('OI_Camera_')){
+          assert.equal(mesh.geometry,originals.get(mesh.name),'Reuse the exact cutscene mesh, without substituting another camera.');
+          assert.equal(mesh.material,scene.teaching.roomOneArt.shell.borrowFinish(mesh.name.replace('OI_Camera_','')));
+        }
+      }
+      assert.equal(camera.tilt.getObjectByName(`${camera.root.name}-housing`)!.visible,false);
+      assert.equal(camera.tilt.getObjectByName(`${camera.root.name}-lens-and-recording-led`)!.visible,false);
+    }
+    assert.equal(geometry.size,5,'All five cameras share four authored buffers and one recording diode.');
+    const camera=rig.cameras.find(camera=>camera.placement.id==='room-2-exit-surveillance-camera')!;
+    const model=camera.tilt.getObjectByName('containment-authored-surveillance-camera')!;
+    const shutterEnvelope=new THREE.Box3(new THREE.Vector3(-2.1,14,48.3),new THREE.Vector3(2.1,14.90,49.5));
+    const T=CONTAINMENT_SURVEILLANCE_TRACKING;
+    for(const yaw of [-T.maximumYawRadians,0,T.maximumYawRadians])
+      for(const pitch of [T.minimumPitchRadians,.3,T.maximumPitchRadians]){
+        camera.pan.rotation.y=yaw;camera.tilt.rotation.x=pitch;scene.root.updateMatrixWorld(true);
+        const bounds=new THREE.Box3().setFromObject(model);
+        assert.equal(bounds.intersectsBox(shutterEnvelope),false,'The camera must clear the shutter when pointing down.');
+        assert.ok(bounds.min.y>15.1,'Leave physical clearance over the header, including the lens and yoke.');
+      }
+    let disposed=0,bank=0;
+    for(const resource of geometry)resource.addEventListener('dispose',()=>disposed++);
+    scene.teaching.roomOneArt.shell.borrowFinish('Ivory').addEventListener('dispose',()=>bank++);
+    rig.dispose();rig.dispose();assert.equal(disposed,5);assert.equal(bank,0);
+    scene.dispose();assert.equal(bank,1);
+  }finally{scene.dispose();}
 });
 
 test('Room 3 sticky-wall trim is separated from the backing and joined without overlapping coplanar corners', () => {

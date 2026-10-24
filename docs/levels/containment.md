@@ -33,8 +33,16 @@ Cultivation.
   the procedural dressing while preserving the route and tracking owners.
   [Room 2 laboratory](../../assets/environments/containment-room-two/README.md)
   documents authoring, resource ownership and surface-clearance checks.
+- Room 3's Blender chemical stress hall adds a reinforced basin, filtration and
+  extraction machinery, braced landing rigs and optical laser heads. It shares
+  the existing finish bank and preserves all hazard timing, acid interaction
+  and traversal geometry. [Room 3 laboratory](../../assets/environments/containment-room-three/README.md)
+  documents the source, runtime ownership and moving-state surface checks.
 - Level-owned effects and resources are disposed on unload; restart restores
   authored state without rebuilding static room geometry.
+- Surveillance cameras in Rooms 1–3 share the intro's `OI_Camera` geometry and
+  existing finish bank. Their pan/tilt owners still track Bob; the doorway mount
+  clears the raised shutter throughout its full rotation range.
 
 ## Verification focus
 

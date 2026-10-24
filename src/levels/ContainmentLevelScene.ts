@@ -13,6 +13,8 @@ import { RoomFiveMonitor } from '../render/environment/containment/RoomFiveMonit
 import { ContainmentSurveillanceCameras } from '../render/environment/containment/ContainmentSurveillanceCameras.ts';
 import { fitContainmentShadowCullingBounds } from '../render/environment/containment/ContainmentShadowCoverage.ts';
 import type {RoomTwoShellLoader} from '../render/environment/containment/RoomTwoShell.ts';
+import type {RoomThreeShellLoader} from '../render/environment/containment/RoomThreeShell.ts';
+import type {ContainmentSurveillanceModelLoader} from '../render/environment/containment/ContainmentSurveillanceModel.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
   type ContainmentStaticBatchDiagnostics,
@@ -304,22 +306,25 @@ export class ContainmentLevelScene {
     ];
   }
 
-  async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader):Promise<void>{
+  async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader,roomThreeLoader?:RoomThreeShellLoader,
+    cameraLoader?:ContainmentSurveillanceModelLoader):Promise<void>{
     await this.teaching.roomOneArt.prepare();
     if(this.disposed)return;
     await this.teaching.roomTwoArt.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomTwoLoader);
     if(this.disposed)return;
-    for(const camera of this.surveillanceCameras.cameras){
-      if(camera.placement.roomId===2)this.teaching.roomTwoArt.shell.attachCamera(camera.tilt);
-    }
+    await this.surveillanceCameras.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),cameraLoader);
+    if(this.disposed)return;
+    await this.roomThree.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomThreeLoader);
   }
 
   private currentFirstUseGeometryResources():readonly THREE.Mesh[]{
-    if(!this.teaching.roomTwoArt.shell.ready)return this.measuredFirstUseGeometryResources;
     // The old hardware timings are historical. Prime the new authored buffers
-    // explicitly instead of uploading hidden procedural Room 2 proxies.
-    return [...this.measuredFirstUseGeometryResources.filter(object=>!object.name.startsWith('room-2-')),
-      ...this.teaching.roomTwoArt.shell.renderMeshes];
+    // explicitly instead of uploading retired procedural Room 2/3 proxies.
+    const roomTwo=this.teaching.roomTwoArt.shell,roomThree=this.roomThree.art.shell;
+    return [...this.measuredFirstUseGeometryResources.filter(object=>
+      !(roomTwo.ready&&object.name.startsWith('room-2-'))&&!(roomThree.ready&&object.name.startsWith('room-3-'))),
+      ...(roomTwo.ready?roomTwo.renderMeshes:[]),...(roomThree.ready?this.roomThree.authoredRenderMeshes:[]),
+      ...this.surveillanceCameras.authoredRenderMeshes];
   }
 
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */

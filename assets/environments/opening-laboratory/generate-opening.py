@@ -247,7 +247,7 @@ def build_camera():
         box('Camera shade flange '+str(side),(.03,.1,.72),(side*.26,.12,.16),'Ivory',.009)
         box('Camera cooling panel '+str(side),(.018,.19,.3),(side*.236,-.005,-.025),'Graphite',.009)
         for z in (-.13,-.065,0,.065):
-            box('Camera heat rib '+str(side)+' '+str(z),(.026,.15,.014),(side*.245,-.005,z),'Alloy',.004)
+            box('Camera heat rib '+str(side)+' '+str(z),(.026,.15,.014),(side*.251,-.005,z),'Alloy',.004)
         tube('Camera tilt hinge '+str(side),(side*.23,0,-.04),(side*.3,0,-.04),.074,'Alloy',16)
     box('Camera yoke base',(.52,.055,.2),(0,.2,-.04),'Graphite',.018)
     for side in (-1,1):
@@ -256,7 +256,7 @@ def build_camera():
     box('Camera front gasket',(.415,.224,.024),(0,0,.35),'Graphite',.018)
     tube('Camera machined lens mount',(0,0,.358),(0,0,.415),.096,'Alloy',24)
     tube('Camera focus barrel',(0,0,.415),(0,0,.52),.078,'Graphite',24)
-    for z in (.435,.47,.505):
+    for z in (.435,.47,.501):
         tube('Camera focus ring '+str(z),(0,0,z),(0,0,z+.014),.083,'Alloy',24)
     tube('Camera optical bezel',(0,0,.52),(0,0,.543),.07,'Graphite',24)
     tube('Camera optical glass',(0,0,.543),(0,0,.548),.053,'Screen',24)

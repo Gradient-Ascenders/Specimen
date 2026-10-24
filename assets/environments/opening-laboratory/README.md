@@ -24,8 +24,14 @@ local to the doorway X offset of 4.3 metres, with floor Y=0 and Z=6.2..80.2.
 The camera prefab faces local +Z and attaches to the existing tilt joint.
 Mesh suffixes select finishes borrowed from `RoomOneShell`; the wing allocates
 no additional surface textures. The approximately 1.4 MB GLB contains about
-21,000 set triangles and a 2,076-triangle camera, reused four times. The intro
+21,000 set triangles and a roughly 2,000-triangle camera, reused four times. The intro
 keeps its four existing light slots and single 512px shadow map.
+
+Gameplay Rooms 1–3 use this same `OI_Camera` prefab on their existing tracking
+joints. `ContainmentSurveillanceModel` keeps its four geometry batches and
+borrows the Room 1 finishes; it discards the unused corridor geometry before
+gameplay GPU uploads. Five fixtures share those buffers and one small recording
+LED. The doorway mount is raised above the shutter's complete tilt envelope.
 
 `OpeningLaboratory.prepare()` loads the shared Room 1 surfaces and this set
 behind the initial blackout, before shader compilation and uploads. Retry

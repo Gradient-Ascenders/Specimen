@@ -22,12 +22,13 @@ test('the authored Room 2 prepares before play and reuses its shared resources a
     layer.setAnimationLoop(null);resources.containmentLevel.teleportToRoomForDebug(2);
     runtime.retargetCameraToActiveSlime(resources);layer.render();
     return {...resources.testScene.teaching.roomTwoArt.shell.diagnostics,
+      cameras:resources.testScene.surveillanceCameras.modelDiagnostics.cameras,
       prime:resources.testScene.measuredFirstUseGeometryPrimeDiagnostics,
       programs:layer.renderer.info.programs.length,glError:layer.renderer.getContext().getError()};
   });
   expect(diagnostics.ready).toBe(true);expect(diagnostics.meshes).toBe(15);
-  expect(diagnostics.cameras).toBe(2);expect(diagnostics.textureCount).toBe(0);expect(diagnostics.glError).toBe(0);
-  expect(diagnostics.prime.resourcesPrimed).toBe(true);expect(diagnostics.prime.resourceCount).toBe(33);
+  expect(diagnostics.cameras).toBe(5);expect(diagnostics.textureCount).toBe(0);expect(diagnostics.glError).toBe(0);
+  expect(diagnostics.prime.resourcesPrimed).toBe(true);expect(diagnostics.prime.resourceCount).toBe(45);
   const evidence='artifacts/evidence/room-two-shell';await mkdir(evidence,{recursive:true});
   for(const [name,position,target,fov] of [
     ['entry',[-8.4,11.7,29.4],[3,6.5,39.8],78],
