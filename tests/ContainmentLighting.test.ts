@@ -53,7 +53,7 @@ test('Room 1 proof retains its fixture and excludes glass and hidden colliders',
   assert.equal(key.castShadow, true);
   assert.deepEqual(key.position.toArray(), [0, 6.4, -0.5]);
   assert.deepEqual(key.target.position.toArray(), [0, 1.65, -0.5]);
-  assert.equal(key.intensity, 62);
+  assert.equal(key.intensity, 78);
   assert.equal(key.color.getHex(), 0xd9efff);
   assert.equal(key.angle, 0.48);
   assert.deepEqual(key.shadow.mapSize.toArray(), [1024, 1024]);

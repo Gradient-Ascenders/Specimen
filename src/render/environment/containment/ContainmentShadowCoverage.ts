@@ -34,7 +34,8 @@ export const CONTAINMENT_FIXTURE_AIMS: Readonly<Record<string, readonly [number,
   'room-2-sticky-and-exit-route-light': [14, 7, 43],
   'room-3-industrial-route-received-light': [16, 18, 63],
   'room-3-high-exit-vent-cue': [9, 31.2, 79],
-  'room-5-upper-traversal-received-light': [18, 82, 116],
+  'room-5-safe-entry-received-light': [7,78,101],
+  'room-5-upper-traversal-received-light': [16,87,116],
 };
 
 /** Doorway overlap is spatial presentation, independent of checkpoint/timer state. */

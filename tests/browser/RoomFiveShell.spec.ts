@@ -29,7 +29,7 @@ test('the atrium renders entry, thruster platforms, observation and Goop release
       programs:host.__atriumPrograms,retained:layer.renderer.info.programs.length};
   });
   expect(initial.shell.ready).toBe(true);expect(initial.shell.textureCount).toBe(0);
-  expect(initial.prime.uniqueGeometryCount).toBe(118);expect(initial.prime.resourcesPrimed).toBe(true);
+  expect(initial.prime.uniqueGeometryCount).toBe(137);expect(initial.prime.resourcesPrimed).toBe(true);
   const evidence='artifacts/evidence/room-five-atrium';await mkdir(evidence,{recursive:true});
   const samples=[];
   const poses:[string,number[],number,number][]=[

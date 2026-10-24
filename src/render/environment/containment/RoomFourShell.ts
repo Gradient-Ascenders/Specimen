@@ -175,7 +175,7 @@ export class RoomFourShell {
   get renderMeshes():readonly THREE.Mesh[]{
     const meshes:THREE.Mesh[]=[],geometry=new Set<THREE.BufferGeometry>();
     for(const root of [this.root,this.carRoot])root.traverse(object=>{
-      if(object instanceof THREE.Mesh&&!geometry.has(object.geometry)){geometry.add(object.geometry);meshes.push(object);}
+      if(object instanceof THREE.Mesh&&!object.userData.lightingOnly&&!geometry.has(object.geometry)){geometry.add(object.geometry);meshes.push(object);}
     });
     if(this.charges[0])meshes.push(this.charges[0].mesh);
     return meshes;
@@ -202,7 +202,7 @@ export class RoomFourShell {
 
 function disposeGeometry(root:THREE.Object3D,materials:boolean):void{
   const geometry=new Set<THREE.BufferGeometry>(),owned=new Set<THREE.Material>();
-  root.traverse(object=>{if(object instanceof THREE.Mesh){geometry.add(object.geometry);
+  root.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly){geometry.add(object.geometry);
     for(const material of Array.isArray(object.material)?object.material:[object.material])owned.add(material);}});
   for(const item of geometry)item.dispose();
   if(materials)for(const item of owned)item.dispose();

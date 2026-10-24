@@ -105,7 +105,7 @@ export class RoomFiveShell{
   get ready(){return !!this.source;}
   get renderMeshes():readonly THREE.Mesh[]{
     const meshes:THREE.Mesh[]=[];
-    for(const root of this.roots)root.traverse(object=>{if(object instanceof THREE.Mesh)meshes.push(object);});
+    for(const root of this.roots)root.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly)meshes.push(object);});
     return meshes;
   }
   get diagnostics(){
@@ -124,7 +124,7 @@ export class RoomFiveShell{
 }
 function disposeGeometry(root:THREE.Object3D,materials:boolean):void{
   const geometry=new Set<THREE.BufferGeometry>(),owned=new Set<THREE.Material>();
-  root.traverse(object=>{if(object instanceof THREE.Mesh){geometry.add(object.geometry);
+  root.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly){geometry.add(object.geometry);
     if(materials)for(const material of Array.isArray(object.material)?object.material:[object.material])owned.add(material);}});
   for(const value of geometry)value.dispose();for(const value of owned)value.dispose();
   root.removeFromParent();root.clear();

@@ -52,8 +52,8 @@ test('authored lift art preserves collision, travel, hazard timing, the complete
         .intersectObject(shell.carRoot,true);
       assert.ok(hits[0]);assert.ok(Math.abs(hits[0].point.y-top)<1e-5,'Keep the walkable roof aligned with its collider.');
     }
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount,118);
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,118);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount,137);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,137);
   }finally{level.dispose();}
 });
 

@@ -71,13 +71,13 @@ export class RoomTwoShell{
   /** Actual visible upload owners replace the retired procedural Room 2 list. */
   get renderMeshes():readonly THREE.Mesh[]{
     const meshes:THREE.Mesh[]=[];
-    this.root.traverse(object=>{if(object instanceof THREE.Mesh)meshes.push(object);});
+    this.root.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly)meshes.push(object);});
     return meshes;
   }
 
   get diagnostics(){
     let meshes=0,triangles=0;
-    this.root.traverse(object=>{if(object instanceof THREE.Mesh){meshes++;triangles+=(object.geometry.index?.count??object.geometry.getAttribute('position').count)/3;}});
+    this.root.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly){meshes++;triangles+=(object.geometry.index?.count??object.geometry.getAttribute('position').count)/3;}});
     return {ready:this.ready,meshes,triangles,textureCount:0,disposed:this.disposed};
   }
 
@@ -92,7 +92,7 @@ export class RoomTwoShell{
 
 function disposeGeometry(root:THREE.Object3D,materials:boolean):void{
   const geometries=new Set<THREE.BufferGeometry>(),owned=new Set<THREE.Material>();
-  root.traverse(object=>{if(object instanceof THREE.Mesh){geometries.add(object.geometry);for(const m of Array.isArray(object.material)?object.material:[object.material])owned.add(m);}});
+  root.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly){geometries.add(object.geometry);for(const m of Array.isArray(object.material)?object.material:[object.material])owned.add(m);}});
   for(const geometry of geometries)geometry.dispose();
   if(materials)for(const material of owned)material.dispose();
   root.removeFromParent();root.clear();

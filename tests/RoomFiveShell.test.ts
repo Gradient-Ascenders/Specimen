@@ -42,7 +42,7 @@ test('the authored atrium preserves collision, lasers, platform routes, thruster
     const file=await readFile(new URL('../assets/environments/containment-room-five/room-five-atrium.glb',import.meta.url));
     const json=JSON.parse(file.subarray(20,20+file.readUInt32LE(12)).toString());
     for(const key of ['images','textures','animations','cameras'])assert.equal(json[key],undefined);
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,118);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,137);
     for(const name of ['R5_Batch_Cell_Security','R5_Batch_Front_Security']){
       const marking=room.root.getObjectByName(name) as THREE.Mesh;
       assert.equal(marking.material,room.art.security.signs.material,'Reuse the original security atlas and its material owner.');

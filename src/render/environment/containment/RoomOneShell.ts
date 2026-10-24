@@ -126,7 +126,7 @@ export class RoomOneShell {
 
   get diagnostics() {
     let meshes=0,triangles=0;
-    this.asset?.traverse(object=>{if(object instanceof THREE.Mesh){meshes++;triangles+=(object.geometry.index?.count??object.geometry.getAttribute('position').count)/3;}});
+    this.asset?.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly){meshes++;triangles+=(object.geometry.index?.count??object.geometry.getAttribute('position').count)/3;}});
     return {ready:!!this.asset,meshes,triangles,textureCount:this.textures.length,
       textureBytes:this.textures.reduce((sum,texture)=>sum+(texture.image.data?.byteLength??0),0),disposed:this.disposed};
   }
@@ -152,7 +152,7 @@ export class RoomOneShell {
 
 function disposeAsset(root: THREE.Group, materials = true): void {
   const geometry = new Set<THREE.BufferGeometry>(), ownedMaterials = new Set<THREE.Material>();
-  root.traverse(object=>{if(object instanceof THREE.Mesh){geometry.add(object.geometry);for(const m of Array.isArray(object.material)?object.material:[object.material])ownedMaterials.add(m);}});
+  root.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly){geometry.add(object.geometry);for(const m of Array.isArray(object.material)?object.material:[object.material])ownedMaterials.add(m);}});
   for (const value of geometry) value.dispose();
   if (materials) for (const value of ownedMaterials) value.dispose();
   root.removeFromParent();root.clear();

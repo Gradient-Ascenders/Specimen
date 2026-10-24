@@ -84,7 +84,7 @@ test('the chemical hall shares the finish bank and retains the complete collisio
     room.reset();await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,()=>{throw new Error('Must reuse static architecture');});
     assert.equal(root,shell.root.children[0]);assert.deepEqual(hazards(),before);
     const prime=scene.measuredFirstUseGeometryPrimeDiagnostics;
-    assert.equal(prime.resourceCount,118);assert.equal(prime.uniqueGeometryCount,118);
+    assert.equal(prime.resourceCount,137);assert.equal(prime.uniqueGeometryCount,137);
     assert.ok(!prime.ownerNames.some(name=>name.startsWith('room-3-production-art-static-batch')));
   }finally{scene.dispose();}
 });

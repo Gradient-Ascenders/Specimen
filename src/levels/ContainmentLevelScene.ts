@@ -16,6 +16,7 @@ import type {RoomTwoShellLoader} from '../render/environment/containment/RoomTwo
 import type {RoomThreeShellLoader} from '../render/environment/containment/RoomThreeShell.ts';
 import type {RoomFourShellLoader} from '../render/environment/containment/RoomFourShell.ts';
 import type {RoomFiveShellLoader} from '../render/environment/containment/RoomFiveShell.ts';
+import {ContainmentLightingArt} from '../render/environment/containment/ContainmentLightingArt.ts';
 import type {ContainmentSurveillanceModelLoader} from '../render/environment/containment/ContainmentSurveillanceModel.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -158,6 +159,7 @@ const PRESERVED_STATIC_ART_NAMES = {
 
 /** Complete Level 1 scene composition while preserving the teaching-scene API. */
 export class ContainmentLevelScene {
+  readonly lightingArt=new ContainmentLightingArt();
   readonly platformBoosters: PlatformBoosters;
   readonly root = new THREE.Group();
   readonly artResources = new ContainmentArtResources();
@@ -323,6 +325,9 @@ export class ContainmentLevelScene {
     if(this.disposed)return;
     await this.roomFive.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
       this.roomThree.art.shell.borrowLaserEmitter()!,roomFiveLoader);
+    if(this.disposed)return;
+    this.lightingArt.prepare(this.root);
+    for(const owner of this.lightingArt.movingOwners)this.lighting.trackShadowOwner(owner.root,owner.radius,owner.localCentre);
   }
 
   private currentFirstUseGeometryResources():readonly THREE.Mesh[]{
@@ -333,7 +338,8 @@ export class ContainmentLevelScene {
       !(roomTwo.ready&&object.name.startsWith('room-2-'))&&!(roomThree.ready&&object.name.startsWith('room-3-'))&&
       !(roomFour.ready&&object.name.startsWith('room-4-'))&&!(roomFive.ready&&object.name.startsWith('room-5-'))),
       ...(roomTwo.ready?roomTwo.renderMeshes:[]),...(roomThree.ready?this.roomThree.authoredRenderMeshes:[]),
-      ...this.surveillanceCameras.authoredRenderMeshes,...(roomFour.ready?roomFour.renderMeshes:[]),...(roomFive.ready?roomFive.renderMeshes:[])];
+      ...this.surveillanceCameras.authoredRenderMeshes,...(roomFour.ready?roomFour.renderMeshes:[]),...(roomFive.ready?roomFive.renderMeshes:[]),
+      ...this.lightingArt.renderMeshes];
   }
 
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
@@ -505,6 +511,7 @@ export class ContainmentLevelScene {
     this.roomTwoMonitor.dispose();
     this.roomThreeMonitor.dispose();
     this.roomFiveMonitor.dispose();
+    this.lightingArt.dispose();
     this.lighting.dispose();
     for (const staticBatch of this.staticBatches) staticBatch.dispose();
     this.roomFive.dispose();

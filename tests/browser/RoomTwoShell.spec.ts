@@ -28,7 +28,7 @@ test('the authored Room 2 prepares before play and reuses its shared resources a
   });
   expect(diagnostics.ready).toBe(true);expect(diagnostics.meshes).toBe(15);
   expect(diagnostics.cameras).toBe(5);expect(diagnostics.textureCount).toBe(0);expect(diagnostics.glError).toBe(0);
-  expect(diagnostics.prime.resourcesPrimed).toBe(true);expect(diagnostics.prime.resourceCount).toBe(118);
+  expect(diagnostics.prime.resourcesPrimed).toBe(true);expect(diagnostics.prime.resourceCount).toBe(137);
   const evidence='artifacts/evidence/room-two-shell';await mkdir(evidence,{recursive:true});
   for(const [name,position,target,fov] of [
     ['entry',[-8.4,11.7,29.4],[3,6.5,39.8],78],

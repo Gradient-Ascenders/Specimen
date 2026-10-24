@@ -470,12 +470,12 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   await expect.poll(
     async () => (await diagnostics.textContent()) ?? '',
     { message: 'Waiting for measured resource prewarm diagnostics' },
-  ).toContain('measured first-use geometries / primes: primed 118 / 1');
+  ).toContain('measured first-use geometries / primes: primed 137 / 1');
   const prewarmProfile = parseLightingPrewarmProfile(
     (await diagnostics.textContent()) ?? '',
   );
   // Six historical owners, fifteen Room 2, eighteen Room 3, five shared camera, thirty Room 4 and forty-one Room 5 buffers.
-  expect(prewarmProfile.measuredFirstUseResourcePrimeCount).toBe(118);
+  expect(prewarmProfile.measuredFirstUseResourcePrimeCount).toBe(137);
   expect(
     prewarmProfile.measuredFirstUseResourcePrimeGeometriesAfter -
       prewarmProfile.measuredFirstUseResourcePrimeGeometriesBefore,

@@ -57,6 +57,41 @@ Cultivation.
   [Room 5 containment atrium](../../assets/environments/containment-room-five/README.md)
   documents the source, shared resources and moving-surface checks.
 
+## Lighting and shadows
+
+The five rooms share one ambient source with smoothly blended colour and
+intensity at the existing doorway handoffs. Fixtures keep the same light count,
+finite ranges and shadow-map budgets. Clinical keys emphasise the Room 1 chamber,
+Room 2 uses softer route lighting, Room 3 separates cool work lights from acid
+spill, the lift has warmer received light, and the atrium balances neutral
+ceiling light against Goop's green containment light.
+
+`ContainmentLightingArt` supplies simple shadow silhouettes derived offline from
+the actual GLBs. Only substantial, nearly solid components and filled landings
+become boxes; glass, hollow frames, small fittings and wall skins spanning
+doorways are excluded. Each assembly uses one depth submission. The existing
+hinges, platform interpolation and lift-door owners move their shadows; door
+cache invalidation uses the geometry's local centre rather than its empty origin.
+Soft vertex-alpha contact patches ground stationary equipment on authored flat
+floors. The pass adds no texture images, lights, post-processing or render targets.
+
+After changing an environment GLB, regenerate the small silhouette data:
+
+```sh
+node scripts/generate-containment-lighting.ts
+```
+
+The generated-asset check validates its source hashes and reproducibility.
+The existing loading preparation explicitly primes all 137 geometry owners,
+including the 19 small lighting meshes. Restart reuses them; unload releases
+their geometry and two shared materials without disposing borrowed finishes.
+Focused checks cover collision identity, silhouette budgets, transparent
+openings, landing coverage, moving-door caching, ambient handoffs and disposal.
+`tests/browser/ContainmentLightingPass.spec.ts` captures matching views through
+all five rooms and checks prepared shaders and restart. The local before/after
+comparison is under ignored `artifacts/evidence/containment-lighting/`; software
+WebGL observations are integration evidence rather than hardware FPS guarantees.
+
 ## Verification focus
 
 Play from title through the Level 2 handoff. Exercise wall attachment/detach,

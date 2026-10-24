@@ -17,7 +17,7 @@
     "generate:character-lods": "node scripts/generate-character-lods.ts",
     "generate:signage": "node scripts/generate-signage.ts",
     "generate:acid-noise": "node scripts/generate-acid-noise.ts",
-    "check:generated-assets": "node scripts/generate-blackout-maintenance-maps.ts --check && node scripts/generate-cultivation-assets.ts --check && node scripts/generate-character-lods.ts --check && node scripts/generate-acid-noise.ts --check && node scripts/generate-extermination-maps.ts --check",
+    "check:generated-assets": "node scripts/generate-blackout-maintenance-maps.ts --check && node scripts/generate-cultivation-assets.ts --check && node scripts/generate-character-lods.ts --check && node scripts/generate-acid-noise.ts --check && node scripts/generate-extermination-maps.ts --check && node scripts/generate-containment-lighting.ts --check",
     "test": "node --test tests/*.test.ts",
     "test:browser": "npm run build && playwright test",
     "test:smoke": "playwright test tests/smoke/ProductionSmoke.spec.ts tests/smoke/OpeningGraphics.spec.ts tests/smoke/LevelSelector.spec.ts --config playwright.smoke.config.ts",
