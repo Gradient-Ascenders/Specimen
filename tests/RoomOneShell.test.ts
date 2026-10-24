@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {RoomOneShell,parseRoomOneShell,readRoomOneMaps} from '../src/render/environment/containment/RoomOneShell.ts';
 import {ContainmentLevelScene} from '../src/levels/ContainmentLevelScene.ts';
 import {captureContainmentCollisionFingerprint} from '../src/levels/ContainmentCollisionFingerprint.ts';
+import {auditRoomOneRearWall} from './helpers/RoomOneRearWallSurfaces.ts';
 
 const bytes = await readFile(new URL('../assets/environments/containment-room-one/room-one-shell.glb',import.meta.url));
 const compressed = await readFile(new URL('../assets/environments/containment-room-one/room-one-maps.bin',import.meta.url));
@@ -69,6 +70,26 @@ test('adopting the shell preserves the complete gameplay collision fingerprint a
     assert.deepEqual(shell.root.children,meshes);
     assert.deepEqual(captureContainmentCollisionFingerprint(scene.collisionMeshes),before);
   } finally {scene.dispose();}
+});
+
+test('rear wall panels, metal returns and instruments have no competing opaque faces or holes',async()=>{
+  const shell=new RoomOneShell();
+  try {
+    await shell.prepare(asset);
+    for(const tolerance of [.0001,.002]){
+      assert.deepEqual(auditRoomOneRearWall(shell.root,tolerance).conflicts,[],
+        `Rear wall conflicts at ${tolerance} m; inspect same-batch bevels as well as separate meshes.`);
+    }
+    // The deliberate reveals have a sealed backing, including the new panel
+    // endpoints and the cover split around the diagnostic display.
+    for(const side of [-1,1])for(const x of [3.69,3.71,3.73,3.78,3.83,3.84,3.86])for(const y of [1.4,3.8,7.5]){
+      const hits=new THREE.Raycaster(new THREE.Vector3(side*x,y,-5),new THREE.Vector3(0,0,-1),0,2).intersectObject(shell.root,true);
+      assert.ok(hits.length>0,`Unsealed rear wall at ${side*x},${y}`);
+    }
+    for(const y of [3.9,4.25,4.27,4.3,4.8,5.03,5.05,5.07,5.2]){
+      assert.ok(new THREE.Raycaster(new THREE.Vector3(.1,y,-5),new THREE.Vector3(0,0,-1),0,2).intersectObject(shell.root,true).length>0);
+    }
+  } finally {shell.dispose();}
 });
 
 test('late preparation disposes its result after unload; normal ownership releases maps, materials and geometry once',async()=>{

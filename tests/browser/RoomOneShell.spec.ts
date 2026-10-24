@@ -32,6 +32,9 @@ test('the Blender Room 1 shell prepares in production, keeps its route and reuse
     ['observation',[-5.4,2.6,-4.4],[3.6,2.7,.7],67],
     ['escape',[4.6,2.2,-3],[-3.2,3.5,5.8],68],
     ['diagnostics-wall',[4.6,2.5,3.7],[-1.2,3,-5.8],72],
+    ['rear-trim-close',[-3.1,3.6,-4.5],[-3.78,3.8,-5.82],60],
+    ['rear-trim-grazing',[-6.2,3.8,-5.35],[3.8,3.8,-5.82],68],
+    ['rear-instruments',[.7,4.45,-4.5],[0,4.55,-5.6],62],
     ['ceiling',[-4.8,2,-3.8],[0,7.6,-.5],78],
   ] as const){
     const png=await page.evaluate(({position,target,fov})=>{

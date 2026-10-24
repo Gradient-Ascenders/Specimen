@@ -12,6 +12,7 @@ import { TitleScreenScene } from '../src/ui/TitleScreenScene.ts';
 import { RoomOneArt } from '../src/render/environment/containment/RoomOneArt.ts';
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import {useOpeningAssetFixtures} from './helpers/OpeningLaboratoryAsset.ts';
+import {auditRoomOneRearWall} from './helpers/RoomOneRearWallSurfaces.ts';
 
 const createScene = (options?: OpeningSceneOptions) => { const scene = new OpeningGameScene(new TitleScreenScene(), undefined, options); scene.begin(); return scene; };
 
@@ -327,6 +328,20 @@ test('the hatch uses the Blender Room 1 shell and real gameplay dressing', async
     assert.equal(scene.laboratory.menuEnvironment.visible, true);
     assert.equal(scene.laboratory.roomOne.root.visible, false);
   } finally { art.dispose(); scene.dispose(); }
+});
+
+test('the prepared intro rear wall stays free of opaque overlap through entry, hatch, lid lift and reset',async context=>{
+  useOpeningAssetFixtures(context);
+  const scene=createScene();
+  try {
+    await scene.laboratory.prepare();
+    for(const seconds of [T.entryStart+3,T.hatchStart,T.crackTwo,T.lidClear,T.formEnd,0,T.hatchStart]){
+      scene.apply(sampleOpeningGame(seconds),16/9);
+      for(const tolerance of [.0001,.002]){
+        assert.deepEqual(auditRoomOneRearWall(scene.room.scene,tolerance).conflicts,[],`Rear wall overlap at ${seconds}s, ${tolerance} m.`);
+      }
+    }
+  } finally {scene.dispose();}
 });
 
 test('security cameras sweep faster without changing their arc or reduced-motion stillness', () => {

@@ -316,6 +316,28 @@ def wall(name, x0, x1, y0, y1, z, mat):
     return box(name, [x1-x0,y1-y0,.12], [(x0+x1)/2,(y0+y1)/2,z-.06], mat, .025)
 
 
+def build_rear_quiet_wings():
+    # Each panel stops outside the full trim footprint, including its bevel.
+    # The old panel continued behind the trim's coplanar bevel faces. The
+    # 10 mm reveal is backed by the existing continuous dark rear bulkhead.
+    for side,name in ((-1,'west'),(1,'east')):
+        box('Rear quiet wing '+name, [2.96,6.6,.12], [side*5.32,4.4,-5.88], material('Ivory'))
+
+
+def build_instrument_covers():
+    for i,x in enumerate((-2.5,0,2.5)):
+        if i == 1:
+            # The diagnostic housing occupies Y=4.28..5.04 and is wider than
+            # its mounting cover. Split the cover around it instead of leaving
+            # intersecting back faces inside both parts' bevels.
+            for name,lo,hi in (('lower',3.375,4.26),('upper',5.06,5.225)):
+                box('Alcove instrument cover 1 '+name, [.35,hi-lo,.03],
+                    [x,(lo+hi)/2,-5.652], material('Alloy'),.006)
+        else:
+            box('Alcove instrument cover '+str(i), [.35,1.85,.03],
+                [x,4.3,-5.652], material('Alloy'))
+
+
 def build_walls():
     ivory, cool, dark, alloy = [material(n) for n in ('Ivory','Cool','Graphite','Alloy')]
     box('Rear alcove backing', [13.6,7.85,.12], [0,3.925,-6.52], dark, 0)
@@ -325,9 +347,8 @@ def build_walls():
     for i,x in enumerate((-2.5,0,2.5)):
         z = -5.73
         box('Alcove diagnostic cassette '+str(i), [.52,2.15,.12], [x,4.3,z], dark)
-        box('Alcove instrument cover '+str(i), [.35,1.85,.03], [x,4.3,z+.078], alloy)
-    for x in (-5.25,5.25):
-        box('Rear quiet wing '+str(x), [3.1,6.6,.12], [x,4.4,-5.88], ivory)
+    build_instrument_covers()
+    build_rear_quiet_wings()
     box('Rear service plinth', [13.6,1.08,.16], [0,.54,-5.89], cool)
     for x in (-3.78,3.78):
         box('Alcove vertical return '+str(x), [.10,6.65,.27], [x,4.4,-5.93], alloy)

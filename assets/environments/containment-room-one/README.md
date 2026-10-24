@@ -11,6 +11,13 @@ and a ceiling service crown. It replaces the old rectangular wall dressing.
 The GLB uses the game's X/Y-up/Z coordinates after Blender's normal glTF export.
 Its `R1_Architecture` node carries version `containment-room-one-v1`.
 
+Rear wall panels stop outside the complete metal-return footprint, including
+bevel faces. The small backed reveals seal the joins without duplicate coverage.
+The centre instrument cover is split around the diagnostic housing for the
+same reason. Keep these footprints separate when changing their dimensions;
+`RoomOneShell.test.ts` and `OpeningLaboratory.test.ts` audit the exported rear
+wall at 0.1 mm and 2 mm tolerances, including entry, hatch, lid lift and reset.
+
 ## Files and reproducibility
 
 - `generate-room-one.py`: deterministic source for geometry, procedural finishes,
