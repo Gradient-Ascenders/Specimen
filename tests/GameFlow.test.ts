@@ -212,7 +212,7 @@ test('pause ownership defers to a death flow that disabled gameplay input', () =
 });
 
 test('all active story sequences keep native pause when character controls are locked', () => {
-  for (const cinematic of ['cultivation-finale', 'cultivation-clearance', 'blackout-arrival', 'blackout-elevator']) {
+  for (const cinematic of ['cultivation-finale', 'cultivation-clearance', 'blackout-arrival', 'blackout-elevator', 'blackout-research']) {
     const pausable = gameFlowCinematicCanPause(cinematic, 'playing');
     assert.equal(pausable, true, cinematic);
     assert.equal(gameFlowCanPause('playing', false, pausable), true, cinematic);

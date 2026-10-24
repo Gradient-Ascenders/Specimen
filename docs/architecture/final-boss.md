@@ -25,19 +25,29 @@ Production builds and `npm run preview` cannot enable it, including with
 
 - WASD moves; Space fully charges a jump in **.35 s** (Bob retains **.7 s**);
   right mouse optionally aims/zooms. Launch strength/gravity are unchanged.
-- Tap/release left mouse fires electric goop: 2 direct damage.
-- Hold left mouse **1.5 seconds**, release: 18 direct damage and up to **14 m**
+- Dash bursts at **2.7 times movement speed** for **.22 seconds**; its cooldown
+  stays at **1.2 seconds**. Collision sweeps and gravity remain active.
+- Turning the wide third-person camera anticipates nearby wall/cover edges
+  along up to **.25 s** of the requested orbit. The boom retracts progressively;
+  the actual collision sweep still wins immediately and mouse yaw stays direct.
+- Tap/release left mouse fires electric goop: 1 direct damage.
+- Hold left mouse **.75 seconds**, release: 18 direct damage and up to **14 m**
   splash, with swept collision and cover/line-of-sight checks. Partial charge
-  retains direct damage but has no area damage.
-- Left mouse works without right mouse. Damage increases continuously with
-  charge: **2 / 6 / 10 / 18** at tap / quarter / half / full charge.
+  deals only **1 damage**, just like a tap, and has no area damage.
+- Left mouse works without right mouse. Only a completed charge receives bonus
+  damage: **1 / 1 / 1 / 18** at tap / quarter / half / full charge.
   Hip-fire retains the shoulder camera, crosshair and charge meter. Camera rays
   converge on combat targets, removing close-range third-person parallax misses.
-- In **phase two only**, a full-charge projectile aimed at the exposed boss core
-  provokes a physical sideways barrel roll. Phase one takes full-charge hits
-  normally. RAM disables evasion throughout its windup, charge and recovery,
-  allowing full-charge counterhits. Use partial charges in other phase-two moves; full charges
-  remain useful for destroying groups of drones and hostile orbs.
+- An accepted fully charged core hit stuns the boss for **.5 seconds**. Its own
+  movement, attack clock, guns and beam stop; existing projectiles and summoned
+  drones remain active. Tap shots and blocked shield/armour hits cannot stun it.
+- The boss no longer evades fully charged attacks in either phase. Full-charge
+  hits still require the exposed core; armour and the summon shield block them.
+- Each cover assembly has **500 HP**, five times Specimen's maximum integrity.
+  Guns, laser orbs and summoned-drone shots deal their normal contact damage;
+  a beam deals **40 damage once per sweep**. At zero HP the entire assembly and
+  its blocker disappear. RAM still destroys cover immediately. Retry restores
+  every assembly and its full HP.
 - Attacking-drone kills drop green medical packs. Touching one restores
   **25% of maximum integrity** (**25 HP**), capped at 100; full health does not
   consume the pack. Guardians do not drop them. Drops persist across the phase
@@ -223,20 +233,12 @@ guardians every **.7 s**. Their **28 / 84 m/s** role-specific projectile speeds 
 Only their attackers leave medical drops. All wings are prebuilt and share
 presentation resources; reset/unload removes their shots, adapters and colliders.
 
-### Physical charged-shot evasion
+### Charged-shot counterplay
 
-**Only phase two** sweeps active fully charged player shots against the actual
-eye collider up to **.22 s** before contact. Cover, armour, near misses and
-distant shots cannot provoke a dodge. RAM is excluded, including its windup
-and recovery, so it remains a full-charge punish window. The boss moves **34 m** sideways
-(bounded inside the arena near walls), rolls once in the first **.48 s**, holds
-upright while the projectile passes, and returns smoothly within **1.6 s**.
-Lateral departure takes **.24 s**; return starts at **.75 s**. A dedicated child roll rig separates
-that single flip from steering; the return never adds another flip. The visible
-hull and core/armour proxies move together; damage is
-not secretly rejected or made invulnerable. Quick and partial shots do not
-trigger this response. Evasion offsets do not accumulate in hover movement,
-and reset clears heading, offset and projectile ownership.
+The encounter no longer creates or updates `ExterminatorEvasion`. The unused
+helper remains isolated for reference; neither phase can trigger a roll or move
+the eye aside to evade a charge. Full-charge core hits deal **18 damage** and
+stun the boss for **.5 s**. Incomplete charges deal **1 damage**.
 
 ### Phase-one summoned drone roles
 

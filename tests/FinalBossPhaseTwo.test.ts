@@ -310,19 +310,18 @@ test('RAM physically crosses the charge path, breaks complete cover assemblies a
   }finally{f.dispose();}
 });
 
-for(const phase of [1,2])test(`phase ${phase} ${phase===1?'takes a full-charge core hit without dodging':'physically evades a full-charge core hit with a spin'}; partial shots still deal damage`,()=>{
+for(const phase of [1,2])test(`phase ${phase} takes full-charge and partial core hits without any evasive roll`,()=>{
   const f=fixture();
   try {
     if(phase===2)f.phaseTwo();const health=f.boss.controller.readModel.health;
     f.tick(90);f.aimCore();f.weapon.update(1.5,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));
     let offset=0,roll=0;
-    for(let i=0;i<180;i++){f.tick();offset=Math.max(offset,f.boss.evasion.offset.length());roll=Math.max(roll,Math.abs(f.boss.evasion.roll));}
-    if(phase===2){assert.ok(offset>33);assert.ok(roll>Math.PI*1.9);assert.equal(f.boss.controller.readModel.health,health);}
-    else {assert.equal(offset,0);assert.equal(roll,0);assert.equal(f.boss.controller.readModel.health,health-18);}
+    for(let i=0;i<180;i++){f.tick();offset=Math.max(offset,f.presentation.evasionOffset.length());roll=Math.max(roll,Math.abs(f.presentation.evasionRoll));}
+    assert.equal(offset,0);assert.equal(roll,0);assert.equal(f.boss.controller.readModel.health,health-18);
     const beforePartial=f.boss.controller.readModel.health;
-    f.aimCore();f.weapon.update(.75,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));f.tick(120);
+    f.aimCore();f.weapon.update(.375,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));f.tick(120);
     assert.ok(f.boss.controller.readModel.health<beforePartial,'partial shots must not be dodged or made invulnerable');
-    f.boss.reset();assert.equal(f.boss.evasion.active,false);assert.equal(f.boss.evasion.offset.length(),0);assert.equal(f.presentation.evasionRoll,0);
+    f.boss.reset();assert.equal(f.presentation.evasionOffset.length(),0);assert.equal(f.presentation.evasionRoll,0);
   }finally{f.dispose();}
 });
 
@@ -338,7 +337,7 @@ for(const stage of ['telegraph','active','recovery'] as const)test(`RAM ${stage}
     f.body.recoverAt(f.presentation.coreWorld.clone().addScaledVector(forward,6).setY(f.presentation.coreWorld.y-.75));
     f.aimCore();f.weapon.update(1.5,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));
     const before=m.health;
-    for(let i=0;i<12;i++){f.tick();assert.equal(f.boss.evasion.active,false);assert.equal(f.boss.evasion.offset.length(),0);assert.equal(f.presentation.evasionRoll,0);}
+    for(let i=0;i<12;i++){f.tick();assert.equal(f.presentation.evasionOffset.length(),0);assert.equal(f.presentation.evasionRoll,0);}
     assert.equal(m.health,before-18,'committing to RAM should allow the full charged damage, not merely hide the roll');
   }finally{f.dispose();}
 });

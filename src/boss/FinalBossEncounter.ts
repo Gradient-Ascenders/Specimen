@@ -16,7 +16,6 @@ import { FinalBossPresentation } from './FinalBossPresentation.ts';
 import { FinalBossHud } from './FinalBossHud.ts';
 import { BossHealthPacks } from './BossHealthPacks.ts';
 import { ExterminatorReinforcements } from './ExterminatorReinforcements.ts';
-import { ExterminatorEvasion } from './ExterminatorEvasion.ts';
 
 /** Visible emitters/endpoints and hit authority share one source. */
 export class FinalBossEncounter {
@@ -26,7 +25,6 @@ export class FinalBossEncounter {
   readonly projectiles:ExterminatorProjectiles;
   readonly healthPacks:BossHealthPacks;
   readonly reinforcements:ExterminatorReinforcements;
-  readonly evasion:ExterminatorEvasion;
   readonly element:HTMLElement;
   readonly beamStart=new THREE.Vector3();
   readonly beamEnd=new THREE.Vector3();
@@ -69,7 +67,6 @@ export class FinalBossEncounter {
     this.options=options;this.controller=new FinalBossController({random:options.random});this.presentation=options.presentation;
     this.droneFlight=new ExterminatorDroneFlight(options.world);
     const {world,targets,arena,weapon}=options,p=this.presentation;arena.root.add(p.root);
-    this.evasion=new ExterminatorEvasion({world,eye:p.core,machine:p.machine});
     for(const collider of [arena.entryDoor,arena.exitDoor,...arena.platforms.map(p=>p.collider)])world.setTransformMode(collider,ColliderTransformMode.Dynamic);
     const weakPoint=new SentinelWeakPointTarget({id:'extermination-core',hitMeshes:[p.core],authority:{
       isWeakPointOpen:()=>this.controller.readModel.weakPointOpen,copyWeakPointSplashPosition:out=>out.copy(p.coreWorld),
@@ -82,15 +79,15 @@ export class FinalBossEncounter {
     world.register(p.shield,CollisionLayer.Projectile|CollisionLayer.LineOfSight,ColliderTransformMode.Dynamic);
     this.unregister.push(()=>world.unregister(p.shield),targets.register({id:'extermination-shield',hitMeshes:[p.shield],isCombatActive:()=>this.controller.readModel.shieldActive,copySplashWorldPosition:out=>out.copy(p.machine.position),
       applyImpact:impact=>{this.controller.deflect();p.burst(this.closest.copy(impact.point),5);return {accepted:false,destroyed:false,rejectionReason:'invulnerable'};}}));
-    this.projectiles=new ExterminatorProjectiles({world,targets,weapon,onPlayerHit:(damage,id)=>this.hitPlayer(damage,id)});arena.root.add(this.projectiles.root);
+    this.projectiles=new ExterminatorProjectiles({world,targets,weapon,onPlayerHit:(damage,id)=>this.hitPlayer(damage,id),onWorldHit:(object,damage)=>this.damageCover(object,damage)});arena.root.add(this.projectiles.root);
     this.healthPacks=new BossHealthPacks(world);arena.root.add(this.healthPacks.root);
     this.reinforcements=new ExterminatorReinforcements({world,targets,
       onDestroyed:(at,attacker)=>{p.burst(at,20);if(attacker)this.healthPacks.drop(at);options.audio?.play('world-drone-dissolve-01',at,true,.75);},
-      onShot:at=>options.audio?.play('specimen-turret-shot',at,true,.3)});arena.root.add(this.reinforcements.root);
+      onShot:at=>options.audio?.play('specimen-turret-shot',at,true,.3),onWorldHit:object=>this.damageCover(object,8)});arena.root.add(this.reinforcements.root);
     this.unregister.push(this.projectiles.events.on('impact',e=>{p.burst(e.position,e.kind==='orb'?22:e.intercepted?9:4);if(e.kind==='orb')options.audio?.play('world-drone-dissolve-01',e.position,true,.65);}));
     this.squad=new SentinelDroneSquad({collisionWorld:world,targetRegistry:targets,anchors:Array.from({length:T.droneCount},()=>new THREE.Vector3(0,20,FINAL_ARENA.centreZ)),maximumDrones:T.droneCount,
       droneHealthUnits:T.droneHealth,fireIntervalSeconds:T.phaseOneDroneFireSeconds,fireStaggerSeconds:.04,deploymentDelaySeconds:1.6,projectileSpeedMetresPerSecond:T.droneProjectileSpeed,projectileLifetimeSeconds:6,projectileRangeMetres:180,
-      projectileCapacity:T.hostileProjectileCapacity,projectileCollisionMask:CollisionLayer.Movement,idPrefix:'extermination-minion',colliderSize:new THREE.Vector3(1.8,1,1.7),blocksLineOfSight:false});
+      projectileCapacity:T.hostileProjectileCapacity,projectileCollisionMask:CollisionLayer.Movement,onProjectileWorldHit:object=>this.damageCover(object,8),idPrefix:'extermination-minion',colliderSize:new THREE.Vector3(1.8,1,1.7),blocksLineOfSight:false});
     arena.root.add(this.squad.root);this.droneResources.material('armour').color.setHex(0x572b32);this.droneResources.material('armourShadow').color.setHex(0x24171e);
     this.squad.root.children.forEach((root,index)=>{
       ((root.children[0] as THREE.Mesh).material as THREE.Material).visible=false;
@@ -112,6 +109,10 @@ export class FinalBossEncounter {
   get cinematic():boolean {return this.controller.cinematic;}
   presentMerge(progress:number):void {this.hud.presentMerge(progress);this.options.host.dataset.bossEncounter='true';}
   start(shortIntro=false):boolean {if(!this.controller.start(shortIntro))return false;this.activateEncounter();return true;}
+  startAfterArrival():boolean {
+    if(!this.controller.start())return false;
+    this.controller.skipCinematic(this.options.body.position);this.activateEncounter();return true;
+  }
   startPhaseTwo():boolean {if(!this.controller.startPhaseTwo(this.options.body.position))return false;this.activateEncounter();return true;}
   private activateEncounter():void {this.options.arena.setPowered(true);this.options.arena.setDoors(true);this.options.audio?.startLoop('final-boss-engine','world-machinery-loop-01',this.presentation.machine.position);this.sync();}
   update(dt:number,skip=false):void {
@@ -128,15 +129,13 @@ export class FinalBossEncounter {
       if(m.state==='escape'||m.state==='complete')this.options.audio?.stopLoop('final-boss-engine');this.oldState=m.state;
     }
     if(m.attackSerial!==this.weaponSerial){this.weaponSerial=m.attackSerial;this.fired=0;if(m.attack==='summon-defend'){this.projectiles.clear();this.squad.clear();}}
-    // RAM is a committed punish window: neither its windup, charge nor recovery
-    // may start or carry a barrel roll away from a full-charge countershot.
-    this.evasion.update(dt,this.controller.combatActive&&m.phase===2&&m.weakPointOpen&&m.attack!=='ram',this.presentation.coreWorld,this.options.weapon.projectileStates);
-    this.presentation.evasionOffset.copy(this.evasion.offset);this.presentation.evasionRoll=this.evasion.roll;
     this.sync();
     if(m.state==='defeated'&&m.progress>.55&&!this.explosionPlayed){this.explosionPlayed=true;this.presentation.burst(this.presentation.coreWorld,32);this.shake=.2;}
     if(!this.controller.combatActive)return;
     const stageKey=`${m.attackSerial}:${m.stage}`;if(stageKey!==this.oldStage){this.options.audio?.play(m.stage==='telegraph'?'world-activation-01':'world-release-01',this.presentation.eyeMuzzle,true,.7);this.oldStage=stageKey;}
-    this.updateRam();this.updateWeapons();this.projectiles.update(dt,this.options.body);if(!this.controller.combatActive)return;this.updateDrones(dt);this.updateBeam();
+    if(m.stunRemaining<=0){this.updateRam();this.updateWeapons();}
+    this.projectiles.update(dt,this.options.body);if(!this.controller.combatActive)return;this.updateDrones(dt);
+    this.updateBeam();
     if(m.phase===2) {
       while(this.reinforcementIndex<m.reinforcementIndex)this.reinforcements.deploy(this.reinforcementIndex++,this.presentation.machine,this.options.body);
       this.reinforcements.update(dt,this.controller.time,this.options.body,(damage,serial)=>this.hitPlayer(damage,serial));
@@ -194,10 +193,11 @@ export class FinalBossEncounter {
   }
   private updateBeam():void {
     const m=this.controller.readModel,p=this.presentation,{body}=this.options;p.beam.visible=false;p.beamCore.visible=false;p.beamImpact.visible=false;
-    if(m.attack!=='laser-beam'||m.stage==='recovery')return;
+    if(m.attack!=='laser-beam'||m.stage==='recovery'||m.stunRemaining>0){this.options.audio?.stopLoop('final-boss-beam');return;}
     this.beamStart.copy(p.eyeMuzzle);p.copyBeamDirection(this.direction);this.beamEnd.copy(this.beamStart).addScaledVector(this.direction,FINAL_ARENA.radius*2.5);this.direction.subVectors(this.beamEnd,this.beamStart);
     const world=this.options.world.sweepSphere(this.beamStart,this.direction,T.beamRadius,this.hit,CollisionLayer.Movement);if(world)this.beamEnd.copy(this.hit.point);
     const active=m.stage==='active';p.showBeam(this.beamStart,this.beamEnd,active?T.beamRadius:.08,!active);if(!active)return;
+    if(world)this.damageCover(this.hit.object,T.beamDamage,m.attackSerial*8+m.beamSegment);
     if(world){p.beamImpact.visible=true;p.beamImpact.position.copy(this.beamEnd);p.beamImpact.scale.setScalar(T.beamRadius*(1.28+.2*Math.sin(this.controller.time*30)));}
     this.line.set(this.beamStart,this.beamEnd);this.line.closestPointToPoint(this.playerPosition.copy(body.position),true,this.closest);const near=this.closest.distanceToSquared(body.position)<(T.beamRadius+body.radiusMetres)**2;
     this.line.closestPointToPoint(this.playerPosition.copy(body.previousPosition),true,this.closest);if(near||this.closest.distanceToSquared(body.previousPosition)<(T.beamRadius+body.radiusMetres)**2)
@@ -219,6 +219,11 @@ export class FinalBossEncounter {
     }
     if(p.ramHull.intersectsPlayer(body.previousPosition,body.position,body.radiusMetres))
       this.hitPlayer(T.ramDamage,m.attackSerial*8+7);
+  }
+  private damageCover(object:THREE.Mesh|null,damage:number,beamSerial?:number):void {
+    this.options.arena.damageCover(object,damage,at=>{
+      this.presentation.burst(at,32);this.shake=Math.max(this.shake,.14);this.options.audio?.play('world-release-01',at,true,.8);
+    },beamSerial);
   }
   private updateDrones(dt:number):void {
     const {body}=this.options,t=this.controller.time,p=this.presentation,m=this.controller.readModel,base=m.phase===1?T.phaseOneDroneFireSeconds:T.phaseTwoDroneFireSeconds;
@@ -280,7 +285,7 @@ export class FinalBossEncounter {
   private shakeCamera(camera:THREE.PerspectiveCamera):void {
     const t=this.controller.time;camera.position.x+=Math.sin(t*83)*this.shake;camera.position.y+=Math.sin(t*67+.8)*this.shake*.65;camera.position.z+=Math.sin(t*97+1.7)*this.shake*.45;
   }
-  clearAttacks():void {this.squad.clear();this.droneFlight.reset();this.projectiles.clear();this.reinforcements.reset();this.evasion.reset();this.shake=0;this.hostileShots.count=0;this.presentation.clearRamImpact();this.presentation.beam.visible=false;this.presentation.beamCore.visible=false;this.presentation.beamImpact.visible=false;this.presentation.shield.visible=false;this.presentation.eyeCharge.visible=false;this.presentation.clearAttackWarnings();for(let i=0;i<6;i++)this.options.arena.setSector(i,'inactive');this.oldStage='';this.options.audio?.stopLoop('final-boss-beam');}
+  clearAttacks():void {this.squad.clear();this.droneFlight.reset();this.projectiles.clear();this.reinforcements.reset();this.presentation.evasionOffset.set(0,0,0);this.presentation.evasionRoll=0;this.shake=0;this.hostileShots.count=0;this.presentation.clearRamImpact();this.presentation.beam.visible=false;this.presentation.beamCore.visible=false;this.presentation.beamImpact.visible=false;this.presentation.shield.visible=false;this.presentation.eyeCharge.visible=false;this.presentation.clearAttackWarnings();for(let i=0;i<6;i++)this.options.arena.setSector(i,'inactive');this.oldStage='';this.options.audio?.stopLoop('final-boss-beam');}
   suspend():void {this.controller.suspend();this.clearAttacks();this.healthPacks.reset();this.options.audio?.stopLoop('final-boss-engine');this.hud.hide();}
   reset():void {this.clearAttacks();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.hud.hide();this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');delete this.options.host.dataset.bossEncounter;}
   dispose():void {if(this.disposed)return;this.reset();for(const off of this.unregister)off();for(const drone of this.drones)drone.dispose();this.droneResources.dispose();this.squad.dispose();this.reinforcements.dispose();this.healthPacks.dispose();this.projectiles.dispose();this.hostileShots.removeFromParent();this.hostileShots.dispose();this.shotGeometry.dispose();this.shotMaterial.dispose();this.presentation.dispose();this.controller.dispose();this.hud.dispose();this.disposed=true;}

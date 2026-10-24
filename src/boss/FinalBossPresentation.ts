@@ -151,6 +151,7 @@ export class FinalBossPresentation {
   }
   update(model:FinalBossReadModel,time:number,body:KinematicBody):void {
     const dt=Math.min(.1,Math.max(0,time-this.lastTime));this.lastTime=time;
+    const motionDt=model.stunRemaining>0?0:dt||1/60;
     this.machine.position.sub(this.appliedEvasion);this.previousBase.copy(this.machine.position);
     this.root.visible=model.state!=='idle';
     this.machine.visible=true;this.finalShot.visible=false;this.explosion.visible=false;
@@ -164,11 +165,11 @@ export class FinalBossPresentation {
       const down=model.stage==='telegraph'?THREE.MathUtils.smoothstep(model.progress,0,.82):model.stage==='active'?1:1-THREE.MathUtils.smoothstep(model.progress,0,1);
       targetY=THREE.MathUtils.lerp(FINAL_BOSS_TUNING.hoverY,FINAL_BOSS_TUNING.beamHeight-this.warDrone.coreMount.y*FINAL_BOSS_TUNING.scale,down);
     }
-    this.machine.position.x=THREE.MathUtils.damp(this.machine.position.x,targetX,5,dt||1/60);
-    this.machine.position.z=THREE.MathUtils.damp(this.machine.position.z,targetZ,5,dt||1/60);
-    this.machine.position.y=beamMove?targetY:THREE.MathUtils.damp(this.machine.position.y,targetY,5,dt||1/60);
+    this.machine.position.x=THREE.MathUtils.damp(this.machine.position.x,targetX,5,motionDt);
+    this.machine.position.z=THREE.MathUtils.damp(this.machine.position.z,targetZ,5,motionDt);
+    this.machine.position.y=beamMove?targetY:THREE.MathUtils.damp(this.machine.position.y,targetY,5,motionDt);
     const wantedYaw=beamMove?this.beamYaw:Math.atan2(this.machine.position.x-body.position.x,this.machine.position.z-body.position.z);
-    this.machine.rotation.y+=Math.atan2(Math.sin(wantedYaw-this.machine.rotation.y),Math.cos(wantedYaw-this.machine.rotation.y))*(1-Math.exp(-7*(dt||1/60)));
+    this.machine.rotation.y+=Math.atan2(Math.sin(wantedYaw-this.machine.rotation.y),Math.cos(wantedYaw-this.machine.rotation.y))*(1-Math.exp(-7*motionDt));
     if(beamMove&&model.stage==='active')this.machine.rotation.y=this.beamYaw+model.beamRotationRadians;
     this.machine.rotation.x=beamMove?0:Math.sin(time*.6)*.02;
     this.machine.rotation.z=beamMove?0:Math.sin(time*.75)*.035;
@@ -327,6 +328,12 @@ export class FinalBossPresentation {
   faceSpecimen(yaw:number):void {
     if(this.authoredSpecimen)this.authoredSpecimen.setYaw(yaw);
     else this.specimen.rotation.y=yaw;
+  }
+  presentArrival(time:number,progress:number):void {
+    this.root.visible=true;this.machine.visible=true;
+    this.machine.position.set(0,THREE.MathUtils.lerp(-30,FINAL_BOSS_TUNING.hoverY,progress),FINAL_ARENA.centreZ);
+    this.machine.rotation.set(-.04*(1-progress),0,Math.sin(time*.8)*.012*(1-progress));
+    this.rollRig.rotation.z=0;this.warDrone.update(time,false,1,1/60);this.machine.updateMatrixWorld(true);
   }
   kickGuns():void {this.warDrone.kickGuns();}
   kickEye():void {this.eyeFlash=.12;}
