@@ -1,3 +1,4 @@
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import type { RenderLayer } from '../render/RenderLayer.ts';
 import type { OpeningGameScene } from './OpeningGameScene.ts';
 import { OPENING_GAME_TIMING, sampleOpeningGame } from './OpeningGameTimeline.ts';
@@ -28,6 +29,7 @@ export class OpeningGamePresentation {
   private readonly options: OpeningGamePresentationOptions;
   private readonly hostWindow: Window;
   private readonly audio: OpeningAudio;
+  private readonly music = new CinematicMusic('awakening', OPENING_GAME_TIMING.end - OPENING_GAME_TIMING.blackoutEnd);
   private started = false;
   private disposed = false;
   private completed = false;
@@ -124,6 +126,7 @@ export class OpeningGamePresentation {
     if (!this.started || this.disposed || this.completed) return;
     this.skipRequested = true;
     this.audio.stop();
+    this.music.stop();
     this.seconds = OPENING_GAME_TIMING.end;
     this.updateFade(1);
     this.schedulePreparation();
@@ -168,6 +171,7 @@ export class OpeningGamePresentation {
     const resized = width !== this.width || height !== this.height;
     if (!resized && this.accumulator + 1e-9 < 1 / 30) return;
     const frame = sampleOpeningGame(this.seconds);
+    this.music.update(frame.seconds - OPENING_GAME_TIMING.blackoutEnd);
     this.audio.update(frame.seconds);
     this.options.scene.apply(frame, width / height, this.options.reducedMotion);
     this.options.renderLayer.withShadowPreparation(true, () => {
@@ -197,6 +201,7 @@ export class OpeningGamePresentation {
     if (this.disposed) return;
     this.disposed = true;
     this.audio.stop();
+    this.music.stop();
     this.options.host.ownerDocument.removeEventListener?.('visibilitychange', this.onVisibility);
     this.hostWindow.cancelAnimationFrame(this.loadFrame);
     this.hostWindow.cancelAnimationFrame(this.levelLoadFrame);
@@ -235,7 +240,7 @@ export class OpeningGamePresentation {
   }
 
   private readonly onVisibility = (): void => {
-    if (this.options.host.ownerDocument.hidden) this.audio.pause();
+    if (this.options.host.ownerDocument.hidden) { this.audio.pause(); this.music.pause(); }
   };
 
   private prepareLevel(): void {

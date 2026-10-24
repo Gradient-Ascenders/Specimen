@@ -2,6 +2,8 @@ import { gameplayBindings } from './core/KeyBindings.ts';
 import { AudioManager } from './audio/AudioManager.ts';
 import { prepareBlackoutArrivalAudio } from './audio/BlackoutArrivalAudio.ts';
 import { BackgroundMusic, musicForFlow, type MusicLevel } from './audio/BackgroundMusic.ts';
+import { cinematicMusicEvents } from './audio/CinematicMusic.ts';
+import { bossMusicEvents } from './audio/BossMusic.ts';
 import { SOUND_BANKS } from './audio/SoundCatalog.ts';
 import { loadBlackoutMaintenanceMapData } from './render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import { loadCultivationBakedAssets } from './render/environment/cultivation/CultivationBakedAssets.ts';
@@ -64,6 +66,11 @@ function startGame(): void {
   let activeLoop: Loop | undefined;
   const audio = new AudioManager(import.meta.env.BASE_URL);
   const music = new BackgroundMusic(import.meta.env.BASE_URL);
+  const unsubscribeCinematicStarted = cinematicMusicEvents.on('started', cue => music.beginCinematic(cue));
+  const unsubscribeCinematicStopped = cinematicMusicEvents.on('stopped', cue => music.endCinematic(cue));
+  const unsubscribeBossStarted = bossMusicEvents.on('started', cue => music.beginBoss(cue));
+  const unsubscribeBossDefeated = bossMusicEvents.on('defeated', cue => music.defeatBoss(cue));
+  const unsubscribeBossStopped = bossMusicEvents.on('stopped', cue => music.stopBoss(cue));
   void audio.preload(SOUND_BANKS.containment);
   const unlockAudio = (): void => { audio.unlock(); music.unlock(); };
   const focusAudio = (): void => {
@@ -437,6 +444,9 @@ function startGame(): void {
   let menuOrigin: 'title' | 'paused' = 'title';
   let gameCompleted = false;
   const unsubscribeMusic = gameFlow.subscribe((state) => {
+    if (state === 'title' || state === 'restarting' || state === 'transitionFailed') {
+      music.cancelCinematic(); music.cancelBoss();
+    }
     if (state === 'title' || state === 'paused') menuOrigin = state;
     if (gameCompleted) return;
     const scene = musicForFlow(state, menuOrigin, musicLevel);
@@ -445,6 +455,7 @@ function startGame(): void {
   const unsubscribeGameCompleted = gameSession.events.on('gameCompleted', () => {
     if(gameCompleted)return;
     gameCompleted = true;
+    music.cancelBoss();
     music.setScene(null, true);
     gameFlow.completeGame();
   });
@@ -467,6 +478,7 @@ function startGame(): void {
   const unsubscribeTransitionStarted = gameSession.events.on(
     'transitionStarted',
     ({ levelId, message }) => {
+      music.cancelBoss();
       musicLevel = levelId === 'level-2' ? 'cultivation' : 'blackout';
       levelOneShaderProgramGuardActive = false;
       sampleLevelOneShaderPrograms = undefined;
@@ -629,6 +641,9 @@ function startGame(): void {
     gameFlow.dispose();
     gameSession.dispose();
     music.dispose();
+    unsubscribeCinematicStarted();
+    unsubscribeCinematicStopped();
+    unsubscribeBossStarted(); unsubscribeBossDefeated(); unsubscribeBossStopped();
     audio.dispose();
     input.dispose();
     renderLayer.dispose();
