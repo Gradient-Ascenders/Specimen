@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { applyExterminationShadowRoles } from './ExterminationShadowRoles.ts';
 
 export const EXTERMINATOR_MODEL_URL = new URL('../../assets/characters/exterminator/exterminator-family.glb', import.meta.url).href;
 export const EXTERMINATOR_MODEL_VERSION = 'exterminator-family-v1';
@@ -40,6 +41,7 @@ export class ExterminatorModelAsset {
         }
       }
     });
+    applyExterminationShadowRoles(root, true);
   }
   cloneBoss(): THREE.Object3D { return this.clone('EX_Boss'); }
   cloneMinion(style: ExterminatorMinionStyle): THREE.Object3D { return this.clone(`SW_${style}`); }

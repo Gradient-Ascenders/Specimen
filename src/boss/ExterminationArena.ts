@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { ExterminationMaterials } from './ExterminationMaterials.ts';
+import { ExterminationLighting } from './ExterminationLighting.ts';
+import { applyExterminationShadowRoles } from './ExterminationShadowRoles.ts';
 import { EXTERMINATION_LAIR_COVER } from './ExterminationLairLayout.ts';
 import { applyLairMaterials, loadExterminationLairAsset, type ExterminationLairAsset } from './ExterminationLairAsset.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
@@ -20,6 +22,7 @@ export class ExterminationArena {
   readonly sectors:THREE.Mesh<THREE.RingGeometry,THREE.ShaderMaterial>[]=[];
   readonly armourFragments:THREE.Mesh[]=[];
   readonly surfaceMaterials=new ExterminationMaterials();
+  readonly lighting=new ExterminationLighting();
   private readonly geometries=new Set<THREE.BufferGeometry>();
   private readonly materials=new Set<THREE.Material>();
   private readonly boxGeometries=new Map<string,THREE.BoxGeometry>();
@@ -30,9 +33,6 @@ export class ExterminationArena {
   private readonly dark=this.surfaceMaterials.get('rubber');
   private readonly cyan=new THREE.MeshBasicMaterial({color:0x76e4d7});
   private readonly amber=this.surfaceMaterials.get('hazard');
-  private readonly lights:THREE.PointLight[]=[];
-  private readonly emergencyLights:THREE.PointLight[]=[];
-  private readonly reactorLights:THREE.PointLight[]=[];
   private readonly artLamps:THREE.MeshStandardMaterial[]=[];
   private readonly hatch=new THREE.Group();
   private readonly placeholder=new THREE.Group();
@@ -86,15 +86,7 @@ export class ExterminationArena {
     }
     if(options.orbitingPlatforms??FINAL_ARENA_ORBIT.enabled)this.buildOrbiters();
     this.buildSectors();
-    for(const x of [-52,52])for(const dz of [-52,52]) {
-      const light=new THREE.PointLight(0xe0e9e5,0,185,2);light.position.set(x,30,z+dz);light.castShadow=false;this.lights.push(light);this.root.add(light);
-    }
-    for(const x of [-60,60]) {
-      const light=new THREE.PointLight(0xff5037,0,85,2);light.position.set(x,26,z+52);light.castShadow=false;this.emergencyLights.push(light);this.root.add(light);
-    }
-    for(const [x,y,dz] of [[-82,30,0],[0,80,0]] as const) {
-      const light=new THREE.PointLight(0xff321b,0,110,2);light.position.set(x,y,z+dz);light.castShadow=false;this.reactorLights.push(light);this.root.add(light);
-    }
+    this.root.add(this.lighting.root);
     for(let i=0;i<8;i++) {
       const a=i*Math.PI/4,fragment=this.worldBox(`authored-armour-fragment-${i}`,[2.5,.25,3],[Math.cos(a)*82,.6,z+Math.sin(a)*82],this.steel);
       fragment.visible=false;fragment.rotation.set(0,i*.7,.1);this.armourFragments.push(fragment);
@@ -102,6 +94,7 @@ export class ExterminationArena {
     // Minimal synchronous preview for physics-only tools; preparation replaces it.
     this.placeholder.name='lair-unprepared-preview';
     const floor=new THREE.Mesh(this.geometry(new THREE.RingGeometry(inner,outer,192)),this.surfaceMaterials.get('floor'));
+    floor.receiveShadow=true;
     floor.name='continuous-lab-walkway';floor.rotation.x=-Math.PI/2;floor.position.set(0,FINAL_ARENA.floorY,z);this.placeholder.add(floor);this.root.add(this.placeholder);
     this.root.updateMatrixWorld(true);
   }
@@ -126,11 +119,17 @@ export class ExterminationArena {
       this.materials.add(material);
       if(material instanceof THREE.MeshStandardMaterial)this.artLamps.push(material);
     }
+    // The large batched shell receives shadows. Only the nearby cover, doors
+    // and actors cast, avoiding a whole-room geometry replay every frame.
+    applyExterminationShadowRoles(asset.staticRoot,false);
+    applyExterminationShadowRoles(asset.entryDoor,true);
+    applyExterminationShadowRoles(asset.exitDoor,true);
     const attach=(object:THREE.Object3D,parent:THREE.Object3D)=>{object.removeFromParent();object.position.set(0,0,0);parent.add(object);};
     attach(asset.staticRoot,this.root);asset.staticRoot.position.z=FINAL_ARENA.centreZ;
     attach(asset.entryDoor,this.entryDoor);attach(asset.exitDoor,this.exitDoor);attach(asset.hatch,this.hatch);
     for(const [i,definition] of EXTERMINATION_LAIR_COVER.entries()) {
       const art=asset.coverTemplates[definition.template]!.clone(true);art.name=`lair-cover-art-${i}`;art.position.set(0,0,0);
+      applyExterminationShadowRoles(art,true);
       art.scale.set(definition.size[0]/7,definition.size[1]/4.2,definition.size[2]/3.2);this.cover[i]!.add(art);
     }
     asset.root.clear();this.placeholder.removeFromParent();this.artReady=true;this.setPowered(this.powered,this.phaseTwo);
@@ -215,9 +214,7 @@ export class ExterminationArena {
   }
   setPowered(powered:boolean,phaseTwo=false,time=0):void {
     this.powered=powered;this.phaseTwo=phaseTwo;
-    for(const light of this.lights){light.intensity=powered?(phaseTwo?5400:6000):0;light.color.setHex(phaseTwo?0xd2dce0:0xe0e9e5);}
-    for(const light of this.emergencyLights)light.intensity=powered&&phaseTwo?1600:0;
-    for(const light of this.reactorLights)light.intensity=powered?1800:0;
+    this.lighting.setPowered(powered,phaseTwo);
     for(const m of this.artLamps) {
       m.emissiveIntensity=m.name.includes('EmergencyLight')?(powered&&phaseTwo?2:0):m.name.includes('ReactorLight')?(powered?(phaseTwo?1.9:1.4):.05):m.name.includes('GuideLight')?(powered?2:.03):m.name.includes('KeyLight')?(powered?2.2:.03):m.emissiveIntensity;
     }
@@ -235,6 +232,7 @@ export class ExterminationArena {
     // Lift through the aperture before sliding above the roof/cradle.
     this.hatch.position.y=95.2+THREE.MathUtils.smoothstep(progress,0,.2)*5.2;
     this.hatch.position.x=THREE.MathUtils.smoothstep(progress,.2,1)*58;
+    this.lighting.setRoofOpening(progress);
   }
   setDamaged(damaged:boolean):void {for(const fragment of this.armourFragments)fragment.visible=damaged;}
   breakCoverAlong(start:THREE.Vector3,end:THREE.Vector3,radius:number,onBreak?:(at:THREE.Vector3)=>void):number {
@@ -251,6 +249,7 @@ export class ExterminationArena {
   }
   dispose():void {
     if(this.disposed)return;this.disposed=true;this.abort.abort();
+    this.lighting.dispose();
     this.root.traverse(o=>{if(o instanceof THREE.InstancedMesh)o.dispose();});this.root.removeFromParent();this.root.clear();
     for(const g of this.geometries)g.dispose();for(const m of this.materials)m.dispose();this.surfaceMaterials.dispose();
   }

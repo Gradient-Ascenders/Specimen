@@ -1628,6 +1628,7 @@ export class BlackoutLevelRuntime {
     }
     resources?.transit?.updatePresentation(stats.frameDeltaSeconds, this.renderLayer.cameraRig.camera);
     resources?.hallwayShadows?.prepareFrame(resources.hallwayShadowParticipants);
+    if (resources) resources.scene.finalArena?.lighting.prepareFrame(resources.renderedSpecimenPosition, this.lifecycle.state === 'running');
     this.renderLayer.render();
   }
 
