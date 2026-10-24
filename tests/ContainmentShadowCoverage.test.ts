@@ -351,6 +351,6 @@ test('fitted box/instance spheres contain every world vertex without altering me
   assert.equal(key.shadow.getFrustum().intersectsObject(scene.root.getObjectByName('room-4-west-wall-mechanical-substrate')!), false,
     'box culling rejects a distant shaft even when its conservative sphere overlaps');
   assert.equal(scene.measuredFirstUseGeometryPrimeDiagnostics.resourceCount, 23);
-  assert.equal(scene.measuredFirstUseGeometryPrimeDiagnostics.instancedResourceCount, 2);
+  assert.equal(scene.measuredFirstUseGeometryPrimeDiagnostics.instancedResourceCount, 1);
   scene.dispose();
 });

@@ -12,6 +12,7 @@ import { RoomThreeMonitor } from '../render/environment/containment/RoomThreeMon
 import { RoomFiveMonitor } from '../render/environment/containment/RoomFiveMonitor.ts';
 import { ContainmentSurveillanceCameras } from '../render/environment/containment/ContainmentSurveillanceCameras.ts';
 import { fitContainmentShadowCullingBounds } from '../render/environment/containment/ContainmentShadowCoverage.ts';
+import type {RoomTwoShellLoader} from '../render/environment/containment/RoomTwoShell.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
   type ContainmentStaticBatchDiagnostics,
@@ -33,11 +34,12 @@ export type ContainmentHazardFailure =
   | RoomFiveHazardFailure;
 
 /**
- * Exact first-use geometry owners measured on Intel Iris Xe / ANGLE D3D11.
+ * Historical first-use owners measured on Intel Iris Xe / ANGLE D3D11.
  *
  * Event A was the 354 -> 361 upload batch and Event B was the 444 -> 460
- * batch in the authoritative DPR1 production trace. Keep this allowlist
- * explicit: additions require another physical-Iris first-use measurement.
+ * batch in the authoritative DPR1 production trace. CPU-only storyboards keep
+ * this list. Once Room 2 prepares, its authored buffers replace its retired
+ * entries; the old hardware timings do not describe those new buffers.
  */
 export const MEASURED_FIRST_USE_GEOMETRY_OWNER_NAMES = {
   eventA: [
@@ -170,6 +172,7 @@ export class ContainmentLevelScene {
   private readonly measuredFirstUseGeometryResources: readonly THREE.Mesh[];
   private measuredFirstUseGeometryResourcesPrimed = false;
   private measuredFirstUseGeometryResourcePrimeCount = 0;
+  private disposed=false;
   private readonly roomOneOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly roomThreeOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly finaleOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
@@ -297,19 +300,38 @@ export class ContainmentLevelScene {
     ];
   }
 
+  async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader):Promise<void>{
+    await this.teaching.roomOneArt.prepare();
+    if(this.disposed)return;
+    await this.teaching.roomTwoArt.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomTwoLoader);
+    if(this.disposed)return;
+    for(const camera of this.surveillanceCameras.cameras){
+      if(camera.placement.roomId===2)this.teaching.roomTwoArt.shell.attachCamera(camera.tilt);
+    }
+  }
+
+  private currentFirstUseGeometryResources():readonly THREE.Mesh[]{
+    if(!this.teaching.roomTwoArt.shell.ready)return this.measuredFirstUseGeometryResources;
+    // The old hardware timings are historical. Prime the new authored buffers
+    // explicitly instead of uploading hidden procedural Room 2 proxies.
+    return [...this.measuredFirstUseGeometryResources.filter(object=>!object.name.startsWith('room-2-')),
+      ...this.teaching.roomTwoArt.shell.renderMeshes];
+  }
+
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
   get solubleTargetMeshes(): readonly THREE.Mesh[] {
     return [this.roomFive.goopWoodenDoor];
   }
 
   get measuredFirstUseGeometryPrimeDiagnostics(): MeasuredFirstUseGeometryPrimeDiagnostics {
+    const resources=this.currentFirstUseGeometryResources();
     return {
-      ownerNames: MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST,
-      resourceCount: this.measuredFirstUseGeometryResources.length,
+      ownerNames: resources.map(object=>object.name),
+      resourceCount: resources.length,
       uniqueGeometryCount: new Set(
-        this.measuredFirstUseGeometryResources.map(({ geometry }) => geometry),
+        resources.map(({ geometry }) => geometry),
       ).size,
-      instancedResourceCount: this.measuredFirstUseGeometryResources.filter(
+      instancedResourceCount: resources.filter(
         (resource) => resource instanceof THREE.InstancedMesh,
       ).length,
       resourcesPrimed: this.measuredFirstUseGeometryResourcesPrimed,
@@ -321,7 +343,7 @@ export class ContainmentLevelScene {
     render: (resources: readonly THREE.Mesh[]) => void,
   ): boolean {
     if (this.measuredFirstUseGeometryResourcesPrimed) return false;
-    render(this.measuredFirstUseGeometryResources);
+    render(this.currentFirstUseGeometryResources());
     this.measuredFirstUseGeometryResourcesPrimed = true;
     this.measuredFirstUseGeometryResourcePrimeCount += 1;
     return true;
@@ -438,6 +460,8 @@ export class ContainmentLevelScene {
   }
 
   dispose(): void {
+    if(this.disposed)return;
+    this.disposed=true;
     this.platformBoosters.dispose();
     this.surveillanceCameras.dispose();
     this.roomOneMonitor.dispose();

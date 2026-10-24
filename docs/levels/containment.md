@@ -28,6 +28,11 @@ Cultivation.
   circular floor island, observation recess and service crown replace the old
   wall dressing while collision remains unchanged. Authoring/source details:
   [Room 1 laboratory](../../assets/environments/containment-room-one/README.md).
+- Room 2's Blender hall uses the same finish bank. Its observation workshop,
+  service bay, adhesion installation and braced thruster-platform rigs replace
+  the procedural dressing while preserving the route and tracking owners.
+  [Room 2 laboratory](../../assets/environments/containment-room-two/README.md)
+  documents authoring, resource ownership and surface-clearance checks.
 - Level-owned effects and resources are disposed on unload; restart restores
   authored state without rebuilding static room geometry.
 

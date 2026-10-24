@@ -56,7 +56,8 @@ test('measured first-use prime exposes only the 23 physical-Iris resources', () 
   ]);
   assert.equal(before.resourceCount, 23);
   assert.equal(before.uniqueGeometryCount, 23);
-  assert.equal(before.instancedResourceCount, 2);
+  // Room 1's flattened wall replacement retired its former instanced batch.
+  assert.equal(before.instancedResourceCount, 1);
   assert.equal(before.resourcesPrimed, false);
   assert.equal(before.resourcePrimeCount, 0);
 
@@ -94,7 +95,6 @@ test('measured first-use prime exposes only the 23 physical-Iris resources', () 
       assert.deepEqual(
         instancedResources.map(({ name }) => name).sort(),
         [
-          'room-1-production-art-static-batch-1',
           'room-2-upper-step-b-restrained-safety-inlays',
         ],
       );
