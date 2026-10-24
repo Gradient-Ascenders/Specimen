@@ -185,7 +185,7 @@ test('production boss renders both phases, health drops, advanced reinforcements
   await step(page,20);await aim(page);
   const beforeHipFire=(await model(page)).health;
   // Keep this partial release below the first shield crossing after the prior
-  // full hit: 732 HP minus about 10.2 damage stays above the 637.5 HP gate.
+  // full hit: 482 HP minus about 10.2 damage stays above the 425 HP gate.
   await mouse(page,0,true);await step(page,30);
   expect((await model(page)).aimActive).toBe(false);expect((await model(page)).charging).toBe(true);
   await expect(page.locator('.specimen-combat-crosshair')).toBeVisible();

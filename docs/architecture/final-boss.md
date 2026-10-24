@@ -697,9 +697,9 @@ human-input victory or a hardware FPS qualification.
   hardware qualification. Final browser evidence:
   `/tmp/specimen-boss-main-merge-browser-results/`.
 
-### 750 HP boss tuning (24 October 2026)
+### 500 HP boss tuning (24 October 2026)
 
-- Boss maximum/retry HP is **750**, with phase two and CP9 recovery at **375 HP**.
-- The existing 85 / 70 / 55% shield gates now fall at **637.5 / 525 / 412.5 HP**.
-  Phase-two reinforcement gates retain their proportions at **262.5 / 187.5 / 75 HP**.
+- Boss maximum/retry HP is **500**, with phase two and CP9 recovery at **250 HP**.
+- The existing 85 / 70 / 55% shield gates now fall at **425 / 350 / 275 HP**.
+  Phase-two reinforcement gates retain their proportions at **175 / 125 / 50 HP**.
   Wave sizes, healing rate and attack cadence remain unchanged.

@@ -60,7 +60,7 @@ test('boss is vulnerable outside its defensive shield, and complete damage gates
 test('85/70/55 crossings synchronously protect against overkill, heal slowly, and fire once even after healing above a threshold',()=>{
   const b=new FinalBossController({random:()=>.5});b.start(true);
   for(const [i,threshold] of FINAL_BOSS_TUNING.defenseThresholds.entries()) {
-    b.applyImpact(impact(999));assert.equal(b.readModel.health,[637.5,525,412.5][i]);
+    b.applyImpact(impact(999));assert.equal(b.readModel.health,[425,350,275][i]);
     assert.equal(b.readModel.shieldActive,true);assert.equal(b.readModel.defenseThreshold,threshold);
     assert.equal(b.readModel.summonCount,[11,13,18][i]);assert.equal(b.applyImpact(impact(999)).accepted,false);
     until(b,()=>b.readModel.stage==='active');const hp=b.readModel.health;b.update(2,target);
