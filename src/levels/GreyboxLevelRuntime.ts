@@ -160,7 +160,6 @@ const LIGHTING_PREWARM_CROSS_ROOM_RENDERABLE_NAMES: Readonly<
     'room-3-first-static-laser-presentation-emitter-start-active-aperture',
   ],
   2: ['room-3-acid-surface-material-integration-point'],
-  3: ['room-2-observation-reinforced-glass'],
   5: ['room-3-acid-surface-material-integration-point'],
 };
 export interface GreyboxLevelRuntimeOptions {
@@ -2279,6 +2278,32 @@ export class GreyboxLevelRuntime {
               }
               withIsolatedPrewarmState(renderer, () => renderer.compile(compileSubset, prewarmCamera, this.renderLayer.scene));
             });
+            if(roomId===1 && coverageRoomIds.includes(2) && this.lightLayout &&
+              resources.testScene.teaching.roomTwoArt.shell.ready){
+              // The last duct turn camera-culls the ten-spot overlap to six.
+              // That smaller layout can already see the new hall's finishes.
+              const saved=prewarmCamera.clone();
+              const ductSubset=createCompileSubset('containment-duct-exit-shader-prewarm-subset',
+                resources.testScene.teaching.roomTwoArt.shell.renderMeshes);
+              try{
+                prewarmCamera.position.set(-8.289,11.671,24.008);
+                prewarmCamera.lookAt(-8.797,10.945,25.98);
+                prewarmCamera.updateMatrixWorld();
+                const targets=requiresTransmissionPreparation(this.renderLayer.scene)
+                  ? [undefined,transmissionPrewarmTarget] : [undefined];
+                for(const target of targets){
+                  await this.yieldPreparation?.();
+                  if(!isCurrent())return;
+                  await withIsolatedPrewarmState(renderer,()=>this.lightLayout!.withCameraCulling(prewarmCamera,()=>{
+                    if(renderer.extensions.has('KHR_parallel_shader_compile'))
+                      return renderer.compileAsync(ductSubset,prewarmCamera,this.renderLayer.scene);
+                    renderer.compile(ductSubset,prewarmCamera,this.renderLayer.scene);
+                  }),target);
+                }
+              }finally{
+                disposeCompileInstances(ductSubset);ductSubset.clear();prewarmCamera.copy(saved);
+              }
+            }
             await programBindings.prepare(renderer.info.programs, this.yieldPreparation, isCurrent);
           } finally {
             disposeCompileInstances(compileSubset);
@@ -2615,6 +2640,15 @@ function createRoomPrewarmSources(
     }
   }
 
+  if(roomId===3){
+    // The preceding hall remains visible through the entry. Its authored
+    // finishes, tracking cameras and monitor need the Room 3/doorway signatures;
+    // the retired procedural window no longer represents that material set.
+    const hall=resources.testScene.teaching.roomTwoArt;
+    sources.push(...(hall.shell.ready?hall.shell.renderMeshes:[hall.root]),
+      resources.testScene.roomTwoMonitor.root);
+  }
+
   // Development spawn markers can also be seen from the far rooms.
   const spawnMarker = levelRoot.getObjectByName('room-1-safe-spawn-marker');
   if (spawnMarker) sources.push(spawnMarker);
@@ -2628,8 +2662,13 @@ function createRoomCompileSubset(
   resources: GreyboxRuntimeResources,
   roomId: DebugRoomId,
 ): THREE.Group {
+  return createCompileSubset(`containment-room-${roomId}-shader-prewarm-subset`,
+    createRoomPrewarmSources(resources,roomId));
+}
+
+function createCompileSubset(name:string,sources:readonly THREE.Object3D[]):THREE.Group{
   const subset = new THREE.Group();
-  subset.name = `containment-room-${roomId}-shader-prewarm-subset`;
+  subset.name = name;
   const compiledSignatures = new Set<string>();
   let compiledObjects = 0;
   const addCompileObject = (object: THREE.Object3D): void => {
@@ -2642,7 +2681,7 @@ function createRoomCompileSubset(
     subset.add(clone);
     compiledObjects += 1;
   };
-  for (const source of createRoomPrewarmSources(resources, roomId)) {
+  for (const source of sources) {
     source.traverse(addCompileObject);
   }
   subset.userData.compiledObjects = compiledObjects;

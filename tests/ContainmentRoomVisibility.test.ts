@@ -100,3 +100,65 @@ test('Room 3 final-wall views skip the hidden Room 5 laboratory without hiding t
     scene.dispose();
   }
 });
+
+test('Room 2 skips the upper rooms while its checkpoint lags and restores every visibility and light owner',()=>{
+  const scene=new ContainmentLevelScene(()=>{});
+  try{
+    const objects:THREE.Object3D[]=[];
+    scene.root.traverse(object=>objects.push(object));
+    scene.roomFive.goopWoodenDoor.visible=false;
+    const visibleLights=()=>{
+      const lights:string[]=[];
+      scene.root.traverseVisible(object=>{if(object instanceof THREE.Light)lights.push(object.uuid);});
+      return lights;
+    };
+    for(const room of [1,2,3] as const){
+      scene.lighting.setActiveRoom(room);
+      const before=objects.map(object=>object.visible);
+      const lights=visibleLights();
+      for(const [body,camera] of [
+        [{x:-8.797,y:10.945,z:25.98},{x:-8.289,y:11.671,z:24.008}],
+        [{x:4.951,y:6.21,z:32.55},{x:5.439,y:5.384,z:27.847}],
+        [{x:14.215,y:10.005,z:39.983},{x:14.293,y:4.6,z:39.287}],
+      ]){
+        scene.withEnclosedRoomOcclusion(body,camera,()=>{
+          for(const root of [scene.roomFour.root,scene.roomFive.root]){
+            let submitted=0;root.traverseVisible(object=>{if(object instanceof THREE.Mesh)submitted++;});
+            assert.equal(submitted,0);
+          }
+          assert.equal(scene.roomThree.root.visible,true,'the next room stays visible through the exit');
+          assert.equal(scene.teaching.roomTwoArt.root.visible,true);
+          assert.deepEqual(visibleLights(),lights,'preserve the shader light layout');
+        });
+        assert.deepEqual(objects.map(object=>object.visible),before);
+        assert.throws(()=>scene.withEnclosedRoomOcclusion(body,camera,()=>{throw new Error('draw failed');}),/draw failed/);
+        assert.deepEqual(objects.map(object=>object.visible),before);
+      }
+    }
+  }finally{scene.dispose();}
+});
+
+test('the old pod is culled beyond the duct bends, including the captured Room 3 hitch pose and backtracking',()=>{
+  const scene=new ContainmentLevelScene(()=>{});
+  try{
+    const oldRoom=scene.teaching.roomOneArt.root;
+    const states=[
+      {room:1 as const,body:{x:.256,y:3.26,z:35.572},camera:{x:-3.143,y:5.197,z:39.649}},
+      {room:3 as const,body:{x:-.243,y:11.36,z:51.734},camera:{x:1.824,y:12.741,z:54.31}},
+    ];
+    for(const {room,body,camera} of states){
+      scene.lighting.setActiveRoom(room);
+      scene.withEnclosedRoomOcclusion(body,camera,()=>{
+        let submitted=0;oldRoom.traverseVisible(object=>{if(object instanceof THREE.Mesh)submitted++;});
+        assert.equal(submitted,0,'pod and its unique label material cannot enter the later-room draw');
+        assert.equal(scene.teaching.roomTwoArt.root.visible,true);
+      });
+      assert.equal(oldRoom.visible,true);
+    }
+    scene.lighting.setActiveRoom(1);
+    for(const [body,camera] of [[{x:-8.4,y:11,z:25.2},{x:-8.4,y:11,z:25}],
+      [{x:-8.4,y:11,z:25},{x:-8.4,y:11,z:25.2}]]){
+      scene.withEnclosedRoomOcclusion(body,camera,()=>assert.equal(oldRoom.visible,true,'restore the earlier view while backtracking'));
+    }
+  }finally{scene.dispose();}
+});

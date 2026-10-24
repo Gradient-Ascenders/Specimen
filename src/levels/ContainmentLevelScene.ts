@@ -174,6 +174,8 @@ export class ContainmentLevelScene {
   private measuredFirstUseGeometryResourcePrimeCount = 0;
   private disposed=false;
   private readonly roomOneOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly roomTwoOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly completedRoomOneBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly roomThreeOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly finaleOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
 
@@ -257,6 +259,8 @@ export class ContainmentLevelScene {
     this.roomOneOccludedBranches = collectLightlessBranches([
       this.roomThree.root, this.roomFour.root, this.roomFive.root,
     ]);
+    this.roomTwoOccludedBranches = collectLightlessBranches([this.roomFour.root,this.roomFive.root]);
+    this.completedRoomOneBranches = collectLightlessBranches([this.teaching.roomOneArt.root]);
     this.roomThreeOccludedBranches = collectLightlessBranches([this.roomFive.root]);
     this.finaleOccludedBranches = collectLightlessBranches([
       this.teaching.roomOneArt.root, this.teaching.roomTwoArt.root,
@@ -369,9 +373,9 @@ export class ContainmentLevelScene {
   }
 
   /**
-   * Enclosed Room 1 cannot see Rooms 3–5, and Room 3 cannot see the Room 5
-   * laboratory above the elevator shaft. Climbing cameras still submit that
-   * hidden geometry (and cold material variants) when they tilt upward.
+   * Enclosed rooms cannot see scenery beyond their solid ceilings and duct
+   * turns. Use both actor and camera positions: the Room 2 checkpoint can lag
+   * the drop, and a trailing camera can still be inside an earlier portal.
    * Cull only for the draw, preserving light ancestry and authored visibility.
    * Stop before each exit so doorway views and subsequent rooms are unchanged.
    */
@@ -385,21 +389,37 @@ export class ContainmentLevelScene {
       activePosition.z < 24 && cameraPosition.z < 24 &&
       activePosition.y < 14 && cameraPosition.y < 14
       ? this.roomOneOccludedBranches
-      : roomId === 3 &&
+      : roomId <= 3 &&
+        activePosition.z >= 24 && cameraPosition.z >= 24 &&
+        activePosition.z < 49 && cameraPosition.z < 49 &&
+        activePosition.y < 18 && cameraPosition.y < 18
+        ? this.roomTwoOccludedBranches
+        : roomId === 3 &&
         activePosition.z < 78 && cameraPosition.z < 78 &&
         activePosition.y < 34 && cameraPosition.y < 34
         ? this.roomThreeOccludedBranches
         : undefined;
-    if (!branches) return draw();
+    // Past the two opaque duct bends, the old pod is fully occluded. Keeping
+    // it submitted creates otherwise-unused material variants under later rigs.
+    const completedRoomOne = roomId <= 3 &&
+      activePosition.z >= 25.1 && cameraPosition.z >= 25.1 &&
+      activePosition.z < 78 && cameraPosition.z < 78 &&
+      activePosition.y < 34 && cameraPosition.y < 34
+      ? this.completedRoomOneBranches : undefined;
+    if (!branches && !completedRoomOne) return draw();
 
-    for (const branch of branches) {
+    if(branches)for (const branch of branches) {
       branch.visible = branch.root.visible;
       branch.root.visible = false;
+    }
+    if(completedRoomOne)for(const branch of completedRoomOne){
+      branch.visible=branch.root.visible;branch.root.visible=false;
     }
     try {
       return draw();
     } finally {
-      for (const branch of branches) branch.root.visible = branch.visible;
+      if(completedRoomOne)for(const branch of completedRoomOne)branch.root.visible=branch.visible;
+      if(branches)for (const branch of branches) branch.root.visible = branch.visible;
     }
   }
 
