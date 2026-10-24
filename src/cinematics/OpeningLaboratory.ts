@@ -6,6 +6,7 @@ import { CONTAINMENT_IDENTIFICATION_COLOURS, createContainmentExperimentDirector
 import type { TitleScreenScene } from '../ui/TitleScreenScene.ts';
 import { OPENING_GAME_TIMING as T, openingEase, type OpeningGameFrame } from './OpeningGameTimeline.ts';
 import { OpeningRoomOne, OPENING_ROOM_ONE_LAYOUT as R } from './OpeningRoomOne.ts';
+import { OpeningLaboratoryAsset } from './OpeningLaboratoryAsset.ts';
 
 export const OPENING_EXPERIMENTS = [
   { code: 'SP-08', specimen: 'PLUTO', threat: 'LOW', colour: CONTAINMENT_IDENTIFICATION_COLOURS.low, side: -1, z: 60 },
@@ -32,11 +33,13 @@ export class OpeningLaboratory {
   readonly labels: THREE.Mesh[] = [];
   readonly cameraHeads: THREE.Group[] = [];
   readonly cameraTilts: THREE.Group[] = [];
+  readonly authored = new OpeningLaboratoryAsset();
 
   private readonly room: TitleScreenScene;
   private readonly materials = new Set<THREE.Material>();
   private readonly geometries = new Set<THREE.BufferGeometry>();
   private readonly instances = new Set<THREE.InstancedMesh>();
+  private readonly shellProxy = new THREE.Group();
   private readonly labelMaterial: THREE.MeshStandardMaterial;
   private readonly cameraMaterial: THREE.MeshStandardMaterial;
   private readonly point = new THREE.Vector3();
@@ -50,6 +53,8 @@ export class OpeningLaboratory {
   private readonly fill: THREE.HemisphereLight;
   private readonly mainRimPosition: THREE.Vector3;
   private readonly mainDiffuserPosition: THREE.Vector3;
+  private readonly corridorKeyColour = new THREE.Color(0xe5f1f4);
+  private readonly podKeyColour = new THREE.Color(0xffefd9);
   private disposed = false;
 
   constructor(room: TitleScreenScene) {
@@ -93,8 +98,24 @@ export class OpeningLaboratory {
     this.materials.add(this.cameraMaterial);
     this.buildWing();
     this.buildEntrance();
+    this.root.add(this.authored.root);
 
     this.root.visible = false;
+  }
+
+  async prepare(): Promise<void> {
+    await this.roomOne.prepare();
+    if (this.disposed) return;
+    await this.authored.prepare(name=>this.roomOne.borrowShellFinish(name));
+    if (this.disposed) return;
+    this.shellProxy.visible=false;
+    for(const tilt of this.cameraTilts){
+      if(tilt.getObjectByName('opening-authored-surveillance-camera'))continue;
+      for(const child of [...tilt.children]){
+        if(!child.name.endsWith('-recording-led'))child.removeFromParent();
+      }
+      this.authored.attachCamera(tilt);
+    }
   }
 
   apply(frame: OpeningGameFrame, reducedMotion: boolean): void {
@@ -120,6 +141,8 @@ export class OpeningLaboratory {
     this.room.keyLight.position.lerpVectors(this.point.set(R.doorwayX, 4.4, 41), this.mainKeyPosition, roomBlend);
     this.room.keyLight.target.position.lerpVectors(this.point.set(R.doorwayX, 0, 40), this.mainKeyTarget, roomBlend);
     this.room.keyLight.intensity = menu ? 205 : THREE.MathUtils.lerp(210, 165, roomBlend);
+    if(menu)this.room.keyLight.color.setHex(0xd9f8f2);
+    else this.room.keyLight.color.copy(this.corridorKeyColour).lerp(this.podKeyColour,roomBlend);
     this.rim.position.lerpVectors(this.point.set(R.doorwayX, 3.8, 59), this.mainRimPosition, roomBlend);
     this.rim.color.setHex(menu ? 0xaca2e6 : 0xb0cbd1);
     this.rim.distance = menu ? 9 : THREE.MathUtils.lerp(28, 9, roomBlend);
@@ -127,6 +150,13 @@ export class OpeningLaboratory {
     this.diffuser.position.lerpVectors(this.point.set(R.doorwayX, 3.8, 22), this.mainDiffuserPosition, roomBlend);
     this.diffuser.distance = menu ? 3 : THREE.MathUtils.lerp(28, 3.5, roomBlend);
     this.diffuser.intensity = menu ? 3.5 : THREE.MathUtils.lerp(80, 2.4, roomBlend);
+    this.diffuser.color.setHex(menu?0x99e6d7:0xb9e6f4);
+    if(!menu&&!reducedMotion&&t>=T.crackOne&&t<T.crackComplete){
+      // A soft internal lift follows the three existing crack/audio beats.
+      // No flash layer, added light or per-frame allocation.
+      const age=t-(t<T.crackTwo?T.crackOne:t<T.crackThree?T.crackTwo:T.crackThree);
+      this.diffuser.intensity+=1.5*Math.sin(Math.min(1,age/.9)*Math.PI)**2;
+    }
     this.fill.intensity = menu ? 0.68 : THREE.MathUtils.lerp(0.8, 0.58, roomBlend);
     if (this.room.scene.fog instanceof THREE.FogExp2) this.room.scene.fog.density = THREE.MathUtils.lerp(0.009, 0.035, roomBlend);
   }
@@ -200,6 +230,7 @@ export class OpeningLaboratory {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.authored.dispose();
     this.roomOne.dispose();
     this.room.setPodCeilingHeight(7);
     for (const instance of this.instances) instance.dispose();
@@ -217,6 +248,7 @@ export class OpeningLaboratory {
   private buildWing(): void {
     const resources = this.room.resources, m = resources.materials;
     const batches = new Map<THREE.Material, BoxInstanceTransform[]>();
+    const indicators = new Map<THREE.Material,BoxInstanceTransform[]>();
     const box = (material: THREE.Material, size: readonly [number, number, number],
       position: readonly [number, number, number], rotation?: readonly [number, number, number]) => {
       let entries = batches.get(material);
@@ -224,6 +256,10 @@ export class OpeningLaboratory {
       entries.push({ size, position, rotation });
     };
     const length = OPENING_LAB_LAYOUT.backZ - OPENING_LAB_LAYOUT.frontZ;
+    // A small synchronous proxy supports CPU-only storyboard tools. Production
+    // replaces it with the Blender set under the opaque preparation cover.
+    this.shellProxy.name='opening-wing-preparation-proxy';
+    this.root.add(this.shellProxy);
     const centreZ = (OPENING_LAB_LAYOUT.backZ + OPENING_LAB_LAYOUT.frontZ) / 2;
     box(m.clinicalFloor, [6.8, 0.2, length], [0, -0.1, centreZ]);
     box(m.mechanicalBacking, [6.8, 0.2, length], [0, 4.7, centreZ]);
@@ -253,7 +289,10 @@ export class OpeningLaboratory {
       place(m.graphite, [1.2, 0.26, 0.035], 0, 2.1, 0.17);
       place(m.serviceMetal, [2.7, 0.12, 0.22], 0, 0.06, 0.1);
       place(m.graphite, [3.02, 0.84, 0.12], 0, OPENING_LAB_LAYOUT.labelHeight, 0.08);
-      place(entry.threat === 'LOW' ? m.staticCyanEmissive : m.warningStatus, [0.38, 0.04, 0.035], 0.7, 2.7, 0.17);
+      const statusMaterial=entry.threat==='LOW'?m.staticCyanEmissive:m.warningStatus;
+      let statuses=indicators.get(statusMaterial);
+      if(!statuses){statuses=[];indicators.set(statusMaterial,statuses);}
+      statuses.push({size:[.38,.04,.025],position:[entry.side*3.17,2.7,entry.z-Math.sin(angle)*.7],rotation:[0,angle,0]});
       const label = this.makeLabel(index, 2.85, 0.7125);
       label.position.set(entry.side * 3.04, OPENING_LAB_LAYOUT.labelHeight, entry.z);
       label.rotation.y = angle;
@@ -274,7 +313,11 @@ export class OpeningLaboratory {
       const mesh = createInstancedBoxes(resources, `opening-wing-static-batch-${index++}`, material, entries);
       mesh.receiveShadow = true;
       mesh.castShadow = material !== m.neutralFixture && material !== m.staticCyanEmissive;
-      this.instances.add(mesh); this.root.add(mesh);
+      this.instances.add(mesh); this.shellProxy.add(mesh);
+    }
+    for(const [material,entries] of indicators){
+      const mesh=createInstancedBoxes(resources,`opening-chamber-status-${index++}`,material,entries);
+      this.instances.add(mesh);this.root.add(mesh);
     }
   }
 

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "source": "Blender Cycles procedural finish bakes",
+  "rawBytes": 25165880,
+  "compressedBytes": 969264,
+  "estimatedTextureBytesWithMipmaps": 33554432,
+  "maps": [
+    {
+      "family": "ceramic",
+      "channel": "color",
+      "width": 2048,
+      "height": 2048,
+      "sha256": "50e3afb0fe863db20ce37c169a2ed679aaaed50adee1acdb4bf1a9361c97d658"
+    },
+    {
+      "family": "ceramic",
+      "channel": "normal",
+      "width": 512,
+      "height": 512,
+      "sha256": "b0d506d928f907deadc3d494d378021088eb7eda3bb2b9707e750957244095db"
+    },
+    {
+      "family": "ceramic",
+      "channel": "orm",
+      "width": 512,
+      "height": 512,
+      "sha256": "1b78fc466cac07290063be6bf708d8ecf2a38799602b32ff4255a8bee8a287fe"
+    },
+    {
+      "family": "resin",
+      "channel": "color",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "743f04386a3e93150741067b94413ff1e110a243256d0c3eb450cddb9b80e974"
+    },
+    {
+      "family": "resin",
+      "channel": "normal",
+      "width": 512,
+      "height": 512,
+      "sha256": "5ae7ca95a203abac6c59a9e7f64c622ce8d1be09a25a20932c8594b9a298e7c1"
+    },
+    {
+      "family": "resin",
+      "channel": "orm",
+      "width": 512,
+      "height": 512,
+      "sha256": "ee388a35a4ddc355fdca5384a77565ab4d06f5326a6b64c68fd28236cabb9076"
+    }
+  ]
+}

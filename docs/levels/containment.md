@@ -24,6 +24,10 @@ Cultivation.
 - Doors, pressure plates, laser sequences, elevators, and release machinery own
   resettable state through the puzzle registry.
 - Lighting and art may change presentation but cannot change puzzle authority.
+- Room 1's Blender-authored shell is prepared before shader compilation. Its
+  circular floor island, observation recess and service crown replace the old
+  wall dressing while collision remains unchanged. Authoring/source details:
+  [Room 1 laboratory](../../assets/environments/containment-room-one/README.md).
 - Level-owned effects and resources are disposed on unload; restart restores
   authored state without rebuilding static room geometry.
 

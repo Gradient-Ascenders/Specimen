@@ -74,9 +74,9 @@ export class ContainmentTeachingScene {
     this.root.name = 'containment-climb-and-bounce-greybox';
 
     const roomOneMaterials = {
-      floor: artResources.materials.clinicalFloor,
-      wall: artResources.materials.mechanicalBacking,
-      ceiling: artResources.materials.mainCeramic,
+      floor: this.collisionOnlyMaterial('containment-room-1-shell-collision-only'),
+      wall: this.collisionOnlyMaterial('containment-room-1-wall-collision-only'),
+      ceiling: this.collisionOnlyMaterial('containment-room-1-ceiling-collision-only'),
       // The round pod supplies the visible shell; its compound support surfaces
       // stay collision-only instead of exposing an old square greybox.
       support: this.collisionOnlyMaterial('containment-room-1-pedestal-collision-only'),

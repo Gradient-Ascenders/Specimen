@@ -7,6 +7,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
 import type { BobCharacterPresentationState } from '../src/render/bob/BobCharacterPresentation.ts';
+import { loadRoomOneShellFixture } from './helpers/RoomOneShellAsset.ts';
 
 const BOB_ASSET_URL = new URL(
   '../assets/characters/bob/bob-authored.glb',
@@ -44,8 +45,9 @@ const bobState = (): BobCharacterPresentationState => ({
 const createScene = (): ContainmentLevelScene =>
   new ContainmentLevelScene(() => undefined);
 
-test('Room 1 proof retains its fixture and excludes glass and hidden colliders', () => {
+test('Room 1 proof retains its fixture and excludes glass and hidden colliders', async () => {
   const scene = createScene();
+  await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
   const key = scene.root.getObjectByName('room-1-pedestal-soft-key');
   assert.ok(key instanceof THREE.SpotLight);
   assert.equal(key.castShadow, true);
@@ -58,7 +60,8 @@ test('Room 1 proof retains its fixture and excludes glass and hidden colliders',
   assert.equal(key.shadow.camera.near, 0.35);
   assert.equal(key.shadow.camera.far, 10);
   assert.equal(key.shadow.autoUpdate, true);
-  assert.equal(scene.root.getObjectByName('room-1-floor')?.receiveShadow, true);
+  assert.equal(scene.root.getObjectByName('room-1-floor')?.receiveShadow, false);
+  assert.equal(scene.root.getObjectByName('R1_Shell_Resin')?.receiveShadow, true);
   assert.equal(scene.root.getObjectByName('room-1-pedestal-clean-shell')?.castShadow, true);
   let wallReceivers = 0;
   scene.root.traverse((object) => {
@@ -68,11 +71,11 @@ test('Room 1 proof retains its fixture and excludes glass and hidden colliders',
       assert.equal(object.castShadow, false, object.name);
       assert.equal(object.receiveShadow, false, object.name);
     }
-    if (object.name.startsWith('room-1-') && materials.some((material) => material.transparent)) {
+    if ((object.name.startsWith('room-1-') || object.name.startsWith('R1_')) && materials.some((material) => material.transparent)) {
       assert.equal(object.castShadow, false, object.name);
     }
     const names: string[] = object.userData.staticBatchSourceNames ?? [object.name];
-    if (names.some((name) => name.startsWith('room-1-panel-'))) {
+    if (names.some((name) => name === 'R1_Shell_Ivory' || name === 'R1_Shell_Cool')) {
       assert.equal(object.receiveShadow, true, object.name);
       wallReceivers++;
     }
@@ -95,16 +98,16 @@ test('Room 1 proof retains its fixture and excludes glass and hidden colliders',
   assert.equal(key.shadow.mapPass, null);
 });
 
-test('Containment replaces inspection lights with visible-source room rigs', () => {
+test('Containment replaces inspection lights with visible-source room rigs', async () => {
   const scene = createScene();
+  await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
 
   assert.equal(
     scene.root.getObjectByName('clinical-inspection-lighting'),
     undefined,
   );
   for (const fixtureName of [
-    'room-1-ceiling-neutral-diffuser--3.8',
-    'room-1-ceiling-neutral-diffuser-3.8',
+    'R1_Shell_Light',
     'room-1-to-2-duct-exit-fixture',
     'room-2-ceiling-neutral-diffuser-1',
     'room-3-ceiling-static-diffuser-1',

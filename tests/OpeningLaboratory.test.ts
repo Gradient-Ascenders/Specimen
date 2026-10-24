@@ -11,6 +11,7 @@ import { createContainmentExperimentDirectoryTexture } from '../src/render/envir
 import { TitleScreenScene } from '../src/ui/TitleScreenScene.ts';
 import { RoomOneArt } from '../src/render/environment/containment/RoomOneArt.ts';
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
+import {useOpeningAssetFixtures} from './helpers/OpeningLaboratoryAsset.ts';
 
 const createScene = (options?: OpeningSceneOptions) => { const scene = new OpeningGameScene(new TitleScreenScene(), undefined, options); scene.begin(); return scene; };
 
@@ -69,9 +70,11 @@ test('five different experiment/danger plaques share one deterministic, upright 
   } finally { copy.dispose(); scene.dispose(); }
 });
 
-test('each door plaque is fully framed and unobstructed at its cinematic shot, including portrait', () => {
+test('each door plaque is fully framed and unobstructed in the Blender set, including portrait', async context => {
+  useOpeningAssetFixtures(context);
   const scene = createScene(), point = new THREE.Vector3(), direction = new THREE.Vector3();
   try {
+    await scene.laboratory.prepare();
     for (const aspect of [16 / 9, 4 / 3, 1, 320 / 900]) for (const reducedMotion of [false, true]) {
       OPENING_DOOR_SHOTS.forEach((shot, index) => {
         for (const offset of [-0.4, 0, 0.4]) {
@@ -97,9 +100,11 @@ test('each door plaque is fully framed and unobstructed at its cinematic shot, i
   } finally { scene.dispose(); }
 });
 
-test('the entire Bob plaque stays unobstructed throughout the approach, not just its centre', () => {
+test('the entire Bob plaque stays unobstructed throughout the authored approach, not just its centre', async context => {
+  useOpeningAssetFixtures(context);
   const scene = createScene(), point = new THREE.Vector3(), direction = new THREE.Vector3();
   try {
+    await scene.laboratory.prepare();
     const label = scene.laboratory.labels.at(-1)!;
     const width = 3, height = 0.75;
     for (let seconds = T.bobDoor; seconds < T.entryStart; seconds += 0.15) {
@@ -112,7 +117,7 @@ test('the entire Bob plaque stays unobstructed throughout the approach, not just
         direction.copy(point).sub(scene.room.camera.position);
         const first = new THREE.Raycaster(scene.room.camera.position, direction.clone().normalize(), 0, direction.length() + 0.01)
           .intersectObjects([scene.laboratory.root, scene.laboratory.entrance], true)[0];
-        assert.equal(first?.object, label, `Plaque obscured at ${seconds}, local sample ${x}, ${y} by ${first?.object.name}.`);
+        assert.equal(first?.object===label, true, `Plaque obscured at ${seconds}, local sample ${x}, ${y} by ${first?.object.name}.`);
       }
     }
   } finally { scene.dispose(); }
@@ -290,9 +295,11 @@ test('the full doorway transom seals the old gaps up to the hallway ceiling', ()
   } finally { scene.dispose(); }
 });
 
-test('the hatch uses authored rectangular Room 1 dressing with mounted fixtures, not the circular menu shell', () => {
+test('the hatch uses the Blender Room 1 shell and real gameplay dressing', async context => {
+  useOpeningAssetFixtures(context);
   const scene = createScene(), art = new RoomOneArt(scene.room.resources);
   try {
+    await scene.laboratory.prepare();
     const names = new Set<string>();
     scene.laboratory.roomOne.root.traverse(object => {
       if (object instanceof THREE.Mesh) for (const name of object.userData.staticBatchSourceNames ?? [object.name]) names.add(name);
@@ -301,11 +308,9 @@ test('the hatch uses authored rectangular Room 1 dressing with mounted fixtures,
       if (child === art.specimenAssembly || child.name === 'room-1-locked-laboratory-door-assembly') continue;
       child.traverse(object => { if (object instanceof THREE.Mesh) assert.ok(names.has(object.name), object.name); });
     }
-    for (const x of [-3.8, 3.8]) {
-      assert.ok(names.has(`room-1-ceiling-fixture-housing-${x}`));
-      assert.ok(names.has(`room-1-ceiling-neutral-diffuser-${x}`));
-      assert.ok(names.has(`opening-room-one-ceiling-fixture-mount-${x}`));
-    }
+    const shell=scene.laboratory.roomOne.root.getObjectByName('R1_Architecture')!;
+    assert.ok(shell);assert.equal(shell.children.length,9);
+    assert.ok(names.has('R1_Shell_Light'),'Ceiling fixtures are authored into the shared Blender shell.');
     assert.ok(![...names].some(name => /^title-|room-1-(pod|egg|pedestal)/.test(name)), 'Keep the one actual menu pod/egg, not a duplicate specimen.');
     scene.apply(sampleOpeningGame(T.hatchStart), 16 / 9); scene.room.scene.updateMatrixWorld(true);
     assert.equal(scene.laboratory.roomOne.root.visible, true);
@@ -316,8 +321,8 @@ test('the hatch uses authored rectangular Room 1 dressing with mounted fixtures,
     const down = new THREE.Raycaster(new THREE.Vector3(2, 1, 0), new THREE.Vector3(0, -1, 0), 0, 2)
       .intersectObject(scene.laboratory.roomOne.root, true)[0];
     assert.ok(down); assert.ok(Math.abs(down.point.y) < 1e-6);
-    assert.ok(scene.laboratory.roomOne.root.userData.staticBatchDiagnostics.drawCallsRemoved > 30,
-      'Reusing the real room dressing must not create a draw call for every panel.');
+    assert.ok(scene.laboratory.roomOne.root.userData.staticBatchDiagnostics.drawCallsRemoved > 0,
+      'Remaining gameplay dressing still consolidates alongside the nine already-batched Blender meshes.');
     scene.apply(sampleOpeningGame(0), 16 / 9);
     assert.equal(scene.laboratory.menuEnvironment.visible, true);
     assert.equal(scene.laboratory.roomOne.root.visible, false);
@@ -344,10 +349,12 @@ test('security cameras sweep faster without changing their arc or reduced-motion
   } finally { scene.dispose(); }
 });
 
-test('the fly-through uses fixed pooled resources, four light slots, one cached shadow and bounded draw objects', () => {
+test('the Blender fly-through shares camera buffers, four light slots and one cached shadow with bounded draws', async context => {
+  useOpeningAssetFixtures(context);
   const scene = createScene(), objects = new Set<THREE.Object3D>(), geometry = new Set(), materials = new Set();
   const versions = new Map<THREE.InstancedMesh, number>();
   try {
+    await scene.laboratory.prepare();
     scene.room.scene.traverse(object => {
       objects.add(object);
       if (object instanceof THREE.Mesh) {
@@ -371,7 +378,7 @@ test('the fly-through uses fixed pooled resources, four light slots, one cached 
       });
       assert.equal(lights, 4); assert.equal(shadowLights, 1);
       if (time < T.doorStart) {
-        assert.ok(meshObjects <= 35, 'Detailed pocket casings must stay pooled rather than increasing the old 38-object wing budget.');
+        assert.ok(meshObjects <= 48, 'Eight set batches, four shared camera batches per gimbal, plaques and the physical entrance stay bounded.');
         assert.equal(scene.laboratory.observatory.visible, false);
       }
       if (time > 1 && time < T.doorStart) assert.equal(scene.needsShadowUpdate, false,
@@ -387,13 +394,18 @@ test('the fly-through uses fixed pooled resources, four light slots, one cached 
     scene.apply(sampleOpeningGame(8), 16 / 9); assert.notDeepEqual(head.rotation, rotation);
     assert.notDeepEqual(tilt.rotation, tiltRotation);
     assert.equal(tilt.parent, head);
-    let cameraMeshes = 0, detailedParts = 0;
+    let cameraMeshes = 0, cameraTriangles = 0;
     head.traverse(child => {
       if (child instanceof THREE.Mesh) { cameraMeshes++; assert.equal(child.castShadow, false); }
-      if (child instanceof THREE.InstancedMesh) detailedParts += child.count;
+      if (child instanceof THREE.Mesh) cameraTriangles += (child.geometry.index?.count??child.geometry.getAttribute('position').count)/3;
     });
-    assert.equal(cameraMeshes, 3, 'More detailed cameras retain the old three-draw-object budget.');
-    assert.ok(detailedParts >= 15, 'Housing, sunshade, barrel, optic and hinge hardware should be modelled.');
+    assert.equal(cameraMeshes, 5, 'Four authored material batches and the existing recording LED.');
+    assert.ok(cameraTriangles>1_500&&cameraTriangles<2_500,'Detailed camera hardware stays below 2.5k triangles.');
+    const cameras=scene.laboratory.cameraTilts.map(tilt=>tilt.getObjectByName('opening-authored-surveillance-camera')!);
+    for(let index=1;index<cameras.length;index++)for(let part=0;part<4;part++){
+      assert.equal((cameras[index].children[part] as THREE.Mesh).geometry,(cameras[0].children[part] as THREE.Mesh).geometry);
+      assert.equal((cameras[index].children[part] as THREE.Mesh).material,(cameras[0].children[part] as THREE.Mesh).material);
+    }
     scene.apply(sampleOpeningGame(8), 16 / 9, true);
     const reducedRotation = head.rotation.clone(), reducedTilt = tilt.rotation.clone();
     scene.apply(sampleOpeningGame(12), 16 / 9, true);
@@ -450,7 +462,8 @@ test('cinematic disposal releases the wing/atlas and borrowed-room resources exa
   assert.equal(room.scene.children.length, 0);
 });
 
-test('startup yields between isolated submissions, primes the actual first view under black and drains its GPU queue', async () => {
+test('startup yields between isolated submissions, primes the actual first view under black and drains its GPU queue', async context => {
+  useOpeningAssetFixtures(context);
   let turn = 0;
   const jobs: number[] = [];
   const scene = createScene({ deferConstruction: true, yieldFrame: async () => {

@@ -99,11 +99,9 @@ test('Room 1 uses shared tagged materials without introducing fake surface seman
     scene.collisionMeshes.map((mesh) => [mesh.name, mesh]),
   );
 
-  assert.equal(colliders.get('room-1-floor')?.material, materials.clinicalFloor);
-  assert.equal(
-    colliders.get('room-1-rear-wall')?.material,
-    materials.mechanicalBacking,
-  );
+  for (const name of ['room-1-floor','room-1-rear-wall','room-1-east-wall','room-1-ceiling']) {
+    assert.equal(colliders.get(name)?.material.visible, false, `${name} is collision-only; the Blender shell owns its appearance`);
+  }
   const stickyWallCollider = colliders.get('room-1-vent-sticky-entry-wall');
   assert.equal(stickyWallCollider?.material.visible, false);
   assert.equal(

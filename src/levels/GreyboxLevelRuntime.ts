@@ -543,6 +543,7 @@ export class GreyboxLevelRuntime {
 
   private async prepareCharacterModels(resources: GreyboxRuntimeResources): Promise<void> {
     await Promise.all([
+      resources.testScene.teaching.roomOneArt.prepare(),
       resources.testScene.bob.prepare(this.characterLoaders?.bob),
       resources.testScene.goop.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
       resources.testScene.roomFive.goopPresentation.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
