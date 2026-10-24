@@ -324,10 +324,17 @@ Browser checks can verify decoding, resources and gameplay synchronization, but 
 
 ## Cinematic music
 
-`BackgroundMusic` also streams the three requester-supplied OGG recordings in
-`public/assets/audio/music/04-*` through `06-*`, unchanged from the supplied ZIP.
-See the existing Music table in `CREDITS.md` for creators, source and CC BY 4.0
-attribution links. No long music enters the decoded SFX bank.
+`BackgroundMusic` also streams the cinematic recordings in
+`public/assets/audio/music/04-*` through `06-*`. Bob and Goop retain the supplied
+OGGs; Volt uses the supplied final Digital Slash OGG Vorbis, copied byte-for-byte without
+re-encoding. This file is already trimmed from the original song's 1:03 mark:
+the existing rescue cue starts at file time 0, with no additional offset. One
+cue owns the whole rescue/escape timeline, without restarting between sections.
+The supplied cut decodes to 129.023 seconds and covers the 129-second cinematic.
+Its smoothed repeat and original musical ending are baked into the recording;
+runtime playback remains once-only, at normal speed, without extra repetitions.
+See the Music table in `CREDITS.md` for attribution. No long music enters the
+decoded SFX bank.
 
 `CinematicMusic` publishes discrete ownership start/stop notifications. The shared
 music owner reads its continuous clock at 20 Hz only while a targeted cinematic
@@ -347,21 +354,48 @@ when background muting is disabled. Media seek drift above 350 ms is corrected;
 resume retains position. Rejected playback waits for the next user gesture.
 
 Standard music gain remains 0.28. High Tech Lab additionally uses 0.60× playback
-gain, and the quieter The Way Out uses 1.75× (maximum effective volume 0.49 before
-user sliders). Source recordings, speeds, visual/event timings and all existing
+gain, and Digital Slash retains Volt's 1.75× (maximum effective volume 0.49 before
+user sliders). Its decoded sample peak is -4.02 dBFS, or about -10.21 dBFS after
+the music gain at full sliders. Source recordings, speeds, visual/event timings and all existing
 SFX mappings remain unchanged. Non-target cinematics retain their original audio.
 
 Volt's sustained cinematic alarm uses 0.25× playback scale, or 0.125× under
 dialogue (previously 0.60× / 0.30×). The shared alarm asset/catalog gain (0.9),
-Goop's alarm mix and every combat/mechanical accent remain unchanged. At default
-sliders, K-weighted measurements over the cinematic alarm sections put Goop's
-music near -27.6 LUFS and its sustained alarm near -31.3 LUFS. Volt's previous
-music/alarm were about -30.3 / -26.6 LUFS; the adjusted mix is about -27.3 /
--34.2 LUFS. This compensates for the source recordings' different loudness and
-gives the continuous alarm more room beneath the music. Measurements include
-the existing SFX compressor and default 0.8 SFX volume; music remains streamed
-outside that compressor. These are component measurements, not a listening
+Goop's alarm mix and every combat/mechanical accent remain unchanged. The shared
+SFX compressor and default 0.8 SFX volume still apply to effects; music remains
+streamed outside that compressor. Source measurements are not a listening
 evaluation or a guarantee against clipping at every user-selected mix.
+
+## Final boss music
+
+`07-blackout-boss-a-flawless-getaway.ogg` is the supplied game-ready loop of
+**A Flawless Getaway** by vitalezzz (CC0 1.0 Universal). It is copied unchanged,
+not decoded into the SFX bank, and resolves through the existing relative base
+URL. The supplied recording is stereo/44.1 kHz and decodes to 169.838 seconds.
+
+`FinalBossEncounter` owns one `BossMusic` token per attempt. It publishes a
+start only upon entering combat, including CP8/CP9 retries; staging and the
+boss introduction keep normal level music. The first combat start preempts
+other music using `BackgroundMusic`'s existing two media elements. Native
+`HTMLAudioElement.loop` plays the whole recording repeatedly at normal speed;
+no combat update polls or seeks music. The token spans the Phase 2 transition,
+so neither transition nor later combat notifications restart the recording.
+
+Entering the actual `defeated` state starts a 2.5-second fade using the existing
+music transition timer. This does not delay destruction, escape or credits.
+Suspend/death, reset, disposal, title/restart, level handoff and game completion
+cancel the attempt and any pending fade. Retry creates a new token and starts
+at file time zero with the normal gain. Old attempt notifications cannot stop
+its replacement. Global subscriptions are installed once in bootstrap and
+removed at shutdown; attempts create no media elements or subscriptions.
+
+Master/music sliders, mute, focus, autoplay retry and game-flow pause/resume
+remain shared; SFX controls remain independent. During a victory fade, pausing
+or losing focus silences playback without restoring full volume or retaining
+a stale fade. The standard music gain is 0.28; the supplied track measures
+about -14.80 dBFS RMS and -1.25 dBFS sample peak before that gain, or about
+-25.86 dBFS RMS / -12.30 dBFS sample peak at full music/master sliders. These
+component measurements do not replace a human listening review of the mix.
 
 Containment Room 5's two moving platforms use their authored booster-hover
 engines only. Their `MovingPlatform` definitions set `machineryAudio: false`,

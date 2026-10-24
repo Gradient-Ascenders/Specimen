@@ -517,5 +517,11 @@ test('Volt rescue music uses the remapped visible timeline for normal and previe
       s.movie.reset();assert.equal(stopped.filter(item=>item===cue).length,1);
     }
     assert.equal(cues.length,2);
+    assert.equal(s.movie.begin(s.camera,true),true);
+    const finalCue=cues.at(-1)!;
+    assert.equal(s.movie.update(T.duration),true);
+    assert.equal(s.movie.active,false);
+    assert.equal(stopped.at(-1),finalCue,'natural completion releases the same continuous rescue cue');
+    s.movie.reset();assert.equal(stopped.filter(item=>item===finalCue).length,1);
   } finally {s.dispose();offs.forEach(off=>off());}
 });

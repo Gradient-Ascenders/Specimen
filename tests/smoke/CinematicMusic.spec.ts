@@ -16,7 +16,7 @@ async function observeMusic(page: Page) {
   });
 }
 const snapshot = (page: Page) => page.evaluate(() => ((window as any).__musicPlayers as HTMLAudioElement[])
-  .map(p => ({ src: p.src, paused: p.paused, loop: p.loop, time: p.currentTime, volume: p.volume, error: p.error?.message })));
+  .map(p => ({ src: p.src, paused: p.paused, loop: p.loop, rate: p.playbackRate, time: p.currentTime, volume: p.volume, error: p.error?.message })));
 
 for (const mode of ['live', 'video']) {
   test(`${mode} opening owns one streamed soundtrack, then skip restores level music under a nested base`, async ({ page }) => {
@@ -58,11 +58,11 @@ for (const mode of ['live', 'video']) {
   });
 }
 
-test('prepared OGGs decode at the nested URL and credits use the existing music rows', async ({ page }) => {
+test('cinematic recordings decode at the nested URL and credits use the existing music rows', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('./', { waitUntil: 'domcontentloaded' });
-  const files = ['04-opening-tension.ogg', '05-containment-escape-high-tech-lab.ogg', '06-cultivation-volt-rescue-the-way-out.ogg'];
+  const files = ['04-opening-tension.ogg', '05-containment-escape-high-tech-lab.ogg', '06-cultivation-volt-rescue-digital-slash.ogg'];
   const decoded = await page.evaluate(async files => {
     const context = new AudioContext();
     try {
@@ -78,11 +78,12 @@ test('prepared OGGs decode at the nested URL and credits use the existing music 
   for (let index = 0; index < decoded.length; index++) {
     expect(decoded[index]!.path).toBe('/group-folder/assets/audio/music/' + files[index]);
     expect(decoded[index]!.channels).toBe(2);
-    expect(decoded[index]!.duration).toBeCloseTo([99.1, 152.92, 172.56][index]!, 0);
+    expect(decoded[index]!.duration).toBeCloseTo([99.1, 152.92, 129.023][index]!, 0);
   }
+  expect(decoded[2]!.duration).toBeGreaterThanOrEqual(VOLT_FINALE.duration);
   await expect(page.locator('[data-flow-panel="title"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-flow-panel="title"] [data-action="credits"]').click();
-  for (const [title, creator] of [['Tension', 'Tsorthan Grove'], ['High Tech Lab', 'remaxim'], ['The Way Out', 'Kevin MacLeod']]) {
+  for (const [title, creator] of [['Tension', 'Tsorthan Grove'], ['High Tech Lab', 'remaxim']]) {
     const row = page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: new RegExp(`^${title}$`) }) });
     await expect(row).toHaveCount(1);
     await expect(row.locator('.credits-creator')).toHaveText(creator!);
@@ -90,6 +91,14 @@ test('prepared OGGs decode at the nested URL and credits use the existing music 
     await expect(row.locator('.credits-use')).toContainText('converted to OGG');
     await expect(row.locator('h3 a')).toHaveAttribute('href', /^https:\/\//);
   }
+  const voltCredit = page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^Digital Slash$/ }) });
+  await expect(voltCredit).toHaveCount(1);
+  await expect(voltCredit.locator('.credits-creator')).toHaveText('PetterTheSturgeon');
+  await expect(voltCredit.locator('h3 a')).toHaveAttribute('href', 'https://opengameart.org/content/digital-slash');
+  await expect(voltCredit.locator('.credits-licence a')).toHaveAttribute('href', 'https://creativecommons.org/licenses/by/3.0/');
+  await expect(voltCredit.locator('.credits-use')).toContainText('plays from file 0:00');
+  await expect(voltCredit.locator('.credits-use')).toContainText('edited for use in Specimen, including trimming and a repeated musical section');
+  await expect(page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^The Way Out$/ }) })).toHaveCount(0);
   await page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^High Tech Lab$/ }) }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('cinematic-music-credits.png') });
   expect(errors).toEqual([]);
@@ -169,9 +178,15 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
     controller.update(4, false, false, false, false); rt.updateRoomFive(1 / 60, r);
     if (!r.roomFiveFinale.active) throw new Error('Volt release did not start');
   });
-  await expect.poll(async () => (await snapshot(page)).some(p => p.src.includes('06-cultivation') && !p.paused), { timeout: 30_000 }).toBe(true);
-  state = await snapshot(page); expect(state.filter(p => !p.paused)).toHaveLength(1);
-  expect(state.find(p => p.src.includes('06-cultivation'))!.loop).toBe(false);
+  // Capture ownership atomically: an intentional stationary-clock pause can
+  // occur between two protocol calls while a software-rendered frame stalls.
+  await expect.poll(async () => {
+    state = await snapshot(page);
+    return state.filter(p => !p.paused).map(p => p.src);
+  }, { timeout: 30_000 }).toEqual([expect.stringContaining('06-cultivation-volt-rescue-digital-slash.ogg')]);
+  expect(state.find(p => p.src.includes('06-cultivation'))!.src).toContain('06-cultivation-volt-rescue-digital-slash.ogg');
+  expect(state.find(p => p.src.includes('06-cultivation'))!.time).toBeLessThan(10);
+  expect(state.find(p => p.src.includes('06-cultivation'))!).toMatchObject({ loop: false, rate: 1, error: undefined });
   await expect.poll(async () => (await snapshot(page)).find(p => p.src.includes('06-cultivation'))!.volume).toBeCloseTo(.49, 4);
   const voltMix = await page.evaluate(timing => {
     const rt = (window as any).__musicSession.runtime, movie = rt.resources.roomFiveFinale;

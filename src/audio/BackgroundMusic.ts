@@ -1,8 +1,9 @@
 import type { GameFlowState } from '../ui/GameFlowUI.ts';
 import type { CinematicMusic, CinematicTrack } from './CinematicMusic.ts';
+import type { BossMusic } from './BossMusic.ts';
 
 export type MusicLevel = 'containment' | 'cultivation' | 'blackout';
-export type MusicTrack = 'intro' | MusicLevel | CinematicTrack;
+export type MusicTrack = 'intro' | MusicLevel | CinematicTrack | 'boss';
 
 const MUSIC_PATHS: Record<MusicTrack, string> = {
   intro: 'assets/audio/music/00-intro-osmotic-memory.ogg',
@@ -11,11 +12,12 @@ const MUSIC_PATHS: Record<MusicTrack, string> = {
   blackout: 'assets/audio/music/03-blackout-searching.ogg',
   awakening: 'assets/audio/music/04-opening-tension.ogg',
   escape: 'assets/audio/music/05-containment-escape-high-tech-lab.ogg',
-  rescue: 'assets/audio/music/06-cultivation-volt-rescue-the-way-out.ogg',
+  rescue: 'assets/audio/music/06-cultivation-volt-rescue-digital-slash.ogg',
+  boss: 'assets/audio/music/07-blackout-boss-a-flawless-getaway.ogg',
 };
 
-// Rescue's recording is quieter at source; bring it close to Escape's audible
-// music level while retaining headroom (0.28 * 1.75 = 0.49 at full sliders).
+// Retain Volt's prominent mix with the supplied, already-trimmed Digital Slash
+// recording (0.28 * 1.75 = 0.49 at full sliders); its decoded peak is -4.02 dBFS.
 const cinematicGain = (track: MusicTrack | null): number => track === 'escape' ? 0.60 : track === 'rescue' ? 1.75 : 1;
 const isCinematic = (track: MusicTrack | null): boolean => track === 'awakening' || track === 'escape' || track === 'rescue';
 
@@ -37,7 +39,7 @@ type MusicElement = Pick<HTMLAudioElement,
   'src' | 'loop' | 'preload' | 'volume' | 'currentTime' | 'paused' | 'play' | 'pause' | 'removeAttribute'>;
 
 /**
- * Stream long OGG tracks instead of adding them to the decoded gameplay-SFX
+ * Stream long music tracks instead of adding them to the decoded gameplay-SFX
  * buffer cache. At most two HTMLMediaElements exist, and they only overlap
  * during a short level/menu crossfade. No music work runs in the frame loop.
  */
@@ -64,10 +66,57 @@ export class BackgroundMusic {
   private lastCinematicSeconds = -1;
   private stationaryTicks = 0;
   private playbackFailed = false;
+  private boss: BossMusic | undefined;
+  private endingBoss = false;
+
+  beginBoss(boss: BossMusic): void {
+    if (this.disposed || this.boss === boss) return;
+    this.cancelCinematic();
+    this.cancelBoss();
+    this.cancelFade();
+    for (const player of this.players) player.pause();
+    this.requested = null;
+    this.boss = boss;
+    this.applyScene('boss', this.flowPlay);
+  }
+
+  defeatBoss(boss: BossMusic): void {
+    if (this.disposed || this.boss !== boss || this.endingBoss) return;
+    this.cancelFade();
+    this.endingBoss = true;
+    this.flowTrack = null;
+    const previous = this.current;
+    const initialGain = this.targetVolume > 0 ? Math.min(1, previous.volume / this.targetVolume) : 1;
+    const startedAt = performance.now();
+    // Use elapsed time so a slow render frame cannot stretch a 2.5-second fade.
+    this.fadeTimer = setInterval(() => {
+      const fraction = Math.max(0, Math.min(1, (performance.now() - startedAt) / 2500));
+      previous.volume = this.targetVolume * initialGain * (1 - fraction);
+      if (fraction === 1) {
+        this.cancelBoss();
+        this.applyScene(this.flowTrack, this.flowPlay);
+      }
+    }, 25);
+  }
+
+  stopBoss(boss: BossMusic): void {
+    if (this.boss !== boss) return;
+    this.cancelBoss();
+  }
+
+  cancelBoss(): void {
+    if (!this.boss) return;
+    this.boss = undefined;
+    this.endingBoss = false;
+    this.cancelFade();
+    for (const player of this.players) player.pause();
+    this.requested = null;
+  }
 
   /** Cinematics override flow routing even while the game still says playing. */
   beginCinematic(cinematic: CinematicMusic): void {
     if (this.disposed || this.cinematic === cinematic) return;
+    this.cancelBoss();
     this.clearCinematic();
     this.cancelFade();
     this.endingCinematic = false;
@@ -168,6 +217,15 @@ export class BackgroundMusic {
   setScene(track: MusicTrack | null, play: boolean): void {
     this.flowTrack = track;
     this.flowPlay = play;
+    if (this.boss) {
+      if (!this.endingBoss) this.applyScene('boss', play);
+      else {
+        this.enabled = play;
+        if (!this.canPlay()) this.current.pause();
+        else this.resume();
+      }
+      return;
+    }
     if (this.cinematic) { this.syncCinematic(); return; }
     if (this.endingCinematic && play && track !== 'intro') return;
     this.endingCinematic = false;
@@ -215,7 +273,7 @@ export class BackgroundMusic {
       this.applyScene(this.flowTrack, this.flowPlay);
     }
     if (!this.canPlay()) {
-      this.cancelFade();
+      if (!this.endingBoss) this.cancelFade();
       for (const player of this.players) player.pause();
     } else this.resume();
   }
@@ -263,7 +321,7 @@ export class BackgroundMusic {
     next.loop = !isCinematic(track);
     next.volume = 0;
     this.active = nextIndex;
-    if (!previous.src || isCinematic(track)) {
+    if (!previous.src || isCinematic(track) || track === 'boss') {
       // First title appearance should not wait for a crossfade from silence.
       next.volume = this.targetVolume;
       this.start(next);
@@ -323,6 +381,7 @@ export class BackgroundMusic {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.cancelBoss();
     this.clearCinematic();
     this.cancelFade();
     this.autoplayBlockedListener = undefined;

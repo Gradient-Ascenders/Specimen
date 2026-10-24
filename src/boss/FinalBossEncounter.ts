@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
+import { BossMusic } from '../audio/BossMusic.ts';
 import type { CombatTargetRegistry } from '../combat/CombatTargetRegistry.ts';
 import type { SpecimenProjectileSystem } from '../combat/SpecimenProjectileSystem.ts';
 import { CollisionHit, CollisionLayer, ColliderTransformMode, type CollisionWorld } from '../physics/CollisionWorld.ts';
@@ -61,6 +62,7 @@ export class FinalBossEncounter {
   private savedFar:number|undefined;
   private disposed=false;
   private explosionPlayed=false;
+  private music=new BossMusic();
   private reinforcementIndex=0;
   private readonly previousNose=new THREE.Vector3();
   private readonly ramDisplacement=new THREE.Vector3();
@@ -113,7 +115,7 @@ export class FinalBossEncounter {
   presentMerge(progress:number):void {this.hud.presentMerge(progress);this.options.host.dataset.bossEncounter='true';}
   start(shortIntro=false):boolean {if(!this.controller.start(shortIntro))return false;this.activateEncounter();return true;}
   startPhaseTwo():boolean {if(!this.controller.startPhaseTwo(this.options.body.position))return false;this.activateEncounter();return true;}
-  private activateEncounter():void {this.options.arena.setPowered(true);this.options.arena.setDoors(true);this.options.audio?.startLoop('final-boss-engine','world-machinery-loop-01',this.presentation.machine.position);this.sync();}
+  private activateEncounter():void {if(this.controller.combatActive)this.music.start();this.options.arena.setPowered(true);this.options.arena.setDoors(true);this.options.audio?.startLoop('final-boss-engine','world-machinery-loop-01',this.presentation.machine.position);this.sync();}
   update(dt:number,skip=false):void {
     if(this.disposed)return;if(skip||this.skipRequested){this.controller.skipCinematic(this.options.body.position);this.skipRequested=false;}
     this.shake*=Math.exp(-dt*5);
@@ -121,6 +123,8 @@ export class FinalBossEncounter {
     if(this.controller.combatActive&&this.controller.readModel.attack==='ram')this.presentation.ramHull.capturePreviousPose();
     this.controller.update(dt,this.options.body.position);const m=this.controller.readModel;
     if(m.state!==this.oldState) {
+      if(m.state==='combat')this.music.start();
+      if(m.state==='defeated')this.music.defeat();
       if(this.cinematic||m.state==='suspended'){this.clearAttacks();this.options.weapon.reset();}
       this.shake=m.state==='transition'?.08:m.state==='defeated'?.18:0;
       if(m.state==='transition')this.options.audio?.play('world-activation-01',this.presentation.machine.position,false,1);
@@ -281,7 +285,7 @@ export class FinalBossEncounter {
     const t=this.controller.time;camera.position.x+=Math.sin(t*83)*this.shake;camera.position.y+=Math.sin(t*67+.8)*this.shake*.65;camera.position.z+=Math.sin(t*97+1.7)*this.shake*.45;
   }
   clearAttacks():void {this.squad.clear();this.droneFlight.reset();this.projectiles.clear();this.reinforcements.reset();this.evasion.reset();this.shake=0;this.hostileShots.count=0;this.presentation.clearRamImpact();this.presentation.beam.visible=false;this.presentation.beamCore.visible=false;this.presentation.beamImpact.visible=false;this.presentation.shield.visible=false;this.presentation.eyeCharge.visible=false;this.presentation.clearAttackWarnings();for(let i=0;i<6;i++)this.options.arena.setSector(i,'inactive');this.oldStage='';this.options.audio?.stopLoop('final-boss-beam');}
-  suspend():void {this.controller.suspend();this.clearAttacks();this.healthPacks.reset();this.options.audio?.stopLoop('final-boss-engine');this.hud.hide();}
-  reset():void {this.clearAttacks();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.hud.hide();this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');delete this.options.host.dataset.bossEncounter;}
+  suspend():void {this.music.stop();this.controller.suspend();this.clearAttacks();this.healthPacks.reset();this.options.audio?.stopLoop('final-boss-engine');this.hud.hide();}
+  reset():void {this.music.stop();this.music=new BossMusic();this.clearAttacks();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.hud.hide();this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.explosionPlayed=false;this.options.audio?.stopLoop('final-boss-engine');delete this.options.host.dataset.bossEncounter;}
   dispose():void {if(this.disposed)return;this.reset();for(const off of this.unregister)off();for(const drone of this.drones)drone.dispose();this.droneResources.dispose();this.squad.dispose();this.reinforcements.dispose();this.healthPacks.dispose();this.projectiles.dispose();this.hostileShots.removeFromParent();this.hostileShots.dispose();this.shotGeometry.dispose();this.shotMaterial.dispose();this.presentation.dispose();this.controller.dispose();this.hud.dispose();this.disposed=true;}
 }

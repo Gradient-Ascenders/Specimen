@@ -159,7 +159,7 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
   for (const [track, file, gain] of [
     ['awakening', '04-opening-tension.ogg', 1],
     ['escape', '05-containment-escape-high-tech-lab.ogg', .60],
-    ['rescue', '06-cultivation-volt-rescue-the-way-out.ogg', 1.75],
+    ['rescue', '06-cultivation-volt-rescue-digital-slash.ogg', 1.75],
   ] as const) {
     const cue = new CinematicMusic(track, 129);
     cue.update(0);
@@ -167,6 +167,7 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
     const player = f.active()[0]!;
     assert.equal(player.src, './group-folder/assets/audio/music/' + file);
     assert.equal(player.loop, false);
+    assert.equal(player.currentTime, 0, 'supplied trimmed recordings start at zero, without an additional song offset');
     assert.equal(player.volume, .28 * gain);
     // Normal flow notifications must not reclaim music during an in-level film.
     f.music.setScene('containment', true);
@@ -185,10 +186,11 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
   assert.equal(f.players.length, 2);
 });
 
-test('cinematic media clock seeks, stalls, pause/focus, settings and resume retain ownership', context => {
+for (const [track, duration, halfVolume] of [['awakening', 53.2, .14], ['rescue', 129, .245]] as const) {
+test(`${track} media clock seeks, stalls, pause/focus, settings and resume retain ownership through natural completion`, context => {
   const f = cinematicFixture(context);
   f.music.setScene(null, true);
-  const cue = new CinematicMusic('awakening', 53.2); cue.update(0);
+  const cue = new CinematicMusic(track, duration); cue.update(0);
   const player = f.active()[0]!;
   cue.update(12); context.mock.timers.tick(50);
   assert.equal(player.currentTime, 12);
@@ -202,17 +204,18 @@ test('cinematic media clock seeks, stalls, pause/focus, settings and resume reta
   cue.update(3); context.mock.timers.tick(50); assert.equal(player.currentTime, 3);
   context.mock.timers.tick(250); assert.equal(player.paused, true, 'a frozen live clock must pause even with background muting disabled');
   cue.update(3.1); context.mock.timers.tick(50); assert.equal(player.paused, false);
-  cue.update(52.7); context.mock.timers.tick(50);
-  assert.ok(Math.abs(player.volume - .14) < 1e-10, 'last second follows the actual movie clock');
-  cue.update(53.2); context.mock.timers.tick(800);
+  cue.update(duration - .5); context.mock.timers.tick(50);
+  assert.ok(Math.abs(player.volume - halfVolume) < 1e-10, 'last second follows the actual movie clock');
+  cue.update(duration); context.mock.timers.tick(800);
   assert.equal(f.active().length, 0);
 });
+}
 
 test('replay resets to the beginning, stale stop cannot cancel replacement, and disposal clears timers', context => {
   const f = cinematicFixture(context); f.music.setScene('containment', true);
-  const first = new CinematicMusic('escape', 80); first.update(0);
+  const first = new CinematicMusic('rescue', 129); first.update(0);
   first.update(30); context.mock.timers.tick(50);
-  const second = new CinematicMusic('escape', 80); second.update(0);
+  const second = new CinematicMusic('rescue', 129); second.update(0);
   first.stop(); context.mock.timers.tick(50);
   assert.equal(f.active().length, 1); assert.equal(f.active()[0]!.currentTime, 0);
   f.music.cancelCinematic(); f.music.setScene('intro', true);

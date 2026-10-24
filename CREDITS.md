@@ -21,7 +21,8 @@ All 3D models were created independently for Specimen.
 | Searching | yd | [OpenGameArt](https://opengameart.org/content/searching) | CC0 | Blackout music · edited for looping and volume. |
 | Tension | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/tension-0) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Bob's Awakening music · converted to OGG for game use. |
 | High Tech Lab | remaxim | [OpenGameArt](https://opengameart.org/content/high-tech-lab) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Goop's Escape music · converted to OGG for game use · reduced playback gain (0.60×). |
-| The Way Out | Kevin MacLeod | [Incompetech](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100045) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Volt's Rescue and Escape music · converted to OGG for game use. |
+| Digital Slash | PetterTheSturgeon | [OpenGameArt](https://opengameart.org/content/digital-slash) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | Volt's Rescue and Escape music · edited for use in Specimen, including trimming and a repeated musical section · supplied cut begins at original 1:03 · plays from file 0:00 · final OGG copied unchanged. |
+| A Flawless Getaway | vitalezzz | [OpenGameArt](https://opengameart.org/content/a-flawless-getaway) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | Final boss combat music · attribution notice: Vitalezzz - A Flawless Getaway · prepared in-game version edited and converted to OGG from the original looping WAV · supplied OGG copied unchanged. |
 
 ## Sound effects
 
