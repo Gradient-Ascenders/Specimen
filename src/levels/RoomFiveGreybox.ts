@@ -121,8 +121,10 @@ export class RoomFiveGreybox {
   });
   readonly failureVolume = new LevelTriggerVolume({
     id: 'room-5-fall-failure',
-    centre: new THREE.Vector3(0, 68, 108.5),
-    size: new THREE.Vector3(44, 12, 39),
+    // Begin at the Room 5 floor/front wall (Z=91.5), keeping the original
+    // back boundary at Z=128. The old Z=89 edge reached into the rising lift.
+    centre: new THREE.Vector3(0, 68, 109.75),
+    size: new THREE.Vector3(44, 12, 36.5),
   });
   readonly lasers: LaserHazardSystem;
   readonly art: RoomFiveArt;

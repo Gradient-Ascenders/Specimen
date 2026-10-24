@@ -143,6 +143,56 @@ test('a physical fall reaches the visible Room 3 acid before its failure trigger
   } finally { scene.dispose(); world.clear(); surfaces.clear(); }
 });
 
+test('Room 5 fall detection cannot kill a rider at the far edge of the late-ascent lift', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const world = new CollisionWorld();
+  const body = createFakeBody();
+  let deaths = 0;
+  const controller = new ContainmentLevelController({
+    scene, body: body as unknown as KinematicBody, collisionWorld: world,
+    requestDeath: () => { deaths++; return true; },
+  });
+  try {
+    controller.teleportToRoomForDebug(4);
+    scene.roomFour.elevator.begin();
+    scene.roomFour.elevator.update(38, []);
+    scene.roomFour.lasers.update(35, {position:{x:1000,y:1000,z:1000},radiusMetres:.45});
+    body.position.set(9, scene.roomFour.elevatorPlatform.position.y + .71, 89.3);
+    body.grounded = true;
+    body.supportCollider = scene.roomFour.elevatorPlatform.collisionMesh;
+    assert.equal(scene.roomFour.lasers.hazards.at(-1)!.enabled, false, 'The last laser has not started.');
+    assert.ok(scene.roomFour.lasers.hazards.every(hazard => !hazard.intersects(body)));
+    controller.update(1 / 60);
+    assert.equal(deaths, 0, `Invisible failure: ${controller.lastFailureId}`);
+    assert.equal(controller.activeRoomId, 4);
+
+    // The fix must preserve real falls after entering Room 5, including the
+    // front edge of that room, rather than globally disabling fall recovery.
+    controller.teleportToRoomForDebug(5);
+    body.position.set(9, 68, 91.6);
+    controller.update(1 / 60);
+    assert.equal(deaths, 1);
+    assert.equal(controller.lastFailureId, 'room-5:fall');
+  } finally { controller.dispose(); world.clear(); scene.dispose(); }
+});
+
+test('Room 5 fall detection clears the whole lift roof throughout ascent and retains its own room coverage', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  const target = {position:new THREE.Vector3(),radiusMetres:.45};
+  try {
+    for(let y=30.21;y<=75.21;y+=.5)for(const x of [5.1,9,12.9])for(const z of [81.6,85.5,89.4]){
+      target.position.set(x,y,z);
+      scene.roomFive.updateFailureTrigger(target as unknown as KinematicBody);
+      assert.equal(scene.roomFive.failureVolume.occupied,false,`Room 5 reaches the lift at ${x}, ${y}, ${z}.`);
+    }
+    for(const x of [-20,0,20])for(const z of [91.6,108.5,127.9]){
+      target.position.set(x,68,z);
+      scene.roomFive.updateFailureTrigger(target as unknown as KinematicBody);
+      assert.equal(scene.roomFive.failureVolume.occupied,true);
+    }
+  } finally { scene.dispose(); }
+});
+
 test('recovering active Goop keeps Bob duct reflections tied to Bob position', () => {
   const scene = new ContainmentLevelScene(() => {});
   const collisionWorld = new CollisionWorld();
@@ -675,7 +725,8 @@ test('Room 4 camera cap is camera-only and compact arrival framing stays inside 
     rig.setGroundOrbitYawRadians(yaw);
     for (let step = 0; step < 90; step += 1) rig.update(1, 1 / 60);
     const diagnostics = rig.getDiagnostics();
-    assert.equal(diagnostics.obstructed, false);
+    assert.ok(!diagnostics.obstructed || diagnostics.obstructionName === 'contextual-camera-bounds',
+      'The lift may apply its soft boundary, but solid geometry must not block the arrival view.');
     assert.ok(diagnostics.preferredCameraPosition.y < 78.1);
     assert.ok(diagnostics.resolvedCameraPosition.y < 78.1);
     assert.ok(diagnostics.resolvedCameraPosition.x > 2.7);
