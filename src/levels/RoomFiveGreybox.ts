@@ -8,6 +8,8 @@ import { LaserHazardSystem } from '../hazards/LaserHazardSystem.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
 import { RoomFiveArt } from '../render/environment/containment/RoomFiveArt.ts';
+import type {RoomFiveShellLoader} from '../render/environment/containment/RoomFiveShell.ts';
+import type {AuthoredLaserEmitter} from '../render/hazards/LaserHazardPresentation.ts';
 import { RoomFiveGoopSpeech } from '../render/environment/containment/RoomFiveGoopSpeech.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
@@ -20,6 +22,26 @@ import { createWoodenVentCoverGeometry } from '../render/environment/containment
 export const ROOM_5_ENTRY_CHECKPOINT_POSITION = new THREE.Vector3(9, 75.21, 94);
 export const ROOM_5_ENTRY_CHECKPOINT_ID = 'containment-room-5-entry';
 export const ROOM_5_PUZZLE_GROUP_ID = 'containment-room-5';
+
+/** Simple solid shapes for the authored furnishings, leaving the button's
+ * centre aisle and the cinematic escape route clear. */
+export const ROOM_FIVE_SOLID_PROPS = [
+  {name:'operator-worktop',size:[1.3,.14,2.5],position:[-12.85,98.37,129.1]},
+  {name:'operator-pedestal',size:[.7,.75,.7],position:[-12.85,97.93,129.1]},
+  {name:'operator-monitor',size:[.16,.72,.92],position:[-13.36,98.89,129.1]},
+  {name:'operator-monitor-stand',size:[.10,.12,.15],position:[-13.36,98.50,129.1]},
+  {name:'operator-keyboard',size:[.34,.025,.7],position:[-12.7,98.465,129.1]},
+  {name:'operator-chair-seat',size:[.55,.10,.62],position:[-11.95,98.02,129.1]},
+  {name:'operator-chair-back',size:[.10,.62,.60],position:[-11.67,98.33,129.1]},
+  {name:'operator-chair-pedestal',size:[.13,.42,.13],position:[-11.95,97.76,129.1]},
+  {name:'equipment-cabinet',size:[.55,1.8,1.3],position:[-6.5,98.43,130.8]},
+  {name:'release-console',size:[2.1,1.65,.30],position:[-10,98.45,131.48]},
+  {name:'cell-service-unit-a',size:[.58,1.45,1.25],position:[3.25,75.475,109]},
+  {name:'cell-service-unit-b',size:[.58,1.45,1.25],position:[3.25,75.475,111.3]},
+  {name:'escape-sleeve-left',size:[.33,1.8,.92],position:[-1.065,75.65,124.84]},
+  {name:'escape-sleeve-right',size:[.33,1.8,.92],position:[1.065,75.65,124.84]},
+  {name:'escape-sleeve-top',size:[1.8,.15,.92],position:[0,76.475,124.84]},
+] as const;
 
 export type RoomFiveEndingState =
   | 'traversal'
@@ -162,7 +184,7 @@ export class RoomFiveGreybox {
     this.goopWoodenDoor = this.buildShell();
     const solubleDoorMaterial = artResources.materials.solubleComposite.clone();
     solubleDoorMaterial.name = 'room-5-soluble-biological-composite-source';
-    solubleDoorMaterial.color.setHex(0x96714f);
+    solubleDoorMaterial.color.setHex(0x927651);
     solubleDoorMaterial.emissive.setHex(0x121408);
     solubleDoorMaterial.emissiveIntensity = 0.1;
     solubleDoorMaterial.roughness = 0.82;
@@ -199,9 +221,26 @@ export class RoomFiveGreybox {
       hazards,
       [this.movingPlatformOne, this.movingPlatformTwo],
     );
+    this.releaseButtonCap.add(this.art.shell.button);
+    for(const prop of ROOM_FIVE_SOLID_PROPS){
+      const collider=this.builder.addCollider({name:`room-5-prop-${prop.name}`,size:prop.size,position:prop.position,
+        material:this.builder.materials.wall});
+      collider.userData.solidProp=true;
+    }
     this.hideGameplayColliders();
     this.root.add(this.lasers.root, this.laserPresentation.root, this.art.root);
     this.resetEndingPresentation();
+  }
+
+  async prepareArt(borrowFinish:(name:string)=>THREE.Material,kit:AuthoredLaserEmitter,loader?:RoomFiveShellLoader):Promise<void>{
+    await this.art.prepare(borrowFinish,loader);
+    this.art.shell.attachLasers(this.laserPresentation,kit);
+    (this.releaseButtonCap.material as THREE.Material).visible=false;
+  }
+
+  get renderSources():readonly THREE.Object3D[]{
+    return [this.art.root,...this.art.movingPlatformDressings,this.laserPresentation.root,this.releaseButtonCap,
+      this.goopWoodenDoor,this.goopSpeech.root];
   }
 
   get endingState(): RoomFiveEndingState {

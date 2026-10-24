@@ -60,7 +60,7 @@ export class ContainmentSurveillanceModel {
     tilt.add(model);this.attachments.set(tilt,{model,previous});
   }
 
-  /** The actual first fixture represents the shared buffers of all five. */
+  /** The actual first fixture represents the shared buffers of all six. */
   get renderMeshes():readonly THREE.Mesh[]{
     const meshes:THREE.Mesh[]=[];
     this.attachments.values().next().value?.model.traverse(object=>{if(object instanceof THREE.Mesh)meshes.push(object);});

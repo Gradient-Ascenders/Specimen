@@ -115,7 +115,7 @@ export class ContainmentSurveillanceCameras {
   async prepare(borrowFinish:(name:string)=>THREE.Material,loader?:ContainmentSurveillanceModelLoader):Promise<void>{
     await this.model.prepare(borrowFinish,loader);
     if(this.disposed)return;
-    for(const camera of this.cameras)if(camera.placement.roomId<=3)this.model.attachCamera(camera.tilt);
+    for(const camera of this.cameras)this.model.attachCamera(camera.tilt);
   }
   get authoredRenderMeshes():readonly THREE.Mesh[]{return this.model.renderMeshes;}
   get modelDiagnostics(){return this.model.diagnostics;}

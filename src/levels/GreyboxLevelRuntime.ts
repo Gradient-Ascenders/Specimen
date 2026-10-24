@@ -2637,6 +2637,7 @@ function createRoomPrewarmSources(
   } else {
     if(roomId===3&&resources.testScene.roomThree.art.shell.ready)sources.push(...resources.testScene.roomThree.renderSources);
     else if(roomId===4&&resources.testScene.roomFour.art.shell.ready)sources.push(...resources.testScene.roomFour.renderSources);
+    else if(roomId===5&&resources.testScene.roomFive.art.shell.ready)sources.push(...resources.testScene.roomFive.renderSources);
     else sources.push(requiredNamedObject(levelRoot, `containment-room-${roomId}-greybox`));
     for (const child of teachingRoot.children) {
       if (child.name.startsWith('player-slime-')) sources.push(child);
@@ -2666,6 +2667,9 @@ function createRoomPrewarmSources(
   }
   if((roomId===3||roomId===5)&&resources.testScene.roomFour.art.shell.ready){
     sources.push(...resources.testScene.roomFour.renderSources);
+  }
+  if(roomId===4&&resources.testScene.roomFive.art.shell.ready){
+    sources.push(...resources.testScene.roomFive.renderSources,resources.testScene.roomFiveMonitor.root);
   }
 
   // Development spawn markers can also be seen from the far rooms.

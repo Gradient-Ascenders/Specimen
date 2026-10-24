@@ -46,9 +46,16 @@ Cultivation.
   travel, collision and camera profiles remain authoritative.
   [Room 4 freight lift](../../assets/environments/containment-room-four/README.md)
   documents assembly ownership and moving-surface checks.
-- Surveillance cameras in Rooms 1–3 share the intro's `OI_Camera` geometry and
+- All six surveillance cameras share the intro's `OI_Camera` geometry and
   existing finish bank. Their pan/tilt owners still track Bob; the doorway mount
   clears the raised shutter throughout its full rotation range.
+- Room 5's Blender containment atrium replaces the procedural shell and cell
+  dressing with sealed portals, a furnished observation gallery and reinforced
+  landings. Platforms share the earlier rooms' inset tops, metal borders,
+  amber corners and thruster harnesses. Moving platforms retain their original routes. The
+  existing hinge, button, release and dissolve owners drive the new visuals.
+  [Room 5 containment atrium](../../assets/environments/containment-room-five/README.md)
+  documents the source, shared resources and moving-surface checks.
 
 ## Verification focus
 

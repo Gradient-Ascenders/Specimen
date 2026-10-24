@@ -12,6 +12,7 @@ import { RoomFiveContainmentSecurity } from '../src/render/environment/containme
 import { CONTAINMENT_IDENTIFICATION_COLOURS, createContainmentSecurityAtlas,
   createContainmentSpecimenLabelTexture } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
 import { OPENING_EXPERIMENTS } from '../src/cinematics/OpeningLaboratory.ts';
+import {ROOM_FIVE_SOLID_PROPS} from '../src/levels/RoomFiveGreybox.ts';
 
 test('Goop’s identification is critical red, with deterministic hazard pictograms and caution tape', () => {
   const first = createContainmentSecurityAtlas('Goop'), second = createContainmentSecurityAtlas('Goop');
@@ -96,7 +97,7 @@ for (const includeDevelopmentHelpers of [false, true]) {
       const before = captureContainmentCollisionFingerprint(scene.collisionMeshes);
       assert.equal(security.root.parent, room.art.containmentAssembly);
       assert.equal(scene.measuredFirstUseGeometryPrimeDiagnostics.resourceCount, 23);
-      assert.equal(scene.collisionMeshes.filter(mesh => mesh.name.startsWith('room-5-')).length, 35);
+      assert.equal(scene.collisionMeshes.filter(mesh => mesh.name.startsWith('room-5-')).length, 35+ROOM_FIVE_SOLID_PROPS.length);
       for (const removed of ['room-5-containment-front-status-array', 'room-5-containment-overpressure-status',
         'room-5-containment-pressure-warning-slot']) assert.equal(room.art.root.getObjectByName(removed), undefined);
       security.root.traverse(object => {

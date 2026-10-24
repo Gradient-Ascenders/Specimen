@@ -256,7 +256,7 @@ test('complete Containment scene exposes unique, consistently tagged colliders',
   assert.deepEqual(goopDoor.userData.sizeMetres,[2.35,1.8,.9]);
   assert.ok(goopDoor.position.equals(new THREE.Vector3(0,75.65,124.72)));
   assert.ok(goopDoor.material instanceof THREE.MeshStandardMaterial);
-  assert.equal(goopDoor.material.color.getHex(),0x96714f);
+  assert.equal(goopDoor.material.color.getHex(),0x927651);
 
   const stickyMeshes = scene.collisionMeshes.filter(
     (mesh) => mesh.userData.surfaceTag === 'sticky',

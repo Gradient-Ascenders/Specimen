@@ -1,3 +1,4 @@
+import {loadRoomFiveShellFixture} from './helpers/RoomFiveShellAsset.ts';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
@@ -16,7 +17,7 @@ import {loadRoomFourShellFixture} from './helpers/RoomFourShellAsset.ts';
 
 async function prepare(scene:ContainmentLevelScene){
   await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
-  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture);
+  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture,loadRoomFiveShellFixture);
 }
 
 test('the chemical hall shares the finish bank and retains the complete collision, acid and hazard contracts',async()=>{
@@ -83,7 +84,7 @@ test('the chemical hall shares the finish bank and retains the complete collisio
     room.reset();await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,()=>{throw new Error('Must reuse static architecture');});
     assert.equal(root,shell.root.children[0]);assert.deepEqual(hazards(),before);
     const prime=scene.measuredFirstUseGeometryPrimeDiagnostics;
-    assert.equal(prime.resourceCount,74);assert.equal(prime.uniqueGeometryCount,74);
+    assert.equal(prime.resourceCount,118);assert.equal(prime.uniqueGeometryCount,118);
     assert.ok(!prime.ownerNames.some(name=>name.startsWith('room-3-production-art-static-batch')));
   }finally{scene.dispose();}
 });

@@ -1,3 +1,4 @@
+import {loadRoomFiveShellFixture} from './helpers/RoomFiveShellAsset.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
@@ -152,18 +153,17 @@ test('all fixtures share three bounded geometries and two materials without per-
   } finally { rig.dispose(); }
 });
 
-test('Rooms 1–3 use the exact shared cutscene camera and the doorway camera clears the shutter through its full tilt range',async()=>{
+test('All surveillance fixtures use the exact shared cutscene camera and the doorway camera clears the shutter through its full tilt range',async()=>{
   const scene=new ContainmentLevelScene(()=>{}),rig=scene.surveillanceCameras;
   const source=await loadOpeningLaboratoryFixture(),prefab=source.getObjectByName('OI_Camera')!;
   const originals=new Map(meshes(prefab).map(mesh=>[mesh.name,mesh.geometry]));
   try{
     await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
-    await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,async()=>source,loadRoomFourShellFixture);
-    assert.deepEqual(rig.modelDiagnostics,{ready:true,cameras:5,meshes:5,textureCount:0});
+    await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,async()=>source,loadRoomFourShellFixture,loadRoomFiveShellFixture);
+    assert.deepEqual(rig.modelDiagnostics,{ready:true,cameras:6,meshes:5,textureCount:0});
     const geometry=new Set<THREE.BufferGeometry>();
     for(const camera of rig.cameras){
       const model=camera.tilt.getObjectByName('containment-authored-surveillance-camera');
-      if(camera.placement.roomId===5){assert.equal(model,undefined);continue;}
       assert.ok(model);
       for(const mesh of meshes(model)){
         geometry.add(mesh.geometry);
@@ -176,7 +176,7 @@ test('Rooms 1–3 use the exact shared cutscene camera and the doorway camera cl
       assert.equal(camera.tilt.getObjectByName(`${camera.root.name}-housing`)!.visible,false);
       assert.equal(camera.tilt.getObjectByName(`${camera.root.name}-lens-and-recording-led`)!.visible,false);
     }
-    assert.equal(geometry.size,5,'All five cameras share four authored buffers and one recording diode.');
+    assert.equal(geometry.size,5,'All six cameras share four authored buffers and one recording diode.');
     const camera=rig.cameras.find(camera=>camera.placement.id==='room-2-exit-surveillance-camera')!;
     const model=camera.tilt.getObjectByName('containment-authored-surveillance-camera')!;
     const shutterEnvelope=new THREE.Box3(new THREE.Vector3(-2.1,14,48.3),new THREE.Vector3(2.1,14.90,49.5));

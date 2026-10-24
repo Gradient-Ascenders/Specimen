@@ -1,3 +1,4 @@
+import {loadRoomFiveShellFixture} from './helpers/RoomFiveShellAsset.ts';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
@@ -13,7 +14,7 @@ import {loadOpeningLaboratoryFixture} from './helpers/OpeningLaboratoryAsset.ts'
 
 async function prepare(level:ContainmentLevelScene){
   await level.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
-  await level.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture);
+  await level.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture,loadRoomFiveShellFixture);
 }
 function pose(level:ContainmentLevelScene,total:number){
   const room=level.roomFour;room.reset();room.elevator.begin();
@@ -51,8 +52,8 @@ test('authored lift art preserves collision, travel, hazard timing, the complete
         .intersectObject(shell.carRoot,true);
       assert.ok(hits[0]);assert.ok(Math.abs(hits[0].point.y-top)<1e-5,'Keep the walkable roof aligned with its collider.');
     }
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount,74);
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,74);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount,118);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,118);
   }finally{level.dispose();}
 });
 

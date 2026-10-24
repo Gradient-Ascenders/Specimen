@@ -147,6 +147,8 @@ test('the old pod is culled beyond the duct bends, including the captured Room 3
       {room:3 as const,body:{x:-.243,y:11.36,z:51.734},camera:{x:1.824,y:12.741,z:54.31}},
       {room:4 as const,body:{x:9,y:30.21,z:85.5},camera:{x:9,y:40.8,z:89.9}},
       {room:4 as const,body:{x:9,y:75.21,z:85.5},camera:{x:9,y:77.2,z:90.4}},
+      {room:5 as const,body:{x:9,y:75.21,z:94},camera:{x:9,y:77,z:98}},
+      {room:5 as const,body:{x:-10,y:97.96,z:129.6},camera:{x:-10,y:99,z:124.7}},
     ];
     for(const {room,body,camera} of states){
       scene.lighting.setActiveRoom(room);

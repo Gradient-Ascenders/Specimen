@@ -15,6 +15,7 @@ import { fitContainmentShadowCullingBounds } from '../render/environment/contain
 import type {RoomTwoShellLoader} from '../render/environment/containment/RoomTwoShell.ts';
 import type {RoomThreeShellLoader} from '../render/environment/containment/RoomThreeShell.ts';
 import type {RoomFourShellLoader} from '../render/environment/containment/RoomFourShell.ts';
+import type {RoomFiveShellLoader} from '../render/environment/containment/RoomFiveShell.ts';
 import type {ContainmentSurveillanceModelLoader} from '../render/environment/containment/ContainmentSurveillanceModel.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
@@ -308,7 +309,7 @@ export class ContainmentLevelScene {
   }
 
   async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader,roomThreeLoader?:RoomThreeShellLoader,
-    cameraLoader?:ContainmentSurveillanceModelLoader,roomFourLoader?:RoomFourShellLoader):Promise<void>{
+    cameraLoader?:ContainmentSurveillanceModelLoader,roomFourLoader?:RoomFourShellLoader,roomFiveLoader?:RoomFiveShellLoader):Promise<void>{
     await this.teaching.roomOneArt.prepare();
     if(this.disposed)return;
     await this.teaching.roomTwoArt.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomTwoLoader);
@@ -319,17 +320,20 @@ export class ContainmentLevelScene {
     if(this.disposed)return;
     await this.roomFour.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
       this.roomThree.art.shell.borrowLaserEmitter()!,roomFourLoader);
+    if(this.disposed)return;
+    await this.roomFive.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
+      this.roomThree.art.shell.borrowLaserEmitter()!,roomFiveLoader);
   }
 
   private currentFirstUseGeometryResources():readonly THREE.Mesh[]{
     // The old hardware timings are historical. Prime the new authored buffers
     // explicitly instead of uploading retired procedural Room 2/3 proxies.
-    const roomTwo=this.teaching.roomTwoArt.shell,roomThree=this.roomThree.art.shell,roomFour=this.roomFour.art.shell;
+    const roomTwo=this.teaching.roomTwoArt.shell,roomThree=this.roomThree.art.shell,roomFour=this.roomFour.art.shell,roomFive=this.roomFive.art.shell;
     return [...this.measuredFirstUseGeometryResources.filter(object=>
       !(roomTwo.ready&&object.name.startsWith('room-2-'))&&!(roomThree.ready&&object.name.startsWith('room-3-'))&&
-      !(roomFour.ready&&object.name.startsWith('room-4-'))),
+      !(roomFour.ready&&object.name.startsWith('room-4-'))&&!(roomFive.ready&&object.name.startsWith('room-5-'))),
       ...(roomTwo.ready?roomTwo.renderMeshes:[]),...(roomThree.ready?this.roomThree.authoredRenderMeshes:[]),
-      ...this.surveillanceCameras.authoredRenderMeshes,...(roomFour.ready?roomFour.renderMeshes:[])];
+      ...this.surveillanceCameras.authoredRenderMeshes,...(roomFour.ready?roomFour.renderMeshes:[]),...(roomFive.ready?roomFive.renderMeshes:[])];
   }
 
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
@@ -417,7 +421,7 @@ export class ContainmentLevelScene {
       activePosition.y < 34 && cameraPosition.y < 34) ||
       // The enclosed lift is beyond two offset rooms and their opaque walls.
       // The old pod cannot be seen here, even during the low arrival camera.
-      (roomId===4&&activePosition.z>=79.2&&cameraPosition.z>=79.2)
+      ((roomId===4||roomId===5)&&activePosition.z>=79.2&&cameraPosition.z>=79.2)
       ? this.completedRoomOneBranches : undefined;
     if (!branches && !completedRoomOne) return draw();
 

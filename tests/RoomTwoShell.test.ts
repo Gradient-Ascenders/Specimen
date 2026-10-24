@@ -1,3 +1,4 @@
+import {loadRoomFiveShellFixture} from './helpers/RoomFiveShellAsset.ts';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
@@ -16,7 +17,7 @@ import {loadRoomFourShellFixture} from './helpers/RoomFourShellAsset.ts';
 
 async function prepare(scene:ContainmentLevelScene){
   await scene.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
-  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture);
+  await scene.prepareEnvironmentArt(loadRoomTwoShellFixture,loadRoomThreeShellFixture,loadOpeningLaboratoryFixture,loadRoomFourShellFixture,loadRoomFiveShellFixture);
 }
 
 test('the Blender hall shares finish resources and preserves all collision data, landings and openings',async()=>{

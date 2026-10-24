@@ -57,7 +57,7 @@ test('the front hatch hinges above the opening, swings only outward, and shares 
     room.art.setReleaseProgress(2);assert.equal(pivot.rotation.x,1.65);
     room.reset();assert.equal(pivot.rotation.x,0);
     room.beginEnding();room.updateEnding(4.2);
-    assert.ok(Math.abs(pivot.rotation.x-sampleContainmentFinale(4.2).panelOpen*1.65)<1e-9);
+    assert.ok(Math.abs(pivot.rotation.x-THREE.MathUtils.clamp((sampleContainmentFinale(4.2).panelOpen-.15)/.85,0,1)*1.65)<1e-9);
     room.finishEnding();assert.equal(pivot.rotation.x,1.65);
     room.reset();assert.equal(pivot.rotation.x,0);
   }finally{world.dispose();}

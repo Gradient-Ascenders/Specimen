@@ -30,7 +30,7 @@ test('the freight lift renders departure, climb and arrival with prepared resour
       programs:host.__liftPrograms,retained:layer.renderer.info.programs.length};
   });
   expect(initial.shell.ready).toBe(true);expect(initial.shell.textureCount).toBe(0);
-  expect(initial.prime.resourceCount).toBe(74);expect(initial.prime.resourcesPrimed).toBe(true);
+  expect(initial.prime.resourceCount).toBe(118);expect(initial.prime.resourcesPrimed).toBe(true);
   const evidence='artifacts/evidence/room-four-lift';await mkdir(evidence,{recursive:true});
   const samples=[];
   const poses:readonly [string,number,boolean,number?,number?,number?][]=[
