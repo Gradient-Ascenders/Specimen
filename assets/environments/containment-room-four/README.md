@@ -23,7 +23,15 @@ illuminated route arrow. The doors open during the existing arrival pause and
 the original exit lock releases at its normal time. The fixed sill sits 12 mm
 above the travelling roof, giving these separate motion owners a physical
 clearance at docking. No gameplay collision, travel speed, checkpoints, hazard
-paths or camera profiles are changed.
+paths are changed.
+
+The lift camera now keeps its focus above the roof and bounds the camera to the
+shaft interior, including near-plane clearance. Framing follows the platform
+with damped adjustment at roof edges; it follows the player more closely near
+the landing. A soft boundary bends the orbit inward before a wall blocks the
+view. Near the landing it also eases upward into available headroom before
+shortening the view. Existing obstruction sweeps, arrival blend and exit handoff
+remain active.
 
 ## Source and export
 

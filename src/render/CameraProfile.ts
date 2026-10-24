@@ -27,6 +27,16 @@ export interface ContextualCameraProfile {
   readonly framingDeadZoneHalfWidthMetres: number;
   readonly framingDeadZoneHalfHeightMetres: number;
   readonly framingDampingPerSecond: number;
+  /** Optional radius for framing in the anchor's horizontal plane. Keeps a
+   * moving-platform focus above its deck instead of following screen-up into
+   * the floor, and limits how far edge movement can push the camera sideways. */
+  readonly framingPlanarRadiusMetres?: number;
+  /** World-space interior for the camera and its focus. Render-side bounds
+   * complement obstruction sweeps without changing movement collision. */
+  readonly cameraBounds?: {
+    readonly min: ReadonlyCameraVector3;
+    readonly max: ReadonlyCameraVector3;
+  };
 }
 
 /** Stable handoff resolved by an authored camera zone. */

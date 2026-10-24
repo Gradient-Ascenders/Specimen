@@ -170,6 +170,9 @@ export class CameraRig {
   private readonly contextualBoomDirection = new THREE.Vector3();
   private readonly contextualScreenRight = new THREE.Vector3();
   private readonly contextualScreenUp = new THREE.Vector3();
+  private readonly contextualBoundsMin = new THREE.Vector3();
+  private readonly contextualBoundsMax = new THREE.Vector3();
+  private contextualCameraLiftMetres = 0;
   private readonly targetUp = new THREE.Vector3(0, 1, 0);
   private readonly smoothedUp = new THREE.Vector3(0, 1, 0);
   private readonly planarBack = new THREE.Vector3(0, 0, 1);
@@ -305,6 +308,7 @@ export class CameraRig {
     this.contextualProfileBlend = 0;
     this.contextualProfileBlendTarget = 0;
     this.contextualFramingOffset.set(0, 0, 0);
+    this.contextualCameraLiftMetres = 0;
     this.desiredContextualFramingOffset.set(0, 0, 0);
     this.aimPresentationBlend = 0;
     this.aimPresentationBlendTarget = 0;
@@ -758,6 +762,7 @@ export class CameraRig {
   }
 
   private resetPresentationForDiscontinuity(): void {
+    this.contextualCameraLiftMetres = 0;
     this.smoothedTarget.copy(this.interpolatedTarget);
     this.smoothedUp.copy(this.targetUp);
     // Preserve the accumulated orbit heading while rebuilding a valid tangent
@@ -926,6 +931,16 @@ export class CameraRig {
       .copy(this.contextualScreenRight)
       .multiplyScalar(horizontalOverflow)
       .addScaledVector(this.contextualScreenUp, verticalOverflow);
+    if (profile.framingPlanarRadiusMetres !== undefined) {
+      this.desiredContextualFramingOffset
+        .copy(this.contextualScreenRight)
+        .multiplyScalar(horizontalOverflow)
+        .addScaledVector(this.planarBack, this.resolveDeadZoneOverflow(
+          this.contextualFramingDelta.dot(this.planarBack),
+          profile.framingDeadZoneHalfHeightMetres,
+        ))
+        .clampLength(0, profile.framingPlanarRadiusMetres);
+    }
     this.contextualFramingOffset.lerp(
       this.desiredContextualFramingOffset,
       exponentialDampingAlpha(
@@ -933,6 +948,11 @@ export class CameraRig {
         deltaSeconds,
       ),
     );
+    if (profile.framingPlanarRadiusMetres !== undefined) {
+      this.contextualFramingOffset
+        .projectOnPlane(this.smoothedUp)
+        .clampLength(0, profile.framingPlanarRadiusMetres);
+    }
     this.contextualFramingPivot.add(this.contextualFramingOffset);
     return true;
   }
@@ -1023,6 +1043,17 @@ export class CameraRig {
         Math.sin(this.effectivePitchRadians),
       )
       .normalize();
+    const bounds = profile?.cameraBounds;
+    if (bounds) {
+      // Include near-plane corners at wider player-selected fields of view.
+      const halfHeight = this.camera.near * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+      const clearance = Math.max(this.obstructionRadiusMetres,
+        Math.hypot(this.camera.near, halfHeight, halfHeight * this.camera.aspect)) + this.config.obstructionBufferMetres;
+      this.framingPivot.clamp(
+        this.contextualBoundsMin.set(bounds.min.x + clearance, bounds.min.y + clearance, bounds.min.z + clearance),
+        this.contextualBoundsMax.set(bounds.max.x - clearance, bounds.max.y - clearance, bounds.max.z - clearance),
+      );
+    }
     this.boomDisplacement
       .copy(this.boomDirection)
       .multiplyScalar(desiredDistanceMetres);
@@ -1030,7 +1061,35 @@ export class CameraRig {
       .copy(this.framingPivot)
       .add(this.boomDisplacement);
 
-    const hasObstruction =
+    let boundsLimitMetres: number | undefined;
+    if (bounds) {
+      this.boomDisplacement.set(
+        this.softenCameraBoundary(this.preferredCameraPosition.x, this.contextualBoundsMin.x, this.contextualBoundsMax.x),
+        THREE.MathUtils.clamp(this.preferredCameraPosition.y, this.contextualBoundsMin.y, this.contextualBoundsMax.y),
+        this.softenCameraBoundary(this.preferredCameraPosition.z, this.contextualBoundsMin.z, this.contextualBoundsMax.z),
+      );
+      // When an edge restricts the horizontal orbit, use available headroom
+      // before shortening the view. This avoids an extreme close-up at docking.
+      const dx = this.boomDisplacement.x - this.framingPivot.x;
+      const dz = this.boomDisplacement.z - this.framingPivot.z;
+      const height = Math.sqrt(Math.max(0, desiredDistanceMetres ** 2 - dx * dx - dz * dz));
+      const desiredLift = Math.max(0, Math.min(this.contextualBoundsMax.y,
+        this.framingPivot.y + height) - this.boomDisplacement.y);
+      this.contextualCameraLiftMetres = THREE.MathUtils.lerp(this.contextualCameraLiftMetres, desiredLift,
+        exponentialDampingAlpha(profile!.framingDampingPerSecond, deltaSeconds));
+      this.boomDisplacement.y = Math.min(this.contextualBoundsMax.y,
+        this.boomDisplacement.y + this.contextualCameraLiftMetres);
+      this.boomDisplacement.sub(this.framingPivot);
+      const length = this.boomDisplacement.length();
+      if (length < desiredDistanceMetres - 1e-9) boundsLimitMetres = length;
+      if (length > 1e-9) {
+        this.boomDirection.copy(this.boomDisplacement).divideScalar(length);
+      }
+    } else {
+      this.contextualCameraLiftMetres = 0;
+    }
+
+    const hasWorldObstruction =
       this.obstructionWorld?.sweepSphere(
         this.framingPivot,
         this.boomDisplacement,
@@ -1039,15 +1098,20 @@ export class CameraRig {
         CollisionLayer.CameraObstruction,
       ) ?? false;
 
+    const hasObstruction = hasWorldObstruction || boundsLimitMetres !== undefined;
     let obstructionLimitMetres: number | undefined;
     if (hasObstruction) {
       this.clearTimeSeconds = 0;
-      obstructionLimitMetres = Math.max(
-        0,
-        this.obstructionHit.distance - this.config.obstructionBufferMetres,
-      );
-      this.obstructionName =
-        this.obstructionHit.object?.name || '<unnamed>';
+      obstructionLimitMetres = hasWorldObstruction ? Math.max(
+        0, this.obstructionHit.distance - this.config.obstructionBufferMetres,
+      ) : boundsLimitMetres;
+      this.obstructionName = this.obstructionHit.object?.name || '<unnamed>';
+      if (boundsLimitMetres !== undefined && (!hasWorldObstruction || boundsLimitMetres < obstructionLimitMetres!)) {
+        obstructionLimitMetres = boundsLimitMetres;
+        this.obstructionName = 'contextual-camera-bounds';
+        this.obstructionHit.reset();
+        this.obstructionHit.distance = boundsLimitMetres;
+      }
     } else {
       this.clearTimeSeconds += deltaSeconds;
       this.obstructionName = 'none';
@@ -1077,6 +1141,21 @@ export class CameraRig {
       recoveryDeltaSeconds,
     );
     this.applyAimShoulderOffset();
+  }
+
+  /** Ease into the last half metre with a continuous slope, then hold the
+   * boundary. Framing remains damped; bounds contract immediately for safety. */
+  private softenCameraBoundary(value: number, min: number, max: number): number {
+    const width = Math.min(.5, (max - min) / 2);
+    if (value < min + width) {
+      const t = THREE.MathUtils.clamp((value - min) / width, 0, 1);
+      return min + width * t * t * (2 - t);
+    }
+    if (value > max - width) {
+      const t = THREE.MathUtils.clamp((max - value) / width, 0, 1);
+      return max - width * t * t * (2 - t);
+    }
+    return value;
   }
 
   private getDesiredDistanceMetres(): number {
@@ -1184,6 +1263,20 @@ export class CameraRig {
         throw new Error(
           `Contextual camera ${name} must be a non-negative finite number.`,
         );
+      }
+    }
+
+    if (profile.framingPlanarRadiusMetres !== undefined &&
+      (!Number.isFinite(profile.framingPlanarRadiusMetres) || profile.framingPlanarRadiusMetres < 0)) {
+      throw new Error('Contextual camera planar framing radius must be finite and non-negative.');
+    }
+    if (profile.cameraBounds) {
+      for (const axis of ['x', 'y', 'z'] as const) {
+        const {min, max} = profile.cameraBounds;
+        if (!Number.isFinite(min[axis]) || !Number.isFinite(max[axis]) ||
+          max[axis] - min[axis] <= 2 * (this.config.obstructionRadiusMetres + this.config.obstructionBufferMetres)) {
+          throw new Error('Contextual camera bounds must contain the camera clearance.');
+        }
       }
     }
 
