@@ -6,6 +6,7 @@ import { AcidSurfaceMaterial } from '../containment/AcidSurfaceMaterial.ts';
 import { createCultivationStickyRouteGeometry } from './CultivationStickyRouteGeometry.ts';
 import { CultivationPlatformArt } from './CultivationPlatformArt.ts';
 import { createCultivationPlatformWear } from './CultivationPlatformWear.ts';
+import { isCultivationBlenderShell } from './CultivationBlenderManifest.ts';
 import { createCultivationMembraneMaterial, createCultivationMembraneTextures, mapCultivationMembranePanel } from './CultivationMembraneMaterial.ts';
 import * as THREE from 'three';
 import { createContainmentPlatformMaterial } from '../containment/ContainmentArtResources.ts';
@@ -18,6 +19,8 @@ interface LabFixtureOptions {
   readonly fillHeightMetres?: number;
   readonly fillPositionsZ?: readonly number[];
   readonly shadowTargets?: readonly (readonly [number, number, number])[];
+  /** Purpose-built Room 1 practicals; all light properties except position stay fixed. */
+  readonly practicalPositions?: readonly (readonly [number, number, number])[];
 }
 
 /** Original, deterministic facility finishes shared by the dressed Cultivation rooms. */
@@ -146,7 +149,7 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
         for (const panel of panels) panel.material = this.platformArt.hidden;
       }
     }
-    for (const platform of platforms) this.platformArt.add(platform);
+    for (const platform of platforms)if(!isCultivationBlenderShell(platform.name))this.platformArt.add(platform);
     if (builder.root.name === 'cultivation-room-3-greybox') this.platformArt.batchStatic(builder.root);
   }
 
@@ -189,7 +192,7 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
     group.name = 'cultivation-lab-presentation';
     group.userData.presentationOnly = true;
     const transforms: THREE.Matrix4[] = [];
-    for (let z = 5; z < length; z += 8) {
+    for (let z = 5; !options.practicalPositions && z < length; z += 8) {
       for (const x of [-width * 0.28, width * 0.28]) {
         if (ceilingOpening && x + 0.12 > ceilingOpening[0] && x - 0.12 < ceilingOpening[1] &&
           z + 1.4 > ceilingOpening[2] && z - 1.4 < ceilingOpening[3]) continue;
@@ -237,6 +240,8 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
         key.name = `${root.name}-fixture-shadow-${index + 1}`;
         key.position.set((index === 0 ? -1 : 1) * width * .28, height - .45,
           5 + 8 * Math.round((z - 5) / 8));
+        const practical=options.practicalPositions?.[index];
+        if(practical){fill.position.set(...practical);key.position.set(...practical);}
         key.target.position.set(...(options.shadowTargets?.[index] ?? [0, 0, z]));
         configureCultivationTraversalLight(key);
         group.add(fill, key, key.target);

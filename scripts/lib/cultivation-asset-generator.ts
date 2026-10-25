@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, gunzipSync } from 'node:zlib';
+import {readFileSync} from 'node:fs';
+import {readRoomOneMaps} from '../../src/render/environment/containment/RoomOneShell.ts';
 import {
   type BakedArray, type BakedGeometry, type BakedTexture,
   type CultivationAssetManifest, type CultivationAssetSource, type SurfaceRepairStep,
@@ -13,6 +15,36 @@ import { generateGlass, generateWeather } from './cultivation-contamination-text
 import { generateWarning } from './cultivation-warning-texture.ts';
 import { createAcidFoundationAlbedo, createContainmentCeramicTextures } from '../../src/render/environment/containment/ContainmentProceduralTextures.ts';
 import { generateCultivationSurfaceRepairs } from './cultivation-surface-repairs.ts';
+import {readFile} from 'node:fs/promises';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {CULTIVATION_BLENDER_ASSETS} from '../../src/render/environment/cultivation/CultivationBlenderManifest.ts';
+
+const blenderSources=new Map<string,Record<string,THREE.BufferGeometry>>();
+for(const asset of CULTIVATION_BLENDER_ASSETS){
+  const bytes=await readFile(new URL(`../../assets/environments/cultivation/${asset.id}.glb`,import.meta.url));
+  const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  scene.updateMatrixWorld(true);const parts:Record<string,THREE.BufferGeometry>={};
+  const wanted=new Set(asset.batches.map(batch=>batch.geometry??batch.name));
+  scene.traverse(object=>{if(object instanceof THREE.Mesh){
+    if(wanted.has(object.name))parts[object.name]=object.geometry.clone().applyMatrix4(object.matrixWorld);
+    object.geometry.dispose();
+    for(const material of Array.isArray(object.material)?object.material:[object.material])material.dispose();
+  }});
+  blenderSources.set('cultivation-blender-'+asset.id,parts);
+}
+{
+  // Reuse the exact Level 1 camera, without loading its opening architecture at runtime.
+  const bytes=await readFile(new URL('../../assets/environments/opening-laboratory/opening-laboratory.glb',import.meta.url));
+  const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  scene.updateMatrixWorld(true);const prefab=scene.getObjectByName('OI_Camera');
+  if(prefab?.userData.asset!=='opening-surveillance-v1')throw Error('Unexpected shared surveillance camera');
+  const inverse=prefab.matrixWorld.clone().invert(),parts:Record<string,THREE.BufferGeometry>={};
+  prefab.traverse(object=>{if(object instanceof THREE.Mesh)
+    parts[object.name]=object.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse,object.matrixWorld));});
+  blenderSources.set('surveillance-camera',parts);
+  scene.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();
+    for(const material of Array.isArray(object.material)?object.material:[object.material])material.dispose();}});
+}
 
 /** Offline only. Runtime has no dependency on this module or its generators. */
 export class CultivationAssetGenerator implements CultivationAssetSource {
@@ -53,6 +85,21 @@ export class CultivationAssetGenerator implements CultivationAssetSource {
 
   private generateTextures(key: string): Record<string, THREE.DataTexture> {
     switch (key) {
+      case 'blender-finishes': {
+        // Reuse the accepted Level 1 diffuse/normal/ORM bakes unchanged. One
+        // shared bank serves every Cultivation room, rather than per-room maps.
+        const bytes=gunzipSync(readFileSync(new URL('../../assets/environments/containment-room-one/room-one-maps.bin',import.meta.url)));
+        const maps=readRoomOneMaps(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+        const names=['ceramicColour','ceramicNormal','ceramicOrm','resinColour','resinNormal','resinOrm'];
+        return Object.fromEntries(maps.map((map,index)=>{
+          const texture=new THREE.DataTexture(map.pixels,map.size,map.size,THREE.RGBAFormat);
+          texture.name='cultivation-shared-level-one-'+names[index];
+          texture.colorSpace=index%3===0?THREE.SRGBColorSpace:THREE.NoColorSpace;
+          texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.generateMipmaps=true;
+          texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;
+          texture.anisotropy=4;texture.needsUpdate=true;return[names[index],texture];
+        }));
+      }
       case 'membrane': return createCultivationMembraneTextures();
       case 'platform-deck': return createCultivationPlatformWear('deck');
       case 'platform-pole': return createCultivationPlatformWear('pole');
@@ -113,7 +160,8 @@ export class CultivationAssetGenerator implements CultivationAssetSource {
   }
 
   geometries(key: string, generate: () => Record<string, THREE.BufferGeometry>): Record<string, THREE.BufferGeometry> {
-    const geometries = generate();
+    const source=blenderSources.get(key);
+    const geometries = source?Object.fromEntries(Object.entries(source).map(([name,geometry])=>[name,geometry.clone()])):generate();
     this.geometrySets[key] = Object.keys(geometries);
     for (const [role, geometry] of Object.entries(geometries)) this.geometry(`${key}/${role}`, () => geometry);
     return geometries;

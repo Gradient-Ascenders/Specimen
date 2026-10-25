@@ -3,6 +3,8 @@ import { CultivationFinaleSet } from '../cinematics/CultivationFinaleSet.ts';
 import { CultivationRoomWorkload, CULTIVATION_ROOM_IDS } from './CultivationRoomWorkload.ts';
 import { freezeStaticTransforms } from '../render/StaticTransforms.ts';
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
+import { CultivationBlenderArt } from '../render/environment/cultivation/CultivationBlenderArt.ts';
+import { CultivationSurveillanceArt } from '../render/environment/cultivation/CultivationSurveillanceArt.ts';
 import { CultivationAssetOwner, type CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
@@ -134,6 +136,8 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly filtrationArt: CultivationFiltrationPassageArt;
   readonly elevatorArt: CultivationElevatorArt;
   readonly surfaceCleanup: CultivationSurfaceCleanup;
+  readonly blenderArt: CultivationBlenderArt;
+  readonly surveillanceArt: CultivationSurveillanceArt;
   readonly roomOneObservation: CultivationRoomOneObservation;
   readonly roomTwoObservation: CultivationRoomTwoObservation;
   readonly roomThreeObservation: CultivationRoomThreeObservation;
@@ -203,7 +207,10 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.chamberArt.addBoundary(this.roomThree.root);
     this.labArt.dress(this.roomOne.builder, [], this.contaminationArt.overrides(this.roomOne.builder));
     this.labArt.dress(this.roomOneToTwoPassage.builder, [], this.contaminationArt.overrides(this.roomOneToTwoPassage.builder));
-    this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
+    this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, {
+      ceilingOpening: [-12, -8, 2, 6],wallSides:[],
+      practicalPositions:[[-9,17.85,15.5],[9,17.85,35]],
+    });
     this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28, { wallSides: [-1] });
     this.passageArt = new CultivationPassageArt(this.roomOneToTwoPassage, this.labArt, this.contaminationArt);
     this.labArt.dress(this.roomTwo.builder, [
@@ -269,6 +276,9 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomFour.root.add(this.roomFourGeometry);
     this.voltFinaleSet = new CultivationFinaleSet(this.roomFive.root, this.labArt);
     this.surfaceCleanup = new CultivationSurfaceCleanup(this, this.assets);
+    this.blenderArt = new CultivationBlenderArt(this);
+    this.roomOneToTwoPassage.entryDoor.statusLight.visible=false;
+    this.roomOneToTwoPassage.entryDoor.root.getObjectByName('cultivation-room-1-to-2-lab-passage-entry-status-housing')!.visible=false;
     applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
     // Add diegetic observation after shadow authoring: the small camera and
     // terminal need no extra shadow casters or another set of room textures.
@@ -281,6 +291,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomTwo.root.add(this.roomTwoObservation.root);
     this.roomThreeObservation=new CultivationRoomThreeObservation(observationResources);
     this.roomThree.root.add(this.roomThreeObservation.root);
+    this.surveillanceArt=new CultivationSurveillanceArt(this);
     // The boarding scenery scrolls upward once the lift descends; the terminal
     // belongs to that alcove, never to the moving elevator deck.
     const boardingFloor=this.roomFour.root.getObjectByName('room-4-boarding-floor')!;
@@ -506,7 +517,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       if (!(object instanceof THREE.Mesh)) return;
       const list = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of list) if (material.visible) materials.add(material);
-      if (object.userData.staticBatchSourceNames || object.userData.staticBatchCell) batches++;
+      if (object.userData.staticBatchSourceNames || object.userData.staticBatchCell || object.userData.blenderBatch) batches++;
     });
     return { ...this.workload.snapshot(), objects, automaticMatrices, frozenTransforms: this.frozenTransformCount,
       renderedObjects, batches, materials: materials.size };
@@ -538,12 +549,14 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
 
   dispose(): void {
     this.workload.dispose();
+    this.surveillanceArt.dispose();
     this.roomOneObservation.dispose();
     this.roomTwoObservation.dispose();
     this.roomThreeObservation.dispose();
     this.roomTwoButtonArt.dispose();
     this.goopSpeech.dispose();
     this.platformSplashes.dispose();
+    this.blenderArt.dispose();
     this.surfaceCleanup.dispose();
     this.voltFinaleSet.dispose();
     this.passageArt.dispose();

@@ -83,7 +83,9 @@ test('the authored production scene mounts the camera left and monitor right of 
     o.root.traverse(node=>{if(node instanceof THREE.Light)lights++;if(node instanceof THREE.Mesh){
       meshes++;assert.equal(node.castShadow,false);assert.equal(world.collisionMeshes.includes(node),false);assert.equal(node.layers.mask,1);
     }});
-    assert.equal(meshes,6);assert.equal(lights,0);assert.equal(camera.pan.matrixAutoUpdate,true);assert.equal(camera.tilt.matrixAutoUpdate,true);
+    assert.equal(meshes,11);assert.equal(lights,0);assert.equal(camera.pan.matrixAutoUpdate,true);assert.equal(camera.tilt.matrixAutoUpdate,true);
+    assert.equal(world.surveillanceArt.diagnostics.cameras,3);
+    assert.ok(camera.tilt.getObjectByName('containment-authored-surveillance-camera'));
     assert.deepEqual(auditOpaqueSurfaces(o.root).conflicts,[], 'Monitor corners and camera brackets must not z-fight.');
     const bob=world.copyRoomSpawnPosition(1,'bob',new THREE.Vector3()),goop=o.root.localToWorld(new THREE.Vector3().copy(TRIGGER.centre));
     const occupants=[{id:'bob' as const,position:bob,radiusMetres:.45},{id:'goop' as const,position:goop,radiusMetres:.45}];

@@ -27,7 +27,15 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
   const dissolve = new DissolveSystem(targets);
   const roomFour = new ElevatorDroneEncounter(scene.roomFour, world, surfaces, bob, goop, targets, dissolve, () => {});
   const roomFive = new RoomFiveDroneEncounter(scene.roomFive, world, surfaces, bob, goop, () => true);
-  const sample = (name: string) => {scene.root.updateWorldMatrix(true, true); visit(name);};
+  const sample = (name: string) => {
+    // An assembled-level audit includes every room's submitted static geometry
+    // even after reset applies distance culling. Descendant mechanism/actor
+    // visibility remains authoritative for the sampled state.
+    const roots=[...scene.root.children,scene.roomFourGeometry];
+    const saved=roots.map(root=>root.visible);
+    try{for(const root of roots)root.visible=true;scene.root.updateWorldMatrix(true,true);visit(name);}
+    finally{roots.forEach((root,i)=>root.visible=saved[i]);}
+  };
   try {
     sample('initial');
     for (const target of targets) if (target.mesh.userData.roomId !== 4 && target.mesh.userData.roomId !== 5) target.advance(target.dissolveDurationSeconds);
@@ -35,15 +43,25 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
       scene.roomOne.update(time); scene.roomTwo.update(time, []); scene.roomThree.update(time, []);
       sample(`drops-${time}`);
     }
-    for (const passage of [scene.roomOneToTwoPassage, scene.roomTwoToThreeGoopPassage]) for (const door of passage.doors) {
+    const passages=[scene.roomOneToTwoPassage, scene.roomTwoToThreeGoopPassage];
+    const doors=passages.flatMap(passage=>[...passage.doors]);
+    const openDoor=(door:typeof doors[number],dt:number)=>{
       door.setLocked(false);
       const centre = door.root.getWorldPosition(new THREE.Vector3()); centre.y += 1;
-      door.update(2, [{id: 'bob', position: centre, radiusMetres: .45}]);
-    }
+      door.update(dt, [{id: 'bob', position: centre, radiusMetres: .45}]);
+    };
+    for(const door of doors)openDoor(door,.24);
+    sample('doors-opening');
+    for(const door of doors)openDoor(door,2);
     sample('doors-open');
+    for(const door of doors)door.update(.24,[]);
+    sample('doors-closing');
+    for(const door of doors)door.update(2,[]);
+    sample('doors-reclosed');
+    for(const door of doors)openDoor(door,2);
     const occupants = ['bob', 'goop'].map((id, i) => ({id, radiusMetres: .45, position: scene.roomFour.root.localToWorld(new THREE.Vector3(i ? 2 : -2, .66, 9))}));
     scene.roomFour.update(1.5, occupants);
-    for (const dt of [1, 15, 17, 27, 1.5]) {scene.roomFour.update(dt, occupants); roomFour.update(dt, 'goop'); sample(`lift-${scene.roomFour.controller.readModel.elapsed}-${scene.roomFour.controller.readModel.arrivalElapsed}`);}
+    for (const dt of [1, 15, 17, 27, .4, 1.1]) {scene.roomFour.update(dt, occupants); roomFour.update(dt, 'goop'); sample(`lift-${scene.roomFour.controller.readModel.elapsed}-${scene.roomFour.controller.readModel.arrivalElapsed}`);}
     scene.roomFive.restoreCheckpoint('rescued'); sample('volt-rescued');
     scene.voltFinaleSet.annex.visible=true;
     for(const [name,time] of [['closed',VOLT_FINALE.ductRun],['buckling',VOLT_FINALE.brake],['breaking',VOLT_FINALE.grateBreak+.3],['open',VOLT_FINALE.ductSilence]] as const){
@@ -52,5 +70,18 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     scene.voltFinaleSet.reset();
     for (const target of targets) target.reset();
     scene.reset(); roomThree.reset(); roomFour.reset(); roomFive.reset(); sample('reset');
+    // Supplemental mechanism histories follow the original fixture so its
+    // existing collision/light fingerprints remain directly comparable.
+    scene.roomFive.restoreCheckpoint('controls');
+    for(const network of ['red','blue','green'] as const){
+      scene.roomFive.controller.security.select(network);scene.roomFive.syncPresentation(.08);
+      sample(`network-${network}-switching`);
+    }
+    scene.roomFive.controller.security.release();
+    for(const elapsed of [1.6,3.2,3.6]){
+      scene.roomFive.controller.releaseElapsed=elapsed;scene.roomFive.syncPresentation(.1);
+      sample(`volt-release-${elapsed}`);
+    }
+    scene.reset();roomThree.reset();roomFour.reset();roomFive.reset();sample('release-reset');
   } finally { roomFive.dispose(); roomFour.dispose(); roomThree.dispose(); dissolve.dispose(); for (const target of targets) target.dispose(); }
 }

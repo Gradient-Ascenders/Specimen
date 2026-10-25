@@ -9,6 +9,7 @@ import type { CultivationContaminationArt } from './CultivationContaminationArt.
 import { CultivationVoltPodArt } from './CultivationVoltPodArt.ts';
 import { optimizeFiniteLightEvaluation } from './FiniteLightEvaluation.ts';
 import { configureCultivationMembraneMaterial } from './CultivationMembraneMaterial.ts';
+import {isCultivationBlenderShell} from './CultivationBlenderManifest.ts';
 
 /** Room-specific dressing of the shared facility library. No gameplay or frame updates. */
 export class CultivationMaintenanceArt {
@@ -100,7 +101,7 @@ export class CultivationMaintenanceArt {
       lab.bind(object, finish);
       this.chamberArt.mapShield(object, room);
       // Parent-local and dynamic pieces must follow their existing owner. Batch only static direct children.
-      if (object.parent === room.root && object !== room.releaseCover && object.visible && !dynamic.has(object) && object.children.length === 0 && !this.acidSurfaces.includes(object)) candidates.push(object);
+      if (object.parent === room.root && object !== room.releaseCover && object.visible && !dynamic.has(object) && object.children.length === 0 && !this.acidSurfaces.includes(object)&&!isCultivationBlenderShell(object.name)) candidates.push(object);
     });
     for (const platform of platforms) {
       this.originals.push({ mesh: platform, material: platform.material });

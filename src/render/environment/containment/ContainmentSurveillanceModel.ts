@@ -16,8 +16,14 @@ export class ContainmentSurveillanceModel {
   prepare(borrowFinish:(name:string)=>THREE.Material,
     loader:ContainmentSurveillanceModelLoader=loadOpeningLaboratory):Promise<void>{
     if(this.disposed)return Promise.resolve();
-    return this.preparation??=loader(this.abort.signal).then(source=>{
-      if(this.disposed){disposeGeometry(source,true);return;}
+    return this.preparation??=loader(this.abort.signal).then(source=>this.adoptSource(source,borrowFinish))
+      .catch(error=>{this.preparation=undefined;if(!this.disposed)throw error;});
+  }
+
+  /** Also accepts the exact camera buffers already decoded in a level's bank.
+   * Ownership transfers here; borrowed finish materials remain with the level. */
+  adoptSource(source:THREE.Group,borrowFinish:(name:string)=>THREE.Material):void{
+      if(this.disposed||this.prefab){disposeGeometry(source,true);return;}
       const prefab=source.getObjectByName('OI_Camera');
       if(prefab?.userData.asset!=='opening-surveillance-v1'){
         disposeGeometry(source,true);throw new Error('Unexpected cutscene camera model.');
@@ -49,7 +55,6 @@ export class ContainmentSurveillanceModel {
       led.userData.visualOnly=true;led.userData.resourceOwnership='borrowed-containment-surveillance-model';
       led.updateMatrix();led.matrixAutoUpdate=false;prefab.add(led);
       this.prefab=prefab;
-    }).catch(error=>{this.preparation=undefined;if(!this.disposed)throw error;});
   }
 
   attachCamera(tilt:THREE.Object3D):void{
@@ -60,7 +65,7 @@ export class ContainmentSurveillanceModel {
     tilt.add(model);this.attachments.set(tilt,{model,previous});
   }
 
-  /** The actual first fixture represents the shared buffers of all six. */
+  /** The actual first fixture represents the buffers of all attached cameras. */
   get renderMeshes():readonly THREE.Mesh[]{
     const meshes:THREE.Mesh[]=[];
     this.attachments.values().next().value?.model.traverse(object=>{if(object instanceof THREE.Mesh)meshes.push(object);});

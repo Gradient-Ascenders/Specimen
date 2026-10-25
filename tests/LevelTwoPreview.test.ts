@@ -178,11 +178,12 @@ test('Room 3 batches only static visuals while preserving collider identity', ()
   const scene = createScene();
   const room = scene.roomThree;
 
-  assert.ok(room.staticBatchDiagnostics.batchCount > 0);
+  const authoredBatches=room.root.children.filter(object=>object.userData.blenderBatch);
+  assert.ok(room.staticBatchDiagnostics.batchCount+authoredBatches.length>0);
   const coverColliders = room.collisionMeshes.filter(mesh => mesh.userData.coverRole);
   assert.equal(coverColliders.length, 8);
-  assert.ok(room.staticBatchDiagnostics.sourceMeshCount > room.staticBatchDiagnostics.batchCount,
-    'compatible neighbors batch while distant cells remain independently culled');
+  assert.ok(room.staticBatchDiagnostics.sourceMeshCount >= room.staticBatchDiagnostics.batchCount);
+  assert.ok(authoredBatches.length>0,'the retired room shell is supplied by its authored finish batches');
   assert.ok(scene.coverArt.diagnostics.drawCalls <= 56, 'six reused finishes across bounded room cells');
   for (const cover of coverColliders) assert.equal((cover.material as THREE.Material).visible, false);
   assert.equal(room.staticBatchDiagnostics.drawCallsRemoved,
