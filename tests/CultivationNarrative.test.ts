@@ -169,6 +169,7 @@ test('the real scene mounts CCTV left of the sticky control, a monitor above the
     scene.roomTwo.update(.6,[{id:'bob',position:b,radiusMetres:.45,attached:true,supportCollider:scene.roomTwo.wallButton}]);
     assert.equal(scene.roomTwoToThreeGoopPassage.entryDoor.locked,false);assert.equal(pad.material.color.getHex(),0x62ff91);
     assert.deepEqual(auditOpaqueSurfaces(scene.roomTwoButtonArt.root).conflicts,[]);
+    assert.deepEqual(auditOpaqueSurfaces(scene.roomTwoButtonArt.root,.01).conflicts,[],'captive fasteners clear the housing face');
     scene.roomTwoButtonArt.root.traverse(node=>assert.ok(!(node instanceof THREE.Light),'The dressing adds no lights.'));
     scene.goopSpeech.update(120,2,g,g);scene.reset({preserveCompletedDialogue:true});assert.equal(scene.goopSpeech.hasHeard('room-two'),true);
     scene.reset();assert.equal(scene.goopSpeech.hasHeard('room-two'),false);assert.equal(pad.material.color.getHex(),0xe53945);

@@ -154,10 +154,10 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Graphite"
       },
       {
-        "name": "C2_room-1_Batch_cultivation-room-1-platform-1-soluble-rope_Composite",
-        "finish": "Composite",
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-1-soluble-rope_Rust",
+        "finish": "Rust",
         "target": "cultivation-room-1-platform-1-soluble-rope",
-        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-soluble-rope_Composite"
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-soluble-rope_Rust"
       },
       {
         "name": "C2_room-1_Batch_cultivation-room-1-platform-2-platform_Alloy",
@@ -190,10 +190,10 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Graphite"
       },
       {
-        "name": "C2_room-1_Batch_cultivation-room-1-platform-2-soluble-rope_Composite",
-        "finish": "Composite",
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-2-soluble-rope_Rust",
+        "finish": "Rust",
         "target": "cultivation-room-1-platform-2-soluble-rope",
-        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-2-soluble-rope_Composite"
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-2-soluble-rope_Rust"
       },
       {
         "name": "C2_room-1_Batch_cultivation-room-1-platform-3-platform_Alloy",
@@ -226,10 +226,10 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Graphite"
       },
       {
-        "name": "C2_room-1_Batch_cultivation-room-1-platform-3-soluble-rope_Composite",
-        "finish": "Composite",
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-3-soluble-rope_Rust",
+        "finish": "Rust",
         "target": "cultivation-room-1-platform-3-soluble-rope",
-        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-3-soluble-rope_Composite"
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-3-soluble-rope_Rust"
       }
     ]
   },
@@ -412,61 +412,322 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
       "cultivation-room-2-above-bob-vent",
       "cultivation-room-2-bob-vent-west-jamb",
       "cultivation-room-2-bob-vent-east-jamb",
-      "cultivation-service-bay-trims"
+      "cultivation-service-bay-trims",
+      "cultivation-room-2-block-1-block",
+      "cultivation-room-2-block-1-ceiling-mount",
+      "cultivation-room-2-block-2-block",
+      "cultivation-room-2-block-2-ceiling-mount",
+      "cultivation-room-2-block-3-block",
+      "cultivation-room-2-block-3-ceiling-mount",
+      "cultivation-room-2-button-rest-ledge",
+      "cultivation-neutral-ceiling-strips",
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-block-1-non-soluble-rope",
+      "cultivation-room-2-block-1-soluble-wooden-brace",
+      "cultivation-room-2-block-2-non-soluble-rope",
+      "cultivation-room-2-block-2-soluble-wooden-brace",
+      "cultivation-room-2-block-3-non-soluble-rope",
+      "cultivation-room-2-block-3-soluble-wooden-brace"
     ],
     "retirePrefixes": [
       "cultivation-room-2-broken-glass-",
-      "cultivation-room-2-cultivation-"
+      "cultivation-room-2-cultivation-",
+      "room-2-panel-",
+      "room-2-upper-service-trim-",
+      "room-2-fluorescent-strip-"
     ],
-    "retireSubtrees": [],
+    "retireSubtrees": [
+      "cultivation-room-2-contamination"
+    ],
     "batches": [
       {
-        "name": "C2_room-2_Batch_Architecture_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-2_Batch_Architecture_TestAlloy",
+        "finish": "TestAlloy",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Alloy"
+        "geometry": "C2_room-2_Batch_Architecture_TestAlloy"
       },
       {
-        "name": "C2_room-2_Batch_Architecture_Amber",
-        "finish": "Amber",
+        "name": "C2_room-2_Batch_Architecture_TestCeramic",
+        "finish": "TestCeramic",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Amber"
+        "geometry": "C2_room-2_Batch_Architecture_TestCeramic"
       },
       {
-        "name": "C2_room-2_Batch_Architecture_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-2_Batch_Architecture_TestCool",
+        "finish": "TestCool",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Ceramic"
+        "geometry": "C2_room-2_Batch_Architecture_TestCool"
       },
       {
-        "name": "C2_room-2_Batch_Architecture_Cool",
-        "finish": "Cool",
+        "name": "C2_room-2_Batch_Architecture_TestDeck",
+        "finish": "TestDeck",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Cool"
+        "geometry": "C2_room-2_Batch_Architecture_TestDeck"
       },
       {
-        "name": "C2_room-2_Batch_Architecture_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-2_Batch_Architecture_TestFoliage",
+        "finish": "TestFoliage",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Graphite"
+        "geometry": "C2_room-2_Batch_Architecture_TestFoliage"
       },
       {
-        "name": "C2_room-2_Batch_Architecture_Ink",
-        "finish": "Ink",
+        "name": "C2_room-2_Batch_Architecture_TestGlass",
+        "finish": "TestGlass",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Ink"
+        "geometry": "C2_room-2_Batch_Architecture_TestGlass"
       },
       {
-        "name": "C2_room-2_Batch_Architecture_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-2_Batch_Architecture_TestGraphite",
+        "finish": "TestGraphite",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Oxide"
+        "geometry": "C2_room-2_Batch_Architecture_TestGraphite"
       },
       {
-        "name": "C2_room-2_Batch_Architecture_Resin",
-        "finish": "Resin",
+        "name": "C2_room-2_Batch_Architecture_TestInk",
+        "finish": "TestInk",
         "target": "",
-        "geometry": "C2_room-2_Batch_Architecture_Resin"
+        "geometry": "C2_room-2_Batch_Architecture_TestInk"
+      },
+      {
+        "name": "C2_room-2_Batch_Architecture_TestLamp",
+        "finish": "TestLamp",
+        "target": "",
+        "geometry": "C2_room-2_Batch_Architecture_TestLamp"
+      },
+      {
+        "name": "C2_room-2_Batch_Architecture_TestLoam",
+        "finish": "TestLoam",
+        "target": "",
+        "geometry": "C2_room-2_Batch_Architecture_TestLoam"
+      },
+      {
+        "name": "C2_room-2_Batch_Architecture_TestOxide",
+        "finish": "TestOxide",
+        "target": "",
+        "geometry": "C2_room-2_Batch_Architecture_TestOxide"
+      },
+      {
+        "name": "C2_room-2_Batch_Architecture_TestPaint",
+        "finish": "TestPaint",
+        "target": "",
+        "geometry": "C2_room-2_Batch_Architecture_TestPaint"
+      },
+      {
+        "name": "C2_room-2_Batch_Architecture_TestSeal",
+        "finish": "TestSeal",
+        "target": "",
+        "geometry": "C2_room-2_Batch_Architecture_TestSeal"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-block-1-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAmber",
+        "finish": "TestAmber",
+        "target": "cultivation-room-2-block-1-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAmber"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestCool",
+        "finish": "TestCool",
+        "target": "cultivation-room-2-block-1-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestCool"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestDeck",
+        "finish": "TestDeck",
+        "target": "cultivation-room-2-block-1-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestDeck"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestGraphite",
+        "finish": "TestGraphite",
+        "target": "cultivation-room-2-block-1-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestGraphite"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-1-non-soluble-rope_TestRust",
+        "finish": "TestRust",
+        "target": "cultivation-room-2-block-1-non-soluble-rope",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-non-soluble-rope_TestRust"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-1-soluble-wooden-brace_TestComposite",
+        "finish": "TestComposite",
+        "target": "cultivation-room-2-block-1-soluble-wooden-brace",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-soluble-wooden-brace_TestComposite"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-2-block_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-block-2-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-2-block_TestAmber",
+        "finish": "TestAmber",
+        "target": "cultivation-room-2-block-2-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAmber"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-2-block_TestCool",
+        "finish": "TestCool",
+        "target": "cultivation-room-2-block-2-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestCool"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-2-block_TestDeck",
+        "finish": "TestDeck",
+        "target": "cultivation-room-2-block-2-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestDeck"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-2-block_TestGraphite",
+        "finish": "TestGraphite",
+        "target": "cultivation-room-2-block-2-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestGraphite"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-2-non-soluble-rope_TestRust",
+        "finish": "TestRust",
+        "target": "cultivation-room-2-block-2-non-soluble-rope",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-non-soluble-rope_TestRust"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-2-soluble-wooden-brace_TestComposite",
+        "finish": "TestComposite",
+        "target": "cultivation-room-2-block-2-soluble-wooden-brace",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-soluble-wooden-brace_TestComposite"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-3-block_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-block-3-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-3-block_TestAmber",
+        "finish": "TestAmber",
+        "target": "cultivation-room-2-block-3-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestAmber"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-3-block_TestCool",
+        "finish": "TestCool",
+        "target": "cultivation-room-2-block-3-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestCool"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-3-block_TestDeck",
+        "finish": "TestDeck",
+        "target": "cultivation-room-2-block-3-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestDeck"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-3-block_TestGraphite",
+        "finish": "TestGraphite",
+        "target": "cultivation-room-2-block-3-block",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-block_TestGraphite"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-3-non-soluble-rope_TestRust",
+        "finish": "TestRust",
+        "target": "cultivation-room-2-block-3-non-soluble-rope",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-non-soluble-rope_TestRust"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-block-3-soluble-wooden-brace_TestComposite",
+        "finish": "TestComposite",
+        "target": "cultivation-room-2-block-3-soluble-wooden-brace",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-block-1-soluble-wooden-brace_TestComposite"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-button-rest-ledge",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestAmber",
+        "finish": "TestAmber",
+        "target": "cultivation-room-2-button-rest-ledge",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestAmber"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestCool",
+        "finish": "TestCool",
+        "target": "cultivation-room-2-button-rest-ledge",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestCool"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestDeck",
+        "finish": "TestDeck",
+        "target": "cultivation-room-2-button-rest-ledge",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestDeck"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestGraphite",
+        "finish": "TestGraphite",
+        "target": "cultivation-room-2-button-rest-ledge",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-button-rest-ledge_TestGraphite"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-start_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-start",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-end_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-end",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-start_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-start",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-end_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-end",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-start_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-start",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-4-button-approach-presentation-emitter-end_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-4-button-approach-presentation-emitter-end",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
+      },
+      {
+        "name": "C2_room-2_Batch_cultivation-room-2-laser-4-button-approach-presentation-emitter-start_TestAlloy",
+        "finish": "TestAlloy",
+        "target": "cultivation-room-2-laser-4-button-approach-presentation-emitter-start",
+        "geometry": "C2_room-2_Batch_cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end_TestAlloy"
       }
     ]
   },
@@ -486,7 +747,8 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
       "cultivation-room-2-to-3-goop-lab-passage-exit-partition-header",
       "cultivation-service-bay-trims",
       "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-1",
-      "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-2"
+      "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-2",
+      "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel"
     ],
     "retirePrefixes": [
       "cultivation-filtration-passage-art-"
@@ -540,6 +802,24 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "finish": "Resin",
         "target": "",
         "geometry": "C2_passage-2-3_Batch_Architecture_Resin"
+      },
+      {
+        "name": "C2_passage-2-3_Batch_cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel_Alloy",
+        "finish": "Alloy",
+        "target": "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel",
+        "geometry": "C2_passage-2-3_Batch_cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel_Alloy"
+      },
+      {
+        "name": "C2_passage-2-3_Batch_cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel_Ceramic",
+        "finish": "Ceramic",
+        "target": "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel",
+        "geometry": "C2_passage-2-3_Batch_cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel_Ceramic"
+      },
+      {
+        "name": "C2_passage-2-3_Batch_cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel_Graphite",
+        "finish": "Graphite",
+        "target": "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel",
+        "geometry": "C2_passage-2-3_Batch_cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel_Graphite"
       }
     ]
   },

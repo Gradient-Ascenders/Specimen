@@ -11,6 +11,36 @@ import {createAuthoredDissolveTarget} from '../src/abilities/DissolveTarget.ts';
 
 const layout=JSON.parse(readFileSync(new URL('../assets/environments/cultivation/authoring-layout.json',import.meta.url),'utf8'));
 
+test('the testing hall seals recessed bays and roof joins while preserving both exit apertures',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),root=scene.roomTwo.root;
+  try{
+    const meshes:THREE.Mesh[]=[];
+    root.traverse(o=>{if(o instanceof THREE.Mesh){
+      const materials=Array.isArray(o.material)?o.material:[o.material];
+      if(o.visible&&materials.some(m=>m.visible&&!m.transparent))meshes.push(o);
+    }});
+    scene.root.updateWorldMatrix(true,true);
+    const hit=(at:THREE.Vector3,direction:THREE.Vector3,far:number)=>
+      new THREE.Raycaster(root.localToWorld(at),direction,0,far).intersectObjects(meshes,false);
+    // Begin in navigable space, beyond the .2 m end-wall thickness.
+    for(const side of [-1,1])for(const z of [.3,3.99,4.2,9.49,9.61,14,18.49,18.6,22.5,28.49,28.61,33,37.49,37.61,40,44.7])
+      for(const y of [.25,1,2.2,6,7.45,12.8,18.7,23.75])
+        assert.ok(hit(new THREE.Vector3(side*18.7,y,z),new THREE.Vector3(side,0,0),4.1).length,`unsealed wall ${side},${y},${z}`);
+    for(const x of [-18.7,-10.64,0,10.64,18.7]){
+      // Start below the receivers and fixture bodies, in free room volume.
+      for(const z of [.3,3.5,9.6,15,29,31.1,34.5,40,44.7])
+        assert.ok(hit(new THREE.Vector3(x,23.1,z),new THREE.Vector3(0,1,0),1).length,`unsealed ceiling ${x},${z}`);
+      for(const z of [.3,4,7.98])
+        assert.ok(hit(new THREE.Vector3(x,.5,z),new THREE.Vector3(0,-1,0),.5).length,'safe entrance floor remains backed');
+    }
+    for(const x of [-1.7,0,1.7])for(const y of [.5,2.3,4.3])
+      assert.equal(hit(new THREE.Vector3(x,y,44.5),new THREE.Vector3(0,0,1),.8).length,0,'Goop doorway stays clear of fixed art');
+    for(const x of [7.25,8,8.75])for(const y of [19,19.8,20.7])
+      assert.equal(hit(new THREE.Vector3(x,y,44.5),new THREE.Vector3(0,0,1),1.2).length,0,'Bob duct stays visibly open');
+    assert.equal(scene.contaminationArt.roots.find(r=>r.name==='cultivation-room-2-contamination')!.children.length,0);
+  }finally{scene.dispose();}
+});
+
 test('the decontamination passage has front-sided enclosure and clear shared doorway openings',()=>{
   const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),passage=scene.roomOneToTwoPassage;
   try{
@@ -49,7 +79,8 @@ test('authored support skins share the original dissolve progress, feedback and 
   };
   try{
     scene.bindDissolveTargets(targets);
-    for(const target of targets.filter(target=>target.mesh.name.startsWith('cultivation-room-1-platform-'))){
+    for(const target of targets.filter(target=>target.mesh.name.startsWith('cultivation-room-1-platform-')||
+        target.mesh.name.startsWith('cultivation-room-2-block-'))){
       const geometry=target.mesh.geometry;
       const skin=target.mesh.children.find((o):o is THREE.Mesh=>o instanceof THREE.Mesh&&o.userData.blenderBatch)!;
       assert.ok(skin);assert.equal((target.mesh.material as THREE.Material).visible,false);
@@ -87,8 +118,8 @@ test('the actual Blender buffers replace old coverage and share one Level 1 fini
         assert.ok(mesh.geometry.getAttribute('color'),batch.name);
         assert.equal(mesh.matrixAutoUpdate,false,'immutable local matrices still inherit their existing moving owner');
         assert.equal(mesh.parent,batch.target?root.getObjectByName(batch.target):asset.owner==='roomFour'?scene.roomFourGeometry:root);
-        if(batch.finish==='Lamp')assert.equal((mesh.material as THREE.MeshStandardMaterial).emissiveIntensity,scene.labArt.fixture.emissiveIntensity);
-        else assert.equal((mesh.material as THREE.MeshStandardMaterial).emissiveIntensity??0,0);
+        if(batch.finish.endsWith('Lamp'))assert.equal((mesh.material as THREE.MeshStandardMaterial).emissiveIntensity,scene.labArt.fixture.emissiveIntensity);
+        else assert.equal((mesh.material as THREE.MeshStandardMaterial).emissive?.getHex()??0,0);
       }
     }
     scene.blenderArt.dispose();scene.blenderArt.dispose();

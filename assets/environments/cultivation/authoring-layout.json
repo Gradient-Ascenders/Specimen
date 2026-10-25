@@ -1248,7 +1248,29 @@
       "cultivation-room-2-above-bob-vent",
       "cultivation-room-2-bob-vent-west-jamb",
       "cultivation-room-2-bob-vent-east-jamb",
-      "cultivation-service-bay-trims"
+      "cultivation-service-bay-trims",
+      "cultivation-room-2-block-1-block",
+      "cultivation-room-2-block-1-ceiling-mount",
+      "cultivation-room-2-block-2-block",
+      "cultivation-room-2-block-2-ceiling-mount",
+      "cultivation-room-2-block-3-block",
+      "cultivation-room-2-block-3-ceiling-mount",
+      "cultivation-room-2-button-rest-ledge",
+      "cultivation-neutral-ceiling-strips",
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-start-housing-collar",
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-end-housing-collar",
+      "cultivation-room-2-block-1-non-soluble-rope",
+      "cultivation-room-2-block-1-soluble-wooden-brace",
+      "cultivation-room-2-block-2-non-soluble-rope",
+      "cultivation-room-2-block-2-soluble-wooden-brace",
+      "cultivation-room-2-block-3-non-soluble-rope",
+      "cultivation-room-2-block-3-soluble-wooden-brace"
     ],
     "occluders": [
       {
@@ -1501,7 +1523,465 @@
     ],
     "retirePrefixes": [
       "cultivation-room-2-broken-glass-",
-      "cultivation-room-2-cultivation-"
+      "cultivation-room-2-cultivation-",
+      "room-2-panel-",
+      "room-2-upper-service-trim-",
+      "room-2-fluorescent-strip-"
+    ],
+    "rigs": {
+      "cultivation-room-2-block-1-block": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -11.5,
+          19.5,
+          30,
+          1
+        ]
+      },
+      "cultivation-room-2-block-2-block": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -5.5,
+          20.5,
+          35,
+          1
+        ]
+      },
+      "cultivation-room-2-block-3-block": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2.5,
+          21,
+          40,
+          1
+        ]
+      },
+      "cultivation-room-2-button-rest-ledge": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -17.35,
+          11.6,
+          29,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-start": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          2.220446049250313e-16,
+          0.9999999999999998,
+          0,
+          0,
+          -0.9999999999999998,
+          2.220446049250313e-16,
+          0,
+          -18.379999999999995,
+          6,
+          10,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          2.220446049250313e-16,
+          -0.9999999999999998,
+          0,
+          0,
+          0.9999999999999998,
+          2.220446049250313e-16,
+          0,
+          -18.379999999999995,
+          6,
+          15.349999999999994,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-start": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -18.379999999999995,
+          8.8,
+          17.5,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-end": {
+        "matrix": [
+          -1,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -18.379999999999995,
+          11.1,
+          17.5,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-start": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -18.379999999999995,
+          9,
+          22,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-end": {
+        "matrix": [
+          -1,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -18.379999999999995,
+          13.4,
+          22,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-start": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -18.379999999999995,
+          11.1,
+          25.700000000000003,
+          1
+        ]
+      },
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-end": {
+        "matrix": [
+          -1,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -18.379999999999995,
+          16.1,
+          25.700000000000003,
+          1
+        ]
+      },
+      "cultivation-room-2-block-1-non-soluble-rope": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          3.1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -11.5,
+          21.35,
+          30,
+          1
+        ]
+      },
+      "cultivation-room-2-block-1-soluble-wooden-brace": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -11.5,
+          23.1,
+          30,
+          1
+        ]
+      },
+      "cultivation-room-2-block-2-non-soluble-rope": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          2.1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -5.5,
+          21.85,
+          35,
+          1
+        ]
+      },
+      "cultivation-room-2-block-2-soluble-wooden-brace": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -5.5,
+          23.1,
+          35,
+          1
+        ]
+      },
+      "cultivation-room-2-block-3-non-soluble-rope": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1.6,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2.5,
+          22.1,
+          40,
+          1
+        ]
+      },
+      "cultivation-room-2-block-3-soluble-wooden-brace": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2.5,
+          23.1,
+          40,
+          1
+        ]
+      }
+    },
+    "retireSubtrees": [
+      "cultivation-room-2-contamination"
+    ],
+    "retainedSurfaceOccluders": [
+      {
+        "lo": [
+          -18.81,
+          0.35,
+          4
+        ],
+        "hi": [
+          -18.63,
+          5.85,
+          11
+        ],
+        "owner": ""
+      },
+      {
+        "lo": [
+          -18.81,
+          3.6,
+          9.5
+        ],
+        "hi": [
+          -18.63,
+          8.4,
+          15.5
+        ],
+        "owner": ""
+      },
+      {
+        "lo": [
+          -18.81,
+          6.2,
+          14
+        ],
+        "hi": [
+          -18.63,
+          11.4,
+          21
+        ],
+        "owner": ""
+      },
+      {
+        "lo": [
+          -18.81,
+          8.6,
+          19
+        ],
+        "hi": [
+          -18.63,
+          13.8,
+          26
+        ],
+        "owner": ""
+      },
+      {
+        "lo": [
+          -18.81,
+          10.85,
+          24
+        ],
+        "hi": [
+          -18.63,
+          16.35,
+          31
+        ],
+        "owner": ""
+      },
+      {
+        "lo": [
+          7,
+          15.8,
+          44.63
+        ],
+        "hi": [
+          9,
+          18.8,
+          44.81
+        ],
+        "owner": ""
+      }
+    ],
+    "laserEmitterTargets": [
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-start",
+      "cultivation-room-2-laser-1-panel-b-crossbar-presentation-emitter-end",
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-start",
+      "cultivation-room-2-laser-2-panel-c-vertical-presentation-emitter-end",
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-start",
+      "cultivation-room-2-laser-3-panel-d-gate-presentation-emitter-end",
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-start",
+      "cultivation-room-2-laser-4-button-approach-presentation-emitter-end"
     ]
   },
   "passage-2-3": {
@@ -1651,7 +2131,8 @@
       "cultivation-room-2-to-3-goop-lab-passage-exit-partition-header",
       "cultivation-service-bay-trims",
       "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-1",
-      "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-2"
+      "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-2",
+      "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel"
     ],
     "occluders": [
       {
@@ -1813,7 +2294,29 @@
     ],
     "retirePrefixes": [
       "cultivation-filtration-passage-art-"
-    ]
+    ],
+    "rigs": {
+      "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          2.3,
+          0.5,
+          1
+        ]
+      }
+    }
   },
   "bob-duct": {
     "owner": "roomTwoToThreeBobAirDuct",

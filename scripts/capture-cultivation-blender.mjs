@@ -75,8 +75,18 @@ try{
     ['passage-1-2-room-one-join',1,'roomOneToTwoPassage',[0,.86,3],[-.6,1.7,2],[0,2,-4],'open-doors'],
     ['room-2-entry',2,'roomTwo',[0,.66,3],[8,5,4],[-5,13,28]],
     ['room-2-adhesion',2,'roomTwo',[0,.66,3],[-10,9,8],[-18,13,25]],
+    ['room-2-adhesive-close',2,'roomTwo',[0,.66,3],[-16.9,6.3,12.3],[-18.63,6.4,12.4]],
+    ['room-2-adhesive-grazing',2,'roomTwo',[0,.66,3],[-18.1,7.2,14.4],[-18.63,6.3,10.8]],
+    ['room-2-vent-adhesive',2,'roomTwo',[0,.66,3],[10.2,18,42.3],[8,17.4,44.72]],
     ['room-2-exit',2,'roomTwo',[0,.66,42],[10,9,39],[-4,12,18]],
     ['room-2-calibration',2,'roomTwo',[0,.66,3],[5,8,7],[19,7,24]],
+    ['room-2-process-detail',2,'roomTwo',[0,.66,10],[16.3,5.3,10.5],[20,5.2,12]],
+    ['room-2-platform-close',2,'roomTwo',[0,.66,3],[-15,16.5,26],[-11.5,12.8,30],'released'],
+    ['room-2-load-assembly',2,'roomTwo',[0,.66,3],[-15,21.8,27],[-11.5,23.1,30]],
+    ['room-2-beam-close',2,'roomTwo',[0,.66,3],[-13.2,20.9,28.4],[-11.5,21.4,30]],
+    ['room-2-support-burning',2,'roomTwo',[0,.66,3],[-15,21.8,27],[-11.5,23.1,30],'support-burning'],
+    ['room-2-beam-landed',2,'roomTwo',[0,.66,3],[-15,17,27],[-11.5,18,30],'released'],
+    ['room-2-button-close',2,'roomTwo',[0,.66,3],[-14.5,14.6,26.2],[-18.5,14.2,28.5]],
     ['room-2-high-join',2,'roomTwo',[8,19.46,43],[8,20,43.2],[8,20,51]],
     ['room-2-low-grazing',2,'roomTwo',[0,.66,3],[18.2,.65,3],[18.7,.8,11]],
     ['room-2-camera-close',2,'roomTwo',[-16,14,32],[-15.6,16,32.6],[-18.3,15.5,33.6]],
@@ -145,7 +155,8 @@ try{
         door.update(.24,[{id:'bob',position:centre,radiusMetres:.45}]);
       }
       if(state==='support-burning'){
-        const target=r.previewDissolveTargets.find(target=>target.mesh.name==='cultivation-room-1-platform-1-soluble-rope');
+        const target=r.previewDissolveTargets.find(target=>target.mesh.name===(room===2?
+          'cultivation-room-2-block-1-soluble-wooden-brace':'cultivation-room-1-platform-1-soluble-rope'));
         target.advance(target.dissolveDurationSeconds*.45);
       }
       if(state==='released'){

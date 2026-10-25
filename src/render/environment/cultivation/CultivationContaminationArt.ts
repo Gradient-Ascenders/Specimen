@@ -50,11 +50,14 @@ export class CultivationContaminationArt {
     return result;
   }
 
-  addRoom(root: THREE.Group, room: 1 | 2 | 3, warning: THREE.MeshStandardMaterial): void {
+  addRoom(root: THREE.Group, room: 1 | 2 | 3, warning: THREE.MeshStandardMaterial, options: {authoredReplacement?: boolean} = {}): void {
     const width = room === 1 ? 36 : room === 2 ? 38 : 48;
     const group = new THREE.Group();
     group.name = `cultivation-room-${room}-contamination`;
     group.userData.presentationOnly = true;
+    if (options.authoredReplacement) {
+      root.add(group); this.roots.push(group); this.lightRoom(root, room); return;
+    }
     const parts = new Map<THREE.Material, THREE.BufferGeometry[]>();
     const add = (material: THREE.Material, geometry: THREE.BufferGeometry) => {
       const list = parts.get(material) ?? []; list.push(geometry); parts.set(material, list);

@@ -30,6 +30,7 @@ PALETTE={
     'Paint':((.74,.74,.69),.96,0),
     'Seal':((.045,.052,.047),.98,0),
     'Composite':((.52,.55,.49),.96,.04),
+    'Rust':((.75,.74,.70),.98,.12),
 }
 # New passage surfaces share Room 1's finishes while the approved entrance
 # shutter retains its original material names, buffers and appearance.
@@ -39,6 +40,10 @@ for _finish in ['Ceramic','Cool','Resin','Graphite','Alloy','Oxide','Foliage','L
         'Alloy':(.36,.40,.39),'Oxide':(.25,.27,.25),'Graphite':(.07,.08,.075)}.get(_finish,_colour)
     PALETTE['Hall'+_finish]=(_colour,_rough,_metal)
 PALETTE['HallGlass']=((.46,.55,.49),.40,.02)
+for _finish in list(PALETTE):
+    if not _finish.startswith('Hall'):
+        PALETTE['Test'+_finish]=PALETTE.get('Hall'+_finish,PALETTE[_finish])
+PALETTE['TestGlass']=PALETTE['HallGlass']
 CURRENT=None
 BOXES=[]
 DETAILS=[]
@@ -71,13 +76,13 @@ def setup(room):
         shader=mat.node_tree.nodes.get('Principled BSDF')
         shader.inputs['Base Color'].default_value=(*colour,1)
         shader.inputs['Roughness'].default_value=rough;shader.inputs['Metallic'].default_value=metal
-        if room=='room-1' or finish.startswith('Hall'):
+        if room=='room-1' or finish.startswith(('Hall','Test')):
             colour_node=mat.node_tree.nodes.new('ShaderNodeVertexColor');colour_node.layer_name='wear'
             tint=mat.node_tree.nodes.new('ShaderNodeMixRGB');tint.blend_type='MULTIPLY'
             tint.inputs[0].default_value=1;tint.inputs[1].default_value=(*colour,1)
             mat.node_tree.links.new(colour_node.outputs['Color'],tint.inputs[2])
             mat.node_tree.links.new(tint.outputs[0],shader.inputs['Base Color'])
-        if finish=='HallGlass':
+        if finish in ('HallGlass','TestGlass'):
             shader.inputs['Alpha'].default_value=.24;mat.diffuse_color=(*colour,.24)
             mat.surface_render_method='DITHERED'
     root=bpy.data.objects.new(prefix+'Architecture',None);scene.collection.objects.link(root)
@@ -103,12 +108,16 @@ def owner_root(owner):
     return obj
 
 def mesh(name,vertices,faces,finish,owner=''):
+    if CURRENT=='room-2':
+        if finish.startswith('Hall'):finish='Test'+finish[4:]
+        elif name.startswith(('Test_','Solid_Test_','Transfer_','Solid_Transfer_','Ivy_')) and not finish.startswith('Test'):finish='Test'+finish
     if CURRENT=='passage-1-2' and name.startswith(('Hall_','Solid_Hall_','Ivy_')) and not finish.startswith('Hall'):
         finish='Hall'+finish
-    hall=finish.startswith('Hall');base_finish=finish[4:] if hall else finish
+    hall=finish.startswith('Hall');testing=finish.startswith('Test')
+    weathered=hall or testing;base_finish=finish[4:] if weathered else finish
     owner=owner or LAYOUT[CURRENT].get('defaultTarget','')
     prefix='C2_'+CURRENT+'_'
-    if (CURRENT=='room-1' or hall) and base_finish not in ('Foliage','Loam','Lamp','Glass'):
+    if (CURRENT=='room-1' or weathered) and base_finish not in ('Foliage','Loam','Lamp','Glass'):
         # Sample dirt on the actual surface, with no coplanar decal layers or
         # extra texture allocation. Metric tessellation keeps large panels dirty.
         points=[];patches=[]
@@ -120,14 +129,23 @@ def mesh(name,vertices,faces,finish,owner=''):
             # Extra samples belong only to leaks and the two safe floor banks.
             # The rest of the room retains its established mesh density.
             near_leak=('wet_bay_rear' in name and abs(abs(centre.x)-19.08)<.001) or ('Archive_recess_back' in name and abs(centre.z+1.15)<.001)
-            floor_bank=abs(centre.y-.2)<.001 and (hall or centre.z<9 or centre.z>43)
+            floor_bank=abs(centre.y-.2)<.001 and (weathered or centre.z<9 or centre.z>43)
             if hall:near_leak='Observation_rear' in name or 'Service_rear' in name
+            if testing:near_leak='Process_rear' in name
             spacing=.38 if near_leak else .55 if floor_bank else 1.6
             nu=max(1,math.ceil(max((b-a).length,(c-d).length)/spacing))
             nv=max(1,math.ceil(max((d-a).length,(c-b).length)/spacing))
             start=len(points)
             for v in range(nv+1):
-                for u in range(nu+1):points.append(tuple(a.lerp(b,u/nu).lerp(d.lerp(c,u/nu),v/nv)))
+                for u in range(nu+1):
+                    if testing:
+                        # Compute the shared boundary in double precision.
+                        # Chained float-vector lerps can leave a micrometre
+                        # crack between the ceiling rail and its neighbour.
+                        t=u/nu;s=v/nv;corners=[vertices[i] for i in face]
+                        points.append(tuple(corners[0][axis]*(1-t)*(1-s)+corners[1][axis]*t*(1-s)+
+                            corners[2][axis]*t*s+corners[3][axis]*(1-t)*s for axis in range(3)))
+                    else:points.append(tuple(a.lerp(b,u/nu).lerp(d.lerp(c,u/nu),v/nv)))
             for v in range(nv):
                 for u in range(nu):
                     k=start+v*(nu+1)+u;patches.append((k,k+1,k+nu+2,k+nu+1))
@@ -191,7 +209,7 @@ def mesh(name,vertices,faces,finish,owner=''):
                 groove=min(abs(abs(x)-.205),abs(abs(z)-.205))<.002
                 dirt=.28 if groove else .86-.24*soil
                 colour=(dirt,dirt*.98,dirt*.92,1)
-        if hall and base_finish!='Lamp':
+        if weathered and base_finish!='Lamp':
             x,y,z=p.x,p.z,-p.y
             cloud=.5+.5*math.sin(z*.73+x*.42+math.sin(y*.54+z*.31)*1.9)
             soil=.16+.22*cloud+.20*max(0,1-y/2)
@@ -202,6 +220,14 @@ def mesh(name,vertices,faces,finish,owner=''):
                     if 0<fall<4:
                         leak=max(leak,.4*math.exp(-((z-at-.035*math.sin(fall*3))/(.10+.025*fall))**2)*math.exp(-fall/3))
             if abs(y-.2)<.001:soil+=.22*max(0,1-(3.85-abs(x))/.9)
+            if testing:
+                soil=.13+.23*cloud+.18*max(0,1-y/4)
+                leak=0
+                if x>18.7:
+                    for at,top in [(10.55,11.2),(17.2,10.8),(29.55,11.2),(35.8,10.8)]:
+                        fall=top-y
+                        if 0<fall<9:leak=max(leak,.50*math.exp(-((z-at-.045*math.sin(fall*2))/(.15+.03*fall))**2)*math.exp(-fall/6))
+                if abs(y-.2)<.001:soil+=.22*max(0,1-(18.8-abs(x))/1.0)
             dirt=max(.32,.94-soil-leak)
             colour=(dirt,dirt*.98,dirt*.94,1)
             if base_finish=='Foliage':colour=(.72+.2*cloud,.75+.2*cloud,.55+.2*cloud,1)
@@ -634,23 +660,52 @@ def nursery_square_ring(x,z,radius,cut,height):
         (radius,-radius+cut),(radius,radius-cut),(radius-cut,radius),
         (-radius+cut,radius),(-radius,radius-cut),(-radius,-radius+cut)]]
 
-def nursery_suspension(index,x,z,length,owner):
-    # Fluted sacrificial composite strut, wholly inside its unchanged hitbox.
+def nursery_fluted_strut(name,length,owner,span=.48,across=None,finish='Composite'):
+    """Room 1's formed composite section, also fitted to the testing rig."""
     section=[]
     for side in range(4):
         angle=side*math.pi/2
         for a,b in [(-.18,-.24),(-.065,-.24),(-.045,-.205),(.045,-.205),(.065,-.24),(.18,-.24)]:
             section.append((a*math.cos(angle)-b*math.sin(angle),a*math.sin(angle)+b*math.cos(angle)))
-    n=len(section);vertices=[(a,y,b) for y in [-length/2,length/2] for a,b in section]
-    faces=[tuple(range(n)),tuple(reversed(range(n,2*n)))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
-    mesh(f'Suspension_{index}_fluted_strut',vertices,faces,'Composite',owner)
-    # Static bolted saddle and receiver use the original ceiling-mount envelope.
-    rings=[nursery_square_ring(x,z,r,c,y) for r,c,y in [(.90,.20,19.825),(.90,.20,19.43),
-        (.73,.13,19.275),(.40,.10,19.275),(.38,.09,19.22),(.265,0,19.22),(.265,0,19.825)]]
-    nursery_ring_profile(f'Suspension_{index}_ceiling_saddle',rings,
+    steps=16 if finish=='Rust' else 1
+    n=len(section);vertices=[(a,-length/2+length*k/steps,b) for k in range(steps+1) for a,b in section]
+    faces=[tuple(range(n)),tuple(reversed(range(n*steps,n*(steps+1))))]+[
+        (k*n+i,k*n+(i+1)%n,(k+1)*n+(i+1)%n,(k+1)*n+i) for k in range(steps) for i in range(n)]
+    if across:
+        # The short release bar retains the original target's full length and
+        # depth. Its upper edge clears the fixed ceiling saddle.
+        vertices=[(y,a*.43/.48-.035,b*.8/.48) for a,y,b in vertices]
+        faces=[tuple(reversed(face)) for face in faces]
+    elif span!=.48:vertices=[(a*span/.48,y,b*span/.48) for a,y,b in vertices]
+    obj=mesh(name,vertices,faces,finish,owner)
+    if finish=='Rust':
+        # Pitted oxide and exposed grey steel, without decals or another map.
+        for v in obj.data.vertices:
+            x,y,z=v.co.x,v.co.z,-v.co.y
+            patch=.5+.5*math.sin(y*31+x*41+math.sin(z*61+y*7)*2.1)
+            flake=max(0,min(1,(patch-.54)/.20))
+            pit=.62+.38*math.sin(y*113+z*97+x*83)**2
+            oxide=(.48*pit,.20*pit,.07*pit);steel=(.22,.25,.24)
+            obj.data.color_attributes['wear'].data[v.index].color=tuple(
+                oxide[i]*(1-flake)+steel[i]*flake for i in range(3))+(1,)
+    return obj
+
+def nursery_ceiling_saddle(index,x,z,top=19.825,width=1.8,height=.605):
+    """The approved Room 1 bolted support, fitted to an existing mount."""
+    scale=width/1.8
+    profile=[(.90,.20,19.825),(.90,.20,19.43),(.73,.13,19.275),(.40,.10,19.275),
+        (.38,.09,19.22),(.265,0,19.22),(.265,0,19.825)]
+    rings=[nursery_square_ring(x,z,r*scale,c*scale,top+(y-19.825)*height/.605) for r,c,y in profile]
+    tag=f'Test_Suspension_{index}' if CURRENT=='room-2' else f'Suspension_{index}'
+    nursery_ring_profile(tag+'_ceiling_saddle',rings,
         ['Cool','Alloy','Ceramic','Alloy','Graphite','Graphite','Alloy'])
     for k,(a,b) in enumerate([(-.54,-.54),(.54,-.54),(.54,.54),(-.54,.54)]):
-        tube(f'Suspension_{index}_saddle_bolt_{k}',(x+a,19.235,z+b),(x+a,19.30,z+b),.065,'Graphite',12)
+        tube(tag+f'_saddle_bolt_{k}',(x+a*scale,top+(19.235-19.825)*height/.605,z+b*scale),
+            (x+a*scale,top+(19.30-19.825)*height/.605,z+b*scale),.065*scale,'Graphite',12)
+
+def nursery_suspension(index,x,z,length,owner):
+    nursery_fluted_strut(f'Suspension_{index}_fluted_strut',length,owner,finish='Rust')
+    nursery_ceiling_saddle(index,x,z)
 
 def nursery_transfer_platform(index,owner):
     # Original five-metre footprint and .30m top; the complete Level 1 harness
@@ -681,12 +736,12 @@ def nursery_transfer_platform(index,owner):
     for x in [-.28,.28]:
         for z in [-.28,.28]:block(f'Transfer_{index}_socket_fastener_{x}_{z}',[.045,.03,.045],[x,.285,z],'Graphite',owner)
 
-def nursery_platform_harness(index,owner):
+def nursery_platform_harness(index,owner,width=5,depth=5,top=.30):
     """Canonical Level 1 Room 2 harness, at this deck's exact width and top.
     Source: containment-room-two/generate-room-two.py::build_thruster_harness.
     The engine, nozzle, flames, glow and spill lights are deliberately absent.
     """
-    top=.30;vertices=[];sides=24
+    vertices=[];sides=24
     for height,radius in [(top-.80,.51),(top-.94,.51),(top-.80,.40),(top-.94,.40)]:
         vertices.extend((radius*math.cos(math.tau*i/sides),height,radius*math.sin(math.tau*i/sides)) for i in range(sides))
     faces=[]
@@ -699,7 +754,7 @@ def nursery_platform_harness(index,owner):
     for sx in [-1,1]:
         for sz in [-1,1]:
             tag=f'Transfer_{index}_Level_one_harness_{sx}_{sz}'
-            mount=(sx*5*.32,top-.60,sz*5*.25)
+            mount=(sx*width*.32,top-.60,sz*depth*.25)
             block(tag+'_clevis',[.19,.18,.27],mount,'Graphite',owner)
             tube(tag+'_diagonal',mount,(sx*.32,top-.87,sz*.32),.055,'Alloy',12,owner)
             block(tag+'_latch',[.022,.07,.12],[mount[0]+sx*.118,mount[1],mount[2]],'Amber',owner)
@@ -1204,6 +1259,199 @@ def build_decontamination_passage():
             box(f'Hall_Exit_door_back_{side}_{low}',[a,.025,27.72],[b,4.575,27.755],'Alloy')
     box('Hall_Exit_door_drive_header',[-2.28,4.6,27.26],[2.28,4.94,27.74],'Alloy')
 
+def testing_deck(index,owner,width=3.8,depth=3.8,height=.6):
+    before=set(bpy.context.scene.objects);start=len(BOXES)
+    nursery_transfer_platform(index,owner)
+    for obj in set(bpy.context.scene.objects)-before:
+        if obj.type!='MESH':continue
+        for v in obj.data.vertices:v.co=(v.co.x*width/5,v.co.y*depth/5,v.co.z*height/.6)
+        obj.data.update()
+    for spec in BOXES[start:]:
+        for end in ['lo','hi']:
+            spec[end]=[spec[end][0]*width/5,spec[end][1]*height/.6,spec[end][2]*depth/5]
+    nursery_platform_harness(index,owner,width,depth,height/2)
+
+def testing_process_bay(centre,index):
+    a,b=centre-4.5,centre+4.5;bottom,top=2.2,12.8
+    box(f'Test_Process_rear_{index}',[22.15,bottom,a],[22.45,top,b],'Cool')
+    for z in [a,b-.22]:box(f'Test_Process_cheek_{index}',[18.8,bottom,z],[22.15,top,z+.22],'Alloy')
+    for y in [bottom,top-.22]:box(f'Test_Process_return_{index}',[18.8,y,a+.22],[22.15,y+.22,b-.22],'Alloy')
+    box(f'Test_Process_sump_{index}',[19.05,2.42,a+.22],[21.95,2.60,b-.22],'Graphite')
+    for k,z in enumerate([centre-2.6,centre,centre+2.6]):
+        tag=f'Test_Process_{index}_vessel_{k}'
+        nursery_profile(tag,[(20.5,y,z) for y in [2.6,2.78,3.00,3.20,9.80,10.0,10.25,10.45]],
+            [.61,.79,.79,.70,.70,.79,.79,.48],['Graphite','Alloy','Alloy','Ceramic','Alloy','Alloy','Cool'],24)
+        for y in [3.55,9.35]:
+            box(tag+'_wall_saddle',[21.18,y-.15,z-.44],[22.15,y+.15,z+.44],'Graphite')
+        nursery_sweep(tag+'_upper_feed',[(20.5,10.45,z),(20.5,10.85,z),(20.8,11.1,z),(21.35,11.1,z)],.10,'Alloy',10)
+        nursery_sweep(tag+'_draw_line',[(20.5,2.75,z),(20.5,2.90,z),(19.85,3.15,z),(19.85,4.4,z)],.075,'Alloy',10)
+        tube(tag+'_valve_stem',(19.85,4.4,z),(19.3,4.4,z),.048,'Alloy',12)
+        hall_service_handwheel(tag+'_service_wheel',19.36,4.4,z)
+        for y in [3.45,4.05]:tube(tag+f'_coupling_{y}',(19.85,y-.11,z),(19.85,y+.11,z),.13,'Oxide',8)
+        box(tag+'_gauge_plinth',[19.45,6.55,z-.40],[19.84,7.35,z+.40],'Cool')
+        tube(tag+'_gauge_body',(19.35,6.95,z),(19.62,6.95,z),.27,'Graphite',32)
+        annulus_x(tag+'_gauge_bezel',19.30,6.95,z,.245,.33,.12,'Alloy',32)
+        vv=[(19.255,6.95+.24*math.cos(i*math.tau/32),z+.24*math.sin(i*math.tau/32)) for i in range(32)]
+        mesh(tag+'_gauge_dial',vv,[tuple(reversed(range(32)))],'Ink')
+        for n in range(11):
+            theta=math.radians(-130+n*26);inner=.168 if n%5==0 else .19
+            tube(tag+f'_dial_tick_{n}',(19.235,6.95+inner*math.cos(theta),z+inner*math.sin(theta)),
+                (19.235,6.95+.215*math.cos(theta),z+.215*math.sin(theta)),.006,'Graphite',5)
+        theta=.45+k*.7;direction=Vector((math.cos(theta),math.sin(theta)));across=Vector((-direction.y,direction.x))
+        shape=[-direction*.06-across*.017,direction*.17,-direction*.06+across*.017]
+        vv=[(x,6.95+p.x,z+p.y) for x in [19.215,19.225] for p in shape]
+        mesh(tag+'_dial_pointer',vv,[(0,2,1),(3,4,5),(0,1,4,3),(1,2,5,4),(2,0,3,5)],'Graphite')
+    nursery_sweep(f'Test_Process_{index}_upper_manifold',[(21.35,11.10,a+.40),(21.35,11.10,b-.40)],.17,'Alloy',12)
+    nursery_sweep(f'Test_Process_{index}_broken_feed',[(19.62,10.95,a+.75),(19.62,9.85,a+.75),(19.62,9.6,a+1.05)],.055,'Oxide',8)
+    hall_process_ivy((19.65,2.54,a+1.0),6.2,.85,40+index*7)
+    for k,z in enumerate([a+.22,centre-1.5,centre+1.5,b-.22]):
+        box(f'Test_Process_mullion_{index}_{k}',[18.80,2.42,z-.06],[19.00,12.58,z+.06],'Ceramic')
+    box(f'Test_Process_crossbar_{index}',[18.80,7.41,a+.22],[19.00,7.56,b-.22],'Alloy')
+    for k,(c,d) in enumerate([(a+.30,centre-1.56),(centre-1.44,centre+1.44),(centre+1.56,b-.30)]):
+        for row,(low,high) in enumerate([(2.63,7.41),(7.56,12.52)]):
+            obj=mesh(f'Test_Process_glass_{index}_{k}_{row}',[(18.87,low,c),(18.87,high,c),(18.87,high,d),(18.87,low,d)],[(0,3,2,1)],'TestGlass')
+            for loop in obj.data.loops:
+                p=obj.data.vertices[loop.vertex_index].co;u=(-p.y-c)/(d-c);v=(p.z-low)/(high-low)
+                variant=(index+k+row)%4
+                obj.data.uv_layers.active.data[loop.index].uv=((variant%2+.008+.984*u)/2,(variant//2+.008+.984*v)/2)
+    label(f'Test_Process_ident_{index}','NUTRIENT CONDITIONING' if index==0 else 'CULTURE PRESSURE RETURN',
+        [19.075,13.35,centre],.34,(90,0,270),'TestInk')
+
+def testing_floor_and_walls():
+    box('Test_Start_floor_foundation',[-19.25,-.20,0],[19.25,.12,8],'Graphite')
+    for i,(a,b) in enumerate(intervals(-18.8,18.8,4.7)):
+        for j,(c,d) in enumerate([(0,4),(4,7.45),(7.45,7.62),(7.62,8)]):
+            box(f'Test_Start_deck_panel_{i}_{j}',[a+.022,.12,c+.022],[b-.022,.20,d-.022],
+                'Paint' if j==2 and i%2==0 else 'Seal' if j==2 else 'Deck')
+    zs=sorted(set([0,4,9.5,12.5,18.5,22.5,28.5,31.5,37.5,41,45]))
+    ys=[.20,2.2,6.0,12.8,18.7,23.8]
+    for side in [-1,1]:
+        def slab(name,a,b,c,d,near,far,finish):
+            lo,hi=sorted([side*near,side*far]);box(f'Test_Wall_{side}_{name}',[lo,c,a],[hi,d,b],finish)
+        slab('base_return',0,45,0,.20,18.8,19.25,'Alloy')
+        slab('head_return',0,45,23.8,24.2,18.8,19.25,'Graphite')
+        for i,(a,b) in enumerate(zip(zs,zs[1:])):
+            for j,(c,d) in enumerate(zip(ys,ys[1:])):
+                if side>0 and any(A<=a and b<=B and 2.2<=c and d<=12.8 for A,B in [(9.5,18.5),(28.5,37.5)]):continue
+                slab(f'back_{i}_{j}',a,b,c,d,19.30,19.50,'Graphite')
+                slab(f'panel_{i}_{j}',a+.035,b-.035,c+.035,d-.035,19.10,19.28,'Cool' if c<2.2 else 'Ceramic')
+        # Recess the cladding behind continuous load-bearing piers. Every
+        # room-facing edge stays at or behind the original collision wall.
+        for z in [0,4,9.5,22.5,28.5,37.5,41,44.64]:
+            slab(f'load_pier_{z}',z,min(45,z+.36),0,24.2,18.83 if side<0 else 18.8,19.50,'Ceramic')
+        for y in [.2,12.8,23.40]:
+            slab(f'load_course_{y}',0,45,y,y+.24,18.8,19.50,'Alloy')
+    # End walls use the authoritative openings. Their backs reach the side
+    # backing, sealing the full corner rather than stopping at the floor edge.
+    for spec in LAYOUT[CURRENT]['boxes']:
+        if not('entry-wall' in spec['name'] or 'far-wall' in spec['name'] or 'bob-vent' in spec['name'] or 'above-blast' in spec['name']):continue
+        lo=list(spec['lo']);hi=list(spec['hi'])
+        if lo[0]<-18:lo[0]=-19.50
+        if hi[0]>18:hi[0]=19.50
+        face=.2 if hi[2]<1 else 44.8;front=hi[2]<1
+        # A 20 mm lap separates the visible backer from adjoining passage
+        # end caps. The fitted returns still seal the complete shared edge.
+        backlo,backhi=(lo[2],face-.18) if front else (face+.18,hi[2])
+        box('Test_End_back_'+spec['name'],[lo[0],lo[1],backlo],[hi[0],hi[1],backhi],'Graphite')
+        for i,(a,b) in enumerate(intervals(lo[0],hi[0],5.5)):
+            for j,(c,d) in enumerate(intervals(lo[1],hi[1],5.9)):
+                za,zb=(face-.18,face) if front else (face,face+.18)
+                box(f'Test_End_panel_{spec["name"]}_{i}_{j}',[a+.035,c+.035,za],[b-.035,d-.035,zb],'Ceramic')
+        # Continuous contact returns seal each end-wall perimeter and reveal.
+        for a,b in [(lo[0],lo[0]+.035),(hi[0]-.035,hi[0])]:
+            box('Test_End_vertical_return',[a,lo[1],lo[2]],[b,hi[1],hi[2]],'Alloy')
+        for c,d in [(lo[1],lo[1]+.035),(hi[1]-.035,hi[1])]:
+            box('Test_End_cross_return',[lo[0],c,lo[2]],[hi[0],d,hi[2]],'Alloy')
+
+def testing_ceiling_and_mounts():
+    cuts=sorted(set([0,8,16,24,28.9,31.1,33.9,36.1,38.9,41.1,45]))
+    for k,(a,b) in enumerate(zip(cuts,cuts[1:])):
+        beam=any(A<=a and b<=B for A,B in [(28.9,31.1),(33.9,36.1),(38.9,41.1)])
+        box(f'Test_Roof_back_{k}',[-19.25,23.98,a],[19.25,24.20,b],'Graphite')
+        if beam:
+            box(f'Test_Load_gantry_beam_{k}',[-19.25,23.8,a],[19.25,24.45,b],'Alloy')
+            for z in [a+.12,b-.24]:box(f'Test_Load_gantry_flange_{k}',[-19.25,23.8,z],[19.25,23.93,z+.12],'Graphite')
+        else:
+            for i,(c,d) in enumerate(intervals(-19.25,19.25,6.4)):
+                box(f'Test_Ceiling_panel_{i}_{k}',[c+.035,23.8,a+.035],[d-.035,23.96,b-.035],'Cool' if i%3==0 else 'Ceramic')
+    for index,(x,z) in enumerate([(-11.5,30),(-5.5,35),(2.5,40)],1):
+        nursery_ceiling_saddle(f'Test_Load_{index}',x,z,23.8,1.7,.5)
+        nursery_fluted_strut(f'Test_Load_{index}_formed_beam',1,
+            f'cultivation-room-2-block-{index}-non-soluble-rope',.22,finish='Rust')
+        nursery_fluted_strut(f'Test_Load_{index}_release_bar',2.2,
+            f'cultivation-room-2-block-{index}-soluble-wooden-brace',across=True)
+        testing_deck(index,f'cultivation-room-2-block-{index}-block')
+    testing_deck('button','cultivation-room-2-button-rest-ledge',2.6,3,.5)
+
+def testing_route_and_exits():
+    # The entire architectural field is behind the existing adhesive fronts.
+    for index,(bottom,top,left,right) in enumerate([(.35,5.85,4,11),(3.6,8.4,9.5,15.5),
+        (6.2,11.4,14,21),(8.6,13.8,19,26),(10.85,16.35,24,31)]):
+        box(f'Test_Adhesion_rig_backplate_{index}',[-19.10,max(.20,bottom-.30),left-.30],
+            [-18.815,top+.30,right+.30],'Cool')
+    for z in [3.55,31.9]:box('Test_Adhesion_rig_jamb',[-19.04,.2,z],[-18.8,19.5,z+.22],'Alloy')
+    for y in [.20,19.3]:box('Test_Adhesion_rig_crossmember',[-19.04,y,3.55],[-18.8,y+.20,32.12],'Alloy')
+    for n in range(15):
+        y=1+n*1.25
+        box(f'Test_Adhesion_scale_{n}',[-18.80,y,32.28],[-18.73,y+.065,32.75 if n%5 else 33.10],'Alloy')
+    label('Test_Adhesion_ident','ADHESION / HOLD CONTROL',[-19.075,18.05,17.7],.43,(90,0,90),'TestInk')
+    # The existing button remains the only control and owns its press/colour.
+    nursery_sweep('Test_Control_conduit',[(-18.9,17.6,31.45),(-18.9,15.8,31.45),(-18.9,14.2,30.2)],.075,'Alloy',10)
+    for side in [-1,1]:
+        a,b=sorted([side*2.0,side*2.37])
+        box('Test_Blast_door_reveal',[a,0,44.71],[b,5.06,45.20],'Alloy')
+    box('Test_Blast_door_header',[-2.37,4.6,44.71],[2.37,5.06,45.20],'Graphite')
+    label('Test_Blast_door_ident','CONTAINMENT / 03',[0,7.65,44.775],.32,(90,0,180),'TestInk')
+    # Continuous duct reveal, open over the original 2 x 2.1 m passage.
+    for a,b in [(6.72,7),(9,9.28)]:box('Test_Upper_duct_jamb',[a,18.52,44.65],[b,21.18,45.20],'Alloy')
+    for a,b in [(18.52,18.77),(20.9,21.18)]:box('Test_Upper_duct_crosspiece',[7,a,44.65],[9,b,45.20],'Alloy')
+    label('Test_Upper_duct_ident','SERVICE / 03',[8,21.85,44.775],.29,(90,0,180),'TestInk')
+
+def testing_practicals():
+    # Bodies are fitted above the actual existing point pools; none of these
+    # meshes is a light or changes light/shadow placement or activation.
+    # The upper-vent and low exit pools are existing fill lights. Keep their
+    # camera/door volumes clear instead of hanging hardware across those routes.
+    for index,(x,y,z,width,depth) in enumerate([(0,14,12,2.6,1.3)]):
+        box(f'Test_Practical_{index}_body',[x-width/2,y+.16,z-depth/2],[x+width/2,y+.44,z+depth/2],'Graphite')
+        box(f'Test_Practical_{index}_diffuser',[x-width/2+.10,y+.12,z-depth/2+.10],[x+width/2-.10,y+.16,z+depth/2-.10],'Lamp')
+        for dx in [-width*.35,width*.35]:
+            tube(f'Test_Practical_{index}_hanger_{dx}',(x+dx,y+.44,z),(x+dx,23.8,z),.045,'Alloy',8)
+    for index,(x,z) in enumerate([(-10.64,13),(10.64,37)]):
+        box(f'Test_Shadow_fixture_{index}',[x-.20,23.70,z-1.1],[x+.20,23.8,z+1.1],'Alloy')
+        box(f'Test_Shadow_diffuser_{index}',[x-.15,23.66,z-1],[x+.15,23.70,z+1],'Lamp')
+    box('Test_Control_worklight',[-17.50,17.16,26.65],[-16.60,17.42,27.35],'Alloy')
+    box('Test_Control_worklight_diffuser',[-17.43,17.12,26.72],[-16.67,17.16,27.28],'Lamp')
+    box('Test_Control_worklight_arm',[-18.80,17.28,26.93],[-17.50,17.40,27.07],'Graphite')
+
+def testing_laser_emitters():
+    # Fit the original 0.18 m emitter body and keep the live aperture/status
+    # meshes. These owner-local housings inherit endpoint motion and reset.
+    scale=.18/.256;sides=24
+    for index,owner in enumerate(LAYOUT[CURRENT].get('laserEmitterTargets',[])):
+        profile=[(.165,-.17),(.205,-.17),(.25,-.12),(.25,.06),(.23,.13),(.23,.16),(.165,.16)]
+        vv=[(r*scale*math.cos(i*math.tau/sides),y,r*scale*math.sin(i*math.tau/sides)) for r,y in profile for i in range(sides)]
+        ff=[]
+        for ring in range(len(profile)):
+            next_ring=(ring+1)%len(profile)
+            for i in range(sides):
+                j=(i+1)%sides
+                ff.append((ring*sides+i,ring*sides+j,next_ring*sides+j,next_ring*sides+i))
+        obj=mesh(f'Test_Laser_emitter_{index}',vv,ff,'Alloy',owner)
+        for vertex in obj.data.vertices:
+            p=vertex.co;radius=math.hypot(p.x,p.y)
+            shade=.82 if p.z>.12 and radius>.12 else .22
+            obj.data.color_attributes['wear'].data[vertex.index].color=(shade,shade*.99,shade*.96,1)
+        for bolt in range(4):
+            angle=(bolt+.5)*math.tau/4;x=.197*scale*math.cos(angle);z=.197*scale*math.sin(angle)
+            tube(f'Test_Laser_fastener_{index}_{bolt}',(x,.145,z),(x,.195,z),.013*scale,'Alloy',8,owner)
+
+def build_testing_hall():
+    testing_floor_and_walls();testing_ceiling_and_mounts()
+    testing_process_bay(14,0);testing_process_bay(33,1)
+    testing_route_and_exits();testing_practicals();testing_laser_emitters()
+
+
 def build_enclosure():
     # Opaque backs of the unchanged fixtures and retained acid slabs own their
     # contact faces. Only immutable surfaces in this same room are trimmed.
@@ -1217,6 +1465,11 @@ def build_enclosure():
         OCCLUDERS[:]=[]
         nursery_sliding_door()
         build_decontamination_passage();return
+    if CURRENT=='room-2':
+        OCCLUDERS[:]=[o for o in OCCLUDERS if o['hi'][1]<=0]+LAYOUT[CURRENT].get('retainedSurfaceOccluders',[])
+        build_testing_hall();return
+    if CURRENT=='passage-2-3':
+        nursery_door_leaf('cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel')
     if CURRENT=='room-4':
         build_lift();return
     if CURRENT=='room-5':
@@ -1504,16 +1757,7 @@ def build_identity():
     elif CURRENT=='passage-1-2':
         return # The purpose-built passage owns its frames and identification.
     elif CURRENT=='room-2':
-        label('Load_sign','02  /  LOAD CALIBRATION',[-7.8,8,44.72],.58)
-        label('Adhesion_sign','ADHESION / HOLD CONTROL',[-18.76,18,20],.48,(90,0,90))
-        # The rising membrane stays the sole usable route. Its scale is mounted
-        # behind the original wall plane and never overlays the adhesive face.
-        for z in [3,11.6,21.8,33.8,42.5]:
-            block(f'Calibration_pier_{z}',[.25,22.5,.4],[18.925,12,z],'Alloy')
-        for y in [5.6,11.8,18.0,22.5]:
-            block(f'Calibration_datum_{y}',[.24,.28,43.8],[18.92,y,22.5],'Oxide')
-        for n in range(15):
-            block(f'Adhesion_scale_{n}',[.12,.09,.4 if n%5 else .7],[-18.88,2+n*1.25,33],'Amber')
+        return # The testing hall owns its equipment labels and metric scales.
     elif CURRENT=='passage-2-3':
         label('Extraction_sign','FILTER RETURN  /  03',[0,5.5,27.18],.28)
         label('Service_header','AIR HANDLING / CARTRIDGE ACCESS',[4.85,5.06,12.4],.24,(90,0,270))
@@ -1595,7 +1839,7 @@ def finalise_boxes():
                 bm=bmesh.new();bm.from_mesh(obj.data)
                 # Metric dirt samples can create T junctions where density
                 # changes. Never bevel a partial shell or a coplanar grid edge.
-                sampled=CURRENT=='room-1' or (CURRENT=='passage-1-2' and s['name'].startswith('Hall_'))
+                sampled=CURRENT=='room-1' or (CURRENT=='passage-1-2' and s['name'].startswith('Hall_')) or CURRENT=='room-2'
                 if not sampled or all(e.is_manifold for e in bm.edges):
                     edges=[e for e in bm.edges if e.is_manifold and (not sampled or e.calc_face_angle()>.01)]
                     bmesh.ops.bevel(bm,geom=edges,offset=.008,segments=1,affect='EDGES')
@@ -1748,16 +1992,16 @@ def build(room,refs=False):
                             a,b=(p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y)
                             uv=(a/8+.13,b/8+.31) if obj['finish'] in ('Deck','Paint') else (a/2,b/2)
                             layer.data[index].uv=tuple(round(v,6) for v in uv)
-    if room=='passage-1-2':
+    if room in ('passage-1-2','room-2'):
         for obj in bpy.context.scene.objects:
-            if obj.type!='MESH' or not obj.get('finish','').startswith('Hall') or obj['finish']=='HallGlass':continue
+            if obj.type!='MESH' or not obj.get('finish','').startswith(('Hall','Test')) or obj['finish'].endswith('Glass'):continue
             for layer in obj.data.uv_layers:
                 for poly in obj.data.polygons:
                     axis=max(range(3),key=lambda i:round(abs(poly.normal[i]),5))
                     for index in poly.loop_indices:
                         p=obj.data.vertices[obj.data.loops[index].vertex_index].co
                         a,b=(p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y)
-                        uv=(a/8+.13,b/8+.31) if obj['finish']=='HallPaint' else (a/2,b/2)
+                        uv=(a/8+.13,b/8+.31) if obj['finish'].endswith(('Paint','Deck')) else (a/2,b/2)
                         layer.data[index].uv=tuple(round(v,6) for v in uv)
     if refs:import_references()
 

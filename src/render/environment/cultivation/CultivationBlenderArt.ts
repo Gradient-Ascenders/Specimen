@@ -28,7 +28,7 @@ export class CultivationBlenderArt {
       if(o instanceof THREE.Mesh&&o.material instanceof THREE.MeshBasicMaterial)legacy.set(o.material.name,o.material);
     });
     const finish=(name:string,escape=false,nursery=false):THREE.MeshStandardMaterial|THREE.MeshBasicMaterial=>{
-      if(name==='HallGlass'){
+      if(name==='HallGlass'||name==='TestGlass'){
         const key='hall:glass',old=this.materials.get(key);if(old)return old;
         const source=scene.contaminationArt.glass,material=source.clone();
         material.name='cultivation-hall-stained-observation-glass';material.vertexColors=true;
@@ -37,6 +37,7 @@ export class CultivationBlenderArt {
         this.materials.set(key,material);return material;
       }
       if(name.startsWith('Hall'))return finish(name.slice(4),false,true);
+      if(name.startsWith('Test'))return finish(name.slice(4),false,true);
       const key=(escape?'escape:':nursery?'nursery:':'')+name,old=this.materials.get(key);if(old)return old;
       if(escape){
         // The cinematic airway already uses unlit finishes. Reuse those exact
@@ -58,6 +59,7 @@ export class CultivationBlenderArt {
         Ink:[scene.labArt.wall,0xe5e3d4],
         Paint:[scene.labArt.platform,0xc7c8bd],Seal:[scene.labArt.metal,0x252c28],
         Composite:[scene.contaminationArt.finishes.wall,0xaeb1a4],
+        Rust:[scene.contaminationArt.finishes.metal,0xbcb7ab],
       };
       const spec=palette[name];if(!spec)throw Error(`Unknown Cultivation Blender finish: ${name}`);
       const material=spec[0].clone();material.color.setHex(spec[1]);material.vertexColors=true;
@@ -84,6 +86,7 @@ export class CultivationBlenderArt {
       if(nursery){material.name='cultivation-nursery-'+name.toLowerCase();material.roughness=Math.max(.86,material.roughness);
         if(['Foliage','Loam','Paint','Seal'].includes(name))material.metalness=0;}
       if(name==='Ink'){material.metalness=0;material.roughness=.9;}
+      if(name==='Rust'){material.metalness=.12;material.roughness=.98;}
       optimizeFiniteLightEvaluation(material);
       this.materials.set(key,material);return material;
     };

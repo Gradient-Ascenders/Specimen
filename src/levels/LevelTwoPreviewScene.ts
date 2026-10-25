@@ -224,6 +224,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
         .map(mesh => [mesh.name, this.contaminationArt.finishes.metal]),
     ));
     this.labArt.addFixtures(this.roomTwo.root, 38, 24, 45, {
+      authoredReplacement: true,
       wallSides: [1],
       fillHeightMetres: 14,
       fillPositionsZ: [12, 34],
@@ -233,7 +234,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.filtrationArt = new CultivationFiltrationPassageArt(this.roomTwoToThreeGoopPassage,
       this.roomTwoToThreeBobAirDuct, this.labArt, this.contaminationArt);
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
-    this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning);
+    this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning, {authoredReplacement:true});
     this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);
     this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering);
     this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
@@ -351,7 +352,8 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       ...this.roomOne.platformDrops.map((drop) => drop.mesh),
       this.roomFour.entrance.collisionMesh, this.roomFour.boardingWall, this.roomFour.arrivalWall, this.roomFour.shield,
       ...this.roomFour.movingEntranceMeshes,
-      ...this.roomTwo.blockDrops.map((drop) => drop.mesh),
+      ...this.roomTwo.blockDrops.flatMap(drop => drop.dynamicTransformRoots)
+        .filter((root): root is THREE.Mesh => root instanceof THREE.Mesh),
       ...movingWallColliders,
       ...this.roomOneToTwoPassage.doors.map((door) => door.collisionMesh),
       ...this.roomTwoToThreeGoopPassage.doors.map(

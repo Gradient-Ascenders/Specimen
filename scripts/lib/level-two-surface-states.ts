@@ -10,6 +10,7 @@ import { CollisionWorld } from '../../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../../src/physics/SurfaceRegistry.ts';
 import { createAuthoredDissolveTarget } from '../../src/abilities/DissolveTarget.ts';
 import {VOLT_FINALE} from '../../src/cinematics/CultivationFinaleTimeline.ts';
+import {visitCultivationRoomTwoSurfaceStates} from './cultivation-room-two-surface-states.ts';
 
 /** Deterministic authored poses; every state is scanned after updating world matrices. */
 export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (name: string) => void): void {
@@ -83,5 +84,6 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
       sample(`volt-release-${elapsed}`);
     }
     scene.reset();roomThree.reset();roomFour.reset();roomFive.reset();sample('release-reset');
+    visitCultivationRoomTwoSurfaceStates(scene,targets,sample);
   } finally { roomFive.dispose(); roomFour.dispose(); roomThree.dispose(); dissolve.dispose(); for (const target of targets) target.dispose(); }
 }

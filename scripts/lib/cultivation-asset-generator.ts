@@ -9,7 +9,7 @@ import {
 import type { LevelTwoPreviewScene } from '../../src/levels/LevelTwoPreviewScene.ts';
 import { createCultivationEquipmentWear } from './CultivationEquipmentWear.ts';
 import { createCultivationPlatformWear } from './CultivationPlatformWear.ts';
-import { createCultivationMembraneTextures } from './CultivationMembraneMaterial.ts';
+import { createCultivationMembraneTextures, createCultivationBiofilmTextures } from './CultivationMembraneMaterial.ts';
 import { generateLabFinish } from './cultivation-lab-textures.ts';
 import { generateGlass, generateWeather } from './cultivation-contamination-textures.ts';
 import { generateWarning } from './cultivation-warning-texture.ts';
@@ -101,6 +101,7 @@ export class CultivationAssetGenerator implements CultivationAssetSource {
         }));
       }
       case 'membrane': return createCultivationMembraneTextures();
+      case 'membrane-biofilm': return createCultivationBiofilmTextures();
       case 'platform-deck': return createCultivationPlatformWear('deck');
       case 'platform-pole': return createCultivationPlatformWear('pole');
       case 'equipment-panel': return createCultivationEquipmentWear();

@@ -5,7 +5,7 @@ type Edge = readonly [number, number, number, number];
 const ordered = (values: number[]) => [...new Set(values.map(v => Number(v.toFixed(5))))].sort((a, b) => a - b);
 
 /** One render skin for the coplanar Room 2 route. Original boxes remain the colliders. */
-export function createCultivationStickyRouteGeometry(panels: readonly THREE.Mesh<THREE.BoxGeometry>[]): THREE.BufferGeometry {
+export function createCultivationStickyRouteGeometry(panels: readonly THREE.Mesh<THREE.BoxGeometry>[],tileMetres=8): THREE.BufferGeometry {
   const rectangles: Rect[] = panels.map(panel => {
     const { height, depth } = panel.geometry.parameters;
     return { left: panel.position.z - depth / 2, right: panel.position.z + depth / 2,
@@ -37,7 +37,7 @@ export function createCultivationStickyRouteGeometry(panels: readonly THREE.Mesh
   const x = panels[0].position.x, halfWidth = panels[0].geometry.parameters.width / 2;
   const vertex = (point: THREE.Vector3, normal: THREE.Vector3, edgeDistance: number) => {
     positions.push(...point.toArray()); normals.push(...normal.toArray());
-    uvs.push((Math.abs(normal.x) > .5 ? -normal.x * point.z : normal.z * point.x) / 8, point.y / 8);
+    uvs.push((Math.abs(normal.x) > .5 ? -normal.x * point.z : normal.z * point.x) / tileMetres, point.y / tileMetres);
     // The material's minimum-of-four distances also accepts a baked union
     // distance, so no artificial border appears on the tessellation edges.
     membrane.push(edgeDistance, 100, 200, 200);
