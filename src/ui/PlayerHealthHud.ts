@@ -51,19 +51,22 @@ export class PlayerHealthHud {
     }
     const dt = Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0;
     const full = health.health >= health.maximumHealth;
+    if (full && this.state === 'hidden') { this.wasFull = true; return; }
     if (!full) { this.fullSeconds = 0; this.setVisible(true); }
     else if (this.state === 'visible') {
       this.fullSeconds = this.wasFull ? this.fullSeconds + dt : 0;
       if (this.fullSeconds >= 1) this.setVisible(false);
     }
     this.wasFull = full;
-    this.element.dataset.healing = String(health.regenerating);
-    this.element.dataset.critical = String(health.normalizedHealth <= .3);
-    this.meter.value = health.normalizedHealth * 100;
+    const healing = String(health.regenerating), critical = String(health.normalizedHealth <= .3);
+    if (this.element.dataset.healing !== healing) this.element.dataset.healing = healing;
+    if (this.element.dataset.critical !== critical) this.element.dataset.critical = critical;
+    const percentage = health.normalizedHealth * 100;
+    if (this.meter.value !== percentage) this.meter.value = percentage;
     const value = `${Math.ceil(health.normalizedHealth * 100)}`;
     if (this.value.textContent !== value) this.value.textContent = value;
     const status = health.regenerating ? 'Healing' : full && this.state !== 'hidden' ? 'Full' : health.normalizedHealth <= .3 ? 'Low' : '';
-    this.status.hidden = !status;
+    if (this.status.hidden !== !status) this.status.hidden = !status;
     if (this.status.textContent !== status) this.status.textContent = status;
 
     // Retarget a short linear fill at most ten times a second during regeneration.

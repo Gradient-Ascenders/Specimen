@@ -1,5 +1,6 @@
 import { calibrateGraphics, chooseAutomaticGraphicsProfile, GRAPHICS_CALIBRATION_BUDGET_MS, type CalibrationView, type GraphicsCalibrationResult } from '../render/GraphicsCalibration.ts';
 import { GRAPHICS_PROFILES } from '../render/GraphicsProfiles.ts';
+import { loadRoomOneCompressedShell } from '../render/environment/containment/RoomOneShell.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
 import { containmentDroneFlightSound, stopContainmentFinaleAudio } from '../audio/ContainmentFinaleAudio.ts';
 import { IdleCinematicPreparation, type CinematicPreparationJob } from '../cinematics/IdleCinematicPreparation.ts';
@@ -556,7 +557,12 @@ export class GreyboxLevelRuntime {
 
   private async prepareCharacterModels(resources: GreyboxRuntimeResources): Promise<void> {
     await Promise.all([
-      resources.testScene.prepareEnvironmentArt(),
+      (async () => {
+        if (this.renderLayer.renderer.extensions.has('EXT_texture_compression_bptc')) {
+          await resources.testScene.teaching.roomOneArt.shell.prepare(loadRoomOneCompressedShell);
+        }
+        if (this.resources === resources) await resources.testScene.prepareEnvironmentArt();
+      })(),
       resources.testScene.bob.prepare(this.characterLoaders?.bob),
       resources.testScene.goop.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
       resources.testScene.roomFive.goopPresentation.prepare(this.characterLoaders?.goop, this.characterLoaders?.goopDetail),
@@ -1002,7 +1008,7 @@ export class GreyboxLevelRuntime {
     slimePairPresentation.root.visible = goopAvailable;
     testScene.goop.updateDetail(this.renderLayer.cameraRig.camera);
     reveal.updateDetail(this.renderLayer.cameraRig.camera);
-    const showReveal = testScene.lightingDiagnostics.visibleRoomIds.includes(5) &&
+    const showReveal = testScene.lighting.isRoomVisible(5) &&
       !testScene.roomFive.releaseComplete && slimePair.activeSlimeId !== 'goop';
     reveal.setVisible(showReveal);
     testScene.goop.setVisible(goopAvailable && !showReveal);
@@ -1011,7 +1017,7 @@ export class GreyboxLevelRuntime {
         cameraDistanceMetres, CAMERA_FADE_START_DISTANCE_METRES, CAMERA_FADE_END_DISTANCE_METRES, CAMERA_MINIMUM_TARGET_OPACITY)) : 1);
     const reflection = testScene.lighting.reflectionTargetForPosition(goopBody.position, testScene.isInsideCameraTightVent(goopBody.position));
     testScene.goop.setReflectionIntensity(reflection.body, reflection.eyes);
-    const lightingRoomId = testScene.lightingDiagnostics.activeRoomId;
+    const lightingRoomId = testScene.lighting.activeRoomId;
     const profileLightingTransition =
       this.debugAvailable &&
       lightingRoomId !== this.lastRenderedLightingRoomId;
@@ -1678,7 +1684,7 @@ export class GreyboxLevelRuntime {
 
   private prepareContainmentShadows(testScene: ContainmentLevelScene, participants: readonly Vector3State[]): void {
     testScene.configureLightingQuality(this.renderLayer.graphicsConfiguration,this.renderLayer.renderer.shadowMap.type);
-    const key = `${testScene.lightingDiagnostics.visibleRoomIds.join(',')}:${this.lightLayout?.cameraCullKey ?? ''}`;
+    const key = `${testScene.lighting.visibleRoomMask}:${this.lightLayout?.cameraCullKey ?? ''}`;
     if (key !== this.lastShadowLayoutKey) {
       this.lightLayout?.sync();
       // Refresh Three's light state before its shadow pass, without compiling

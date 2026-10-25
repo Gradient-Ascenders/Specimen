@@ -188,6 +188,7 @@ export class ContainmentLevelScene {
   private readonly roomTwoOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly completedRoomOneBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly roomThreeOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly lowerFloorOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly finaleOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
 
   get goop() { return this.teaching.goop; }
@@ -273,6 +274,9 @@ export class ContainmentLevelScene {
     this.roomTwoOccludedBranches = collectLightlessBranches([this.roomFour.root,this.roomFive.root]);
     this.completedRoomOneBranches = collectLightlessBranches([this.teaching.roomOneArt.root]);
     this.roomThreeOccludedBranches = collectLightlessBranches([this.roomFive.root]);
+    this.lowerFloorOccludedBranches = collectLightlessBranches([
+      this.teaching.roomOneArt.root, this.teaching.roomTwoArt.root, this.roomThree.root,
+    ]);
     this.finaleOccludedBranches = collectLightlessBranches([
       this.teaching.roomOneArt.root, this.teaching.roomTwoArt.root,
       this.roomThree.root, this.roomFour.root,
@@ -431,7 +435,14 @@ export class ContainmentLevelScene {
         activePosition.z < 78 && cameraPosition.z < 78 &&
         activePosition.y < 34 && cameraPosition.y < 34
         ? this.roomThreeOccludedBranches
-        : undefined;
+        // The lift's opaque floor/walls separate these chambers. Keep the
+        // entry vent and low arrival view until both actor and camera clear it.
+        : roomId === 4 && activePosition.x >= 3.2 && activePosition.x <= 14.8 &&
+          cameraPosition.x >= 3.2 && cameraPosition.x <= 14.8 &&
+          activePosition.z >= 80.2 && activePosition.z <= 91 &&
+          cameraPosition.z >= 80.2 && cameraPosition.z <= 91 &&
+          activePosition.y >= 36 && cameraPosition.y >= 36
+          ? this.lowerFloorOccludedBranches : undefined;
     // Past the two opaque duct bends, the old pod is fully occluded. Keeping
     // it submitted creates otherwise-unused material variants under later rigs.
     const completedRoomOne = (roomId <= 3 &&
@@ -470,12 +481,12 @@ export class ContainmentLevelScene {
   }
 
   update(deltaSeconds: number, bobPosition?: Vector3State, activePosition = bobPosition): void {
-    this.surveillanceCameras.update(deltaSeconds, bobPosition);
+    if (activePosition) this.lighting.setTraversalPosition(activePosition);
+    this.surveillanceCameras.update(deltaSeconds, bobPosition, this.lighting.visibleRoomMask);
     this.roomOneMonitor.update(deltaSeconds);
     this.roomTwoMonitor.update(deltaSeconds, activePosition);
     this.roomThreeMonitor.update(deltaSeconds, activePosition);
     this.roomFiveMonitor.update(deltaSeconds, activePosition);
-    if (activePosition) this.lighting.setTraversalPosition(activePosition);
     if (bobPosition) {
       this.lighting.setBobInDarkDuct(
         this.isInsideCameraTightVent(bobPosition),

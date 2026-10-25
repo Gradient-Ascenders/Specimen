@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {gunzipSync} from 'node:zlib';
 import test from 'node:test';
 import * as THREE from 'three';
-import {RoomOneShell,parseRoomOneShell,readRoomOneMaps} from '../src/render/environment/containment/RoomOneShell.ts';
+import {RoomOneShell,parseRoomOneShell,readRoomOneMaps,readRoomOneCompressedMaps,loadRoomOneCompressedShell,ROOM_ONE_SHELL_URL,ROOM_ONE_MAPS_URL,ROOM_ONE_COMPRESSED_MAPS_URL} from '../src/render/environment/containment/RoomOneShell.ts';
 import {ContainmentLevelScene} from '../src/levels/ContainmentLevelScene.ts';
 import {captureContainmentCollisionFingerprint} from '../src/levels/ContainmentCollisionFingerprint.ts';
 import {auditRoomOneRearWall} from './helpers/RoomOneRearWallSurfaces.ts';
@@ -14,6 +14,50 @@ const data = gunzipSync(compressed);
 const buffer = data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength);
 const maps = readRoomOneMaps(buffer);
 const asset = async()=>({root:await parseRoomOneShell(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)),maps});
+
+test('native BC7 maps retain every mip, colour space and ownership with a bounded payload',async()=>{
+  const packed=await readFile(new URL('../assets/environments/containment-room-one/room-one-maps-bc7.bin',import.meta.url));
+  const decoded=gunzipSync(packed),buffer=decoded.buffer.slice(decoded.byteOffset,decoded.byteOffset+decoded.byteLength);
+  const compressedMaps=readRoomOneCompressedMaps(buffer),shell=new RoomOneShell();
+  assert.equal(compressedMaps.length,6);
+  assert.throws(()=>readRoomOneCompressedMaps(buffer.slice(0,-1)),/Invalid/);
+  assert.throws(()=>readRoomOneCompressedMaps(buffer.slice(0,10)),/Truncated/);
+  const corrupt=buffer.slice(0);new DataView(corrupt).setUint32(56,0,true);
+  assert.throws(()=>readRoomOneCompressedMaps(corrupt),/Invalid/);
+  let disposed=0;
+  try{
+    await shell.prepare(async()=>({...await asset(),maps:[],compressedMaps}));
+    assert.equal(shell.diagnostics.textureBytes,8_388_768);
+    const textures=new Set<THREE.CompressedTexture>();
+    shell.root.traverse(object=>{if(!(object instanceof THREE.Mesh))return;
+      const material=object.material as THREE.MeshStandardMaterial;
+      for(const texture of [material.map,material.normalMap,material.roughnessMap])if(texture){
+        assert.ok(texture instanceof THREE.CompressedTexture);textures.add(texture);
+        assert.equal(texture.format,THREE.RGBA_BPTC_Format);assert.equal(texture.generateMipmaps,false);
+        assert.equal(texture.mipmaps.length,Math.log2(texture.image.width)+1);
+      }
+      if(material.map){assert.equal(material.map.colorSpace,THREE.SRGBColorSpace);assert.equal(material.normalMap!.colorSpace,THREE.NoColorSpace);}
+    });
+    assert.equal(textures.size,6);for(const texture of textures)texture.addEventListener('dispose',()=>disposed++);
+  }finally{shell.dispose();shell.dispose();}
+  assert.equal(disposed,6);
+});
+
+test('a failed optional BC7 bank falls back to authored RGBA without fetching geometry twice',async()=>{
+  const originalFetch=globalThis.fetch,calls:string[]=[],shell=new RoomOneShell();
+  globalThis.fetch=async input=>{
+    const url=String(input);calls.push(url);
+    if(url===ROOM_ONE_SHELL_URL)return new Response(bytes);
+    if(url===ROOM_ONE_COMPRESSED_MAPS_URL)return new Response(null,{status:503});
+    if(url===ROOM_ONE_MAPS_URL)return new Response(compressed);
+    throw new Error(`Unexpected request ${url}`);
+  };
+  try{
+    await shell.prepare(loadRoomOneCompressedShell);
+    assert.equal(shell.diagnostics.textureCount,6);assert.equal(shell.diagnostics.textureBytes,25_165_824);
+    assert.deepEqual(calls,[ROOM_ONE_SHELL_URL,ROOM_ONE_COMPRESSED_MAPS_URL,ROOM_ONE_MAPS_URL]);
+  }finally{globalThis.fetch=originalFetch;shell.dispose();}
+});
 
 test('Blender Room 1 uses nine material batches, no exported lights or duplicate images, and bounded map storage',async()=>{
   const json = JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());

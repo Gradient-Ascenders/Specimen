@@ -136,7 +136,7 @@ export class RoomThreeDroneEncounter {
         throw new Error(`Ceiling drone "${config.drone.id}" has no registered support target.`);
       }
     }
-    this.presentationResources = new SecurityDronePresentationResources(options.surfaceMaps, true);
+    this.presentationResources = new SecurityDronePresentationResources(options.surfaceMaps, true, true);
     this.root.name = 'cultivation-room-3-drone-encounter';
     this.bobBody = options.bobBody;
     this.radiationSurface = options.radiationSurface;

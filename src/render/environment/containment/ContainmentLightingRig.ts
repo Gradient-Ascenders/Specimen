@@ -197,6 +197,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   private disposed = false;
   private bobInDarkDuct = false;
   private traversalPosition: Vector3State | undefined;
+  private appliedRoomWeights: ReadonlyMap<ContainmentLightingRoomId, number> | undefined;
   private readonly shadowLights: (THREE.PointLight | THREE.SpotLight)[] = [];
   private readonly authoredIntensities = new Map<THREE.Light, number>();
   private readonly previousShadowParticipants: THREE.Vector3[] = [];
@@ -402,6 +403,17 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     return this.activeRoomIdValue;
   }
 
+  isRoomVisible(roomId: ContainmentLightingRoomId): boolean {
+    return this.room(roomId).visible;
+  }
+
+  /** Stable layout identity without building the diagnostic scene snapshot. */
+  get visibleRoomMask(): number {
+    let mask = 0;
+    for (const [roomId, group] of this.roomGroups) if (group.visible) mask |= 1 << roomId;
+    return mask;
+  }
+
   get diagnostics(): ContainmentLightingDiagnostics {
     let authoredLightCount = 0;
     let visibleAuthoredLightCount = 0;
@@ -450,7 +462,13 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
   setTraversalPosition(position: Vector3State): void {
     // Borrow the existing body position: no duplicate movement or timer state.
     this.traversalPosition = position;
-    this.applyRoomVisibility();
+    const weights = containmentRoomLightWeights(this.activeRoomIdValue, position);
+    let changed = weights.size !== this.appliedRoomWeights?.size;
+    if (!changed) for (const [room, weight] of weights) {
+      if (this.appliedRoomWeights!.get(room) !== weight) { changed = true; break; }
+    }
+    if (!changed) return;
+    this.applyRoomVisibility(weights);
   }
 
   /** Call after presenting poses, immediately before the live draw.
@@ -477,9 +495,10 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     }
     // Dissolve shaders change silhouettes without changing a transform.
     const dissolvingDoor = this.roomFive.goopWoodenDoor;
-    const doorMaterials = [dissolvingDoor.material].flat();
-    const dissolveAmount = doorMaterials.find((material): material is DissolveMaterial =>
-      material instanceof DissolveMaterial)?.dissolveAmountUniform.value ?? 0;
+    const doorMaterial = Array.isArray(dissolvingDoor.material)
+      ? dissolvingDoor.material.find((material): material is DissolveMaterial => material instanceof DissolveMaterial)
+      : dissolvingDoor.material;
+    const dissolveAmount = doorMaterial instanceof DissolveMaterial ? doorMaterial.dissolveAmountUniform.value : 0;
     const dissolveLive = dissolvingDoor.visible && dissolveAmount > 0 && dissolveAmount < 1;
     const dissolveChanged = dissolveAmount !== this.lastDoorDissolveAmount;
     for (const light of this.shadowLights) {
@@ -492,7 +511,7 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       const intersects = (position: Vector3State, radius: number): boolean => {
         this.shadowSphere.center.set(position.x, position.y, position.z);
         this.shadowSphere.radius = radius;
-        if (this.shadowSourcePosition.distanceTo(this.shadowSphere.center) > light.distance + radius) return false;
+        if (this.shadowSourcePosition.distanceToSquared(this.shadowSphere.center) > (light.distance + radius) ** 2) return false;
         return !(light instanceof THREE.SpotLight) || light.shadow.getFrustum().intersectsSphere(this.shadowSphere);
       };
       const dynamic = participants.some(position => intersects(position, 1.5)) ||
@@ -696,8 +715,8 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     return group;
   }
 
-  private applyRoomVisibility(): void {
-    const weights = containmentRoomLightWeights(this.activeRoomIdValue, this.traversalPosition);
+  private applyRoomVisibility(weights = containmentRoomLightWeights(this.activeRoomIdValue, this.traversalPosition)): void {
+    this.appliedRoomWeights = weights;
     this.foundation.color.setRGB(0,0,0);this.foundation.groundColor.setRGB(0,0,0);this.foundation.intensity=0;
     for(const [roomId,weight] of weights){
       const ambience=CONTAINMENT_ROOM_AMBIENCE[roomId];

@@ -4,12 +4,37 @@ import { readGzipResponse } from '../ReadGzipResponse.ts';
 
 export const ROOM_ONE_SHELL_URL = new URL('../../../../assets/environments/containment-room-one/room-one-shell.glb', import.meta.url).href;
 export const ROOM_ONE_MAPS_URL = new URL('../../../../assets/environments/containment-room-one/room-one-maps.bin', import.meta.url).href;
+export const ROOM_ONE_COMPRESSED_MAPS_URL = new URL('../../../../assets/environments/containment-room-one/room-one-maps-bc7.bin', import.meta.url).href;
 export const ROOM_ONE_SHELL_VERSION = 'containment-room-one-v1';
 const MAP_SIZES = [2048,512,512,1024,512,512] as const;
 const MAP_NAMES = ['ceramic-color','ceramic-normal','ceramic-orm','resin-color','resin-normal','resin-orm'] as const;
 const HEADER_BYTES = 8 + MAP_SIZES.length * 8;
 export interface RoomOneMap { readonly size: number; readonly pixels: Uint8Array; }
-export interface RoomOneShellAsset { readonly root: THREE.Group; readonly maps: readonly RoomOneMap[]; }
+export interface RoomOneCompressedMap { readonly size: number; readonly mipmaps: readonly THREE.CompressedTextureMipmap[]; }
+export interface RoomOneShellAsset { readonly root: THREE.Group; readonly maps: readonly RoomOneMap[]; readonly compressedMaps?: readonly RoomOneCompressedMap[]; }
+
+/** Native BC7 blocks, validated before texture creation. Original RGBA remains
+ * the fallback on devices without BPTC and on failed optional-bank loads. */
+export function readRoomOneCompressedMaps(buffer: ArrayBuffer): readonly RoomOneCompressedMap[] {
+  if (buffer.byteLength < HEADER_BYTES) throw new Error('Truncated Room 1 BC7 maps.');
+  const bytes = new Uint8Array(buffer), header = new DataView(buffer);
+  if (String.fromCharCode(...bytes.subarray(0,8)) !== 'R1BC7001') throw new Error('Unsupported Room 1 BC7 maps.');
+  let offset = HEADER_BYTES;
+  const maps = MAP_SIZES.map((size,index) => {
+    const levels = Math.log2(size) + 1;
+    if (header.getUint32(8+index*8,true) !== size || header.getUint32(12+index*8,true) !== levels) throw new Error('Invalid Room 1 BC7 dimensions.');
+    const mipmaps: THREE.CompressedTextureMipmap[] = [];
+    for (let level=0; level<levels; level++) {
+      const width = Math.max(1,size >> level), length = Math.ceil(width/4) ** 2 * 16;
+      if (offset+4+length > buffer.byteLength || header.getUint32(offset,true) !== length) throw new Error('Invalid Room 1 BC7 mip.');
+      offset += 4;
+      mipmaps.push({width,height:width,data:new Uint8Array(buffer,offset,length)}); offset += length;
+    }
+    return {size,mipmaps};
+  });
+  if (offset !== buffer.byteLength) throw new Error('Unexpected Room 1 BC7 data.');
+  return maps;
+}
 
 /** Validate before allocating GPU resources. Views borrow one decompressed bank. */
 export function readRoomOneMaps(buffer: ArrayBuffer): readonly RoomOneMap[] {
@@ -45,12 +70,34 @@ async function loadRoomOneShell(signal: AbortSignal): Promise<RoomOneShellAsset>
   return {root,maps:bank};
 }
 
+export async function loadRoomOneCompressedShell(signal: AbortSignal): Promise<RoomOneShellAsset> {
+  // Fetch geometry only once; a missing compressed bank retries the RGBA maps.
+  const geometry = fetch(ROOM_ONE_SHELL_URL,{signal}).then(response => {
+    if (!response.ok) throw new Error('Could not load Room 1 architecture.');
+    return response.arrayBuffer();
+  });
+  const maps = (async () => {
+    try {
+      const response = await fetch(ROOM_ONE_COMPRESSED_MAPS_URL,{signal});
+      if (!response.ok) throw new Error('Could not load Room 1 BC7 maps.');
+      return {maps:[],compressedMaps:readRoomOneCompressedMaps(await readGzipResponse(response,signal))};
+    } catch (error) {
+      if (signal.aborted) throw error;
+      const response = await fetch(ROOM_ONE_MAPS_URL,{signal});
+      if (!response.ok) throw new Error('Could not load Room 1 surface maps.');
+      return {maps:readRoomOneMaps(await readGzipResponse(response,signal))};
+    }
+  })();
+  const [bytes,bank] = await Promise.all([geometry,maps]);
+  return {root:await parseRoomOneShell(bytes),...bank};
+}
+
 /** Owns only the authored shell. Colliders, pod animation and puzzle state stay
  * with their existing owners. The same asset also dresses the opening shot. */
 export class RoomOneShell {
   readonly root = new THREE.Group();
   private readonly abort = new AbortController();
-  private readonly textures: THREE.DataTexture[] = [];
+  private readonly textures: (THREE.DataTexture | THREE.CompressedTexture)[] = [];
   private readonly materials = new Set<THREE.Material>();
   private readonly finishes = new Map<string,THREE.Material>();
   private asset: THREE.Group | undefined;
@@ -75,12 +122,15 @@ export class RoomOneShell {
   }
 
   private adopt(asset: RoomOneShellAsset): void {
-    const textures = asset.maps.map((map,index)=>{
-      const texture = new THREE.DataTexture(map.pixels,map.size,map.size,THREE.RGBAFormat);
+    const textures = (asset.compressedMaps ?? asset.maps).map((map,index)=>{
+      const compressed = 'mipmaps' in map;
+      const texture = compressed
+        ? new THREE.CompressedTexture([...map.mipmaps],map.size,map.size,THREE.RGBA_BPTC_Format)
+        : new THREE.DataTexture(map.pixels,map.size,map.size,THREE.RGBAFormat);
       texture.name = `room-1-${MAP_NAMES[index]}`;
       texture.colorSpace = index%3 === 0 ? THREE.SRGBColorSpace : THREE.NoColorSpace;
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.generateMipmaps = true;
+      texture.generateMipmaps = !compressed;
       texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
       texture.anisotropy = 4; texture.needsUpdate = true;
       this.textures.push(texture); return texture;
@@ -128,7 +178,8 @@ export class RoomOneShell {
     let meshes=0,triangles=0;
     this.asset?.traverse(object=>{if(object instanceof THREE.Mesh&&!object.userData.lightingOnly){meshes++;triangles+=(object.geometry.index?.count??object.geometry.getAttribute('position').count)/3;}});
     return {ready:!!this.asset,meshes,triangles,textureCount:this.textures.length,
-      textureBytes:this.textures.reduce((sum,texture)=>sum+(texture.image.data?.byteLength??0),0),disposed:this.disposed};
+      textureBytes:this.textures.reduce((sum,texture)=>sum+(texture instanceof THREE.CompressedTexture
+        ? texture.mipmaps.reduce((bytes,mip)=>bytes+mip.data.byteLength,0) : texture.image.data?.byteLength??0),0),disposed:this.disposed};
   }
 
   /** Borrowed by the opening wing; ownership stays with this shell. */

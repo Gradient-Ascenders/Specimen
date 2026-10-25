@@ -155,7 +155,7 @@ test('the old pod is culled beyond the duct bends, including the captured Room 3
       scene.withEnclosedRoomOcclusion(body,camera,()=>{
         let submitted=0;oldRoom.traverseVisible(object=>{if(object instanceof THREE.Mesh)submitted++;});
         assert.equal(submitted,0,'pod and its unique label material cannot enter the later-room draw');
-        assert.equal(scene.teaching.roomTwoArt.root.visible,true);
+        if(room<=3 || body.y<36 || camera.y<36)assert.equal(scene.teaching.roomTwoArt.root.visible,true);
       });
       assert.equal(oldRoom.visible,true);
     }
@@ -163,6 +163,25 @@ test('the old pod is culled beyond the duct bends, including the captured Room 3
     for(const [body,camera] of [[{x:-8.4,y:11,z:25.2},{x:-8.4,y:11,z:25}],
       [{x:-8.4,y:11,z:25},{x:-8.4,y:11,z:25.2}]]){
       scene.withEnclosedRoomOcclusion(body,camera,()=>assert.equal(oldRoom.visible,true,'restore the earlier view while backtracking'));
+    }
+  }finally{scene.dispose();}
+});
+
+test('upper lift culling preserves the entry portal, light layout and visibility after failure',()=>{
+  const scene=new ContainmentLevelScene(()=>{});
+  try{
+    scene.lighting.setActiveRoom(4);
+    const root=scene.teaching.roomTwoArt.root;
+    const lights=()=>{const names:string[]=[];scene.root.traverseVisible(o=>{if(o instanceof THREE.Light)names.push(o.uuid);});return names;};
+    const originalLights=lights(),body={x:9,y:53,z:85.5},camera={x:9,y:54,z:88};
+    scene.withEnclosedRoomOcclusion(body,camera,()=>{assert.equal(root.visible,false);assert.deepEqual(lights(),originalLights);});
+    assert.equal(root.visible,true);
+    assert.throws(()=>scene.withEnclosedRoomOcclusion(body,camera,()=>{throw new Error('draw failed');}),/draw failed/);
+    assert.equal(root.visible,true);assert.deepEqual(lights(),originalLights);
+    for(const [player,view] of [[{...body,y:33},camera],[body,{...camera,y:33}],
+      [{...body,z:79.5},camera],[body,{...camera,z:79.5}],[{...body,x:0},camera],
+      [body,{...camera,x:0}],[{...body,z:92},camera],[body,{...camera,z:92}]]){
+      scene.withEnclosedRoomOcclusion(player,view,()=>assert.equal(root.visible,true,'a trailing view through the entrance must keep the earlier rooms'));
     }
   }finally{scene.dispose();}
 });

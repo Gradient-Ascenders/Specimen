@@ -25,6 +25,18 @@ function meshes(root: THREE.Object3D): THREE.Mesh[] {
   return result;
 }
 
+test('hidden rooms skip decorative tracking and resume when their lighting room returns',()=>{
+  const {rig}=createFixtures();
+  try{
+    const target=new THREE.Vector3(0,2,20),first=rig.cameras[0],second=rig.cameras[1];
+    rig.update(.1,target,1<<1);
+    assert.notEqual(first.tilt.rotation.x,.3);assert.equal(second.pan.rotation.y,0);assert.equal(second.tilt.rotation.x,.3);
+    const pan=first.pan.rotation.y,tilt=first.tilt.rotation.x;
+    rig.update(.1,target,1<<2);
+    assert.equal(first.pan.rotation.y,pan);assert.equal(first.tilt.rotation.x,tilt);assert.notEqual(second.tilt.rotation.x,.3);
+  }finally{rig.dispose();}
+});
+
 for (const includeDevelopmentHelpers of [false, true]) {
   test(`all six surveillance cameras match the requested monitor, doorway and upper-wall locations (dev ${includeDevelopmentHelpers})`, () => {
     const scene = new ContainmentLevelScene(() => {}, { includeDevelopmentHelpers });

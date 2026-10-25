@@ -46,7 +46,7 @@ export class ElevatorDroneEncounter {
     bob: KinematicBody, goop: KinematicBody, targets: readonly DissolveTarget[],
     dissolve: DissolveSystem, requestDeath: (id: 'bob' | 'goop') => void,
     surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }) {
-    this.resources = new SecurityDronePresentationResources(surfaceMaps, true);
+    this.resources = new SecurityDronePresentationResources(surfaceMaps, true, true);
     this.room = room; this.world = world;
     this.breakup = new DroneBreakupPresentation(room.droneRoots.length);
     room.root.add(this.breakup.root);
@@ -193,6 +193,10 @@ export class ElevatorDroneEncounter {
       body.teleport(this.room.root.localToWorld(this.ejection)); body.applyKnockback(this.impulse);
       slot.ejected |= 1 << i;
     }
+  }
+
+  updateDetail(camera: THREE.Camera): void {
+    for (const slot of this.slots) if (slot.root.visible) slot.drone.presentation.updateDetail(camera);
   }
 
   diagnostics(): string {

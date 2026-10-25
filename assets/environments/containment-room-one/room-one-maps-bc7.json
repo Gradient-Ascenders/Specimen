@@ -1,0 +1,38 @@
+{
+  "sourceSHA256": "b3b414178ee8e3fbfa29aab74074e10fd5319e3a5a4a6cb3eb15d8cc7c7f48ed",
+  "outputSHA256": "a0f463f99f5d2f1e1a2fd005011aa3f12ce4fdf8166217491d7f778da60627b2",
+  "encoder": "ktx version: v4.4.2",
+  "encoding": "KTX2 UASTC quality 3, native BC7, complete mip chain, gzip 9",
+  "maps": [
+    {
+      "size": 2048,
+      "levels": 12,
+      "bytes": 5592432
+    },
+    {
+      "size": 512,
+      "levels": 10,
+      "bytes": 349552
+    },
+    {
+      "size": 512,
+      "levels": 10,
+      "bytes": 349552
+    },
+    {
+      "size": 1024,
+      "levels": 11,
+      "bytes": 1398128
+    },
+    {
+      "size": 512,
+      "levels": 10,
+      "bytes": 349552
+    },
+    {
+      "size": 512,
+      "levels": 10,
+      "bytes": 349552
+    }
+  ]
+}

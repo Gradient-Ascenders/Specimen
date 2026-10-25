@@ -57,7 +57,7 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   assert.equal(encounter.ceilingDrones.length, 3);
   assert.equal(encounter.groundDrones.length, 4);
   assert.deepEqual(encounter.presentationResourceDiagnostics, {
-    geometryCount: 14,
+    geometryCount: 26,
     materialCount: 4,
   });
   const presentationGeometries = new Set<THREE.BufferGeometry>();
@@ -77,7 +77,7 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
       for (const material of materials) presentationMaterials.add(material);
     });
   }
-  assert.equal(presentationGeometries.size, 14);
+  assert.equal(presentationGeometries.size, 26);
   assert.equal(presentationMaterials.size, 11);
   assert.equal(indicatorMaterials.size, 7);
   for (const lifecycle of [...encounter.ceilingDrones, ...encounter.groundDrones]) {

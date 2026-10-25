@@ -120,13 +120,16 @@ export class ContainmentSurveillanceCameras {
   get authoredRenderMeshes():readonly THREE.Mesh[]{return this.model.renderMeshes;}
   get modelDiagnostics(){return this.model.diagnostics;}
 
-  update(deltaSeconds: number, bobPosition?: Vector3State): void {
+  update(deltaSeconds: number, bobPosition?: Vector3State, visibleRoomMask?: number): void {
     if (this.disposed) return;
     if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0) throw new RangeError('Invalid camera timestep.');
     if (!isFinitePosition(bobPosition)) return;
     const blend = -Math.expm1(-CONTAINMENT_SURVEILLANCE_TRACKING.responsePerSecond * deltaSeconds);
     if (blend === 0) return;
-    for (const camera of this.cameras) camera.track(bobPosition, blend);
+    for (const camera of this.cameras) {
+      if (visibleRoomMask !== undefined && !(visibleRoomMask & (1 << camera.placement.roomId))) continue;
+      camera.track(bobPosition, blend);
+    }
   }
 
   reset(bobPosition?: Vector3State): void {

@@ -116,6 +116,14 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   const health = page.locator('.player-health-hud');
   await page.evaluate(() => window.__hudTest.flow.updateFrame(0));
   await expect(health).toBeHidden();
+  const idleHealthMutations = await page.evaluate(async () => {
+    let mutations = 0;
+    const observer = new MutationObserver(records => { mutations += records.length; });
+    observer.observe(document.querySelector('.player-health-hud')!, {attributes:true,childList:true,subtree:true,characterData:true});
+    for(let frame=0;frame<120;frame++)window.__hudTest.flow.updateFrame(1/60);
+    await Promise.resolve();observer.disconnect();return mutations;
+  });
+  expect(idleHealthMutations).toBe(0);
   await page.evaluate(() => { const { damage, flow } = window.__hudTest; damage.applyDamage('bob', 20); flow.updateFrame(0); });
   await expect(health).toBeVisible();
   await expect(health.getByRole('progressbar')).toHaveJSProperty('value', 80);

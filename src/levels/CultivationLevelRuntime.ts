@@ -944,6 +944,10 @@ export class CultivationLevelRuntime {
       }
       if (resources.roomThreeEncounter && resources.authoredPreview) {
         resources.roomThreeEncounter.root.visible = resources.authoredPreview.roomThree.root.visible;
+        if (resources.roomThreeEncounter.root.visible) {
+          for (const entry of resources.roomThreeEncounter.ceilingDrones) entry.drone.presentation.updateDetail(this.renderLayer.cameraRig.camera);
+          for (const entry of resources.roomThreeEncounter.groundDrones) entry.drone.presentation.updateDetail(this.renderLayer.cameraRig.camera);
+        }
       }
       resources.pairPresentation.update(
         resources.renderedBobPosition,
@@ -967,6 +971,7 @@ export class CultivationLevelRuntime {
       }
       if (resources.authoredPreview) resources.roomFiveView?.update(resources.authoredPreview.roomFive.controller, this.authoredPreviewRoomId === 5);
       const inRoomFour = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position) === 4;
+      if (inRoomFour) resources.roomFourEncounter?.updateDetail(this.renderLayer.cameraRig.camera);
       if (resources.authoredPreview) resources.roomFourView?.update(resources.authoredPreview.roomFour.controller, inRoomFour);
       const damageSlimeId = resources.manager.activeSlimeId === 'goop' ? 'goop' : 'bob';
       resources.roomFiveDamage?.update(stats.frameDeltaSeconds, damageSlimeId,

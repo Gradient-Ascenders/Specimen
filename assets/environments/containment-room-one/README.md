@@ -69,3 +69,22 @@ Focused checks are `tests/RoomOneShell.test.ts`, the Containment art/collider/
 lighting tests and `tests/browser/RoomOneShell.spec.ts`. Production captures live
 under ignored `artifacts/evidence/room-one-shell/`. Software WebGL captures prove
 routing, rendering and resource reuse; they are not hardware FPS measurements.
+
+## Desktop texture compression
+
+`room-one-maps-bc7.bin` contains the same six maps as native BC7 blocks with
+complete mip chains. The shared finishes use it when the renderer supports
+`EXT_texture_compression_bptc`; other devices retain the RGBA bank. A failed
+compressed-bank request also falls back to RGBA. Collision and Blender source
+assets are unaffected.
+
+The bank uses about 8 MiB of mip data versus 32 MiB for RGBA, excluding driver
+overhead. Its gzip download is about 1.10 MB versus 0.97 MB for the original.
+There is no runtime transcoder, WebAssembly module or texture worker.
+
+To regenerate, use KTX-Software 4.4.2 and set `SPECIMEN_KTX_BIN` to its `bin`
+directory, then run `npm run generate:room-one-compressed-maps`. The script
+encodes KTX2/UASTC and transcodes to BC7 offline, preserving RGB normal maps,
+linear data maps, sRGB colour maps and orientation. The JSON manifest records
+source/output hashes and tool settings. `--check`, also included in
+`check:generated-assets`, verifies provenance without requiring the encoder.
