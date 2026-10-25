@@ -111,7 +111,7 @@ def mesh(name,vertices,faces,finish,owner=''):
     if CURRENT=='room-2':
         if finish.startswith('Hall'):finish='Test'+finish[4:]
         elif name.startswith(('Test_','Solid_Test_','Transfer_','Solid_Transfer_','Ivy_')) and not finish.startswith('Test'):finish='Test'+finish
-    if CURRENT=='passage-1-2' and name.startswith(('Hall_','Solid_Hall_','Ivy_')) and not finish.startswith('Hall'):
+    if CURRENT in ('passage-1-2','passage-2-3','bob-duct') and name.startswith(('Hall_','Solid_Hall_','Filter_','Solid_Filter_','Duct_','Solid_Duct_','Ivy_')) and not finish.startswith('Hall'):
         finish='Hall'+finish
     hall=finish.startswith('Hall');testing=finish.startswith('Test')
     weathered=hall or testing;base_finish=finish[4:] if weathered else finish
@@ -138,7 +138,7 @@ def mesh(name,vertices,faces,finish,owner=''):
             start=len(points)
             for v in range(nv+1):
                 for u in range(nu+1):
-                    if testing:
+                    if testing or CURRENT in ('passage-2-3','bob-duct'):
                         # Compute the shared boundary in double precision.
                         # Chained float-vector lerps can leave a micrometre
                         # crack between the ceiling rail and its neighbour.
@@ -1452,6 +1452,182 @@ def build_testing_hall():
     testing_route_and_exits();testing_practicals();testing_laser_emitters()
 
 
+def filtration_architecture():
+    box('Filter_Floor_back',[-3.65,-.24,0],[3.65,.16,28],'Graphite')
+    for i,(a,b) in enumerate(intervals(-3.35,3.35,1.675)):
+        for k,(c,d) in enumerate(intervals(0,28,3.5)):
+            box(f'Filter_Floor_plate_{i}_{k}',[a+.018,.16,c+.018],[b-.018,.20,d-.018],'Resin')
+    for side in [-1,1]:
+        def slab(name,near,far,low,high,a,b,finish):
+            x,X=sorted([side*near,side*far]);box(f'Filter_{side}_{name}',[x,low,a],[X,high,b],finish)
+        a,b,c,d=(6.8,17.2,1.25,4.8) if side>0 else (17,23.4,1.05,4.65)
+        zs=sorted(set([0,3.5,6.8,10.3,13.7,17,17.2,20.5,23.4,26,28,a,b]))
+        ys=sorted(set([.20,1.05,1.25,3.0,4.65,4.8,6.35,c,d]))
+        for i,(left,right) in enumerate(zip(zs,zs[1:])):
+            for j,(low,high) in enumerate(zip(ys,ys[1:])):
+                if a<=left and right<=b and c<=low and high<=d:continue
+                slab(f'Wall_back_{i}_{j}',3.50,3.72,low,high,left,right,'Graphite')
+                slab(f'Wall_cassette_{i}_{j}',3.35,3.48,low+.025,high-.025,left+.025,right-.025,'Cool' if high<=1.25 else 'Ceramic')
+        slab('Bay_back',4.88,5.10,c,d,a,b,'Cool')
+        for z in [a,b-.16]:slab('Bay_cheek',3.35,4.88,c,d,z,z+.16,'Alloy')
+        for y in [c,d-.16]:slab('Bay_sill',3.35,4.88,y,y+.16,a+.16,b-.16,'Alloy')
+        slab('Floor_return',3.35,3.72,.04,.20,0,28,'Alloy')
+        slab('Ceiling_return',3.35,3.72,6.35,6.65,0,28,'Alloy')
+        for z in [2.0,25.8]:slab('Pressure_pier',3.35,3.74,.2,6.35,z-.10,z+.10,'Alloy')
+        for z in [4.5,23.5]:
+            for y in [.6,5.90]:tube(f'Filter_Pier_bolt_{side}_{z}_{y}',(side*3.38,y,z),(side*3.43,y,z),.042,'Graphite',8)
+    for k,(a,b) in enumerate(intervals(0,28,3.5)):
+        box(f'Filter_Ceiling_back_{k}',[-3.65,6.47,a],[3.65,6.68,b],'Graphite')
+        for i,(c,d) in enumerate([(-3.5,-.9),(-.9,.9),(.9,3.5)]):
+            box(f'Filter_Ceiling_cassette_{i}_{k}',[c+.025,6.35,a+.025],[d-.025,6.45,b-.025],'Ceramic' if i!=1 else 'Cool')
+    for z in [28/3,56/3]:box('Filter_Crosshead',[-3.35,6.14,z-.16],[3.35,6.68,z+.16],'Alloy')
+    for spec in LAYOUT[CURRENT]['boxes']:
+        if 'partition' in spec['name']:box('Filter_'+spec['name'],spec['lo'],spec['hi'],'Ceramic')
+    for end,z in [('entry',.5),('exit',27.5)]:
+        owner=f'cultivation-room-2-to-3-goop-lab-passage-{end}-shutter-panel'
+        nursery_door_leaf(owner)
+        for side in [-1,1]:
+            x,X=sorted([side*2,side*2.28])
+            box(f'Filter_{end}_door_guide_{side}',[x,0,z-.24],[X,4.6,z+.24],'Graphite')
+            for a,b in [(2.025,2.09),(2.18,2.28)]:
+                x,X=sorted([side*a,side*b])
+                for zz in [z-.255,z+.22]:box(f'Filter_{end}_door_face_{side}',[x,.025,zz],[X,4.575,zz+.035],'Alloy')
+        box(f'Filter_{end}_drive_header',[-2.28,4.6,z-.24],[2.28,4.94,z+.24],'Alloy')
+
+def filtration_cartridge(tag,z):
+    # A continuous corrugated insert, sealed along its top/bottom and ends.
+    points=[(3.78 if i%2==0 else 4.14,z-1.22+i*2.44/40) for i in range(41)]
+    n=len(points);vv=[(x+offset,y,zz) for offset,y in [(0,1.68),(0,4.42),(.03,1.68),(.03,4.42)] for x,zz in points]
+    ff=[]
+    for i in range(n-1):
+        j=i+1;ff.extend([(i,j,j+n,i+n),(i+2*n,i+3*n,j+3*n,j+2*n),
+            (i,i+2*n,j+2*n,j),(i+n,j+n,j+3*n,i+3*n)])
+    ff.extend([(0,n,3*n,2*n),(n-1,3*n-1,4*n-1,2*n-1)])
+    mesh(tag+'_folded_filter',vv,ff,'HallCeramic')
+    box(tag+'_rear',[4.30,1.58,z-1.33],[4.44,4.52,z+1.33],'Graphite')
+    for a,b in [(z-1.43,z-1.28),(z+1.28,z+1.43)]:box(tag+'_stile',[3.47,1.48,a],[4.32,4.62,b],'Alloy')
+    for a,b in [(1.48,1.68),(4.42,4.62)]:box(tag+'_crossbar',[3.47,a,z-1.28],[4.32,b,z+1.28],'Ceramic')
+    for k in range(9):box(tag+'_guard',[3.53,1.74+k*.31,z-1.25],[3.56,1.77+k*.31,z+1.25],'Graphite')
+    for k in range(7):box(tag+'_upright',[3.53,1.74,z-1.18+k*.393],[3.56,4.37,z-1.15+k*.393],'Graphite')
+    for y in [1.60,4.50]:
+        for zz in [z-1.35,z+1.35]:tube(tag+'_captive_bolt',(3.43,y,zz),(3.52,y,zz),.040,'Graphite',8)
+
+def filtration_equipment():
+    filtration_cartridge('Filter_Cartridge_A',8.45);filtration_cartridge('Filter_Cartridge_B',15.55)
+    # The fan stays on the original x-axis rotor owner, at the original centre.
+    for inner,outer,x,depth,finish in [(1.15,1.38,3.64,.22,'Alloy'),(1.10,1.15,3.90,.30,'Graphite'),(1.10,1.36,4.15,.20,'Alloy')]:
+        annulus_x('Filter_Fan_formed_shroud',x,3.05,12,inner,outer,depth,finish,48)
+    for k in range(8):
+        t=(k+.5)*math.tau/8;y=3.05+1.27*math.cos(t);z=12+1.27*math.sin(t)
+        tube('Filter_Fan_flange_fastener',(3.48,y,z),(3.58,y,z),.047,'Graphite',8)
+    for y in [1.97,3.97]:
+        for z in [11.20,12.64]:box('Filter_Fan_rear_mount',[4.20,y,z],[4.90,y+.16,z+.16],'Alloy')
+    tube('Filter_Fan_rear_spindle',(4.12,3.05,12),(4.90,3.05,12),.085,'HallGraphite',20)
+    for y in [2.00,2.35,2.70,3.05,3.40,3.75,4.10]:
+        dz=math.sqrt(max(0,1.23**2-(y-3.05)**2))
+        box('Filter_Fan_guard_bar',[3.51,y-.014,12-dz],[3.55,y+.014,12+dz],'Graphite')
+    box('Filter_Fan_guard_spine',[3.51,1.82,11.986],[3.55,4.28,12.014],'Graphite')
+    owner='cultivation-filtration-slow-fan'
+    for k in range(5):
+        angle=k*math.tau/5;shape=[(.22,-.06),(.87,-.22),(1.04,-.04),(.97,.13),(.46,.24),(.22,.12)]
+        vv=[(x,a*math.cos(angle)-b*math.sin(angle),a*math.sin(angle)+b*math.cos(angle)) for x in [-.045,.045] for a,b in shape]
+        n=len(shape);ff=[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+        mesh(f'Filter_Rotor_formed_blade_{k}',vv,ff,'HallAlloy',owner)
+    tube('Filter_Rotor_hub',(-.14,0,0),(.14,0,0),.23,'HallGraphite',32,owner)
+    for k in range(5):
+        t=k*math.tau/5;tube('Filter_Rotor_hub_bolt',(-.18,.13*math.cos(t),.13*math.sin(t)),(-.12,.13*math.cos(t),.13*math.sin(t)),.027,'HallAlloy',8,owner)
+    hall_service_bay() # The approved dial, regulator and handwheel assembly.
+    for index,y in enumerate([1.45,2.85]):
+        box(f'Filter_Spare_cassette_{index}',[-4.34,y,21.25],[-3.81,y+1.12,22.95],'Ceramic')
+        for zz in [21.32,22.84]:box('Filter_Spare_retainer',[-3.81,y+.06,zz],[-3.67,y+1.06,zz+.045],'Graphite')
+        for k in range(7):box('Filter_Spare_face_pleat',[-3.80,y+.16,21.44+k*.18],[-3.74,y+.96,21.48+k*.18],'Alloy')
+    nursery_sweep('Filter_Feed_upper',[(4.76,4.60,7.0),(4.76,5.08,7.0),(4.76,5.08,16.65),(4.76,4.78,16.65)],.075,'HallAlloy',10)
+    nursery_sweep('Filter_Failed_feed',[(4.76,4.67,16.65),(4.76,3.82,16.65)],.055,'HallOxide',8)
+    nursery_sweep('Filter_Abandoned_riser',[(4.76,4.98,13.75),(3.87,4.98,13.75),(3.87,1.41,13.75)],.045,'HallOxide',10)
+    hall_process_ivy((3.75,1.42,13.75),3.1,.30,54)
+    label('Filter_Intake_ident','BIOFILTRATION / 03',[3.325,5.58,8.45],.24,(90,0,270),'HallInk')
+    label('Filter_Service_ident','FILTER SERVICE',[-3.325,5.58,20.15],.23,(90,0,90),'HallInk')
+    label('Filter_Exit_ident','03 / RESTRICTED',[0,5.59,27.30],.28,(90,0,180),'HallInk')
+
+def filtration_practicals():
+    # Fitted diffusers face the two existing point pools. No source is added.
+    for k,(side,x,y,z) in enumerate([(1,2.5,4.9,11.5),(-1,2.8,4.55,17.95)]):
+        def slab(name,near,far,lo,hi,a,b,finish):
+            X,Y=sorted([side*near,side*far]);box(f'Filter_Practical_{k}_{name}',[X,lo,a],[Y,hi,b],finish)
+        slab('body',x+.15,x+.37,y-.30,y+.30,z-.42,z+.42,'Alloy')
+        slab('diffuser',x+.11,x+.15,y-.23,y+.23,z-.32,z+.32,'Lamp')
+        for zz in [z-.34,z,z+.34]:slab('cage',x+.07,x+.12,y-.25,y+.25,zz-.014,zz+.014,'Graphite')
+        slab('bracket',x+.37,3.5,y+.20,y+.28,z-.08,z+.08,'Alloy')
+    for k,z in enumerate([5,13,21]):
+        for x in [-1.96,1.96]:
+            box('Filter_Ceiling_light_housing',[x-.18,6.24,z-1.12],[x+.18,6.35,z+1.12],'Alloy')
+            box('Filter_Ceiling_light_lens',[x-.12,6.21,z-1.02],[x+.12,6.24,z+1.02],'Lamp')
+    for x in [-.86,.86]:box('Filter_Cable_tray_rail',[x-.035,5.92,1.5],[x+.035,6.11,26.5],'Alloy')
+    for k in range(19):box('Filter_Cable_tray_rung',[-.82,5.92,2+k*1.28],[.82,5.95,2.055+k*1.28],'Graphite')
+    for x in [-.49,-.17,.17,.49]:tube('Filter_Cable_run',(x,6.015,1.6),(x,6.015,26.4),.031,'Graphite',8)
+    for z in [3.5,14,24.5]:
+        for x in [-.86,.86]:box('Filter_Tray_hanger',[x-.035,6.11,z-.06],[x+.035,6.50,z+.06],'Alloy')
+
+def build_filtration_passage():
+    filtration_architecture();filtration_equipment();filtration_practicals()
+
+def duct_flange(z,index):
+    inner=[(-1.02,-.015),(1.02,-.015),(1.08,.10),(1.08,2.10),(1,2.18),(-1,2.18),(-1.08,2.10),(-1.08,.10)]
+    outer=[(-1.18,-.20),(1.18,-.20),(1.34,.04),(1.34,2.20),(1.10,2.40),(-1.10,2.40),(-1.34,2.20),(-1.34,.04)]
+    loops=[[(x,y,zz) for x,y in ring] for ring,zz in [(inner,z),(outer,z),(outer,z+.12),(inner,z+.12)]]
+    vv=sum(loops,[]);ff=[]
+    for k in range(4):
+        for i in range(8):j=(i+1)%8;ff.append((k*8+i,k*8+j,((k+1)%4)*8+j,((k+1)%4)*8+i))
+    mesh(f'Duct_Formed_flange_{index}',vv,ff,'HallAlloy')
+    for x,y in [(-1.17,.35),(1.17,.35),(-1.17,1.83),(1.17,1.83),(-.65,2.29),(.65,2.29)]:
+        tube(f'Duct_Flange_fastener_{index}',(x,y,z-.045),(x,y,z+.025),.028,'HallOxide',8)
+
+def build_service_duct():
+    # Every formed corner expands outside the original 2 x 2.1 m clear box.
+    inner=[(-1,0),(1,0),(1.20,.18),(1.20,2.12),(1.03,2.28),(-1.03,2.28),(-1.20,2.12),(-1.20,.18)]
+    outer=[(-1.18,-.24),(1.18,-.24),(1.38,.12),(1.38,2.20),(1.12,2.46),(-1.12,2.46),(-1.38,2.20),(-1.38,.12)]
+    for i in [1,3,5,7]:
+        j=(i+1)%8
+        vv=[(x,y,z) for z in [.2,27.8] for x,y in [inner[i],inner[j],outer[j],outer[i]]]
+        # Adjacent room reveals own the end caps of this continuous liner.
+        mesh(f'Duct_Folded_corner_{i}',vv,[(0,1,5,4),(3,7,6,2),(0,4,7,3),(1,2,6,5)],'HallAlloy')
+    box('Duct_Floor_back',[-1.18,-.24,.2],[1.18,-.04,27.8],'Graphite')
+    cuts=sorted(set([.2,1.5,3.5,7,10.5,14,17.5,21,24.5,27.8]))
+    for k,(a,b) in enumerate(zip(cuts,cuts[1:])):
+        box(f'Duct_Floor_panel_{k}',[-1,-.04,a],[1,0,b],'Alloy')
+    for k,(a,b) in enumerate(intervals(.2,27.8,3.5)):
+        box(f'Duct_Roof_back_{k}',[-1.12,2.40,a],[1.12,2.46,b],'Graphite')
+        box(f'Duct_Roof_panel_{k}',[-1.03,2.28,a+.018],[1.03,2.38,b-.018],'Alloy')
+    for side,centre in [(1,9.5),(-1,22)]:
+        def slab(name,near,far,low,high,a,b,finish):
+            x,X=sorted([side*near,side*far]);box(f'Duct_{side}_{name}',[x,low,a],[X,high,b],finish)
+        a,b,c,d=centre-.9,centre+.9,.65,1.65
+        zs=sorted(set([.2,3.5,7,10.5,14,17.5,21,24.5,27.8,a,b]));ys=[.18,c,d,2.12]
+        for k,(left,right) in enumerate(zip(zs,zs[1:])):
+            for j,(low,high) in enumerate(zip(ys,ys[1:])):
+                if a<=left and right<=b and c<=low and high<=d:continue
+                slab(f'Wall_back_{k}_{j}',1.30,1.38,low,high,left,right,'Graphite')
+                slab(f'Wall_panel_{k}_{j}',1.20,1.28,low,high,left+.018,right-.018,'Alloy')
+        slab('Grille_back',1.46,1.56,c,d,a,b,'Graphite')
+        for z in [a,b-.06]:slab('Grille_cheek',1.04,1.46,c,d,z,z+.06,'Alloy')
+        for y in [c,d-.06]:slab('Grille_sill',1.04,1.46,y,y+.06,a+.06,b-.06,'Alloy')
+        for k in range(6):slab(f'Grille_louvre_{k}',1.09,1.13,c+.12+k*.14,c+.145+k*.14,a+.08,b-.08,'Alloy')
+        for zz in [a+.09,b-.09]:
+            for y in [c+.08,d-.08]:tube('Duct_Grille_fastener',(side*1.015,y,zz),(side*1.075,y,zz),.023,'HallGraphite',8)
+    for k,z in enumerate([.30,7.5,15.5,23.5,27.62]):duct_flange(z,k)
+    for k,z in enumerate([7,14,21]):
+        box('Duct_Fixture_body',[-.48,2.04,z-.17],[.48,2.08,z+.17],'Alloy')
+        box('Duct_Fixture_diffuser',[-.40,2.02,z-.13],[.40,2.04,z+.13],'Lamp')
+        for x in [-.48,.43]:box('Duct_Fixture_endcap',[x,2.02,z-.17],[x+.05,2.04,z+.17],'Graphite')
+    for side,a,b in [(1,5.0,10.0),(-1,20.7,24.5)]:
+        points=[(side*(1.115+.025*math.sin(k*.9)),2.18+.025*math.sin(k*.7),a+(b-a)*k/20) for k in range(21)]
+        nursery_profile(f'Duct_Root_runner_{side}',points,[.018-.010*k/20 for k in range(21)],['HallLoam']*20,6)
+        for k in [4,9,14]:
+            p=Vector(points[k]);nursery_sweep(f'Duct_Root_branch_{side}_{k}',[tuple(p),tuple(p+Vector((side*.035,.015,.22))),tuple(p+Vector((side*.045,.02,.48)))],.009,'HallLoam',5)
+    label('Duct_Exit_marker','03 / AIR RETURN',[1.175,1.55,25.8],.12,(90,0,270),'HallInk')
+    label('Duct_Section_marker','F-02',[-1.175,1.48,12.8],.10,(90,0,90),'HallInk')
+
+
 def build_enclosure():
     # Opaque backs of the unchanged fixtures and retained acid slabs own their
     # contact faces. Only immutable surfaces in this same room are trimmed.
@@ -1469,7 +1645,8 @@ def build_enclosure():
         OCCLUDERS[:]=[o for o in OCCLUDERS if o['hi'][1]<=0]+LAYOUT[CURRENT].get('retainedSurfaceOccluders',[])
         build_testing_hall();return
     if CURRENT=='passage-2-3':
-        nursery_door_leaf('cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel')
+        OCCLUDERS[:]=[]
+        build_filtration_passage();return
     if CURRENT=='room-4':
         build_lift();return
     if CURRENT=='room-5':
@@ -1477,20 +1654,8 @@ def build_enclosure():
     if CURRENT=='escape-duct':
         build_escape();return
     if CURRENT=='bob-duct':
-        # Pressed octagonal liner expands into the existing wall/roof thickness;
-        # it never reduces the authored rectangular traversal clearance.
-        inner=[(-1,0),(1,0),(1.12,.18),(1.12,1.92),(.8,2.28),(-.8,2.28),(-1.12,1.92),(-1.12,.18)]
-        outer=[(-1.18,-.24),(1.18,-.24),(1.30,.10),(1.30,2),(.88,2.46),(-.88,2.46),(-1.30,2),(-1.30,.10)]
-        for k,(a,b) in enumerate(intervals(.2,27.8,4)):
-            for i in range(8):
-                j=(i+1)%8
-                vv=[(x,y,z) for z in [a,b] for x,y in [inner[i],inner[j],outer[j],outer[i]]]
-                mesh(f'Pressed_duct_{k}_{i}',vv,[(0,3,2,1),(4,5,6,7),(0,1,5,4),(3,7,6,2),(0,4,7,3),(1,2,6,5)],
-                    'Graphite' if i in [1,3,5,7] else 'Alloy')
-        for z in [7,14,21]:
-            for x in [-.4,.4]:block(f'Duct_fixture_seat_{z}_{x}',[.1,.2,.18],[x,2.18,z],'Alloy')
-        block('Duct_identification_plate',[.03,.38,1.35],[1.105,1.3,8],'Graphite')
-        print('Pressed service duct:',CURRENT);return
+        OCCLUDERS[:]=[]
+        build_service_duct();return
     for spec in LAYOUT[CURRENT]['boxes']:
         lo,hi=spec['lo'],spec['hi'];dy=hi[1]-lo[1]
         if dy<.85 and ('floor' in spec['name']):deck(spec)
@@ -1758,13 +1923,8 @@ def build_identity():
         return # The purpose-built passage owns its frames and identification.
     elif CURRENT=='room-2':
         return # The testing hall owns its equipment labels and metric scales.
-    elif CURRENT=='passage-2-3':
-        label('Extraction_sign','FILTER RETURN  /  03',[0,5.5,27.18],.28)
-        label('Service_header','AIR HANDLING / CARTRIDGE ACCESS',[4.85,5.06,12.4],.24,(90,0,270))
-        for side in [-1,1]:
-            for z in [3,6,18,26]:block(f'Filter_rib_{side}_{z}',[.18,5.8,.2],[side*3.44,3.2,z],'Alloy')
-    elif CURRENT=='bob-duct':
-        label('Duct_route','SERVICE 03',[1.065,1.22,8],.16,(90,0,270),'Amber')
+    elif CURRENT in ('passage-2-3','bob-duct'):
+        return # The filtration and duct builders own fitted identification.
     elif CURRENT=='room-3':
         label('Filter_sign','03  /  SECURITY FILTRATION',[0,9,71.72],.67)
         for side in [-1,1]:
@@ -1839,7 +1999,7 @@ def finalise_boxes():
                 bm=bmesh.new();bm.from_mesh(obj.data)
                 # Metric dirt samples can create T junctions where density
                 # changes. Never bevel a partial shell or a coplanar grid edge.
-                sampled=CURRENT=='room-1' or (CURRENT=='passage-1-2' and s['name'].startswith('Hall_')) or CURRENT=='room-2'
+                sampled=CURRENT in ('room-1','room-2','passage-2-3','bob-duct') or (CURRENT=='passage-1-2' and s['name'].startswith('Hall_'))
                 if not sampled or all(e.is_manifold for e in bm.edges):
                     edges=[e for e in bm.edges if e.is_manifold and (not sampled or e.calc_face_angle()>.01)]
                     bmesh.ops.bevel(bm,geom=edges,offset=.008,segments=1,affect='EDGES')
@@ -1992,7 +2152,7 @@ def build(room,refs=False):
                             a,b=(p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y)
                             uv=(a/8+.13,b/8+.31) if obj['finish'] in ('Deck','Paint') else (a/2,b/2)
                             layer.data[index].uv=tuple(round(v,6) for v in uv)
-    if room in ('passage-1-2','room-2'):
+    if room in ('passage-1-2','room-2','passage-2-3','bob-duct'):
         for obj in bpy.context.scene.objects:
             if obj.type!='MESH' or not obj.get('finish','').startswith(('Hall','Test')) or obj['finish'].endswith('Glass'):continue
             for layer in obj.data.uv_layers:

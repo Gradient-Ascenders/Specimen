@@ -26,10 +26,16 @@ export class CultivationFiltrationPassageArt {
   private disposed = false;
 
   constructor(passage: LevelTwoLabPassageGreybox, duct: LevelTwoAirDuctGreybox,
-    lab: CultivationLabMaterials, contamination: CultivationContaminationArt) {
+    lab: CultivationLabMaterials, contamination: CultivationContaminationArt, options: {authoredReplacement?: boolean} = {}) {
     this.root.name = 'cultivation-filtration-passage-art';
     this.ductRoot.name = 'cultivation-filtration-duct-art';
     this.root.userData.presentationOnly = this.ductRoot.userData.presentationOnly = true;
+    if (options.authoredReplacement) {
+      this.fan = this.createFan(contamination.finishes.metal);
+      passage.root.add(this.root); duct.root.add(this.ductRoot);
+      this.configureOriginalLights(passage, duct, lab);
+      return;
+    }
     const wall = contamination.finishes.wall, metal = contamination.finishes.metal;
     const dark = this.finish(lab.metal, 'rubber-and-shadowed-services', 0x242c29, .94);
     const iron = this.finish(lab.pole, 'oxidized-brackets', 0x96886a, .94);
@@ -58,6 +64,10 @@ export class CultivationFiltrationPassageArt {
     this.ductDetails(metal, dark, dust);
     this.ductBatches = this.batch(this.ductRoot);
     duct.root.add(this.ductRoot);
+    this.configureOriginalLights(passage, duct, lab);
+  }
+
+  private configureOriginalLights(passage: LevelTwoLabPassageGreybox, duct: LevelTwoAirDuctGreybox, lab: CultivationLabMaterials): void {
     // Use the existing three emitters and point pools inside the upper duct.
     for (let i = 1; i <= 3; i++) {
       const fixture = duct.root.getObjectByName(`${duct.root.name}-ceiling-light-${i}`) as THREE.Mesh;
@@ -120,6 +130,10 @@ export class CultivationFiltrationPassageArt {
     this.box(dark, [.08, .46, 3.4], [3.34, 5.28, 12]);
     this.add(paint, createCultivationFacilityLettering('FILTER 02', .23, [3.29, 5.16, 11.23], -Math.PI / 2));
 
+    return this.createFan(metal);
+  }
+
+  private createFan(metal: Material): THREE.Mesh {
     const blades: THREE.BufferGeometry[] = [];
     for (let i = 0; i < 5; i++) {
       const shape = new THREE.Shape([new THREE.Vector2(.16, -.035), new THREE.Vector2(.98, -.16),

@@ -112,7 +112,7 @@ export class CultivationBlenderArt {
           const mesh=new THREE.Mesh(geometry,finish(batch.finish,asset.id==='escape-duct',asset.id==='room-1'));mesh.name=batch.name;
           mesh.userData.presentationOnly=true;mesh.userData.blenderBatch=true;
           if(parent.userData.soluble===true)this.solubleSkins.push({mesh,source:mesh.material as THREE.MeshStandardMaterial,owner:parent.name});
-          if(asset.id==='escape-duct')mesh.userData.shadowProxyReceiver=true;
+          if(asset.id==='escape-duct'||batch.target==='cultivation-filtration-slow-fan')mesh.userData.shadowProxyReceiver=true;
           parent.add(mesh);mesh.updateMatrix();mesh.matrixAutoUpdate=false;this.meshes.push(mesh);
           this.geometries.add(geometry);
           this.diagnostics.triangles+=(geometry.index?.count??geometry.getAttribute('position').count)/3;

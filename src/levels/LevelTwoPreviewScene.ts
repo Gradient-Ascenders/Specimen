@@ -230,9 +230,9 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       fillPositionsZ: [12, 34],
       shadowTargets: [[-17, 17, 27], [0, 0, 34]],
     });
-    this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28, { wallSides: [] });
+    this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28, { wallSides: [], authoredReplacement: true });
     this.filtrationArt = new CultivationFiltrationPassageArt(this.roomTwoToThreeGoopPassage,
-      this.roomTwoToThreeBobAirDuct, this.labArt, this.contaminationArt);
+      this.roomTwoToThreeBobAirDuct, this.labArt, this.contaminationArt, {authoredReplacement:true});
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning, {authoredReplacement:true});
     this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);

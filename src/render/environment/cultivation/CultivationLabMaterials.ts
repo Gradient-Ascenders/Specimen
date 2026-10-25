@@ -141,6 +141,14 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
       if (material) {
         builder.borrowedMaterials.add(material);
         this.bind(object, material);
+        if(object.name==='cultivation-room-2-final-vent-sticky-approach'){
+          // Growth ends on the climbable wall. Its horizontal threshold cap
+          // belongs to the metal vent, using the same submitted triangles.
+          const normals=object.geometry.getAttribute('normal'),indices=object.geometry.index;
+          for(const group of object.geometry.groups)
+            group.materialIndex=normals.getY(indices?.getX(group.start)??group.start)>.5?1:0;
+          object.material=[material,this.duct];builder.borrowedMaterials.add(this.duct);
+        }
       }
     });
     if (builder.root.name === 'cultivation-room-2-greybox') {

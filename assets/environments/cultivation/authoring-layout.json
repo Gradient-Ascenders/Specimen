@@ -2132,7 +2132,16 @@
       "cultivation-service-bay-trims",
       "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-1",
       "cultivation-room-2-to-3-goop-lab-passage-ceiling-frame-2",
-      "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel"
+      "cultivation-room-2-to-3-goop-lab-passage-entry-shutter-panel",
+      "cultivation-room-2-to-3-goop-lab-passage-entry-frame-top",
+      "cultivation-room-2-to-3-goop-lab-passage-entry-frame-left",
+      "cultivation-room-2-to-3-goop-lab-passage-entry-frame-right",
+      "cultivation-room-2-to-3-goop-lab-passage-exit-shutter-panel",
+      "cultivation-room-2-to-3-goop-lab-passage-exit-frame-top",
+      "cultivation-room-2-to-3-goop-lab-passage-exit-frame-left",
+      "cultivation-room-2-to-3-goop-lab-passage-exit-frame-right",
+      "cultivation-filtration-slow-fan",
+      "cultivation-neutral-ceiling-strips"
     ],
     "occluders": [
       {
@@ -2315,6 +2324,46 @@
           0.5,
           1
         ]
+      },
+      "cultivation-room-2-to-3-goop-lab-passage-exit-shutter-panel": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          2.3,
+          27.5,
+          1
+        ]
+      },
+      "cultivation-filtration-slow-fan": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4.02,
+          3.05,
+          12,
+          1
+        ]
       }
     }
   },
@@ -2401,7 +2450,10 @@
       "cultivation-room-2-to-3-bob-air-duct-rib-2-ceiling",
       "cultivation-room-2-to-3-bob-air-duct-rib-3-west",
       "cultivation-room-2-to-3-bob-air-duct-rib-3-east",
-      "cultivation-room-2-to-3-bob-air-duct-rib-3-ceiling"
+      "cultivation-room-2-to-3-bob-air-duct-rib-3-ceiling",
+      "cultivation-room-2-to-3-bob-air-duct-ceiling-light-1",
+      "cultivation-room-2-to-3-bob-air-duct-ceiling-light-2",
+      "cultivation-room-2-to-3-bob-air-duct-ceiling-light-3"
     ],
     "occluders": [
       {

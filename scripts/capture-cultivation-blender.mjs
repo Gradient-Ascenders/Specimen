@@ -92,8 +92,24 @@ try{
     ['room-2-camera-close',2,'roomTwo',[-16,14,32],[-15.6,16,32.6],[-18.3,15.5,33.6]],
     ['passage-2-3-forward',2,'roomTwoToThreeGoopPassage',[0,.86,5],[1,2.5,3],[-1,3,25]],
     ['passage-2-3-reverse',3,'roomTwoToThreeGoopPassage',[0,.86,23],[-1,2.5,25],[1,2.5,2]],
+    ['passage-2-3-fan-detail',2,'roomTwoToThreeGoopPassage',[0,.86,3],[.8,3,9],[3.7,3.05,12]],
+    ['passage-2-3-service-detail',2,'roomTwoToThreeGoopPassage',[0,.86,3],[.8,2.8,18.5],[-4,3,20]],
+    ['passage-2-3-ivy-detail',2,'roomTwoToThreeGoopPassage',[0,.86,3],[.8,2.9,12.8],[3.7,3.1,13.75]],
+    ['passage-2-3-floor-edge',2,'roomTwoToThreeGoopPassage',[0,.86,3],[-3,.45,6],[-3.4,.16,8]],
+    ['passage-2-3-ceiling-return',2,'roomTwoToThreeGoopPassage',[0,.86,3],[3.1,5.9,18],[3.65,6.43,21]],
+    ['passage-2-3-room-two-join',2,'roomTwoToThreeGoopPassage',[0,.86,4],[.5,1.7,2],[0,2,-4],'open-doors'],
+    ['passage-2-3-room-three-join',2,'roomTwoToThreeGoopPassage',[0,.86,24],[.5,1.7,26],[0,2,32],'open-doors'],
+    ['passage-2-3-entry-partial',2,'roomTwoToThreeGoopPassage',[0,.86,4],[.5,2.4,3],[0,2.8,.5],'connector-entry-partial'],
+    ['passage-2-3-exit-partial',2,'roomTwoToThreeGoopPassage',[0,.86,24],[.5,2.4,25],[0,2.8,27.5],'connector-exit-partial'],
     ['bob-duct-forward',2,'roomTwoToThreeBobAirDuct',[0,.66,4],[0,1,3],[0,1,26]],
     ['bob-duct-reverse',3,'roomTwoToThreeBobAirDuct',[0,.66,24],[0,1,25],[0,1,1]],
+    ['bob-duct-clear-forward',2,'roomTwoToThreeBobAirDuct',[0,.66,1],[0,1,3],[0,1,26]],
+    ['bob-duct-grille-detail',2,'roomTwoToThreeBobAirDuct',[0,.66,3],[-.2,1.1,7.8],[1.4,1.1,9.5]],
+    ['bob-duct-upper-corner',2,'roomTwoToThreeBobAirDuct',[0,.66,3],[.75,1.7,10],[1.15,2.2,12]],
+    ['bob-duct-room-two-join',2,'roomTwoToThreeBobAirDuct',[0,.66,5],[0,1.1,3],[0,1.1,-5]],
+    ['bob-duct-room-three-join',3,'roomTwoToThreeBobAirDuct',[0,.66,3],[0,1.1,26],[0,1.1,33]],
+    ['bob-duct-entry-biofilm',2,'roomTwoToThreeBobAirDuct',[0,.66,4],[0,1.2,2.3],[0,0,.75]],
+    ['bob-duct-entry-corner',2,'roomTwoToThreeBobAirDuct',[0,.66,5],[0,1.1,1],[.98,2.08,.2]],
     ['room-3-entry',3,'roomThree',[0,.66,3],[1,5,3],[0,13,46]],
     ['room-3-cover',3,'roomThree',[0,.66,3],[0,7,14],[5,3,31]],
     ['room-3-upper',3,'roomThree',[0,.66,3],[-12,24,18],[4,23,55]],
@@ -153,6 +169,11 @@ try{
         const door=state==='exit-door-partial'?p.roomOneToTwoPassage.exitDoor:p.roomOneToTwoPassage.entryDoor;door.setLocked(false);
         const centre=door.root.getWorldPosition(r.pair.bobBody.position.clone());centre.y+=1;
         door.update(.24,[{id:'bob',position:centre,radiusMetres:.45}]);
+      }
+      if(state==='connector-entry-partial'||state==='connector-exit-partial'){
+        const door=state==='connector-entry-partial'?p.roomTwoToThreeGoopPassage.entryDoor:p.roomTwoToThreeGoopPassage.exitDoor;
+        door.setLocked(false);const centre=door.root.getWorldPosition(r.pair.bobBody.position.clone());centre.y+=1;
+        door.update(.24,[{id:'goop',position:centre,radiusMetres:.45}]);
       }
       if(state==='support-burning'){
         const target=r.previewDissolveTargets.find(target=>target.mesh.name===(room===2?

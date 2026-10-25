@@ -52,7 +52,15 @@ test('cultured adhesive stays in the first two rooms and leaves later-room mater
     const route=scene.roomTwo.root.getObjectByName('cultivation-room-2-continuous-sticky-route') as THREE.Mesh;
     assert.equal(route.material,scene.labArt.nurserySticky);
     const approach=scene.roomTwo.root.getObjectByName('cultivation-room-2-final-vent-sticky-approach') as THREE.Mesh;
-    assert.ok(approach.children.some(o=>o instanceof THREE.Mesh&&o.material===scene.labArt.nurserySticky)||approach.material===scene.labArt.nurserySticky);
+    const skin=approach.getObjectByName(`${approach.name}-surface-skin`) as THREE.Mesh|undefined;
+    const materials=skin?.material??approach.material;
+    assert.ok(Array.isArray(materials),'the submitted approach uses separate wall and cap finishes');
+    assert.ok(materials[0]===scene.labArt.nurserySticky,'the vertical approach keeps its shared biofilm');
+    assert.ok(materials[1]===scene.labArt.duct,'the threshold cap borrows the vent finish');
+    const normal=approach.geometry.getAttribute('normal'),indices=approach.geometry.index;
+    for(const group of approach.geometry.groups)
+      assert.equal(group.materialIndex,normal.getY(indices?.getX(group.start)??group.start)>.5?1:0,
+        'only the horizontal threshold cap loses the biofilm');
     assert.equal(scene.labArt.nurserySticky.emissiveIntensity,scene.labArt.sticky.emissiveIntensity);
     assert.equal(scene.labArt.nurserySticky.emissive.getHex(),scene.labArt.sticky.emissive.getHex());
     for(const root of [scene.roomThree.root,scene.roomFour.root,scene.roomFive.root,scene.roomTwoToThreeBobAirDuct.root])root.traverse(o=>{
