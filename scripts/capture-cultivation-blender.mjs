@@ -40,6 +40,9 @@ try{
     ['room-1-low-corner',1,'roomOne',[-11,.66,5.5],[-17.2,.7,7],[-17.6,.3,8.8]],
     ['room-1-landed',1,'roomOne',[-11,.66,5.5],[-9,3,8],[0,1,33],'released'],
     ['room-1-platform-close',1,'roomOne',[-3,1.06,15.5],[-3,4.3,12.1],[-3,.6,15.5],'released'],
+    ['room-1-platform-suspended',1,'roomOne',[-11,.66,5.5],[-7,16.5,11],[-3,13.2,15.5]],
+    ['room-1-support-close',1,'roomOne',[-11,.66,5.5],[-5,18.4,12.7],[-3,19.35,15.5]],
+    ['room-1-support-burning',1,'roomOne',[-11,.66,5.5],[-5,18.4,12.7],[-3,17.5,15.5],'support-burning'],
     ['room-1-camera-close',1,'roomOne',[0,.86,46],[2.2,4.5,46.8],[3.25,4.1,49.1]],
     ['room-1-sign-close',1,'roomOne',[0,.86,46],[-2,7.5,42],[0,7.7,49.72]],
     ['room-1-wet-bay',1,'roomOne',[-11,.66,5.5],[-9,7.5,10],[-17.7,8,19]],
@@ -130,6 +133,10 @@ try{
         const door=p.roomOneToTwoPassage.entryDoor;door.setLocked(false);
         const centre=door.root.getWorldPosition(r.pair.bobBody.position.clone());centre.y+=1;
         door.update(.24,[{id:'bob',position:centre,radiusMetres:.45}]);
+      }
+      if(state==='support-burning'){
+        const target=r.previewDissolveTargets.find(target=>target.mesh.name==='cultivation-room-1-platform-1-soluble-rope');
+        target.advance(target.dissolveDurationSeconds*.45);
       }
       if(state==='released'){
         for(const target of r.previewDissolveTargets)if(target.mesh.userData.roomId===room)target.advance(target.dissolveDurationSeconds);

@@ -177,7 +177,13 @@
       "cultivation-room-1-platform-1-platform",
       "cultivation-room-1-platform-2-platform",
       "cultivation-room-1-platform-3-platform",
-      "cultivation-room-1-room-2-exit-header"
+      "cultivation-room-1-room-2-exit-header",
+      "cultivation-room-1-platform-1-ceiling-mount",
+      "cultivation-room-1-platform-1-soluble-rope",
+      "cultivation-room-1-platform-2-ceiling-mount",
+      "cultivation-room-1-platform-2-soluble-rope",
+      "cultivation-room-1-platform-3-ceiling-mount",
+      "cultivation-room-1-platform-3-soluble-rope"
     ],
     "retirePrefixes": [
       "cultivation-room-1-broken-glass-",
@@ -555,6 +561,66 @@
           0,
           -1,
           12.5,
+          35,
+          1
+        ]
+      },
+      "cultivation-room-1-platform-1-soluble-rope": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -3,
+          16.275,
+          15.5,
+          1
+        ]
+      },
+      "cultivation-room-1-platform-2-soluble-rope": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          17.275,
+          25,
+          1
+        ]
+      },
+      "cultivation-room-1-platform-3-soluble-rope": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -1,
+          16.025,
           35,
           1
         ]

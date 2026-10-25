@@ -5,8 +5,42 @@ import * as THREE from 'three';
 import {LevelTwoPreviewScene} from '../src/levels/LevelTwoPreviewScene.ts';
 import {cultivationAssets} from './helpers/CultivationBakedAssets.ts';
 import {CULTIVATION_BLENDER_ASSETS} from '../src/render/environment/cultivation/CultivationBlenderManifest.ts';
+import {CollisionWorld} from '../src/physics/CollisionWorld.ts';
+import {SurfaceRegistry} from '../src/physics/SurfaceRegistry.ts';
+import {createAuthoredDissolveTarget} from '../src/abilities/DissolveTarget.ts';
 
 const layout=JSON.parse(readFileSync(new URL('../assets/environments/cultivation/authoring-layout.json',import.meta.url),'utf8'));
+
+test('authored support skins share the original dissolve progress, feedback and shadow masks through release/reset',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),world=new CollisionWorld(),surfaces=new SurfaceRegistry();
+  const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces)!);
+  const compile=(material:THREE.Material)=>{
+    const shader={uniforms:{} as Record<string,THREE.IUniform>,vertexShader:'#include <common>\n#include <project_vertex>',
+      fragmentShader:'#include <common>\n#include <clipping_planes_fragment>\n#include <emissivemap_fragment>'};
+    material.onBeforeCompile(shader,null as never);return shader;
+  };
+  try{
+    scene.bindDissolveTargets(targets);
+    for(const target of targets.filter(target=>target.mesh.name.startsWith('cultivation-room-1-platform-'))){
+      const geometry=target.mesh.geometry;
+      const skin=target.mesh.children.find((o):o is THREE.Mesh=>o instanceof THREE.Mesh&&o.userData.blenderBatch)!;
+      assert.ok(skin);assert.equal((target.mesh.material as THREE.Material).visible,false);
+      assert.equal((skin.material as THREE.Material).visible,true);
+      const original=compile(target.mesh.material as THREE.Material),art=compile(skin.material as THREE.Material);
+      assert.equal(art.uniforms.uDissolveAmount,original.uniforms.uDissolveAmount);
+      assert.equal(art.uniforms.uAimHighlightStrength,original.uniforms.uAimHighlightStrength);
+      assert.equal(art.uniforms.uBurnHighlightStrength,original.uniforms.uBurnHighlightStrength);
+      assert.equal(skin.customDepthMaterial,target.mesh.customDepthMaterial);
+      assert.equal(skin.customDistanceMaterial,target.mesh.customDistanceMaterial);
+      target.advance(target.dissolveDurationSeconds*.45);
+      assert.equal(art.uniforms.uDissolveAmount.value,target.progress);
+      target.advance(target.dissolveDurationSeconds);
+      assert.equal(target.mesh.visible,false);assert.equal(art.uniforms.uDissolveAmount.value,1);
+      target.reset();assert.equal(target.mesh.visible,true);assert.equal(art.uniforms.uDissolveAmount.value,0);
+      assert.equal(target.mesh.geometry,geometry);
+    }
+  }finally{for(const target of targets)target.dispose();scene.dispose();}
+});
 
 test('the actual Blender buffers replace old coverage and share one Level 1 finish bank without changing collision data',()=>{
   const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets);

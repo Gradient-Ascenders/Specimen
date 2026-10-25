@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import type {LevelTwoPreviewScene} from '../../../levels/LevelTwoPreviewScene.ts';
 import {CULTIVATION_BLENDER_ASSETS} from './CultivationBlenderManifest.ts';
 import {optimizeFiniteLightEvaluation} from './FiniteLightEvaluation.ts';
+import type {DissolveTarget} from '../../../abilities/DissolveTarget.ts';
 
 /** Pure presentation adapter. Runtime controller roots still own every pose.
  * The existing asset bank supplies exact GLB buffers before GPU preparation. */
 export class CultivationBlenderArt {
   private readonly hidden=new THREE.MeshBasicMaterial({visible:false});
+  private readonly hiddenSoluble=new THREE.MeshStandardMaterial({visible:false});
+  private readonly solubleSkins:{mesh:THREE.Mesh;source:THREE.MeshStandardMaterial;owner:string;target?:DissolveTarget;material?:THREE.MeshStandardMaterial}[]=[];
   private readonly bindings:{mesh:THREE.Mesh;material:THREE.Material|THREE.Material[]}[]=[];
   private readonly meshes:THREE.Mesh[]=[];
   private readonly geometries=new Set<THREE.BufferGeometry>();
@@ -45,6 +48,7 @@ export class CultivationBlenderArt {
         Deck:[scene.labArt.platform,0xc7c8b6],
         Ink:[scene.labArt.wall,0xe5e3d4],
         Paint:[scene.labArt.platform,0xc7c8bd],Seal:[scene.labArt.metal,0x252c28],
+        Composite:[scene.contaminationArt.finishes.wall,0xaeb1a4],
       };
       const spec=palette[name];if(!spec)throw Error(`Unknown Cultivation Blender finish: ${name}`);
       const material=spec[0].clone();material.color.setHex(spec[1]);material.vertexColors=true;
@@ -85,7 +89,8 @@ export class CultivationBlenderArt {
           let subtree=false;for(let p:THREE.Object3D|null=object.parent;p&&p!==owner;p=p.parent)
             if(asset.retireSubtrees?.includes(p.name)){subtree=true;break;}
           if(!names.has(original)&&!asset.retirePrefixes.some(prefix=>object.name.startsWith(prefix))&&!subtree)return;
-          this.bindings.push({mesh:object,material:object.material});object.material=this.hidden;
+          this.bindings.push({mesh:object,material:object.material});
+          object.material=object.userData.soluble===true?this.hiddenSoluble:this.hidden;
         });
         const geometries=scene.assets.geometries('cultivation-blender-'+asset.id,()=>{throw Error('Blender GLB geometry must be registered by the offline generator');});
         for(const batch of asset.batches){
@@ -94,6 +99,7 @@ export class CultivationBlenderArt {
           if(!parent)throw Error(`Missing authored mechanism owner: ${batch.target}`);
           const mesh=new THREE.Mesh(geometry,finish(batch.finish,asset.id==='escape-duct',asset.id==='room-1'));mesh.name=batch.name;
           mesh.userData.presentationOnly=true;mesh.userData.blenderBatch=true;
+          if(parent.userData.soluble===true)this.solubleSkins.push({mesh,source:mesh.material as THREE.MeshStandardMaterial,owner:parent.name});
           if(asset.id==='escape-duct')mesh.userData.shadowProxyReceiver=true;
           parent.add(mesh);mesh.updateMatrix();mesh.matrixAutoUpdate=false;this.meshes.push(mesh);
           this.geometries.add(geometry);
@@ -105,13 +111,27 @@ export class CultivationBlenderArt {
       this.diagnostics.geometries=this.geometries.size;
     }catch(error){this.dispose();throw error;}
   }
+  bindDissolveTargets(targets:readonly DissolveTarget[]):void{
+    for(const skin of this.solubleSkins){
+      const target=targets.find(target=>target.mesh.name===skin.owner);
+      if(!target)throw Error('Missing authored support target: '+skin.owner);
+      if(skin.target===target)continue;
+      skin.material?.dispose();skin.target=target;
+      skin.material=target.createPresentationMaterial(skin.source);
+      optimizeFiniteLightEvaluation(skin.material);skin.mesh.material=skin.material;
+      skin.mesh.customDepthMaterial=target.mesh.customDepthMaterial;
+      skin.mesh.customDistanceMaterial=target.mesh.customDistanceMaterial;
+    }
+  }
   dispose():void{
     if(this.disposed)return;this.disposed=true;
+    for(const skin of this.solubleSkins){skin.material?.dispose();skin.mesh.customDepthMaterial=undefined;skin.mesh.customDistanceMaterial=undefined;}
     for(const mesh of this.meshes)mesh.removeFromParent();
     for(const geometry of this.geometries)geometry.dispose();
     for(const binding of this.bindings)binding.mesh.material=binding.material;
     for(const material of this.materials.values())material.dispose();
     for(const texture of this.textures)texture.dispose();
     this.hidden.dispose();
+    this.hiddenSoluble.dispose();
   }
 }

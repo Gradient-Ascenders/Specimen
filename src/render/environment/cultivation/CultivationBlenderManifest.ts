@@ -32,7 +32,13 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
       "cultivation-room-1-platform-1-platform",
       "cultivation-room-1-platform-2-platform",
       "cultivation-room-1-platform-3-platform",
-      "cultivation-room-1-room-2-exit-header"
+      "cultivation-room-1-room-2-exit-header",
+      "cultivation-room-1-platform-1-ceiling-mount",
+      "cultivation-room-1-platform-1-soluble-rope",
+      "cultivation-room-1-platform-2-ceiling-mount",
+      "cultivation-room-1-platform-2-soluble-rope",
+      "cultivation-room-1-platform-3-ceiling-mount",
+      "cultivation-room-1-platform-3-soluble-rope"
     ],
     "retirePrefixes": [
       "cultivation-room-1-broken-glass-",
@@ -130,6 +136,12 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Amber"
       },
       {
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Cool",
+        "finish": "Cool",
+        "target": "cultivation-room-1-platform-1-platform",
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Cool"
+      },
+      {
         "name": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Deck",
         "finish": "Deck",
         "target": "cultivation-room-1-platform-1-platform",
@@ -142,10 +154,10 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Graphite"
       },
       {
-        "name": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Oxide",
-        "finish": "Oxide",
-        "target": "cultivation-room-1-platform-1-platform",
-        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Oxide"
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-1-soluble-rope_Composite",
+        "finish": "Composite",
+        "target": "cultivation-room-1-platform-1-soluble-rope",
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-soluble-rope_Composite"
       },
       {
         "name": "C2_room-1_Batch_cultivation-room-1-platform-2-platform_Alloy",
@@ -160,6 +172,12 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Amber"
       },
       {
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-2-platform_Cool",
+        "finish": "Cool",
+        "target": "cultivation-room-1-platform-2-platform",
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Cool"
+      },
+      {
         "name": "C2_room-1_Batch_cultivation-room-1-platform-2-platform_Deck",
         "finish": "Deck",
         "target": "cultivation-room-1-platform-2-platform",
@@ -172,10 +190,10 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Graphite"
       },
       {
-        "name": "C2_room-1_Batch_cultivation-room-1-platform-2-platform_Oxide",
-        "finish": "Oxide",
-        "target": "cultivation-room-1-platform-2-platform",
-        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Oxide"
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-2-soluble-rope_Composite",
+        "finish": "Composite",
+        "target": "cultivation-room-1-platform-2-soluble-rope",
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-2-soluble-rope_Composite"
       },
       {
         "name": "C2_room-1_Batch_cultivation-room-1-platform-3-platform_Alloy",
@@ -190,6 +208,12 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Amber"
       },
       {
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-3-platform_Cool",
+        "finish": "Cool",
+        "target": "cultivation-room-1-platform-3-platform",
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Cool"
+      },
+      {
         "name": "C2_room-1_Batch_cultivation-room-1-platform-3-platform_Deck",
         "finish": "Deck",
         "target": "cultivation-room-1-platform-3-platform",
@@ -202,10 +226,10 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Graphite"
       },
       {
-        "name": "C2_room-1_Batch_cultivation-room-1-platform-3-platform_Oxide",
-        "finish": "Oxide",
-        "target": "cultivation-room-1-platform-3-platform",
-        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-1-platform_Oxide"
+        "name": "C2_room-1_Batch_cultivation-room-1-platform-3-soluble-rope_Composite",
+        "finish": "Composite",
+        "target": "cultivation-room-1-platform-3-soluble-rope",
+        "geometry": "C2_room-1_Batch_cultivation-room-1-platform-3-soluble-rope_Composite"
       }
     ]
   },

@@ -29,6 +29,7 @@ PALETTE={
     'Ink':((.82,.81,.73),.90,0),
     'Paint':((.74,.74,.69),.96,0),
     'Seal':((.045,.052,.047),.98,0),
+    'Composite':((.52,.55,.49),.96,.04),
 }
 CURRENT=None
 BOXES=[]
@@ -171,6 +172,10 @@ def mesh(name,vertices,faces,finish,owner=''):
                 fade=.46+.29*cloud+.14*math.sin(x*4.2+z*7)**2
                 colour=(fade,fade,fade*.98,1)
             if finish=='Seal':colour=(.70+.15*cloud,)*3+(1,)
+            if finish=='Composite':
+                groove=min(abs(abs(x)-.205),abs(abs(z)-.205))<.002
+                dirt=.28 if groove else .86-.24*soil
+                colour=(dirt,dirt*.98,dirt*.92,1)
         colours.data[v.index].color=colour
     for poly in data.polygons:
         axis=max(range(3),key=lambda i:abs(poly.normal[i]))
@@ -574,6 +579,76 @@ def nursery_ivy(side,origin,height,spread,seed,root_height=3.8,recess=False):
         runner=[tuple(p+Vector((-side*.035*math.sin(t*math.pi),.6*math.sin(t*2.2),hand*t*.95))) for t in [0,.2,.4,.6,.8,1]]
         nursery_profile(f'Ivy_{side}_{seed}_dry_tendril_{index}',runner,[.024,.023,.021,.018,.016,.014],['Loam']*5,6)
 
+def nursery_ring_profile(name,loops,finishes,owner='',cycle=True):
+    """One fitted band per finish; adjacent rings share only their boundary."""
+    assert len(finishes)==len(loops)-(0 if cycle else 1)
+    def bridge(a,b):
+        if len(a)==len(b):return [(i,(i+1)%len(a),(i+1)%len(b)+len(a),i+len(a)) for i in range(len(a))]
+        if len(a)==8:
+            faces=[]
+            for i in range(4):faces.extend([(2*i,2*i+1,8+(i+1)%4,8+i),(2*i+1,(2*i+2)%8,8+(i+1)%4)])
+            return faces
+        lookup=list(range(4,12))+list(range(4))
+        return [tuple(lookup[i] for i in reversed(face)) for face in bridge(b,a)]
+    objects=[]
+    for i,finish in enumerate(finishes):
+        a=loops[i];b=loops[(i+1)%len(loops)]
+        objects.append(mesh(f'{name}_{i}',a+b,bridge(a,b),finish,owner))
+    return objects
+
+def nursery_square_ring(x,z,radius,cut,height):
+    if not cut:return [(x+a,height,z+b) for a,b in [(-radius,-radius),(radius,-radius),(radius,radius),(-radius,radius)]]
+    return [(x+a,height,z+b) for a,b in [(-radius+cut,-radius),(radius-cut,-radius),
+        (radius,-radius+cut),(radius,radius-cut),(radius-cut,radius),
+        (-radius+cut,radius),(-radius,radius-cut),(-radius,-radius+cut)]]
+
+def nursery_suspension(index,x,z,length,owner):
+    # Fluted sacrificial composite strut, wholly inside its unchanged hitbox.
+    section=[]
+    for side in range(4):
+        angle=side*math.pi/2
+        for a,b in [(-.18,-.24),(-.065,-.24),(-.045,-.205),(.045,-.205),(.065,-.24),(.18,-.24)]:
+            section.append((a*math.cos(angle)-b*math.sin(angle),a*math.sin(angle)+b*math.cos(angle)))
+    n=len(section);vertices=[(a,y,b) for y in [-length/2,length/2] for a,b in section]
+    faces=[tuple(range(n)),tuple(reversed(range(n,2*n)))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+    mesh(f'Suspension_{index}_fluted_strut',vertices,faces,'Composite',owner)
+    # Static bolted saddle and receiver use the original ceiling-mount envelope.
+    rings=[nursery_square_ring(x,z,r,c,y) for r,c,y in [(.90,.20,19.825),(.90,.20,19.43),
+        (.73,.13,19.275),(.40,.10,19.275),(.38,.09,19.22),(.265,0,19.22),(.265,0,19.825)]]
+    nursery_ring_profile(f'Suspension_{index}_ceiling_saddle',rings,
+        ['Cool','Alloy','Ceramic','Alloy','Graphite','Graphite','Alloy'])
+    for k,(a,b) in enumerate([(-.54,-.54),(.54,-.54),(.54,.54),(-.54,.54)]):
+        tube(f'Suspension_{index}_saddle_bolt_{k}',(x+a,19.235,z+b),(x+a,19.30,z+b),.065,'Graphite',12)
+
+def nursery_transfer_platform(index,owner):
+    # Original five-metre footprint and .30m top; the complete Level 1 harness
+    # below is unchanged. A formed chassis replaces the plain black box.
+    loops=[nursery_square_ring(0,0,r,c,y) for r,c,y in [(2.5,.12,.30),(2.5,.12,.24),
+        (2.47,.13,.16),(2.47,.13,-.14),(2.5,.13,-.22),(2.44,.13,-.30)]]
+    nursery_ring_profile(f'Transfer_{index}_formed_chassis',loops,
+        ['Alloy','Alloy','Cool','Graphite','Alloy'],owner,False)
+    bottom=loops[-1];mesh(f'Transfer_{index}_chassis_bottom',bottom,[tuple(range(8))],'Graphite',owner)
+    inner=nursery_square_ring(0,0,2.25,0,.30)
+    # Reverse this ring: its visible face is the upward rim, not an underside.
+    for obj in nursery_ring_profile(f'Transfer_{index}_rolled_rim',[loops[0],inner],['Alloy'],owner,False):
+        for polygon in obj.data.polygons:polygon.flip()
+        obj.data.update()
+    box(f'Transfer_{index}_deck_backing',[-2.25,.18,-2.25],[2.25,.27,2.25],'Graphite',owner)
+    for sx in [-1,1]:
+        for sz in [-1,1]:
+            xa,xb=(-2.25,-.018) if sx<0 else (.018,2.25)
+            za,zb=(-2.25,-.018) if sz<0 else (.018,2.25)
+            a,b=(xa,-.34) if sx<0 else (.34,xb)
+            box(f'Transfer_{index}_deck_outer_{sx}_{sz}',[a,.27,za],[b,.30,zb],'Deck',owner)
+            a,b=(-.34,xb) if sx<0 else (xa,.34)
+            c,d=(za,-.34) if sz<0 else (.34,zb)
+            box(f'Transfer_{index}_deck_inner_{sx}_{sz}',[a,.27,c],[b,.30,d],'Deck',owner)
+            x,z=sx*2.15,sz*2.15
+            block(f'Transfer_{index}_corner_{sx}_{sz}',[.17,.03,.17],[x,.285,z],'Amber',owner)
+    box(f'Transfer_{index}_flush_release_socket',[-.34,.27,-.34],[.34,.30,.34],'Alloy',owner)
+    for x in [-.28,.28]:
+        for z in [-.28,.28]:block(f'Transfer_{index}_socket_fastener_{x}_{z}',[.045,.03,.045],[x,.285,z],'Graphite',owner)
+
 def nursery_platform_harness(index,owner):
     """Canonical Level 1 Room 2 harness, at this deck's exact width and top.
     Source: containment-room-two/generate-room-two.py::build_thruster_harness.
@@ -834,14 +909,7 @@ def build_nursery():
     # weathered. Motion inherits the existing platform collider, including reset.
     for index in range(1,4):
         owner=f'cultivation-room-1-platform-{index}-platform'
-        block(f'Transfer_{index}_base',[5,.48,5],[0,-.06,0],'Graphite',owner)
-        for a,b,c,d in [(-2.5,-2.31,-2.5,2.5),(2.31,2.5,-2.5,2.5),(-2.31,2.31,-2.5,-2.31),(-2.31,2.31,2.31,2.5)]:
-            box(f'Transfer_{index}_border',[a,.18,c],[b,.30,d],'Alloy',owner)
-        for a,b,c,d in [(-2.31,-.31,-2.31,2.31),(.31,2.31,-2.31,2.31),(-.31,.31,-2.31,-.31),(-.31,.31,.31,2.31)]:
-            box(f'Transfer_{index}_inset_deck',[a,.19,c],[b,.30,d],'Deck',owner)
-        block(f'Transfer_{index}_release_seat',[.62,.04,.62],[0,.20,0],'Oxide',owner)
-        for x in [-2.22,2.22]:
-            for z in [-2.22,2.22]:block(f'Transfer_{index}_corner_{x}_{z}',[.17,.11,.17],[x,.245,z],'Amber',owner)
+        nursery_transfer_platform(index,owner)
         nursery_platform_harness(index,owner)
     print('Abandoned nursery: asymmetric process bays, folded ivy, fitted platforms and service fixtures')
 
@@ -1288,6 +1356,8 @@ def finalise_boxes():
                 (a,low,d),(b,low,d),(b,high_b,d),(a,high_a,d)],
                 [(0,3,2,1),(4,5,6,7),(0,1,5,4),(3,7,6,2),(0,4,7,3),(1,2,6,5)],'Alloy')
         nursery_entry_vent()
+        for index,(x,y,z) in enumerate([(-3,13,15.5),(2,15,25),(-1,12.5,35)],1):
+            nursery_suspension(index,x,z,19.25-y-.3,f'cultivation-room-1-platform-{index}-soluble-rope')
 
 def import_references():
     prefix='C2_'+CURRENT+'_'

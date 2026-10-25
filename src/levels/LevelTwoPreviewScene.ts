@@ -371,6 +371,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   }
 
   bindDissolveTargets(targets: readonly DissolveTarget[]): void {
+    this.blenderArt.bindDissolveTargets(targets);
     this.roomOne.bindDissolveTargets(targets);
     this.roomTwo.bindDissolveTargets(targets);
     this.roomThree.bindDissolveTargets(targets);
