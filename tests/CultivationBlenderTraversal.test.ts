@@ -79,12 +79,12 @@ test('Goop releases all three nursery cradles and Bob crosses them through the r
       if(goop.grounded&&goop.supportColliderName==='cultivation-room-1-far-floor')break;
     }
     assert.equal(goop.supportColliderName,'cultivation-room-1-far-floor');
-    walk(goop,8,46);walk(goop,0,46);walk(goop,0,54);
+    walk(goop,8,46);walk(goop,0,46);walk(goop,0,54);walk(goop,0,81);
     walk(bob,-3,8.5);jump(-3,15.5,room.platformDrops[0].mesh.name);
     walk(bob,-1.9,17.6);jump(2,25,room.platformDrops[1].mesh.name);
     walk(bob,1.37,27.1);jump(-1,35,room.platformDrops[2].mesh.name);
-    walk(bob,-1,37.1);jump(0,44.5,'cultivation-room-1-far-floor');walk(bob,0,54);
-    assert.ok(local(bob).z>50&&local(goop).z>50);
+    walk(bob,-1,37.1);jump(0,44.5,'cultivation-room-1-far-floor');walk(bob,0,54);walk(bob,0,81);
+    assert.ok(local(bob).z>78&&local(goop).z>78,'both bodies pass the full decontamination corridor into Room 2');
     assert.deepEqual(failures,[]);assert.equal(acid.getDiagnostics().solubleImpactCount,3);
     scene.reset();assert.ok(room.platformDrops.every(drop=>drop.state==='suspended'));
   }finally{acid.dispose();burns.dispose();for(const target of targets)target.dispose();scene.dispose();world.clear();surfaces.clear();}

@@ -28,6 +28,15 @@ export class CultivationBlenderArt {
       if(o instanceof THREE.Mesh&&o.material instanceof THREE.MeshBasicMaterial)legacy.set(o.material.name,o.material);
     });
     const finish=(name:string,escape=false,nursery=false):THREE.MeshStandardMaterial|THREE.MeshBasicMaterial=>{
+      if(name==='HallGlass'){
+        const key='hall:glass',old=this.materials.get(key);if(old)return old;
+        const source=scene.contaminationArt.glass,material=source.clone();
+        material.name='cultivation-hall-stained-observation-glass';material.vertexColors=true;
+        material.opacity=.50;material.onBeforeCompile=source.onBeforeCompile;
+        material.customProgramCacheKey=()=>source.customProgramCacheKey()+':hall';
+        this.materials.set(key,material);return material;
+      }
+      if(name.startsWith('Hall'))return finish(name.slice(4),false,true);
       const key=(escape?'escape:':nursery?'nursery:':'')+name,old=this.materials.get(key);if(old)return old;
       if(escape){
         // The cinematic airway already uses unlit finishes. Reuse those exact

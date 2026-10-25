@@ -253,7 +253,12 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
       "cultivation-room-1-to-2-lab-passage-entry-frame-top",
       "cultivation-room-1-to-2-lab-passage-entry-frame-left",
       "cultivation-room-1-to-2-lab-passage-entry-frame-right",
-      "cultivation-room-1-to-2-lab-passage-entry-shutter-panel"
+      "cultivation-room-1-to-2-lab-passage-entry-shutter-panel",
+      "cultivation-room-1-to-2-lab-passage-exit-frame-top",
+      "cultivation-room-1-to-2-lab-passage-exit-frame-left",
+      "cultivation-room-1-to-2-lab-passage-exit-frame-right",
+      "cultivation-room-1-to-2-lab-passage-exit-shutter-panel",
+      "cultivation-neutral-ceiling-strips"
     ],
     "retirePrefixes": [
       "cultivation-passage-"
@@ -267,46 +272,88 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_passage-1-2_Batch_Architecture_Alloy"
       },
       {
-        "name": "C2_passage-1-2_Batch_Architecture_Amber",
-        "finish": "Amber",
-        "target": "",
-        "geometry": "C2_passage-1-2_Batch_Architecture_Amber"
-      },
-      {
-        "name": "C2_passage-1-2_Batch_Architecture_Ceramic",
-        "finish": "Ceramic",
-        "target": "",
-        "geometry": "C2_passage-1-2_Batch_Architecture_Ceramic"
-      },
-      {
-        "name": "C2_passage-1-2_Batch_Architecture_Cool",
-        "finish": "Cool",
-        "target": "",
-        "geometry": "C2_passage-1-2_Batch_Architecture_Cool"
-      },
-      {
         "name": "C2_passage-1-2_Batch_Architecture_Graphite",
         "finish": "Graphite",
         "target": "",
         "geometry": "C2_passage-1-2_Batch_Architecture_Graphite"
       },
       {
-        "name": "C2_passage-1-2_Batch_Architecture_Ink",
-        "finish": "Ink",
+        "name": "C2_passage-1-2_Batch_Architecture_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_passage-1-2_Batch_Architecture_Ink"
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallAlloy"
       },
       {
-        "name": "C2_passage-1-2_Batch_Architecture_Oxide",
-        "finish": "Oxide",
+        "name": "C2_passage-1-2_Batch_Architecture_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_passage-1-2_Batch_Architecture_Oxide"
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallCeramic"
       },
       {
-        "name": "C2_passage-1-2_Batch_Architecture_Resin",
-        "finish": "Resin",
+        "name": "C2_passage-1-2_Batch_Architecture_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_passage-1-2_Batch_Architecture_Resin"
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallCool"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallFoliage",
+        "finish": "HallFoliage",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallFoliage"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallGlass",
+        "finish": "HallGlass",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallGlass"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallGraphite"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallInk"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallLamp",
+        "finish": "HallLamp",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallLamp"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallLoam",
+        "finish": "HallLoam",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallLoam"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallOxide",
+        "finish": "HallOxide",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallOxide"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallPaint",
+        "finish": "HallPaint",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallPaint"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallResin",
+        "finish": "HallResin",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallResin"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_Architecture_HallSeal",
+        "finish": "HallSeal",
+        "target": "",
+        "geometry": "C2_passage-1-2_Batch_Architecture_HallSeal"
       },
       {
         "name": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-entry-shutter-panel_Alloy",
@@ -324,6 +371,24 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "name": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-entry-shutter-panel_Graphite",
         "finish": "Graphite",
         "target": "cultivation-room-1-to-2-lab-passage-entry-shutter-panel",
+        "geometry": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-entry-shutter-panel_Graphite"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-exit-shutter-panel_Alloy",
+        "finish": "Alloy",
+        "target": "cultivation-room-1-to-2-lab-passage-exit-shutter-panel",
+        "geometry": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-entry-shutter-panel_Alloy"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-exit-shutter-panel_Ceramic",
+        "finish": "Ceramic",
+        "target": "cultivation-room-1-to-2-lab-passage-exit-shutter-panel",
+        "geometry": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-entry-shutter-panel_Ceramic"
+      },
+      {
+        "name": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-exit-shutter-panel_Graphite",
+        "finish": "Graphite",
+        "target": "cultivation-room-1-to-2-lab-passage-exit-shutter-panel",
         "geometry": "C2_passage-1-2_Batch_cultivation-room-1-to-2-lab-passage-entry-shutter-panel_Graphite"
       }
     ]

@@ -783,7 +783,12 @@
       "cultivation-room-1-to-2-lab-passage-entry-frame-top",
       "cultivation-room-1-to-2-lab-passage-entry-frame-left",
       "cultivation-room-1-to-2-lab-passage-entry-frame-right",
-      "cultivation-room-1-to-2-lab-passage-entry-shutter-panel"
+      "cultivation-room-1-to-2-lab-passage-entry-shutter-panel",
+      "cultivation-room-1-to-2-lab-passage-exit-frame-top",
+      "cultivation-room-1-to-2-lab-passage-exit-frame-left",
+      "cultivation-room-1-to-2-lab-passage-exit-frame-right",
+      "cultivation-room-1-to-2-lab-passage-exit-shutter-panel",
+      "cultivation-neutral-ceiling-strips"
     ],
     "occluders": [
       {
@@ -1003,6 +1008,26 @@
           0,
           2.3,
           0.5,
+          1
+        ]
+      },
+      "cultivation-room-1-to-2-lab-passage-exit-shutter-panel": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          2.3,
+          27.5,
           1
         ]
       }

@@ -212,7 +212,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       practicalPositions:[[-9,17.85,15.5],[9,17.85,35]],
     });
     this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28, { wallSides: [-1] });
-    this.passageArt = new CultivationPassageArt(this.roomOneToTwoPassage, this.labArt, this.contaminationArt);
+    this.passageArt = new CultivationPassageArt(this.roomOneToTwoPassage, this.labArt, this.contaminationArt,{authoredReplacement:true});
     this.labArt.dress(this.roomTwo.builder, [
       'cultivation-room-2-above-bob-vent',
       'cultivation-room-2-bob-vent-west-jamb',

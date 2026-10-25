@@ -63,6 +63,16 @@ try{
     ['room-1-exit-wall',1,'roomOne',[0,.86,44],[1,4.6,34],[0,4.6,50]],
     ['passage-1-2-forward',1,'roomOneToTwoPassage',[0,.86,5],[1,2.5,3],[-1,2.5,25]],
     ['passage-1-2-reverse',2,'roomOneToTwoPassage',[0,.86,23],[-1,2.5,25],[1,2.5,2]],
+    ['passage-1-2-observation',1,'roomOneToTwoPassage',[0,.86,10],[-1.7,2.8,9],[4.8,3,12.5]],
+    ['passage-1-2-service-detail',1,'roomOneToTwoPassage',[0,.86,18.8],[-.8,2.8,17.1],[-4.14,3.05,19.12]],
+    ['passage-1-2-ivy-detail',1,'roomOneToTwoPassage',[0,.86,10],[2.9,2.8,9.75],[4.57,3,10.91]],
+    ['passage-1-2-decon',1,'roomOneToTwoPassage',[0,.86,18],[.5,2.5,18],[0,3.6,25]],
+    ['passage-1-2-floor-edge',1,'roomOneToTwoPassage',[0,.86,18],[-3.35,.7,18],[-3.8,.3,23.5]],
+    ['passage-1-2-upper-return',1,'roomOneToTwoPassage',[0,.86,6],[3.3,5.6,6],[3.85,6.35,9.2]],
+    ['passage-1-2-upper-seal',1,'roomOneToTwoPassage',[0,.86,7],[2.2,4.4,6],[3.85,5.5,7.5]],
+    ['passage-1-2-exit-partial',1,'roomOneToTwoPassage',[0,.86,25],[.5,2.4,24.8],[0,2.8,28.4],'exit-door-partial'],
+    ['passage-1-2-room-two-join',1,'roomOneToTwoPassage',[0,.86,25],[.6,1.7,26],[0,2,32],'open-doors'],
+    ['passage-1-2-room-one-join',1,'roomOneToTwoPassage',[0,.86,3],[-.6,1.7,2],[0,2,-4],'open-doors'],
     ['room-2-entry',2,'roomTwo',[0,.66,3],[8,5,4],[-5,13,28]],
     ['room-2-adhesion',2,'roomTwo',[0,.66,3],[-10,9,8],[-18,13,25]],
     ['room-2-exit',2,'roomTwo',[0,.66,42],[10,9,39],[-4,12,18]],
@@ -129,8 +139,8 @@ try{
         door.setLocked(false);const centre=door.root.getWorldPosition(r.pair.bobBody.position.clone());centre.y+=1;
         door.update(2,[{id:'bob',position:centre,radiusMetres:.45}]);
       }
-      if(state==='door-partial'){
-        const door=p.roomOneToTwoPassage.entryDoor;door.setLocked(false);
+      if(state==='door-partial'||state==='exit-door-partial'){
+        const door=state==='exit-door-partial'?p.roomOneToTwoPassage.exitDoor:p.roomOneToTwoPassage.entryDoor;door.setLocked(false);
         const centre=door.root.getWorldPosition(r.pair.bobBody.position.clone());centre.y+=1;
         door.update(.24,[{id:'bob',position:centre,radiusMetres:.45}]);
       }

@@ -11,6 +11,34 @@ import {createAuthoredDissolveTarget} from '../src/abilities/DissolveTarget.ts';
 
 const layout=JSON.parse(readFileSync(new URL('../assets/environments/cultivation/authoring-layout.json',import.meta.url),'utf8'));
 
+test('the decontamination passage has front-sided enclosure and clear shared doorway openings',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),passage=scene.roomOneToTwoPassage;
+  try{
+    const meshes:THREE.Mesh[]=[];
+    passage.root.traverse(o=>{if(o instanceof THREE.Mesh&&o.parent===passage.root&&o.userData.blenderBatch){
+      const materials=Array.isArray(o.material)?o.material:[o.material];
+      if(materials.some(m=>m.visible&&!m.transparent))meshes.push(o);
+    }});
+    scene.root.updateWorldMatrix(true,true);
+    const hit=(point:THREE.Vector3,direction:THREE.Vector3,far=3)=>
+      new THREE.Raycaster(passage.root.localToWorld(point),direction,0,far).intersectObjects(meshes,false);
+    const uncovered:unknown[]=[];
+    // Wall probes begin above the finished floor, outside its opaque volume.
+    for(const side of [-1,1])for(const z of [.25,.76,3.5,7.475,7.525,10.73,13.9,17.175,17.225,18.7,20.775,20.825,22,23.6,26.3,27.2,27.9]){
+      for(const y of [.23,.5,1.25,2.2,3.6,5.3,5.48,6.15,6.34])
+        if(!hit(new THREE.Vector3(side*3.7,y,z),new THREE.Vector3(side,0,0)).length)uncovered.push({side,y,z});
+    }
+    assert.deepEqual(uncovered,[],'side returns have opaque coverage');
+    for(const x of [-3.7,-2.1,0,.3,2.1,3.7])for(const z of [.1,3.5,7.7,12.3,17.6,22.9,23.6,24.4,26.8,27.9]){
+      assert.ok(hit(new THREE.Vector3(x,.6,z),new THREE.Vector3(0,-1,0),1).length,'floor and drain remain opaque');
+      assert.ok(hit(new THREE.Vector3(x,6.3,z),new THREE.Vector3(0,1,0),.5).length,'ceiling joints remain opaque');
+    }
+    for(const z of [-.25,26.75])for(const x of [-1.7,0,1.7])for(const y of [.6,2.3,4.3])
+      assert.equal(hit(new THREE.Vector3(x,y,z),new THREE.Vector3(0,0,1),1.5).length,0,'no static art crosses the existing doorway');
+    assert.equal(scene.passageArt.root.children.length,0,'superseded procedural dressing is excluded from preparation');
+  }finally{scene.dispose();}
+});
+
 test('authored support skins share the original dissolve progress, feedback and shadow masks through release/reset',()=>{
   const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),world=new CollisionWorld(),surfaces=new SurfaceRegistry();
   const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces)!);

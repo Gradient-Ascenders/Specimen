@@ -31,6 +31,14 @@ PALETTE={
     'Seal':((.045,.052,.047),.98,0),
     'Composite':((.52,.55,.49),.96,.04),
 }
+# New passage surfaces share Room 1's finishes while the approved entrance
+# shutter retains its original material names, buffers and appearance.
+for _finish in ['Ceramic','Cool','Resin','Graphite','Alloy','Oxide','Foliage','Loam','Lamp','Ink','Paint','Seal']:
+    _colour,_rough,_metal=PALETTE[_finish]
+    _colour={'Ceramic':(.69,.68,.63),'Cool':(.39,.42,.40),'Resin':(.40,.42,.40),
+        'Alloy':(.36,.40,.39),'Oxide':(.25,.27,.25),'Graphite':(.07,.08,.075)}.get(_finish,_colour)
+    PALETTE['Hall'+_finish]=(_colour,_rough,_metal)
+PALETTE['HallGlass']=((.46,.55,.49),.40,.02)
 CURRENT=None
 BOXES=[]
 DETAILS=[]
@@ -63,12 +71,15 @@ def setup(room):
         shader=mat.node_tree.nodes.get('Principled BSDF')
         shader.inputs['Base Color'].default_value=(*colour,1)
         shader.inputs['Roughness'].default_value=rough;shader.inputs['Metallic'].default_value=metal
-        if room=='room-1':
+        if room=='room-1' or finish.startswith('Hall'):
             colour_node=mat.node_tree.nodes.new('ShaderNodeVertexColor');colour_node.layer_name='wear'
             tint=mat.node_tree.nodes.new('ShaderNodeMixRGB');tint.blend_type='MULTIPLY'
             tint.inputs[0].default_value=1;tint.inputs[1].default_value=(*colour,1)
             mat.node_tree.links.new(colour_node.outputs['Color'],tint.inputs[2])
             mat.node_tree.links.new(tint.outputs[0],shader.inputs['Base Color'])
+        if finish=='HallGlass':
+            shader.inputs['Alpha'].default_value=.24;mat.diffuse_color=(*colour,.24)
+            mat.surface_render_method='DITHERED'
     root=bpy.data.objects.new(prefix+'Architecture',None);scene.collection.objects.link(root)
     root['asset']='cultivation-blender-v1';root['owner']=LAYOUT[room]['owner']
     root['gameplay']='Presentation only; protected colliders, lights and controllers remain in TypeScript.'
@@ -92,9 +103,12 @@ def owner_root(owner):
     return obj
 
 def mesh(name,vertices,faces,finish,owner=''):
+    if CURRENT=='passage-1-2' and name.startswith(('Hall_','Solid_Hall_','Ivy_')) and not finish.startswith('Hall'):
+        finish='Hall'+finish
+    hall=finish.startswith('Hall');base_finish=finish[4:] if hall else finish
     owner=owner or LAYOUT[CURRENT].get('defaultTarget','')
     prefix='C2_'+CURRENT+'_'
-    if CURRENT=='room-1' and finish not in ('Foliage','Loam','Lamp'):
+    if (CURRENT=='room-1' or hall) and base_finish not in ('Foliage','Loam','Lamp','Glass'):
         # Sample dirt on the actual surface, with no coplanar decal layers or
         # extra texture allocation. Metric tessellation keeps large panels dirty.
         points=[];patches=[]
@@ -106,7 +120,8 @@ def mesh(name,vertices,faces,finish,owner=''):
             # Extra samples belong only to leaks and the two safe floor banks.
             # The rest of the room retains its established mesh density.
             near_leak=('wet_bay_rear' in name and abs(abs(centre.x)-19.08)<.001) or ('Archive_recess_back' in name and abs(centre.z+1.15)<.001)
-            floor_bank=abs(centre.y-.2)<.001 and (centre.z<9 or centre.z>43)
+            floor_bank=abs(centre.y-.2)<.001 and (hall or centre.z<9 or centre.z>43)
+            if hall:near_leak='Observation_rear' in name or 'Service_rear' in name
             spacing=.38 if near_leak else .55 if floor_bank else 1.6
             nu=max(1,math.ceil(max((b-a).length,(c-d).length)/spacing))
             nv=max(1,math.ceil(max((d-a).length,(c-b).length)/spacing))
@@ -176,13 +191,30 @@ def mesh(name,vertices,faces,finish,owner=''):
                 groove=min(abs(abs(x)-.205),abs(abs(z)-.205))<.002
                 dirt=.28 if groove else .86-.24*soil
                 colour=(dirt,dirt*.98,dirt*.92,1)
+        if hall and base_finish!='Lamp':
+            x,y,z=p.x,p.z,-p.y
+            cloud=.5+.5*math.sin(z*.73+x*.42+math.sin(y*.54+z*.31)*1.9)
+            soil=.16+.22*cloud+.20*max(0,1-y/2)
+            leak=0
+            if abs(x)>3.7:
+                for at,top in [(10.85,5.1),(16.8,5.25),(18.7,4.15)]:
+                    fall=top-y
+                    if 0<fall<4:
+                        leak=max(leak,.4*math.exp(-((z-at-.035*math.sin(fall*3))/(.10+.025*fall))**2)*math.exp(-fall/3))
+            if abs(y-.2)<.001:soil+=.22*max(0,1-(3.85-abs(x))/.9)
+            dirt=max(.32,.94-soil-leak)
+            colour=(dirt,dirt*.98,dirt*.94,1)
+            if base_finish=='Foliage':colour=(.72+.2*cloud,.75+.2*cloud,.55+.2*cloud,1)
+            if base_finish=='Loam':colour=(.66,.65,.57,1)
+            if base_finish=='Glass':colour=(.82,.86,.82,1)
+            if base_finish=='Paint':colour=(.55+.25*cloud,)*3+(1,)
         colours.data[v.index].color=colour
     for poly in data.polygons:
         axis=max(range(3),key=lambda i:abs(poly.normal[i]))
         for i in poly.loop_indices:
             p=data.vertices[data.loops[i].vertex_index].co
             a,b=((p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y))
-            uv.data[i].uv=(a/8+.13,b/8+.31) if CURRENT=='room-1' and finish in ('Deck','Paint') else (a/2,b/2)
+            uv.data[i].uv=(a/8+.13,b/8+.31) if (CURRENT=='room-1' and finish in ('Deck','Paint')) or finish=='HallPaint' else (a/2,b/2)
     obj=bpy.data.objects.new(prefix+name,data);bpy.context.scene.collection.objects.link(obj)
     obj.parent=owner_root(owner);data.materials.append(material(finish))
     obj['finish']=finish;obj['runtimeTarget']=owner;obj['visualOnly']=True
@@ -784,8 +816,7 @@ def door_band(name,outer,inner,side,back,front,inset_depth,owner):
     if side<0:faces=[tuple(reversed(f)) for f in faces]
     return mesh(name,vertices,faces,'Alloy',owner)
 
-def nursery_door_leaf():
-    owner='cultivation-room-1-to-2-lab-passage-entry-shutter-panel'
+def nursery_door_leaf(owner='cultivation-room-1-to-2-lab-passage-entry-shutter-panel'):
     # Sculpted armour remains entirely inside the original leaf's envelope.
     vertices=[(x,y,z) for z,h in [(-.07,2.30),(.07,2.26)] for y in [-h,h] for x in [-2,2]]
     mesh('Containment_door_core',vertices,[(0,2,3,1),(4,5,7,6),(0,1,5,4),(2,6,7,3),(0,4,6,2),(1,3,7,5)],'Graphite',owner)
@@ -913,6 +944,266 @@ def build_nursery():
         nursery_platform_harness(index,owner)
     print('Abandoned nursery: asymmetric process bays, folded ivy, fitted platforms and service fixtures')
 
+def hall_floor():
+    box('Hall_Floor_foundation',[-4,-.2,0],[4,.10,28],'Graphite')
+    cuts=sorted(set([0,28,22.72,24.52]+[i*2.8 for i in range(1,10)]))
+    for j,(a,b) in enumerate(zip(cuts,cuts[1:])):
+        drain=a>=22.72 and b<=24.52
+        spans=[(-4,-3.35),(3.35,4)] if drain else [(-4,0),(0,4)]
+        for i,(c,d) in enumerate(spans):
+            box(f'Hall_Floor_back_{i}_{j}',[c,.10,a],[d,.165,b],'Graphite')
+            box(f'Hall_Floor_panel_{i}_{j}',[c+.018,.165,a+.018],[d-.018,.20,b-.018],'Resin')
+            if not drain:
+                for x in [-2.65,2.65]:
+                    if c<x<d and (20<a<22.72 or 24.52<=a<26):
+                        box(f'Hall_Faded_containment_{x}_{j}',[x-.035,.175,a+.15],[x+.035,.20,min(b-.05,a+.9)],'Paint')
+    box('Hall_Drain_sealed_tray',[-3.35,.10,22.72],[3.35,.135,24.52],'Seal')
+    for x in [-3.35,3.25]:box('Hall_Drain_edge',[x,.135,22.72],[x+.10,.20,24.52],'Alloy')
+    for z in [22.72,24.42]:box('Hall_Drain_end',[-3.25,.135,z],[3.25,.20,z+.10],'Alloy')
+    for i in range(41):
+        x=-3.22+i*.16
+        box(f'Hall_Drain_grate_{i}',[x,.14,22.82],[x+.065,.20,24.42],'Alloy')
+
+def hall_ivy_leaf(name,at,angle,size,tilt,phase):
+    # Thin, folded three-lobed ivy. Cross-sections give the midrib its own
+    # narrow colour strip and keep the leaf edge crisp rather than inflated.
+    sections=[(0,.016),(.045,.13),(.10,.23),(.18,.30),(.27,.31),(.35,.24),
+        (.465,.43),(.50,.29),(.55,.135),(.67,.105),(.82,.055),(.94,.004)]
+    across=[-1,-.07,0,.07,1];vv=[]
+    for layer in [0,.0025]:
+        for v,width in sections:
+            for fraction in across:
+                u=width*fraction
+                depth=.027*(1-abs(fraction))*(.35+.65*math.sin(v*math.pi/.98))
+                depth+=.012*fraction*fraction*math.sin(v*5+phase)+.016*max(0,v-.65)
+                uu=(u*math.cos(angle)-v*math.sin(angle))*size
+                hh=(u*math.sin(angle)+v*math.cos(angle))*size
+                vv.append((at[0]-depth*size+uu*math.sin(tilt)+layer,at[1]+hh,at[2]+uu*math.cos(tilt)))
+    count=len(sections)*len(across);front=[];boundary={}
+    for row in range(len(sections)-1):
+        for col in range(len(across)-1):
+            a=row*len(across)+col
+            cell=(a,a+1,a+1+len(across),a+len(across));front.append(cell)
+            for a,b in zip(cell,cell[1:]+cell[:1]):
+                key=tuple(sorted((a,b)))
+                if key in boundary:del boundary[key]
+                else:boundary[key]=(a,b)
+    faces=front+[tuple(count+k for k in reversed(f)) for f in front]
+    faces.extend((a,b,b+count,a+count) for a,b in boundary.values())
+    obj=mesh(name,vv,faces,'HallFoliage')
+    for poly in obj.data.polygons:poly.use_smooth=abs(poly.normal.x)>.5
+    colours=obj.data.color_attributes['wear'];shade=.61+.23*(.5+.5*math.sin(phase*2.41))
+    for vertex in obj.data.vertices:
+        p=vertex.co;game=Vector((p.x,p.z,-p.y))-Vector(at)
+        u=(game.z/math.cos(tilt)*math.cos(angle)+game.y*math.sin(angle))/size
+        vein=math.exp(-(u/.007)**2)
+        edge=min(1,abs(u)/.31)
+        colours.data[vertex.index].color=(shade*.76+.19*vein+.035*edge,
+            shade+.16*vein,shade*.58+.14*vein+.025*edge,1)
+    obj['botanicalPart']='thin folded three-lobed ivy blade with midrib'
+    return obj
+
+
+def hall_process_ivy(at,height,spread,seed):
+    # Runners remain wholly in the observation recess. Alternating leaves
+    # have their own rotation and depth instead of forming one flat curtain.
+    path=[]
+    for k in range(15):
+        t=k/14
+        path.append((at[0]+.045*math.sin(t*7+seed),at[1]+height*.85*t,
+            at[2]+.10*math.sin(t*8+seed)+.08*t))
+    nursery_profile(f'Ivy_{seed}_root',path,[.026-.018*k/14 for k in range(15)],['HallLoam']*14,7)
+    for branch,(anchor,hand) in enumerate([(2,-1),(4,1),(6,-1),(8,1),(10,-1),(12,1)]):
+        p=Vector(path[anchor]);length=height*(.18+.09*math.sin(seed+branch*1.7)**2)
+        shoot=[]
+        for k in range(7):
+            t=k/6
+            shoot.append(tuple(p+Vector((-.09*math.sin(t*2),length*t,
+                hand*spread*(.42+.18*math.sin(branch+seed)**2)*t))))
+        nursery_profile(f'Ivy_{seed}_shoot_{branch}',shoot,[.014-.007*k/6 for k in range(7)],['HallLoam']*6,6)
+        for k in [1,3,5]:
+            p=Vector(shoot[k]);hand_leaf=-1 if (k+branch)%2 else 1
+            leaf_at=p+Vector((-.055,.015,hand_leaf*.045))
+            nursery_sweep(f'Ivy_{seed}_petiole_{branch}_{k}',[tuple(p),tuple(leaf_at)],.006,'HallLoam',5)
+            size=(.22+.095*math.sin(seed+k*2.1+branch)**2)*min(1,height/1.8)
+            hall_ivy_leaf(f'Ivy_{seed}_blade_{branch}_{k}',tuple(leaf_at),
+                hand_leaf*(.55+.57*math.sin(seed+k+branch)**2),size,
+                .45*math.sin(seed+branch*2.7+k),seed+branch*7+k)
+    for k in [3,7,11,14]:
+        p=Vector(path[k]);hand=-1 if k%2 else 1
+        leaf_at=p+Vector((-.055,.01,hand*.04))
+        nursery_sweep(f'Ivy_{seed}_main_petiole_{k}',[tuple(p),tuple(leaf_at)],.006,'HallLoam',5)
+        hall_ivy_leaf(f'Ivy_{seed}_main_blade_{k}',tuple(leaf_at),hand*.52,
+            .29*min(1,height/1.8),.35*math.sin(k+seed),seed+k*3)
+
+
+def hall_observation():
+    a,b=7.5,17.2
+    box('Hall_Observation_rear',[5.90,1.15,a],[6.15,5.45,b],'Cool')
+    for z in [a,b-.18]:box('Hall_Observation_cheek',[3.85,1.15,z],[5.90,5.45,z+.18],'Alloy')
+    for y in [1.15,5.28]:box('Hall_Observation_return',[3.85,y,a+.18],[5.90,y+.15,b-.18],'Alloy')
+    for z in [a,10.66,13.80,b-.14]:box('Hall_Observation_mullion',[3.85,1.30,z],[4.04,5.28,z+.14],'Ceramic')
+    for y in [1.30,5.18]:box('Hall_Observation_gasket',[3.85,y,a+.14],[3.89,y+.10,b-.14],'Seal')
+    panes=[(7.72,10.66),(10.80,13.80),(13.94,17.00)]
+    for k,(c,d) in enumerate(panes):
+        obj=mesh(f'Hall_Observation_glass_{k}',[(3.90,1.43,c),(3.90,5.18,c),(3.90,5.18,d),(3.90,1.43,d)],[(0,3,2,1)],'HallGlass')
+        uv=obj.data.uv_layers.active
+        for loop in obj.data.loops:
+            p=obj.data.vertices[loop.vertex_index].co
+            u=(-p.y-c)/(d-c);v=(p.z-1.43)/(5.18-1.43)
+            uv.data[loop.index].uv=((.008+.984*u+k%2)/2,(.008+.984*v+k//2)/2)
+    for k,z in enumerate([9.2,12.35,15.5]):
+        box(f'Hall_Canister_seat_{k}',[4.26,1.30,z-.65],[5.58,1.44,z+.65],'Graphite')
+        path=[(4.95,y,z) for y in [1.43,1.50,1.62,1.74,4.36,4.50,4.64,4.78,4.96]]
+        nursery_profile(f'Hall_Culture_canister_{k}',path,[.48,.57,.57,.48,.48,.57,.57,.39,.39],
+            ['Graphite','Alloy','Alloy','Cool','Alloy','Alloy','Alloy','Cool'],20)
+        nursery_sweep(f'Hall_Canister_feed_{k}',[(4.95,4.96,z),(4.95,5.10,z),(5.52,5.10,z),(5.52,4.66,z)],.055,'Alloy',8)
+    nursery_sweep('Hall_Failed_irrigation_upper',[(5.62,5.16,8.3),(5.62,5.16,10.85),(5.62,4.64,10.85)],.075,'Alloy',10)
+    nursery_sweep('Hall_Failed_irrigation_lower',[(5.62,4.53,10.85),(5.62,1.42,10.85)],.075,'Oxide',10)
+    hall_process_ivy((4.72,1.265,10.8),3.7,.55,23)
+    for z in [11.8,12.9]:box('Hall_Observation_sign_mount',[3.785,5.51,z-.06],[3.96,5.59,z+.06],'Alloy')
+    label('Hall_Observation_ident','CULTURE TRANSFER',[3.76,5.48,12.35],.24,(90,0,270),'HallInk')
+
+def hall_service_handwheel(name,x,y,z):
+    # The rim, hub and spokes are one pressed part. Shared radial cells own
+    # only their exterior boundary, including the three open apertures.
+    sides=24;radii=[.034,.058,.097,.142];vv=[]
+    for xx in [x-.0175,x+.0175]:
+        for r in radii:
+            vv.extend((xx,y+r*math.cos(i*math.tau/sides),z+r*math.sin(i*math.tau/sides)) for i in range(sides))
+    cells=[]
+    for ring in range(3):
+        for i in range(sides):
+            if ring==1 and i%8 not in (0,7):continue
+            j=(i+1)%sides
+            cells.append((ring*sides+i,(ring+1)*sides+i,(ring+1)*sides+j,ring*sides+j))
+    count=4*sides;faces=[];boundary={}
+    for cell in cells:
+        faces.extend([tuple(reversed(cell)),tuple(i+count for i in cell)])
+        for a,b in zip(cell,cell[1:]+cell[:1]):
+            key=tuple(sorted((a,b)))
+            if key in boundary:del boundary[key]
+            else:boundary[key]=(a,b)
+    for a,b in boundary.values():faces.append((a,b,b+count,a+count))
+    return mesh(name,vv,faces,'Graphite')
+
+def hall_service_bay():
+    a,b=17.65,20.8
+    box('Hall_Service_rear',[-4.85,1.35,a],[-4.65,4.80,b],'Cool')
+    for z in [a,b-.14]:box('Hall_Service_cheek',[-4.65,1.35,z],[-3.85,4.80,z+.14],'Alloy')
+    for y in [1.35,4.64]:box('Hall_Service_return',[-4.65,y,a+.14],[-3.85,y+.16,b-.14],'Alloy')
+    box('Hall_Service_mounting_chassis',[-4.61,1.58,17.90],[-4.43,4.45,20.53],'Graphite')
+    box('Hall_Service_pressed_instrument_plate',[-4.43,1.70,18.00],[-4.32,4.37,19.67],'Ceramic')
+    for z in [18.09,19.58]:
+        for y in [1.80,4.28]:tube(f'Hall_Service_plate_fastener_{y}_{z}',(-4.32,y,z),(-4.26,y,z),.035,'Alloy',8)
+    for k,z in enumerate([18.34,19.22]):
+        y=3.65
+        tube(f'Hall_Gauge_cast_body_{k}',(-4.32,y,z),(-4.15,y,z),.235,'Graphite',32)
+        annulus_x(f'Hall_Gauge_stepped_bezel_{k}',-4.09,y,z,.213,.275,.13,'Alloy',32)
+        annulus_x(f'Hall_Gauge_inner_gasket_{k}',-4.017,y,z,.205,.238,.016,'Seal',32)
+        vv=[(-4.021,y+.203*math.cos(i*math.tau/32),z+.203*math.sin(i*math.tau/32)) for i in range(32)]
+        mesh(f'Hall_Gauge_porcelain_dial_{k}',vv,[tuple(range(32))],'Ink')
+        for i in range(13):
+            angle=math.radians(-130+i*260/12)
+            outer=.177;inner=.133 if i%3==0 else .151
+            tube(f'Hall_Gauge_scale_{k}_{i}',(-3.992,y+inner*math.cos(angle),z+inner*math.sin(angle)),
+                (-3.992,y+outer*math.cos(angle),z+outer*math.sin(angle)),.005,'Graphite',5)
+        angle=math.radians(-42 if k==0 else 67)
+        direction=Vector((math.cos(angle),math.sin(angle)));across=Vector((-direction.y,direction.x))
+        shape=[-direction*.055-across*.014,direction*.139,-direction*.055+across*.014]
+        vv=[(x,y+p.x,z+p.y) for x in [-3.987,-3.975] for p in shape]
+        mesh(f'Hall_Gauge_pointed_needle_{k}',vv,[(0,2,1),(3,4,5),(0,1,4,3),(1,2,5,4),(2,0,3,5)],'Graphite')
+        # Open rear is buried in the needle boss, with no duplicate contact cap.
+        vv=[(x,y+.026*math.cos(i*math.tau/12),z+.026*math.sin(i*math.tau/12)) for x in [-3.983,-3.950] for i in range(12)]
+        ff=[tuple(range(12,24))]+[(i,(i+1)%12,(i+1)%12+12,i+12) for i in range(12)]
+        mesh(f'Hall_Gauge_needle_boss_{k}',vv,ff,'Alloy')
+        nursery_sweep(f'Hall_Gauge_pressure_line_{k}',[(-4.23,3.43,z),(-4.23,3.08,z),
+            (-4.23,2.95,z),(-4.18,2.84,z),(-4.18,2.12,z)],.048,'Alloy',10)
+        for y in [2.38,2.70]:tube(f'Hall_Line_compression_fitting_{k}_{y}',(-4.18,y-.07,z),(-4.18,y+.07,z),.078,'Oxide',8)
+        # A small handwheel reads as manual maintenance hardware behind glass.
+        tube(f'Hall_Service_valve_stem_{k}',(-4.18,2.48,z),(-3.98,2.48,z),.031,'Alloy',10)
+        hall_service_handwheel(f'Hall_Service_handwheel_{k}',-4.015,2.48,z)
+    nursery_profile('Hall_Service_lower_manifold',[(-4.18,2.12,z) for z in [18.05,18.14,19.49,19.58]],
+        [.08,.10,.10,.08],['Alloy','Cool','Alloy'],12)
+    # One rigid regulator replaces the loose dangling wires. Connections end
+    # in the manifold, rear plate and header, all behind the original wall line.
+    nursery_profile('Hall_Service_regulator',[(-4.14,y,20.05) for y in [1.84,1.96,2.10,2.27,3.40,3.52,3.64]],
+        [.13,.19,.19,.145,.145,.19,.19],['Alloy','Alloy','Cool','Ceramic','Alloy','Graphite'],20)
+    nursery_sweep('Hall_Service_manifold_return',[(-4.18,2.12,19.58),(-4.18,2.12,19.78),(-4.14,2.12,20.05)],.065,'Alloy',10)
+    nursery_sweep('Hall_Service_regulator_feed',[(-4.14,3.64,20.05),(-4.14,3.98,20.05),
+        (-4.24,4.12,20.05),(-4.42,4.12,20.05)],.058,'Alloy',10)
+    for y in [2.40,3.24]:
+        box(f'Hall_Service_regulator_saddle_{y}',[-4.43,y-.06,19.84],[-4.22,y+.06,20.26],'Graphite')
+
+
+def hall_decon_arch():
+    z=23.6
+    for side in [-1,1]:
+        a,b=sorted([side*3.85,side*4.22])
+        box(f'Hall_Decon_leg_{side}',[a,.20,z-.20],[b,5.26,z+.34],'Ceramic')
+        a,b=sorted([side*3.85,side*3.92])
+        box(f'Hall_Decon_leg_gasket_{side}',[a,.36,z-.11],[b,5.18,z+.20],'Seal')
+    box('Hall_Decon_head_core',[-3.85,5.26,z-.18],[3.85,6.35,z+.34],'Graphite')
+    polygon=[(-3.85,5.26),(3.85,5.26),(3.85,5.94),(3.4,6.35),(-3.4,6.35),(-3.85,5.94)]
+    door_pressed('Hall_Decon_pressed_fascia',polygon,-1,-(z-.18),-(z-.24),'Ceramic','')
+    for x in [-3.12,3.12]:
+        tube(f'Hall_Decon_fascia_bolt_{x}',(x,5.72,z-.28),(x,5.72,z-.16),.07,'Alloy',12)
+    for k,x in enumerate([-2.65,0,2.65]):
+        nursery_profile(f'Hall_Dormant_spray_nozzle_{k}',[(x,5.28,z),(x,5.18,z),(x,5.10,z),(x,5.05,z)],
+            [.10,.10,.07,.055],['Alloy','Alloy','Graphite'],12)
+    label('Hall_Decon_ident','DECONTAMINATION / 02',[0,5.70,z-.29],.28,(90,0,180),'HallInk')
+
+def hall_practicals():
+    for k,(side,x,y,z) in enumerate([(1,2.99,4.3,12),(-1,3.20,4.15,18.7)]):
+        def side_box(name,near,far,low,high,left,right,finish):
+            a,b=sorted([side*near,side*far]);box(f'Hall_Practical_{k}_{name}',[a,low,left],[b,high,right],finish)
+        side_box('housing',x,x+.28,y-.27,y+.27,z-.43,z+.43,'Alloy')
+        side_box('diffuser',x-.025,x,y-.20,y+.20,z-.34,z+.34,'Lamp')
+        for at in [z-.39,z+.36]:side_box('guard',x-.06,x,y-.23,y+.23,at,at+.03,'Graphite')
+        anchor=5.29 if side>0 else 4.72
+        side_box('wall_arm',x+.28,3.74,y+.16,y+.24,z-.055,z+.055,'Alloy')
+        side_box('drop_bracket',3.66,3.74,y+.16,anchor,z-.055,z+.055,'Alloy')
+        side_box('header_foot',3.66,4.14,anchor-.04,anchor+.04,z-.12,z+.12,'Graphite')
+    for side in [-1,1]:
+        for y in [5.85,6.12]:
+            nursery_sweep(f'Hall_Upper_service_{side}_{y}',[(side*3.74,y,2),(side*3.74,y,21.5)],.065,'Alloy',10)
+        for z in [3.8,7.2,17.7,21.5]:
+            a,b=sorted([side*3.74,side*4.18]);box(f'Hall_Conduit_clamp_{side}_{z}',[a,5.70,z-.07],[b,6.27,z+.07],'Graphite')
+
+def build_decontamination_passage():
+    hall_floor()
+    for side in [-1,1]:
+        def slab(name,a,b,c,d,near,far,finish):
+            lo,hi=sorted([side*near,side*far]);box(f'Hall_{side}_{name}',[lo,c,a],[hi,d,b],finish)
+        opening=(7.5,17.2,1.15,5.45) if side>0 else (17.65,20.8,1.35,4.80)
+        a,b,c,d=opening
+        zs=sorted(set([0,3.5,7.5,10.7,14,17.2,20.8,23.6,26,28,a,b]))
+        ys=sorted(set([.20,1.05,3.45,5.45,6.35,c,d]))
+        for i,(left,right) in enumerate(zip(zs,zs[1:])):
+            for j,(low,high) in enumerate(zip(ys,ys[1:])):
+                if a<=left and right<=b and c<=low and high<=d:continue
+                slab(f'Wall_back_{i}_{j}',left,right,low,high,3.98,4.20,'Graphite')
+                slab(f'Wall_panel_{i}_{j}',left+.025,right-.025,low+.025,high-.025,3.85,3.96,'Cool' if low<1.05 else 'Ceramic')
+        slab('Floor_return',0,28,.04,.20,3.85,4.20,'Alloy')
+        slab('Ceiling_return',0,28,6.35,6.65,3.85,4.20,'Alloy')
+    for k,(a,b) in enumerate(intervals(0,28,3.5)):
+        box(f'Hall_Ceiling_back_{k}',[-4,6.47,a],[4,6.65,b],'Graphite')
+        for i,(c,d) in enumerate([(-4,-.6),(-.6,.6),(.6,4)]):
+            box(f'Hall_Ceiling_panel_{i}_{k}',[c+.025,6.35,a+.025],[d-.025,6.45,b-.025],'Cool' if i==1 else 'Ceramic')
+    for spec in LAYOUT[CURRENT]['boxes']:
+        if 'partition' in spec['name']:box('Hall_'+spec['name'],spec['lo'],spec['hi'],'Ceramic')
+    hall_observation();hall_service_bay();hall_decon_arch();hall_practicals()
+    owner='cultivation-room-1-to-2-lab-passage-exit-shutter-panel'
+    nursery_door_leaf(owner)
+    for side in [-1,1]:
+        a,b=sorted([side*2,side*2.28])
+        box(f'Hall_Exit_door_guide_{side}',[a,0,27.26],[b,4.6,27.74],'Graphite')
+        for low,high in [(2.025,2.09),(2.18,2.28)]:
+            a,b=sorted([side*low,side*high])
+            box(f'Hall_Exit_door_face_{side}_{low}',[a,.025,27.245],[b,4.575,27.28],'Alloy')
+            box(f'Hall_Exit_door_back_{side}_{low}',[a,.025,27.72],[b,4.575,27.755],'Alloy')
+    box('Hall_Exit_door_drive_header',[-2.28,4.6,27.26],[2.28,4.94,27.74],'Alloy')
+
 def build_enclosure():
     # Opaque backs of the unchanged fixtures and retained acid slabs own their
     # contact faces. Only immutable surfaces in this same room are trimmed.
@@ -923,8 +1214,9 @@ def build_enclosure():
         OCCLUDERS[:]=[o for o in OCCLUDERS if o['hi'][1]<=0]
         build_nursery();return
     if CURRENT=='passage-1-2':
-        OCCLUDERS[:]=[o for o in OCCLUDERS if not(o['lo'][2]<1 and o['hi'][2]>.2)]
+        OCCLUDERS[:]=[]
         nursery_sliding_door()
+        build_decontamination_passage();return
     if CURRENT=='room-4':
         build_lift();return
     if CURRENT=='room-5':
@@ -1210,12 +1502,7 @@ def build_identity():
         label('Nursery_bay_ident','IRRIGATION  /  ISOLATE FEED',[-17.69,14.25,17.6],.35,(90,0,90),'Ceramic')
         label('Nursery_bay_warning','CONTAINMENT 01',[17.69,14.25,33.3],.43,(90,0,270),'Ceramic')
     elif CURRENT=='passage-1-2':
-        label('Passage_sign','DECONTAMINATION  /  02',[0,5.5,27.20],.28)
-        for side in [-1,1]:
-            face=side*3.85
-            for z in [3,6,18,26]:
-                block(f'Inspection_rib_{side}_{z}',[.18,5.8,.20],[face+side*.09,3.2,z],'Alloy')
-        label('Cartridge_header','STERILE SAMPLE RETURN',[5.35,4.98,12.4],.30,(90,0,270))
+        return # The purpose-built passage owns its frames and identification.
     elif CURRENT=='room-2':
         label('Load_sign','02  /  LOAD CALIBRATION',[-7.8,8,44.72],.58)
         label('Adhesion_sign','ADHESION / HOLD CONTROL',[-18.76,18,20],.48,(90,0,90))
@@ -1308,8 +1595,9 @@ def finalise_boxes():
                 bm=bmesh.new();bm.from_mesh(obj.data)
                 # Metric dirt samples can create T junctions where density
                 # changes. Never bevel a partial shell or a coplanar grid edge.
-                if CURRENT!='room-1' or all(e.is_manifold for e in bm.edges):
-                    edges=[e for e in bm.edges if e.is_manifold and (CURRENT!='room-1' or e.calc_face_angle()>.01)]
+                sampled=CURRENT=='room-1' or (CURRENT=='passage-1-2' and s['name'].startswith('Hall_'))
+                if not sampled or all(e.is_manifold for e in bm.edges):
+                    edges=[e for e in bm.edges if e.is_manifold and (not sampled or e.calc_face_angle()>.01)]
                     bmesh.ops.bevel(bm,geom=edges,offset=.008,segments=1,affect='EDGES')
                     bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(obj.data)
                 bm.free()
@@ -1460,6 +1748,17 @@ def build(room,refs=False):
                             a,b=(p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y)
                             uv=(a/8+.13,b/8+.31) if obj['finish'] in ('Deck','Paint') else (a/2,b/2)
                             layer.data[index].uv=tuple(round(v,6) for v in uv)
+    if room=='passage-1-2':
+        for obj in bpy.context.scene.objects:
+            if obj.type!='MESH' or not obj.get('finish','').startswith('Hall') or obj['finish']=='HallGlass':continue
+            for layer in obj.data.uv_layers:
+                for poly in obj.data.polygons:
+                    axis=max(range(3),key=lambda i:round(abs(poly.normal[i]),5))
+                    for index in poly.loop_indices:
+                        p=obj.data.vertices[obj.data.loops[index].vertex_index].co
+                        a,b=(p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y)
+                        uv=(a/8+.13,b/8+.31) if obj['finish']=='HallPaint' else (a/2,b/2)
+                        layer.data[index].uv=tuple(round(v,6) for v in uv)
     if refs:import_references()
 
 if '--cultivation-build' in sys.argv:

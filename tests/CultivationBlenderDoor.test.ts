@@ -4,12 +4,12 @@ import * as THREE from 'three';
 import {LevelTwoPreviewScene} from '../src/levels/LevelTwoPreviewScene.ts';
 import {cultivationAssets} from './helpers/CultivationBakedAssets.ts';
 
-test('the authored containment door seals both faces and follows the original upward slide and occupancy reset',()=>{
-  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),door=scene.roomOneToTwoPassage.entryDoor;
+for(const end of ['entry','exit'] as const)test(`the authored ${end} containment door seals both faces and follows its original upward slide and occupancy reset`,()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),door=scene.roomOneToTwoPassage[end==='entry'?'entryDoor':'exitDoor'];
   try{
     const collider=door.collisionMesh,geometry=collider.geometry;
-    assert.equal(door.statusLight.visible,false);
-    assert.equal(door.root.getObjectByName('cultivation-room-1-to-2-lab-passage-entry-status-housing')!.visible,false);
+    assert.equal(door.statusLight.visible,end==='exit');
+    assert.equal(door.root.getObjectByName(`cultivation-room-1-to-2-lab-passage-${end}-status-housing`)!.visible,end==='exit');
     const skin=collider.children.filter((o):o is THREE.Mesh=>o instanceof THREE.Mesh&&o.userData.blenderBatch);
     assert.ok(skin.length>=3);assert.equal(collider.matrixAutoUpdate,true);
     const metadata=structuredClone(collider.userData),closed=collider.position.clone();
@@ -30,7 +30,7 @@ test('the authored containment door seals both faces and follows the original up
     door.update(.1,[]);assert.equal(door.state,'closing');
     door.update(.1,[{id:'bob',position:centre,radiusMetres:.45}]);assert.equal(door.state,'open','either persistent body keeps the existing proximity opening');
     scene.reset();assert.equal(door.state,'closed');assert.deepEqual(collider.position,closed);
-    door.setLocked(true);door.setLocked(false);assert.equal(door.statusLight.visible,false);
+    door.setLocked(true);door.setLocked(false);assert.equal(door.statusLight.visible,end==='exit');
     assert.equal(collider.geometry,geometry);assert.equal(collider.userData.doorId,metadata.doorId);
     assert.deepEqual(collider.userData.sizeMetres,metadata.sizeMetres);
   }finally{scene.dispose();}
