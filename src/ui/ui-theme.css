@@ -246,58 +246,6 @@
   max-width: 25rem;
 }
 
-.brand-scanner {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 4rem;
-  aspect-ratio: 1;
-  margin-bottom: var(--ui-space-4);
-  filter: drop-shadow(0 0 1.25rem rgb(116 172 169 / 16%));
-}
-
-.brand-scanner-orbit,
-.brand-scanner-node {
-  position: absolute;
-  border-radius: 50%;
-}
-
-.brand-scanner-orbit--outer {
-  inset: 0;
-  background: repeating-conic-gradient(
-    from 3deg,
-    rgb(163 203 194 / 58%) 0deg 1deg,
-    transparent 1deg 11deg
-  );
-  -webkit-mask: radial-gradient(circle, transparent 0 72%, #000 73% 75%, transparent 76%);
-  mask: radial-gradient(circle, transparent 0 72%, #000 73% 75%, transparent 76%);
-  animation: scanner-orbit 9s linear infinite;
-}
-
-.brand-scanner-orbit--inner {
-  inset: 12%;
-  border: 1px solid rgb(163 203 194 / 23%);
-  border-top-color: var(--ui-lavender);
-  border-right-color: rgb(116 172 169 / 66%);
-  animation: scanner-orbit 2.8s linear infinite reverse;
-}
-
-.brand-scanner-node {
-  top: -0.08rem;
-  left: 50%;
-  width: 0.38rem;
-  height: 0.38rem;
-  background: var(--ui-violet);
-  box-shadow: var(--ui-shadow-signal);
-  transform: translateX(-50%);
-}
-
-.brand-scanner-mark {
-  width: 58%;
-  aspect-ratio: 1;
-  background: radial-gradient(circle, rgb(116 172 169 / 10%), transparent 70%);
-}
-
 /* Actions */
 .flow-actions { display: grid; gap: var(--ui-space-2); }
 .game-menu { width: min(21rem, 100%); margin-top: var(--ui-space-6); }
@@ -1365,16 +1313,6 @@
   background: var(--ui-bg);
 }
 
-.graphics-preparation-content {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-3);
-  max-width: 32rem;
-}
-.graphics-preparation-content p { margin: 0; }
-.ui-loading { display: block; animation: scanner-orbit 1.2s linear infinite; }
-.graphics-preparation[data-state='failed'] .ui-loading { animation: none; color: var(--ui-warning); }
-
 .elevator-encounter-status,
 .security-network-status {
   position: absolute;
@@ -1406,7 +1344,6 @@
   .hud-roster-content { padding: var(--ui-space-2); }
 }
 
-@media (prefers-reduced-motion: reduce) { .ui-loading { animation: none; } }
 
 /* HUD */
 .game-hud {
@@ -2160,11 +2097,6 @@ kbd {
     padding-block: var(--ui-space-3);
   }
 
-  .brand-scanner {
-    width: 4.75rem;
-    margin-bottom: var(--ui-space-3);
-  }
-
   .system-state {
     padding-block: var(--ui-space-4);
   }
@@ -2182,12 +2114,6 @@ kbd {
 
   .title-screen h1 {
     font-size: clamp(1.8rem, min(4.8vw, 12vh), 4rem);
-  }
-}
-
-@keyframes scanner-orbit {
-  to {
-    transform: rotate(1turn);
   }
 }
 
@@ -2271,7 +2197,6 @@ kbd {
   .system-state,
   .death-screen.is-visible .death-card,
   .death-screen.is-visible .death-signal,
-  .brand-scanner-orbit,
   .goop-aim-crosshair.is-firing {
     animation: none;
   }

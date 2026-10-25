@@ -5,7 +5,7 @@ import test from 'node:test';
 import {
   BRAND_ASSETS,
   createBrandMarkMarkup,
-  createBrandedScannerMarkup,
+  createLiquidLoaderMarkup,
 } from '../src/ui/Branding.ts';
 
 const repositoryRoot = new URL('../', import.meta.url);
@@ -34,31 +34,30 @@ test('game-flow brand marks remain decorative', () => {
   assert.match(simple, /aria-hidden="true"/);
 });
 
-test('the shared scanner animates orbital geometry around a still decorative mark', () => {
-  const scanner = createBrandedScannerMarkup();
+test('the liquid loader reuses the decorative mark without claiming numeric progress', () => {
+  const loader = createLiquidLoaderMarkup();
 
-  assert.match(scanner, /brand-scanner-orbit--outer/);
-  assert.match(scanner, /brand-scanner-orbit--inner/);
-  assert.match(scanner, /brand-scanner-node/);
-  assert.match(scanner, new RegExp(BRAND_ASSETS.simpleMark));
-  assert.match(scanner, /aria-hidden="true"/);
+  assert.match(loader, new RegExp(BRAND_ASSETS.simpleMark));
+  assert.match(loader, /alt=""/);
+  assert.match(loader, /aria-hidden="true"/);
+  assert.doesNotMatch(loader, /aria-valuenow|<canvas|<video/);
 });
 
-test('every live game-flow loader uses the shared branded scanner', async () => {
-  const gameFlowUi = await readFile(
-    new URL('src/ui/GameFlowUI.ts', repositoryRoot),
-    'utf8',
-  );
+test('game-flow and graphics preparation share the same loading treatment', async () => {
+  const [gameFlowUi, graphicsPreparation] = await Promise.all([
+    readFile(new URL('src/ui/GameFlowUI.ts', repositoryRoot), 'utf8'),
+    readFile(new URL('src/ui/GraphicsPreparationOverlay.ts', repositoryRoot), 'utf8'),
+  ]);
 
-  assert.doesNotMatch(gameFlowUi, /class="[^"]*\bloading-mark\b[^"]*"/);
-  for (const panel of ['loading', 'restarting', 'transitioning']) {
+  for (const panel of ['loading', 'opening', 'restarting', 'transitioning']) {
     assert.match(
       gameFlowUi,
       new RegExp(
-        `data-flow-panel="${panel}"[\\s\\S]*?\\$\\{createBrandedScannerMarkup\\(\\)\\}`,
+        `data-flow-panel="${panel}"[\\s\\S]*?\\$\\{createLiquidLoaderMarkup\\(\\)\\}`,
       ),
     );
   }
+  assert.match(graphicsPreparation, /\$\{createLiquidLoaderMarkup\(\)\}/);
 });
 
 test('document metadata and README use deployment-safe brand paths', async () => {

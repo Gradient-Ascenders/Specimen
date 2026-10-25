@@ -34,6 +34,7 @@ import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
 import './ui/ui-theme.css';
+import './ui/liquid-loading.css';
 
 const trailerShot = new URLSearchParams(window.location.search).get('trailer');
 if (trailerShot === 'opening' || trailerShot === 'goop') {
@@ -385,6 +386,7 @@ function startGame(): void {
         } finally { autoDetecting = false; }
       },
       applySettings: (nextSettings) => {
+        app.dataset.reducedMenuMotion = String(nextSettings.reduceMenuMotion);
         audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);
         music.setMasterVolume(nextSettings.masterVolume);
         music.setMusicVolume(nextSettings.musicVolume);

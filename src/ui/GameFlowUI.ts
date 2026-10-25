@@ -35,7 +35,7 @@ import {
 } from './SlimeRosterView.ts';
 import {
   createBrandMarkMarkup,
-  createBrandedScannerMarkup,
+  createLiquidLoaderMarkup,
 } from './Branding.ts';
 
 export type GameFlowState =
@@ -692,7 +692,14 @@ export class GameFlowUI {
 
   setOpeningStatus(message: string, failed: boolean): void {
     const status = this.requireElement('[data-opening-status]');
-    if (status.textContent !== message) status.textContent = message;
+    const panel = this.panels.get('opening')!;
+    const loadingState = failed ? 'failed' : 'loading';
+    if (status.textContent === message && panel.dataset.loadingState === loadingState) return;
+    status.textContent = message;
+    panel.dataset.loading = String(message.length > 0);
+    panel.dataset.loadingState = loadingState;
+    this.requireElement('[data-opening-loading-label]').textContent = failed ? 'Couldn’t load'
+      : /Level 1/.test(message) ? 'Containment' : 'Loading…';
     this.requireElement<HTMLButtonElement>('[data-action="retry-opening"]').hidden = !failed;
   }
 
@@ -719,8 +726,9 @@ export class GameFlowUI {
     this.transitionRuntimeLabel.textContent = levelTwo
       ? 'Cultivation'
       : 'Blackout';
-    this.transitionMessage.textContent = message;
-    this.transitionCopy.textContent = 'Preparing the next level.';
+    this.transitionMessage.textContent = 'Loading…';
+    this.transitionCopy.textContent = message;
+    this.panels.get('transitioning')!.dataset.loadingState = 'loading';
     this.transitionContinueButton.hidden = true;
     this.switchFeedbackModel.clear();
     this.switchFeedback.textContent = '';
@@ -730,7 +738,9 @@ export class GameFlowUI {
   finishLevelTransition(levelId: 'level-2' | 'level-3' = 'level-2'): void {
     if (this.model.state !== 'transitioning') return;
     const levelName = levelId === 'level-2' ? 'Level 2' : 'Level 3';
-    this.transitionMessage.textContent = `${levelName} ready`;
+    this.transitionMessage.textContent = 'Ready';
+    this.transitionCopy.textContent = '';
+    this.panels.get('transitioning')!.dataset.loadingState = 'ready';
     const label = this.transitionContinueButton.querySelector('span');
     if (label) label.textContent = `Enter ${levelName}`;
     this.transitionContinueButton.hidden = false;
@@ -777,12 +787,10 @@ export class GameFlowUI {
     const root = this.hostDocument.createElement('div');
     root.className = 'game-flow';
     root.innerHTML = `
-      <section class="flow-screen loading-screen" data-flow-panel="loading" aria-labelledby="loading-title">
-        <div class="system-state">
-          ${createBrandedScannerMarkup()}
-          <h1 id="loading-title">Preparing game</h1>
-          <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <p class="system-copy" role="status" aria-live="polite">Loading Containment.</p>
+      <section class="flow-screen loading-screen liquid-loading-screen" data-flow-panel="loading" aria-labelledby="loading-title">
+        <div class="liquid-loading-state">
+          ${createLiquidLoaderMarkup()}
+          <h1 id="loading-title" class="liquid-loading-label" role="status" aria-live="polite">Loading…</h1>
         </div>
       </section>
 
@@ -884,6 +892,12 @@ export class GameFlowUI {
         <div class="opening-fade" aria-hidden="true"></div>
         <div class="opening-letterbox opening-letterbox-top" aria-hidden="true"></div>
         <div class="opening-letterbox opening-letterbox-bottom" aria-hidden="true"></div>
+        <div class="opening-loading liquid-loading-screen">
+          <div class="liquid-loading-state">
+            ${createLiquidLoaderMarkup()}
+            <p class="liquid-loading-label" data-opening-loading-label>Loading…</p>
+          </div>
+        </div>
         <div class="opening-controls">
           <p class="system-status" data-opening-status role="status" aria-live="polite"></p>
           <button type="button" class="system-action" data-action="retry-opening" hidden>${icon('RotateCcw')}<span>Retry</span></button>
@@ -968,22 +982,19 @@ export class GameFlowUI {
         </div>
       </section>
 
-      <section class="flow-screen" data-flow-panel="restarting" aria-labelledby="restarting-heading" hidden>
-        <div class="system-state">
-          ${createBrandedScannerMarkup()}
-          <h1 id="restarting-heading">Restarting</h1>
-          <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <p class="system-copy" role="status" aria-live="polite">Restoring the level.</p>
+      <section class="flow-screen liquid-loading-screen" data-flow-panel="restarting" aria-labelledby="restarting-heading" hidden>
+        <div class="liquid-loading-state">
+          ${createLiquidLoaderMarkup()}
+          <h1 id="restarting-heading" class="liquid-loading-label" role="status" aria-live="polite">Restarting…</h1>
         </div>
       </section>
 
-      <section class="flow-screen" data-flow-panel="transitioning" aria-labelledby="transition-heading" hidden>
-        <div class="system-state">
-          ${createBrandedScannerMarkup()}
-          <p class="system-label" data-transition-runtime-label>Cultivation</p>
-          <h1 id="transition-heading" data-transition-message>Entering Level 2…</h1>
-          <div class="signal-rule" aria-hidden="true"><span></span></div>
-          <p class="system-copy" data-transition-copy role="status" aria-live="polite">Preparing the next level.</p>
+      <section class="flow-screen liquid-loading-screen" data-flow-panel="transitioning" aria-labelledby="transition-heading" aria-describedby="transition-context" hidden>
+        <div class="liquid-loading-state">
+          ${createLiquidLoaderMarkup()}
+          <p class="liquid-loading-sector" data-transition-runtime-label>Cultivation</p>
+          <h1 id="transition-heading" class="liquid-loading-label" data-transition-message role="status" aria-live="polite">Loading…</h1>
+          <p id="transition-context" class="liquid-loading-description" data-transition-copy></p>
           <button class="system-action primary-action transition-action" type="button" data-action="enter-level" hidden>
             ${icon('ArrowRight')}<span>Enter Level 2</span>
           </button>
@@ -1180,9 +1191,9 @@ export class GameFlowUI {
 
   private async returnToMenu(): Promise<void> {
     if (!this.actions.returnToMenu || !this.model.beginReturnToMenu()) return;
-    this.requireElement('#loading-title').textContent = 'Returning to menu';
-    const status = this.requireElement('.loading-screen .system-copy');
-    status.textContent = 'Preparing main menu.';
+    const status = this.requireElement('#loading-title');
+    status.textContent = 'Returning to menu…';
+    this.panels.get('loading')!.dataset.loadingState = 'loading';
     this.switchFeedbackModel.clear();
     this.switchFeedback.textContent = '';
     this.restartStatus.textContent = '';
@@ -1192,7 +1203,10 @@ export class GameFlowUI {
       await this.actions.returnToMenu();
       if (!this.disposed) this.completeBoot();
     } catch {
-      if (!this.disposed) status.textContent = 'Could not open the main menu. Reload to try again.';
+      if (!this.disposed) {
+        status.textContent = 'Could not open the main menu. Reload to try again.';
+        this.panels.get('loading')!.dataset.loadingState = 'failed';
+      }
     }
   }
 
