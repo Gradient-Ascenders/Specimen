@@ -10,6 +10,7 @@ own qualification run.
 
 | Change | Matched local result |
 | --- | --- |
+| [Separate Room 1 chamber and duct light scopes](room-one-light-scoping.md) | Chamber GPU time approximately 15.0 → 7.3 ms; repeat Play-to-control loading approximately 2.7 → 2.5 s |
 | Cull earlier chambers while both player and camera are inside the upper lift | 297 → 127 draw calls; GPU time approximately 9.6 → 7.3 ms |
 | Native BC7 maps for the shared Level 1 finishes | Complete mip storage approximately 32 → 8 MiB; approximately 2–7% lower GPU time in stable sampled views |
 | Distant industrial drones in Cultivation's chamber and elevator | 23,056 fewer submitted triangles in the reviewed chamber view; approximately 2% lower GPU time there |

@@ -99,6 +99,7 @@ try {
     for (const [key, value] of Object.entries(GRAPHICS_PROFILES.standard.settings))
       assert.equal(row.preferences.settings[key], value, `Medium setting changed: ${key}`);
     assert.equal(row.preparation?.roomStepsCompleted, 9, 'Every room and doorway must be ready.');
+    assert.equal(row.preparation.roomOneChamberPrepared, true, 'The optimized chamber must be prepared before controls.');
     assert.equal(row.preparation.measuredProgramDelta, 0);
     assert.equal(row.preparation.measuredGeometryDelta, 0);
     assert.equal(row.preparation.burstProgramDelta, 0);

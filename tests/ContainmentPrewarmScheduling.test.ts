@@ -8,12 +8,14 @@ import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
 import { GreyboxLevelRuntime } from '../src/levels/GreyboxLevelRuntime.ts';
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
 import type { createDepthPrewarmGroup } from '../src/render/ShadowPrewarmMaterial.ts';
+import { ContainmentLightLayout } from '../src/render/ContainmentLightLayout.ts';
 
 function fixture(parallel: boolean, cancelAt = Infinity) {
   const scene = new THREE.Scene(), level = new ContainmentLevelScene(() => {});
   const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 300);
   camera.position.set(3, 2, 5); camera.lookAt(0, 1, 0);
   scene.add(level.root);
+  const layout = new ContainmentLightLayout(scene);
   const resources = {
     testScene: level, spawnPosition: new THREE.Vector3(0, 0.45, 0), goopSpawnPosition: new THREE.Vector3(2, 0.45, 0),
     slimePairPresentation: { root: new THREE.Group() }, goopAcidPresentation: { root: new THREE.Group() },
@@ -63,6 +65,7 @@ function fixture(parallel: boolean, cancelAt = Infinity) {
     yieldPreparation: async () => {
       assert.deepEqual(snapshot(), before, 'Restore renderer state before letting the opening paint.');
       assert.ok(camera.position.equals(cameraPosition) && camera.quaternion.equals(cameraRotation));
+      assert.equal(layout.cameraCullKey, '', 'restore temporary chamber light selection before the opening paints');
       jobsThisTurn = 0; yields++;
       if (yields === cancelAt) probe.lightingPrewarmGeneration++;
     },
@@ -72,11 +75,12 @@ function fixture(parallel: boolean, cancelAt = Infinity) {
     lightingPrewarmGeneration: number;
     depthPrewarmGroups: ReturnType<typeof createDepthPrewarmGroup>[];
     runLightingPrewarm(resources: typeof resources, generation: number): Promise<void>;
+    lightLayout: ContainmentLightLayout;
   };
-  probe.resources = resources; probe.lightingPrewarmGeneration = 1;
+  probe.resources = resources; probe.lightingPrewarmGeneration = 1; probe.lightLayout = layout;
   return { runtime, probe, resources, snapshot, before, level,
     counts: () => ({ jobs, yields, maxJobsPerTurn, configurationsAtFirstDraw }),
-    dispose: () => { for (const batch of probe.depthPrewarmGroups) batch.dispose(); level.dispose(); policy.dispose(); },
+    dispose: () => { for (const batch of probe.depthPrewarmGroups) batch.dispose(); layout.dispose(); level.dispose(); policy.dispose(); },
   };
 }
 
@@ -88,12 +92,13 @@ for (const parallel of [false, true]) test(`Level 1 prewarm yields between GPU j
     assert.ok(f.counts().jobs > 80, 'Exercise the complete room, overlap, fade, alternate-view and final priming sequence.');
     assert.equal(f.counts().maxJobsPerTurn, 1, 'An entire room must not monopolize one cinematic frame.');
     assert.ok(f.counts().yields >= f.counts().jobs);
-    assert.equal(f.counts().configurationsAtFirstDraw, 9,
-      'Submit all room and doorway variants before a first-use draw can force shader synchronization.');
+    assert.equal(f.counts().configurationsAtFirstDraw, 10,
+      'Submit every room, doorway and the chamber layout before any first-use draw.');
     assert.equal(f.level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount, 23);
     assert.equal(f.level.measuredFirstUseGeometryPrimeDiagnostics.resourcesPrimed, true);
     assert.equal(f.runtime.levelOnePrewarmVerification?.measuredProgramDelta, 0);
-    assert.ok(f.runtime.levelOnePrewarmVerification!.roomStepsCompleted >= 5);
+    assert.equal(f.runtime.levelOnePrewarmVerification!.roomStepsCompleted, 9);
+    assert.equal(f.runtime.levelOnePrewarmVerification!.roomOneChamberPrepared, true);
   } finally { f.dispose(); }
 });
 

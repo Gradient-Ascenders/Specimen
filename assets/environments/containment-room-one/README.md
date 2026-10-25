@@ -18,6 +18,17 @@ same reason. Keep these footprints separate when changing their dimensions;
 `RoomOneShell.test.ts` and `OpeningLaboratory.test.ts` audit the exported rear
 wall at 0.1 mm and 2 mm tolerances, including entry, hatch, lid lift and reset.
 
+The west maintenance panels also stop before the complete corner-spine footprint,
+with a backed 20 mm reveal. The flush perimeter floor extends 80 mm under the
+wall bases and includes the rectangle's exact corners, sealing the rear plinth's
+beveled toe without adding a raised strip or changing collision. The focused
+shell test checks both the corner faces and floor coverage at this junction.
+The separate panel/plinth joint at 1.08–1.10 m is sealed by continuous ceramic
+backing, 5 mm behind the panel faces, including their beveled lower edges.
+On the escape wall beside the green climb route, 140 mm graphite dividers cover
+the panel/plinth joins and match the maintenance-wall framing. Separate sections
+retain the door and vent openings and share the existing graphite material batch.
+
 ## Files and reproducibility
 
 - `generate-room-one.py`: deterministic source for geometry, procedural finishes,

@@ -106,3 +106,59 @@ test('camera culling retains offscreen sources that can light the view and resto
     assert.deepEqual(objects.map(object => object.visible), before);
   } finally { layout.dispose(); }
 });
+
+test('the enclosed chamber uses three spots and restores source/padding visibility even when drawing fails', () => {
+  const level = new ContainmentLevelScene(), scene = new THREE.Scene(); scene.add(level.root);
+  const layout = new ContainmentLightLayout(scene), camera = new THREE.PerspectiveCamera(48, 16 / 9, .05, 300);
+  camera.position.set(0, 1.7, -5.5); camera.lookAt(0, .8, -2.6);
+  const objects: THREE.Object3D[] = []; scene.traverse(object => objects.push(object));
+  const visibility = objects.map(object => object.visible);
+  const sources: THREE.SpotLight[] = [];
+  level.root.traverse(object => { if (object instanceof THREE.SpotLight) sources.push(object); });
+  const authored = sources.map(light => [light.intensity, light.castShadow, light.shadow.map, light.shadow.autoUpdate, light.shadow.needsUpdate]);
+  const inspect = () => {
+    let points = 0, spots = 0;
+    scene.traverseVisible(object => {
+      if (object instanceof THREE.PointLight) points++;
+      if (object instanceof THREE.SpotLight) spots++;
+    });
+    assert.equal(points, 7); assert.equal(spots, 3);
+    assert.equal(layout.cameraCullKey, 'room-1-chamber');
+    assert.ok(sources.filter(light => light.name.startsWith('room-1-to-2-duct-')).every(light => !light.visible));
+  };
+  try {
+    assert.equal(layout.withRoomOneView({x:0,y:.46,z:-2.6}, camera, () => { inspect(); return 42; }), 42);
+    assert.deepEqual(objects.map(object => object.visible), visibility);
+    assert.throws(() => layout.withRoomOneView({x:0,y:.46,z:-2.6}, camera, () => { inspect(); throw new Error('failed draw'); }), /failed draw/);
+    assert.deepEqual(objects.map(object => object.visible), visibility);
+    assert.equal(layout.cameraCullKey, '');
+    assert.deepEqual(sources.map(light => [light.intensity, light.castShadow, light.shadow.map, light.shadow.autoUpdate, light.shadow.needsUpdate]), authored);
+  } finally { layout.dispose(); level.dispose(); }
+});
+
+test('upward vent views, climbing and either side of a trailing-camera transition retain the duct rig', () => {
+  const level = new ContainmentLevelScene(), scene = new THREE.Scene(); scene.add(level.root);
+  const layout = new ContainmentLightLayout(scene), camera = new THREE.PerspectiveCamera(48, 16 / 9, .05, 300);
+  const cases = [
+    ['look into vent', [0,.46,-2.6], [0,1.7,-4], [-4.8,5.9,5.9]],
+    ['climbing before entry', [-4.8,4.6,5], [0,2,-4], [0,1,0]],
+    ['actor in vent', [-4.8,5.7,6.3], [0,2,-4], [0,1,0]],
+    ['camera in vent', [0,.46,0], [-4.8,6,6.5], [0,1,0]],
+    ['camera outside chamber', [0,.46,0], [-7,2,0], [0,1,0]],
+  ] as const;
+  try {
+    for (const [name,actor,eye,target] of cases) {
+      camera.position.set(...eye); camera.lookAt(...target);
+      layout.withRoomOneView({x:actor[0],y:actor[1],z:actor[2]},camera,()=>{
+        assert.equal(layout.cameraCullKey, '', name);
+        let spots = 0; scene.traverseVisible(object => { if (object instanceof THREE.SpotLight) spots++; });
+        assert.equal(spots, 10, name);
+      });
+    }
+    // Turning away and back must restore both layouts without persistent state.
+    camera.position.set(0,1.7,-4); camera.lookAt(0,.8,-2);
+    layout.withRoomOneView({x:0,y:.46,z:0},camera,()=>assert.equal(layout.cameraCullKey,'room-1-chamber'));
+    camera.lookAt(-4.8,5.9,5.9);
+    layout.withRoomOneView({x:0,y:.46,z:0},camera,()=>assert.equal(layout.cameraCullKey,''));
+  } finally { layout.dispose(); level.dispose(); }
+});

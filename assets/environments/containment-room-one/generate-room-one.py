@@ -287,18 +287,33 @@ def ring(name, inner, outer, y, mat, start=0, end=math.tau, segments=96):
     return mesh(name, vertices, faces, mat, facing=(0,1,0))
 
 
-def build_floor():
-    # All walking faces meet at Y=0. Dark joints replace surface area; they
-    # are not coplanar decals, raised curbs or new gameplay steps.
+def build_perimeter_floor():
+    # Run the flush floor 80 mm beneath the wall bases. Ending at their inner
+    # envelope left a slit beneath the rear plinth's recessed, beveled toe.
     vertices, faces = [], []
     for i in range(129):
         a = math.tau * i / 128
         x, z = math.cos(a), math.sin(a)
-        distance = min(6.8 / max(abs(x), 1e-8), (6.3 if z > 0 else 5.3) / max(abs(z), 1e-8))
+        distance = min(6.88 / max(abs(x), 1e-8), (6.38 if z > 0 else 5.38) / max(abs(z), 1e-8))
         vertices.extend([(x*3.04,0,-.5+z*3.04),(x*distance,0,-.5+z*distance)])
     for i in range(128):
         faces.append((i*2+2,i*2+3,i*2+1,i*2))
+    # Radial samples straddling a rectangular corner otherwise cut it off.
+    # Fill only that missing triangle, retaining the existing inner ring edge.
+    for x in (-6.88,6.88):
+        for z in (-5.38,6.38):
+            angle = math.atan2(z,x) % math.tau
+            i = int(angle / math.tau * 128)
+            corner = len(vertices)
+            vertices.append((x,0,-.5+z))
+            faces.append((i*2+1,corner,i*2+3))
     mesh('Resin perimeter floor', vertices, faces, material('Resin'), facing=(0,1,0))
+
+
+def build_floor():
+    # All walking faces meet at Y=0. Dark joints replace surface area; they
+    # are not coplanar decals, raised curbs or new gameplay steps.
+    build_perimeter_floor()
     ring('Pod footing seal', 0, 1.64, 0, material('Graphite'))
     ring('Machined inner collar', 1.64, 1.75, 0, material('Alloy'))
     ring('Outer isolation seal', 2.98, 3.04, 0, material('Graphite'))
@@ -338,6 +353,35 @@ def build_instrument_covers():
                 [x,4.3,-5.652], material('Alloy'))
 
 
+def build_west_panels():
+    # Stop the final bay at Z=5.72, before the corner spine's full 5.74..5.82
+    # footprint. Their inward faces otherwise coincide at X=-6.74. The
+    # continuous west backing seals the 20 mm reveal behind the bevels.
+    for i,(z0,z1) in enumerate(((-5.70,-2.0),(-1.8,1.9),(2.04,5.72))):
+        length,z = z1-z0,(z0+z1)/2
+        box('West service plinth '+str(i), [.12,1.12,length], [-6.79,.56,z], material('Cool'))
+        box('West ceramic sail '+str(i), [.12,6.48,length], [-6.80,4.45,z], material('Ivory'))
+
+
+def build_rear_plinth_join():
+    # The plinth ends at Y=1.08 and the panels start at 1.10. Seal that
+    # opening and the beveled panel toes with a continuous ceramic backing,
+    # 5 mm behind the panel faces. Its overlap stays hidden, without coplanar
+    # faces or a view through the joint to the distant rear bulkhead.
+    mesh('Rear plinth seam closure', [(-6.8,1.04,-5.825),(-6.8,1.14,-5.825),
+         (6.8,1.14,-5.825),(6.8,1.04,-5.825)], [(0,1,2,3)],
+         material('Ivory'), facing=(0,0,1))
+
+
+def build_escape_plinth_dividers():
+    # Match the bold horizontal frame on the maintenance wall. These solid
+    # graphite rails cover the panel/plinth reveal beside the green climb
+    # route, with a clear front face and open door/vent spans between sections.
+    for name,x0,x1 in (('west',-6.8,-5.9),('centre',-3.7,2.6),('east',6.0,6.8)):
+        box('North '+name+' plinth divider', [x1-x0,.14,.12],
+            [(x0+x1)/2,1.11,5.75], material('Graphite'), .01)
+
+
 def build_walls():
     ivory, cool, dark, alloy = [material(n) for n in ('Ivory','Cool','Graphite','Alloy')]
     box('Rear alcove backing', [13.6,7.85,.12], [0,3.925,-6.52], dark, 0)
@@ -350,13 +394,12 @@ def build_walls():
     build_instrument_covers()
     build_rear_quiet_wings()
     box('Rear service plinth', [13.6,1.08,.16], [0,.54,-5.89], cool)
+    build_rear_plinth_join()
     for x in (-3.78,3.78):
         box('Alcove vertical return '+str(x), [.10,6.65,.27], [x,4.4,-5.93], alloy)
     # West: three recessed maintenance bays, each framed as an assembly.
     box('West backing', [.12,7.85,11.6], [-6.86,3.925,0], dark, 0)
-    for i,(z,length) in enumerate([(-3.85,3.8),(.05,3.8),(3.92,3.86)]):
-        box('West service plinth '+str(i), [.12,1.12,length-.10], [-6.79,.56,z], cool)
-        box('West ceramic sail '+str(i), [.12,6.48,length-.10], [-6.80,4.45,z], ivory)
+    build_west_panels()
     for z in (-5.78,-1.93,1.99,5.78):
         box('West recessed spine '+str(z), [.10,7.5,.08], [-6.79,3.75,z], alloy, .012)
     # East: real glazed observation recess outside the playable envelope.
@@ -388,6 +431,7 @@ def build_walls():
         wall('North '+name+' ceramic',x0,x1,1.12,7.85,5.91,ivory)
     wall('North vent header',-5.9,-3.7,6.9,7.85,5.91,dark)
     wall('North door header',2.6,6.0,3.8,7.85,5.91,ivory)
+    build_escape_plinth_dividers()
     for x in (-5.98,-3.62):
         box('Escape service jamb '+str(x), [.09,7.5,.12], [x,3.75,5.79], alloy)
     for x in (-6.51,-6.24):
