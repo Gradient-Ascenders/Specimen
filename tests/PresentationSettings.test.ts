@@ -12,15 +12,33 @@ function memoryStorage(): SettingsStorage {
     removeItem: key => { entries.delete(key); } };
 }
 
-test('display preferences and a manual graphics choice persist independently', () => {
+test('audio, camera, input and display preferences survive reload independently of graphics', () => {
   const storage = memoryStorage(), first = new GameSettings({ storage });
   first.setShowFPS(true); first.setReduceMenuMotion(true);
   first.setGraphicsProfile('standard'); first.setMasterVolume(0.25);
+  first.setSoundEffectsVolume(0.4); first.setMouseSensitivity(1.7);
+  first.setInvertVerticalLook(true); first.setCameraDistanceMetres(7);
   const reloaded = new GameSettings({ storage });
-  assert.deepEqual(reloaded.value, { ...DEFAULT_GAME_SETTINGS, ...GRAPHICS_PROFILES.standard.settings, showFPS: true, reduceMenuMotion: true });
+  assert.deepEqual(reloaded.value, { ...DEFAULT_GAME_SETTINGS, ...GRAPHICS_PROFILES.standard.settings,
+    showFPS: true, reduceMenuMotion: true, masterVolume: 0.25, soundEffectsVolume: 0.4,
+    mouseSensitivity: 1.7, invertVerticalLook: true, cameraDistanceMetres: 7 });
   const saved = JSON.parse(storage.getItem(PRESENTATION_PREFERENCES_KEY)!);
   assert.equal(saved.showFPS, true); assert.equal(saved.reduceMenuMotion, true);
   assert.equal('graphicsProfile' in saved, false);
+});
+
+test('newly persisted preferences validate old saves and clamp unsupported values', () => {
+  const storage = memoryStorage();
+  storage.setItem(PRESENTATION_PREFERENCES_KEY, JSON.stringify({ musicVolume: 0.3,
+    masterVolume: 4, soundEffectsVolume: -1, mouseSensitivity: 'fast',
+    cameraDistanceMetres: null, invertVerticalLook: 'yes' }));
+  const settings = new GameSettings({ storage });
+  assert.equal(settings.value.masterVolume, 1);
+  assert.equal(settings.value.soundEffectsVolume, 0);
+  assert.equal(settings.value.mouseSensitivity, DEFAULT_GAME_SETTINGS.mouseSensitivity);
+  assert.equal(settings.value.cameraDistanceMetres, DEFAULT_GAME_SETTINGS.cameraDistanceMetres);
+  assert.equal(settings.value.invertVerticalLook, false);
+  assert.equal(settings.value.musicVolume, 0.3);
 });
 
 test('reset restores every default atomically and clears saved presentation preferences', () => {

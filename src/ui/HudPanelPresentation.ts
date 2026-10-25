@@ -13,6 +13,7 @@ export class HudPanelPresentation {
   private animations: ReturnType<typeof animate>[] = [];
   private animationVersion = 0;
   private disposed = false;
+  private reducedMotion = false;
   private readonly root: HTMLElement;
   private readonly hostWindow: Window;
   private readonly axis: 'X' | 'Y';
@@ -36,6 +37,11 @@ export class HudPanelPresentation {
     if (this.visibilityMode === mode) return;
     this.visibilityMode = mode;
     this.reset();
+  }
+
+  setReducedMotion(reduced: boolean): void {
+    this.reducedMotion = reduced;
+    if (reduced) for (const animation of this.animations) animation.complete();
   }
 
   reset(): void {
@@ -82,7 +88,7 @@ export class HudPanelPresentation {
       (collapsed ? this.panel : this.compact).style.visibility = 'hidden';
       this.animations = [];
     };
-    if (this.hostWindow.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (this.reducedMotion || this.hostWindow.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       Object.assign(this.panel.style, panel);
       Object.assign(this.compact.style, compact);
       finish();

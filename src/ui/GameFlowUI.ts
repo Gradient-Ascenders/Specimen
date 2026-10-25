@@ -14,6 +14,9 @@ import { menuIconMarkup as icon } from './MenuIcons.ts';
 import { SLIME_PORTRAITS } from './SlimePortraits.ts';
 import { SlimeRosterPresentation } from './SlimeRosterPresentation.ts';
 import { HudPanelPresentation } from './HudPanelPresentation.ts';
+import { ProgressFeedback } from './ProgressFeedback.ts';
+import { createLevelSelectCards, loadLevelPreviews } from './LevelSelectCards.ts';
+import type { CheckpointReachedEvent } from '../levels/GameLevelRuntime.ts';
 import { HudFooterLayout } from './HudFooterLayout.ts';
 import { PlayerHealthHud } from './PlayerHealthHud.ts';
 import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
@@ -481,6 +484,8 @@ export class GameFlowUI {
   private readonly focusTargets = new Map<GameFlowState, HTMLElement>();
   private readonly restartStatus: HTMLElement;
   private readonly objective: HTMLElement;
+  private readonly progressFeedback: ProgressFeedback;
+  private readonly motionPreference: MediaQueryList;
   private readonly sensitivityInput: HTMLInputElement;
   private readonly sensitivityOutput: HTMLOutputElement;
   private readonly invertVerticalInput: HTMLInputElement;
@@ -535,12 +540,15 @@ export class GameFlowUI {
     this.settings = options.settings;
     this.hostDocument = options.document ?? document;
     this.hostWindow = options.window ?? window;
+    this.motionPreference = this.hostWindow.matchMedia('(prefers-reduced-motion: reduce)');
     this.slimeHUD = options.slimeHUD;
     this.element = this.createElement(options.creditsMarkdown);
 
     this.requireElement('.title-description').textContent = chooseTitleScreenLine(this.hostWindow);
     this.restartStatus = this.requireElement('[data-restart-status]');
     this.objective = this.requireElement('[data-current-objective]');
+    this.progressFeedback = new ProgressFeedback(this.objective, this.hostWindow);
+    this.requireElement('.game-hud').append(this.progressFeedback.element);
     this.sensitivityInput = this.requireElement<HTMLInputElement>(
       '[data-setting="sensitivity"]',
     );
@@ -650,6 +658,7 @@ export class GameFlowUI {
   updateFrame(deltaSeconds: number): void {
     if (this.disposed) return;
     if (this.model.state === 'playing') {
+      this.progressFeedback.update(this.actions.isGameplayInputEnabled() && !this.actions.isCinematicPlaying?.() ? deltaSeconds : 0);
       this.healthHud.update(this.actions.isCinematicPlaying?.() ? undefined : this.slimeHUD?.getPlayerHealth?.(),
         this.actions.isGameplayInputEnabled() && !this.hostDocument.hidden ? deltaSeconds : 0);
     }
@@ -714,7 +723,13 @@ export class GameFlowUI {
   setObjective(objective: string): void {
     const nextObjective = objective.trim();
     if (!nextObjective) throw new Error('Gameplay objectives cannot be empty.');
-    this.objective.textContent = nextObjective;
+    this.progressFeedback.setObjective(nextObjective, this.gameplayActive && !this.actions.isCinematicPlaying?.());
+  }
+
+  notifyCheckpointReached(event: CheckpointReachedEvent): void {
+    if (this.gameplayActive && this.actions.isGameplayInputEnabled() && !this.actions.isCinematicPlaying?.()) {
+      this.progressFeedback.showCheckpoint(event.label);
+    }
   }
 
   beginLevelTransition(
@@ -772,6 +787,7 @@ export class GameFlowUI {
     this.rosterPresentation.dispose();
     this.controlHints.dispose();
     this.healthHud.dispose();
+    this.progressFeedback.dispose();
     this.hudFooter.dispose();
     this.additionalControls.dispose();
     this.settingHelp.dispose();
@@ -827,21 +843,13 @@ export class GameFlowUI {
       </section>
 
       <section class="flow-screen submenu-screen" data-flow-panel="levelSelect" aria-labelledby="level-select-heading" hidden>
-        <div class="system-panel lab-menu-panel level-select-panel">
+        <div class="system-panel lab-menu-panel level-select-panel level-select-gallery">
           <header class="system-panel-header">
             <span class="signal-bar" aria-hidden="true"></span>
             <h1 id="level-select-heading">Select level</h1>
           </header>
           <nav class="flow-actions game-menu level-select-actions" aria-label="Levels">
-            <button type="button" class="menu-action" data-action="select-level" data-level="level-1" data-autofocus>
-              ${icon('Play')}<span><small>Level 1</small>Containment</span>
-            </button>
-            <button type="button" class="menu-action" data-action="select-level" data-level="level-2">
-              ${icon('Play')}<span><small>Level 2</small>Cultivation</span>
-            </button>
-            <button type="button" class="menu-action" data-action="select-level" data-level="level-3">
-              ${icon('Play')}<span><small>Level 3</small>Blackout</span>
-            </button>
+            ${createLevelSelectCards()}
           </nav>
           <footer class="credits-footer">
             <button type="button" class="system-action" data-action="back">
@@ -1022,6 +1030,7 @@ export class GameFlowUI {
   }
 
   private bindActions(): void {
+    this.motionPreference.addEventListener('change', this.syncMotionPreference, { signal: this.listeners.signal });
     const signal = this.listeners.signal;
     this.element.addEventListener('click', this.onClick, { signal });
     this.sensitivityInput.addEventListener('input', this.onSensitivityInput, {
@@ -1091,6 +1100,10 @@ export class GameFlowUI {
     this.additionalControls.dismiss();
     this.syncGraphicsDiagnostics();
     const state = this.model.state;
+    if (state === 'levelSelect') loadLevelPreviews(this.panels.get('levelSelect')!);
+    if (state === 'loading' || state === 'title' || state === 'opening' || state === 'restarting' || state === 'transitioning') {
+      this.progressFeedback.reset();
+    }
     this.element.dataset.state = state;
     this.element.dataset.menuOrigin = this.model.menuOrigin;
     this.gamepadNavigation.reset();
@@ -1424,6 +1437,7 @@ export class GameFlowUI {
   private readonly onSettingsChanged = (
     settings: Readonly<GameSettingsSnapshot>,
   ): void => {
+    this.syncMotionPreference();
     this.sensitivityInput.value = settings.mouseSensitivity.toFixed(1);
     this.sensitivityInput.style.setProperty(
       '--range-progress',
@@ -1501,6 +1515,15 @@ export class GameFlowUI {
     this.syncGraphicsDiagnostics();
   };
 
+  private readonly syncMotionPreference = (): void => {
+    const reduced = this.settings.value.reduceMenuMotion || this.motionPreference.matches;
+    this.element.dataset.reducedMenuMotion = String(reduced);
+    this.rosterPresentation.setReducedMotion(reduced);
+    this.controlHints.setReducedMotion(reduced);
+    this.healthHud.setReducedMotion(reduced);
+    this.progressFeedback.setReducedMotion(reduced);
+  };
+
   private readonly syncGraphicsDiagnostics = (): void => {
     const diagnostics = this.actions.getGraphicsDiagnostics?.();
     this.graphicsDiagnostics.textContent = diagnostics
@@ -1574,6 +1597,11 @@ export class GameFlowUI {
       return;
     }
     const direction = action === 'increase' ? 1 : -1;
+    if (this.model.state === 'levelSelect' && control.matches('[data-action="select-level"]')) {
+      const cards = controls.filter(item => item.matches('[data-action="select-level"]'));
+      this.focusMenuControl(cards[nextMenuFocusIndex(cards.indexOf(control), cards.length, direction)]);
+      return;
+    }
     if (control.getAttribute('role') === 'tab') {
       const tabs = Array.from(this.element.querySelectorAll<HTMLButtonElement>('[data-action="settings-section"]'));
       const next = tabs[nextMenuFocusIndex(tabs.indexOf(control as HTMLButtonElement), tabs.length, direction)];
@@ -1621,6 +1649,11 @@ export class GameFlowUI {
         this.focusMenuControl(controls[event.shiftKey ? controls.length - 1 : 0]);
         return true;
       }
+    } else if (this.model.state === 'levelSelect' && (event.code === 'ArrowLeft' || event.code === 'ArrowRight') &&
+      active?.matches('[data-action="select-level"]')) {
+      event.preventDefault();
+      this.navigateMenu(event.code === 'ArrowRight' ? 'increase' : 'decrease');
+      return true;
     } else if ((event.code === 'ArrowUp' || event.code === 'ArrowDown') && active?.tagName !== 'SELECT') {
       event.preventDefault();
       this.navigateMenu(event.code === 'ArrowDown' ? 'next' : 'previous');

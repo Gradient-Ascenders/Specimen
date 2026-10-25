@@ -221,6 +221,7 @@ interface GreyboxRuntimeResources {
   readonly unsubscribeDamaged: () => void;
   unsubscribeSlimeRoster: readonly (() => void)[];
   readonly unsubscribeObjectiveChanged: () => void;
+  readonly unsubscribeCheckpointReached: () => void;
   readonly unsubscribeLevelCompleted: () => void;
   readonly testPanel: GreyboxTestPanel | undefined;
 }
@@ -1369,6 +1370,8 @@ export class GreyboxLevelRuntime {
       'objectiveChanged',
       (event) => this.events.emit('objectiveChanged', event),
     );
+    const unsubscribeCheckpointReached = containmentLevel.events.on('checkpointReached',
+      (event) => this.events.emit('checkpointReached', event));
 
     if (testPanel) {
       this.host.append(testPanel.element);
@@ -1420,6 +1423,7 @@ export class GreyboxLevelRuntime {
       unsubscribeDamaged,
       unsubscribeSlimeRoster: [],
       unsubscribeObjectiveChanged,
+      unsubscribeCheckpointReached,
       unsubscribeLevelCompleted,
       testPanel,
     };
@@ -1541,6 +1545,7 @@ export class GreyboxLevelRuntime {
     resources.unsubscribeDamaged();
     for (const unsubscribe of resources.unsubscribeSlimeRoster) unsubscribe();
     resources.unsubscribeObjectiveChanged();
+    resources.unsubscribeCheckpointReached();
     resources.unsubscribeLevelCompleted();
     resources.movementEvents.clear();
     resources.goopMovementEvents.clear();

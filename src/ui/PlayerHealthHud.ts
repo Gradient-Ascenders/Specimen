@@ -20,6 +20,7 @@ export class PlayerHealthHud {
   private fillAnimation?: ReturnType<typeof animate>;
   private version = 0;
   private disposed = false;
+  private reduceInterfaceMotion = false;
 
   constructor(doc: Document, hostWindow: Window) {
     this.hostWindow = hostWindow;
@@ -94,7 +95,14 @@ export class PlayerHealthHud {
 
   dispose(): void { this.reset(); this.disposed = true; this.element.remove(); }
 
-  private get reducedMotion(): boolean { return this.hostWindow.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  setReducedMotion(reduced: boolean): void {
+    this.reduceInterfaceMotion = reduced;
+    if (reduced) { this.visibilityAnimation?.complete(); this.fillAnimation?.complete(); }
+  }
+
+  private get reducedMotion(): boolean {
+    return this.reduceInterfaceMotion || this.hostWindow.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
 
   private setVisible(visible: boolean): void {
     if (visible ? this.state === 'visible' : this.state !== 'visible') return;

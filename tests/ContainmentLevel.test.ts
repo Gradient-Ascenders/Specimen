@@ -760,6 +760,8 @@ test('Containment objectives follow room entry and reset to Room 1', () => {
 
   const observedRooms: ContainmentRoomId[] = [];
   const observedObjectives: string[] = [];
+  const observedCheckpoints: (string | number)[] = [];
+  controller.events.on('checkpointReached', event => observedCheckpoints.push(event.roomId));
   controller.events.on('objectiveChanged', ({ roomId, objective }) => {
     observedRooms.push(roomId);
     observedObjectives.push(objective);
@@ -797,12 +799,13 @@ test('Containment objectives follow room entry and reset to Room 1', () => {
   assert.equal(controller.activeRoomId, 1);
   assert.deepEqual(observedRooms, [2, 3, 4, 5, 1]);
   assert.deepEqual(observedObjectives, [
-    'Learn how to jump',
-    'Get past the lasers',
-    'Survive the elevator!',
-    'Free Goop!',
+    'Cross the platforms to reach the next chamber',
+    'Time your jumps through the laser chamber',
+    'Survive the lift and reach the upper floor',
+    'Reach the release controls and free Goop',
     'Climb through the vent',
   ]);
+  assert.deepEqual(observedCheckpoints, [2, 3, 4, 5], 'Reset and repeated upper-lift activation must not announce new checkpoints.');
 
   controller.dispose();
   collisionWorld.clear();

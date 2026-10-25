@@ -35,6 +35,7 @@ import '@fontsource-variable/space-grotesk';
 import './style.css';
 import './ui/ui-theme.css';
 import './ui/liquid-loading.css';
+import './ui/interface-polish.css';
 
 const trailerShot = new URLSearchParams(window.location.search).get('trailer');
 if (trailerShot === 'opening' || trailerShot === 'goop') {
@@ -466,6 +467,8 @@ function startGame(): void {
     'objectiveChanged',
     ({ objective }) => gameFlow.setObjective(objective),
   );
+  const unsubscribeCheckpointReached = gameSession.events.on('checkpointReached',
+    (event) => gameFlow.notifyCheckpointReached(event));
   const unsubscribeTransitionStarted = gameSession.events.on(
     'transitionStarted',
     ({ levelId, message }) => {
@@ -612,6 +615,7 @@ function startGame(): void {
     window.removeEventListener('focus', focusAudio);
     document.removeEventListener('visibilitychange', focusAudio);
     unsubscribeObjectiveChanged();
+    unsubscribeCheckpointReached();
     unsubscribeGraphicsPreparation(); graphicsPreparationOverlay.dispose();
     goopSpeedOverlay.dispose();
     unsubscribeTransitionStarted();

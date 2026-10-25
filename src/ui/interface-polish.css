@@ -1,0 +1,141 @@
+/* One entrance rhythm for menus. Readiness and input never wait for motion. */
+.title-composition,
+.pause-rail,
+.system-panel,
+.system-state,
+.death-screen.is-visible .death-card {
+  animation: interface-surface-enter var(--ui-motion-medium) var(--ui-ease) both;
+}
+
+.title-brand-mark { animation: none; }
+.settings-section { animation: interface-surface-enter var(--ui-motion-fast) var(--ui-ease) both; }
+
+@keyframes interface-surface-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.game-flow[data-menu-origin] .submenu-screen .level-select-gallery {
+  width: min(64rem, 100%);
+  max-height: calc(100dvh - 2rem);
+  padding: clamp(1rem, 2vw, 1.5rem);
+  overflow: hidden;
+}
+
+.level-select-gallery .level-select-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 0;
+  gap: 1rem;
+  padding: .25rem;
+  grid-auto-rows: max-content;
+}
+
+.level-select-gallery .level-select-actions .level-preview-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: start;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-deep);
+}
+
+.level-select-gallery .level-select-actions .level-preview-card:hover,
+.level-select-gallery .level-select-actions .level-preview-card:focus-visible {
+  border-color: var(--ui-lavender);
+  background: var(--ui-surface-raised);
+}
+
+.level-card-image {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: calc(var(--ui-radius-md) - 1px) calc(var(--ui-radius-md) - 1px) 0 0;
+  border-bottom: 1px solid var(--ui-line-soft);
+  background: linear-gradient(135deg, var(--ui-surface-raised), var(--ui-violet-deep));
+}
+
+.level-card-image img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.level-card-copy { display: grid; gap: .65rem; padding: 1rem 1rem 2.5rem; }
+.level-card-name { display: grid; gap: .3rem; }
+.level-card-name strong { color: var(--ui-lavender-pale); font-size: 1.15rem; font-weight: var(--ui-weight-semibold); }
+.level-card-description { color: var(--ui-text-muted); font-size: var(--ui-note-size); line-height: 1.55; }
+.level-card-arrow { position: absolute; right: 1rem; bottom: .85rem; display: flex; color: var(--ui-violet); }
+
+.checkpoint-notice {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  max-width: min(21rem, calc(100% - 3rem));
+  padding: .85rem 1rem;
+  border: 1px solid var(--ui-line);
+  border-left: 2px solid var(--ui-lavender);
+  border-radius: var(--ui-radius-md);
+  background: rgb(10 21 28 / 96%);
+  box-shadow: 0 .5rem 1.5rem rgb(0 0 0 / 18%);
+  pointer-events: none;
+}
+
+.checkpoint-notice > svg { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; color: var(--ui-lavender); }
+.checkpoint-notice > span { display: grid; gap: .15rem; }
+.checkpoint-notice strong { color: var(--ui-lavender-pale); font-size: .875rem; font-weight: var(--ui-weight-semibold); }
+.checkpoint-notice [data-checkpoint-label] { color: var(--ui-text-muted); font-size: .8125rem; }
+.game-fps:not([hidden]) ~ .game-hud .checkpoint-notice { top: 4rem; }
+
+@media (max-width: 700px), (max-height: 540px) {
+  .level-select-gallery .level-select-actions { grid-template-columns: minmax(0, 1fr); gap: .65rem; }
+  .level-select-gallery .level-select-actions .level-preview-card { flex-direction: row; }
+  .level-card-image {
+    flex: 0 0 clamp(5.5rem, 22vw, 10rem);
+    width: auto;
+    aspect-ratio: auto;
+    align-self: stretch;
+    border-radius: calc(var(--ui-radius-md) - 1px) 0 0 calc(var(--ui-radius-md) - 1px);
+    border-right: 1px solid var(--ui-line-soft);
+    border-bottom: 0;
+  }
+  .level-card-copy { gap: .35rem; padding: .75rem 2rem .75rem .8rem; }
+  .level-card-name { gap: .1rem; }
+  .level-card-name strong { font-size: 1rem; }
+  .level-card-description { font-size: .8125rem; }
+  .level-card-arrow { right: .65rem; bottom: .75rem; }
+}
+
+@media (max-width: 600px) {
+  .checkpoint-notice,
+  .game-fps:not([hidden]) ~ .game-hud .checkpoint-notice {
+    top: auto;
+    bottom: 4.5rem;
+    left: 1rem;
+    max-width: calc(100% - 2rem);
+  }
+}
+
+/* The game preference covers menus and death UI; OS changes remain live too. */
+[data-reduced-menu-motion='true'] :is(.title-composition, .title-brand-mark, .pause-rail, .system-panel,
+  .system-state, .settings-section, .death-card, .death-signal) { animation: none; }
+[data-reduced-menu-motion='true'] .death-screen.is-visible :is(.death-card, .death-signal) { animation: none; }
+[data-reduced-menu-motion='true'] .death-card { opacity: 1; transform: none; }
+[data-reduced-menu-motion='true'] :is(.menu-action, .system-action, .setting-toggle-row input) { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .title-composition, .title-brand-mark, .pause-rail, .system-panel, .system-state,
+  .settings-section, .death-screen.is-visible .death-card, .death-screen.is-visible .death-signal { animation: none; }
+  .death-card { opacity: 1; transform: none; }
+}

@@ -3,15 +3,24 @@ import { expect, test } from '@playwright/test';
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
 
 test('level selector supports keyboard navigation, cancel, and compact screens', async ({ page }) => {
+  const previewRequests: string[] = [];
+  page.on('request', request => { if (request.url().includes('/assets/ui/level-previews/')) previewRequests.push(request.url()); });
   await page.goto('./', { waitUntil: 'domcontentloaded' });
   const title = page.locator('[data-flow-panel="title"]');
   const selector = page.locator('[data-flow-panel="levelSelect"]');
   const button = title.getByRole('button', { name: 'Select level' });
   await expect(button).toBeVisible({ timeout: 120_000 });
+  expect(previewRequests).toEqual([]);
   await mkdir('artifacts/evidence/level-selector', { recursive: true });
   await page.screenshot({ path: 'artifacts/evidence/level-selector/main-menu.png' });
   await button.click();
   await expect(selector.getByRole('button', { name: 'Level 1 Containment' })).toBeFocused();
+  await expect.poll(() => previewRequests.length).toBe(3);
+  await expect.poll(() => selector.locator('img[data-level-preview]').evaluateAll(images =>
+    images.every(image => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  await page.keyboard.press('ArrowRight');
+  await expect(selector.getByRole('button', { name: 'Level 2 Cultivation' })).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowDown');
   await expect(selector.getByRole('button', { name: 'Level 2 Cultivation' })).toBeFocused();
   await page.keyboard.press('Escape');

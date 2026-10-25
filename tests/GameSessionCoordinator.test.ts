@@ -73,6 +73,9 @@ for (const levelId of ['level-2', 'level-3'] as const) {
       scheduleTransition: callback => { transition = callback; },
     });
     const completed: string[] = [];
+    const checkpoints: string[] = [];
+    session.events.on('checkpointReached', event => checkpoints.push(event.checkpointId));
+    initial.events.emit('checkpointReached', { checkpointId: 'initial', roomId: 2, label: 'Traversal lab' });
     session.events.on('transitionCompleted', event => completed.push(event.levelId));
     session.startSelectedLevel(levelId);
     session.startSelectedLevel(levelId === 'level-2' ? 'level-3' : 'level-2');
@@ -85,6 +88,9 @@ for (const levelId of ['level-2', 'level-3'] as const) {
     assert.deepEqual(completed, [levelId]);
     assert.equal(initial.state, 'disposed');
     assert.equal(selected.state, 'stopped');
+    initial.events.emit('checkpointReached', { checkpointId: 'stale', roomId: 3, label: 'Old runtime' });
+    selected.events.emit('checkpointReached', { checkpointId: 'selected', roomId: 1, label: 'New runtime' });
+    assert.deepEqual(checkpoints, ['initial', 'selected'], 'Only the active runtime may publish checkpoint feedback.');
     session.start();
     assert.equal(selected.state, 'running');
     session.restartLevel();
