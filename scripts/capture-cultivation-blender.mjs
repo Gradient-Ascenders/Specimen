@@ -114,6 +114,7 @@ try{
     ['room-3-entry',3,'roomThree',[0,.66,3],[1,5,3],[0,13,46]],
     ['room-3-cover',3,'roomThree',[0,.66,3],[0,7,14],[5,3,31]],
     ['room-3-upper',3,'roomThree',[0,.66,3],[-12,24,18],[4,23,55]],
+    ['room-3-lift-door-distant',3,'roomThree',[0,.66,55],[0,3,52],[0,3,78]],
     ['room-3-lift-join',3,'roomThree',[0,.66,72],[1,3,71],[0,3,82]],
     ['room-3-hood',3,'roomThree',[0,.66,68],[-5,13,54],[0,19,72]],
     ['room-3-lift-join-open',3,'roomThree',[0,.66,73],[.7,2,74],[0,2,81],'open-doors'],

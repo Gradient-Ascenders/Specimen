@@ -132,6 +132,8 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly roomThree: LevelTwoRoomThreeGreybox;
   readonly roomFour = new LevelTwoRoomFourGreybox();
   readonly roomFourGeometry = new THREE.Group();
+  readonly roomFourEntranceGeometry = new THREE.Group();
+  readonly roomFourLighting = new THREE.Group();
   readonly roomFive: LevelTwoRoomFiveGreybox;
   readonly maintenanceArt: CultivationMaintenanceArt;
   readonly passageArt: CultivationPassageArt;
@@ -269,6 +271,10 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     // vent and leaving the lift's render range use the same shader layout.
     // Geometry still has its own culling root; collider visibility is untouched.
     this.roomFourGeometry.name = 'cultivation-room-4-render-geometry';
+    this.roomFourEntranceGeometry.name = 'cultivation-room-4-entrance-geometry';
+    this.roomFourLighting.name = 'cultivation-room-4-lighting';
+    const entranceNodes = new Set<THREE.Object3D>([this.roomFour.entrance.root,
+      ...this.roomFour.movingEntranceMeshes.filter(mesh => mesh !== this.roomFour.boardingGuard)]);
     const lightNodes = new Set<THREE.Object3D>();
     for (const child of this.roomFour.root.children) {
       if (child instanceof THREE.Light) lightNodes.add(child);
@@ -281,6 +287,11 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.voltFinaleSet = new CultivationFinaleSet(this.roomFive.root, this.labArt);
     this.surfaceCleanup = new CultivationSurfaceCleanup(this, this.assets);
     this.blenderArt = new CultivationBlenderArt(this);
+    // Apply the offline bank's index paths before splitting render scope.
+    // These identity groups retain the existing world transforms and owners.
+    for (const node of lightNodes) this.roomFourLighting.add(node);
+    for (const node of entranceNodes) this.roomFourEntranceGeometry.add(node);
+    this.roomFour.root.add(this.roomFourEntranceGeometry, this.roomFourLighting);
     this.roomOneToTwoPassage.entryDoor.statusLight.visible=false;
     this.roomOneToTwoPassage.entryDoor.root.getObjectByName('cultivation-room-1-to-2-lab-passage-entry-status-housing')!.visible=false;
     applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
@@ -501,15 +512,22 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomTwoToThreeGoopPassage.root.visible = secondPassage;
     this.roomTwoToThreeBobAirDuct.root.visible = secondPassage;
     this.roomThree.root.visible = !departed && farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FOUR_OFFSET_Z + 12;
-    this.roomFourGeometry.visible = farZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 12;
+    const liftInRange = farZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 12;
+    // The entrance closes Room 3's view even when the shaft is out of range.
+    // An inactive body can hold it open while the active body is still far away.
+    this.roomFourEntranceGeometry.visible = this.roomThree.root.visible || liftInRange;
+    this.roomFourGeometry.visible = liftInRange || (this.roomThree.root.visible && this.roomFour.entrance.openProgress > 0);
     // The closed lift vent occludes the entire lower sector during descent.
     this.roomFive.root.visible = bodyZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z || cameraZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z ||
       (this.roomFour.controller.readModel.state === 'complete' && farZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 12);
-    this.roomFour.root.visible = this.roomFourGeometry.visible || this.roomFive.root.visible;
+    // Keep the original effective light activation, independently of the newly
+    // visible entrance; no light properties or shadow roles change.
+    this.roomFourLighting.visible = liftInRange || this.roomFive.root.visible;
+    this.roomFour.root.visible = this.roomFourGeometry.visible || this.roomFourEntranceGeometry.visible || this.roomFourLighting.visible;
     if (recordScope) {
       this.workload.rendered.clear();
       const roots = [this.roomOne.root, this.roomTwo.root, this.roomThree.root, this.roomFourGeometry, this.roomFive.root];
-      for (const id of CULTIVATION_ROOM_IDS) if (roots[id - 1].visible) this.workload.rendered.add(id);
+      for (const id of CULTIVATION_ROOM_IDS) if (roots[id - 1].visible || (id === 4 && this.roomFourEntranceGeometry.visible)) this.workload.rendered.add(id);
     }
   }
 
