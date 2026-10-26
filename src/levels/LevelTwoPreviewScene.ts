@@ -243,7 +243,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning,{authoredReplacement:true});
     this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering);
     this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
-    this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt);
+    this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt, {authoredReplacement:true});
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;
     this.roomTwo.root.position.z = LEVEL_TWO_ROOM_TWO_OFFSET_Z;
@@ -286,6 +286,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomFour.root.add(this.roomFourGeometry);
     this.voltFinaleSet = new CultivationFinaleSet(this.roomFive.root, this.labArt);
     this.surfaceCleanup = new CultivationSurfaceCleanup(this, this.assets);
+    this.elevatorArt.installDepthPointer(this.roomFour);
     this.blenderArt = new CultivationBlenderArt(this);
     // Apply the offline bank's index paths before splitting render scope.
     // These identity groups retain the existing world transforms and owners.
@@ -331,6 +332,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       ...this.roomOneToTwoPassage.doors.map(door => door.root),
       ...this.roomTwoToThreeGoopPassage.doors.map(door => door.root), this.filtrationArt.fan,
       ...this.roomFour.dynamicTransformRoots, ...this.roomFive.dynamicTransformRoots,
+      this.elevatorArt.depthPointer,
       ...this.voltFinaleSet.dynamicTransformRoots,
     ]);
     this.frozenTransformCount = [this.roomOne.root, this.roomOneToTwoPassage.root, this.roomTwo.root,
@@ -463,6 +465,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomTwoToThreeGoopPassage.update(deltaSeconds, occupants);
     if (simulated.has(4)) this.roomFour.update(deltaSeconds, occupants);
     else this.roomFour.entrance.update(deltaSeconds, occupants);
+    this.elevatorArt.update(this.roomFour.controller.progress);
     if (simulated.has(5)) this.roomFive.update(deltaSeconds, occupants, false);
     this.workload.cosmeticUpdates = 0;
     if(this.workload.rendered.has(1)){
@@ -566,6 +569,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.filtrationArt.reset();
     this.roomThree.reset();
     this.roomFour.reset();
+    this.elevatorArt.update(0);
     this.roomFive.reset();
     this.voltFinaleSet.reset();
     this.updatePresentationVisibility({ z: 4 }, { z: 8 });

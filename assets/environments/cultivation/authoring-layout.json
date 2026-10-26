@@ -4205,7 +4205,12 @@
       "room-4-art-shaft-6-2",
       "room-4-art-shaft-7-0",
       "room-4-art-shaft-7-1",
-      "room-4-art-shaft-7-2"
+      "room-4-art-shaft-7-2",
+      "room-4-underdeck-motor",
+      "room-4-rail--4.9",
+      "room-4-rail-4.9",
+      "room-4-deck-warning-edge--4.65",
+      "room-4-deck-warning-edge-4.65"
     ],
     "occluders": [],
     "rigs": {
@@ -4866,6 +4871,26 @@
           0,
           0,
           0,
+          1
+        ]
+      },
+      "room-4-depth-pointer": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          -0.2,
+          10,
           1
         ]
       }

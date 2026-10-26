@@ -1495,7 +1495,12 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
       "room-4-art-shaft-6-2",
       "room-4-art-shaft-7-0",
       "room-4-art-shaft-7-1",
-      "room-4-art-shaft-7-2"
+      "room-4-art-shaft-7-2",
+      "room-4-underdeck-motor",
+      "room-4-rail--4.9",
+      "room-4-rail-4.9",
+      "room-4-deck-warning-edge--4.65",
+      "room-4-deck-warning-edge-4.65"
     ],
     "retirePrefixes": [
       "room-4-shaft-beam-",
@@ -1505,40 +1510,64 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
     "retireSubtrees": [],
     "batches": [
       {
-        "name": "C2_room-4_Batch_Architecture_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_Architecture_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-4_Batch_Architecture_Graphite"
+        "geometry": "C2_room-4_Batch_Architecture_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-arrival-shield_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_Architecture_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-4_Batch_Architecture_HallCeramic"
+      },
+      {
+        "name": "C2_room-4_Batch_Architecture_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-4_Batch_Architecture_HallGraphite"
+      },
+      {
+        "name": "C2_room-4_Batch_Architecture_Ink",
+        "finish": "Ink",
+        "target": "",
+        "geometry": "C2_room-4_Batch_Architecture_Ink"
+      },
+      {
+        "name": "C2_room-4_Batch_Architecture_Rust",
+        "finish": "Rust",
+        "target": "",
+        "geometry": "C2_room-4_Batch_Architecture_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-arrival-shield_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-arrival-shield",
-        "geometry": "C2_room-4_Batch_room-4-arrival-shield_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-arrival-shield_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-arrival-shield_Graphite",
-        "finish": "Graphite",
-        "target": "room-4-arrival-shield",
-        "geometry": "C2_room-4_Batch_room-4-arrival-shield_Graphite"
-      },
-      {
-        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-boarding-proximity-shutter",
-        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-boarding-proximity-shutter",
-        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Ceramic"
+        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-boarding-proximity-shutter",
-        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallGraphite"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallResin",
+        "finish": "HallResin",
+        "target": "room-4-boarding-proximity-shutter",
+        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_HallResin"
       },
       {
         "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Ink",
@@ -1547,34 +1576,34 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Ink"
       },
       {
-        "name": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Resin",
-        "finish": "Resin",
-        "target": "room-4-boarding-proximity-shutter",
-        "geometry": "C2_room-4_Batch_room-4-boarding-proximity-shutter_Resin"
-      },
-      {
-        "name": "C2_room-4_Batch_room-4-boarding-safety-guard_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-boarding-safety-guard_HallCool",
+        "finish": "HallCool",
         "target": "room-4-boarding-safety-guard",
-        "geometry": "C2_room-4_Batch_room-4-boarding-safety-guard_Cool"
+        "geometry": "C2_room-4_Batch_room-4-boarding-safety-guard_HallCool"
       },
       {
-        "name": "C2_room-4_Batch_room-4-boarding-safety-guard_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-boarding-safety-guard_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-boarding-safety-guard",
-        "geometry": "C2_room-4_Batch_room-4-boarding-safety-guard_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-boarding-safety-guard_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-boarding-shutter-panel_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-boarding-shutter-panel_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-boarding-shutter-panel",
-        "geometry": "C2_room-4_Batch_room-4-boarding-shutter-panel_Cool"
+        "geometry": "C2_room-4_Batch_room-4-boarding-shutter-panel_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-boarding-shutter-panel_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-boarding-shutter-panel_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-boarding-shutter-panel",
-        "geometry": "C2_room-4_Batch_room-4-boarding-shutter-panel_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-boarding-shutter-panel_HallCeramic"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-boarding-shutter-panel_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-4-boarding-shutter-panel",
+        "geometry": "C2_room-4_Batch_room-4-boarding-shutter-panel_HallGraphite"
       },
       {
         "name": "C2_room-4_Batch_room-4-carriage-4p65-6_Alloy",
@@ -1601,226 +1630,394 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-4_Batch_room-4-carriage-4p65-14_Alloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-destination-vent-shutter_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-depth-pointer_HallPaint",
+        "finish": "HallPaint",
+        "target": "room-4-depth-pointer",
+        "geometry": "C2_room-4_Batch_room-4-depth-pointer_HallPaint"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-destination-vent-shutter_HallCool",
+        "finish": "HallCool",
         "target": "room-4-destination-vent-shutter",
-        "geometry": "C2_room-4_Batch_room-4-destination-vent-shutter_Cool"
+        "geometry": "C2_room-4_Batch_room-4-destination-vent-shutter_HallCool"
       },
       {
-        "name": "C2_room-4_Batch_room-4-destination-vent-shutter_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-destination-vent-shutter_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-destination-vent-shutter",
-        "geometry": "C2_room-4_Batch_room-4-destination-vent-shutter_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-destination-vent-shutter_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-lift-floor_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-lift-floor_Amber",
+        "finish": "Amber",
         "target": "room-4-lift-floor",
-        "geometry": "C2_room-4_Batch_room-4-lift-floor_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_Amber"
       },
       {
-        "name": "C2_room-4_Batch_room-4-lift-floor_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-lift-floor_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-lift-floor",
-        "geometry": "C2_room-4_Batch_room-4-lift-floor_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-lift-floor_Resin",
-        "finish": "Resin",
+        "name": "C2_room-4_Batch_room-4-lift-floor_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-lift-floor",
-        "geometry": "C2_room-4_Batch_room-4-lift-floor_Resin"
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-0_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-lift-floor_HallCool",
+        "finish": "HallCool",
+        "target": "room-4-lift-floor",
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_HallCool"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-lift-floor_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-4-lift-floor",
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_HallGraphite"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-lift-floor_HallInk",
+        "finish": "HallInk",
+        "target": "room-4-lift-floor",
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_HallInk"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-lift-floor_HallPaint",
+        "finish": "HallPaint",
+        "target": "room-4-lift-floor",
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_HallPaint"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-lift-floor_Rust",
+        "finish": "Rust",
+        "target": "room-4-lift-floor",
+        "geometry": "C2_room-4_Batch_room-4-lift-floor_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-0",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-0_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-shaft-module-0",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-0_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_HallFoliage",
+        "finish": "HallFoliage",
         "target": "room-4-shaft-module-0",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallFoliage"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-0_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-shaft-module-0",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-1_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_HallInk",
+        "finish": "HallInk",
+        "target": "room-4-shaft-module-0",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallInk"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_HallLoam",
+        "finish": "HallLoam",
+        "target": "room-4-shaft-module-0",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallLoam"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-0",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-0_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-0",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-1_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-1",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-1_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-1_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-shaft-module-1_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-shaft-module-1",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-1_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-1_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-shaft-module-1_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-shaft-module-1",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-1_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-1_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-1_HallInk",
+        "finish": "HallInk",
         "target": "room-4-shaft-module-1",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-1_HallInk"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-2_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-shaft-module-1_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-1",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-1_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-1",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-2_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-2",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-2_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-2_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-shaft-module-2_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-shaft-module-2",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-2_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-2_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-shaft-module-2_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-shaft-module-2",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-2_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-2_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-2_HallInk",
+        "finish": "HallInk",
         "target": "room-4-shaft-module-2",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-2_HallInk"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-3_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-shaft-module-2_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-2",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-2_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-2",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-3_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-3",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-3_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-shaft-module-3_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-shaft-module-3",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-3_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-shaft-module-3_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-shaft-module-3",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-3_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-3_HallInk",
+        "finish": "HallInk",
         "target": "room-4-shaft-module-3",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-3_HallInk"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-4_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-shaft-module-3_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-3",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-3_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-3",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-4",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-4_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-4_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-shaft-module-4",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-4_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-4_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_HallFoliage",
+        "finish": "HallFoliage",
         "target": "room-4-shaft-module-4",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-4_HallFoliage"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-4_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-shaft-module-4",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-4_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-5_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_HallInk",
+        "finish": "HallInk",
+        "target": "room-4-shaft-module-4",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-4_HallInk"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_HallLoam",
+        "finish": "HallLoam",
+        "target": "room-4-shaft-module-4",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-4_HallLoam"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-4",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-4_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-4",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-5_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-5",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-5_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-5_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-shaft-module-5_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-shaft-module-5",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-4_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-5_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-shaft-module-5_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-shaft-module-5",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-5_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-5_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-5_HallInk",
+        "finish": "HallInk",
         "target": "room-4-shaft-module-5",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-5_HallInk"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-6_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-4_Batch_room-4-shaft-module-5_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-5",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-5_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-5",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-6",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-6_HallAlloy"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-6_Cool",
-        "finish": "Cool",
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-4-shaft-module-6",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-6_HallCeramic"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-6_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_HallFoliage",
+        "finish": "HallFoliage",
         "target": "room-4-shaft-module-6",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-6_HallFoliage"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-6_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-4-shaft-module-6",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-6_HallGraphite"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-7_Alloy",
-        "finish": "Alloy",
-        "target": "room-4-shaft-module-7",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Alloy"
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_HallInk",
+        "finish": "HallInk",
+        "target": "room-4-shaft-module-6",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-6_HallInk"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-7_Cool",
-        "finish": "Cool",
-        "target": "room-4-shaft-module-7",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Cool"
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_HallLoam",
+        "finish": "HallLoam",
+        "target": "room-4-shaft-module-6",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-6_HallLoam"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-7_Graphite",
-        "finish": "Graphite",
-        "target": "room-4-shaft-module-7",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Graphite"
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-6",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
       },
       {
-        "name": "C2_room-4_Batch_room-4-shaft-module-7_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-4_Batch_room-4-shaft-module-6_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-6",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-7_HallAlloy",
+        "finish": "HallAlloy",
         "target": "room-4-shaft-module-7",
-        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Oxide"
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-7_HallAlloy"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-7_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-4-shaft-module-7",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-6_HallCeramic"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-7_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-4-shaft-module-7",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-7_HallGraphite"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-7_HallInk",
+        "finish": "HallInk",
+        "target": "room-4-shaft-module-7",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-7_HallInk"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-7_LiftLamp",
+        "finish": "LiftLamp",
+        "target": "room-4-shaft-module-7",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_LiftLamp"
+      },
+      {
+        "name": "C2_room-4_Batch_room-4-shaft-module-7_Rust",
+        "finish": "Rust",
+        "target": "room-4-shaft-module-7",
+        "geometry": "C2_room-4_Batch_room-4-shaft-module-0_Rust"
       }
     ]
   },

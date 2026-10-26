@@ -13,6 +13,7 @@ import {VOLT_FINALE} from '../../src/cinematics/CultivationFinaleTimeline.ts';
 import {visitCultivationRoomTwoSurfaceStates} from './cultivation-room-two-surface-states.ts';
 import {visitCultivationConnectorSurfaceStates} from './cultivation-connector-surface-states.ts';
 import {visitCultivationRoomThreeSurfaceStates} from './cultivation-room-three-surface-states.ts';
+import {visitCultivationLiftSurfaceStates} from './cultivation-lift-surface-states.ts';
 import {addCultivationRoomThreeBoosters,addCultivationButtonPlatformBooster} from '../../src/render/environment/cultivation/CultivationBoosterPlatforms.ts';
 
 /** Deterministic authored poses; every state is scanned after updating world matrices. */
@@ -38,7 +39,7 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     // An assembled-level audit includes every room's submitted static geometry
     // even after reset applies distance culling. Descendant mechanism/actor
     // visibility remains authoritative for the sampled state.
-    const roots=[...scene.root.children,scene.roomFourGeometry];
+    const roots=[...scene.root.children,scene.roomFourGeometry,scene.roomFourEntranceGeometry,scene.roomFourLighting];
     const saved=roots.map(root=>root.visible);
     try{for(const root of roots)root.visible=true;scene.root.updateWorldMatrix(true,true);visit(name);}
     finally{roots.forEach((root,i)=>root.visible=saved[i]);}
@@ -66,9 +67,9 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     for(const door of doors)door.update(2,[]);
     sample('doors-reclosed');
     for(const door of doors)openDoor(door,2);
-    const occupants = ['bob', 'goop'].map((id, i) => ({id, radiusMetres: .45, position: scene.roomFour.root.localToWorld(new THREE.Vector3(i ? 2 : -2, .66, 9))}));
-    scene.roomFour.update(1.5, occupants);
-    for (const dt of [1, 15, 17, 27, .4, 1.1]) {scene.roomFour.update(dt, occupants); roomFour.update(dt, 'goop'); sample(`lift-${scene.roomFour.controller.readModel.elapsed}-${scene.roomFour.controller.readModel.arrivalElapsed}`);}
+    visitCultivationLiftSurfaceStates(scene,roomFour,sample,()=>{
+      for(const target of targets)target.reset();world.registerAll(scene.roomFour.solubleTargetMeshes);
+    });
     scene.roomFive.restoreCheckpoint('rescued'); sample('volt-rescued');
     scene.voltFinaleSet.annex.visible=true;
     for(const [name,time] of [['closed',VOLT_FINALE.ductRun],['buckling',VOLT_FINALE.brake],['breaking',VOLT_FINALE.grateBreak+.3],['open',VOLT_FINALE.ductSilence]] as const){

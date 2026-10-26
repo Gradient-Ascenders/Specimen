@@ -41,6 +41,12 @@ export class CultivationBlenderArt {
       if(name.startsWith('Hall'))return finish(name.slice(4),false,true);
       if(name.startsWith('Test'))return finish(name.slice(4),false,true);
       const key=(escape?'escape:':nursery?'nursery:':'')+name,old=this.materials.get(key);if(old)return old;
+      if(name==='LiftLamp'){
+        const material=scene.labArt.fixture.clone();
+        material.name='cultivation-lift-original-practical';material.color.setHex(0xb7d8cd);
+        material.emissive.setHex(0x9dcec1);material.emissiveIntensity=.65;material.roughness=.45;
+        optimizeFiniteLightEvaluation(material);this.materials.set(key,material);return material;
+      }
       if(escape){
         // The cinematic airway already uses unlit finishes. Reuse those exact
         // materials without adding lights or baking directional illumination.

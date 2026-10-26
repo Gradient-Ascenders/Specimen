@@ -44,6 +44,7 @@ for _finish in list(PALETTE):
     if not _finish.startswith('Hall'):
         PALETTE['Test'+_finish]=PALETTE.get('Hall'+_finish,PALETTE[_finish])
 PALETTE['TestGlass']=PALETTE['HallGlass']
+PALETTE['LiftLamp']=((.47,.69,.61),.45,0)
 CURRENT=None
 BOXES=[]
 DETAILS=[]
@@ -108,6 +109,8 @@ def owner_root(owner):
     return obj
 
 def mesh(name,vertices,faces,finish,owner=''):
+    if CURRENT=='room-4' and finish not in ('Rust','Amber','LiftLamp') and not finish.startswith('Hall'):
+        finish='HallPaint' if finish=='Deck' else 'Hall'+finish
     if CURRENT=='room-3' and name.startswith(('Extraction_','Solid_Extraction_','Transfer_','Solid_Transfer_','Ivy_')):
         if finish=='Deck':finish='HallPaint'
         elif finish not in ('Rust','Amber') and not finish.startswith('Hall'):finish='Hall'+finish
@@ -136,6 +139,10 @@ def mesh(name,vertices,faces,finish,owner=''):
             if hall:near_leak='Observation_rear' in name or 'Service_rear' in name
             if testing:near_leak='Process_rear' in name
             spacing=.38 if near_leak else .55 if floor_bank else 1.6
+            if CURRENT=='room-4':
+                # Long hidden shaft backs need no dense dirt grid. The shared
+                # wear maps handle those spans; formed edges remain explicit.
+                spacing=8 if base_finish=='Graphite' else 3.2
             nu=max(1,math.ceil(max((b-a).length,(c-d).length)/spacing))
             nv=max(1,math.ceil(max((d-a).length,(c-b).length)/spacing))
             start=len(points)
@@ -237,6 +244,16 @@ def mesh(name,vertices,faces,finish,owner=''):
             if base_finish=='Loam':colour=(.66,.65,.57,1)
             if base_finish=='Glass':colour=(.82,.86,.82,1)
             if base_finish=='Paint':colour=(.55+.25*cloud,)*3+(1,)
+        if CURRENT=='room-4' and base_finish not in ('Foliage','Lamp'):
+            x,y,z=p.x,p.z,-p.y
+            if base_finish=='Rust':
+                patch=.5+.5*math.sin(y*31+x*41+math.sin(z*61+y*7)*2.1)
+                flake=max(0,min(1,(patch-.54)/.20));pit=.62+.38*math.sin(y*113+z*97+x*83)**2
+                colour=tuple((.48,.20,.07)[i]*pit*(1-flake)+(.22,.25,.24)[i]*flake for i in range(3))+(1,)
+            elif 'Lift_' in name and abs(y-.44)<.001:
+                edge=max(0,1-(4.8-max(abs(x),abs(z)))/.6)
+                oil=.18*edge+.22*math.exp(-((abs(x)-3.6)/.5)**2)*(.5+.5*math.sin(z*1.3))
+                colour=tuple(c*(1-oil) for c in colour[:3])+(1,)
         colours.data[v.index].color=colour
     for poly in data.polygons:
         axis=max(range(3),key=lambda i:abs(poly.normal[i]))
@@ -2239,6 +2256,174 @@ def quarantine_crown(spec):
             for z in [c,d-.17]:box(f'Crown_coffer_z_{i}_{j}_{z}',[a+.17,38,z],[b-.17,40.5,z+.17],'Alloy')
             box(f'Crown_coffer_inner_{i}_{j}',[a+.20,40.26,c+.20],[b-.20,40.38,d-.20],'Cool')
 
+def lift_deck():
+    owner='room-4-lift-floor'
+    # The approved platform's inset white deck and folded grey chassis, fitted
+    # to the original 10 m deck. All relief stays at/below its existing .44 top.
+    loops=[nursery_square_ring(0,0,r,c,y) for r,c,y in
+           [(5,.14,.44),(5,.14,.28),(4.96,.16,.16),(4.96,.16,-.30),(4.90,.18,-.40)]]
+    nursery_ring_profile('Lift_folded_freight_chassis',loops,['Alloy','Alloy','Cool','Graphite'],owner,False)
+    mesh('Lift_closed_undertray',loops[-1],[tuple(range(8))],'Graphite',owner)
+    OCCLUDERS.append({'lo':[-4.9,-.4,-4.9],'hi':[4.9,-.4,4.9],'owner':owner})
+    inner=nursery_square_ring(0,0,4.64,0,.44)
+    for obj in nursery_ring_profile('Lift_rolled_deck_edge',[loops[0],inner],['Alloy'],owner,False):
+        for polygon in obj.data.polygons:polygon.flip()
+        obj.data.update()
+    box('Lift_deck_continuous_back',[-4.64,.24,-4.64],[4.64,.40,4.64],'Graphite',owner)
+    for i,(a,b) in enumerate(intervals(-4.64,4.64,2.32)):
+        for j,(c,d) in enumerate(intervals(-4.64,4.64,2.32)):
+            box(f'Lift_white_load_plate_{i}_{j}',[a+.018,.40,c+.018],[b-.018,.44,d-.018],'Deck',owner)
+    for sx in [-1,1]:
+        for sz in [-1,1]:
+            block(f'Lift_corner_index_{sx}_{sz}',[.20,.04,.20],[sx*4.48,.42,sz*4.48],'Amber',owner)
+            for k in ([-1,1] if sz<0 else []):
+                tube(f'Lift_fascia_fastener_{sx}_{sz}_{k}',(sx*(4.5+k*.10),.10,sz*4.94),
+                     (sx*(4.5+k*.10),.10,sz*5.025),.035,'Graphite',8,owner)
+    # Original rail collider heights/footprints remain authoritative. Their
+    # replacement skin has a fitted 20 mm base reveal above the rolled deck.
+    for side in [-1,1]:
+        a,b=sorted([side*4.81,side*4.89])
+        box('Lift_original_rail_skin',[a,.46,-5],[b,1.6,5],'Alloy',owner)
+    # Low-slung motor and open reinforcing structure cannot become new steps.
+    for z in [-3,3]:box('Lift_underfloor_crossmember',[-4.65,-.72,z-.16],[4.65,-.40,z+.16],'Alloy',owner)
+    for x in [-3,3]:box('Lift_underfloor_longitudinal',[x-.16,-.72,-2.84],[x+.16,-.40,2.84],'Alloy',owner)
+    box('Lift_drive_gearcase',[-1.3,-1.55,-1.3],[1.3,-.72,1.3],'Graphite',owner)
+    for z in [-1.20,-.8,-.4,0,.4,.8,1.20]:
+        box('Lift_motor_cooling_rib',[-1.38,-1.48,z-.055],[1.38,-.80,z+.055],'Alloy',owner)
+    for x in [-4.85,4.85]:
+        for z in [-4.1,4.1]:box('Lift_fitted_corner_web',[x-.10,-.38,z-.35],[x+.10,.12,z+.35],'Rust',owner)
+
+
+def lift_cassette(index,side,z,owner):
+    tag=f'Module_{index}_pressed_bay_{side}_{z}'
+    # A thick pressed cassette sits behind a substantial open perimeter frame.
+    outline=[(1.05,z-1.55),(1.25,z-1.75),(6.50,z-1.75),(6.70,z-1.55),
+             (6.70,z+1.55),(6.50,z+1.75),(1.25,z+1.75),(1.05,z+1.55)]
+    vv=[(side*x,y,Z) for x in [5.16,5.22] for y,Z in outline]
+    mesh(tag,vv,[tuple(reversed(range(8))),tuple(range(8,16))]+
+         [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],'Ceramic',owner)
+    for low,high in [(.82,1.00),(6.75,6.93)]:
+        a,b=sorted([side*5.04,side*5.15]);box(tag+'_frame_tie',[a,low,z-1.95],[b,high,z+1.95],'Alloy',owner)
+    for Z in [z-1.95,z+1.79]:
+        a,b=sorted([side*5.04,side*5.15]);box(tag+'_frame_stile',[a,1,Z],[b,6.75,Z+.16],'Alloy',owner)
+    for y in [1.36,6.4]:
+        for Z in [z-1.58,z+1.58]:tube(tag+'_fastener',(side*5.105,y,Z),(side*5.185,y,Z),.042,'Graphite',8,owner)
+    # The service insert stands off the panel; all caps retain real clearance.
+    a,b=sorted([side*5.065,side*5.14]);box(tag+'_filter_back',[a,2.45,z-.62],[b,4.15,z+.62],'Graphite',owner)
+    for row in range(7):
+        y=2.56+row*.215;a,b=sorted([side*5.025,side*5.045])
+        box(tag+'_pressed_filter_louvre',[a,y,z-.56],[b,y+.075,z+.56],'Alloy',owner)
+    # Recessed pipework and its collars replace featureless coloured strips.
+    Z=z+1.22
+    tube(tag+'_service_riser',(side*5.075,1.35,Z),(side*5.075,6.4,Z),.045,'Rust',10,owner)
+    for y in [1.6,4.6,6.1]:tube(tag+'_riser_collar',(side*5.075,y-.055,Z),(side*5.075,y+.055,Z),.067,'Alloy',10,owner)
+
+
+def lift_growth(index,side,owner):
+    # Localised thick ivy around a failed service riser, outside the body lane.
+    z=13.2
+    points=[(side*(5.10+.015*math.sin(k)),1.1+k*.37,z+.16*math.sin(k*.71+index)) for k in range(13)]
+    for k in range(12):tube(f'Module_{index}_root_{side}',points[k],points[k+1],.019,'Loam',6,owner)
+    for k in [1,3,5,7,9,11]:
+        p=points[k];obj=nursery_leaf(f'Module_{index}_ivy_{side}_{k}',p,-side,(-1 if k%4 else 1)*.8,.62,0)
+        obj.parent=owner_root(owner);obj['runtimeTarget']=owner
+
+
+def lift_shaft_module(index):
+    owner=f'room-4-shaft-module-{index}'
+    for side in [-1,1]:
+        for z in [7.5,12.1]:lift_cassette(index,side,z,owner)
+        for z in [5.35,9.7,14.35]:
+            a,b=sorted([side*5.055,side*5.23]);box(f'Module_{index}_structural_rib',[a,.1,z],[b,7.86,z+.15],'Alloy',owner)
+        for y in [.1,7.68]:
+            a,b=sorted([side*5.055,side*5.23]);box(f'Module_{index}_structural_return',[a,y,5.35],[b,y+.18,14.5],'Alloy',owner)
+        # Existing practical strips keep their original owners and positions.
+        for z in [7.5,11.5]:
+            a,b=sorted([side*4.9825,side*5.14]);box(f'Module_{index}_fixture_seat',[a,6.24,z-.72],[b,6.46,z+.72],'Graphite',owner)
+            block(f'Module_{index}_original_wall_emitter',[.075,.09,1.25],[side*4.945,6.35,z],'LiftLamp',owner)
+        if index in [0,4,6]:lift_growth(index,side,owner)
+    for x in [-3.30,3.30]:
+        box(f'Module_{index}_rear_recess_back',[x-1.52,.18,14.81],[x+1.52,7.82,14.83],'Graphite',owner)
+        for X in [x-1.52,x+1.36]:box(f'Module_{index}_rear_reveal',[X,.18,14.59],[X+.16,7.82,14.81],'Alloy',owner)
+        for y in [.18,7.64]:box(f'Module_{index}_rear_return',[x-1.36,y,14.59],[x+1.36,y+.18,14.81],'Alloy',owner)
+        for a,b in [(.43,6.15),(6.55,7.39)]:box(f'Module_{index}_rear_white_panel',[x-1.32,a,14.77],[x+1.32,b,14.79],'Ceramic',owner)
+        for y in [1.3,5.0]:
+            box(f'Module_{index}_rear_service_back',[x-.85,y,14.47],[x+.85,y+1.05,14.56],'Graphite',owner)
+            for row in range(4):box(f'Module_{index}_rear_service_blade',[x-.78,y+.12+row*.21,14.43],[x+.78,y+.19+row*.21,14.45],'Alloy',owner)
+        emitter_x=math.copysign(3.05,x)
+        box(f'Module_{index}_rear_fixture_seat',[emitter_x-.65,6.25,14.7575],[emitter_x+.65,6.45,14.83],'Graphite',owner)
+        block(f'Module_{index}_original_rear_emitter',[1.25,.09,.075],[emitter_x,6.35,14.72],'LiftLamp',owner)
+    # Every label is backed and framed; three identifiable service districts.
+    text=['CULTURE SERVICES','PRESSURE MAINS','LOWER CONTAINMENT'][index%3]
+    label(f'Module_{index}_sector',f'{index+1:02d} / '+text,[-3.05,7.0,14.55],.14,finish='HallInk',owner=owner)
+
+
+def lift_hoist():
+    # Everything remains above the highest existing drone spawn envelope.
+    for x in [-4.45,4.45]:box('Shaft_winch_girder',[x-.2,42.8,5.3],[x+.2,44.2,14.7],'Rust')
+    for z in [5.5,10,14.5]:box('Shaft_winch_cross_tie',[-4.25,43.4,z-.18],[4.25,44.2,z+.18],'Alloy')
+    anchors=[(-3,13),(0,13),(3,13),(-3.5,10),(3.5,10),(-3,7),(0,7),(3,7)]
+    for i,(x,z) in enumerate(anchors):
+        # Open bottomed deployment hood, with a clear gap above spawn height 30.
+        for X in [x-1.08,x+.92]:box(f'Drone_{i}_hood_cheek',[X,32.4,z-1.08],[X+.16,33.75,z+1.08],'Ceramic')
+        for Z in [z-1.08,z+.92]:box(f'Drone_{i}_hood_return',[x-.92,32.4,Z],[x+.92,33.75,Z+.16],'Alloy')
+        box(f'Drone_{i}_hood_cap',[x-1.08,33.75,z-1.08],[x+1.08,33.93,z+1.08],'Graphite')
+        for X in [x-.92,x+.76]:box(f'Drone_{i}_suspension',[X,33.93,z-.10],[X+.16,43.4,z+.10],'Rust')
+
+
+def lift_depth_gauge():
+    owner='room-4-lift-floor'
+    # Mounted outside the existing deck/rail movement envelope. The only moving
+    # child is driven directly by controller.progress, never an animation clock.
+    box('Depth_gauge_back',[4.95,1.5,-.72],[5.03,4.0,.72],'Graphite',owner)
+    for z in [-.75,.66]:box('Depth_gauge_frame',[4.915,1.46,z],[5.03,4.04,z+.09],'Alloy',owner)
+    for y in [1.46,3.95]:box('Depth_gauge_return',[4.915,y,-.66],[5.03,y+.09,.66],'Alloy',owner)
+    label('Depth_gauge_ident','DEPTH / m',[4.925,3.77,-.02],.13,(90,0,270),'HallInk',owner,False)
+    for i in range(13):
+        y=3.6-i*.15
+        box('Depth_gauge_tick',[4.915,y-.012,-.25],[4.93,y+.012,.05 if i%3 else .18],'Ceramic',owner)
+        if i%3==0:label('Depth_gauge_number_'+str(i),str(i*10),[4.925,y-.035,-.48],.12,(90,0,270),'HallInk',owner,False)
+    owner='room-4-depth-pointer'
+    vv=[(x,y,z) for x in [4.875,4.895] for y,z in [(3.6,.24),(3.68,.48),(3.52,.48)]]
+    mesh('Depth_pointer',vv,[(0,2,1),(3,4,5),(0,1,4,3),(1,2,5,4),(2,0,3,5)],'HallPaint',owner)
+
+
+def lift_landing():
+    # Frame and sill sit outside the unchanged 2.2 m arrival vent aperture.
+    for side in [-1,1]:
+        a,b=sorted([side*1.18,side*1.55]);box('Arrival_cast_jamb',[a,.22,14.48],[b,3.15,14.76],'Alloy')
+        a,b=sorted([side*1.24,side*1.48]);box('Arrival_white_jamb_face',[a,.28,14.43],[b,3.1,14.48],'Ceramic')
+    box('Arrival_folded_lintel',[-1.55,3.15,14.48],[1.55,3.53,14.76],'Alloy')
+    label('Arrival_identifier','LOWER CONTAINMENT',[0,3.25,14.42],.15,owner='')
+    for x in [-.8,-.4,0,.4,.8]:box('Arrival_flush_approach_marker',[x-.07,.40,4.40],[x+.07,.44,4.58],'Amber','room-4-lift-floor')
+
+
+def lift_arrival_shield(owner):
+    # Folded armour remains inside the original shield envelope. Angled folds
+    # and cast end returns pass the moving service ribs without flat cap clashes.
+    bottom=[(-5,-.175)]+[(-4.8+i*.4,-.15 if i%2==0 else -.035) for i in range(25)]+[(5,-.175)]
+    top=[(x*.97,y+.14) for x,y in bottom]
+    profile=bottom+list(reversed(top));n=len(profile)
+    vv=[(x,y,z) for z in [-4.75,4.75] for x,y in profile]
+    ff=[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+    mesh('Arrival_folded_armour_shield',vv,ff,'Alloy',owner)
+
+
+def lift_pitch_rear_returns():
+    # Rear service pans have pitched hems. All joined returns share one affine
+    # profile so the moving pans pass the stationary deck edge as angled joins.
+    # Original practical emitters keep their exact rectangular dimensions/pose.
+    for obj in bpy.context.scene.objects:
+        if obj.type!='MESH' or obj.get('finish')=='LiftLamp':continue
+        if not obj.get('runtimeTarget','').startswith('room-4-shaft-module-'):continue
+        if '_rear_' not in obj.name and '_sector' not in obj.name:continue
+        basis=obj.matrix_local.copy();inverse=basis.inverted()
+        for vertex in obj.data.vertices:
+            point=basis@vertex.co;point.z+=.08*(-point.y-14.75)
+            vertex.co=inverse@point
+        obj.data.update()
+
+
 def build_lift():
     """Travelling presentation is authored in its existing owner's local frame."""
     rigs=LAYOUT[CURRENT]['rigs']
@@ -2264,6 +2449,10 @@ def build_lift():
                   'room-4-boarding-safety-guard','room-4-destination-vent-shutter','room-4-arrival-shield',
                   'room-4-boarding-shutter-panel']:
         original_owner=owner;spec=rigs[owner];lo=list(spec['lo']);hi=list(spec['hi'])
+        if original_owner=='room-4-boarding-shutter-panel':
+            nursery_door_leaf(owner);continue
+        if original_owner=='room-4-arrival-shield':
+            lift_arrival_shield(owner);continue
         if original_owner=='room-4-boarding-shaft-wall':lo[0]=-4.97;hi[0]=4.97
         if original_owner=='room-4-boarding-safety-guard':lo[0]=-4.95;hi[0]=4.95
         if owner in shared_boarding:
@@ -2284,35 +2473,9 @@ def build_lift():
             for i,(a,b) in enumerate(intervals(lo[0]+.08,hi[0]-.08,2)):
                 box(original_owner+f'_plate_{i}',[a+.02,lo[1]+.08,hi[2]-.04],[b-.02,hi[1]-.08,hi[2]],
                     'Cool' if 'guard' in original_owner or 'shutter' in original_owner else 'Ceramic',owner)
-    owner='room-4-lift-floor';spec=rigs[owner]
-    box('Lift_underframe',spec['lo'],spec['hi'],'Graphite',owner)
-    for i,(a,b) in enumerate(intervals(-4.8,4.8,1.6)):
-        for j,(c,d) in enumerate(intervals(-4.8,4.8,1.6)):
-            left=a+(.30 if abs(a+4.8)<.001 else .025);right=b-(.30 if abs(b-4.8)<.001 else .025)
-            box(f'Lift_load_plate_{i}_{j}',[left,.4,c+.025],[right,.44,d-.025],
-                'Alloy' if (i+j)%4==0 else 'Resin',owner)
-    for x in [-3.4,-1.7,0,1.7,3.4]:
-        for z in [-3.5,-1.8,-.1,1.6,3.3]:
-            for n in range(3):block(f'Lift_grip_{x}_{z}_{n}',[.8,.008,.024],[x,.444,z+n*.13],'Alloy',owner)
-    for index in range(8):
-        owner=f'room-4-shaft-module-{index}'
-        for side in [-1,1]:
-            for z in [7.5,11.5]:
-                block(f'Module_{index}_cassette_{side}_{z}',[.10,6.5,3.45],[side*5.12,3.9,z],'Cool',owner)
-                for y in [.65,7.15]:block(f'Module_{index}_crossrail_{side}_{z}_{y}',[.24,.18,3.5],[side*5.055,y,z],'Alloy',owner)
-                for zz in [z-1.72,z+1.72]:block(f'Module_{index}_stanchion_{side}_{zz}',[.24,6.35,.16],[side*5.055,3.9,zz],'Oxide',owner)
-                annulus_x(f'Module_{index}_hatch_{side}_{z}',side*5.0,3.8,z,.32,.56,.12,'Alloy',20,owner)
-                tube(f'Module_{index}_hatch_core_{side}_{z}',(side*4.96,3.8,z),(side*5.08,3.8,z),.29,'Graphite',16,owner)
-                for bolt in range(4):
-                    angle=math.pi/4+bolt*math.pi/2
-                    y=3.8+.50*math.sin(angle);zz=z+.50*math.cos(angle)
-                    tube(f'Module_{index}_inspection_bolt_{side}_{z}_{bolt}',(side*4.925,y,zz),(side*4.985,y,zz),.055,'Oxide',6,owner)
-                block(f'Module_{index}_fixture_seat_{side}_{z}',[.19,.2,1.3],[side*5.0775,6.35,z],'Graphite',owner)
-        for x in [-3.05,3.05]:
-            block(f'Module_{index}_rear_panel_{x}',[3.4,6.5,.09],[x,3.9,14.785],'Cool',owner)
-            for y in [.65,7.15]:block(f'Module_{index}_rear_rail_{x}_{y}',[3.45,.18,.13],[x,y,14.765],'Alloy',owner)
-            for xx in [x-1.7,x+1.7]:block(f'Module_{index}_rear_stile_{xx}',[.16,6.35,.13],[xx,3.9,14.765],'Oxide',owner)
-            block(f'Module_{index}_rear_fixture_seat_{x}',[1.3,.2,.0725],[x,6.35,14.79375],'Graphite',owner)
+    lift_deck()
+    for index in range(8):lift_shaft_module(index)
+    lift_hoist();lift_depth_gauge();lift_landing()
     label('Lift_identification','04 / SERVICE DESCENT',[0,5.775,-.22],.32,finish='Ceramic',owner=boarding)
     reuse_lift_wheels()
     print('Lift built against',len(rigs),'existing pose owners; no animation tracks.')
@@ -2554,6 +2717,7 @@ def export_asset(save=True):
 
 def build(room,refs=False):
     setup(room);build_enclosure();build_identity();finalise_boxes()
+    if room=='room-4':lift_pitch_rear_returns()
     if room=='room-1':
         # Accepted interactive Blender edit: one blade folds downward/outward.
         damaged=bpy.data.objects['C2_room-1_Solid_Return_filter_baffle_1_0']
@@ -2573,7 +2737,7 @@ def build(room,refs=False):
                             a,b=(p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y)
                             uv=(a/8+.13,b/8+.31) if obj['finish'] in ('Deck','Paint') else (a/2,b/2)
                             layer.data[index].uv=tuple(round(v,6) for v in uv)
-    if room in ('passage-1-2','room-2','room-3','passage-2-3','bob-duct'):
+    if room in ('passage-1-2','room-2','room-3','room-4','passage-2-3','bob-duct'):
         for obj in bpy.context.scene.objects:
             if obj.type!='MESH' or not obj.get('finish','').startswith(('Hall','Test')) or obj['finish'].endswith('Glass'):continue
             for layer in obj.data.uv_layers:
