@@ -28,7 +28,7 @@ All 3D models were created independently for Specimen.
 
 | Resource | Creator | Source | Licence | Use |
 | --- | --- | --- | --- | --- |
-| Sound effects | Made with ElevenLabs | Requester-supplied sound packs and turret recording; see resource notes below. | Licence details not supplied | Character, interaction, environment and cutscene audio. |
+| Sound effects | Made with ElevenLabs | Requester-supplied sound packs and turret recording; see resource notes below. | Licence details not supplied | Character, interaction, environment, boss combat and cutscene audio. |
 
 ## Tools
 
@@ -137,6 +137,8 @@ texture assets, external code or third-party dependencies were introduced.
 | Cultivation sentry pack (3 effects) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `cultivation-sentry-sounds.tar`, retained unchanged at repository root | Requester-supplied; generating account's plan/licence documentation not supplied | Room 3 sentry shoves, toppling and acid splashes. Import details in `docs/assets/cultivation-sentry-audio-import.json`. |
 | Volt rescue pack (5 effects) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `volt-rescue-sounds.tar`, retained unchanged at repository root | Requester-supplied; generating account's plan/licence documentation not supplied | Containment shutter, cover release and drone impact, electrical hijack and duct-floor strain. Import details in `docs/assets/volt-rescue-audio-import.json`. |
 | Blackout arrival slide | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `vent-slime-slide-2.wav`, retained unchanged at repository root | Requester-supplied; generating account's plan/licence documentation not supplied | Shared vent-sliding sound for Bob, Goop and Volt. Import details in `docs/assets/blackout-arrival-audio-import.json`; earlier unused `vent-slime-slide.wav` also retained. |
+| Boss fight pack (27 effects) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `boss-sounds.tar`, retained unchanged at repository root | Requester-supplied; generating account's plan/licence documentation not supplied | Boss emergence, weapons, shield, drones, RAM, impacts, escalation/destruction, player damage, dash and healing. Import details in `docs/assets/boss-audio-import.json`. |
+| Blackout elevator and research pack (17 effects) | Requester-generated using ElevenLabs Sound Effects | Requester-supplied `latest-cutcenes.tar`, retained unchanged at repository root | Requester-supplied; generating account's plan/licence documentation not supplied | Lift operation, light failures, fusion, charged blasts, door/glass breakage, falling/landing and pit opening. Reuses Goop's Escape power failure and existing character/drone effects. Import details in `docs/assets/blackout-cutscene-audio-import.json`. |
 | Osmotic Memory | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/osmotic-memory) | CC0 | Intro/title screen music; edited for looping and loudness. |
 | Thought Loop | GloryToTheMachine | [OpenGameArt](https://opengameart.org/content/thought-loop-glorytothemachine-ambientdeepnostalgic-loop) | CC BY 4.0 | Containment music; edited for loudness. Attribution: Music by GloryToTheMachine. |
 | Unsolved Investigation | isaiah658 | [OpenGameArt](https://opengameart.org/content/unsolved-investigation) | CC0 | Cultivation music; lossless WAV source converted to OGG. |

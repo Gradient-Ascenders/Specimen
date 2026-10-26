@@ -1,6 +1,6 @@
 # Gameplay sound effects
 
-Specimen ships 72 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1, interaction polish 10, intro 14, Containment escape 9, Cultivation sentries 3, Volt rescue 5, Blackout arrival 1. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
+Specimen ships 116 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1, interaction polish 10, intro 14, Containment escape 9, Cultivation sentries 3, Volt rescue 5, Blackout arrival 1, boss fight 27, Blackout elevator/research 17. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Movement uses authoritative KinematicBody events and resolved grounded velocity,
 
 ## Assets and provenance
 
-`public/assets/audio/{bob,goop,volt,world,environment,turrets,polish,intro,escape,cultivation,blackout}/` contains only runtime OGG files. Source archives and original WAVs are not shipped in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
+`public/assets/audio/{bob,goop,volt,world,environment,turrets,polish,intro,escape,cultivation,blackout,boss}/` contains only runtime OGG files. Source archives and original WAVs are not shipped in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
 
 The requester generated Bob's replacement recordings in ElevenLabs and selected them through listening review. The seven originals (six stereo PCM16 WAVs and one stereo Vorbis file, all 48 kHz) are preserved byte-for-byte in `assets/audio/bob/bob-sounds.tar`. `scripts/import-bob-audio.py` prepares the runtime files using NumPy and SoundFile/libsndfile: average stereo to mono, remove DC offset, balance levels without compression, cap peaks with headroom, apply 2 ms edge fades, and encode Vorbis. The powerful jump starts at source 0.58 s and hard landing at 0.30 s to remove separate preparation sounds before their main hit; soft landing starts at 0.065 s to remove its leading delay. Other clips retain their full timeline. `docs/assets/bob-audio-import.json` records source/archive hashes, trims, gains and resulting RMS. Reimport with `python3 scripts/import-bob-audio.py` after installing NumPy and SoundFile; Python is not a game dependency.
 
@@ -405,3 +405,102 @@ other platforms retain mechanical motors by default. Platform motion, riders,
 lasers, monitor/dialogue cues and cinematic audio are unchanged. The omitted
 sources are never registered, so reset/retry/disposal cannot retain or recreate
 a hidden mechanical layer for these two platforms.
+
+## Final boss effects
+
+The 27 selected ElevenLabs recordings in `boss-sounds.tar` are retained unchanged
+at repository root. `scripts/import-boss-audio.py` produces the mono OGG files in
+`public/assets/audio/boss/`; `docs/assets/boss-audio-import.json` records archive
+and per-recording hashes, trims, fitted durations, gains and RMS. Reimport with
+`python3 scripts/import-boss-audio.py` after installing NumPy and SoundFile.
+Only the hover, beam sustain and shield regeneration recordings loop, with
+100 ms circular overlaps. One-shots have 2 ms edge fades. Charge/wind-up and
+cinematic source lengths are fitted by resampling where necessary; ordinary
+impact and explosion tails are retained. Nothing changes combat timing.
+
+`FinalBossAudio` follows the authoritative state and attack stage: turbine hover,
+unique weapon warnings, beam ignition/sustain/shutdown, shield activation and
+regeneration, shield collapse, phase-two overload, terminal reactor failure and
+final explosion. The explosion starts at 55% of the seven-second destruction
+sequence. Skip discards unheard cinematic beats and stops their recordings.
+Beam fire stops during stun and resumes with the actual attack; recovery,
+transition, suspension, retry and disposal release owned loops and warnings.
+Pause uses the existing AudioContext suspension so playback time freezes.
+
+`FinalBossEncounter` emits one cannon cue per successful triple volley, one orb
+launch per real spawn, orb bursts on contact/interception, deployment on actual
+summons, RAM crash on wall contact, and cover destruction only when it breaks.
+The player-damage cue follows accepted damage; dash protection and damage grace
+remain silent. A health-pack pickup sounds only after it restores HP. Shared
+small-drone shots/destruction and the player weapon/charge assets remain in use.
+`SpecimenAbilityAudio` routes dash start to its dedicated clip, distinguishes
+accepted core hits from blocked shots, and emits one hit cue per projectile
+blast rather than layering generic feedback over the core effect.
+
+The normal research-cinematic arrival plays emergence and hover from the rising
+boss; its cleanup releases those before combat takes ownership. The alternate
+nine-second boss intro also uses emergence. CP8/CP9 combat retries skip that
+recording. Phase-two orb and beam warnings play at 1.35/0.8 and 2.6/1.6 speed
+respectively to fit their shorter windows. Boss effects retain spatial direction
+with a 65 m reference distance, 0.6 rolloff and 250 m maximum distance, covering
+the roughly 80 m gap to the ring. Containment and Cultivation exclude this pack
+until Blackout loads; escape and intro remain restricted to their existing
+prefix banks. All effects keep the existing 24-voice application cap.
+
+The sweeping laser's current catalog gains are 2 for charge, 2.5 for ignition,
+4 for sustain and 1.7 for shutdown. Sustain is four times its initial boss-pack
+gain before the shared SFX compressor. Small boss drones in both phases use
+`boss-drone-shot-01`, an alias of the existing turret recording at full cue scale
+with catalog gain 0.9, 24 m reference distance, 0.7 rolloff and 200 m maximum
+distance. Six simultaneous drone-shot voices share the existing application
+cap. Each accepted projectile spawn cues its actual firing drone, and encounter
+cleanup releases these voices. Other levels retain the original turret mix;
+this alias adds no new audio file.
+
+## Blackout elevator and research effects
+
+`latest-cutcenes.tar` retains the 17 selected ElevenLabs recordings unchanged,
+including the original filename spellings and `specimen-landing .wav` space.
+`scripts/import-blackout-cutscene-audio.py` reuses the boss import pipeline to
+prepare mono OGG files under `public/assets/audio/blackout/`. The archive and
+recording hashes, source durations, gain, onset/tail edits and fitted durations
+are in `docs/assets/blackout-cutscene-audio-import.json`. Three loops use 100 ms
+circular overlaps. The two-second absorption recording keeps its first active
+0.5 seconds with edge fades, preserving its pitch for frequent incoming hits.
+Reimport with `python3 scripts/import-blackout-cutscene-audio.py` after installing
+NumPy and SoundFile. Source WAVs and archives stay outside the production build.
+
+`BlackoutElevatorAudio` follows boarding-relative simulation time. Power returns
+at 11.3 seconds; the three-second start plays at 12.5; travel follows the existing
+acceleration and braking ramps until 44.5; the stop recording starts three
+seconds before arrival. The existing door motor/stop clips follow the rear gate
+and landing shutter. Volt retains his three real electrical pulses. Shared
+body contacts, jumps and landings follow sampled actor travel, rather than the
+scrolling shaft. The quiet conversation and existing dialogue audio remain.
+
+`BlackoutResearchAudio` uses the same timeline as the visible scene. The four
+light failures share timing data with the sparks. At blackout it explicitly
+reuses Goop's Escape `escape-power-down-01`, with no replacement generation.
+New recordings follow fusion attraction and its shockwave, charged blasts,
+the door impact after projectile flight, glass breakage, shaft fall/landing,
+and the pit unlock/retraction/stop. Incoming projectile absorption uses the
+same muzzle offset, target surface and flight-speed helper as the visible
+shots. Simultaneous arrivals share one contact accent per frame.
+
+Existing recordings add bounded nearby drone flight, boss-drone shots, twelve
+small-drone destructions, subtle search-light activation, Bob's door collision,
+Specimen's body-impact/reform feedback, weapon charge, and character travel.
+`research-drone-destroy-01` reuses the escape destruction file with its own
+cinematic spatial range and four-voice budget, preserving its original use.
+Cinematic motion excludes hidden/fusing actors, teleports, stationary poses,
+carrier motion and seeks. The large Specimen gets a longer contact stride;
+its dedicated heavy landing replaces an extra generic landing cue.
+
+These are simulation-driven presentation owners. Rendering cannot emit new
+sounds; repeated time samples cannot replay beats. Pause freezes the shared
+AudioContext. Skip/reset/dispose and normal handoff stop only the cinematic's
+requested loops and one-shots, including reused recordings, without calling
+`stopAll`. Research hover is released before the existing boss owner starts.
+Loop pitch/volume changes flow through `GameplayAudio` to the existing mixer;
+there are no browser timers or changes to gameplay, dialogue or cinematic
+lengths. The 17 new recordings and destruction alias load only for Blackout.

@@ -8,6 +8,7 @@ export class SpecimenAbilityAudio {
   private readonly unsubscribe: (() => void)[];
   private chargedJump = false;
   private enabled = false;
+  private coreHitProjectile = -1;
   private readonly audio: AudioPlayback;
   private readonly body: KinematicBody;
   private readonly weapon: SpecimenProjectileSystem;
@@ -23,14 +24,18 @@ export class SpecimenAbilityAudio {
       }),
       weapon.events.on('fullChargeReached', () => { if (this.enabled) audio.play('volt-charge-ready-01', body.position, false, 0.8); }),
       weapon.events.on('overchargeReady', () => { if (this.enabled) audio.play('volt-circuit-connect-01', body.position, false, 0.9); }),
+      weapon.events.on('targetImpact', ({ impact, accepted }) => {
+        if (this.enabled && accepted && impact.targetId === 'extermination-core') this.coreHitProjectile = impact.projectileId;
+      }),
       weapon.events.on('hitFeedback', event => {
         if (!this.enabled) return;
-        audio.play(event.kind === 'hit' ? 'goop-projectile-impact-01' : 'volt-circuit-release-01',
-          body.position, false, event.kind === 'hit' ? (event.fullyCharged ? 0.85 : 0.6) : 0.4);
+        const core = event.kind === 'hit' && this.coreHitProjectile === event.projectileId;
+        audio.play(event.kind === 'blocked' ? 'boss-hit-blocked-01' : core ? 'boss-core-hit-01' : 'goop-projectile-impact-01',
+          core || event.kind === 'blocked' ? event.point : body.position, false, event.kind === 'blocked' ? .8 : event.fullyCharged ? 1 : .6);
+        this.coreHitProjectile = -1;
       }),
       dash.events.on('started', () => { if (this.enabled) {
-        audio.play('world-release-01', body.position, true, 0.8);
-        audio.play('volt-circuit-release-01', body.position, true, 0.55);
+        audio.play('specimen-dash-01', body.position, true);
       } }),
       dash.events.on('dodged', () => { if (this.enabled) audio.play('volt-circuit-connect-01', body.position, false, 0.85); }),
       body.events.on('jumped', event => { this.chargedJump = this.enabled && event.chargeFraction >= 0.85; }),
@@ -45,7 +50,7 @@ export class SpecimenAbilityAudio {
   }
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    if (!enabled) { this.chargedJump = false; this.stopCharge(); }
+    if (!enabled) { this.chargedJump = false; this.coreHitProjectile = -1; this.stopCharge(); }
   }
   update(): void {
     const model = this.weapon.readModel;

@@ -7,6 +7,14 @@ export interface ResearchFlightPose { position: THREE.Vector3; yaw: number; pitc
 const before = new THREE.Vector3(), after = new THREE.Vector3(), specimen = new THREE.Vector3();
 export const researchHallLaunchTime = (index: number): number => T.pursuit + Math.floor(index / 2) * .5 + index % 2 * .1;
 export const researchHallLaunchZ = (index: number): number => 52.6 - Math.floor(index / 2) * (5.2 / 3);
+
+/** Same muzzle offset, slime surface and travel speed for visible shots and audio. */
+export function copyResearchIncomingShot(index: number, fired: number, specimen: THREE.Vector3,
+  from: THREE.Vector3, to: THREE.Vector3, direction: THREE.Vector3): number {
+  sampleResearchDronePosition(index, fired, from); to.copy(specimen); to.y += .7;
+  direction.subVectors(to, from).normalize(); from.addScaledVector(direction, .85); to.addScaledVector(direction, -1.15);
+  return from.distanceTo(to) / 58;
+}
 export const researchGalleryLaunchTime = (index: number): number => T.sentries + Math.floor(index / 2) * 1.5 + index % 2 * .2;
 
 function pursuitProgress(t: number, start: number): number {

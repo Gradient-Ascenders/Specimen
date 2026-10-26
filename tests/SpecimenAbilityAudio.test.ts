@@ -35,7 +35,16 @@ test('charge audio rises without extra voices and release, pause, landing and di
     weapon.events.emit('hitFeedback', { projectileId: 1, kind: 'hit', point: body.position, fullyCharged: false });
     assert.equal(sounds.at(-1), 'goop-projectile-impact-01');
     weapon.events.emit('hitFeedback', { projectileId: 2, kind: 'blocked', point: body.position, fullyCharged: false });
-    assert.equal(sounds.at(-1), 'volt-circuit-release-01');
+    assert.equal(sounds.at(-1), 'boss-hit-blocked-01');
+    weapon.events.emit('targetImpact', { accepted: true, destroyed: false, impact: {
+      projectileId: 7, targetId: 'extermination-core', kind: 'direct', chargeAmount: 1,
+      fullyCharged: true, damageUnits: 18, point: body.position, direction: body.position,
+    } });
+    weapon.events.emit('hitFeedback', { projectileId: 7, kind: 'hit', point: body.position, fullyCharged: true });
+    assert.equal(sounds.at(-1), 'boss-core-hit-01');
+    const beforeDash = sounds.length;
+    dash.events.emit('started', {});
+    assert.deepEqual(sounds.slice(beforeDash), ['specimen-dash-01'], 'dash replaces the old stacked placeholder cues');
     dash.events.emit('dodged', {}); assert.equal(sounds.at(-1), 'volt-circuit-connect-01');
     controls.firePressed = controls.fireHeld = true; controls.fireReleased = false;
     weapon.update(0.2, controls); feedback.update(); assert.equal(loops.size, 1);
