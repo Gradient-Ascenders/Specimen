@@ -1,8 +1,7 @@
 name: Production integration
 
 on:
-  push:
-    branches: [main]
+  # Extended coverage runs outside the PR/submission path, or on demand.
   schedule:
     - cron: '23 3 * * *'
   workflow_dispatch:

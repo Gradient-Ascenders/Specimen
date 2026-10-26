@@ -52,7 +52,7 @@ unit tests, builds and byte-validates the production archive, smoke-tests the
 extracted ZIP under `/group-folder/`, uploads the actual ZIP without another
 ZIP wrapper and writes its download URL/hash to the summary.
 The production integration workflow runs the production-parity regressions
-after the merge to `main`; `npm run test:smoke` remains the fast extracted
+nightly on `main` and on manual dispatch; `npm run test:smoke` remains the fast extracted
 archive release gate.
 
 The latest existing Linux run for the integrated main baseline succeeded:

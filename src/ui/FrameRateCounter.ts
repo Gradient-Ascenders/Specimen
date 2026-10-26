@@ -5,7 +5,8 @@ export class FrameRateCounter {
 
   sample(deltaSeconds: number): number | undefined {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return undefined;
-    if (deltaSeconds > 1) { this.reset(); return undefined; }
+    // The application loop resets its clock on pause/focus changes. A long
+    // rendered frame is still a valid sample, including on software renderers.
     this.seconds += deltaSeconds;
     this.frames++;
     if (this.seconds + 1e-9 < 0.5) return undefined;

@@ -1,4 +1,5 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { finishLevelArrival } from '../helpers/LevelArrival.ts';
 import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -152,6 +153,7 @@ test(`F1 preserves ${preset} gameplay across three levels and captures normal, c
       'data-state',
       'playing',
     );
+    await finishLevelArrival(page, '__cleanSession');
     // AudioContext.resume() completes asynchronously after the entry gesture.
     // Compare F1's effect only after that unrelated transition has settled.
     await page.waitForFunction(() =>

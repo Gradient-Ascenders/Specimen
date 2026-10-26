@@ -3,7 +3,8 @@
 ## Pull requests
 
 `.github/workflows/pr-validation.yml` runs for pull requests targeting `main`.
-Two independent jobs install the lockfile dependencies and run:
+A unit-test job and two production-smoke shards install the lockfile dependencies
+and run:
 
 | Check | Commands |
 | --- | --- |
@@ -14,6 +15,9 @@ The build already performs TypeScript checking. Browser failures retain traces,
 screenshots, and reports as short-lived CI artifacts. Do not commit those files
 under `docs/`.
 
+Each smoke shard uses one software-rendering worker. The `Production smoke`
+aggregate check passes only when both shards succeed.
+
 Repository rules should require both checks, an up-to-date branch, one approval,
 and resolved review threads. Verify the live ruleset before relying on this
 document because repository settings can change independently of source.
@@ -21,8 +25,8 @@ document because repository settings can change independently of source.
 ## Production integration
 
 `.github/workflows/production-integration.yml` runs the longer Chromium journeys
-and a Firefox production-startup check after pushes to `main`, nightly, and on
-manual dispatch. It covers graphics-profile parity across all levels, clean
+and a Firefox production-startup check nightly and on manual dispatch. It covers
+graphics-profile parity across all levels, clean
 gameplay mode, real browser audio, optional character-detail failures, and basic
 cross-browser startup. It never runs for pull requests and is diagnostic
 coverage rather than a required merge check.
