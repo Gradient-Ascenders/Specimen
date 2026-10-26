@@ -1329,6 +1329,7 @@ export class CultivationLevelRuntime {
         previewDissolveTargets, dissolveSystem,
         (slimeId) => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), slimeId),
         authoredPreview.coverArt.droneSurfaceMaps,
+        authoredPreview.securityDroneModels,
       ) : undefined;
       if (roomFourEncounter) rollback(() => roomFourEncounter.dispose());
       const roomFourView = authoredPreview ? new gameplay.ElevatorEncounterView() : undefined;

@@ -13,6 +13,30 @@ import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { createAuthoredDissolveTarget } from '../src/abilities/DissolveTarget.ts';
 import { DissolveSystem } from '../src/abilities/DissolveSystem.ts';
 import { AcidProjectileSystem } from '../src/abilities/AcidProjectileSystem.ts';
+import { CultivationSecurityDroneModels } from '../src/render/environment/cultivation/CultivationSecurityDroneModels.ts';
+import type { SecurityDroneGeometrySource } from '../src/render/hazards/SecurityDronePresentation.ts';
+import type { SecurityDroneConfig } from '../src/hazards/SecurityDrone.ts';
+import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
+
+test('lift drones borrow their sized Blender model while retaining the live eye, engines and corrosion reset',()=>{
+  const models=new CultivationSecurityDroneModels(cultivationAssets),f=fixture(models);
+  const modelConfig={type:'ceiling',colliderSize:new THREE.Vector3(1.2,.7,1.2)} as SecurityDroneConfig;
+  try{
+    const root=f.room.droneRoots[0];
+    const shell=root.getObjectByName('room-4-drone-1-armoured-shell') as THREE.Mesh;
+    assert.ok(shell.geometry===models.geometry(modelConfig,'armour',false),'lift uses its authored size variant');
+    const eye=root.getObjectByName('room-4-drone-1-front-indicator') as THREE.Mesh;
+    assert.equal(eye.position.z,-1.2*.51);
+    assert.equal(root.getObjectByName('room-4-drone-1-mount')!.visible,false);
+    assert.ok(root.getObjectByName('lift-drone-flight-hardware'));
+    for(let i=0;i<1000;i++)f.step();
+    assert.equal(f.dissolve.startBurn(f.targets[0]),'started');
+    for(let i=0;i<180;i++)f.step();
+    assert.equal(f.targets[0].completed,true);
+    f.reset();assert.equal(f.targets[0].completed,false);
+    assert.ok(shell.geometry===models.geometry(modelConfig,'armour',false),'reset retains borrowed buffers');
+  }finally{f.dispose();models.dispose();}
+});
 
 test('lift drone flight follows visible powered engines and a completed acid kill replaces the generic completion cue', () => {
   const f=fixture(), root=new THREE.Group(), loops=new Map<string,SoundId>(), cues:SoundId[]=[];
@@ -59,7 +83,7 @@ test('Room 4 checkpoint advances both bodies together', () => {
   assert.equal(both.roomId, 4); assert.deepEqual(both.recoveryRoomIds, { bob: 4, goop: 4 });
 });
 
-function fixture() {
+function fixture(presentationModels?:SecurityDroneGeometrySource) {
   const room = new LevelTwoRoomFourGreybox();
   const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
   world.registerAll(room.collisionMeshes); surfaces.registerAll(room.collisionMeshes);
@@ -69,7 +93,7 @@ function fixture() {
   const bob = new KinematicBody({ world, surfaces, initialPosition: new THREE.Vector3(-2, .66, 9) });
   const goop = new KinematicBody({ world, surfaces, initialPosition: new THREE.Vector3(2, .66, 9) });
   let deaths = 0;
-  const encounter = new ElevatorDroneEncounter(room, world, surfaces, bob, goop, targets, dissolve, () => deaths++);
+  const encounter = new ElevatorDroneEncounter(room, world, surfaces, bob, goop, targets, dissolve, () => deaths++,undefined,presentationModels);
   const step = (dt = 1 / 60) => {
     room.controller.update(dt, true, true);
     encounter.update(dt, 'goop'); dissolve.update(dt);

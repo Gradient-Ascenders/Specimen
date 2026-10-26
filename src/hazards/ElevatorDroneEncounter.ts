@@ -6,7 +6,7 @@ import { ColliderTransformMode, CollisionLayer, DEFAULT_SOLID_COLLISION_LAYERS, 
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { LiftDroneFlightPresentation } from '../render/hazards/LiftDroneFlightPresentation.ts';
 import { DroneBreakupPresentation } from '../render/hazards/DroneBreakupPresentation.ts';
-import { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
+import { SecurityDronePresentationResources, type SecurityDroneGeometrySource } from '../render/hazards/SecurityDronePresentation.ts';
 import { SlimeDamageSystem } from '../systems/SlimeDamageSystem.ts';
 import { DroneProjectileSystem, type DroneProjectileTarget } from './DroneProjectileSystem.ts';
 import { SecurityDrone, type SecurityDroneTarget } from './SecurityDrone.ts';
@@ -45,8 +45,9 @@ export class ElevatorDroneEncounter {
     world: CollisionWorld, surfaces: SurfaceRegistry,
     bob: KinematicBody, goop: KinematicBody, targets: readonly DissolveTarget[],
     dissolve: DissolveSystem, requestDeath: (id: 'bob' | 'goop') => void,
-    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }) {
-    this.resources = new SecurityDronePresentationResources(surfaceMaps, true, true);
+    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture },
+    presentationModels?: SecurityDroneGeometrySource) {
+    this.resources = new SecurityDronePresentationResources(surfaceMaps, true, true, presentationModels);
     this.room = room; this.world = world;
     this.breakup = new DroneBreakupPresentation(room.droneRoots.length);
     room.root.add(this.breakup.root);

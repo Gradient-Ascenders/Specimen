@@ -12,7 +12,7 @@ from mathutils import Vector
 HERE = ''
 SCENE = 'Cultivation Security Foundry'
 MATERIAL_PREFIX = 'CV_'
-SIZES = {'ceiling': (2.2, 1.35, 2.2), 'ground': (3.6, 1.5, 1.7)}
+SIZES = {'ceiling': (2.2, 1.35, 2.2), 'ground': (3.6, 1.5, 1.7), 'lift': (1.2, .7, 1.2)}
 ROLES = ('armour', 'armourShadow', 'mechanism', 'barrel', 'mount', 'linkage')
 
 
@@ -208,10 +208,29 @@ def optics_and_weapons(kind, distant=False):
     s = min(w, h, d)
     n = 12 if distant else 24
     # The live state-controlled pupil remains in the original runtime owner.
-    profile('SensorBezel', [(s * .225, -d * .445), (s * .225, -d * .49),
-                           (s * .195, -d * .52), (s * .135, -d * .52),
-                           (s * .125, -d * .49), (s * .125, -d * .445)],
-            (0, 0, 0), 'z', 'armourShadow', root, n)
+    # One continuous hollow scope seats inside the cast chassis and reaches
+    # the existing bezel. The state-controlled eye stays at -depth * .51.
+    # Shared rings avoid stacked end caps at the barrel/collar transition.
+    scope = profile('SensorScope', [(s * .245, -d * .24), (s * .245, -d * .30),
+                           (s * .19, -d * .325), (s * .19, -d * .425),
+                           (s * .205, -d * .445), (s * .225, -d * .445),
+                           (s * .225, -d * .49), (s * .195, -d * .52),
+                           (s * .135, -d * .52), (s * .125, -d * .49),
+                           (s * .125, -d * .24)],
+                    (0, 0, 0), 'z', 'armourShadow', root, n)
+    for vertex in scope.data.vertices:
+        if d * .31 < vertex.co.y < d * .43:
+            colour = scope.data.color_attributes['wear'].data[vertex.index].color
+            scope.data.color_attributes['wear'].data[vertex.index].color = tuple(c * .42 for c in colour[:3]) + (1,)
+    if not distant:
+        for k in range(4):
+            angle = (k + .5) * math.pi / 2
+            vv = [(s * (r * math.cos(angle) - u * math.sin(angle)), y,
+                   z) for z in [-d * .335, -d * .415]
+                  for r,u in [(.185,-.015),(.205,-.015),(.205,.015),(.185,.015)]
+                  for y in [s * (r * math.sin(angle) + u * math.cos(angle))]]
+            mesh('ScopeAxialRib', vv, [(3,2,1,0),(4,5,6,7),(0,1,5,4),
+                 (1,2,6,5),(2,3,7,6),(3,0,4,7)], 'barrel', root, s * .003)
     tube('RecessedSensorGlass', (0, 0, -d * .482), (0, 0, -d * .465), s * .12, 'mechanism', root, n)
     for side in [-1, 1]:
         x = side * w * .36
@@ -279,10 +298,11 @@ def mounting(kind, distant=False):
 
 
 def build(kind, distant=False):
-    armour(kind, distant)
+    armour(kind, distant, marking_offset=.12 if kind == 'lift' else .19)
     optics_and_weapons(kind, distant)
     cooling(kind, distant)
-    mounting(kind, distant)
+    if kind != 'lift':
+        mounting(kind, distant)
     runtime_pupil_reference(kind, distant)
 
 
@@ -316,6 +336,8 @@ def finish():
             root = rig(kind, distant)
             for role in ROLES:
                 parts = [o for o in root.children if o.type == 'MESH' and o.get('securityRole') == role]
+                if not parts:
+                    continue
                 for o in bpy.context.selected_objects:
                     o.select_set(False)
                 for o in parts:
@@ -327,12 +349,12 @@ def finish():
                 part.name = root.name + '_' + role
                 part['securityRole'] = role
                 part.select_set(False)
-            root.location = xyz((-2.2 if kind == 'ceiling' else 2.6, 0, 4 if distant else 0))
+            root.location = xyz(({'ceiling': -2.2, 'ground': 2.6, 'lift': 6.3}[kind], 0, 4 if distant else 0))
     for area in bpy.context.screen.areas if bpy.context.screen else []:
         if area.type == 'VIEW_3D':
             area.spaces.active.shading.type = 'MATERIAL'
             area.spaces.active.overlay.show_overlays = False
-    return '24 immutable role/detail buffers; original pupil and aim pivots remain runtime-owned'
+    return '32 immutable role/detail buffers; original pupil and aim pivots remain runtime-owned'
 
 
 def export(save=True):
