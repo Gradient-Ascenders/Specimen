@@ -183,10 +183,10 @@ test('the actual Blender buffers replace old coverage and share one Level 1 fini
   }finally{scene.dispose();}
 });
 
-test('front-sided opaque coverage seals the authored wall, floor and ceiling footprints, including close wall views',()=>{
+for(const asset of CULTIVATION_BLENDER_ASSETS)test(`front-sided opaque coverage seals ${asset.id}, including close wall views`,()=>{
   const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),failures:unknown[]=[];
   try{
-    for(const asset of CULTIVATION_BLENDER_ASSETS){
+    {
       const room=(scene as any)[asset.owner].root as THREE.Group;room.visible=true;
       const owner=(layout[asset.id].defaultTarget?room.getObjectByName(layout[asset.id].defaultTarget):room) as THREE.Group;
       owner.visible=true;
@@ -230,13 +230,74 @@ test('front-sided opaque coverage seals the authored wall, floor and ceiling foo
       if(asset.id==='room-5'){
         // Front-sided radial probes cover the true vault and its deep joints;
         // its angled panels are deliberately absent from the AABB footprint list.
-        for(const z of [16.2,19.8,21.7,39.97,64.02,95.97,121.99,122.01,122.06,123.8,125.94,125.99,126.01,139.8]){
+        for(const z of [16.2,19.8,21.7,34.001,36.5,38.999,39.97,58.001,60.5,62.999,64.02,86.001,88.5,90.999,106.001,108.5,110.999,95.97,121.99,122.01,122.06,123.8,125.94,125.99,126.01,139.8]){
           for(let cell=0;cell<20;cell++)for(const phase of [.001,.5,.999]){
             if(z>18.5&&z<21.5&&(cell===9||cell===10))continue;
             const angle=(cell+phase)*Math.PI/20,n=new THREE.Vector3(Math.cos(angle),Math.sin(angle),0);
             const from=owner.localToWorld(new THREE.Vector3(40,-12,z).addScaledVector(n,9.55));
-            const ray=new THREE.Raycaster(from,n.transformDirection(owner.matrixWorld),0,2);
+            const ray=new THREE.Raycaster(from,n.transformDirection(owner.matrixWorld),0,3.3);
             if(!ray.intersectObjects(meshes,false).length)failures.push({room:asset.id,source:'vault joint',cell,phase,z});
+          }
+        }
+        // Walkway-to-vault joints are closed behind the unchanged tangent
+        // collision panels. The intentional 6 m liquid channel stays open.
+        for(const x of [29.9,50.1])for(const z of [20.5,39.98,60.5,88.5,108.5,124,136]){
+          const from=owner.localToWorld(new THREE.Vector3(x,-10.9,z));
+          const ray=new THREE.Raycaster(from,new THREE.Vector3(0,-1,0),0,.8);
+          assert.ok(ray.intersectObjects(meshes,false).some(hit=>{
+            const y=owner.worldToLocal(hit.point.clone()).y;
+            return y>=-11.34&&y<=-11.19;
+          }),`closed sewer outer floor joint ${x},${z}`);
+        }
+        // Centre-of-panel probes miss perimeter slits. Look diagonally into
+        // the actual floor/wall contact, including every cassette seam.
+        for(const wall of layout[asset.id].boxes){
+          const size=wall.hi.map((v:number,i:number)=>v-wall.lo[i]);
+          const axis=size.indexOf(Math.min(...size));
+          if(axis===1||size[1]<1||size[axis]>.65)continue;
+          const along=axis===0?2:0,inward=wall.inward??((wall.lo[axis]+wall.hi[axis])/2<(axis===2?1:0)?1:-1);
+          const face=inward>0?wall.hi[axis]:wall.lo[axis];
+          for(const floor of layout[asset.id].boxes){
+            if(!/floor|landing-tile/.test(floor.name)||floor.hi[1]-floor.lo[1]>=.85)continue;
+            const height=floor.hi[1];
+            const edge=inward>0?floor.lo[axis]:floor.hi[axis],depth=(face-edge)*inward;
+            if(height<wall.lo[1]-.03||height>=wall.hi[1]||depth<-.031||depth>.491)continue;
+            const a=Math.max(wall.lo[along],floor.lo[along]),b=Math.min(wall.hi[along],floor.hi[along]);
+            if(b-a<.01)continue;
+            const samples=[a+.001,b-.001,(a+b)/2];
+            for(let u=Math.ceil(a/4)*4;u<b;u+=4)if(u>a)samples.push(u);
+            for(const u of samples){
+              const corner=new THREE.Vector3().fromArray(floor.lo);corner.y=height;corner.setComponent(axis,face);corner.setComponent(along,u);
+              const towardRoom=new THREE.Vector3(0,1,0);towardRoom.setComponent(axis,inward);
+              const start=corner.addScaledVector(towardRoom,.2);
+              // The shaft's retained solid adhesive field occupies its end;
+              // an origin inside that collider is outside the walking space.
+              if(layout[asset.id].occluders.some((o:any)=>start.toArray().every((v,i)=>v>o.lo[i]&&v<o.hi[i])))continue;
+              const from=owner.localToWorld(start);
+              const direction=towardRoom.negate().normalize().transformDirection(owner.matrixWorld);
+              if(!new THREE.Raycaster(from,direction,0,.295).intersectObjects(meshes,false).length)
+                failures.push({room:asset.id,source:'floor/wall perimeter',wall:wall.name,floor:floor.name,u});
+              const base=owner.worldToLocal(from.clone());base.y=height+.005;
+              const intoWall=new THREE.Vector3();intoWall.setComponent(axis,-inward);
+              if(!new THREE.Raycaster(owner.localToWorld(base),intoWall.transformDirection(owner.matrixWorld),0,.215).intersectObjects(meshes,false).length)
+                failures.push({room:asset.id,source:'wall base',wall:wall.name,floor:floor.name,u});
+            }
+          }
+        }
+        // Probe the narrow joints independently of the old floor collider.
+        const ramp=room.getObjectByName('room-5-reunion-ramp') as THREE.Mesh;
+        for(const z of [66,74,90,108,120]){
+          const down=new THREE.Vector3(0,-1,0).transformDirection(owner.matrixWorld);
+          const ground=new THREE.Raycaster(owner.localToWorld(new THREE.Vector3(25,4,z)),down,0,30)
+            .intersectObject(ramp,false)[0];
+          assert.ok(ground,'original ramp upper surface');
+          const height=owner.worldToLocal(ground.point.clone()).y;
+          for(const x of [22.99,27.01]){
+            const hit=new THREE.Raycaster(owner.localToWorld(new THREE.Vector3(x,height+.25,z)),down,0,.6)
+              .intersectObjects(meshes,false)[0];
+            assert.ok(hit,`closed sloped floor-to-wall joint ${x},${z}`);
+            const y=owner.worldToLocal(hit.point.clone()).y;
+            assert.ok(y>=height-.005&&y<=height+.08,'flashing fits the original slope');
           }
         }
         const drop=owner.localToWorld(new THREE.Vector3(40,-2.45,20));

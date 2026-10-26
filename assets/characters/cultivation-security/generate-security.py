@@ -12,7 +12,7 @@ from mathutils import Vector
 HERE = ''
 SCENE = 'Cultivation Security Foundry'
 MATERIAL_PREFIX = 'CV_'
-SIZES = {'ceiling': (2.2, 1.35, 2.2), 'ground': (3.6, 1.5, 1.7), 'lift': (1.2, .7, 1.2)}
+SIZES = {'ceiling': (2.2, 1.35, 2.2), 'ground': (3.6, 1.5, 1.7), 'lift': (1.2, .7, 1.2), 'quarantine': (2, 1.3, 2)}
 ROLES = ('armour', 'armourShadow', 'mechanism', 'barrel', 'mount', 'linkage')
 
 
@@ -301,7 +301,7 @@ def build(kind, distant=False):
     armour(kind, distant, marking_offset=.12 if kind == 'lift' else .19)
     optics_and_weapons(kind, distant)
     cooling(kind, distant)
-    if kind != 'lift':
+    if kind not in ('lift','quarantine'):
         mounting(kind, distant)
     runtime_pupil_reference(kind, distant)
 
@@ -349,12 +349,12 @@ def finish():
                 part.name = root.name + '_' + role
                 part['securityRole'] = role
                 part.select_set(False)
-            root.location = xyz(({'ceiling': -2.2, 'ground': 2.6, 'lift': 6.3}[kind], 0, 4 if distant else 0))
+            root.location = xyz(({'ceiling': -2.2, 'ground': 2.6, 'lift': 6.3, 'quarantine': 9.2}[kind], 0, 4 if distant else 0))
     for area in bpy.context.screen.areas if bpy.context.screen else []:
         if area.type == 'VIEW_3D':
             area.spaces.active.shading.type = 'MATERIAL'
             area.spaces.active.overlay.show_overlays = False
-    return '32 immutable role/detail buffers; original pupil and aim pivots remain runtime-owned'
+    return '40 immutable role/detail buffers; original pupil and aim pivots remain runtime-owned'
 
 
 def export(save=True):

@@ -97,7 +97,7 @@ export class CultivationAccessTunnelArt {
     return this.wall;
   }
 
-  addDetails(parent: THREE.Group): void {
+  addDetails(parent: THREE.Group,options:{authoredReplacement?:boolean}={}): void {
     this.root.name = 'room-5-access-tunnel-details';
     this.root.userData.presentationOnly = true;
     const parts = new Map<THREE.Material, THREE.BufferGeometry[]>();
@@ -106,6 +106,7 @@ export class CultivationAccessTunnelArt {
     };
     const box = (material: THREE.Material, size: [number, number, number], at: [number, number, number]) =>
       add(material, new THREE.BoxGeometry(...size).translate(...at));
+    if(!options.authoredReplacement){
     // Shallow pipes and clamps stay above head height and off the wall plane.
     for (const y of [2.04, 2.25]) add(this.iron,
       new THREE.CylinderGeometry(.045, .045, 48, 8).rotateZ(Math.PI / 2).translate(14, y, 10.08));
@@ -114,6 +115,7 @@ export class CultivationAccessTunnelArt {
     for (const x of [-1, 1]) {
       add(this.iron, new THREE.CylinderGeometry(.04, .04, 7.6, 8).rotateX(Math.PI / 2).translate(x, 2.15, 4));
       box(this.iron, [.09, .012, 7.4], [x, .21, 4]);
+    }
     }
     const lamp = new THREE.MeshStandardMaterial({ name: 'cultivation-access-caged-lamp',
       color: 0xa08755, emissive: 0xd1a356, emissiveIntensity: .65, roughness: .85 });

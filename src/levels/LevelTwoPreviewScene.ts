@@ -241,8 +241,8 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning, {authoredReplacement:true});
     this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning,{authoredReplacement:true});
-    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering);
-    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
+    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering, true);
+    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt,{authoredReplacement:true});
     this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt, {authoredReplacement:true});
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;

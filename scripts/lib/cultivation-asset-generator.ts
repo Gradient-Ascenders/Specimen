@@ -40,12 +40,12 @@ for(const asset of CULTIVATION_BLENDER_ASSETS){
   const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   scene.updateMatrixWorld(true);const parts:Record<string,THREE.BufferGeometry>={};
   scene.traverse(object=>{if(object instanceof THREE.Mesh){
-    if(!/^CV_(ceiling|ground|lift)_(full|distant)_(armour|armourShadow|mechanism|barrel|mount|linkage)$/.test(object.name))
+    if(!/^CV_(ceiling|ground|lift|quarantine)_(full|distant)_(armour|armourShadow|mechanism|barrel|mount|linkage)$/.test(object.name))
       throw Error('Unexpected security export mesh: '+object.name);
     parts[object.name]=object.geometry.clone().applyMatrix4(object.matrixWorld);
     object.geometry.dispose();for(const m of Array.isArray(object.material)?object.material:[object.material])m.dispose();
   }});
-  if(Object.keys(parts).length!==32)throw Error('Security export needs 32 role/detail buffers.');
+  if(Object.keys(parts).length!==40)throw Error('Security export needs 40 role/detail buffers.');
   blenderSources.set('cultivation-security-drones',parts);
 }
 {

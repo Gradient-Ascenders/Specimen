@@ -22,10 +22,11 @@ export class CultivationMaintenanceArt {
   private readonly accessArt: CultivationAccessTunnelArt;
   private readonly sewerArt: CultivationSewerArt;
   private readonly chamberArt: CultivationDroneChamberArt;
-  private readonly podArt: CultivationVoltPodArt;
+  private readonly podArt: CultivationVoltPodArt|undefined;
   readonly diagnostics = { newTextures: 0, variants: 0, staticMeshesBatched: 0, batches: 0 };
 
-  constructor(room: LevelTwoRoomFiveGreybox, lab: CultivationLabMaterials, contamination: CultivationContaminationArt) {
+  constructor(room: LevelTwoRoomFiveGreybox, lab: CultivationLabMaterials, contamination: CultivationContaminationArt,
+    options:{authoredReplacement?:boolean}={}) {
     const b = room.builder, m = b.materials;
     this.accessArt = new CultivationAccessTunnelArt(lab, contamination);
     this.sewerArt = new CultivationSewerArt(lab, contamination);
@@ -52,8 +53,8 @@ export class CultivationMaintenanceArt {
     culvert.side = THREE.BackSide;
     const oxidized = variant(lab.metal, 'worn-service-iron', 0x796b52, .8);
     // Preserve the same jade route cue in the dim maintenance section.
-    const sticky = variant(lab.sticky, 'adhesive-tile', 0xffffff, lab.sticky.roughness, .14);
-    sticky.emissive.copy(lab.sticky.emissive);
+    const sticky = options.authoredReplacement?lab.nurserySticky:variant(lab.sticky, 'adhesive-tile', 0xffffff, lab.sticky.roughness, .14);
+    if(!options.authoredReplacement)sticky.emissive.copy(lab.sticky.emissive);
     const terminal = variant(lab.metal, 'conductive-terminal', 0xb9a55a, .45, .16);
     // Retain the existing maps. Only the drainage finish adds world-scale runoff shading.
     const compileWet = wet.onBeforeCompile;
@@ -83,7 +84,6 @@ export class CultivationMaintenanceArt {
         platforms.push(object); return;
       }
       let finish = sourceToFinish.get(object.material);
-      if (/room-5-route-\d+-hanger-|room-5-safe-\d+-suspension-/.test(name)) finish = lab.pole;
       if (object.userData.textureRole === 'acid-floor' || object.material === m.acid) {
         finish = lab.acid; this.acidSurfaces.push(object);
       } else if (object.userData.surfaceTag === 'sticky') finish = sticky;
@@ -94,6 +94,7 @@ export class CultivationMaintenanceArt {
       else if (/safe-.*-deck|release-quiet-walk|rescue-shortcut|reunion-ramp$/.test(name)) finish = deck;
       else if (name === 'room-5-volt-conductive-terminal') finish = terminal;
       finish = this.chamberArt.finishFor(object) ?? this.accessArt.finishFor(object) ?? this.sewerArt.finishFor(object) ?? finish;
+      if(object.userData.surfaceTag==='sticky')finish=sticky;
       // Retain animated contacts, network signals, glass and the approved damaged drone.
       if (object === room.brokenCore || object.parent === room.brokenCore || object.userData.soluble) finish = undefined;
       if (!finish) return;
@@ -101,15 +102,19 @@ export class CultivationMaintenanceArt {
       lab.bind(object, finish);
       this.chamberArt.mapShield(object, room);
       // Parent-local and dynamic pieces must follow their existing owner. Batch only static direct children.
-      if (object.parent === room.root && object !== room.releaseCover && object.visible && !dynamic.has(object) && object.children.length === 0 && !this.acidSurfaces.includes(object)&&!isCultivationBlenderShell(object.name)) candidates.push(object);
+      const authoredBaffle=options.authoredReplacement&&/^room-5-safe-\d+-network-\d+-baffle$/.test(name);
+      const authoredControl=options.authoredReplacement&&/^room-5-control-(red|blue|green)-(face|cabinet)$/.test(name);
+      if (object.parent === room.root && object !== room.releaseCover && object.visible && !dynamic.has(object) && object.children.length === 0 && !this.acidSurfaces.includes(object)&&!isCultivationBlenderShell(object.name)&&!authoredBaffle&&!authoredControl) candidates.push(object);
     });
     for (const platform of platforms) {
       this.originals.push({ mesh: platform, material: platform.material });
-      if (platform.geometry instanceof THREE.BoxGeometry) lab.platformArt.add(platform);
-      else lab.platformArt.addClipped(platform);
+      if(!options.authoredReplacement){
+        if (platform.geometry instanceof THREE.BoxGeometry) lab.platformArt.add(platform);
+        else lab.platformArt.addClipped(platform);
+      }
       platform.material = this.hidden;
     }
-    lab.platformArt.batchStatic(room.root, 10);
+    if(!options.authoredReplacement)lab.platformArt.batchStatic(room.root, 10);
     const platformBatch = room.root.children.find(o => o.name === 'cultivation-static-platform-art');
     platformBatch?.traverse(o => {
       if (!(o instanceof THREE.Mesh)) return;
@@ -140,7 +145,7 @@ export class CultivationMaintenanceArt {
       const hull = new THREE.Mesh(geometry, hullMaterial); hull.name = 'room-5-platform-shadow-hulls'; hull.userData.presentationOnly = true;
       room.root.add(hull); this.batches.push(hull);
     }
-    this.podArt = new CultivationVoltPodArt(room, lab);
+    this.podArt = options.authoredReplacement?undefined:new CultivationVoltPodArt(room, lab);
     // Keep spatial batches small enough for camera and shadow-frustum rejection.
     const parts = new Map<string, { material: THREE.Material; sources: THREE.Mesh[] }>();
     for (const mesh of candidates) {
@@ -184,16 +189,15 @@ export class CultivationMaintenanceArt {
     }
     // Warning markings identify the final terminal approach.
     for (const x of [13.9, 18.1]) box(lab.platformArt.warning, [x, .01, 68], [.12, .02, 2.2]);
-    for (const [material, transforms] of accents) {
+    for (const [material, transforms] of options.authoredReplacement?[]:accents) {
       b.borrowedMaterials.add(material);
       const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, transforms.length);
       mesh.name = 'room-5-art-service-markings'; mesh.userData.presentationOnly = true;
       transforms.forEach((matrix, i) => mesh.setMatrixAt(i, matrix)); mesh.computeBoundingSphere();
       room.root.add(mesh); this.batches.push(mesh);
     }
-    this.accessArt.addDetails(room.root);
-    this.sewerArt.addDetails(room, lab);
-    this.chamberArt.addDetails(room);
+    this.accessArt.addDetails(room.root,options);
+    if(!options.authoredReplacement){this.sewerArt.addDetails(room, lab);this.chamberArt.addDetails(room);}
     this.diagnostics.variants = this.materials.length + this.accessArt.materialCount + this.sewerArt.materialCount + this.chamberArt.materialCount;
     this.diagnostics.staticMeshesBatched = candidates.length;
     this.diagnostics.batches = this.batches.length + this.accessArt.batchCount + this.sewerArt.batchCount + this.chamberArt.batchCount;
@@ -201,7 +205,7 @@ export class CultivationMaintenanceArt {
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
-    this.podArt.dispose(); this.accessArt.dispose(); this.sewerArt.dispose(); this.chamberArt.dispose();
+    this.podArt?.dispose(); this.accessArt.dispose(); this.sewerArt.dispose(); this.chamberArt.dispose();
     for (const { mesh, material } of this.originals) mesh.material = material;
     for (const mesh of this.batches) {
       mesh.removeFromParent(); mesh.geometry.dispose();

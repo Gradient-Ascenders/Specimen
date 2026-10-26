@@ -1436,7 +1436,7 @@ export class CultivationLevelRuntime {
       const roomFiveEncounter = authoredPreview ? new gameplay.RoomFiveDroneEncounter(
         authoredPreview.roomFive, collisionWorld, surfaceRegistry, bobBody, goopBody,
         id => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), id),
-        authoredPreview.labArt.metal, authoredPreview.root) : undefined;
+        authoredPreview.labArt.metal, authoredPreview.root, authoredPreview.securityDroneModels) : undefined;
       if (roomFiveEncounter) {
         rollback(() => roomFiveEncounter.dispose());
         addCultivationRoomThreeBoosters(roomFiveEncounter.platformBoosters, authoredPreview!.roomThree);

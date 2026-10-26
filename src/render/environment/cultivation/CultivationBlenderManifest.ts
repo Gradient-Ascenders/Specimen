@@ -2227,196 +2227,487 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
       "room-5-sewer-hidden-exit-skin-19",
       "room-5-sewer-bank-33.5",
       "room-5-sewer-bank-46.5",
-      "room-5-sewer-pipe-32"
+      "room-5-sewer-pipe-32",
+      "room-5-control-red-acid-contact",
+      "room-5-control-blue-acid-contact",
+      "room-5-control-green-acid-contact",
+      "room-5-safe-0-deck",
+      "room-5-safe-0-network-0-baffle",
+      "room-5-safe-1-deck",
+      "room-5-safe-1-network-0-baffle",
+      "room-5-safe-1-network-1-baffle",
+      "room-5-safe-2-deck",
+      "room-5-safe-2-network-1-baffle",
+      "room-5-safe-2-network-2-baffle",
+      "room-5-safe-3-deck",
+      "room-5-safe-3-network-2-baffle",
+      "room-5-safe-3-network-3-baffle",
+      "room-5-safe-4-deck",
+      "room-5-safe-4-network-3-baffle",
+      "room-5-safe-4-network-4-baffle",
+      "room-5-safe-5-deck",
+      "room-5-safe-5-network-4-baffle",
+      "room-5-safe-5-network-5-baffle",
+      "room-5-safe-6-deck",
+      "room-5-safe-6-network-5-baffle",
+      "room-5-route-0-jump-1",
+      "room-5-route-0-jump-2",
+      "room-5-route-1-jump-1",
+      "room-5-route-1-jump-2",
+      "room-5-route-2-jump-1",
+      "room-5-route-2-jump-2",
+      "room-5-route-2-jump-3",
+      "room-5-route-3-jump-1",
+      "room-5-route-3-jump-2",
+      "room-5-route-4-jump-1",
+      "room-5-route-4-jump-2",
+      "room-5-route-5-jump-1",
+      "room-5-route-5-jump-2",
+      "room-5-release-quiet-walk",
+      "room-5-release-pedestal",
+      "room-5-pod-base",
+      "room-5-pod-cap",
+      "room-5-pod-glass-x--1",
+      "room-5-pod-glass-z--1",
+      "room-5-pod-glass-x-1",
+      "room-5-pod-glass-z-1",
+      "room-5-pod-cable--1",
+      "room-5-pod-cable-1",
+      "room-5-control-red-cabinet",
+      "room-5-control-red-face",
+      "room-5-control-blue-cabinet",
+      "room-5-control-blue-face",
+      "room-5-control-green-cabinet",
+      "room-5-control-green-face",
+      "room-5-sewer-pipe-48",
+      "room-5-broken-drone-exposed-core"
     ],
     "retirePrefixes": [],
-    "retireSubtrees": [],
+    "retireSubtrees": [
+      "room-5-control-red-acid-contact",
+      "room-5-control-blue-acid-contact",
+      "room-5-control-green-acid-contact"
+    ],
     "batches": [
       {
-        "name": "C2_room-5_Batch_Architecture_access_0_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_access_0_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_access_0_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_access_0_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_access_0_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_access_0_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_access_0_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_access_0_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_access_0_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_access_0_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_access_0_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_access_0_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_access_0_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_access_0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_access_0_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_access_0_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_access_0_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_access_0_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_access_0_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_access_0_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_0_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_crown_0_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_0_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_crown_0_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_0_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_crown_0_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_0_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_crown_0_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_0_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_crown_0_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_0_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_crown_0_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_0_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_crown_0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_0_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_crown_0_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_0_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_crown_0_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_0_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_crown_0_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_1_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_1_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_1_Amber",
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallCool"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallFoliage",
+        "finish": "HallFoliage",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallFoliage"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallGlass",
+        "finish": "HallGlass",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallGlass"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallInk"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallLoam",
+        "finish": "HallLoam",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallLoam"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_HallOxide",
+        "finish": "HallOxide",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_HallOxide"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_1_Rust",
+        "finish": "Rust",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_1_Rust"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallCool"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallGlass",
+        "finish": "HallGlass",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallGlass"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallInk"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallLoam",
+        "finish": "HallLoam",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallLoam"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_2_HallOxide",
+        "finish": "HallOxide",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_2_HallOxide"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_3_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_3_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_3_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_3_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_3_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_3_HallCool"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_3_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_3_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_3_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_3_HallInk"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_3_HallOxide",
+        "finish": "HallOxide",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_3_HallOxide"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_4_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_4_HallCool"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_4_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_4_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_5_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_5_HallCool"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_crown_5_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_crown_5_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_1_0_Amber",
         "finish": "Amber",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_1_Amber"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_0_Amber"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_1_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_decks_1_0_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_1_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_0_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_1_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_decks_1_0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_1_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_0_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_1_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_decks_1_0_HallPaint",
+        "finish": "HallPaint",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_1_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_0_HallPaint"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_1_Oxide",
-        "finish": "Oxide",
-        "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_1_Oxide"
-      },
-      {
-        "name": "C2_room-5_Batch_Architecture_crown_2_Alloy",
-        "finish": "Alloy",
-        "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_2_Alloy"
-      },
-      {
-        "name": "C2_room-5_Batch_Architecture_crown_2_Amber",
+        "name": "C2_room-5_Batch_Architecture_decks_1_-1_Amber",
         "finish": "Amber",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_2_Amber"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_-1_Amber"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_2_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_decks_1_-1_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_2_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_-1_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_2_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_decks_1_-1_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_2_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_-1_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_2_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_decks_1_-1_HallPaint",
+        "finish": "HallPaint",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_2_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_decks_1_-1_HallPaint"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_2_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_decks_2_0_Amber",
+        "finish": "Amber",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_2_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_0_Amber"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_3_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_decks_2_0_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_3_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_0_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_3_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_decks_2_0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_3_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_0_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_3_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_decks_2_0_HallPaint",
+        "finish": "HallPaint",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_3_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_0_HallPaint"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_3_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_decks_2_-1_Amber",
+        "finish": "Amber",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_3_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_-1_Amber"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_3_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_decks_2_-1_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_3_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_-1_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_4_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_decks_2_-1_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_4_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_-1_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_4_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_decks_2_-1_HallPaint",
+        "finish": "HallPaint",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_4_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_-1_HallPaint"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_5_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_decks_2_-2_Amber",
+        "finish": "Amber",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_5_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_-2_Amber"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_crown_5_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_decks_2_-2_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_crown_5_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_-2_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_2_-2_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_2_-2_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_0_Amber",
+        "finish": "Amber",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_0_Amber"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_0_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_0_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_0_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_0_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_0_HallPaint",
+        "finish": "HallPaint",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_0_HallPaint"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_-1_Amber",
+        "finish": "Amber",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_-1_Amber"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_-1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_-1_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_-1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_-1_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_3_-1_HallPaint",
+        "finish": "HallPaint",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_3_-1_HallPaint"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_4_0_Amber",
+        "finish": "Amber",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_4_0_Amber"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_4_0_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_4_0_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_4_0_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_4_0_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_decks_4_0_HallPaint",
+        "finish": "HallPaint",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_decks_4_0_HallPaint"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_HallInk"
       },
       {
         "name": "C2_room-5_Batch_Architecture_Ink",
@@ -2425,316 +2716,790 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-5_Batch_Architecture_Ink"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_0_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_return_0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_0_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_return_0_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_2_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_return_2_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_2_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_return_2_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_2_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_return_2_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_2_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_return_2_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_3_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_return_3_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_3_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_return_3_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_3_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_return_3_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_3_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_return_3_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_3_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_return_3_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_3_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_return_3_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_3_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_return_3_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_3_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_return_3_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_3_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_return_4_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_3_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_return_4_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_4_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_return_4_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_4_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_return_4_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_4_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_return_4_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_4_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_return_4_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_5_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_return_5_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_5_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_return_5_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_5_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_return_5_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_5_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_return_5_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_5_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_return_5_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_5_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_return_5_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_return_5_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_return_5_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_return_5_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_return_5_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_0_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_return_5_HallOxide",
+        "finish": "HallOxide",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_0_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_return_5_HallOxide"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_0_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_return_5_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_0_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_return_5_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_0_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_sewer_0_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_0_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_0_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_0_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_sewer_0_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_0_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_0_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_0_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_sewer_0_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_0_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_0_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_0_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_sewer_0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_0_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_0_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_1_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_sewer_0_HallOxide",
+        "finish": "HallOxide",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_1_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_0_HallOxide"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_1_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_sewer_0_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_1_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_0_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_1_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_sewer_0_Rust",
+        "finish": "Rust",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_1_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_0_Rust"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_1_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_1_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_1_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_1_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_1_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_1_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_2_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallFoliage",
+        "finish": "HallFoliage",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_2_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallFoliage"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_2_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_2_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_2_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallLoam",
+        "finish": "HallLoam",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_2_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallLoam"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_2_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallOxide",
+        "finish": "HallOxide",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_2_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallOxide"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_2_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_2_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_2_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_sewer_1_Rust",
+        "finish": "Rust",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_2_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_1_Rust"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_3_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_sewer_2_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_3_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_2_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_3_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_sewer_2_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_3_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_2_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_3_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_sewer_2_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_3_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_2_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_3_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_sewer_2_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_3_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_2_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_3_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_sewer_2_HallOxide",
+        "finish": "HallOxide",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_3_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_2_HallOxide"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_3_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_sewer_2_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_3_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_2_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_4_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_sewer_2_Rust",
+        "finish": "Rust",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_4_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_2_Rust"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_4_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_sewer_3_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_4_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_3_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_4_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_sewer_3_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_4_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_3_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_4_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_sewer_3_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_4_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_3_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_4_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_sewer_3_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_4_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_3_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_4_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_sewer_3_HallOxide",
+        "finish": "HallOxide",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_4_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_3_HallOxide"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_5_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-5_Batch_Architecture_sewer_3_HallResin",
+        "finish": "HallResin",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_5_Alloy"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_3_HallResin"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_5_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_sewer_3_Rust",
+        "finish": "Rust",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_5_Ceramic"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_3_Rust"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_5_Cool",
-        "finish": "Cool",
+        "name": "C2_room-5_Batch_Architecture_sewer_4_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_5_Cool"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_4_HallAlloy"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_5_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_Architecture_sewer_4_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_5_Graphite"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_4_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_5_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-5_Batch_Architecture_sewer_4_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_5_Oxide"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_4_HallCool"
       },
       {
-        "name": "C2_room-5_Batch_Architecture_sewer_5_Resin",
-        "finish": "Resin",
+        "name": "C2_room-5_Batch_Architecture_sewer_4_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-5_Batch_Architecture_sewer_5_Resin"
+        "geometry": "C2_room-5_Batch_Architecture_sewer_4_HallGraphite"
       },
       {
-        "name": "C2_room-5_Batch_room-5-maintenance-reunion-door_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-5_Batch_Architecture_sewer_4_HallOxide",
+        "finish": "HallOxide",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_4_HallOxide"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_4_HallResin",
+        "finish": "HallResin",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_4_HallResin"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_4_Rust",
+        "finish": "Rust",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_4_Rust"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_5_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_5_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_5_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_5_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_5_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_5_HallCool"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_5_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_5_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_5_HallOxide",
+        "finish": "HallOxide",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_5_HallOxide"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_5_HallResin",
+        "finish": "HallResin",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_5_HallResin"
+      },
+      {
+        "name": "C2_room-5_Batch_Architecture_sewer_5_Rust",
+        "finish": "Rust",
+        "target": "",
+        "geometry": "C2_room-5_Batch_Architecture_sewer_5_Rust"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-broken-drone-exposed-core_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-broken-drone-exposed-core",
+        "geometry": "C2_room-5_Batch_room-5-broken-drone-exposed-core_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-broken-drone-exposed-core_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-broken-drone-exposed-core",
+        "geometry": "C2_room-5_Batch_room-5-broken-drone-exposed-core_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-broken-drone-exposed-core_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-broken-drone-exposed-core",
+        "geometry": "C2_room-5_Batch_room-5-broken-drone-exposed-core_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-broken-drone-exposed-core_Rust",
+        "finish": "Rust",
+        "target": "room-5-broken-drone-exposed-core",
+        "geometry": "C2_room-5_Batch_room-5-broken-drone-exposed-core_Rust"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-control-blue-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-control-blue-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-control-blue-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-green-acid-contact_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-control-green-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-green-acid-contact_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-control-green-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-green-acid-contact_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-control-green-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-red-acid-contact_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-control-red-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-red-acid-contact_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-control-red-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-control-red-acid-contact_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-control-red-acid-contact",
+        "geometry": "C2_room-5_Batch_room-5-control-blue-acid-contact_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-maintenance-reunion-door_HallCeramic",
+        "finish": "HallCeramic",
         "target": "room-5-maintenance-reunion-door",
-        "geometry": "C2_room-5_Batch_room-5-maintenance-reunion-door_Ceramic"
+        "geometry": "C2_room-5_Batch_room-5-maintenance-reunion-door_HallCeramic"
       },
       {
-        "name": "C2_room-5_Batch_room-5-maintenance-reunion-door_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-5_Batch_room-5-maintenance-reunion-door_HallGraphite",
+        "finish": "HallGraphite",
         "target": "room-5-maintenance-reunion-door",
-        "geometry": "C2_room-5_Batch_room-5-maintenance-reunion-door_Graphite"
+        "geometry": "C2_room-5_Batch_room-5-maintenance-reunion-door_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-base_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-pod-base",
+        "geometry": "C2_room-5_Batch_room-5-pod-base_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-base_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-pod-base",
+        "geometry": "C2_room-5_Batch_room-5-pod-base_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-base_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-pod-base",
+        "geometry": "C2_room-5_Batch_room-5-pod-base_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-cable-1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-pod-cable-1",
+        "geometry": "C2_room-5_Batch_room-5-pod-cable-1_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-cable--1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-pod-cable--1",
+        "geometry": "C2_room-5_Batch_room-5-pod-cable-1_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-cap_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-pod-cap",
+        "geometry": "C2_room-5_Batch_room-5-pod-cap_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-cap_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-pod-cap",
+        "geometry": "C2_room-5_Batch_room-5-pod-cap_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-cap_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-pod-cap",
+        "geometry": "C2_room-5_Batch_room-5-pod-cap_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-x-1_CellGlass",
+        "finish": "CellGlass",
+        "target": "room-5-pod-glass-x-1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-x-1_CellGlass"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-x-1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-pod-glass-x-1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-x-1_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-x--1_CellGlass",
+        "finish": "CellGlass",
+        "target": "room-5-pod-glass-x--1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-x--1_CellGlass"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-x--1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-pod-glass-x--1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-x-1_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-z-1_CellGlass",
+        "finish": "CellGlass",
+        "target": "room-5-pod-glass-z-1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-z-1_CellGlass"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-z-1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-pod-glass-z-1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-z-1_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-z--1_CellGlass",
+        "finish": "CellGlass",
+        "target": "room-5-pod-glass-z--1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-z--1_CellGlass"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-pod-glass-z--1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-pod-glass-z--1",
+        "geometry": "C2_room-5_Batch_room-5-pod-glass-z--1_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-release-pedestal_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-release-pedestal",
+        "geometry": "C2_room-5_Batch_room-5-release-pedestal_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-release-pedestal_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-release-pedestal",
+        "geometry": "C2_room-5_Batch_room-5-release-pedestal_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-release-pedestal_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-release-pedestal",
+        "geometry": "C2_room-5_Batch_room-5-release-pedestal_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-release-pedestal_HallInk",
+        "finish": "HallInk",
+        "target": "room-5-release-pedestal",
+        "geometry": "C2_room-5_Batch_room-5-release-pedestal_HallInk"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-0-network-0-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-0-network-0-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-0-network-0-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-0-network-0-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-0-network-0-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-0-network-0-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-1-network-0-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-1-network-0-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-1-network-0-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-1-network-0-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-1-network-0-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-1-network-0-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-1-network-1-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-1-network-1-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-1-network-1-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-1-network-1-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-1-network-1-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-1-network-1-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-2-network-1-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-2-network-1-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-2-network-1-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-2-network-1-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-2-network-1-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-2-network-1-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-2-network-2-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-2-network-2-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-2-network-2-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-2-network-2-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-2-network-2-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-2-network-2-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-3-network-2-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-3-network-2-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-3-network-2-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-3-network-2-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-3-network-2-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-3-network-2-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-3-network-3-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-3-network-3-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-3-network-3-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-3-network-3-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-3-network-3-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-3-network-3-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-4-network-3-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-4-network-3-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-4-network-3-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-4-network-3-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-4-network-3-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-4-network-3-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-4-network-4-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-4-network-4-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-4-network-4-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-4-network-4-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-4-network-4-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-4-network-4-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-5-network-4-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-5-network-4-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-5-network-4-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-5-network-4-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-5-network-4-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-5-network-4-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-5-network-5-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-5-network-5-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-5-network-5-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-5-network-5-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-5-network-5-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-5-network-5-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-6-network-5-baffle_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-safe-6-network-5-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-6-network-5-baffle_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-safe-6-network-5-baffle_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-safe-6-network-5-baffle",
+        "geometry": "C2_room-5_Batch_room-5-safe-6-network-5-baffle_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-volt-containment_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-volt-containment",
+        "geometry": "C2_room-5_Batch_room-5-volt-containment_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-volt-containment_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-volt-containment",
+        "geometry": "C2_room-5_Batch_room-5-volt-containment_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-volt-containment_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-volt-containment",
+        "geometry": "C2_room-5_Batch_room-5-volt-containment_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-volt-containment_Ink",
+        "finish": "Ink",
+        "target": "room-5-volt-containment",
+        "geometry": "C2_room-5_Batch_room-5-volt-containment_Ink"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-wreck-stage-1",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-1_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-1_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-wreck-stage-1",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-1_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-wreck-stage-1",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-1_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-1_Rust",
+        "finish": "Rust",
+        "target": "room-5-wreck-stage-1",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-1_Rust"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-2_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "room-5-wreck-stage-2",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-2_HallAlloy"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-2_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "room-5-wreck-stage-2",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-2_HallCeramic"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-2_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "room-5-wreck-stage-2",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-2_HallGraphite"
+      },
+      {
+        "name": "C2_room-5_Batch_room-5-wreck-stage-2_Rust",
+        "finish": "Rust",
+        "target": "room-5-wreck-stage-2",
+        "geometry": "C2_room-5_Batch_room-5-wreck-stage-2_Rust"
       }
     ]
   },

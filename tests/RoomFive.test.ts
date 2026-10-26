@@ -894,3 +894,42 @@ test('cosmetic draw cadence leaves detection, projectile impacts and damage iden
     assert.deepEqual(everyDraw.events, noDraw.events); assert.deepEqual(catchUp.events, noDraw.events);
   }
 });
+
+test('Blender Room 5 patrol and damage skins follow live owners and survive retry without disposing borrowed buffers',async()=>{
+  const {LevelTwoPreviewScene}=await import('../src/levels/LevelTwoPreviewScene.ts');
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),room=scene.roomFive;
+  const world=new CollisionWorld(),surfaces=new SurfaceRegistry();
+  world.registerAll(scene.collisionMeshes);surfaces.registerAll(scene.collisionMeshes);
+  const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces));
+  scene.bindDissolveTargets(targets);
+  const bob=new KinematicBody({world,surfaces,initialPosition:scene.copyRoomSpawnPosition(5,'bob',new THREE.Vector3())});
+  const goop=new KinematicBody({world,surfaces,initialPosition:scene.copyRoomSpawnPosition(5,'goop',new THREE.Vector3())});
+  const encounter=new RoomFiveDroneEncounter(room,world,surfaces,bob,goop,()=>true,
+    scene.coverArt.droneSurfaceMaps,undefined,scene.securityDroneModels);
+  const borrowed=new Set<THREE.BufferGeometry>();let disposed=0;
+  try{
+    for(const drone of encounter.drones){
+      assert.equal(drone.presentation.root.visible,true);
+      assert.equal(drone.root.getObjectByName(`${drone.id}-flying-shell`)?.parent,drone.presentation.root);
+      drone.presentation.root.traverse(o=>{if(o instanceof THREE.Mesh&&o!==drone.frontIndicator)borrowed.add(o.geometry);});
+    }
+    for(const geometry of borrowed)geometry.addEventListener('dispose',()=>disposed++);
+    const stages=[1,2].map(n=>room.brokenCore.getObjectByName(`room-5-wreck-stage-${n}`)!);
+    assert.ok(stages.every(stage=>stage.children.some(o=>o.userData.blenderBatch)));
+    for(const hits of [1,2,3]){
+      room.controller.hitBrokenDrone();encounter.update(1/60);
+      assert.deepEqual(stages.map(o=>o.visible),[hits<1,hits<2]);
+    }
+    assert.equal(room.brokenCore.visible,false);
+    room.reset();encounter.reset();
+    assert.equal(room.brokenCore.visible,true);assert.ok(stages.every(o=>o.visible));
+    for(const network of ['red','blue','green']as const){
+      room.controller.security.select(network);encounter.update(1/60);
+      assert.ok(encounter.drones.every(drone=>drone.presentation.root.visible));
+      for(const drone of encounter.drones)assert.equal(drone.frontIndicator.material.color.getHex(),
+        drone.root.userData.network===network?0x20252a:({red:0xff475c,blue:0x245bff,green:0x61db65}as const)[drone.root.userData.network as 'red'|'blue'|'green']);
+    }
+    encounter.dispose();assert.equal(disposed,0,'encounters borrow scene-owned Blender geometry');
+  }finally{encounter.dispose();for(const target of targets)target.dispose();scene.dispose();world.clear();surfaces.clear();}
+  assert.equal(disposed,borrowed.size,'scene disposal releases every borrowed buffer once');
+});

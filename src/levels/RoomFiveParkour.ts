@@ -17,9 +17,6 @@ export function addRoomFiveParkour(b: GreyboxRoomBuilder): void {
       const mesh = b.addCollider({ name: `room-5-route-${section}-jump-${i + 1}`,
         size: [width, .4, depth], position: [x, y - .2, z], material: m.platform });
       Object.assign(mesh.userData, { roomId: 5, routeBeat: ['staggered-entry', 'wall-ascent', 'switchback-climb', 'narrow-crossing', 'reverse-zigzag', 'final-wall-return'][section] });
-      // Suspension keeps these obstacles visually part of a research installation.
-      b.addVisualBox({ name: `room-5-route-${section}-hanger-${i}`, size: [.1, 38 - y, .1],
-        position: [x + width / 2 - .14, (38 + y) / 2, z + depth / 2 - .14], material: m.cable });
     }
   }
 }

@@ -40,6 +40,7 @@ for _finish in ['Ceramic','Cool','Resin','Graphite','Alloy','Oxide','Foliage','L
         'Alloy':(.36,.40,.39),'Oxide':(.25,.27,.25),'Graphite':(.07,.08,.075)}.get(_finish,_colour)
     PALETTE['Hall'+_finish]=(_colour,_rough,_metal)
 PALETTE['HallGlass']=((.46,.55,.49),.40,.02)
+PALETTE['CellGlass']=((.56,.65,.64),.20,.04)
 for _finish in list(PALETTE):
     if not _finish.startswith('Hall'):
         PALETTE['Test'+_finish]=PALETTE.get('Hall'+_finish,PALETTE[_finish])
@@ -83,8 +84,9 @@ def setup(room):
             tint.inputs[0].default_value=1;tint.inputs[1].default_value=(*colour,1)
             mat.node_tree.links.new(colour_node.outputs['Color'],tint.inputs[2])
             mat.node_tree.links.new(tint.outputs[0],shader.inputs['Base Color'])
-        if finish in ('HallGlass','TestGlass'):
-            shader.inputs['Alpha'].default_value=.24;mat.diffuse_color=(*colour,.24)
+        if finish in ('HallGlass','TestGlass','CellGlass'):
+            alpha=.13 if finish=='CellGlass' else .24
+            shader.inputs['Alpha'].default_value=alpha;mat.diffuse_color=(*colour,alpha)
             mat.surface_render_method='DITHERED'
     root=bpy.data.objects.new(prefix+'Architecture',None);scene.collection.objects.link(root)
     root['asset']='cultivation-blender-v1';root['owner']=LAYOUT[room]['owner']
@@ -109,6 +111,8 @@ def owner_root(owner):
     return obj
 
 def mesh(name,vertices,faces,finish,owner=''):
+    if CURRENT=='room-5' and finish in ('Ceramic','Cool','Resin','Graphite','Alloy','Oxide','Foliage','Loam','Lamp','Deck','Ink','Paint','Seal'):
+        finish='HallPaint' if finish=='Deck' else 'Hall'+finish
     if CURRENT=='room-4' and finish not in ('Rust','Amber','LiftLamp') and not finish.startswith('Hall'):
         finish='HallPaint' if finish=='Deck' else 'Hall'+finish
     if CURRENT=='room-3' and name.startswith(('Extraction_','Solid_Extraction_','Transfer_','Solid_Transfer_','Ivy_')):
@@ -144,6 +148,7 @@ def mesh(name,vertices,faces,finish,owner=''):
                 # Keep fine samples local to the machinery's gravity trails.
                 sources=[23.25,65.4] if centre.x<0 else [45.0,51.6]
                 if any(min(a.z,b.z,c.z,d.z)-.8<z<max(a.z,b.z,c.z,d.z)+.8 for z in sources):spacing=.55
+            if CURRENT=='room-5' and base_finish=='Graphite':spacing=3.2
             if CURRENT=='room-4':
                 # Long hidden shaft backs need no dense dirt grid. The shared
                 # wear maps handle those spans; formed edges remain explicit.
@@ -153,7 +158,7 @@ def mesh(name,vertices,faces,finish,owner=''):
             start=len(points)
             for v in range(nv+1):
                 for u in range(nu+1):
-                    if testing or CURRENT in ('passage-2-3','bob-duct','room-3'):
+                    if testing or CURRENT in ('passage-2-3','bob-duct','room-3','room-5'):
                         # Compute the shared boundary in double precision.
                         # Chained float-vector lerps can leave a micrometre
                         # crack between the ceiling rail and its neighbour.
@@ -251,6 +256,12 @@ def mesh(name,vertices,faces,finish,owner=''):
                         width=.18+.038*fall
                         leak=max(leak,strength*math.exp(-((z-at-.08*math.sin(fall*1.7))/width)**2)*math.exp(-fall/9))
                 soil+=.18*max(0,1-y/3)*(.4+.6*cloud)
+            if CURRENT=='room-5' and abs(x)>19.7:
+                sources=[(43.75,13.2),(61.0,35.0)] if x<0 else [(28.25,18.2),(69.65,26.7),(73.35,26.7)]
+                for at,top in sources:
+                    fall=top-y
+                    if 0<fall<13:leak=max(leak,.55*math.exp(-((z-at-.07*math.sin(fall*1.8))/(.20+.038*fall))**2)*math.exp(-fall/9))
+                soil+=.15*max(0,1-y/8)*(.3+.7*cloud)
             dirt=max(.32,.94-soil-leak)
             colour=(dirt,dirt*.98,dirt*.94,1)
             if base_finish=='Foliage':colour=(.72+.2*cloud,.75+.2*cloud,.55+.2*cloud,1)
@@ -261,7 +272,7 @@ def mesh(name,vertices,faces,finish,owner=''):
                 # Oxide is localized below failed fittings, not a panel colour.
                 rust=.65*leak*math.sin(z*8.1+y*.31)**2
                 colour=(colour[0],colour[1]*(1-.32*rust),colour[2]*(1-.46*rust),1)
-        if CURRENT=='room-3' and finish=='Rust' and 'Extraction_WallDetail_' in name:
+        if finish=='Rust' and ((CURRENT=='room-3' and 'Extraction_WallDetail_' in name) or CURRENT=='room-5'):
             x,y,z=p.x,p.z,-p.y
             patch=.5+.5*math.sin(y*19+z*11+math.sin(y*4+x*23)*2)
             flake=max(0,min(1,(patch-.50)/.24))
@@ -294,6 +305,7 @@ def mesh(name,vertices,faces,finish,owner=''):
         centre=sum((Vector(v) for v in vertices),Vector())/max(1,len(vertices))
         zone='sewer' if centre.x>29 else 'return' if centre.y<0 else 'crown' if centre.z>17 else 'access'
         obj['spatialRegion']=zone+'_'+str(math.floor(centre.z/24))
+        if 'Quarantine_Deck_' in name:obj['spatialRegion']='decks_'+str(int(centre.z//16))+'_'+str(int(centre.x//16))
     if CURRENT=='escape-duct':
         centre=sum((Vector(v) for v in vertices),Vector())/max(1,len(vertices))
         obj['spatialRegion']='drop_'+str(math.floor(centre.y/18)) if centre.y<-1 else 'branch' if centre.z>63.2 else 'airway_'+str(math.floor(centre.x/12))
@@ -450,6 +462,19 @@ def wall(spec,bays=True):
             margin=.12 if CURRENT=='escape-duct' else .025
             along_margin=.15 if CURRENT=='escape-duct' and axis==0 and lo[1]<-10 else margin
             slab(name+f'_panel_{i}_{j}',a+along_margin,b-along_margin,c+margin,d-margin,depths[1],depths[2],finish)
+    if CURRENT=='room-5':
+        # An integral return joins the inner wall face to each adjacent deck.
+        # Insets and recessed backing must never expose an open perimeter slit.
+        for floor in LAYOUT[CURRENT]['boxes']:
+            if not ('floor' in floor['name'] or 'landing-tile' in floor['name']):continue
+            low,high=floor['lo'],floor['hi'];height=high[1]
+            if high[1]-low[1]>=.85 or not lo[1]-.03<=height<hi[1]:continue
+            edge=low[axis] if inward>0 else high[axis]
+            if not -.031<=(face-edge)*inward<=outer_depth+.031:continue
+            a=max(lo[along],low[along]);b=min(hi[along],high[along])
+            if b<=a:continue
+            slab(name+'_integral_floor_return_'+floor['name'],a,b,height-.12,height+.12,
+                face-inward*outer_depth,face,'Ceramic')
     for k,(a,b,c,d) in enumerate(recesses):
         rear=face-1.55*inward
         slab(name+f'_process_back_{k}',a,b,c,d,rear,rear-.18*inward,'Graphite')
@@ -518,11 +543,15 @@ def wall(spec,bays=True):
 
 def deck(spec):
     lo,hi=spec['lo'],spec['hi'];name=spec['name'];height=hi[1]
-    box(name+'_substrate',lo,[hi[0],height-.13,hi[2]],'Graphite')
+    box(name+'_substrate',lo,[hi[0],height-(.10 if CURRENT=='room-5' else .13),hi[2]],'Graphite')
     step=2.8 if 'passage' in CURRENT or CURRENT=='bob-duct' else 4
     for i,(a,b) in enumerate(intervals(lo[0],hi[0],step)):
         for j,(c,d) in enumerate(intervals(lo[2],hi[2],step)):
-            box(name+f'_deck_{i}_{j}',[a+.025,height-.10,c+.025],[b-.025,height,d-.025],
+            ax=0 if CURRENT=='room-5' and abs(a-lo[0])<.001 else .025
+            bx=0 if CURRENT=='room-5' and abs(b-hi[0])<.001 else .025
+            cz=0 if CURRENT=='room-5' and abs(c-lo[2])<.001 else .025
+            dz=0 if CURRENT=='room-5' and abs(d-hi[2])<.001 else .025
+            box(name+f'_deck_{i}_{j}',[a+ax,height-.10,c+cz],[b-bx,height,d-dz],
                 'Alloy' if (i+j)%7==0 else 'Resin')
 
 def roof(spec):
@@ -534,7 +563,7 @@ def roof(spec):
             box(name+f'_cassette_{i}_{j}',[a+.025,lo[1],c+.025],[b-.025,lo[1]+.12,d-.025],
                 'Alloy' if i%3==0 else 'Cool')
 
-def nursery_sweep(name,path,radius,finish='Oxide',sides=7):
+def nursery_sweep(name,path,radius,finish='Oxide',sides=7,owner=''):
     """One closed tube; bends share rings instead of overlapping capped parts."""
     path=[Vector(p) for p in path];vertices=[]
     for i,p in enumerate(path):
@@ -547,9 +576,9 @@ def nursery_sweep(name,path,radius,finish='Oxide',sides=7):
     for i in range(len(path)-1):
         for j in range(sides):
             k=i*sides+j;n=i*sides+(j+1)%sides;faces.append((k,n,n+sides,k+sides))
-    return mesh(name,vertices,faces,finish)
+    return mesh(name,vertices,faces,finish,owner)
 
-def nursery_profile(name,path,radii,finishes,sides=10):
+def nursery_profile(name,path,radii,finishes,sides=10,owner=''):
     """Continuous tube with material boundaries, without internal contact caps."""
     path=[Vector(p) for p in path];vertices=[];right=None
     for i,p in enumerate(path):
@@ -570,7 +599,7 @@ def nursery_profile(name,path,radii,finishes,sides=10):
     result=[]
     for finish,faces in groups.items():
         indices=sorted({index for face in faces for index in face});lookup={old:new for new,old in enumerate(indices)}
-        result.append(mesh(name+'_'+finish,[vertices[i] for i in indices],[tuple(lookup[i] for i in f) for f in faces],finish))
+        result.append(mesh(name+'_'+finish,[vertices[i] for i in indices],[tuple(lookup[i] for i in f) for f in faces],finish,owner))
     return result
 
 def nursery_polygon_split(polygon,a,b):
@@ -2408,7 +2437,7 @@ def room_mesh(name,vertices,faces,finish,owner=''):
         vertices=[tuple(inv@Vector(v)) for v in vertices]
     return mesh(name,vertices,faces,finish,owner)
 
-def sewer_shell(i,a,b,missing_start=False,missing_end=False,owner=''):
+def sewer_shell_legacy(i,a,b,missing_start=False,missing_end=False,owner=''):
     """Fitted radial backing, with returns only at intentional open boundaries."""
     angle=i*math.pi/20;next_angle=(i+1)*math.pi/20
     inner=(10.85 if owner else 10.15)/math.cos(math.pi/40)
@@ -2437,16 +2466,233 @@ def sewer_shell(i,a,b,missing_start=False,missing_end=False,owner=''):
         ff=[(0,4,5,1),(2,3,7,6),(0,1,3,2),(4,6,7,5),(0,2,6,4),(1,5,7,3)]
         room_mesh(f'Interceptor_cassette_{i}_{c}',vv,ff,'Cool' if i in [3,4,15,16] else 'Ceramic' if i<5 or i>14 else 'Oxide',owner)
 
+def quarantine_sewer_bays():
+    return [(34,39),(58,63),(86,91),(106,111)]
+
+
+def quarantine_sector(name,angle,next_angle,a,b,inner,outer,ends=True,low_side=False,high_side=False):
+    vv=[(40+r*math.cos(t),-12+r*math.sin(t),z) for z in [a,b] for r in [inner,outer] for t in [angle,next_angle]]
+    ff=[(0,1,5,4),(2,6,7,3)]
+    if ends:ff.extend([(0,2,3,1),(4,5,7,6)])
+    if low_side:ff.append((0,4,6,2))
+    if high_side:ff.append((1,3,7,5))
+    mesh('Quarantine_Sewer_'+name,vv,[tuple(reversed(f)) for f in ff],'HallAlloy' if ends else 'HallGraphite')
+
+
+def sewer_shell(i,a,b,missing_start=False,missing_end=False,owner=''):
+    bays=quarantine_sewer_bays() if CURRENT=='room-5' and not owner and 1<=i<=4 else []
+    if not bays:
+        sewer_shell_legacy(i,a,b,missing_start,missing_end,owner);return
+    cuts=sorted({a,b,*[z for c,d in bays for z in [c-.18,c,d,d+.18] if a<z<b]})
+    for A,B in zip(cuts,cuts[1:]):
+        middle=(A+B)/2;t,T=i*math.pi/20,(i+1)*math.pi/20;scale=1/math.cos(math.pi/40)
+        near=any(c-.18<=middle<c for c,d in bays)
+        far=any(d<middle<=d+.18 for c,d in bays)
+        recessed=any(c<=middle<=d for c,d in bays)
+        if near or far:
+            quarantine_sector('recess_axial_return',t,T,A,B,9.825*scale,12.45*scale,True,i==1,i==4)
+        elif recessed:
+            quarantine_sector('recess_closed_back',t,T,A,B,12*scale,12.45*scale,False,i==1,i==4)
+            if i==1:quarantine_sector('recess_lower_return',t-.012,t,A,B,9.825*scale,12.45*scale,True,True,True)
+            if i==4:quarantine_sector('recess_upper_return',T,T+.012,A,B,9.825*scale,12.45*scale,True,True,True)
+        else:sewer_shell_legacy(i,A,B,missing_start and A==a,missing_end and B==b,owner)
+
+
+def quarantine_switch_skin(tag,owner):
+    # Two machined arms share the original switch's pivot and target volume.
+    shape=[(-.42,-.035),(-.22,-.075),(.42,-.075),(.64,-.020),(.64,.060),(.40,.095),(-.22,.075),(-.42,.035)]
+    for hand in [-1,1]:
+        vv=[(x,y,z) for z in [hand*.17-.045,hand*.17+.045] for x,y in shape]
+        mesh(tag+'_forked_cast_arm',vv,[tuple(reversed(range(8))),tuple(range(8,16))]+
+            [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],'HallAlloy',owner)
+    tube(tag+'_rotating_pivot_hub',(.55,0,-.13),(.55,0,.13),.145,'HallGraphite',24,owner)
+    tube(tag+'_captured_hinge_axle',(.55,0,-.39),(.55,0,.39),.062,'HallAlloy',16,owner)
+    for hand in [-1,1]:
+        tube(tag+'_hex_axle_retainer',(.55,0,hand*.38),(.55,0,hand*.415),.085,'HallAlloy',6,owner)
+    # One continuous profiled ceramic grip, with recessed finger grooves and
+    # tapered metal ferrules instead of a rectangular projecting block.
+    profile=[(-.34,.095,'HallGraphite'),(-.31,.130,'HallAlloy'),(-.27,.130,'HallAlloy'),(-.24,.115,'HallCeramic')]
+    for z in [-.18,-.09,0,.09,.18]:
+        profile.extend([(z-.018,.115,'HallCeramic'),(z-.008,.105,'HallGraphite'),(z+.008,.105,'HallGraphite'),(z+.018,.115,'HallCeramic')])
+    profile.extend([(.24,.115,'HallCeramic'),(.27,.130,'HallAlloy'),(.31,.130,'HallAlloy'),(.34,.095,'HallGraphite')])
+    nursery_profile(tag+'_insulated_cross_grip',[(-.42,0,z) for z,r,f in profile],
+        [r for z,r,f in profile],[f for z,r,f in profile[:-1]],20,owner)
+
+
+def quarantine_return_skirting():
+    # Follow the authoritative ramp's actual upper plane. The formed flashing
+    # stays inside the existing side-wall thickness, outside x=23..27 walk space.
+    spec=next(s for s in LAYOUT[CURRENT]['profiles'] if s['name']=='room-5-reunion-ramp')
+    candidates=[]
+    for k in range(0,len(spec['indices']),3):
+        a,b,c=[Vector(spec['vertices'][j]) for j in spec['indices'][k:k+3]]
+        n=(b-a).cross(c-a).normalized()
+        if n.y>.9:candidates.append((-n.z/n.y,a.y+n.z/n.y*a.z))
+    intercept,slope=max((height,gradient) for gradient,height in candidates)
+    for hand in [-1,1]:
+        a,b=63.9,122.35 if hand<0 else 121.65
+        section=[(23,0),(22.97,.06),(22.56,.06),(22.56,-.26),(23,-.26)]
+        if hand>0:section=[(50-x,y) for x,y in section]
+        vv=[(x,slope*z+intercept+y,z) for z in [a,b] for x,y in section]
+        # The old floor/side wall own the inner vertical contact. Do not submit
+        # another coplanar inner face beneath that floor edge.
+        ff=[(4,3,2,1,0),(5,6,7,8,9)]+[(i,i+1,i+6,i+5) for i in range(4)]
+        if hand>0:ff=[tuple(reversed(f)) for f in ff]
+        mesh('Quarantine_Return_continuous_base_flashing_'+str(hand),vv,ff,'HallAlloy')
+
+
+def quarantine_network_stations():
+    for index,colour in enumerate(['red','blue','green']):
+        z=118+index*4;tag='Quarantine_Control_'+colour
+        box(tag+'_sealed_cabinet',[47.20,-11.20,z-1.30],[47.90,-8.05,z+1.30],'Graphite')
+        for Z in [z-1.3,z+1.12]:box(tag+'_folded_cheek',[46.78,-11.1,Z],[47.20,-8.1,Z+.18],'Alloy')
+        for y in [-11.1,-8.26]:box(tag+'_frame_return',[46.78,y,z-1.12],[47.2,y+.16,z+1.12],'Alloy')
+        box(tag+'_white_service_front',[46.84,-10.94,z-1.10],[47.20,-8.28,z+1.10],'Ceramic')
+        for y in [-10.9,-10.64]:
+            for k in range(5):box(tag+'_pressed_vent_slot',[46.817,y,z-.50+k*.20],[46.84,y+.045,z-.40+k*.20],'Graphite')
+        box(tag+'_upper_identifier_panel',[46.81,-8.05,z-1.22],[47.9,-7.68,z+1.22],'Ceramic')
+        label(tag+'_identifier',colour.upper()+' / SECURITY',[46.785,-7.97,z],.16,(90,0,270),'HallInk')
+        # Existing live I/O signals remain visible in their original positions.
+        annulus_x(tag+'_online_bezel',46.80,-8.55,z,.22,.28,.07,'Alloy',24)
+        annulus_x(tag+'_offline_bezel',46.80,-10.45,z,.24,.30,.07,'Alloy',24)
+        nursery_sweep(tag+'_power_conduit',[(47.6,-7.76,z),(47.6,-7.40,z),(48,-7.40,z)],.075,'HallGraphite',10)
+        owner=f'room-5-control-{colour}-acid-contact'
+        box(tag+'_hinge_mount_pad',[46.80,-9.78,z-.44],[46.92,-9.22,z+.44],'Alloy')
+        for hand in [-1,1]:
+            annulus_z(tag+'_fixed_bearing',46.65,-9.5,z+hand*.31,.075,.20,.12,'Alloy',24)
+        quarantine_switch_skin(tag,owner)
+
+
+def quarantine_sewer_banks():
+    # Close the deck-to-vault joint behind the unchanged tangent colliders.
+    # The centre channel remains x=37..43. The hidden outer apron reaches the
+    # continuous radial backing at floor height, including cassette joints.
+    for hand in [-1,1]:
+        bands=[(16,122),(122,126),(126,140)] if hand<0 else [(16,140)]
+        for index,(a,b) in enumerate(bands):
+            lo=29.70 if hand<0 and not(a==122 and b==126) else 30 if hand<0 else 43
+            hi=37 if hand<0 else 50.30
+            tag='Quarantine_Sewer_bank_'+str(hand)+'_'+str(index)
+            box(tag+'_continuous_foundation',[lo,-12.50,a],[hi,-11.28,b],'Graphite')
+            for i,(x,X) in enumerate(intervals(lo,hi,4)):
+                for j,(z,Z) in enumerate(intervals(a,b,4)):
+                    xa=0 if abs(x-lo)<.001 else .018;xb=0 if abs(X-hi)<.001 else .018
+                    za=0 if abs(z-a)<.001 else .018;zb=0 if abs(Z-b)<.001 else .018
+                    box(tag+'_fitted_load_plate',[x+xa,-11.28,z+za],[X-xb,-11.20,Z-zb],
+                        'Alloy' if (i+j)%7==0 else 'Resin')
+        # Flush coping owns the exposed edge instead of floating above a second
+        # floor skin. The common static union removes the covered deck faces.
+        lo,hi=(36.82,37) if hand<0 else (43,43.18)
+        box('Quarantine_Sewer_closed_channel_coping_'+str(hand),[lo,-11.56,16],[hi,-11.20,140],'Alloy')
+
+
+def quarantine_sewer_equipment():
+    # The original right-side main climbs over the live control row.
+    nursery_sweep('Quarantine_Sewer_right_pressure_main',[(48,-8.7,17),(48,-8.7,114.2),
+        (48,-8.55,114.8),(48,-7.55,115.5),(48,-7.40,116.2),
+        (48,-7.40,127.4),(48,-7.55,128.1),(48,-8.55,128.8),(48,-8.7,129.4),(48,-8.7,139)],.30,'Rust',16)
+    for index,(a,b) in enumerate(quarantine_sewer_bays()):
+        z=(a+b)/2;tag='Quarantine_Sewer_pump_'+str(index)
+        box(tag+'_closed_machine_back',[50.20,-9.50,a+.35],[50.50,-5.55,b-.35],'Graphite')
+        for Z in [a+.35,b-.51]:box(tag+'_cast_rack_stile',[49.94,-9.48,Z],[50.24,-5.58,Z+.16],'Alloy')
+        for y in [-9.48,-5.75]:box(tag+'_rack_return',[49.94,y,a+.50],[50.24,y+.17,b-.50],'Alloy')
+        # Raised impeller housing and recessed motor, safely behind the vault's
+        # unchanged player/camera collision surface.
+        section=[(.99,50.25),(.99,49.88),(.91,49.65),(.72,49.65),(.65,49.82),(.65,50.23)]
+        loops=[[(X,-7.85+r*math.cos(k*math.tau/32),z+r*math.sin(k*math.tau/32)) for k in range(32)] for r,X in section]
+        for obj in nursery_ring_profile(tag+'_pressed_pump_housing',loops,
+            ['HallGraphite','HallCeramic','HallAlloy','HallGraphite','HallAlloy','HallGraphite']):
+            for face in obj.data.polygons:face.flip()
+            obj.data.update()
+        tube(tag+'_opaque_impeller_back',(50.22,-7.85,z),(50.25,-7.85,z),.64,'HallGraphite',24)
+        for k in range(6):
+            t=k*math.tau/6;shape=[(.14,-.035),(.54,-.12),(.60,.025),(.27,.14)]
+            vv=[(X,-7.85+A*math.cos(t)-B*math.sin(t),z+A*math.sin(t)+B*math.cos(t)) for X in [49.92,49.98] for A,B in shape]
+            mesh(tag+'_impeller_vane',vv,[(3,2,1,0),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)],'HallAlloy')
+        tube(tag+'_impeller_hub',(49.86,-7.85,z),(50.12,-7.85,z),.16,'HallAlloy',16)
+        for k in range(8):
+            t=(k+.5)*math.tau/8;Y,Z=-7.85+.84*math.cos(t),z+.84*math.sin(t)
+            tube(tag+'_captive_flange_fastener',(49.62,Y,Z),(49.72,Y,Z),.045,'HallGraphite',8,cap_b=False)
+        nursery_sweep(tag+'_connected_outlet',[(49.70,-7.85,z),(49.3,-7.85,z),
+            (48.5,-8.2,z),(48,-8.52,z)],.13,'HallCeramic',12)
+        label(tag+'_identifier',['SUMP / 01','RETURN / 02','FILTRATION / 03','ISOLATE / 04'][index],
+            [49.90,-5.93,z],.19,(90,0,270),'HallInk')
+    # One damp failure supports a small climbing colony, inside the first bay.
+    path=[(49.82+.04*math.sin(k),-9.25+k*.20,35.1+.15*math.sin(k*.6)) for k in range(15)]
+    nursery_sweep('Quarantine_Sewer_ivy_runner',path,.025,'HallLoam',7)
+    for k in range(2,14):
+        x,y,z=path[k];hall_ivy_leaf('Quarantine_Sewer_folded_ivy',(x-.035,y,z),(-1 if k%2 else 1)*.8,.42,.15*math.sin(k),k+77)
+
+
+def quarantine_passages():
+    # Fitted cassette straps remain behind the original 2.2 m clear rectangle.
+    # No grille or decorative solid enters either body's shared passage.
+    for z in [1.0,4.0,7.5]:
+        for x in [-1.145,1.145]:box('Quarantine_Access_pressed_jamb',[x-.035,.22,z-.07],[x+.035,2.38,z+.07],'Alloy')
+        box('Quarantine_Access_pressed_lintel',[-1.13,2.38,z-.07],[1.13,2.44,z+.07],'Alloy')
+    for x in [-9,-3,3,9,15,21,27,33,37]:
+        for z in [7.96,10.24]:box('Quarantine_Fork_pressure_strap',[x-.065,.22,z-.03],[x+.065,2.38,z+.03],'Alloy')
+        box('Quarantine_Fork_ceiling_strap',[x-.065,2.38,8.02],[x+.065,2.44,10.18],'Alloy')
+    for y in [3.8,7.6,11.6]:
+        for x in [-13.15,-10.85]:box('Quarantine_Bob_shaft_return',[x-.03,y-.08,16],[x+.03,y+.08,17.75],'Alloy')
+    # Thick splayed drop collar sits outside the unchanged falling envelope.
+    quarantine_drop_collar()
+    for z in [72,88,104,118]:
+        y=-5.72+(93-z)*11.2/58
+        for x in [22.94,27.06]:box('Quarantine_Return_service_joint',[x-.05,y+.38,z-.07],[x+.05,y+3.45,z+.07],'Alloy')
+    quarantine_return_skirting()
+    label('Quarantine_Fork_bob_route','ADHESIVE ACCESS',[-5.4,1.48,10.17],.16)
+    label('Quarantine_Fork_goop_route','EFFLUENT CONTROL',[7.5,1.48,10.17],.16)
+
+
+
+def quarantine_drop_collar():
+    rings=[[(40+x,y,20+z) for x,z in [(-r,-r),(r,-r),(r,r),(-r,r)]]
+        for r,y in [(1.8,-2.4),(1.8,-2.075),(1.45,-2.075),(1.45,.2),(1.1,.2),(1.1,-2.4)]]
+    for band,finish in enumerate(['HallGraphite','HallAlloy','HallCeramic','HallAlloy','HallGraphite','HallGraphite']):
+        # Upper passage walls own the coplanar top shoulder at y=.2.
+        if band==3:continue
+        if band==4:
+            for i in range(4):
+                j=(i+1)%4
+                vv=[rings[band][i],rings[band][j],rings[(band+1)%len(rings)][j],rings[(band+1)%len(rings)][i]]
+                if i==0:vv=[(x,min(y,-.2),z) for x,y,z in vv]
+                mesh('Quarantine_Drop_inner_owned_'+str(i),vv,[(3,2,1,0)],finish)
+            continue
+        for obj in nursery_ring_profile('Quarantine_Drop_formed_throat_'+str(band),[rings[band],rings[(band+1)%len(rings)]],[finish],cycle=False):
+            for face in obj.data.polygons:face.flip()
+            obj.data.update()
+
+
+def quarantine_lower_enclosure():
+    # The return uses only the existing five-metre landing. Enclose the wider
+    # former service void, leaving its full walk/camera aperture unobstructed.
+    for name,lo,hi in [
+        ('east_return_near',[20,-.05,58],[20.5,6.5,58.85]),
+        ('east_return_far',[20,-.05,64.15],[20.5,6.5,80]),
+        ('east_return_header',[20,4.5,58.85],[20.5,6.5,64.15]),
+        ('bob_shaft_lower_west',[-14,0,17.75],[-13.1,10,18.25]),
+        ('bob_shaft_lower_east',[-10.9,0,17.75],[-10,10,18.25])]:
+        wall({'name':'Quarantine_Closure_'+name,'lo':lo,'hi':hi,
+            'inward':1 if name=='bob_shaft_lower_west' else -1},bays=False)
+    for z in [58.65,64.15]:
+        box('Quarantine_Return_mouth_jamb',[20,0,z],[20.40,4.5,z+.20],'Alloy')
+    box('Quarantine_Return_mouth_header',[20,4.5,58.65],[20.4,4.76,64.35],'Alloy')
+    label('Quarantine_Return_route_ident','SERVICE RETURN',[19.975,5.35,61.5],.22,(90,0,270),'HallInk')
+
+
 def build_quarantine():
     # Ducts, climb shaft and return keep their existing faces and openings;
     # all depth and service reveals extend behind those protected planes.
     for spec in LAYOUT[CURRENT]['boxes']:
         name=spec['name'];lo,hi=spec['lo'],spec['hi'];dy=hi[1]-lo[1]
+        if name.startswith('Quarantine_Closure_'):continue
+        if name.startswith(('room-5-drop-ceiling-seal-','room-5-drop-ceiling-flange-')):continue
         if name=='room-5-chamber-roof':
             quarantine_crown(spec);continue
         if dy<.85 and ('floor' in name or 'landing-tile' in name):deck(spec)
         elif dy<.85 and ('roof' in name or 'flange' in name):roof(spec)
-        else:wall(spec,bays='chamber' in name)
+        else:wall(spec,bays=False)
     # Preserve the actual sloped, front-sided profiles; introduce alternating
     # service bands on their existing triangles without changing the route.
     for spec in LAYOUT[CURRENT]['profiles']:
@@ -2457,14 +2703,15 @@ def build_quarantine():
             if int(z/6)%4==0:finish='Oxide'
             by_finish.setdefault(finish,[]).append(face)
         for finish,faces in by_finish.items():mesh(spec['name']+'_'+finish,vertices,faces,finish)
-    for x in [33.5,46.5]:
-        deck({'name':f'Interceptor_bank_{x}','lo':[x-3.5,-12.5,16],'hi':[x+3.5,-11.2,140]})
+    quarantine_sewer_banks()
+    quarantine_cut_fields()
+    quarantine_lower_enclosure()
     # The original non-colliding pipe ducked across the return's entry view.
     # Route its presentation above that doorway through the service shell.
     for run,(start,end) in enumerate([(17,119.5),(128.5,139)]):
         sections=intervals(start,end,24)
         for j,(a,b) in enumerate(sections):
-            tube(f'Interceptor_return_pipe_{run}_{j}',(32,-8.7,a),(32,-8.7,b),.30,'Oxide',12,
+            tube(f'Interceptor_return_pipe_{run}_{j}',(32,-8.7,a),(32,-8.7,b),.30,'Rust',12,
                  cap_a=j==0 and run==0,cap_b=j==len(sections)-1 and run==1)
     vv=[];segments=24;sides=12
     for j in range(segments+1):
@@ -2476,7 +2723,7 @@ def build_quarantine():
     for j in range(segments):
         for i in range(sides):
             n=(i+1)%sides;ff.append((j*sides+i,j*sides+n,(j+1)*sides+n,(j+1)*sides+i))
-    mesh('Interceptor_return_pipe_arch',vv,ff,'Oxide')
+    mesh('Interceptor_return_pipe_arch',vv,ff,'Rust')
     bands=[(16,18.5),(18.5,21.5),(21.5,122),(122,126),(126,140)]
     for band,(a,b) in enumerate(bands):
         for i in range(20):
@@ -2491,12 +2738,13 @@ def build_quarantine():
         # the chamber collision plane, clear of every patrol and jump path.
         for z in [24,44,76]:
             box(f'Crown_pressure_pier_{side}_{z}',[side*20.15-.15,0,z-.23],[side*20.15+.15,38,z+.23],'Alloy')
-        for y in [3.35,15.0,30.15]:
-            box(f'Crown_service_spine_{side}_{y}',[side*20.15-.15,y,18.3],[side*20.15+.15,y+.28,79.7],'Oxide' if y<4 else 'Alloy')
+        for y in [3.35]:
+            for a,b in ([(18.3,58.65),(64.35,79.7)] if side>0 else [(18.3,79.7)]):
+                box(f'Crown_service_spine_{side}_{y}',[side*20.15-.15,y,a],[side*20.15+.15,y+.28,b],'Oxide' if y<4 else 'Alloy')
     for seat in LAYOUT[CURRENT].get('ceilingSeats',[]):
         lo=list(seat['lo']);lo[1]=38.025
         box('Crown_seat_'+seat['name'],lo,seat['hi'],'Alloy')
-    for x in [-2.5,2.5]:block('Crown_cell_feed_collar_'+str(x),[.28,2.24,.28],[x,39.145,49],'Oxide')
+
     # One thick tapered collar owns the wall-to-airway join. The cinematic
     # liner starts beyond the wall; neither independently visible owner copies
     # the other's flat reveal planes.
@@ -2514,9 +2762,347 @@ def build_quarantine():
     label('Quarantine_identification','05 / QUARANTINE CROWN',[0,36.4,79.72],1.0)
     label('Quarantine_protocol','EXCLUSIVE NETWORKS / CELL ISOLATION',[0,35.65,79.72],.36)
     # Route labels are set into the duct's existing rear wall, not its floor.
-    label('Fork_bob','ADHESIVE ACCESS  <',[-5.2,1.35,10.17],.23)
-    label('Fork_goop','>  EFFLUENT CONTROL',[7.5,1.35,10.17],.23)
+    # New fork identifiers are owned by quarantine_passages().
+    # Shared access labels stay in the original rear wall plane.
+    quarantine_cell()
+    quarantine_platforms()
+    quarantine_baffles()
+    quarantine_wall_details()
+    quarantine_sewer_equipment()
+    quarantine_network_stations()
+    quarantine_passages()
+    quarantine_wreck()
     print('Quarantine crown, two-body access and complete interceptor/return authored')
+
+def quarantine_wall_features():
+    return [(-1,23.0,36.5,15.5,24.5,'gallery'),(1,38.5,52.0,16.0,25.0,'gallery'),
+        (-1,54.0,69.0,22.0,32.0,'gallery'),(1,68.0,75.0,8.4,27.6,'pressure'),
+        (-1,39.5,47.0,3.0,14.0,'growth'),(1,24.0,31.5,8.0,19.0,'growth')]
+
+
+def quarantine_cut_fields():
+    cuts=quarantine_wall_features()+[(side,18.25,79.75,34.4,36.4,'header') for side in [-1,1]]
+    result=[]
+    for spec in BOXES:
+        name=spec['name']
+        if not name.startswith(('room-5-chamber-west_','room-5-chamber-east_','room-5-chamber-east-upper-')) or not any(token in name for token in ['_back_','_panel_']):
+            result.append(spec);continue
+        side=-1 if spec['hi'][0]<0 else 1;pieces=[spec]
+        for hand,a,b,c,d,kind in cuts:
+            if hand!=side:continue
+            pending=[]
+            for piece in pieces:
+                lo,hi=piece['lo'],piece['hi'];A,B=max(a,lo[2]),min(b,hi[2]);C,D=max(c,lo[1]),min(d,hi[1])
+                if B<=A or D<=C:pending.append(piece);continue
+                for z,Z,y,Y in [(lo[2],A,lo[1],hi[1]),(B,hi[2],lo[1],hi[1]),(A,B,lo[1],C),(A,B,D,hi[1])]:
+                    if Z-z<.00001 or Y-y<.00001:continue
+                    part=dict(piece);part['lo']=[lo[0],y,z];part['hi']=[hi[0],Y,Z];pending.append(part)
+            pieces=pending
+        for k,piece in enumerate(pieces):
+            part=dict(piece);part['name']+='_quarantine_cut_'+str(k);result.append(part)
+    BOXES[:]=result
+
+
+def quarantine_translate_parts(objects,start,offset,tag):
+    for obj in objects:
+        if obj.type!='MESH':continue
+        obj.location+=Vector(xyz(offset))
+        obj.name='C2_room-5_Quarantine_'+tag+'_'+obj.name.split('C2_room-5_')[-1]
+        centre=sum((obj.matrix_local@v.co for v in obj.data.vertices),Vector())/max(1,len(obj.data.vertices))
+        obj['spatialRegion']='crown_'+str(int(-centre.y//24))
+    for spec in BOXES[start:]:
+        spec['lo']=[spec['lo'][i]+offset[i] for i in range(3)]
+        spec['hi']=[spec['hi'][i]+offset[i] for i in range(3)]
+        spec['name']='Quarantine_'+tag+'_'+spec['name']
+
+
+def quarantine_wall_slab(tag,side,near,far,low,high,a,b,finish='Alloy'):
+    x,X=sorted([side*near,side*far]);box('Quarantine_Wall_'+tag,[x,low,a],[X,high,b],finish)
+
+
+def quarantine_wall_details():
+    gallery=0;growth=0
+    for side,a,b,low,high,kind in quarantine_wall_features():
+        before=set(bpy.context.scene.objects);start=len(BOXES)
+        if kind=='gallery':
+            extraction_observation_gallery(gallery,side,a,b,low,high,
+                ['CELL DIAGNOSTICS','ISOLATION LABORATORY','REMOTE OBSERVATION'][gallery]);gallery+=1
+            offset=(side*-3.8,0,0)
+        elif kind=='pressure':
+            extraction_pressure_tower(0,side,a,b,2.4,21.6,'BIOELECTRIC COOLANT');offset=(side*-3.8,6,0)
+        else:
+            extraction_ivy_patch(growth,side,a,b,low,high);growth+=1;offset=(side*-3.8,0,0)
+        quarantine_translate_parts(set(bpy.context.scene.objects)-before,start,offset,kind+str(gallery+growth))
+    for side in [-1,1]:
+        # Deep, closed service channel, clear of the upper escape aperture.
+        quarantine_wall_slab('header_closed_back',side,21.05,21.28,34.4,36.4,18.25,79.75,'Graphite')
+        for y,Y in [(34.4,34.57),(36.23,36.4)]:
+            quarantine_wall_slab('header_return',side,20,21.05,y,Y,18.25,79.75,'Alloy')
+        for z,Z in [(18.25,18.42),(79.58,79.75)]:
+            quarantine_wall_slab('header_end',side,20,21.05,34.57,36.23,z,Z,'Alloy')
+        for y in [35.0,35.78]:
+            section=[(18.34,.14,'HallCeramic')]
+            for z in [26,42,58,74]:section.extend([(z-.15,.14,'HallAlloy'),(z-.10,.19,'HallAlloy'),(z+.10,.19,'HallAlloy'),(z+.15,.14,'HallCeramic')])
+            section.append((79.66,.14,'HallCeramic'))
+            nursery_profile('Quarantine_Wall_insulated_service_main',[(side*20.38,y,z) for z,r,f in section],
+                [r for z,r,f in section],[f for z,r,f in section[:-1]],12)
+        for z in [21,38,55,72]:
+            quarantine_wall_slab('header_mount',side,20.53,21.05,34.72,36.07,z-.10,z+.10,'Alloy')
+    # Fitted feed pedestals connect the actual moving cable endpoints to roof.
+    for x in [-2.5,2.5]:
+        loops=[nursery_square_ring(x,49,r,cut,y) for r,cut,y in
+            [(.60,.10,38.0),(.60,.10,38.30),(.34,.07,38.50),(.34,.07,40.50)]]
+        bands=nursery_ring_profile('Quarantine_Roof_feed_socket',loops,['HallAlloy','HallCeramic','HallGraphite'],cycle=False)
+        for obj in bands:
+            for poly in obj.data.polygons:poly.flip()
+        box('Quarantine_Roof_feed_bridge',[x-.50,40.5,48.5],[x+.50,40.72,49.5],'Alloy')
+    # Release wiring stays above Bob's walk/jump lane at the original tray height.
+    box('Quarantine_Release_riser',[-.18,30.85,26.40],[.18,36.98,26.72],'Alloy')
+    nursery_sweep('Quarantine_Release_routed_conduit',[(0,31,26.75),(0,36.65,26.75),
+        (0,37.02,27.10),(0,37.02,48.70),(0,37.20,49),(-2.5,37.20,49)],.07,'HallGraphite',10)
+    for z in [28,35,42,48]:
+        box('Quarantine_Release_tray_cleat',[-.32,36.90,z-.10],[.32,37.18,z+.10],'Alloy')
+
+
+
+def quarantine_offset(polygon,inset):
+    # Parallel inset of a convex footprint, retaining clipped safe-deck corners.
+    result=[]
+    for i,p in enumerate(polygon):
+        prev=polygon[i-1];nxt=polygon[(i+1)%len(polygon)]
+        a=Vector((p[0]-prev[0],p[1]-prev[1]));b=Vector((nxt[0]-p[0],nxt[1]-p[1]))
+        a.normalize();b.normalize();na=Vector((-a.y,a.x));nb=Vector((-b.y,b.x))
+        da=na.dot(Vector(p))+inset;db=nb.dot(Vector(p))+inset;det=na.x*nb.y-nb.x*na.y
+        if abs(det)<1e-6:result.append((p[0]+na.x*inset,p[1]+na.y*inset));continue
+        result.append(((da*nb.y-db*na.y)/det,(na.x*db-nb.x*da)/det))
+    return result
+
+
+def quarantine_static_parts(objects,start,offset,index):
+    basis=Matrix.Translation(Vector(xyz(offset)))
+    for obj in objects:
+        if obj.type!='MESH':continue
+        obj.data.transform(basis);obj.data.update()
+        obj.name='C2_room-5_Quarantine_Deck_'+str(index)+'_'+obj.name.split('C2_room-5_')[-1]
+        obj['spatialRegion']='decks_'+str(int(offset[2]//16))+'_'+str(int(offset[0]//16))
+    for spec in BOXES[start:]:
+        spec['lo']=[spec['lo'][i]+offset[i] for i in range(3)]
+        spec['hi']=[spec['hi'][i]+offset[i] for i in range(3)]
+        spec['name']='Quarantine_Deck_'+str(index)+'_'+spec['name']
+
+
+def quarantine_platforms():
+    for index,spec in enumerate(LAYOUT[CURRENT]['quarantinePlatforms']):
+        before=set(bpy.context.scene.objects);start=len(BOXES)
+        points=spec['points'];top=max(p[1] for p in points);bottom=min(p[1] for p in points)
+        polygon=list({(round(p[0],6),round(p[2],6)) for p in points if abs(p[1]-top)<.00001})
+        cx=sum(p[0] for p in polygon)/len(polygon);cz=sum(p[1] for p in polygon)/len(polygon)
+        polygon=[p for angle,p in sorted((math.atan2(p[1]-cz,p[0]-cx),p) for p in polygon)]
+        inset=quarantine_offset(polygon,.12);lower=quarantine_offset(polygon,.035)
+        loops=[[(x,y,z) for x,z in outline] for outline,y in [(polygon,top),(polygon,bottom+.06),(lower,bottom)]]
+        nursery_ring_profile('Quarantine_Deck_folded_chassis',loops,['HallAlloy','HallGraphite'],cycle=False)
+        mesh('Quarantine_Deck_closed_undertray',loops[-1],[tuple(range(len(polygon)))],'HallGraphite')
+        marked={max((sx*p[0]+sz*p[1],i) for i,p in enumerate(polygon))[1] for sx,sz in [(-1,-1),(-1,1),(1,-1),(1,1)]}
+        for i,(a,b) in enumerate(zip(polygon,polygon[1:]+polygon[:1])):
+            j=(i+1)%len(polygon);length=math.hypot(b[0]-a[0],b[1]-a[1]);t=min(.12,.17/max(.1,length))
+            for u,v in [(0,t),(t,1-t),(1-t,1)]:
+                def mix(A,B,T):return (A[0]*(1-T)+B[0]*T,A[1]*(1-T)+B[1]*T)
+                Oa,Ob,Ia,Ib=mix(a,b,u),mix(a,b,v),mix(inset[i],inset[j],u),mix(inset[i],inset[j],v)
+                vv=[(x,top,z) for x,z in [Oa,Ob,Ib,Ia]]
+                amber=(u==0 and i in marked) or (v==1 and j in marked)
+                mesh('Quarantine_Deck_owned_rim_index',vv,[(3,2,1,0)],'Amber' if amber else 'HallAlloy')
+        mesh('Quarantine_Deck_continuous_inset_back',[(x,top-.035,z) for x,z in inset],
+            [tuple(reversed(range(len(inset))))],'HallGraphite')
+        # Four inset load plates share one opaque substrate below real seams.
+        for sx in [-1,1]:
+            for sz in [-1,1]:
+                poly=inset
+                for A,B in [((.009*sx,-100),(.009*sx,100)),((-100,.009*sz),(100,.009*sz))]:
+                    inside,outside=nursery_polygon_split(poly,A,B)
+                    poly=(outside if sx>0 else inside) if A[0]==B[0] else (inside if sz>0 else outside)
+                    if len(poly)<3:break
+                if len(poly)<3:continue
+                count=len(poly);vv=[(x,y,z) for y in [top-.028,top] for x,z in poly]
+                ff=[tuple(reversed(range(count,count*2)))]+[(i+count,(i+1)%count+count,(i+1)%count,i) for i in range(count)]
+                mesh('Quarantine_Deck_white_load_plate',vv,ff,'HallPaint')
+        width=max(p[0] for p in polygon)-min(p[0] for p in polygon)
+        depth=max(p[1] for p in polygon)-min(p[1] for p in polygon)
+        w,d=min(width,3),min(depth,3)
+        nursery_platform_harness('Quarantine_'+str(index),'',w,d,top)
+        for sx in [-1,1]:
+            for sz in [-1,1]:
+                x,z=sx*w*.32,sz*d*.25
+                box('Quarantine_Deck_cradle_mount',[x-.085,top-.60,z-.12],[x+.085,bottom+.02,z+.12],'Alloy')
+        quarantine_static_parts(set(bpy.context.scene.objects)-before,start,spec['matrix'][12:15],index)
+
+
+def quarantine_baffles():
+    for spec in LAYOUT[CURRENT]['quarantineBaffles']:
+        owner=spec['name'];points=spec['points'];n=len(points)//2
+        polygon=[(p[0],p[2]) for p in points[:n]];height=max(p[1] for p in points)
+        # The footprint and full outer cover silhouette stay exact. Pressed
+        # panel centres sit inside that envelope rather than adding false cover.
+        mesh('Quarantine_Baffle_end_caps',points,[tuple(range(n)),tuple(reversed(range(n,n*2)))],'HallAlloy',owner)
+        for i,a in enumerate(polygon):
+            b=polygon[(i+1)%n];length=math.hypot(b[0]-a[0],b[1]-a[1]);dx,dz=(b[0]-a[0])/length,(b[1]-a[1])/length
+            if length<.8:
+                vv=[(a[0],0,a[1]),(b[0],0,b[1]),(b[0],height,b[1]),(a[0],height,a[1])]
+                mesh('Quarantine_Baffle_cast_return',vv,[(3,2,1,0)],'HallAlloy',owner);continue
+            outer=[(a[0],0,a[1]),(b[0],0,b[1]),(b[0],height,b[1]),(a[0],height,a[1])]
+            inner=[(a[0]+dx*.12-dz*.035,.14,a[1]+dz*.12+dx*.035),
+                   (b[0]-dx*.12-dz*.035,.14,b[1]-dz*.12+dx*.035),
+                   (b[0]-dx*.12-dz*.035,height-.14,b[1]-dz*.12+dx*.035),
+                   (a[0]+dx*.12-dz*.035,height-.14,a[1]+dz*.12+dx*.035)]
+            mesh('Quarantine_Baffle_pressed_border',outer+inner,[(k+4,(k+1)%4+4,(k+1)%4,k) for k in range(4)],'HallAlloy',owner)
+            # One inlaid shell surface, with physical folded ribs in its depth.
+            mesh('Quarantine_Baffle_white_armour',inner,[(3,2,1,0)],'HallCeramic',owner)
+            for u in [.18,length-.18]:
+                x,z=a[0]+dx*u-dz*.035,a[1]+dz*u+dx*.035
+                for y in [.29,height-.29]:
+                    tube('Quarantine_Baffle_captive_fastener',(x,y,z),(x+dz*.025,y,z-dx*.025),
+                        .039,'HallAlloy',10,owner,cap_a=False)
+            if length>1.6:
+                for offset in [-.27,.27]:
+                    u=length/2+offset;x,z=a[0]+dx*u-dz*.015,a[1]+dz*u+dx*.015
+                    tube('Quarantine_Baffle_pressed_stiffener',(x,.70,z),(x,2.45,z),.014,'HallAlloy',8,owner)
+            for y in [.52,2.68]:
+                vv=[(x,Y,z) for x,Y,z in [
+                    (inner[0][0],y-.025,inner[0][2]),(inner[1][0],y-.025,inner[1][2]),
+                    (inner[1][0]+dz*.022,y+.025,inner[1][2]-dx*.022),
+                    (inner[0][0]+dz*.022,y+.025,inner[0][2]-dx*.022)]]
+                mesh('Quarantine_Baffle_folded_horizontal_rib',vv,[(3,2,1,0)],'HallAlloy',owner)
+
+
+
+def quarantine_cell():
+    owner='room-5-volt-containment'
+    # Insulated induction columns occupy the old extraction stacks' footprint.
+    for x in [-2.05,2.05]:
+        for z in [-1.90,1.90]:
+            section=[(-1.62,.21,'HallAlloy'),(-1.49,.28,'HallAlloy'),(-1.36,.14,'HallGraphite')]
+            for k in range(7):
+                y=-1.25+k*.38
+                section.extend([(y-.07,.14,'HallCeramic'),(y-.045,.29,'HallCeramic'),
+                    (y+.045,.29,'HallCeramic'),(y+.07,.14,'HallGraphite')])
+            section.extend([(1.40,.14,'HallAlloy'),(1.51,.28,'HallAlloy'),(1.62,.21,'HallAlloy')])
+            nursery_profile('Quarantine_Cell_induction_stack',[(x,y,z) for y,r,f in section],
+                [r for y,r,f in section],[f for y,r,f in section[:-1]],20,owner)
+            for y in [-1.58,1.58]:
+                nursery_sweep('Quarantine_Cell_power_bridge',[(x,y,z),(x*.78,y,z*.78),(x*.55,y,z*.55)],.07,'HallAlloy',10,owner)
+    # Corner structure and fitted end castings leave Volt's view unobstructed.
+    for sx in [-1,1]:
+        for sz in [-1,1]:
+            x,z=sx*2.68,sz*2.68
+            box('Quarantine_Cell_cast_upright',[x-.14,-1.77,z-.14],[x+.14,1.77,z+.14],'Ceramic',owner)
+            for y in [-1.60,1.60]:
+                block('Quarantine_Cell_corner_lock',[.44,.25,.44],[x,y,z],'Alloy',owner)
+                tube('Quarantine_Cell_corner_fastener',(x,y-.08,z-sz*.23),(x,y+.08,z-sz*.23),.047,'HallGraphite',10,owner)
+            for y in [-1.79,1.79]:block('Quarantine_Cell_corner_seal',[.28,.06,.28],[x,y,z],'Graphite',owner)
+    for name in ['room-5-pod-base','room-5-pod-cap']:
+        base=name.endswith('base');direction=1 if base else -1
+        loops=[nursery_square_ring(0,0,r,cut,y*direction) for r,cut,y in
+            [(3,.15,.20),(3,.15,-.02),(2.90,.20,-.20)]]
+        bands=nursery_ring_profile('Quarantine_Cell_armoured_end_casting',loops,
+            ['HallCeramic','HallAlloy'],name,False)
+        if not base:
+            for obj in bands:
+                for poly in obj.data.polygons:poly.flip()
+        mesh('Quarantine_Cell_end_cap_closed_back',loops[-1],[tuple(range(8)) if base else tuple(reversed(range(8)))],'HallGraphite',name)
+        inset=nursery_square_ring(0,0,2.70,.18,.20*direction)
+        border=nursery_ring_profile('Quarantine_Cell_end_casting_reveal',[loops[0],inset],['HallGraphite'],name,False)
+        if base:
+            for obj in border:
+                for poly in obj.data.polygons:poly.flip()
+        mesh('Quarantine_Cell_inner_deck',inset,[tuple(reversed(range(8))) if base else tuple(range(8))],'HallCeramic',name)
+        for sx in [-1,1]:
+            for sz in [-1,1]:
+                tube('Quarantine_Cell_end_captive_bolt',(sx*2.80,.19*direction,sz*2.80),
+                    (sx*2.80,.23*direction,sz*2.80),.065,'HallAlloy',10,name)
+    # A one-piece annular cradle leaves an open view of the captive body.
+    for y in [-1.56,1.56]:
+        loops=[[(r*math.cos(k*math.tau/40),Y,r*math.sin(k*math.tau/40)) for k in range(40)]
+            for r,Y in [(1.48,y-.07),(1.48,y+.07),(1.27,y+.07),(1.27,y-.07)]]
+        cradle=nursery_ring_profile('Quarantine_Cell_field_cradle',loops,['HallAlloy','HallCeramic','HallGraphite','HallAlloy'],owner)
+        for obj in cradle:
+            for poly in obj.data.polygons:poly.flip()
+    # Every pane is attached to its existing independently animated collider.
+    for axis in ['x','z']:
+        for side in [-1,1]:
+            pane=f'room-5-pod-glass-{axis}-{side}'
+            if axis=='x':vv=[(0,y,u) for y,u in [(-1.76,-2.74),(-1.76,2.74),(1.76,2.74),(1.76,-2.74)]]
+            else:vv=[(u,y,0) for y,u in [(-1.76,-2.74),(-1.76,2.74),(1.76,2.74),(1.76,-2.74)]]
+            flip=(axis=='z' and side<0) or (axis=='x' and side>0)
+            mesh('Quarantine_Cell_single_glazing',vv,[(3,2,1,0) if flip else (0,1,2,3)],'CellGlass',pane)
+            for hand in [-1,1]:
+                if axis=='x':
+                    box('Quarantine_Cell_glazing_stile',[-.075,-1.78,hand*2.76-.08],[.075,1.78,hand*2.76+.08],'Alloy',pane)
+                    box('Quarantine_Cell_glazing_rail',[-.075,hand*1.79-.07,-2.84],[.075,hand*1.79+.07,2.84],'Alloy',pane)
+                else:
+                    box('Quarantine_Cell_glazing_stile',[hand*2.76-.08,-1.78,-.075],[hand*2.76+.08,1.78,.075],'Alloy',pane)
+                    box('Quarantine_Cell_glazing_rail',[-2.84,hand*1.79-.07,-.075],[2.84,hand*1.79+.07,.075],'Alloy',pane)
+            if axis=='z' and side==-1:
+                for y in [-.59,.59]:box('Quarantine_Cell_telescopic_shutter_muntin',[-2.68,y-.028,-.065],[2.68,y+.028,.065],'Alloy',pane)
+    # Hood and slide guides receive the original front-pane telescoping pose.
+    for side in [-1,1]:
+        x=side*3.14
+        box('Quarantine_Cell_shutter_fixed_guide',[x-.09,-1.91,-3.11],[x+.09,2.12,-2.87],'Graphite',owner)
+        box('Quarantine_Cell_white_guide_cheek',[x-.055,-1.82,-3.16],[x+.055,1.78,-3.11],'Ceramic',owner)
+    box('Quarantine_Cell_shutter_cast_hood',[-3.24,1.90,-3.18],[3.24,2.57,-2.74],'Alloy',owner)
+    box('Quarantine_Cell_hood_white_brow',[-3.10,2.40,-3.23],[3.10,2.57,-3.18],'Ceramic',owner)
+    label('Quarantine_Cell_identification','VOLT / BIOELECTRIC CELL',[0,2.08,-3.205],.28,owner=owner)
+    for x in [-2.5,2.5]:
+        nursery_profile('Quarantine_Cell_feed_insulator',[(x,y,0) for y in [2.25,2.42,2.48,2.56,2.62,2.70,2.76,2.90]],
+            [.12,.12,.25,.25,.12,.25,.25,.12],['HallGraphite','HallAlloy','HallCeramic','HallCeramic','HallAlloy','HallCeramic','HallAlloy'],16,owner)
+        feed=f'room-5-pod-cable-{int(x/2.5)}'
+        tube('Quarantine_Cell_live_power_feed',(0,-.5,0),(0,.5,0),.105,'HallGraphite',12,feed)
+    # Original release interaction, signal colour and button travel stay live.
+    pedestal='room-5-release-pedestal'
+    box('Quarantine_Release_station_back',[-.65,-.85,-.16],[.65,.85,.16],'Graphite',pedestal)
+    for side in [-1,1]:
+        box('Quarantine_Release_white_cheek',[side*.54-.09,-.70,.16],[side*.54+.09,.70,.30],'Ceramic',pedestal)
+    box('Quarantine_Release_station_header',[-.65,.85,-.10],[.65,1.30,.24],'Alloy',pedestal)
+    label('Quarantine_Release_station_label','CELL RELEASE',[0,.98,.265],.13,(90,0,0),'HallInk',pedestal)
+
+
+
+def quarantine_wreck():
+    owner='room-5-broken-drone-exposed-core';tag='Quarantine_Wreck_'
+    # The hit-volume remains the original mesh. Open split armour exposes the
+    # same scout family chassis; its two side assemblies follow damage anchors.
+    shape=[(-.76,-.88),(.76,-.88),(1.14,-.53),(1.12,.63),(.72,.94),(-.72,.94),(-1.12,.63),(-1.14,-.53)]
+    lower=[(x,-.34,z) for x,z in shape];upper=[(x,.24+z*.07,z) for x,z in shape]
+    vv=lower+upper
+    mesh(tag+'closed_cast_core',vv,[tuple(range(8)),tuple(reversed(range(8,16)))]+
+        [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],'HallGraphite',owner)
+    for side in [-1,1]:
+        x=side*.62
+        block(tag+'split_white_brow',[.62,.13,.93],[x,.43,-.12],'HallCeramic',owner)
+        block(tag+'folded_receiver',[.28,.47,1.08],[side*1.03,-.02,-.18],'Rust',owner)
+        block(tag+'cheek_white_armour',[.26,.32,.61],[side*.78,.10,-.73],'HallCeramic',owner)
+        stage='room-5-wreck-stage-'+str(1 if side<0 else 2)
+        block(tag+'exposed_outboard_spar',[1.0,.15,.25],[side*1.30,.05,.18],'Rust',stage)
+        # A continuous annular casing avoids stacked coplanar rotor guards.
+        n=24;profile=[(.65,.08),(.65,.24),(.57,.30),(.50,.30),(.50,.08)]
+        loops=[[(side*1.64+r*math.cos(k*math.tau/n),y,.18+r*math.sin(k*math.tau/n)) for k in range(n)] for r,y in profile]
+        for obj in nursery_ring_profile(tag+'broken_fan_guard',loops,['Rust','HallCeramic','HallCeramic','HallGraphite','HallGraphite'],stage):
+            for face in obj.data.polygons:face.flip()
+            obj.data.update()
+        tube(tag+'fan_hub',(side*1.64,.05,.18),(side*1.64,.28,.18),.13,'HallAlloy',12,stage)
+        for k in range(3):
+            a=k*math.tau/3;points=[(.14,-.035),(.45,-.07),(.48,.04),(.19,.10)]
+            vv=[(side*1.64+u*math.cos(a)-v*math.sin(a),y,.18+u*math.sin(a)+v*math.cos(a)) for y in [.25,.29] for u,v in points]
+            mesh(tag+'fan_blade',vv,[(3,2,1,0),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)],'HallGraphite',stage)
+        nursery_sweep(tag+'exposed_flexible_lead',[(side*.65,.27,.28),(side*1.02,.36,.40),(side*1.32,.20,.24)],.045,'HallGraphite',8,stage)
+    # Hollow scope joins the original live pupil without changing its centre.
+    n=24;profile=[(.32,-.75),(.30,-1.03),(.25,-1.16),(.214,-1.16),(.214,-.91),(.27,-.75)]
+    loops=[[(r*math.cos(k*math.tau/n),.05+r*math.sin(k*math.tau/n),z) for k in range(n)] for r,z in profile]
+    for obj in nursery_ring_profile(tag+'continuous_sensor_scope',loops,['HallGraphite','HallAlloy','HallAlloy','HallGraphite','HallGraphite','HallGraphite'],owner):
+        for face in obj.data.polygons:face.flip()
+        obj.data.update()
+    for k in range(6):
+        block(tag+'exposed_heat_sink',[.06,.12,.64],[-.30+k*.12,.36,.28],'HallAlloy',owner)
+    block(tag+'fractured_top_plate',[.40,.08,.67],[.65,.54,.43],'Rust',owner)
+
 
 def quarantine_crown(spec):
     # A deep central containment coffer changes the high-room silhouette;

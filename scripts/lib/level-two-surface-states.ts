@@ -31,8 +31,8 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     attachPresentation:root=>scene.blenderArt.attachRuntimeOwners(root)});
   scene.roomThree.root.add(roomThree.root);
   const dissolve = new DissolveSystem(targets);
-  const roomFour = new ElevatorDroneEncounter(scene.roomFour, world, surfaces, bob, goop, targets, dissolve, () => {});
-  const roomFive = new RoomFiveDroneEncounter(scene.roomFive, world, surfaces, bob, goop, () => true);
+  const roomFour = new ElevatorDroneEncounter(scene.roomFour, world, surfaces, bob, goop, targets, dissolve, () => {},scene.coverArt.droneSurfaceMaps,scene.securityDroneModels);
+  const roomFive = new RoomFiveDroneEncounter(scene.roomFive, world, surfaces, bob, goop, () => true,scene.coverArt.droneSurfaceMaps,undefined,scene.securityDroneModels);
   addCultivationRoomThreeBoosters(roomFive.platformBoosters,scene.roomThree);
   addCultivationButtonPlatformBooster(roomFive.platformBoosters,scene.roomTwo);
   const sample = (name: string) => {
@@ -89,6 +89,14 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     for(const elapsed of [1.6,3.2,3.6]){
       scene.roomFive.controller.releaseElapsed=elapsed;scene.roomFive.syncPresentation(.1);
       sample(`volt-release-${elapsed}`);
+    }
+    for(const [name,open] of [['closed',0],['opening',.5],['open',1]] as const){
+      scene.roomFive.presentCinematicCell(open);sample(`volt-cell-${name}`);
+    }
+    for(const target of targets)if(target.mesh.userData.roomId===5)target.reset();
+    scene.roomFive.reset();roomFive.reset();
+    for(const hits of [1,2,3]){
+      scene.roomFive.controller.hitBrokenDrone();roomFive.update(1/60);sample(`sewer-drone-damage-${hits}`);
     }
     scene.reset();roomThree.reset();roomFour.reset();roomFive.reset();sample('release-reset');
     visitCultivationRoomTwoSurfaceStates(scene,targets,sample);

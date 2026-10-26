@@ -30,6 +30,12 @@ export class CultivationBlenderArt {
       if(o instanceof THREE.Mesh&&o.material instanceof THREE.MeshBasicMaterial)legacy.set(o.material.name,o.material);
     });
     const finish=(name:string,escape=false,nursery=false):THREE.MeshStandardMaterial|THREE.MeshBasicMaterial=>{
+      if(name==='CellGlass'){
+        const old=this.materials.get(name);if(old)return old;
+        const material=new THREE.MeshStandardMaterial({name:'room-5-containment-clean-glass',color:0xa6c8ca,
+          roughness:.2,metalness:.04,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide,vertexColors:true});
+        this.materials.set(name,material);return material;
+      }
       if(name==='HallGlass'||name==='TestGlass'){
         const key='hall:glass',old=this.materials.get(key);if(old)return old;
         const source=scene.contaminationArt.glass,material=source.clone();
@@ -121,7 +127,7 @@ export class CultivationBlenderArt {
           const mesh=new THREE.Mesh(geometry,finish(batch.finish,asset.id==='escape-duct',asset.id==='room-1'));mesh.name=batch.name;
           mesh.userData.presentationOnly=true;mesh.userData.blenderBatch=true;
           if(parent?.userData.soluble===true)this.solubleSkins.push({mesh,source:mesh.material as THREE.MeshStandardMaterial,owner:parent.name});
-          if(asset.id==='escape-duct'||batch.target==='cultivation-filtration-slow-fan'||batch.name.includes('_cover_'))mesh.userData.shadowProxyReceiver=true;
+          if(asset.id==='escape-duct'||batch.target==='cultivation-filtration-slow-fan'||batch.name.includes('_cover_')||batch.name.includes('_decks_'))mesh.userData.shadowProxyReceiver=true;
           if(deferred)this.deferred.push({target:batch.target,mesh});else parent!.add(mesh);
           mesh.updateMatrix();mesh.matrixAutoUpdate=false;this.meshes.push(mesh);
           this.geometries.add(geometry);
