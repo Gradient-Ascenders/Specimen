@@ -124,9 +124,26 @@ test('loop distance fades adjust one continuing voice and survive suspension and
   } finally { globalThis.fetch = originalFetch; audio.dispose(); }
 });
 
-test('all 73 runtime sound definitions resolve to OGG beneath a relative deployment base', () => {
+test('boss warnings fit phase-two timing and carry across the arena through the actual audio mixer', async () => {
+  const originalFetch = globalThis.fetch, context = new Context();
+  globalThis.fetch = async () => new Response(new Uint8Array([1]));
+  const audio = new AudioManager('./', () => context as unknown as AudioContext);
+  try {
+    await audio.preload(['boss-beam-charge-01']); audio.setPaused(false); audio.unlock(); await Promise.resolve();
+    audio.play('boss-beam-charge-01', {x:82.5,y:18,z:0}, false, 1, 2.6/1.6);
+    assert.equal(context.sources[0].playbackRate.value, 2.6/1.6);
+    const panner = context.panners[0] as unknown as PannerNode;
+    assert.equal(panner.maxDistance, 250);
+    const retained = panner.refDistance / (panner.refDistance + panner.rolloffFactor * (82.5-panner.refDistance));
+    assert.ok(retained > .8, 'the boss warning remains audible from the playable ring');
+    audio.setPaused(true); audio.play('boss-beam-charge-01');
+    assert.equal(context.sources.length, 1, 'pause cannot start more one-shots');
+  } finally { globalThis.fetch = originalFetch; audio.dispose(); }
+});
+
+test('all 119 runtime sound definitions resolve to OGG beneath a relative deployment base', () => {
   const ids = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-  assert.equal(ids.length, 73);
+  assert.equal(ids.length, 119);
   assert.equal(SOUND_BANKS.containment.some(id => id.startsWith('cultivation-')), false);
   assert.equal(SOUND_BANKS.cultivation.filter(id => id.startsWith('cultivation-')).length, 8);
   assert.equal(SOUND_BANKS.containment.includes('blackout-vent-slime-slide-01'), false);
@@ -138,7 +155,7 @@ test('all 73 runtime sound definitions resolve to OGG beneath a relative deploym
     assert.equal(new URL(soundUrl(id), 'https://example.test/group-folder/').pathname, `/group-folder/${path}`);
     assert.equal(soundUrl(id, '/group-folder/'), `/group-folder/${path}`);
   }
-  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro','escape','cultivation','blackout'])
+  for (const folder of ['bob','goop','volt','world','environment','turrets','polish','intro','escape','cultivation','blackout','boss'])
     assert.ok(readdirSync(new URL(`../public/assets/audio/${folder}/`, import.meta.url)).every(f => f.endsWith('.ogg')));
 });
 

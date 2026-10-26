@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RESEARCH_WING_ORIGIN as ORIGIN, RESEARCH_OVERLOAD_LAMP, researchWorldPoint } from './BlackoutResearchLayout.ts';
-import { RESEARCH_TIMING as T, researchWindow, researchPursuerShotTime, researchDroneDeathTime, researchDroneFireStart, researchDroneFireInterval } from './BlackoutResearchTimeline.ts';
-import { sampleResearchDronePosition } from './BlackoutResearchFlight.ts';
+import { RESEARCH_TIMING as T, RESEARCH_LIGHT_FAILURES, researchWindow, researchPursuerShotTime, researchDroneDeathTime, researchDroneFireStart, researchDroneFireInterval } from './BlackoutResearchTimeline.ts';
+import { sampleResearchDronePosition, copyResearchIncomingShot } from './BlackoutResearchFlight.ts';
 import { ResearchCinematicAtmosphere } from './ResearchCinematicAtmosphere.ts';
 
 const UP = new THREE.Vector3(0, 1, 0), FORWARD = new THREE.Vector3(0, 0, 1), COLORS = [0x6ce9ee, 0x82ff62, 0xffda65] as const;
@@ -66,8 +66,7 @@ export class BlackoutResearchEffects {
       this.lightning(this.a, this.b, t, 0xffe692, .032, 12);
       this.p.copy(this.b); this.sparkBurst(this.p, (t - T.overload) % .18, 1.5, 8, 0xffd982);
     }
-    for (const z of [25, 20, 12, 4]) {
-      const at = T.lampBurst + (25 - z) / 8 * .65;
+    for (const {z,at} of RESEARCH_LIGHT_FAILURES) {
       researchWorldPoint(0, 7.68, z, this.p); this.sparkBurst(this.p, t - at, 3.6, 12, 0xffe6a1);
       if (z !== 25 && t >= at - .25 && t < at + .12) {
         researchWorldPoint(0, 7.7, z + 6, this.a); researchWorldPoint(0, 7.7, z, this.b); this.lightning(this.a, this.b, t, 0xc9ecff, .025, 8);
@@ -157,11 +156,7 @@ export class BlackoutResearchEffects {
       for (let n = latest; n >= Math.max(0, latest - 4); n--) {
         const fired = start + n * interval, age = t - fired;
         if (fired >= death) continue;
-        sampleResearchDronePosition(i, fired, this.a);
-        this.incomingDirection.subVectors(this.absorptionTarget, this.a).normalize();
-        this.a.addScaledVector(this.incomingDirection, .85);
-        this.b.copy(this.absorptionTarget).addScaledVector(this.incomingDirection, -1.15);
-        const flight = this.a.distanceTo(this.b) / 58;
+        const flight = copyResearchIncomingShot(i, fired, specimen, this.a, this.b, this.incomingDirection);
         if (age < flight) {
           this.p.lerpVectors(this.a, this.b, age / flight);
           this.q.copy(this.p).addScaledVector(this.incomingDirection, -Math.min(.95, age * 58));

@@ -7,8 +7,7 @@ import type { SpecimenCharacterPresentation, SpecimenCharacterState } from '../r
 import type { FinalBossPresentation } from '../boss/FinalBossPresentation.ts';
 import type { ExterminationArena } from '../boss/ExterminationArena.ts';
 import { SecurityDronePresentation, SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
-import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
-import type { SoundId } from '../audio/SoundCatalog.ts';
+import { BlackoutResearchAudio } from '../audio/BlackoutCutsceneAudio.ts';
 import { TypewriterAudio } from '../audio/TypewriterAudio.ts';
 import { BlackoutResearchWing } from './BlackoutResearchWing.ts';
 import { RESEARCH_WING_ORIGIN as ORIGIN, RESEARCH_OVERLOAD_LAMP, createResearchObservationCutout } from './BlackoutResearchLayout.ts';
@@ -16,7 +15,7 @@ import { BlackoutResearchCamera } from './BlackoutResearchCamera.ts';
 import { BlackoutResearchEffects } from './BlackoutResearchEffects.ts';
 import { BlackoutResearchOverlay } from './BlackoutResearchOverlay.ts';
 import { sampleResearchDrone, sampleResearchDronePosition, researchSearchTarget, type ResearchFlightPose } from './BlackoutResearchFlight.ts';
-import { RESEARCH_TIMING as T, RESEARCH_DIALOGUE, researchWindow, researchShot, researchPursuerShotTime, researchDroneDeathTime, researchDroneFireStart, researchDroneFireInterval,
+import { RESEARCH_TIMING as T, RESEARCH_DIALOGUE, researchWindow, researchShot, researchPursuerShotTime,
   sampleResearchSlime, sampleResearchSpecimenWorld, type ResearchSlime } from './BlackoutResearchTimeline.ts';
 import { preserveResearchPresentation } from './BlackoutResearchPreparation.ts';
 import { ResearchArenaReveal } from './ResearchArenaReveal.ts';
@@ -38,30 +37,6 @@ interface Actor {
 }
 const UP = new THREE.Vector3(0, 1, 0), ZERO = new THREE.Vector3();
 const SPECIMEN_SHOTS = [T.blast, T.doorBlast, ...[0, 1, 2, 3].map(researchPursuerShotTime)];
-const CUES: readonly { at: number; sound: SoundId; volume: number }[] = [
-  { at: T.alarm, sound: 'world-activation-01', volume: .8 },
-  { at: T.overload, sound: 'volt-shoot-01', volume: .8 },
-  { at: T.lampBurst, sound: 'world-vent-break-01', volume: .45 },
-  { at: T.lampBurst + .5, sound: 'world-vent-break-01', volume: .3 },
-  { at: T.lampBurst + 1.2, sound: 'world-vent-break-01', volume: .25 },
-  { at: T.collision, sound: 'world-door-stop-01', volume: .18 },
-  { at: T.crossfire, sound: 'volt-circuit-connect-01', volume: .8 },
-  { at: T.fusion, sound: 'world-platform-land-01', volume: .4 },
-  { at: T.fusion - .05, sound: 'world-drone-dissolve-01', volume: .85 },
-  { at: T.reveal, sound: 'world-release-01', volume: .9 },
-  { at: T.charge, sound: 'volt-charge-ready-01', volume: .85 },
-  { at: T.blast, sound: 'volt-shoot-01', volume: 1 },
-  { at: T.blast + .3, sound: 'world-drone-dissolve-01', volume: .8 },
-  { at: T.blast + .58, sound: 'world-drone-dissolve-01', volume: .65 },
-  { at: T.doorBlast, sound: 'world-vent-break-01', volume: .8 },
-  { at: T.ambush, sound: 'world-release-01', volume: .7 },
-  { at: T.ram, sound: 'world-door-stop-01', volume: .65 },
-  { at: T.glass, sound: 'world-vent-break-01', volume: .9 },
-  { at: T.landing, sound: 'world-platform-land-01', volume: .6 },
-  { at: T.pitUnlock, sound: 'world-activation-01', volume: .85 },
-  { at: T.pitClear, sound: 'world-door-stop-01', volume: .75 },
-  { at: T.boss, sound: 'world-machinery-loop-01', volume: .3 },
-];
 export const RESEARCH_PREPARATION_SAMPLES = Object.freeze([3, 22, 39, 73, 96, 109, 118, 122, 124, 128, 131, 142, 157, 168.8, 171, 188,
   196, 204, 207, 208.2, 209.1, 211, 214, 217, 221, 222.6, 227.3, 237, T.ambush + .2, T.glass + .05, T.fall + .2,
   T.fall + 1.5, T.landing + .6, T.clearPursuers + .15, T.clearPursuers + 1.55, T.pitUnlock + .4, T.pitOpen + 1, T.pitOpen + 3.5, T.boss + 3, T.handback - 3]);
@@ -103,7 +78,7 @@ export class BlackoutResearchFinale {
   private savedAmbient = 0; private savedFov = 65; private camera?: THREE.PerspectiveCamera;
   private elapsed = 0; private previousElapsed = 0;
   private playing = false; private played = false; private disposed = false; private skipRequested = false;
-  private lastCrossfireTick = -1;
+  private readonly sound = new BlackoutResearchAudio();
   private releaseArenaCutout?: () => void;
   private restoreWorld?: () => void;
   private restoreArenaDoors?: () => void;
@@ -270,7 +245,7 @@ export class BlackoutResearchFinale {
   begin(camera: THREE.PerspectiveCamera): boolean {
     if (this.played || this.disposed) return false;
     this.played = this.playing = true; this.skipRequested = false; this.elapsed = this.previousElapsed = 0;
-    this.camera = camera; this.savedFov = camera.fov; this.lastCrossfireTick = -1;
+    this.camera = camera; this.savedFov = camera.fov;
     this.restoreWorld = this.isolateWorld(); this.retainedLights = this.retainActorLights();
     const entry = this.options.arena.entryDoor.position.clone(), exit = this.options.arena.exitDoor.position.clone();
     this.restoreArenaDoors = () => {
@@ -295,7 +270,7 @@ export class BlackoutResearchFinale {
     if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Invalid research cinematic timestep.');
     this.previousElapsed = this.elapsed; this.elapsed = skip || this.skipRequested ? T.duration : Math.min(T.duration, this.elapsed + dt);
     this.presentActors(this.elapsed, dt, false);
-    if (!skip && !this.skipRequested) this.soundStep(this.previousElapsed, this.elapsed);
+    if (!skip && !this.skipRequested) this.sound.update(this.previousElapsed, this.elapsed, this.options.boss.machine.position);
     this.presentWorld(this.elapsed); this.overlay.present(this.elapsed);
     if (this.elapsed >= T.duration) { this.release(false); return true; } return false;
   }
@@ -364,29 +339,6 @@ export class BlackoutResearchFinale {
     }
     out.set(0, 0, t >= T.noticeBoss ? 1 : -1);
   }
-  private soundStep(before: number, t: number): void {
-    for (const cue of CUES) if (before < cue.at && t >= cue.at) gameplayAudioEvents.emit('cue', {
-      sound: cue.sound, position: cue.at >= T.fall ? this.specimenPosition : this.actors[cue.at === T.collision ? 0 : 2]!.position, volumeScale: cue.volume, maxDistance: 90 });
-    if (before < T.alarm && t >= T.alarm) gameplayAudioEvents.emit('loop', { key: 'research-containment-alarm', sound: 'world-containment-alarm-loop-01', position: this.groupAnchor, volumeScale: .18 });
-    if (before < T.blackout && t >= T.blackout) gameplayAudioEvents.emit('stop', { key: 'research-containment-alarm' });
-    const tick = Math.floor((t - T.crossfire) / .32);
-    if (t >= T.crossfire && t < T.fusion && tick !== this.lastCrossfireTick) {
-      this.lastCrossfireTick = tick;
-      for (const [id, sound] of [[1, 'goop-shoot-01'], [2, 'volt-shoot-01']] as const) gameplayAudioEvents.emit('cue', { sound, position: this.actors[id]!.position, volumeScale: .4, maxDistance: 35 });
-    }
-    if (t >= T.overload && t < T.lampBurst) gameplayAudioEvents.emit('loop', { key: 'research-light-overload', sound: 'volt-circuit-hold-loop-01', position: this.actors[2]!.position, volumeScale: .45 });
-    else gameplayAudioEvents.emit('stop', { key: 'research-light-overload' });
-    if (t >= T.crossfire + 3 && t < T.reveal || t >= T.charge && t < T.blast) gameplayAudioEvents.emit('loop', { key: 'research-fusion-charge', sound: 'specimen-charge-loop-01', position: t < T.fusion ? this.actors[0]!.position : this.specimenPosition, volumeScale: .65 });
-    else gameplayAudioEvents.emit('stop', { key: 'research-fusion-charge' });
-    if (t >= T.pitOpen && t < T.pitClear) gameplayAudioEvents.emit('loop', { key: 'research-pit-gates', sound: 'world-machinery-loop-01', position: this.specimenPosition, volumeScale: .6 });
-    else gameplayAudioEvents.emit('stop', { key: 'research-pit-gates' });
-    for (let i = 0; i < 4; i++) if (before < researchPursuerShotTime(i) && t >= researchPursuerShotTime(i)) gameplayAudioEvents.emit('cue', { sound: 'volt-shoot-01', position: this.specimenPosition, volumeScale: .7, maxDistance: 60 });
-    for (let i = 0; i < 12; i++) {
-      const start = researchDroneFireStart(i), interval = researchDroneFireInterval(i), end = researchDroneDeathTime(i);
-      const first = Math.max(0, Math.floor((before - start) / interval) + 1), last = Math.floor((Math.min(t, end - 1e-8) - start) / interval);
-      if (last >= first) gameplayAudioEvents.emit('cue', { sound: 'specimen-turret-shot', position: this.dronePositions[i]!, volumeScale: .15, maxDistance: 90 });
-    }
-  }
   private presentWorld(t: number, preparing = false): void {
     this.wing.present(t); this.effectsRoot.visible = true;
     this.arenaReveal.present(t);
@@ -433,7 +385,7 @@ export class BlackoutResearchFinale {
   }
   reset(complete = false): void { this.release(true); this.played = complete; this.elapsed = this.previousElapsed = 0; this.wing.reset(complete); }
   private release(restoreBodies: boolean): void {
-    for (const key of ['research-containment-alarm', 'research-light-overload', 'research-fusion-charge', 'research-pit-gates']) gameplayAudioEvents.emit('stop', { key });
+    this.sound.stop();
     if (this.playing) {
       for (const actor of this.actors) {
         if (restoreBodies) actor.body.teleport(actor.initial);

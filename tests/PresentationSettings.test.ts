@@ -52,18 +52,22 @@ test('invalid or inaccessible storage does not block settings or reset', () => {
   settings.resetToDefaults(); assert.deepEqual(settings.value, DEFAULT_GAME_SETTINGS);
 });
 
-test('FPS uses a half-second frame average, ignores invalid samples and resets gaps', () => {
+test('FPS uses a half-second average, includes slow rendered frames and supports explicit resets', () => {
   const counter = new FrameRateCounter();
   assert.equal(counter.sample(0), undefined); assert.equal(counter.sample(NaN), undefined);
+  assert.equal(counter.sample(Infinity), undefined); assert.equal(counter.sample(-1), undefined);
   for (let i = 0; i < 29; i++) assert.equal(counter.sample(1 / 60), undefined);
   assert.equal(counter.sample(1 / 60), 60);
   for (let i = 0; i < 14; i++) assert.equal(counter.sample(1 / 30), undefined);
   assert.equal(counter.sample(1 / 30), 30);
   counter.sample(0.25); counter.reset();
   assert.equal(counter.sample(0.25), undefined);
-  assert.equal(counter.sample(2), undefined);
-  assert.equal(counter.sample(0.25), undefined);
   assert.equal(counter.sample(0.25), 4);
+  assert.equal(counter.sample(1.2), 1, 'a slow renderer must produce a numeric sample instead of resetting forever');
+  assert.equal(counter.sample(1.5), 1);
+  assert.equal(counter.sample(3), 0, 'sub-one-FPS rendering stays measurable');
+  assert.equal(counter.sample(.25), undefined);
+  assert.equal(counter.sample(.25), 4, 'normal rendering recovers immediately');
 });
 
 function pad(button?: number, axes = [0, 0]): MenuGamepad {

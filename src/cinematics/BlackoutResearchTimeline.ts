@@ -12,6 +12,8 @@ export const RESEARCH_TIMING = Object.freeze({ alarm: 66, sentries: 68, monitorE
   fall: 244, landing: 247.4, turnPursuers: 251.5, clearPursuers: 253,
   pitUnlock: 256.4, pitOpen: 257, noticeBoss: 258.4, pitClear: 261.2,
   boss: 262, handback: 274, duration: 277 });
+/** The visible cascading failures and their sound share the same four beats. */
+export const RESEARCH_LIGHT_FAILURES = Object.freeze([25, 20, 12, 4].map(z => ({z, at: RESEARCH_TIMING.lampBurst + (25-z)/8*.65})));
 export const RESEARCH_DIALOGUE = Object.freeze([
   { start: 12, end: 18, speaker: 'goop', text: 'Looks like they’re quite the fans of you, Bob.' },
   { start: 49, end: 56, speaker: 'volt', text: 'Never thought I’d see someone more dangerous than Goop.' },

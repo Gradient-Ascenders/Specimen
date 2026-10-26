@@ -48,14 +48,14 @@ export class GameplayAudio {
     this.listenerCamera = listenerCamera;
     this.worldAudio = worldRoot ? new WorldAudio(audio, worldRoot) : undefined;
     this.unsubscribers.push(
-      gameplayAudioEvents.on('cue', ({ sound, position, volumeScale, maxDistance }) => {
+      gameplayAudioEvents.on('cue', ({ sound, position, volumeScale, maxDistance, varyPitch, playbackRate }) => {
         const listener = this.controlledBody()?.position;
         if (maxDistance !== undefined && position && (!listener ||
           (position.x-listener.x)**2 + (position.y-listener.y)**2 + (position.z-listener.z)**2 > maxDistance**2)) return;
-        if (this.enabled && !this.dead && !this.resetting) audio.play(sound, position, false, volumeScale);
+        if (this.enabled && !this.dead && !this.resetting) audio.play(sound, position, varyPitch ?? false, volumeScale, playbackRate);
       }),
-      gameplayAudioEvents.on('loop', ({ key, sound, position, volumeScale }) => {
-        if (this.enabled && !this.dead && !this.resetting) audio.startLoop(key, sound, position, volumeScale);
+      gameplayAudioEvents.on('loop', ({ key, sound, position, volumeScale, playbackRate }) => {
+        if (this.enabled && !this.dead && !this.resetting) audio.startLoop(key, sound, position, volumeScale, playbackRate);
       }),
       gameplayAudioEvents.on('stop', ({ key }) => audio.stopLoop(key)),
       gameplayAudioEvents.on('stopSound', ({ sound }) => audio.stopSound?.(sound)),

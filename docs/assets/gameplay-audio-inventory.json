@@ -1,5 +1,41 @@
 [
   {
+    "id": "blackout-lift-power-restore-01",
+    "path": "assets/audio/blackout/blackout-lift-power-restore-01.ogg",
+    "durationSeconds": 1.2,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.3181,
+    "loop": false
+  },
+  {
+    "id": "blackout-lift-start-01",
+    "path": "assets/audio/blackout/blackout-lift-start-01.ogg",
+    "durationSeconds": 3.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.6739,
+    "loop": false
+  },
+  {
+    "id": "blackout-lift-stop-01",
+    "path": "assets/audio/blackout/blackout-lift-stop-01.ogg",
+    "durationSeconds": 3.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.66688,
+    "loop": false
+  },
+  {
+    "id": "blackout-lift-travel-loop-01",
+    "path": "assets/audio/blackout/blackout-lift-travel-loop-01.ogg",
+    "durationSeconds": 7.9,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.23404,
+    "loop": true
+  },
+  {
     "id": "blackout-vent-slime-slide-01",
     "path": "assets/audio/blackout/blackout-vent-slime-slide-01.ogg",
     "durationSeconds": 4.0,
@@ -70,6 +106,231 @@
     "channels": 1,
     "peak": 0.67555,
     "loop": false
+  },
+  {
+    "id": "boss-beam-charge-01",
+    "path": "assets/audio/boss/boss-beam-charge-01.ogg",
+    "durationSeconds": 2.6,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.284,
+    "loop": false
+  },
+  {
+    "id": "boss-beam-ignite-01",
+    "path": "assets/audio/boss/boss-beam-ignite-01.ogg",
+    "durationSeconds": 2.56,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.44699,
+    "loop": false
+  },
+  {
+    "id": "boss-beam-shutdown-01",
+    "path": "assets/audio/boss/boss-beam-shutdown-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.31788,
+    "loop": false
+  },
+  {
+    "id": "boss-beam-sustain-loop-01",
+    "path": "assets/audio/boss/boss-beam-sustain-loop-01.ogg",
+    "durationSeconds": 5.98,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.21644,
+    "loop": true
+  },
+  {
+    "id": "boss-cannon-spin-up-01",
+    "path": "assets/audio/boss/boss-cannon-spin-up-01.ogg",
+    "durationSeconds": 1.1,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.53989,
+    "loop": false
+  },
+  {
+    "id": "boss-cannon-volley-01",
+    "path": "assets/audio/boss/boss-cannon-volley-01.ogg",
+    "durationSeconds": 0.60375,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.40371,
+    "loop": false
+  },
+  {
+    "id": "boss-core-hit-01",
+    "path": "assets/audio/boss/boss-core-hit-01.ogg",
+    "durationSeconds": 1.475313,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.45135,
+    "loop": false
+  },
+  {
+    "id": "boss-cover-break-01",
+    "path": "assets/audio/boss/boss-cover-break-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.44318,
+    "loop": false
+  },
+  {
+    "id": "boss-drone-deploy-01",
+    "path": "assets/audio/boss/boss-drone-deploy-01.ogg",
+    "durationSeconds": 1.663875,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.3174,
+    "loop": false
+  },
+  {
+    "id": "boss-emergence-01",
+    "path": "assets/audio/boss/boss-emergence-01.ogg",
+    "durationSeconds": 6.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.4085,
+    "loop": false
+  },
+  {
+    "id": "boss-final-explosion-01",
+    "path": "assets/audio/boss/boss-final-explosion-01.ogg",
+    "durationSeconds": 4.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.63543,
+    "loop": false
+  },
+  {
+    "id": "boss-health-pickup-01",
+    "path": "assets/audio/boss/boss-health-pickup-01.ogg",
+    "durationSeconds": 0.8865,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.66949,
+    "loop": false
+  },
+  {
+    "id": "boss-hit-blocked-01",
+    "path": "assets/audio/boss/boss-hit-blocked-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.50449,
+    "loop": false
+  },
+  {
+    "id": "boss-hover-loop-01",
+    "path": "assets/audio/boss/boss-hover-loop-01.ogg",
+    "durationSeconds": 7.9,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.24168,
+    "loop": true
+  },
+  {
+    "id": "boss-orb-burst-01",
+    "path": "assets/audio/boss/boss-orb-burst-01.ogg",
+    "durationSeconds": 0.996958,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.49233,
+    "loop": false
+  },
+  {
+    "id": "boss-orb-charge-01",
+    "path": "assets/audio/boss/boss-orb-charge-01.ogg",
+    "durationSeconds": 1.35,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.42095,
+    "loop": false
+  },
+  {
+    "id": "boss-orb-launch-01",
+    "path": "assets/audio/boss/boss-orb-launch-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.28639,
+    "loop": false
+  },
+  {
+    "id": "boss-phase-two-overload-01",
+    "path": "assets/audio/boss/boss-phase-two-overload-01.ogg",
+    "durationSeconds": 5.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.48845,
+    "loop": false
+  },
+  {
+    "id": "boss-ram-impact-01",
+    "path": "assets/audio/boss/boss-ram-impact-01.ogg",
+    "durationSeconds": 2.4,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.72604,
+    "loop": false
+  },
+  {
+    "id": "boss-ram-rush-01",
+    "path": "assets/audio/boss/boss-ram-rush-01.ogg",
+    "durationSeconds": 1.05,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.43307,
+    "loop": false
+  },
+  {
+    "id": "boss-ram-windup-01",
+    "path": "assets/audio/boss/boss-ram-windup-01.ogg",
+    "durationSeconds": 2.1,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.39158,
+    "loop": false
+  },
+  {
+    "id": "boss-reactor-failure-01",
+    "path": "assets/audio/boss/boss-reactor-failure-01.ogg",
+    "durationSeconds": 3.8,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.43934,
+    "loop": false
+  },
+  {
+    "id": "boss-shield-activate-01",
+    "path": "assets/audio/boss/boss-shield-activate-01.ogg",
+    "durationSeconds": 1.35,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.28381,
+    "loop": false
+  },
+  {
+    "id": "boss-shield-collapse-01",
+    "path": "assets/audio/boss/boss-shield-collapse-01.ogg",
+    "durationSeconds": 1.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.6205,
+    "loop": false
+  },
+  {
+    "id": "boss-shield-regeneration-loop-01",
+    "path": "assets/audio/boss/boss-shield-regeneration-loop-01.ogg",
+    "durationSeconds": 5.98,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.30227,
+    "loop": true
   },
   {
     "id": "cultivation-cover-break-free-01",
@@ -393,6 +654,141 @@
     "sampleRate": 48000,
     "channels": 1,
     "peak": 0.42167,
+    "loop": false
+  },
+  {
+    "id": "research-door-breach-01",
+    "path": "assets/audio/blackout/research-door-breach-01.ogg",
+    "durationSeconds": 2.367917,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.71719,
+    "loop": false
+  },
+  {
+    "id": "research-energy-absorb-01",
+    "path": "assets/audio/blackout/research-energy-absorb-01.ogg",
+    "durationSeconds": 0.5,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.28093,
+    "loop": false
+  },
+  {
+    "id": "research-fusion-burst-01",
+    "path": "assets/audio/blackout/research-fusion-burst-01.ogg",
+    "durationSeconds": 2.905417,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.6929,
+    "loop": false
+  },
+  {
+    "id": "research-fusion-charge-loop-01",
+    "path": "assets/audio/blackout/research-fusion-charge-loop-01.ogg",
+    "durationSeconds": 5.98,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.24194,
+    "loop": true
+  },
+  {
+    "id": "research-glass-shatter-01",
+    "path": "assets/audio/blackout/research-glass-shatter-01.ogg",
+    "durationSeconds": 3.48,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.647,
+    "loop": false
+  },
+  {
+    "id": "research-light-rupture-01",
+    "path": "assets/audio/blackout/research-light-rupture-01.ogg",
+    "durationSeconds": 0.997792,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.65167,
+    "loop": false
+  },
+  {
+    "id": "research-pit-retract-loop-01",
+    "path": "assets/audio/blackout/research-pit-retract-loop-01.ogg",
+    "durationSeconds": 5.98,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.192,
+    "loop": true
+  },
+  {
+    "id": "research-pit-stop-01",
+    "path": "assets/audio/blackout/research-pit-stop-01.ogg",
+    "durationSeconds": 1.433896,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.6659,
+    "loop": false
+  },
+  {
+    "id": "research-pit-unlock-01",
+    "path": "assets/audio/blackout/research-pit-unlock-01.ogg",
+    "durationSeconds": 0.6,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.64161,
+    "loop": false
+  },
+  {
+    "id": "research-shaft-fall-01",
+    "path": "assets/audio/blackout/research-shaft-fall-01.ogg",
+    "durationSeconds": 3.4,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.38354,
+    "loop": false
+  },
+  {
+    "id": "research-slime-fusion-01",
+    "path": "assets/audio/blackout/research-slime-fusion-01.ogg",
+    "durationSeconds": 3.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.55521,
+    "loop": false
+  },
+  {
+    "id": "research-specimen-land-01",
+    "path": "assets/audio/blackout/research-specimen-land-01.ogg",
+    "durationSeconds": 1.979021,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.68902,
+    "loop": false
+  },
+  {
+    "id": "specimen-damage-01",
+    "path": "assets/audio/boss/specimen-damage-01.ogg",
+    "durationSeconds": 0.6065,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.67227,
+    "loop": false
+  },
+  {
+    "id": "specimen-dash-01",
+    "path": "assets/audio/boss/specimen-dash-01.ogg",
+    "durationSeconds": 0.602417,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.66879,
+    "loop": false
+  },
+  {
+    "id": "specimen-heavy-blast-01",
+    "path": "assets/audio/blackout/specimen-heavy-blast-01.ogg",
+    "durationSeconds": 1.199208,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.58482,
     "loop": false
   },
   {

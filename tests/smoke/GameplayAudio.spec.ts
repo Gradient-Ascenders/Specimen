@@ -1,11 +1,13 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
 import { expect, test } from '@playwright/test';
-import { SOUND_BANKS, SOUND_DEFINITIONS } from '../../src/audio/SoundCatalog.ts';
+import { SOUND_BANKS, SOUND_DEFINITIONS, type SoundId } from '../../src/audio/SoundCatalog.ts';
 
 test('selected Bob and Goop clips decode beneath nested base and follow gameplay and recovery', async ({ page, baseURL }) => {
   const errors: string[] = [], audioRequests: string[] = [];
   const soundEffectUrls = new Set(SOUND_BANKS.blackout.map(id =>
     new URL(SOUND_DEFINITIONS[id].path, baseURL!).href));
+  const recordingUrls = (bank: readonly SoundId[]) => [...new Set(bank.map(id =>
+    new URL(SOUND_DEFINITIONS[id].path, baseURL!).href))].sort();
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('request', request => { if (soundEffectUrls.has(request.url())) audioRequests.push(request.url()); });
@@ -29,7 +31,7 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
     const { loaded, failed, pending } = (window as any).__audioRuntime.audio.diagnostics;
     return { loaded, failed, pending };
   }), { timeout: 60_000 }).toEqual({ loaded: SOUND_BANKS.containment.length, failed: [], pending: 0 });
-  expect(new Set(audioRequests).size).toBe(SOUND_BANKS.containment.length);
+  expect([...new Set(audioRequests)].sort()).toEqual(recordingUrls(SOUND_BANKS.containment));
   expect(audioRequests.some(url => url.includes('/volt/'))).toBe(false);
   expect(audioRequests.filter(url => url.includes('/turrets/'))).toHaveLength(1);
   expect(audioRequests.every(url => new URL(url).pathname.startsWith('/group-folder/assets/audio/'))).toBe(true);
@@ -39,23 +41,16 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   await page.waitForFunction(() => (window as any).__audioRuntime.audio.diagnostics.contextState === 'running');
   // Unlock must not silently expand the bank. Later factories warm their
   // cumulative banks before entry; verify actual browser OGG decoding too.
-  expect(new Set(audioRequests).size).toBe(SOUND_BANKS.containment.length);
+  expect([...new Set(audioRequests)].sort()).toEqual(recordingUrls(SOUND_BANKS.containment));
   await page.evaluate(async banks => {
     const audio = (window as any).__audioRuntime.audio;
     await audio.preload(banks.cultivation);
     if (audio.diagnostics.loaded !== banks.cultivation.length) throw new Error('Cultivation bank missing');
     await audio.preload(banks.blackout);
   }, SOUND_BANKS);
-  expect(new Set(audioRequests).size).toBe(SOUND_BANKS.blackout.length);
-  expect(new Set(audioRequests.filter(url => url.includes('/bob/'))).size).toBe(7);
-  expect(new Set(audioRequests.filter(url => url.includes('/goop/'))).size).toBe(5);
-  expect(new Set(audioRequests.filter(url => url.includes('/world/'))).size).toBe(6);
-  expect(new Set(audioRequests.filter(url => url.includes('/environment/'))).size).toBe(6);
-  expect(new Set(audioRequests.filter(url => url.includes('/polish/'))).size).toBe(10);
-  expect(new Set(audioRequests.filter(url => url.includes('/intro/'))).size).toBe(14);
-  expect(new Set(audioRequests.filter(url => url.includes('/escape/'))).size).toBe(9);
-  expect(new Set(audioRequests.filter(url => url.includes('/cultivation/'))).size).toBe(8);
-  expect(new Set(audioRequests.filter(url => url.includes('/blackout/'))).size).toBe(1);
+  // Aliases deliberately reuse recordings, and new banks may add folders.
+  // Require the complete exact asset set, rather than one URL per sound ID.
+  expect([...new Set(audioRequests)].sort()).toEqual(recordingUrls(SOUND_BANKS.blackout));
   await page.evaluate(() => {
     const runtime=(window as any).__audioRuntime;
     runtime.resources.body.teleport({x:3,y:0.46,z:0});

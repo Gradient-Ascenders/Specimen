@@ -1,4 +1,5 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { finishLevelArrival } from '../helpers/LevelArrival.ts';
 import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
@@ -90,6 +91,7 @@ for (const { profile, preset, expectedDpr } of scenarios) {
     const evidence: unknown[] = [];
     for (const level of [1, 2, 3]) {
       await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
+      await finishLevelArrival(page, '__paritySession');
       const s = await snapshot(page); evidence.push({ level, ...s });
       expect(s.debug).toBe(false); expect(s.panel).toBe(false);
       expect(s.bob).toBe(true); expect(s.goop).toBe(true);
