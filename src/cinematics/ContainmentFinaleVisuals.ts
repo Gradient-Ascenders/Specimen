@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { SecurityDroneConfig } from '../hazards/SecurityDrone.ts';
 import { SecurityDronePresentation, SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
-import { prepareIndustrialDroneGeometry } from '../render/hazards/IndustrialDroneGeometry.ts';
+import {EscapeDroneModel} from '../render/hazards/EscapeDroneModel.ts';
 import type { CinematicPreparationJob } from './IdleCinematicPreparation.ts';
 import { FINALE_VENT, finaleEase, finaleMix, sampleContainmentFinale, type ContainmentFinaleFrame, type FinalePoint } from './ContainmentFinaleTimeline.ts';
 import { FINALE_DRONE_HOVER } from './ContainmentFinaleBobMotion.ts';
@@ -32,13 +32,13 @@ export class ContainmentFinaleVisuals {
   readonly annex = new THREE.Group();
   readonly drones: Craft[] = [];
   readonly shots: FinaleShot[] = [];
-  private readonly resources = new SecurityDronePresentationResources(undefined, true);
+  private readonly model=new EscapeDroneModel();
+  private readonly resources = new SecurityDronePresentationResources(undefined, true, false, this.model);
   private readonly ownedGeometry: THREE.BufferGeometry[] = [];
   private readonly ownedMaterials: THREE.Material[] = [];
   private readonly instances: THREE.InstancedMesh[] = [];
   private box!: THREE.BoxGeometry;
   private sphere!: THREE.SphereGeometry;
-  private fan!: THREE.CylinderGeometry;
   private red!: THREE.InstancedMesh;
   private green!: THREE.InstancedMesh;
   private acidImpacts!: THREE.InstancedMesh;
@@ -67,18 +67,9 @@ export class ContainmentFinaleVisuals {
   *preparationJobs(): Generator<CinematicPreparationJob> {
     yield { label: 'finale shared primitives', run: () => {
       this.box = new THREE.BoxGeometry(1, 1, 1); this.sphere = new THREE.SphereGeometry(1, 10, 7);
-      this.fan = new THREE.CylinderGeometry(.37, .37, .12, 12, 1, true);
-      this.ownedGeometry.push(this.box, this.sphere, this.fan);
+      this.ownedGeometry.push(this.box, this.sphere);
     } };
-    for (const role of ['armour', 'armourShadow', 'mechanism', 'barrel', 'mount', 'linkage'] as const) {
-      const preparation = prepareIndustrialDroneGeometry(DRONE_CONFIG, role);
-      try {
-        for (let i = 0; i < preparation.steps.length; i++) yield { label: `finale drone ${role} part ${i + 1}`, run: preparation.steps[i] };
-        yield { label: `finale merge drone ${role}`, run: () => {
-          this.resources.geometry(`industrial-${role}:ceiling:1.6:0.8:1.4`, () => preparation.finish());
-        } };
-      } finally { preparation.dispose(); }
-    }
+    yield* this.model.preparationJobs();
     for (let i = 0; i < 4; i++) yield { label: `finale pooled drone ${i + 1}`, run: () => this.createCraft(i) };
     yield { label: 'finale straight escape airduct', run: () => this.buildAnnex() };
     yield { label: 'finale pooled projectiles and wreck', run: () => this.buildEffects() };
@@ -125,7 +116,7 @@ export class ContainmentFinaleVisuals {
       for (let j = 0; j < 4; j++) {
         this.position.set(j % 2 ? .95 : -.95, .38, j < 2 ? -.65 : .65);
         this.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, t * 42 * (j % 2 ? 1 : -1));
-        this.scale.set(.62, .025, .075);
+        this.scale.set(1,1,1);
         this.matrix.compose(this.position, this.quaternion, this.scale); craft.rotors.setMatrixAt(j, this.matrix);
       }
       craft.rotors.instanceMatrix.needsUpdate = true;
@@ -142,6 +133,7 @@ export class ContainmentFinaleVisuals {
     this.drones.forEach(craft => craft.head.dispose());
     this.instances.forEach(mesh => mesh.dispose());
     this.resources.dispose();
+    this.model.dispose();
     this.ownedGeometry.forEach(geometry => geometry.dispose());
     this.ownedMaterials.forEach(material => material.dispose());
     this.root.clear();
@@ -151,13 +143,13 @@ export class ContainmentFinaleVisuals {
     const head = new SecurityDronePresentation({ ...DRONE_CONFIG, id: `finale-drone-${index}` }, this.resources);
     for (const child of [...head.root.children]) if (child !== head.aimHead) child.removeFromParent();
     const root = new THREE.Group(); root.name = `finale-flying-drone-${index}`; root.visible = false; root.add(head.root);
-    const fans = this.instance(this.fan, this.resources.material('mechanism'), 4);
-    const arms = this.instance(this.box, this.resources.material('armourShadow'), 3);
-    for (let j = 0; j < 4; j++) this.place(fans, j, [j % 2 ? .95 : -.95, .38, j < 2 ? -.65 : .65], [1, 1, 1]);
-    for (let j = 0; j < 2; j++) this.place(arms, j, [0, .3, j ? .65 : -.65], [2.1, .1, .14]);
-    this.place(arms, 2, [0, .47, 0], [.85, .08, .8]);
-    const rotors = this.instance(this.box, this.resources.material('barrel'), 4);
-    root.add(fans, arms, rotors); this.root.add(root); this.drones.push({ root, head, rotors });
+    for(const role of ['armour','armourShadow','mechanism'] as const){
+      const airframe=new THREE.Mesh(this.model.part('ED_Airframe_'+role),this.resources.material(role));
+      airframe.name=`finale-drone-${index}-airframe-${role}`;root.add(airframe);
+    }
+    const rotors = this.instance(this.model.part('ED_Rotor_barrel'), this.resources.material('barrel'), 4);
+    rotors.name=`finale-drone-${index}-lift-rotors`;
+    root.add(rotors); this.root.add(root); this.drones.push({ root, head, rotors });
     root.traverse(object => { if (object instanceof THREE.Mesh) object.castShadow = object.receiveShadow = false; });
   }
 

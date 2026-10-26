@@ -11,6 +11,7 @@ from mathutils import Vector
 
 HERE = ''
 SCENE = 'Cultivation Security Foundry'
+MATERIAL_PREFIX = 'CV_'
 SIZES = {'ceiling': (2.2, 1.35, 2.2), 'ground': (3.6, 1.5, 1.7)}
 ROLES = ('armour', 'armourShadow', 'mechanism', 'barrel', 'mount', 'linkage')
 
@@ -35,7 +36,7 @@ def setup():
     palette = {'armour': (0xe4e9e8, .82, .32), 'armourShadow': (0x778389, .82, .58),
                'mechanism': (0x10171a, .58, .82), 'barrel': (0x293338, .58, .9)}
     for role, (colour, rough, metal) in palette.items():
-        name = 'CV_' + role
+        name = MATERIAL_PREFIX + role
         mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
         rgb = tuple(linear(((colour >> bit) & 255) / 255) for bit in [16, 8, 0])
         mat.diffuse_color = (*rgb, 1)
@@ -89,7 +90,7 @@ def mesh(name, points, faces, role, root, bevel=0, tint=(1, 1, 1)):
     bpy.context.scene.collection.objects.link(obj)
     obj.parent = root
     obj['securityRole'] = role
-    data.materials.append(bpy.data.materials['CV_' + ('armourShadow' if role == 'mount' else 'mechanism' if role == 'linkage' else role)])
+    data.materials.append(bpy.data.materials[MATERIAL_PREFIX + ('armourShadow' if role == 'mount' else 'mechanism' if role == 'linkage' else role)])
     uv = data.uv_layers.new(name='MetricUV')
     colours = data.color_attributes.new(name='wear', type='FLOAT_COLOR', domain='POINT')
     for vertex in data.vertices:
@@ -166,7 +167,7 @@ def profile(name, loops, at, axis, role, root, sides=24):
     return mesh(name, vv, ff, role, root)
 
 
-def armour(kind, distant=False):
+def armour(kind, distant=False, marking_offset=.19):
     root = rig(kind, distant)
     w, h, d = SIZES[kind]
     wedge('CastChassis', w * .60, d * .73, h * .42, h * .49, (0, 0, d * .06), 'mechanism', root)
@@ -191,7 +192,7 @@ def armour(kind, distant=False):
             (side * w * .365, h * .225, -d * .06), 'armour', root)
         if not distant:
             box('WornUnitMarking', (w * .075, .018, d * .14),
-                (side * w * .19, h * .417, d * .19), 'armour', root, .005, (.64, .47, .14))
+                (side * w * marking_offset, h * .417, d * .19), 'armour', root, .005, (.64, .47, .14))
             for z in [-.12, .20]:
                 tube('CaptiveTopBolt', (side * w * .20, h * .37, z * d),
                      (side * w * .20, h * .438, z * d), .022, 'armourShadow', root, 8, False)
@@ -353,7 +354,7 @@ def export(save=True):
     # directly so a standalone GLB preview retains the four finish colours.
     material_links = []
     for role in ROLES[:4]:
-        tree = bpy.data.materials['CV_' + role].node_tree
+        tree = bpy.data.materials[MATERIAL_PREFIX + role].node_tree
         for link in list(tree.nodes.get('Principled BSDF').inputs['Base Color'].links):
             material_links.append((tree, link.from_socket, link.to_socket))
             tree.links.remove(link)
