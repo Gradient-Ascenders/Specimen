@@ -11,6 +11,53 @@ import {createAuthoredDissolveTarget} from '../src/abilities/DissolveTarget.ts';
 
 const layout=JSON.parse(readFileSync(new URL('../assets/environments/cultivation/authoring-layout.json',import.meta.url),'utf8'));
 
+test('Room 3 observation cavities have opaque backs and fitted returns independently of the glazing',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),root=scene.roomThree.root;
+  try{
+    const meshes:THREE.Mesh[]=[];
+    root.traverse(o=>{
+      if(!(o instanceof THREE.Mesh)||!o.userData.blenderBatch||o.parent!==root)return;
+      const materials=Array.isArray(o.material)?o.material:[o.material];
+      if(materials.some(m=>m.visible&&!m.transparent&&m.colorWrite))meshes.push(o);
+    });
+    scene.root.updateWorldMatrix(true,true);
+    const hit=(x:number,y:number,z:number,direction:THREE.Vector3,far:number)=>
+      new THREE.Raycaster(root.localToWorld(new THREE.Vector3(x,y,z)),
+        direction.transformDirection(root.matrixWorld),0,far).intersectObjects(meshes,false);
+    // Start behind the glass and mullions, in the upper unoccupied part of
+    // each gallery. Transparent glass cannot conceal an absent wall here.
+    for(const [side,a,b,low,high] of [[1,13.2,26.8,8,18],[-1,27.9,35.5,10,20],[-1,37.3,46.9,10,20]]){
+      for(const z of [a+.19,a+.47,(a+b)/2,b-.47,b-.19]){
+        for(const y of [low+.25,low+5,high-.25])
+          assert.ok(hit(side*27.4,y,z,new THREE.Vector3(side,0,0),.5).length,`gallery back ${side},${y},${z}`);
+        assert.ok(hit(side*25.2,high-.3,z,new THREE.Vector3(0,1,0),.5).length,'gallery roof return');
+        assert.ok(hit(side*25.2,low+.3,z,new THREE.Vector3(0,-1,0),.5).length,'gallery sill return');
+      }
+      for(const x of [24.9,25.5,27.3])for(const y of [low+.3,low+5,high-.3]){
+        assert.ok(hit(side*x,y,a+.3,new THREE.Vector3(0,0,-1),.5).length,'near jamb return');
+        assert.ok(hit(side*x,y,b-.3,new THREE.Vector3(0,0,1),.5).length,'far jamb return');
+      }
+      // Probe the perimeter from navigable room space on both sides of each
+      // reveal, including small distances either side of the old tile cuts.
+      for(const z of [a-.001,a+.001,a+.18,b-.18,b-.001,b+.001])
+        for(const y of [low-.001,low+.001,low+.3,high-.3,high-.001,high+.001])
+          assert.ok(hit(side*23.65,y,z,new THREE.Vector3(side,0,0),4.15).length,`gallery perimeter ${side},${y},${z}`);
+    }
+    for(const side of [-1,1])for(const z of [.99,19.5,41.5,69.9])
+      for(const y of [21.999,22.001,22.3,23.8,23.999,24.001])
+        assert.ok(hit(side*23.65,y,z,new THREE.Vector3(side,0,0),1.5).length,'recessed pressure header stays enclosed');
+    for(const side of [-1,1])for(let z=.3;z<72;z+=1.4)
+      for(const y of [.4,1.19,2.3,4,7,9.5,13,17.5,20.5,21.99,23.7,24.01,27,29.7])
+        assert.ok(hit(side*23.65,y,z,new THREE.Vector3(side,0,0),4.15).length,
+          `opaque Room 3 side wall ${side},${y},${z}`);
+    for(const [side,z] of [[-1,21],[1,45],[1,53],[-1,68]])for(const y of [3.86,4.14]){
+      const mount=hit(side*23.65,y,z,new THREE.Vector3(side,0,0),.5)[0];
+      assert.ok(mount,'existing practical is seated on a physical mounting bridge');
+      assert.ok(Math.abs(Math.abs(root.worldToLocal(mount.point.clone()).x)-23.8)<1e-4);
+    }
+  }finally{scene.dispose();}
+});
+
 test('the testing hall seals recessed bays and roof joins while preserving both exit apertures',()=>{
   const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),root=scene.roomTwo.root;
   try{
@@ -122,7 +169,8 @@ test('the actual Blender buffers replace old coverage and share one Level 1 fini
         assert.ok(mesh.geometry.getAttribute('color'),batch.name);
         assert.equal(mesh.matrixAutoUpdate,false,'immutable local matrices still inherit their existing moving owner');
         assert.equal(mesh.parent,batch.target?root.getObjectByName(batch.target):asset.owner==='roomFour'?scene.roomFourGeometry:root);
-        if(batch.finish.endsWith('Lamp'))assert.equal((mesh.material as THREE.MeshStandardMaterial).emissiveIntensity,scene.labArt.fixture.emissiveIntensity);
+        if(batch.finish.endsWith('Lamp'))assert.equal((mesh.material as THREE.MeshStandardMaterial).emissiveIntensity,
+          batch.finish==='LiftLamp'?.65:scene.labArt.fixture.emissiveIntensity);
         else assert.equal((mesh.material as THREE.MeshStandardMaterial).emissive?.getHex()??0,0);
       }
     }

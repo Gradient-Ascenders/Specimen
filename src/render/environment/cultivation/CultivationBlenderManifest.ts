@@ -1196,10 +1196,22 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-3_Batch_Architecture_shell_0_HallFoliage"
       },
       {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallGlass",
+        "finish": "HallGlass",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallGlass"
+      },
+      {
         "name": "C2_room-3_Batch_Architecture_shell_0_HallGraphite",
         "finish": "HallGraphite",
         "target": "",
         "geometry": "C2_room-3_Batch_Architecture_shell_0_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallInk"
       },
       {
         "name": "C2_room-3_Batch_Architecture_shell_0_HallLamp",
@@ -1238,10 +1250,22 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-3_Batch_Architecture_shell_1_HallFoliage"
       },
       {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallGlass",
+        "finish": "HallGlass",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallGlass"
+      },
+      {
         "name": "C2_room-3_Batch_Architecture_shell_1_HallGraphite",
         "finish": "HallGraphite",
         "target": "",
         "geometry": "C2_room-3_Batch_Architecture_shell_1_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallInk"
       },
       {
         "name": "C2_room-3_Batch_Architecture_shell_1_HallLamp",
@@ -1274,6 +1298,12 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-3_Batch_Architecture_shell_2_HallCool"
       },
       {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallFoliage",
+        "finish": "HallFoliage",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallFoliage"
+      },
+      {
         "name": "C2_room-3_Batch_Architecture_shell_2_HallGraphite",
         "finish": "HallGraphite",
         "target": "",
@@ -1286,10 +1316,22 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-3_Batch_Architecture_shell_2_HallLamp"
       },
       {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallLoam",
+        "finish": "HallLoam",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallLoam"
+      },
+      {
         "name": "C2_room-3_Batch_Architecture_shell_2_HallResin",
         "finish": "HallResin",
         "target": "",
         "geometry": "C2_room-3_Batch_Architecture_shell_2_HallResin"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_2_Rust",
+        "finish": "Rust",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_Rust"
       },
       {
         "name": "C2_room-3_Batch_cultivation-room-3-cover-sticky-transfer_HallAlloy",

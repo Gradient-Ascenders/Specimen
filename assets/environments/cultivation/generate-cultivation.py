@@ -139,6 +139,11 @@ def mesh(name,vertices,faces,finish,owner=''):
             if hall:near_leak='Observation_rear' in name or 'Service_rear' in name
             if testing:near_leak='Process_rear' in name
             spacing=.38 if near_leak else .55 if floor_bank else 1.6
+            if CURRENT=='room-3' and abs(centre.x)>23.7 and base_finish in ('Ceramic','Cool','Alloy'):
+                # New wall leaks are sampled on the physical panel surface.
+                # Keep fine samples local to the machinery's gravity trails.
+                sources=[23.25,65.4] if centre.x<0 else [45.0,51.6]
+                if any(min(a.z,b.z,c.z,d.z)-.8<z<max(a.z,b.z,c.z,d.z)+.8 for z in sources):spacing=.55
             if CURRENT=='room-4':
                 # Long hidden shaft backs need no dense dirt grid. The shared
                 # wear maps handle those spans; formed edges remain explicit.
@@ -238,12 +243,29 @@ def mesh(name,vertices,faces,finish,owner=''):
                         fall=top-y
                         if 0<fall<9:leak=max(leak,.50*math.exp(-((z-at-.045*math.sin(fall*2))/(.15+.03*fall))**2)*math.exp(-fall/6))
                 if abs(y-.2)<.001:soil+=.22*max(0,1-(18.8-abs(x))/1.0)
+            if CURRENT=='room-3' and abs(x)>23.7:
+                sources=[(23.25,21.0,.60),(65.4,20.8,.46)] if x<0 else [(45.0,21.0,.56),(51.6,12.5,.62)]
+                for at,top,strength in sources:
+                    fall=top-y
+                    if 0<fall<12:
+                        width=.18+.038*fall
+                        leak=max(leak,strength*math.exp(-((z-at-.08*math.sin(fall*1.7))/width)**2)*math.exp(-fall/9))
+                soil+=.18*max(0,1-y/3)*(.4+.6*cloud)
             dirt=max(.32,.94-soil-leak)
             colour=(dirt,dirt*.98,dirt*.94,1)
             if base_finish=='Foliage':colour=(.72+.2*cloud,.75+.2*cloud,.55+.2*cloud,1)
             if base_finish=='Loam':colour=(.66,.65,.57,1)
             if base_finish=='Glass':colour=(.82,.86,.82,1)
             if base_finish=='Paint':colour=(.55+.25*cloud,)*3+(1,)
+            if CURRENT=='room-3' and abs(x)>23.7 and base_finish not in ('Foliage','Loam','Glass'):
+                # Oxide is localized below failed fittings, not a panel colour.
+                rust=.65*leak*math.sin(z*8.1+y*.31)**2
+                colour=(colour[0],colour[1]*(1-.32*rust),colour[2]*(1-.46*rust),1)
+        if CURRENT=='room-3' and finish=='Rust' and 'Extraction_WallDetail_' in name:
+            x,y,z=p.x,p.z,-p.y
+            patch=.5+.5*math.sin(y*19+z*11+math.sin(y*4+x*23)*2)
+            flake=max(0,min(1,(patch-.50)/.24))
+            colour=tuple((.46,.22,.10)[i]*(1-flake)+(.21,.24,.22)[i]*flake for i in range(3))+(1,)
         if CURRENT=='room-4' and base_finish not in ('Foliage','Lamp'):
             x,y,z=p.x,p.z,-p.y
             if base_finish=='Rust':
@@ -1772,6 +1794,259 @@ def extraction_roof():
             box(f'Extraction_Roof_back_{k}_{j}',[a,29.98,c],[b,30.20,d],'Graphite')
             box(f'Extraction_Roof_cassette_{k}_{j}',[a+.025,29.8,c+.025],[b-.025,29.96,d-.025],'Ceramic')
 
+def extraction_wall_features():
+    # All cavities are beyond the unchanged room-side blocking plane, X=23.8.
+    return [
+        (1,13.2,26.8,8.0,18.0,'gallery','CULTURE ANALYSIS / 03A'),
+        (-1,27.9,35.5,10.0,20.0,'gallery','SECURITY OBSERVATION'),
+        (-1,37.3,46.9,10.0,20.0,'gallery','QUARANTINED / 03C'),
+        (-1,20.0,26.5,2.4,21.6,'manifold','PRESSURE RETURN'),
+        (1,42.0,48.0,2.4,21.6,'manifold','NUTRIENT SUPPLY'),
+        (1,49.0,54.8,2.0,13.5,'growth',''),
+        (-1,62.0,68.8,11.0,21.5,'growth',''),
+        (-1,62.0,68.8,2.4,9.4,'retired','ISOLATED / SERVICE'),
+    ]
+
+
+def extraction_cut_wall_fields():
+    # Subtract real volumes before the box union. A render-only occluder would
+    # leave the old solid blocking the new reveals inside the same batch.
+    cuts=extraction_wall_features()+[(side,.8,71.2,22,24,'header','') for side in [-1,1]]
+    result=[]
+    for spec in BOXES:
+        if not spec['name'].startswith(('Extraction_Wall_back_','Extraction_Wall_cassette_')):
+            result.append(spec);continue
+        side=-1 if spec['hi'][0]<0 else 1
+        pieces=[spec]
+        for hand,a,b,c,d,kind,title in cuts:
+            if hand!=side:continue
+            next_pieces=[]
+            for piece in pieces:
+                lo,hi=piece['lo'],piece['hi']
+                A,B=max(a,lo[2]),min(b,hi[2]);C,D=max(c,lo[1]),min(d,hi[1])
+                if B<=A or D<=C:next_pieces.append(piece);continue
+                for z,Z,y,Y in [(lo[2],A,lo[1],hi[1]),(B,hi[2],lo[1],hi[1]),(A,B,lo[1],C),(A,B,D,hi[1])]:
+                    if Z-z<.00001 or Y-y<.00001:continue
+                    part=dict(piece);part['lo']=[lo[0],y,z];part['hi']=[hi[0],Y,Z]
+                    next_pieces.append(part)
+            pieces=next_pieces
+        for index,piece in enumerate(pieces):
+            piece=dict(piece);piece['name']+=f'_wallcut_{index}';result.append(piece)
+    BOXES[:]=result
+
+
+def extraction_wall_slab(tag,side,near,far,low,high,a,b,finish='Alloy'):
+    x,X=sorted([side*near,side*far])
+    box('Extraction_WallDetail_'+tag,[x,low,a],[X,high,b],finish)
+
+
+def extraction_wall_recess(tag,side,a,b,low,high,depth):
+    extraction_wall_slab(tag+'_closed_back',side,depth,depth+.22,low,high,a,b,'Graphite')
+    for z,Z in [(a,a+.18),(b-.18,b)]:
+        extraction_wall_slab(tag+'_side_return',side,23.95,depth,low,high,z,Z,'Alloy')
+    for y,Y in [(low,low+.18),(high-.18,high)]:
+        extraction_wall_slab(tag+'_horizontal_return',side,23.95,depth,y,Y,a+.18,b-.18,'Alloy')
+
+
+def extraction_gallery_frame(tag,side,a,b,low,high):
+    # A single pressed cast ring with chamfered reveals. The surrounding lab
+    # box owns its outside returns; no duplicate faces are submitted there.
+    r=.44;c=.30
+    outer=[(a,low),(b,low),(b,low),(b,high),(b,high),(a,high),(a,high),(a,low)]
+    inner=[(a+r+c,low+r),(b-r-c,low+r),(b-r,low+r+c),(b-r,high-r-c),
+           (b-r-c,high-r),(a+r+c,high-r),(a+r,high-r-c),(a+r,low+r+c)]
+    vv=[(side*x,y,z) for ring,x in [(outer,23.8),(inner,24.10),(inner,24.78),(outer,24.78)] for z,y in ring]
+    ff=[]
+    for i in range(8):
+        j=(i+1)%8
+        for face in [(i,j,j+8,i+8),(i+8,j+8,j+16,i+16),(i+16,j+16,j+24,i+24)]:
+            clean=[]
+            for k in face:
+                if not clean or vv[k]!=vv[clean[-1]]:clean.append(k)
+            if len(clean)>2 and vv[clean[0]]==vv[clean[-1]]:clean.pop()
+            for k in range(1,len(clean)-1):ff.append((clean[0],clean[k],clean[k+1]))
+    if side<0:ff=[tuple(reversed(face)) for face in ff]
+    mesh('Extraction_WallDetail_'+tag+'_cast_observation_frame',vv,ff,'Alloy')
+
+
+def extraction_observation_gallery(index,side,a,b,low,high,title):
+    tag=f'Gallery_{index}'
+    extraction_wall_recess(tag,side,a,b,low,high,27.55)
+    extraction_gallery_frame(tag,side,a,b,low,high)
+    # Glass is deliberately thin; the fully opaque room behind it proves
+    # enclosure independently of glass sidedness or transparency sorting.
+    vv=[(side*24.85,y,z) for y,z in [(low+.45,a+.45),(high-.45,a+.45),(high-.45,b-.45),(low+.45,b-.45)]]
+    mesh('Extraction_WallDetail_'+tag+'_stained_glazing',vv,[(3,2,1,0) if side>0 else (0,1,2,3)],'HallGlass')
+    bays=3 if b-a>11 else 2
+    for k in range(1,bays):
+        z=a+(b-a)*k/bays
+        extraction_wall_slab(tag+'_glazing_mullion',side,24.08,24.75,low+.44,high-.44,z-.085,z+.085,'Graphite')
+    # A failed shutter hangs at a different level in each gallery.
+    rows=4 if index==0 else 7 if index==1 else 5
+    for k in range(rows):
+        y=high-.74-k*.32
+        profile=[(24.22,y),(24.42,y+.10),(24.56,y+.10),(24.56,y-.065)]
+        vv=[(side*x,Y,z) for z in [a+.46,b-.46] for x,Y in profile]
+        ff=[(0,3,2,1),(4,5,6,7)]+[(i,(i+1)%4,(i+1)%4+4,i+4) for i in range(4)]
+        if side<0:ff=[tuple(reversed(face)) for face in ff]
+        mesh('Extraction_WallDetail_'+tag+'_folded_shutter_'+str(k),vv,ff,'Ceramic')
+    for k in range(bays):
+        z=a+(b-a)*(k+.5)/bays;half=(b-a)/bays/2-.3
+        extraction_wall_slab(tag+'_rear_white_liner',side,27.46,27.525,low+.25,high-.25,z-half,z+half,'Ceramic')
+        extraction_wall_slab(tag+'_abandoned_console',side,26.10,27.30,low+.18,low+2.4,z-half+.15,z+half-.15,'Ceramic')
+        extraction_wall_slab(tag+'_console_service_front',side,25.93,26.05,low+.45,low+2.1,z-half+.3,z+half-.3,'Alloy')
+        extraction_wall_slab(tag+'_dead_display_housing',side,25.80,26.30,low+2.8,low+4.2,z-.95,z+.95,'Ceramic')
+        extraction_wall_slab(tag+'_dead_display_face',side,25.75,25.80,low+2.95,low+4.05,z-.80,z+.80,'Graphite')
+        extraction_wall_slab(tag+'_display_pedestal',side,26.15,26.30,low+2.4,low+2.9,z-.08,z+.08,'Alloy')
+        for y in [low+.65,low+1.3]:
+            extraction_wall_slab(tag+'_console_drawer_reveal',side,25.895,25.93,y,y+.055,z-half+.5,z+half-.5,'Graphite')
+        nursery_sweep('Extraction_WallDetail_'+tag+'_loose_console_cable_'+str(k),
+            [(side*25.85,low+2.95,z+.6),(side*25.65,low+2.3,z+.7),(side*25.75,low+1.0,z+.5)],.025,'HallLoam',7)
+    # The backed sign sits within the existing fixture trim allowance.
+    label('Extraction_WallDetail_'+tag+'_identifier',title,[side*23.76,high-.24,(a+b)/2],.24,
+          (90,0,270 if side>0 else 90),'HallInk')
+
+
+def extraction_wall_headers():
+    for side in [-1,1]:
+        extraction_wall_recess('Header',side,.8,71.2,22,24,24.95)
+        # Insulation, joints and collars are bands of one continuous tube.
+        # No coplanar ring lining or capped segments overlap the pipe skin.
+        for circuit,y in enumerate([22.62,23.40]):
+            knots=[(.89,.14,'HallCeramic')]
+            for z in [6.8,19.0,27.2,41.0,55.4,69.8]:
+                knots.extend([(z-.15,.14,'HallAlloy'),(z-.10,.19,'HallAlloy'),
+                    (z+.10,.19,'HallAlloy'),(z+.15,.14,'HallCeramic')])
+            knots.append((71.11,.14,'HallCeramic'))
+            nursery_profile(f'Extraction_WallDetail_Header_{side}_{circuit}',
+                [(side*24.35,y,z) for z,r,finish in knots],[r for z,r,finish in knots],
+                [finish for z,r,finish in knots[:-1]],12)
+        for z in [4,22.9,44.8,65.6]:
+            extraction_wall_slab('Header_pipe_cleat',side,24.49,24.95,22.30,23.74,z-.09,z+.09,'Alloy')
+
+
+def extraction_wall_dial(tag,side,x,y,z,radius):
+    # A closed mechanical gauge; no emission or gameplay-style status light.
+    steps=[(x+.24,radius),(x+.03,radius),(x,radius*.88),(x+.035,radius*.74)]
+    loops=[[(side*X,y+r*math.cos(k*math.tau/24),z+r*math.sin(k*math.tau/24)) for k in range(24)] for X,r in steps]
+    nursery_ring_profile('Extraction_WallDetail_'+tag+'_gauge_bezel',loops,
+        ['HallAlloy','HallCeramic','HallAlloy'],cycle=False)
+    tube('Extraction_WallDetail_'+tag+'_closed_dial',(side*(x+.04),y,z),
+        (side*(x+.08),y,z),radius*.73,'HallInk',24)
+    for k in range(11):
+        t=math.radians(-140+k*28)
+        nursery_sweep('Extraction_WallDetail_'+tag+'_tick',
+            [(side*(x+.018),y+radius*r*math.cos(t),z+radius*r*math.sin(t)) for r in [.54,.68]],.008,'HallGraphite',5)
+    t=math.radians(56)
+    nursery_sweep('Extraction_WallDetail_'+tag+'_needle',[(side*(x+.005),y,z),
+        (side*(x+.005),y+radius*.59*math.cos(t),z+radius*.59*math.sin(t))],.018,'HallGraphite',6)
+
+
+def extraction_pressure_tower(index,side,a,b,low,high,title):
+    tag=f'Pressure_{index}'
+    extraction_wall_recess(tag,side,a,b,low,high,26.65)
+    extraction_gallery_frame(tag,side,a,b,low,high)
+    for k,z in enumerate([a+1.65,b-1.65]):
+        # Bell-ended white pressure cylinders, with actual raised seams.
+        section=[(4.0,.22),(4.18,.49),(4.42,.66),(4.65,.69),(4.76,.76),
+            (4.92,.76),(5.02,.69),(18.24,.69),(18.34,.76),(18.50,.76),
+            (18.61,.69),(18.90,.64),(19.12,.47),(19.30,.22)]
+        finishes=['HallAlloy']*6+['HallCeramic']+['HallAlloy']*6
+        nursery_profile(f'Extraction_WallDetail_{tag}_vessel_{k}',
+            [(side*25.1,y,z) for y,r in section],[r for y,r in section],finishes,24)
+        for y in [6.6,16.8]:
+            extraction_wall_slab(tag+'_vessel_seat',side,25.0,26.65,y-.13,y+.13,z-.86,z+.86,'Alloy')
+        # The return line folds upward into the shared pressure header.
+        nursery_sweep(f'Extraction_WallDetail_{tag}_top_branch_{k}',
+            [(side*25.1,19.26,z),(side*25.1,20.0,z),
+             (side*24.35,20.7,z),(side*24.35,23.40,z)],.13,'HallCeramic',12)
+        nursery_sweep(f'Extraction_WallDetail_{tag}_bottom_branch_{k}',
+            [(side*25.1,4.05,z),(side*25.1,3.35,z),
+             (side*25.55,3.0,z),(side*26.6,3.0,z)],.13,'HallAlloy',12)
+        extraction_wall_dial(tag+'_'+str(k),side,24.18,14.2,z,.43)
+        tube('Extraction_WallDetail_'+tag+'_valve_neck',(side*24.37,7.8,z),(side*24.70,7.8,z),.12,'HallAlloy',12)
+        wheel=hall_service_handwheel('Extraction_WallDetail_'+tag+'_manual_valve',0,0,0)
+        for v in wheel.data.vertices:
+            X,Y,Z=v.co.x,v.co.z,-v.co.y
+            v.co=(side*(24.26+X*3.5),-(z+Z*3.5),7.8+Y*3.5)
+        if side<0:
+            for p in wheel.data.polygons:p.flip()
+        wheel.data.update();wheel['spatialRegion']='shell_'+str(min(2,int(z//24)))
+        for y in [10.1,10.9,11.7]:
+            extraction_wall_slab(tag+'_vessel_ident_band',side,24.38,24.43,y,y+.13,z-.34,z+.34,'Graphite')
+    label('Extraction_WallDetail_'+tag+'_identifier',title,[side*23.76,high-.24,(a+b)/2],.24,
+          (90,0,270 if side>0 else 90),'HallInk')
+
+
+def extraction_ivy_patch(index,side,a,b,low,high):
+    tag=f'Growth_{index}'
+    extraction_wall_recess(tag,side,a,b,low,high,24.95)
+    extraction_wall_slab(tag+'_failed_backing',side,24.70,24.92,low+.20,high-.20,a+.20,b-.20,'Ceramic')
+    z=(a+b)/2
+    nursery_sweep('Extraction_WallDetail_'+tag+'_failed_riser',
+        [(side*24.57,low+.25,z),(side*24.57,high-1.2,z),(side*24.78,high-.8,z+.50)],.12,'Rust',12)
+    # Larger leaves deliberately collect into two climbing silhouettes.
+    for runner,hand in enumerate([-1,1]):
+        path=[]
+        for k in range(15):
+            t=k/14
+            path.append((24.35+.07*math.sin(t*9+index),low+.35+(high-low-1.4)*t,
+                z+hand*(.35+1.25*t)+.23*math.sin(t*7+index)))
+        nursery_profile('Extraction_WallDetail_'+tag+'_runner_'+str(runner),
+            [(side*x,y,Z) for x,y,Z in path],[.065-.046*k/14 for k in range(15)],['HallLoam']*14,7)
+        for k in range(2,15):
+            x,y,Z=path[k];leafhand=-1 if (k+runner)%2 else 1
+            size=.91+.42*math.sin(k*2.1+index+runner)**2
+            at=(24.14,y-.18,Z+leafhand*.06)
+            nursery_sweep('Extraction_WallDetail_'+tag+'_petiole',
+                [(side*x,y,Z),(side*at[0],at[1],at[2])],.018,'HallLoam',6)
+            leaf=hall_ivy_leaf('Extraction_WallDetail_'+tag+'_blade',at,
+                leafhand*(.64+.36*math.sin(k+index)**2),size,.17*math.sin(k),index*31+k+runner)
+            if side<0:
+                for v in leaf.data.vertices:v.co.x=-v.co.x
+                for p in leaf.data.polygons:p.flip()
+                leaf.data.update()
+
+
+def extraction_retired_bay(side,a,b,low,high,title):
+    tag='Retired'
+    extraction_wall_recess(tag,side,a,b,low,high,24.95)
+    extraction_wall_slab(tag+'_dirty_equipment_outline',side,24.75,24.94,low+.45,high-.45,a+.45,b-.45,'Cool')
+    # Detached mounting rails, empty standoffs and capped supply ports make
+    # the old installation readable without loose clutter in the route.
+    for z in [a+.85,b-.85]:
+        extraction_wall_slab(tag+'_mount_rail',side,24.40,24.73,low+.75,high-.75,z-.10,z+.10,'Alloy')
+        for y in [low+1.05,high-1.05]:
+            tube('Extraction_WallDetail_'+tag+'_empty_standoff',(side*24.20,y,z),(side*24.55,y,z),.10,'Rust',10)
+    for z in [a+2,b-2]:
+        nursery_profile('Extraction_WallDetail_'+tag+'_capped_supply',
+            [(side*x,low+2.2,z) for x in [24.13,24.22,24.30,24.72]],
+            [.25,.29,.22,.22],['HallAlloy','HallAlloy','HallCeramic'],16)
+    for y in [low+.8,high-.8]:
+        extraction_wall_slab(tag+'_bare_mounting_scar',side,24.72,24.76,y,y+.24,a+1.1,b-1.1,'Ceramic')
+    label('Extraction_WallDetail_'+tag+'_identifier',title,[side*23.82,high-.48,(a+b)/2],.24,
+          (90,0,270 if side>0 else 90),'HallInk')
+
+
+def extraction_wall_details():
+    extraction_wall_headers()
+    gallery=0;pressure=0;growth=0
+    for side,a,b,low,high,kind,title in extraction_wall_features():
+        if kind=='gallery':
+            extraction_observation_gallery(gallery,side,a,b,low,high,title);gallery+=1
+        elif kind=='manifold':
+            extraction_pressure_tower(pressure,side,a,b,low,high,title);pressure+=1
+        elif kind=='growth':
+            extraction_ivy_patch(growth,side,a,b,low,high);growth+=1
+        elif kind=='retired':extraction_retired_bay(side,a,b,low,high,title)
+        if low<3.82 and high>4.18:
+            # Retain the original light and diffuser coordinates. A physical
+            # bridge seats their unchanged backs where the new wall is inset.
+            extraction_wall_slab('Practical_mounting_bridge',side,23.80,24.08,3.82,4.18,a+.56,b-.56,'Alloy')
+            for z,Z in [(a+.05,a+.64),(b-.64,b-.05)]:
+                extraction_wall_slab('Practical_mounting_return',side,24.08,24.82,3.84,4.16,z,Z,'Alloy')
+
+
 def extraction_shell():
     # Broad wall bays are recessed behind the unchanged blocking planes.
     bays=[(-1,8,18,6,17),(1,28,40,6,17),(-1,48,60,8,19)]
@@ -1804,6 +2079,7 @@ def extraction_shell():
             box(f'Extraction_Safe_bank_tile_{k}_{j}',[a+.02,.29,c if j==0 else c+.02],[b-.02,.35,d-.02],'Resin')
     for spec in LAYOUT[CURRENT]['boxes']:
         if 'exit-connector' in spec['name']:box('Extraction_'+spec['name'],spec['lo'],spec['hi'],'Ceramic')
+    extraction_cut_wall_fields()
 
 def extraction_transform(objects,start,offset,scale,tag):
     for obj in objects:
@@ -2066,7 +2342,7 @@ def extraction_practicals():
     label('Extraction_East_service_ident','CULTURE EXHAUST',[23.74,18.0,34],.32,(90,0,270),'HallInk')
 
 def build_extraction_hall():
-    extraction_shell();extraction_equipment();extraction_mechanisms();extraction_practicals()
+    extraction_shell();extraction_equipment();extraction_mechanisms();extraction_practicals();extraction_wall_details()
 
 def build_enclosure():
     # Opaque backs of the unchanged fixtures and retained acid slabs own their
