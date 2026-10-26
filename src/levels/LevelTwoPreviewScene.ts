@@ -15,6 +15,7 @@ import { CultivationElevatorArt } from '../render/environment/cultivation/Cultiv
 import { AcidLiquidInteractions, type AcidContactBody } from '../render/environment/containment/AcidLiquidInteractions.ts';
 import { CultivationCoverEquipmentArt } from '../render/environment/cultivation/CultivationCoverEquipmentArt.ts';
 import { CultivationChamberMaterials } from '../render/environment/cultivation/CultivationChamberMaterials.ts';
+import {CultivationSecurityDroneModels} from '../render/environment/cultivation/CultivationSecurityDroneModels.ts';
 import * as THREE from 'three';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { CultivationRoomOneObservation } from '../render/environment/cultivation/CultivationRoomOneObservation.ts';
@@ -125,6 +126,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly contaminationArt = new CultivationContaminationArt(this.labArt);
   readonly coverArt = new CultivationCoverEquipmentArt(this.assets, this.labArt.platform,{authoredReplacement:true});
   readonly chamberArt = new CultivationChamberMaterials(this.assets);
+  readonly securityDroneModels=new CultivationSecurityDroneModels(this.assets);
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
@@ -561,6 +563,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.goopSpeech.dispose();
     this.platformSplashes.dispose();
     this.blenderArt.dispose();
+    this.securityDroneModels.dispose();
     this.surfaceCleanup.dispose();
     this.voltFinaleSet.dispose();
     this.passageArt.dispose();

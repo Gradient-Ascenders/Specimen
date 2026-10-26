@@ -1656,6 +1656,83 @@ def extraction_end_wall(is_exit=False):
         for a,b in [(-3.36,-3),(3,3.36)]:box('Extraction_Exit_drive_column',[a,.35,71.8],[b,6.40,72.3],'Alloy')
         box('Extraction_Exit_header',[-3.36,6,71.8],[3.36,6.40,72.3],'Graphite')
 
+def extraction_drone_saddle(index,drone):
+    x,y,z=drone['position']
+    # Cast docking flange, fitted service well and a recessed hoist motor.
+    # The original rotating hatch and its swept aperture remain clear below it.
+    profile=[(1.8,0,30.45),(1.8,0,30.13),(1.61,.20,29.92),(1.47,.16,29.92),
+        (1.42,.13,29.8),(1.05,0,29.8),(1.05,0,30.45)]
+    nursery_ring_profile(f'Extraction_Drone_{index}_ceiling_saddle',
+        [nursery_square_ring(x,z,r,cut,Y) for r,cut,Y in profile],
+        ['HallCool','HallAlloy','HallCeramic','HallAlloy','HallGraphite','HallGraphite','HallAlloy'])
+    for sx in [-1,1]:
+        for sz in [-1,1]:tube('Extraction_Drone_saddle_fastener',(x+sx*1.47,29.94,z+sz*1.47),(x+sx*1.47,30.035,z+sz*1.47),.07,'HallGraphite',10)
+    for side in [-1,1]:
+        a,b=sorted([x+side*1.05,x+side*1.23])
+        box('Extraction_Drone_service_well_side',[a,30.45,z-1.23],[b,32.45,z+1.23],'Cool')
+        a,b=sorted([z+side*1.05,z+side*1.23])
+        box('Extraction_Drone_service_well_return',[x-1.05,30.45,a],[x+1.05,32.45,b],'Cool')
+    box('Extraction_Drone_service_well_cap',[x-1.23,32.45,z-1.23],[x+1.23,32.62,z+1.23],'Graphite')
+    tube('Extraction_Drone_hoist_drum',(x-.45,31.70,z),(x+.45,31.70,z),.32,'HallAlloy',24)
+    for side in [-1,1]:
+        annulus_x('Extraction_Drone_spool_flange',x+side*.52,31.70,z,.14,.40,.08,'Alloy',24)
+    tube('Extraction_Drone_hoist_axle',(x-.66,31.70,z),(x+.66,31.70,z),.115,'HallGraphite',12)
+    box('Extraction_Drone_hoist_motor',[x+.60,31.36,z-.32],[x+.95,32.04,z+.32],'Ceramic')
+    box('Extraction_Drone_hoist_bearing',[x-.88,31.43,z-.28],[x-.70,31.97,z+.28],'Alloy')
+    tube('Extraction_Drone_upper_wire_guide',(x,30.40,z),(x,31.32,z),.055,'HallGraphite',10)
+    # A continuous bridge and hollow gland visually seat the soluble strut.
+    # The gland fits the hatch's central slot; the bridge is above its complete
+    # 75.6-degree sweep. The original replacement cable uses the same bore.
+    section=[(1.05,.26,30.62),(1.05,.26,30.40),(.22,.22,30.40),
+        (.17,.17,30.30),(.17,.17,29.53),(.15,.15,29.40),
+        (.125,.125,29.40),(.125,.125,30.62)]
+    rings=[]
+    for half_x,half_z,Y in section:
+        cut=min(.025,half_x*.08,half_z*.08)
+        square=nursery_square_ring(0,0,1,cut/max(half_x,half_z),Y)
+        rings.append([(x+X*half_x,H,z+Z*half_z) for X,H,Z in square])
+    nursery_ring_profile(f'Extraction_Drone_{index}_strut_socket',rings,
+        ['HallAlloy','HallGraphite','HallAlloy','HallCool','HallAlloy','HallGraphite','HallGraphite','HallAlloy'])
+    # The visible hinge is coaxial with the existing hatch rotation, and seats
+    # into ears joined to the fixed flange rather than floating in the well.
+    for side in [-1,1]:
+        a,b=sorted([z+side*.88,z+side*1.08])
+        box('Extraction_Drone_hatch_bearing_ear',[x-.18,29.38,a],[x+.18,29.94,b],'Alloy')
+        tube('Extraction_Drone_hatch_hinge_pin',(x,29.55,z+side*.68),
+            (x,29.55,z+side*1.02),.085,'HallGraphite',12,cap_a=False)
+
+
+def extraction_drone_strut(name,length,owner):
+    # True slotted extrusion, entirely within the original .22 m target.
+    section=[(-.11,-.08),(-.08,-.11),(-.045,-.11),(-.045,-.085),(.045,-.085),(.045,-.11),
+        (.08,-.11),(.11,-.08),(.11,-.045),(.085,-.045),(.085,.045),(.11,.045),
+        (.11,.08),(.08,.11),(.045,.11),(.045,.085),(-.045,.085),(-.045,.11),
+        (-.08,.11),(-.11,.08),(-.11,.045),(-.085,.045),(-.085,-.045),(-.11,-.045)]
+    steps=max(4,math.ceil(length/.30));n=len(section)
+    vv=[(x,-length/2+length*k/steps,z) for k in range(steps+1) for x,z in section]
+    ff=[tuple(reversed(range(n))),tuple(range(n*steps,n*(steps+1)))]+[
+        (k*n+i,k*n+(i+1)%n,(k+1)*n+(i+1)%n,(k+1)*n+i) for k in range(steps) for i in range(n)]
+    obj=mesh(name,vv,ff,'Rust',owner)
+    for v in obj.data.vertices:
+        x,y,z=v.co.x,v.co.z,-v.co.y
+        patch=.5+.5*math.sin(y*31+x*41+math.sin(z*61+y*7)*2.1)
+        flake=max(0,min(1,(patch-.54)/.20));pit=.62+.38*math.sin(y*113+z*97+x*83)**2
+        oxide=(.48*pit,.20*pit,.07*pit);steel=(.22,.25,.24)
+        obj.data.color_attributes['wear'].data[v.index].color=tuple(oxide[i]*(1-flake)+steel[i]*flake for i in range(3))+(1,)
+
+
+def extraction_drone_hatch(index,owner):
+    # Paired service cheeks leave a real cable pass. Thin end ties clear the
+    # original 75.6-degree hatch rotation and the angled replacement strut.
+    for side in [-1,1]:
+        a,b=sorted([side*.18,side*.70])
+        box(f'Extraction_Drone_{index}_hatch_seal',[-.70,-.075,a],[.70,.075,b],'Graphite',owner)
+        box(f'Extraction_Drone_{index}_hatch_face',[-.65,-.12,a+.035],[.65,-.075,b-.035],'Ceramic',owner)
+        box(f'Extraction_Drone_{index}_hatch_upper',[-.65,.075,a+.035],[.65,.12,b-.035],'Cool',owner)
+        for X in [-.70,.62]:box(f'Extraction_Drone_{index}_hatch_side_return',[X,-.12,a],[X+.08,.12,b],'Alloy',owner)
+    for X in [-.70,.62]:box(f'Extraction_Drone_{index}_hatch_end_tie',[X,-.025,-.18],[X+.08,.025,.18],'Alloy',owner)
+
+
 def extraction_roof():
     openings=[]
     for wall in LAYOUT[CURRENT]['extractionWalls']:
@@ -1668,14 +1745,7 @@ def extraction_roof():
         box('Extraction_Wall_storage_cap',[a,top,c],[b,top+.20,e],'Alloy')
     for index,drone in enumerate(LAYOUT[CURRENT]['extractionDrones']):
         x,y,z=drone['position'];a,b,c,d=x-1.8,x+1.8,z-1.8,z+1.8;openings.append((a,b,c,d))
-        # Room 1's bolted saddle construction, with a wider hatch aperture.
-        profile=[(1.8,0,30.45),(1.8,0,30.05),(1.55,.24,29.85),(1.25,.14,29.85),
-            (1.22,.10,29.8),(1.05,0,29.8),(1.05,0,30.45)]
-        nursery_ring_profile(f'Extraction_Drone_{index}_ceiling_saddle',
-            [nursery_square_ring(x,z,r,cut,Y) for r,cut,Y in profile],
-            ['HallCool','HallAlloy','HallCeramic','HallAlloy','HallGraphite','HallGraphite','HallAlloy'])
-        for sx in [-1,1]:
-            for sz in [-1,1]:tube('Extraction_Drone_saddle_fastener',(x+sx*1.45,29.92,z+sz*1.45),(x+sx*1.45,30.02,z+sz*1.45),.065,'HallGraphite',10)
+        extraction_drone_saddle(index,drone)
     # Openings clip the regular roof modules; they do not introduce extra
     # visible seams across every other ceiling panel.
     for a,b,c,d in openings:OCCLUDERS.append({'lo':[a,29.79,c],'hi':[b,30.21,d],'owner':''})
@@ -1961,9 +2031,10 @@ def extraction_mechanisms():
                     part(f'pressed_panel_{side}_{k}_{j}',a+.018,b-.018,c+.018,d-.018,near,far,'Ceramic')
         for Y in [-h/2,h/2-.10]:part('end_cap',-across/2+.10,across/2-.10,Y,Y+.10,-.09,.09,'Alloy')
     for i,spec in enumerate(LAYOUT[CURRENT]['extractionDrones']):
-        nursery_fluted_strut(f'Extraction_Drone_{i}_rusted_support',spec['size'][1],spec['name'],.22,finish='Rust')
+        extraction_drone_strut(f'Extraction_Drone_{i}_rusted_support',spec['size'][1],spec['name'])
         owner=spec['name'].replace('-acid-soluble-support-cable','-replacement-cable')
-        nursery_fluted_strut(f'Extraction_Drone_{i}_replacement_support',1,owner,.22,finish='Rust')
+        extraction_drone_strut(f'Extraction_Drone_{i}_replacement_support',1,owner)
+        extraction_drone_hatch(i,spec['name'].replace('-acid-soluble-support-cable','-replacement-hatch'))
 
 def extraction_practicals():
     for z in range(5,72,8):

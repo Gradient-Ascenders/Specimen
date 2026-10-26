@@ -33,6 +33,22 @@ for(const asset of CULTIVATION_BLENDER_ASSETS){
   blenderSources.set('cultivation-blender-'+asset.id,parts);
 }
 {
+  const bytes=await readFile(new URL('../../assets/characters/cultivation-security/cultivation-security.glb',import.meta.url));
+  const data=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
+  if(data.images?.length||data.cameras?.length||data.animations?.length||data.extensions?.KHR_lights_punctual)
+    throw Error('Security export must contain geometry only.');
+  const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  scene.updateMatrixWorld(true);const parts:Record<string,THREE.BufferGeometry>={};
+  scene.traverse(object=>{if(object instanceof THREE.Mesh){
+    if(!/^CV_(ceiling|ground)_(full|distant)_(armour|armourShadow|mechanism|barrel|mount|linkage)$/.test(object.name))
+      throw Error('Unexpected security export mesh: '+object.name);
+    parts[object.name]=object.geometry.clone().applyMatrix4(object.matrixWorld);
+    object.geometry.dispose();for(const m of Array.isArray(object.material)?object.material:[object.material])m.dispose();
+  }});
+  if(Object.keys(parts).length!==24)throw Error('Security export needs 24 role/detail buffers.');
+  blenderSources.set('cultivation-security-drones',parts);
+}
+{
   // Reuse the exact Level 1 camera, without loading its opening architecture at runtime.
   const bytes=await readFile(new URL('../../assets/environments/opening-laboratory/opening-laboratory.glb',import.meta.url));
   const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');

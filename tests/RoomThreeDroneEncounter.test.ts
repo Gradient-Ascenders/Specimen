@@ -42,6 +42,7 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   const baselineColliders = world.colliderCount;
   const baselineSurfaces = surfaces.registeredCount;
   const originalCableMaterials=new Map<THREE.Mesh,THREE.Material|THREE.Material[]>();
+  const originalHatchMaterials=new Map<THREE.Mesh,THREE.Material|THREE.Material[]>();
   const encounter = new RoomThreeDroneEncounter({
     config: CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
     supportsById,
@@ -52,14 +53,20 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
     requestDeath: () => true,
     radiationSurface: scene.roomThree.radiationHazard,
     surfaceMaps: scene.coverArt.droneSurfaceMaps,
+    presentationModels:scene.securityDroneModels,
     attachPresentation(root){
       root.traverse(o=>{if(o instanceof THREE.Mesh&&/^cultivation-room-3-roof-drone-[123]-replacement-cable$/.test(o.name))
-        originalCableMaterials.set(o,o.material);});
+        originalCableMaterials.set(o,o.material);
+        if(o instanceof THREE.Mesh&&o.userData.authoringRole==='drone-replacement-hatch')originalHatchMaterials.set(o,o.material);
+      });
       return scene.blenderArt.attachRuntimeOwners(root);
     },
   });
   scene.roomThree.root.add(encounter.root);
   assert.equal(originalCableMaterials.size,3);
+  assert.equal(originalHatchMaterials.size,3);
+  assert.ok([...originalHatchMaterials.keys()].every(o=>o.children.filter(c=>c.userData.blenderBatch).length>=3),
+    'each original hatch owns its complete set of authored finish batches');
   const cableSkins=[...originalCableMaterials.keys()].map(owner=>{
     const skin=owner.children.find((o):o is THREE.Mesh=>o instanceof THREE.Mesh&&o.userData.blenderBatch);
     assert.ok(skin,owner.name);assert.equal(skin.castShadow,owner.castShadow);
@@ -94,9 +101,16 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   assert.equal(presentationGeometries.size, 26);
   assert.equal(presentationMaterials.size, 11);
   assert.equal(indicatorMaterials.size, 7);
+  const borrowedGeometry=new Set<THREE.BufferGeometry>();
+  for(const kind of [CULTIVATION_ROOM_THREE_DRONE_AUTHORING.ceilingDrones[0].drone,CULTIVATION_ROOM_THREE_DRONE_AUTHORING.groundDrones[0].drone])
+    for(const role of ['armour','armourShadow','mechanism','barrel','mount','linkage'] as const)for(const distant of [false,true])
+      borrowedGeometry.add(scene.securityDroneModels.geometry(kind,role,distant));
+  let borrowedDisposals=0;
+  for(const geometry of borrowedGeometry)geometry.addEventListener('dispose',()=>borrowedDisposals++);
   for (const lifecycle of [...encounter.ceilingDrones, ...encounter.groundDrones]) {
     const shell = lifecycle.drone.presentation.root.getObjectByName(`${lifecycle.drone.id}-armoured-shell`) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
-    assert.equal(shell.material.map, scene.coverArt.droneSurfaceMaps.scuffMap);
+    assert.ok(shell.material.map===scene.coverArt.droneSurfaceMaps.scuffMap,'the new armour borrows the existing wear map');
+    assert.equal(shell.material.vertexColors,true);
     assert.equal(lifecycle.drone.frontIndicator.material.map, null);
   }
   let scuffMapDisposals = 0;
@@ -132,7 +146,9 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   assert.ok(encounter.damage.health.every((health) => health.health === health.maximumHealth));
 
   encounter.dispose();
+  assert.equal(borrowedDisposals,0,'encounter unload must retain scene-owned Blender buffers');
   for(const [owner,material]of originalCableMaterials)assert.ok(owner.material===material,'restore borrowed actor material before actor disposal');
+  for(const [owner,material]of originalHatchMaterials)assert.ok(owner.material===material,'restore each hatch material once after detaching all its finish batches');
   assert.ok(cableSkins.every(skin=>skin.parent===null));
   assert.equal(authoredGeometryDisposals,0,'encounter disposal does not own authored buffers');
   assert.equal(scuffMapDisposals, 0, 'encounter must not dispose borrowed wear maps');
@@ -140,6 +156,7 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   assert.equal(surfaces.registeredCount, baselineSurfaces);
   for (const target of targets) target.dispose();
   scene.dispose();
+  assert.equal(borrowedDisposals,borrowedGeometry.size,'the scene releases the shared security buffers once');
   assert.equal(authoredGeometryDisposals,cableSkins.length,'the asset owner releases each prepared cable skin once');
   assert.equal(scuffMapDisposals, 1);
   world.clear();
@@ -178,6 +195,7 @@ test('split-room eligibility keeps Room 3 live without targeting the body left i
   };
   const encounter = new RoomThreeDroneEncounter({
     config,
+    presentationModels:scene.securityDroneModels,
     supportsById,
     collisionWorld: world,
     surfaceRegistry: surfaces,

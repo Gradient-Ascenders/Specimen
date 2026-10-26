@@ -3633,6 +3633,69 @@
           51,
           1
         ]
+      },
+      "cultivation-room-3-roof-drone-1-replacement-hatch": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          13,
+          29.55,
+          18.5,
+          1
+        ],
+        "type": "runtime-hatch-presentation"
+      },
+      "cultivation-room-3-roof-drone-2-replacement-hatch": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -9,
+          29.55,
+          32,
+          1
+        ],
+        "type": "runtime-hatch-presentation"
+      },
+      "cultivation-room-3-roof-drone-3-replacement-hatch": {
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          9,
+          29.55,
+          52,
+          1
+        ],
+        "type": "runtime-hatch-presentation"
       }
     },
     "extractionPlatforms": [

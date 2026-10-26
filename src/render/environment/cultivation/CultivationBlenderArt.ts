@@ -110,7 +110,7 @@ export class CultivationBlenderArt {
         for(const batch of asset.batches){
           const geometry=geometries[batch.geometry??batch.name];if(!geometry)throw Error(`Missing authored GLB batch: ${batch.name}`);
           const parent=batch.target?owner.getObjectByName(batch.target):asset.owner==='roomFour'?scene.roomFourGeometry:owner;
-          const deferred=!parent&&asset.id==='room-3'&&/^cultivation-room-3-roof-drone-[123]-replacement-cable$/.test(batch.target);
+          const deferred=!parent&&asset.id==='room-3'&&/^cultivation-room-3-roof-drone-[123]-replacement-(cable|hatch)$/.test(batch.target);
           if(!parent&&!deferred)throw Error(`Missing authored mechanism owner: ${batch.target}`);
           const mesh=new THREE.Mesh(geometry,finish(batch.finish,asset.id==='escape-duct',asset.id==='room-1'));mesh.name=batch.name;
           mesh.userData.presentationOnly=true;mesh.userData.blenderBatch=true;
@@ -130,17 +130,20 @@ export class CultivationBlenderArt {
   /** The existing encounter owns deployment poses and visibility; this layer
    * lends only its prepared authored skin until that encounter unloads. */
   attachRuntimeOwners(root:THREE.Object3D):()=>void{
-    const bindings:{owner:THREE.Mesh;material:THREE.Material|THREE.Material[];mesh:THREE.Mesh}[]=[];
+    const bindings:{owner:THREE.Mesh;mesh:THREE.Mesh}[]=[];
+    const originals=new Map<THREE.Mesh,THREE.Material|THREE.Material[]>();
     for(const entry of this.deferred){
       const owner=root.getObjectByName(entry.target);
       if(!(owner instanceof THREE.Mesh))throw Error(`Missing runtime presentation owner: ${entry.target}`);
       if(entry.mesh.parent)throw Error(`Runtime presentation is already attached: ${entry.target}`);
-      bindings.push({owner,material:owner.material,mesh:entry.mesh});owner.material=this.hidden;
+      if(!originals.has(owner)){originals.set(owner,owner.material);owner.material=this.hidden;}
+      bindings.push({owner,mesh:entry.mesh});
       entry.mesh.castShadow=owner.castShadow;entry.mesh.receiveShadow=owner.receiveShadow;owner.add(entry.mesh);
     }
     let detached=false;
     const detach=()=>{if(detached)return;detached=true;
-      for(const b of bindings){b.owner.material=b.material;b.mesh.removeFromParent();}
+      for(const b of bindings)b.mesh.removeFromParent();
+      for(const [owner,material]of originals)owner.material=material;
       this.runtimeBindings.delete(detach);
     };
     this.runtimeBindings.add(detach);return detach;

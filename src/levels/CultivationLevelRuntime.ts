@@ -1308,6 +1308,7 @@ export class CultivationLevelRuntime {
             goopBody,
             radiationSurface: authoredPreview.roomThree.radiationHazard,
             surfaceMaps: authoredPreview.coverArt.droneSurfaceMaps,
+            presentationModels:authoredPreview.securityDroneModels,
             attachPresentation:root=>authoredPreview.blenderArt.attachRuntimeOwners(root),
             requestDeath: (slimeId) => this.requestRoomThreeDroneDeath(slimeId),
           })

@@ -36,6 +36,7 @@ export interface RoomThreeDroneEncounterConfig {
 }
 
 export interface RoomThreeDroneEncounterOptions {
+  readonly presentationModels?:import('../render/hazards/SecurityDronePresentation.ts').SecurityDroneGeometrySource;
   readonly attachPresentation?: (root:THREE.Group)=>()=>void;
   readonly surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture };
   readonly config: RoomThreeDroneEncounterConfig;
@@ -138,7 +139,7 @@ export class RoomThreeDroneEncounter {
         throw new Error(`Ceiling drone "${config.drone.id}" has no registered support target.`);
       }
     }
-    this.presentationResources = new SecurityDronePresentationResources(options.surfaceMaps, true, true);
+    this.presentationResources = new SecurityDronePresentationResources(options.surfaceMaps, true, true,options.presentationModels);
     this.root.name = 'cultivation-room-3-drone-encounter';
     this.bobBody = options.bobBody;
     this.radiationSurface = options.radiationSurface;

@@ -113,7 +113,7 @@ test('the actual Blender buffers replace old coverage and share one Level 1 fini
     for(const asset of CULTIVATION_BLENDER_ASSETS){
       const root=(scene as any)[asset.owner].root as THREE.Group;
       for(const batch of asset.batches){
-        if(asset.id==='room-3'&&/^cultivation-room-3-roof-drone-[123]-replacement-cable$/.test(batch.target)){
+        if(asset.id==='room-3'&&/^cultivation-room-3-roof-drone-[123]-replacement-(cable|hatch)$/.test(batch.target)){
           assert.equal(root.getObjectByName(batch.target),undefined,'the encounter creates this controller-owned cable later');
           continue; // Runtime attachment and cleanup are covered with the real encounter.
         }

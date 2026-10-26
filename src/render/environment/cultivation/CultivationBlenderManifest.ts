@@ -1322,6 +1322,30 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-cable_Rust"
       },
       {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "cultivation-room-3-roof-drone-1-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "cultivation-room-3-roof-drone-1-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCool",
+        "finish": "HallCool",
+        "target": "cultivation-room-3-roof-drone-1-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "cultivation-room-3-roof-drone-1-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallGraphite"
+      },
+      {
         "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-acid-soluble-support-cable_Rust",
         "finish": "Rust",
         "target": "cultivation-room-3-roof-drone-2-acid-soluble-support-cable",
@@ -1334,6 +1358,30 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-cable_Rust"
       },
       {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-replacement-hatch_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "cultivation-room-3-roof-drone-2-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-replacement-hatch_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "cultivation-room-3-roof-drone-2-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-replacement-hatch_HallCool",
+        "finish": "HallCool",
+        "target": "cultivation-room-3-roof-drone-2-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-replacement-hatch_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "cultivation-room-3-roof-drone-2-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallGraphite"
+      },
+      {
         "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-acid-soluble-support-cable_Rust",
         "finish": "Rust",
         "target": "cultivation-room-3-roof-drone-3-acid-soluble-support-cable",
@@ -1344,6 +1392,30 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
         "finish": "Rust",
         "target": "cultivation-room-3-roof-drone-3-replacement-cable",
         "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-cable_Rust"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-replacement-hatch_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "cultivation-room-3-roof-drone-3-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-replacement-hatch_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "cultivation-room-3-roof-drone-3-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-replacement-hatch_HallCool",
+        "finish": "HallCool",
+        "target": "cultivation-room-3-roof-drone-3-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-replacement-hatch_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "cultivation-room-3-roof-drone-3-replacement-hatch",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-hatch_HallGraphite"
       },
       {
         "name": "C2_room-3_Batch_cultivation-room-3-second-cover-sticky-transfer_HallAlloy",

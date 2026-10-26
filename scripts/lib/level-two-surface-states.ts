@@ -26,7 +26,8 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
   const roomThree = new RoomThreeDroneEncounter({config: CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
     supportsById: new Map(targets.map(t => [t.id, t])), collisionWorld: world, surfaceRegistry: surfaces,
     bobBody: bob, goopBody: goop, requestDeath: () => true, radiationSurface: scene.roomThree.radiationHazard,
-    surfaceMaps: scene.coverArt.droneSurfaceMaps,attachPresentation:root=>scene.blenderArt.attachRuntimeOwners(root)});
+    surfaceMaps: scene.coverArt.droneSurfaceMaps,presentationModels:scene.securityDroneModels,
+    attachPresentation:root=>scene.blenderArt.attachRuntimeOwners(root)});
   scene.roomThree.root.add(roomThree.root);
   const dissolve = new DissolveSystem(targets);
   const roomFour = new ElevatorDroneEncounter(scene.roomFour, world, surfaces, bob, goop, targets, dissolve, () => {});

@@ -137,6 +137,15 @@ try{
     ['room-3-first-metal-landing',3,'roomThree',[0,.66,3],[1,26,22],[1,23.95,18.7],'released'],
     ['room-3-final-metal-landing',3,'roomThree',[0,.66,3],[3,27.5,56],[3,25.75,51.7],'released'],
     ['room-3-support-close',3,'roomThree',[0,.66,3],[-2,27.7,20],[-8,29.8,24]],
+    ['room-3-security-ceiling',3,'roomThree',[0,.66,3],[8.4,25.8,14.4],[13,24.3,18.5]],
+    ['room-3-security-ceiling-rear',3,'roomThree',[0,.66,3],[17,25.4,22.6],[13,24.3,18.5]],
+    ['room-3-security-sentry',3,'roomThree',[0,.66,3],[-1.1,2.8,63.6],[-2,1.1,68.7]],
+    ['room-3-security-sentry-rear',3,'roomThree',[0,.66,3],[.2,2.4,73],[-2,1.1,68.7]],
+    ['room-3-security-row',3,'roomThree',[0,.66,3],[2,3.6,60],[0,1.1,68.3]],
+    ['room-3-security-hanger',3,'roomThree',[0,.66,3],[10.5,28.6,16.5],[13,29.8,18.5]],
+    ['room-3-security-released',3,'roomThree',[0,.66,3],[8,3,15],[13,.8,18.5],'security-released'],
+    ['room-3-security-deploying',3,'roomThree',[0,.66,3],[9,28,15],[13,28.7,18.5],'security-deploying'],
+    ['room-3-security-tipped',3,'roomThree',[0,.66,3],[-.4,2.2,63.3],[-2,.7,66.2],'security-tipped'],
     ['room-4-board',4,'roomFour',[0,.66,4],[0,4,2],[0,4,13]],
     ['room-4-reverse',4,'roomFour',[0,.66,9],[4,4,12],[0,5,-2]],
     ['room-4-mid-descent',4,'roomFour',[0,.66,9],[0,3,8],[4.8,5,12],'lift-mid'],
@@ -201,6 +210,22 @@ try{
       if(state==='released'){
         for(const target of r.previewDissolveTargets)if(target.mesh.userData.roomId===room)target.advance(target.dissolveDurationSeconds);
         if(room===1)p.roomOne.update(2);if(room===2)p.roomTwo.update(2,[]);if(room===3)p.roomThree.update(2,[]);
+      }
+      if(state==='security-released'||state==='security-deploying'){
+        const encounter=r.roomThreeEncounter;
+        for(const target of r.previewDissolveTargets)if(target.mesh.userData.authoringRole==='ceiling-drone-soluble-support-cable')
+          target.advance(target.dissolveDurationSeconds);
+        encounter.update(.01,'goop',r.movement,{bob:false,goop:false});
+        encounter.update(.7,'goop',r.movement,{bob:false,goop:false});
+        if(state==='security-deploying'){
+          encounter.update(13,'goop',r.movement,{bob:false,goop:false});
+          encounter.update(.8,'goop',r.movement,{bob:false,goop:false});
+        }
+      }
+      if(state==='security-tipped'){
+        for(const drone of r.roomThreeEncounter.groundDrones)drone.beginCinematicPush();
+        r.roomThreeEncounter.update(.4,'goop',r.movement,{bob:false,goop:false});
+        r.roomThreeEncounter.update(.6,'goop',r.movement,{bob:false,goop:false});
       }
       if(state==='lift-mid'||state==='lift-arrived'){
         const occupants=['bob','goop'].map((id,i)=>({id,radiusMetres:.45,
