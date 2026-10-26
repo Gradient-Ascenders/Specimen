@@ -36,6 +36,7 @@ export interface RoomThreeDroneEncounterConfig {
 }
 
 export interface RoomThreeDroneEncounterOptions {
+  readonly attachPresentation?: (root:THREE.Group)=>()=>void;
   readonly surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture };
   readonly config: RoomThreeDroneEncounterConfig;
   readonly supportsById: ReadonlyMap<string, DissolveTarget>;
@@ -111,6 +112,7 @@ export class RoomThreeDroneEncounter {
   private readonly model: MutableEncounterReadModel;
   private readonly droneById = new Map<string, CeilingSecurityDrone | GroundSecurityDrone>();
   private readonly unsubscribeDamageDeath: () => void;
+  private readonly detachPresentation: (()=>void)|undefined;
   private disabledCount = 0;
   private disposed = false;
 
@@ -208,6 +210,7 @@ export class RoomThreeDroneEncounter {
     });
     this.shields=new RoomThreeDroneShields([...this.ceilingDrones,...this.groundDrones].map(lifecycle=>lifecycle.drone));
     this.root.add(this.shields.root);
+    this.detachPresentation=options.attachPresentation?.(this.root);
     this.radiationTargets = [
       ...this.ceilingDrones.map((drone) => drone.radiationTarget),
       ...this.groundDrones.map((drone) => drone.radiationTarget),
@@ -278,6 +281,7 @@ export class RoomThreeDroneEncounter {
 
   dispose(): void {
     if (this.disposed) return;
+    this.detachPresentation?.();
     this.unsubscribeDamageDeath();
     this.shields.dispose();
     for (const drone of this.ceilingDrones) drone.dispose();

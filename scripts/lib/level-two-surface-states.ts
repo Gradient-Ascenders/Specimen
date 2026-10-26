@@ -12,6 +12,8 @@ import { createAuthoredDissolveTarget } from '../../src/abilities/DissolveTarget
 import {VOLT_FINALE} from '../../src/cinematics/CultivationFinaleTimeline.ts';
 import {visitCultivationRoomTwoSurfaceStates} from './cultivation-room-two-surface-states.ts';
 import {visitCultivationConnectorSurfaceStates} from './cultivation-connector-surface-states.ts';
+import {visitCultivationRoomThreeSurfaceStates} from './cultivation-room-three-surface-states.ts';
+import {addCultivationRoomThreeBoosters,addCultivationButtonPlatformBooster} from '../../src/render/environment/cultivation/CultivationBoosterPlatforms.ts';
 
 /** Deterministic authored poses; every state is scanned after updating world matrices. */
 export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (name: string) => void): void {
@@ -24,11 +26,13 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
   const roomThree = new RoomThreeDroneEncounter({config: CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
     supportsById: new Map(targets.map(t => [t.id, t])), collisionWorld: world, surfaceRegistry: surfaces,
     bobBody: bob, goopBody: goop, requestDeath: () => true, radiationSurface: scene.roomThree.radiationHazard,
-    surfaceMaps: scene.coverArt.droneSurfaceMaps});
+    surfaceMaps: scene.coverArt.droneSurfaceMaps,attachPresentation:root=>scene.blenderArt.attachRuntimeOwners(root)});
   scene.roomThree.root.add(roomThree.root);
   const dissolve = new DissolveSystem(targets);
   const roomFour = new ElevatorDroneEncounter(scene.roomFour, world, surfaces, bob, goop, targets, dissolve, () => {});
   const roomFive = new RoomFiveDroneEncounter(scene.roomFive, world, surfaces, bob, goop, () => true);
+  addCultivationRoomThreeBoosters(roomFive.platformBoosters,scene.roomThree);
+  addCultivationButtonPlatformBooster(roomFive.platformBoosters,scene.roomTwo);
   const sample = (name: string) => {
     // An assembled-level audit includes every room's submitted static geometry
     // even after reset applies distance culling. Descendant mechanism/actor
@@ -87,5 +91,6 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     scene.reset();roomThree.reset();roomFour.reset();roomFive.reset();sample('release-reset');
     visitCultivationRoomTwoSurfaceStates(scene,targets,sample);
     visitCultivationConnectorSurfaceStates(scene,targets,sample);
+    visitCultivationRoomThreeSurfaceStates(scene,targets,roomThree,sample);
   } finally { roomFive.dispose(); roomFour.dispose(); roomThree.dispose(); dissolve.dispose(); for (const target of targets) target.dispose(); }
 }

@@ -76,7 +76,7 @@ def setup(room):
         shader=mat.node_tree.nodes.get('Principled BSDF')
         shader.inputs['Base Color'].default_value=(*colour,1)
         shader.inputs['Roughness'].default_value=rough;shader.inputs['Metallic'].default_value=metal
-        if room=='room-1' or finish.startswith(('Hall','Test')):
+        if room=='room-1' or finish=='Rust' or finish.startswith(('Hall','Test')):
             colour_node=mat.node_tree.nodes.new('ShaderNodeVertexColor');colour_node.layer_name='wear'
             tint=mat.node_tree.nodes.new('ShaderNodeMixRGB');tint.blend_type='MULTIPLY'
             tint.inputs[0].default_value=1;tint.inputs[1].default_value=(*colour,1)
@@ -108,6 +108,9 @@ def owner_root(owner):
     return obj
 
 def mesh(name,vertices,faces,finish,owner=''):
+    if CURRENT=='room-3' and name.startswith(('Extraction_','Solid_Extraction_','Transfer_','Solid_Transfer_','Ivy_')):
+        if finish=='Deck':finish='HallPaint'
+        elif finish not in ('Rust','Amber') and not finish.startswith('Hall'):finish='Hall'+finish
     if CURRENT=='room-2':
         if finish.startswith('Hall'):finish='Test'+finish[4:]
         elif name.startswith(('Test_','Solid_Test_','Transfer_','Solid_Transfer_','Ivy_')) and not finish.startswith('Test'):finish='Test'+finish
@@ -138,7 +141,7 @@ def mesh(name,vertices,faces,finish,owner=''):
             start=len(points)
             for v in range(nv+1):
                 for u in range(nu+1):
-                    if testing or CURRENT in ('passage-2-3','bob-duct'):
+                    if testing or CURRENT in ('passage-2-3','bob-duct','room-3'):
                         # Compute the shared boundary in double precision.
                         # Chained float-vector lerps can leave a micrometre
                         # crack between the ceiling rail and its neighbour.
@@ -244,6 +247,10 @@ def mesh(name,vertices,faces,finish,owner=''):
     obj=bpy.data.objects.new(prefix+name,data);bpy.context.scene.collection.objects.link(obj)
     obj.parent=owner_root(owner);data.materials.append(material(finish))
     obj['finish']=finish;obj['runtimeTarget']=owner;obj['visualOnly']=True
+    if CURRENT=='room-3' and not owner:
+        centre=sum((Vector(v) for v in vertices),Vector())/max(1,len(vertices))
+        family='cover' if 'Extraction_Cover_' in name else 'deck' if 'Extraction_Deck_' in name else 'shell'
+        obj['spatialRegion']=family+'_'+str(min(2,max(0,math.floor(centre.z/24))))
     if CURRENT=='room-5' and not owner:
         centre=sum((Vector(v) for v in vertices),Vector())/max(1,len(vertices))
         zone='sewer' if centre.x>29 else 'return' if centre.y<0 else 'crown' if centre.z>17 else 'access'
@@ -1628,6 +1635,351 @@ def build_service_duct():
     label('Duct_Section_marker','F-02',[-1.175,1.48,12.8],.10,(90,0,90),'HallInk')
 
 
+def extraction_end_wall(is_exit=False):
+    openings=[(-3,3,0,6),(-4.3,4.3,8,27)] if is_exit else [(-2,2,0,4.6),(7,9,18.8,20.9)]
+    xs=sorted(set([-24,-18,-12,-6,0,6,12,18,24]+[v for r in openings for v in r[:2]]))
+    ys=sorted(set([0,1.2,6,12,18,24,29.8]+[v for r in openings for v in r[2:]]))
+    for k,(a,b) in enumerate(zip(xs,xs[1:])):
+        for j,(c,d) in enumerate(zip(ys,ys[1:])):
+            if any(A<=a and b<=B and C<=c and d<=D for A,B,C,D in openings):continue
+            z,Z=(71.96,72.3) if is_exit else (-.2,.04)
+            box(f'Extraction_End_{is_exit}_back_{k}_{j}',[a,c,z],[b,d,Z],'Graphite')
+            z,Z=(71.8,71.94) if is_exit else (.06,.20)
+            box(f'Extraction_End_{is_exit}_panel_{k}_{j}',[a+.025,c+.025,z],[b-.025,d-.025,Z],'Ceramic')
+    if not is_exit:
+        # Room 2's vent liner and the retained passage shutter own the mouths.
+        # All new returns stay outside their original clear rectangles.
+        for a,b in [(6.6,7),(9,9.4)]:box('Extraction_Vent_reveal',[a,18.8,-.2],[b,20.9,.35],'Alloy')
+        for a,b in [(18.48,18.8),(20.9,21.22)]:box('Extraction_Vent_reveal',[6.6,a,-.2],[9.4,b,.2 if a<19 else .35],'Alloy')
+        for a,b in [(-2.25,-2),(2,2.25)]:box('Extraction_Goop_entry_reveal',[a,0,-.2],[b,4.9,.35],'Alloy')
+    else:
+        for a,b in [(-3.36,-3),(3,3.36)]:box('Extraction_Exit_drive_column',[a,.35,71.8],[b,6.40,72.3],'Alloy')
+        box('Extraction_Exit_header',[-3.36,6,71.8],[3.36,6.40,72.3],'Graphite')
+
+def extraction_roof():
+    openings=[]
+    for wall in LAYOUT[CURRENT]['extractionWalls']:
+        # The cassette also houses the original wall-mounted laser emitters
+        # and their full sweep while the assembly is above the room ceiling.
+        x,y,z=wall['position'];w,h,d=wall['size'];a,b=x-w/2-.85,x+w/2+.85;c,e=z-d/2-.85,z+d/2+.85
+        openings.append((a,b,c,e));top=29.85+h+.38
+        for X,Y in [(a-.18,a),(b,b+.18)]:box('Extraction_Wall_storage_side',[X,29.8,c-.18],[Y,top,e+.18],'Alloy')
+        for Z,T in [(c-.18,c),(e,e+.18)]:box('Extraction_Wall_storage_return',[a,29.8,Z],[b,top,T],'Graphite')
+        box('Extraction_Wall_storage_cap',[a,top,c],[b,top+.20,e],'Alloy')
+    for index,drone in enumerate(LAYOUT[CURRENT]['extractionDrones']):
+        x,y,z=drone['position'];a,b,c,d=x-1.8,x+1.8,z-1.8,z+1.8;openings.append((a,b,c,d))
+        # Room 1's bolted saddle construction, with a wider hatch aperture.
+        profile=[(1.8,0,30.45),(1.8,0,30.05),(1.55,.24,29.85),(1.25,.14,29.85),
+            (1.22,.10,29.8),(1.05,0,29.8),(1.05,0,30.45)]
+        nursery_ring_profile(f'Extraction_Drone_{index}_ceiling_saddle',
+            [nursery_square_ring(x,z,r,cut,Y) for r,cut,Y in profile],
+            ['HallCool','HallAlloy','HallCeramic','HallAlloy','HallGraphite','HallGraphite','HallAlloy'])
+        for sx in [-1,1]:
+            for sz in [-1,1]:tube('Extraction_Drone_saddle_fastener',(x+sx*1.45,29.92,z+sz*1.45),(x+sx*1.45,30.02,z+sz*1.45),.065,'HallGraphite',10)
+    # Openings clip the regular roof modules; they do not introduce extra
+    # visible seams across every other ceiling panel.
+    for a,b,c,d in openings:OCCLUDERS.append({'lo':[a,29.79,c],'hi':[b,30.21,d],'owner':''})
+    xs=list(range(-24,25,8));zs=list(range(0,73,8))
+    for k,(a,b) in enumerate(zip(xs,xs[1:])):
+        for j,(c,d) in enumerate(zip(zs,zs[1:])):
+            box(f'Extraction_Roof_back_{k}_{j}',[a,29.98,c],[b,30.20,d],'Graphite')
+            box(f'Extraction_Roof_cassette_{k}_{j}',[a+.025,29.8,c+.025],[b-.025,29.96,d-.025],'Ceramic')
+
+def extraction_shell():
+    # Broad wall bays are recessed behind the unchanged blocking planes.
+    bays=[(-1,8,18,6,17),(1,28,40,6,17),(-1,48,60,8,19)]
+    for side in [-1,1]:
+        own=[b for b in bays if b[0]==side]
+        zs=sorted(set([0,6,12,18,24,30,36,42,48,54,60,66,72]+[v for s,a,b,c,d in own for v in [a,b]]))
+        ys=sorted(set([0,1.2,6,12,18,24,29.8]+[v for s,a,b,c,d in own for v in [c,d]]))
+        def slab(name,near,far,low,high,a,b,finish):
+            x,X=sorted([side*near,side*far]);box('Extraction_'+name,[x,low,a],[X,high,b],finish)
+        for k,(a,b) in enumerate(zip(zs,zs[1:])):
+            for j,(c,d) in enumerate(zip(ys,ys[1:])):
+                if any(A<=a and b<=B and C<=c and d<=D for s,A,B,C,D in own):continue
+                slab(f'Wall_back_{side}_{k}_{j}',23.98,24.30,c,d,a,b,'Graphite')
+                slab(f'Wall_cassette_{side}_{k}_{j}',23.8,23.96,c+.035,d-.035,a+.035,b-.035,'Cool' if d<=1.2 else 'Ceramic')
+        for s,a,b,c,d in own:
+            slab(f'Bay_back_{a}',26.9,27.2,c,d,a,b,'Cool')
+            for Z in [a,b-.22]:slab(f'Bay_jamb_{a}',23.8,26.9,c,d,Z,Z+.22,'Alloy')
+            for Y in [c,d-.22]:slab(f'Bay_return_{a}',23.8,26.9,Y,Y+.22,a+.22,b-.22,'Alloy')
+        for z in ([0,7.6,18,36,47.6,60,71.2] if side<0 else [0,12,27.6,40,56,71.2]):
+            slab(f'Pressure_pier_{z}',23.8,24.45,0,30.2,z,z+.8,'Alloy')
+        slab('Upper_service_spine',23.8,24.45,24,24.6,0,72,'Alloy')
+        slab('Wall_floor_return',23.8,24.3,0,.30,0,72,'Alloy')
+        slab('Wall_ceiling_return',23.8,24.3,29.8,30.2,0,72,'Alloy')
+    extraction_end_wall();extraction_end_wall(True);extraction_roof()
+    box('Extraction_Safe_bank_back',[-23.8,-.15,66],[23.8,.29,72],'Graphite')
+    for k,(a,b) in enumerate(intervals(-23.8,23.8,5.95)):
+        for j,(c,d) in enumerate(intervals(66,72,3)):
+            # Match the original bank front plane so tipped sentry fittings
+            # retain clearance from this thin vertical tile return.
+            box(f'Extraction_Safe_bank_tile_{k}_{j}',[a+.02,.29,c if j==0 else c+.02],[b-.02,.35,d-.02],'Resin')
+    for spec in LAYOUT[CURRENT]['boxes']:
+        if 'exit-connector' in spec['name']:box('Extraction_'+spec['name'],spec['lo'],spec['hi'],'Ceramic')
+
+def extraction_transform(objects,start,offset,scale,tag):
+    for obj in objects:
+        if obj.type!='MESH':continue
+        for v in obj.data.vertices:
+            x,y,z=v.co.x,v.co.z,-v.co.y
+            v.co=(x*scale[0]+offset[0],-(z*scale[2]+offset[2]),y*scale[1]+offset[1])
+        if scale[0]*scale[1]*scale[2]<0:
+            for p in obj.data.polygons:p.flip()
+        obj.data.update();obj.name='C2_room-3_'+tag+'_'+obj.name.split('C2_room-3_')[-1]
+        obj['spatialRegion']=('cover_' if 'Cover_' in tag else 'deck_' if 'Deck_' in tag else 'shell_')+str(min(2,max(0,math.floor(offset[2]/24))))
+    for spec in BOXES[start:]:
+        lo=[spec['lo'][i]*scale[i]+offset[i] for i in range(3)];hi=[spec['hi'][i]*scale[i]+offset[i] for i in range(3)]
+        spec['lo']=[min(lo[i],hi[i]) for i in range(3)];spec['hi']=[max(lo[i],hi[i]) for i in range(3)]
+        spec['name']=tag+'_'+spec['name']
+
+def extraction_filter_bank(side,a,b,low,index):
+    for j,z in enumerate([a+2.7,b-2.7]):
+        before=set(bpy.context.scene.objects);start=len(BOXES)
+        filtration_cartridge(f'Extraction_Filter_{index}_{j}',0)
+        extraction_transform(set(bpy.context.scene.objects)-before,start,
+            (side*(23.8-3.47*2.4),low-1.48*3,z),(side*2.4,3,1.65),f'Extraction_Bay_{index}')
+    # A failed service riser gives the climbing growth a physical support.
+    x=side*24.18;z=a+2.7
+    nursery_sweep(f'Extraction_Leaking_riser_{index}',[(side*26.5,low+8.7,z),(x,low+8.7,z),(x,low+.22,z)],.075,'HallAlloy',10)
+    if index<2:
+        before=set(bpy.context.scene.objects);start=len(BOXES)
+        hall_process_ivy((3.75,1.42,0),3.1,.42,31+index*17)
+        extraction_transform(set(bpy.context.scene.objects)-before,start,
+            (side*(24.01-3.75*.65),low+.22-1.42*2.3,z),(side*.65,2.3,2.3),f'Extraction_Ivy_{index}')
+
+def extraction_pressed_panel(tag,a,b,low,high,front=.025,depth=.10,finish='Ceramic',bolts=True):
+    cut=min(.085,(b-a)*.08,(high-low)*.08)
+    outline=[(a+cut,low),(b-cut,low),(b,low+cut),(b,high-cut),(b-cut,high),(a+cut,high),(a,high-cut),(a,low+cut)]
+    vv=[(x,y,z) for z in [front,front+depth] for x,y in outline]
+    ff=[tuple(reversed(range(8))),tuple(range(8,16))]+[(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)]
+    mesh(tag+'_pressed_face',vv,ff,finish)
+    if bolts and b-a>.45 and high-low>.45:
+        for x in [a+.13,b-.13]:
+            for y in [low+.13,high-.13]:tube(tag+'_captive_fastener',(x,y,max(0,front-.025)),(x,y,front+.055),.026,'HallGraphite',8)
+
+def extraction_machine_grille(tag,a,b,low,high):
+    box(tag+'_closed_grille_back',[a,low,.28],[b,high,.32],'Graphite')
+    for x in [a,b-.06]:box(tag+'_grille_stile',[x,low,.025],[x+.06,high,.13],'Alloy')
+    for y in [low,high-.06]:box(tag+'_grille_end',[a+.06,y,.025],[b-.06,y+.06,.13],'Alloy')
+    rows=max(2,int((high-low-.14)/.14))
+    for k in range(rows):
+        y=low+.10+k*(high-low-.22)/max(1,rows-1)
+        box(tag+'_folded_louvre',[a+.08,y,.055],[b-.08,y+.045,.15],'Alloy')
+    if b-a>1.8:
+        x=(a+b)/2
+        box(tag+'_grille_guard',[x-.022,low+.06,.025],[x+.022,high-.06,.045],'Graphite')
+
+def extraction_machine_port(tag,x,y,radius,fan=False):
+    # One stepped annulus, with real depth and a sealed, opaque rear.
+    profile=[(1,.25),(1,.075),(.91,.025),(.72,.025),(.64,.09),(.64,.25)]
+    loops=[[(x+radius*r*math.cos(k*math.tau/32),y+radius*r*math.sin(k*math.tau/32),z) for k in range(32)] for r,z in profile]
+    nursery_ring_profile(tag+'_machined_bezel',loops,['HallAlloy','HallCeramic','HallAlloy','HallGraphite','HallAlloy','HallGraphite'])
+    for k in range(8):
+        t=(k+.5)*math.tau/8
+        tube(tag+'_bezel_bolt',(x+radius*.82*math.cos(t),y+radius*.82*math.sin(t),0),
+            (x+radius*.82*math.cos(t),y+radius*.82*math.sin(t),.085),.032,'HallGraphite',8)
+    tube(tag+'_sealed_inner_disc',(x,y,.27),(x,y,.30),radius*.62,'HallGraphite' if fan else 'HallCool',32)
+    if fan:
+        for k in range(5):
+            t=k*math.tau/5;shape=[(.15,-.05),(.54,-.15),(.58,.04),(.28,.17),(.14,.08)]
+            points=[(x+radius*(a*math.cos(t)-b*math.sin(t)),y+radius*(a*math.sin(t)+b*math.cos(t)),z) for z in [.14,.18] for a,b in shape]
+            mesh(tag+'_impeller',points,[tuple(reversed(range(5))),tuple(range(5,10))]+[(i,(i+1)%5,(i+1)%5+5,i+5) for i in range(5)],'Alloy')
+        tube(tag+'_impeller_boss',(x,y,.105),(x,y,.22),radius*.15,'HallAlloy',16)
+        for dy in [-.43,0,.43]:
+            half=radius*math.sqrt(.76**2-dy**2)
+            box(tag+'_fan_guard',[x-half,y+radius*dy-.018,.055],[x+half,y+radius*dy+.018,.075],'Graphite')
+    else:
+        # Reuse the approved filtration handwheel rather than loose wires.
+        wheel=hall_service_handwheel(tag+'_manual_lock',0,0,0)
+        for v in wheel.data.vertices:
+            X,Y,Z=v.co.x,v.co.z,-v.co.y;v.co=(x+Z*radius*2,-(.045-X*radius*2),y+Y*radius*2)
+        wheel.data.update()
+        tube(tag+'_lock_spindle',(x,y,.09),(x,y,.25),.045,'HallAlloy',10)
+
+def extraction_machine_gauge(tag,x,y,radius=.23):
+    annulus_z(tag+'_gauge_bezel',x,y,.07,radius*.82,radius,.07,'Alloy',24)
+    tube(tag+'_porcelain_dial',(x,y,.08),(x,y,.12),radius*.77,'HallInk',32)
+    for k in range(13):
+        angle=math.radians(-130+k*260/12)
+        inner=radius*(.58 if k%3==0 else .68);outer=radius*.75
+        tube(tag+'_dial_tick',(x+inner*math.cos(angle),y+inner*math.sin(angle),.060),
+            (x+outer*math.cos(angle),y+outer*math.sin(angle),.060),.004,'HallGraphite',5)
+    angle=math.radians(38);dx=math.cos(angle);dy=math.sin(angle)
+    shape=[(-dx*.035-dy*.010,-dy*.035+dx*.010),(dx*radius*.62,dy*radius*.62),(-dx*.035+dy*.010,-dy*.035-dx*.010)]
+    vv=[(x+a,y+b,z) for z in [.035,.045] for a,b in shape]
+    mesh(tag+'_needle',vv,[(2,1,0),(3,4,5),(0,1,4,3),(1,2,5,4),(2,0,3,5)],'Graphite')
+    tube(tag+'_needle_pivot',(x,y,.01),(x,y,.10),.022,'HallAlloy',12)
+
+def extraction_cover(index,spec):
+    before=set(bpy.context.scene.objects);start=len(BOXES)
+    w,h,d=spec['size'];a,b=-w/2,w/2;tag=f'Extraction_Cover_{index}'
+    # The original complete cover envelope remains opaque. Detail is inset,
+    # including fasteners, handles, pipework and the equipment's relief.
+    box(tag+'_sealed_core',[a+.12,.18,1.9 if index==2 else .32],[b-.12,h-.14,d-.12],'Graphite')
+    box(tag+'_cast_plinth',[a,0,0],[b,.18,d],'Alloy')
+    for x in [a,b-.14]:
+        for z in [0,d-.14]:box(tag+'_formed_corner',[x,.18,z],[x+.14,h,z+.14],'Alloy')
+    for x in [a,b-.15]:box(tag+'_lid_side',[x,h-.14,.14],[x+.15,h,d-.14],'Alloy')
+    for z in [0,d-.15]:box(tag+'_lid_end',[a+.14,h-.14,z],[b-.14,h,z+.15],'Alloy')
+    for k,(A,B) in enumerate(intervals(a+.17,b-.17,max(1,(w-.34)/2))):
+        box(tag+'_lid_gasket',[A,h-.10,.17],[B,h-.065,d-.17],'Graphite')
+        box(tag+'_recessed_service_lid',[A+.025,h-.065,.195],[B-.025,h-.025,d-.195],'Ceramic')
+    # Side service hatches, exposed pressure lines, compression joints and seats.
+    for side in [-1,1]:
+        x=side*w/2
+        X,Y=sorted([x-side*.125,x-side*.025]);box(tag+'_side_access',[X,.20,.60],[Y,h-.16,d-.16],'Ceramic')
+        X,Y=sorted([x-side*.24,x-side*.20]);box(tag+'_pipe_recess',[X,.20,.225],[Y,h-.16,.62],'Graphite')
+        px=x-side*.075
+        tube(tag+'_rigid_side_line',(px,.34,.37),(px,h-.30,.37),.045,'HallAlloy',10)
+        for yy in [.48,h*.51,h-.43]:
+            tube(tag+'_line_compression_joint',(px,yy-.065,.37),(px,yy+.065,.37),.064,'HallGraphite',10)
+            X,Y=sorted([x-side*.24,x-side*.17]);box(tag+'_line_standoff',[X,yy-.035,.29],[Y,yy+.035,.45],'Alloy')
+        for yy in [.40,h-.38]:
+            X,Y=sorted([x-side*.08,x])
+            for z in ([.66,d-.24] if d<1.2 else [.85,d-.34]):tube(tag+'_side_bolt',(X,yy,z),(Y,yy,z),.031,'HallGraphite',8)
+    # Rear access panels have their own gaskets, hinge leaves and service grille.
+    for k,(A,B) in enumerate(intervals(a+.18,b-.18,max(1,(w-.36)/2))):
+        box(tag+'_rear_gasket',[A,.23,d-.16],[B,h-.18,d-.13],'Graphite')
+        box(tag+'_rear_access',[A+.035,.265,d-.13],[B-.035,h-.215,d-.06],'Cool')
+        for row in range(4):box(tag+'_rear_vent_reveal',[A+.18,.40+row*.13,d-.08],[B-.18,.445+row*.13,d-.035],'Graphite')
+        for yy in [.43,h-.40]:
+            tube(tag+'_rear_hinge_pin',(A+.10,yy-.07,d-.05),(A+.10,yy+.07,d-.05),.040,'HallAlloy',8)
+    if index==0: # Three-chamber decontamination intake, guarded static impellers.
+        for k in range(3):
+            A=a+.18+k*(w-.36)/3;B=a+.18+(k+1)*(w-.36)/3-.04;cx=(A+B)/2
+            extraction_machine_grille(tag,A,B,h-.82,h-.20)
+            extraction_machine_port(tag,cx,h*.51,min((B-A)*.39,h*.20),True)
+            extraction_pressed_panel(tag,A,B,.22,h*.25)
+            for yy in [h*.27,h*.75]:box(tag+'_module_crossbar',[A,yy,.075],[B,yy+.075,.15],'Alloy')
+        label(tag+'_asset_tag','DECONTAMINATION',[0,h*.765,.025],.14,(90,0,180),'HallInk')
+    elif index==1: # Insulated twin freezer leaves and a separate compressor crown.
+        for k in range(2):
+            A=a+.18+k*(w-.36)/2;B=a+.18+(k+1)*(w-.36)/2-.05
+            box(tag+'_door_seal',[A,.24,.16],[B,h-.76,.22],'Graphite')
+            extraction_pressed_panel(tag,A+.035,B-.035,.275,h-.795,.025,.11,'Ceramic')
+            hx=B-.16 if k==0 else A+.16
+            box(tag+'_long_latch',[hx-.035,h*.31,0],[hx+.035,h*.65,.095],'Graphite')
+            for yy in [h*.34,h*.62]:tube(tag+'_handle_seat',(hx,yy,.012),(hx,yy,.12),.055,'HallAlloy',10)
+            for yy in [.55,h-.99]:tube(tag+'_insulated_hinge',(A+.035,yy-.10,.06),(A+.035,yy+.10,.06),.048,'HallAlloy',10)
+        extraction_machine_grille(tag,a+.18,b-.18,h-.70,h-.20)
+    elif index==2: # Twin sealed pressure vessels inside a rigid guarded skid.
+        for sx in [-1,1]:
+            cx=sx*w*.235;r=w*.145;z=r+.09
+            nursery_profile(tag+'_pressure_vessel',[(cx,y,z) for y in [.27,.36,.48,.58,h-.76,h-.62,h-.46,h-.36]],
+                [r*.70,r*.90,r,r,r,r*.97,r*.78,r*.62],['HallGraphite','HallAlloy','HallAlloy','HallCeramic','HallAlloy','HallCeramic','HallAlloy'],24)
+            nursery_sweep(tag+'_vessel_feed',[(cx,h-.36,z),(cx,h-.22,z),(cx*.65,h-.22,z),(cx*.65,h-.55,z)],.055,'HallAlloy',10)
+            extraction_machine_gauge(tag,cx,h*.60,.21)
+        for k in range(9):
+            xx=a+.22+k*(w-.44)/8
+            box(tag+'_pressure_guard',[xx-.018,.24,.005],[xx+.018,h-.25,.035],'Graphite')
+        for yy in [.24,h-.32]:box(tag+'_pressure_guard_rail',[a+.18,yy,.005],[b-.18,yy+.07,.12],'Alloy')
+    elif index==3: # Analysis machine: bolted test cell and separate instrument stack.
+        split=a+w*.46
+        extraction_pressed_panel(tag,a+.18,split,h-.65,h-.20)
+        extraction_pressed_panel(tag,a+.23,split-.05,h*.41,h-.72,.16,.10,'Ceramic')
+        extraction_machine_grille(tag,a+.30,split-.12,.36,h*.36)
+        extraction_machine_gauge(tag,a+w*.26,h*.66,.25)
+        extraction_machine_port(tag,a+w*.74,h*.52,min(w*.20,h*.29),False)
+        box(tag+'_instrument_spine',[split+.04,.22,.025],[split+.14,h-.18,.19],'Alloy')
+    elif index==4: # Five courses of specimen drawers with captive pulls and labels.
+        for k in range(2):
+            A=a+.18+k*(w-.36)/2;B=a+.18+(k+1)*(w-.36)/2-.04
+            for row in range(5):
+                L=.23+row*(h-.46)/5;H=.23+(row+1)*(h-.46)/5-.04
+                extraction_pressed_panel(tag,A,B,L,H,.025,.11,'Ceramic',False)
+                box(tag+'_drawer_handle_seat',[A+.23,L+.16,.005],[B-.23,L+.31,.055],'Graphite')
+                box(tag+'_captive_drawer_pull',[A+.31,L+.20,0],[B-.31,L+.27,.035],'Alloy')
+                for xx in [A+.12,B-.12]:tube(tag+'_drawer_rivet',(xx,L+.12,0),(xx,L+.12,.07),.025,'HallGraphite',8)
+    elif index==5: # Large centrifuge service hatch with a flanking cooling stack.
+        R=min(h*.32,w*.25);cx=a+w*.39
+        extraction_machine_port(tag,cx,h*.53,R,False)
+        extraction_machine_grille(tag,a+w*.70,b-.18,.28,h-.25)
+        extraction_pressed_panel(tag,a+.20,a+w*.64,.23,.54,.025,.12,'Cool',False)
+    elif index==6: # Rack of six removable closed data modules per column.
+        for k in range(2):
+            A=a+.18+k*(w-.36)/2;B=a+.18+(k+1)*(w-.36)/2-.04
+            for row in range(6):
+                L=.24+row*(h-.48)/6;H=.24+(row+1)*(h-.48)/6-.045
+                extraction_pressed_panel(tag,A,B,L,H,.025,.11,'Cool',False)
+                for yy in [L+.13,L+.23]:box(tag+'_server_air_slot',[A+.22,yy,0],[B-.22,yy+.035,.065],'Graphite')
+                for xx in [A+.10,B-.10]:box(tag+'_server_captive_handle',[xx-.025,L+.11,0],[xx+.025,H-.10,.09],'Alloy')
+    else: # Reinforced, sealed containment hatch with recessed diagonal stiffeners.
+        extraction_pressed_panel(tag,a+.18,b-.18,.23,h-.22,.19,.13,'Graphite',False)
+        extraction_pressed_panel(tag,a+.28,b-.28,.33,h-.32,.075,.065,'Ceramic',False)
+        for side in [-1,1]:
+            for upper in [False,True]:
+                X=side*(w*.38);Y=h*.50+(-1 if not upper else 1)*h*.32
+                tube(tag+'_diagonal_hatch_rib',(X,Y,.035),(side*w*.09,h*.50+(-1 if not upper else 1)*.16,.035),.035,'HallAlloy',8)
+        extraction_machine_port(tag,0,h*.50,min(w*.14,h*.19),False)
+        for xx in [a+.35,b-.35]:
+            for yy in [.50,h-.50]:tube(tag+'_hatch_lock_bolt',(xx,yy,.005),(xx,yy,.17),.055,'HallGraphite',8)
+    offset=spec['position'];offset=(offset[0],offset[1]-h/2,offset[2]-d/2)
+    for obj in set(bpy.context.scene.objects)-before:
+        if obj.type!='MESH':continue
+        obj.matrix_world.translation+=Vector(xyz(offset))
+        obj['spatialRegion']='cover_'+str(min(2,max(0,math.floor(offset[2]/24))))
+    for item in BOXES[start:]:
+        for end in ['lo','hi']:item[end]=[item[end][i]+offset[i] for i in range(3)]
+
+
+def extraction_intake():
+    box('Extraction_Intake_back',[-4.3,8,74.2],[4.3,27,74.45],'Graphite')
+    for x in [-4.3,4.08]:box('Extraction_Intake_jamb',[x,8,71.8],[x+.22,27,74.2],'Alloy')
+    for y in [8,26.78]:box('Extraction_Intake_return',[-4.08,y,71.8],[4.08,y+.22,74.2],'Alloy')
+    for y in [8.3,14.45,20.6]:
+        box('Extraction_Intake_module_back',[-3.85,y,73.4],[3.85,y+5.9,73.6],'Cool')
+        for x in [-3.90,3.72]:box('Extraction_Intake_module_stile',[x,y,71.94],[x+.18,y+5.9,73.4],'Ceramic')
+        for k in range(8):
+            Y=y+.20+k*.70
+            box('Extraction_Intake_closed_louvre',[-3.70,Y,72.12],[3.70,Y+.18,72.48],'Alloy')
+        for x in [-2.55,0,2.55]:box('Extraction_Intake_guard',[x-.025,y+.15,71.98],[x+.025,y+5.70,72.03],'Graphite')
+    label('Extraction_Main_ident','03 / CONTAINMENT EXTRACTION',[0,27.8,71.74],.43,(90,0,180),'HallInk')
+
+def extraction_equipment():
+    for i,(side,a,b,low) in enumerate([(-1,8,18,6),(1,28,40,6),(-1,48,60,8)]):extraction_filter_bank(side,a,b,low,i)
+    for i,spec in enumerate(LAYOUT[CURRENT]['extractionCovers']):extraction_cover(i,spec)
+    extraction_intake()
+
+def extraction_mechanisms():
+    for i,spec in enumerate(LAYOUT[CURRENT]['extractionPlatforms']):
+        before=set(bpy.context.scene.objects);start=len(BOXES);w,h,d=spec['size'];x,y,z=spec['position']
+        testing_deck(i,'',w,d,h)
+        extraction_transform(set(bpy.context.scene.objects)-before,start,(x,y,z),(1,1,1),f'Extraction_Deck_{i}')
+    for i,spec in enumerate(LAYOUT[CURRENT]['extractionWalls']):
+        if spec['biofilm']:continue
+        owner=spec['name'];w,h,d=spec['size'];thin_x=w<d;across=d if thin_x else w
+        # All visible features fit inside the original thin wall prism.
+        def part(name,A,B,L,H,near,far,finish):
+            lo=[near,L,A] if thin_x else [A,L,near];hi=[far,H,B] if thin_x else [B,H,far]
+            box(f'Extraction_Baffle_{i}_{name}',lo,hi,finish,owner)
+        part('sealed_back',-across/2,across/2,-h/2,h/2,-.035,.035,'Graphite')
+        for side in [-1,1]:
+            near,far=(-.09,-.035) if side<0 else (.035,.09)
+            for k,(a,b) in enumerate(intervals(-across/2,across/2,max(1,across/3))):
+                for j,(c,d) in enumerate(intervals(-h/2+.12,h/2-.12,max(1,h/3))):
+                    part(f'pressed_panel_{side}_{k}_{j}',a+.018,b-.018,c+.018,d-.018,near,far,'Ceramic')
+        for Y in [-h/2,h/2-.10]:part('end_cap',-across/2+.10,across/2-.10,Y,Y+.10,-.09,.09,'Alloy')
+    for i,spec in enumerate(LAYOUT[CURRENT]['extractionDrones']):
+        nursery_fluted_strut(f'Extraction_Drone_{i}_rusted_support',spec['size'][1],spec['name'],.22,finish='Rust')
+        owner=spec['name'].replace('-acid-soluble-support-cable','-replacement-cable')
+        nursery_fluted_strut(f'Extraction_Drone_{i}_replacement_support',1,owner,.22,finish='Rust')
+
+def extraction_practicals():
+    for z in range(5,72,8):
+        for x in [-13.44,13.44]:
+            key=(x<0 and z==21) or (x>0 and z==53);low=29.60 if key else 29.73
+            box('Extraction_Ceiling_fixture_body',[x-.19,low+.035,z-1.35],[x+.19,29.8,z+1.35],'Alloy')
+            box('Extraction_Ceiling_fixture_diffuser',[x-.12,low,z-1.22],[x+.12,low+.035,z+1.22],'Lamp')
+        for side in [-1,1]:
+            a,b=sorted([side*23.74,side*23.80]);box('Extraction_Wall_fixture_body',[a,3.90,z-1.28],[b,4.10,z+1.28],'Graphite')
+            a,b=sorted([side*23.735,side*23.74]);box('Extraction_Wall_fixture_diffuser',[a,3.94,z-1.12],[b,4.06,z+1.12],'Lamp')
+    label('Extraction_West_service_ident','FILTRATION / ISOLATE FEED',[-23.74,18.0,13],.32,(90,0,90),'HallInk')
+    label('Extraction_East_service_ident','CULTURE EXHAUST',[23.74,18.0,34],.32,(90,0,270),'HallInk')
+
+def build_extraction_hall():
+    extraction_shell();extraction_equipment();extraction_mechanisms();extraction_practicals()
+
 def build_enclosure():
     # Opaque backs of the unchanged fixtures and retained acid slabs own their
     # contact faces. Only immutable surfaces in this same room are trimmed.
@@ -1644,6 +1996,9 @@ def build_enclosure():
     if CURRENT=='room-2':
         OCCLUDERS[:]=[o for o in OCCLUDERS if o['hi'][1]<=0]+LAYOUT[CURRENT].get('retainedSurfaceOccluders',[])
         build_testing_hall();return
+    if CURRENT=='room-3':
+        OCCLUDERS[:]=[o for o in OCCLUDERS if o['hi'][1]<=0]+LAYOUT[CURRENT].get('retainedSurfaceOccluders',[])
+        build_extraction_hall();return
     if CURRENT=='passage-2-3':
         OCCLUDERS[:]=[]
         build_filtration_passage();return
@@ -1926,13 +2281,7 @@ def build_identity():
     elif CURRENT in ('passage-2-3','bob-duct'):
         return # The filtration and duct builders own fitted identification.
     elif CURRENT=='room-3':
-        label('Filter_sign','03  /  SECURITY FILTRATION',[0,9,71.72],.67)
-        for side in [-1,1]:
-            for z in [6,13,22,39,45,63,69]:
-                block(f'Extraction_pier_{side}_{z}',[.24,28.7,.45],[side*23.92,15,z],'Alloy')
-            for y in [1.4,12.4,23.4]:
-                block(f'Extraction_manifold_{side}_{y}',[.22,.36,70.6],[side*23.91,y,36],'Oxide' if y<2 else 'Graphite')
-        label('Extraction_header','EXTRACTION / NEGATIVE PRESSURE',[0,28.2,71.72],.45)
+        return # The extraction hall owns its equipment and framed identifiers.
     print('Identity stage:',CURRENT)
 
 def finalise_boxes():
@@ -1999,7 +2348,7 @@ def finalise_boxes():
                 bm=bmesh.new();bm.from_mesh(obj.data)
                 # Metric dirt samples can create T junctions where density
                 # changes. Never bevel a partial shell or a coplanar grid edge.
-                sampled=CURRENT in ('room-1','room-2','passage-2-3','bob-duct') or (CURRENT=='passage-1-2' and s['name'].startswith('Hall_'))
+                sampled=CURRENT in ('room-1','room-2','room-3','passage-2-3','bob-duct') or (CURRENT=='passage-1-2' and s['name'].startswith('Hall_'))
                 if not sampled or all(e.is_manifold for e in bm.edges):
                     edges=[e for e in bm.edges if e.is_manifold and (not sampled or e.calc_face_angle()>.01)]
                     bmesh.ops.bevel(bm,geom=edges,offset=.008,segments=1,affect='EDGES')
@@ -2063,6 +2412,7 @@ def import_references():
     subtrees=LAYOUT[CURRENT].get('retireSubtrees',[])
     for item in data['objects']:
         if item['name'].startswith('C2_'):continue
+        if CURRENT=='room-3' and item['name'].startswith('cover-props-'):continue
         if CURRENT=='room-1' and not item['name']:continue # Retired procedural platform preview parts.
         if not item['visible'] or item['name'].split('[')[0] in retired or item['name'].removesuffix('-surface-skin') in retired:continue
         if any('/'+name+'/' in item.get('path','') for name in subtrees):continue
@@ -2152,7 +2502,7 @@ def build(room,refs=False):
                             a,b=(p.y,p.z) if axis==0 else (p.x,p.z) if axis==1 else (p.x,p.y)
                             uv=(a/8+.13,b/8+.31) if obj['finish'] in ('Deck','Paint') else (a/2,b/2)
                             layer.data[index].uv=tuple(round(v,6) for v in uv)
-    if room in ('passage-1-2','room-2','passage-2-3','bob-duct'):
+    if room in ('passage-1-2','room-2','room-3','passage-2-3','bob-duct'):
         for obj in bpy.context.scene.objects:
             if obj.type!='MESH' or not obj.get('finish','').startswith(('Hall','Test')) or obj['finish'].endswith('Glass'):continue
             for layer in obj.data.uv_layers:

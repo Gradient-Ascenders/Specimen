@@ -41,6 +41,7 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   const goop = new KinematicBody({ world, surfaces, initialPosition: goopSpawn });
   const baselineColliders = world.colliderCount;
   const baselineSurfaces = surfaces.registeredCount;
+  const originalCableMaterials=new Map<THREE.Mesh,THREE.Material|THREE.Material[]>();
   const encounter = new RoomThreeDroneEncounter({
     config: CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
     supportsById,
@@ -51,8 +52,21 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
     requestDeath: () => true,
     radiationSurface: scene.roomThree.radiationHazard,
     surfaceMaps: scene.coverArt.droneSurfaceMaps,
+    attachPresentation(root){
+      root.traverse(o=>{if(o instanceof THREE.Mesh&&/^cultivation-room-3-roof-drone-[123]-replacement-cable$/.test(o.name))
+        originalCableMaterials.set(o,o.material);});
+      return scene.blenderArt.attachRuntimeOwners(root);
+    },
   });
   scene.roomThree.root.add(encounter.root);
+  assert.equal(originalCableMaterials.size,3);
+  const cableSkins=[...originalCableMaterials.keys()].map(owner=>{
+    const skin=owner.children.find((o):o is THREE.Mesh=>o instanceof THREE.Mesh&&o.userData.blenderBatch);
+    assert.ok(skin,owner.name);assert.equal(skin.castShadow,owner.castShadow);
+    assert.equal((owner.material as THREE.Material).visible,false);return skin;
+  });
+  let authoredGeometryDisposals=0;
+  for(const skin of cableSkins)skin.geometry.addEventListener('dispose',()=>authoredGeometryDisposals++);
 
   assert.equal(encounter.ceilingDrones.length, 3);
   assert.equal(encounter.groundDrones.length, 4);
@@ -103,6 +117,12 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   support.advance(support.dissolveDurationSeconds);
   assert.equal(first.readModel.state, 'released');
   assert.ok(encounter.ceilingDrones.slice(1).every((drone) => drone.readModel.state === 'active'));
+  for(const dt of [.01,.7,15,.8,1.2,.8]){
+    encounter.update(dt,'goop',new THREE.Vector3(),{bob:false,goop:false});
+    scene.root.updateWorldMatrix(true,true);
+    for(const skin of cableSkins)assert.deepEqual(skin.matrixWorld.toArray(),skin.parent!.matrixWorld.toArray(),
+      'the authored unit strut follows its original deployment owner');
+  }
 
   support.reset();
   encounter.reset();
@@ -112,11 +132,15 @@ test('Room 3 constructs seven drones and resets one-to-one cable release', () =>
   assert.ok(encounter.damage.health.every((health) => health.health === health.maximumHealth));
 
   encounter.dispose();
+  for(const [owner,material]of originalCableMaterials)assert.ok(owner.material===material,'restore borrowed actor material before actor disposal');
+  assert.ok(cableSkins.every(skin=>skin.parent===null));
+  assert.equal(authoredGeometryDisposals,0,'encounter disposal does not own authored buffers');
   assert.equal(scuffMapDisposals, 0, 'encounter must not dispose borrowed wear maps');
   assert.equal(world.colliderCount, baselineColliders);
   assert.equal(surfaces.registeredCount, baselineSurfaces);
   for (const target of targets) target.dispose();
   scene.dispose();
+  assert.equal(authoredGeometryDisposals,cableSkins.length,'the asset owner releases each prepared cable skin once');
   assert.equal(scuffMapDisposals, 1);
   world.clear();
   surfaces.clear();

@@ -123,7 +123,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly acidInteractions: readonly AcidLiquidInteractions[];
   readonly labArt = new CultivationLabMaterials(this.assets);
   readonly contaminationArt = new CultivationContaminationArt(this.labArt);
-  readonly coverArt = new CultivationCoverEquipmentArt(this.assets, this.labArt.platform);
+  readonly coverArt = new CultivationCoverEquipmentArt(this.assets, this.labArt.platform,{authoredReplacement:true});
   readonly chamberArt = new CultivationChamberMaterials(this.assets);
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
@@ -198,9 +198,10 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
         'cultivation-room-3-bob-vent-west-jamb',
         'cultivation-room-3-bob-vent-east-jamb',
       ], new Map([...this.contaminationArt.overrides(builder), ...this.chamberArt.overrides(builder, this.labArt), ...this.coverArt.overrides()]));
-      this.coverArt.build(builder);
+      this.coverArt.build(builder,{authoredReplacement:true});
     }, this.assets);
     this.labArt.addFixtures(this.roomThree.root, 48, 30, 72, {
+      authoredReplacement:true,
       fillHeightMetres: 16, fillPositionsZ: [18, 54],
       shadowTargets: [[-4, 23, 25.5], [0, 23, 53]],
     });
@@ -235,7 +236,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       this.roomTwoToThreeBobAirDuct, this.labArt, this.contaminationArt, {authoredReplacement:true});
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
     this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning, {authoredReplacement:true});
-    this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);
+    this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning,{authoredReplacement:true});
     this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering);
     this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
     this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt);

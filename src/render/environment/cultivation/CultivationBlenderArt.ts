@@ -12,6 +12,8 @@ export class CultivationBlenderArt {
   private readonly solubleSkins:{mesh:THREE.Mesh;source:THREE.MeshStandardMaterial;owner:string;target?:DissolveTarget;material?:THREE.MeshStandardMaterial}[]=[];
   private readonly bindings:{mesh:THREE.Mesh;material:THREE.Material|THREE.Material[]}[]=[];
   private readonly meshes:THREE.Mesh[]=[];
+  private readonly deferred:{target:string;mesh:THREE.Mesh}[]=[];
+  private readonly runtimeBindings=new Set<()=>void>();
   private readonly geometries=new Set<THREE.BufferGeometry>();
   private readonly materials=new Map<string,THREE.MeshStandardMaterial|THREE.MeshBasicMaterial>();
   private readonly textures:THREE.Texture[]=[];
@@ -108,12 +110,14 @@ export class CultivationBlenderArt {
         for(const batch of asset.batches){
           const geometry=geometries[batch.geometry??batch.name];if(!geometry)throw Error(`Missing authored GLB batch: ${batch.name}`);
           const parent=batch.target?owner.getObjectByName(batch.target):asset.owner==='roomFour'?scene.roomFourGeometry:owner;
-          if(!parent)throw Error(`Missing authored mechanism owner: ${batch.target}`);
+          const deferred=!parent&&asset.id==='room-3'&&/^cultivation-room-3-roof-drone-[123]-replacement-cable$/.test(batch.target);
+          if(!parent&&!deferred)throw Error(`Missing authored mechanism owner: ${batch.target}`);
           const mesh=new THREE.Mesh(geometry,finish(batch.finish,asset.id==='escape-duct',asset.id==='room-1'));mesh.name=batch.name;
           mesh.userData.presentationOnly=true;mesh.userData.blenderBatch=true;
-          if(parent.userData.soluble===true)this.solubleSkins.push({mesh,source:mesh.material as THREE.MeshStandardMaterial,owner:parent.name});
-          if(asset.id==='escape-duct'||batch.target==='cultivation-filtration-slow-fan')mesh.userData.shadowProxyReceiver=true;
-          parent.add(mesh);mesh.updateMatrix();mesh.matrixAutoUpdate=false;this.meshes.push(mesh);
+          if(parent?.userData.soluble===true)this.solubleSkins.push({mesh,source:mesh.material as THREE.MeshStandardMaterial,owner:parent.name});
+          if(asset.id==='escape-duct'||batch.target==='cultivation-filtration-slow-fan'||batch.name.includes('_cover_'))mesh.userData.shadowProxyReceiver=true;
+          if(deferred)this.deferred.push({target:batch.target,mesh});else parent!.add(mesh);
+          mesh.updateMatrix();mesh.matrixAutoUpdate=false;this.meshes.push(mesh);
           this.geometries.add(geometry);
           this.diagnostics.triangles+=(geometry.index?.count??geometry.getAttribute('position').count)/3;
         }
@@ -122,6 +126,24 @@ export class CultivationBlenderArt {
       this.diagnostics.meshes=this.meshes.length;this.diagnostics.retiredMeshes=this.bindings.length;
       this.diagnostics.geometries=this.geometries.size;
     }catch(error){this.dispose();throw error;}
+  }
+  /** The existing encounter owns deployment poses and visibility; this layer
+   * lends only its prepared authored skin until that encounter unloads. */
+  attachRuntimeOwners(root:THREE.Object3D):()=>void{
+    const bindings:{owner:THREE.Mesh;material:THREE.Material|THREE.Material[];mesh:THREE.Mesh}[]=[];
+    for(const entry of this.deferred){
+      const owner=root.getObjectByName(entry.target);
+      if(!(owner instanceof THREE.Mesh))throw Error(`Missing runtime presentation owner: ${entry.target}`);
+      if(entry.mesh.parent)throw Error(`Runtime presentation is already attached: ${entry.target}`);
+      bindings.push({owner,material:owner.material,mesh:entry.mesh});owner.material=this.hidden;
+      entry.mesh.castShadow=owner.castShadow;entry.mesh.receiveShadow=owner.receiveShadow;owner.add(entry.mesh);
+    }
+    let detached=false;
+    const detach=()=>{if(detached)return;detached=true;
+      for(const b of bindings){b.owner.material=b.material;b.mesh.removeFromParent();}
+      this.runtimeBindings.delete(detach);
+    };
+    this.runtimeBindings.add(detach);return detach;
   }
   bindDissolveTargets(targets:readonly DissolveTarget[]):void{
     for(const skin of this.solubleSkins){
@@ -137,6 +159,7 @@ export class CultivationBlenderArt {
   }
   dispose():void{
     if(this.disposed)return;this.disposed=true;
+    for(const detach of this.runtimeBindings)detach();
     for(const skin of this.solubleSkins){skin.material?.dispose();skin.mesh.customDepthMaterial=undefined;skin.mesh.customDistanceMaterial=undefined;}
     for(const mesh of this.meshes)mesh.removeFromParent();
     for(const geometry of this.geometries)geometry.dispose();

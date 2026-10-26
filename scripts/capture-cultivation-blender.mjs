@@ -8,7 +8,8 @@ import {chromium} from '@playwright/test';
 const output=resolve(process.argv[2]??'artifacts/evidence/cultivation-blender/baseline/game');
 await mkdir(output,{recursive:true});
 const server=await preview({configFile:false,preview:{host:'127.0.0.1',port:0}});
-const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--disable-dev-shm-usage']});
+const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--disable-dev-shm-usage',
+  '--renderer-process-limit=1','--num-raster-threads=1','--js-flags=--max-old-space-size=384']});
 const page=await browser.newPage({viewport:{width:1120,height:700}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));
 page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
@@ -119,6 +120,23 @@ try{
     ['room-3-low-grazing',3,'roomThree',[0,.66,68],[23.2,.8,67],[23.7,.5,71]],
     ['room-3-released',3,'roomThree',[0,.66,3],[0,7,14],[5,3,31],'released'],
     ['room-3-camera-close',3,'roomThree',[0,.66,68],[1.6,7.8,68.5],[0,7.4,71.2]],
+    ['room-3-cover-decon',3,'roomThree',[0,.66,3],[6,4,2.6],[0,2.2,7]],
+    ['room-3-cover-freezer',3,'roomThree',[0,.66,3],[-6,3,3.3],[-10,1.9,9]],
+    ['room-3-cover-pressure',3,'roomThree',[0,.66,3],[14,3.3,8.2],[9,2.1,13.5]],
+    ['room-3-cover-analysis',3,'roomThree',[0,.66,3],[-7.9,3.2,14.4],[-13,1.7,20]],
+    ['room-3-cover-drawers',3,'roomThree',[0,.66,3],[9,3.2,19],[5,2.1,25]],
+    ['room-3-cover-centrifuge',3,'roomThree',[0,.66,3],[11,3,24],[15,1.9,30.4]],
+    ['room-3-cover-server',3,'roomThree',[0,.66,3],[-2,3.5,30.3],[-7,2.2,37]],
+    ['room-3-cover-hatch',3,'roomThree',[0,.66,3],[15,3,37],[10,1.7,43]],
+    ['room-3-entry-reverse',3,'roomThree',[0,.66,3],[.5,2,4],[0,2,-4],'open-doors'],
+    ['room-3-vent-reverse',3,'roomThree',[8,19.46,1],[8,19.8,3],[8,19.8,-5]],
+    ['room-3-exit-reverse',3,'roomThree',[0,.66,72],[.5,2,75],[0,3,64],'open-doors'],
+    ['room-3-first-biofilm',3,'roomThree',[0,.66,3],[3,23,10],[1,22,18],'released'],
+    ['room-3-central-biofilm',3,'roomThree',[0,.66,3],[-6,25,30],[-13,24,35.5],'released'],
+    ['room-3-final-biofilm',3,'roomThree',[0,.66,3],[8,29,45],[3,25.7,51],'released'],
+    ['room-3-first-metal-landing',3,'roomThree',[0,.66,3],[1,26,22],[1,23.95,18.7],'released'],
+    ['room-3-final-metal-landing',3,'roomThree',[0,.66,3],[3,27.5,56],[3,25.75,51.7],'released'],
+    ['room-3-support-close',3,'roomThree',[0,.66,3],[-2,27.7,20],[-8,29.8,24]],
     ['room-4-board',4,'roomFour',[0,.66,4],[0,4,2],[0,4,13]],
     ['room-4-reverse',4,'roomFour',[0,.66,9],[4,4,12],[0,5,-2]],
     ['room-4-mid-descent',4,'roomFour',[0,.66,9],[0,3,8],[4.8,5,12],'lift-mid'],

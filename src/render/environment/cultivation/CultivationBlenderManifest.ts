@@ -968,55 +968,400 @@ export const CULTIVATION_BLENDER_ASSETS:readonly CultivationBlenderAsset[]=[
       "cultivation-room-3-exit-connector-side--3.2",
       "cultivation-room-3-exit-connector-side-3.2",
       "cultivation-room-3-exit-connector-ceiling",
-      "cultivation-service-bay-trims"
+      "cultivation-service-bay-trims",
+      "cultivation-room-3-bob-entry",
+      "cultivation-room-3-bob-launch-island",
+      "cultivation-room-3-bob-cross-beam",
+      "cultivation-room-3-bob-first-wall-exit",
+      "cultivation-room-3-bob-offset-island",
+      "cultivation-room-3-bob-west-runup",
+      "cultivation-room-3-bob-west-wall-exit",
+      "cultivation-room-3-bob-west-return-island",
+      "cultivation-room-3-bob-cross-room-a",
+      "cultivation-room-3-bob-cross-room-b",
+      "cultivation-room-3-bob-final-wall-exit",
+      "cultivation-room-3-bob-last-island",
+      "cultivation-room-3-bob-drop-launch",
+      "cultivation-room-3-cover-sticky-transfer",
+      "cultivation-room-3-second-cover-sticky-transfer",
+      "cultivation-room-3-roof-drone-1-acid-soluble-support-cable",
+      "cultivation-room-3-roof-drone-2-acid-soluble-support-cable",
+      "cultivation-room-3-roof-drone-3-acid-soluble-support-cable",
+      "cultivation-room-3-entry-sticky-transfer-ceiling-mount",
+      "cultivation-room-3-central-sticky-transfer-ceiling-mount",
+      "cultivation-room-3-cover-sticky-transfer-ceiling-mount",
+      "cultivation-room-3-second-cover-sticky-transfer-ceiling-mount",
+      "cultivation-neutral-ceiling-strips",
+      "cultivation-room-3-high-sticky-transfer-ceiling-mount",
+      "cultivation-room-3-entry-sticky-transfer-laser-guide--1",
+      "cultivation-room-3-entry-sticky-transfer-laser-guide-1",
+      "cultivation-room-3-central-sticky-transfer-laser-guide--1",
+      "cultivation-room-3-central-sticky-transfer-laser-guide-1",
+      "cultivation-room-3-high-sticky-transfer-laser-guide--1",
+      "cultivation-room-3-high-sticky-transfer-laser-guide-1"
     ],
     "retirePrefixes": [
       "cultivation-room-3-broken-glass-",
       "cultivation-room-3-cultivation-"
     ],
-    "retireSubtrees": [],
+    "retireSubtrees": [
+      "cultivation-room-3-bob-entry",
+      "cultivation-room-3-bob-launch-island",
+      "cultivation-room-3-bob-cross-beam",
+      "cultivation-room-3-bob-first-wall-exit",
+      "cultivation-room-3-bob-offset-island",
+      "cultivation-room-3-bob-west-runup",
+      "cultivation-room-3-bob-west-wall-exit",
+      "cultivation-room-3-bob-west-return-island",
+      "cultivation-room-3-bob-cross-room-a",
+      "cultivation-room-3-bob-cross-room-b",
+      "cultivation-room-3-bob-final-wall-exit",
+      "cultivation-room-3-bob-last-island",
+      "cultivation-room-3-bob-drop-launch",
+      "cultivation-static-platform-art"
+    ],
     "batches": [
       {
-        "name": "C2_room-3_Batch_Architecture_Alloy",
-        "finish": "Alloy",
+        "name": "C2_room-3_Batch_Architecture_cover_0_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-3_Batch_Architecture_Alloy"
+        "geometry": "C2_room-3_Batch_Architecture_cover_0_HallAlloy"
       },
       {
-        "name": "C2_room-3_Batch_Architecture_Ceramic",
-        "finish": "Ceramic",
+        "name": "C2_room-3_Batch_Architecture_cover_0_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-3_Batch_Architecture_Ceramic"
+        "geometry": "C2_room-3_Batch_Architecture_cover_0_HallCeramic"
       },
       {
-        "name": "C2_room-3_Batch_Architecture_Cool",
-        "finish": "Cool",
+        "name": "C2_room-3_Batch_Architecture_cover_0_HallCool",
+        "finish": "HallCool",
         "target": "",
-        "geometry": "C2_room-3_Batch_Architecture_Cool"
+        "geometry": "C2_room-3_Batch_Architecture_cover_0_HallCool"
       },
       {
-        "name": "C2_room-3_Batch_Architecture_Graphite",
-        "finish": "Graphite",
+        "name": "C2_room-3_Batch_Architecture_cover_0_HallGraphite",
+        "finish": "HallGraphite",
         "target": "",
-        "geometry": "C2_room-3_Batch_Architecture_Graphite"
+        "geometry": "C2_room-3_Batch_Architecture_cover_0_HallGraphite"
       },
       {
-        "name": "C2_room-3_Batch_Architecture_Ink",
-        "finish": "Ink",
+        "name": "C2_room-3_Batch_Architecture_cover_0_HallInk",
+        "finish": "HallInk",
         "target": "",
-        "geometry": "C2_room-3_Batch_Architecture_Ink"
+        "geometry": "C2_room-3_Batch_Architecture_cover_0_HallInk"
       },
       {
-        "name": "C2_room-3_Batch_Architecture_Oxide",
-        "finish": "Oxide",
+        "name": "C2_room-3_Batch_Architecture_cover_1_HallAlloy",
+        "finish": "HallAlloy",
         "target": "",
-        "geometry": "C2_room-3_Batch_Architecture_Oxide"
+        "geometry": "C2_room-3_Batch_Architecture_cover_1_HallAlloy"
       },
       {
-        "name": "C2_room-3_Batch_Architecture_Resin",
-        "finish": "Resin",
+        "name": "C2_room-3_Batch_Architecture_cover_1_HallCeramic",
+        "finish": "HallCeramic",
         "target": "",
-        "geometry": "C2_room-3_Batch_Architecture_Resin"
+        "geometry": "C2_room-3_Batch_Architecture_cover_1_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_cover_1_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_cover_1_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_cover_1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_cover_1_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_0_Amber",
+        "finish": "Amber",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_0_Amber"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_0_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_0_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_0_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_0_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_0_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_0_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_0_HallPaint",
+        "finish": "HallPaint",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_0_HallPaint"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_1_Amber",
+        "finish": "Amber",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_1_Amber"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_1_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_1_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_1_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_1_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_1_HallPaint",
+        "finish": "HallPaint",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_1_HallPaint"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_2_Amber",
+        "finish": "Amber",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_2_Amber"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_2_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_2_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_2_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_2_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_2_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_2_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_deck_2_HallPaint",
+        "finish": "HallPaint",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_deck_2_HallPaint"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_HallInk",
+        "finish": "HallInk",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_HallInk"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallFoliage",
+        "finish": "HallFoliage",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallFoliage"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallLamp",
+        "finish": "HallLamp",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallLamp"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_0_HallLoam",
+        "finish": "HallLoam",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_0_HallLoam"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallFoliage",
+        "finish": "HallFoliage",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallFoliage"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallLamp",
+        "finish": "HallLamp",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallLamp"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_1_HallLoam",
+        "finish": "HallLoam",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_1_HallLoam"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallCool",
+        "finish": "HallCool",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallCool"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallLamp",
+        "finish": "HallLamp",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallLamp"
+      },
+      {
+        "name": "C2_room-3_Batch_Architecture_shell_2_HallResin",
+        "finish": "HallResin",
+        "target": "",
+        "geometry": "C2_room-3_Batch_Architecture_shell_2_HallResin"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-cover-sticky-transfer_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "cultivation-room-3-cover-sticky-transfer",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-cover-sticky-transfer_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-cover-sticky-transfer_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "cultivation-room-3-cover-sticky-transfer",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-cover-sticky-transfer_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-cover-sticky-transfer_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "cultivation-room-3-cover-sticky-transfer",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-cover-sticky-transfer_HallGraphite"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-acid-soluble-support-cable_Rust",
+        "finish": "Rust",
+        "target": "cultivation-room-3-roof-drone-1-acid-soluble-support-cable",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-acid-soluble-support-cable_Rust"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-cable_Rust",
+        "finish": "Rust",
+        "target": "cultivation-room-3-roof-drone-1-replacement-cable",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-cable_Rust"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-acid-soluble-support-cable_Rust",
+        "finish": "Rust",
+        "target": "cultivation-room-3-roof-drone-2-acid-soluble-support-cable",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-acid-soluble-support-cable_Rust"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-2-replacement-cable_Rust",
+        "finish": "Rust",
+        "target": "cultivation-room-3-roof-drone-2-replacement-cable",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-cable_Rust"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-acid-soluble-support-cable_Rust",
+        "finish": "Rust",
+        "target": "cultivation-room-3-roof-drone-3-acid-soluble-support-cable",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-acid-soluble-support-cable_Rust"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-roof-drone-3-replacement-cable_Rust",
+        "finish": "Rust",
+        "target": "cultivation-room-3-roof-drone-3-replacement-cable",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-roof-drone-1-replacement-cable_Rust"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-second-cover-sticky-transfer_HallAlloy",
+        "finish": "HallAlloy",
+        "target": "cultivation-room-3-second-cover-sticky-transfer",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-second-cover-sticky-transfer_HallAlloy"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-second-cover-sticky-transfer_HallCeramic",
+        "finish": "HallCeramic",
+        "target": "cultivation-room-3-second-cover-sticky-transfer",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-second-cover-sticky-transfer_HallCeramic"
+      },
+      {
+        "name": "C2_room-3_Batch_cultivation-room-3-second-cover-sticky-transfer_HallGraphite",
+        "finish": "HallGraphite",
+        "target": "cultivation-room-3-second-cover-sticky-transfer",
+        "geometry": "C2_room-3_Batch_cultivation-room-3-second-cover-sticky-transfer_HallGraphite"
       }
     ]
   },
