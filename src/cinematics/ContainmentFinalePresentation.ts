@@ -64,7 +64,8 @@ export class ContainmentFinalePresentation {
     movementIntentWorld: this.goopIntent, maximumLocomotionSpeedMetresPerSecond: 6, grounded: true };
 
   constructor(options: Options) {
-    this.visuals = new ContainmentFinaleVisuals([options.world.roomFive.art.root, ...options.world.roomFive.collisionMeshes]);
+    this.visuals = new ContainmentFinaleVisuals([options.world.roomFive.art.root, ...options.world.roomFive.collisionMeshes],
+      options.world.roomFive.art.shell.ready);
     this.options = options; this.actors.name = 'containment-finale-borrowed-actors';
     this.actors.visible = false; this.actors.add(this.bobPose, this.goopPose);
     this.visuals.root.add(this.setDressing.root);

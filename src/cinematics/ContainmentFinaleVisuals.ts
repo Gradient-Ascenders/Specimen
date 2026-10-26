@@ -56,10 +56,12 @@ export class ContainmentFinaleVisuals {
   private readonly impactU = new THREE.Vector3();
   private readonly impactV = new THREE.Vector3();
   private readonly impactTargets: readonly THREE.Object3D[];
+  private readonly authoredEscapeDuct: boolean;
   private disposed = false;
 
-  constructor(impactTargets: readonly THREE.Object3D[] = []) {
+  constructor(impactTargets: readonly THREE.Object3D[] = [], authoredEscapeDuct = false) {
     this.impactTargets=impactTargets;
+    this.authoredEscapeDuct=authoredEscapeDuct;
     this.root.name = 'containment-finale-pooled-visuals'; this.root.visible = false;
     this.annex.name = 'containment-finale-escape-annex'; this.root.add(this.annex);
   }
@@ -164,8 +166,15 @@ export class ContainmentFinaleVisuals {
     add([9,74.65,88.55],[3,.2,5.7],0x34484e);
     add([9,78.65,88.55],[3,.2,5.7],0x213238);
     add([9,76.65,85.6],[3.4,4.2,.2],0x030809);
-    // RoomFiveArt owns the narrow neck (125.5..128). The straight duct starts
-    // at its real back edge and ends at an open drop, not another large room.
+    const installShell=()=>{
+      const material=new THREE.MeshBasicMaterial({color:0xffffff});this.ownedMaterials.push(material);
+      const shell=this.instance(this.box,material,parts.length);shell.name='finale-escape-annex-shell';
+      parts.forEach((part,i)=>{this.place(shell,i,part.at,part.size);shell.setColorAt(i,new THREE.Color(part.color));});
+      this.annex.add(shell);
+    };
+    // The complete authored Escape assembly owns the vent, fittings and shaft.
+    // This cinematic retains only the distant Room 4 entrance continuation.
+    if(this.authoredEscapeDuct){installShell();return;}
     add([-1.45,y-.1,135],[.3,.2,14],0x43545a);
     add([1.45,y-.1,135],[.3,.2,14],0x43545a);
     add([0,y-.1,132.6],[2.6,.2,9.2],0x526369);
@@ -177,21 +186,18 @@ export class ContainmentFinaleVisuals {
     add([0,76.75,128.06],[1.8,.7,.12],0x25383f);
     for(let z=129;z<142;z+=2){
       for(const x of [-1.57,1.57])add([x,75.9,z],[.08,2.28,.08],0x152a31);
-      add([0,77,z],[3.14,.08,.08],0x152a31);
-      if(z<137)add([0,74.77,z],[3.1,.015,.035],0x293b41);
+      // Both returns stop at the legs' inner faces; crossing their end caps
+      // submits duplicate faces inside this same instance batch.
+      add([0,77,z],[3.06,.08,.08],0x152a31);
+      if(z<137)add([0,74.77,z],[3.06,.015,.035],0x293b41);
       for(const x of [-1.585,1.585])add([x,75.9,z+.55],[.025,.22,.65],0x263b43);
     }
-    // Butt-jointed shaft walls finish below the floor top. Neither their top
-    // faces nor the four rim corners overlap a coplanar neighbour.
     for(const x of [-1.39,1.39])add([x,71.295,138.5],[.18,6.5,2.6],0x172a31);
     for(const z of [137.11,139.89])add([0,71.295,z],[2.96,6.5,.18],0x172a31);
     add([0,67.9,138.5],[2.96,.2,2.96],0x020609);
     for(const x of [-1.39,1.39])add([x,y+.035,138.5],[.18,.07,2.6],0x71898d);
     for(const z of [137.11,139.89])add([0,y+.035,z],[2.96,.07,.18],0x71898d);
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff }); this.ownedMaterials.push(material);
-    const shell = this.instance(this.box, material, parts.length); shell.name = 'finale-escape-annex-shell';
-    parts.forEach((part, i) => { this.place(shell, i, part.at, part.size); shell.setColorAt(i, new THREE.Color(part.color)); });
-    this.annex.add(shell);
+    installShell();
     const trimMaterial = new THREE.MeshBasicMaterial({ color: 0x8fd8c2 }); this.ownedMaterials.push(trimMaterial);
     const trim = this.instance(this.box, trimMaterial, 16);
     let index = 0;

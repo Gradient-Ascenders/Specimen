@@ -3,7 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {ContainmentArtMaterials} from './ContainmentArtResources.ts';
 import type {AuthoredLaserEmitter,LaserHazardPresentation} from '../../hazards/LaserHazardPresentation.ts';
 
-const PARTS=['Architecture','Cell','Front','Rear','Left','Right','CarriageOne','CarriageTwo','Locks','Status','ButtonCap'] as const;
+const PARTS=['Architecture','Escape','Cell','Front','Rear','Left','Right','CarriageOne','CarriageTwo','Locks','Status','ButtonCap'] as const;
 export const ROOM_FIVE_SHELL_URL=new URL('../../../../assets/environments/containment-room-five/room-five-atrium.glb',import.meta.url).href;
 export type RoomFiveShellLoader=(signal:AbortSignal)=>Promise<THREE.Group>;
 
@@ -32,6 +32,7 @@ export class RoomFiveShell{
   private source:THREE.Group|undefined;
   private wear:THREE.MeshStandardMaterial|undefined;
   private status:THREE.MeshBasicMaterial|undefined;
+  private ventLight:THREE.MeshBasicMaterial|undefined;
   private locks:THREE.Object3D|undefined;
   private detachEmitter:(()=>void)|undefined;
   private release=0;
@@ -67,6 +68,9 @@ export class RoomFiveShell{
               this.wear.vertexColors=true;this.wear.roughness=.87;this.wear.metalness=.12;
             }
             material=this.wear;
+          }else if(finish==='VentLight'){
+            this.ventLight??=new THREE.MeshBasicMaterial({color:0x8fd8c2});
+            material=this.ventLight;
           }else if(finish==='Status'){
             if(!this.status){this.status=(borrowFinish('Light') as THREE.MeshBasicMaterial).clone();this.status.name='room-5-release-status';}
             material=this.status;
@@ -74,7 +78,7 @@ export class RoomFiveShell{
           mapped.set(object,material);
           for(const material of Array.isArray(object.material)?object.material:[object.material])old.add(material);
         });
-      }catch(error){disposeGeometry(source,true);this.wear?.dispose();this.status?.dispose();this.wear=undefined;this.status=undefined;throw error;}
+      }catch(error){disposeGeometry(source,true);this.wear?.dispose();this.status?.dispose();this.ventLight?.dispose();this.wear=undefined;this.status=undefined;this.ventLight=undefined;throw error;}
       for(const [object,material] of mapped){
         object.material=material;object.castShadow=object.name.startsWith('R5_Batch_Carriage');
         object.receiveShadow=material instanceof THREE.MeshStandardMaterial&&!material.transparent;
@@ -83,7 +87,7 @@ export class RoomFiveShell{
       }
       for(const material of old)material.dispose();
       this.source=source;
-      for(const part of ['Architecture','Cell','Locks','Status'])this.root.add(source.getObjectByName(`R5_${part}`)!);
+      for(const part of ['Architecture','Escape','Cell','Locks','Status'])this.root.add(source.getObjectByName(`R5_${part}`)!);
       for(const [name,parent] of Object.entries(this.panels))parent.add(source.getObjectByName(`R5_${name[0].toUpperCase()+name.slice(1)}`)!);
       this.carriages[0].add(source.getObjectByName('R5_CarriageOne')!);
       this.carriages[1].add(source.getObjectByName('R5_CarriageTwo')!);
@@ -119,7 +123,7 @@ export class RoomFiveShell{
     const geometries=new Set(this.renderMeshes.map(mesh=>mesh.geometry));
     for(const geometry of geometries)geometry.dispose();
     for(const root of this.roots){root.removeFromParent();root.clear();}
-    this.source?.clear();this.source=undefined;this.wear?.dispose();this.status?.dispose();
+    this.source?.clear();this.source=undefined;this.wear?.dispose();this.status?.dispose();this.ventLight?.dispose();
   }
 }
 function disposeGeometry(root:THREE.Object3D,materials:boolean):void{

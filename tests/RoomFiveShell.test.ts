@@ -14,6 +14,7 @@ import {loadRoomFourShellFixture} from './helpers/RoomFourShellAsset.ts';
 import {loadRoomFiveShellFixture} from './helpers/RoomFiveShellAsset.ts';
 import {loadOpeningLaboratoryFixture} from './helpers/OpeningLaboratoryAsset.ts';
 import type {KinematicBody} from '../src/physics/KinematicBody.ts';
+import {ContainmentFinalePresentation} from '../src/cinematics/ContainmentFinalePresentation.ts';
 
 async function prepare(level:ContainmentLevelScene){
   await level.teaching.roomOneArt.shell.prepare(loadRoomOneShellFixture);
@@ -37,12 +38,12 @@ test('the authored atrium preserves collision, lasers, platform routes, thruster
     const after:THREE.Light[]=[];level.root.traverse(o=>{if(o instanceof THREE.Light)after.push(o);});
     assert.deepEqual(after,lights);assert.equal(level.platformBoosters.platformCount,boosterCount);
     assert.equal(room.goopWoodenDoor.geometry,wood);
-    assert.equal(room.art.shell.diagnostics.textureCount,0);assert.equal(room.art.shell.diagnostics.meshes,44);
+    assert.equal(room.art.shell.diagnostics.textureCount,0);assert.equal(room.art.shell.diagnostics.meshes,50);
     assert.ok(room.art.shell.diagnostics.triangles<40_000);assert.equal(room.art.shell.diagnostics.lasersAttached,true);
     const file=await readFile(new URL('../assets/environments/containment-room-five/room-five-atrium.glb',import.meta.url));
     const json=JSON.parse(file.subarray(20,20+file.readUInt32LE(12)).toString());
     for(const key of ['images','textures','animations','cameras'])assert.equal(json[key],undefined);
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,137);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,143);
     for(const name of ['R5_Batch_Cell_Security','R5_Batch_Front_Security']){
       const marking=room.root.getObjectByName(name) as THREE.Mesh;
       assert.equal(marking.material,room.art.security.signs.material,'Reuse the original security atlas and its material owner.');
@@ -97,6 +98,55 @@ test('the complete atrium has no overlapping opaque surfaces through platform tr
         `Opaque overlap at travel ${time}s / hatch ${open} / ${tolerance}m.`);
     }
   }finally{level.dispose();}
+});
+
+test('the escape cinematic shares the authored vent shell and seals the open shaft without duplicate surfaces',async()=>{
+  const level=new ContainmentLevelScene(()=>{});
+  let film:ContainmentFinalePresentation|undefined;
+  try{
+    await prepare(level);
+    const collision=JSON.stringify(captureContainmentCollisionFingerprint(level.collisionMeshes));
+    const lights:THREE.Light[]=[];level.root.traverse(o=>{if(o instanceof THREE.Light)lights.push(o);});
+    film=new ContainmentFinalePresentation({scene:new THREE.Scene(),world:level,camera:new THREE.PerspectiveCamera(),
+      overlay:{} as never,cue:()=>{},openDoor:()=>{}});
+    for(const job of film.preparationJobs())await job.run();
+    level.roomFive.root.visible=true;film.visuals.root.visible=true;
+    const roots=[level.roomFive.root,film.visuals.annex];
+    assert.ok(level.roomFive.root.getObjectByName('R5_Escape'),'Use the complete authored Escape assembly.');
+    assert.ok(new THREE.Box3().setFromObject(film.visuals.annex).max.z<124,'Retire all cinematic vent dressing when the authored model is ready.');
+    const bounds=new THREE.Box3(new THREE.Vector3(-1.81,67.8,125.3),new THREE.Vector3(1.81,77.21,142.3));
+    const triangles=roots.flatMap(root=>collectOpaqueTriangles(root)).filter(t=>bounds.intersectsBox(new THREE.Box3().setFromPoints(t.points)));
+    const rendered=[...new Set(triangles.map(t=>t.mesh))];
+    for(const tolerance of [.002,.01]){
+      let conflicts=0;findOpaqueSurfaceOverlaps(triangles,tolerance,()=>conflicts++);
+      assert.equal(conflicts,0,'No duplicate shell, rib corners or floor-strip surfaces in the assembled cinematic.');
+    }
+    const origin=new THREE.Vector3(0,75.5,130.1);
+    for(const [direction,axis,position] of [
+      [[1,0,0],'x',1.6],[[-1,0,0],'x',-1.6],[[0,1,0],'y',77.05],[[0,-1,0],'y',74.75],
+    ] as const){
+      const hits=new THREE.Raycaster(origin,new THREE.Vector3(...direction),0,3).intersectObjects(rendered,false);
+      assert.ok(hits.length>0);
+      assert.equal(hits.filter(hit=>Math.abs(hit.distance-hits[0].distance)<.002).length,1,
+        'One nearest surface; the formed panels have physically separated solid backing.');
+      assert.ok(Math.abs(hits[0].point[axis]-position)<1e-5);
+    }
+    for(const z of [125.31,126.4,127.69,127.85,127.99,128.01,129.99,130,130.01,137.19,139.81,141.99]){
+      for(const direction of [[-1,0,0],[1,0,0],[0,1,0]] as const){
+        const hits=new THREE.Raycaster(new THREE.Vector3(0,75.5,z),new THREE.Vector3(...direction),0,3).intersectObjects(rendered,false);
+        assert.ok(hits.length>0,'Seal the entrance transition, panel joints and ceiling returns.');
+      }
+    }
+    for(const height of [68.001,72,74.54,74.7,74.749,74.751])for(const side of [-1,1]){
+      const hits=new THREE.Raycaster(new THREE.Vector3(0,height,138.5),new THREE.Vector3(side,0,0),0,2).intersectObjects(rendered,false);
+      assert.ok(hits.length>0,'Shaft returns meet the authored floor and lower base without a gap.');
+    }
+    const drop=new THREE.Raycaster(new THREE.Vector3(0,75,138.5),new THREE.Vector3(0,-1,0),0,10).intersectObjects(rendered,false);
+    assert.ok(drop.length>0&&drop[0].point.y<=68.01,'Keep the original drop opening clear.');
+    assert.ok(JSON.stringify(captureContainmentCollisionFingerprint(level.collisionMeshes))===collision,'Protected collision data stay unchanged.');
+    const after:THREE.Light[]=[];level.root.traverse(o=>{if(o instanceof THREE.Light)after.push(o);});
+    assert.ok(after.length===lights.length&&after.every((light,i)=>light===lights[i]),'The same lighting owners remain installed.');
+  }finally{film?.dispose();level.dispose();}
 });
 
 test('landings and the cell roof retain their walking height while platform art and thrusters interpolate together',async()=>{

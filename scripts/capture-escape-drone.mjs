@@ -37,13 +37,29 @@ try{
  await page.evaluate(()=>{const r=globalThis.__escapeDroneRuntime;r.renderLayer.setAnimationLoop(null);r.stop();});
  console.log('Running-game Containment finale prepared');
  const results=[];
- for(const [name,time,inspection] of [['reveal',17],['hardware',17,'front'],['rear',17,'rear'],
-  ['platform',35],['mounted',50],['acid-hit',59],['wreck',63],['reinforcements',69],['pursuit',76]]){
+ const views=process.env.ESCAPE_CAPTURE_VENT_ONLY==='1'?
+  [['vent-entry',73.5],['vent-reverse',76],['vent-run',77.4],['vent-first-dive',78.5],['vent-second-dive',79.6],
+   ['vent-shaft',81.5],['vent-entry-low',76,'vent-entry-low'],['vent-grazing',77.4,'vent-grazing']]:
+  [['reveal',17],['hardware',17,'front'],['rear',17,'rear'],['platform',35],['mounted',50],
+   ['acid-hit',59],['wreck',63],['reinforcements',69],['pursuit',76]];
+ for(const [name,time,inspection] of views){
   const result=await page.evaluate(async({time,inspection})=>{
    const r=globalThis.__escapeDroneRuntime,world=r.resources.testScene,layer=r.renderLayer;
    const seconds=time;
+   if(seconds>=world.roomFive.endingSeconds){
+    world.roomFive.updateEnding(seconds-world.roomFive.endingSeconds);world.lighting.update(0);
+   }
+   if(seconds>=73){
+    const cover=r.resources.dissolveSystem.getTargetForMesh(world.roomFive.goopWoodenDoor);
+    cover?.advance(cover.dissolveDurationSeconds);
+   }
    r.finale.render(seconds);
-   if(inspection){
+   if(inspection?.startsWith('vent-')){
+    const c=layer.cameraRig.camera;
+    if(inspection==='vent-entry-low'){c.position.set(.7,75.0,126.4);c.lookAt(0,75.2,130.5);}
+    else{c.position.set(1.43,76.1,140.5);c.lookAt(1.58,76.1,128.4);}
+    c.fov=62;c.updateProjectionMatrix();c.updateMatrixWorld(true);
+   }else if(inspection){
     const p=r.finale.visuals.drones[0].root.position,c=layer.cameraRig.camera;
     c.position.copy(p).add({x:inspection==='front'?-1.6:2,y:1.2,z:inspection==='front'?-3.4:3.2});
     c.lookAt(p);c.fov=48;c.updateProjectionMatrix();c.updateMatrixWorld(true);
